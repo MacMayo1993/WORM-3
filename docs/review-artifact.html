@@ -1,0 +1,1097 @@
+<title>Antipodal Seams</title>
+<style>
+  /* ── Tokens: light is the base palette ─────────────────────────────── */
+  :root {
+    --ground:      #FBFAFC;
+    --surface:     #FFFFFF;
+    --sunk:        #F3F1F6;
+    --border:      #E4E0EA;
+    --border-firm: #CFC8D8;
+    --text:        #17141C;
+    --text-mid:    #453E52;
+    --text-mute:   #6B6379;
+    --accent:      #C2158A;
+    --accent-ink:  #8E0F65;
+    --accent-tint: #FBEAF5;
+    --sev-high:    #B31229;
+    --sev-high-bg: #FCEAEC;
+    --sev-med:     #8A6009;
+    --sev-med-bg:  #FBF2DF;
+    --sev-low:     #4F5769;
+    --sev-low-bg:  #EEF0F4;
+    --good:        #1F6B47;
+    --good-bg:     #E7F3EC;
+
+    --mono: 'SF Mono', ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+
+    --measure: 68ch;
+    --rail: 5.5rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #100D16;
+      --surface:     #191420;
+      --sunk:        #221B2B;
+      --border:      #302739;
+      --border-firm: #453A50;
+      --text:        #EDE8F2;
+      --text-mid:    #C3BACE;
+      --text-mute:   #9C92AA;
+      --accent:      #FF6FC4;
+      --accent-ink:  #FFA3D8;
+      --accent-tint: #2B1024;
+      --sev-high:    #FF8494;
+      --sev-high-bg: #2E141A;
+      --sev-med:     #E8B863;
+      --sev-med-bg:  #2A2113;
+      --sev-low:     #A3AEC4;
+      --sev-low-bg:  #1E222B;
+      --good:        #6FCf9C;
+      --good-bg:     #12251B;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #100D16;
+    --surface:     #191420;
+    --sunk:        #221B2B;
+    --border:      #302739;
+    --border-firm: #453A50;
+    --text:        #EDE8F2;
+    --text-mid:    #C3BACE;
+    --text-mute:   #9C92AA;
+    --accent:      #FF6FC4;
+    --accent-ink:  #FFA3D8;
+    --accent-tint: #2B1024;
+    --sev-high:    #FF8494;
+    --sev-high-bg: #2E141A;
+    --sev-med:     #E8B863;
+    --sev-med-bg:  #2A2113;
+    --sev-low:     #A3AEC4;
+    --sev-low-bg:  #1E222B;
+    --good:        #6FCf9C;
+    --good-bg:     #12251B;
+  }
+
+  /* ── Base ───────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 1.5rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: calc(var(--measure) + var(--rail)); margin: 0 auto; }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* ── Masthead ───────────────────────────────────────────────────────── */
+  .mast { padding: 4.5rem 0 0; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 1.4rem;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(2rem, 6vw, 3.15rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0 0 1.1rem;
+  }
+
+  .standfirst {
+    font-size: 1.09rem;
+    line-height: 1.6;
+    color: var(--text-mid);
+    max-width: 60ch;
+    margin: 0 0 2.5rem;
+  }
+
+  /* The seam: an offset double rule — two halves that don't quite meet. */
+  .seam { display: block; height: 5px; margin: 3.5rem 0; position: relative; border: 0; }
+  .seam::before, .seam::after {
+    content: ''; position: absolute; height: 1px;
+  }
+  .seam::before { left: 0; right: 28%; top: 0; background: var(--border-firm); }
+  .seam::after  { left: 34%; right: 0; top: 4px; background: var(--accent); opacity: 0.55; }
+
+  /* ── Baseline metric strip ──────────────────────────────────────────── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .metric { background: var(--surface); padding: 0.95rem 1.1rem; }
+  .metric dt {
+    font-family: var(--mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin: 0 0 0.35rem;
+  }
+  .metric dd {
+    font-family: var(--mono);
+    font-size: 1.15rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--text);
+  }
+  .metric dd.ok { color: var(--good); }
+
+  /* ── Sections ───────────────────────────────────────────────────────── */
+  h2 {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--text-mute);
+    margin: 0 0 1.6rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  p { margin: 0 0 1.1rem; max-width: var(--measure); }
+  .lede { font-size: 1.03rem; color: var(--text-mid); }
+
+  strong { font-weight: 650; color: var(--text); }
+  em { font-style: italic; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.855em;
+    background: var(--sunk);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    word-break: break-word;
+  }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  /* ── Register table ─────────────────────────────────────────────────── */
+  .scroll { overflow-x: auto; margin: 0 0 1.5rem; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 34rem; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    text-align: left;
+    font-weight: 600;
+    padding: 0 0.8rem 0.6rem;
+    border-bottom: 1px solid var(--border-firm);
+  }
+  tbody td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text-mid);
+  }
+  tbody tr:hover td { background: var(--sunk); }
+  td.num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-mute);
+    width: 2.5rem;
+  }
+  td.what { color: var(--text); }
+
+  /* ── Severity chips ─────────────────────────────────────────────────── */
+  .sev {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 0.2em 0.5em;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .sev-high { color: var(--sev-high); background: var(--sev-high-bg); }
+  .sev-med  { color: var(--sev-med);  background: var(--sev-med-bg); }
+  .sev-low  { color: var(--sev-low);  background: var(--sev-low-bg); }
+
+  /* ── Findings ───────────────────────────────────────────────────────── */
+  .finding {
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    gap: 0 1.5rem;
+    padding: 2.2rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .finding:first-of-type { border-top: 0; }
+
+  .rail { display: flex; flex-direction: column; gap: 0.55rem; align-items: flex-start; }
+  .fnum {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  h3 {
+    font-size: 1.22rem;
+    line-height: 1.28;
+    letter-spacing: -0.015em;
+    font-weight: 640;
+    text-wrap: balance;
+    margin: -0.2rem 0 0.9rem;
+  }
+
+  .where {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-mute);
+    margin: 0 0 1rem;
+    word-break: break-word;
+  }
+
+  /* ── Code blocks ────────────────────────────────────────────────────── */
+  pre {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.65;
+    background: var(--sunk);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--accent);
+    border-radius: 3px;
+    padding: 0.9rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  pre .cm { color: var(--text-mute); }
+  pre .hl { color: var(--sev-high); font-weight: 600; }
+
+  /* ── Evidence block ─────────────────────────────────────────────────── */
+  .evidence {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1.1rem 1.2rem;
+    margin: 0 0 1.2rem;
+  }
+  .evidence-label {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin: 0 0 0.85rem;
+  }
+
+  /* ── Flip-cap track diagram ─────────────────────────────────────────── */
+  .track { margin: 0 0 1.1rem; }
+  .track:last-child { margin-bottom: 0; }
+  .track-head {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-mid);
+    margin: 0 0 0.45rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .track-head b { color: var(--text); font-weight: 600; }
+  .cells { display: flex; gap: 3px; }
+  .cell {
+    flex: 1 1 0;
+    height: 26px;
+    border-radius: 2px;
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .cell.live { background: var(--sunk); border: 1px solid var(--border-firm); color: var(--text-mute); }
+  .cell.bad  { background: var(--sev-high-bg); border: 1px solid var(--sev-high); color: var(--sev-high); font-weight: 600; }
+  .track-note {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    color: var(--sev-high);
+    margin: 0.4rem 0 0;
+  }
+
+  /* ── State trace ────────────────────────────────────────────────────── */
+  .trace { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: stretch; }
+  .state {
+    flex: 1 1 7rem;
+    background: var(--sunk);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.65rem 0.75rem;
+  }
+  .state.flag { border-color: var(--sev-high); background: var(--sev-high-bg); }
+  .state-k {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin: 0 0 0.4rem;
+  }
+  .state-v {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    margin: 0;
+  }
+  .state.flag .state-v { color: var(--sev-high); font-weight: 600; }
+
+  /* ── Fix callout ────────────────────────────────────────────────────── */
+  .fix {
+    border-left: 2px solid var(--accent);
+    padding: 0.1rem 0 0.1rem 1rem;
+    margin: 1.2rem 0 0;
+  }
+  .fix p { margin: 0; color: var(--text-mid); font-size: 0.95rem; }
+  .fix-label {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+
+  /* ── Lists ──────────────────────────────────────────────────────────── */
+  ul, ol { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.5rem; color: var(--text-mid); }
+  li::marker { color: var(--text-mute); }
+  ol.order { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.order li {
+    display: grid;
+    grid-template-columns: 2.1rem 1fr;
+    gap: 0.9rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+    margin: 0;
+  }
+  ol.order li::before {
+    counter-increment: step;
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    padding-top: 0.12em;
+  }
+
+  /* ── Working-well block ─────────────────────────────────────────────── */
+  .well {
+    background: var(--good-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1.5rem 1.6rem;
+  }
+  .well h2 { color: var(--good); border-bottom-color: var(--border); }
+  .well li { color: var(--text-mid); }
+  .well li strong { color: var(--text); }
+
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-mute);
+  }
+
+  @media (max-width: 640px) {
+    :root { --rail: 3.1rem; }
+    .finding { gap: 0 1rem; }
+    .fnum { font-size: 1.15rem; }
+    .rail { flex-direction: column; }
+    .sev { font-size: 0.55rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="eyebrow">Code review · 2026-08-12</p>
+    <h1>Antipodal Seams</h1>
+    <p class="standfirst">
+      A full pass over WORM-3 — game mechanics, UI/UX, and architecture health — across 393 source
+      files and roughly 90,800 lines. Every finding below is present in a completely green build.
+    </p>
+
+    <dl class="metrics">
+      <div class="metric"><dt>Lint</dt><dd class="ok">clean</dd></div>
+      <div class="metric"><dt>Tests</dt><dd class="ok">1002/1002</dd></div>
+      <div class="metric"><dt>Test files</dt><dd>64</dd></div>
+      <div class="metric"><dt>Build</dt><dd class="ok">passing</dd></div>
+      <div class="metric"><dt>Bundle gate</dt><dd class="ok">passing</dd></div>
+      <div class="metric"><dt>Findings</dt><dd>14</dd></div>
+    </dl>
+  </header>
+
+  <hr class="seam">
+
+  <section>
+    <h2>The shape of it</h2>
+    <p class="lede">
+      The pure-logic core is genuinely excellent. <code>src/game/</code> is React-free and DOM-free —
+      verified, not assumed — densely documented with the <em>why</em> rather than the <em>what</em>,
+      and it carries the great majority of the 1002 tests.
+    </p>
+    <p>
+      The defects cluster almost perfectly in one layer. <code>src/hooks/</code> holds the orchestration
+      between that pure core and React, contains the 955-line store, is referenced by roughly two test
+      files, and sits outside the coverage report entirely. Every correctness bug below lives there, or
+      in the constant it reaches for.
+    </p>
+    <p>
+      Three of them are player-visible today at default settings. The seam runs exactly where nobody is
+      looking.
+    </p>
+  </section>
+
+  <hr class="seam">
+
+  <section>
+    <h2>Register</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Finding</th><th>Severity</th><th>Area</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">01</td><td class="what">Configurable Disparity flip cap is only half-wired</td><td><span class="sev sev-high">High</span></td><td>Mechanics</td></tr>
+          <tr><td class="num">02</td><td class="what">Undo of a flip consumes two flips of tile life</td><td><span class="sev sev-high">High</span></td><td>Mechanics</td></tr>
+          <tr><td class="num">03</td><td class="what">Tapping a dead tile costs a move and does nothing</td><td><span class="sev sev-high">High</span></td><td>Mechanics / UX</td></tr>
+          <tr><td class="num">04</td><td class="what">8 of 11 keyboard callbacks silently ignored</td><td><span class="sev sev-high">High</span></td><td>Input</td></tr>
+          <tr><td class="num">05</td><td class="what">Global keydown handler is live on every screen</td><td><span class="sev sev-med">Medium</span></td><td>UX</td></tr>
+          <tr><td class="num">06</td><td class="what">Escape closes 2 of ~10 dismissible surfaces</td><td><span class="sev sev-med">Medium</span></td><td>UX</td></tr>
+          <tr><td class="num">07</td><td class="what">Store monolith, no screen state machine</td><td><span class="sev sev-med">Medium</span></td><td>Architecture</td></tr>
+          <tr><td class="num">08</td><td class="what">resetGame drifted from makeDisparityRuntimeDefaults</td><td><span class="sev sev-med">Medium</span></td><td>Architecture</td></tr>
+          <tr><td class="num">09</td><td class="what">Wallet persistence duplicated across 6 call sites</td><td><span class="sev sev-low">Low</span></td><td>Architecture</td></tr>
+          <tr><td class="num">10</td><td class="what">Coverage blind spot over src/hooks/</td><td><span class="sev sev-med">Medium</span></td><td>Test health</td></tr>
+          <tr><td class="num">11</td><td class="what">Remaining monoliths</td><td><span class="sev sev-low">Low</span></td><td>Architecture</td></tr>
+          <tr><td class="num">12</td><td class="what">Focus styling effectively absent</td><td><span class="sev sev-med">Medium</span></td><td>Accessibility</td></tr>
+          <tr><td class="num">13</td><td class="what">995 inline style objects vs 4.6k lines of CSS</td><td><span class="sev sev-low">Low</span></td><td>UI</td></tr>
+          <tr><td class="num">14</td><td class="what">CLAUDE.md drift</td><td><span class="sev sev-low">Low</span></td><td>Docs</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="seam">
+
+  <section>
+    <h2>The three that reach the player</h2>
+
+    <!-- 01 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">01</div>
+        <span class="sev sev-high">High</span>
+      </div>
+      <div>
+        <h3>The configurable flip cap is only half-wired</h3>
+        <p class="where">src/game/manifoldLogic.js:206 · src/utils/constants.js:84 · src/hooks/useCubeState.js</p>
+
+        <p>
+          The Disparity wizard offers caps of <strong>3 / 8 / 13 / 20</strong>, and the store defaults to 8.
+          The chaos sim honours that value. So does the per-tile health bar. So does bet resolution.
+          The player's own flip path does not — it reaches for the module constant:
+        </p>
+
+        <pre><code><span class="cm">// src/game/manifoldLogic.js</span>
+const currentFlips = st.flips || 0;
+<span class="hl">if (currentFlips >= FLIP_CAP) return;</span>        <span class="cm">// module constant = 6, not the configured cap</span>
+stickers[loc.dirKey] = { ...st,
+  curr:  ANTIPODAL_COLOR[st.curr],
+  <span class="hl">flips: Math.min(FLIP_CAP, currentFlips + 1)</span> };</code></pre>
+
+        <div class="evidence">
+          <p class="evidence-label">Verified — 12 consecutive player flips land at flips = 6 regardless of cap</p>
+
+          <div class="track">
+            <p class="track-head"><span>Default tier — <b>Standard, cap 8</b></span><span>tile life</span></p>
+            <div class="cells">
+              <div class="cell live">1</div><div class="cell live">2</div><div class="cell live">3</div>
+              <div class="cell live">4</div><div class="cell live">5</div><div class="cell live">6</div>
+              <div class="cell bad">7</div><div class="cell bad">8</div>
+            </div>
+            <p class="track-note">Health bar reads 2 remaining, tile looks alive — the tap is refused.</p>
+          </div>
+
+          <div class="track">
+            <p class="track-head"><span>Fast tier — <b>Fragile, cap 3</b></span><span>tile life</span></p>
+            <div class="cells">
+              <div class="cell live">1</div><div class="cell live">2</div><div class="cell live">3</div>
+              <div class="cell bad">4</div><div class="cell bad">5</div><div class="cell bad">6</div>
+            </div>
+            <p class="track-note">The error inverts: players push tiles past the death threshold the tier exists for.</p>
+          </div>
+        </div>
+
+        <p>
+          The same constant leaks into presentation, so wormhole pairs sever at 6, the pair-death FX fires
+          at 6, the leaderboard marks tiles dead at 6, and the HUD tooltip prints the wrong number outright —
+          <code>tiles burned out at flip cap (${FLIP_CAP})</code> reports "(6)" during a cap-13 game.
+        </p>
+
+        <div class="fix">
+          <span class="fix-label">Fix</span>
+          <p>
+            Thread the effective cap as a parameter, exactly as <code>chaosSim</code> already does.
+            <code>StickerPlane.jsx:685</code> already computes the right expression — lift it to a
+            <code>selectEffectiveFlipCap</code> selector and have every consumer read that one thing.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 02 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">02</div>
+        <span class="sev sev-high">High</span>
+      </div>
+      <div>
+        <h3>Undo of a flip spends two flips of tile life</h3>
+        <p class="where">src/hooks/useUndo.js:62</p>
+
+        <pre><code><span class="cm">// Flip is its own inverse — just flip again.</span></code></pre>
+
+        <p>
+          The <em>colour</em> is its own inverse. The <strong>flip counter is not</strong> —
+          <code>flipStickerPair</code> increments <code>flips</code> on both members of the pair on every
+          call, the undo included.
+        </p>
+
+        <div class="evidence">
+          <p class="evidence-label">Verified — board looks restored, a third of the tile's life is gone</p>
+          <div class="trace">
+            <div class="state">
+              <p class="state-k">Start</p>
+              <p class="state-v">curr 1<br>flips 0</p>
+            </div>
+            <div class="state">
+              <p class="state-k">Flip</p>
+              <p class="state-v">curr 4<br>flips 1</p>
+            </div>
+            <div class="state flag">
+              <p class="state-k">Undo</p>
+              <p class="state-v">curr 1<br>flips 2</p>
+            </div>
+          </div>
+        </div>
+
+        <p>Two follow-on effects:</p>
+        <ul>
+          <li>
+            <strong>On a capped tile the undo is a total no-op</strong> — <code>flipStickerPair</code> returns
+            early — yet <code>useUndo</code> still pops history and decrements the move counter. The count
+            drifts below the true number of moves and the history entry is destroyed.
+          </li>
+          <li>
+            WORM³ victory counts stickers with <code>flips &gt; 0</code>, so a flip the player <em>took back</em>
+            still counts as travelled. The secret win can be part-satisfied by retracted moves.
+          </li>
+        </ul>
+
+        <div class="fix">
+          <span class="fix-label">Fix</span>
+          <p>
+            Undo needs a real inverse, not a repeat. Record <code>flipsBefore</code> for both pair members and
+            restore it, or add an <code>unflipStickerPair</code> that toggles colour while decrementing.
+            Bail out — leaving history and the counter intact — when the flip cannot be reversed.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 03 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">03</div>
+        <span class="sev sev-high">High</span>
+      </div>
+      <div>
+        <h3>Tapping a dead tile charges a move and changes nothing</h3>
+        <p class="where">src/hooks/useCubeState.js:157–193, :275–300</p>
+
+        <p>
+          <code>flipSticker</code> guards on three things — the first-flip timer, the refractory window, and
+          first-flip interception. There is <strong>no dead-tile guard</strong>. When
+          <code>flipStickerPair</code> refuses, the surrounding batch still runs in full:
+        </p>
+
+        <pre><code>cubies: flipStickerPair(...),        <span class="cm">// returns the board unchanged</span>
+<span class="hl">moves: state.moves + 1,</span>             <span class="cm">// still charged</span>
+moveHistory: [...state.moveHistory, { type: 'flip', ... }],
+flipWaveOrigins: origins,  blackHolePulse: ts,
+flipPulse: {...},  cubiePops: {...},</code></pre>
+
+        <p>
+          A tap on a burnt-out tile plays the sound, pops the cubie, rings the screen glow, charges a move,
+          and pushes an undo entry — while the board does not move. This is the worst failure mode for
+          feedback: <strong>the game says "that worked" when nothing happened.</strong> It also seeds
+          finding 02's counter drift, since the history now holds an un-undoable entry.
+        </p>
+
+        <div class="fix">
+          <span class="fix-label">Fix</span>
+          <p>
+            Return early when the tapped tile or its partner is at the effective cap, and give the refusal its
+            own feedback — a dull thud and a shake read as "this tile is gone", which is information the player
+            needs. The refractory guard is the model to follow.
+          </p>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <hr class="seam">
+
+  <section>
+    <h2>Input and navigation</h2>
+
+    <!-- 04 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">04</div>
+        <span class="sev sev-high">High</span>
+      </div>
+      <div>
+        <h3>Eight of eleven keyboard callbacks are silently ignored</h3>
+        <p class="where">src/App.jsx:1324–1336 · src/hooks/useKeyboardControls.js:18</p>
+
+        <p>App wires up eleven props. The hook destructures two:</p>
+
+        <pre><code><span class="cm">// App.jsx — passes 11</span>
+useKeyboardControls({
+  onMove, onFlip, onUndo, onReset, onShuffle, onSaveState,
+  onLoadState, onLevelJump, onExecuteHandsMove, onToggleHandsMode,
+  <span class="hl">disabled: coopMode,</span>
+});
+
+<span class="cm">// useKeyboardControls.js — accepts 2</span>
+export function useKeyboardControls({ onMove, onFlip }) {</code></pre>
+
+        <p>
+          Undo, reset, shuffle, save/load state, level jump and both hands-mode callbacks have no binding at
+          all. There is no <code>Ctrl+Z</code>, despite <code>useUndo</code> being fully implemented.
+        </p>
+        <p>
+          <strong><code>disabled: coopMode</code> is the live bug.</strong> Co-op crawler mode reads WASD and
+          arrows for movement. App tries to disable the cube handler for exactly that reason, and the flag is
+          dropped on the floor — hooks have already run by the time App early-returns into the crawler, so the
+          window listener is still attached. In co-op, <strong>WASD drives the crawler and rotates slices of
+          the cube underneath at the same time.</strong>
+        </p>
+
+        <div class="fix">
+          <span class="fix-label">Fix</span>
+          <p>
+            Honour <code>disabled</code> with an early return, then either implement the remaining shortcuts or
+            delete the dead props. Passed-but-ignored is the worst of the three states — the call site reads as
+            though the feature exists.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 05 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">05</div>
+        <span class="sev sev-med">Medium</span>
+      </div>
+      <div>
+        <h3>The global keydown handler is live on every screen</h3>
+        <p class="where">src/hooks/useKeyboardControls.js:180–222, :308</p>
+
+        <p>
+          The listener attaches once at App level with empty deps and guards only three cases: worm-paused, an
+          editable event target, and the level tutorial. Nothing checks the menu, welcome, settings, store, any
+          wizard, help, or victory. So while a full-screen modal owns the display:
+        </p>
+        <ul>
+          <li><code>W A S D Q E</code> rotate slices of the cube behind it</li>
+          <li><code>C</code> toggles chaos · <code>V</code> cycles visual mode · <code>X</code> explodes the cube · <code>T</code> toggles tunnels</li>
+          <li>arrow keys call <code>preventDefault()</code> unconditionally, <strong>blocking arrow-key scrolling inside the settings menu, the store, and the help panel</strong> — all scrollable surfaces</li>
+        </ul>
+        <p>A player navigating the menu is silently scrambling their next game.</p>
+
+        <div class="fix">
+          <span class="fix-label">Fix</span>
+          <p>
+            Derive one <code>inputTarget</code> from screen state (finding 07) and gate the whole handler on it,
+            rather than adding a guard per new screen.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 06 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">06</div>
+        <span class="sev sev-med">Medium</span>
+      </div>
+      <div>
+        <h3>Escape closes two of about ten dismissible surfaces</h3>
+        <p class="where">src/hooks/useKeyboardControls.js:303</p>
+
+        <pre><code>case 'escape':
+  setShowHelp(false); setShowSettings(false); setShowCursor(false);</code></pre>
+
+        <p>
+          The store, all four setup wizards, mode select, Coming Soon, the Möbius cubelet viewer, the
+          leaderboard and the net panel all ignore <code>Esc</code>. Escape-to-dismiss is a convention players
+          expect to hold everywhere once it works anywhere. It falls out of a screen state machine for free —
+          pop the top of the stack.
+        </p>
+      </div>
+    </article>
+  </section>
+
+  <hr class="seam">
+
+  <section>
+    <h2>Architecture health</h2>
+
+    <!-- 07 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">07</div>
+        <span class="sev sev-med">Medium</span>
+      </div>
+      <div>
+        <h3>A 955-line store, and no screen state machine</h3>
+        <p class="where">src/hooks/useGameStore.js · src/App.jsx:587–622</p>
+
+        <p>
+          The store spans roughly twenty domains — cube, session, undo, visual modes, flip FX, chaos, disparity,
+          economy, betting, worm, animation, cursor, UI, levels, hands, dev console, solve, teach, demo, merge,
+          hollow/mirror, face rotation, settings. Only worm is factored out. Zustand's slice pattern is already
+          in the file; it is applied once.
+        </p>
+        <p>
+          <strong>Screen state is ~24 independent booleans with no invariant</strong> — ten <code>useState</code>
+          flags in App plus fourteen more in the store. Nothing prevents two being true at once; correctness
+          rests on every handler remembering to clear its peers. That is the root cause of findings 05 and 06:
+          there is no single value to ask <em>what owns the screen right now?</em>
+        </p>
+        <p>
+          <strong>Game modes are non-exclusive booleans too</strong> — eleven of them, with
+          <code>getActiveMode</code> resolving conflicts by priority. That is a read-side paper-over, not an
+          invariant: two modes really can be on at once, and the selector just picks one while the other keeps
+          running its effects. The manual patch-ups are already visible — App force-closes Teach Mode when the
+          menu opens or the size leaves 3, because nothing else would.
+        </p>
+
+        <div class="fix">
+          <span class="fix-label">Fix — incremental, no big bang</span>
+          <p>
+            Split the store along the section banners already in the file; they are an accurate map, and
+            <code>createWormSlice</code> is the template. Introduce <code>activeScreen</code> as one enum plus a
+            modal stack, and migrate the booleans to derived selectors so call sites need not change at once.
+            Then collapse the mode booleans into a single <code>activeMode</code>, keeping
+            <code>getActiveMode</code> as a shim.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 08 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">08</div>
+        <span class="sev sev-med">Medium</span>
+      </div>
+      <div>
+        <h3>resetGame has drifted from makeDisparityRuntimeDefaults</h3>
+        <p class="where">src/hooks/useGameStore.js:137–150, :338–363</p>
+
+        <p>Two hand-maintained lists of the same concept, now unequal:</p>
+        <ul>
+          <li><code>resetGame</code> clears <code>tunnelDeaths</code>; the factory does not.</li>
+          <li>
+            The factory clears <code>disparityParityScore</code> and <code>holonomyMode</code>;
+            <code>resetGame</code> does not — so <strong>starting a fresh game carries the previous session's
+            un-cashed parity score forward</strong>, and can leave <code>holonomyMode</code> set.
+          </li>
+        </ul>
+        <p>
+          Smaller drift in the same file: a comment names <code>makeWormRuntimeDefaults</code>, which does not
+          exist; <code>clearDisparityGame</code> lives in the worm slice despite its name;
+          <code>visualMode</code>'s comment lists four modes while <code>cycleVisualMode</code> cycles nine; and
+          <code>victory</code>/<code>achievedWins</code> still carry <code>sudokube</code> and
+          <code>ultimate</code>, whose screens were removed.
+        </p>
+
+        <div class="fix">
+          <span class="fix-label">Fix</span>
+          <p>
+            <code>resetGame</code> should spread <code>makeDisparityRuntimeDefaults()</code> and add only
+            genuinely session-scoped fields, with <code>tunnelDeaths</code> moved into the factory beside the
+            other transient FX maps it already owns.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 09 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">09</div>
+        <span class="sev sev-low">Low</span>
+      </div>
+      <div>
+        <h3>Wallet persistence duplicated across six call sites</h3>
+        <p class="where">src/hooks/useGameStore.js:535, :586, :593, :609, :633, :644</p>
+        <p>
+          <code>localStorage.setItem(PARITY_POINTS_KEY, …)</code> wrapped in <code>try/catch {}</code> appears in
+          six places. Any future writer of <code>parityPoints</code> that forgets the line loses the player's
+          money on reload. Settings already demonstrate the right pattern in the same file — a
+          <code>subscribe</code> at the bottom. Apply it to <code>parityPoints</code>, <code>ownedItems</code>
+          and <code>betStreak</code>, and delete the six inline writes.
+        </p>
+      </div>
+    </article>
+
+    <!-- 10 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">10</div>
+        <span class="sev sev-med">Medium</span>
+      </div>
+      <div>
+        <h3>The coverage report cannot see where the bugs are</h3>
+        <p class="where">vitest.config.js</p>
+
+        <pre><code>include: ['src/game/**/*.js', 'src/utils/**/*.js', 'src/levels/**/*.js'],</code></pre>
+
+        <p>
+          <code>src/hooks/**</code> — 18 files including the 955-line store, <code>useCubeState</code>'s flip
+          path, <code>useUndo</code> and <code>useKeyboardControls</code> — is outside the report and touched by
+          roughly two test files. Findings 01 through 06 all live in that gap, and the suite is green with every
+          one of them present.
+        </p>
+        <p>
+          <strong>This is the single highest-leverage change in the review.</strong> The pure layer's test
+          discipline is excellent; extending it one layer outward is what turns the green build into a real
+          signal. Each bug above was reproducible in a handful of lines using only existing pure helpers, so the
+          tests are cheap to write.
+        </p>
+      </div>
+    </article>
+
+    <!-- 11 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">11</div>
+        <span class="sev sev-low">Low</span>
+      </div>
+      <div>
+        <h3>Remaining monoliths</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>File</th><th>Lines</th></tr></thead>
+            <tbody>
+              <tr><td><code>src/3d/StickerPlane.jsx</code></td><td class="num">2398</td></tr>
+              <tr><td><code>src/worm/healerWorm/wormSim.js</code></td><td class="num">1756</td></tr>
+              <tr><td><code>src/App.jsx</code></td><td class="num">1732</td></tr>
+              <tr><td><code>src/worm/WormCrawlerHUD.jsx</code></td><td class="num">1635</td></tr>
+              <tr><td><code>src/components/menus/MainMenu.jsx</code></td><td class="num">1493</td></tr>
+              <tr><td><code>src/3d/CubeAssembly.jsx</code></td><td class="num">1278</td></tr>
+              <tr><td><code>src/components/screens/DemoFlowController.jsx</code></td><td class="num">1207</td></tr>
+              <tr><td><code>src/teach/TeachMode.jsx</code></td><td class="num">1183</td></tr>
+              <tr><td><code>src/hooks/useDemoMode.js</code></td><td class="num">1102</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <code>StickerPlane.jsx</code> grew from 1382 to 2398 since the March review despite being on its split
+          list; <code>App.jsx</code> from 1148 to 1732, now holding 27 <code>useState</code> calls and 84 store
+          references. Not urgent beside 01–06 — but the store-slice work in finding 07 is the natural moment to
+          lift App's mode-launch wiring out.
+        </p>
+      </div>
+    </article>
+  </section>
+
+  <hr class="seam">
+
+  <section>
+    <h2>Interface and accessibility</h2>
+
+    <!-- 12 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">12</div>
+        <span class="sev sev-med">Medium</span>
+      </div>
+      <div>
+        <h3>Focus styling is effectively absent</h3>
+        <p>
+          220 <code>&lt;button&gt;</code> elements across the app; <strong>ten <code>:focus</code> /
+          <code>:focus-visible</code> rules in all CSS</strong>. Because styling is overwhelmingly inline,
+          buttons cannot express focus without JS state — so most simply do not. A keyboard or switch-control
+          player cannot see where they are.
+        </p>
+        <p>
+          Supporting counts: 67 <code>aria-label</code>s for 220 buttons, 5 uses of <code>tabIndex</code>, 20
+          <code>role=</code> attributes. Only 5 non-semantic <code>onClick</code> handlers on
+          <code>div</code>/<code>span</code>, which is good — the elements are right, the affordance is missing.
+        </p>
+
+        <div class="fix">
+          <span class="fix-label">Fix</span>
+          <p>
+            One global <code>:focus-visible</code> rule in <code>App.css</code> covering
+            <code>button, [role="button"], a, input, select</code> gets most of the way there in a few lines,
+            and inline styles will not override it since neither sets <code>outline</code>.
+          </p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 13 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">13</div>
+        <span class="sev sev-low">Low</span>
+      </div>
+      <div>
+        <h3>995 inline style objects against 4.6k lines of CSS</h3>
+        <p>
+          Concentrated in <code>TeachMode</code> (80), <code>ParityStoreScreen</code> (52),
+          <code>WormCrawlerHUD</code> (49), <code>DisparityBettingScreen</code> (43). Each is a fresh object per
+          render, defeating <code>React.memo</code> on any component receiving one as a prop, and none can
+          express <code>:hover</code>, <code>:focus</code>, <code>:active</code> or media queries.
+        </p>
+        <p>
+          The token layer itself is in good shape — <code>uiTheme.js</code> is well designed and imported by 61
+          files. The gap is the delivery mechanism, not the palette. Moving the repeated card, button and panel
+          shapes into CSS classes backed by custom properties would cut the inline count sharply and make
+          finding 12 a one-line fix.
+        </p>
+      </div>
+    </article>
+
+    <!-- 14 -->
+    <article class="finding">
+      <div class="rail">
+        <div class="fnum">14</div>
+        <span class="sev sev-low">Low</span>
+      </div>
+      <div>
+        <h3>CLAUDE.md has drifted from the tree it describes</h3>
+        <ul>
+          <li>
+            The UI-theme note documents <code>GLASS_*</code> as the "dark navy in-game overlay family". Those
+            tokens no longer exist — <code>uiTheme.js</code> explicitly records the glass family's removal in
+            favour of <code>NIGHT_*</code>. An agent following the doc today would import symbols that are gone.
+          </li>
+          <li>
+            The directory tree omits five real directories: <code>coming-soon/</code> (12 files),
+            <code>holonomy/</code> (5), <code>modes/</code> (5), <code>workers/</code> (1), <code>assets/</code>.
+          </li>
+          <li>
+            The <code>detectWinConditions</code> example is no longer the live win path —
+            <code>useGameSession</code> uses <code>checkRubiksWin</code>, deliberately and with a comment
+            explaining why.
+          </li>
+        </ul>
+      </div>
+    </article>
+  </section>
+
+  <hr class="seam">
+
+  <section class="well">
+    <h2>What is working well</h2>
+    <p>Worth stating plainly, because it is much of why this codebase is pleasant to review.</p>
+    <ul>
+      <li>
+        <strong>The purity of <code>src/game/</code> is real, not aspirational.</strong> Zero React imports,
+        zero DOM access — verified by grep. It is why every bug above was reproducible in a five-line test.
+      </li>
+      <li>
+        <strong>The comments explain the why.</strong> Why non-slice cubies keep their references (React.memo
+        and InstancedMesh colour-buffer corruption); why incremental map rebuilds are safe; why the live win
+        path skips <code>detectWinConditions</code>. This is unusually good.
+      </li>
+      <li>
+        <strong>The March review's recommendations were genuinely executed.</strong> Wizard duplication is gone
+        behind a shared <code>WizardChrome</code> and <code>wizardSteps/</code>; shaders are extracted;
+        <code>HealerWormMode</code> dropped from 2041 lines to 526.
+      </li>
+      <li>
+        <strong>Performance work is thoughtful and measured</strong> — worker-based chaos, incremental grid
+        maps, adaptive DPR with a separate Mega override, frameloop parking on tab hide, and a
+        <code>ClockContinuity</code> component to keep timelines unbroken across it.
+      </li>
+      <li>
+        <strong>Bundle discipline holds</strong> — vendor chunks separated, heavy modes lazy-loaded, and a
+        <code>bundle:check</code> gate wired into CI.
+      </li>
+    </ul>
+  </section>
+
+  <hr class="seam">
+
+  <section>
+    <h2>Suggested order of work</h2>
+    <ol class="order">
+      <li><span>Finding <strong>10</strong> — add <code>src/hooks/**</code> to coverage and test the flip, undo and keyboard paths. First, because it is what catches 01–04 and prevents their return.</span></li>
+      <li><span>Findings <strong>01, 02, 03</strong> — cap threading, a real undo inverse, and the dead-tile guard. All three sit in the same call path and are best fixed together.</span></li>
+      <li><span>Finding <strong>04</strong> — honour <code>disabled</code>, then implement or delete the seven dead callbacks.</span></li>
+      <li><span>Findings <strong>05, 06, 07</strong> — the screen state machine, which resolves the input-gating and Escape inconsistencies as a side effect.</span></li>
+      <li><span>Findings <strong>08, 09</strong> — store hygiene, while the slices are being split anyway.</span></li>
+      <li><span>Finding <strong>12</strong> — the global <code>:focus-visible</code> rule. Cheap, and high value.</span></li>
+      <li><span>Finding <strong>14</strong> — refresh <code>CLAUDE.md</code> so the next agent starts from accurate ground.</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    WORM-3 · 393 source files · ~90,800 LOC · reviewed against a green baseline
+  </footer>
+
+</div>
