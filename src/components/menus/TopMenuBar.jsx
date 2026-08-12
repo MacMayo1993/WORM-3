@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { FLIP_CAP } from '../../utils/constants.js';
-import { useGameStore } from '../../hooks/useGameStore.js';
+import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import ParityWallet from '../overlays/ParityWallet.jsx';
 
 // Must match MAX_CASCADES in useChaosMode.js — keeps the bolt display accurate
@@ -77,6 +76,9 @@ const TopMenuBar = ({
   // rides in the bar beside the gear instead of floating over the scene.
   actionSlotRef,
 }) => {
+  // The cap this session actually enforces — the DEAD readout used to report
+  // the standard-play constant during a cap-13 Disparity game.
+  const flipCap = useGameStore(selectEffectiveFlipCap);
   const VISUAL_MODE_LABELS = {
     classic: 'Classic', grid: 'Grid', sudokube: 'Sudoku', wireframe: 'Wire', glass: 'Glass',
     chrome: 'Chrome', neon: 'Neon', gap: 'Gap', lego: 'Lego'
@@ -281,7 +283,7 @@ const TopMenuBar = ({
                 value={`${chaosStats.deadPct}%`}
                 color={hexToRgba(fc[6], 0.6)}
                 dimColor={dimColor}
-                title={`${chaosStats.deadTiles} tiles burned out at flip cap (${FLIP_CAP})`}
+                title={`${chaosStats.deadTiles} tiles burned out at flip cap (${flipCap})`}
               />
             )}
             {/* A1/Stats: live lightning-bolt count shows cascade queue depth */}

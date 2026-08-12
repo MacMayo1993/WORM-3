@@ -11,7 +11,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/game/**/*.js', 'src/utils/**/*.js', 'src/levels/**/*.js'],
+      // src/hooks/** is in scope deliberately: it is the orchestration layer
+      // between the pure game logic and React, and every correctness bug found
+      // in the 2026-08-12 review lived there while the suite stayed green —
+      // precisely because the report could not see it.
+      include: ['src/game/**/*.js', 'src/utils/**/*.js', 'src/levels/**/*.js', 'src/hooks/**/*.js'],
       exclude: ['src/**/*.test.js', 'src/**/*.spec.js'],
     },
   },

@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
+import { getHalfLifeMultiplier } from '../utils/constants.js';
+import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { flipBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 import TunnelSparkShower from './TunnelSparkShower.jsx';
 
@@ -65,7 +66,7 @@ const FACE_NORM_LOCAL = {
 const FACE_OFFSET = 0.52;
 
 const DANGER_START = 9;
-const DANGER_RANGE = FLIP_CAP - 1 - DANGER_START;
+const dangerRangeFor = (flipCap) => Math.max(1, flipCap - 1 - DANGER_START);
 const STREAK_COUNT_LOW = 10;
 const STREAK_COUNT_HIGH = 18;
 const STREAK_COUNT_MAX = STREAK_COUNT_HIGH;
@@ -161,6 +162,7 @@ const strandFragmentShader = `
 
 
 const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, active1, active2, cubieRefs, intensity, flips, color1, color2, isCenter, maxStrands = 50, _explosionFactor = 0 }) => {
+  const flipCap = useGameStore(selectEffectiveFlipCap);
   const coreTubeRef = useRef();
   const atmosphereTubeRef = useRef();
   const atmosphereMatRef = useRef();
@@ -276,16 +278,16 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     _vEnd.copy(_wPos2).addScaledVector(_faceNorm2, -FACE_OFFSET);
 
     const t = state.clock.elapsedTime;
-    const dead = flips >= FLIP_CAP;
+    const dead = flips >= flipCap;
 
-    const halfLife = getHalfLifeMultiplier(flips);
+    const halfLife = getHalfLifeMultiplier(flips, flipCap);
     const breathRate = dead ? 0 : halfLife;
 
 
     pulseT.current += delta * (2 + intensity * 0.5) * Math.max(1, breathRate);
     const pulse = dead ? 0.3 : Math.sin(pulseT.current) * 0.1 + 0.9;
 
-    const dangerT = flips >= DANGER_START && !dead ? Math.max(0, Math.min(1, (flips - DANGER_START) / DANGER_RANGE)) : 0;
+    const dangerT = flips >= DANGER_START && !dead ? Math.max(0, Math.min(1, (flips - DANGER_START) / dangerRangeFor(flipCap))) : 0;
 
     if (dead) {
       _c1.set('#555555');

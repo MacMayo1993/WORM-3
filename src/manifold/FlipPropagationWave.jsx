@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
+import { FACE_COLORS, ANTIPODAL_COLOR, getHalfLifeMultiplier } from '../utils/constants.js';
+import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 
 // Shared geometries for wave effects - created once, reused
 const sharedWaveRingGeometry = new THREE.RingGeometry(0.8, 1.0, 32);
@@ -109,7 +110,8 @@ const computeHeatHSL = (intensity) => {
 export const ChaosHeatMap = ({ position, rotation, flips, maxFlips = 10 }) => {
   const glowRef = useRef();
   const pulseRef = useRef(0);
-  const dead = flips >= FLIP_CAP;
+  const flipCap = useGameStore(selectEffectiveFlipCap);
+  const dead = flips >= flipCap;
 
   const intensity = Math.min(1, flips / maxFlips);
   const heatColor = useMemo(() => {
@@ -127,7 +129,7 @@ export const ChaosHeatMap = ({ position, rotation, flips, maxFlips = 10 }) => {
       return;
     }
 
-    const halfLife = getHalfLifeMultiplier(flips);
+    const halfLife = getHalfLifeMultiplier(flips, flipCap);
     const baseRate = 1.5;
     const heartRate = baseRate * halfLife;
     pulseRef.current += delta * heartRate;

@@ -3,10 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import MobiusTunnel from './MobiusTunnel.jsx';
 import RestingCords from './RestingCords.jsx';
 import TunnelSnap from './TunnelSnap.jsx';
-import { FACE_COLORS, FLIP_CAP } from '../utils/constants.js';
+import { FACE_COLORS } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
-import { useGameStore } from '../hooks/useGameStore.js';
+import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
@@ -33,6 +33,9 @@ const FOCUS_BUDGET = 3;
 const DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 
 const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
+  // Sever pairs at the cap the session actually grants, so a tunnel stays lit for
+  // exactly as long as its tiles are still flippable.
+  const flipCap = useGameStore(selectEffectiveFlipCap);
   const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths } = useGameStore(
     useShallow(s => ({
       cubies: s.cubies,
@@ -76,7 +79,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
           for (let i = 0; i < DIRS.length; i++) {
             const dirKey = DIRS[i];
             const sticker = cubie.stickers[dirKey];
-            if (!sticker || sticker.flips === 0 || sticker.flips >= FLIP_CAP) continue;
+            if (!sticker || sticker.flips === 0 || sticker.flips >= flipCap) continue;
 
             const gridId = getManifoldGridId(sticker, size);
             if (processed.has(gridId)) continue;
@@ -85,7 +88,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
             const antipodalLoc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
             if (!antipodalLoc || !antipodalLoc.sticker) continue;
             // Also sever if the antipodal side is dead
-            if (antipodalLoc.sticker.flips >= FLIP_CAP) continue;
+            if (antipodalLoc.sticker.flips >= flipCap) continue;
 
             const antipodalGridId = getManifoldGridId(antipodalLoc.sticker, size);
             // Prevent the reverse-direction tunnel when the loop reaches the antipodal sticker.
@@ -127,7 +130,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     // Most-active pairs stay visible; low-activity tail is dropped silently.
     connections.sort((a, b) => b.flips - a.flips);
     return connections.slice(0, MAX_TUNNELS);
-  }, [deferredCubies, size, showTunnels, manifoldMap, fc]);
+  }, [deferredCubies, size, showTunnels, manifoldMap, fc, flipCap]);
 
   // The worm's current tunnel lives in mutable module state (written by
   // WormChaseCamera on the Three.js RAF, not through the store). Poll it and

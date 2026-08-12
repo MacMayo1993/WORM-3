@@ -13,7 +13,7 @@ import { isMobile } from '../utils/device.js';
 import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../utils/storeCatalog.js';
 import { UNLOCK_ALL } from '../utils/testUnlock.js';
 import { STARTING_BANKROLL } from '../utils/economyConstants.js';
-import { MODES } from '../utils/constants.js';
+import { MODES, FLIP_CAP } from '../utils/constants.js';
 
 const SETTINGS_STORAGE_KEY = 'worm3_settings';
 const SETTINGS_VERSION_KEY = 'worm3_settings_version';
@@ -131,9 +131,18 @@ const loadPersistedState = () => {
 
 
 const persistedState = loadPersistedState();
-const MAX_UNDO_HISTORY = 10;
+// Exported so the hooks that push history inline (useCubeState's rotate/flip
+// batches) trim to the same depth the store's own addToHistory does — three
+// hand-copied `.slice(-10)`s had to agree by convention before this.
+export const MAX_UNDO_HISTORY = 10;
 
 // Disparity-specific runtime fields reset on session start/end.
+//
+// This is the ONE list of what a Disparity session leaves behind. resetGame used
+// to re-enumerate most of it by hand and the two copies had drifted apart: the
+// inline list forgot disparityParityScore (so a new game inherited the previous
+// session's un-cashed winnings) and holonomyMode, while the factory forgot
+// tunnelDeaths. Both spread this now — add new session fields here only.
 const makeDisparityRuntimeDefaults = () => ({
   disparityDeaths: [],
   disparityDeathByGridId: {},
@@ -147,6 +156,7 @@ const makeDisparityRuntimeDefaults = () => ({
   cubiePops: {},
   tunnelBirths: {},
   tunnelPulses: {},
+  tunnelDeaths: {},
 });
 
 // Worm session fields reset on each worm run.
@@ -259,6 +269,8 @@ const createWormSlice = (set, _get) => ({
   setWormSessionOrbs: (v) => set({ wormSessionOrbs: v }),
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
+  // Tears down BOTH a disparity round and a worm run — the two share the same
+  // runtime fields. Lives in the worm slice because initWormMode is its mirror.
   clearDisparityGame: () => set({
     ...makeDisparityRuntimeDefaults(),
     ...makeWormSessionDefaults(),
@@ -320,7 +332,9 @@ export const useGameStore = create(
     gameTime: 0,
     gameStartTime: Date.now(),
     hasShuffled: false,
-    victory: null, // null, 'rubiks', 'sudokube', 'ultimate', or 'worm'
+    // null | 'rubiks' | 'worm'. The Sudokube and Ultimate screens were removed;
+    // achievedWins still carries their keys so old saved profiles deserialise.
+    victory: null,
     achievedWins: { rubiks: false, sudokube: false, ultimate: false, worm: false },
 
     setMoves: (moves) => set(typeof moves === 'function'
@@ -345,21 +359,12 @@ export const useGameStore = create(
       moveHistory: [],
       // Full wipe of Chaos & Disparity states to ensure a truly fresh cube
       chaosLevel: 0,
-      disparityDeaths: [],
-      disparityDeathByGridId: {},
-      disparityWinner: null,
-      showDisparityWinner: false,
-      disparityEliminatedFaces: [],
-      cascades: [],
+      ...makeDisparityRuntimeDefaults(),
       blackHolePulse: 0,
       flipWaveOrigins: [],
       flipPulse: null,
       exploded: false,
       explosionT: 0,
-      cubiePops: {},
-      tunnelBirths: {},
-      tunnelPulses: {},
-      tunnelDeaths: {},
     }),
 
     // ========================================================================
@@ -378,7 +383,8 @@ export const useGameStore = create(
     // ========================================================================
     // VISUAL MODES
     // ========================================================================
-    visualMode: 'classic', // 'classic', 'grid', 'sudokube', 'colors'
+    // One of the keys cycled by cycleVisualMode below — keep the two in step.
+    visualMode: 'classic',
     flipMode: false,
     showTunnels: false,
     // Tunnel density tier, applied only while showTunnels is true.
@@ -519,7 +525,7 @@ export const useGameStore = create(
 
     // Running parity score for the current disparity game session.
     // Incremented by EARN_DISPARITY_TILE_RESTORE × healed-tile-count on each player heal.
-    // Reset by makeWormRuntimeDefaults (called from clearDisparityGame + initWormMode).
+    // Reset by makeDisparityRuntimeDefaults (via clearDisparityGame + initWormMode).
     disparityParityScore: 0,
     addDisparityParityScore: (points) => set((state) => ({
       disparityParityScore: state.disparityParityScore + points,
@@ -531,9 +537,7 @@ export const useGameStore = create(
     cashOutParityScore: () => set((state) => {
       const score = Math.round(state.disparityParityScore || 0);
       if (score <= 0) return state;
-      const next = Math.max(0, (state.parityPoints || 0) + score);
-      try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
-      return { parityPoints: next, disparityParityScore: 0 };
+      return { parityPoints: Math.max(0, (state.parityPoints || 0) + score), disparityParityScore: 0 };
     }),
 
     // Chosen game length for the current disparity session ('short' | 'medium' | 'long').
@@ -581,18 +585,13 @@ export const useGameStore = create(
 
     // ── Economy ──────────────────────────────────────────────────────────────
     parityPoints: persistedState.parityPoints,
-    earnCoins: (amount) => set((state) => {
-      const next = Math.max(0, (state.parityPoints || 0) + Math.round(amount));
-      try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
-      return { parityPoints: next };
-    }),
+    earnCoins: (amount) => set((state) => ({
+      parityPoints: Math.max(0, (state.parityPoints || 0) + Math.round(amount)),
+    })),
     spendCoins: (amount) => {
-      const state = get();
-      const current = state.parityPoints || 0;
+      const current = get().parityPoints || 0;
       if (current < amount) return false;
-      const next = current - Math.round(amount);
-      try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
-      set({ parityPoints: next });
+      set({ parityPoints: current - Math.round(amount) });
       return true;
     },
 
@@ -603,13 +602,7 @@ export const useGameStore = create(
       if (state.ownedItems.includes(itemId)) return true; // already owned
       const current = state.parityPoints || 0;
       if (current < price) return false;
-      const next = current - Math.round(price);
-      const nextOwned = [...state.ownedItems, itemId];
-      try {
-        localStorage.setItem(PARITY_POINTS_KEY, String(next));
-        localStorage.setItem(OWNED_ITEMS_KEY, JSON.stringify(nextOwned));
-      } catch { }
-      set({ parityPoints: next, ownedItems: nextOwned });
+      set({ parityPoints: current - Math.round(price), ownedItems: [...state.ownedItems, itemId] });
       return true;
     },
 
@@ -630,7 +623,6 @@ export const useGameStore = create(
         // Already-stamped bet from an earlier round reached a new round start —
         // its round never resolved, so refund it rather than adopting it.
         const pts = Math.max(0, (state.parityPoints || 0) + Math.round(bet.wager || 0));
-        try { localStorage.setItem(PARITY_POINTS_KEY, String(pts)); } catch { }
         return { disparityRoundId: nextId, activeBet: null, parityPoints: pts };
       }
       return {
@@ -640,9 +632,10 @@ export const useGameStore = create(
     }),
     refundActiveBet: () => set((state) => {
       if (!state.activeBet) return state;
-      const next = Math.max(0, (state.parityPoints || 0) + Math.round(state.activeBet.wager || 0));
-      try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
-      return { parityPoints: next, activeBet: null };
+      return {
+        parityPoints: Math.max(0, (state.parityPoints || 0) + Math.round(state.activeBet.wager || 0)),
+        activeBet: null,
+      };
     }),
     // lastBetResult: { won, payout, description, wager }
     lastBetResult: null,
@@ -652,10 +645,7 @@ export const useGameStore = create(
     // part of the wallet's earning power (up to +50% payout), so losing it to
     // a page reload read as a bug.
     betStreak: persistedState.betStreak,
-    setBetStreak: (v) => {
-      try { localStorage.setItem(BET_STREAK_KEY, String(v)); } catch { }
-      set({ betStreak: v });
-    },
+    setBetStreak: (v) => set({ betStreak: v }),
 
     // ========================================================================
     // WORM MODE (all worm state via slice)
@@ -924,6 +914,22 @@ export const useGameStore = create(
 );
 
 /**
+ * Derived selector: the flip cap actually in force right now.
+ *
+ * Disparity/Chaos sessions run on the cap chosen in the setup wizard
+ * (3 / 8 / 13 / 20); everything else runs on the standard-play constant. This is
+ * the ONE place that decision is made — the simulation, the player's own flip
+ * path, the per-tile health bars, the wormhole network's sever threshold and the
+ * HUD's dead-tile readout all read it, so a tile that looks alive is a tile the
+ * player can still flip.
+ *
+ * @param {object} state - Zustand store state
+ * @returns {number} flips a tile survives before it burns out
+ */
+export const selectEffectiveFlipCap = (state) =>
+  state.chaosLevel > 0 ? state.disparityFlipCap : FLIP_CAP;
+
+/**
  * Derived selector: returns the single active game mode identifier.
  * Priority order matches the original design: worm-healer overrides teach,
  * teach overrides holonomy, etc.  Use with `useGameStore(getActiveMode)`.
@@ -943,7 +949,20 @@ export const getActiveMode = (state) => {
   return MODES.FREEPLAY;
 };
 
-// Subscribe to settings changes and persist to localStorage
+// ── Persistence ─────────────────────────────────────────────────────────────
+// Every persisted slice is written by subscription, never inline in an action.
+//
+// The wallet used to be the exception: `localStorage.setItem(PARITY_POINTS_KEY,…)`
+// was hand-copied into six actions (earn, spend, buy, cash-out, round-begin,
+// refund), so any future writer of parityPoints that forgot the line would lose
+// the player's money on reload. Settings already had the right pattern; the
+// wallet, purchases and streak now use it too.
+const persist = (key, serialise = String) => (value) => {
+  try {
+    localStorage.setItem(key, serialise(value));
+  } catch { /* storage unavailable (private mode, quota) — state stays in memory */ }
+};
+
 useGameStore.subscribe(
   (state) => state.settings,
   (settings) => {
@@ -953,3 +972,7 @@ useGameStore.subscribe(
     } catch { }
   }
 );
+
+useGameStore.subscribe((state) => state.parityPoints, persist(PARITY_POINTS_KEY));
+useGameStore.subscribe((state) => state.ownedItems, persist(OWNED_ITEMS_KEY, JSON.stringify));
+useGameStore.subscribe((state) => state.betStreak, persist(BET_STREAK_KEY));

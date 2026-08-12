@@ -5,16 +5,16 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useGameStore } from './useGameStore.js';
+import { useGameStore, selectEffectiveFlipCap, MAX_UNDO_HISTORY } from './useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
-import { flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { flipStickerPair, canFlipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker as healStickerState } from '../game/cubeState.js';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { play } from '../utils/audio.js';
 import { feel } from '../utils/feel.js';
-import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isInRefractory, markFlipped, clearRefractory } from '../game/refractoryMap.js';
 import { computeMergeRegions } from '../modes/merge/index.js';
@@ -137,7 +137,7 @@ export function useCubeState() {
       rotationEpoch: state.rotationEpoch + 1,
       lastRotation: { axis, sliceIndex, dir },
       moves: state.moves + 1,
-      moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
+      moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-MAX_UNDO_HISTORY),
     }));
     updateMergeTiers();
   }, [size]);
@@ -166,6 +166,22 @@ export function useCubeState() {
     // change cube geometry so the cached map is always valid here.
     const currentManifoldMap = manifoldMapRef.current;
     const sticker = currentCubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
+
+    // ── Burnt-out pair guard ──────────────────────────────────────────────
+    // The cap in force, not the standard-play constant: a Disparity session
+    // grants 3/8/13/20 flips of life, and the health bar the player is reading
+    // is drawn against that same number.
+    //
+    // Everything below this line is unconditional — it charges a move, pushes an
+    // undo entry and fires the full flip feedback (pop, glow, haptic, audio). So
+    // a dead pair has to bail HERE; letting it through told the player "that
+    // worked" while the board never moved, and left an un-undoable entry in the
+    // history. The refusal gets its own beat so the tile still answers the tap.
+    const flipCap = selectEffectiveFlipCap(useGameStore.getState());
+    if (sticker && !canFlipStickerPair(currentCubies, currentSize, pos.x, pos.y, pos.z, dirKey, currentManifoldMap, flipCap)) {
+      feel('tunnelSnap');
+      return;
+    }
 
     // ── First-flip interception ───────────────────────────────────────────
     // Before the very first flip, show the antipodal pair highlight for 800ms
@@ -203,7 +219,7 @@ export function useCubeState() {
     let pairId = null;
     // Flip count on the tapped tile AFTER this flip — drives the audio pitch ladder.
     let flipsAfter = 0;
-    // Populated only when this flip pushes the pair to FLIP_CAP and severs it.
+    // Populated only when this flip pushes the pair to the cap and severs it.
     let pairDeath = null;
 
     if (sticker) {
@@ -237,7 +253,7 @@ export function useCubeState() {
       // Compute animation keys
       antKey = antipodalLoc ? `${antipodalLoc.x},${antipodalLoc.y},${antipodalLoc.z}` : null;
       isFirstFlipOnPair = sticker.flips === 0;
-      flipsAfter = Math.min(FLIP_CAP, (sticker.flips || 0) + 1);
+      flipsAfter = Math.min(flipCap, (sticker.flips || 0) + 1);
       if (antipodalLoc) {
         const antipodalSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
         if (antipodalSticker) {
@@ -245,15 +261,16 @@ export function useCubeState() {
           const antGridId = getManifoldGridId(antipodalSticker, currentSize);
           pairId = [srcGridId, antGridId].sort().join('|');
 
-          // A pair is severed the moment EITHER side reaches FLIP_CAP — that is the
-          // condition WormholeNetwork uses to drop it from the network. Detect the
-          // transition here (both sides live before, at least one capped after) so
-          // the tunnel can die visibly instead of just vanishing on the next render.
+          // A pair is severed the moment EITHER side reaches the cap in force —
+          // that is the condition WormholeNetwork uses to drop it from the network.
+          // Detect the transition here (both sides live before, at least one capped
+          // after) so the tunnel can die visibly instead of just vanishing on the
+          // next render.
           const s1Before = sticker.flips || 0;
           const s2Before = antipodalSticker.flips || 0;
-          const s1After = Math.min(FLIP_CAP, s1Before + 1);
-          const s2After = Math.min(FLIP_CAP, s2Before + 1);
-          if (s1Before < FLIP_CAP && s2Before < FLIP_CAP && (s1After >= FLIP_CAP || s2After >= FLIP_CAP)) {
+          const s1After = Math.min(flipCap, s1Before + 1);
+          const s2After = Math.min(flipCap, s2Before + 1);
+          if (s1Before < flipCap && s2Before < flipCap && (s1After >= flipCap || s2After >= flipCap)) {
             const meshIdx = (x, y, z) => ((x * currentSize) + y) * currentSize + z;
             pairDeath = {
               startMs: now,
@@ -276,9 +293,9 @@ export function useCubeState() {
     const popDuration = isFirstFlip ? 1200 : 600;
     const tunnelBirthDuration = isFirstFlip ? 1400 : 700;
     useGameStore.setState((state) => ({
-      cubies: flipStickerPair(state.cubies, state.cubies.length, pos.x, pos.y, pos.z, dirKey, currentManifoldMap),
+      cubies: flipStickerPair(state.cubies, state.cubies.length, pos.x, pos.y, pos.z, dirKey, currentManifoldMap, flipCap),
       moves: state.moves + 1,
-      moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-10),
+      moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-MAX_UNDO_HISTORY),
       flipWaveOrigins: origins,
       blackHolePulse: ts,
       // Screen-space echo of the flip, consumed by FlipScreenGlow outside the
@@ -288,7 +305,7 @@ export function useCubeState() {
       flipPulse: {
         at: ts,
         color: origins[0]?.color ?? null,
-        danger: FLIP_CAP > 0 ? Math.min(1, (sticker?.flips ?? 0) / FLIP_CAP) : 0,
+        danger: flipCap > 0 ? Math.min(1, (sticker?.flips ?? 0) / flipCap) : 0,
       },
       cubiePops: {
         ...pruneExpiredFx(state.cubiePops, now),

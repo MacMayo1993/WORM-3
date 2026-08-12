@@ -1,7 +1,8 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import {
   makeTunnelPath,
   buildTunnelPathInto,
@@ -440,6 +441,7 @@ const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
   gridId1, gridId2, tunnelBirths, tunnelPulses,
 }) => {
+  const flipCap          = useGameStore(selectEffectiveFlipCap);
   const meshRef          = useRef();
   const pulseT           = useRef(Math.random() * Math.PI * 2);
   const portalPulseT     = useRef(Math.random() * Math.PI * 2);
@@ -572,7 +574,7 @@ const MobiusTunnel = ({
       // with it rather than letting the band slip out from behind the sticker.
       setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
 
-      const dead = flips >= FLIP_CAP;
+      const dead = flips >= flipCap;
       const cA = dead ? '#555555' : color1;
       const cB = dead ? '#444444' : color2;
       uniforms.uColorA.value.set(cA);

@@ -182,40 +182,112 @@ export const findAntipodalStickerByGrid = (manifoldMap, sticker, size) => {
   return manifoldMap.get(antipodalGridId) || null;
 };
 
+// Resolve both endpoints of a β-pair from one of its members.
+// Returns [selfLoc, partnerLoc]; partnerLoc is null for a sticker whose grid ID
+// has no antipodal entry in the map (should not happen on a well-formed cube).
+const resolvePairLocs = (state, size, x, y, z, dirKey, manifoldMap) => {
+  const sticker = state[x]?.[y]?.[z]?.stickers?.[dirKey];
+  if (!sticker) return null;
+  return [{ x, y, z, dirKey }, findAntipodalStickerByGrid(manifoldMap, sticker, size)];
+};
+
+const flipsAt = (state, loc) => (loc ? state[loc.x][loc.y][loc.z].stickers[loc.dirKey].flips || 0 : 0);
+
+// True iff a native flip on this pair would actually change the board — i.e. both
+// members are still below the cap. Callers should gate on this BEFORE charging a
+// move or firing flip feedback, so a tap on a burnt-out tile is not reported as a
+// successful flip (see useCubeState.flipSticker).
+//
+// `flipCap` defaults to the module constant for standard play; Disparity/Chaos
+// sessions pass the configured cap (selectEffectiveFlipCap) so the tile life the
+// simulation and the health bars agree on is the one the player's taps obey too.
+export const canFlipStickerPair = (state, size, x, y, z, dirKey, manifoldMap, flipCap = FLIP_CAP) => {
+  const locs = resolvePairLocs(state, size, x, y, z, dirKey, manifoldMap);
+  if (!locs) return false;
+  const [self, partner] = locs;
+  if (flipsAt(state, self) >= flipCap) return false;
+  return !partner || flipsAt(state, partner) < flipCap;
+};
+
 // Flip a sticker pair (sticker and its antipodal counterpart).
 // Shallow-clones the outer arrays and only creates new cubie objects for the
 // two positions that actually change — identical to the pattern in cubeRotation.js.
 // This avoids a full deep-clone of all cubies on every user flip, which was
 // causing unnecessary re-renders of every StickerPlane in the scene.
-export const flipStickerPair = (state, size, x, y, z, dirKey, manifoldMap) => {
+//
+// The flip is ATOMIC across the pair: if either member is at the cap, neither
+// moves. Flipping one member alone would break the ∆ invariant that
+// antipodalEngine relies on ("∆ = 0 throughout ordinary play — flips are always
+// paired"), stranding the pair as permanently asymmetric and adding a mandatory
+// heal to every future solve plan.
+export const flipStickerPair = (state, size, x, y, z, dirKey, manifoldMap, flipCap = FLIP_CAP) => {
   // Shallow-clone: outer arrays are new, cubie objects are shared by reference
   const next = state.map(L => L.map(R => R.slice()));
 
-  const sticker = state[x]?.[y]?.[z]?.stickers?.[dirKey];
-  if (!sticker) return next;
-
-  const sticker1Loc = { x, y, z, dirKey };
-  const sticker2Loc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+  const locs = resolvePairLocs(state, size, x, y, z, dirKey, manifoldMap);
+  if (!locs) return next;
+  if (!canFlipStickerPair(state, size, x, y, z, dirKey, manifoldMap, flipCap)) return next;
 
   // Create a new cubie object only for the affected position
   const applyFlip = (loc) => {
     if (!loc) return;
     const c = next[loc.x][loc.y][loc.z];
     const st = c.stickers[loc.dirKey];
-    const currentFlips = st.flips || 0;
-    // Dead tiles (at flip cap) can no longer be flipped
-    if (currentFlips >= FLIP_CAP) return;
     const stickers = { ...c.stickers };
     stickers[loc.dirKey] = {
       ...st,
       curr: ANTIPODAL_COLOR[st.curr],
-      flips: Math.min(FLIP_CAP, currentFlips + 1)
+      flips: Math.min(flipCap, (st.flips || 0) + 1)
     };
     next[loc.x][loc.y][loc.z] = { ...c, stickers };
   };
 
-  applyFlip(sticker1Loc);
-  applyFlip(sticker2Loc);
+  applyFlip(locs[0]);
+  applyFlip(locs[1]);
+
+  return next;
+};
+
+// True iff the pair's last flip can be taken back: both members must carry at
+// least one flip to give back. A pair at flips 0 was never flipped (or has
+// already been unflipped), so there is nothing to reverse.
+export const canUnflipStickerPair = (state, size, x, y, z, dirKey, manifoldMap) => {
+  const locs = resolvePairLocs(state, size, x, y, z, dirKey, manifoldMap);
+  if (!locs) return false;
+  const [self, partner] = locs;
+  if (flipsAt(state, self) <= 0) return false;
+  return !partner || flipsAt(state, partner) > 0;
+};
+
+// The true inverse of flipStickerPair: toggles the colour back AND gives back the
+// flip each member spent.
+//
+// Re-running flipStickerPair restores the colour (ANTIPODAL_COLOR is an
+// involution) but *increments* the counter again, so a flip followed by an "undo"
+// used to cost the pair two flips of its life instead of none — and on a capped
+// tile it silently did nothing at all. Undo must hand the life back, so use this.
+export const unflipStickerPair = (state, size, x, y, z, dirKey, manifoldMap) => {
+  const next = state.map(L => L.map(R => R.slice()));
+
+  const locs = resolvePairLocs(state, size, x, y, z, dirKey, manifoldMap);
+  if (!locs) return next;
+  if (!canUnflipStickerPair(state, size, x, y, z, dirKey, manifoldMap)) return next;
+
+  const applyUnflip = (loc) => {
+    if (!loc) return;
+    const c = next[loc.x][loc.y][loc.z];
+    const st = c.stickers[loc.dirKey];
+    const stickers = { ...c.stickers };
+    stickers[loc.dirKey] = {
+      ...st,
+      curr: ANTIPODAL_COLOR[st.curr],
+      flips: Math.max(0, (st.flips || 0) - 1)
+    };
+    next[loc.x][loc.y][loc.z] = { ...c, stickers };
+  };
+
+  applyUnflip(locs[0]);
+  applyUnflip(locs[1]);
 
   return next;
 };
