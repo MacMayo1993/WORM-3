@@ -280,7 +280,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   transform: selected ? 'translateY(1px)' : 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
-                  outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
                   fontFamily: 'inherit'
                 }}

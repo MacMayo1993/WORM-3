@@ -79,6 +79,11 @@ src/
 ├── teach/        # Teaching mode (algorithms, solver, step-by-step UI)
 ├── utils/        # Constants, color schemes, audio
 ├── worm/         # Worm co-op mode (platformer, crawler)
+├── holonomy/     # Holonomy loop mode
+├── modes/        # Mode-specific rules (merge, city biome)
+├── coming-soon/  # Preview environments for unreleased modes
+├── workers/      # Web workers (chaos simulation)
+├── assets/       # Static assets imported by components
 ├── App.jsx       # Main application component
 └── main.jsx      # React entry point
 ```
@@ -153,7 +158,7 @@ import { OrbitControls } from '@react-three/drei';
 // Game logic (pure functions)
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
-import { detectWinConditions } from './game/winDetection.js';
+import { checkRubiksWin } from './game/winDetection.js';
 
 // Hooks (import from barrel file)
 import { useGameStore, useCubeState, useAnimation } from './hooks/index.js';
@@ -169,4 +174,7 @@ import { COLORS, ANTIPODAL_COLOR, DIR_VECTORS } from './utils/constants.js';
 - Animations use both GSAP and requestAnimationFrame
 - Mobile support is built-in with touch controls (`MobileControls.jsx`) and responsive layout
 - Cube sizes range from 2×2 to 5×5, configurable per level
-- **UI theme**: shared tokens live in `src/utils/uiTheme.js` — `UI_FONT` (body text, mirrors `--ui-font` in App.css), `DISPLAY_FONT` (Bungee, big titles), `PAPER_*` (cream setup-modal family: wizards, store, help), `GLASS_*` (dark navy in-game overlay family: tutorials, victory, HUD cards). Import these instead of hardcoding font stacks or panel colors; bare `monospace` is reserved for manifold grid IDs and algorithm notation
+- **Flip cap**: never import `FLIP_CAP` to decide whether a tile is spent — read `selectEffectiveFlipCap(state)` from `useGameStore.js`. Disparity/Chaos sessions run on a configurable cap (3/8/13/20) and the constant is only the standard-play default; mixing the two is what let a tile show health remaining while refusing the player's tap. Pure helpers take the cap as a trailing argument (`flipStickerPair(..., flipCap)`).
+- **Flips are paired and reversible**: `flipStickerPair` is atomic across the β-pair (both members move or neither), which keeps antipodalEngine's ∆ = 0 invariant. To take a flip back use `unflipStickerPair`, not a second `flipStickerPair` — re-flipping restores the colour but spends the tile's life again.
+- **Screen ownership**: `src/hooks/uiSurfaces.js` decides which surface owns the screen. Anything that adds a full-screen modal should register there so keyboard gating and Escape-to-dismiss pick it up automatically; ambient side panels stay out of the blocking set.
+- **UI theme**: shared tokens live in `src/utils/uiTheme.js` — `UI_FONT` (body text, mirrors `--ui-font` in App.css), `DISPLAY_FONT` (Bungee, big titles), `HAND_FONT` (Mobi's dialogue), `PAPER_*` (cream sheets: the player is reading or deciding and the panel owns the screen — wizards, store, help, level select), `NIGHT_*` (warm dark surfaces layered over the live 3D scene — victory, the mode carousel, in-scene viewers). There is no `GLASS_*` family; the old cold-navy set was removed in favour of `NIGHT_*`. Import these instead of hardcoding font stacks or panel colors; bare `monospace` is reserved for manifold grid IDs and algorithm notation

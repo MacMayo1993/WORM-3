@@ -40,7 +40,7 @@ export default function SceneStep({ cos }) {
                 borderRadius: '10px', overflow: 'hidden',
                 border: selected ? `3px solid ${accent}` : '3px solid transparent',
                 boxShadow: selected ? `0 0 0 1px ${accent}44` : '0 2px 6px rgba(0,0,0,0.10)',
-                cursor: 'pointer', transition: 'all 0.18s ease', outline: 'none',
+                cursor: 'pointer', transition: 'all 0.18s ease',
                 position: 'relative', aspectRatio: '4/3', padding: 0,
                 WebkitTapHighlightColor: 'transparent'
               }}
