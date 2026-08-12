@@ -144,7 +144,7 @@ function detailPixelScale(camera, viewportHeight) {
 
 // SingleOrb renders geometry and registers refs with the parent OrbAnimator.
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
-function SingleOrb({
+function SingleOrbImpl({
   position, color = '#ffd700', antipodalColor = '#ffd700',
   collected = false, isTarget = false, elevated = false,
   dirKey = 'PY', orbKey, type = 'parity',
@@ -364,6 +364,46 @@ function SingleOrb({
     </group>
   );
 }
+
+/**
+ * An orb's rendered tree — ten meshes, each with its own material element — is
+ * completely static between the handful of events that actually change an orb.
+ * Everything that moves is driven imperatively by the animator loop below, which
+ * writes to refs and never goes through React at all.
+ *
+ * Without this memo that tree was reconciled far more often than anything about
+ * it changed. `PowerupOrbs` subscribes to `cubies`, so every wormhole spawn,
+ * every heal and every rotation-hazard turn re-rendered all of it; and App's
+ * one-second `gameTime` tick re-renders the whole R3F tree anyway, so the orbs
+ * were being diffed — a dozen-odd props per mesh, times ten meshes, times every
+ * orb on the board — at least once a second all run long. That is a hitch on a
+ * timer, which is what makes it read as stutter rather than a low frame rate.
+ *
+ * Every prop is a primitive except `position` (a fresh array each time the
+ * parent's memo recomputes) and the two register callbacks (already stable via
+ * useCallback), so the comparison is exact rather than a heuristic: when one
+ * orb's colour changes, only that orb re-renders.
+ */
+const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
+  a.orbKey === b.orbKey &&
+  a.color === b.color &&
+  a.antipodalColor === b.antipodalColor &&
+  a.dirKey === b.dirKey &&
+  a.type === b.type &&
+  a.collected === b.collected &&
+  a.isTarget === b.isTarget &&
+  a.elevated === b.elevated &&
+  a.gridX === b.gridX &&
+  a.gridY === b.gridY &&
+  a.gridZ === b.gridZ &&
+  a.isGlowWorm === b.isGlowWorm &&
+  a.reducedDetail === b.reducedDetail &&
+  a.registerAnim === b.registerAnim &&
+  a.unregisterAnim === b.unregisterAnim &&
+  a.position[0] === b.position[0] &&
+  a.position[1] === b.position[1] &&
+  a.position[2] === b.position[2]
+));
 
 /**
  * ParityOrbs — renders all active orbs and drives their animation via a single useFrame.

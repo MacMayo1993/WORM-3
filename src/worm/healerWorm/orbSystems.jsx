@@ -1,6 +1,6 @@
 // src/worm/healerWorm/orbSystems.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split).
-import { useState, useMemo, useRef } from 'react';
+import { memo, useState, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -17,7 +17,13 @@ import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
 // Each orb uses the exact color of the face it represents, matching the
 // tracker/inventory HUD, and follows that tile through cube rotations.
-export function PowerupOrbs({ size }) {
+//
+// Memoised on `size`, its only prop. Everything else it needs comes from its own
+// store subscription, so it still re-renders the instant an orb tile changes —
+// but a re-render of the mode above it (App re-renders every second on the
+// gameTime tick, and that cascades down the whole R3F tree) no longer walks the
+// orb subtree for nothing. See the note on SingleOrb in ParityOrb.jsx.
+function PowerupOrbsImpl({ size }) {
     const { wormPowerups, cubies, settings, wormCharacter } = useGameStore(useShallow(s => ({
         wormPowerups: s.wormPowerups,
         cubies: s.cubies,
@@ -61,6 +67,8 @@ export function PowerupOrbs({ size }) {
 
     return <ParityOrbs orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
 }
+
+export const PowerupOrbs = memo(PowerupOrbsImpl);
 
 // ─── Special power-up orbs (rocket / magnet) ─────────────────────────────────
 // These hover clear of the surface and carry their own silhouette rather than the
