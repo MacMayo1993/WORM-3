@@ -31,10 +31,17 @@ const MAX_DT = 0.05;
 const REST_EPS = 0.0015;
 const REST_V_EPS = 0.02;
 
-// A very long worm covers a lot of ground, and every pressed tile costs an active
-// sticker tick plus a drawn border. Past this many the oldest covered tiles simply
-// do not light — the head end is what anyone is looking at.
-export const MAX_PRESSED_TILES = 64;
+// A very long worm covers a lot of ground, and every pressed tile costs a full
+// StickerPlane tick (the whole per-frame sticker body, not a cheap branch) plus a
+// drawn border. Past this many the oldest covered tiles simply do not light — the
+// head end is what anyone is looking at.
+//
+// 24 rather than 64: at the chase camera's distance a 24-tile lit run already
+// reaches past the edge of the screen, so the tiles the old cap paid for were
+// behind the camera or around the far side of the cube. The cost was real and it
+// only appeared late in a run, when a long worm is exactly when the frame budget
+// is tightest.
+export const MAX_PRESSED_TILES = 24;
 
 /**
  * Number of consecutive trail cells touched by a body of `worldReach` units.

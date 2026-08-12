@@ -141,7 +141,7 @@ describe('tilePressBridge', () => {
     // Not a spring property — a budget. Every pressed tile wakes a sticker's
     // per-frame tick and draws a border, and a 600-segment worm covers the cube.
     expect(MAX_PRESSED_TILES).toBeGreaterThan(8);
-    expect(MAX_PRESSED_TILES).toBeLessThanOrEqual(96);
+    expect(MAX_PRESSED_TILES).toBeLessThanOrEqual(24);
   });
 
   it('includes both cells when the starting worm straddles a tile boundary', () => {

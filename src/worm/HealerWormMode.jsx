@@ -109,6 +109,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const bombTimerRef  = useRef(BOMB_SPAWN_INTERVAL);
     const bombSeqRef    = useRef(0);          // monotonic bomb id source
     const blastApiRef   = useRef(null);       // imperative detonation-flash handle from HealerBombs
+    const occupiedTilesRef = useRef(new Set()); // scratch: body-covered tiles, rebuilt each frame
+    // Bumped whenever the live bomb set gains or loses a member, so <HealerBombs>
+    // can notice the change without serialising the id list every frame.
+    const bombMembershipRef = useRef(0);
 
     useEffect(() => {
         setWormTurnCallback(worm.queueTurn);
@@ -132,6 +136,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             pendingRotRef.current     = null;
             warningProgressRef.current = 0;
             bombsRef.current          = [];
+            bombMembershipRef.current++;
             bombTimerRef.current      = BOMB_SPAWN_INTERVAL;
             // Freeze the worm until the countdown completes
             useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
@@ -311,7 +316,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const trail = worm.tileTrail.current;
             const bodyReach = Math.min(MAX_TAIL, worm.tailLength.current) * BODY_BALL_SPACING;
             const occupiedCount = Math.min(trail.count, Math.max(1, Math.ceil(bodyReach)));
-            const occupied = new Set();
+            // Reused across frames: a long worm rebuilds this every frame for the
+            // whole run, and a fresh Set per frame is garbage the collector has to
+            // come back for mid-crawl. Cleared and refilled instead.
+            const occupied = occupiedTilesRef.current;
+            occupied.clear();
             for (let i = 0; i < occupiedCount; i++) occupied.add(ttAt(trail, i));
 
             // Spawn clock — one attempt per interval, capped by board size.
@@ -333,19 +342,21 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     });
                     const tile = randomFreeTile(size, exclude);
                     if (tile) {
-                        bombsRef.current = [
-                            ...bombsRef.current,
-                            { id: bombSeqRef.current++, tile, fuse: BOMB_FUSE_SECONDS, maxFuse: BOMB_FUSE_SECONDS }
-                        ];
+                        bombsRef.current.push({ id: bombSeqRef.current++, tile, fuse: BOMB_FUSE_SECONDS, maxFuse: BOMB_FUSE_SECONDS });
+                        bombMembershipRef.current++;
                     }
                 }
             }
 
-            // Fuse / disarm / detonate. Rebuild the list from the survivors so a
-            // disarmed or detonated bomb is removed in the same pass.
+            // Fuse / disarm / detonate. Survivors are compacted toward the front of
+            // the existing array rather than collected into a new one — this runs on
+            // every active frame, and the list it was rebuilding is almost always
+            // unchanged.
             if (bombsRef.current.length > 0) {
-                const survivors = [];
-                for (const bomb of bombsRef.current) {
+                const bombs = bombsRef.current;
+                let kept = 0;
+                for (let read = 0; read < bombs.length; read++) {
+                    const bomb = bombs[read];
                     // Disarm: body fully encircles the bomb — reward and remove it.
                     if (isBombDisarmed(bomb, occupied, size)) {
                         useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);
@@ -353,7 +364,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                         continue;
                     }
                     bomb.fuse -= bdelta;
-                    if (bomb.fuse > 0) { survivors.push(bomb); continue; }
+                    if (bomb.fuse > 0) { bombs[kept++] = bomb; continue; }
 
                     // Detonate: shoot fire out along the arms, then resolve the hit.
                     // Flames ignite staggered by distance so the blast reads as
@@ -388,9 +399,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                             worm.cutFocusPos.current = hitPos;
                         }
                     }
-                    // bomb consumed — not carried into survivors
+                    // bomb consumed — not compacted into the kept range
                 }
-                bombsRef.current = survivors;
+                if (kept !== bombs.length) {
+                    bombs.length = kept;
+                    bombMembershipRef.current++;
+                }
             }
         }
 
@@ -510,7 +524,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 voidTunnelKeysRef={worm.voidTunnelKeysRef}
                 tunnelUseCountsRef={worm.tunnelUseCountsRef}
             />}
-            {!wormInTunnel && <HealerBombs bombsRef={bombsRef} blastApiRef={blastApiRef} size={size} />}
+            {!wormInTunnel && <HealerBombs bombsRef={bombsRef} membershipRef={bombMembershipRef} blastApiRef={blastApiRef} size={size} />}
             <TunnelHealProgress size={size} />
             <HealBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />

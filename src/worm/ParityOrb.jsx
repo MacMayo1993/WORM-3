@@ -103,6 +103,45 @@ const _orbGeos = {
   },
 };
 
+// ── Screen-size detail thresholds ───────────────────────────────────────────
+// An orb's on-screen radius in CSS pixels decides how much of it is worth
+// drawing, measured against its outer readable extent (the orbit-ring radius)
+// because that is the silhouette a player actually resolves.
+//
+// The numbers come from measuring the real chase camera rather than guessing at
+// a "far" distance. On a 3×3 every orb sits at 21–29px whatever the viewport,
+// so nothing here fires and that board looks exactly as it always has. On a 7×7
+// with the orb count turned up they fall to 11–14px, where the orbit rings (a
+// 0.011-radius tube — under a third of a pixel wide at that size) and the
+// signature's pole axis are sub-pixel shimmer still costing a transparent draw
+// each. That board was drawing over a thousand calls a frame, most of them orbs.
+//
+// What is never dropped: the gem, the plasma core, and the parity cage. The
+// cage is the orb's silhouette against a busy board — trimming it made orbs
+// genuinely harder to find, which is a worse game, not a faster one.
+//
+// Thresholds are one-way with a margin (DETAIL_HYSTERESIS) so an orb bobbing
+// across the line does not flicker its detail on and off frame to frame.
+const ORB_VISUAL_RADIUS = 0.37;
+const DETAIL_TRIM_PX = 18; // below this: no orbit rings, no signature poles
+const DETAIL_HALO_PX = 10; // below this: no additive halo, no Möbius strip
+const DETAIL_HYSTERESIS = 1.18; // must grow this much past a threshold to come back
+
+/**
+ * Pixels of on-screen orb radius at one world unit of distance.
+ *
+ * Divide by an orb's distance to the camera to get its apparent radius. The
+ * camera-dependent half is constant across a frame, so the per-orb work is one
+ * distance and one compare.
+ */
+function detailPixelScale(camera, viewportHeight) {
+  const h = viewportHeight || 800;
+  if (!camera?.isPerspectiveCamera) return Infinity; // unknown projection: keep full detail
+  // Half the viewport height spans a half-angle of fov/2, so an object of radius R
+  // at distance d covers (h/2) · (R/d) / tan(fov/2) pixels of radius.
+  return (h * 0.5 * ORB_VISUAL_RADIUS) / Math.tan((camera.fov * Math.PI) / 360);
+}
+
 // SingleOrb renders geometry and registers refs with the parent OrbAnimator.
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
 function SingleOrb({
@@ -127,6 +166,7 @@ function SingleOrb({
   const electronGlowRefs = useRef([]); // target only
   const outlineRef     = useRef();
   const parityMarkRef  = useRef();
+  const parityPolesRef = useRef();  // axis + antipodal nodes — dropped first at small screen size
 
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
 
@@ -158,6 +198,7 @@ function SingleOrb({
       get electronGlows() { return electronGlowRefs.current; },
       get outline()       { return outlineRef.current; },
       get parityMark()    { return parityMarkRef.current; },
+      get parityPoles()   { return parityPolesRef.current; },
       get isTarget()      { return isTargetRef.current; },
       get elevated()      { return elevatedRef.current; },
       get position()      { return positionRef.current; },
@@ -250,7 +291,12 @@ function SingleOrb({
 
       {/* Parity signature: a sharp diamond cage and two opposite poles connected
           through the core. It reads as "antipodal pair" even when tile colours are
-          close, and its angular outline cannot be mistaken for either special. */}
+          close, and its angular outline cannot be mistaken for either special.
+
+          The cage is the orb's silhouette on a busy board — it stays drawn at any
+          size. The poles and their axis are the part that stops resolving first
+          (the axis is a 0.012-radius cylinder), so they live in their own group
+          and drop out with the orbit rings when the orb gets small. */}
       <group ref={parityMarkRef} rotation={[Math.PI / 4, 0, Math.PI / 4]}>
         <mesh geometry={g.parityCage}>
           <meshBasicMaterial
@@ -258,15 +304,17 @@ function SingleOrb({
             wireframe blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
           />
         </mesh>
-        <mesh geometry={g.parityAxis}>
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
-        </mesh>
-        <mesh geometry={g.parityNode} position={[0, isTarget ? 0.34 : 0.27, 0]}>
-          <meshBasicMaterial color={color} toneMapped={false} />
-        </mesh>
-        <mesh geometry={g.parityNode} position={[0, isTarget ? -0.34 : -0.27, 0]}>
-          <meshBasicMaterial color={antipodalColor} toneMapped={false} />
-        </mesh>
+        <group ref={parityPolesRef}>
+          <mesh geometry={g.parityAxis}>
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <mesh geometry={g.parityNode} position={[0, isTarget ? 0.34 : 0.27, 0]}>
+            <meshBasicMaterial color={color} toneMapped={false} />
+          </mesh>
+          <mesh geometry={g.parityNode} position={[0, isTarget ? -0.34 : -0.27, 0]}>
+            <meshBasicMaterial color={antipodalColor} toneMapped={false} />
+          </mesh>
+        </group>
       </group>
 
       {/* Möbius strip — antipodal-color accent orbiting the sphere. DoubleSide so the twist reads clearly. */}
@@ -339,12 +387,15 @@ export default function ParityOrbs({
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
+    // Screen-size LOD (see DETAIL_* above): one camera-dependent factor per frame,
+    // then a cheap distance compare per orb.
+    const detailScale = detailPixelScale(state.camera, state.size?.height);
 
     for (const refs of animMapRef.current.values()) {
       const {
         group, core, innerCore, innerGlow, shell, glow, targetGlow,
         orbitSystem, ringA, ringB, ringC,
-        electrons, electronGlows, outline, parityMark,
+        electrons, electronGlows, outline, parityMark, parityPoles,
         isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset,
       } = refs;
       if (!group || !core) continue;
@@ -374,15 +425,47 @@ export default function ParityOrbs({
         );
       }
 
-      // ── Crystal core spin ──────────────────────────────────────────────────
-      core.rotation.y = time * (isTarget ? 1.7 : 1.0);
-      core.rotation.x = Math.sin(time * 1.4) * 0.2;
-      core.scale.setScalar(1 + Math.sin(time * (isTarget ? 5.2 : 3.8)) * (isTarget ? 0.18 : 0.10));
+      // ── Detail level for this orb ─────────────────────────────────────────
+      // Every orb was drawing its full ten-mesh assembly — gem, plasma core,
+      // additive halo, Möbius strip, two orbit rings and the four-piece parity
+      // signature — with every layer transparent and most of them additive.
+      // That is the biggest per-frame cost in WORM mode, and it multiplies by
+      // the orb count the player picks (up to 144) and by board size.
+      //
+      // The decorations are hidden once the orb is too small on screen to read
+      // them, and their animation maths is skipped with them. Nothing unmounts
+      // — visibility is toggled on meshes that stay in the tree — so an orb
+      // coming back toward the camera pops its detail straight back on without
+      // a React commit. The target orb is exempt: it is the one the player is
+      // being pointed at, and it must stay unmistakable at any distance.
+      const orbPx = detailScale / Math.max(0.001, group.position.distanceTo(state.camera.position));
+      // An orb starts fully detailed (undefined reads as on) and only drops a
+      // layer once it is measurably too small, so nothing pops off on mount.
+      const showTrim = isTarget || (refs.trimOn !== false
+        ? orbPx >= DETAIL_TRIM_PX
+        : orbPx >= DETAIL_TRIM_PX * DETAIL_HYSTERESIS);
+      const showHalo = isTarget || (refs.haloOn !== false
+        ? orbPx >= DETAIL_HALO_PX
+        : orbPx >= DETAIL_HALO_PX * DETAIL_HYSTERESIS);
+      refs.trimOn = showTrim;
+      refs.haloOn = showHalo;
 
-      if (outline) {
-        outline.rotation.y = core.rotation.y;
-        outline.rotation.x = core.rotation.x;
-        outline.scale.setScalar(core.scale.x * 1.22);
+      if (parityPoles && parityPoles.visible !== showTrim) parityPoles.visible = showTrim;
+      if (orbitSystem && orbitSystem.visible !== showTrim) orbitSystem.visible = showTrim;
+      if (innerGlow && innerGlow.visible !== showHalo) innerGlow.visible = showHalo;
+      if (core.visible !== showHalo) core.visible = showHalo;
+
+      // ── Crystal core spin ──────────────────────────────────────────────────
+      if (showHalo) {
+        core.rotation.y = time * (isTarget ? 1.7 : 1.0);
+        core.rotation.x = Math.sin(time * 1.4) * 0.2;
+        core.scale.setScalar(1 + Math.sin(time * (isTarget ? 5.2 : 3.8)) * (isTarget ? 0.18 : 0.10));
+
+        if (outline) {
+          outline.rotation.y = core.rotation.y;
+          outline.rotation.x = core.rotation.x;
+          outline.scale.setScalar(core.scale.x * 1.22);
+        }
       }
 
       // ── Inner plasma core — counter-spins for parallax depth ──────────────
@@ -398,21 +481,26 @@ export default function ParityOrbs({
       }
 
       // ── Inner glow — pulses offset from outer glow ─────────────────────────
-      if (innerGlow) {
+      if (innerGlow && showHalo) {
         innerGlow.material.opacity = (isTarget ? 0.28 : 0.18) + Math.sin(time * 3.8 + 1.2) * 0.07;
         innerGlow.scale.setScalar(1 + Math.sin(time * 3.2) * 0.05);
       }
 
       // ── Orbit system ───────────────────────────────────────────────────────
-      if (orbitSystem) {
-        orbitSystem.rotation.y = time * (isTarget ? 2.6 : 1.8);
-        orbitSystem.rotation.x = Math.sin(time * 0.8) * 0.65;
-        orbitSystem.rotation.z = Math.cos(time * 0.55) * 0.5;
+      if (showTrim) {
+        if (orbitSystem) {
+          orbitSystem.rotation.y = time * (isTarget ? 2.6 : 1.8);
+          orbitSystem.rotation.x = Math.sin(time * 0.8) * 0.65;
+          orbitSystem.rotation.z = Math.cos(time * 0.55) * 0.5;
+        }
+
+        if (ringA) ringA.rotation.z = time * 1.5;
+        if (ringB) ringB.rotation.x = time * 1.2;
+        if (isTarget && ringC) ringC.rotation.y = time * 1.35;
       }
 
-      if (ringA) ringA.rotation.z = time * 1.5;
-      if (ringB) ringB.rotation.x = time * 1.2;
-      if (isTarget && ringC) ringC.rotation.y = time * 1.35;
+      // The cage keeps turning at every detail level — it is drawn at every
+      // detail level, and a frozen diamond next to spinning ones reads as a bug.
       if (parityMark) {
         parityMark.rotation.y = -time * (isTarget ? 1.15 : 0.8);
         parityMark.rotation.z = Math.PI / 4 + Math.sin(time * 1.4) * 0.12;
