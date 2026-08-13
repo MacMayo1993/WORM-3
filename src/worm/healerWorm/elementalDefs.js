@@ -1,0 +1,87 @@
+// src/worm/healerWorm/elementalDefs.js
+//
+// Elemental power-up orbs for worm mode.
+//
+// Each elemental orb reuses the identity of one of the "Living" tile styles
+// (water / lava / grass / ice — see src/utils/tileStyleCatalog.js) and, when
+// claimed, bathes the entire cube in that element for a while: a coloured
+// atmosphere, drifting element particles and a soft envelope glow. The base
+// tile styles keep rendering underneath, so every sticker stays readable — the
+// element is a wash over the world, not a repaint of it.
+//
+// This module is deliberately dependency-free (no React, no Three.js, no store),
+// exactly like specialDefs.js, so the simulation and its headless tests can
+// import the canonical element list without pulling in a renderer. Colours and
+// silhouettes live here; numeric tuning (how long the wash lasts) stays in
+// constants.js.
+//
+// `iconPath` is SVG path data in a 24×24 viewBox so the HUD can draw the same
+// silhouette the 3D orb carries, rather than a per-platform emoji.
+
+export const ELEMENTAL_DEFS = {
+  water: {
+    label: 'WATER',
+    element: true,
+    // The living tile style whose identity this orb borrows.
+    tileStyle: 'water',
+    color: '#38bdf8',
+    accent: '#e0f7ff',
+    // The colour the scene's fog/tint drifts toward while this element is active.
+    fogColor: '#0a2f4a',
+    // Which drifting particle behaviour ElementalAtmosphere plays: bubbles rise,
+    // embers rise and flicker, motes drift down, flakes fall and sway.
+    particle: 'bubbles',
+    // A teardrop.
+    iconPath: 'M12 2.2c3.6 4.7 6.2 8.3 6.2 11.6a6.2 6.2 0 0 1-12.4 0c0-3.3 2.6-6.9 6.2-11.6z',
+    iconAccent: 'M9.2 12.6a2 2 0 1 1 0 4 2 2 0 0 1 0-4z',
+    description: 'Floods the whole cube with water — a blue tide and rising bubbles wash over every face.',
+  },
+  lava: {
+    label: 'LAVA',
+    element: true,
+    tileStyle: 'lava',
+    color: '#ff6a2e',
+    accent: '#ffe08a',
+    fogColor: '#3a0d05',
+    particle: 'embers',
+    // A flame.
+    iconPath: 'M13.5 1.8c.6 3-1.2 4.6-2.8 6.4-1.6 1.8-3.2 3.7-3.2 6.6a6.5 6.5 0 0 0 13 0c0-2-.9-3.6-2-5 .1 1.6-.6 2.6-1.6 3-.1-2.6-1.4-4.6-3.4-6.4 1-1.6 1.2-3 0-4.6z',
+    iconAccent: 'M12 12.4c1.4 1 2.1 2.2 2.1 3.5a2.1 2.1 0 0 1-4.2 0c0-1.3.7-2.5 2.1-3.5z',
+    description: 'Sets the whole cube alight — a molten glow and rising embers pour across every face.',
+  },
+  grass: {
+    label: 'NATURE',
+    element: true,
+    tileStyle: 'grass',
+    color: '#4ade80',
+    accent: '#dcfce7',
+    fogColor: '#0b2e14',
+    particle: 'spores',
+    // A sprouting leaf pair.
+    iconPath: 'M12 22V9m0 0C11 5 8 3 3 3c0 5 2 8 6 9m2 0c1-4 4-6 9-6 0 5-2 8-6 9z',
+    iconAccent: '',
+    description: 'Overgrows the whole cube — a verdant haze and drifting spores settle across every face.',
+  },
+  ice: {
+    label: 'ICE',
+    element: true,
+    tileStyle: 'ice',
+    color: '#7dd3fc',
+    accent: '#ffffff',
+    fogColor: '#0d2438',
+    particle: 'flakes',
+    // A six-point snowflake.
+    iconPath: 'M12 1.5v21M3.2 6.6l17.6 10.2M20.8 6.6L3.2 16.8M12 5.2l2.6-2.6M12 5.2 9.4 2.6M12 18.8l2.6 2.6M12 18.8l-2.6 2.6',
+    iconAccent: '',
+    description: 'Freezes the whole cube — a pale frost and falling flakes drift across every face.',
+  },
+};
+
+/** Canonical list of elemental orb types. */
+export const ELEMENTAL_TYPES = Object.keys(ELEMENTAL_DEFS);
+
+/** True when `type` names an elemental orb rather than a rocket/magnet special. */
+export const isElementalType = (type) => Object.prototype.hasOwnProperty.call(ELEMENTAL_DEFS, type);
+
+/** Look up an element's presentation data, or null when `type` is not an element. */
+export const getElementalDef = (type) => ELEMENTAL_DEFS[type] ?? null;

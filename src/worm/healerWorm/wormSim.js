@@ -64,6 +64,7 @@ import {
     tileKeyOf,
 } from './specialSpawn.js';
 import { SURVIVAL_TICK_INTERVAL } from '../../utils/economyConstants.js';
+import { isElementalType } from './specialDefs.js';
 import {
     WORM_LIFT,
     TUNNEL_SPEED_SCALE,
@@ -96,6 +97,7 @@ import {
     ROCKET_SPEED_MULT,
     MAGNET_DURATION,
     MAGNET_RADIUS,
+    ELEMENTAL_DURATION,
     SPECIAL_SPAWN_RADIUS,
     SPECIAL_JUMP_REACH,
     SPECIAL_TUNNEL_RADIUS,
@@ -194,6 +196,9 @@ export function makeWormSim(size) {
         rocketT: 0,
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
+        elementalType: null,      // active elemental wash ('water'|'lava'|'grass'|'ice'|null)
+        elementalT: 0,            // seconds of elemental wash remaining
+        elementalMaxT: 0,         // duration of the active wash, for the HUD's fill
         landingGraceT: 0,         // post-rocket window where a landing can't kill
         // Injected RNG — every random draw in the special system goes through this so
         // tests can make spawn type and placement deterministic. Set once at
@@ -313,6 +318,9 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.rocketT = 0;
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
+    sim.elementalType = null;
+    sim.elementalT = 0;
+    sim.elementalMaxT = 0;
     sim.landingGraceT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -403,10 +411,25 @@ export function startMagnet(sim, ctx) {
     ctx.onMagnetState(MAGNET_DURATION, MAGNET_DURATION);
 }
 
+/**
+ * Start — or replace — an elemental wash. Unlike the buffs this grants no
+ * mechanical advantage; it hands the renderer an element to bathe the cube in
+ * for ELEMENTAL_DURATION seconds. Claiming a second element simply swaps the
+ * active one, so the cube never shows two elements at once.
+ */
+export function startElemental(sim, ctx, type) {
+    sim.elementalType = type;
+    sim.elementalT = ELEMENTAL_DURATION;
+    sim.elementalMaxT = ELEMENTAL_DURATION;
+    ctx.feel('orb');
+    ctx.onElementalTheme(type, ELEMENTAL_DURATION);
+}
+
 /** Apply a claimed special orb's effect. */
 export function activateSpecial(sim, ctx, type) {
     if (type === 'rocket') startRocket(sim, ctx);
     else if (type === 'magnet') startMagnet(sim, ctx);
+    else if (isElementalType(type)) startElemental(sim, ctx, type);
 }
 
 /** Whether `next` is a 180° reversal of the current heading. */
@@ -1444,6 +1467,19 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.magnetT = 0;
             sim.magnetMaxT = 0;
             ctx.onMagnetState(0, 0);
+        }
+    }
+
+    // Elemental wash: drain the mood timer on the same crawling-only clock as the
+    // buffs, so a pause or tunnel transit freezes it rather than letting it lapse
+    // off-screen. Purely cosmetic — nothing about gameplay reads it.
+    if (sim.phase === 'crawling' && sim.elementalT > 0) {
+        sim.elementalT -= delta;
+        if (sim.elementalT <= 0) {
+            sim.elementalT = 0;
+            sim.elementalMaxT = 0;
+            sim.elementalType = null;
+            ctx.onElementalTheme(null, 0);
         }
     }
 

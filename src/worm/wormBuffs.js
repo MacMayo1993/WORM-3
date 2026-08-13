@@ -17,6 +17,8 @@ export const wormBuffs = {
   magnetT: 0,        // seconds of magnet reach remaining
   magnetMaxT: 0,     // duration of the active magnet, for the fill fraction
   rocketActive: false,
+  elementalT: 0,     // seconds of the active elemental wash remaining
+  elementalMaxT: 0,  // duration of the active wash, for the fill fraction
 };
 
 /**
@@ -43,4 +45,6 @@ export function resetWormBuffs() {
   wormBuffs.magnetT = 0;
   wormBuffs.magnetMaxT = 0;
   wormBuffs.rocketActive = false;
+  wormBuffs.elementalT = 0;
+  wormBuffs.elementalMaxT = 0;
 }

@@ -196,7 +196,7 @@ export function useWormCrawler(size, cubies) {
                 // A run ending mid-buff must not leave a pill stranded on the death
                 // screen — clear both the live readout and the store transitions.
                 resetWormBuffs();
-                useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null });
+                useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null });
                 if (deathMenuTimer.current) {
                     clearTimeout(deathMenuTimer.current);
                     deathMenuTimer.current = null;
@@ -304,6 +304,17 @@ export function useWormCrawler(size, cubies) {
                     wormMagnetSeq: (state.wormMagnetSeq ?? 0) + 1,
                 }));
             },
+            // Elemental wash: the store carries only the active element key (null when
+            // none), enough for the atmosphere overlay to mount/unmount and the HUD to
+            // show a pill. The remaining seconds ride the wormBuffs bridge like the
+            // magnet's, so the countdown freezes with the simulation.
+            onElementalTheme: (type, maxSeconds) => {
+                wormBuffs.elementalT = type ? (maxSeconds ?? 0) : 0;
+                wormBuffs.elementalMaxT = type ? (maxSeconds ?? 0) : 0;
+                if (useGameStore.getState().wormElementalTheme !== (type ?? null)) {
+                    useGameStore.setState({ wormElementalTheme: type ?? null });
+                }
+            },
             onSpecialSpawned: (type) => useGameStore.setState((state) => ({
                 wormSpecialNotice: { kind: 'spawn', type, seq: (state.wormSpecialNotice?.seq ?? 0) + 1 },
             })),
@@ -347,6 +358,8 @@ export function useWormCrawler(size, cubies) {
         wormBuffs.magnetT = sim.magnetT;
         wormBuffs.magnetMaxT = sim.magnetMaxT;
         wormBuffs.rocketActive = sim.rocketActive;
+        wormBuffs.elementalT = sim.elementalT;
+        wormBuffs.elementalMaxT = sim.elementalMaxT;
         publishTilePress(sim, sizeRef.current, ctxRef.current, delta);
     }, []);
 
@@ -372,6 +385,7 @@ export function useWormCrawler(size, cubies) {
             wormMagnetActive: false,
             wormMagnetSeq: 0,
             wormSpecialNotice: null,
+            wormElementalTheme: null,
             wormOrbFlash: null,
             wormBodyTiles: 0,
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },

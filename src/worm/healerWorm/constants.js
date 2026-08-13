@@ -187,6 +187,11 @@ export const ROCKET_LANDING_GRACE = 1.0;
 // pull reaches around face edges and corners.
 export const MAGNET_DURATION = 8;
 export const MAGNET_RADIUS = 2;
+// Elemental orbs (water / lava / grass / ice) — a claimed element bathes the whole
+// cube in its atmosphere for ELEMENTAL_DURATION seconds. Longer than the buffs
+// because it is a scene mood rather than a moment-to-moment advantage; a second
+// element claimed while one is running simply replaces it.
+export const ELEMENTAL_DURATION = 18;
 // Ceiling on queued attraction streaks. A sweep can only reach a dozen or so orbs,
 // but the cap keeps a pathological case from spawning unbounded geometry and React
 // state in a single frame.

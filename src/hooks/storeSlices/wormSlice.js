@@ -67,6 +67,7 @@ export const createWormSlice = (set, _get) => ({
   setWormBodyTiles: (v) => set({ wormBodyTiles: v }),
   setWormPowerups: (v) => set({ wormPowerups: v }),
   setWormSpecials: (v) => set({ wormSpecials: v }),
+  setWormElementalTheme: (v) => set({ wormElementalTheme: v }),
   setWormAlive: (v) => set({ wormAlive: v }),
   setShowWormDeathMenu: (v) => set({ showWormDeathMenu: v }),
   setWormDeathDetails: (v) => set({ wormDeathDetails: v }),

@@ -10,8 +10,17 @@
 // `iconPath` is SVG path data in a 24×24 viewBox, so the HUD can draw the same
 // silhouette the 3D orb uses instead of an emoji (which renders differently on
 // every platform and carries no accessible name).
+//
+// The elemental orbs (water / lava / grass / ice) are folded in from
+// elementalDefs.js so the shared spawn, lifetime, claim, HUD-notice and icon
+// pipeline treats them exactly like the rocket and magnet — only their claimed
+// effect differs (they wash the cube in their element instead of buffing the
+// worm). Keeping them in one map is why nothing in the spawn/HUD path needs a
+// special case for elements.
 
-export const SPECIAL_DEFS = {
+import { ELEMENTAL_DEFS, ELEMENTAL_TYPES, isElementalType } from './elementalDefs.js';
+
+const BASE_SPECIAL_DEFS = {
   rocket: {
     label: 'ROCKET',
     color: '#ff9d2e',
@@ -36,8 +45,21 @@ export const SPECIAL_DEFS = {
   },
 };
 
-/** Canonical list of supported special types. */
+/**
+ * All claimable orb types — the two worm buffs plus every elemental wash.
+ * Elements are appended after rocket/magnet so the shuffle bag (specialSpawn.js)
+ * spreads them evenly alongside the buffs.
+ */
+export const SPECIAL_DEFS = { ...BASE_SPECIAL_DEFS, ...ELEMENTAL_DEFS };
+
+/** Canonical list of supported special types (buffs + elements). */
 export const SPECIAL_TYPES = Object.keys(SPECIAL_DEFS);
+
+/** Just the worm buffs (rocket / magnet) — the always-present half of each bag. */
+export const BUFF_TYPES = Object.keys(BASE_SPECIAL_DEFS);
+
+/** Just the elemental orb types, in catalogue order. */
+export { ELEMENTAL_TYPES, isElementalType };
 
 /** Look up a special's presentation data, falling back to the first defined type. */
 export const getSpecialDef = (type) => SPECIAL_DEFS[type] ?? SPECIAL_DEFS[SPECIAL_TYPES[0]];
