@@ -1,28 +1,30 @@
 // src/worm/ElementalAtmosphere.jsx
 //
-// The visible payload of an elemental orb. When the worm claims one, the store's
-// `wormElementalTheme` flips to that element and this overlay mounts, bathing the
-// entire cube in the element: a translucent colour dome washes the whole scene,
-// a coloured fill light shifts the cube's lighting toward the element, and a field
-// of drifting particles (bubbles, embers, spores or flakes) fills the air around it.
+// The ambiance around an active elemental orb. The element itself is laid ON the
+// cube by ElementalCubeSkin (a translucent water/lava/grass/ice layer over every
+// face); this component adds the space around it so the worm reads as moving
+// *through* the element:
+//   • a field of drifting particles enveloping the cube — bubbles rising through
+//     water, embers through lava, spores through grass, snow through ice, and
+//   • a soft element-coloured fill light so the worm and cube pick up the element's
+//     hue as they move through it.
 //
-// The wash is deliberately thin and the dome uses normal blending at low opacity,
-// so every sticker's own tile style keeps rendering and stays readable underneath —
-// the cube reads as "water" or "lava" as a whole while each face is still itself.
-//
-// The effect temporarily owns scene.fog, but restores the previous fog on cleanup.
+// It deliberately does NOT touch scene.fog or the canvas background — an earlier
+// version tinted the whole backdrop, which read as "the background changed" rather
+// than "the cube is in the element". The visible element now lives on the cube.
 
-import { useEffect, useMemo, useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { wormBuffs } from './wormBuffs.js';
+import ElementalCubeSkin from './ElementalCubeSkin.jsx';
 
 const PARTICLE_COUNT = 130;
-const FADE_IN = 0.55; // seconds to ramp the wash up on claim
-const FADE_OUT = 1.25; // soften the end instead of popping the atmosphere away
+const FADE_IN = 0.55; // seconds to ramp the fill light up on claim
+const FADE_OUT = 1.25; // soften the end instead of popping the light/particles away
 
 // Per-behaviour motion. `vy` is the vertical drift (units/sec, sign = direction),
 // `sway` the horizontal wobble amplitude, `blend` the material blending, and
@@ -110,9 +112,7 @@ function ElementalParticles({ element, kind, color, extent }) {
 
 export default function ElementalAtmosphere({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
-  const scene = useThree((s) => s.scene);
   const lightRef = useRef();
-  const ownedFogRef = useRef(null);
   const fadeRef = useRef(0);
   const reducedRef = useRef(prefersReducedMotion());
 
@@ -126,61 +126,33 @@ export default function ElementalAtmosphere({ size = 3 }) {
     fadeRef.current = 0;
   }
 
-  // Envelope large enough to surround the whole cube.
+  // Particle envelope large enough to surround the whole cube.
   const extent = size * 0.75 + 1.6;
-  // How far the wash reaches. Near tiles stay clear (readable); everything past
-  // FOG_FAR recedes fully into the element colour, so the whole world reads as it.
-  const FOG_NEAR = size * 0.6 + 1.0;
-  const FOG_FAR = size * 2.4 + 9.0;
 
-  // The wash colour is a saturated blend of the element's vivid colour with its
-  // deep fog tone — bright enough to read unmistakably as "water"/"lava" rather
-  // than merely darkening the cube, deep enough not to blow out the tiles.
-  const fogColor = useMemo(() => {
-    if (!def) return new THREE.Color('#000');
-    return new THREE.Color(def.color).lerp(new THREE.Color(def.fogColor), 0.45);
-  }, [def]);
   const lightColor = useMemo(() => (def ? new THREE.Color(def.color) : new THREE.Color('#fff')), [def]);
-
-  // Own scene.fog for the element's lifetime, restoring whatever was there before.
-  // This is the reliable full-world wash: it tints the cube, the worm and the
-  // backdrop by distance, regardless of where the chase camera sits.
-  useEffect(() => {
-    if (!def) return undefined;
-    const prevFog = scene.fog;
-    const fog = new THREE.Fog(fogColor.clone(), FOG_NEAR, 400);
-    ownedFogRef.current = fog;
-    scene.fog = fog;
-    return () => {
-      // Do not clobber fog installed by another scene effect after this one mounted.
-      if (scene.fog === fog) scene.fog = prevFog;
-      if (ownedFogRef.current === fog) ownedFogRef.current = null;
-    };
-    // Re-own on element change so the new colour takes over cleanly.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [def, scene]);
 
   useFrame((_, delta) => {
     if (!def) return;
     fadeRef.current = Math.min(1, fadeRef.current + delta / FADE_IN);
+    // Ramp the fill light down over the buff's final second so it eases out rather
+    // than snapping off. wormBuffs mirrors the sim clock (freezes on pause/tunnel).
     const remainingFade = Math.min(1, wormBuffs.elementalT / FADE_OUT);
     const f = Math.min(fadeRef.current, remainingFade);
-    // Pull the fog's far plane in as the wash ramps up: far away → barely any tint,
-    // at FOG_FAR → the world is fully bathed. A smooth, reversible intensity knob.
-    if (ownedFogRef.current) {
-      ownedFogRef.current.far = THREE.MathUtils.lerp(400, FOG_FAR, f);
-    }
-    if (lightRef.current) lightRef.current.intensity = 0.75 * f;
+    if (lightRef.current) lightRef.current.intensity = 0.55 * f;
   });
 
   if (!def) return null;
 
   return (
     <group>
-      {/* Element-coloured fill light — shifts the cube's lighting toward the element
-          so the whole solid reads as bathed in it, not just fogged around. */}
-      <hemisphereLight ref={lightRef} color={lightColor} groundColor={fogColor} intensity={0} />
+      {/* The element laid on the cube itself — the main event. */}
+      <ElementalCubeSkin size={size} />
 
+      {/* Element-coloured fill light — the worm and cube pick up the element's hue
+          as they move through it. */}
+      <hemisphereLight ref={lightRef} color={lightColor} groundColor={lightColor} intensity={0} />
+
+      {/* Drifting medium around the cube — bubbles/embers/spores/snow. */}
       {!reducedRef.current && (
         <ElementalParticles
           element={element}
