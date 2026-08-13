@@ -1128,34 +1128,43 @@ export const newStyleShaders = {
     varying vec2 vUv;
     varying vec3 vTileCenter;
 
-    // Smooth 2D metaball field in tile UV space.  The previous lava-lamp shader
-    // rebuilt a tangent frame from screen-space derivatives and then raymarched
-    // through that frame; during live slice drags, zooms, and camera rotations
-    // those derivatives can jump a pixel at a time, which made the blobs look
-    // grainy or glitchy.  This version is intentionally local-UV based, so the
-    // pattern moves with the sticker and stays stable at every viewing angle.
-    float lavaField(vec2 p, float t, float ph, float jit) {
+    // Smooth, bounded 2D metaball field in tile-local UV space.
+    //
+    // The blobs are computed entirely from vUv and a per-tile phase, so the
+    // pattern rides the sticker and never re-seeds from screen-space derivatives
+    // (the old raymarched version did, which is what made it glitch on drags and
+    // zooms). Each blob's contribution is a SOFT metaball: dividing by
+    // (d² + r²·k) with k≈0.55 keeps every term bounded to ~1/k at the centre, so
+    // the summed field is smooth everywhere. The old field divided by a tiny
+    // constant (d² + 0.012), which spiked near a blob's centre and made the
+    // threshold isoline flicker frame-to-frame — the "spazzing" being fixed here.
+    //
+    // Blobs rise and fall on a slow eased loop (cos), pausing at the top and
+    // bottom like real wax, wobbling gently sideways and necking thinner at the
+    // ends of their travel.
+    float lavaField(vec2 p, float t, float ph, float sway) {
       float f = 0.0;
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 4; i++) {
         float fi = float(i);
-        float travel = sin(t * (0.16 + 0.025 * fi) + ph + fi * 2.12);
-        float y = travel * 0.33;
-        float x = sin(t * (0.10 + 0.03 * fi) + ph + fi * 1.31) * 0.12
-                + sin(travel * 2.8 + fi) * 0.035;
-        // Slow, smooth shake while the tile's slice is being dragged.  Avoid
-        // high-frequency jitter here; high temporal frequencies alias badly on
-        // mobile and were perceived as grain during rotations.
-        x += sin(t * 3.2 + ph + fi * 1.7) * 0.055 * jit;
-        y += cos(t * 2.8 + ph + fi * 1.1) * 0.045 * jit;
-        vec2 d = p - vec2(x, y);
-        float r = 0.13 + 0.025 * sin(t * 0.45 + ph + fi * 1.9);
-        f += (r * r) / (dot(d, d) + 0.012);
+        float phase = ph + fi * 1.7;
+        // Slow vertical loop, eased at both ends (~16–24s period per blob).
+        float speed = 0.22 + 0.045 * fi;
+        float climb = 0.5 - 0.5 * cos(t * speed + phase);   // 0 bottom → 1 top
+        float yc = -0.34 + 0.68 * climb;
+        // Gentle horizontal wobble; a touch more while the slice is turning.
+        float xc = sin(t * (0.33 + 0.07 * fi) + phase) * 0.09
+                 + sin(t * 1.6 + phase) * 0.03 * sway;
+        // Fuller through the middle of the climb, thinner (necking) at the ends.
+        float neck = 0.5 + 0.5 * sin(climb * 3.14159);
+        float r = (0.105 + 0.02 * sin(t * 0.5 + phase)) * neck;
+        vec2 d = p - vec2(xc, yc);
+        f += (r * r) / (dot(d, d) + r * r * 0.55);
       }
 
-      // Warm bottom reservoir with a flattened silhouette, giving blobs
-      // something to visually neck off from without any raymarch quantization.
-      vec2 d = p - vec2(0.0, -0.43);
-      f += 0.095 / (d.x * d.x * 0.65 + d.y * d.y * 5.0 + 0.012);
+      // Wide, flat heated reservoir at the base for blobs to neck off from.
+      vec2 dr = p - vec2(0.0, -0.44);
+      float rr = 0.17;
+      f += (rr * rr) / (dr.x * dr.x * 0.5 + dr.y * dr.y * 3.5 + rr * rr * 0.5);
       return f;
     }
 
@@ -1167,7 +1176,7 @@ export const newStyleShaders = {
       float rr = min(max(qd.x, qd.y), 0.0) + length(max(qd, vec2(0.0))) - 0.06;
       float chamber = 1.0 - smoothstep(0.0, 0.015, rr);
 
-      // Slice membership → only the turning slice's lamps get a gentle shake.
+      // Slice membership → only the turning slice's lamps sway a little more.
       float axisCoord = spinAxis < 0.5 ? vTileCenter.x
                       : spinAxis < 1.5 ? vTileCenter.y
                       : vTileCenter.z;
@@ -1178,35 +1187,40 @@ export const newStyleShaders = {
       float ph = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;
 
       float F = lavaField(p, time, ph, sp);
-      // fwidth anti-aliases the blob edge based on the final scalar field only;
-      // it does not affect the coordinate system, so camera motion cannot warp
-      // or re-seed the lava pattern.
-      float aa = max(fwidth(F) * 0.65, 0.012);
-      float cover = smoothstep(0.92 - aa, 0.92 + aa, F);
+      // The field is smooth and bounded now, so fwidth stays modest; clamp it to a
+      // tight band anyway so the blob edge can never shimmer at grazing angles.
+      float aa = clamp(fwidth(F) * 0.8, 0.008, 0.05);
+      float cover = smoothstep(1.0 - aa, 1.0 + aa, F);
+      // How deep inside a blob a pixel is — drives the hot glowing core.
+      float depth = smoothstep(1.0, 2.1, F);
 
+      // ── Background fluid ─────────────────────────────────────────────────────
       float grad = smoothstep(0.5, -0.5, p.y);      // 1 at the bottom
+      vec3 fluid = mix(baseColor * 0.20, mix(baseColor, antipodalColor, 0.30) * 0.5, grad);
+      // Warm halo cast by the bulb/heater at the very bottom.
+      float heater = smoothstep(0.32, 0.0, length(p - vec2(0.0, -0.46)));
+      fluid += mix(antipodalColor, vec3(1.0, 0.86, 0.5), 0.5) * heater * 0.32;
 
-      vec3 lavaDeep = antipodalColor * 0.55;
-      vec3 lavaHot  = mix(antipodalColor, vec3(1.0, 0.92, 0.5), 0.45);
-      vec3 lava = mix(lavaDeep, lavaHot, smoothstep(0.0, 1.0, cover));
-      lava *= 0.86 + 0.28 * smoothstep(-0.35, 0.35, p.y);
-      float rimGlow = smoothstep(0.08, 0.32, cover) * (1.0 - smoothstep(0.55, 0.96, cover));
-      lava += mix(antipodalColor, vec3(1.0), 0.6) * rimGlow * 0.32;
-      lava += antipodalColor * cover * 0.16;
+      // ── Lava blobs ───────────────────────────────────────────────────────────
+      // Palette-faithful: deep antipodal edge → soft glowing core, so any face
+      // colour reads as molten wax rather than being forced orange.
+      vec3 lavaEdge = antipodalColor * 0.6;
+      vec3 lavaCore = mix(antipodalColor, vec3(1.0, 0.95, 0.8), 0.5);
+      vec3 lava = mix(lavaEdge, lavaCore, depth);
+      lava += lavaCore * depth * 0.18;              // inner glow
+      // Bright necking rim where a blob meets the fluid.
+      float rimGlow = cover * (1.0 - depth);
+      lava += mix(antipodalColor, vec3(1.0), 0.5) * rimGlow * 0.14;
 
-      vec3 fluid = baseColor * (0.28 + grad * 0.3);
-      float bulb = smoothstep(0.42, 0.0, length(p - vec2(0.0, -0.42)));
-      fluid += mix(baseColor, antipodalColor, 0.45) * bulb * 0.4;
+      vec3 col = mix(fluid, lava, cover);
 
-      vec3 col = mix(fluid, lava, smoothstep(0.04, 0.55, cover));
-
-      // Glass front: bright rim + a diagonal reflection.
+      // ── Glass vessel: bright rim + a diagonal reflection ─────────────────────
       float rimEdge = smoothstep(0.05, 0.0, abs(rr + 0.03));
-      col += mix(baseColor * 1.3, vec3(1.0), 0.5) * rimEdge * 0.5;
-      float slash = smoothstep(0.03, 0.0, abs((p.x + p.y * 0.5) - 0.12)) * smoothstep(0.4, 0.05, length(p));
-      col += vec3(1.0) * slash * 0.07;
+      col += mix(baseColor * 1.3, vec3(1.0), 0.5) * rimEdge * 0.45;
+      float slash = smoothstep(0.035, 0.0, abs((p.x + p.y * 0.5) - 0.14)) * smoothstep(0.42, 0.05, length(p));
+      col += vec3(1.0) * slash * 0.06;
 
-      vec3 frame = baseColor * 0.72;
+      vec3 frame = baseColor * 0.7;
       col = mix(frame, col, chamber);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
