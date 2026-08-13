@@ -13,6 +13,7 @@ import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
 import { wormBuffs } from './wormBuffs.js';
 import { getSpecialDef } from './healerWorm/specialDefs.js';
+import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { wormClock } from './wormClock.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
@@ -942,8 +943,11 @@ function BuffStrip() {
     const rocketActive = useGameStore(s => s.wormRocketActive ?? false);
     const magnetActive = useGameStore(s => s.wormMagnetActive ?? false);
     const magnetSeq = useGameStore(s => s.wormMagnetSeq ?? 0);
+    const elementalTheme = useGameStore(s => s.wormElementalTheme ?? null);
     const fillRef = useRef(null);
     const secondsRef = useRef(null);
+    const elemFillRef = useRef(null);
+    const elemSecondsRef = useRef(null);
 
     useEffect(() => {
         if (!magnetActive) return;
@@ -960,10 +964,27 @@ function BuffStrip() {
         // magnetSeq re-runs the loop on a refresh so the fill rescales to the new max.
     }, [magnetActive, magnetSeq]);
 
-    if (!rocketActive && !magnetActive) return null;
+    // Same rAF-to-DOM pattern as the magnet fill, reading the elemental clock the
+    // sim mirrors onto the wormBuffs bridge so it freezes with the simulation.
+    useEffect(() => {
+        if (!elementalTheme) return;
+        let raf = 0;
+        const paint = () => {
+            const { elementalT, elementalMaxT } = wormBuffs;
+            const pct = elementalMaxT > 0 ? Math.max(0, Math.min(1, elementalT / elementalMaxT)) * 100 : 0;
+            if (elemFillRef.current) elemFillRef.current.style.width = `${pct}%`;
+            if (elemSecondsRef.current) elemSecondsRef.current.textContent = `${Math.max(0, elementalT).toFixed(0)}s`;
+            raf = requestAnimationFrame(paint);
+        };
+        paint();
+        return () => cancelAnimationFrame(raf);
+    }, [elementalTheme]);
+
+    if (!rocketActive && !magnetActive && !elementalTheme) return null;
 
     const rocketDef = getSpecialDef('rocket');
     const magnetDef = getSpecialDef('magnet');
+    const elemDef = elementalTheme ? getElementalDef(elementalTheme) : null;
 
     return (
         <div style={BUFF_STRIP_STYLE} role="status" aria-live="polite">
@@ -997,6 +1018,26 @@ function BuffStrip() {
                     </span>
                     <span style={{ position: 'relative', zIndex: 1 }}>{magnetDef.label}</span>
                     <span ref={secondsRef} style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 30, textAlign: 'right' }} />
+                </div>
+            )}
+            {elemDef && (
+                <div
+                    style={{
+                        ...BUFF_PILL_STYLE,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        background: 'rgba(15, 23, 42, 0.78)',
+                        border: `1px solid ${elemDef.color}`,
+                        color: '#fff',
+                    }}
+                    aria-label={`${elemDef.label} element active`}
+                >
+                    <div ref={elemFillRef} style={{ ...BUFF_FILL_STYLE, width: '100%', background: `${elemDef.color}40` }} />
+                    <span style={{ position: 'relative', zIndex: 1, display: 'flex', color: elemDef.color }}>
+                        <SpecialIcon type={elementalTheme} />
+                    </span>
+                    <span style={{ position: 'relative', zIndex: 1 }}>{elemDef.label}</span>
+                    <span ref={elemSecondsRef} style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 24, textAlign: 'right' }} />
                 </div>
             )}
         </div>

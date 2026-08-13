@@ -10,21 +10,31 @@
 
 import { collectManifoldRing } from '../wormLogic.js';
 import { DIR_FORWARD } from './constants.js';
-import { SPECIAL_TYPES } from './specialDefs.js';
+import { BUFF_TYPES, ELEMENTAL_TYPES } from './specialDefs.js';
 
 export const tileKeyOf = (t) => `${t.x},${t.y},${t.z},${t.dirKey}`;
 
 // ─── Fair type selection ─────────────────────────────────────────────────────
-// A plain Math.random() pick over two types produces visible streaks — four
-// magnets in a row is a one-in-sixteen event, and players read that as broken.
-// A shuffle bag holding one of each type instead guarantees both appear over every
-// pair of draws, so the longest possible run is two (tail of one bag, head of the
-// next) and even that is suppressed below.
+// A plain Math.random() pick produces visible streaks — four magnets in a row is a
+// one-in-sixteen event, and players read that as broken. A shuffle bag holding one
+// of each type instead spreads the draws evenly.
+//
+// Each bag holds BOTH worm buffs (rocket + magnet) plus exactly one elemental orb,
+// rotated through the four elements bag by bag. That keeps the protective buffs
+// coming up as often as they always did — an element does not crowd them out — while
+// every element still appears in turn, as a rarer treat. The longest possible run of
+// a type is two (tail of one bag, head of the next) and even that is suppressed below.
 
-export const makeSpecialPicker = () => ({ bag: [], lastType: null, streak: 0 });
+export const makeSpecialPicker = () => ({ bag: [], lastType: null, streak: 0, elementCursor: 0 });
 
 const refillBag = (picker, rand) => {
-    const bag = SPECIAL_TYPES.slice();
+    const bag = BUFF_TYPES.slice();
+    // One rotating element joins each bag so a wash appears about once per bag
+    // without diluting how often rocket/magnet come up.
+    if (ELEMENTAL_TYPES.length > 0) {
+        bag.push(ELEMENTAL_TYPES[picker.elementCursor % ELEMENTAL_TYPES.length]);
+        picker.elementCursor = (picker.elementCursor + 1) % ELEMENTAL_TYPES.length;
+    }
     // Fisher-Yates with the injected RNG.
     for (let i = bag.length - 1; i > 0; i--) {
         const j = Math.floor(rand() * (i + 1));

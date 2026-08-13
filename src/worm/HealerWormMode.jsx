@@ -48,6 +48,7 @@ import { WormBody, RocketTailFire, GlowWormAura } from './healerWorm/WormBody.js
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { WormFace } from './healerWorm/WormFace.jsx';
 import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem, MagnetFX } from './healerWorm/orbSystems.jsx';
+import ElementalAtmosphere from './ElementalAtmosphere.jsx';
 import { HealBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
 import { WormholeRings } from './healerWorm/WormholeRings.jsx';
 import { HealerBombs } from './healerWorm/HealerBombs.jsx';
@@ -505,6 +506,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         <>
             <WormChaseCamera worm={worm} size={size} />
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
+            {/* Elemental orb wash — bathes the whole cube in the claimed element. */}
+            <ElementalAtmosphere size={size} />
             <TunnelInteriorView worm={worm} size={size} />
             {/* The shaft the camera actually rides inside — encloses the view so the
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}

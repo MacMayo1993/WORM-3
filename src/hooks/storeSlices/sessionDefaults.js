@@ -52,6 +52,10 @@ export const makeWormSessionDefaults = () => ({
   wormRocketActive: false,
   wormMagnetActive: false,
   wormMagnetSeq: 0,
+  // Active elemental wash ('water'|'lava'|'grass'|'ice') or null — drives the
+  // ElementalAtmosphere overlay and the HUD's element pill. Remaining seconds
+  // ride the wormBuffs bridge, not the store.
+  wormElementalTheme: null,
   // { kind: 'spawn'|'expire', type, seq } — drives the HUD's special notice toast.
   wormSpecialNotice: null,
   // { color, combo, seq } for the most recent orb pickup — drives the HUD's

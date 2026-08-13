@@ -10,7 +10,7 @@ import { getStickerWorldPos } from '../../game/coordinates.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { ensureOrbContrast, getOrbColor, readLiveTile } from '../wormHelpers.js';
 import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX, ORB_HOVER_HEIGHT, ORB_ELEVATED_HOVER_HEIGHT } from './constants.js';
-import { getSpecialDef } from './specialDefs.js';
+import { getSpecialDef, isElementalType } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
 
@@ -89,6 +89,11 @@ const _specialGeos = {
     timer: new THREE.TorusGeometry(0.34, 0.022, 8, 32),
     rocketBeacon: new THREE.ConeGeometry(0.42, 0.72, 3, 1, true),
     magnetField: new THREE.TorusGeometry(0.48, 0.018, 8, 40),
+    // Elemental orbs carry a faceted crystal instead of a rocket/magnet silhouette:
+    // a bright gem core inside a translucent shell, ringed by an element-coloured aura.
+    elemCore: new THREE.OctahedronGeometry(0.13, 0),
+    elemShell: new THREE.IcosahedronGeometry(0.2, 0),
+    elemAura: new THREE.TorusGeometry(0.46, 0.02, 8, 40),
 };
 
 const _spPos = new THREE.Vector3();
@@ -194,6 +199,24 @@ function SpecialOrb({ special, size }) {
                             </mesh>
                         ))}
                     </>
+                ) : isElementalType(special.type) ? (
+                    <>
+                        {/* Faceted element crystal: a glowing core inside a translucent shell. */}
+                        <mesh geometry={_specialGeos.elemShell} ref={tag(0.4)}>
+                            <meshStandardMaterial
+                                color={look.color} emissive={look.color} emissiveIntensity={0.7}
+                                roughness={0.1} metalness={0.1} transparent opacity={0.4}
+                                flatShading toneMapped={false}
+                            />
+                        </mesh>
+                        <mesh geometry={_specialGeos.elemCore} ref={tag(1)}>
+                            <meshStandardMaterial
+                                color={look.accent} emissive={look.color} emissiveIntensity={1.5}
+                                roughness={0.2} metalness={0.2} transparent opacity={1}
+                                flatShading toneMapped={false}
+                            />
+                        </mesh>
+                    </>
                 ) : (
                     <>
                         {/* Horseshoe magnet: a half-torus standing on two pole tips. */}
@@ -221,6 +244,17 @@ function SpecialOrb({ special, size }) {
                 <mesh geometry={_specialGeos.rocketBeacon} position={[0, -0.36, 0]} rotation={[0, 0, Math.PI]} ref={tag(0.34)}>
                     <meshBasicMaterial color="#ff5a16" transparent opacity={0.34} wireframe depthWrite={false} toneMapped={false} />
                 </mesh>
+            ) : isElementalType(special.type) ? (
+                /* Two crossed aura loops mark an element orb as clearly not a buff, and
+                   read from any oblique angle where the crystal is edge-on. */
+                <group>
+                    <mesh geometry={_specialGeos.elemAura} rotation={[Math.PI / 2, 0, 0]} ref={tag(0.5)}>
+                        <meshBasicMaterial color={look.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
+                    </mesh>
+                    <mesh geometry={_specialGeos.elemAura} rotation={[0, 0, Math.PI / 2]} ref={tag(0.32)}>
+                        <meshBasicMaterial color={look.accent} transparent opacity={0.32} depthWrite={false} toneMapped={false} />
+                    </mesh>
+                </group>
             ) : (
                 /* Two perpendicular cyan field loops give the magnet a wide, unmistakable
                    crosshair footprint instead of another compact floating gem. */

@@ -86,6 +86,7 @@ function makeCtx(overrides = {}) {
     onMagnetState: log('magnetState'),
     onSpecialSpawned: log('specialSpawned'),
     onSpecialExpired: log('specialExpired'),
+    onElementalTheme: log('elemental'),
     ...overrides,
   };
 }
@@ -517,11 +518,31 @@ describe('special type chooser', () => {
     return () => values[i++ % values.length];
   };
 
-  it('produces every type over each pair of draws', () => {
+  it('produces both buffs plus one element in each bag', () => {
     const picker = makeSpecialPicker();
-    const rand = seqRand([0.1, 0.9]);
-    const drawn = [drawSpecialType(picker, { rand }), drawSpecialType(picker, { rand })];
-    expect(new Set(drawn).size).toBe(SPECIAL_TYPES.length);
+    const rand = seqRand([0.1, 0.9, 0.5]);
+    // A bag is rocket + magnet + one element, so three draws empty exactly one bag.
+    const drawn = [
+      drawSpecialType(picker, { rand }),
+      drawSpecialType(picker, { rand }),
+      drawSpecialType(picker, { rand }),
+    ];
+    expect(drawn).toContain('rocket');
+    expect(drawn).toContain('magnet');
+    // Exactly one of the three is an element.
+    expect(drawn.filter(t => !['rocket', 'magnet'].includes(t))).toHaveLength(1);
+  });
+
+  it('rotates through every element across successive bags', () => {
+    const picker = makeSpecialPicker();
+    const rand = seqRand([0.1, 0.9, 0.5, 0.3, 0.7]);
+    const elements = new Set();
+    // Four bags of three draws — long enough to see all four elements cycle in.
+    for (let i = 0; i < 12; i++) {
+      const t = drawSpecialType(picker, { rand });
+      if (!['rocket', 'magnet'].includes(t)) elements.add(t);
+    }
+    expect(elements.size).toBe(4);
   });
 
   it('never returns the same type three times in a row', () => {
