@@ -45,6 +45,7 @@ const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
 const _bulgeStickerGeo = new THREE.PlaneGeometry(0.85, 0.85, 24, 24);
 // Slightly larger plane for the worm-mode rim glow — extends the halo beyond the tile edge.
 const _wormRimGlowGeo = new THREE.PlaneGeometry(1.05, 1.05);
+const _wormApertureGeo = new THREE.PlaneGeometry(0.76, 0.76);
 // Neon worm-border plane — sits in the grid-line channel just outside the sticker so the
 // glowing square outline traces the tile's own perimeter (like the neon view mode).
 const _neonBorderGeo = new THREE.PlaneGeometry(0.94, 0.94);
@@ -255,6 +256,40 @@ const wormRimGlowFragmentShader = `
 
     float alpha = rim * (0.55 + beat * 0.75) * shimmer * uIntensity;
     gl_FragColor = vec4(uColor * (1.5 + beat * 2.0), alpha);
+  }
+`;
+
+// A single, dominant depth cue for worm-mode flipped tiles. Concentric rounded
+// squares contract toward an off-centre vanishing point while sparse spokes
+// breathe outward. Unlike the older crack/rim decoration this reads as an actual
+// opening even in a still frame and leaves a border of the tile colour visible.
+const wormApertureFragmentShader = `
+  uniform vec3 uColor;
+  uniform float uTime;
+  uniform float uIntensity;
+  uniform float uDanger;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 p = vUv - 0.5;
+    float box = max(abs(p.x), abs(p.y));
+    float opening = 1.0 - smoothstep(0.39, 0.49, box);
+
+    vec2 q = p + vec2(sin(uTime * 0.37), cos(uTime * 0.31)) * 0.018;
+    float depth = max(abs(q.x), abs(q.y));
+    float rings = pow(1.0 - abs(fract(depth * 13.0 - uTime * (0.34 + uDanger * 0.22)) - 0.5) * 2.0, 7.0);
+    float angle = atan(q.y, q.x);
+    float rays = pow(max(0.0, sin(angle * 6.0 + uTime * 0.55)), 18.0)
+      * smoothstep(0.08, 0.42, depth) * (1.0 - smoothstep(0.42, 0.49, depth));
+    float throat = 1.0 - smoothstep(0.02, 0.18, length(q));
+    float rim = smoothstep(0.35, 0.43, box) * (1.0 - smoothstep(0.43, 0.49, box));
+    float beat = 0.72 + 0.28 * sin(uTime * (2.2 + uDanger * 2.0));
+
+    vec3 voidCol = vec3(0.006, 0.008, 0.018);
+    vec3 col = voidCol + uColor * (rings * 0.48 + rays * 0.9 + rim * 1.25) * beat;
+    col += uColor * throat * 0.13;
+    float alpha = opening * uIntensity * (0.88 + rim * 0.12);
+    gl_FragColor = vec4(col, alpha);
   }
 `;
 
@@ -767,10 +802,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Worm-mode rim glow — heartbeat ring on flipped tiles in worm healer mode
   const wormRimGroupRef = useRef();
   const wormRimMatRef = useRef();
+  const wormApertureMatRef = useRef();
   const [wormRimUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
     uTime: { value: 0 },
     uIntensity: { value: 0 },
+  }));
+  const [wormApertureUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color() },
+    uTime: { value: 0 },
+    uIntensity: { value: 0 },
+    uDanger: { value: 0 },
   }));
   // Worm footprint — the tile's grid square lit up while the worm's weight is on it.
   // The group carries the lit square down with the tile; the sticker itself sinks on
@@ -804,6 +846,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       wispyRingMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       neonBorderMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       wormRimMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
+      wormApertureMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       footprintMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
     };
   }, []);
@@ -1580,6 +1623,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         : 0;
       wormRimMatRef.current.uniforms.uColor.value.set(antipodalColor);
     }
+    if (wormApertureMatRef.current) {
+      const apertureActive = wormHealerMode && showWormholeHazardFx;
+      wormApertureMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      wormApertureMatRef.current.uniforms.uIntensity.value = apertureActive ? 1 : 0;
+      wormApertureMatRef.current.uniforms.uDanger.value = effectiveFlipCap > 0
+        ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap)
+        : 0;
+      wormApertureMatRef.current.uniforms.uColor.value.set(antipodalColor);
+    }
     if (wormRimGroupRef.current) {
       if (wormHealerMode && showWormholeHazardFx) {
         const bt = (state.clock.elapsedTime * 1.8) % 1.0;
@@ -2269,6 +2321,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               effect "pops" forward rhythmically, as if the antipodal face is pressing through. */}
           {isWormhole && wormHealerMode && (
             <group ref={wormRimGroupRef}>
+              <mesh position={[0, 0, 0.021]} renderOrder={2} geometry={_wormApertureGeo}>
+                <shaderMaterial
+                  ref={wormApertureMatRef}
+                  vertexShader={hazardCrackVertexShader}
+                  fragmentShader={wormApertureFragmentShader}
+                  uniforms={wormApertureUniforms}
+                  transparent
+                  depthWrite={false}
+                />
+              </mesh>
               <mesh position={[0, 0, 0.022]} renderOrder={3}>
                 <primitive object={_wormRimGlowGeo} attach="geometry" />
                 <shaderMaterial

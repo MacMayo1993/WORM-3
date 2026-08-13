@@ -105,13 +105,17 @@ const fragmentShader = /* glsl */`
       alpha = 0.5 + fres * 0.35 + caustic * 0.1;
     } else if (uMode == 1) {
       // ── Lava ─────────────────────────────────────────────────────────────
-      // Dark crust broken by glowing cracks that flow across the world field.
+      // Sparse molten runoff rather than an opaque coat. Most of the sticker is
+      // deliberately clear; only narrow moving fissures and their warm fringe
+      // remain, so face colours and special-tile markings stay readable.
       float f = wfield3(vWorld, t);
-      float crust = smoothstep(0.15, 0.9, abs(f) * 0.5);
-      col = mix(uColor * 1.1, vec3(0.04, 0.01, 0.0), crust);
-      col += uAccent * (1.0 - crust) * 0.8;                 // molten glow in the cracks
-      col += uColor * pow(1.0 - crust, 3.0) * 0.6;
-      alpha = 0.88;
+      float line = 1.0 - smoothstep(0.06, 0.23, abs(f));
+      float fringe = 1.0 - smoothstep(0.12, 0.48, abs(f));
+      float flicker = 0.78 + 0.22 * sin(t * 2.8 + vWorld.x * 2.1 - vWorld.y * 1.7);
+      col = mix(uColor * 0.65, uAccent, line * 0.72);
+      col += uColor * line * flicker * 0.85;
+      // A faint heat stain connects the fissures without repainting the board.
+      alpha = 0.07 + fringe * 0.18 + line * 0.42;
     } else {
       // ── Ice ──────────────────────────────────────────────────────────────
       // Frosted facets + crack lines, bright at grazing angles.
