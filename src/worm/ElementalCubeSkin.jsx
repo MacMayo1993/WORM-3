@@ -9,14 +9,21 @@
 // It reuses the exact per-sticker volume components the "Living" tile styles use
 // (WaterVolume / LavaVolume / GrassBlades / IceVolume). Each renders in its
 // sticker's local +Z frame (the outward face normal), the tile roughly filling
-// local XY — so we simply place one at every surface sticker, oriented so local
-// +Z points along that face's world normal, and the layer floats just above the
-// existing sticker, translucent enough that the tile style stays readable.
+// local XY — so we place them across every face, oriented so local +Z points
+// along that face's world normal, translucent enough that the tile style stays
+// readable underneath.
 //
-// The surface-position set is fixed for a given cube size and the layer colour is
-// uniform across faces, so the whole skin is static geometry — it never depends
-// on `cubies`, never churns on a move, and looks identical whether a slice is
-// mid-turn or not (uniform coverage). Memoised on size+element accordingly.
+// Density is capped, not the effect: up to a MAX_SKIN_GRID×MAX_SKIN_GRID grid of
+// volumes per face. For cubes at or below that size that is exactly one volume
+// per sticker (cellScale 1). For the bigger advertised modes (6×6, 7×7, 15×15)
+// it coarsens to the same bounded ~6·grid² volumes, each scaled up to cover its
+// cell so the whole cube is still sheathed — an optimized face-level fallback
+// rather than dropping the effect. Cost is therefore constant in cube size.
+//
+// The layer colour is uniform across faces and the sampled positions are fixed
+// for a given size, so the whole skin is static geometry — it never depends on
+// `cubies`, never churns on a move, and looks identical whether a slice is
+// mid-turn or not. Memoised on size+element accordingly.
 
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -41,30 +48,44 @@ const ELEMENT_VOLUME = {
 
 const FADE_IN = 0.55;  // seconds for the layer to well up out of the faces
 const FADE_OUT = 1.25; // matches ElementalAtmosphere — soften the end, no pop
-// Above this cube size the per-sticker volumes are a performance risk (6·size²
-// translucent volumes), mirroring StickerPlane's own suppressVolumeFX cap.
-const MAX_SKIN_SIZE = 5;
+// Cap on volumes-per-face-edge. At or below this the grid is one volume per real
+// sticker; above it the face is covered by a coarser grid of scaled-up volumes,
+// so total cost stays ~6·MAX_SKIN_GRID² regardless of cube size. 5 matches the
+// point at which StickerPlane's own suppressVolumeFX stops per-sticker volumes.
+const MAX_SKIN_GRID = 5;
 
-const DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
+// Per-face definition: the fixed axis pinned to the outer layer, plus the two
+// in-plane axes the grid varies over.
+const FACES = [
+  { dk: 'PX', fixed: 'x', outer: (n) => n - 1, a: 'y', b: 'z' },
+  { dk: 'NX', fixed: 'x', outer: () => 0, a: 'y', b: 'z' },
+  { dk: 'PY', fixed: 'y', outer: (n) => n - 1, a: 'x', b: 'z' },
+  { dk: 'NY', fixed: 'y', outer: () => 0, a: 'x', b: 'z' },
+  { dk: 'PZ', fixed: 'z', outer: (n) => n - 1, a: 'x', b: 'y' },
+  { dk: 'NZ', fixed: 'z', outer: () => 0, a: 'x', b: 'y' }
+];
 const _zAxis = new THREE.Vector3(0, 0, 1);
 
-// Every outward-facing sticker position for a cube of this size.
+// Sampled cover positions for the element layer. Returns a gridN×gridN grid per
+// face (gridN = min(size, MAX_SKIN_GRID)); each entry carries the world position
+// of a representative sticker in its cell and `cell` = how many stickers wide the
+// cell is, so the volume there can be scaled to cover it.
 function surfaceStickers(size) {
+  const gridN = Math.min(size, MAX_SKIN_GRID);
+  const cell = size / gridN;                                   // 1 when gridN === size
+  const sample = (j) => Math.min(size - 1, Math.floor((j + 0.5) * size / gridN));
   const out = [];
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      for (let z = 0; z < size; z++) {
-        for (const dk of DIRS) {
-          const visible =
-            (dk === 'PX' && x === size - 1) || (dk === 'NX' && x === 0) ||
-            (dk === 'PY' && y === size - 1) || (dk === 'NY' && y === 0) ||
-            (dk === 'PZ' && z === size - 1) || (dk === 'NZ' && z === 0);
-          if (!visible) continue;
-          const wp = getStickerWorldPos(x, y, z, dk, size, 0);
-          const n = FACE_NORMALS[dk] ?? FACE_NORMALS.PZ;
-          const quat = new THREE.Quaternion().setFromUnitVectors(_zAxis, n);
-          out.push({ key: `${x},${y},${z},${dk}`, pos: [wp[0], wp[1], wp[2]], quat });
-        }
+  for (const f of FACES) {
+    for (let j = 0; j < gridN; j++) {
+      for (let k = 0; k < gridN; k++) {
+        const coord = { x: 0, y: 0, z: 0 };
+        coord[f.fixed] = f.outer(size);
+        coord[f.a] = sample(j);
+        coord[f.b] = sample(k);
+        const wp = getStickerWorldPos(coord.x, coord.y, coord.z, f.dk, size, 0);
+        const n = FACE_NORMALS[f.dk] ?? FACE_NORMALS.PZ;
+        const quat = new THREE.Quaternion().setFromUnitVectors(_zAxis, n);
+        out.push({ key: `${f.dk}-${j}-${k}`, pos: [wp[0], wp[1], wp[2]], quat, cell });
       }
     }
   }
@@ -88,7 +109,7 @@ export default function ElementalCubeSkin({ size = 3 }) {
   }
 
   const stickers = useMemo(
-    () => (def && size <= MAX_SKIN_SIZE ? surfaceStickers(size) : []),
+    () => (def ? surfaceStickers(size) : []),
     [def, size]
   );
 
@@ -114,7 +135,9 @@ export default function ElementalCubeSkin({ size = 3 }) {
     <group>
       {stickers.map((s, i) => (
         <group key={s.key} position={s.pos} quaternion={s.quat}>
-          <group ref={(el) => { growRefs.current[i] = el; }}>
+          {/* In-plane scale (x,y) covers the cell on big cubes; the frame loop
+              drives only z, so the layer wells up without disturbing coverage. */}
+          <group ref={(el) => { growRefs.current[i] = el; }} scale={[s.cell, s.cell, 0.04]}>
             <Volume faceColor={def.color} />
           </group>
         </group>
