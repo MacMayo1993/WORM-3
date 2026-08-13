@@ -575,7 +575,8 @@ const BUFF_STRIP_STYLE = {
     left: '50%',
     transform: 'translateX(-50%)',
     display: 'flex',
-    gap: 6,
+    gap: 4,
+    maxWidth: 'calc(100vw - 16px)',
     pointerEvents: 'none',
 };
 
@@ -583,7 +584,7 @@ const BUFF_PILL_STYLE = {
     position: 'relative',
     overflow: 'hidden',
     borderRadius: 999,
-    padding: '5px 12px',
+    padding: '5px clamp(8px, 2.5vw, 12px)',
     fontSize: 11,
     fontWeight: 800,
     letterSpacing: 1.0,
@@ -1012,12 +1013,14 @@ function BuffStrip() {
                     }}
                     aria-label="Magnet active"
                 >
-                    <div ref={fillRef} style={{ ...BUFF_FILL_STYLE, width: '100%', background: 'rgba(56, 224, 255, 0.38)' }} />
+                    <div ref={fillRef} aria-hidden="true" style={{ ...BUFF_FILL_STYLE, width: '100%', background: 'rgba(56, 224, 255, 0.38)' }} />
                     <span style={{ position: 'relative', zIndex: 1, display: 'flex', color: magnetDef.color }}>
                         <SpecialIcon type="magnet" />
                     </span>
                     <span style={{ position: 'relative', zIndex: 1 }}>{magnetDef.label}</span>
-                    <span ref={secondsRef} style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 30, textAlign: 'right' }} />
+                    {/* The visual timer updates every frame; hide it from the live
+                        region so assistive tech announces activation once, not 10×/s. */}
+                    <span ref={secondsRef} aria-hidden="true" style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 30, textAlign: 'right' }} />
                 </div>
             )}
             {elemDef && (
@@ -1032,12 +1035,12 @@ function BuffStrip() {
                     }}
                     aria-label={`${elemDef.label} element active`}
                 >
-                    <div ref={elemFillRef} style={{ ...BUFF_FILL_STYLE, width: '100%', background: `${elemDef.color}40` }} />
+                    <div ref={elemFillRef} aria-hidden="true" style={{ ...BUFF_FILL_STYLE, width: '100%', background: `${elemDef.color}40` }} />
                     <span style={{ position: 'relative', zIndex: 1, display: 'flex', color: elemDef.color }}>
                         <SpecialIcon type={elementalTheme} />
                     </span>
                     <span style={{ position: 'relative', zIndex: 1 }}>{elemDef.label}</span>
-                    <span ref={elemSecondsRef} style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 24, textAlign: 'right' }} />
+                    <span ref={elemSecondsRef} aria-hidden="true" style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 24, textAlign: 'right' }} />
                 </div>
             )}
         </div>
