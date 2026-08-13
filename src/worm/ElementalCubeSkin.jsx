@@ -37,18 +37,12 @@ import { FACE_NORMALS } from './healerWorm/constants.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
-import WaterVolume from '../3d/styles/WaterVolume.jsx';
-import LavaVolume from '../3d/styles/LavaVolume.jsx';
 import GrassBlades from '../3d/styles/GrassBlades.jsx';
-import IceVolume from '../3d/styles/IceVolume.jsx';
+import { getElementalSurfaceGeo, getElementalSurfaceMaterial } from './ElementalSurface.jsx';
 
-// Which volume component skins the cube for each element.
-const ELEMENT_VOLUME = {
-  water: WaterVolume,
-  lava: LavaVolume,
-  grass: GrassBlades,
-  ice: IceVolume
-};
+// Water / lava / ice are drawn as a continuous animated surface (ElementalSurface);
+// grass keeps its dedicated blade mesh, which already sprouts convincingly.
+const SURFACE_ELEMENTS = new Set(['water', 'lava', 'ice']);
 
 const FADE_IN = 0.55;  // seconds for the layer to well up out of the faces
 const FADE_OUT = 1.25; // matches ElementalAtmosphere — soften the end, no pop
@@ -109,7 +103,14 @@ function surfaceStickers(size) {
 export default function ElementalCubeSkin({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
   const def = element ? getElementalDef(element) : null;
-  const Volume = element ? ELEMENT_VOLUME[element] : null;
+  const isSurface = !!def && SURFACE_ELEMENTS.has(element);
+  // Shared geometry + material for the surface elements — every tile references
+  // the same pair, so the whole layer is a few GPU objects regardless of count.
+  const surfaceGeo = useMemo(() => (isSurface ? getElementalSurfaceGeo() : null), [isSurface]);
+  const surfaceMat = useMemo(
+    () => (isSurface ? getElementalSurfaceMaterial(element, def.color, def.accent) : null),
+    [isSurface, element, def]
+  );
 
   // One ref per cell to the outer group. The frame loop drives its full transform
   // so the layer rides the live cubie meshes (mid-rotation slices included) rather
@@ -160,7 +161,7 @@ export default function ElementalCubeSkin({ size = 3 }) {
     }
   });
 
-  if (!def || !Volume || stickers.length === 0) return null;
+  if (!def || stickers.length === 0) return null;
 
   return (
     <group>
@@ -174,7 +175,12 @@ export default function ElementalCubeSkin({ size = 3 }) {
           quaternion={s.restQuat}
           scale={[s.cell * 0.01, s.cell * 0.01, 0.01]}
         >
-          <Volume faceColor={def.color} />
+          {isSurface ? (
+            // Continuous animated element surface, lifted just off the sticker.
+            <mesh geometry={surfaceGeo} material={surfaceMat} position={[0, 0, 0.03]} raycast={() => null} />
+          ) : (
+            <GrassBlades faceColor={def.color} />
+          )}
         </group>
       ))}
     </group>
