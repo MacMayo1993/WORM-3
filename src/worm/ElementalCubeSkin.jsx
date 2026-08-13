@@ -20,10 +20,13 @@
 // cell so the whole cube is still sheathed — an optimized face-level fallback
 // rather than dropping the effect. Cost is therefore constant in cube size.
 //
-// The layer colour is uniform across faces and the sampled positions are fixed
-// for a given size, so the whole skin is static geometry — it never depends on
-// `cubies`, never churns on a move, and looks identical whether a slice is
-// mid-turn or not. Memoised on size+element accordingly.
+// The layer colour is uniform across faces and the sampled cells are fixed for a
+// given size, so the geometry itself never churns on a move (memoised on
+// size+element). Each cell's transform is driven every frame from its live cubie
+// mesh, so the layer rides a turning slice with the tiles instead of hanging on
+// the stationary rest grid; it falls back to the rest grid before the meshes
+// exist. The claim/expiry fade is a uniform scale ramp (coverage + thickness),
+// since scaling thickness alone would leave the top plane at full size and alpha.
 
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -33,6 +36,7 @@ import { getStickerWorldPos } from '../game/coordinates.js';
 import { FACE_NORMALS } from './healerWorm/constants.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { wormBuffs } from './wormBuffs.js';
+import { readLiveTile } from './wormHelpers.js';
 import WaterVolume from '../3d/styles/WaterVolume.jsx';
 import LavaVolume from '../3d/styles/LavaVolume.jsx';
 import GrassBlades from '../3d/styles/GrassBlades.jsx';
@@ -65,11 +69,17 @@ const FACES = [
   { dk: 'NZ', fixed: 'z', outer: () => 0, a: 'x', b: 'y' }
 ];
 const _zAxis = new THREE.Vector3(0, 0, 1);
+// Frame-loop scratch — no per-frame allocation.
+const _livePos = new THREE.Vector3();
+const _liveNorm = new THREE.Vector3();
+const _liveQuat = new THREE.Quaternion();
+const _restPos = new THREE.Vector3();
 
-// Sampled cover positions for the element layer. Returns a gridN×gridN grid per
-// face (gridN = min(size, MAX_SKIN_GRID)); each entry carries the world position
-// of a representative sticker in its cell and `cell` = how many stickers wide the
-// cell is, so the volume there can be scaled to cover it.
+// Sampled cover cells for the element layer. Returns a gridN×gridN grid per face
+// (gridN = min(size, MAX_SKIN_GRID)); each entry names a representative sticker in
+// its cell (x/y/z/dirKey — used to read that cubie's LIVE transform each frame),
+// a resting world position + orientation for before the meshes exist, and `cell`
+// = how many stickers wide the cell is, so the volume can be scaled to cover it.
 function surfaceStickers(size) {
   const gridN = Math.min(size, MAX_SKIN_GRID);
   const cell = size / gridN;                                   // 1 when gridN === size
@@ -84,8 +94,12 @@ function surfaceStickers(size) {
         coord[f.b] = sample(k);
         const wp = getStickerWorldPos(coord.x, coord.y, coord.z, f.dk, size, 0);
         const n = FACE_NORMALS[f.dk] ?? FACE_NORMALS.PZ;
-        const quat = new THREE.Quaternion().setFromUnitVectors(_zAxis, n);
-        out.push({ key: `${f.dk}-${j}-${k}`, pos: [wp[0], wp[1], wp[2]], quat, cell });
+        const restQuat = new THREE.Quaternion().setFromUnitVectors(_zAxis, n);
+        out.push({
+          key: `${f.dk}-${j}-${k}`,
+          x: coord.x, y: coord.y, z: coord.z, dirKey: f.dk,
+          restPos: [wp[0], wp[1], wp[2]], restQuat, cell
+        });
       }
     }
   }
@@ -97,15 +111,16 @@ export default function ElementalCubeSkin({ size = 3 }) {
   const def = element ? getElementalDef(element) : null;
   const Volume = element ? ELEMENT_VOLUME[element] : null;
 
-  // Collected refs to each sticker's inner (pre-orientation) group. Scaling their
-  // local Z grows the layer straight out of the face — water rises, grass sprouts.
-  const growRefs = useRef([]);
+  // One ref per cell to the outer group. The frame loop drives its full transform
+  // so the layer rides the live cubie meshes (mid-rotation slices included) rather
+  // than sitting on the stationary rest grid.
+  const tileRefs = useRef([]);
   const fadeRef = useRef(0);
   const lastElementRef = useRef(null);
   if (lastElementRef.current !== element) {
     lastElementRef.current = element;
     fadeRef.current = 0;
-    growRefs.current = [];
+    tileRefs.current = [];
   }
 
   const stickers = useMemo(
@@ -120,12 +135,28 @@ export default function ElementalCubeSkin({ size = 3 }) {
     // of vanishing. wormBuffs mirrors the sim clock, so it freezes on pause/tunnel.
     const remaining = Math.min(1, wormBuffs.elementalT / FADE_OUT);
     const f = Math.min(fadeRef.current, remaining);
-    // Ease so it wells up smoothly. Keep a sliver of thickness so it never fully
-    // flattens into z-fighting with the tile while still visible.
-    const grow = 0.04 + 0.96 * f * f * (3 - 2 * f);
-    const refs = growRefs.current;
+    // Uniform grow drives BOTH coverage and thickness, so the layer visibly wells
+    // up from nothing and shrinks away — changing scale.z alone would leave the top
+    // plane at full size and full shader alpha the whole time, never fading. Floor
+    // keeps a sliver so a zero-scale matrix never produces NaN normals.
+    const g = Math.max(0.01, f * f * (3 - 2 * f));
+
+    const refs = tileRefs.current;
     for (let i = 0; i < refs.length; i++) {
-      if (refs[i]) refs[i].scale.z = grow;
+      const grp = refs[i];
+      const s = stickers[i];
+      if (!grp || !s) continue;
+      // Follow the live cubie transform (rides a turning slice); fall back to the
+      // rest grid before the meshes exist.
+      if (readLiveTile(s, _livePos, _liveNorm)) {
+        grp.position.copy(_livePos);
+        _liveQuat.setFromUnitVectors(_zAxis, _liveNorm);
+        grp.quaternion.copy(_liveQuat);
+      } else {
+        grp.position.copy(_restPos.fromArray(s.restPos));
+        grp.quaternion.copy(s.restQuat);
+      }
+      grp.scale.set(s.cell * g, s.cell * g, g);
     }
   });
 
@@ -134,12 +165,16 @@ export default function ElementalCubeSkin({ size = 3 }) {
   return (
     <group>
       {stickers.map((s, i) => (
-        <group key={s.key} position={s.pos} quaternion={s.quat}>
-          {/* In-plane scale (x,y) covers the cell on big cubes; the frame loop
-              drives only z, so the layer wells up without disturbing coverage. */}
-          <group ref={(el) => { growRefs.current[i] = el; }} scale={[s.cell, s.cell, 0.04]}>
-            <Volume faceColor={def.color} />
-          </group>
+        // Transform (position/quaternion/scale) is set entirely in the frame loop;
+        // the rest values here just avoid a one-frame flash at the origin.
+        <group
+          key={s.key}
+          ref={(el) => { tileRefs.current[i] = el; }}
+          position={s.restPos}
+          quaternion={s.restQuat}
+          scale={[s.cell * 0.01, s.cell * 0.01, 0.01]}
+        >
+          <Volume faceColor={def.color} />
         </group>
       ))}
     </group>
