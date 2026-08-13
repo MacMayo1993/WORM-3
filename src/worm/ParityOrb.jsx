@@ -105,8 +105,12 @@ const _orbGeos = {
 
 const ELEMENTAL_BADGE_TYPES = new Set(['water', 'lava', 'grass', 'ice']);
 
-// Mega-cube elemental pickups use a bold, camera-facing enamel badge instead of
-// the tiny fallback sphere.  The shared medal silhouette, dark keyline and pale
+// Elemental pickups use a bold, camera-facing enamel badge at every cube size.
+// There is only ever one special orb on the board (SPECIAL_MAX_ON_BOARD), so the
+// badge is cheap even on small cubes, and the distinct silhouette is what lets a
+// player read water/lava/grass/ice at a glance — the generic parity gem only
+// distinguished them by colour and, worse, wore the antipodal-pair mark that
+// belongs to parity orbs. The shared medal silhouette, dark keyline and pale
 // inset stay legible against every face colour; the raised elemental glyph gives
 // each pickup a distinct silhouette even when colour is not enough.
 const _badgeGeos = {
@@ -246,7 +250,9 @@ function SingleOrbImpl({
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  if (reducedDetail && ELEMENTAL_BADGE_TYPES.has(type)) {
+  // Elemental pickups always wear the badge, regardless of reducedDetail — see
+  // the ElementalBadge comment for why it's shown at every size.
+  if (ELEMENTAL_BADGE_TYPES.has(type)) {
     return (
       <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
         <ElementalBadge type={type} color={color} badgeRef={badgeRef} />
