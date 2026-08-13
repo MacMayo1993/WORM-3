@@ -17,6 +17,11 @@ import { wormClock } from './wormClock.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
+import {
+    overlayScrimStyle, overlayCardStyle, Eyebrow, OverlayTitle, StatTiles,
+    SETTING_ROW_STYLE, SETTING_LABEL_STYLE, togglePillStyle, segmentStyle,
+    primaryBtnStyle, LIST_BTN_STYLE, ACTION_ROW_STYLE,
+} from './wormOverlayUI.jsx';
 import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED } from '../utils/uiTheme.js';
 
 // ─── Worm Countdown Overlay ─────────────────────────────────────────────────
@@ -550,65 +555,6 @@ const PAUSE_BTN_STYLE = {
     pointerEvents: 'auto',
 };
 
-const PAUSE_OVERLAY_STYLE = {
-    position: 'absolute',
-    inset: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(2, 6, 23, 0.72)',
-    pointerEvents: 'auto',
-    zIndex: 10,
-};
-
-const PAUSE_CARD_STYLE = {
-    width: 'min(88vw, 320px)',
-    borderRadius: 16,
-    border: `1px solid ${PANEL_BORDER}`,
-    background: 'rgba(255, 255, 255, 0.95)',
-    boxShadow: '0 16px 48px rgba(15, 23, 42, 0.25)',
-    padding: 20,
-    textAlign: 'center',
-};
-
-const PAUSE_ROW_STYLE = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '10px 0',
-    borderBottom: `1px solid rgba(15, 23, 42, 0.08)`,
-};
-
-const PAUSE_ROW_LABEL_STYLE = {
-    fontSize: 13,
-    fontWeight: 700,
-    color: '#0f172a',
-};
-
-const PAUSE_ROW_VALUE_STYLE = {
-    fontSize: 13,
-    fontWeight: 600,
-    color: 'rgba(15, 23, 42, 0.6)',
-};
-
-const PAUSE_MENU_BTN_STYLE = {
-    width: '100%',
-    borderRadius: 12,
-    padding: '10px 16px',
-    fontSize: 13,
-    fontWeight: 700,
-    color: '#0f172a',
-    background: 'rgba(15, 23, 42, 0.06)',
-    border: `1px solid ${PANEL_BORDER}`,
-    cursor: 'pointer',
-    touchAction: 'manipulation',
-    WebkitTapHighlightColor: 'transparent',
-    textAlign: 'left',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-};
 
 // ─── Portal hint, Examine, Countdown ─────────────────────────────────────────
 
@@ -1180,15 +1126,10 @@ function BoostButton({ wormAlive, fc }) {
 
 function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc }) {
     const green = fc[2] || FACE_FALLBACKS[2];
+    const blue = fc[5] || FACE_FALLBACKS[5];
     const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
     const hapticsOn = useGameStore(s => s.settings?.haptics ?? true);
     const setSettings = useGameStore(s => s.setSettings);
-    const feelChipStyle = (on) => ({
-        borderRadius: 999, border: `1px solid ${on ? `${green}66` : BORDER}`,
-        background: on ? `${green}18` : 'rgba(15, 23, 42, 0.06)', padding: '5px 12px',
-        fontSize: 12, fontWeight: 700, color: '#0f172a',
-        cursor: 'pointer', touchAction: 'manipulation',
-    });
     // Read from the wormClock bridge (not the store) on purpose: the countdown changes
     // every frame while crawling but the crawler tick is frozen while paused, so a
     // mount-time snapshot is exact for as long as this menu is visible. Keeping it out
@@ -1196,117 +1137,101 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
     const wormholeCountdown = wormClock.countdown;
 
     return (
-        <div style={PAUSE_OVERLAY_STYLE} onPointerDown={onResume}>
-            <div style={PAUSE_CARD_STYLE} onPointerDown={e => e.stopPropagation()}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: 'rgba(15, 23, 42, 0.5)', marginBottom: 2 }}>PAUSED</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', marginBottom: 16 }}>WORM MODE</div>
+        // Not fixed: the pause menu lives inside the HUD's stacking context and must
+        // not escape it, so the scrim is absolute against that instead of the viewport.
+        <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onPointerDown={onResume}>
+            <div style={overlayCardStyle(green, { width: 380 })} onPointerDown={e => e.stopPropagation()}>
+                <Eyebrow accent={green}>Paused</Eyebrow>
+                <OverlayTitle size="clamp(26px, min(9vw, 8vh), 44px)" outline="#14310f" glow={`${green}55`}>
+                    WORM MODE
+                </OverlayTitle>
 
-                {/* Stats grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-                    {[
-                        ['TIME', formatTime(wormTimeAlive)],
-                        ['HEALED', wormHealedCount],
-                        ['COLLECTED', wormSessionOrbs],
-                        ['NEXT HOLE', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
-                    ].map(([label, value]) => (
-                        <div key={label} style={{ padding: '8px', borderRadius: 10, background: 'rgba(15, 23, 42, 0.04)' }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.8, color: 'rgba(15, 23, 42, 0.45)' }}>{label}</div>
-                            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{value}</div>
-                        </div>
-                    ))}
-                </div>
+                <StatTiles columns={2} stats={[
+                    ['Time', formatTime(wormTimeAlive)],
+                    ['Healed', wormHealedCount],
+                    ['Collected', wormSessionOrbs],
+                    ['Next hole', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
+                ]} />
 
                 {/* Named speed presets — keep the underlying multipliers out of the UI. */}
-                <div style={{ ...PAUSE_ROW_STYLE, gap: 10 }}>
-                    <span style={PAUSE_ROW_LABEL_STYLE}>Speed</span>
+                <div style={{ ...SETTING_ROW_STYLE, marginTop: 'clamp(10px, 2vh, 16px)' }}>
+                    <span style={SETTING_LABEL_STYLE}>Speed</span>
                     <div style={{ display: 'flex', gap: 5, flex: 1 }}>
-                        {WORM_SPEED_OPTIONS.map(option => {
-                            const selected = wormSpeed === option.value;
-                            return (
-                                <button
-                                    key={option.label}
-                                    type="button"
-                                    disabled={!wormAlive}
-                                    onPointerDown={() => wormAlive && setWormSpeed(option.value)}
-                                    style={{
-                                        flex: 1, padding: '7px 4px', borderRadius: 8,
-                                        border: `1px solid ${selected ? (fc[5] || FACE_FALLBACKS[5]) : BORDER}`,
-                                        background: selected ? `${fc[5] || FACE_FALLBACKS[5]}22` : 'rgba(255,255,255,0.5)',
-                                        color: '#0f172a', font: 'inherit', fontSize: 10, fontWeight: selected ? 800 : 600,
-                                        cursor: wormAlive ? 'pointer' : 'default', opacity: wormAlive ? 1 : 0.55,
-                                    }}
-                                >
-                                    {option.label}
-                                </button>
-                            );
-                        })}
+                        {WORM_SPEED_OPTIONS.map(option => (
+                            <button
+                                key={option.label}
+                                type="button"
+                                disabled={!wormAlive}
+                                onPointerDown={() => wormAlive && setWormSpeed(option.value)}
+                                style={segmentStyle(wormSpeed === option.value, blue, wormAlive)}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
                 {/* Control mode toggle */}
-                <div style={PAUSE_ROW_STYLE}>
-                    <span style={PAUSE_ROW_LABEL_STYLE}>Controls</span>
+                <div style={SETTING_ROW_STYLE}>
+                    <span style={SETTING_LABEL_STYLE}>Controls</span>
                     <button
                         onPointerDown={() => toggleWormControlMode()}
-                        style={{
-                            borderRadius: 999, border: `1px solid ${BORDER}`,
-                            background: 'rgba(15, 23, 42, 0.06)', padding: '5px 12px',
-                            fontSize: 12, fontWeight: 700, color: '#0f172a',
-                            cursor: 'pointer', touchAction: 'manipulation',
-                        }}
+                        style={togglePillStyle(wormControlMode === 'oriented', blue)}
                     >
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
                     </button>
                 </div>
 
-                <div style={PAUSE_ROW_STYLE}>
-                    <span style={PAUSE_ROW_LABEL_STYLE}>Feel</span>
+                <div style={SETTING_ROW_STYLE}>
+                    <span style={SETTING_LABEL_STYLE}>Feel</span>
                     <div style={{ display: 'flex', gap: 6 }}>
-                        <button onPointerDown={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))} style={feelChipStyle(sfxOn)}>
-                            {sfxOn ? '🔊 SFX' : '🔇 SFX'}
+                        <button
+                            onPointerDown={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))}
+                            style={togglePillStyle(sfxOn, green)}
+                        >
+                            {sfxOn ? 'SFX ON' : 'SFX OFF'}
                         </button>
-                        <button onPointerDown={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))} style={feelChipStyle(hapticsOn)}>
-                            {hapticsOn ? '📳 Haptics' : '📴 Haptics'}
+                        <button
+                            onPointerDown={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))}
+                            style={togglePillStyle(hapticsOn, green)}
+                        >
+                            {hapticsOn ? 'HAPTICS ON' : 'HAPTICS OFF'}
                         </button>
                     </div>
                 </div>
 
-                {/* Action buttons */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+                {/* Secondary navigation */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'clamp(10px, 2vh, 14px)' }}>
                     {onToggleAntipodal && (
-                        <button onPointerDown={onToggleAntipodal} style={{ ...PAUSE_MENU_BTN_STYLE, ...(antipodalActive ? { background: `${fc[5] || FACE_FALLBACKS[5]}18`, borderColor: `${fc[5] || FACE_FALLBACKS[5]}40` } : {}) }}>
-                            <span>⊕</span>
+                        <button
+                            onPointerDown={onToggleAntipodal}
+                            style={{
+                                ...LIST_BTN_STYLE,
+                                ...(antipodalActive ? { background: `${blue}26`, borderColor: `${blue}66`, color: '#fff' } : {}),
+                            }}
+                        >
+                            <span aria-hidden="true">⊕</span>
                             <span>Antipodal Camera {antipodalActive ? '(On)' : '(Off)'}</span>
                         </button>
                     )}
                     {onSettings && (
-                        <button onPointerDown={onSettings} style={PAUSE_MENU_BTN_STYLE}>
-                            <span>⚙</span>
+                        <button onPointerDown={onSettings} style={LIST_BTN_STYLE}>
+                            <span aria-hidden="true">⚙</span>
                             <span>Settings</span>
                         </button>
                     )}
                     {onHome && (
-                        <button onPointerDown={onHome} style={PAUSE_MENU_BTN_STYLE}>
-                            <span>⌂</span>
+                        <button onPointerDown={onHome} style={LIST_BTN_STYLE}>
+                            <span aria-hidden="true">⌂</span>
                             <span>Main Menu</span>
                         </button>
                     )}
                 </div>
 
-                {/* Resume */}
-                <button
-                    onPointerDown={onResume}
-                    style={{
-                        width: '100%', marginTop: 12, borderRadius: 12, padding: '12px 16px',
-                        fontSize: 15, fontWeight: 800, letterSpacing: 0.7, color: '#fff',
-                        background: `linear-gradient(135deg, ${green}, ${fc[5] || FACE_FALLBACKS[5]})`,
-                        border: `1px solid ${green}60`,
-                        cursor: 'pointer', touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent',
-                    }}
-                >
-                    RESUME
-                </button>
+                {/* Resume is the only primary — the reason the player opened this. */}
+                <div style={ACTION_ROW_STYLE}>
+                    <button onPointerDown={onResume} style={primaryBtnStyle(green, blue)}>RESUME</button>
+                </div>
             </div>
         </div>
     );
