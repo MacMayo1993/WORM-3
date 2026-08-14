@@ -14,6 +14,7 @@ import {
   startMagnet,
   queueTurn,
   tileKey,
+  faceCenterTiles,
 } from '../worm/healerWorm/wormSim.js';
 import {
   SPECIAL_SPAWN_INTERVAL,
@@ -178,11 +179,14 @@ describe('special orb spawning', () => {
     // before the worm has crawled away from it.
     // The spawn runs before the movement commit inside a frame, so the head it
     // anchored to is the position from the START of that frame.
+    // Elemental offerings land on face centres by design (their own describe
+    // block below), so this looks only at the buffs, which spawn near the worm.
     let spawned = null;
     for (let i = 0; i < 2000 && !spawned; i++) {
       const headBefore = { ...sim.pos };
       stepWormSim(sim, 0.05, SIZE, ctx);
-      if (sim.specials.length) spawned = { orb: sim.specials[0], head: headBefore };
+      const buff = sim.specials.find(s => !isElementalType(s.type));
+      if (buff) spawned = { orb: buff, head: headBefore };
     }
     expect(spawned).not.toBeNull();
     expect(SPECIAL_TYPES).toContain(spawned.orb.type);
@@ -230,7 +234,7 @@ describe('special orb spawning', () => {
 });
 
 describe('elemental offering', () => {
-  it('offers one orb of every element near the worm on its own clock', () => {
+  it('offers one orb of every element on its own clock', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specialTimer = 9999;        // isolate: no buff spawns
@@ -238,9 +242,34 @@ describe('elemental offering', () => {
     run(sim, ctx, 0.05);            // exactly one step — the worm barely moves
     const elems = sim.specials.filter(s => isElementalType(s.type));
     expect(new Set(elems.map(s => s.type))).toEqual(new Set(ELEMENTAL_TYPES));
-    // Every offered orb is within reach of the head — not stranded on the far side.
-    const reach = collectManifoldRing(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, SIZE, SPECIAL_SPAWN_RADIUS);
-    for (const e of elems) expect(reach.has(tileKey(e))).toBe(true);
+  });
+
+  it('places every offered orb on the centre tile of a different face', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;
+    sim.elementalSpawnTimer = 0;
+    run(sim, ctx, 0.05);
+    const elems = sim.specials.filter(s => isElementalType(s.type));
+    const centers = new Set(faceCenterTiles(SIZE).map(tileKey));
+    for (const e of elems) expect(centers.has(tileKey(e))).toBe(true);
+    // One per manifold face — no two elements share a face.
+    expect(new Set(elems.map(e => e.dirKey)).size).toBe(elems.length);
+  });
+
+  it('skips a face whose centre is already taken', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;
+    sim.elementalSpawnTimer = 9999;
+    // Park a parity orb on every face centre but one: only that face can be used.
+    const centers = faceCenterTiles(SIZE);
+    sim.powerups = centers.slice(1).map(t => ({ ...t }));
+    sim.elementalSpawnTimer = 0;
+    run(sim, ctx, 0.05);
+    const elems = sim.specials.filter(s => isElementalType(s.type));
+    expect(elems).toHaveLength(1);
+    expect(tileKey(elems[0])).toBe(tileKey(centers[0]));
   });
 
   it('grabbing one element wipes the rest of the offering', () => {
@@ -251,7 +280,7 @@ describe('elemental offering', () => {
     // (2,3,4,PZ) is the tile the worm commits onto first (see the claim test below).
     sim.specials = [
       special(2, 3, 4, 'PZ', 'water'),
-      special(0, 0, 4, 'PZ', 'lava'),
+      special(0, 0, 4, 'PZ', 'fire'),
       special(4, 4, 4, 'PZ', 'grass'),
       special(0, 4, 4, 'PZ', 'ice'),
     ];

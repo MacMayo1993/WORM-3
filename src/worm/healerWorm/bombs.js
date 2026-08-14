@@ -19,7 +19,10 @@ import { BODY_BALL_SPACING } from './constants.js';
 // ─── Tuning ──────────────────────────────────────────────────────────────────
 export const BOMB_FUSE_SECONDS = 5; // countdown from spawn to detonation
 export const BOMB_BLAST_RADIUS = 3; // tiles each arm reaches (the "3 out" of Bomberman)
-export const BOMB_SPAWN_INTERVAL = 11; // seconds between spawn attempts
+// Seconds between spawn attempts. The clock is also reset to a full interval
+// whenever a spawn is skipped because an elemental wash is running, so a bomb
+// never lands the moment the element ends — see the bomb block in HealerWormMode.
+export const BOMB_SPAWN_INTERVAL = 20;
 export const BOMB_DISARM_REWARD = 12; // coins for surrounding a live bomb
 
 // Four face-local headings the blast fires along — the Bomberman plus.

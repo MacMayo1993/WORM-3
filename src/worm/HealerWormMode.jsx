@@ -49,6 +49,7 @@ import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { WormFace } from './healerWorm/WormFace.jsx';
 import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem, MagnetFX } from './healerWorm/orbSystems.jsx';
 import ElementalAtmosphere from './ElementalAtmosphere.jsx';
+import { wormBuffs } from './wormBuffs.js';
 import { HealBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
 import { WormholeRings } from './healerWorm/WormholeRings.jsx';
 import { HealerBombs } from './healerWorm/HealerBombs.jsx';
@@ -325,10 +326,18 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             for (let i = 0; i < occupiedCount; i++) occupied.add(ttAt(trail, i));
 
             // Spawn clock — one attempt per interval, capped by board size.
+            //
+            // An active elemental wash suspends it entirely: the cube is re-skinned,
+            // the camera has pulled out and the player is reading a transformed
+            // board, which is the worst possible moment to drop a five-second fuse
+            // on them. The clock is reset to a full interval on the skip, so the
+            // wash ending does not immediately hand over a bomb either.
             bombTimerRef.current -= bdelta;
             if (bombTimerRef.current <= 0) {
                 bombTimerRef.current = BOMB_SPAWN_INTERVAL;
-                if (bombsRef.current.length < bombCap(size)) {
+                if (wormBuffs.elementalT > 0) {
+                    // suspended for the wash — fall through to the fuse loop below
+                } else if (bombsRef.current.length < bombCap(size)) {
                     // Never spawn on or right next to the worm: exclude a no-spawn ring
                     // around the head (size-scaled), the visible body, and live bombs, so
                     // every bomb lands with room to react and detonates in open view.

@@ -248,8 +248,8 @@ export default function ElementalOrb({ special, size }) {
     }
 
     if (lightRef.current) {
-      // Lava gutters, ice is steady, water and nature breathe.
-      const flicker = reducedRef.current ? 1 : special.type === 'lava' ? 0.75 + 0.25 * Math.sin(t * 9.0) : 0.85 + 0.15 * Math.sin(t * 2.2);
+      // Fire gutters, ice is steady, water and nature breathe.
+      const flicker = reducedRef.current ? 1 : special.type === 'fire' ? 0.75 + 0.25 * Math.sin(t * 9.0) : 0.85 + 0.15 * Math.sin(t * 2.2);
       lightRef.current.intensity = 1.35 * alpha * pop * flicker;
     }
 

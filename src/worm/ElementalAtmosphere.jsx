@@ -1,11 +1,11 @@
 // src/worm/ElementalAtmosphere.jsx
 //
 // The ambiance around an active elemental orb. The element itself is laid ON the
-// cube by ElementalCubeSkin (a translucent water/lava/grass/ice layer over every
+// cube by ElementalCubeSkin (a water/fire/grass/ice layer over every
 // face); this component adds the space around it so the worm reads as moving
 // *through* the element:
 //   • a field of drifting particles enveloping the cube — bubbles rising through
-//     water, embers through lava, spores through grass, snow through ice, and
+//     water, embers off the fire, spores through grass, snow through ice, and
 //   • a soft element-coloured fill light so the worm and cube pick up the element's
 //     hue as they move through it.
 //

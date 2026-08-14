@@ -16,13 +16,15 @@
 //
 // One shared geometry and one shared material per element back every tile (the
 // skin renders up to ~150 meshes but they all reference these), so the whole
-// layer is a handful of GPU objects. Grass keeps its dedicated blade mesh; this
-// covers the flat-surface elements (water / lava / ice).
+// layer is a handful of GPU objects. This covers the two flat-surface elements,
+// water and ice. Grass keeps its dedicated blade mesh, and fire is drawn with the
+// bombs' flame sprites (ElementalFireSkin) — it used to have a "lava" branch here
+// that painted molten runoff across each sticker and read as orange squiggles.
 
 import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 
-export const SURFACE_MODE = { water: 0, lava: 1, ice: 2 };
+export const SURFACE_MODE = { water: 0, ice: 1 };
 
 const _geoCache = { geo: null };
 export function getElementalSurfaceGeo() {
@@ -103,19 +105,6 @@ const fragmentShader = /* glsl */`
       col += vec3(1.0) * spec * 0.8;
       col = mix(col, uAccent, fres * 0.45);
       alpha = 0.5 + fres * 0.35 + caustic * 0.1;
-    } else if (uMode == 1) {
-      // ── Lava ─────────────────────────────────────────────────────────────
-      // Sparse molten runoff rather than an opaque coat. Most of the sticker is
-      // deliberately clear; only narrow moving fissures and their warm fringe
-      // remain, so face colours and special-tile markings stay readable.
-      float f = wfield3(vWorld, t);
-      float line = 1.0 - smoothstep(0.06, 0.23, abs(f));
-      float fringe = 1.0 - smoothstep(0.12, 0.48, abs(f));
-      float flicker = 0.78 + 0.22 * sin(t * 2.8 + vWorld.x * 2.1 - vWorld.y * 1.7);
-      col = mix(uColor * 0.65, uAccent, line * 0.72);
-      col += uColor * line * flicker * 0.85;
-      // A faint heat stain connects the fissures without repainting the board.
-      alpha = 0.07 + fringe * 0.18 + line * 0.42;
     } else {
       // ── Ice ──────────────────────────────────────────────────────────────
       // Frosted facets + crack lines, bright at grazing angles.
@@ -130,16 +119,6 @@ const fragmentShader = /* glsl */`
   }
 `;
 
-// wfield needs to exist for the fragment's lava branch too; GLSL compiles the
-// whole program, so declare it above main by prefixing the source.
-const fragmentSharedFns = /* glsl */`
-  float wfield3(vec3 p, float t) {
-    return sin(p.x * 3.2 + t * 0.7)
-         + sin(p.z * 3.6 - t * 0.6)
-         + sin((p.x + p.z) * 2.4 + t * 0.5)
-         + sin(p.y * 3.3 + t * 0.55);
-  }
-`;
 
 const _matCache = new Map();
 export function getElementalSurfaceMaterial(element, colorHex, accentHex) {
@@ -154,7 +133,7 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex) {
         uAccent: { value: new THREE.Color(accentHex) }
       },
       vertexShader,
-      fragmentShader: fragmentShader.replace('void main() {', fragmentSharedFns + '\n  void main() {'),
+      fragmentShader,
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,

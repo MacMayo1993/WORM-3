@@ -4,13 +4,13 @@
 // directly ON TOP of the cube, over whatever tile styles the faces already carry.
 // When the worm claims a water orb the whole cube is sheathed in water and the
 // worm reads as swimming through it; a grass orb sprouts blades from every face;
-// lava wells up molten; ice sheathes it in frost.
+// fire licks up off every sticker; ice sheathes it in frost.
 //
-// It reuses the exact per-sticker volume components the "Living" tile styles use
-// (WaterVolume / LavaVolume / GrassBlades / IceVolume). Each renders in its
-// sticker's local +Z frame (the outward face normal), the tile roughly filling
-// local XY — so we place them across every face, oriented so local +Z points
-// along that face's world normal, translucent enough that the tile style stays
+// Each element brings its own layer, all of them rendered in a cell's local +Z
+// frame (the outward face normal, the tile roughly filling local XY): water and
+// ice are a continuous animated surface (ElementalSurface), nature keeps the
+// Living style's GrassBlades, and fire burns with the bombs' own flame sprites
+// (ElementalFireSkin). All are translucent or additive, so the tile style stays
 // readable underneath.
 //
 // Density is capped, not the effect: up to a MAX_SKIN_GRID×MAX_SKIN_GRID grid of
@@ -38,11 +38,14 @@ import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
 import GrassBlades from '../3d/styles/GrassBlades.jsx';
+import ElementalFireSkin from './ElementalFireSkin.jsx';
 import { getElementalSurfaceGeo, getElementalSurfaceMaterial } from './ElementalSurface.jsx';
 
-// Water / lava / ice are drawn as a continuous animated surface (ElementalSurface);
-// grass keeps its dedicated blade mesh, which already sprouts convincingly.
-const SURFACE_ELEMENTS = new Set(['water', 'lava', 'ice']);
+// Water and ice are drawn as a continuous animated surface (ElementalSurface);
+// grass keeps its dedicated blade mesh, which already sprouts convincingly; fire
+// is flame sprites. Fire used to run through the surface shader as "lava" and read
+// as orange squiggles on the sticker rather than as anything molten.
+const SURFACE_ELEMENTS = new Set(['water', 'ice']);
 
 const FADE_IN = 0.55;  // seconds for the layer to well up out of the faces
 const FADE_OUT = 1.25; // matches ElementalAtmosphere — soften the end, no pop
@@ -123,6 +126,7 @@ export default function ElementalCubeSkin({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
   const def = element ? getElementalDef(element) : null;
   const isSurface = !!def && SURFACE_ELEMENTS.has(element);
+  const isFire = element === 'fire';
   // Shared geometry + material for the surface elements — every tile references
   // the same pair, so the whole layer is a few GPU objects regardless of count.
   const surfaceGeo = useMemo(() => (isSurface ? getElementalSurfaceGeo() : null), [isSurface]);
@@ -176,7 +180,11 @@ export default function ElementalCubeSkin({ size = 3 }) {
         grp.position.copy(_restPos.fromArray(s.restPos));
         grp.quaternion.copy(s.restQuat);
       }
-      grp.scale.set(s.cell * g, s.cell * g, g);
+      // Fire is sprites, whose on-screen size comes from world scale — the
+      // surface layers' squashed (cell, cell, fade) scale would distort them, so
+      // fire gets a uniform scale that still carries both cell size and the ramp.
+      if (isFire) grp.scale.setScalar(s.cell * g);
+      else grp.scale.set(s.cell * g, s.cell * g, g);
     }
   });
 
@@ -197,6 +205,8 @@ export default function ElementalCubeSkin({ size = 3 }) {
           {isSurface ? (
             // Continuous animated element surface, lifted just off the sticker.
             <mesh geometry={surfaceGeo} material={surfaceMat} position={[0, 0, 0.03]} raycast={() => null} />
+          ) : isFire ? (
+            <ElementalFireSkin seed={i} />
           ) : (
             <GrassBlades faceColor={def.color} />
           )}

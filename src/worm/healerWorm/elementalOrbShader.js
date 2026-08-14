@@ -5,7 +5,7 @@
 //
 //   core  — the element itself, churning inside the sphere (object-space field,
 //           slowly rotated in-shader so the interior turns even while the orb
-//           holds still). Normal-blended, so water reads deep and lava reads solid.
+//           holds still). Normal-blended, so water reads deep and fire reads solid.
 //   shell — the glass around it: fresnel rim, a thin-film band and a specular
 //           hotspot, additively blended so the middle stays clear and only the
 //           edge lights up. This is what makes it read as a sphere rather than a
@@ -24,7 +24,7 @@
 import * as THREE from 'three';
 
 /** Element → shader branch. Matches ELEMENTAL_TYPES order but is looked up by key. */
-export const ELEMENT_MODE = { water: 0, lava: 1, grass: 2, ice: 3 };
+export const ELEMENT_MODE = { water: 0, fire: 1, grass: 2, ice: 3 };
 
 const varyings = /* glsl */ `
   uniform float uTime;
@@ -93,7 +93,7 @@ const coreFragment = /* glsl */ `
       col = mix(col, uAccent, fres * 0.4);
       alpha = 0.46 + fres * 0.34 + caustic * 0.22;
     } else if (uMode == 1) {
-      // ── Lava: dark crust plates broken by molten veins, flickering.
+      // ── Fire: dark crust plates broken by white-hot veins, flickering.
       float crust = smoothstep(0.25, 1.40, abs(f));
       float vein = 1.0 - smoothstep(0.0, 0.38, abs(f));
       float flicker = 0.84 + 0.16 * sin(t * 6.5 + p.x * 3.0 - p.y * 2.2);
