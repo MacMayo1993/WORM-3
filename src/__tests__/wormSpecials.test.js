@@ -230,7 +230,7 @@ describe('special orb spawning', () => {
 });
 
 describe('elemental offering', () => {
-  it('offers one orb of every element near the worm on its own clock', () => {
+  it('offers one orb of every element, each on a distinct face', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specialTimer = 9999;        // isolate: no buff spawns
@@ -238,9 +238,9 @@ describe('elemental offering', () => {
     run(sim, ctx, 0.05);            // exactly one step — the worm barely moves
     const elems = sim.specials.filter(s => isElementalType(s.type));
     expect(new Set(elems.map(s => s.type))).toEqual(new Set(ELEMENTAL_TYPES));
-    // Every offered orb is within reach of the head — not stranded on the far side.
-    const reach = collectManifoldRing(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, SIZE, SPECIAL_SPAWN_RADIUS);
-    for (const e of elems) expect(reach.has(tileKey(e))).toBe(true);
+    // No two elements share a face — they spread around the cube, not beside each other.
+    const faces = elems.map(s => s.dirKey);
+    expect(new Set(faces).size).toBe(faces.length);
   });
 
   it('grabbing one element wipes the rest of the offering', () => {

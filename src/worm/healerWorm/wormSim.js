@@ -833,13 +833,17 @@ function spawnSpecial(sim, size, ctx, nearTile = null) {
 }
 
 /**
- * Put an elemental OFFERING on the board: one orb of each element, clustered near
- * the worm. The player grabs the one they want; the rest are wiped on that claim
- * (see trySpecialPickupAt), or fade on their own before the next offering.
+ * Put an elemental OFFERING on the board: one orb of each element, each on a
+ * DISTINCT face so the four are spread around the cube instead of clustering on the
+ * tiles right beside the worm. The player grabs the one they want; the rest are
+ * wiped on that claim (see trySpecialPickupAt), or fade on their own before the next
+ * offering.
  *
  * Leftovers from a previous offering are cleared first, so the board never carries
- * two offerings at once. Reuses the same scored placement as spawnSpecial, adding
- * each placed tile to the occupancy set so the four orbs never stack.
+ * two offerings at once. Reuses the same scored placement as spawnSpecial, but
+ * restricts each pick to a face not yet used this cycle. Candidates reach `size`
+ * manifold steps — always far enough to cross the worm's own face onto the faces
+ * around it, from any head position — so four distinct faces are available.
  *
  * @returns {number} how many elemental orbs were actually placed
  */
@@ -850,7 +854,7 @@ function spawnElementalOffering(sim, size, ctx) {
         if (isElementalType(sim.specials[i].type)) { sim.specials.splice(i, 1); changed = true; }
     }
 
-    const candidates = buildSpawnCandidates(sim.pos, size, SPECIAL_SPAWN_RADIUS);
+    const candidates = buildSpawnCandidates(sim.pos, size, size);
     const occupiedKeys = new Set(
         [...sim.powerups, ...sim.specials, sim.pos].map(tileKeyOf)
     );
@@ -870,10 +874,13 @@ function spawnElementalOffering(sim, size, ctx) {
     const trailKeys = bodyTrailKeys(sim);
     const tunnelKeys = tunnelMouthKeys(candidates, ctx);
 
+    const usedFaces = new Set();
     let placed = 0;
     for (const type of ELEMENTAL_TYPES) {
+        // One elemental orb per face: only consider tiles on faces not yet used.
+        const faceCandidates = candidates.filter(c => !usedFaces.has(c.tile.dirKey));
         const tile = pickSpawnTile({
-            candidates,
+            candidates: faceCandidates,
             head: sim.pos,
             moveDir: sim.moveDir,
             size,
@@ -882,8 +889,9 @@ function spawnElementalOffering(sim, size, ctx) {
             tunnelKeys,
             claimRadius: 0,
         }, sim.rand);
-        if (!tile) break; // neighbourhood is full — offer what fits
-        occupiedKeys.add(tileKeyOf(tile)); // don't let the next element reuse this tile
+        if (!tile) continue; // no free tile on an unused face — offer what fits
+        usedFaces.add(tile.dirKey);
+        occupiedKeys.add(tileKeyOf(tile)); // and never stack two on one tile
         sim.specials.push({
             x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey,
             type,
