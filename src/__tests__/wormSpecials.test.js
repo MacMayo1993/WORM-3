@@ -31,7 +31,7 @@ import {
   ROCKET_FLIGHT_HEIGHT,
   rocketFlightLift,
 } from '../worm/healerWorm/constants.js';
-import { SPECIAL_TYPES } from '../worm/healerWorm/specialDefs.js';
+import { SPECIAL_TYPES, isElementalType, ELEMENTAL_TYPES } from '../worm/healerWorm/specialDefs.js';
 import {
   makeSpecialPicker,
   drawSpecialType,
@@ -199,15 +199,20 @@ describe('special orb spawning', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     run(sim, ctx, Math.max(SPECIAL_SPAWN_INTERVAL, 6) * 4);
-    expect(sim.specials.length).toBeLessThanOrEqual(SPECIAL_MAX_ON_BOARD);
+    // The cap governs the buff track only; elemental offerings are a separate
+    // track and legitimately put several orbs on the board at once.
+    const buffs = sim.specials.filter(s => !isElementalType(s.type));
+    expect(buffs.length).toBeLessThanOrEqual(SPECIAL_MAX_ON_BOARD);
   });
 
   it('despawns a special once its lifetime runs out', () => {
     const sim = makeSim();
     const ctx = makeCtx();
-    // Pin the ambient timer, or a replacement spawns into the freed slot before the
-    // assertion runs and the test reads as a failure to despawn.
+    // Pin both spawn clocks, or a replacement buff (or an elemental offering)
+    // populates the board before the assertion runs and the test reads as a
+    // failure to despawn.
     sim.specialTimer = 9999;
+    sim.elementalSpawnTimer = 9999;
     sim.specials = [special(0, 0, 4, 'PZ', 'magnet')];
     run(sim, ctx, SPECIAL_LIFETIME + 0.5);
     expect(sim.specials).toHaveLength(0);
@@ -221,6 +226,53 @@ describe('special orb spawning', () => {
     run(sim, ctx, SPECIAL_LIFETIME + SPECIAL_SPAWN_INTERVAL);
     expect(sim.specials).toHaveLength(1);
     expect(sim.specials[0].ttl).toBe(SPECIAL_LIFETIME);
+  });
+});
+
+describe('elemental offering', () => {
+  it('offers one orb of every element near the worm on its own clock', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;        // isolate: no buff spawns
+    sim.elementalSpawnTimer = 0;    // fire an offering on the first step
+    run(sim, ctx, 0.05);            // exactly one step — the worm barely moves
+    const elems = sim.specials.filter(s => isElementalType(s.type));
+    expect(new Set(elems.map(s => s.type))).toEqual(new Set(ELEMENTAL_TYPES));
+    // Every offered orb is within reach of the head — not stranded on the far side.
+    const reach = collectManifoldRing(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, SIZE, SPECIAL_SPAWN_RADIUS);
+    for (const e of elems) expect(reach.has(tileKey(e))).toBe(true);
+  });
+
+  it('grabbing one element wipes the rest of the offering', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;
+    sim.elementalSpawnTimer = 9999; // no auto-offering — place a known one
+    // (2,3,4,PZ) is the tile the worm commits onto first (see the claim test below).
+    sim.specials = [
+      special(2, 3, 4, 'PZ', 'water'),
+      special(0, 0, 4, 'PZ', 'lava'),
+      special(4, 4, 4, 'PZ', 'grass'),
+      special(0, 4, 4, 'PZ', 'ice'),
+    ];
+    stepUntilCommit(sim, ctx);
+    expect(sim.elementalType).toBe('water'); // the one grabbed starts its wash
+    expect(sim.specials).toHaveLength(0);    // the other three are wiped
+  });
+
+  it('a fresh offering clears an un-taken previous one instead of stacking', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;
+    sim.elementalSpawnTimer = 0;
+    run(sim, ctx, 0.05);
+    const first = sim.specials.filter(s => isElementalType(s.type)).map(s => s.id);
+    expect(first.length).toBeGreaterThan(0);
+    // Force the next cycle; the leftover orbs from the first must be gone.
+    sim.elementalSpawnTimer = 0;
+    run(sim, ctx, 0.05);
+    const secondIds = sim.specials.filter(s => isElementalType(s.type)).map(s => s.id);
+    for (const id of first) expect(secondIds).not.toContain(id);
   });
 });
 
@@ -518,31 +570,25 @@ describe('special type chooser', () => {
     return () => values[i++ % values.length];
   };
 
-  it('produces both buffs plus one element in each bag', () => {
+  it('produces both buffs in each bag', () => {
     const picker = makeSpecialPicker();
-    const rand = seqRand([0.1, 0.9, 0.5]);
-    // A bag is rocket + magnet + one element, so three draws empty exactly one bag.
+    const rand = seqRand([0.1, 0.9]);
+    // A bag is just rocket + magnet now, so two draws empty exactly one bag.
     const drawn = [
-      drawSpecialType(picker, { rand }),
       drawSpecialType(picker, { rand }),
       drawSpecialType(picker, { rand }),
     ];
     expect(drawn).toContain('rocket');
     expect(drawn).toContain('magnet');
-    // Exactly one of the three is an element.
-    expect(drawn.filter(t => !['rocket', 'magnet'].includes(t))).toHaveLength(1);
   });
 
-  it('rotates through every element across successive bags', () => {
+  it('never draws an element from the buff bag — elements are their own track', () => {
     const picker = makeSpecialPicker();
     const rand = seqRand([0.1, 0.9, 0.5, 0.3, 0.7]);
-    const elements = new Set();
-    // Four bags of three draws — long enough to see all four elements cycle in.
     for (let i = 0; i < 12; i++) {
       const t = drawSpecialType(picker, { rand });
-      if (!['rocket', 'magnet'].includes(t)) elements.add(t);
+      expect(ELEMENTAL_TYPES).not.toContain(t);
     }
-    expect(elements.size).toBe(4);
   });
 
   it('never returns the same type three times in a row', () => {
@@ -709,6 +755,7 @@ describe('spawn placement in the sim', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specialTimer = 9999;
+    sim.elementalSpawnTimer = 9999; // isolate the buff — no offering on the board
     sim.specials = [special(0, 0, 4, 'PZ', 'magnet')];
     run(sim, ctx, SPECIAL_LIFETIME + 0.5);
     expect(sim.specials).toHaveLength(0);

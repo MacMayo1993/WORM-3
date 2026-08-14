@@ -601,6 +601,13 @@ const BUFF_FILL_STYLE = {
     pointerEvents: 'none',
 };
 
+// Elemental chip: the active wash reads as a mini enamel medal (the same badge the
+// pickup wears) with a radial countdown ring, rather than a flat pill — it is a
+// scene-wide transformation, so it gets the richer treatment. Ring geometry: r=9
+// in a 22×22 box, so the circumference the rAF loop animates is 2π·9.
+const ELEM_RING_R = 9;
+const ELEM_RING_CIRC = 2 * Math.PI * ELEM_RING_R;
+
 // Spawn/expiry notice — sits just under the buff strip, above the play area and
 // clear of the thumb tray and the mobile safe-area insets.
 const SPECIAL_NOTICE_STYLE = {
@@ -966,14 +973,17 @@ function BuffStrip() {
     }, [magnetActive, magnetSeq]);
 
     // Same rAF-to-DOM pattern as the magnet fill, reading the elemental clock the
-    // sim mirrors onto the wormBuffs bridge so it freezes with the simulation.
+    // sim mirrors onto the wormBuffs bridge so it freezes with the simulation. The
+    // elemental readout is a radial countdown ring (see the medal below): drive its
+    // stroke-dashoffset from full circumference (empty) down to 0 (full) so it
+    // drains as the wash expires.
     useEffect(() => {
         if (!elementalTheme) return;
         let raf = 0;
         const paint = () => {
             const { elementalT, elementalMaxT } = wormBuffs;
-            const pct = elementalMaxT > 0 ? Math.max(0, Math.min(1, elementalT / elementalMaxT)) * 100 : 0;
-            if (elemFillRef.current) elemFillRef.current.style.width = `${pct}%`;
+            const frac = elementalMaxT > 0 ? Math.max(0, Math.min(1, elementalT / elementalMaxT)) : 0;
+            if (elemFillRef.current) elemFillRef.current.style.strokeDashoffset = `${ELEM_RING_CIRC * (1 - frac)}`;
             if (elemSecondsRef.current) elemSecondsRef.current.textContent = `${Math.max(0, elementalT).toFixed(0)}s`;
             raf = requestAnimationFrame(paint);
         };
@@ -1027,20 +1037,57 @@ function BuffStrip() {
                 <div
                     style={{
                         ...BUFF_PILL_STYLE,
-                        position: 'relative',
-                        overflow: 'hidden',
-                        background: 'rgba(15, 23, 42, 0.78)',
+                        overflow: 'visible',
+                        paddingLeft: 4,
+                        background: `linear-gradient(135deg, ${elemDef.color}2e, rgba(15, 23, 42, 0.82))`,
                         border: `1px solid ${elemDef.color}`,
+                        boxShadow: `${SHADOW}, 0 0 14px ${elemDef.color}55, inset 0 0 10px ${elemDef.color}1f`,
                         color: '#fff',
                     }}
                     aria-label={`${elemDef.label} element active`}
                 >
-                    <div ref={elemFillRef} aria-hidden="true" style={{ ...BUFF_FILL_STYLE, width: '100%', background: `${elemDef.color}40` }} />
-                    <span style={{ position: 'relative', zIndex: 1, display: 'flex', color: elemDef.color }}>
-                        <SpecialIcon type={elementalTheme} />
+                    {/* Enamel medal + radial countdown ring — the pickup badge, HUD-sized. */}
+                    <span style={{ position: 'relative', width: 22, height: 22, flexShrink: 0, display: 'block' }}>
+                        <svg
+                            width={22}
+                            height={22}
+                            viewBox="0 0 22 22"
+                            aria-hidden="true"
+                            style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}
+                        >
+                            <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
+                            <circle
+                                ref={elemFillRef}
+                                cx="11"
+                                cy="11"
+                                r={ELEM_RING_R}
+                                fill="none"
+                                stroke={elemDef.color}
+                                strokeWidth="2.4"
+                                strokeLinecap="round"
+                                strokeDasharray={ELEM_RING_CIRC}
+                                strokeDashoffset={0}
+                                style={{ filter: `drop-shadow(0 0 2px ${elemDef.color})` }}
+                            />
+                        </svg>
+                        <span
+                            style={{
+                                position: 'absolute',
+                                inset: 3,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: `radial-gradient(circle at 34% 28%, ${elemDef.accent}, ${elemDef.color} 78%)`,
+                                boxShadow: `inset 0 -1px 3px rgba(0,0,0,0.4)`,
+                                color: '#ffffff',
+                            }}
+                        >
+                            <SpecialIcon type={elementalTheme} size={12} />
+                        </span>
                     </span>
                     <span style={{ position: 'relative', zIndex: 1 }}>{elemDef.label}</span>
-                    <span ref={elemSecondsRef} aria-hidden="true" style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 24, textAlign: 'right' }} />
+                    <span ref={elemSecondsRef} aria-hidden="true" style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 24, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} />
                 </div>
             )}
         </div>

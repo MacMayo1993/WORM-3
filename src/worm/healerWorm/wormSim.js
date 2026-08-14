@@ -64,7 +64,7 @@ import {
     tileKeyOf,
 } from './specialSpawn.js';
 import { SURVIVAL_TICK_INTERVAL } from '../../utils/economyConstants.js';
-import { isElementalType } from './specialDefs.js';
+import { isElementalType, ELEMENTAL_TYPES } from './specialDefs.js';
 import {
     WORM_LIFT,
     TUNNEL_SPEED_SCALE,
@@ -99,6 +99,8 @@ import {
     MAGNET_RADIUS,
     ELEMENTAL_DURATION,
     ELEMENTAL_FOCUS_DURATION,
+    ELEMENTAL_SPAWN_INTERVAL,
+    ELEMENTAL_LIFETIME,
     SPECIAL_SPAWN_RADIUS,
     SPECIAL_JUMP_REACH,
     SPECIAL_TUNNEL_RADIUS,
@@ -189,8 +191,9 @@ export function makeWormSim(size) {
         boostCooldownT: 0,
 
         // ── Special power-ups (rocket / magnet) ────────────────────────────────
-        specials: [],             // hovering rocket/magnet orbs on the board
+        specials: [],             // hovering rocket/magnet + elemental orbs on the board
         specialTimer: SPECIAL_SPAWN_INTERVAL,
+        elementalSpawnTimer: ELEMENTAL_SPAWN_INTERVAL, // own clock for the elemental offering
         specialSeq: 0,            // monotonic id source for spawned specials
         specialPicker: makeSpecialPicker(),
         rocketActive: false,      // protected three-second overdrive
@@ -315,6 +318,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
     sim.specials = [];
     sim.specialTimer = SPECIAL_SPAWN_INTERVAL;
+    sim.elementalSpawnTimer = ELEMENTAL_SPAWN_INTERVAL;
     sim.specialPicker = makeSpecialPicker();
     sim.rocketActive = false;
     sim.rocketT = 0;
@@ -715,6 +719,13 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey) {
     if (idx === -1) return;
     const [claimed] = sim.specials.splice(idx, 1);
     sim.pendingSpecialFlash = { type: claimed.type, pos: sim.curWorldPos.toArray() };
+    // Claiming an element is a choice: grabbing one wipes the rest of the offering
+    // off the board until the next spawn cycle. Rocket/magnet are untouched.
+    if (isElementalType(claimed.type)) {
+        for (let i = sim.specials.length - 1; i >= 0; i--) {
+            if (isElementalType(sim.specials[i].type)) sim.specials.splice(i, 1);
+        }
+    }
     ctx.onSpecialsChanged(sim.specials.slice());
     activateSpecial(sim, ctx, claimed.type);
 }
@@ -757,7 +768,11 @@ function tunnelMouthKeys(candidates, ctx) {
  * @returns {boolean} whether an orb was actually placed
  */
 function spawnSpecial(sim, size, ctx, nearTile = null) {
-    if (sim.specials.length >= SPECIAL_MAX_ON_BOARD) return false;
+    // Only rocket/magnet count toward this cap — the elemental offering is a
+    // separate track with its own board presence, so a full offering must not
+    // starve the buffs (or vice versa).
+    const buffCount = sim.specials.reduce((n, s) => n + (isElementalType(s.type) ? 0 : 1), 0);
+    if (buffCount >= SPECIAL_MAX_ON_BOARD) return false;
 
     const anchor = nearTile ?? sim.pos;
     const radius = nearTile ? SPECIAL_TUNNEL_RADIUS : SPECIAL_SPAWN_RADIUS;
@@ -815,6 +830,80 @@ function spawnSpecial(sim, size, ctx, nearTile = null) {
     ctx.onSpecialSpawned(type);
     ctx.feel('specialSpawn');
     return true;
+}
+
+/**
+ * Put an elemental OFFERING on the board: one orb of each element, clustered near
+ * the worm. The player grabs the one they want; the rest are wiped on that claim
+ * (see trySpecialPickupAt), or fade on their own before the next offering.
+ *
+ * Leftovers from a previous offering are cleared first, so the board never carries
+ * two offerings at once. Reuses the same scored placement as spawnSpecial, adding
+ * each placed tile to the occupancy set so the four orbs never stack.
+ *
+ * @returns {number} how many elemental orbs were actually placed
+ */
+function spawnElementalOffering(sim, size, ctx) {
+    let changed = false;
+    // Clear any un-taken elemental orbs from the last cycle (buffs stay).
+    for (let i = sim.specials.length - 1; i >= 0; i--) {
+        if (isElementalType(sim.specials[i].type)) { sim.specials.splice(i, 1); changed = true; }
+    }
+
+    const candidates = buildSpawnCandidates(sim.pos, size, SPECIAL_SPAWN_RADIUS);
+    const occupiedKeys = new Set(
+        [...sim.powerups, ...sim.specials, sim.pos].map(tileKeyOf)
+    );
+    // Exclude the worm's live claim reach so an orb isn't swallowed on the tick it
+    // appears (same reasoning as spawnSpecial).
+    const claimRadius = Math.max(
+        sim.isJumping ? SPECIAL_JUMP_REACH : 0,
+        sim.magnetT > 0 ? MAGNET_RADIUS : 0,
+    );
+    if (claimRadius > 0) {
+        collectManifoldRing(
+            sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey,
+            size, claimRadius, _specialClaimExclusion
+        );
+        for (const key of _specialClaimExclusion) occupiedKeys.add(key);
+    }
+    const trailKeys = bodyTrailKeys(sim);
+    const tunnelKeys = tunnelMouthKeys(candidates, ctx);
+
+    let placed = 0;
+    for (const type of ELEMENTAL_TYPES) {
+        const tile = pickSpawnTile({
+            candidates,
+            head: sim.pos,
+            moveDir: sim.moveDir,
+            size,
+            occupiedKeys,
+            trailKeys,
+            tunnelKeys,
+            claimRadius: 0,
+        }, sim.rand);
+        if (!tile) break; // neighbourhood is full — offer what fits
+        occupiedKeys.add(tileKeyOf(tile)); // don't let the next element reuse this tile
+        sim.specials.push({
+            x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey,
+            type,
+            ttl: ELEMENTAL_LIFETIME,
+            maxTtl: ELEMENTAL_LIFETIME,
+            id: `el-${sim.specialSeq++}`,
+        });
+        placed++;
+        changed = true;
+    }
+
+    if (changed) ctx.onSpecialsChanged(sim.specials.slice());
+    if (placed > 0) {
+        ctx.feel('specialSpawn');
+        sim.elementalSpawnTimer = ELEMENTAL_SPAWN_INTERVAL;
+    } else {
+        // Nowhere acceptable right now — retry shortly rather than skip a full cycle.
+        sim.elementalSpawnTimer = SPECIAL_SPAWN_RETRY;
+    }
+    return placed;
 }
 
 // Writes the interpolated ground position into outPos (module-level scratch or a
@@ -1567,6 +1656,12 @@ export function stepWormSim(sim, delta, size, ctx) {
             // are transient, so retry soon rather than skipping a whole interval.
             if (!spawnSpecial(sim, size, ctx)) sim.specialTimer = SPECIAL_SPAWN_RETRY;
         }
+        // Elemental offering runs on its own faster clock (spawnElementalOffering
+        // resets the timer itself, to the interval on success or a short retry).
+        sim.elementalSpawnTimer -= delta;
+        if (sim.elementalSpawnTimer <= 0) {
+            spawnElementalOffering(sim, size, ctx);
+        }
         if (sim.specials.length > 0) {
             let expired = false;
             for (let i = sim.specials.length - 1; i >= 0; i--) {
@@ -1574,11 +1669,13 @@ export function stepWormSim(sim, delta, size, ctx) {
                 if (sim.specials[i].ttl <= 0) {
                     const [gone] = sim.specials.splice(i, 1);
                     expired = true;
-                    // Published as a transition so the HUD can retire its notice and
-                    // the player gets a quiet "that one got away" cue — distinct from
-                    // both the spawn chime and the claim burst.
-                    ctx.onSpecialExpired(gone.type);
-                    ctx.feel('specialExpire');
+                    // Buffs get the "that one got away" notice + cue. An un-taken
+                    // elemental offering just fades quietly — firing four expiry
+                    // notices and chimes at once would be noise, not information.
+                    if (!isElementalType(gone.type)) {
+                        ctx.onSpecialExpired(gone.type);
+                        ctx.feel('specialExpire');
+                    }
                 }
             }
             if (expired) ctx.onSpecialsChanged(sim.specials.slice());

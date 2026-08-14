@@ -103,78 +103,6 @@ const _orbGeos = {
   },
 };
 
-const ELEMENTAL_BADGE_TYPES = new Set(['water', 'lava', 'grass', 'ice']);
-
-// Elemental pickups use a bold, camera-facing enamel badge at every cube size.
-// There is only ever one special orb on the board (SPECIAL_MAX_ON_BOARD), so the
-// badge is cheap even on small cubes, and the distinct silhouette is what lets a
-// player read water/lava/grass/ice at a glance — the generic parity gem only
-// distinguished them by colour and, worse, wore the antipodal-pair mark that
-// belongs to parity orbs. The shared medal silhouette, dark keyline and pale
-// inset stay legible against every face colour; the raised elemental glyph gives
-// each pickup a distinct silhouette even when colour is not enough.
-const _badgeGeos = {
-  rim: new THREE.CylinderGeometry(0.40, 0.40, 0.085, 12),
-  keyline: new THREE.CylinderGeometry(0.345, 0.345, 0.096, 12),
-  enamel: new THREE.CylinderGeometry(0.31, 0.31, 0.105, 12),
-  halo: new THREE.TorusGeometry(0.46, 0.025, 8, 24),
-  water: new THREE.SphereGeometry(0.13, 16, 12),
-  lava: new THREE.ConeGeometry(0.15, 0.30, 7),
-  grass: new THREE.SphereGeometry(0.15, 12, 8),
-  iceBar: new THREE.BoxGeometry(0.055, 0.32, 0.045),
-};
-
-function ElementalBadge({ type, color, badgeRef }) {
-  return (
-    <group ref={badgeRef}>
-      <mesh geometry={_badgeGeos.rim} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color="#ffd45e" emissive="#ff9f1c" emissiveIntensity={0.75} metalness={0.72} roughness={0.2} toneMapped={false} />
-      </mesh>
-      <mesh geometry={_badgeGeos.keyline} position={[0, 0, 0.012]} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color="#24140d" roughness={0.48} />
-      </mesh>
-      <mesh geometry={_badgeGeos.enamel} position={[0, 0, 0.024]} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.85} metalness={0.18} roughness={0.22} toneMapped={false} />
-      </mesh>
-
-      {/* Raised, intentionally chunky symbols: readable at a 15x15 tile's size. */}
-      {type === 'water' && (
-        <group position={[0, 0, 0.105]} scale={[0.72, 1.18, 0.72]}>
-          <mesh geometry={_badgeGeos.water}><meshStandardMaterial color="#e9fbff" emissive="#8cecff" emissiveIntensity={1.1} toneMapped={false} /></mesh>
-          <mesh geometry={_badgeGeos.lava} position={[0, -0.12, 0]} rotation={[0, 0, Math.PI]} scale={[0.72, 0.72, 0.72]}>
-            <meshStandardMaterial color="#e9fbff" emissive="#8cecff" emissiveIntensity={1.1} toneMapped={false} />
-          </mesh>
-        </group>
-      )}
-      {type === 'lava' && (
-        <group position={[0, 0, 0.12]}>
-          <mesh geometry={_badgeGeos.lava} rotation={[0, 0, Math.PI]}><meshStandardMaterial color="#fff0a6" emissive="#ffd45e" emissiveIntensity={1.35} toneMapped={false} /></mesh>
-          <mesh geometry={_badgeGeos.lava} position={[0, 0, 0.035]} rotation={[0, 0, Math.PI]} scale={[0.48, 0.58, 0.48]}>
-            <meshStandardMaterial color="#ff5b22" emissive="#ff5b22" emissiveIntensity={1.1} toneMapped={false} />
-          </mesh>
-        </group>
-      )}
-      {type === 'grass' && (
-        <group position={[0, 0, 0.12]} rotation={[0, 0, -0.62]} scale={[0.72, 1.18, 0.38]}>
-          <mesh geometry={_badgeGeos.grass}><meshStandardMaterial color="#efffd6" emissive="#baff8a" emissiveIntensity={0.9} toneMapped={false} /></mesh>
-        </group>
-      )}
-      {type === 'ice' && (
-        <group position={[0, 0, 0.12]}>
-          {[0, Math.PI / 3, -Math.PI / 3].map((z) => (
-            <mesh key={z} geometry={_badgeGeos.iceBar} rotation={[0, 0, z]}>
-              <meshStandardMaterial color="#ffffff" emissive="#b9f1ff" emissiveIntensity={1.25} toneMapped={false} />
-            </mesh>
-          ))}
-        </group>
-      )}
-      <mesh geometry={_badgeGeos.halo}>
-        <meshBasicMaterial color={color} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
 // SingleOrb renders geometry and registers refs with the parent OrbAnimator.
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
 function SingleOrbImpl({
@@ -199,7 +127,6 @@ function SingleOrbImpl({
   const electronGlowRefs = useRef([]); // target only
   const outlineRef     = useRef();
   const parityMarkRef  = useRef();
-  const badgeRef       = useRef();
 
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
 
@@ -231,7 +158,6 @@ function SingleOrbImpl({
       get electronGlows() { return electronGlowRefs.current; },
       get outline()       { return outlineRef.current; },
       get parityMark()    { return parityMarkRef.current; },
-      get badge()         { return badgeRef.current; },
       get isTarget()      { return isTargetRef.current; },
       get elevated()      { return elevatedRef.current; },
       get position()      { return positionRef.current; },
@@ -249,16 +175,6 @@ function SingleOrbImpl({
   if (collected) return null;
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
-
-  // Elemental pickups always wear the badge, regardless of reducedDetail — see
-  // the ElementalBadge comment for why it's shown at every size.
-  if (ELEMENTAL_BADGE_TYPES.has(type)) {
-    return (
-      <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
-        <ElementalBadge type={type} color={color} badgeRef={badgeRef} />
-      </group>
-    );
-  }
 
   // Mega Mode can carry more than a hundred pickups. Rendering the full gem,
   // cage, Möbius strip, and orbital system for every one turns those pickups
@@ -471,18 +387,11 @@ export default function ParityOrbs({
       const {
         group, core, innerCore, innerGlow, shell, glow, targetGlow,
         orbitSystem, ringA, ringB, ringC,
-        electrons, electronGlows, outline, parityMark, badge,
+        electrons, electronGlows, outline, parityMark,
         isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset,
       } = refs;
-      if (!group || (!core && !badge)) continue;
+      if (!group || !core) continue;
       const time = t + timeOffset;
-
-      // Badge pickups are screen-facing landmarks, not tiny objects that can
-      // turn edge-on. A soft pulse adds motion without sacrificing their emblem.
-      if (badge) {
-        badge.quaternion.copy(state.camera.quaternion);
-        badge.scale.setScalar(1 + Math.sin(time * 3.4) * 0.08);
-      }
 
       // ── World position — glued to live cubie transform ─────────────────────
       const bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
