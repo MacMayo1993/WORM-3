@@ -54,7 +54,7 @@ function makeSim() {
 
 describe('elementalDefs', () => {
   it('defines the four elements', () => {
-    expect(ELEMENTAL_TYPES).toEqual(['water', 'lava', 'grass', 'ice']);
+    expect(ELEMENTAL_TYPES).toEqual(['water', 'fire', 'grass', 'ice']);
   });
 
   it('each element reuses an existing Living tile style', () => {
@@ -112,7 +112,7 @@ describe('elemental wash lifecycle', () => {
   it('a second element replaces the first without stacking', () => {
     const sim = makeSim();
     const ctx = makeCtx();
-    startElemental(sim, ctx, 'lava');
+    startElemental(sim, ctx, 'fire');
     startElemental(sim, ctx, 'ice');
     expect(sim.elementalType).toBe('ice');
     expect(sim.elementalT).toBeCloseTo(ELEMENTAL_DURATION);

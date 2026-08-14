@@ -11,7 +11,7 @@
 // silhouette the 3D orb uses instead of an emoji (which renders differently on
 // every platform and carries no accessible name).
 //
-// The elemental orbs (water / lava / grass / ice) are folded in from
+// The elemental orbs (water / fire / grass / ice) are folded in from
 // elementalDefs.js so the shared spawn, lifetime, claim, HUD-notice and icon
 // pipeline treats them exactly like the rocket and magnet — only their claimed
 // effect differs (they wash the cube in their element instead of buffing the

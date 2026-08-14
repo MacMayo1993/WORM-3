@@ -200,7 +200,7 @@ export function makeWormSim(size) {
         rocketT: 0,
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
-        elementalType: null,      // active elemental wash ('water'|'lava'|'grass'|'ice'|null)
+        elementalType: null,      // active elemental wash ('water'|'fire'|'grass'|'ice'|null)
         elementalT: 0,            // seconds of elemental wash remaining
         elementalMaxT: 0,         // duration of the active wash, for the HUD's fill
         elementalFocusT: 0,       // seconds remaining of the claim camera beat (pull out to the overview)
@@ -832,14 +832,55 @@ function spawnSpecial(sim, size, ctx, nearTile = null) {
     return true;
 }
 
+// The six manifold faces, each pinned to its outer layer. `fixed` names the axis
+// held at the layer, `a`/`b` the two axes that vary across the face.
+const ELEMENTAL_FACES = [
+    { dirKey: 'PX', fixed: 'x', outer: true, a: 'y', b: 'z' },
+    { dirKey: 'NX', fixed: 'x', outer: false, a: 'y', b: 'z' },
+    { dirKey: 'PY', fixed: 'y', outer: true, a: 'x', b: 'z' },
+    { dirKey: 'NY', fixed: 'y', outer: false, a: 'x', b: 'z' },
+    { dirKey: 'PZ', fixed: 'z', outer: true, a: 'x', b: 'y' },
+    { dirKey: 'NZ', fixed: 'z', outer: false, a: 'x', b: 'y' },
+];
+
 /**
- * Put an elemental OFFERING on the board: one orb of each element, clustered near
- * the worm. The player grabs the one they want; the rest are wiped on that claim
- * (see trySpecialPickupAt), or fade on their own before the next offering.
+ * The centre tile of one manifold face. Exact for odd cubes; on an even cube any
+ * of the four middle tiles is equally central, and this picks one of them
+ * consistently.
+ *
+ * @param {{dirKey:string, fixed:string, outer:boolean, a:string, b:string}} face
+ * @param {number} size
+ * @returns {{x:number,y:number,z:number,dirKey:string}}
+ */
+export function faceCenterTile(face, size) {
+    const c = Math.floor(size / 2);
+    const tile = { x: 0, y: 0, z: 0, dirKey: face.dirKey };
+    tile[face.fixed] = face.outer ? size - 1 : 0;
+    tile[face.a] = c;
+    tile[face.b] = c;
+    return tile;
+}
+
+/** Every face's centre tile, in face order. */
+export function faceCenterTiles(size) {
+    return ELEMENTAL_FACES.map((f) => faceCenterTile(f, size));
+}
+
+/**
+ * Put an elemental OFFERING on the board: one orb of each element, each on the
+ * CENTRE tile of a different manifold face. The player crawls to the one they
+ * want; the rest are wiped on that claim (see trySpecialPickupAt), or fade on
+ * their own before the next offering.
+ *
+ * Face centres rather than the scored neighbourhood placement spawnSpecial uses:
+ * an element re-skins the whole cube, so it should be a landmark you navigate to
+ * on a face you can name, not another gem that happens to appear next to you. One
+ * per face keeps the four of them spread across the manifold instead of clustered.
  *
  * Leftovers from a previous offering are cleared first, so the board never carries
- * two offerings at once. Reuses the same scored placement as spawnSpecial, adding
- * each placed tile to the occupancy set so the four orbs never stack.
+ * two offerings at once. Faces whose centre is taken (a parity orb, a live buff,
+ * the worm's own body or its live claim reach) are skipped, so an offering can be
+ * short if the board is busy.
  *
  * @returns {number} how many elemental orbs were actually placed
  */
@@ -850,7 +891,6 @@ function spawnElementalOffering(sim, size, ctx) {
         if (isElementalType(sim.specials[i].type)) { sim.specials.splice(i, 1); changed = true; }
     }
 
-    const candidates = buildSpawnCandidates(sim.pos, size, SPECIAL_SPAWN_RADIUS);
     const occupiedKeys = new Set(
         [...sim.powerups, ...sim.specials, sim.pos].map(tileKeyOf)
     );
@@ -867,23 +907,30 @@ function spawnElementalOffering(sim, size, ctx) {
         );
         for (const key of _specialClaimExclusion) occupiedKeys.add(key);
     }
-    const trailKeys = bodyTrailKeys(sim);
-    const tunnelKeys = tunnelMouthKeys(candidates, ctx);
+    for (const key of bodyTrailKeys(sim)) occupiedKeys.add(key);
+    // A face centre that is currently a wormhole mouth is not a place to leave an
+    // offering — the worm falls in rather than picking it up.
+    const centers = ELEMENTAL_FACES.map((f) => ({ tile: faceCenterTile(f, size) }));
+    for (const key of tunnelMouthKeys(centers, ctx)) occupiedKeys.add(key);
+
+    // Shuffle the faces so the same element does not always land on the same face.
+    const faces = ELEMENTAL_FACES.slice();
+    for (let i = faces.length - 1; i > 0; i--) {
+        const j = Math.floor(sim.rand() * (i + 1));
+        [faces[i], faces[j]] = [faces[j], faces[i]];
+    }
 
     let placed = 0;
+    let faceIdx = 0;
     for (const type of ELEMENTAL_TYPES) {
-        const tile = pickSpawnTile({
-            candidates,
-            head: sim.pos,
-            moveDir: sim.moveDir,
-            size,
-            occupiedKeys,
-            trailKeys,
-            tunnelKeys,
-            claimRadius: 0,
-        }, sim.rand);
-        if (!tile) break; // neighbourhood is full — offer what fits
-        occupiedKeys.add(tileKeyOf(tile)); // don't let the next element reuse this tile
+        // Walk on to the next face until one has a free centre — one orb per face.
+        let tile = null;
+        while (faceIdx < faces.length) {
+            const candidate = faceCenterTile(faces[faceIdx++], size);
+            if (!occupiedKeys.has(tileKeyOf(candidate))) { tile = candidate; break; }
+        }
+        if (!tile) break; // no faces left — offer what fits
+        occupiedKeys.add(tileKeyOf(tile));
         sim.specials.push({
             x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey,
             type,

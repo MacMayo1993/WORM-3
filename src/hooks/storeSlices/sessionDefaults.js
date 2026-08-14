@@ -52,7 +52,7 @@ export const makeWormSessionDefaults = () => ({
   wormRocketActive: false,
   wormMagnetActive: false,
   wormMagnetSeq: 0,
-  // Active elemental wash ('water'|'lava'|'grass'|'ice') or null — drives the
+  // Active elemental wash ('water'|'fire'|'grass'|'ice') or null — drives the
   // ElementalAtmosphere overlay and the HUD's element pill. Remaining seconds
   // ride the wormBuffs bridge, not the store.
   wormElementalTheme: null,

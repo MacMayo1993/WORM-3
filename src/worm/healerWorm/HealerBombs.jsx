@@ -48,7 +48,9 @@ function makeFlameTexture() {
   tex.anisotropy = 2;
   return tex;
 }
-const FLAME_TEX = makeFlameTexture();
+// Exported so the FIRE element's cube skin burns with the same flame the bombs do
+// (see ElementalFireSkin) rather than carrying a second, differently-shaped one.
+export const FLAME_TEX = makeFlameTexture();
 
 // ─── Shared geometries (created once, reused by every bomb + flame) ─────────────
 const GEO = {

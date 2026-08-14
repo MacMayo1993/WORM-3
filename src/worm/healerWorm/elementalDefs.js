@@ -3,11 +3,11 @@
 // Elemental power-up orbs for worm mode.
 //
 // Each elemental orb reuses the identity of one of the "Living" tile styles
-// (water / lava / grass / ice — see src/utils/tileStyleCatalog.js) and, when
-// claimed, bathes the entire cube in that element for a while: a coloured
-// atmosphere, drifting element particles and a soft envelope glow. The base
-// tile styles keep rendering underneath, so every sticker stays readable — the
-// element is a wash over the world, not a repaint of it.
+// (water / lava / grass / ice — see src/utils/tileStyleCatalog.js; fire borrows
+// lava's) and, when claimed, bathes the entire cube in that element for a while:
+// a coloured atmosphere, drifting element particles and a soft envelope glow. The
+// base tile styles keep rendering underneath, so every sticker stays readable —
+// the element is a wash over the world, not a repaint of it.
 //
 // This module is deliberately dependency-free (no React, no Three.js, no store),
 // exactly like specialDefs.js, so the simulation and its headless tests can
@@ -36,9 +36,12 @@ export const ELEMENTAL_DEFS = {
     iconAccent: 'M9.2 12.6a2 2 0 1 1 0 4 2 2 0 0 1 0-4z',
     description: 'Floods the whole cube with water — a blue tide and rising bubbles wash over every face.',
   },
-  lava: {
-    label: 'LAVA',
+  fire: {
+    label: 'FIRE',
     element: true,
+    // Borrows the "lava" Living tile style's identity; the cube skin itself is
+    // the bomb's flame sprites (see ElementalFireSkin), not a molten surface —
+    // molten runoff on flat stickers never read as anything but orange squiggles.
     tileStyle: 'lava',
     color: '#ff6a2e',
     accent: '#ffe08a',
@@ -47,7 +50,7 @@ export const ELEMENTAL_DEFS = {
     // A flame.
     iconPath: 'M13.5 1.8c.6 3-1.2 4.6-2.8 6.4-1.6 1.8-3.2 3.7-3.2 6.6a6.5 6.5 0 0 0 13 0c0-2-.9-3.6-2-5 .1 1.6-.6 2.6-1.6 3-.1-2.6-1.4-4.6-3.4-6.4 1-1.6 1.2-3 0-4.6z',
     iconAccent: 'M12 12.4c1.4 1 2.1 2.2 2.1 3.5a2.1 2.1 0 0 1-4.2 0c0-1.3.7-2.5 2.1-3.5z',
-    description: 'Sets the whole cube alight — a molten glow and rising embers pour across every face.',
+    description: 'Sets the whole cube alight — flames lick up off every face and embers rise off the board.',
   },
   grass: {
     label: 'NATURE',
