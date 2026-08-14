@@ -191,7 +191,14 @@ export const MAGNET_RADIUS = 2;
 // cube in its atmosphere for ELEMENTAL_DURATION seconds. Longer than the buffs
 // because it is a scene mood rather than a moment-to-moment advantage; a second
 // element claimed while one is running simply replaces it.
-export const ELEMENTAL_DURATION = 18;
+export const ELEMENTAL_DURATION = 10;
+// Elemental orbs spawn on their OWN track, separate from the rocket/magnet special
+// clock. Every interval the board is offered one orb of each element clustered near
+// the worm; grabbing one claims that element and wipes the rest of the offering
+// until the next cycle. The lifetime is a hair under the interval so an un-taken
+// offering fades out cleanly before the next one appears.
+export const ELEMENTAL_SPAWN_INTERVAL = 12; // seconds between elemental offerings
+export const ELEMENTAL_LIFETIME = 11;       // seconds an un-taken offering stays on the board
 // On claim the camera eases out to the opening-overview framing for this long so
 // the player sees the whole cube get sheathed in the element, then eases back to
 // the chase. Short — it's a punctuation beat on pickup, not a mode.
