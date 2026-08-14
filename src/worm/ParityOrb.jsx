@@ -8,7 +8,6 @@ import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
-import { getElementalDef } from './healerWorm/elementalDefs.js';
 
 // Orbs float this far above the tile surface so they're visible from any angle
 const HOVER_ABOVE = 0.28;
@@ -104,104 +103,6 @@ const _orbGeos = {
   },
 };
 
-const ELEMENTAL_BADGE_TYPES = new Set(['water', 'lava', 'grass', 'ice']);
-
-// Elemental pickups are a bold, camera-facing enamel gym badge at every cube size.
-// There is only ever one special orb on the board (SPECIAL_MAX_ON_BOARD), so the
-// badge is cheap even on small cubes, and the distinct silhouette is what lets a
-// player read water/lava/grass/ice at a glance. A faceted gold octagon rim, a dark
-// keyline, and an element-coloured enamel carry the element's OWN icon (the exact
-// silhouette elementalDefs ships and the HUD draws), stamped as a glowing emblem —
-// so the pickup and the HUD chip read as one badge system. Radial 8 = octagon.
-const _badgeGeos = {
-  rim: new THREE.CylinderGeometry(0.40, 0.40, 0.085, 8),
-  keyline: new THREE.CylinderGeometry(0.35, 0.35, 0.096, 8),
-  enamel: new THREE.CylinderGeometry(0.315, 0.315, 0.105, 8),
-  emblem: new THREE.PlaneGeometry(0.46, 0.46),
-  gloss: new THREE.CircleGeometry(0.30, 16),
-  halo: new THREE.TorusGeometry(0.47, 0.022, 8, 8),
-};
-
-// The element's icon, rasterised once per type into a glowing emblem texture. It
-// reuses elementalDefs' iconPath (24×24 viewBox) so the 3D badge and the HUD show
-// the identical silhouette. Cached module-level (≤4 textures), built lazily on the
-// first badge render so a headless import never touches the canvas API.
-const _emblemTexCache = {};
-function getEmblemTexture(type) {
-  if (_emblemTexCache[type] !== undefined) return _emblemTexCache[type];
-  const def = getElementalDef(type);
-  if (!def || typeof document === 'undefined') { _emblemTexCache[type] = null; return null; }
-  const S = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = S;
-  const ctx = canvas.getContext('2d');
-  const pad = 46;
-  const scale = (S - pad * 2) / 24;
-  ctx.translate(pad, pad);
-  ctx.scale(scale, scale);
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  const light = def.accent || '#ffffff';
-  const p = new Path2D(def.iconPath);
-  // Coloured outer glow so the emblem reads as lit enamel, not a flat decal.
-  ctx.shadowColor = def.color;
-  ctx.shadowBlur = 7;
-  ctx.fillStyle = light;
-  ctx.fill(p);
-  // Stroke as well: the leaf/snowflake icons are open line paths with no fill area,
-  // and a stroke bolds the filled ones enough to read at a 15×15 tile's size.
-  ctx.lineWidth = 1.4;
-  ctx.strokeStyle = light;
-  ctx.stroke(p);
-  if (def.iconAccent) {
-    const pa = new Path2D(def.iconAccent);
-    ctx.shadowBlur = 4;
-    ctx.fillStyle = def.color;
-    ctx.fill(pa);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  _emblemTexCache[type] = tex;
-  return tex;
-}
-
-function ElementalBadge({ type, color, badgeRef }) {
-  const def = getElementalDef(type);
-  const accent = def?.accent || '#ffffff';
-  const emblemTex = useMemo(() => getEmblemTexture(type), [type]);
-  return (
-    <group ref={badgeRef}>
-      {/* Gold octagon rim */}
-      <mesh geometry={_badgeGeos.rim} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color="#ffd45e" emissive="#ff9f1c" emissiveIntensity={0.8} metalness={0.78} roughness={0.18} toneMapped={false} />
-      </mesh>
-      {/* Dark keyline that makes the rim pop off any face colour */}
-      <mesh geometry={_badgeGeos.keyline} position={[0, 0, 0.012]} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color="#1c1108" metalness={0.3} roughness={0.5} />
-      </mesh>
-      {/* Element-coloured enamel field */}
-      <mesh geometry={_badgeGeos.enamel} position={[0, 0, 0.024]} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.95} metalness={0.22} roughness={0.2} toneMapped={false} />
-      </mesh>
-      {/* A soft radial gloss gives the enamel a domed, glassy read */}
-      <mesh geometry={_badgeGeos.gloss} position={[0, 0.02, 0.088]}>
-        <meshBasicMaterial color={accent} transparent opacity={0.14} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
-      {/* The element's own icon, stamped and glowing */}
-      {emblemTex && (
-        <mesh geometry={_badgeGeos.emblem} position={[0, 0, 0.092]}>
-          <meshBasicMaterial map={emblemTex} transparent depthWrite={false} toneMapped={false} />
-        </mesh>
-      )}
-      {/* Outer glow ring in the element colour */}
-      <mesh geometry={_badgeGeos.halo}>
-        <meshBasicMaterial color={color} transparent opacity={0.72} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
 // SingleOrb renders geometry and registers refs with the parent OrbAnimator.
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
 function SingleOrbImpl({
@@ -226,7 +127,6 @@ function SingleOrbImpl({
   const electronGlowRefs = useRef([]); // target only
   const outlineRef     = useRef();
   const parityMarkRef  = useRef();
-  const badgeRef       = useRef();
 
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
 
@@ -258,7 +158,6 @@ function SingleOrbImpl({
       get electronGlows() { return electronGlowRefs.current; },
       get outline()       { return outlineRef.current; },
       get parityMark()    { return parityMarkRef.current; },
-      get badge()         { return badgeRef.current; },
       get isTarget()      { return isTargetRef.current; },
       get elevated()      { return elevatedRef.current; },
       get position()      { return positionRef.current; },
@@ -276,16 +175,6 @@ function SingleOrbImpl({
   if (collected) return null;
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
-
-  // Elemental pickups always wear the badge, regardless of reducedDetail — see
-  // the ElementalBadge comment for why it's shown at every size.
-  if (ELEMENTAL_BADGE_TYPES.has(type)) {
-    return (
-      <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
-        <ElementalBadge type={type} color={color} badgeRef={badgeRef} />
-      </group>
-    );
-  }
 
   // Mega Mode can carry more than a hundred pickups. Rendering the full gem,
   // cage, Möbius strip, and orbital system for every one turns those pickups
@@ -498,18 +387,11 @@ export default function ParityOrbs({
       const {
         group, core, innerCore, innerGlow, shell, glow, targetGlow,
         orbitSystem, ringA, ringB, ringC,
-        electrons, electronGlows, outline, parityMark, badge,
+        electrons, electronGlows, outline, parityMark,
         isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset,
       } = refs;
-      if (!group || (!core && !badge)) continue;
+      if (!group || !core) continue;
       const time = t + timeOffset;
-
-      // Badge pickups are screen-facing landmarks, not tiny objects that can
-      // turn edge-on. A soft pulse adds motion without sacrificing their emblem.
-      if (badge) {
-        badge.quaternion.copy(state.camera.quaternion);
-        badge.scale.setScalar(1 + Math.sin(time * 3.4) * 0.08);
-      }
 
       // ── World position — glued to live cubie transform ─────────────────────
       const bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
