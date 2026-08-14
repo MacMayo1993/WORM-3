@@ -76,19 +76,38 @@ const _restPos = new THREE.Vector3();
 // = how many stickers wide the cell is, so the volume can be scaled to cover it.
 function surfaceStickers(size) {
   const gridN = Math.min(size, MAX_SKIN_GRID);
-  const cell = size / gridN;                                   // 1 when gridN === size
   const sample = (j) => Math.min(size - 1, Math.floor((j + 0.5) * size / gridN));
+  // The sampled sticker index for each grid line, plus the width (in sticker
+  // units) each coarse cell must span to reach the midpoints toward its
+  // neighbours. floor() sampling clusters unevenly for sizes that do not divide
+  // by gridN (6–9), so a single fixed size/gridN width leaves whole rows bare —
+  // e.g. on a 7×7 it samples {0,2,3,4,6} at width 1.4, and rows 1 and 5 fall in
+  // the gaps. Sizing each cell from its own neighbour spacing tiles the face with
+  // no gaps; the resulting overlaps are thin and harmless (the surface layer is
+  // depthWrite:false and world-sampled, grass just reads denser). At/below the
+  // cap every span is 1, exactly one volume per sticker, unchanged.
+  const idx = [];
+  for (let j = 0; j < gridN; j++) idx.push(sample(j));
+  const span = idx.map((p, j) => {
+    const halfLeft = j === 0 ? p + 0.5 : (p - idx[j - 1]) / 2;
+    const halfRight = j === gridN - 1 ? (size - 1 - p) + 0.5 : (idx[j + 1] - p) / 2;
+    return 2 * Math.max(halfLeft, halfRight);
+  });
   const out = [];
   for (const f of FACES) {
     for (let j = 0; j < gridN; j++) {
       for (let k = 0; k < gridN; k++) {
         const coord = { x: 0, y: 0, z: 0 };
         coord[f.fixed] = f.outer(size);
-        coord[f.a] = sample(j);
-        coord[f.b] = sample(k);
+        coord[f.a] = idx[j];
+        coord[f.b] = idx[k];
         const wp = getStickerWorldPos(coord.x, coord.y, coord.z, f.dk, size, 0);
         const n = FACE_NORMALS[f.dk] ?? FACE_NORMALS.PZ;
         const restQuat = new THREE.Quaternion().setFromUnitVectors(_zAxis, n);
+        // Uniform per-cell scale (the larger of the two in-plane spans): the
+        // z→normal quaternion carries an arbitrary in-plane roll, so a single
+        // scale that covers the wider axis stays gap-free however local X/Y land.
+        const cell = Math.max(span[j], span[k]);
         out.push({
           key: `${f.dk}-${j}-${k}`,
           x: coord.x, y: coord.y, z: coord.z, dirKey: f.dk,

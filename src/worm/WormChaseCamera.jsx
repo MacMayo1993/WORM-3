@@ -29,6 +29,7 @@ import {
     ORB_SEGMENT_GROWTH,
     HEAL_PAUSE_DURATION,
     CUT_FOCUS_DURATION,
+    ELEMENTAL_FOCUS_DURATION,
 } from './healerWorm/constants.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
@@ -95,6 +96,15 @@ const _cutSide = new THREE.Vector3();
 const _cutCam = new THREE.Vector3();
 const _cutUp = new THREE.Vector3();
 const CUT_FOCUS_PEAK = 0.9; // how far toward the impact shot the swing goes (0..1)
+
+// Elemental-claim beat scratch — the opening-overview framing the camera eases
+// out to when a wash is claimed, so the whole-cube transform is visible. This is
+// the same pose the opening scramble uses (see the 'scrambling' branch), which we
+// know frames the cube cleanly without ever clipping into it.
+const _elemFocusCam = new THREE.Vector3();
+const _elemFocusLook = new THREE.Vector3();
+const _elemFocusUp = new THREE.Vector3();
+const ELEM_FOCUS_PEAK = 1.0; // full pull-out to the overview at the beat's peak
 
 
 export default function WormChaseCamera({ worm, size }) {
@@ -431,6 +441,30 @@ export default function WormChaseCamera({ worm, size }) {
                     _cutUp.set(0, _cutN.y < -0.85 ? -1 : 1, 0);
                     _camUp.lerp(_cutUp, cutBlend);
                     if (_camUp.lengthSq() < 1e-6) _camUp.copy(_cutUp);
+                    _camUp.normalize();
+                }
+            }
+
+            // Elemental-claim beat: a claimed wash sheathes the WHOLE cube, so ease
+            // the framing out to the opening-overview shot — the exact pose the
+            // scramble uses, which never clips the cube — hold a beat, then ease
+            // back to the chase. Pure punctuation; the crawl continues underneath.
+            const elemFocusT = worm.elementalFocusT?.current ?? 0;
+            if (elemFocusT > 0) {
+                const elapsed = ELEMENTAL_FOCUS_DURATION - elemFocusT;
+                const rampIn = THREE.MathUtils.smoothstep(elapsed, 0, 0.35);
+                const rampOut = THREE.MathUtils.smoothstep(elemFocusT, 0, 0.5);
+                const elemBlend = Math.min(rampIn, rampOut) * ELEM_FOCUS_PEAK;
+                if (elemBlend > 0.001) {
+                    const dist = 5 + size * 4.0;
+                    _elemFocusCam.set(0.6, 1.1, 1).normalize().multiplyScalar(dist);
+                    _elemFocusLook.set(0, 0, 0);
+                    _camTargetCam.lerp(_elemFocusCam, elemBlend);
+                    _camTargetLook.lerp(_elemFocusLook, elemBlend);
+                    // The overview is world-level; unroll toward Y-up as we pull out.
+                    _elemFocusUp.set(0, 1, 0);
+                    _camUp.lerp(_elemFocusUp, elemBlend);
+                    if (_camUp.lengthSq() < 1e-6) _camUp.copy(_elemFocusUp);
                     _camUp.normalize();
                 }
             }
