@@ -520,6 +520,7 @@ export function useWormCrawler(size, cubies) {
             healFocusTile: f('healFocusTile'),
             cutFocusT: f('cutFocusT'),
             cutFocusPos: f('cutFocusPos'),
+            elementalFocusT: f('elementalFocusT'),
             pendingOrbFlashRef: f('pendingOrbFlash'),
             tileTrail: f('tileTrail'),
             pathHistory: f('pathHistory'),

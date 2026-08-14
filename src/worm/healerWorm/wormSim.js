@@ -98,6 +98,7 @@ import {
     MAGNET_DURATION,
     MAGNET_RADIUS,
     ELEMENTAL_DURATION,
+    ELEMENTAL_FOCUS_DURATION,
     SPECIAL_SPAWN_RADIUS,
     SPECIAL_JUMP_REACH,
     SPECIAL_TUNNEL_RADIUS,
@@ -199,6 +200,7 @@ export function makeWormSim(size) {
         elementalType: null,      // active elemental wash ('water'|'lava'|'grass'|'ice'|null)
         elementalT: 0,            // seconds of elemental wash remaining
         elementalMaxT: 0,         // duration of the active wash, for the HUD's fill
+        elementalFocusT: 0,       // seconds remaining of the claim camera beat (pull out to the overview)
         landingGraceT: 0,         // post-rocket window where a landing can't kill
         // Injected RNG — every random draw in the special system goes through this so
         // tests can make spawn type and placement deterministic. Set once at
@@ -321,6 +323,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.elementalType = null;
     sim.elementalT = 0;
     sim.elementalMaxT = 0;
+    sim.elementalFocusT = 0;
     sim.landingGraceT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -421,6 +424,10 @@ export function startElemental(sim, ctx, type) {
     sim.elementalType = type;
     sim.elementalT = ELEMENTAL_DURATION;
     sim.elementalMaxT = ELEMENTAL_DURATION;
+    // Kick off the claim camera beat: the wash bathes the WHOLE cube, so the
+    // camera pulls out to the opening-overview framing for a moment to show the
+    // cube transform, then eases back to the chase (WormChaseCamera reads this).
+    sim.elementalFocusT = ELEMENTAL_FOCUS_DURATION;
     ctx.feel('orb');
     ctx.onElementalTheme(type, ELEMENTAL_DURATION);
 }
@@ -1481,6 +1488,11 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.elementalType = null;
             ctx.onElementalTheme(null, 0);
         }
+    }
+
+    // Claim camera beat — ticks alongside the wash, does not freeze the crawl.
+    if (sim.phase === 'crawling' && sim.elementalFocusT > 0) {
+        sim.elementalFocusT = Math.max(0, sim.elementalFocusT - delta);
     }
 
     // Post-landing protection decays in the same (crawling-only) clock family.

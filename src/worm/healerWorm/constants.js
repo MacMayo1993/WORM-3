@@ -192,6 +192,10 @@ export const MAGNET_RADIUS = 2;
 // because it is a scene mood rather than a moment-to-moment advantage; a second
 // element claimed while one is running simply replaces it.
 export const ELEMENTAL_DURATION = 18;
+// On claim the camera eases out to the opening-overview framing for this long so
+// the player sees the whole cube get sheathed in the element, then eases back to
+// the chase. Short — it's a punctuation beat on pickup, not a mode.
+export const ELEMENTAL_FOCUS_DURATION = 1.4;
 // Ceiling on queued attraction streaks. A sweep can only reach a dozen or so orbs,
 // but the cap keeps a pathological case from spawning unbounded geometry and React
 // state in a single frame.
