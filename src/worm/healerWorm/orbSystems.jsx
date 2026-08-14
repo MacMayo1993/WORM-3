@@ -13,7 +13,7 @@ import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_F
 import { getSpecialDef, isElementalType } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
-import { ElementalBadge } from './elementalBadge.jsx';
+import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
 // Each orb uses the exact color of the face it represents, matching the
@@ -92,12 +92,10 @@ const _specialGeos = {
     magnetField: new THREE.TorusGeometry(0.48, 0.018, 8, 40),
 };
 
-// The elemental orb is a camera-facing enamel badge (ElementalBadge), not a
-// rocket/magnet silhouette — it gets its own renderer below. A countdown ring sits
-// in the badge's screen plane and closes in as the offering's lifetime runs out.
-const _elemOrbGeos = {
-    ring: new THREE.TorusGeometry(0.56, 0.02, 8, 44),
-};
+// The elemental orb is not a rocket/magnet silhouette — it is a glassy elemental
+// sphere with the enamel crest floated on its near face. It lives in its own module
+// (ElementalOrb.jsx) since it carries a shader body, a particle field and a claim
+// burst of its own.
 
 const _spPos = new THREE.Vector3();
 const _spNorm = new THREE.Vector3();
@@ -263,73 +261,6 @@ function SpecialOrb({ special, size }) {
     );
 }
 
-// ─── Elemental offering orbs ─────────────────────────────────────────────────
-// The element pickups are a camera-facing enamel badge (ElementalBadge) rather than
-// a rocket/magnet silhouette, so they read as the same emblem the HUD chip shows.
-// Same live-tile anchoring and lifetime fade as SpecialOrb; the extras are the
-// billboard, the orbiting spark ring, a gentle breathing pulse, and a countdown ring
-// in the badge's screen plane that mirrors the HUD's draining ring.
-function ElementalOrb({ special, size }) {
-    const groupRef = useRef();
-    const badgeRef = useRef();
-    const sparksRef = useRef();
-    const ringRef = useRef();
-    const reducedRef = useRef(prefersReducedMotion());
-    const look = getSpecialDef(special.type);
-
-    useFrame((state) => {
-        const group = groupRef.current;
-        if (!group) return;
-
-        if (!readLiveTile(special, _spPos, _spNorm)) {
-            const wp = getStickerWorldPos(special.x, special.y, special.z, special.dirKey, size, 0);
-            _spPos.set(wp[0], wp[1], wp[2]);
-            _spNorm.copy(FACE_NORMALS[special.dirKey] ?? FACE_NORMALS.PZ);
-        }
-
-        const t = state.clock.elapsedTime;
-        const bob = Math.sin(t * 2.2) * 0.06;
-        group.position.copy(_spPos).addScaledVector(_spNorm, SPECIAL_HOVER_HEIGHT + bob);
-        group.quaternion.copy(state.camera.quaternion); // face the camera
-
-        // Lifetime fade — dim as the offering runs out. No urgency blink: if you don't
-        // want this element you just grab another, so there is nothing to panic about.
-        const ttl = special.ttl ?? SPECIAL_FADE_TIME;
-        const life = special.maxTtl || SPECIAL_FADE_TIME;
-        const fade = ttl >= SPECIAL_FADE_TIME ? 1 : Math.max(0, ttl / SPECIAL_FADE_TIME);
-        const alpha = Math.max(0.5, fade);
-
-        const breathe = reducedRef.current ? 1 : 1 + Math.sin(t * 3.2) * 0.05;
-        // Specials read larger than parity gems; the badge keeps that presence.
-        if (badgeRef.current) badgeRef.current.scale.setScalar(1.15 * breathe);
-        if (sparksRef.current && !reducedRef.current) sparksRef.current.rotation.z = t * 1.1;
-
-        group.traverse((o) => {
-            if (o.material && o.material.transparent) o.material.opacity = (o.userData.baseOpacity ?? 1) * alpha;
-        });
-
-        // Countdown ring — tightens subtly toward the badge as time runs out. Kept
-        // just outside the emblem so it never crowds it. Set after the traverse.
-        if (ringRef.current) {
-            const remaining = Math.max(0, Math.min(1, ttl / life));
-            ringRef.current.scale.setScalar(0.82 + 0.18 * remaining);
-            ringRef.current.rotation.z = t * 0.5;
-            ringRef.current.material.opacity = 0.5 * alpha;
-        }
-    });
-
-    return (
-        <group ref={groupRef}>
-            <group ref={badgeRef}>
-                <ElementalBadge type={special.type} color={look.color} sparksRef={sparksRef} />
-            </group>
-            <mesh ref={ringRef} geometry={_elemOrbGeos.ring}>
-                <meshBasicMaterial color={look.accent} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
-            </mesh>
-        </group>
-    );
-}
-
 export function SpecialOrbs({ size }) {
     const specials = useGameStore(s => s.wormSpecials);
     if (!specials || specials.length === 0) return null;
@@ -482,6 +413,10 @@ export function MagnetFX({ worm }) {
 
 // Burst played where a special was claimed — fires for every character (unlike the
 // glow worm's orb bloom below), since claiming one is a rare, deliberate moment.
+//
+// Elements get their own, much bigger burst: claiming one re-skins the entire cube
+// and pulls the camera out to the overview, and the generic orb pop was far too
+// small a punctuation mark for that.
 export function SpecialFlashSystem({ worm }) {
     const [flashes, setFlashes] = useState([]);
 
@@ -490,19 +425,17 @@ export function SpecialFlashSystem({ worm }) {
         if (!pending) return;
         worm.pendingSpecialFlashRef.current = null;
         const look = getSpecialDef(pending.type);
-        setFlashes(prev => [...prev, { id: Date.now() + Math.random(), pos: pending.pos, color: look.color }]);
+        setFlashes(prev => [...prev, { id: Date.now() + Math.random(), pos: pending.pos, type: pending.type, color: look.color }]);
     });
 
     if (flashes.length === 0) return null;
+    const drop = (id) => setFlashes(prev => prev.filter(x => x.id !== id));
     return (
         <>
             {flashes.map(f => (
-                <OrbCollectEffect
-                    key={f.id}
-                    position={f.pos}
-                    color={f.color}
-                    onDone={() => setFlashes(prev => prev.filter(x => x.id !== f.id))}
-                />
+                isElementalType(f.type)
+                    ? <ElementalClaimBurst key={f.id} position={f.pos} type={f.type} onDone={() => drop(f.id)} />
+                    : <OrbCollectEffect key={f.id} position={f.pos} color={f.color} onDone={() => drop(f.id)} />
             ))}
         </>
     );
