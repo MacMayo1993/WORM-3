@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
+import { getElementalDef } from './healerWorm/elementalDefs.js';
 
 // Orbs float this far above the tile surface so they're visible from any angle
 const HOVER_ABOVE = 0.28;
@@ -105,71 +106,97 @@ const _orbGeos = {
 
 const ELEMENTAL_BADGE_TYPES = new Set(['water', 'lava', 'grass', 'ice']);
 
-// Elemental pickups use a bold, camera-facing enamel badge at every cube size.
+// Elemental pickups are a bold, camera-facing enamel gym badge at every cube size.
 // There is only ever one special orb on the board (SPECIAL_MAX_ON_BOARD), so the
 // badge is cheap even on small cubes, and the distinct silhouette is what lets a
-// player read water/lava/grass/ice at a glance — the generic parity gem only
-// distinguished them by colour and, worse, wore the antipodal-pair mark that
-// belongs to parity orbs. The shared medal silhouette, dark keyline and pale
-// inset stay legible against every face colour; the raised elemental glyph gives
-// each pickup a distinct silhouette even when colour is not enough.
+// player read water/lava/grass/ice at a glance. A faceted gold octagon rim, a dark
+// keyline, and an element-coloured enamel carry the element's OWN icon (the exact
+// silhouette elementalDefs ships and the HUD draws), stamped as a glowing emblem —
+// so the pickup and the HUD chip read as one badge system. Radial 8 = octagon.
 const _badgeGeos = {
-  rim: new THREE.CylinderGeometry(0.40, 0.40, 0.085, 12),
-  keyline: new THREE.CylinderGeometry(0.345, 0.345, 0.096, 12),
-  enamel: new THREE.CylinderGeometry(0.31, 0.31, 0.105, 12),
-  halo: new THREE.TorusGeometry(0.46, 0.025, 8, 24),
-  water: new THREE.SphereGeometry(0.13, 16, 12),
-  lava: new THREE.ConeGeometry(0.15, 0.30, 7),
-  grass: new THREE.SphereGeometry(0.15, 12, 8),
-  iceBar: new THREE.BoxGeometry(0.055, 0.32, 0.045),
+  rim: new THREE.CylinderGeometry(0.40, 0.40, 0.085, 8),
+  keyline: new THREE.CylinderGeometry(0.35, 0.35, 0.096, 8),
+  enamel: new THREE.CylinderGeometry(0.315, 0.315, 0.105, 8),
+  emblem: new THREE.PlaneGeometry(0.46, 0.46),
+  gloss: new THREE.CircleGeometry(0.30, 16),
+  halo: new THREE.TorusGeometry(0.47, 0.022, 8, 8),
 };
 
+// The element's icon, rasterised once per type into a glowing emblem texture. It
+// reuses elementalDefs' iconPath (24×24 viewBox) so the 3D badge and the HUD show
+// the identical silhouette. Cached module-level (≤4 textures), built lazily on the
+// first badge render so a headless import never touches the canvas API.
+const _emblemTexCache = {};
+function getEmblemTexture(type) {
+  if (_emblemTexCache[type] !== undefined) return _emblemTexCache[type];
+  const def = getElementalDef(type);
+  if (!def || typeof document === 'undefined') { _emblemTexCache[type] = null; return null; }
+  const S = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  const pad = 46;
+  const scale = (S - pad * 2) / 24;
+  ctx.translate(pad, pad);
+  ctx.scale(scale, scale);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const light = def.accent || '#ffffff';
+  const p = new Path2D(def.iconPath);
+  // Coloured outer glow so the emblem reads as lit enamel, not a flat decal.
+  ctx.shadowColor = def.color;
+  ctx.shadowBlur = 7;
+  ctx.fillStyle = light;
+  ctx.fill(p);
+  // Stroke as well: the leaf/snowflake icons are open line paths with no fill area,
+  // and a stroke bolds the filled ones enough to read at a 15×15 tile's size.
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = light;
+  ctx.stroke(p);
+  if (def.iconAccent) {
+    const pa = new Path2D(def.iconAccent);
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = def.color;
+    ctx.fill(pa);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  _emblemTexCache[type] = tex;
+  return tex;
+}
+
 function ElementalBadge({ type, color, badgeRef }) {
+  const def = getElementalDef(type);
+  const accent = def?.accent || '#ffffff';
+  const emblemTex = useMemo(() => getEmblemTexture(type), [type]);
   return (
     <group ref={badgeRef}>
+      {/* Gold octagon rim */}
       <mesh geometry={_badgeGeos.rim} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color="#ffd45e" emissive="#ff9f1c" emissiveIntensity={0.75} metalness={0.72} roughness={0.2} toneMapped={false} />
+        <meshStandardMaterial color="#ffd45e" emissive="#ff9f1c" emissiveIntensity={0.8} metalness={0.78} roughness={0.18} toneMapped={false} />
       </mesh>
+      {/* Dark keyline that makes the rim pop off any face colour */}
       <mesh geometry={_badgeGeos.keyline} position={[0, 0, 0.012]} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color="#24140d" roughness={0.48} />
+        <meshStandardMaterial color="#1c1108" metalness={0.3} roughness={0.5} />
       </mesh>
+      {/* Element-coloured enamel field */}
       <mesh geometry={_badgeGeos.enamel} position={[0, 0, 0.024]} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.85} metalness={0.18} roughness={0.22} toneMapped={false} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.95} metalness={0.22} roughness={0.2} toneMapped={false} />
       </mesh>
-
-      {/* Raised, intentionally chunky symbols: readable at a 15x15 tile's size. */}
-      {type === 'water' && (
-        <group position={[0, 0, 0.105]} scale={[0.72, 1.18, 0.72]}>
-          <mesh geometry={_badgeGeos.water}><meshStandardMaterial color="#e9fbff" emissive="#8cecff" emissiveIntensity={1.1} toneMapped={false} /></mesh>
-          <mesh geometry={_badgeGeos.lava} position={[0, -0.12, 0]} rotation={[0, 0, Math.PI]} scale={[0.72, 0.72, 0.72]}>
-            <meshStandardMaterial color="#e9fbff" emissive="#8cecff" emissiveIntensity={1.1} toneMapped={false} />
-          </mesh>
-        </group>
+      {/* A soft radial gloss gives the enamel a domed, glassy read */}
+      <mesh geometry={_badgeGeos.gloss} position={[0, 0.02, 0.088]}>
+        <meshBasicMaterial color={accent} transparent opacity={0.14} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+      {/* The element's own icon, stamped and glowing */}
+      {emblemTex && (
+        <mesh geometry={_badgeGeos.emblem} position={[0, 0, 0.092]}>
+          <meshBasicMaterial map={emblemTex} transparent depthWrite={false} toneMapped={false} />
+        </mesh>
       )}
-      {type === 'lava' && (
-        <group position={[0, 0, 0.12]}>
-          <mesh geometry={_badgeGeos.lava} rotation={[0, 0, Math.PI]}><meshStandardMaterial color="#fff0a6" emissive="#ffd45e" emissiveIntensity={1.35} toneMapped={false} /></mesh>
-          <mesh geometry={_badgeGeos.lava} position={[0, 0, 0.035]} rotation={[0, 0, Math.PI]} scale={[0.48, 0.58, 0.48]}>
-            <meshStandardMaterial color="#ff5b22" emissive="#ff5b22" emissiveIntensity={1.1} toneMapped={false} />
-          </mesh>
-        </group>
-      )}
-      {type === 'grass' && (
-        <group position={[0, 0, 0.12]} rotation={[0, 0, -0.62]} scale={[0.72, 1.18, 0.38]}>
-          <mesh geometry={_badgeGeos.grass}><meshStandardMaterial color="#efffd6" emissive="#baff8a" emissiveIntensity={0.9} toneMapped={false} /></mesh>
-        </group>
-      )}
-      {type === 'ice' && (
-        <group position={[0, 0, 0.12]}>
-          {[0, Math.PI / 3, -Math.PI / 3].map((z) => (
-            <mesh key={z} geometry={_badgeGeos.iceBar} rotation={[0, 0, z]}>
-              <meshStandardMaterial color="#ffffff" emissive="#b9f1ff" emissiveIntensity={1.25} toneMapped={false} />
-            </mesh>
-          ))}
-        </group>
-      )}
+      {/* Outer glow ring in the element colour */}
       <mesh geometry={_badgeGeos.halo}>
-        <meshBasicMaterial color={color} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={color} transparent opacity={0.72} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
     </group>
   );
