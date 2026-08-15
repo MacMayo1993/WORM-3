@@ -8,7 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getStickerSafe } from '../../game/cubeState.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
-import { ensureOrbContrast, getOrbColor, readLiveTile } from '../wormHelpers.js';
+import { getAntipodalOrbColor, getOrbColor, readLiveTile } from '../wormHelpers.js';
 import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX, ORB_HOVER_HEIGHT, ORB_ELEVATED_HOVER_HEIGHT } from './constants.js';
 import { getSpecialDef, isElementalType } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
@@ -16,8 +16,10 @@ import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
 import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
-// Each orb uses the exact color of the face it represents, matching the
-// tracker/inventory HUD, and follows that tile through cube rotations.
+// Each orb carries the face it represents — matching the tracker/inventory HUD —
+// and follows that tile through cube rotations. The face colour rides the Möbius
+// band while the gem shows the antipodal partner, so the pickup never disappears
+// into the same-coloured tile it hovers over. See the note in the memo below.
 //
 // Memoised on `size`, its only prop. Everything else it needs comes from its own
 // store subscription, so it still re-renders the instant an orb tile changes —
@@ -32,6 +34,7 @@ function PowerupOrbsImpl({ size }) {
         wormCharacter: s.wormCharacter ?? 'classic',
     })));
     const faceColors = useMemo(() => resolveColors(settings), [settings]);
+    const manifoldStyles = settings?.manifoldStyles;
 
     // Cheap signature of just the orb-tile stickers' colors. `cubies` gets a new
     // array reference on every single rotation/flip, but only a handful of tiles
@@ -54,17 +57,24 @@ function PowerupOrbsImpl({ size }) {
         return wormPowerups.map(p => {
             const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
             const faceId = sticker?.curr ?? 0;
-            const manifoldColor = ensureOrbContrast((faceId && faceColors[faceId]) ?? '#22ff88');
-            const color = getOrbColor(faceId, faceColors);
             // Orbs on flipped tiles hover above the surface — worm must jump to collect
             const elevated = !!(sticker && sticker.curr !== sticker.orig);
-            // ParityOrb uses `color` for the dominant gem and `antipodalColor` for
-            // its Möbius accent. Keep the dominant gem identical to the collected
-            // face/tracker color instead of showing the antipodal partner.
-            return { ...p, color, antipodalColor: manifoldColor, elevated };
+            // `color` is the face the orb belongs to (the tracker/HUD colour) and
+            // `antipodalColor` its manifold partner. ParityOrb renders the GEM in the
+            // antipodal colour and the Möbius band in `color` — an orb hovers over a
+            // tile of its own face colour, so a gem in that same colour vanished into
+            // the tile. The band also wears that face's tile style, so a patterned
+            // board still reads off the pickup.
+            return {
+                ...p,
+                color: getOrbColor(faceId, faceColors),
+                antipodalColor: getAntipodalOrbColor(faceId, faceColors),
+                styleKey: manifoldStyles?.[faceId] || 'solid',
+                elevated,
+            };
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orbSignature, faceColors]);
+    }, [orbSignature, faceColors, manifoldStyles]);
 
     return <ParityOrbs orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
 }

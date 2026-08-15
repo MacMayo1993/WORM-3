@@ -230,7 +230,7 @@ const ANTIPODAL_STYLES = new Set([
  * @param {string|null} antipodalHex - hex color of the antipodal face (for antipodal patterns).
  *   When null for an antipodal-style, a hue-shifted contrast color is derived automatically.
  */
-export function getTileStyleMaterial(style, colorHex, useTexture = false, texture = null, antipodalHex = null) {
+export function getTileStyleMaterial(style, colorHex, useTexture = false, texture = null, antipodalHex = null, forceDoubleSide = false) {
   // Texture path — cached by texture.uuid so repeated calls don't allocate a new
   // GPU program each time.  MeshStandardMaterial is evicted and disposed by the
   // same LRU logic as the shader materials below.
@@ -259,7 +259,9 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   const antipodalSuffix = ANTIPODAL_STYLES.has(safeStyle)
     ? (antipodalHex ? `_${antipodalHex}` : '_derived')
     : '';
-  const cacheKey = `${safeStyle}_${safeColorHex}${antipodalSuffix}`;
+  // Double-sided variants live under their own key: the same style+colour pair
+  // is wanted in both forms at once (flat stickers and a parity orb's band).
+  const cacheKey = `${forceDoubleSide ? 'ds_' : ''}${safeStyle}_${safeColorHex}${antipodalSuffix}`;
   const cached = _matCacheGet(cacheKey);
   if (cached) return cached;
 
@@ -304,7 +306,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     // Eyeball tiles displace a tessellated plane so the eye bulges off the face
     vertexShader: safeStyle === 'eyeball' ? eyeballBulgeVertexShader : baseVertexShader,
     fragmentShader: fragmentShader,
-    side: isGlass ? THREE.DoubleSide : THREE.FrontSide,
+    side: forceDoubleSide || isGlass ? THREE.DoubleSide : THREE.FrontSide,
     transparent: isGlass,
     depthWrite: !isGlass,
     blending: THREE.NormalBlending,
@@ -316,6 +318,26 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
 
   _matCachePut(cacheKey, material);
   return material;
+}
+
+/**
+ * The same tile-style shader, but double-sided — for surfaces that are not flat
+ * stickers.
+ *
+ * The parity orbs wear their tile's pattern on their Möbius band so a patterned
+ * board does not reduce every pickup to a plain coloured gem. A Möbius band is
+ * one-sided: rendered front-face-only it disappears for half its loop, so it
+ * cannot share the FrontSide material the flat stickers use. Cached separately
+ * (same LRU, distinct key prefix) rather than by mutating the sticker material,
+ * which every tile of that face is also using.
+ *
+ * @param {string} style
+ * @param {string} colorHex
+ * @param {string|null} [antipodalHex]
+ * @returns {THREE.ShaderMaterial}
+ */
+export function getTileStyleBandMaterial(style, colorHex, antipodalHex = null) {
+  return getTileStyleMaterial(style, colorHex, false, null, antipodalHex, true);
 }
 
 /**

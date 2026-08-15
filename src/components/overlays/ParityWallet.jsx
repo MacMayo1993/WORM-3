@@ -2,8 +2,11 @@
 // Reads parityPoints from the store directly.
 // Flashes green on earn, red on spend.
 // Props:
-//   dark  — true for dark-background contexts (main menu, betting screen)
-//           false (default) for light panels (TopMenuBar, WormHUD)
+//   dark    — true for dark-background contexts (main menu, betting screen)
+//             false (default) for light panels (TopMenuBar, WormHUD)
+//   neutral — drop the cyan family for white + green. The worm HUD's status bar
+//             is white text with one green accent (matching the d-pad), and a
+//             cyan chip sitting in it read as a fifth unrelated colour.
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -11,7 +14,7 @@ import { UI_FONT } from '../../utils/uiTheme.js';
 
 const FONT = UI_FONT;
 
-export default function ParityWallet({ dark = false }) {
+export default function ParityWallet({ dark = false, neutral = false }) {
   const parityPoints = useGameStore((s) => s.parityPoints);
   const prevRef = useRef(parityPoints);
   const [flash, setFlash] = useState(null); // 'up' | 'down' | null
@@ -30,11 +33,11 @@ export default function ParityWallet({ dark = false }) {
 
   const upColor   = '#4ade80';
   const downColor = '#f87171';
-  const baseColor = dark ? '#22d3ee' : '#0e7490';
-  const numColor  = dark ? '#22d3ee' : '#0891B2';
-  const subColor  = dark ? 'rgba(34,211,238,0.55)' : 'rgba(8,145,178,0.55)';
-  const borderBase = dark ? 'rgba(8,145,178,0.30)' : 'rgba(8,145,178,0.22)';
-  const bgBase     = dark ? 'rgba(8,145,178,0.12)' : 'rgba(8,145,178,0.07)';
+  const baseColor = neutral ? upColor : dark ? '#22d3ee' : '#0e7490';
+  const numColor  = neutral ? 'rgba(255,253,242,0.86)' : dark ? '#22d3ee' : '#0891B2';
+  const subColor  = neutral ? 'rgba(255,253,242,0.55)' : dark ? 'rgba(34,211,238,0.55)' : 'rgba(8,145,178,0.55)';
+  const borderBase = neutral ? 'rgba(255,245,220,0.18)' : dark ? 'rgba(8,145,178,0.30)' : 'rgba(8,145,178,0.22)';
+  const bgBase     = neutral ? 'rgba(250,247,238,0.07)' : dark ? 'rgba(8,145,178,0.12)' : 'rgba(8,145,178,0.07)';
 
   const flashColor  = flash === 'up' ? upColor : flash === 'down' ? downColor : null;
   const borderColor = flashColor ? `${flashColor}45` : borderBase;

@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
+import { getTileStyleBandMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 
 // Orbs float this far above the tile surface so they're visible from any angle
 const HOVER_ABOVE = 0.28;
@@ -40,6 +41,11 @@ export const ORB_TYPES = {
 function _mkMobius(R, w) {
   const uS = 48, vS = 3, cols = vS + 1;
   const pos = [], uvs = [], idx = [];
+  // The band is roughly 2πR long and 2w wide — about 9:1. A plain 0..1 U would
+  // smear a tile pattern the whole way round the loop, so U repeats enough times
+  // to keep each pattern cell square-ish when the band wears a tile style. An
+  // integer count keeps the repeat aligned with the seam at u=0.
+  const uRepeat = Math.max(1, Math.round((Math.PI * R) / (2 * w)));
   for (let i = 0; i <= uS; i++) {
     const u = (i / uS) * Math.PI * 2;
     for (let j = 0; j <= vS; j++) {
@@ -49,7 +55,7 @@ function _mkMobius(R, w) {
         (R + w * v * Math.cos(u * 0.5)) * Math.sin(u),
         w * v * Math.sin(u * 0.5)
       );
-      uvs.push(i / uS, j / vS);
+      uvs.push((i / uS) * uRepeat, j / vS);
     }
   }
   for (let i = 0; i < uS; i++) {
@@ -106,12 +112,28 @@ const _orbGeos = {
 // SingleOrb renders geometry and registers refs with the parent OrbAnimator.
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
 function SingleOrbImpl({
-  position, color = '#ffd700', antipodalColor = '#ffd700',
+  position, color = '#ffd700', antipodalColor = '#ffd700', styleKey = 'solid',
   collected = false, isTarget = false, elevated = false,
   dirKey = 'PY', orbKey, type = 'parity',
   registerAnim, unregisterAnim,
   gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false, reducedDetail = false,
 }) {
+  // The gem wears the ANTIPODAL colour and the Möbius band the orb's own face
+  // colour — the inverse of how this used to read. An orb hovers over a tile of
+  // its own face colour, so colouring the gem to match made it disappear into
+  // the tile exactly when the player needed to spot it. The face colour is not
+  // lost: it moves to the band, which also carries that face's tile style, so a
+  // patterned board still reads off the pickup instead of flattening to a
+  // coloured ball. `color` and `antipodalColor` keep meaning what they say.
+  const gemColor = antipodalColor;
+  const bandColor = color;
+  // Shared and cached per style+colour in TileStyleMaterials, so all the orbs on
+  // one face reference a single material. 'solid' has no pattern worth carrying,
+  // so it keeps the emissive band below instead.
+  const bandMaterial = useMemo(
+    () => (styleKey && styleKey !== 'solid' ? getTileStyleBandMaterial(styleKey, bandColor, gemColor) : null),
+    [styleKey, bandColor, gemColor]
+  );
   const orbGroupRef    = useRef();
   const coreRef        = useRef();
   const innerCoreRef   = useRef();
@@ -185,8 +207,8 @@ function SingleOrbImpl({
       <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
         <mesh ref={coreRef} geometry={g.shell}>
           <meshStandardMaterial
-            color={color}
-            emissive={color}
+            color={gemColor}
+            emissive={gemColor}
             emissiveIntensity={1.4}
             roughness={0.18}
             metalness={0.05}
@@ -206,8 +228,8 @@ function SingleOrbImpl({
           the inner core glowing through, not a blown-out surface. */}
       <mesh ref={shellRef} geometry={g.shell}>
         <meshPhysicalMaterial
-          color={color}
-          emissive={color}
+          color={gemColor}
+          emissive={gemColor}
           emissiveIntensity={isTarget ? 0.85 : 0.6}
           metalness={0}
           roughness={0.06}
@@ -226,8 +248,8 @@ function SingleOrbImpl({
           through the glassy shell, giving the orb visible depth and a molten centre. */}
       <mesh ref={innerCoreRef} geometry={g.innerCore}>
         <meshStandardMaterial
-          color={color}
-          emissive={color}
+          color={gemColor}
+          emissive={gemColor}
           emissiveIntensity={isTarget ? 2.6 : 2.0}
           metalness={0}
           roughness={0.1}
@@ -238,7 +260,7 @@ function SingleOrbImpl({
       {/* Inner additive halo — soft bloom around the core, pulsed by the animator. */}
       <mesh ref={innerGlowRef} geometry={g.innerGlow}>
         <meshBasicMaterial
-          color={color}
+          color={gemColor}
           transparent
           opacity={0.18}
           blending={THREE.AdditiveBlending}
@@ -262,37 +284,43 @@ function SingleOrbImpl({
           <meshBasicMaterial color="#ffffff" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
         </mesh>
         <mesh geometry={g.parityNode} position={[0, isTarget ? 0.34 : 0.27, 0]}>
-          <meshBasicMaterial color={color} toneMapped={false} />
+          <meshBasicMaterial color={gemColor} toneMapped={false} />
         </mesh>
         <mesh geometry={g.parityNode} position={[0, isTarget ? -0.34 : -0.27, 0]}>
-          <meshBasicMaterial color={antipodalColor} toneMapped={false} />
+          <meshBasicMaterial color={bandColor} toneMapped={false} />
         </mesh>
       </group>
 
-      {/* Möbius strip — antipodal-color accent orbiting the sphere. DoubleSide so the twist reads clearly. */}
-      <mesh ref={coreRef} geometry={g.core}>
-        <meshStandardMaterial
-          color={antipodalColor}
-          emissive={antipodalColor}
-          emissiveIntensity={isTarget ? 1.8 : 1.2}
-          metalness={0.15}
-          roughness={0.06}
-          side={THREE.DoubleSide}
-        />
+      {/* Möbius strip — the orb's own face, in that face's colour AND its tile
+          style, so a patterned board is still legible from the pickup. Falls back
+          to the emissive band on plain (solid) faces, where there is no pattern to
+          carry and the glow reads better. DoubleSide either way: a Möbius band is
+          one-sided, so front faces alone would drop half the loop. */}
+      <mesh ref={coreRef} geometry={g.core} material={bandMaterial ?? undefined}>
+        {!bandMaterial && (
+          <meshStandardMaterial
+            color={bandColor}
+            emissive={bandColor}
+            emissiveIntensity={isTarget ? 1.8 : 1.2}
+            metalness={0.15}
+            roughness={0.06}
+            side={THREE.DoubleSide}
+          />
+        )}
       </mesh>
 
       {/* Electron orbital rings + electrons */}
       <group ref={orbitSystemRef}>
         <mesh ref={ringARef} geometry={g.ringA} rotation={[0.3, 0.4, 0]}>
-          <meshBasicMaterial color={color} transparent opacity={0.42} depthWrite={false} />
+          <meshBasicMaterial color={gemColor} transparent opacity={0.42} depthWrite={false} />
         </mesh>
         <mesh ref={ringBRef} geometry={g.ringB} rotation={[-0.6, 0, 0.5]}>
-          <meshBasicMaterial color={antipodalColor} transparent opacity={0.34} depthWrite={false} />
+          <meshBasicMaterial color={bandColor} transparent opacity={0.34} depthWrite={false} />
         </mesh>
         {/* Third ring — target only (geometry only exists on target set) */}
         {isTarget && g.ringC && (
           <mesh ref={ringCRef} geometry={g.ringC} rotation={[0, 0.85, -0.35]}>
-            <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} />
+            <meshBasicMaterial color={gemColor} transparent opacity={0.28} depthWrite={false} />
           </mesh>
         )}
 
@@ -311,7 +339,7 @@ function SingleOrbImpl({
 
       {/* Point light — target orbs only; non-target glow via emissive + AdditiveBlending */}
       {isTarget && (
-        <pointLight color={color} intensity={1.1} distance={3.3} decay={2} />
+        <pointLight color={gemColor} intensity={1.1} distance={3.3} decay={2} />
       )}
     </group>
   );
@@ -343,6 +371,7 @@ const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
   a.orbKey === b.orbKey &&
   a.color === b.color &&
   a.antipodalColor === b.antipodalColor &&
+  a.styleKey === b.styleKey &&
   a.dirKey === b.dirKey &&
   a.type === b.type &&
   a.collected === b.collected &&
@@ -584,6 +613,7 @@ export default function ParityOrbs({
         position,
         color:          orb.color          || '#ffd700',
         antipodalColor: orb.antipodalColor || orb.color || '#ffd700',
+        styleKey:       orb.styleKey       || 'solid',
         dirKey:         orb.dirKey         || 'PY',
         type:           orb.type           || 'parity',
         key,
@@ -605,6 +635,7 @@ export default function ParityOrbs({
           position={data.position}
           color={data.color}
           antipodalColor={data.antipodalColor}
+          styleKey={data.styleKey}
           dirKey={data.dirKey}
           type={data.type}
           isTarget={data.isTarget}
