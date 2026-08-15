@@ -18,7 +18,13 @@ import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 // How far down the interior faces are tinted while riding. High enough that the
 // tunnel is clearly the brightest thing in frame, low enough that the antipodal
 // tile colours — the reason this view exists — stay legible behind it.
-const DIM_STRENGTH = 0.34;
+//
+// Raised from 0.34 with the tube's rebuild. The tube is translucent by design, so
+// whatever the room is doing shows through it: with six inner faces at close to
+// full saturation, a warm-coloured tunnel and a warm-coloured room summed into one
+// flat wash and the shaft had no edges. The room still reads as coloured tiles —
+// it just no longer competes with the thing in front of it.
+const DIM_STRENGTH = 0.52;
 
 // Maps each face direction to its antipodal (opposite) face direction.
 
