@@ -13,12 +13,31 @@
 // (ElementalFireSkin). All are translucent or additive, so the tile style stays
 // readable underneath.
 //
-// Density is capped, not the effect: up to a MAX_SKIN_GRID×MAX_SKIN_GRID grid of
-// volumes per face. For cubes at or below that size that is exactly one volume
-// per sticker (cellScale 1). For the bigger advertised modes (6×6, 7×7, 15×15)
-// it coarsens to the same bounded ~6·grid² volumes, each scaled up to cover its
-// cell so the whole cube is still sheathed — an optimized face-level fallback
-// rather than dropping the effect. Cost is therefore constant in cube size.
+// ── What this file owns ──────────────────────────────────────────────────────
+// One thing: driving every cover cell's transform, once per frame, for whichever
+// element is active. Three decisions it used to make inline now come from shared
+// modules, so adding an element does not add another branch here:
+//
+//   • WHICH renderer draws it → elementalRenderers.js (a lookup, not an if/set)
+//   • HOW MUCH to draw        → elementalQuality.js (grid density, flame counts)
+//   • HOW FAR through the wash → elementalLifecycle.js (the one fade envelope,
+//     shared with the fill light and the particle field so they can no longer
+//     disagree about when the element arrives and leaves)
+//
+// ── Density and cost ─────────────────────────────────────────────────────────
+// Density is capped, not the effect: up to a grid×grid grid of cover cells per
+// face, where grid comes from the quality tier (5 on desktop — unchanged — down to
+// 3 on phones and under reduced motion). For cubes at or below that size that is
+// exactly one volume per sticker (cellScale 1). For the bigger advertised modes
+// (6×6, 7×7, 15×15) it coarsens to the same bounded ~6·grid² volumes, each scaled
+// up to cover its cell so the whole cube is still sheathed — an optimized
+// face-level fallback rather than dropping the effect. Cost is constant in cube
+// size.
+//
+// Beyond that, the cells of an instanced renderer are one InstancedMesh: water,
+// ice and fire each draw the entire sheathed cube in a SINGLE draw call, where fire
+// alone used to cost ~900 (six sprites per cell) plus a per-cell frame callback.
+// The loop below is the only per-frame CPU work any element does.
 //
 // The layer colour is uniform across faces and the sampled cells are fixed for a
 // given size, so the geometry itself never churns on a move (memoised on
@@ -33,27 +52,17 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
+import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { FACE_NORMALS } from './healerWorm/constants.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
+import { resolveElementalRenderer } from './healerWorm/elementalRenderers.js';
+import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
+import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
 import GrassBlades from '../3d/styles/GrassBlades.jsx';
 import ElementalFireSkin from './ElementalFireSkin.jsx';
 import { getElementalSurfaceGeo, getElementalSurfaceMaterial } from './ElementalSurface.jsx';
-
-// Water and ice are drawn as a continuous animated surface (ElementalSurface);
-// grass keeps its dedicated blade mesh, which already sprouts convincingly; fire
-// is flame sprites. Fire used to run through the surface shader as "lava" and read
-// as orange squiggles on the sticker rather than as anything molten.
-const SURFACE_ELEMENTS = new Set(['water', 'ice']);
-
-const FADE_IN = 0.55;  // seconds for the layer to well up out of the faces
-const FADE_OUT = 1.25; // matches ElementalAtmosphere — soften the end, no pop
-// Cap on volumes-per-face-edge. At or below this the grid is one volume per real
-// sticker; above it the face is covered by a coarser grid of scaled-up volumes,
-// so total cost stays ~6·MAX_SKIN_GRID² regardless of cube size. 5 matches the
-// point at which StickerPlane's own suppressVolumeFX stops per-sticker volumes.
-const MAX_SKIN_GRID = 5;
 
 // Per-face definition: the fixed axis pinned to the outer layer, plus the two
 // in-plane axes the grid varies over.
@@ -69,16 +78,17 @@ const _zAxis = new THREE.Vector3(0, 0, 1);
 // Frame-loop scratch — no per-frame allocation.
 const _livePos = new THREE.Vector3();
 const _liveNorm = new THREE.Vector3();
-const _liveQuat = new THREE.Quaternion();
-const _restPos = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
+const _scale = new THREE.Vector3();
+const _matrix = new THREE.Matrix4();
 
 // Sampled cover cells for the element layer. Returns a gridN×gridN grid per face
-// (gridN = min(size, MAX_SKIN_GRID)); each entry names a representative sticker in
-// its cell (x/y/z/dirKey — used to read that cubie's LIVE transform each frame),
+// (gridN = min(size, quality grid cap)); each entry names a representative sticker
+// in its cell (x/y/z/dirKey — used to read that cubie's LIVE transform each frame),
 // a resting world position + orientation for before the meshes exist, and `cell`
 // = how many stickers wide the cell is, so the volume can be scaled to cover it.
-function surfaceStickers(size) {
-  const gridN = Math.min(size, MAX_SKIN_GRID);
+function surfaceStickers(size, maxGrid) {
+  const gridN = Math.min(size, maxGrid);
   const sample = (j) => Math.min(size - 1, Math.floor((j + 0.5) * size / gridN));
   // The sampled sticker index for each grid line, plus the width (in sticker
   // units) each coarse cell must span to reach the midpoints toward its
@@ -113,6 +123,7 @@ function surfaceStickers(size) {
         const cell = Math.max(span[j], span[k]);
         out.push({
           key: `${f.dk}-${j}-${k}`,
+          faceKey: f.dk, j, k, gridN,
           x: coord.x, y: coord.y, z: coord.z, dirKey: f.dk,
           restPos: [wp[0], wp[1], wp[2]], restQuat, cell
         });
@@ -125,91 +136,134 @@ function surfaceStickers(size) {
 export default function ElementalCubeSkin({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
   const def = element ? getElementalDef(element) : null;
-  const isSurface = !!def && SURFACE_ELEMENTS.has(element);
-  const isFire = element === 'fire';
-  // Shared geometry + material for the surface elements — every tile references
-  // the same pair, so the whole layer is a few GPU objects regardless of count.
+  // A lookup, not a branch. An unknown element resolves to null and the skin draws
+  // nothing rather than silently borrowing another element's look.
+  const renderer = useMemo(() => resolveElementalRenderer(element, getElementalDef), [element]);
+
+  // Device budget. Read once per mount: the tier only depends on facts that do not
+  // change mid-session, and re-resolving it per frame would churn the cell memo.
+  const quality = useMemo(
+    () => resolveElementalQuality({ mobile: isMobile, reducedMotion: prefersReducedMotion(), cubeSize: size }),
+    [size]
+  );
+
+  const isSurface = renderer?.key === 'surface';
+  const isFire = renderer?.key === 'flames';
+
+  // Shared geometry + material for the surface elements — every instance references
+  // the same pair, so the whole layer is a couple of GPU objects.
   const surfaceGeo = useMemo(() => (isSurface ? getElementalSurfaceGeo() : null), [isSurface]);
   const surfaceMat = useMemo(
     () => (isSurface ? getElementalSurfaceMaterial(element, def.color, def.accent) : null),
     [isSurface, element, def]
   );
 
-  // One ref per cell to the outer group. The frame loop drives its full transform
-  // so the layer rides the live cubie meshes (mid-rotation slices included) rather
-  // than sitting on the stationary rest grid.
-  const tileRefs = useRef([]);
-  const fadeRef = useRef(0);
+  const cells = useMemo(
+    () => (renderer ? surfaceStickers(size, quality.skinGrid) : []),
+    [renderer, size, quality.skinGrid]
+  );
+
+  // Instanced renderers write through instanceMatrix; the per-cell fallback writes
+  // group transforms. Only one of the two is ever populated.
+  const instRef = useRef(null);
+  const groupRefs = useRef([]);
+  const elapsedRef = useRef(0);
   const lastElementRef = useRef(null);
   if (lastElementRef.current !== element) {
     lastElementRef.current = element;
-    fadeRef.current = 0;
-    tileRefs.current = [];
+    elapsedRef.current = 0;
+    groupRefs.current = [];
+    instRef.current = null;
   }
 
-  const stickers = useMemo(
-    () => (def ? surfaceStickers(size) : []),
-    [def, size]
-  );
-
   useFrame((_, delta) => {
-    if (!def) return;
-    fadeRef.current = Math.min(1, fadeRef.current + delta / FADE_IN);
-    // Ramp back down over the buff's final second so the layer sinks away instead
-    // of vanishing. wormBuffs mirrors the sim clock, so it freezes on pause/tunnel.
-    const remaining = Math.min(1, wormBuffs.elementalT / FADE_OUT);
-    const f = Math.min(fadeRef.current, remaining);
+    if (!renderer) return;
+    elapsedRef.current += delta;
+    // One envelope, shared with the fill light and the particles. wormBuffs mirrors
+    // the sim clock, so it freezes on pause and during tunnel transit.
+    const env = elementalEnvelope({ elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
     // Uniform grow drives BOTH coverage and thickness, so the layer visibly wells
     // up from nothing and shrinks away — changing scale.z alone would leave the top
-    // plane at full size and full shader alpha the whole time, never fading. Floor
-    // keeps a sliver so a zero-scale matrix never produces NaN normals.
-    const g = Math.max(0.01, f * f * (3 - 2 * f));
+    // plane at full size and full shader alpha the whole time, never fading.
+    const g = env.grow;
 
-    const refs = tileRefs.current;
-    for (let i = 0; i < refs.length; i++) {
-      const grp = refs[i];
-      const s = stickers[i];
-      if (!grp || !s) continue;
+    // An InstancedMesh's capacity is fixed at construction. During the frame an
+    // element swap or a size change commits, the ref can still hold the outgoing
+    // mesh, so match on capacity before writing into it — a stale one is skipped
+    // for a frame rather than throwing out of range mid-loop.
+    const inst = instRef.current?.count === cells.length ? instRef.current : null;
+    const groups = groupRefs.current;
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
       // Follow the live cubie transform (rides a turning slice); fall back to the
       // rest grid before the meshes exist.
-      if (readLiveTile(s, _livePos, _liveNorm)) {
-        grp.position.copy(_livePos);
-        _liveQuat.setFromUnitVectors(_zAxis, _liveNorm);
-        grp.quaternion.copy(_liveQuat);
+      if (readLiveTile(c, _livePos, _liveNorm)) {
+        _quat.setFromUnitVectors(_zAxis, _liveNorm);
       } else {
-        grp.position.copy(_restPos.fromArray(s.restPos));
-        grp.quaternion.copy(s.restQuat);
+        _livePos.fromArray(c.restPos);
+        _quat.copy(c.restQuat);
       }
-      // Fire is sprites, whose on-screen size comes from world scale — the
-      // surface layers' squashed (cell, cell, fade) scale would distort them, so
-      // fire gets a uniform scale that still carries both cell size and the ramp.
-      if (isFire) grp.scale.setScalar(s.cell * g);
-      else grp.scale.set(s.cell * g, s.cell * g, g);
+      // Billboarded renderers take their on-screen size from world scale, so the
+      // surface layers' squashed (cell, cell, grow) scale would distort them; they
+      // get a uniform scale that still carries both cell size and the ramp.
+      if (renderer.uniformScale) _scale.setScalar(c.cell * g);
+      else _scale.set(c.cell * g, c.cell * g, g);
+
+      if (inst) {
+        _matrix.compose(_livePos, _quat, _scale);
+        inst.setMatrixAt(i, _matrix);
+      } else {
+        const grp = groups[i];
+        if (!grp) continue;
+        grp.position.copy(_livePos);
+        grp.quaternion.copy(_quat);
+        grp.scale.copy(_scale);
+      }
     }
+    if (inst) inst.instanceMatrix.needsUpdate = true;
   });
 
-  if (!def || stickers.length === 0) return null;
+  if (!renderer || cells.length === 0) return null;
 
+  if (isSurface) {
+    return (
+      // Keyed on the instance count: an InstancedMesh's capacity is fixed at
+      // construction, so a size change has to build a new one rather than resize.
+      <instancedMesh
+        key={`${element}-${cells.length}`}
+        ref={instRef}
+        args={[surfaceGeo, surfaceMat, cells.length]}
+        frustumCulled={false}
+        raycast={() => null}
+      />
+    );
+  }
+
+  if (isFire) {
+    return (
+      <ElementalFireSkin
+        key={`fire-${cells.length}-${quality.flamesPerCell}`}
+        meshRef={instRef}
+        count={cells.length}
+        flamesPerCell={quality.flamesPerCell}
+      />
+    );
+  }
+
+  // Per-cell fallback: nature's blade mesh still owns a real child per cell.
   return (
     <group>
-      {stickers.map((s, i) => (
+      {cells.map((c, i) => (
         // Transform (position/quaternion/scale) is set entirely in the frame loop;
         // the rest values here just avoid a one-frame flash at the origin.
         <group
-          key={s.key}
-          ref={(el) => { tileRefs.current[i] = el; }}
-          position={s.restPos}
-          quaternion={s.restQuat}
-          scale={[s.cell * 0.01, s.cell * 0.01, 0.01]}
+          key={c.key}
+          ref={(el) => { groupRefs.current[i] = el; }}
+          position={c.restPos}
+          quaternion={c.restQuat}
+          scale={[c.cell * 0.01, c.cell * 0.01, 0.01]}
         >
-          {isSurface ? (
-            // Continuous animated element surface, lifted just off the sticker.
-            <mesh geometry={surfaceGeo} material={surfaceMat} position={[0, 0, 0.03]} raycast={() => null} />
-          ) : isFire ? (
-            <ElementalFireSkin seed={i} />
-          ) : (
-            <GrassBlades faceColor={def.color} />
-          )}
+          <GrassBlades faceColor={def.color} />
         </group>
       ))}
     </group>

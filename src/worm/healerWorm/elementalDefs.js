@@ -24,6 +24,8 @@ export const ELEMENTAL_DEFS = {
     element: true,
     // The living tile style whose identity this orb borrows.
     tileStyle: 'water',
+    // Which cube-skin renderer draws it — see elementalRenderers.js.
+    renderer: 'surface',
     color: '#38bdf8',
     accent: '#e0f7ff',
     // The colour the scene's fog/tint drifts toward while this element is active.
@@ -43,6 +45,7 @@ export const ELEMENTAL_DEFS = {
     // the bomb's flame sprites (see ElementalFireSkin), not a molten surface —
     // molten runoff on flat stickers never read as anything but orange squiggles.
     tileStyle: 'lava',
+    renderer: 'flames',
     color: '#ff6a2e',
     accent: '#ffe08a',
     fogColor: '#3a0d05',
@@ -56,6 +59,7 @@ export const ELEMENTAL_DEFS = {
     label: 'NATURE',
     element: true,
     tileStyle: 'grass',
+    renderer: 'blades',
     color: '#4ade80',
     accent: '#dcfce7',
     fogColor: '#0b2e14',
@@ -69,6 +73,7 @@ export const ELEMENTAL_DEFS = {
     label: 'ICE',
     element: true,
     tileStyle: 'ice',
+    renderer: 'surface',
     color: '#7dd3fc',
     accent: '#ffffff',
     fogColor: '#0d2438',
