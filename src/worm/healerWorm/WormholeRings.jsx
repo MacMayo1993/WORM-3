@@ -6,6 +6,9 @@ import * as THREE from 'three';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { buildManifoldGridMapIncremental } from '../../game/manifoldLogic.js';
 import { getActiveTunnels } from '../wormLogic.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { resolveColors } from '../../utils/colorSchemes.js';
+import { FACE_COLORS } from '../../utils/constants.js';
 import { FACE_NORMALS, WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
 // ─── Module-level helpers for canonical tunnel key (mirrors useWormCrawler logic) ─
@@ -32,6 +35,12 @@ const _tapeRight = new THREE.Vector3();
 const _tapeForward = new THREE.Vector3();
 const _liveBaseColor = new THREE.Color('#ff44ff');
 const _liveColor = new THREE.Color();
+const _moteDummy = new THREE.Object3D();
+const _moteColor = new THREE.Color();
+// Fallback when a face id has no resolved colour — the old uniform neon pink, so
+// a missing palette entry degrades to the previous look rather than to black.
+const _faceColorFallback = new THREE.Color('#ff44ff');
+const _WHITE = new THREE.Color('#ffffff');
 
 // Void swamp palette — sickly, stagnant, antipodality-gone-wrong
 const VOID_OUTER_COLOR = '#b8b1ff';   // inverted-feel rim over dark tiles
@@ -56,13 +65,29 @@ const SPARKS_PER_CRITICAL = 7;
 const POLES_PER_TILE = 4;
 const TAPES_PER_TILE = 4;
 const FRAME_SEGMENTS_PER_VOID = 4;
+// Calm motes rising off every SAFE portal. This is the bottom rung of the hazard
+// ladder: before this existed the critical tier's sparks arrived out of nowhere,
+// because a safe portal emitted nothing at all for them to escalate from.
+const MOTES_PER_LIVE = 5;
+
+// ── DEMO FLAG ────────────────────────────────────────────────────────────────
+// Puts the caution poles + tape on EVERY flipped tile, not just the ones that
+// will kill you. On by request, to demo how strongly the tape reads as a marker.
+//
+// Set back to false before shipping. The tape is the only thing in the mode that
+// means "entering this is fatal" (void kills on contact, critical kills when you
+// step off the exit); painting it on every portal spends that alarm on the most
+// common object in the game and leaves nothing to distinguish the deadly ones.
+// The mote plume below is the intended always-on portal marker.
+const DEMO_TAPE_ON_ALL_PORTALS = true;
 
 export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef }) {
     // Patched incrementally instead of rebuilt from scratch on every debounce tick (see
     // buildManifoldGridMapIncremental) — only the cells that changed since the last tick
     // get their gridId entries recomputed.
     const manifoldMapCacheRef = useRef({ map: null, prevCubies: null, size: null });
-    const liveRef = useRef();       // live wormhole rings (neon pink)
+    const liveRef = useRef();       // live wormhole rings (tinted to the face they charge)
+    const moteRef = useRef();       // calm plume rising off safe portals
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
@@ -147,6 +172,14 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                         result.push({
                             x, y, z, dirKey: dk,
                             tunnelKey: tunnelKeyMap.get(`${x},${y},${z},${dk}`) ?? null,
+                            // The sticker's CURRENT face id. Entering the tunnel here
+                            // charges orbs of exactly this colour — wormSim reads
+                            // `entryFaceId = entrySticker.curr` and computeOrbDeposit
+                            // pays from `inventory[entryFaceId]`. Colouring per tile
+                            // (not per tunnel) is therefore correct: a tunnel's two
+                            // mouths can sit on different colours, and each one
+                            // charges its own.
+                            faceId: st.curr,
                             // Cache world position + normal once — constant for the lifetime
                             // of this entry, so the frame loop never recomputes/reallocates.
                             wp: getStickerWorldPos(x, y, z, dk, size, 0),
@@ -158,6 +191,20 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         }
         return result;
     }, [debouncedCubies, size]);
+
+    // Face id → THREE.Color for the portal tints. Built once per palette change and
+    // read in the frame loop, so the hot path never parses a hex string or allocates
+    // a Color. Subscribing to `settings` alone (not the whole store) keeps this from
+    // re-rendering on every cubie tick.
+    const settings = useGameStore((s) => s.settings);
+    const faceColorObjs = React.useMemo(() => {
+        const hexes = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+        const out = new Map();
+        for (const id of [1, 2, 3, 4, 5, 6]) {
+            out.set(id, new THREE.Color(hexes[id] ?? FACE_COLORS[id] ?? '#ff44ff'));
+        }
+        return out;
+    }, [settings]);
 
     // Performance throttle:
     // - During active tunnel travel, update at full frame rate for smooth motion.
@@ -175,6 +222,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     const MAX_POLES = MAX_RINGS * POLES_PER_TILE;
     const MAX_TAPES = MAX_RINGS * TAPES_PER_TILE;
     const MAX_VOID_FRAME_SEGMENTS = MAX_RINGS * FRAME_SEGMENTS_PER_VOID;
+    const MAX_MOTES = MAX_RINGS * MOTES_PER_LIVE;
 
     useFrame(({ clock }, delta) => {
         const phase = worm?.phase?.current ?? 'crawling';
@@ -202,7 +250,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         const poles = poleRef.current;
         const tapes = tapeRef.current;
         const voidFrames = voidFrameRef.current;
-        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks || !poles || !tapes || !voidFrames) return;
+        const motes = moteRef.current;
+        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks || !poles || !tapes || !voidFrames || !motes) return;
 
         const t = clock.elapsedTime;
         const voidKeys = voidTunnelKeysRef?.current ?? _EMPTY_SET;
@@ -215,12 +264,14 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         let poleIdx = 0;
         let tapeIdx = 0;
         let frameIdx = 0;
+        let moteIdx = 0;
 
         for (let i = 0; i < allPositions.length; i++) {
-            const { tunnelKey, wp, normal: n } = allPositions[i];
+            const { tunnelKey, wp, normal: n, faceId } = allPositions[i];
             const isVoid = !!(tunnelKey && voidKeys.has(tunnelKey));
             const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
             const isCritical = !isVoid && traversals >= WORMHOLE_MAX_TRAVERSALS;
+            const faceColor = faceColorObjs.get(faceId) ?? _faceColorFallback;
 
             _ringDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.08);
             _ringUp.set(0, 1, 0);
@@ -276,9 +327,43 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 _ringDummy.scale.setScalar(pulse);
                 _ringDummy.updateMatrix();
                 liveMesh.setMatrixAt(liveIdx, _ringDummy.matrix);
-                _liveColor.copy(_liveBaseColor).lerp(_criticalArcColor, isCritical ? 0.45 : 0).multiplyScalar(glowMul);
+                // Tint the ring with the face colour this mouth charges. Every live
+                // portal used to be the same neon pink, which meant the single most
+                // important thing about a wormhole — which orbs it wants — was not
+                // visible anywhere on the board. Kept part-way toward the old pink so
+                // portals still read as one family (and so a dark face colour still
+                // glows), and driven to the critical green once it turns deadly, which
+                // has to beat the face colour to be a warning at all.
+                _liveColor.copy(faceColor).lerp(_liveBaseColor, 0.25);
+                _liveColor.lerp(_criticalArcColor, isCritical ? 0.65 : 0).multiplyScalar(glowMul);
                 liveMesh.setColorAt(liveIdx, _liveColor);
                 liveIdx++;
+
+                // ── Bottom rung of the ladder: a calm plume off SAFE portals ──
+                // Not drawn once the portal is critical — the sparks below take over,
+                // so the escalation is a change of behaviour and not just more stuff.
+                if (!isCritical) {
+                    for (let m = 0; m < MOTES_PER_LIVE && moteIdx < MAX_MOTES; m++) {
+                        const si = (i * MOTES_PER_LIVE + m) * 3;
+                        const phase = (t * 0.42 + bubbleSeeds[si + 2]) % 1;
+                        const lift = 0.06 + phase * 0.55;
+                        const envelope = Math.sin(phase * Math.PI); // 0→1→0 over lifetime
+                        _moteDummy.position.set(
+                            wp[0] + n.x * lift + bubbleSeeds[si] * envelope * 1.6,
+                            wp[1] + n.y * lift + bubbleSeeds[si + 1] * envelope * 1.6,
+                            wp[2] + n.z * lift + bubbleSeeds[si] * envelope * 0.9
+                        );
+                        _moteDummy.scale.setScalar(Math.max(0, envelope * 0.055));
+                        _moteDummy.updateMatrix();
+                        motes.setMatrixAt(moteIdx, _moteDummy.matrix);
+                        // Brightened well past the tile colour: these are small and
+                        // additive over a sticker of the same hue, so at face value
+                        // they vanish into the tile they are rising off.
+                        _moteColor.copy(faceColor).lerp(_WHITE, 0.45).multiplyScalar(1.8);
+                        motes.setColorAt(moteIdx, _moteColor);
+                        moteIdx++;
+                    }
+                }
 
                 if (isCritical) {
                     _voidArcRight.crossVectors(n, _voidArcAxisY);
@@ -308,7 +393,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 }
             }
 
-            if (isVoid || isCritical) {
+            if (isVoid || isCritical || DEMO_TAPE_ON_ALL_PORTALS) {
                 _tapeRight.crossVectors(n, _voidArcAxisY);
                 if (_tapeRight.lengthSq() < 1e-4) _tapeRight.set(1, 0, 0);
                 _tapeRight.normalize();
@@ -456,6 +541,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         poles.count = poleIdx;
         tapes.count = tapeIdx;
         voidFrames.count = frameIdx;
+        motes.count = moteIdx;
 
         // Re-upload only buffers that were written this frame — skips idle GPU uploads.
         if (liveIdx > 0) {
@@ -471,6 +557,10 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         if (poleIdx > 0) poles.instanceMatrix.needsUpdate = true;
         if (tapeIdx > 0) tapes.instanceMatrix.needsUpdate = true;
         if (frameIdx > 0) voidFrames.instanceMatrix.needsUpdate = true;
+        if (moteIdx > 0) {
+            motes.instanceMatrix.needsUpdate = true;
+            if (motes.instanceColor) motes.instanceColor.needsUpdate = true;
+        }
 
         clearedRef.current = allPositions.length === 0;
     });
@@ -517,6 +607,14 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             <instancedMesh ref={tapeRef} args={[undefined, undefined, MAX_TAPES]} frustumCulled={false}>
                 <planeGeometry args={[1, 1]} />
                 <meshBasicMaterial map={cautionTexture} color="#ffffff" side={THREE.DoubleSide} transparent opacity={0.98} depthWrite={false} />
+            </instancedMesh>
+
+            {/* Calm plume off safe portals — tinted to the face colour that portal
+                charges, so a flipped tile is spottable from across the board and the
+                orb colour it wants is legible without reading anything. */}
+            <instancedMesh ref={moteRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
+                <sphereGeometry args={[1, 6, 6]} />
+                <meshBasicMaterial vertexColors transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
             </instancedMesh>
 
             {/* Void tile frame booster — brighter than neighbor tile frames */}
