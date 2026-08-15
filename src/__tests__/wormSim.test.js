@@ -299,12 +299,16 @@ describe('body-cut freeze', () => {
 
 describe('active tunnel pair cap', () => {
   it('scales down for smaller boards and clamps mega to the ceiling', () => {
-    expect(activeTunnelCap(2)).toBe(3);
-    expect(activeTunnelCap(3)).toBe(4);
-    expect(activeTunnelCap(4)).toBe(5);
-    expect(activeTunnelCap(5)).toBe(7);
-    expect(activeTunnelCap(15)).toBe(20);
+    expect(activeTunnelCap(2)).toBe(1);
+    expect(activeTunnelCap(3)).toBe(2);
+    expect(activeTunnelCap(4)).toBe(3);
+    expect(activeTunnelCap(5)).toBe(3);
+    expect(activeTunnelCap(7)).toBe(5);
+    expect(activeTunnelCap(15)).toBe(10);
     expect(activeTunnelCap(15)).toBe(MAX_ACTIVE_TUNNEL_PAIRS);
+    // The proportional scale-down must never round a board to zero holes, which
+    // would leave it with no wormholes at all to heal.
+    expect(activeTunnelCap(1)).toBeGreaterThanOrEqual(1);
   });
 
   it('holds spawning while the board is at the cap, then refills after a heal', () => {

@@ -21,7 +21,11 @@ export const TUNNEL_SURF_BACK = 0.264;     // camera behind worm along tunnel ax
 export const TUNNEL_SURF_UP = 0.132;       // raise camera above ribbon surface; nonzero value causes Möbius orbit (camera rolls 180° over tunnel) — intentional RP² effect
 export const TUNNEL_LOOK_AHEAD = 1.8;      // 1 arm-length ahead; keeps exit in view without shooting past the cube
 export const TUNNEL_SURF_SWAY = 0.22;
-export const TUNNEL_SPEED_SCALE = 0.60; // 0.264 was 35% slower than original; 0.50 was snappy, 0.60 is 20% faster still
+// Multiplies every phase of the tunnel trip (windup, dive, ride, exit, windout — all
+// five tunnelProgress increments in wormSim scale off this), so it is the single lever
+// on how long a trip takes. 0.264 was 35% slower than original; 0.50 was snappy; 0.60
+// was 20% faster still. 0.90 cuts the trip duration by a further 33% (0.60 / 0.67).
+export const TUNNEL_SPEED_SCALE = 0.90;
 
 // Face outward normals.
 export const FACE_NORMALS = {
@@ -72,13 +76,16 @@ export const WORMHOLE_MAX_TRAVERSALS = 3;
 // Hard ceiling on how many tunnel pairs may be active at once. A pair is one antipodal
 // wormhole (two flipped surface stickers), which is exactly what getActiveTunnels counts
 // and what the per-step heal scan iterates. Mega (size 15) has room for 675 pairs and
-// used to accumulate toward it unbounded, spiking both difficulty and the scan cost — it
-// now holds at 20. Smaller boards scale down proportionally with edge length so they
-// inherit the same bound while staying denser on the smaller face: round(size/15 · 20),
-// i.e. 2×2→3, 3×3→4, 4×4→5, 5×5→7, 15×15→20.
-export const MAX_ACTIVE_TUNNEL_PAIRS = 20;
+// used to accumulate toward it unbounded, spiking both difficulty and the scan cost.
+//
+// Halved from 20 to 10: at 20 the board had so many holes open simultaneously that
+// they stopped reading as events and became terrain, and the player could not cross a
+// face without falling into one. Every size inherits the cut, because the smaller
+// boards scale proportionally with edge length off this same number:
+// round(size/15 · 10), i.e. 2×2→1, 3×3→2, 4×4→3, 5×5→3, 7×7→5, 15×15→10.
+export const MAX_ACTIVE_TUNNEL_PAIRS = 10;
 export const activeTunnelCap = (size) =>
-  Math.min(MAX_ACTIVE_TUNNEL_PAIRS, Math.round((size * MAX_ACTIVE_TUNNEL_PAIRS) / 15));
+  Math.max(1, Math.min(MAX_ACTIVE_TUNNEL_PAIRS, Math.round((size * MAX_ACTIVE_TUNNEL_PAIRS) / 15)));
 
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
@@ -199,11 +206,13 @@ export const ELEMENTAL_DURATION = 10;
 // offering fades out cleanly before the next one appears.
 export const ELEMENTAL_SPAWN_INTERVAL = 12; // seconds between elemental offerings
 export const ELEMENTAL_LIFETIME = 11;       // seconds an un-taken offering stays on the board
-// On claim the sim freezes for this long and the camera drops to a near-first-person
-// shot on the surface beside the worm, so the player can actually watch the element
-// take over the cube instead of crawling past it. The wash's own clock is held for
-// the beat too, so this is not taken out of ELEMENTAL_DURATION. Short — it's a
-// punctuation beat on pickup, not a mode.
+// On claim the sim freezes for this long so the player can watch the element take
+// over the cube instead of crawling past it. The wash's own clock is held for the
+// beat too, so this is not taken out of ELEMENTAL_DURATION.
+//
+// This is only the FREEZE, not the camera move: the close over-the-worm ride runs
+// off elementalT and lasts the whole wash (see WormChaseCamera). What this duration
+// controls is how long the worm is held still while that ride eases in.
 export const ELEMENTAL_FOCUS_DURATION = 1.8;
 // Ceiling on queued attraction streaks. A sweep can only reach a dozen or so orbs,
 // but the cap keeps a pathological case from spawning unbounded geometry and React
