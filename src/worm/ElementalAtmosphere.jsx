@@ -18,13 +18,11 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
-import { prefersReducedMotion } from '../utils/device.js';
+import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
+import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
+import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { wormBuffs } from './wormBuffs.js';
 import ElementalCubeSkin from './ElementalCubeSkin.jsx';
-
-const PARTICLE_COUNT = 130;
-const FADE_IN = 0.55; // seconds to ramp the fill light up on claim
-const FADE_OUT = 1.25; // soften the end instead of popping the light/particles away
 
 // Per-behaviour motion. `vy` is the vertical drift (units/sec, sign = direction),
 // `sway` the horizontal wobble amplitude, `blend` the material blending, and
@@ -39,18 +37,23 @@ const PARTICLE_KINDS = {
 
 // Drifting particle field. Positions live in a plain Float32Array animated straight
 // in useFrame — zero React renders per frame and one allocation on mount.
-function ElementalParticles({ element, kind, color, extent }) {
+//
+// `count` comes from the quality budget rather than a fixed constant: the field is
+// one draw call at any size, but its CPU cost is a loop over every particle every
+// frame, which is exactly the kind of work a phone cannot spare.
+function ElementalParticles({ element, kind, color, extent, count }) {
   const pointsRef = useRef();
   const materialRef = useRef();
+  const elapsedRef = useRef(0);
   const cfg = PARTICLE_KINDS[kind] ?? PARTICLE_KINDS.bubbles;
 
   // Seeds: each particle gets a random start position, a per-particle sway phase
   // and a slight speed jitter so the field never looks like a marching grid.
   const { geometry, seeds, origins } = useMemo(() => {
-    const positions = new Float32Array(PARTICLE_COUNT * 3);
-    const originArr = new Float32Array(PARTICLE_COUNT * 2); // stable [x, z] anchors
-    const seedArr = new Float32Array(PARTICLE_COUNT * 2); // [phase, speedJitter]
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const positions = new Float32Array(count * 3);
+    const originArr = new Float32Array(count * 2); // stable [x, z] anchors
+    const seedArr = new Float32Array(count * 2); // [phase, speedJitter]
+    for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() * 2 - 1) * extent;
       positions[i * 3 + 1] = (Math.random() * 2 - 1) * extent;
       positions[i * 3 + 2] = (Math.random() * 2 - 1) * extent;
@@ -62,9 +65,9 @@ function ElementalParticles({ element, kind, color, extent }) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     return { geometry: geo, seeds: seedArr, origins: originArr };
-    // Rebuild only when the element (hence extent/kind) changes.
+    // Rebuild only when the element (hence extent/kind) or the budget changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [element, extent]);
+  }, [element, extent, count]);
 
   useFrame((state, delta) => {
     const pts = pointsRef.current;
@@ -72,7 +75,7 @@ function ElementalParticles({ element, kind, color, extent }) {
     const dt = Math.min(delta, 0.05);
     const arr = pts.geometry.attributes.position.array;
     const t = state.clock.elapsedTime;
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
+    for (let i = 0; i < count; i++) {
       const yi = i * 3 + 1;
       arr[yi] += cfg.vy * seeds[i * 2 + 1] * dt;
       // Wrap around the box so the field never empties out.
@@ -88,8 +91,12 @@ function ElementalParticles({ element, kind, color, extent }) {
     }
     pts.geometry.attributes.position.needsUpdate = true;
     if (materialRef.current) {
-      const remainingFade = Math.min(1, wormBuffs.elementalT / FADE_OUT);
-      materialRef.current.opacity = cfg.opacity * remainingFade;
+      // Same envelope the skin and the fill light run on, so the field can no
+      // longer arrive before the element it belongs to or outlive it. It used to
+      // read elementalT and divide by its own copy of the fade constant.
+      elapsedRef.current += delta;
+      const env = elementalEnvelope({ elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
+      materialRef.current.opacity = cfg.opacity * env.intensity;
     }
   });
 
@@ -113,17 +120,24 @@ function ElementalParticles({ element, kind, color, extent }) {
 export default function ElementalAtmosphere({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
   const lightRef = useRef();
-  const fadeRef = useRef(0);
-  const reducedRef = useRef(prefersReducedMotion());
+  const elapsedRef = useRef(0);
 
   const def = element ? getElementalDef(element) : null;
+
+  // Device budget: how many particles this machine can afford, and whether the
+  // viewer has asked for no motion at all. Fixed per mount — none of its inputs
+  // change mid-session.
+  const quality = useMemo(
+    () => resolveElementalQuality({ mobile: isMobile, reducedMotion: prefersReducedMotion(), cubeSize: size }),
+    [size]
+  );
 
   // Reset the fade ramp whenever the active element changes so a swap fades in
   // cleanly rather than snapping to full strength.
   const lastElementRef = useRef(null);
   if (lastElementRef.current !== element) {
     lastElementRef.current = element;
-    fadeRef.current = 0;
+    elapsedRef.current = 0;
   }
 
   // Particle envelope large enough to surround the whole cube.
@@ -133,12 +147,13 @@ export default function ElementalAtmosphere({ size = 3 }) {
 
   useFrame((_, delta) => {
     if (!def) return;
-    fadeRef.current = Math.min(1, fadeRef.current + delta / FADE_IN);
-    // Ramp the fill light down over the buff's final second so it eases out rather
-    // than snapping off. wormBuffs mirrors the sim clock (freezes on pause/tunnel).
-    const remainingFade = Math.min(1, wormBuffs.elementalT / FADE_OUT);
-    const f = Math.min(fadeRef.current, remainingFade);
-    if (lightRef.current) lightRef.current.intensity = 0.55 * f;
+    elapsedRef.current += delta;
+    // The shared envelope — the same one the cube skin scales itself by — so the
+    // light can no longer be at full strength while the layer is still welling up,
+    // or still lit after it has dissolved. wormBuffs mirrors the sim clock, so this
+    // freezes on pause and during tunnel transit.
+    const env = elementalEnvelope({ elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
+    if (lightRef.current) lightRef.current.intensity = 0.55 * env.intensity;
   });
 
   if (!def) return null;
@@ -152,13 +167,16 @@ export default function ElementalAtmosphere({ size = 3 }) {
           as they move through it. */}
       <hemisphereLight ref={lightRef} color={lightColor} groundColor={lightColor} intensity={0} />
 
-      {/* Drifting medium around the cube — bubbles/embers/spores/snow. */}
-      {!reducedRef.current && (
+      {/* Drifting medium around the cube — bubbles/embers/spores/snow. Reduced
+          motion and the floor budget both zero the count, which drops the field
+          entirely rather than animating an empty buffer. */}
+      {quality.particleCount > 0 && (
         <ElementalParticles
           element={element}
           kind={def.particle}
           color={def.accent}
           extent={extent}
+          count={quality.particleCount}
         />
       )}
     </group>

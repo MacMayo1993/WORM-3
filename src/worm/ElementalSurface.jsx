@@ -14,12 +14,13 @@
 //     `uTime` is sharedUniforms.time, which CubeAssembly already ticks every
 //     frame, so it flows on its own.
 //
-// One shared geometry and one shared material per element back every tile (the
-// skin renders up to ~150 meshes but they all reference these), so the whole
-// layer is a handful of GPU objects. This covers the two flat-surface elements,
-// water and ice. Grass keeps its dedicated blade mesh, and fire is drawn with the
-// bombs' flame sprites (ElementalFireSkin) — it used to have a "lava" branch here
-// that painted molten runoff across each sticker and read as orange squiggles.
+// One shared geometry and one shared material per element back every tile, and the
+// skin draws all of them as a single InstancedMesh — the whole sheathed cube is ONE
+// draw call rather than the ~150 it used to cost. This covers the two flat-surface
+// elements, water and ice. Grass keeps its dedicated blade mesh, and fire is drawn
+// with the bombs' flame sprites (ElementalFireSkin) — it used to have a "lava"
+// branch here that painted molten runoff across each sticker and read as orange
+// squiggles.
 //
 // ── Why the patterns are noise fields and not sines ──────────────────────────
 // The first version built both elements out of products of sines, and both were
@@ -47,6 +48,12 @@ export function getElementalSurfaceGeo() {
     // enough subdivisions for the water ripple and the ice plate relief to read
     // as displaced surfaces rather than as flat painted quads.
     _geoCache.geo = new THREE.PlaneGeometry(1.04, 1.04, 18, 18);
+    // Lift off the sticker, baked in. The skin used to carry this as a child mesh
+    // offset inside each cell group; the cells are instances of ONE mesh now, so
+    // there is no child transform left to hold it. Baking it into the geometry
+    // keeps it inside the instance matrix's scale, exactly as the child offset was
+    // inside the group's, so the lift still shrinks with the claim/expiry ramp.
+    _geoCache.geo.translate(0, 0, 0.03);
   }
   return _geoCache.geo;
 }
@@ -118,7 +125,18 @@ const vertexShader = /* glsl */`
 
   void main() {
     vUv = uv;
-    vec4 wp = modelMatrix * vec4(position, 1.0);
+    // Every cover cell is an INSTANCE of this one quad, so the cell's own
+    // position/orientation/scale arrives as instanceMatrix rather than as a parent
+    // group's modelMatrix. World position — which every pattern below is a function
+    // of, and which is what keeps the field continuous across cells — must be
+    // composed through it. Guarded so the material still works on a plain mesh.
+    #ifdef USE_INSTANCING
+      mat4 cellMatrix = modelMatrix * instanceMatrix;
+    #else
+      mat4 cellMatrix = modelMatrix;
+    #endif
+
+    vec4 wp = cellMatrix * vec4(position, 1.0);
     vWorld = wp.xyz;
     float w = wfield(wp.xyz, uTime);
     vWave = w;
@@ -134,7 +152,10 @@ const vertexShader = /* glsl */`
       // steps land between vertices and read as chipped, which is what ice does.
       pos.z += (hash13(iceCell(wp.xyz)) - 0.5) * 0.075;
     }
-    vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+    // viewMatrix * cellMatrix, not modelViewMatrix: the latter folds in only the
+    // parent group, and under instancing that would leave every cell shaded as if
+    // it sat at the cube's centre facing +Z.
+    vec4 mv = viewMatrix * cellMatrix * vec4(pos, 1.0);
     vView = -mv.xyz;
     gl_Position = projectionMatrix * mv;
   }
