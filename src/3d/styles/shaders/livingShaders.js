@@ -117,9 +117,9 @@ export const livingShaders = {
       vec2 q = vec2(ca * p.x + sa * p.y, -sa * p.x + ca * p.y);
 
       // Dial: dark face, bright rim, eight ticks.
-      vec3 col = baseColor * 0.16;
-      col = mix(col, baseColor * 0.30, smoothstep(0.40, 0.36, r));
-      col = mix(col, baseColor * 1.25, smoothstep(0.005, 0.0, abs(r - 0.405)));
+      vec3 col = baseColor * 0.34;
+      col = mix(col, baseColor * 0.58, smoothstep(0.40, 0.36, r));
+      col = mix(col, baseColor * 1.30, smoothstep(0.005, 0.0, abs(r - 0.405)));
       float tickAng = atan(p.y, p.x);
       float tick = smoothstep(0.05, 0.0, abs(fract(tickAng / 0.7853981 + 0.5) - 0.5))
                  * smoothstep(0.32, 0.36, r) * (1.0 - smoothstep(0.385, 0.40, r));
@@ -132,10 +132,10 @@ export const livingShaders = {
       float body = smoothstep(w, w * 0.45, abs(q.y)) * step(abs(q.x), halfLen);
       float north = step(0.0, q.x);
       col = mix(col, antipodalColor * 1.35, body * north);
-      col = mix(col, vec3(0.92, 0.93, 0.95), body * (1.0 - north) * 0.85);
+      col = mix(col, mix(baseColor, vec3(1.0), 0.70), body * (1.0 - north) * 0.9);
 
       // Hub
-      col = mix(col, vec3(0.85), smoothstep(0.045, 0.028, r));
+      col = mix(col, mix(baseColor, vec3(1.0), 0.55), smoothstep(0.045, 0.028, r));
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
@@ -173,7 +173,7 @@ export const livingShaders = {
                + vec2(sin(time * 21.0), cos(time * 18.0)) * sqrt(sp) * 0.06;
 
       // Vial body — tinted fluid, darker toward the rim.
-      vec3 col = mix(baseColor * 0.55, baseColor * 0.22, smoothstep(0.10, 0.46, r));
+      vec3 col = mix(baseColor * 0.88, baseColor * 0.38, smoothstep(0.10, 0.46, r));
       // Two centring rings.
       col += baseColor * 0.9 * smoothstep(0.006, 0.0, abs(r - 0.17));
       col += baseColor * 0.7 * smoothstep(0.006, 0.0, abs(r - 0.26));
@@ -182,9 +182,9 @@ export const livingShaders = {
 
       float bd = length(p - bub);
       float bubble = smoothstep(0.105, 0.088, bd);
-      col = mix(col, vec3(0.94, 0.97, 0.96), bubble * 0.85);
+      col = mix(col, mix(baseColor, vec3(1.0), 0.74), bubble * 0.92);
       // Meniscus + a highlight so it reads as air, not a hole.
-      col += vec3(0.9) * smoothstep(0.006, 0.0, abs(bd - 0.098)) * 0.5;
+      col += mix(baseColor, vec3(1.0), 0.8) * smoothstep(0.006, 0.0, abs(bd - 0.098)) * 0.5;
       col += vec3(1.0) * smoothstep(0.035, 0.0, length(p - bub - vec2(0.03, 0.035))) * 0.35;
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
@@ -220,7 +220,7 @@ export const livingShaders = {
       // sqrt keeps the flurry alive well after the layer stops.
       float agit = sqrt(lSpin());
 
-      vec3 col = mix(baseColor * 0.44, baseColor * 0.16, length(p) * 1.5);
+      vec3 col = mix(baseColor * 0.72, baseColor * 0.28, length(p) * 1.5);
       float glit = 0.0;
       for (int i = 0; i < 22; i++) {
         float fi = float(i);
@@ -233,7 +233,7 @@ export const livingShaders = {
         float sz = 0.014 + h3 * 0.012;
         glit += smoothstep(sz, sz * 0.2, length(p - pp));
       }
-      col += vec3(0.93, 0.96, 1.0) * clamp(glit, 0.0, 1.4) * (0.55 + agit * 0.45);
+      col += mix(baseColor, vec3(0.94, 0.97, 1.0), 0.72) * clamp(glit, 0.0, 1.4) * (0.6 + agit * 0.45);
       // Globe glass.
       col = mix(col, baseColor * 1.15, smoothstep(0.008, 0.0, abs(length(p) - 0.45)));
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
@@ -287,11 +287,11 @@ export const livingShaders = {
       float core = smoothstep(0.026, 0.004, d);
       float halo = smoothstep(0.17, 0.0, d);
 
-      vec3 col = baseColor * 0.10;
+      vec3 col = baseColor * 0.26;
       // The whole plate lights for an instant as the channel breaks down.
       col += baseColor * 0.30 * exp(-ph * 20.0);
       col += baseColor * halo * (0.80 * flash + 0.22 * scar);
-      col += mix(baseColor, vec3(1.0), 0.85) * core * (1.45 * flash + 0.45 * scar);
+      col += mix(baseColor, vec3(1.0), 0.58) * core * (1.55 * flash + 0.5 * scar);
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
@@ -354,7 +354,7 @@ export const livingShaders = {
       col = mix(col, baseColor * 0.62, clear);
       col = mix(col, baseColor * 0.78, bead);
       // Lens highlight on every drop.
-      col += vec3(0.95) * bead * 0.30;
+      col += mix(baseColor, vec3(1.0), 0.72) * bead * 0.32;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
@@ -387,7 +387,7 @@ export const livingShaders = {
       // Fake a lit surface from the height field's slope.
       float lit = clamp(0.5 + h * 0.9, 0.0, 1.4);
       vec3 col = baseColor * (0.28 + lit * 0.55);
-      col += vec3(1.0) * smoothstep(0.55, 1.05, lit) * 0.30;
+      col += mix(baseColor, vec3(1.0), 0.70) * smoothstep(0.55, 1.05, lit) * 0.32;
       // Still-water shimmer so an empty moment is not a flat square.
       col += baseColor * 0.05 * lNoise(vUv * 9.0 + time * 0.15);
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
@@ -415,7 +415,7 @@ export const livingShaders = {
 
       // Dial face, warmed by the light of the hour.
       vec3 warm = mix(vec3(1.0, 0.52, 0.20), vec3(1.0, 0.97, 0.88), smoothstep(0.15, 0.75, elev));
-      vec3 col = baseColor * (0.30 + elev * 0.45) * mix(vec3(1.0), warm, 0.45);
+      vec3 col = baseColor * (0.34 + elev * 0.48) * mix(vec3(1.0), warm, 0.28);
       // Hour ticks.
       float ta = atan(p.y, p.x);
       col += baseColor * 0.5 * smoothstep(0.06, 0.0, abs(fract(ta / 0.5235987 + 0.5) - 0.5))
@@ -470,10 +470,12 @@ export const livingShaders = {
 
       // Feathering across the arms, fine enough to read as crystal not stripes.
       float feather = lNoise(vec2(ang * 24.0, dist * 22.0));
-      vec3 frost = mix(baseColor * 0.80, vec3(0.90, 0.96, 1.0), 0.40 + feather * 0.38);
-      vec3 col = mix(baseColor * 0.28, frost, ice);
+      // Frost is the face colour lightened, not white laid over it.
+      vec3 frostHi = mix(baseColor, vec3(0.92, 0.97, 1.0), 0.46);
+      vec3 frost = mix(baseColor * 0.72, frostHi, 0.32 + feather * 0.40);
+      vec3 col = mix(baseColor * 0.42, frost, ice);
       // The growing edge is the busy part; it quiets down once the front holds.
-      col += vec3(0.85, 0.95, 1.0)
+      col += mix(baseColor, vec3(0.90, 0.97, 1.0), 0.68)
            * smoothstep(0.05, 0.0, abs(dist - reach))
            * (0.20 + 0.40 * step(cyc, 0.70));
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
@@ -521,8 +523,9 @@ export const livingShaders = {
       sand *= 0.65 + grain;
 
       // Plate: dark, with the standing wave faintly visible in the metal.
-      vec3 col = baseColor * (0.14 + 0.10 * abs(ch));
-      col = mix(col, mix(baseColor * 0.7, vec3(0.96, 0.93, 0.85), 0.8), clamp(sand, 0.0, 1.0));
+      vec3 col = baseColor * (0.30 + 0.18 * abs(ch));
+      // The sand takes the face colour up, rather than burying it under cream.
+      col = mix(col, mix(baseColor * 1.18, vec3(1.0), 0.42), clamp(sand, 0.0, 1.0));
       // Everything blurs slightly while the plate is between modes.
       col += baseColor * blend * 0.10 * lNoise(vUv * 40.0 + time * 20.0);
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
@@ -551,11 +554,14 @@ export const livingShaders = {
 
       float spots = smoothstep(0.47, 0.545, n);
       // The reactant ring around each cell — the part that actually looks alive.
-      float membrane = smoothstep(0.435, 0.475, n) - smoothstep(0.545, 0.60, n);
+      // Narrow, and mixed in well under half: at full strength it covered enough
+      // of the tile to average every face toward its own antipode, i.e. toward
+      // grey, which is the one thing a colour-identification game cannot afford.
+      float membrane = smoothstep(0.448, 0.478, n) - smoothstep(0.542, 0.585, n);
 
-      vec3 col = mix(baseColor * 0.24, baseColor * 1.25 + vec3(0.05), spots);
-      col = mix(col, antipodalColor * 1.30, membrane * 0.90);
-      col += baseColor * 0.16 * smoothstep(0.60, 0.75, n);
+      vec3 col = mix(baseColor * 0.26, baseColor * 1.30 + vec3(0.05), spots);
+      col = mix(col, antipodalColor * 1.15, membrane * 0.45);
+      col += baseColor * 0.18 * smoothstep(0.60, 0.75, n);
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
