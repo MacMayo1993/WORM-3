@@ -118,6 +118,10 @@ const TILE_PRICES = {
   // Animated style pack (dev request)
   prismBloom: 175, magnetFlux: 175, liquidChrome: 200, orbChamber: 175, liquidTank: 175, dice: 200, sandChamber: 175, lavaLamp: 200, eyeball: 200, auroraWeave: 175, plasmaCells: 175,
   quantumScanlines: 150, emberstorm: 175, fractalPulse: 175, bioLattice: 175, stellarLensing: 200,
+  // Living batch 2. The three that answer the player's turns are top of the tier;
+  // the rest sit with the other animated styles.
+  compass: 225, spiritLevel: 200, snowGlobe: 200, lichtenberg: 175, rainGlass: 200,
+  pond: 150, sundial: 175, crystalGrowth: 175, cymatics: 225, turing: 175,
   // Non-Euclidean — the heaviest shaders in the catalog (iterated inversion,
   // Möbius transport), priced as the top tier.
   poincareDisk: 200, hyperbolicWeave: 225, apollonian: 200, circleInversion: 150,

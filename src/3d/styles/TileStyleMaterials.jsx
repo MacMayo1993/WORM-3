@@ -9,6 +9,7 @@ import { natureShaders } from './shaders/natureShaders.js';
 import { opArtShaders } from './shaders/opArtShaders.js';
 import { antipodalShaders } from './shaders/antipodalShaders.js';
 import { newStyleShaders } from './shaders/newStyleShaders.js';
+import { livingShaders } from './shaders/livingShaders.js';
 import { nonEuclideanShaders } from './shaders/nonEuclideanShaders.js';
 import { impossibleShaders } from './shaders/impossibleShaders.js';
 import { surrealShaders } from './shaders/surrealShaders.js';
@@ -136,6 +137,7 @@ const fragmentShaders = {
   ...opArtShaders,
   ...antipodalShaders,
   ...newStyleShaders,
+  ...livingShaders,
   ...nonEuclideanShaders,
   ...impossibleShaders,
   ...surrealShaders,
@@ -212,13 +214,17 @@ export function getVolumeResource(key, create) {
   return res;
 }
 
-// Styles that use a second antipodalColor uniform (opposite face's color)
-const ANTIPODAL_STYLES = new Set([
+// Styles that use a second antipodalColor uniform (opposite face's color).
+// A shader that reads antipodalColor without being listed here gets an unset
+// uniform, i.e. BLACK, with no warning from anywhere — exported so a test can
+// hold the two in sync.
+export const ANTIPODAL_STYLES = new Set([
   'polkaDots', 'zigzag', 'checkerboard', 'diagStripes',
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
   'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
   'waveform', 'dnaHelix', 'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
+  'compass', 'turing',
 ]);
 
 /**
@@ -342,6 +348,8 @@ const ANIMATED_STYLES = new Set([
   'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
   'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
+  'compass', 'spiritLevel', 'snowGlobe', 'lichtenberg', 'rainGlass', 'pond',
+  'sundial', 'crystalGrowth', 'cymatics', 'turing',
   'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
   // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
   'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',

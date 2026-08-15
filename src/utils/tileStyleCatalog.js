@@ -20,6 +20,11 @@ export const LIVING_STYLE_KEYS = [
   'oilSlick', 'constellation', 'neonSign',
   'prismBloom', 'magnetFlux', 'liquidChrome', 'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
+  // Batch 2. compass / spiritLevel / snowGlobe are reactive: they read the tile's
+  // live world orientation and the rotation energy, so the player's turns move
+  // them rather than a clock.
+  'compass', 'spiritLevel', 'snowGlobe', 'lichtenberg', 'rainGlass', 'pond',
+  'sundial', 'crystalGrowth', 'cymatics', 'turing',
 ];
 
 // Tiles drawn in geometries that are not the flat plane — hyperbolic, elliptic,
