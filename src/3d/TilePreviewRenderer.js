@@ -21,6 +21,8 @@ const ANIMATED_STYLE_SET = new Set([
   'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
   'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
+  'compass', 'spiritLevel', 'snowGlobe', 'lichtenberg', 'rainGlass', 'pond',
+  'sundial', 'crystalGrowth', 'cymatics', 'turing',
   'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
   // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
   'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',

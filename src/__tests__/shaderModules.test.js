@@ -5,10 +5,11 @@ import { natureShaders } from '../3d/styles/shaders/natureShaders.js';
 import { opArtShaders } from '../3d/styles/shaders/opArtShaders.js';
 import { antipodalShaders } from '../3d/styles/shaders/antipodalShaders.js';
 import { newStyleShaders } from '../3d/styles/shaders/newStyleShaders.js';
+import { livingShaders } from '../3d/styles/shaders/livingShaders.js';
 import { nonEuclideanShaders } from '../3d/styles/shaders/nonEuclideanShaders.js';
 import { impossibleShaders } from '../3d/styles/shaders/impossibleShaders.js';
 import { surrealShaders } from '../3d/styles/shaders/surrealShaders.js';
-import { isAnimatedStyle } from '../3d/styles/TileStyleMaterials.jsx';
+import { isAnimatedStyle, ANTIPODAL_STYLES } from '../3d/styles/TileStyleMaterials.jsx';
 import { isAnimatedPreviewStyle } from '../3d/TilePreviewRenderer.js';
 import { TILE_STYLE_SECTIONS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
 import { TILE_STYLES } from '../utils/colorSchemes.js';
@@ -21,6 +22,7 @@ const modules = [
   ['opArtShaders', opArtShaders],
   ['antipodalShaders', antipodalShaders],
   ['newStyleShaders', newStyleShaders],
+  ['livingShaders', livingShaders],
   ['nonEuclideanShaders', nonEuclideanShaders],
   ['impossibleShaders', impossibleShaders],
   ['surrealShaders', surrealShaders],
@@ -95,6 +97,16 @@ describe('tile style catalog', () => {
       }
       expect(TILE_STYLES[key]?.label, `${key} has no label`).toBeTruthy();
       expect(priced.has(key), `${key} is not sold in the store`).toBe(true);
+    }
+  });
+
+  it('every shader reading antipodalColor is registered to receive it', () => {
+    // An unregistered style still compiles — the uniform is simply never set, so
+    // it reads as black and the bug is invisible until someone looks at the tile.
+    for (const [key, src] of Object.entries(allShaders)) {
+      if (typeof src === 'string' && src.includes('antipodalColor')) {
+        expect(ANTIPODAL_STYLES.has(key), `${key} reads antipodalColor but is not in ANTIPODAL_STYLES`).toBe(true);
+      }
     }
   });
 
