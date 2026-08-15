@@ -11,7 +11,8 @@ import { impossibleShaders } from '../3d/styles/shaders/impossibleShaders.js';
 import { surrealShaders } from '../3d/styles/shaders/surrealShaders.js';
 import { isAnimatedStyle, ANTIPODAL_STYLES } from '../3d/styles/TileStyleMaterials.jsx';
 import { isAnimatedPreviewStyle } from '../3d/TilePreviewRenderer.js';
-import { TILE_STYLE_SECTIONS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
+import { TILE_STYLE_SECTIONS, ALL_TILE_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
+import { resolveWizardTileStyles } from '../utils/wizardTileStyles.js';
 import { TILE_STYLES } from '../utils/colorSchemes.js';
 import { STORE_TILES } from '../utils/storeCatalog.js';
 
@@ -107,6 +108,34 @@ describe('tile style catalog', () => {
       if (typeof src === 'string' && src.includes('antipodalColor')) {
         expect(ANTIPODAL_STYLES.has(key), `${key} reads antipodalColor but is not in ANTIPODAL_STYLES`).toBe(true);
       }
+    }
+  });
+
+  it('every catalogued style is reachable from Random Mix', () => {
+    // Random Mix draws from ALL_TILE_STYLE_KEYS, and every selector (settings
+    // randomize, the menu's decorative cube) derives its pool from the same
+    // export. A style that is in a section but not in that pool is a style the
+    // player can never be given.
+    for (const section of TILE_STYLE_SECTIONS) {
+      for (const key of section.keys) {
+        expect(ALL_TILE_STYLE_KEYS, `${key} missing from the random pool`).toContain(key);
+      }
+    }
+    // And the draw really can produce any of them: walk a deterministic RNG
+    // across the whole pool and check each index comes back out.
+    for (let i = 0; i < ALL_TILE_STYLE_KEYS.length; i++) {
+      // Aim at the middle of bucket i: (i/N)*N can round just under i.
+      const styles = resolveWizardTileStyles({ tileStyle: 'random' }, () => (i + 0.5) / ALL_TILE_STYLE_KEYS.length);
+      expect(styles[1]).toBe(ALL_TILE_STYLE_KEYS[i]);
+    }
+  });
+
+  it('keeps the second Living batch in the catalogue', () => {
+    // These are only reachable because they are listed in a section — the store,
+    // the settings grids, the wizard families and Random Mix are all derived.
+    for (const key of ['compass', 'spiritLevel', 'snowGlobe', 'lichtenberg', 'rainGlass',
+                       'pond', 'sundial', 'crystalGrowth', 'cymatics', 'turing']) {
+      expect(LIVING_STYLE_KEYS, `${key} dropped from Living`).toContain(key);
     }
   });
 

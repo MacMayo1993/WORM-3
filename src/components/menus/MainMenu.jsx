@@ -15,7 +15,7 @@ preloadFont(
 );
 import { makeCubies } from '../../game/cubeState.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
-import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
+import { ALL_TILE_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { bodyMaterialProps, pickCubeletViewStyle, LED_EDGE_MODES, PER_CUBELET_VIEW_STYLES } from '../../3d/cubeViewStyles.js';
 import { updateSharedTime, getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
@@ -29,7 +29,7 @@ import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z } from '../../utils/uiTheme.js';
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
 const _SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'custom');
-const _TILE_KEYS   = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS, ...NON_EUCLIDEAN_STYLE_KEYS, ...IMPOSSIBLE_STYLE_KEYS, ...SURREAL_STYLE_KEYS];
+const _TILE_KEYS   = ALL_TILE_STYLE_KEYS;
 
 // Mutable state — rerandomizeMenuStyle() reassigns all three.
 let _menuSchemeKey  = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];

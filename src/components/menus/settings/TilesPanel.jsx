@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../../utils/colorSchemes.js';
-import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS } from '../../../utils/tileStyleCatalog.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS, ALL_TILE_STYLE_KEYS } from '../../../utils/tileStyleCatalog.js';
 import { useGameStore } from '../../../hooks/useGameStore.js';
 import {
   registerTilePreview,
@@ -100,8 +100,9 @@ export function TilesPanel({ settings, onSettingsChange }) {
 
   // Pick 6 unique styles (no repeats) from the owned pool and assign one per face
   const randomizeStyles = () => {
-    const pool = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS, ...NON_EUCLIDEAN_STYLE_KEYS, ...IMPOSSIBLE_STYLE_KEYS, ...SURREAL_STYLE_KEYS]
-      .filter(k => tileOwned(k));
+    // Derived from the catalogue, not re-listed: a hand-rolled concatenation of
+    // the sections silently drops any section added later.
+    const pool = ALL_TILE_STYLE_KEYS.filter(k => tileOwned(k));
     // Fisher-Yates shuffle then take first 6
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
