@@ -15,6 +15,13 @@
 // The canvas textures below (emblem / soft glow / ray burst) are built lazily and
 // cached at module level — at most four emblems plus two shared greyscale sprites
 // for the whole session — so a headless import never touches the canvas API.
+//
+// So are the MATERIALS, and for a sharper reason. Declared as JSX intrinsics they
+// belong to R3F, which disposes them when the badge unmounts; disposing the last
+// material using a program makes three destroy it, so every elemental offering
+// relinked the full MeshStandardMaterial shader (~69KB of source) from scratch.
+// Linking is synchronous, so on a phone that is the game freezing on a 12-second
+// beat. One set per element, built once, never disposed.
 
 import { useMemo } from 'react';
 import * as THREE from 'three';
@@ -175,6 +182,42 @@ const bo = (v) => (m) => {
   if (m) m.userData.baseOpacity = v;
 };
 
+// One long-lived material set per element. Each entry backs exactly one mesh in the
+// badge, so the parent's fade (which writes material.opacity from the MESH's
+// baseOpacity) still has a single writer per material.
+const _badgeMatCache = new Map();
+function getBadgeMaterials(type, color) {
+  const def = getElementalDef(type);
+  const accent = def?.accent || '#ffffff';
+  const key = `${type}_${color}`;
+  const hit = _badgeMatCache.get(key);
+  if (hit) return hit;
+  const additive = (c, opacity, map) =>
+    new THREE.MeshBasicMaterial({
+      color: c, map: map ?? null, transparent: true, opacity,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+  const set = {
+    bloom: additive(color, 0.55, getSoftGlowTexture()),
+    rays: additive(accent, 0.22, getRayTexture()),
+    rim: new THREE.MeshStandardMaterial({
+      color: '#ffd45e', emissive: '#ff9f1c', emissiveIntensity: 0.85,
+      metalness: 0.8, roughness: 0.16, transparent: true, opacity: 1, toneMapped: false
+    }),
+    keyline: new THREE.MeshStandardMaterial({ color: '#1c1108', metalness: 0.3, roughness: 0.5, transparent: true, opacity: 1 }),
+    enamel: new THREE.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: 1.0,
+      metalness: 0.22, roughness: 0.2, transparent: true, opacity: 1, toneMapped: false
+    }),
+    pinstripe: additive(accent, 0.9),
+    gloss: additive(accent, 0.14),
+    emblem: new THREE.MeshBasicMaterial({ map: getEmblemTexture(type), transparent: true, depthWrite: false, toneMapped: false }),
+    spark: additive(accent, 0.95)
+  };
+  _badgeMatCache.set(key, set);
+  return set;
+}
+
 /**
  * The crest, in local space (+Z outward).
  *
@@ -182,100 +225,41 @@ const bo = (v) => (m) => {
  * burst behind the medal, so the caller can spin each at its own rate.
  */
 export function ElementalBadge({ type, color, sparksRef, raysRef }) {
-  const def = getElementalDef(type);
-  const accent = def?.accent || '#ffffff';
-  const emblemTex = useMemo(() => getEmblemTexture(type), [type]);
-  const glowTex = useMemo(() => getSoftGlowTexture(), []);
-  const rayTex = useMemo(() => getRayTexture(), []);
+  const mats = useMemo(() => getBadgeMaterials(type, color), [type, color]);
 
   return (
     <group>
       {/* Soft element-coloured bloom behind everything — replaces the old faceted
           halo ring, which was visibly an octagon up close. */}
-      {glowTex && (
-        <mesh geometry={_badgeGeos.bloom} position={[0, 0, -0.02]} ref={bo(0.55)}>
-          <meshBasicMaterial
-            map={glowTex}
-            color={color}
-            transparent
-            opacity={0.55}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
-      )}
+      {mats.bloom.map && <mesh geometry={_badgeGeos.bloom} material={mats.bloom} position={[0, 0, -0.02]} ref={bo(0.55)} />}
       {/* Slow star burst — the "this is an offering" shine. */}
-      {rayTex && (
+      {mats.rays.map && (
         <group ref={raysRef}>
-          <mesh geometry={_badgeGeos.rays} position={[0, 0, -0.015]} ref={bo(0.22)}>
-            <meshBasicMaterial
-              map={rayTex}
-              color={accent}
-              transparent
-              opacity={0.22}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
-            />
-          </mesh>
+          <mesh geometry={_badgeGeos.rays} material={mats.rays} position={[0, 0, -0.015]} ref={bo(0.22)} />
         </group>
       )}
       {/* Gold octagon rim */}
-      <mesh geometry={_badgeGeos.rim} rotation={[Math.PI / 2, 0, 0]} ref={bo(1)}>
-        <meshStandardMaterial
-          color="#ffd45e"
-          emissive="#ff9f1c"
-          emissiveIntensity={0.85}
-          metalness={0.8}
-          roughness={0.16}
-          transparent
-          opacity={1}
-          toneMapped={false}
-        />
-      </mesh>
+      <mesh geometry={_badgeGeos.rim} material={mats.rim} rotation={[Math.PI / 2, 0, 0]} ref={bo(1)} />
       {/* Dark keyline so the rim pops off any face colour */}
-      <mesh geometry={_badgeGeos.keyline} position={[0, 0, 0.012]} rotation={[Math.PI / 2, 0, 0]} ref={bo(1)}>
-        <meshStandardMaterial color="#1c1108" metalness={0.3} roughness={0.5} transparent opacity={1} />
-      </mesh>
+      <mesh geometry={_badgeGeos.keyline} material={mats.keyline} position={[0, 0, 0.012]} rotation={[Math.PI / 2, 0, 0]} ref={bo(1)} />
       {/* Element-coloured enamel field */}
-      <mesh geometry={_badgeGeos.enamel} position={[0, 0, 0.024]} rotation={[Math.PI / 2, 0, 0]} ref={bo(1)}>
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={1.0}
-          metalness={0.22}
-          roughness={0.2}
-          transparent
-          opacity={1}
-          toneMapped={false}
-        />
-      </mesh>
+      <mesh geometry={_badgeGeos.enamel} material={mats.enamel} position={[0, 0, 0.024]} rotation={[Math.PI / 2, 0, 0]} ref={bo(1)} />
       {/* Bright octagon pinstripe at the enamel edge */}
-      <mesh geometry={_badgeGeos.pinstripe} position={[0, 0, 0.086]} ref={bo(0.9)}>
-        <meshBasicMaterial color={accent} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
+      <mesh geometry={_badgeGeos.pinstripe} material={mats.pinstripe} position={[0, 0, 0.086]} ref={bo(0.9)} />
       {/* Soft domed gloss */}
-      <mesh geometry={_badgeGeos.gloss} position={[0, 0.02, 0.088]} ref={bo(0.14)}>
-        <meshBasicMaterial color={accent} transparent opacity={0.14} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
+      <mesh geometry={_badgeGeos.gloss} material={mats.gloss} position={[0, 0.02, 0.088]} ref={bo(0.14)} />
       {/* The element's own icon, stamped and glowing */}
-      {emblemTex && (
-        <mesh geometry={_badgeGeos.emblem} position={[0, 0, 0.092]} ref={bo(1)}>
-          <meshBasicMaterial map={emblemTex} transparent depthWrite={false} toneMapped={false} />
-        </mesh>
-      )}
+      {mats.emblem.map && <mesh geometry={_badgeGeos.emblem} material={mats.emblem} position={[0, 0, 0.092]} ref={bo(1)} />}
       {/* Orbiting element sparks — the caller spins this group */}
       <group ref={sparksRef}>
         {SPARK_ANGLES.map((a, i) => (
           <mesh
             key={i}
             geometry={_badgeGeos.spark}
+            material={mats.spark}
             position={[Math.cos(a) * SPARK_RADIUS, Math.sin(a) * SPARK_RADIUS, 0.05]}
             ref={bo(0.95)}
-          >
-            <meshBasicMaterial color={accent} transparent opacity={0.95} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-          </mesh>
+          />
         ))}
       </group>
     </group>

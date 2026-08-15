@@ -21,8 +21,8 @@
 //
 // Everything animates from one useFrame writing to refs: no React renders per frame
 // and no per-frame allocation. Up to four of these exist at once (one offering =
-// one orb per element), so geometry is shared at module level and each orb owns only
-// its three shader materials and one small particle buffer, both disposed on unmount.
+// one orb per element), so geometry AND the body's shader materials are shared at
+// module level; the orb owns only one small particle buffer, disposed on unmount.
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -33,7 +33,7 @@ import { prefersReducedMotion, isMobile } from '../../utils/device.js';
 import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME } from './constants.js';
 import { getElementalDef } from './elementalDefs.js';
 import { ElementalBadge, getSoftGlowTexture } from './elementalBadge.jsx';
-import { makeElementalOrbMaterials } from './elementalOrbShader.js';
+import { getElementalOrbMaterials } from './elementalOrbShader.js';
 
 // One knob for how big the pickup reads. Every part of the orb is authored at
 // ORB_SCALE 1 and multiplied through here — the body, the billboarded crest and
@@ -91,6 +91,42 @@ const _up = new THREE.Vector3(0, 1, 0);
 const _quat = new THREE.Quaternion();
 const _billboard = new THREE.Quaternion();
 
+// The orb's non-shader materials, held per element for the same reason the badge's
+// are (see elementalBadge.jsx): R3F disposes JSX-declared materials on unmount, and
+// disposing the last user of a program makes three destroy it, so every offering
+// relinked them. Each entry backs exactly one mesh, so the lifetime fade — which
+// writes material.opacity from the MESH's baseOpacity — keeps a single writer.
+const _trimCache = new Map();
+function getOrbTrimMaterials(element, color, accent, particleSize) {
+  const key = `${element}_${color}_${accent}`;
+  const hit = _trimCache.get(key);
+  if (hit) return hit;
+  const glow = getSoftGlowTexture();
+  const additive = (c, opacity, map) =>
+    new THREE.MeshBasicMaterial({
+      color: c, map: map ?? null, transparent: true, opacity,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+  const set = {
+    ringA: additive(accent, 0.34),
+    ringB: additive(color, 0.3),
+    mote: new THREE.SpriteMaterial({
+      map: glow, color: accent, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    }),
+    points: new THREE.PointsMaterial({
+      map: glow, color: accent, size: particleSize, sizeAttenuation: true,
+      transparent: true, opacity: 1, blending: THREE.AdditiveBlending,
+      depthWrite: false, toneMapped: false
+    }),
+    countdown: additive(color, 0.45),
+    pool: additive(color, 0.42, glow),
+    shock: additive(accent, 0.8)
+  };
+  _trimCache.set(key, set);
+  return set;
+}
+
 const easeOutBack = (t) => {
   const c = 1.9;
   const p = t - 1;
@@ -124,12 +160,16 @@ export default function ElementalOrb({ special, size }) {
   const color = def?.color ?? '#ffffff';
   const accent = def?.accent ?? '#ffffff';
 
-  // The orb body's three shader materials, owned by this orb (each drives its own
-  // lifetime alpha) and disposed with it.
-  const mats = useMemo(() => makeElementalOrbMaterials(special.type, color, accent), [special.type, color, accent]);
-  useEffect(() => () => mats.dispose(), [mats]);
+  // Shared per element and never disposed — disposing them on unmount destroyed
+  // the compiled programs, so every offering relinked all three shaders and stalled
+  // the frame. See the note at the top of elementalOrbShader.js.
+  const mats = useMemo(() => getElementalOrbMaterials(special.type, color, accent), [special.type, color, accent]);
 
   const glowTex = useMemo(() => getSoftGlowTexture(), []);
+  const trim = useMemo(
+    () => getOrbTrimMaterials(special.type, color, accent, PARTICLE_KINDS[def?.particle]?.size ?? 0.055),
+    [special.type, color, accent, def?.particle]
+  );
 
   // The drifting matter field: a plain Float32Array animated straight in useFrame.
   const field = useMemo(() => {
@@ -306,68 +346,45 @@ export default function ElementalOrb({ special, size }) {
         {/* Counter-rotating orbit rings — movement the silhouette keeps at distance. */}
         <mesh
           geometry={_geos.ringA}
+          material={trim.ringA}
           ref={(el) => {
             ringARef.current = el;
             if (el) el.userData.baseOpacity = 0.34;
           }}
-        >
-          <meshBasicMaterial
-            color={accent}
-            transparent
-            opacity={0.34}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
+        />
         <mesh
           geometry={_geos.ringB}
+          material={trim.ringB}
           ref={(el) => {
             ringBRef.current = el;
             if (el) el.userData.baseOpacity = 0.3;
           }}
-        >
-          <meshBasicMaterial color={color} transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-        </mesh>
+        />
 
         {/* Sprites, not spheres: at this size a low-poly sphere reads as a visible
             hexagon, and a soft billboarded dot is both prettier and cheaper. */}
         {MOTES.map((m, i) => (
           <sprite
             key={i}
+            material={trim.mote}
             scale={[0.14, 0.14, 0.14]}
             ref={(el) => {
               motesRef.current[i] = el;
               if (el) el.userData.baseOpacity = 0.85;
             }}
-          >
-            <spriteMaterial
-              map={glowTex}
-              color={accent}
-              transparent
-              opacity={0.85}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
-            />
-          </sprite>
+          />
         ))}
 
         {/* The element's own matter drifting around the orb. */}
         {!reducedRef.current && (
-          <points ref={pointsRef} geometry={field.geometry} frustumCulled={false} raycast={() => null} userData={{ baseOpacity: field.cfg.opacity }}>
-            <pointsMaterial
-              map={glowTex}
-              color={accent}
-              size={field.cfg.size}
-              sizeAttenuation
-              transparent
-              opacity={field.cfg.opacity}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
-            />
-          </points>
+          <points
+            ref={pointsRef}
+            geometry={field.geometry}
+            material={trim.points}
+            frustumCulled={false}
+            raycast={() => null}
+            userData={{ baseOpacity: field.cfg.opacity }}
+          />
         )}
       </group>
 
@@ -376,9 +393,7 @@ export default function ElementalOrb({ special, size }) {
         <group ref={crestRef} position={[0, 0, 0.5 * ORB_SCALE]}>
           <ElementalBadge type={special.type} color={color} sparksRef={sparksRef} raysRef={raysRef} />
         </group>
-        <mesh ref={countdownRef} geometry={_geos.countdown} position={[0, 0, 0.5 * ORB_SCALE]}>
-          <meshBasicMaterial color={color} transparent opacity={0.45} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-        </mesh>
+        <mesh ref={countdownRef} geometry={_geos.countdown} material={trim.countdown} position={[0, 0, 0.5 * ORB_SCALE]} />
       </group>
 
       {/* ── Light pooled on the tile below ─────────────────────────────────── */}
@@ -386,26 +401,15 @@ export default function ElementalOrb({ special, size }) {
         {glowTex && (
           <mesh
             geometry={_geos.pool}
+            material={trim.pool}
             raycast={() => null}
             ref={(el) => {
               poolRef.current = el;
               if (el) el.userData.baseOpacity = 0.42;
             }}
-          >
-            <meshBasicMaterial
-              map={glowTex}
-              color={color}
-              transparent
-              opacity={0.42}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
-            />
-          </mesh>
+          />
         )}
-        <mesh ref={shockRef} geometry={_geos.shock} raycast={() => null}>
-          <meshBasicMaterial color={accent} transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-        </mesh>
+        <mesh ref={shockRef} geometry={_geos.shock} material={trim.shock} raycast={() => null} />
       </group>
 
       {lightsRef.current && <pointLight ref={lightRef} color={color} intensity={0} distance={3.0 * ORB_SCALE} decay={2} />}

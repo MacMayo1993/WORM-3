@@ -17,9 +17,18 @@
 // program: spawning an offering (four orbs at once, every 12s) never triggers a
 // shader compile after the first one.
 //
-// Materials are built per orb instance and disposed with it — see ElementalOrb —
-// because each orb drives its own `uAlpha` for the lifetime fade. Three's program
-// cache keys on shader source, so per-instance materials are still one program.
+// The material set is cached per element and never disposed. It used to be built
+// per orb instance and disposed on unmount, on the assumption that three's program
+// cache would keep one program alive across spawns. It does not: `releaseProgram`
+// decrements a use count and destroys the program when the last material using it
+// is disposed, so every offering — one every ELEMENTAL_SPAWN_INTERVAL seconds —
+// recompiled and relinked these three shaders from scratch, forever. Shader linking
+// is synchronous, so on a phone that read as the game freezing every 12 seconds.
+//
+// An offering places at most one orb per element, so one set per element is all
+// that is ever live and `uAlpha` has a single writer. The cache is bounded by the
+// four elements, matching how ElementalSurface and HealerBombs hold their own
+// long-lived materials.
 
 import * as THREE from 'three';
 
@@ -177,14 +186,20 @@ function makeUniforms(element, colorHex, accentHex) {
   };
 }
 
+const _orbMatCache = new Map();
+
 /**
- * Build the orb body's three materials for one element.
+ * The orb body's three materials for one element, built once and kept.
  *
  * They share a single uniforms object, so the frame loop ticks `uTime` and the
  * lifetime fade writes `uAlpha` exactly once per orb per frame rather than three
- * times. Call `dispose()` when the orb unmounts.
+ * times. There is deliberately no dispose: see the note at the top of the file.
  */
-export function makeElementalOrbMaterials(element, colorHex, accentHex) {
+export function getElementalOrbMaterials(element, colorHex, accentHex) {
+  const key = `${element}_${colorHex}_${accentHex}`;
+  const hit = _orbMatCache.get(key);
+  if (hit) return hit;
+
   const uniforms = makeUniforms(element, colorHex, accentHex);
   const base = { uniforms, vertexShader, transparent: true, depthWrite: false, toneMapped: false };
 
@@ -202,15 +217,7 @@ export function makeElementalOrbMaterials(element, colorHex, accentHex) {
     blending: THREE.AdditiveBlending
   });
 
-  return {
-    uniforms,
-    core,
-    shell,
-    inner,
-    dispose() {
-      core.dispose();
-      shell.dispose();
-      inner.dispose();
-    }
-  };
+  const set = { uniforms, core, shell, inner };
+  _orbMatCache.set(key, set);
+  return set;
 }
