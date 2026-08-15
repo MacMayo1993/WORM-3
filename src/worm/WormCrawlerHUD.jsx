@@ -216,6 +216,12 @@ const HUD_SURFACE_SOFT = 'rgba(250, 247, 238, 0.07)';
 const HUD_BLUR = 'blur(14px) saturate(1.05)';
 const TEXT = NIGHT_TEXT;
 const TEXT_MUTED = NIGHT_TEXT_MUTED;
+// The status bar's one accent. It used to tint itself from the face palette —
+// the phase chip, the two stat values and the PP chip each took a different
+// manifold colour, so the bar changed hue with the scheme and read as four
+// unrelated readouts. It is white text with one green accent now, the same
+// neutral-plate/white-glyph/green-hub language as the d-pad below it.
+const HUD_ACCENT = '#4ade80';
 
 // Paper token, still used by the pause card / overlays that own the screen.
 const PANEL_BORDER = 'rgba(15, 23, 42, 0.12)';
@@ -1422,11 +1428,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         [wormOrbInventory]
     );
 
-    // Antipodal-paired colors for action buttons
+    // Antipodal-paired colors for action buttons. The status bar's readouts no
+    // longer draw from the palette — see HUD_ACCENT.
     const red = fc[1] || FACE_FALLBACKS[1];
     const orange = fc[4] || FACE_FALLBACKS[4];
     const blue = fc[5] || FACE_FALLBACKS[5];
-    const green = fc[2] || FACE_FALLBACKS[2];
 
     // Jump button — Red→Orange antipodal gradient once a wormhole is under the
     // worm; otherwise it sits in the tray's own dark glass so the lit state is
@@ -1473,14 +1479,14 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     {/* Phase label */}
                     <div className="worm-hud-phase" style={{
                         ...GLANCE_CHIP_STYLE,
-                        background: withAlpha(phaseColor, 0.16),
-                        border: `1px solid ${withAlpha(phaseColor, 0.4)}`,
-                        color: phaseColor,
+                        background: HUD_SURFACE_SOFT,
+                        border: `1px solid ${BORDER}`,
+                        color: TEXT,
                     }}>
                         <div style={{
                             width: 6, height: 6, borderRadius: '50%',
-                            background: phaseColor,
-                            boxShadow: `0 0 6px ${phaseColor}`,
+                            background: HUD_ACCENT,
+                            boxShadow: `0 0 6px ${HUD_ACCENT}`,
                         }} />
                         {phaseMeta.label}
                     </div>
@@ -1489,19 +1495,19 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     <div className="worm-hud-stats" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <span style={GLANCE_LABEL_STYLE}>Worm</span>
-                            <span style={{ ...GLANCE_VALUE_STYLE, color: green }}>{wormBodyTiles}</span>
+                            <span style={{ ...GLANCE_VALUE_STYLE, color: TEXT }}>{wormBodyTiles}</span>
                         </div>
 
                         <div style={STAT_DIVIDER_STYLE} />
 
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <span style={GLANCE_LABEL_STYLE}>Orbs</span>
-                            <span style={{ ...GLANCE_VALUE_STYLE, color: blue }}>{orbTotal}</span>
+                            <span style={{ ...GLANCE_VALUE_STYLE, color: HUD_ACCENT }}>{orbTotal}</span>
                         </div>
 
                         <div style={STAT_DIVIDER_STYLE} />
 
-                        <ParityWallet dark />
+                        <ParityWallet dark neutral />
 
                         <button
                             onPointerDown={handlePause}
@@ -1517,7 +1523,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 {/* Reserve row — the coins that used to float in a second panel */}
                 {wormAlive && (
                     <div className="worm-hud-reserve" style={RESERVE_ROW_STYLE}>
-                        <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} mobile={isMobile} />
+                        <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
                     </div>
                 )}
             </div>
