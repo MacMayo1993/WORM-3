@@ -199,10 +199,12 @@ export const ELEMENTAL_DURATION = 10;
 // offering fades out cleanly before the next one appears.
 export const ELEMENTAL_SPAWN_INTERVAL = 12; // seconds between elemental offerings
 export const ELEMENTAL_LIFETIME = 11;       // seconds an un-taken offering stays on the board
-// On claim the camera eases out to the opening-overview framing for this long so
-// the player sees the whole cube get sheathed in the element, then eases back to
-// the chase. Short — it's a punctuation beat on pickup, not a mode.
-export const ELEMENTAL_FOCUS_DURATION = 1.4;
+// On claim the sim freezes for this long and the camera drops to a near-first-person
+// shot on the surface beside the worm, so the player can actually watch the element
+// take over the cube instead of crawling past it. The wash's own clock is held for
+// the beat too, so this is not taken out of ELEMENTAL_DURATION. Short — it's a
+// punctuation beat on pickup, not a mode.
+export const ELEMENTAL_FOCUS_DURATION = 1.8;
 // Ceiling on queued attraction streaks. A sweep can only reach a dozen or so orbs,
 // but the cap keeps a pathological case from spawning unbounded geometry and React
 // state in a single frame.

@@ -308,6 +308,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // the next turn can fire the instant the worm resumes.
         if (worm.cutFocusT.current > 0) return;
 
+        // Same for the elemental-claim beat — the sim is frozen for it, so the
+        // auto-rotate clock must not keep charging behind the camera move.
+        if ((worm.elementalFocusT?.current ?? 0) > 0) return;
+
         // ── Bomb hazard: spawn → fuse → disarm-by-encircle → detonation ────────
         {
             // Clamp the timestep so a render stall (tab switch, GC pause) can't burn a

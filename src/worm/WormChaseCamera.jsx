@@ -97,14 +97,25 @@ const _cutCam = new THREE.Vector3();
 const _cutUp = new THREE.Vector3();
 const CUT_FOCUS_PEAK = 0.9; // how far toward the impact shot the swing goes (0..1)
 
-// Elemental-claim beat scratch — the opening-overview framing the camera eases
-// out to when a wash is claimed, so the whole-cube transform is visible. This is
-// the same pose the opening scramble uses (see the 'scrambling' branch), which we
-// know frames the cube cleanly without ever clipping into it.
+// Elemental-claim beat scratch. This used to pull OUT to the opening overview,
+// which showed the whole re-skinned cube but from so far away that the element
+// itself — flames licking off the stickers, frost creeping, caustics — was a few
+// pixels tall. The beat now drops almost to first person instead: right down onto
+// the surface beside the worm, so the element is the whole screen.
+//
+// The approach direction is the opening shot's own angle (ELEM_VIEW_DIR is the
+// same vector the 'scrambling' branch uses), so the move reads as the familiar
+// establishing framing brought in close rather than an arbitrary new pose.
 const _elemFocusCam = new THREE.Vector3();
 const _elemFocusLook = new THREE.Vector3();
 const _elemFocusUp = new THREE.Vector3();
-const ELEM_FOCUS_PEAK = 1.0; // full pull-out to the overview at the beat's peak
+const _elemHead = new THREE.Vector3();
+const _elemNorm = new THREE.Vector3();
+const ELEM_VIEW_DIR = new THREE.Vector3(0.6, 1.1, 1).normalize();
+const ELEM_FOCUS_PEAK = 1.0; // fully committed to the close shot at the beat's peak
+const ELEM_EYE_DIST = 2.2;   // close enough to be *in* the element, far enough that
+                             // the worm's own head does not fill the middle of the shot
+const ELEM_EYE_LIFT = 0.8;   // clearance above the face so the camera never enters the cube
 
 
 export default function WormChaseCamera({ worm, size }) {
@@ -456,12 +467,26 @@ export default function WormChaseCamera({ worm, size }) {
                 const rampOut = THREE.MathUtils.smoothstep(elemFocusT, 0, 0.5);
                 const elemBlend = Math.min(rampIn, rampOut) * ELEM_FOCUS_PEAK;
                 if (elemBlend > 0.001) {
-                    const dist = 5 + size * 4.0;
-                    _elemFocusCam.set(0.6, 1.1, 1).normalize().multiplyScalar(dist);
-                    _elemFocusLook.set(0, 0, 0);
+                    _elemHead.copy(worm.headInterpPos.current);
+                    _elemNorm.copy(worm.currentNormal.current);
+                    if (_elemNorm.lengthSq() < 1e-6) _elemNorm.set(0, 1, 0);
+                    _elemNorm.normalize();
+
+                    // Eye: back along the opening angle from the worm, then lifted
+                    // clear of the face it is standing on. Without the lift, a worm
+                    // on a face pointing away from ELEM_VIEW_DIR puts the eye inside
+                    // the cube and the shot is a black screen.
+                    _elemFocusCam.copy(_elemHead)
+                        .addScaledVector(ELEM_VIEW_DIR, ELEM_EYE_DIST)
+                        .addScaledVector(_elemNorm, ELEM_EYE_LIFT);
+                    // Look slightly past the worm along the surface, so the shot is
+                    // of the element running away over the board rather than of the
+                    // worm's own back.
+                    _elemFocusLook.copy(_elemHead).addScaledVector(_elemNorm, 0.12);
+
                     _camTargetCam.lerp(_elemFocusCam, elemBlend);
                     _camTargetLook.lerp(_elemFocusLook, elemBlend);
-                    // The overview is world-level; unroll toward Y-up as we pull out.
+                    // Keep the horizon level, as the opening shot does.
                     _elemFocusUp.set(0, 1, 0);
                     _camUp.lerp(_elemFocusUp, elemBlend);
                     if (_camUp.lengthSq() < 1e-6) _camUp.copy(_elemFocusUp);

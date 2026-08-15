@@ -12,8 +12,8 @@ import {
   getElementalDef,
 } from '../worm/healerWorm/elementalDefs.js';
 import { SPECIAL_DEFS, SPECIAL_TYPES, getSpecialDef } from '../worm/healerWorm/specialDefs.js';
-import { makeWormSim, resetWormSim, stepWormSim, activateSpecial, startElemental } from '../worm/healerWorm/wormSim.js';
-import { ELEMENTAL_DURATION } from '../worm/healerWorm/constants.js';
+import { makeWormSim, resetWormSim, stepWormSim, activateSpecial, startElemental, tileKey } from '../worm/healerWorm/wormSim.js';
+import { ELEMENTAL_DURATION, ELEMENTAL_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
 import { LIVING_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
 
 const SIZE = 5;
@@ -118,12 +118,39 @@ describe('elemental wash lifecycle', () => {
     expect(sim.elementalT).toBeCloseTo(ELEMENTAL_DURATION);
   });
 
+  it('freezes the whole sim for the claim beat, off the wash\'s own clock', () => {
+    // The beat stops the crawl so the player can look at the re-skinned cube.
+    // It must not be charged to the element: the wash clock is held too, so the
+    // full ELEMENTAL_DURATION of crawling still follows.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const startTile = tileKey(sim.pos);
+    startElemental(sim, ctx, 'ice');
+    expect(sim.elementalFocusT).toBeCloseTo(ELEMENTAL_FOCUS_DURATION);
+
+    const dt = 0.1;
+    for (let i = 0; i < Math.round((ELEMENTAL_FOCUS_DURATION - 0.2) / dt); i++) {
+      stepWormSim(sim, dt, SIZE, ctx);
+    }
+    expect(sim.elementalFocusT).toBeGreaterThan(0);
+    expect(tileKey(sim.pos)).toBe(startTile);              // the crawl is frozen
+    expect(sim.elementalT).toBeCloseTo(ELEMENTAL_DURATION); // and so is the wash
+
+    // Once the beat expires the crawl resumes and the wash starts draining.
+    for (let i = 0; i < Math.round(1.0 / dt); i++) stepWormSim(sim, dt, SIZE, ctx);
+    expect(sim.elementalFocusT).toBe(0);
+    expect(sim.elementalT).toBeLessThan(ELEMENTAL_DURATION);
+  });
+
   it('the wash drains and clears after ELEMENTAL_DURATION', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     startElemental(sim, ctx, 'grass');
     const dt = 0.1;
-    for (let i = 0; i < Math.round((ELEMENTAL_DURATION + 1) / dt); i++) {
+    // The claim beat freezes everything first, so the wash's own clock only
+    // starts once it expires — budget for both.
+    const span = ELEMENTAL_FOCUS_DURATION + ELEMENTAL_DURATION + 1;
+    for (let i = 0; i < Math.round(span / dt); i++) {
       stepWormSim(sim, dt, SIZE, ctx);
     }
     expect(sim.elementalT).toBe(0);

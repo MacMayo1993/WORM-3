@@ -1572,6 +1572,21 @@ export function stepWormSim(sim, delta, size, ctx) {
         return;
     }
 
+    // Elemental-claim freeze: the same treatment as the body-cut beat above.
+    // Claiming a wash re-skins the entire cube, and the player could not actually
+    // look at it while still crawling — the camera swung out, the worm carried on
+    // into whatever was ahead, and the transformation went by unwatched. The whole
+    // sim stops for the beat, HealerWormMode holds the rotation hazard in lockstep,
+    // and the camera drops to a close first-person shot of the new surface.
+    //
+    // Returning here also freezes the wash's own clock, so the beat is not taken
+    // out of the element's duration — the player gets the full ELEMENTAL_DURATION
+    // of crawling afterwards.
+    if (sim.elementalFocusT > 0) {
+        sim.elementalFocusT = Math.max(0, sim.elementalFocusT - Math.min(delta, MAX_TICK_DELTA));
+        return;
+    }
+
     // Clamp the frame delta so a hitch can't advance the simulation by a huge jump.
     // Without this, one long frame inflates interpT and the step accumulator at once,
     // teleporting the head several tiles forward — which in a snake-like mode scatters
@@ -1624,11 +1639,6 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.elementalType = null;
             ctx.onElementalTheme(null, 0);
         }
-    }
-
-    // Claim camera beat — ticks alongside the wash, does not freeze the crawl.
-    if (sim.phase === 'crawling' && sim.elementalFocusT > 0) {
-        sim.elementalFocusT = Math.max(0, sim.elementalFocusT - delta);
     }
 
     // Post-landing protection decays in the same (crawling-only) clock family.
