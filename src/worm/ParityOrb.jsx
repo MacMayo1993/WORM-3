@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
-import { getTileStyleBandMaterial } from '../3d/styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 
 // Orbs float this far above the tile surface so they're visible from any angle
 const HOVER_ABOVE = 0.28;
@@ -64,7 +64,17 @@ function _mkMobius(R, w) {
       const last = i === uS - 1;
       const c = last ? vS - j     : (i + 1) * cols + j;
       const d = last ? vS - j - 1 : (i + 1) * cols + j + 1;
+      // Each quad is emitted twice, the second copy wound backwards, so the band
+      // is two-sided in GEOMETRY rather than needing a DoubleSide material. A
+      // Möbius band is one-sided and would otherwise drop half its loop under a
+      // front-face-only material — but `side` is part of three's program cache
+      // key, so a DoubleSide variant of a tile-style shader is a whole second
+      // program that has to be compiled the first time an orb on that face is
+      // drawn (a visible stall mid-crawl, right when the camera rounds a corner
+      // onto a new face). Doubling ~576 triangles is free by comparison, and it
+      // lets the band share the exact material the stickers already use.
       idx.push(a, b, c, b, d, c);
+      idx.push(c, b, a, c, d, b);
     }
   }
   const g = new THREE.BufferGeometry();
@@ -73,6 +83,61 @@ function _mkMobius(R, w) {
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
+}
+
+// ── Shared module-level materials ───────────────────────────────────────────
+// Declared as JSX intrinsics these belong to R3F, which disposes them when an orb
+// is collected — and disposing the last material using a program makes three
+// destroy it, so the next orb to spawn relinks the lot. The gem shell is a
+// MeshPhysicalMaterial with clearcoat AND iridescence, the most expensive shader
+// three compiles; relinking it mid-crawl is a visible stall. There is one set per
+// (gem, band, target) combination — at most a dozen for a whole session — and they
+// are never disposed.
+//
+// Sharing is safe because every property the animator writes is either per-mesh
+// (scale, rotation, position) or uniform across orbs of the same colour (the glow
+// worm's rainbow hue and the target ring's pulse are both pure functions of time).
+const _orbMatCache = new Map();
+function getOrbMaterials(gemColor, bandColor, isTarget) {
+  const key = `${gemColor}_${bandColor}_${isTarget ? 't' : 'n'}`;
+  const hit = _orbMatCache.get(key);
+  if (hit) return hit;
+  const basic = (color, opacity, extra) =>
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false, ...extra });
+  const set = {
+    shell: new THREE.MeshPhysicalMaterial({
+      color: gemColor, emissive: gemColor, emissiveIntensity: isTarget ? 0.85 : 0.6,
+      metalness: 0, roughness: 0.06, iridescence: 1, iridescenceIOR: 1.4,
+      clearcoat: 1, clearcoatRoughness: 0.08,
+      transparent: true, opacity: 0.78, depthWrite: false, toneMapped: false
+    }),
+    innerCore: new THREE.MeshStandardMaterial({
+      color: gemColor, emissive: gemColor, emissiveIntensity: isTarget ? 2.6 : 2.0,
+      metalness: 0, roughness: 0.1, toneMapped: false
+    }),
+    innerGlow: basic(gemColor, 0.18, { blending: THREE.AdditiveBlending, side: THREE.BackSide }),
+    cage: basic('#e8fbff', isTarget ? 0.6 : 0.46, { wireframe: true, blending: THREE.AdditiveBlending }),
+    axis: basic('#ffffff', 0.72),
+    nodeGem: new THREE.MeshBasicMaterial({ color: gemColor, toneMapped: false }),
+    nodeBand: new THREE.MeshBasicMaterial({ color: bandColor, toneMapped: false }),
+    band: new THREE.MeshStandardMaterial({
+      color: bandColor, emissive: bandColor, emissiveIntensity: isTarget ? 1.8 : 1.2,
+      metalness: 0.15, roughness: 0.06
+    }),
+    ringA: new THREE.MeshBasicMaterial({ color: gemColor, transparent: true, opacity: 0.42, depthWrite: false }),
+    ringB: new THREE.MeshBasicMaterial({ color: bandColor, transparent: true, opacity: 0.34, depthWrite: false }),
+    ringC: new THREE.MeshBasicMaterial({ color: gemColor, transparent: true, opacity: 0.28, depthWrite: false }),
+    lockRing: new THREE.MeshBasicMaterial({
+      color: '#ffffff', transparent: true, opacity: 0.30,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }),
+    reduced: new THREE.MeshStandardMaterial({
+      color: gemColor, emissive: gemColor, emissiveIntensity: 1.4,
+      roughness: 0.18, metalness: 0.05, toneMapped: false
+    })
+  };
+  _orbMatCache.set(key, set);
+  return set;
 }
 
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
@@ -127,13 +192,14 @@ function SingleOrbImpl({
   // coloured ball. `color` and `antipodalColor` keep meaning what they say.
   const gemColor = antipodalColor;
   const bandColor = color;
-  // Shared and cached per style+colour in TileStyleMaterials, so all the orbs on
-  // one face reference a single material. 'solid' has no pattern worth carrying,
-  // so it keeps the emissive band below instead.
+  // The stickers' own material — same shader, same defines, so it shares their
+  // already-compiled program and never links a new one mid-run. 'solid' has no
+  // pattern worth carrying, so it keeps the emissive band below instead.
   const bandMaterial = useMemo(
-    () => (styleKey && styleKey !== 'solid' ? getTileStyleBandMaterial(styleKey, bandColor, gemColor) : null),
+    () => (styleKey && styleKey !== 'solid' ? getTileStyleMaterial(styleKey, bandColor, false, null, gemColor) : null),
     [styleKey, bandColor, gemColor]
   );
+  const mat = useMemo(() => getOrbMaterials(gemColor, bandColor, isTarget), [gemColor, bandColor, isTarget]);
   const orbGroupRef    = useRef();
   const coreRef        = useRef();
   const innerCoreRef   = useRef();
@@ -205,16 +271,7 @@ function SingleOrbImpl({
   if (reducedDetail) {
     return (
       <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
-        <mesh ref={coreRef} geometry={g.shell}>
-          <meshStandardMaterial
-            color={gemColor}
-            emissive={gemColor}
-            emissiveIntensity={1.4}
-            roughness={0.18}
-            metalness={0.05}
-            toneMapped={false}
-          />
-        </mesh>
+        <mesh ref={coreRef} geometry={g.shell} material={mat.reduced} />
       </group>
     );
   }
@@ -226,69 +283,23 @@ function SingleOrbImpl({
           shimmers with view angle. Low emissive (vs the old flat glowing ball) so the
           sheen and thin-film iridescence actually read; the brightness now comes from
           the inner core glowing through, not a blown-out surface. */}
-      <mesh ref={shellRef} geometry={g.shell}>
-        <meshPhysicalMaterial
-          color={gemColor}
-          emissive={gemColor}
-          emissiveIntensity={isTarget ? 0.85 : 0.6}
-          metalness={0}
-          roughness={0.06}
-          iridescence={1}
-          iridescenceIOR={1.4}
-          clearcoat={1}
-          clearcoatRoughness={0.08}
-          transparent
-          opacity={0.78}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
+      <mesh ref={shellRef} geometry={g.shell} material={mat.shell} />
 
       {/* Inner energy core — a small, bright, counter-spinning faceted gem that glows
           through the glassy shell, giving the orb visible depth and a molten centre. */}
-      <mesh ref={innerCoreRef} geometry={g.innerCore}>
-        <meshStandardMaterial
-          color={gemColor}
-          emissive={gemColor}
-          emissiveIntensity={isTarget ? 2.6 : 2.0}
-          metalness={0}
-          roughness={0.1}
-          toneMapped={false}
-        />
-      </mesh>
+      <mesh ref={innerCoreRef} geometry={g.innerCore} material={mat.innerCore} />
 
       {/* Inner additive halo — soft bloom around the core, pulsed by the animator. */}
-      <mesh ref={innerGlowRef} geometry={g.innerGlow}>
-        <meshBasicMaterial
-          color={gemColor}
-          transparent
-          opacity={0.18}
-          blending={THREE.AdditiveBlending}
-          side={THREE.BackSide}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
+      <mesh ref={innerGlowRef} geometry={g.innerGlow} material={mat.innerGlow} />
 
       {/* Parity signature: a sharp diamond cage and two opposite poles connected
           through the core. It reads as "antipodal pair" even when tile colours are
           close, and its angular outline cannot be mistaken for either special. */}
       <group ref={parityMarkRef} rotation={[Math.PI / 4, 0, Math.PI / 4]}>
-        <mesh geometry={g.parityCage}>
-          <meshBasicMaterial
-            color="#e8fbff" transparent opacity={isTarget ? 0.6 : 0.46}
-            wireframe blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
-          />
-        </mesh>
-        <mesh geometry={g.parityAxis}>
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
-        </mesh>
-        <mesh geometry={g.parityNode} position={[0, isTarget ? 0.34 : 0.27, 0]}>
-          <meshBasicMaterial color={gemColor} toneMapped={false} />
-        </mesh>
-        <mesh geometry={g.parityNode} position={[0, isTarget ? -0.34 : -0.27, 0]}>
-          <meshBasicMaterial color={bandColor} toneMapped={false} />
-        </mesh>
+        <mesh geometry={g.parityCage} material={mat.cage} />
+        <mesh geometry={g.parityAxis} material={mat.axis} />
+        <mesh geometry={g.parityNode} material={mat.nodeGem} position={[0, isTarget ? 0.34 : 0.27, 0]} />
+        <mesh geometry={g.parityNode} material={mat.nodeBand} position={[0, isTarget ? -0.34 : -0.27, 0]} />
       </group>
 
       {/* Möbius strip — the orb's own face, in that face's colour AND its tile
@@ -296,32 +307,15 @@ function SingleOrbImpl({
           to the emissive band on plain (solid) faces, where there is no pattern to
           carry and the glow reads better. DoubleSide either way: a Möbius band is
           one-sided, so front faces alone would drop half the loop. */}
-      <mesh ref={coreRef} geometry={g.core} material={bandMaterial ?? undefined}>
-        {!bandMaterial && (
-          <meshStandardMaterial
-            color={bandColor}
-            emissive={bandColor}
-            emissiveIntensity={isTarget ? 1.8 : 1.2}
-            metalness={0.15}
-            roughness={0.06}
-            side={THREE.DoubleSide}
-          />
-        )}
-      </mesh>
+      <mesh ref={coreRef} geometry={g.core} material={bandMaterial ?? mat.band} />
 
       {/* Electron orbital rings + electrons */}
       <group ref={orbitSystemRef}>
-        <mesh ref={ringARef} geometry={g.ringA} rotation={[0.3, 0.4, 0]}>
-          <meshBasicMaterial color={gemColor} transparent opacity={0.42} depthWrite={false} />
-        </mesh>
-        <mesh ref={ringBRef} geometry={g.ringB} rotation={[-0.6, 0, 0.5]}>
-          <meshBasicMaterial color={bandColor} transparent opacity={0.34} depthWrite={false} />
-        </mesh>
+        <mesh ref={ringARef} geometry={g.ringA} material={mat.ringA} rotation={[0.3, 0.4, 0]} />
+        <mesh ref={ringBRef} geometry={g.ringB} material={mat.ringB} rotation={[-0.6, 0, 0.5]} />
         {/* Third ring — target only (geometry only exists on target set) */}
         {isTarget && g.ringC && (
-          <mesh ref={ringCRef} geometry={g.ringC} rotation={[0, 0.85, -0.35]}>
-            <meshBasicMaterial color={gemColor} transparent opacity={0.28} depthWrite={false} />
-          </mesh>
+          <mesh ref={ringCRef} geometry={g.ringC} material={mat.ringC} rotation={[0, 0.85, -0.35]} />
         )}
 
         {/* Orbiting electrons removed — the small low-poly glowing spheres read as faceted
@@ -332,9 +326,7 @@ function SingleOrbImpl({
 
       {/* Target lock ring */}
       {isTarget && (
-        <mesh ref={targetGlowRef} geometry={_orbGeos.target.lockRing}>
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.30} blending={THREE.AdditiveBlending} depthWrite={false} />
-        </mesh>
+        <mesh ref={targetGlowRef} geometry={_orbGeos.target.lockRing} material={mat.lockRing} />
       )}
 
       {/* Point light — target orbs only; non-target glow via emissive + AdditiveBlending */}
@@ -540,7 +532,13 @@ export default function ParityOrbs({
           shell.material.color.copy(_rainbowColor);
           shell.material.emissive.copy(_rainbowColor);
         }
-        if (core && core.material) {
+        // The Möbius band carries its face's TILE STYLE on patterned boards, and a
+        // tile-style ShaderMaterial has neither `.emissive` nor a meaningful
+        // `.color` — touching emissive here threw on every frame, inside the R3F
+        // render loop, for any elevated orb on a patterned face. That is a hard
+        // freeze, not a glitch. The pattern is the information; leave it alone and
+        // let the gem carry the rainbow.
+        if (core && core.material?.emissive) {
           _rainbowColor.setHSL((hue + 0.5) % 1, 1.0, 0.62);
           core.material.color.copy(_rainbowColor);
           core.material.emissive.copy(_rainbowColor);
