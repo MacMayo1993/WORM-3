@@ -35,6 +35,12 @@ import { getElementalDef } from './elementalDefs.js';
 import { ElementalBadge, getSoftGlowTexture } from './elementalBadge.jsx';
 import { makeElementalOrbMaterials } from './elementalOrbShader.js';
 
+// One knob for how big the pickup reads. Every part of the orb is authored at
+// ORB_SCALE 1 and multiplied through here — the body, the billboarded crest and
+// its countdown, the pool on the tile, the hover height that keeps the sphere off
+// the face and the reach of its light — so the whole thing grows as one object
+// rather than a sphere drifting away from its own furniture.
+const ORB_SCALE = 1.5;
 // Extra clearance over SPECIAL_HOVER_HEIGHT: the flat badge could sit low, a
 // half-unit sphere cannot without sinking into the face.
 const ELEM_HOVER_LIFT = 0.3;
@@ -165,8 +171,10 @@ export default function ElementalOrb({ special, size }) {
       _norm.copy(FACE_NORMALS[special.dirKey] ?? FACE_NORMALS.PZ);
     }
 
-    const bob = reducedRef.current ? 0 : Math.sin(t * 1.9) * 0.07;
-    const hover = SPECIAL_HOVER_HEIGHT + ELEM_HOVER_LIFT;
+    const bob = reducedRef.current ? 0 : Math.sin(t * 1.9) * 0.07 * ORB_SCALE;
+    // Scaled with the orb: the clearance under the sphere has to grow with its
+    // radius, or a bigger orb sits half-buried in the tile it hovers over.
+    const hover = (SPECIAL_HOVER_HEIGHT + ELEM_HOVER_LIFT) * ORB_SCALE;
     group.position.copy(_pos).addScaledVector(_norm, hover + bob);
     // Stand the orb up off its face — +Y local is the surface normal.
     _quat.setFromUnitVectors(_up, _norm);
@@ -184,7 +192,7 @@ export default function ElementalOrb({ special, size }) {
     const pop = reducedRef.current ? spawn : easeOutBack(spawn);
     const breathe = reducedRef.current ? 1 : 1 + Math.sin(t * 2.6) * 0.035;
 
-    if (bodyRef.current) bodyRef.current.scale.setScalar(1.15 * pop * breathe);
+    if (bodyRef.current) bodyRef.current.scale.setScalar(1.15 * ORB_SCALE * pop * breathe);
     if (spinRef.current && !reducedRef.current) {
       spinRef.current.rotation.y = t * 0.45;
       spinRef.current.rotation.x = Math.sin(t * 0.3) * 0.25;
@@ -236,7 +244,7 @@ export default function ElementalOrb({ special, size }) {
       _billboard.copy(group.quaternion).invert().multiply(state.camera.quaternion);
       billboardRef.current.quaternion.copy(_billboard);
     }
-    if (crestRef.current) crestRef.current.scale.setScalar(0.58 * pop);
+    if (crestRef.current) crestRef.current.scale.setScalar(0.58 * ORB_SCALE * pop);
     if (sparksRef.current && !reducedRef.current) sparksRef.current.rotation.z = t * 1.1;
     if (raysRef.current && !reducedRef.current) raysRef.current.rotation.z = -t * 0.22;
 
@@ -244,7 +252,7 @@ export default function ElementalOrb({ special, size }) {
     // gently so the face looks lit rather than stickered.
     if (groundRef.current) {
       groundRef.current.position.y = -(hover + bob) + 0.03;
-      groundRef.current.scale.setScalar(pop * (reducedRef.current ? 1 : 1 + Math.sin(t * 2.1) * 0.05));
+      groundRef.current.scale.setScalar(ORB_SCALE * pop * (reducedRef.current ? 1 : 1 + Math.sin(t * 2.1) * 0.05));
     }
 
     if (lightRef.current) {
@@ -265,7 +273,7 @@ export default function ElementalOrb({ special, size }) {
     // after the traverse, which would otherwise overwrite its opacity.
     if (countdownRef.current) {
       const remaining = Math.max(0, Math.min(1, ttl / life));
-      countdownRef.current.scale.setScalar((0.82 + 0.18 * remaining) * pop);
+      countdownRef.current.scale.setScalar((0.82 + 0.18 * remaining) * ORB_SCALE * pop);
       countdownRef.current.rotation.z = t * 0.5;
       countdownRef.current.material.opacity = 0.45 * alpha;
     }
@@ -365,10 +373,10 @@ export default function ElementalOrb({ special, size }) {
 
       {/* ── Crest, floated on the near face of the sphere ──────────────────── */}
       <group ref={billboardRef}>
-        <group ref={crestRef} position={[0, 0, 0.5]}>
+        <group ref={crestRef} position={[0, 0, 0.5 * ORB_SCALE]}>
           <ElementalBadge type={special.type} color={color} sparksRef={sparksRef} raysRef={raysRef} />
         </group>
-        <mesh ref={countdownRef} geometry={_geos.countdown} position={[0, 0, 0.5]}>
+        <mesh ref={countdownRef} geometry={_geos.countdown} position={[0, 0, 0.5 * ORB_SCALE]}>
           <meshBasicMaterial color={color} transparent opacity={0.45} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </mesh>
       </group>
@@ -400,7 +408,7 @@ export default function ElementalOrb({ special, size }) {
         </mesh>
       </group>
 
-      {lightsRef.current && <pointLight ref={lightRef} color={color} intensity={0} distance={3.0} decay={2} />}
+      {lightsRef.current && <pointLight ref={lightRef} color={color} intensity={0} distance={3.0 * ORB_SCALE} decay={2} />}
     </group>
   );
 }

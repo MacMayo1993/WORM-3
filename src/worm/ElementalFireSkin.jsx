@@ -24,8 +24,8 @@ import { getSoftGlowTexture } from './healerWorm/elementalBadge.jsx';
 const FLAMES_PER_CELL = 5;
 // Flame footprint inside a 1×1 cell. Several small tongues per cell read as a
 // burning surface; two big ones read as a candle sitting on the sticker.
-const FLAME_W = 0.26;
-const FLAME_H = 0.45;
+const FLAME_W = 0.39;
+const FLAME_H = 0.675;
 // The sprite grows UP from its anchor rather than being centred on it, and the
 // anchors sit along the low edge of the cell, so the fire licks up off the tile
 // instead of floating over the middle of it.
