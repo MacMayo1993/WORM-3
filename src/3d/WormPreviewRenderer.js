@@ -21,7 +21,7 @@ import { getSkin } from '../worm/wormCosmeticsData.js';
 import { getHatParts } from '../worm/wormHatParts.js';
 import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
 import { getSkinFX } from '../worm/wormSkinFX.js';
-import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
+import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../worm/wormSkinMaterial.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
@@ -305,12 +305,19 @@ function _poseWorm(opts, time) {
   // only need reapplying when the equipped/browsed skin actually changes —
   // not every frame, so browsing the store doesn't force a shader-uniform
   // rewrite on every render.
-  const skinChanged = rig.skinKey !== skinId;
-  if (skinChanged) {
+  // Keyed on the character too: the Glow Worm's bioluminescence is applied on top
+  // of the skin profile, so switching specimens has to re-run this even when the
+  // equipped skin has not changed. Browsing skins previously only re-applied on a
+  // skin change, which left a worm lit like whichever character was picked before.
+  const fxKey = `${skinId}|${characterId}`;
+  if (rig.skinKey !== fxKey) {
     const fx = getSkinFX(skinId);
-    for (let i = 0; i < SEGMENTS; i++) applySkinMaterialProfile(rig.beads[i].material, fx, i);
+    for (let i = 0; i < SEGMENTS; i++) {
+      applySkinMaterialProfile(rig.beads[i].material, fx, i);
+      applyBioluminescence(rig.beads[i].material, skin.glow, isGlow);
+    }
     rig.particles.configure(fx.particle, skin.glow);
-    rig.skinKey = skinId;
+    rig.skinKey = fxKey;
   }
   for (let i = 0; i < SEGMENTS; i++) updateWormSkinMaterialTime(rig.beads[i].material, time);
 

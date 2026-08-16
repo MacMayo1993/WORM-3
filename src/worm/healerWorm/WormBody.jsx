@@ -18,7 +18,7 @@ import { beginWormSegments, pushWormSegment, endWormSegments } from '../wormSegm
 import { getSkin } from '../wormCosmeticsData.js';
 import { getWormCharacter } from '../wormCharacterData.js';
 import { getSkinFX } from '../wormSkinFX.js';
-import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
+import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../wormSkinMaterial.js';
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
     PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
@@ -170,7 +170,9 @@ export function WormBody({ worm, size }) {
     const skinMaterial = useMemo(() => createWormSkinMaterial(), []);
     useEffect(() => {
         applySkinMaterialProfile(skinMaterial, getSkinFX(wormSkinId), 0);
-    }, [skinMaterial, wormSkinId]);
+        // After the profile, which resets emissiveIntensity from the skin.
+        applyBioluminescence(skinMaterial, skin.glow, isGlow);
+    }, [skinMaterial, wormSkinId, skin.glow, isGlow]);
     useEffect(() => () => skinMaterial.dispose(), [skinMaterial]);
     // Refs so useFrame always reads latest values without closure staleness
     const wormColorRef = useRef(wormColor);
