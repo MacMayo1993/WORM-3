@@ -40,7 +40,10 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 
-export const SURFACE_MODE = { water: 0, ice: 1 };
+// Lightning rides the same instanced quad, geometry and attribute set as water and
+// ice — it is a third branch of this shader rather than a fourth renderer, so the
+// charged cube costs exactly what a wet one does: one draw call.
+export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2 };
 
 const _geoCache = { geo: null };
 export function getElementalSurfaceGeo() {
@@ -184,6 +187,10 @@ const vertexShader = /* glsl */`
       // Ripple plus the broad swell, both gated by the sweep so a cell rises into
       // the water rather than snapping to full displacement the moment it arrives.
       pos.z += (w * 0.035 + vSwell * 0.05) * vArrive;
+    } else if (uMode == 2) {
+      // Lightning is a charge crawling ON the surface, not a body sitting on it —
+      // it stays flat. Any displacement here would lift the veins off the tile and
+      // break the "the cube itself is conducting" read.
     } else {
       // Each crystal plate sits at its own height, so the frozen surface is
       // genuinely faceted instead of a flat quad with facets painted on. The
@@ -299,6 +306,46 @@ const fragmentShader = /* glsl */`
       // the gaps and the silhouette where the element should read strongest.
       alpha *= readable;
       alpha += meniscus * 0.16;
+    } else if (uMode == 2) {
+      // ── Lightning ────────────────────────────────────────────────────────
+      // Charge veins that crawl through the SEAMS. Branching current follows the
+      // path of least resistance, and on a cube that path is the grid of gaps
+      // between tiles — running the veins across tile faces instead made the cube
+      // look shrink-wrapped in a crackle texture with nothing to do with its shape.
+      //
+      // Ridged noise gives the branching filaments (the same trick water's caustics
+      // use); weighting it by the gap band is what pins them to the seams.
+      float n1 = vnoise(vWorld * 5.2 + vec3(0.0, t * 0.9, t * 0.4));
+      float n2 = vnoise(vWorld * 9.5 - vec3(t * 0.7, 0.0, t * 0.5));
+      float vein = clamp(pow(1.0 - abs(n1 * 2.0 - 1.0), 9.0) + 0.7 * pow(1.0 - abs(n2 * 2.0 - 1.0), 11.0), 0.0, 1.5);
+      float gapBand = smoothstep(0.30, 0.95, cellRim);
+      vein *= 0.25 + 1.05 * gapBand;
+
+      // Cells discharge in short, non-simultaneous groups. The stagger comes from
+      // the cell's own seed, so neighbouring cells are never in phase and the cube
+      // crackles instead of strobing as one object.
+      float phase = fract(vCellMask.x * 0.37 + hash13(floor(vWorld * 1.7)) * 3.1);
+      float pulse = pow(0.5 + 0.5 * sin(t * 4.2 + phase * 6.2831853), 8.0);
+
+      // Charge rails: current gathers along the cube's own edges, brightest at the
+      // corners where three faces meet. This is the cube-scale read — from the
+      // overview camera the silhouette is traced in light.
+      float rail = vCellMask.y * smoothstep(0.55, 0.94, cellRim) * (0.6 + 0.4 * vCellMask.z);
+      rail *= 0.45 + 0.55 * pow(0.5 + 0.5 * sin(t * 2.3 - vWorld.y * 1.4), 3.0);
+
+      // A dark conductive sheen, so the white-hot cores have contrast to be hot
+      // against. Nearly black at the tile centre, which also leaves the sticker
+      // and its markings readable straight through the charge.
+      float sheen = pow(clamp(dot(normalize(vFaceNormal), normalize(vView)), 0.0, 1.0), 1.5);
+      col = mix(uColor * 0.10, uColor * 0.42, sheen * 0.7 + 0.3 * vCellMask.x);
+      col += uColor * vein * (0.35 + 0.75 * pulse);
+      col += uAccent * vein * pulse * 1.15;          // white-hot cores, only mid-burst
+      col += uAccent * rail * 0.55;
+      float fres = pow(1.0 - clamp(sheen, 0.0, 1.0), 2.0);
+      col = mix(col, uAccent, fres * 0.16);
+
+      alpha = 0.30 + vein * 0.34 + pulse * vein * 0.28 + rail * 0.30 + fres * 0.14;
+      alpha *= readable;
     } else {
       // ── Ice ──────────────────────────────────────────────────────────────
       // Every fragment belongs to a crystal plate; the plate's id drives both its

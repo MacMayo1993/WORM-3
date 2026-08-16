@@ -33,7 +33,7 @@
 import * as THREE from 'three';
 
 /** Element → shader branch. Matches ELEMENTAL_TYPES order but is looked up by key. */
-export const ELEMENT_MODE = { water: 0, fire: 1, grass: 2, ice: 3 };
+export const ELEMENT_MODE = { water: 0, fire: 1, grass: 2, ice: 3, lightning: 4 };
 
 const varyings = /* glsl */ `
   uniform float uTime;
@@ -121,7 +121,7 @@ const coreFragment = /* glsl */ `
       col += uAccent * vein * 0.6;
       col = mix(col, uAccent, fres * 0.28);
       alpha = 0.64 + fres * 0.32;
-    } else {
+    } else if (uMode == 3) {
       // ── Ice: frozen facets shot through with cracks, glassy at the edge. Same
       // summed-band reasoning as nature above.
       float facet = 0.5 + 0.5 * sin(0.9 * sin(p.x * 2.4) + 0.9 * sin(p.y * 2.7) + 0.9 * sin(p.z * 2.2));
@@ -130,6 +130,21 @@ const coreFragment = /* glsl */ `
       col = mix(uColor * 0.50, vec3(0.92, 0.98, 1.0), facet * 0.55 + fres * 0.45);
       col += vec3(1.0) * crack * 0.65;
       alpha = 0.52 + fres * 0.40;
+    } else {
+      // ── Lightning: a dark conductive body with white-hot filaments running
+      // through it, discharging in bursts rather than pulsing evenly. The core is
+      // kept deliberately dark so the filaments have something to be bright
+      // against — an evenly-lit violet ball reads as a plasma globe, not a charge.
+      float filament = 1.0 - smoothstep(0.0, 0.30, abs(f));
+      // Discharge gate: mostly quiet, with brief bursts. floor(t*n) re-rolls the
+      // burst a few times a second, which is what makes it read as arcing rather
+      // than as a sine glow.
+      float burst = pow(0.5 + 0.5 * sin(t * 3.1 + floor(t * 5.0) * 8.13), 6.0);
+      float veins = filament * (0.35 + 0.9 * burst);
+      col = mix(uColor * 0.18, uColor * 0.85, 0.5 + 0.5 * sin(f * 1.6));
+      col += uAccent * veins * 1.30;
+      col = mix(col, uAccent, fres * 0.30);
+      alpha = 0.58 + fres * 0.34 + veins * 0.22;
     }
 
     gl_FragColor = vec4(clamp(col, 0.0, 1.4), clamp(alpha, 0.0, 1.0) * uAlpha);

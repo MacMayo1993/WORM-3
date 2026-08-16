@@ -23,6 +23,7 @@ import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { wormBuffs } from './wormBuffs.js';
 import ElementalCubeSkin from './ElementalCubeSkin.jsx';
+import ElementalStrikes from './ElementalStrikes.jsx';
 
 // Per-behaviour motion. `vy` is the vertical drift (units/sec, sign = direction),
 // `sway` the horizontal wobble amplitude, `blend` the material blending, and
@@ -32,7 +33,10 @@ const PARTICLE_KINDS = {
   bubbles: { vy: 0.55, sway: 0.35, size: 0.09, blend: THREE.AdditiveBlending, opacity: 0.55 },
   embers: { vy: 0.85, sway: 0.28, size: 0.075, blend: THREE.AdditiveBlending, opacity: 0.9 },
   spores: { vy: -0.22, sway: 0.5, size: 0.07, blend: THREE.NormalBlending, opacity: 0.7 },
-  flakes: { vy: -0.45, sway: 0.45, size: 0.08, blend: THREE.NormalBlending, opacity: 0.8 }
+  flakes: { vy: -0.45, sway: 0.45, size: 0.08, blend: THREE.NormalBlending, opacity: 0.8 },
+  // Ion motes drift UP and slowly, the way charge bleeds off a surface — fast
+  // sparks would read as embers and put lightning in fire's register.
+  ions: { vy: 0.32, sway: 0.22, size: 0.055, blend: THREE.AdditiveBlending, opacity: 0.75 }
 };
 
 // Drifting particle field. Positions live in a plain Float32Array animated straight
@@ -119,6 +123,11 @@ function ElementalParticles({ element, kind, color, extent, count }) {
 
 export default function ElementalAtmosphere({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
+  // Fairness gates for the lightning strikes. Subscribed rather than polled because
+  // they change a handful of times per run, not per frame.
+  const paused = useGameStore((s) => s.wormPaused);
+  const gamePhase = useGameStore((s) => s.wormGamePhase);
+  const wormPhase = useGameStore((s) => s.wormPhase);
   const lightRef = useRef();
   const elapsedRef = useRef(0);
 
@@ -145,6 +154,7 @@ export default function ElementalAtmosphere({ size = 3 }) {
 
   const lightColor = useMemo(() => (def ? new THREE.Color(def.color) : new THREE.Color('#fff')), [def]);
 
+
   useFrame((_, delta) => {
     if (!def) return;
     elapsedRef.current += delta;
@@ -166,6 +176,28 @@ export default function ElementalAtmosphere({ size = 3 }) {
       {/* Element-coloured fill light — the worm and cube pick up the element's hue
           as they move through it. */}
       <hemisphereLight ref={lightRef} color={lightColor} groundColor={lightColor} intensity={0} />
+
+      {/* Lightning's hero beat — bolts arcing out of the charged cube into the
+          worm. Pure staging: no damage, no stun, no simulation writes. Every gate
+          gate that changes at most a few times a run is passed in here; the ones
+          that change per frame (the claim freeze, the dissolve) are read from the
+          shared envelope inside its own frame loop, where they are still live. */}
+      {element === 'lightning' && quality.accents && (
+        <ElementalStrikes
+          active
+          enabled={
+            !paused &&
+            gamePhase === 'active' &&
+            // Only while the worm is out on the surface: mid-tunnel it is inside
+            // the cube and there is nothing on screen to hit.
+            wormPhase === 'crawling'
+          }
+          branches={quality.tier === 'high' ? 3 : quality.tier === 'medium' ? 2 : 1}
+          pool={quality.tier === 'high' ? 2 : 1}
+          color={def.color}
+          accent={def.accent}
+        />
+      )}
 
       {/* Drifting medium around the cube — bubbles/embers/spores/snow. Reduced
           motion and the floor budget both zero the count, which drops the field

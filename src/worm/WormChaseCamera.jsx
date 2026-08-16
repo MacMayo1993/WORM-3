@@ -30,7 +30,9 @@ import {
     HEAL_PAUSE_DURATION,
     CUT_FOCUS_DURATION,
     ELEMENTAL_FOCUS_DURATION,
+    ELEMENTAL_DURATION,
 } from './healerWorm/constants.js';
+import { elementalRideBlend } from './healerWorm/elementalLifecycle.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
 const _camForward = new THREE.Vector3();
@@ -306,21 +308,15 @@ export default function WormChaseCamera({ worm, size }) {
             : phase === 'entering' ? _enterP * _enterP
             : phase === 'exiting'  ? 1
             : 0;
-        // Elemental ride blend. This is driven by the wash's own clock, not by the
-        // claim beat, so the close framing lasts as long as the element does — the
-        // beat only decides how it eases IN. During the freeze elementalT is held at
-        // its full value (stepWormSim returns early), so the ramp-in has to come from
-        // the beat's countdown; once the beat expires elemFocusT is 0 and the
-        // expression saturates at 1 on its own, which carries the blend flat through
-        // the rest of the wash with no seam at the hand-off.
-        const elemFocusT = worm.elementalFocusT?.current ?? 0;
-        const elemT = worm.elementalT?.current ?? 0;
-        const elemRideBlend = elemT > 0
-            ? Math.min(
-                THREE.MathUtils.smoothstep(ELEMENTAL_FOCUS_DURATION - elemFocusT, 0, 0.35),
-                THREE.MathUtils.smoothstep(elemT, 0, 0.6) // ease back out to the chase as it runs dry
-            ) * ELEM_FOCUS_PEAK
-            : 0;
+        // Elemental ride blend: in on the claim beat, a short linger, then back out
+        // to the chase. See elementalLifecycle.elementalRideBlend for why it is no
+        // longer held for the whole wash.
+        const elemRideBlend = elementalRideBlend({
+            focusT: worm.elementalFocusT?.current ?? 0,
+            remaining: worm.elementalT?.current ?? 0,
+            maxT: worm.elementalMaxT?.current || ELEMENTAL_DURATION,
+            focusDuration: ELEMENTAL_FOCUS_DURATION
+        }) * ELEM_FOCUS_PEAK;
 
         const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix)
             + ELEM_FOV_WIDEN * elemRideBlend; // widen for the portal/tunnel view and the elemental ride

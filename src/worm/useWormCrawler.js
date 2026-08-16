@@ -41,6 +41,7 @@ import {
 import { getOrbColor, parseTileKey, _parseTile } from './wormHelpers.js';
 import { wormClock } from './wormClock.js';
 import { wormBuffs, resetWormBuffs } from './wormBuffs.js';
+import { resetWormSegments } from './wormSegments.js';
 import { ttAt } from './circularBuffers.js';
 import { getSkin } from './wormCosmeticsData.js';
 import { wormPress, pressTile, tickWormPress, resetWormPress, pressedTileCount } from './tilePressBridge.js';
@@ -196,6 +197,7 @@ export function useWormCrawler(size, cubies) {
                 // A run ending mid-buff must not leave a pill stranded on the death
                 // screen — clear both the live readout and the store transitions.
                 resetWormBuffs();
+                resetWormSegments();
                 useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null });
                 if (deathMenuTimer.current) {
                     clearTimeout(deathMenuTimer.current);
@@ -380,6 +382,7 @@ export function useWormCrawler(size, cubies) {
         const sim = simRef.current;
         resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
         resetWormBuffs();
+        resetWormSegments();
         resetWormPress();
         useGameStore.getState().setWormBoostState('ready');
         useGameStore.setState({
@@ -418,6 +421,7 @@ export function useWormCrawler(size, cubies) {
         // otherwise still be holding the last run's buff (and its dents) when the
         // mode remounts.
         resetWormBuffs();
+        resetWormSegments();
         resetWormPress();
         useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null });
     }, []);
@@ -526,6 +530,7 @@ export function useWormCrawler(size, cubies) {
             cutFocusPos: f('cutFocusPos'),
             elementalFocusT: f('elementalFocusT'),
             elementalT: f('elementalT'),
+            elementalMaxT: f('elementalMaxT'),
             pendingOrbFlashRef: f('pendingOrbFlash'),
             tileTrail: f('tileTrail'),
             pathHistory: f('pathHistory'),

@@ -93,3 +93,47 @@ export function elementalEnvelope({
     accents: phase !== 'release' && focus <= 0
   };
 }
+
+/** Seconds the claim camera holds close after the beat's freeze ends. */
+export const ELEMENTAL_RIDE_HOLD = 1.0;
+/** Seconds the claim camera takes to ease back out to the chase framing. */
+export const ELEMENTAL_RIDE_OUT = 0.9;
+
+/**
+ * How committed the camera is to the close claim framing, 0..1.
+ *
+ * It used to ride the wash's whole clock: ten seconds sat on top of the worm, close
+ * enough that the cube filled the frame and the player could see neither where they
+ * were going nor the element they had just claimed — the wash bathes the WHOLE cube,
+ * and the shot showing it off was the one shot you could not see it from. The beat
+ * is the payoff, a moment of linger is that payoff landing, and everything after
+ * belongs back to the player.
+ *
+ * Both halves run on clocks the simulation freezes, so the shot pauses exactly when
+ * gameplay does. The ramp IN reads the beat's countdown, because the wash clock is
+ * held at full while the beat freezes it and cannot measure anything there. The ramp
+ * OUT reads the wash clock, which starts only once the beat expires — so the two
+ * hand off with no seam and the linger begins as the crawl resumes.
+ *
+ * @param {object} o
+ * @param {number} o.focusT     seconds left of the claim beat (frozen while > 0)
+ * @param {number} o.remaining  seconds of wash left
+ * @param {number} o.maxT       the wash's full duration
+ * @param {number} o.focusDuration
+ * @returns {number} 0..1
+ */
+export function elementalRideBlend({
+  focusT = 0,
+  remaining = 0,
+  maxT = 0,
+  focusDuration = 1.8,
+  hold = ELEMENTAL_RIDE_HOLD,
+  out = ELEMENTAL_RIDE_OUT
+} = {}) {
+  if (remaining <= 0) return 0;
+  const rampIn = smoothstep01(focusDuration > 0 ? (focusDuration - focusT) / 0.35 : 1);
+  // Seconds of wash actually consumed — still 0 throughout the frozen beat.
+  const washElapsed = Math.max(0, (maxT || 0) - remaining);
+  const rampOut = 1 - smoothstep01(out > 0 ? (washElapsed - hold) / out : (washElapsed >= hold ? 1 : 0));
+  return rampIn * rampOut;
+}

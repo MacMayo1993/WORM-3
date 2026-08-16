@@ -13,6 +13,7 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { makeBoltPath, boltPointAt } from './boltPath.js';
 
 // ─── Shared geometries (no per-instance path data, safe to reuse) ─────────────
 const headGeo = new THREE.SphereGeometry(0.11, 8, 8);
@@ -25,69 +26,26 @@ const faceBloomGeo = new THREE.PlaneGeometry(7, 7);
 // Reusable scratch vectors — avoids per-bolt and per-frame GC pressure
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
-const _c = new THREE.Vector3(); // makePath: along
-const _d = new THREE.Vector3(); // makePath: perp ref axis
-const _e = new THREE.Vector3(); // makePath: p1
-const _f = new THREE.Vector3(); // makePath: p2
-
-// Deterministic pseudo-random for reproducible bolt shape variation per seed
-const seededRand = (s) => {
-  const x = Math.sin(s) * 10000;
-  return x - Math.floor(x);
-};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const JITTER_SEGS = 10; // points in the jagged path (including endpoints)
 const GHOST_COUNT = 4;
 const GHOST_GAP = 0.09; // fraction of path length between ghost positions
 
-// ─── Pure path helpers ────────────────────────────────────────────────────────
+// ─── Path ─────────────────────────────────────────────────────────────────────
+// The jagged shape itself now lives in boltPath.js, so the elemental lightning
+// theme can draw the same bolt without importing anything from the chaos cascade.
+// The arithmetic moved verbatim — same seededRand, same sine taper, same
+// perpendicular basis — so chaos bolts are unchanged. Only the container differs:
+// the shared helper works in plain arrays, and this adapts them to the Vector3
+// list that BufferGeometry.setFromPoints and the head/ghost lerps want.
 
-/**
- * Build a jagged polyline from `from` to `to` using random perpendicular jitter.
- * Jitter tapers to zero at both endpoints so the bolt always starts and ends
- * exactly on the tile surface positions.
- */
-const makePath = (from, to, segs = JITTER_SEGS, jitter = 0.22, seed = 0) => {
-  const f = _a.set(from[0], from[1], from[2]);
-  const t = _b.set(to[0], to[1], to[2]);
-  const along = _c.subVectors(t, f);
-  const len = along.length();
-
-  if (len < 0.01) return [f.clone(), t.clone()]; // degenerate guard
-
-  along.normalize();
-
-  // Two stable perpendicular axes for 3-D jitter
-  const ref = Math.abs(along.y) < 0.9 ? _d.set(0, 1, 0) : _d.set(1, 0, 0);
-  const p1 = _e.crossVectors(along, ref).normalize();
-  const p2 = _f.crossVectors(along, p1).normalize();
-
-  const pts = [f.clone()];
-  for (let i = 1; i < segs; i++) {
-    const frac = i / segs;
-    const pt = new THREE.Vector3().lerpVectors(f, t, frac);
-    // sin-taper: max jitter at midpoint, zero at both ends
-    const taper = Math.sin(frac * Math.PI);
-    const j = jitter * taper * len;
-    pt.addScaledVector(p1, (seededRand(seed + i * 2) - 0.5) * 2 * j);
-    pt.addScaledVector(p2, (seededRand(seed + i * 2 + 1) - 0.5) * 2 * j);
-    pts.push(pt);
-  }
-  pts.push(t.clone());
-  return pts;
-};
-
-/**
- * Interpolate a position along a polyline at fraction t ∈ [0, 1].
- * Writes into `out` (THREE.Vector3) and returns it.
- */
+// Frame-loop scratch — the head and every ghost sample the path each frame, so
+// this must not allocate.
+const _pt = [0, 0, 0];
 const pathAt = (pts, t, out) => {
-  const maxSeg = pts.length - 1;
-  const s = Math.min(t * maxSeg, maxSeg - 1e-6);
-  const si = Math.floor(s);
-  out.lerpVectors(pts[si], pts[si + 1], s - si);
-  return out;
+  boltPointAt(_pt, pts, t);
+  return out.set(_pt[0], _pt[1], _pt[2]);
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -107,20 +65,27 @@ const ChaosWave = ({ from, to, crossFace = false, onComplete, speedMult = 1, col
   const faceBloomRef = useRef(); // whole-face bloom overlay (cross-face only)
 
   // ── Stable jagged path — one generation per cascade ──────────────────────
-  const path = useMemo(() => makePath(from, to, JITTER_SEGS, 0.22, seed), [from, to, seed]);
+  // Kept in the shared helper's plain-array form: that is what the frame loop
+  // samples, and converting per frame would allocate for the head and every ghost.
+  const path = useMemo(
+    () => makeBoltPath(from, to, { segs: JITTER_SEGS, jitter: 0.22, seed }),
+    [from, to, seed]
+  );
 
   // ── Per-instance line geometries (unique path, so cannot be shared) ───────
+  const pathVecs = useMemo(() => path.map((p) => new THREE.Vector3(p[0], p[1], p[2])), [path]);
+
   const coreGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry().setFromPoints(path);
+    const g = new THREE.BufferGeometry().setFromPoints(pathVecs);
     g.setDrawRange(0, 0); // invisible until the first useFrame tick
     return g;
-  }, [path]);
+  }, [pathVecs]);
 
   const glowGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry().setFromPoints(path);
+    const g = new THREE.BufferGeometry().setFromPoints(pathVecs);
     g.setDrawRange(0, 0);
     return g;
-  }, [path]);
+  }, [pathVecs]);
 
   // Dispose per-instance geometries when the component unmounts
   useEffect(() => () => { coreGeo.dispose(); glowGeo.dispose(); }, [coreGeo, glowGeo]);

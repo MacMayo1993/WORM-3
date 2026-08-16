@@ -14,7 +14,10 @@ import {
   elementalEnvelope,
   smoothstep01,
   ELEMENTAL_FADE_IN,
-  ELEMENTAL_FADE_OUT
+  ELEMENTAL_FADE_OUT,
+  elementalRideBlend,
+  ELEMENTAL_RIDE_HOLD,
+  ELEMENTAL_RIDE_OUT
 } from '../worm/healerWorm/elementalLifecycle.js';
 import {
   resolveElementalQuality,
@@ -34,7 +37,7 @@ import {
   resolveSweepOrigin
 } from '../worm/healerWorm/elementalSeeds.js';
 import { ELEMENTAL_TYPES, getElementalDef } from '../worm/healerWorm/elementalDefs.js';
-import { ELEMENTAL_DURATION } from '../worm/healerWorm/constants.js';
+import { ELEMENTAL_DURATION, ELEMENTAL_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
 
 describe('elemental lifecycle envelope', () => {
   const full = (o) => elementalEnvelope({ remaining: ELEMENTAL_DURATION, ...o });
@@ -98,6 +101,62 @@ describe('elemental lifecycle envelope', () => {
     expect(smoothstep01(0.5)).toBeCloseTo(0.5);
     expect(smoothstep01(1)).toBe(1);
     expect(smoothstep01(2)).toBe(1);
+  });
+});
+
+describe('elemental claim camera', () => {
+  const D = ELEMENTAL_DURATION;
+  const F = ELEMENTAL_FOCUS_DURATION;
+  // Seconds of wash consumed → the blend. The beat freezes the wash clock, so
+  // washElapsed 0 is "the beat just ended".
+  const atWash = (washElapsed, focusT = 0) =>
+    elementalRideBlend({ focusT, remaining: D - washElapsed, maxT: D, focusDuration: F });
+
+  it('eases in over the claim beat rather than snapping to the close shot', () => {
+    expect(elementalRideBlend({ focusT: F, remaining: D, maxT: D, focusDuration: F })).toBe(0);
+    const mid = elementalRideBlend({ focusT: F - 0.18, remaining: D, maxT: D, focusDuration: F });
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+    // Fully committed well before the beat ends, and stays there through the freeze.
+    expect(elementalRideBlend({ focusT: F - 0.35, remaining: D, maxT: D, focusDuration: F })).toBe(1);
+    expect(elementalRideBlend({ focusT: 0.2, remaining: D, maxT: D, focusDuration: F })).toBe(1);
+  });
+
+  it('lingers close for the hold, then gives the cube back', () => {
+    expect(atWash(0)).toBe(1);
+    expect(atWash(ELEMENTAL_RIDE_HOLD)).toBe(1);
+    const easing = atWash(ELEMENTAL_RIDE_HOLD + ELEMENTAL_RIDE_OUT / 2);
+    expect(easing).toBeGreaterThan(0);
+    expect(easing).toBeLessThan(1);
+    expect(atWash(ELEMENTAL_RIDE_HOLD + ELEMENTAL_RIDE_OUT)).toBe(0);
+  });
+
+  it('stays out for the whole rest of the wash', () => {
+    // The bug: the close framing used to ride the wash's entire clock, so the
+    // player spent ten seconds unable to see the cube the element was washing.
+    for (const washElapsed of [3, 5, 8, D - 0.1]) {
+      expect(atWash(washElapsed), `still close at ${washElapsed}s`).toBe(0);
+    }
+  });
+
+  it('is monotonically non-increasing once the beat has ended', () => {
+    let prev = Infinity;
+    for (let t = 0; t <= D; t += 0.1) {
+      const v = atWash(t);
+      expect(v).toBeLessThanOrEqual(prev + 1e-9);
+      prev = v;
+    }
+  });
+
+  it('is fully out whenever no wash is running', () => {
+    expect(elementalRideBlend({ focusT: 0, remaining: 0, maxT: D, focusDuration: F })).toBe(0);
+    expect(elementalRideBlend({})).toBe(0);
+  });
+
+  it('holds still while the beat freezes the clock', () => {
+    // Nothing is consumed during the freeze, so the linger cannot start early —
+    // this is what keeps the shot paused exactly when gameplay is.
+    expect(atWash(0, 1.2)).toBe(atWash(0, 0.4));
   });
 });
 

@@ -12,9 +12,10 @@ import {
   getElementalDef,
 } from '../worm/healerWorm/elementalDefs.js';
 import { SPECIAL_DEFS, SPECIAL_TYPES, getSpecialDef } from '../worm/healerWorm/specialDefs.js';
-import { makeWormSim, resetWormSim, stepWormSim, activateSpecial, startElemental, tileKey } from '../worm/healerWorm/wormSim.js';
-import { ELEMENTAL_DURATION, ELEMENTAL_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
+import { makeWormSim, resetWormSim, stepWormSim, activateSpecial, startElemental, tileKey, faceCenterTiles } from '../worm/healerWorm/wormSim.js';
+import { ELEMENTAL_DURATION, ELEMENTAL_FOCUS_DURATION, ELEMENTAL_SPAWN_INTERVAL } from '../worm/healerWorm/constants.js';
 import { LIVING_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
+import { ELEMENT_MODE } from '../worm/healerWorm/elementalOrbShader.js';
 
 const SIZE = 5;
 
@@ -53,8 +54,8 @@ function makeSim() {
 }
 
 describe('elementalDefs', () => {
-  it('defines the four elements', () => {
-    expect(ELEMENTAL_TYPES).toEqual(['water', 'fire', 'grass', 'ice']);
+  it('defines the five elements', () => {
+    expect(ELEMENTAL_TYPES).toEqual(['water', 'fire', 'grass', 'ice', 'lightning']);
   });
 
   it('each element reuses an existing Living tile style', () => {
@@ -80,8 +81,27 @@ describe('elementalDefs', () => {
       const def = ELEMENTAL_DEFS[key];
       expect(def.label).toBeTruthy();
       expect(def.color).toMatch(/^#/);
+      expect(def.accent).toMatch(/^#/);
+      expect(def.fogColor).toMatch(/^#/);
       expect(def.iconPath).toBeTruthy();
+      expect(def.description).toBeTruthy();
     }
+  });
+
+  it('every element names a renderer and a particle behaviour', () => {
+    for (const key of ELEMENTAL_TYPES) {
+      const def = ELEMENTAL_DEFS[key];
+      expect(def.renderer, `${key} has no renderer`).toBeTruthy();
+      expect(def.particle, `${key} has no particle kind`).toBeTruthy();
+    }
+  });
+
+  it('every element resolves to a distinct orb shader branch', () => {
+    const modes = ELEMENTAL_TYPES.map((k) => ELEMENT_MODE[k]);
+    for (const [i, m] of modes.entries()) {
+      expect(m, `${ELEMENTAL_TYPES[i]} has no orb shader mode`).toBeTypeOf('number');
+    }
+    expect(new Set(modes).size).toBe(ELEMENTAL_TYPES.length);
   });
 });
 
@@ -94,6 +114,75 @@ describe('special defs include elements', () => {
     // Buffs are still present alongside them.
     expect(SPECIAL_TYPES).toContain('rocket');
     expect(SPECIAL_TYPES).toContain('magnet');
+  });
+});
+
+describe('elemental offering placement', () => {
+  // Run the sim until the offering clock fires and hand back the elemental orbs.
+  function spawnOffering(sim, ctx) {
+    const dt = 0.1;
+    for (let i = 0; i < Math.round((ELEMENTAL_SPAWN_INTERVAL + 2) / dt); i++) {
+      stepWormSim(sim, dt, SIZE, ctx);
+      const els = sim.specials.filter(s => isElementalType(s.type));
+      if (els.length) return els;
+    }
+    return sim.specials.filter(s => isElementalType(s.type));
+  }
+
+  it('offers one orb of every element at once', () => {
+    // Five elements onto six face centres. The placement walks faces until it finds
+    // a free one, so growing the element list past four had to keep working rather
+    // than silently dropping the last orb.
+    const sim = makeSim();
+    const els = spawnOffering(sim, makeCtx());
+    expect(els).toHaveLength(ELEMENTAL_TYPES.length);
+    expect(new Set(els.map(e => e.type))).toEqual(new Set(ELEMENTAL_TYPES));
+  });
+
+  it('puts every orb on its own tile', () => {
+    const sim = makeSim();
+    const els = spawnOffering(sim, makeCtx());
+    const keys = els.map(e => tileKey(e));
+    expect(new Set(keys).size).toBe(keys.length);
+    // And one per face, which is what keeps them reachable from different sides.
+    expect(new Set(els.map(e => e.dirKey)).size).toBe(els.length);
+  });
+
+  it('offers what fits when faces are occupied rather than failing outright', () => {
+    // Occupancy fallback: the placement skips a taken face centre. With five types
+    // and six faces there is exactly one spare, so blocking two must still yield
+    // four orbs — never a crash and never a doubled-up tile.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const centres = faceCenterTiles(SIZE);
+    sim.powerups.push({ ...centres[0], id: 'block-a' }, { ...centres[1], id: 'block-b' });
+    const els = spawnOffering(sim, ctx);
+    expect(els.length).toBeGreaterThanOrEqual(ELEMENTAL_TYPES.length - 2);
+    const blocked = new Set([tileKey(centres[0]), tileKey(centres[1])]);
+    for (const e of els) expect(blocked.has(tileKey(e))).toBe(false);
+  });
+
+  it('claiming one element wipes every other orb in the offering', () => {
+    // The offering is a choice: taking one element costs you the other four until
+    // the next spawn cycle. Driven through the real claim path (an orb sitting on
+    // the worm's own tile) rather than by calling startElemental directly.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const els = spawnOffering(sim, ctx);
+    expect(els.length).toBeGreaterThan(1);
+
+    // The claim fires as the worm steps ONTO a tile, so parking the orb on the tile
+    // the head already occupies never triggers it. A magnet widens the reach to the
+    // surrounding ring, which is a supported claim path and makes contact certain.
+    const target = els[0];
+    sim.magnetT = 10;
+    for (let i = 0; i < 60 && !sim.elementalType; i++) {
+      target.x = sim.pos.x; target.y = sim.pos.y; target.z = sim.pos.z; target.dirKey = sim.pos.dirKey;
+      stepWormSim(sim, 0.05, SIZE, ctx);
+    }
+
+    expect(sim.elementalType).toBe(target.type);
+    expect(sim.specials.filter(o => isElementalType(o.type))).toHaveLength(0);
   });
 });
 
