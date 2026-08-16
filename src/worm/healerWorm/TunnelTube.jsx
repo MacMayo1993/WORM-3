@@ -67,6 +67,18 @@ const vertexShader = `
 `;
 
 // vUv.y runs 0 (entry mouth) → 1 (exit mouth); vUv.x wraps the circumference.
+//
+// ── Why this is built out of noise and darks ─────────────────────────────────
+// The first version was `base * intensity`: one face colour, multiplied by a
+// scalar that floored at 0.50 and summed to well over 2. Every pixel of the bore
+// therefore sat in the top of the range of a single hue, and a trip down an
+// orange tunnel was a flat orange screen — no darks for the energy to read
+// against, no chroma anywhere, and the rings washing out into the wall they were
+// supposed to be racing across.
+//
+// It now composes the way the elemental surfaces do: a dark body, energy laid on
+// top in a hotter colour than the wall, and the detail coming from a real 3D
+// noise field rather than from a single sine.
 const fragmentShader = `
   uniform vec3  uColorA;
   uniform vec3  uColorB;
@@ -77,22 +89,67 @@ const fragmentShader = `
   varying vec2 vUv;
   varying vec3 vViewPos;
 
-  void main() {
-    // Each half carries its own tile's colour, fusing at the midpoint — the same
-    // language the ribbon uses, so tube and ribbon read as one object. Lifted
-    // toward white because face colours can be very dark (deep reds especially),
-    // and a shaft lit only by its own tile colour goes black.
-    vec3 base = mix(uColorA, uColorB, smoothstep(0.35, 0.65, vUv.y));
-    base = mix(base, vec3(1.0), 0.10);
+  float hash13(vec3 p3) {
+    p3 = fract(p3 * 0.1031);
+    p3 += dot(p3, p3.zyx + 31.32);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+  float vnoise(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(mix(hash13(i + vec3(0.0, 0.0, 0.0)), hash13(i + vec3(1.0, 0.0, 0.0)), f.x),
+          mix(hash13(i + vec3(0.0, 1.0, 0.0)), hash13(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+      mix(mix(hash13(i + vec3(0.0, 0.0, 1.0)), hash13(i + vec3(1.0, 0.0, 1.0)), f.x),
+          mix(hash13(i + vec3(0.0, 1.0, 1.0)), hash13(i + vec3(1.0, 1.0, 1.0)), f.x), f.y),
+      f.z);
+  }
 
-    // Rings racing past the camera. This is the speed cue: on a bare ribbon
-    // there was nothing in the periphery to register motion against.
-    float ring = fract(vUv.y * 26.0 - uTime * 2.4);
-    float rings = smoothstep(0.85, 1.0, ring) * 0.9;
+  void main() {
+    float t = uTime;
+
+    // Each half carries its own tile's colour — the same language the ribbon
+    // uses, so tube and ribbon read as one object. The two do not cross-fade
+    // directly into each other (two saturated tile colours average into mud);
+    // they drive through a hot fused colour at the midpoint instead, which is
+    // also where the band's half-twist happens.
+    vec3 fused = mix(mix(uColorA, uColorB, 0.5), vec3(1.0), 0.55);
+    vec3 base = mix(uColorA, uColorB, smoothstep(0.30, 0.70, vUv.y));
+    // Small lift only: face colours can be very dark (deep reds especially) and a
+    // shaft lit purely by its own tile colour goes black. The brightness comes
+    // from the energy layers below, not from bleaching the wall.
+    base = mix(base, vec3(1.0), 0.06);
+    float mid = 1.0 - smoothstep(0.0, 0.22, abs(vUv.y - 0.5));
+    base = mix(base, fused, mid * 0.8);
+
+    // Sampling the noise on a CIRCLE of the bore (cos/sin of the wrapped
+    // coordinate) rather than on vUv.x directly is what keeps it seamless: vUv.x
+    // jumps 1→0 at the seam, and any field sampled on it tears in a visible line
+    // straight down the tunnel.
+    float ang = vUv.x * 6.2831853;
+    vec2  ring2 = vec2(cos(ang), sin(ang));
+
+    // Plasma crawling down the bore — the wall's own texture, so it is not a
+    // flat sheet of colour between rings.
+    vec3 np = vec3(ring2 * 1.6, vUv.y * 9.0 - t * 1.6);
+    float plasma = vnoise(np) * 0.6 + vnoise(np * 2.3 + 5.0) * 0.4;
+
+    // Warp streaks: ridged noise stretched along the bore leaves thin filaments
+    // running toward the camera. This is the real speed cue — far stronger than
+    // the rings, because the filaments are long enough to track.
+    // Frequency and exponent both matter here: too few filaments, or too soft a
+    // ridge, and they stop being streaks and become fat beams that wash the whole
+    // bore out. Many thin ones read as speed; a handful of wide ones read as fog.
+    vec3 sp = vec3(ring2 * 7.0, vUv.y * 4.0 - t * 3.2);
+    float streak = pow(1.0 - abs(vnoise(sp) * 2.0 - 1.0), 10.0);
+
+    // Rings racing past, kept as the regular beat under the streaks' irregular one.
+    float rings = smoothstep(0.86, 1.0, fract(vUv.y * 26.0 - t * 2.4));
 
     // Longitudinal ribs give the bore a readable cross-section so it reads as a
     // round shaft rather than a flat backdrop.
-    float ribs = pow(abs(sin(vUv.x * 3.14159265 * 8.0)), 6.0) * 0.35;
+    float ribs = pow(abs(sin(vUv.x * 3.14159265 * 8.0)), 6.0);
 
     // The half-twist point — where the band's orientation inverts. The HUD marks
     // it as ½π; this is the same moment in the world. Widened to span the stretch
@@ -100,7 +157,7 @@ const fragmentShader = `
     // between two shafts rather than as a hole.
     float dMid = abs(vUv.y - 0.5);
     float seam = 1.0 - smoothstep(0.0, 0.15, dMid);
-    seam *= 0.9 + 0.1 * sin(uTime * 8.0);
+    seam *= 0.9 + 0.1 * sin(t * 8.0);
 
     // Never draw the wall across the corner where the two arms meet — no frame
     // can carry a cross-section smoothly through a sharp bend, and the result
@@ -111,7 +168,7 @@ const fragmentShader = `
     // has depth instead of being uniformly lit end to end. The falloff has to be
     // wide: anchoring tunnels on their tiles made each arm ~5x longer, so a tight
     // pool leaves almost the whole shaft unlit.
-    float headGlow = exp(-pow((vUv.y - uHead) / 0.32, 2.0)) * 0.75;
+    float headGlow = exp(-pow((vUv.y - uHead) / 0.32, 2.0));
 
     // Both mouths open out to nothing so the tube never ends in a hard disc, and
     // so the ends do not read as geometry hanging outside the cube.
@@ -120,20 +177,36 @@ const fragmentShader = `
     // Grazing incidence brightening: walls far down the bore catch more light,
     // which is what sells a cylinder when you are standing inside it.
     vec3  V = normalize(-vViewPos);
-    float graze = 1.0 - abs(V.z);
-    graze = pow(clamp(graze, 0.0, 1.0), 2.0) * 0.5;
+    float graze = pow(clamp(1.0 - abs(V.z), 0.0, 1.0), 2.0);
 
-    // The floor carries the whole shaft away from the worm, so it cannot be dim.
-    float intensity = 0.50 + rings * 0.8 + ribs + headGlow + graze;
-    vec3  col = base * intensity + vec3(1.0) * seam * 0.9;
+    // Dark body first, so there is somewhere for the energy to sit against.
+    vec3 col = base * (0.10 + 0.35 * plasma + 0.30 * headGlow + 0.25 * graze);
+    // Energy laid over it in a HOTTER colour than the wall rather than as a
+    // brighter version of the same hue — that difference is what reads as light
+    // in the tunnel instead of as a lighter patch of tunnel.
+    //
+    // Only part-way to white, though. Taking the accent most of the way there
+    // bleached the streaks out and the tunnel came back reading white-blue with
+    // the tile colour barely present — the opposite of the complaint. The hue is
+    // carried by the accent; the white is added back only on the brightest cores
+    // of the streaks, where a blown-out centre is what makes them look hot.
+    vec3 accent = mix(base, vec3(1.0), 0.55);
+    col += accent * streak * 0.80;
+    col += vec3(1.0) * pow(streak, 3.0) * 0.22;
+    col += accent * rings  * 0.55;
+    col += base   * ribs   * 0.30;
+    col += vec3(1.0) * seam * 1.10;
 
     // Wall and seam are summed separately: the seam peaks exactly where coreFade
     // removes the wall, so the shaft hands off to light and back without a gap.
     // Translucent on purpose: the Möbius ribbon runs down the middle of this
     // shaft and the cube's interior sits beyond it, and both have to stay
     // readable through the wall rather than being sealed off by it.
-    float wall = (0.34 + rings * 0.30 + headGlow * 0.22) * coreFade;
-    float glow = seam * 0.55;
+    // The plasma contributes to colour far more than it should to coverage: at a
+    // higher weight here it filled the gaps between the streaks with milk and the
+    // whole bore fogged over, which is what the flat original did too.
+    float wall = (0.16 + rings * 0.28 + streak * 0.30 + plasma * 0.09 + headGlow * 0.22) * coreFade;
+    float glow = seam * 0.60;
     gl_FragColor = vec4(col, clamp((wall + glow) * mouth * uOpacity, 0.0, 1.0));
   }
 `;
