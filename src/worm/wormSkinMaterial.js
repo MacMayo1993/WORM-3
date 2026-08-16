@@ -154,3 +154,39 @@ export function updateWormSkinMaterialTime(material, elapsed) {
     material.emissiveIntensity = pulse.base * (1 + Math.sin(elapsed * pulse.speed + (material.userData.seed || 0)) * pulse.amp);
   }
 }
+
+/**
+ * Make a worm body materially luminous — the Glow Worm's bioluminescence.
+ *
+ * Applied ON TOP of the skin's own FX profile, so it must be called after
+ * applySkinMaterialProfile (which resets emissiveIntensity from the profile).
+ *
+ * This replaces an additive halo sphere at 1.4x the bead on every other segment.
+ * A halo wider than the bead it sits on cannot stay hidden behind it: the parts
+ * occluded by neighbouring beads were depth-rejected, and the surviving crescents
+ * squeezed out of every joint as spikes growing off the body. Emission has no
+ * silhouette, so it cannot protrude — the worm glows because the worm is glowing,
+ * not because a bigger object is parked behind it.
+ *
+ * @param {THREE.Material} material  the body material
+ * @param {string} glowHex           the skin's glow colour
+ * @param {boolean} isGlow           false restores the skin profile untouched
+ */
+export function applyBioluminescence(material, glowHex, isGlow) {
+  if (!material) return;
+  if (!isGlow) {
+    // Put the tint back. applySkinMaterialProfile restores emissiveIntensity but
+    // not the emissive COLOUR, and the preview reuses one rig across every
+    // specimen — without this, browsing from the Glow Worm to any other character
+    // left it lit through the previous worm's glow colour.
+    material.emissive.set(0xffffff);
+    return;
+  }
+  material.emissive.set(glowHex);
+  // Well above the 0.22 the skin profiles use: this has to carry the character on
+  // its own now, and it is what the halo used to be doing.
+  material.emissiveIntensity = 0.85;
+  // Breathe, so it reads as alive rather than as a flat repaint. Overwrites any
+  // pulse the skin set, which is intentional — the character wins over the skin.
+  material.userData.pulse = { base: 0.85, amp: 0.22, speed: 2.4 };
+}
