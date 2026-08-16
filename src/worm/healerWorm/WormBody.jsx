@@ -14,6 +14,7 @@ import {
 } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
 import { shAt } from '../circularBuffers.js';
+import { beginWormSegments, pushWormSegment, endWormSegments } from '../wormSegments.js';
 import { getSkin } from '../wormCosmeticsData.js';
 import { getWormCharacter } from '../wormCharacterData.js';
 import { getSkinFX } from '../wormSkinFX.js';
@@ -352,6 +353,10 @@ export function WormBody({ worm, size }) {
         const transitScale = transitScaleRef.current;
 
         if (transitScale < 0.015) {
+            // Body hidden (mid-tunnel): publish an empty feed so effects aiming at it
+            // stop rather than firing at where it used to be.
+            beginWormSegments();
+            endWormSegments();
             mesh.count = 0;
             if (glowAltRef.current) glowAltRef.current.count = 0;
             if (leftPageRef.current) leftPageRef.current.count = 0;
@@ -423,6 +428,7 @@ export function WormBody({ worm, size }) {
             prevCS.isInch = _isInch;
         }
 
+        beginWormSegments();
         for (let i = 0; i < visibleCount; i++) {
             // Distance LOD: segments far behind the head are visually indistinguishable at
             // gameplay camera distance, so thin them out — every segment near the head,
@@ -624,6 +630,12 @@ export function WormBody({ worm, size }) {
             }
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(writeIdx, _wormDummy.matrix);
+            // Publish where this segment actually ended up, for effects that need to
+            // aim at the body (the lightning theme's strikes). Recorded here rather
+            // than recomputed elsewhere because this position has already been
+            // through the curve walk, the live-slice ride and the LOD thinning —
+            // anything re-deriving it would drift from what the player sees.
+            pushWormSegment(_wormDummy.position.x, _wormDummy.position.y, _wormDummy.position.z);
 
             // Glow worm: write every other *drawn* segment to additive overlay at 1.4× scale
             // (writeIdx, not i, so the ratio holds regardless of LOD thinning).
@@ -728,6 +740,7 @@ export function WormBody({ worm, size }) {
 
         mesh.count = writeIdx;
         mesh.instanceMatrix.needsUpdate = true;
+        endWormSegments();
         if (mesh.instanceColor && colorDirty) mesh.instanceColor.needsUpdate = true;
 
         // Update glow overlay count

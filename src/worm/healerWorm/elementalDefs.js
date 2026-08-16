@@ -83,6 +83,27 @@ export const ELEMENTAL_DEFS = {
     iconAccent: '',
     description: 'Freezes the whole cube — a pale frost and falling flakes drift across every face.',
   },
+  lightning: {
+    label: 'LIGHTNING',
+    element: true,
+    // There is no dedicated "lightning" Living style, and inventing a catalogue key
+    // that nothing renders would only satisfy the definition test while leaving the
+    // tile itself broken. `circuit` is the deliberate, supported fallback: it is the
+    // one Living style already built out of conductive traces, so an electrified
+    // tile reads as the same material family as the wash over it.
+    tileStyle: 'circuit',
+    renderer: 'surface',
+    color: '#a78bfa',
+    accent: '#f0f9ff',
+    // Storm-dark, not merely violet-tinted: the strikes only read as bright if the
+    // fill they land against is genuinely low-key.
+    fogColor: '#170b33',
+    particle: 'ions',
+    // A bolt.
+    iconPath: 'M13.6 1.8 4.2 13.4h5.4l-1.2 8.8 9.4-11.6h-5.4z',
+    iconAccent: '',
+    description: 'Charges the whole cube — veins of current crawl the seams and bolts strike the worm.',
+  },
 };
 
 /** Canonical list of elemental orb types. */
