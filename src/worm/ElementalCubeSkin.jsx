@@ -58,11 +58,12 @@ import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { resolveElementalRenderer } from './healerWorm/elementalRenderers.js';
 import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
 import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
+import { cellEdgeMask, cellSeed, cellSweepDelay, resolveSweepOrigin } from './healerWorm/elementalSeeds.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
 import GrassBlades from '../3d/styles/GrassBlades.jsx';
 import ElementalFireSkin from './ElementalFireSkin.jsx';
-import { getElementalSurfaceGeo, getElementalSurfaceMaterial } from './ElementalSurface.jsx';
+import { ElementalSurfaceSkin } from './ElementalSurface.jsx';
 
 // Per-face definition: the fixed axis pinned to the outer layer, plus the two
 // in-plane axes the grid varies over.
@@ -133,6 +134,29 @@ function surfaceStickers(size, maxGrid) {
   return out;
 }
 
+/**
+ * Fill each cell's share of the claim sweep, so the element travels outward from
+ * the tile the orb was taken on instead of appearing on all six faces at once.
+ *
+ * The origin arrives as a sticker (x/y/z/dirKey), which is not a cover cell: above
+ * the grid cap several stickers share one cell. It is resolved to the cell on the
+ * same face whose representative sticker is nearest, so the sweep still starts
+ * under the worm on a 15×15.
+ *
+ * With no origin — a wash restored mid-session, or a claim the sim never recorded —
+ * every delay is 0 and the whole cube arrives together, which is the old behaviour.
+ */
+function writeSweep(cells, out, origin) {
+  if (!origin) {
+    out.fill(0);
+    return;
+  }
+  const best = resolveSweepOrigin(cells, origin);
+  for (let i = 0; i < cells.length; i++) {
+    out[i] = cellSweepDelay(cells[i], best, cells[i].gridN);
+  }
+}
+
 export default function ElementalCubeSkin({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
   const def = element ? getElementalDef(element) : null;
@@ -150,18 +174,27 @@ export default function ElementalCubeSkin({ size = 3 }) {
   const isSurface = renderer?.key === 'surface';
   const isFire = renderer?.key === 'flames';
 
-  // Shared geometry + material for the surface elements — every instance references
-  // the same pair, so the whole layer is a couple of GPU objects.
-  const surfaceGeo = useMemo(() => (isSurface ? getElementalSurfaceGeo() : null), [isSurface]);
-  const surfaceMat = useMemo(
-    () => (isSurface ? getElementalSurfaceMaterial(element, def.color, def.accent) : null),
-    [isSurface, element, def]
-  );
-
   const cells = useMemo(
     () => (renderer ? surfaceStickers(size, quality.skinGrid) : []),
     [renderer, size, quality.skinGrid]
   );
+
+  // Per-instance cube-scale data, the thing that lets one flat quad know it is part
+  // of a cube: where the cell sits (rim / edge / corner), its stable seed, and its
+  // share of the claim sweep. `cell` is fixed for a given board; `sweep` is rewritten
+  // once per claim, when the origin tile arrives.
+  const cellData = useMemo(() => {
+    const cell = new Float32Array(cells.length * 4);
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      const m = cellEdgeMask(c.j, c.k, c.gridN);
+      cell[i * 4] = m.rim;
+      cell[i * 4 + 1] = m.edge;
+      cell[i * 4 + 2] = m.corner;
+      cell[i * 4 + 3] = cellSeed(c.faceKey, c.j, c.k, c.gridN);
+    }
+    return { cell, sweep: new Float32Array(cells.length) };
+  }, [cells]);
 
   // Instanced renderers write through instanceMatrix; the per-cell fallback writes
   // group transforms. Only one of the two is ever populated.
@@ -169,11 +202,13 @@ export default function ElementalCubeSkin({ size = 3 }) {
   const groupRefs = useRef([]);
   const elapsedRef = useRef(0);
   const lastElementRef = useRef(null);
+  const lastOriginRef = useRef(undefined);
   if (lastElementRef.current !== element) {
     lastElementRef.current = element;
     elapsedRef.current = 0;
     groupRefs.current = [];
     instRef.current = null;
+    lastOriginRef.current = undefined;
   }
 
   useFrame((_, delta) => {
@@ -186,6 +221,17 @@ export default function ElementalCubeSkin({ size = 3 }) {
     // up from nothing and shrinks away — changing scale.z alone would leave the top
     // plane at full size and full shader alpha the whole time, never fading.
     const g = env.grow;
+
+    // The claim sweep's starting point. The sim snapshots the tile the orb was
+    // taken on and never mutates it, so an identity check is enough to notice a new
+    // claim — this recomputes once per wash, not per frame.
+    if (lastOriginRef.current !== wormBuffs.elementalOrigin) {
+      lastOriginRef.current = wormBuffs.elementalOrigin;
+      writeSweep(cells, cellData.sweep, wormBuffs.elementalOrigin);
+      const geo = instRef.current?.geometry;
+      const attr = geo?.getAttribute?.('aSweep');
+      if (attr) attr.needsUpdate = true;
+    }
 
     // An InstancedMesh's capacity is fixed at construction. During the frame an
     // element swap or a size change commits, the ref can still hold the outgoing
@@ -220,7 +266,14 @@ export default function ElementalCubeSkin({ size = 3 }) {
         grp.scale.copy(_scale);
       }
     }
-    if (inst) inst.instanceMatrix.needsUpdate = true;
+    if (inst) {
+      inst.instanceMatrix.needsUpdate = true;
+      // One uniform write per frame carries the whole envelope to both shaders —
+      // they read it to gate the sweep and the dissolve, so no per-instance work is
+      // needed for either.
+      const u = inst.material?.uniforms?.uEnv;
+      if (u) u.value.set(env.intensity, env.claim, env.release, 0);
+    }
   });
 
   if (!renderer || cells.length === 0) return null;
@@ -229,12 +282,14 @@ export default function ElementalCubeSkin({ size = 3 }) {
     return (
       // Keyed on the instance count: an InstancedMesh's capacity is fixed at
       // construction, so a size change has to build a new one rather than resize.
-      <instancedMesh
+      <ElementalSurfaceSkin
         key={`${element}-${cells.length}`}
-        ref={instRef}
-        args={[surfaceGeo, surfaceMat, cells.length]}
-        frustumCulled={false}
-        raycast={() => null}
+        meshRef={instRef}
+        element={element}
+        color={def.color}
+        accent={def.accent}
+        count={cells.length}
+        cellData={cellData}
       />
     );
   }
@@ -246,6 +301,7 @@ export default function ElementalCubeSkin({ size = 3 }) {
         meshRef={instRef}
         count={cells.length}
         flamesPerCell={quality.flamesPerCell}
+        cellData={cellData}
       />
     );
   }

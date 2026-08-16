@@ -36,6 +36,7 @@
 // light makes through a wavy surface) and ice is a domain-warped cell field with
 // per-plate normals, so it has genuine crystal facets that catch the light.
 
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 
@@ -106,10 +107,24 @@ const ICE_CELLS = /* glsl */`
 const vertexShader = /* glsl */`
   uniform float uTime;
   uniform int uMode;
+  // (intensity, claim, release, unused) — the shared elemental envelope, written
+  // once per frame by ElementalCubeSkin. See elementalLifecycle.js.
+  uniform vec4 uEnv;
+  // Per cover cell: (rim, edge, corner, seed). Where the cell sits on the cube —
+  // rim 0 at a face centre → 1 at its border, edge/corner flags for the cells that
+  // meet another face. This is what lets one flat quad know it is part of a cube.
+  attribute vec4 aCell;
+  // Per cover cell: 0..1 share of the claim sweep before this cell is reached.
+  attribute float aSweep;
+
   varying vec2 vUv;
   varying vec3 vWorld;
   varying vec3 vView;
   varying float vWave;
+  varying float vSwell;
+  varying vec3 vCellMask;   // (rim, edge, corner)
+  varying float vArrive;
+  varying vec3 vFaceNormal;
 
   ${NOISE}
   ${ICE_CELLS}
@@ -123,8 +138,18 @@ const vertexShader = /* glsl */`
          + sin(p.y * 3.1 + t * 1.1);
   }
 
+  // The broad swell, deliberately NOT part of wfield: a single low-frequency plane
+  // wave travelling through world space. Because it is a function of world position
+  // it carries across a cube edge onto the next face on its own, which is what makes
+  // the six faces read as one body of water rather than six aquarium panes.
+  float swellField(vec3 p, float t) {
+    vec3 dir = normalize(vec3(1.0, 0.35, 0.8));
+    return sin(dot(p, dir) * 0.85 - t * 0.75);
+  }
+
   void main() {
     vUv = uv;
+    vCellMask = aCell.xyz;
     // Every cover cell is an INSTANCE of this one quad, so the cell's own
     // position/orientation/scale arrives as instanceMatrix rather than as a parent
     // group's modelMatrix. World position — which every pattern below is a function
@@ -140,12 +165,25 @@ const vertexShader = /* glsl */`
     vWorld = wp.xyz;
     float w = wfield(wp.xyz, uTime);
     vWave = w;
+    vSwell = swellField(wp.xyz, uTime);
+    // Local +Z is the outward face normal for every cell; in world space it is the
+    // instance matrix's Z column, which is how the surface knows which way is up on
+    // a cube whose faces all point somewhere different.
+    vFaceNormal = normalize((cellMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+
+    // The claim sweep. Each cell holds off until the sweep reaches it, so the
+    // element travels outward from the tile the orb was taken on rather than
+    // appearing on all six faces at once. Once the sweep has passed, uEnv.y pins to
+    // 1 and this is a constant 1 for the rest of the wash.
+    vArrive = smoothstep(aSweep, aSweep + 0.35, uEnv.y);
 
     vec3 pos = position;
     // Local +Z is the outward face normal for every cell, so displacement along
     // it lifts the surface off the sticker on all six faces.
     if (uMode == 0) {
-      pos.z += w * 0.035;                              // water swell
+      // Ripple plus the broad swell, both gated by the sweep so a cell rises into
+      // the water rather than snapping to full displacement the moment it arrives.
+      pos.z += (w * 0.035 + vSwell * 0.05) * vArrive;
     } else {
       // Each crystal plate sits at its own height, so the frozen surface is
       // genuinely faceted instead of a flat quad with facets painted on. The
@@ -167,10 +205,15 @@ const fragmentShader = /* glsl */`
   uniform int uMode;
   uniform vec3 uColor;
   uniform vec3 uAccent;
+  uniform vec4 uEnv;
   varying vec2 vUv;
   varying vec3 vWorld;
   varying vec3 vView;
   varying float vWave;
+  varying float vSwell;
+  varying vec3 vCellMask;
+  varying float vArrive;
+  varying vec3 vFaceNormal;
 
   ${NOISE}
   ${ICE_CELLS}
@@ -179,6 +222,13 @@ const fragmentShader = /* glsl */`
     vec3 vd = normalize(vView);
     float t = uTime;
     vec3 lightDir = normalize(vec3(0.4, 0.8, 0.5));
+
+    // Distance from this cell's own centre, 0 → 1 at its border. Everything the
+    // player has to read — the sticker colour, heal state, bomb fuses, markings —
+    // sits in the middle of a tile, so the element is thinned there and its
+    // strongest cues are pushed out to the gaps between tiles.
+    float cellRim = clamp(max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0, 0.0, 1.0);
+    float readable = mix(0.66, 1.0, smoothstep(0.10, 0.92, cellRim));
 
     vec3 col;
     float alpha;
@@ -193,8 +243,9 @@ const fragmentShader = /* glsl */`
 
       // Depth tint: troughs hold the deep colour, crests lift toward the accent,
       // so the swell reads as a body of water with volume rather than as a flat
-      // sheet with highlights on it.
-      float h = clamp(vWave * 0.25 * 0.5 + 0.5, 0.0, 1.0);
+      // sheet with highlights on it. The broad swell is folded in at low frequency,
+      // which is what gives the cube whole-body motion instead of a uniform chop.
+      float h = clamp((vWave * 0.25 + vSwell * 0.55) * 0.5 + 0.5, 0.0, 1.0);
       col = mix(uColor * 0.30, mix(uColor, uAccent, 0.35), h);
 
       // Caustics. Ridged noise (1 - |2n-1|, raised to a high power) leaves thin
@@ -210,14 +261,44 @@ const fragmentShader = /* glsl */`
 
       // Foam, but only on the crests and broken up by noise, so it collects along
       // the tops of the swell the way real foam does instead of frosting evenly.
-      float crest = smoothstep(0.35, 1.0, vWave * 0.25);
+      float crest = smoothstep(0.30, 1.0, vWave * 0.25 + vSwell * 0.45);
       float foam = smoothstep(0.35, 0.85, crest * (0.45 + 0.9 * vnoise(vWorld * 10.0 + t * 0.5)));
-      col = mix(col, vec3(1.0), foam * 0.8);
+
+      // ── The waterline ────────────────────────────────────────────────────
+      // A meniscus riding the cube's silhouette. Surface tension piles water up
+      // where a body of it meets an edge, and without this the cube read as six
+      // wet squares that happened to be adjacent — there was nothing telling the
+      // eye it was ONE volume with an outside. It is strongest in the tile gaps of
+      // the cells that actually sit on a cube edge, and builds further at corners
+      // where two edges meet.
+      // The band rises toward the tile gap and then falls away again BEFORE the
+      // quad's outer limit. Cover quads are cut slightly oversized so neighbours
+      // overlap and the grout disappears, which means their last sliver hangs past
+      // the cube's silhouette into empty space — running the waterline all the way
+      // out to cellRim 1.0 painted bright foam on that overhang and fringed the
+      // cube with ragged white flaps.
+      float gapBand = smoothstep(0.45, 0.80, cellRim) * (1.0 - smoothstep(0.88, 1.0, cellRim));
+      float meniscus = vCellMask.y * gapBand * (0.55 + 0.45 * vCellMask.z);
+      // Broken up so the waterline crawls rather than sitting as a painted stripe.
+      meniscus *= 0.55 + 0.75 * vnoise(vWorld * 7.0 + vec3(0.0, t * 0.6, t * 0.35));
+      float rimFoam = meniscus * (0.5 + 0.5 * crest);
+
+      // Restrained: a waterline is a bright EDGE on a blue body. Pushed harder it
+      // stops reading as water piling up and starts reading as frost.
+      col = mix(col, vec3(1.0), clamp(foam * 0.8 + rimFoam * 0.32, 0.0, 1.0));
 
       float spec = pow(max(dot(reflect(-lightDir, n), vd), 0.0), 60.0);
       col += vec3(1.0) * spec * 1.1;
       col = mix(col, uAccent, fres * 0.4);
+      // Deep body, cyan caustics, white foam: the accent is pushed hardest exactly
+      // where the water is thickest, along the rims.
+      col += uAccent * meniscus * 0.30;
+
       alpha = 0.5 + fres * 0.32 + caustic * 0.18 + foam * 0.35;
+      // Thin over tile centres so gameplay marks stay legible, and thicken along
+      // the gaps and the silhouette where the element should read strongest.
+      alpha *= readable;
+      alpha += meniscus * 0.16;
     } else {
       // ── Ice ──────────────────────────────────────────────────────────────
       // Every fragment belongs to a crystal plate; the plate's id drives both its
@@ -275,6 +356,9 @@ const fragmentShader = /* glsl */`
       alpha = 0.80 + fres * 0.14 + crack * 0.12;
     }
 
+    // The cell has not been reached by the claim sweep yet, or the wash is
+    // dissolving. Both are the same statement about how much element is here.
+    alpha *= vArrive;
     gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
   }
 `;
@@ -290,7 +374,9 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex) {
         uTime: sharedUniforms.time,                 // ticked by CubeAssembly every frame
         uMode: { value: SURFACE_MODE[element] ?? 0 },
         uColor: { value: new THREE.Color(colorHex) },
-        uAccent: { value: new THREE.Color(accentHex) }
+        uAccent: { value: new THREE.Color(accentHex) },
+        // Written once per frame by the skin's transform loop, never per instance.
+        uEnv: { value: new THREE.Vector4(1, 1, 0, 0) }
       },
       vertexShader,
       fragmentShader,
@@ -303,4 +389,44 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex) {
     _matCache.set(key, mat);
   }
   return mat;
+}
+
+/**
+ * The water/ice skin for every cover cell at once — one InstancedMesh, one draw
+ * call for the whole sheathed cube.
+ *
+ * The geometry is built per mount rather than shared from a module cache, because
+ * it carries this wash's per-cell attributes (where each cell sits on the cube, and
+ * its share of the claim sweep). The material stays cached: it holds no per-wash
+ * state beyond uniforms the skin writes each frame.
+ *
+ * ElementalCubeSkin's single frame loop owns the instance matrices and `uEnv`;
+ * nothing here runs per frame.
+ */
+export function ElementalSurfaceSkin({ element, color, accent, count, cellData, meshRef }) {
+  const material = useMemo(() => getElementalSurfaceMaterial(element, color, accent), [element, color, accent]);
+
+  const geometry = useMemo(() => {
+    const geo = getElementalSurfaceGeo().clone();
+    geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(cellData.cell, 4));
+    // Marked dynamic: the sweep is rewritten once when a claim origin arrives,
+    // which can be a frame or two after the mesh mounts.
+    const sweep = new THREE.InstancedBufferAttribute(cellData.sweep, 1);
+    sweep.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aSweep', sweep);
+    return geo;
+  }, [cellData]);
+
+  // Ours to dispose — the clone is per mount. The cached source geometry and the
+  // cached material outlive it and must not be touched.
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[geometry, material, count]}
+      frustumCulled={false}
+      raycast={() => null}
+    />
+  );
 }

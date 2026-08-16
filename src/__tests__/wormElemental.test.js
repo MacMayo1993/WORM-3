@@ -160,6 +160,67 @@ describe('elemental wash lifecycle', () => {
     expect(clears.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('records the claim tile as the sweep origin, snapshotted not aliased', () => {
+    // The cube skin sweeps the element outward from where the orb was taken. The
+    // orb is claimed by the head, so the head's tile IS the claim point — but the
+    // worm keeps crawling, so a live reference to sim.pos would drag the sweep
+    // origin along behind it.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const claimedAt = { ...sim.pos };
+    startElemental(sim, ctx, 'water');
+    expect(sim.elementalOrigin).toEqual({
+      x: claimedAt.x, y: claimedAt.y, z: claimedAt.z, dirKey: claimedAt.dirKey
+    });
+    expect(sim.elementalOrigin).not.toBe(sim.pos);
+
+    const dt = 0.1;
+    const span = ELEMENTAL_FOCUS_DURATION + 3;
+    for (let i = 0; i < Math.round(span / dt); i++) stepWormSim(sim, dt, SIZE, ctx);
+    expect(tileKey(sim.pos)).not.toBe(tileKey(claimedAt));   // the worm moved on
+    expect(sim.elementalOrigin.x).toBe(claimedAt.x);          // the origin did not
+    expect(sim.elementalOrigin.y).toBe(claimedAt.y);
+    expect(sim.elementalOrigin.z).toBe(claimedAt.z);
+  });
+
+  it('a replacement element re-seeds the sweep origin', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startElemental(sim, ctx, 'fire');
+    const first = sim.elementalOrigin;
+    const dt = 0.1;
+    for (let i = 0; i < Math.round((ELEMENTAL_FOCUS_DURATION + 3) / dt); i++) stepWormSim(sim, dt, SIZE, ctx);
+    startElemental(sim, ctx, 'ice');
+    expect(sim.elementalOrigin).not.toBe(first);
+    expect(tileKey(sim.elementalOrigin)).toBe(tileKey(sim.pos));
+  });
+
+  it('clears the sweep origin when the wash expires', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startElemental(sim, ctx, 'grass');
+    const dt = 0.1;
+    const span = ELEMENTAL_FOCUS_DURATION + ELEMENTAL_DURATION + 1;
+    for (let i = 0; i < Math.round(span / dt); i++) stepWormSim(sim, dt, SIZE, ctx);
+    expect(sim.elementalType).toBeNull();
+    expect(sim.elementalOrigin).toBeNull();
+  });
+
+  it('claiming an element does not touch the cube or the worm', () => {
+    // The wash is presentation only. If this ever fails, an art pass has reached
+    // into the simulation.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const before = {
+      tail: sim.tailLength, alive: sim.alive, pos: tileKey(sim.pos), speed: sim.speed
+    };
+    startElemental(sim, ctx, 'water');
+    expect(sim.tailLength).toBe(before.tail);
+    expect(sim.alive).toBe(before.alive);
+    expect(tileKey(sim.pos)).toBe(before.pos);
+    expect(sim.speed).toBe(before.speed);
+  });
+
   it('resetWormSim wipes an active wash', () => {
     const sim = makeSim();
     const ctx = makeCtx();
@@ -167,5 +228,6 @@ describe('elemental wash lifecycle', () => {
     resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
     expect(sim.elementalType).toBeNull();
     expect(sim.elementalT).toBe(0);
+    expect(sim.elementalOrigin).toBeNull();
   });
 });

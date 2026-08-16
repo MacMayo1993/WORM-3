@@ -19,6 +19,12 @@ export const wormBuffs = {
   rocketActive: false,
   elementalT: 0,     // seconds of the active elemental wash remaining
   elementalMaxT: 0,  // duration of the active wash, for the fill fraction
+  // The tile the wash was claimed on, {x,y,z,dirKey} or null. Purely a render
+  // input: the cube skin sweeps the element outward from it. Mirrored here rather
+  // than put in the store because it is read inside a frame loop, and a store write
+  // would re-run every subscriber's selector across the whole app for a value only
+  // one component looks at.
+  elementalOrigin: null,
 };
 
 /**
@@ -47,4 +53,5 @@ export function resetWormBuffs() {
   wormBuffs.rocketActive = false;
   wormBuffs.elementalT = 0;
   wormBuffs.elementalMaxT = 0;
+  wormBuffs.elementalOrigin = null;
 }
