@@ -141,7 +141,6 @@ const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal, tx: -1, ty: -1,
 export function WormBody({ worm, size }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
     const boxMeshRef = useRef();    // box body (book worm only)
-    const glowAltRef = useRef();    // additive overlay — even glow segments only
     const leftPageRef = useRef();   // book worm only — left page-stack overlay
     const rightPageRef = useRef();  // book worm only — right page-stack overlay
     const bookHeadRef = useRef();   // book worm only — the round head orb
@@ -358,7 +357,6 @@ export function WormBody({ worm, size }) {
             beginWormSegments();
             endWormSegments();
             mesh.count = 0;
-            if (glowAltRef.current) glowAltRef.current.count = 0;
             if (leftPageRef.current) leftPageRef.current.count = 0;
             if (rightPageRef.current) rightPageRef.current.count = 0;
             if (bookHeadRef.current) bookHeadRef.current.count = 0;
@@ -401,7 +399,6 @@ export function WormBody({ worm, size }) {
 
         let walkIndex = 0;
         let cumulativeDist = 0;
-        let altIdx = 0; // index into glowAltRef (even glow segments)
         let writeIdx = 0; // compacted instance slot — advances only for segments actually drawn
         let pageWriteIdx = 0; // book worm only — compacted slot into the page-flap overlays (body segments only, no head entry)
 
@@ -637,17 +634,6 @@ export function WormBody({ worm, size }) {
             // anything re-deriving it would drift from what the player sees.
             pushWormSegment(_wormDummy.position.x, _wormDummy.position.y, _wormDummy.position.z);
 
-            // Glow worm: write every other *drawn* segment to additive overlay at 1.4× scale
-            // (writeIdx, not i, so the ratio holds regardless of LOD thinning).
-            if (_isGlow && writeIdx % 2 === 0) {
-                const altMesh = glowAltRef.current;
-                if (altMesh) {
-                    _wormDummy.scale.setScalar(_wormDummy.scale.x * 1.4);
-                    _wormDummy.updateMatrix();
-                    altMesh.setMatrixAt(altIdx++, _wormDummy.matrix);
-                }
-            }
-
             // Color per segment — only recomputed when colorDirty (see above)
             if (colorDirty) {
                 const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
@@ -656,7 +642,14 @@ export function WormBody({ worm, size }) {
                     // Spectrum: a rainbow that flows down the body and scrolls over time.
                     _bodyColor.setHSL(((i * 0.022) + time * 0.12) % 1, 0.85, 0.6);
                 } else if (i === 0 && _isGlow) {
-                    // Glow head — use base worm color; GlowWormAura point light provides visible glow
+                    // Glow head — use base worm color; GlowWormAura point light IS the
+                    // bioluminescence. There was also an additive sphere at 1.4x the
+                    // bead on every other segment; a halo wider than its bead cannot
+                    // hide behind it, so the parts occluded by neighbouring beads were
+                    // depth-rejected and the surviving crescents squeezed out of every
+                    // joint as spikes growing off the body. Removed — the light carries
+                    // the character on its own, and the overlay was a whole instanced
+                    // mesh of up to MAX_TAIL instances per frame.
                     _bodyColor.set(baseColor);
                 } else if (hasOrbColor) {
                     // Each orb grows a trio of segments (ORB_SEGMENT_GROWTH): 2 in the worm's
@@ -743,12 +736,6 @@ export function WormBody({ worm, size }) {
         endWormSegments();
         if (mesh.instanceColor && colorDirty) mesh.instanceColor.needsUpdate = true;
 
-        // Update glow overlay count
-        if (_isGlow) {
-            const altMesh = glowAltRef.current;
-            if (altMesh) { altMesh.count = altIdx; altMesh.instanceMatrix.needsUpdate = true; }
-        }
-
         // Update book worm page-flap overlay counts (meshes are only mounted when isBook)
         if (_isBook) {
             const lp = leftPageRef.current;
@@ -816,13 +803,6 @@ export function WormBody({ worm, size }) {
                     colours (setColorAt) pass through untinted. */}
                 <primitive object={skinMaterial} attach="material" />
             </instancedMesh>
-            {isGlow && (
-                <instancedMesh ref={glowAltRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-                    <sphereGeometry args={[1, 10, 10]} />
-                    <meshBasicMaterial color={skin.glow} transparent opacity={0.7}
-                        blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-                </instancedMesh>
-            )}
             <group ref={particlesGroupRef}>
                 <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />
             </group>

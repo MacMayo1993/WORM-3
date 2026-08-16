@@ -72,7 +72,6 @@ function _buildRig() {
   // Thin spine/binding — the pages (below) are the visible body now, not a
   // flat square slab the pages ride on top of.
   const boxGeo = new THREE.BoxGeometry(SPINE_X_SCALE, 0.68, 1.12);
-  const glowGeo = new THREE.SphereGeometry(1, 10, 10);
 
   // Book Worm's page flaps — same geometry/hinge recipe as WormBody.jsx /
   // CrawlerCharacter.jsx, posed manually per-frame in _poseWorm() (an idle
@@ -83,7 +82,6 @@ function _buildRig() {
 
   const beads = [];
   const boxes = [];
-  const glows = [];
   const leftPages = [];  // leftPages[i] = [layer0Mesh, layer1Mesh, ...]
   const rightPages = [];
   for (let i = 0; i < SEGMENTS; i++) {
@@ -95,12 +93,8 @@ function _buildRig() {
     const box = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({
       emissive: 0xffffff, emissiveIntensity: 0.18, roughness: 0.58, metalness: 0.2,
     }));
-    const glow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({
-      transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending,
-      depthWrite: false, toneMapped: false,
-    }));
-    group.add(bead, box, glow);
-    beads.push(bead); boxes.push(box); glows.push(glow);
+    group.add(bead, box);
+    beads.push(bead); boxes.push(box);
 
     const leftLayers = [];
     const rightLayers = [];
@@ -150,7 +144,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, glows, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
+  return { group, beads, boxes, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -324,7 +318,6 @@ function _poseWorm(opts, time) {
     _segmentOffset(i, characterId, time, _off);
     const bead = rig.beads[i];
     const box = rig.boxes[i];
-    const glow = rig.glows[i];
     const leftLayers = rig.leftPages[i];
     const rightLayers = rig.rightPages[i];
     // The Book Worm's head is a sphere bead like every other worm's; only its
@@ -335,7 +328,6 @@ function _poseWorm(opts, time) {
     const shown = !headOnly || i <= 2;
     bead.visible = shown && !bookBodySeg;
     box.visible = shown && bookBodySeg;
-    glow.visible = shown && isGlow && i % 2 === 0;
     const pagesShown = shown && bookBodySeg;
     for (const l of leftLayers) l.visible = pagesShown;
     for (const l of rightLayers) l.visible = pagesShown;
@@ -436,16 +428,19 @@ function _poseWorm(opts, time) {
     // instead of lying flat like the body stack — same orientation basis as
     // the body pages (computed against segment 1, since there's no "segment
     // -1" to diff against), a box whose Y is its largest dimension.
-    if (glow.visible) {
-      glow.position.copy(_off);
-      glow.scale.setScalar(body.scale.x * 1.4);
-      glow.material.color.set(skin.glow);
-    }
-
     if (i === 0) rig.particlesAnchor.position.copy(_off);
   }
   rig.particles.update(time);
 
+  // The Glow Worm's bioluminescence is THIS LIGHT, and only this light.
+  //
+  // It used to also carry an additive sphere at 1.4x the bead on every other
+  // segment. A halo wider than the bead it sits on cannot stay hidden behind it:
+  // the parts occluded by neighbouring beads get depth-rejected and what survives
+  // is a crescent squeezing out of each joint, which read as spikes and fins
+  // growing out of the worm rather than as a glow. Raising the sphere's segment
+  // count only made the spikes rounder — the shape was the problem, not the
+  // faceting. A light has no silhouette to poke out, so it cannot come back.
   rig.glowLight.visible = isGlow;
   rig.glowLight.intensity = isGlow ? 0.5 + Math.sin(time * 2.4) * 0.15 : 0;
   if (isGlow) {
