@@ -360,6 +360,10 @@ export function useWormCrawler(size, cubies) {
         wormBuffs.rocketActive = sim.rocketActive;
         wormBuffs.elementalT = sim.elementalT;
         wormBuffs.elementalMaxT = sim.elementalMaxT;
+        // Reference-copied, not cloned: the sim snapshots a fresh object per claim
+        // and never mutates it, so the skin can compare identity to detect a new
+        // claim without allocating anything per frame.
+        wormBuffs.elementalOrigin = sim.elementalOrigin;
         publishTilePress(sim, sizeRef.current, ctxRef.current, delta);
     }, []);
 

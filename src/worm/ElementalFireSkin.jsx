@@ -27,7 +27,7 @@
 // The jitter hash is reproduced from elementalSeeds.hashSeed verbatim, so a given
 // cell burns the same way it did when the numbers were computed in JS.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { FLAME_TEX } from './healerWorm/HealerBombs.jsx';
 import { getSoftGlowTexture } from './healerWorm/elementalBadge.jsx';
@@ -87,10 +87,16 @@ function buildFlameCellGeometry(flamesPerCell) {
 
 const vertexShader = /* glsl */`
   uniform float uTime;
+  // (intensity, claim, release, unused) — the shared elemental envelope.
+  uniform vec4 uEnv;
   attribute float aFlame;   // per-vertex: tongue index, or -1 for the ember bed
   attribute float aSeed;    // per-instance: the cover cell's stable identity
+  attribute vec4 aCell;     // per-instance: (rim, edge, corner, seed) on the cube
+  attribute float aSweep;   // per-instance: share of the claim sweep before arrival
   varying vec2 vUv;
   varying float vKind;      // 1 = flame tongue, 0 = ember bed
+  varying float vHeat;      // 0..1 how hot this quad is burning right now
+  varying vec3 vCellMask;
 
   // elementalSeeds.hashSeed / hashSeed2, verbatim.
   float h1(float s, float i) { return fract(sin((s + 1.0) * 12.9898 + i * 78.233) * 43758.5453); }
@@ -99,12 +105,33 @@ const vertexShader = /* glsl */`
   void main() {
     vUv = uv;
     vKind = aFlame < 0.0 ? 0.0 : 1.0;
+    vCellMask = aCell.xyz;
 
     #ifdef USE_INSTANCING
       mat4 cellMatrix = modelMatrix * instanceMatrix;
     #else
       mat4 cellMatrix = modelMatrix;
     #endif
+
+    vec3 cellWorld = cellMatrix[3].xyz;
+    vec3 faceNormal = normalize((cellMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+
+    // ── Gust bands ───────────────────────────────────────────────────────────
+    // A slow plane wave through world space, so neighbouring cells rise and fall
+    // TOGETHER and the fire moves across the cube in bands. Every cell flickering
+    // on its own timer is what made the first version read as a grid of identical
+    // campfires rather than as one burning object.
+    float gust = 0.5 + 0.5 * sin(dot(cellWorld, vec3(0.62, 0.31, 0.47)) * 1.15 - uTime * 1.35);
+
+    // Fire climbs, and it shows most where the surface ends. Tongues run taller on
+    // the cells that sit on a cube edge, taller again at the corners, and taller
+    // still on faces pointing skyward — which is what gives the burning cube a
+    // silhouette instead of an even fur of flame.
+    float upFacing = max(0.0, dot(faceNormal, vec3(0.0, 1.0, 0.0)));
+    float tall = 1.0 + 0.32 * aCell.y + 0.22 * aCell.z + 0.30 * upFacing;
+
+    // The claim sweep: each cell catches only when the sweep reaches it.
+    float arrive = smoothstep(aSweep, aSweep + 0.30, uEnv.y);
 
     vec2 size;
     vec2 center;
@@ -114,9 +141,10 @@ const vertexShader = /* glsl */`
       // The hot bed under the tongues. Without it each cell reads as a few discrete
       // flames sitting ON a tile; with it the tile itself looks like it is burning.
       float pulse = 0.85 + 0.15 * sin(uTime * 3.1 + aSeed);
-      size = vec2(0.95 * pulse, 0.62 * pulse);
+      size = vec2(0.95 * pulse, 0.62 * pulse) * arrive;
       center = vec2(0.5, 0.5);
       local = vec3(0.0, -0.12, 0.06);
+      vHeat = 0.35 + 0.4 * gust;
     } else {
       float r1 = h1(aSeed, aFlame);
       float r2 = h2(aSeed, aFlame);
@@ -125,8 +153,13 @@ const vertexShader = /* glsl */`
       float scl = 0.55 + r2 * 0.75;
       float sway = 0.04 + r2 * 0.05;
       float flick = 0.72 + 0.5 * sin(uTime * rate + phase);
+      // The gust rides ON the per-tongue flicker rather than replacing it: the
+      // tongue keeps its own life, the band decides how far it gets to throw.
+      float band = (0.72 + 0.50 * gust) * tall * arrive;
+      vHeat = clamp(0.30 + 0.55 * gust + 0.35 * (aCell.y * 0.5 + upFacing * 0.5), 0.0, 1.0);
 
-      size = vec2(${FLAME_W} * scl * (0.85 + 0.25 * flick), ${FLAME_H} * scl * (0.8 + 0.45 * flick));
+      size = vec2(${FLAME_W} * scl * (0.85 + 0.25 * flick),
+                  ${FLAME_H} * scl * (0.8 + 0.45 * flick) * band);
       center = vec2(0.5, ${FLAME_CENTER_Y});
       local = vec3(
         (r1 - 0.5) * 0.78 + sin(uTime * rate * 0.32 + phase) * sway,
@@ -157,8 +190,12 @@ const fragmentShader = /* glsl */`
   uniform sampler2D uGlowTex;
   uniform vec3 uFlameColor;
   uniform vec3 uEmberColor;
+  uniform vec3 uCrustColor;
+  uniform vec3 uCoreColor;
   varying vec2 vUv;
   varying float vKind;
+  varying float vHeat;
+  varying vec3 vCellMask;
 
   void main() {
     // Both are sampled unconditionally: a texture fetch inside divergent flow has
@@ -166,11 +203,24 @@ const fragmentShader = /* glsl */`
     vec4 flame = texture2D(uFlameTex, vUv);
     vec4 ember = texture2D(uGlowTex, vUv);
     vec4 tex = mix(ember, flame, vKind);
-    // The old sprite materials' colour tint and opacity, per kind. The flame texture
-    // is white-hot at its base — sized for a bomb against a dark scene — so additive
-    // over a bright sticker it is tinted warm and kept well under full opacity.
-    vec3 tint = mix(uEmberColor, uFlameColor, vKind);
-    float op = mix(0.34, 0.55, vKind);
+
+    // ── The ember bed: crust, not campfire ───────────────────────────────────
+    // Near-black red where the surface is banked over, opening to hot orange in
+    // the gaps between tiles — a fissure pattern, so the cube reads as something
+    // burning from within rather than as a glow decal per sticker. Keeping the
+    // centre dark is also what leaves the tile's own colour and markings legible.
+    float gap = smoothstep(0.25, 0.95, max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0);
+    vec3 bed = mix(uCrustColor, uEmberColor, gap * (0.45 + 0.55 * vHeat));
+
+    // ── The tongues: warm body, pale-gold core ───────────────────────────────
+    // The core rides the base of the tongue (v near 0, where the texture is
+    // white-hot) and only on the tongues actually being thrown by a gust, so the
+    // hottest part of the fire moves across the cube with the bands.
+    float core = smoothstep(0.45, 0.0, vUv.y) * vHeat;
+    vec3 tongue = mix(uFlameColor, uCoreColor, core * 0.75);
+
+    vec3 tint = mix(bed, tongue, vKind);
+    float op = mix(0.30 + 0.16 * gap, 0.55, vKind);
     gl_FragColor = vec4(tex.rgb * tint, tex.a * op);
   }
 `;
@@ -187,7 +237,11 @@ function getFlameMaterial() {
         uFlameTex: { value: FLAME_TEX },
         uGlowTex: { value: getSoftGlowTexture() },
         uFlameColor: { value: new THREE.Color('#ff5a12') },
-        uEmberColor: { value: new THREE.Color('#ff4a08') }
+        uEmberColor: { value: new THREE.Color('#ff4a08') },
+        // Near-black red crust → orange body → pale-gold cores.
+        uCrustColor: { value: new THREE.Color('#2e0703') },
+        uCoreColor: { value: new THREE.Color('#ffd9a0') },
+        uEnv: { value: new THREE.Vector4(1, 1, 0, 0) }
       },
       vertexShader,
       fragmentShader,
@@ -209,22 +263,27 @@ function getFlameMaterial() {
  *
  * @param {number}  count          number of cover cells
  * @param {number}  flamesPerCell  from the quality budget
+ * @param {object}  cellData       per-cell masks and sweep shares from the skin
  * @param {object}  meshRef        ref the skin writes instance matrices through
  */
-export default function ElementalFireSkin({ count, flamesPerCell = 5, meshRef }) {
-  const geometry = useMemo(() => buildFlameCellGeometry(flamesPerCell), [flamesPerCell]);
-  const material = getFlameMaterial();
-  const seedRef = useRef(null);
-
-  // Per-instance seed: the cover cell's index, matching the seed the per-cell
-  // component was handed before. Rebuilt only when the cell count changes.
-  useEffect(() => {
+export default function ElementalFireSkin({ count, flamesPerCell = 5, cellData, meshRef }) {
+  const geometry = useMemo(() => {
+    const geo = buildFlameCellGeometry(flamesPerCell);
+    // Per-instance seed: the cover cell's index, matching the seed the per-cell
+    // component was handed before, so a given cell burns the way it always has.
     const seeds = new Float32Array(count);
     for (let i = 0; i < count; i++) seeds[i] = i;
-    const attr = new THREE.InstancedBufferAttribute(seeds, 1);
-    geometry.setAttribute('aSeed', attr);
-    seedRef.current = attr;
-  }, [geometry, count]);
+    geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
+    geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(cellData.cell, 4));
+    // Dynamic: the sweep is rewritten once when a claim origin arrives, which can
+    // be a frame or two after the mesh mounts.
+    const sweep = new THREE.InstancedBufferAttribute(cellData.sweep, 1);
+    sweep.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aSweep', sweep);
+    return geo;
+  }, [flamesPerCell, count, cellData]);
+
+  const material = getFlameMaterial();
 
   // The geometry is built per mount (its vertex count depends on the quality tier),
   // so it is ours to dispose. The material and both textures are shared and stay.

@@ -30,7 +30,8 @@ import {
   hashSeed2,
   cellSeed,
   cellEdgeMask,
-  cellSweepDelay
+  cellSweepDelay,
+  resolveSweepOrigin
 } from '../worm/healerWorm/elementalSeeds.js';
 import { ELEMENTAL_TYPES, getElementalDef } from '../worm/healerWorm/elementalDefs.js';
 import { ELEMENTAL_DURATION } from '../worm/healerWorm/constants.js';
@@ -302,5 +303,63 @@ describe('elemental seeds and cube-scale masks', () => {
 
   it('no sweep origin means no delay', () => {
     expect(cellSweepDelay({ faceKey: 'PZ', j: 0, k: 0 }, null, 5)).toBe(0);
+  });
+
+  it('resolves a claimed sticker to the cover cell under it', () => {
+    // A 3x3 board: every sticker is its own cell, so the match must be exact.
+    const cells = [
+      { faceKey: 'PZ', j: 0, k: 0, x: 0, y: 0, z: 2 },
+      { faceKey: 'PZ', j: 1, k: 1, x: 1, y: 1, z: 2 },
+      { faceKey: 'PY', j: 1, k: 1, x: 1, y: 2, z: 1 }
+    ];
+    expect(resolveSweepOrigin(cells, { x: 1, y: 1, z: 2, dirKey: 'PZ' })).toBe(cells[1]);
+    expect(resolveSweepOrigin(cells, { x: 1, y: 2, z: 1, dirKey: 'PY' })).toBe(cells[2]);
+  });
+
+  it('snaps to the nearest cell on the claimed face when cells are coarser than stickers', () => {
+    // Above the grid cap several stickers share one cover cell, so the claimed
+    // sticker often has no cell of its own — the sweep must still start under the
+    // worm rather than defaulting to a corner or giving up.
+    const cells = [
+      { faceKey: 'PZ', j: 0, k: 0, x: 1, y: 1, z: 14 },
+      { faceKey: 'PZ', j: 1, k: 1, x: 7, y: 7, z: 14 },
+      { faceKey: 'PZ', j: 2, k: 2, x: 13, y: 13, z: 14 }
+    ];
+    expect(resolveSweepOrigin(cells, { x: 8, y: 6, z: 14, dirKey: 'PZ' })).toBe(cells[1]);
+    expect(resolveSweepOrigin(cells, { x: 0, y: 2, z: 14, dirKey: 'PZ' })).toBe(cells[0]);
+  });
+
+  it('never starts the sweep on a face the element was not claimed on', () => {
+    const cells = [
+      { faceKey: 'PZ', j: 0, k: 0, x: 0, y: 0, z: 2 },
+      { faceKey: 'NX', j: 0, k: 0, x: 0, y: 0, z: 0 }
+    ];
+    // The nearest cell by raw distance is the PZ one; the face must win anyway.
+    expect(resolveSweepOrigin(cells, { x: 0, y: 0, z: 0, dirKey: 'NX' })).toBe(cells[1]);
+    // A face with no cells at all yields nothing rather than a wrong-face origin.
+    expect(resolveSweepOrigin(cells, { x: 0, y: 0, z: 0, dirKey: 'PY' })).toBeNull();
+  });
+
+  it('fails soft with no origin or no cells', () => {
+    expect(resolveSweepOrigin([], { x: 0, y: 0, z: 0, dirKey: 'PZ' })).toBeNull();
+    expect(resolveSweepOrigin([{ faceKey: 'PZ', x: 0, y: 0, z: 0 }], null)).toBeNull();
+  });
+
+  it('orders a whole board so the claimed face leads and the rest follow', () => {
+    // This is the shape the shader consumes: the claimed face occupies the first
+    // half of the sweep, every other face the second, and nothing is left behind.
+    const gridN = 3;
+    const faces = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
+    const cells = [];
+    for (const faceKey of faces) {
+      for (let j = 0; j < gridN; j++) for (let k = 0; k < gridN; k++) cells.push({ faceKey, j, k });
+    }
+    const origin = { faceKey: 'PY', j: 1, k: 1 };
+    const delays = cells.map(c => cellSweepDelay(c, origin, gridN));
+    const onOrigin = delays.filter((_, i) => cells[i].faceKey === 'PY');
+    const elsewhere = delays.filter((_, i) => cells[i].faceKey !== 'PY');
+    expect(Math.min(...onOrigin)).toBe(0);
+    expect(Math.max(...onOrigin)).toBeLessThan(Math.min(...elsewhere));
+    expect(Math.max(...elsewhere)).toBeLessThan(1);
   });
 });

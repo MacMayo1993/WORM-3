@@ -100,3 +100,28 @@ export function cellSweepDelay(cell, origin, gridN) {
   const maxD = 2 * gridN;
   return Math.min(1, d / maxD);
 }
+
+/**
+ * Resolve the sticker an element was claimed on to the cover cell the sweep should
+ * start from.
+ *
+ * The simulation records a sticker (x/y/z/dirKey); the skin works in cover cells,
+ * and above the grid cap several stickers share one. Picking the nearest cell on
+ * the same face keeps the sweep starting under the worm even on a 15×15, where the
+ * claimed sticker may have no cell of its own at all.
+ *
+ * @param {Array<{faceKey:string,x:number,y:number,z:number}>} cells
+ * @param {{x:number,y:number,z:number,dirKey:string}|null} origin
+ * @returns {object|null} the cell to sweep from, or null when there is no origin
+ */
+export function resolveSweepOrigin(cells, origin) {
+  if (!origin || !cells?.length) return null;
+  let best = null;
+  let bestD = Infinity;
+  for (const c of cells) {
+    if (c.faceKey !== origin.dirKey) continue;
+    const d = Math.abs(c.x - origin.x) + Math.abs(c.y - origin.y) + Math.abs(c.z - origin.z);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}

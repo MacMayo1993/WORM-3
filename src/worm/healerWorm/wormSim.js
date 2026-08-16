@@ -204,6 +204,10 @@ export function makeWormSim(size) {
         elementalT: 0,            // seconds of elemental wash remaining
         elementalMaxT: 0,         // duration of the active wash, for the HUD's fill
         elementalFocusT: 0,       // seconds remaining of the claim camera beat (pull out to the overview)
+        // The tile the wash was claimed on, {x,y,z,dirKey}. Render-only: the cube
+        // skin sweeps the element outward from here across the six faces instead of
+        // having it appear everywhere at once. Nothing in the simulation reads it.
+        elementalOrigin: null,
         landingGraceT: 0,         // post-rocket window where a landing can't kill
         // Injected RNG — every random draw in the special system goes through this so
         // tests can make spawn type and placement deterministic. Set once at
@@ -328,6 +332,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.elementalT = 0;
     sim.elementalMaxT = 0;
     sim.elementalFocusT = 0;
+    sim.elementalOrigin = null;
     sim.landingGraceT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -428,6 +433,11 @@ export function startElemental(sim, ctx, type) {
     sim.elementalType = type;
     sim.elementalT = ELEMENTAL_DURATION;
     sim.elementalMaxT = ELEMENTAL_DURATION;
+    // Where the element enters the world. The orb is claimed by the head, so the
+    // head's tile IS the claim point; the skin sweeps outward from it. Snapshotted
+    // rather than referenced, since sim.pos keeps moving once the beat ends.
+    const { x, y, z, dirKey } = sim.pos;
+    sim.elementalOrigin = { x, y, z, dirKey };
     // Kick off the claim camera beat: the wash bathes the WHOLE cube, so the
     // camera pulls out to the opening-overview framing for a moment to show the
     // cube transform, then eases back to the chase (WormChaseCamera reads this).
@@ -1637,6 +1647,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.elementalT = 0;
             sim.elementalMaxT = 0;
             sim.elementalType = null;
+            sim.elementalOrigin = null;
             ctx.onElementalTheme(null, 0);
         }
     }
