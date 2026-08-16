@@ -22,6 +22,7 @@ import { getHatParts } from '../worm/wormHatParts.js';
 import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../worm/wormSkinMaterial.js';
+import { makeWormHaloSprite, HALO_SCALE } from '../worm/wormGlowHalo.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
@@ -82,6 +83,9 @@ function _buildRig() {
 
   const beads = [];
   const boxes = [];
+  // Soft camera-facing halos — the Glow Worm's light spilling past its body. See
+  // wormGlowHalo.js for why this is a billboard and not a sphere.
+  const halos = [];
   const leftPages = [];  // leftPages[i] = [layer0Mesh, layer1Mesh, ...]
   const rightPages = [];
   for (let i = 0; i < SEGMENTS; i++) {
@@ -93,8 +97,11 @@ function _buildRig() {
     const box = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({
       emissive: 0xffffff, emissiveIntensity: 0.18, roughness: 0.58, metalness: 0.2,
     }));
-    group.add(bead, box);
-    beads.push(bead); boxes.push(box);
+    const halo = makeWormHaloSprite();
+    // Rendered before the beads so the body reads as sitting IN the glow.
+    halo.renderOrder = -1;
+    group.add(bead, box, halo);
+    beads.push(bead); boxes.push(box); halos.push(halo);
 
     const leftLayers = [];
     const rightLayers = [];
@@ -144,7 +151,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
+  return { group, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -325,6 +332,7 @@ function _poseWorm(opts, time) {
     _segmentOffset(i, characterId, time, _off);
     const bead = rig.beads[i];
     const box = rig.boxes[i];
+    const halo = rig.halos[i];
     const leftLayers = rig.leftPages[i];
     const rightLayers = rig.rightPages[i];
     // The Book Worm's head is a sphere bead like every other worm's; only its
@@ -435,6 +443,18 @@ function _poseWorm(opts, time) {
     // instead of lying flat like the body stack — same orientation basis as
     // the body pages (computed against segment 1, since there's no "segment
     // -1" to diff against), a box whose Y is its largest dimension.
+    // Halo: every segment, not every other one. The alternating version was a
+    // workaround for the old solid spheres overlapping into a lumpy tube; a soft
+    // additive falloff simply adds up along the body, which is what a glowing
+    // creature looks like.
+    halo.visible = shown && isGlow;
+    if (halo.visible) {
+      halo.position.copy(_off);
+      const s = body.scale.x * HALO_SCALE * (0.94 + Math.sin(time * 2.4 + i * 0.5) * 0.06);
+      halo.scale.set(s, s, 1);
+      halo.material.color.set(skin.glow);
+    }
+
     if (i === 0) rig.particlesAnchor.position.copy(_off);
   }
   rig.particles.update(time);

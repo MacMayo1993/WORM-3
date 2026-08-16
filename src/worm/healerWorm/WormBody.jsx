@@ -15,6 +15,15 @@ import {
 import { liveRotation } from '../liveRotation.js';
 import { shAt } from '../circularBuffers.js';
 import { beginWormSegments, pushWormSegment, endWormSegments } from '../wormSegments.js';
+import { getWormHaloGeometry, getWormHaloMaterial } from '../wormGlowHalo.js';
+
+// Halos are drawn every other segment and capped. Each is a camera-facing quad
+// several bead-radii across, so they overlap heavily and their real cost is fill
+// rate, not instance count — a mega-worm does not need three hundred of them to
+// read as glowing, and uncapped they would shade the screen many times over.
+const HALO_STRIDE = 2;
+const HALO_MAX = 48;
+const _haloDummy = new THREE.Object3D();
 import { getSkin } from '../wormCosmeticsData.js';
 import { getWormCharacter } from '../wormCharacterData.js';
 import { getSkinFX } from '../wormSkinFX.js';
@@ -167,6 +176,7 @@ export function WormBody({ worm, size }) {
     // Skin-themed material (metalness/roughness/clearcoat/transmission/iridescence/
     // flatShading + body-surface displacement) — one material shared by every
     // instance of the sphere body, since only one skin is ever equipped at once.
+    const haloRef = useRef();       // soft additive glow billboards (glow worm only)
     const skinMaterial = useMemo(() => createWormSkinMaterial(), []);
     useEffect(() => {
         applySkinMaterialProfile(skinMaterial, getSkinFX(wormSkinId), 0);
@@ -177,6 +187,8 @@ export function WormBody({ worm, size }) {
     // Refs so useFrame always reads latest values without closure staleness
     const wormColorRef = useRef(wormColor);
     wormColorRef.current = wormColor;
+    const glowColorRef = useRef(skin.glow);
+    glowColorRef.current = skin.glow;
     const bellyColorRef = useRef(bellyColor);
     bellyColorRef.current = bellyColor;
     const isInchRef = useRef(isInch);
@@ -359,6 +371,7 @@ export function WormBody({ worm, size }) {
             beginWormSegments();
             endWormSegments();
             mesh.count = 0;
+            if (haloRef.current) haloRef.current.count = 0;
             if (leftPageRef.current) leftPageRef.current.count = 0;
             if (rightPageRef.current) rightPageRef.current.count = 0;
             if (bookHeadRef.current) bookHeadRef.current.count = 0;
@@ -402,6 +415,7 @@ export function WormBody({ worm, size }) {
         let walkIndex = 0;
         let cumulativeDist = 0;
         let writeIdx = 0; // compacted instance slot — advances only for segments actually drawn
+        let haloIdx = 0;  // compacted slot into the glow-halo overlay
         let pageWriteIdx = 0; // book worm only — compacted slot into the page-flap overlays (body segments only, no head entry)
 
         const visibleCount = Math.min(MAX_TAIL, tLen);
@@ -636,6 +650,19 @@ export function WormBody({ worm, size }) {
             // anything re-deriving it would drift from what the player sees.
             pushWormSegment(_wormDummy.position.x, _wormDummy.position.y, _wormDummy.position.z);
 
+            // Glow worm: a soft camera-facing halo at this segment. The material's
+            // own uScale widens it, so the instance carries the segment's scale
+            // unchanged and one constant governs halo size in both renderers.
+            if (_isGlow && writeIdx % HALO_STRIDE === 0 && haloIdx < HALO_MAX) {
+                const haloMesh = haloRef.current;
+                if (haloMesh) {
+                    _haloDummy.position.copy(_wormDummy.position);
+                    _haloDummy.scale.setScalar(_wormDummy.scale.x);
+                    _haloDummy.updateMatrix();
+                    haloMesh.setMatrixAt(haloIdx++, _haloDummy.matrix);
+                }
+            }
+
             // Color per segment — only recomputed when colorDirty (see above)
             if (colorDirty) {
                 const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
@@ -736,6 +763,15 @@ export function WormBody({ worm, size }) {
         mesh.count = writeIdx;
         mesh.instanceMatrix.needsUpdate = true;
         endWormSegments();
+
+        const haloMesh = haloRef.current;
+        if (haloMesh) {
+            haloMesh.count = _isGlow ? haloIdx : 0;
+            if (haloIdx > 0) {
+                haloMesh.instanceMatrix.needsUpdate = true;
+                haloMesh.material.uniforms.uColor.value.set(glowColorRef.current);
+            }
+        }
         if (mesh.instanceColor && colorDirty) mesh.instanceColor.needsUpdate = true;
 
         // Update book worm page-flap overlay counts (meshes are only mounted when isBook)
@@ -805,6 +841,15 @@ export function WormBody({ worm, size }) {
                     colours (setColorAt) pass through untinted. */}
                 <primitive object={skinMaterial} attach="material" />
             </instancedMesh>
+            {isGlow && (
+                <instancedMesh
+                    ref={haloRef}
+                    args={[getWormHaloGeometry(), getWormHaloMaterial(), HALO_MAX]}
+                    frustumCulled={false}
+                    raycast={() => null}
+                    renderOrder={-1}
+                />
+            )}
             <group ref={particlesGroupRef}>
                 <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />
             </group>
