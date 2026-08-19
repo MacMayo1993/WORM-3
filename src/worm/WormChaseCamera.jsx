@@ -78,6 +78,19 @@ const _healForward = new THREE.Vector3();
 // tile without making the player lose the worm's heading.
 const HEAL_ORBIT_SPEED = 0.34;
 
+// ── Countdown reveal ─────────────────────────────────────────────────────────
+// Between the scramble overview and live play the camera used to lerp straight
+// from the fixed overview corner to the chase pose — a chord that crosses the
+// cube (and the worm's own body) whenever the worm spawns on a far face, so the
+// countdown played over a screen-filling clip of worm segments. Instead: on the
+// spawn beat, cut to a pulled-back version of the chase pose — built in the
+// worm's own frame (up its face normal, behind its heading), so it is outside
+// the cube by construction — and dolly in to the true chase framing while the
+// 3-2-1 plays. The run then starts with the camera already settled.
+const REVEAL_DURATION = 3.0; // seconds of dolly-in; countdown runs ~4.25s + spawn
+const REVEAL_LIFT = 2.2;     // extra height at the start, as a multiple of camHeight
+const REVEAL_BACK = 2.6;     // extra setback at the start, as a multiple of camBack
+
 // Slice-death freeze frame ("WORM'D") scratch + tuning. On the hit we ease once
 // into a tight, centred framing of the severed head — a comic-book impact beat —
 // then hold that pose dead still. Computed a single time on entry; the settled
@@ -154,6 +167,7 @@ export default function WormChaseCamera({ worm, size }) {
     const sliceFreezeActiveRef = useRef(false); // are we mid slice-death freeze frame?
     const sliceFreezeTRef = useRef(0);          // elapsed settle time of that freeze
     const sliceFreezeFovRef = useRef(70);       // FOV captured the instant the freeze began
+    const revealTRef = useRef(1);               // countdown reveal dolly progress (0 = fully pulled back)
 
     // This camera is the app's shared one, and the chase view leaves it wide
     // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
@@ -290,6 +304,10 @@ export default function WormChaseCamera({ worm, size }) {
             prevGamePhaseRef.current = gamePhase;
             return;
         }
+        // Countdown-reveal entry test, taken BEFORE prevGamePhaseRef is refreshed.
+        const inReveal = gamePhase === 'spawning' || gamePhase === 'countdown';
+        const enteredReveal = inReveal &&
+            prevGamePhaseRef.current !== 'spawning' && prevGamePhaseRef.current !== 'countdown';
         prevGamePhaseRef.current = gamePhase;
 
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
@@ -348,6 +366,70 @@ export default function WormChaseCamera({ worm, size }) {
         const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
         const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
 
+        // Portrait rake: the base chase runs nearly level (~10° below horizontal),
+        // which on a tall phone viewport parks the horizon mid-frame and hands half
+        // the pixels to empty sky/void — the same failure the elemental ride's
+        // comment describes. As the viewport narrows, steepen the pitch: more lift
+        // up the face normal, less setback, and a shorter aim, so the surface ahead
+        // (orbs, tunnels, dead tiles) fills the frame instead. Lands ~34° below
+        // horizontal at full portrait; desktop landscape is unchanged.
+        const rakeLift = THREE.MathUtils.lerp(0, 1.5, portraitFactor);
+        const rakeTuck = THREE.MathUtils.lerp(1, 0.75, portraitFactor);
+        const rakeAhead = LOOK_AHEAD * THREE.MathUtils.lerp(1, 0.55, portraitFactor);
+
+        // ── Countdown reveal ─────────────────────────────────────────────────
+        // Spawn + 3-2-1: cut to a pulled-back chase pose built in the worm's own
+        // frame (always outside the cube — the old overview→chase lerp cut a chord
+        // straight through it, playing the countdown over a screenful of clipped
+        // worm body), then dolly in so the run starts on the settled chase framing.
+        if (inReveal && (phase === 'crawling' || !worm.activeTunnel.current)) {
+            const { dirKey } = worm.pos.current;
+            _camNormal.copy(FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ);
+            const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current]
+                ?? DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
+            _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]).normalize();
+            _camWormWorld.copy(worm.headInterpPos.current);
+
+            if (enteredReveal) revealTRef.current = 0;
+            revealTRef.current = Math.min(1, revealTRef.current + delta / REVEAL_DURATION);
+            const rt = revealTRef.current;
+            const pull = 1 - rt * rt * (3 - 2 * rt); // smoothstep-eased, 1 → 0
+
+            _camTargetCam.copy(_camWormWorld)
+                .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 + REVEAL_LIFT * pull))
+                .addScaledVector(_camForward, -(camBack * rakeTuck) * (1 + REVEAL_BACK * pull));
+            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead);
+            _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
+            // Centre the spawning worm first; ease out to the chase aim as the pull expires.
+            _camTargetLook.lerp(_camWormWorld, pull * 0.8);
+
+            _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
+
+            if (enteredReveal) {
+                camPosRef.current.copy(_camTargetCam);
+                lookAtRef.current.copy(_camTargetLook);
+                camUpRef.current.copy(_camUp);
+            } else {
+                const a = Math.min(1, CAM_LERP * delta);
+                camPosRef.current.lerp(_camTargetCam, a);
+                lookAtRef.current.lerp(_camTargetLook, a);
+                camUpRef.current.lerp(_camUp, a).normalize();
+            }
+
+            // Seed the crawl branch's face-blend state so 'active' takes over
+            // without a face-transition jerk on the first live frame.
+            prevDirKeyRef.current = dirKey;
+            lastNormalRef.current.copy(_camNormal);
+            lastForwardRef.current.copy(_camForward);
+            faceTransT.current = 0;
+
+            camera.position.copy(camPosRef.current);
+            camera.up.copy(camUpRef.current);
+            camera.lookAt(lookAtRef.current);
+            prevPhaseRef.current = phase;
+            return;
+        }
+
         if (phase === 'crawling' || !worm.activeTunnel.current) {
             // Smooth interpolated worm world position (copy into scratch — no .clone())
             _camWormWorld.copy(worm.headInterpPos.current);
@@ -395,11 +477,12 @@ export default function WormChaseCamera({ worm, size }) {
             lastNormalRef.current.copy(_camNormal);
             lastForwardRef.current.copy(_camForward);
 
-            // Camera: behind worm (opposite of forward) + above face (along normal).
+            // Camera: behind worm (opposite of forward) + above face (along normal),
+            // pitched down by the portrait rake on narrow viewports.
             _camTargetCam.copy(_camWormWorld)
-                .addScaledVector(_camNormal, camHeight)
-                .addScaledVector(_camForward, -camBack);
-            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, LOOK_AHEAD);
+                .addScaledVector(_camNormal, camHeight + rakeLift)
+                .addScaledVector(_camForward, -camBack * rakeTuck);
+            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead);
             // Pull the look target partway toward the cube centre (origin) so the whole cube
             // stays framed rather than drifting off-screen as the camera tracks the worm.
             _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
