@@ -978,13 +978,9 @@ const VIEW_SHOWCASE_SEQUENCE = [
     apply: (s) => s.setHollowMode(true),
     cleanup: (s) => s.setHollowMode(false),
   },
-  {
-    key: 'net',
-    title: 'Net',
-    copy: 'The cube unfolded flat, like a paper craft template. Handy for spotting patterns across faces.',
-    apply: (s) => s.setShowNetPanel(true),
-    cleanup: (s) => s.setShowNetPanel(false),
-  },
+  // Net is deliberately absent: unfolding the cube flat mid-tour reads as a
+  // different app on a phone screen, and the panel is discoverable from the
+  // Views sheet anyway.
 ];
 
 // ── Step beats ───────────────────────────────────────────────────────────────

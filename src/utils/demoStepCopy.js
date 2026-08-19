@@ -18,7 +18,7 @@ export const STEP_COPY = {
   'control-tour': 'Five buttons run this whole game. Let me hand them to you one at a time — press each one as it lights up.',
   'twin-paradox': 'Every tile has a twin: the tile dead opposite it, straight through the middle of the cube. Touch one and both move.',
   'flip-gateway': 'Tapping a tile sends it through the middle to its twin. Send the whole front face across, then bring it home.',
-  'view-showcase': 'Same cube, a dozen different looks. Try them on.',
+  'view-showcase': 'Same cube, eleven different looks. Try them on.',
   'make-it-yours': 'Colors, tiles, backgrounds — set the cube up how you like it. Whatever you pick here, you keep.',
   'worm-traversal': 'This is WORM mode — steer a worm over the cube and dive through a twin tunnel to heal it.',
   'chaos-forecast': 'This is CHAOS — tiles jump to their twins at random until just one pair of colors is left. Call it early.',
