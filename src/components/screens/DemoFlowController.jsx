@@ -357,6 +357,17 @@ const ensureDemoShellStyle = () => {
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* Compact advance pill left behind after Mobi's coach dialogue dismisses.
+       Declared BEFORE the phone media query — the override below drops it under
+       the crowded top bar, and at equal specificity source order decides. */
+    .demo-coach-pill {
+      position: fixed;
+      top: calc(max(10px, env(safe-area-inset-top, 10px)) + 44px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 11000;
+    }
+
     @media (max-width: 640px) {
       /* Phone bars are crowded: the pill sat on top of the mode label and the
          bar's icons. Drop it just below the bar instead of over it. */
@@ -404,15 +415,6 @@ const ensureDemoShellStyle = () => {
       bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
     }
 
-    /* Compact advance pill left behind after Mobi's coach dialogue dismisses */
-    .demo-coach-pill {
-      position: fixed;
-      top: calc(max(10px, env(safe-area-inset-top, 10px)) + 44px);
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 11000;
-    }
-
     .demo-coach-pill--bottom {
       top: auto;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 144px);
@@ -433,12 +435,13 @@ const ensureDemoShellStyle = () => {
     }
 
     /* Worm control hint — non-blocking pill during early worm-step play.
-       Sits above the bottom-docked progress/coach pills; fades out once the
-       player makes progress (first tunnel) or the skip pill appears. */
+       Sits above the bottom-docked progress pill AND the raised step hint
+       (both stay up through play); fades out once the player makes progress
+       (first tunnel) or the skip pill appears. */
     .demo-worm-hint {
       position: fixed;
       left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 196px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 252px);
       transform: translateX(-50%);
       z-index: 11000;
       width: min(320px, calc(100vw - 40px));
@@ -490,6 +493,12 @@ const ensureDemoShellStyle = () => {
     }
 
     .demo-step-hint strong { font-weight: 800; color: #3f5730; }
+
+    /* Worm mode drops the progress pill (+100) and coach pill (+144) into the
+       step hint's usual slot — raise the hint above both so all three read. */
+    .demo-step-hint--worm {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 196px);
+    }
 
     /* Flip-gateway progress pill — bottom-center, stacked above the step hint so
        both read at once. Shows how many front-face tiles are flipped (or
@@ -741,11 +750,12 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
 // <strong> for the one word that names a button.
 const DemoStepHint = ({ step }) => {
   ensureDemoShellStyle();
+  const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const copy = TRY_COPY[step];
   if (!copy) return null;
   return (
     <div
-      className="demo-step-hint"
+      className={`demo-step-hint${wormHealerMode ? ' demo-step-hint--worm' : ''}`}
       role="status"
       aria-live="polite"
       // TRY_COPY is authored in this file, never user input — the only markup is
