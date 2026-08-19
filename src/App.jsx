@@ -95,7 +95,8 @@ const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoFor
 import {
   DemoProgressBar, DemoStepIntro, DemoCoach, DemoStepHint, DemoViewShowcase,
   DemoViewSpotlightHint, DemoFlipSpotlightHint, DemoControlTour, CONTROL_TOUR_SEQUENCE,
-  DemoWormControlHint, DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp
+  DemoWormControlHint, DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp,
+  DemoTeachCameo
 } from './components/screens/DemoFlowController.jsx';
 
 
@@ -1703,6 +1704,14 @@ export default function WORM3() {
       {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible && !demoChromeQuiet &&
         !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
         <DemoFlipProgress progress={demoFlipProgress} />
+      )}
+      {/* Learn-to-solve cameo — mounts the live Kociemba guide (gold layer
+          highlight + progress pill) for the whole hands-on phase; unmounting
+          clears the highlight, so the same gates that hide the other pills
+          also put the guide away during stamps and celebrations. */}
+      {demoMode && demoStep === 'learn-to-solve' && !demoColdOpenVisible && !demoChromeQuiet &&
+        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
+        <DemoTeachCameo />
       )}
       <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
         <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />

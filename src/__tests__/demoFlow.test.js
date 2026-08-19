@@ -12,9 +12,10 @@ const advance = (from) => {
 };
 
 describe('demo flow state machine', () => {
-  it('has the expected 11-step order ending in end', () => {
+  it('has the expected 12-step order ending in end', () => {
     expect(IDS).toEqual([
       'baby-cube',
+      'learn-to-solve',
       'control-tour',
       'twin-paradox',
       'flip-gateway',
@@ -55,7 +56,7 @@ describe('demo flow state machine', () => {
   });
 
   it('every cube step has a try-phase instruction; watch steps also have a watch action', () => {
-    for (const id of ['baby-cube', 'twin-paradox', 'flip-gateway']) {
+    for (const id of ['baby-cube', 'learn-to-solve', 'twin-paradox', 'flip-gateway']) {
       const cfg = DEMO_LEVEL_CONFIGS[id];
       expect(cfg?.type).toBe('cube');
       expect(TRY_COPY[id]).toBeTruthy();
@@ -166,10 +167,17 @@ describe('demo copy stays in plain language', () => {
   });
 
   it('drops the formal name exactly once, as an aside after the mechanic has landed', () => {
-    const notes = Object.entries(STEP_COMPLETE_NOTE);
-    expect(notes).toHaveLength(1);
-    const [step, note] = notes[0];
-    expect(step).toBe('twin-paradox');
-    expect(note.toLowerCase()).toContain('antipodal');
+    // Completion notes may exist for other steps (learn-to-solve points at the
+    // full Teach lesson), but the math jargon appears in exactly one of them:
+    // the twin step's deliberate aside.
+    const jargonNotes = Object.entries(STEP_COMPLETE_NOTE)
+      .filter(([, note]) => JARGON.some((word) => note.toLowerCase().includes(word)));
+    expect(jargonNotes).toHaveLength(1);
+    expect(jargonNotes[0][0]).toBe('twin-paradox');
+    expect(jargonNotes[0][1].toLowerCase()).toContain('antipodal');
+  });
+
+  it('the learn-to-solve completion note points at the full lesson by its menu name', () => {
+    expect(STEP_COMPLETE_NOTE['learn-to-solve'].toLowerCase()).toContain('learn to solve');
   });
 });
