@@ -9,9 +9,10 @@ import { checkRubiksSolved } from '../game/winDetection.js';
 // of that solved state before the player tries it themselves (see App.jsx
 // handleDemoStepContinue). These tests replay that same beat.
 describe('demo flow configuration', () => {
-  it('keeps the shipped demo in the intended ten-stage order plus end state', () => {
+  it('keeps the shipped demo in the intended stage order plus end state', () => {
     expect(DEMO_STEP_IDS).toEqual([
       'baby-cube',
+      'learn-to-solve',
       'control-tour',
       'twin-paradox',
       'flip-gateway',
@@ -56,6 +57,31 @@ describe('demo flow configuration', () => {
     // Flipping them all back restores solved parity.
     for (const f of flips) state = flipStickerPair(state, sz, f.x, f.y, f.z, f.dirKey, flipMap);
     expect(checkRubiksSolved(state, sz)).toBe(true);
+  });
+
+  it('learn-to-solve stages a short scramble that breaks the solve and inverts cleanly', () => {
+    // The cameo hands the scrambled cube to the live Kociemba guide, so the
+    // scramble must genuinely break the solve, stay tiny (a taste, not a
+    // lesson), use only outer slices (centres stay home for the fixed-centre
+    // solver), and invert back to solved — proof a short guided path exists.
+    const config = DEMO_LEVEL_CONFIGS['learn-to-solve'];
+    expect(config.type).toBe('cube');
+    expect(config.cubeSize).toBe(3);
+    expect(config.scrambleSequence.length).toBeLessThanOrEqual(4);
+    for (const { sliceIndex } of config.scrambleSequence) {
+      expect([0, config.cubeSize - 1]).toContain(sliceIndex);
+    }
+
+    let state = makeCubies(config.cubeSize);
+    for (const { axis, sliceIndex, dir } of config.scrambleSequence) {
+      state = rotateSliceCubies(state, config.cubeSize, axis, sliceIndex, dir);
+    }
+    expect(checkRubiksSolved(state, config.cubeSize)).toBe(false);
+
+    for (const { axis, sliceIndex, dir } of [...config.scrambleSequence].reverse()) {
+      state = rotateSliceCubies(state, config.cubeSize, axis, sliceIndex, -dir);
+    }
+    expect(checkRubiksSolved(state, config.cubeSize)).toBe(true);
   });
 
   it('stages baby-cube solved, then its watch moves break the solve', () => {

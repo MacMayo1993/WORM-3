@@ -130,6 +130,7 @@ export default function GameScene({
     solveModeActive,
     solveHighlights,
     kociembaLayerHighlight,
+    demoLearnGuide,
     size,
     cubies,
     wormHealerMode,
@@ -147,6 +148,7 @@ export default function GameScene({
     solveModeActive: s.solveModeActive,
     solveHighlights: s.solveHighlights,
     kociembaLayerHighlight: s.kociembaLayerHighlight,
+    demoLearnGuide: s.demoMode && s.demoStep === 'learn-to-solve',
     size: s.size,
     cubies: s.cubies,
     wormHealerMode: s.wormHealerMode,
@@ -316,7 +318,9 @@ export default function GameScene({
           />
         )}
 
-        {solveModeActive && kociembaLayerHighlight && (
+        {/* The demo's learn-to-solve cameo drives the same store channel as the
+            Solve panel, without mounting the panel itself. */}
+        {(solveModeActive || demoLearnGuide) && kociembaLayerHighlight && (
           <LayerHighlight
             axis={kociembaLayerHighlight.axis}
             sliceIndex={kociembaLayerHighlight.sliceIndex}

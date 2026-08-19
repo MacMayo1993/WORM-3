@@ -3,6 +3,7 @@ import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { useKociembaSolver } from '../../teach/useKociembaSolver.js';
 import { STEP_COPY, TWIN_ASIDE } from '../../utils/demoStepCopy.js';
 import MobiIntroScreen from './MobiIntroScreen.jsx';
 
@@ -12,22 +13,24 @@ import MobiIntroScreen from './MobiIntroScreen.jsx';
 // sequence and know what they just did.
 const DEMO_STEPS = [
   { id: 'baby-cube', label: 'First Twist', num: 1 },
-  { id: 'control-tour', label: 'Your Controls', num: 2 },
-  { id: 'twin-paradox', label: 'Meet the Twins', num: 3 },
-  { id: 'flip-gateway', label: 'Through the Middle', num: 4 },
-  { id: 'view-showcase', label: 'Every Look', num: 5 },
-  { id: 'make-it-yours', label: 'Make It Yours', num: 6 },
-  { id: 'worm-traversal', label: 'Worm Run', num: 7 },
-  { id: 'chaos-forecast', label: 'Call the Winner', num: 8 },
-  { id: 'random-showcase', label: 'Surprise Cube', num: 9 },
-  { id: 'cosmetic-reward', label: 'Spend Your Points', num: 10 },
-  { id: 'end', label: 'Complete', num: 11 },
+  { id: 'learn-to-solve', label: 'Learn to Solve', num: 2 },
+  { id: 'control-tour', label: 'Your Controls', num: 3 },
+  { id: 'twin-paradox', label: 'Meet the Twins', num: 4 },
+  { id: 'flip-gateway', label: 'Through the Middle', num: 5 },
+  { id: 'view-showcase', label: 'Every Look', num: 6 },
+  { id: 'make-it-yours', label: 'Make It Yours', num: 7 },
+  { id: 'worm-traversal', label: 'Worm Run', num: 8 },
+  { id: 'chaos-forecast', label: 'Call the Winner', num: 9 },
+  { id: 'random-showcase', label: 'Surprise Cube', num: 10 },
+  { id: 'cosmetic-reward', label: 'Spend Your Points', num: 11 },
+  { id: 'end', label: 'Complete', num: 12 },
 ];
 
 // Extra line held under a step's STEP COMPLETE stamp. Only the twin step has
 // one: now that the player has felt two tiles move together, naming the formal
 // concept costs nothing and rewards the curious.
 const STEP_COMPLETE_NOTE = {
+  'learn-to-solve': 'That gold guide is Teach Mode. The full lesson — every stage of a real solve, at your pace — lives in the menu under Learn to Solve.',
   'twin-paradox': TWIN_ASIDE,
 };
 
@@ -357,6 +360,17 @@ const ensureDemoShellStyle = () => {
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* Compact advance pill left behind after Mobi's coach dialogue dismisses.
+       Declared BEFORE the phone media query — the override below drops it under
+       the crowded top bar, and at equal specificity source order decides. */
+    .demo-coach-pill {
+      position: fixed;
+      top: calc(max(10px, env(safe-area-inset-top, 10px)) + 44px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 11000;
+    }
+
     @media (max-width: 640px) {
       /* Phone bars are crowded: the pill sat on top of the mode label and the
          bar's icons. Drop it just below the bar instead of over it. */
@@ -404,15 +418,6 @@ const ensureDemoShellStyle = () => {
       bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
     }
 
-    /* Compact advance pill left behind after Mobi's coach dialogue dismisses */
-    .demo-coach-pill {
-      position: fixed;
-      top: calc(max(10px, env(safe-area-inset-top, 10px)) + 44px);
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 11000;
-    }
-
     .demo-coach-pill--bottom {
       top: auto;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 144px);
@@ -433,12 +438,13 @@ const ensureDemoShellStyle = () => {
     }
 
     /* Worm control hint — non-blocking pill during early worm-step play.
-       Sits above the bottom-docked progress/coach pills; fades out once the
-       player makes progress (first tunnel) or the skip pill appears. */
+       Sits above the bottom-docked progress pill AND the raised step hint
+       (both stay up through play); fades out once the player makes progress
+       (first tunnel) or the skip pill appears. */
     .demo-worm-hint {
       position: fixed;
       left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 196px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 252px);
       transform: translateX(-50%);
       z-index: 11000;
       width: min(320px, calc(100vw - 40px));
@@ -490,6 +496,12 @@ const ensureDemoShellStyle = () => {
     }
 
     .demo-step-hint strong { font-weight: 800; color: #3f5730; }
+
+    /* Worm mode drops the progress pill (+100) and coach pill (+144) into the
+       step hint's usual slot — raise the hint above both so all three read. */
+    .demo-step-hint--worm {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 196px);
+    }
 
     /* Flip-gateway progress pill — bottom-center, stacked above the step hint so
        both read at once. Shows how many front-face tiles are flipped (or
@@ -607,6 +619,23 @@ const DEMO_LEVEL_CONFIGS = {
     features: { rotations: true, tunnels: false, flips: false },
     chaosLevel: 0,
   },
+  // Teach cameo: a 3×3 scrambled by exactly three turns, handed to the live
+  // Kociemba guide (DemoTeachCameo). The player follows the gold layer
+  // highlight home — a taste of the full Learn to Solve lesson, not the lesson
+  // itself, so the scramble stays tiny and the solve stays under a minute.
+  'learn-to-solve': {
+    type: 'cube',
+    cubeSize: 3,
+    scrambleSequence: [
+      { axis: 'row', sliceIndex: 0, dir: 1 },
+      { axis: 'col', sliceIndex: 2, dir: -1 },
+      { axis: 'row', sliceIndex: 2, dir: -1 },
+    ],
+    flipSequence: null,
+    watch: null,
+    features: { rotations: true, tunnels: false, flips: false },
+    chaosLevel: 0,
+  },
   // Guided sweep of the bottom bar. Staged on a scrambled 3×3 so the first two
   // buttons (Reset, Shuffle) visibly do something when pressed.
   'control-tour': {
@@ -691,6 +720,7 @@ const DEMO_LEVEL_CONFIGS = {
 // the player's thumb is already on the cube.
 const TRY_COPY = {
   'baby-cube': 'Drag across a row to twist it. Drag the space around the cube to spin the whole thing. Red <strong>Reset</strong> undoes the mess.',
+  'learn-to-solve': 'Follow the <strong>gold ring</strong> — drag the glowing layer the way the light sweeps. It always knows the way home.',
   'twin-paradox': 'Tap any tile — the tile dead opposite it flips at the same moment.',
   'flip-gateway': 'Tap the front tiles to send them through the middle, then tap them again to bring them home.',
   'make-it-yours': 'Try the <strong>Colors</strong>, <strong>Tiles</strong> and <strong>Scene</strong> tabs. Close Settings when you like what you see.',
@@ -741,11 +771,12 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
 // <strong> for the one word that names a button.
 const DemoStepHint = ({ step }) => {
   ensureDemoShellStyle();
+  const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const copy = TRY_COPY[step];
   if (!copy) return null;
   return (
     <div
-      className="demo-step-hint"
+      className={`demo-step-hint${wormHealerMode ? ' demo-step-hint--worm' : ''}`}
       role="status"
       aria-live="polite"
       // TRY_COPY is authored in this file, never user input — the only markup is
@@ -968,13 +999,9 @@ const VIEW_SHOWCASE_SEQUENCE = [
     apply: (s) => s.setHollowMode(true),
     cleanup: (s) => s.setHollowMode(false),
   },
-  {
-    key: 'net',
-    title: 'Net',
-    copy: 'The cube unfolded flat, like a paper craft template. Handy for spotting patterns across faces.',
-    apply: (s) => s.setShowNetPanel(true),
-    cleanup: (s) => s.setShowNetPanel(false),
-  },
+  // Net is deliberately absent: unfolding the cube flat mid-tour reads as a
+  // different app on a phone screen, and the panel is discoverable from the
+  // Views sheet anyway.
 ];
 
 // ── Step beats ───────────────────────────────────────────────────────────────
@@ -1148,6 +1175,34 @@ const DemoFlipProgress = ({ progress }) => {
   );
 };
 
+// Learn-to-solve cameo: mounts the live Kociemba guide for the whole hands-on
+// phase. The hook keeps a solution for the cube's CURRENT position — it
+// advances when the player performs the previewed move by hand and quietly
+// re-solves if they wander off the path — and drives the gold in-scene layer
+// highlight through the store (see GameScene's demo-step gate). This pill is
+// the only UI the cameo adds: where the guide stands, in the flip-progress
+// slot above the step hint.
+const DemoTeachCameo = () => {
+  ensureDemoShellStyle();
+  const cubies = useGameStore((s) => s.cubies);
+  const size = useGameStore((s) => s.size);
+  const { status, moves, moveIndex } = useKociembaSolver(cubies, size);
+  const total = moves.length;
+  const done = status === 'done';
+  const pct = done ? 100 : total > 0 ? Math.min(100, (moveIndex / total) * 100) : 0;
+  return (
+    <div className="demo-flip-progress" role="status" aria-live="polite">
+      <span className="demo-flip-progress-label">{done ? 'Solved' : 'Guide'}</span>
+      <div className="demo-flip-progress-track">
+        <div className="demo-flip-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="demo-flip-progress-count">
+        {total > 0 ? `${Math.min(moveIndex, total)} / ${total}` : '…'}
+      </span>
+    </div>
+  );
+};
+
 const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
   ensureDemoShellStyle();
   const entry = VIEW_SHOWCASE_SEQUENCE[subStep];
@@ -1199,6 +1254,7 @@ export {
   DemoStepComplete,
   DemoStepLaunch,
   DemoRewardStamp,
+  DemoTeachCameo,
   VIEW_SHOWCASE_SEQUENCE,
   TRY_COPY,
   STEP_COMPLETE_NOTE,

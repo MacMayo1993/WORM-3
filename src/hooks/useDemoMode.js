@@ -112,6 +112,8 @@ export function useDemoMode({
   const advanceDemoStepRef = useRef(null);
   const demoFlipPhaseRef = useRef(null);
   const babySolveArmedRef = useRef(false);
+  // Same arm-then-detect pattern for the learn-to-solve cameo's solved state.
+  const learnSolveArmedRef = useRef(false);
   // The control tour hands the player the Flip button by name. If they went
   // through it, the twin step no longer withholds Flip — it would be asking for
   // the same press twice inside a minute. If they skipped the tour, the twin
@@ -619,6 +621,7 @@ export function useDemoMode({
 
     demoFlipPhaseRef.current = step === 'flip-gateway' ? 'flip-all' : null;
     babySolveArmedRef.current = false;
+    learnSolveArmedRef.current = false;
     twinFlipBaselineRef.current = null;
     twinWatchFiredRef.current = false;
     setDemoCoachCopy(null);
@@ -932,6 +935,22 @@ export function useDemoMode({
     if (babySolveArmedRef.current) {
       babySolveArmedRef.current = false;
       celebrateStep('baby-cube');
+    }
+  }, [demoMode, demoStep, cubies, size, celebrateStep]);
+
+  // Learn-to-solve cameo: same arm-then-detect shape as baby-cube. The staged
+  // scramble breaks the solve (arming the watcher), and the moment the player
+  // follows the gold guide back to solved, the step completes — however they
+  // got there, guided or on their own.
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'learn-to-solve') return;
+    if (!checkRubiksSolved(cubies, size)) {
+      learnSolveArmedRef.current = true;
+      return;
+    }
+    if (learnSolveArmedRef.current) {
+      learnSolveArmedRef.current = false;
+      celebrateStep('learn-to-solve');
     }
   }, [demoMode, demoStep, cubies, size, celebrateStep]);
 
