@@ -79,6 +79,35 @@ export const createDisparitySlice = (set, get) => ({
       disparityDeathByGridId: byGrid,
     };
   }),
+  // Undo death records for tiles the board says are alive again (the player
+  // healed them). Emitted by the chaos sim's ledger reconciliation — see
+  // reconcileDeadLedger in chaosSim.js. Ranks already handed out are left as
+  // they are: they are a historical log, not an index.
+  removeDisparityDeathsBulk: (gridIds) => set((state) => {
+    if (!gridIds?.length) return state;
+    const drop = new Set(gridIds);
+    const kept = state.disparityDeaths.filter((d) => !drop.has(d.gridId));
+    if (kept.length === state.disparityDeaths.length) return state;
+    const byGrid = { ...state.disparityDeathByGridId };
+    for (const gridId of drop) delete byGrid[gridId];
+    return { disparityDeaths: kept, disparityDeathByGridId: byGrid };
+  }),
+  removeDisparityEliminatedFacesBulk: (faces) => set((state) => {
+    if (!faces?.length) return state;
+    const drop = new Set(faces);
+    const kept = state.disparityEliminatedFaces.filter((f) => !drop.has(f));
+    if (kept.length === state.disparityEliminatedFaces.length) return state;
+    return { disparityEliminatedFaces: kept };
+  }),
+
+  // Bumped whenever the cube is edited outside the chaos worker's knowledge —
+  // today that is the player's heal wave (CubeAssembly). useChaosWorker watches
+  // this and pushes a full SYNC_CUBIES; without it the worker keeps simulating
+  // damage the player already cleared, and its death ledger drifts away from
+  // the tiles on screen.
+  chaosResyncEpoch: 0,
+  requestChaosResync: () => set((state) => ({ chaosResyncEpoch: state.chaosResyncEpoch + 1 })),
+
   setDisparityWinner: (winner) => set({ disparityWinner: winner }),
   setShowDisparityWinner: (v) => set({ showDisparityWinner: v }),
   addDisparityEliminatedFace: (faceNum) => set((state) => ({

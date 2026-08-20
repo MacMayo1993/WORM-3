@@ -640,11 +640,52 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
     rebuildLivingStickers();
   };
 
+  // Reconcile the death ledger against `state`. The board is the truth: a tile
+  // the ledger has buried but whose flips now sit below the cap (the player
+  // healed it, or a heal landed on the render thread in the same beat the
+  // worker capped it) is put back in the living set and reported so the store
+  // can drop its death record. Without this the ALIVE counter and the tiles on
+  // screen drift apart for the rest of the round, and the buried tile stays
+  // inert — it renders healthy but no chain will ever walk onto it again.
+  const reconcileDeadLedger = () => {
+    if (!deadTileSet.size) return null;
+    const revived = [];
+    const restoredFaces = [];
+    for (const [x, y, z] of surfaceCoords) {
+      const c = state[x]?.[y]?.[z];
+      if (!c) continue;
+      for (const dirKey of Object.keys(c.stickers)) {
+        const st = c.stickers[dirKey];
+        if ((st.flips || 0) >= cap) continue;
+        const gridId = getManifoldGridId(st, size);
+        if (!deadTileSet.has(gridId)) continue;
+        deadTileSet.delete(gridId);
+        revived.push(gridId);
+        const faceNum = st.orig;
+        if (faceNum) {
+          const prev = faceAliveMap.get(faceNum) ?? 0;
+          faceAliveMap.set(faceNum, prev + 1);
+          if (prev === 0) restoredFaces.push(faceNum);
+        }
+      }
+    }
+    if (!revived.length) return null;
+    cachedMetrics = computeChaosMetrics(state, surfaceCoords, cap);
+    return { revived, restoredFaces: [...new Set(restoredFaces)] };
+  };
+
+  // Returns a revival payload when the incoming cube contradicts the ledger
+  // (see reconcileDeadLedger), otherwise null.
   const syncCubies = (nextCubies) => {
     state = nextCubies;
     manifoldMapCache = null;
     neighborCache = null;
+    // Reconcile BEFORE rebuilding the living index — rebuildLivingStickers
+    // skips anything still in deadTileSet, so a revived tile has to leave the
+    // set first or it never rejoins the walkable surface.
+    const revivalPayload = winnerAnnounced ? null : reconcileDeadLedger();
     rebuildLivingStickers();
+    return revivalPayload;
   };
 
   const setChaosLevel = (nextLevel) => {

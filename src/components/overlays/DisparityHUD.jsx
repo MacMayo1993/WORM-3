@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useGameStore } from '../../hooks/useGameStore.js';
+import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { FACE_COLORS } from '../../utils/constants.js';
+import { countDeadTiles } from '../../game/chaosMetrics.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
 
 const FACE_NAMES = { 1: 'RED', 2: 'GREEN', 3: 'WHITE', 4: 'ORANGE', 5: 'BLUE', 6: 'YELLOW' };
@@ -124,7 +125,13 @@ const DisparityHUD = () => {
   );
 
   const totalTiles = size * size * 6;
-  const aliveCount = Math.max(0, totalTiles - disparityDeaths.length);
+  // Count the living tiles off the cube itself, with the SAME predicate that
+  // decides whether a sticker renders as a tombstone. Deriving this from the
+  // death ledger's length instead let the two disagree whenever the ledger and
+  // the board drifted apart — the player would count more un-tombstoned tiles
+  // on screen than the HUD claimed were alive. The selector returns a number,
+  // so the HUD still re-renders only when the count actually changes.
+  const aliveCount = useGameStore((s) => Math.max(0, totalTiles - countDeadTiles(s.cubies, s.size, selectEffectiveFlipCap(s))));
 
   // Animate the alive counter when it drops
   const prevAliveRef = useRef(aliveCount);
@@ -281,8 +288,10 @@ const DisparityHUD = () => {
           </div>
         </div>
       )}
-      {/* Alive count — always visible once chaos has started (at least 1 death) */}
-      {!disparityWinner && disparityDeaths.length > 0 && (
+      {/* Alive count — visible from the first tombstone on. Gated on the board
+          (aliveCount < totalTiles), not on the death ledger's length, so the
+          panel appears and disappears with the tiles it is counting. */}
+      {!disparityWinner && aliveCount < totalTiles && (
         <div style={aliveCountStyle}>
           <span style={aliveNumStyle}>
             {aliveCount}
