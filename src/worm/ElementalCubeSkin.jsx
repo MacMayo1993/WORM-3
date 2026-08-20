@@ -297,10 +297,14 @@ export default function ElementalCubeSkin({ size = 3 }) {
   if (isFire) {
     return (
       <ElementalFireSkin
-        key={`fire-${cells.length}-${quality.flamesPerCell}`}
+        key={`fire-${cells.length}-${quality.flamesPerCell}-${quality.animate ? 1 : 0}`}
         meshRef={instRef}
         count={cells.length}
         flamesPerCell={quality.flamesPerCell}
+        // Reduced motion holds the fire on one frame and drops the ember sparks;
+        // the lower tiers drop the second turbulence octave in the flame shader.
+        animate={quality.animate}
+        highDetail={quality.accents}
         cellData={cellData}
       />
     );
