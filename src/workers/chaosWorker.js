@@ -93,13 +93,19 @@ self.onmessage = (e) => {
       break;
     }
 
-    case 'SYNC_CUBIES':
-      // Full resync (reset / shuffle / size change / loaded state): the cube was
-      // replaced out from under the sim, so advance the generation — any TICKs the
-      // main thread already has in flight carry the old gen and will be dropped.
+    case 'SYNC_CUBIES': {
+      // Full resync (reset / shuffle / size change / loaded state / player heal):
+      // the cube was replaced out from under the sim, so advance the generation —
+      // any TICKs the main thread already has in flight carry the old gen and will
+      // be dropped.
       if (payload.gen != null) workerGen = payload.gen;
-      sim?.syncCubies(payload.cubies);
+      const revival = sim?.syncCubies(payload.cubies);
+      // The incoming cube contradicted the death ledger (healed tiles the ledger
+      // had buried). Report the revivals so the store's death list — and the
+      // ALIVE counter derived from it — match the board again.
+      if (revival) self.postMessage({ type: 'REVIVE', payload: { ...revival, gen: workerGen } });
       break;
+    }
 
     case 'ROTATE_SLICE':
       // Lightweight counterpart to SYNC_CUBIES: replay a single-slice rotation

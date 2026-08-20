@@ -339,6 +339,11 @@ export function useWormCrawler(size, cubies) {
                     cubies: healed,
                     cubiePops: { ...pruneExpiredFx(state.cubiePops, now), ...pops },
                 }));
+                // A worm heal during a chaos round edits the cube behind the chaos
+                // worker's back — push it across, or the worker keeps spreading the
+                // damage that was just cleared and its death ledger drifts away from
+                // the tiles on screen.
+                if (st.chaosLevel > 0) useGameStore.getState().requestChaosResync();
                 const newProgress = { ...(st.wormHealingProgress ?? {}) };
                 const healedProgressKeys = Array.isArray(stableKey) ? stableKey : [stableKey];
                 for (const key of healedProgressKeys) if (key) delete newProgress[key];

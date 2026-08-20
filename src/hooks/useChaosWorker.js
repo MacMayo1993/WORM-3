@@ -108,6 +108,7 @@ export function useChaosWorker({
   flipPctRef,
   addDisparityDeathsBulk,
   addDisparityEliminatedFacesBulk,
+  chaosResyncEpoch,
 }) {
   const workerRef = useRef(null);
   const manifoldMapRef = useRef(null);
@@ -143,6 +144,16 @@ export function useChaosWorker({
       if (e.data.type === 'METRICS') {
         // Initial snapshot posted on START so HUDs have data before the first tick.
         useGameStore.getState().setChaosStats(e.data.payload.metrics);
+        return;
+      }
+      if (e.data.type === 'REVIVE') {
+        // The worker reconciled its death ledger against a cube we sent it and
+        // found tiles it had buried that are alive again (the player healed
+        // them). Drop those death records so the ALIVE counter, the death log
+        // and the tiles on screen agree.
+        const { revived, restoredFaces } = e.data.payload || {};
+        if (revived?.length) useGameStore.getState().removeDisparityDeathsBulk(revived);
+        if (restoredFaces?.length) useGameStore.getState().removeDisparityEliminatedFacesBulk(restoredFaces);
         return;
       }
       if (e.data.type !== 'TICK') return;
@@ -334,6 +345,19 @@ export function useChaosWorker({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaosMode, rotationEpoch]);
+
+  // Out-of-band cube edits (the player's heal wave) bump chaosResyncEpoch. The
+  // worker owns a private copy of the cube, so without this push it keeps
+  // spreading damage the player already cleared and its death ledger drifts
+  // away from the board — which is exactly what made the ALIVE counter
+  // disagree with the un-tombstoned tiles on screen.
+  useEffect(() => {
+    if (!workerRef.current || !chaosMode || !chaosResyncEpoch) return;
+    genRef.current += 1;
+    manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
+    workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies: cubiesRef.current, gen: genRef.current } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaosResyncEpoch]);
 
   useEffect(() => {
     if (!workerRef.current) return;

@@ -40,3 +40,28 @@ export const computeChaosMetrics = (cubeState, surfCoords, flipCap = Infinity) =
   }
   return { disparity, flipActive, edgeTotal, totalFlips, deadTiles };
 };
+
+// Dead-tile count read straight off a cube, using the SAME predicate the
+// renderer uses to draw a tombstone (flips at or over the cap). The ALIVE
+// counter is derived from this rather than from the death ledger's length so
+// the number on the HUD can never disagree with the tiles on screen.
+// Walks the surface inline rather than via buildSurfaceCoords: this runs inside
+// a Zustand selector, i.e. on every store write, so it must not allocate.
+export const countDeadTiles = (cubeState, size, flipCap) => {
+  if (!cubeState || !(flipCap > 0)) return 0;
+  let dead = 0;
+  const last = size - 1;
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        if (x !== 0 && x !== last && y !== 0 && y !== last && z !== 0 && z !== last) continue;
+        const c = cubeState[x]?.[y]?.[z];
+        if (!c) continue;
+        for (const key in c.stickers) {
+          if ((c.stickers[key].flips || 0) >= flipCap) dead++;
+        }
+      }
+    }
+  }
+  return dead;
+};

@@ -101,3 +101,17 @@ export function resolveElementalQuality({ mobile = false, reducedMotion = false,
   const animate = !reducedMotion;
   return { tier, ...budget, animate, accents: budget.accents && animate };
 }
+
+/**
+ * Rising ember sparks per cell for the FIRE skin, derived from the tongue budget so
+ * the accents scale with the same device tier.
+ *
+ * Reduced motion (animate: false) gets none: a spark is pure motion, and frozen
+ * ones would just be dots parked in mid-air above the cube.
+ */
+export function sparksForBudget(flamesPerCell, animate = true) {
+  if (!animate) return 0;
+  if (flamesPerCell >= 5) return 2;
+  if (flamesPerCell >= 4) return 1;
+  return 0;
+}

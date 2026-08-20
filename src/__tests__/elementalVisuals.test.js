@@ -22,6 +22,7 @@ import {
 import {
   resolveElementalQuality,
   elementalBudget,
+  sparksForBudget,
   ELEMENTAL_TIERS
 } from '../worm/healerWorm/elementalQuality.js';
 import {
@@ -247,6 +248,24 @@ describe('elemental renderer registry', () => {
       expect(['instanced', 'perCell']).toContain(r.mode);
       expect(typeof r.uniformScale).toBe('boolean');
     }
+  });
+
+  it('fire ember sparks scale with the tongue budget, and reduced motion has none', () => {
+    // A spark is pure motion — frozen, it is a dot parked in mid-air over the cube,
+    // so the reduced-motion tier drops them rather than holding one frame of them.
+    for (const tier of ELEMENTAL_TIERS) {
+      const b = elementalBudget(tier);
+      const sparks = sparksForBudget(b.flamesPerCell, tier !== 'minimal');
+      expect(sparks).toBeGreaterThanOrEqual(0);
+      expect(sparks).toBeLessThanOrEqual(2);
+    }
+    expect(sparksForBudget(5, true)).toBe(2);
+    expect(sparksForBudget(4, true)).toBe(1);
+    expect(sparksForBudget(3, true)).toBe(0);
+    for (const n of [3, 4, 5]) expect(sparksForBudget(n, false)).toBe(0);
+    // Reduced motion resolves to a budget that draws no sparks either way.
+    const rm = resolveElementalQuality({ reducedMotion: true });
+    expect(sparksForBudget(rm.flamesPerCell, rm.animate)).toBe(0);
   });
 
   it('billboarded renderers demand a uniform cell scale', () => {

@@ -16,13 +16,13 @@ import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll,
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import CameraFlipKick from './CameraFlipKick.jsx';
-import { useGameStore } from '../hooks/useGameStore.js';
+import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
-import { healSticker } from '../game/cubeState.js';
-import { buildManifoldGridMap, findAntipodalStickerByGrid, getManifoldNeighbors } from '../game/manifoldLogic.js';
+import { collectHealWave, healTilePair, isHealable } from '../game/chaosHeal.js';
+import { buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 import { pruneExpiredFx } from '../utils/transientFx.js';
 
@@ -546,59 +546,55 @@ const CubeAssembly = React.memo(({
           // on the same face. Each wave heals + pops its cubies outward.
           if (store.chaosLevel > 0) {
             const liveCubs = store.cubies;
+            const flipCap = selectEffectiveFlipCap(store);
             const tapped = liveCubs[x]?.[y]?.[z]?.stickers[dirKey];
-            if (tapped && tapped.curr !== tapped.orig) {
+            if (isHealable(tapped, flipCap)) {
               // Build manifold map once from the snapshot so antipodal lookups are fast.
               const manifoldMap = buildManifoldGridMap(liveCubs, size);
               // BFS over the MANIFOLD neighbourhood (not just the tapped face) so the
               // heal follows damage across seams onto adjacent sides — chaos chains
               // spread cross-face, so a face-only heal left orphaned damage on the
-              // neighbouring faces it had jumped to. Key visited state per sticker
-              // (x,y,z,dirKey) since corner cubies host multiple stickers.
-              const waves = [[{ x, y, z, dirKey }]];
-              const visited = new Set([`${x},${y},${z},${dirKey}`]);
-              let frontier = [{ x, y, z, dirKey }];
-              while (frontier.length > 0) {
-                const nextFrontier = [];
-                const wave = [];
-                for (const cur of frontier) {
-                  for (const n of getManifoldNeighbors(cur.x, cur.y, cur.z, cur.dirKey, size)) {
-                    const key = `${n.x},${n.y},${n.z},${n.dirKey}`;
-                    if (visited.has(key)) continue;
-                    visited.add(key);
-                    const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
-                    if (ns && ns.curr !== ns.orig) { wave.push(n); nextFrontier.push(n); }
-                  }
-                }
-                if (wave.length > 0) waves.push(wave);
-                frontier = nextFrontier;
-              }
-              const totalHealed = waves.reduce((s, w) => s + w.length, 0);
-              // Award score up-front so the counter updates on tap.
-              useGameStore.setState((s) => ({ disparityParityScore: s.disparityParityScore + totalHealed * EARN_DISPARITY_TILE_RESTORE }));
+              // neighbouring faces it had jumped to. Dead tiles neither heal nor
+              // conduct the wave: see collectHealWave.
+              const waves = collectHealWave(liveCubs, size, { x, y, z, dirKey }, flipCap);
               waves.forEach((tiles, waveIdx) => {
                 const fire = () => {
                   const now = performance.now();
-                  let updated = useGameStore.getState().cubies;
+                  const live = useGameStore.getState();
+                  const cap = selectEffectiveFlipCap(live);
+                  let updated = live.cubies;
                   const pops = {};
+                  let healed = 0;
                   for (const t of tiles) {
-                    // Heal the tapped tile — the cubie-pop (below) is the only feedback:
-                    // the tile simply springs back to its true color. No white particle
-                    // burst / seal overlay here; that read as a white tile slapped over
-                    // the sticker and broke immersion.
-                    const st = liveCubs[t.x]?.[t.y]?.[t.z]?.stickers?.[t.dirKey];
-                    updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
-                    pops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 500 };
-                    // Heal its antipodal pair — same logical sticker on the opposite face.
-                    if (st) {
-                      const anti = findAntipodalStickerByGrid(manifoldMap, st, size);
-                      if (anti) {
-                        updated = healSticker(updated, size, anti.x, anti.y, anti.z, anti.dirKey);
-                        pops[`${anti.x},${anti.y},${anti.z}`] = { startMs: now, durationMs: 500 };
-                      }
+                    // Re-check against the CURRENT cube, not the tap-time snapshot:
+                    // later waves fire up to a second after the tap, and a tile the
+                    // chaos worker capped in the meantime is a tombstone now. Healing
+                    // it here would resurrect it on the render thread only, leaving a
+                    // healthy-looking tile the simulation had already buried.
+                    // healTilePair applies the same guard to the antipodal partner.
+                    const step = healTilePair(updated, size, manifoldMap, t, cap);
+                    if (!step.healed.length) continue;
+                    updated = step.cubies;
+                    // The cubie-pop is the only feedback: the tile simply springs
+                    // back to its true color. No white particle burst / seal overlay
+                    // here; that read as a white tile slapped over the sticker and
+                    // broke immersion.
+                    for (const h of step.healed) {
+                      pops[`${h.x},${h.y},${h.z}`] = { startMs: now, durationMs: 500 };
                     }
+                    healed++;
                   }
-                  useGameStore.setState((s) => ({ cubies: updated, cubiePops: { ...pruneExpiredFx(s.cubiePops, now), ...pops } }));
+                  if (healed === 0) return;
+                  useGameStore.setState((s) => ({
+                    cubies: updated,
+                    cubiePops: { ...pruneExpiredFx(s.cubiePops, now), ...pops },
+                    disparityParityScore: s.disparityParityScore + healed * EARN_DISPARITY_TILE_RESTORE,
+                  }));
+                  // The chaos worker simulates on its own private copy of the cube.
+                  // Push this edit to it, or it keeps spreading damage the player
+                  // just paid to clear and its death ledger drifts away from the
+                  // board the player is looking at.
+                  useGameStore.getState().requestChaosResync();
                 };
                 if (waveIdx === 0) fire(); else setTimeout(fire, waveIdx * 130);
               });

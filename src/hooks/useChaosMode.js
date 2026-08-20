@@ -21,7 +21,7 @@ export function useChaosMode() {
     cubies, setCubies, rotationEpoch,
     addDisparityDeathsBulk, addDisparityEliminatedFacesBulk,
     upcomingRotation, setUpcomingRotation, setRotationCountdown,
-    setAnimState, setPendingMove,
+    setAnimState, setPendingMove, chaosResyncEpoch,
   } = useGameStore(useShallow(s => ({
     chaosLevel: s.chaosLevel,
     setChaosLevel: s.setChaosLevel,
@@ -43,6 +43,7 @@ export function useChaosMode() {
     setRotationCountdown: s.setRotationCountdown,
     setAnimState: s.setAnimState,
     setPendingMove: s.setPendingMove,
+    chaosResyncEpoch: s.chaosResyncEpoch,
   })));
 
   const chaosMode = chaosLevel > 0;
@@ -94,6 +95,7 @@ export function useChaosMode() {
     flipPctRef,
     addDisparityDeathsBulk,
     addDisparityEliminatedFacesBulk,
+    chaosResyncEpoch,
   });
 
   const generateRandomRotation = useCallback((cubeSize) => {
