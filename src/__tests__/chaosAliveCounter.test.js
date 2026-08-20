@@ -11,7 +11,8 @@ import { createChaosSim } from '../game/chaosSim.js';
 import { makeCubies, healSticker } from '../game/cubeState.js';
 import { getManifoldGridId } from '../game/gridIds.js';
 import { countDeadTiles } from '../game/chaosMetrics.js';
-import { collectHealWave, isHealable } from '../game/chaosHeal.js';
+import { collectHealWave, healTilePair, isHealable } from '../game/chaosHeal.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 
 const FLIP_CAP = 4;
 const SIZE = 3;
@@ -160,5 +161,55 @@ describe('chaos sim ledger reconciliation', () => {
     }
     // Whatever happened, the ledger and the board still agree afterwards.
     expect(countDeadTiles(sim.getState(), SIZE, FLIP_CAP)).toBe(sim.getDeadTileSet().size);
+  });
+});
+
+describe('healTilePair', () => {
+  // Locate a sticker and its antipodal partner on a fresh cube.
+  const pairOn = (cubies, size, tile) => {
+    const map = buildManifoldGridMap(cubies, size);
+    const st = cubies[tile.x][tile.y][tile.z].stickers[tile.dirKey];
+    return { map, anti: findAntipodalStickerByGrid(map, st, size) };
+  };
+  const tile = { x: 1, y: 1, z: SIZE - 1, dirKey: 'PZ' };
+
+  const damagedPair = (flips, antiFlips) => {
+    const cubies = makeCubies(SIZE);
+    const { map, anti } = pairOn(cubies, SIZE, tile);
+    const st = cubies[tile.x][tile.y][tile.z].stickers[tile.dirKey];
+    st.flips = flips;
+    st.curr = 4; // flipped colour, so curr !== orig
+    const antiSt = cubies[anti.x][anti.y][anti.z].stickers[anti.dirKey];
+    antiSt.flips = antiFlips;
+    antiSt.curr = 1;
+    return { cubies, map, anti };
+  };
+
+  it('heals both members of a living pair', () => {
+    const { cubies, map, anti } = damagedPair(2, 2);
+    const { cubies: next, healed } = healTilePair(cubies, SIZE, map, tile, FLIP_CAP);
+    expect(healed).toHaveLength(2);
+    expect(next[tile.x][tile.y][tile.z].stickers[tile.dirKey].flips).toBe(0);
+    expect(next[anti.x][anti.y][anti.z].stickers[anti.dirKey].flips).toBe(0);
+  });
+
+  it('leaves a capped antipodal partner buried', () => {
+    // The pair has drifted — the partner is already a tombstone. Healing it
+    // would clear a death the ledger, the winner check and the player all treat
+    // as final, and the worker resync would then put it back in play.
+    const { cubies, map, anti } = damagedPair(2, FLIP_CAP);
+    const { cubies: next, healed } = healTilePair(cubies, SIZE, map, tile, FLIP_CAP);
+    expect(healed).toEqual([tile]);
+    expect(next[tile.x][tile.y][tile.z].stickers[tile.dirKey].flips).toBe(0);
+    expect(next[anti.x][anti.y][anti.z].stickers[anti.dirKey].flips).toBe(FLIP_CAP);
+    expect(countDeadTiles(next, SIZE, FLIP_CAP)).toBe(1);
+  });
+
+  it('refuses a capped primary and returns the cube untouched', () => {
+    const { cubies, map } = damagedPair(FLIP_CAP, FLIP_CAP);
+    const result = healTilePair(cubies, SIZE, map, tile, FLIP_CAP);
+    expect(result.healed).toEqual([]);
+    expect(result.cubies).toBe(cubies);
+    expect(countDeadTiles(cubies, SIZE, FLIP_CAP)).toBe(2);
   });
 });

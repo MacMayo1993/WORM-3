@@ -21,9 +21,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
-import { healSticker } from '../game/cubeState.js';
-import { collectHealWave, isHealable } from '../game/chaosHeal.js';
-import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { collectHealWave, healTilePair, isHealable } from '../game/chaosHeal.js';
+import { buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 import { pruneExpiredFx } from '../utils/transientFx.js';
 
@@ -572,21 +571,18 @@ const CubeAssembly = React.memo(({
                     // chaos worker capped in the meantime is a tombstone now. Healing
                     // it here would resurrect it on the render thread only, leaving a
                     // healthy-looking tile the simulation had already buried.
-                    const st = updated[t.x]?.[t.y]?.[t.z]?.stickers?.[t.dirKey];
-                    if (!isHealable(st, cap)) continue;
-                    // Heal the tapped tile — the cubie-pop (below) is the only feedback:
-                    // the tile simply springs back to its true color. No white particle
-                    // burst / seal overlay here; that read as a white tile slapped over
-                    // the sticker and broke immersion.
-                    updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
-                    pops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 500 };
-                    healed++;
-                    // Heal its antipodal pair — same logical sticker on the opposite face.
-                    const anti = findAntipodalStickerByGrid(manifoldMap, st, size);
-                    if (anti) {
-                      updated = healSticker(updated, size, anti.x, anti.y, anti.z, anti.dirKey);
-                      pops[`${anti.x},${anti.y},${anti.z}`] = { startMs: now, durationMs: 500 };
+                    // healTilePair applies the same guard to the antipodal partner.
+                    const step = healTilePair(updated, size, manifoldMap, t, cap);
+                    if (!step.healed.length) continue;
+                    updated = step.cubies;
+                    // The cubie-pop is the only feedback: the tile simply springs
+                    // back to its true color. No white particle burst / seal overlay
+                    // here; that read as a white tile slapped over the sticker and
+                    // broke immersion.
+                    for (const h of step.healed) {
+                      pops[`${h.x},${h.y},${h.z}`] = { startMs: now, durationMs: 500 };
                     }
+                    healed++;
                   }
                   if (healed === 0) return;
                   useGameStore.setState((s) => ({

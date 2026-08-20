@@ -14,7 +14,8 @@
 // only, leaving a tile that looked healthy but was already struck from the
 // simulation's living set.
 
-import { getManifoldNeighbors } from './manifoldLogic.js';
+import { getManifoldNeighbors, findAntipodalStickerByGrid } from './manifoldLogic.js';
+import { healSticker } from './cubeState.js';
 
 const isHealable = (st, flipCap) => !!st && st.curr !== st.orig && (st.flips || 0) < flipCap;
 
@@ -55,6 +56,37 @@ export function collectHealWave(cubies, size, origin, flipCap) {
   }
 
   return waves;
+}
+
+/**
+ * Heal one tile and its antipodal partner, skipping either if it is dead.
+ *
+ * Both members are checked against the cap. Flips are paired, so the two
+ * normally carry the same flip count — but a dropped worker TICK or a
+ * half-applied batch can leave one capped while the other still has life, and
+ * healing a capped tile clears a tombstone that every other part of the game
+ * treats as final (the resync would then lift it out of the death ledger and
+ * put it back in play).
+ *
+ * @returns {{ cubies, healed: Array<{x,y,z,dirKey}> }} — `healed` is empty when
+ *          nothing was eligible, and `cubies` is then the input untouched.
+ */
+export function healTilePair(cubies, size, manifoldMap, tile, flipCap) {
+  const { x, y, z, dirKey } = tile;
+  const st = cubies[x]?.[y]?.[z]?.stickers?.[dirKey];
+  if (!isHealable(st, flipCap)) return { cubies, healed: [] };
+
+  let next = healSticker(cubies, size, x, y, z, dirKey);
+  const healed = [{ x, y, z, dirKey }];
+
+  const anti = manifoldMap && findAntipodalStickerByGrid(manifoldMap, st, size);
+  const antiSt = anti && next[anti.x]?.[anti.y]?.[anti.z]?.stickers?.[anti.dirKey];
+  if (antiSt && (antiSt.flips || 0) < flipCap) {
+    next = healSticker(next, size, anti.x, anti.y, anti.z, anti.dirKey);
+    healed.push({ x: anti.x, y: anti.y, z: anti.z, dirKey: anti.dirKey });
+  }
+
+  return { cubies: next, healed };
 }
 
 export { isHealable };
