@@ -100,6 +100,8 @@ import {
     ELEMENTAL_DURATION,
     ELEMENTAL_FOCUS_DURATION,
     ELEMENTAL_SPAWN_INTERVAL,
+    ELEMENTAL_OFFER_COUNT,
+    ELEMENTAL_CLAIM_COOLDOWN,
     ELEMENTAL_LIFETIME,
     SPECIAL_SPAWN_RADIUS,
     SPECIAL_JUMP_REACH,
@@ -735,6 +737,10 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey) {
         for (let i = sim.specials.length - 1; i >= 0; i--) {
             if (isElementalType(sim.specials[i].type)) sim.specials.splice(i, 1);
         }
+        // ...and it buys a quiet spell. On the spawn clock alone the next offering
+        // arrived a breath after the wash ended, so there was always an orb on the
+        // cube; this puts a real gap between one element and the next.
+        sim.elementalSpawnTimer = Math.max(sim.elementalSpawnTimer, ELEMENTAL_CLAIM_COOLDOWN);
     }
     ctx.onSpecialsChanged(sim.specials.slice());
     activateSpecial(sim, ctx, claimed.type);
@@ -885,7 +891,8 @@ export function faceCenterTiles(size) {
  * Face centres rather than the scored neighbourhood placement spawnSpecial uses:
  * an element re-skins the whole cube, so it should be a landmark you navigate to
  * on a face you can name, not another gem that happens to appear next to you. One
- * per face keeps the four of them spread across the manifold instead of clustered.
+ * per face keeps the offered elements spread across the manifold, and only
+ * ELEMENTAL_OFFER_COUNT of them are drawn each cycle so most faces stay empty.
  *
  * Leftovers from a previous offering are cleared first, so the board never carries
  * two offerings at once. Faces whose centre is taken (a parity orb, a live buff,
@@ -930,9 +937,20 @@ function spawnElementalOffering(sim, size, ctx) {
         [faces[i], faces[j]] = [faces[j], faces[i]];
     }
 
+    // Draw the elements on offer, rather than laying out the whole set every time:
+    // a menu of every element on every cycle is not a choice, and one orb per face
+    // meant there was always one wherever the worm happened to be. Same shuffle,
+    // truncated — so the draw is uniform and never repeats a type within a cycle.
+    const offered = ELEMENTAL_TYPES.slice();
+    for (let i = offered.length - 1; i > 0; i--) {
+        const j = Math.floor(sim.rand() * (i + 1));
+        [offered[i], offered[j]] = [offered[j], offered[i]];
+    }
+    offered.length = Math.min(offered.length, Math.max(1, ELEMENTAL_OFFER_COUNT));
+
     let placed = 0;
     let faceIdx = 0;
-    for (const type of ELEMENTAL_TYPES) {
+    for (const type of offered) {
         // Walk on to the next face until one has a free centre — one orb per face.
         let tile = null;
         while (faceIdx < faces.length) {

@@ -34,6 +34,11 @@ import {
 } from '../worm/healerWorm/constants.js';
 import { SPECIAL_TYPES, isElementalType, ELEMENTAL_TYPES } from '../worm/healerWorm/specialDefs.js';
 import {
+  ELEMENTAL_OFFER_COUNT,
+  ELEMENTAL_CLAIM_COOLDOWN,
+  ELEMENTAL_SPAWN_INTERVAL
+} from '../worm/healerWorm/constants.js';
+import {
   makeSpecialPicker,
   drawSpecialType,
   rankSpecialSpawnCandidates,
@@ -234,14 +239,31 @@ describe('special orb spawning', () => {
 });
 
 describe('elemental offering', () => {
-  it('offers one orb of every element on its own clock', () => {
+  it('offers two of the elements, drawn at random, never the whole set', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specialTimer = 9999;        // isolate: no buff spawns
     sim.elementalSpawnTimer = 0;    // fire an offering on the first step
     run(sim, ctx, 0.05);            // exactly one step — the worm barely moves
     const elems = sim.specials.filter(s => isElementalType(s.type));
-    expect(new Set(elems.map(s => s.type))).toEqual(new Set(ELEMENTAL_TYPES));
+    expect(elems).toHaveLength(ELEMENTAL_OFFER_COUNT);
+    // Two DIFFERENT elements — a choice, not the same orb twice.
+    expect(new Set(elems.map(s => s.type)).size).toBe(ELEMENTAL_OFFER_COUNT);
+    for (const e of elems) expect(ELEMENTAL_TYPES).toContain(e.type);
+  });
+
+  it('draws a different pair over time rather than always the same two', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;
+    const seen = new Set();
+    for (let cycle = 0; cycle < 12; cycle++) {
+      sim.elementalSpawnTimer = 0;
+      run(sim, ctx, 0.05);
+      for (const e of sim.specials.filter(s => isElementalType(s.type))) seen.add(e.type);
+    }
+    // Over a dozen cycles the draw should have reached beyond one fixed pair.
+    expect(seen.size).toBeGreaterThan(ELEMENTAL_OFFER_COUNT);
   });
 
   it('places every offered orb on the centre tile of a different face', () => {
@@ -287,6 +309,39 @@ describe('elemental offering', () => {
     stepUntilCommit(sim, ctx);
     expect(sim.elementalType).toBe('water'); // the one grabbed starts its wash
     expect(sim.specials).toHaveLength(0);    // the other three are wiped
+  });
+
+  it('goes quiet for a while after an element is actually claimed', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;
+    sim.specials = [special(2, 3, 4, 'PZ', 'water')]; // a known orb to grab
+    // A normal clock, not the test sentinel: the claim must be what delays the
+    // next offering, and it may only ever push the clock back, never forward.
+    sim.elementalSpawnTimer = ELEMENTAL_SPAWN_INTERVAL;
+    stepUntilCommit(sim, ctx);
+    expect(sim.elementalType).toBe('water');
+    // The claim buys the cooldown, not the ordinary spawn interval.
+    expect(sim.elementalSpawnTimer).toBeGreaterThanOrEqual(ELEMENTAL_CLAIM_COOLDOWN - 1e-6);
+    expect(ELEMENTAL_CLAIM_COOLDOWN).toBeGreaterThan(ELEMENTAL_SPAWN_INTERVAL);
+
+    // Run out most of the cooldown: still nothing on the board.
+    run(sim, ctx, ELEMENTAL_CLAIM_COOLDOWN - 2);
+    expect(sim.specials.filter(s => isElementalType(s.type))).toHaveLength(0);
+    // ...and then the next offering arrives.
+    run(sim, ctx, 4);
+    expect(sim.specials.filter(s => isElementalType(s.type)).length).toBeGreaterThan(0);
+  });
+
+  it('an offering that simply expires does not buy the cooldown', () => {
+    // Only a claim is worth a quiet spell; ignoring the orbs should not stop the
+    // next set from coming round on the ordinary clock.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;
+    sim.elementalSpawnTimer = 0;
+    run(sim, ctx, 0.05);
+    expect(sim.elementalSpawnTimer).toBeLessThanOrEqual(ELEMENTAL_SPAWN_INTERVAL);
   });
 
   it('a fresh offering clears an un-taken previous one instead of stacking', () => {
