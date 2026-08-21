@@ -8,6 +8,9 @@ import * as THREE from 'three';
 const _sharedHealGeo = new THREE.PlaneGeometry(1, 1);
 const _healDummy = new THREE.Object3D();
 const _bloomWhite = new THREE.Color(1, 1, 1);
+// Warm tint mixed into the burst colour at the bloom peak. Constant — it was being
+// allocated fresh on every frame of every heal burst.
+const _GOLD_TINT = new THREE.Color(1.0, 0.87, 0.2);
 const _baseHealColor = new THREE.Color();
 
 const HEAL_PARTICLE_COUNT = 40;
@@ -135,8 +138,7 @@ const HealParticles = React.forwardRef((_props, ref) => {
     // Golden → white bloom: mix toward gold at peak, then fade to white
     const bloomPeak = Math.sin(p * Math.PI);
     // Lean toward gold (warm) at the bloom peak
-    const goldColor = new THREE.Color(1.0, 0.87, 0.2);
-    _baseHealColor.lerp(goldColor, 0.4); // tint the base color golden
+    _baseHealColor.lerp(_GOLD_TINT, 0.4); // tint the base color golden
     uniformsRef.current.uColor.value.lerpColors(
       _baseHealColor,
       _bloomWhite,

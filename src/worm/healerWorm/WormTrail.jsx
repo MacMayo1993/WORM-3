@@ -101,11 +101,31 @@ export function WormTrail({ worm, size: _size }) {
     // equipped trail overrides both colors regardless of skin.
     const wormTrailId = useGameStore(s => s.wormTrail ?? 'classic');
     const equippedTrail = getTrail(wormTrailId);
-    const trailColorsRef = useRef({ body: equippedTrail.body ?? skin.body, glow: equippedTrail.glow ?? skin.glow });
-    trailColorsRef.current = { body: equippedTrail.body ?? skin.body, glow: equippedTrail.glow ?? skin.glow };
+    // Parsed once per palette change, not once per daub. Each daub used to run
+    // THREE.Color.set(hexString) — a regex parse of the same two strings — and the
+    // frame paints up to TRAIL_DAUB_CAP daubs plus TRAIL_GLOW_CAP halos, so the
+    // stroke was re-parsing those literals thousands of times every frame. Colours
+    // are copied from these below, which is bit-identical to parsing them again.
+    const trailColorsRef = useRef(null);
+    if (trailColorsRef.current === null) {
+        trailColorsRef.current = { bodyHex: null, glowHex: null, body: new THREE.Color(), glow: new THREE.Color() };
+    }
+    {
+        const bodyHex = equippedTrail.body ?? skin.body;
+        const glowHex = equippedTrail.glow ?? skin.glow;
+        const tc = trailColorsRef.current;
+        if (tc.bodyHex !== bodyHex) { tc.bodyHex = bodyHex; tc.body.set(bodyHex); }
+        if (tc.glowHex !== glowHex) { tc.glowHex = glowHex; tc.glow.set(glowHex); }
+    }
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
-    const gaitRef = useRef(trailGaitParams(wormCharacterId));
-    gaitRef.current = trailGaitParams(wormCharacterId);
+    // trailGaitParams returns a fresh object; only re-derive it when the character
+    // actually changes rather than on every render of the mode above.
+    const gaitRef = useRef(null);
+    const gaitCharRef = useRef(null);
+    if (gaitCharRef.current !== wormCharacterId) {
+        gaitCharRef.current = wormCharacterId;
+        gaitRef.current = trailGaitParams(wormCharacterId);
+    }
 
     useFrame(() => {
         const mesh = meshRef.current;
@@ -205,7 +225,7 @@ export function WormTrail({ worm, size: _size }) {
                     mesh.setMatrixAt(visible, _trailDummy.matrix);
 
                     // Encode fade as color brightness
-                    _trailColor.set(trailColors.body).multiplyScalar(0.20 + fs * 0.80);
+                    _trailColor.copy(trailColors.body).multiplyScalar(0.20 + fs * 0.80);
                     mesh.setColorAt(visible, _trailColor);
 
                     // Recent daubs also get a soft additive glow halo in the skin's glow colour,
@@ -214,7 +234,7 @@ export function WormTrail({ worm, size: _size }) {
                         _trailDummy.scale.multiplyScalar(TRAIL_GLOW_SCALE);
                         _trailDummy.updateMatrix();
                         glowMesh.setMatrixAt(visible, _trailDummy.matrix);
-                        _trailGlowColor.set(trailColors.glow).multiplyScalar(0.14 + fs * 0.36);
+                        _trailGlowColor.copy(trailColors.glow).multiplyScalar(0.14 + fs * 0.36);
                         glowMesh.setColorAt(visible, _trailGlowColor);
                         glowCount = visible + 1;
                     }

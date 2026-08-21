@@ -60,6 +60,16 @@ const _tapeMat4 = new THREE.Matrix4();
 // Static empty collections used as safe fallbacks (never mutated)
 const _EMPTY_SET = new Set();
 const _EMPTY_MAP = new Map();
+// Tile-local corner offsets for the caution poles/tape, in (right, forward) units.
+// Fixed data — it was being rebuilt as five arrays per marked tile per frame, and
+// with the demo flag below every flipped tile on the board is marked.
+const CAUTION_HALF = 0.45;
+const CAUTION_CORNERS = [
+    [CAUTION_HALF, CAUTION_HALF],
+    [CAUTION_HALF, -CAUTION_HALF],
+    [-CAUTION_HALF, -CAUTION_HALF],
+    [-CAUTION_HALF, CAUTION_HALF]
+];
 const BUBBLES_PER_VOID = 5;          // rising gas bubbles per dead portal
 const SPARKS_PER_CRITICAL = 7;
 const POLES_PER_TILE = 4;
@@ -156,8 +166,14 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         const result = [];
         const dirs = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
         for (let x = 0; x < size; x++) {
+            const xOuter = x === 0 || x === size - 1;
             for (let y = 0; y < size; y++) {
+                const yOuter = y === 0 || y === size - 1;
                 for (let z = 0; z < size; z++) {
+                    // Only the shell can carry a visible sticker; the isVisible test
+                    // below rejects every interior cubie anyway. Skipping them here
+                    // drops the scan from 3,375 cells to 1,352 on a 15×15 board.
+                    if (!xOuter && !yOuter && z !== 0 && z !== size - 1) continue;
                     const cubie = debouncedCubies?.[x]?.[y]?.[z];
                     if (!cubie) continue;
                     for (const dk of dirs) {
@@ -399,14 +415,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 _tapeRight.normalize();
                 _tapeForward.crossVectors(n, _tapeRight).normalize();
                 
-                const half = 0.45;
-                const corners = [
-                    [half, half],
-                    [half, -half],
-                    [-half, -half],
-                    [-half, half]
-                ];
-                
+                const corners = CAUTION_CORNERS;
+
                 for (let c = 0; c < 4 && poleIdx < MAX_POLES; c++) {
                     const cx = corners[c][0];
                     const cy = corners[c][1];

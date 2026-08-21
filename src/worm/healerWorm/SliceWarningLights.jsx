@@ -30,9 +30,12 @@ export function SliceWarningLights({ pendingRotRef, size }) {
 
     useFrame(() => {
         const p = pendingRotRef.current;
-        const key = p ? `${p.axis}-${(p.sliceIndices ?? [p.sliceIndex]).join(',')}-${(p.sliceDirs ?? [p.dir]).join(',')}` : null;
-        if (key === lastKeyRef.current) return;
-        lastKeyRef.current = key;
+        // The mode arms this ref with one stable move object per warning (and nulls
+        // it on reset), so identity is an exact change test. It used to build a
+        // composite key string — two array allocations, two joins and a template
+        // literal — on every frame of every run just to find nothing had changed.
+        if (p === lastKeyRef.current) return;
+        lastKeyRef.current = p;
         setPending(p ? { axis: p.axis, sliceIndex: p.sliceIndex, sliceIndices: p.sliceIndices, sliceDirs: p.sliceDirs, dir: p.dir } : null);
     });
 
