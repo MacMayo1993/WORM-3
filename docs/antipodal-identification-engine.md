@@ -3,7 +3,8 @@
 *The Antipodal Identification Engine: an operation-metric decoder, its geometric
 realization on RP², and its extension to a cubical cochain complex.*
 
-**Status:** rev 3.1 — full paper, incorporating four rounds of external review.
+**Status:** rev 3.2 — full paper, incorporating four rounds of external review;
+core theorems computationally validated (Appendix B).
 The contribution is positioned per §24: not a new linear-code family, but the
 *factorisation of the shortest-repair problem induced by a free involution and
 an operation-derived metric*, together with the point at which that
@@ -607,6 +608,40 @@ constructions use to tell trivial cycles from logical classes (Breuckmann–Terh
 2016; Bombín–Martin-Delgado 2007). A formal complexity-class claim for regime B
 is deferred (§25) until the signed-cut correspondence is developed and cited.
 
+### 18.6 A worked `r = 2` example (regimes A and B)
+
+Take one `G`-orbit = a single square `I²` with vertices `00, 01, 10, 11`
+(`v = (v₁, v₂)`), `τ₁` flipping `v₁`, `τ₂` flipping `v₂`.
+
+**Regime A (exact).** Let `b` be the checkerboard `b(v) = v₁ ⊕ v₂`, i.e.
+`b(00)=0, b(01)=1, b(10)=1, b(11)=0` — nonconstant, so this orbit is dirty. Its
+edge coboundary `Δ = δ⁰b` is:
+
+```
+dir 1:  Δ₁(00) = b(00)⊕b(10) = 1,   Δ₁(01) = b(01)⊕b(11) = 1
+dir 2:  Δ₂(00) = b(00)⊕b(01) = 1,   Δ₂(10) = b(10)⊕b(11) = 1
+```
+
+The square identity holds: `Δ₁(00) + Δ₂(10) + Δ₁(01) + Δ₂(00) = 1+1+1+1 = 0`, so
+`Δ ∈ Z¹` (closed). Integrate from `b(00) = 0`:
+`b(10)=Δ₁(00)=1`, `b(01)=Δ₂(00)=1`, `b(11)=b(10)⊕Δ₂(10)=0` — recovering `b`, and
+`b+1 = (1,0,0,1)` is the other lift. With `k = wt(b) = 2`, Theorem 5 gives repair
+`min(2, 2²−2) = 2`: toggling the two `1`-vertices (or the two `0`-vertices) to a
+constant. Each vertex toggle flips `r = 2` edge-defects at once — e.g. toggling
+`01` flips `Δ₂(00)` and `Δ₁(01)` — which is exactly the internal coupling that the
+`r = 1` engine did not have, yet the problem is still solved by integration.
+
+**Regime B (noisy, and `H¹(I²) = 0`).** Corrupt one observation of the field
+above: set `Δ₁(00) = 0`, leaving the other three at `1`. Now
+`Δ₁(00) + Δ₂(10) + Δ₁(01) + Δ₂(00) = 0+1+1+1 = 1 ≠ 0`, so the observed
+`η ∉ Z¹` — it is *not integrable*, even though the filled square has `H¹ = 0` and
+therefore admits no closed-but-non-exact field. Nearest-exact decoding
+`min_{β∈B¹} d(η, β)` returns the checkerboard coboundary at Hamming distance `1`
+(the single flipped edge): a genuine nearest-`B¹` (signed-cut-type) problem with
+no cohomological obstruction. This is precisely regime B — local inconsistency,
+not global topology — and it is why `H¹ ≠ 0` is not the criterion for
+nearest-exact decoding to be nontrivial.
+
 ## 19. Expansion IV: hybrid diagonal and boundary-coupled codes
 
 Combine two syndrome sources: local involution defects `H_τ` (block diagonal) and
@@ -712,9 +747,11 @@ The right framing is not "a new decoder" but a two-phase-change story:
 > **A free `C₂`-action gives coordinatewise factorisation. A free `(Z₂)^r`-action
 > replaces independent defect coordinates with an internally coupled cubical
 > coboundary system while retaining orbitwise exact solvability (by integration).
-> Genuine nonlocal decoding appears only after additional topology, incomplete
-> filling, noise, or cross-orbit constraints introduce nontrivial cohomology or
-> destroy the remaining product structure.**
+> Genuine nonlocal decoding appears only when additional topology, incomplete
+> filling, gluing, or cross-orbit constraints introduce nontrivial global
+> structure or destroy the remaining orbitwise product decomposition. Independent
+> edge noise may already make the per-orbit nearest-exact problem nontrivial
+> without making it nonlocal (§18.5 regime B; §23).**
 
 Compactly:
 `independent checks → cubically constrained but exactly integrable checks →
@@ -729,8 +766,12 @@ claim precise enough to be hard to dismiss.
    `τ(x) ≠ x`, and `D(gb) = Db` for all legal paired `g`, with closed-form vs.
    exhaustive agreement on small instances.
 2. **Develop the `(Z₂)^r` cubical complex of §18** along the progression
-   `exact cube integration → closed but non-exact edge fields → noisy/inconsistent
-   edge fields → glued complexes → hybrid decoding`. Concretely, once the edge
+   `exact cube integration → noisy/inconsistent fields → altered/glued topology →
+   closed non-exact fields → hybrid decoding` — ordered by mathematical
+   dependency: on the filled cube `I^r`, `H¹ = 0`, so *exact* data integrate and
+   arbitrary *noisy* `η` already give a nearest-`B¹` problem, but *closed
+   non-exact* fields cannot exist until the topology is altered to make `H¹ ≠ 0`.
+   Concretely, once the edge
    field `η ∈ C¹` is promoted to independent data: (a) the *integration* test
    `η ∈ Z¹ ⇒ η ∈ B¹?`; (b) the *classification* `[η] ∈ H¹`; (c) the
    *nearest-exact-field* decoder `min_{β ∈ B¹} d(η, β)` — the first genuine coding
@@ -786,6 +827,31 @@ something deeper.
   `C*` requires a raise operation and is a deliberate non-goal (a gameplay
   change). The planner is left unchanged; this is a documented modelling choice,
   not a missed optimisation.
+
+## Appendix B. Computational validation
+
+Every closed form in this paper is checked exhaustively against an *independent*
+brute-force optimum over the declared generators and costs — no theorem is
+assumed; each optimum is found by BFS/Dijkstra and compared. The verifier is
+`scripts/verify_antipodal_engine.py` (pure Python, no dependencies;
+`python3 scripts/verify_antipodal_engine.py`, exit 0 iff all agree). Current
+results:
+
+| Theorem | Closed form | Independent check | Cases (all OK) |
+|---|---|---|---|
+| **2** — sector distance | `wt(Δ)` | BFS over single-member toggles to `Δ = 0` | all `2^{2P}` states, `P = 1..4` |
+| **3** — quotient completion | `min(k, P−k)` | Hamming distance to both codewords `0…0`, `1…1` | all `2^P` states, `P = 1..5` |
+| **4** — free-orientation joint | `min(Σ cᵢ→00, Σ cᵢ→11)`, `gᵢ = min(fᵢ, hᵢ^a+hᵢ^c)` | Dijkstra over `{paired flip, toggle a, toggle c}` to nearest solved state | all `2^{2P}` states, `P = 1..3`, cost profiles `(f,h^a,h^c) ∈ {(1,1,1),(1,2,2),(3,1,1),(2,1,3)}` |
+| **5** — `(Z₂)^r` sector | `Σ_o min(k_o, 2^r − k_o)` | BFS over single-vertex toggles per orbit; and the integrate-then-choose-lighter decoder reconstructs `b` up to global complement | all `2^{2^r}` orbit states, `r = 1..3` |
+
+The Theorem 4 cases deliberately include `fᵢ > hᵢ^a + hᵢ^c` (e.g. `(3,1,1)`),
+where the corrected `gᵢ = min(fᵢ, hᵢ^a+hᵢ^c)` is what makes the closed form agree
+with Dijkstra — a naive `gᵢ = fᵢ` fails exactly these cases, which is why the
+substitution matters (§6.1). All checks pass.
+
+*(Suggested extensions, not yet automated: property tests `τ² = id`, `τ(x) ≠ x`,
+`D(gb) = Db`; and a check of the actual WORM `planQuotientCompletion` against
+brute force for the restricted canonical model of Appendix A.)*
 
 ## References
 
