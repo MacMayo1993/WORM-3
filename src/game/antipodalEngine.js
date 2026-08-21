@@ -145,6 +145,16 @@ export function isFibreInSolvedOrbit(cubies, size) {
  * two heals under target 0, and target 1 is only chosen when every pair it
  * must flip is flippable.
  *
+ * Repair model — this is the CANONICAL model, and it is optimal for WORM's
+ * operations. `healSticker` restores only (dirty→clean); there is no one-sided
+ * "flip toward antipode", and the paired flip preserves ∆ so it cannot fix an
+ * asymmetric pair. So an asymmetric pair can only heal to (0,0), giving q with
+ * k = (dirty pairs), and completion is min(k, P−k) flips — optimal here. A
+ * strictly cheaper wt(∆) + min(n_clean, n_dirty) exists only under a FREE repair
+ * model (a one-sided op that can drive an asymmetric pair to (1,1) in one step),
+ * which WORM deliberately does not expose; adding it would be a gameplay change,
+ * not a planner fix. See docs/antipodal-identification-engine.md §7.4.
+ *
  * @returns {{ target: 0|1, heals: Array<{x,y,z,dir}>, flips: Array<{x,y,z,dir}>,
  *             healCost: number, flipCost: number, totalCost: number }}
  */

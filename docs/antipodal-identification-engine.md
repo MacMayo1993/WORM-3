@@ -74,8 +74,8 @@ or touches React; each is a function of the board.
 4. **A repair class, and a minimum-cost planner.** A *heal* acts on one member
    alone — deliberately outside the legal group — so it changes exactly one `Δᵢ`
    and moves the board to an adjacent sector. Once every pair is symmetric, the
-   solved states form a two-element coset under the global flip `γ`, and
-   completion costs `min(k, P−k)` flips. — `antipodalEngine.js ·
+   solved states are the two codewords `{0, γ}` of the length-P repetition code,
+   and completion costs `min(k, P−k)` flips. — `antipodalEngine.js ·
    planQuotientCompletion()`
 
 ### 2.1 Two move classes (reconciling "conserved" with "repaired")
@@ -129,11 +129,31 @@ wt(q + 1)  = P − wt(q)
 ∴  d = min(k, P − k)
 ```
 
-That is the whole decoder: **nearest-coset decoding of `Z₂ᴾ / ⟨1⟩`** — the
-bit-vector space modulo the all-ones (global-flip) vector. It is a genuine
-coding-theoretic optimum, closed-form, and needs no analogy to verify. RP² is a
-realization of `(X, τ, b)`, and a legitimate one — but the theorems hold for
-*any* free involution on a finite set.
+That is the whole decoder: **nearest-codeword decoding against the length-P
+repetition code `C = ⟨1⟩ = {0, 1}`** (the all-zero and all-one words). A note on
+language: `C` has two *codewords*, but the quotient `Z₂ᴾ / ⟨1⟩` has `2^{P−1}`
+cosets, each with two representatives `[q] = {q, q+1}` — so "two-element" refers
+to the code, never the quotient. The result is a genuine coding-theoretic
+optimum, closed-form, and needs no analogy to verify. RP² is a realization of
+`(X, τ, b)`, and a legitimate one — but the theorems hold for *any* free
+involution on a finite set.
+
+**Theorem 4 (Joint decoder, free repair orientation).** Theorems 2–3 compose to
+`wt(Δ) + min(k, P−k)` *only under the canonical repair model*, where a heal has a
+prescribed direction (dirty→clean) and so fixes the post-heal symmetric state
+`q` with `k = n₁₁` (dirty pairs). If instead a one-sided repair may orient an
+asymmetric pair toward *either* symmetric representative at equal cost (the free
+repair model), the two stages stop being independent and the optimum is
+
+```
+C_joint = wt(Δ) + min(n₀₀, n₁₁)          (n₀₀ = clean pairs, n₁₁ = dirty pairs)
+```
+
+which can be strictly smaller — it never repairs an asymmetric pair toward one
+orientation and then flips it back. **WORM implements the canonical model** (see
+§7.4): `healSticker` only restores `curr = orig`, and there is no one-sided
+"flip toward antipode", so the extra `min(n₀₀,n₁₁)`-vs-`min(k,P−k)` saving is not
+reachable without adding a new operation.
 
 ### 3.1 On the numbers
 
@@ -264,13 +284,22 @@ Its global structure is genuinely homological, but in the **top** degree:
   The free involution `τ` is the antipodal Z₂-action; `π : S² → RP²` is the
   orientation double cover, and the `P` orbits are the 2-cells of the induced
   cellulation of RP².
-- `Δ(b) = 0 ⟺ b` is τ-invariant `⟺ b = π*(c)` for a 2-cochain `c` on RP². So
-  **`Δ` is the obstruction to descending a cochain from the double cover** — the
-  τ-anti-invariant component. The engine is an equivariant-descent computation.
-- The global flip `γ` = all-ones on the `P` orbit-faces. On a closed surface
-  `∂₂(Σ all faces) = 0 mod 2` (every edge borders exactly two faces), so `γ` is a
-  2-cycle; with `C₃ = 0` it is not a boundary. Hence **`γ` generates
-  `H₂(RP²; Z₂) ≅ Z₂` — the mod-2 fundamental class.**
+- Writing `N = I + τ*` (so `(Nb)(x) = b(x) + b(τx)`), note `N² = 0` over F₂ and
+  `Nb = 0 ⟺ τ*b = b`. Then `Δ(b) = 0 ⟺ b` is deck-invariant `⟺ b = π*(c)` for a
+  2-cochain `c` on RP². So **`Δ` is the obstruction to descending a cochain from
+  the double cover** — the **descent (deck-invariance) defect**. It should *not*
+  be called a "τ-anti-invariant part": in characteristic 2 the `+1` and `−1`
+  eigenspaces of `τ*` are not distinct (`N = I + τ* = I − τ*`), so invariant and
+  anti-invariant no longer split. The engine is an equivariant-descent
+  computation.
+- The global flip `γ` = all-ones on the `P` orbit-faces. It is a top-dimensional
+  *cochain*; the fundamental class is a *chain*, so the correspondence runs
+  through the cellular-basis identification `ι : C²(K; F₂) → C₂(K; F₂)`,
+  `f* ↦ f`. On a closed surface `∂₂(Σ all faces) = 0 mod 2` (every edge borders
+  exactly two faces), so `ι(γ)` is a 2-cycle; with `C₃ = 0` it is not a boundary.
+  Hence **`ι(γ)` represents `[RP²] ∈ H₂(RP²; Z₂) ≅ Z₂` — the mod-2 fundamental
+  class.** (The engine's state vector is not *literally* a homology class; it
+  *corresponds* to one under `ι`.)
 
 ### 7.3 The verdict
 
@@ -292,6 +321,31 @@ build — the legitimate "next step," not a claim to make now.
 the **mod-2 top-homology / equivariant-descent structure of the double cover
 `S² → RP²`**, with `γ` the fundamental class of `H₂(RP²; Z₂)`. That is a tighter
 and more defensible identification than "surface code" ever was.
+
+### 7.4 Which repair model the code implements (and why the planner is optimal)
+
+`planQuotientCompletion` implements the **canonical repair model** of Theorem 4,
+and is optimal for the operation set WORM actually exposes:
+
+- `healSticker` is one-sided and restores only (`curr := orig`, `flips := 0`) —
+  dirty→clean, never clean→dirty. There is **no one-sided "flip toward
+  antipode."** `flipStickerPair` / `unflipStickerPair` are both *paired* (they
+  toggle both members atomically), and a paired flip preserves `Δ`, so it cannot
+  fix an asymmetric orbit.
+- Consequently an asymmetric pair can only be healed to `(0,0)`, so after the
+  mandatory `wt(Δ)` heals the symmetric vector `q` has `k = n₁₁`, and the two
+  targets cost: target `0` = `wt(Δ) + n₁₁` flips; target `1` = `wt(Δ) +
+  (n₀₀ + n_asym)` flips. The planner picks the cheaper (`P − k < k`), i.e.
+  `min(k, P−k)` flips — which is **optimal for these operations**. It does not
+  leave flips on the table.
+- Theorem 4's strictly smaller `wt(Δ) + min(n₀₀, n₁₁)` requires the *free*
+  repair model — a one-sided op that can drive an asymmetric pair to `(1,1)` in
+  one step. Realizing it would mean adding a new player operation
+  (`curr := ANTIPODAL_COLOR[orig]` on a single sticker) and switching the planner
+  to the joint decoder. That is a **gameplay change**, not a planner fix, and is
+  intentionally out of scope: the current planner is already optimal for the
+  current rules. The gap is a property of the operation set, and reversibility of
+  the paired flip does not close it.
 
 ## 8. Porting: the general kernel
 
@@ -322,7 +376,7 @@ whole port.
 > not a surface code (those live in `H₁`).
 
 No "accidental quantum surface code" is claimed. The defensible core is
-Theorems 1–3 — elementary, self-contained, and specific to this codebase. The
+Theorems 1–4 — elementary, self-contained, and specific to this codebase. The
 RP² realization and the axis-valued-data transfer are legitimate; the
 surface-code resemblance is real, has a precise homological reason, and is
 correctly re-attributed to `H₂` and equivariant descent in §7.
@@ -338,8 +392,10 @@ correctly re-attributed to `H₂` and equivariant descent in §7.
 - **`Δ`** — per orbit, `b(x) ⊕ b(τx)`. Conserved by the legal group; changed
   only by out-of-group single-member repairs. Its weight is the mandatory-repair
   count, and (§4) the quotient map by the flip subspace `S`.
-- **`γ` / all-ones vector** — global complementation `q ↦ q + 1`; generates
-  `Z₂ᴾ/⟨1⟩` (the solved coset) and, geometrically, `H₂(RP²; Z₂)`.
+- **`γ` / all-ones vector** — global complementation `q ↦ q + 1`; the nonzero
+  codeword of `⟨1⟩ = {0, γ}` (so `{0, γ}` are the two solved states, while
+  `Z₂ᴾ/⟨1⟩` has `2^{P−1}` cosets). Geometrically, as a cochain it corresponds
+  under `ι` to the mod-2 fundamental class of `H₂(RP²; Z₂)`.
 - **nearest-coset decoding** — correcting to the nearest representative of a
   quotient; here `min(k, P−k)`.
 - **RP²** — `S²/(x ~ −x)`. Non-orientable; `H₁ ≅ H₂ ≅ Z₂` mod 2, but
