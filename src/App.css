@@ -3698,10 +3698,14 @@ select.btn-compact:disabled {
   animation: none;
 }
 
-.worm-menu-ghost:hover {
-  border-color: rgba(230, 240, 255, 0.55) !important;
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.06) !important;
+/* Secondary green CTAs (Start Demo, Give Feedback) — same colour as START, one
+   press-down system, but no idle pulse so START stays the loud primary. */
+.worm-menu-cta-secondary:hover {
+  filter: brightness(1.06);
+}
+.worm-menu-cta-secondary:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 #2f9d4d, 0 3px 8px rgba(0, 0, 0, 0.36) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

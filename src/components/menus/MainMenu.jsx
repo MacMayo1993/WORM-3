@@ -1195,7 +1195,8 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
       <style>{`
         .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
         .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
-        .mc-pill:hover   { border-color: rgba(255,255,255,0.45) !important; color: rgba(255,255,255,0.92) !important; }
+        .mc-pill:hover   { filter: brightness(1.14); }
+        .mc-pill:active  { transform: scale(0.97); }
         .mc-cube-window { height: min(47vh, 415px); }
         @media (max-width: 600px) {
           .mc-cube-window { height: min(45vh, 395px); }
@@ -1298,17 +1299,20 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             }}
           >{mode.cta || 'PLAY'}</button>
 
-          {/* Utility row — destinations that are not game modes */}
+          {/* Utility row — destinations that are not game modes. The pills carry
+              the active mode's colour (a translucent fill + solid rim of
+              mode.tileColor) so they read as the same system as the PLAY button
+              above, just quieter. */}
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
             {UTILITY_MODES.map((u) => (
               <button
                 key={u.id} type="button" className="mc-pill" onClick={() => launch(u.id)}
                 style={{
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.24)',
+                  background: `${mode.tileColor}26`, border: `1.5px solid ${mode.tileColor}`,
                   borderRadius: '100px', padding: '8px 18px',
-                  color: 'rgba(255,255,255,0.58)', fontSize: '11.5px', fontWeight: 600,
+                  color: mode.textColor, fontSize: '11.5px', fontWeight: 700,
                   letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
-                  transition: 'border-color 160ms ease, color 160ms ease',
+                  transition: 'filter 160ms ease, background 160ms ease',
                   WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
                 }}
               >{u.label}</button>
@@ -1316,11 +1320,11 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             <button
               type="button" className="mc-pill" onClick={onBack}
               style={{
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.24)',
+                background: `${mode.tileColor}26`, border: `1.5px solid ${mode.tileColor}`,
                 borderRadius: '100px', padding: '8px 18px',
-                color: 'rgba(255,255,255,0.58)', fontSize: '11.5px', fontWeight: 600,
+                color: mode.textColor, fontSize: '11.5px', fontWeight: 700,
                 letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
-                transition: 'border-color 160ms ease, color 160ms ease',
+                transition: 'filter 160ms ease, background 160ms ease',
                 WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
               }}
             >Back</button>
@@ -1378,43 +1382,47 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
         // so it's cached by the time the demo scene mounts.
         onPointerEnter={warmDemoAssets}
         onPointerDown={warmDemoAssets}
-        // Secondary action — ghost pill so START stays the single loud CTA and
-        // the two buttons read as one system (was a competing blue gradient).
-        className="worm-menu-ghost"
+        // Secondary action — the same green as START (one action colour), but
+        // smaller and without the pulse/glow so START stays the loud CTA.
+        className="worm-menu-cta-secondary"
         style={{
-          background: 'transparent',
-          border: '1.5px solid rgba(230,240,255,0.30)',
+          background: 'linear-gradient(180deg, #7bd88a, #3fbf62)',
+          border: 'none',
           borderRadius: '100px',
-          padding: '11px 30px',
-          color: 'rgba(233,242,255,0.88)',
-          fontSize: '13px',
-          fontWeight: 700,
+          padding: '11px 34px',
+          color: '#08210f',
+          fontSize: '14px',
+          fontWeight: 800,
           fontFamily: UI_FONT,
-          letterSpacing: '0.14em',
+          letterSpacing: '0.12em',
           cursor: 'pointer',
           textTransform: 'uppercase',
-          transition: 'border-color 0.2s, color 0.2s, background 0.2s',
+          boxShadow: '0 4px 0 #2f9d4d, 0 8px 16px rgba(0,0,0,0.34)',
+          transition: 'filter 0.15s ease, transform 0.1s ease',
         }}
       >Start Demo</button>
     )}
     <button
       type="button"
+      className="worm-menu-cta-secondary"
       onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}
+      // Same green family as START, smallest of the three so the hierarchy is
+      // START → Start Demo → Give Feedback while all read as one action colour.
       style={{
-        background: 'transparent',
-        border: '1px solid rgba(120, 160, 255, 0.18)',
-        borderRadius: '10px',
-        padding: '7px 18px',
-        color: 'rgba(200, 220, 255, 0.5)',
+        background: 'linear-gradient(180deg, #7bd88a, #3fbf62)',
+        border: 'none',
+        borderRadius: '100px',
+        padding: '9px 26px',
+        color: '#08210f',
         fontSize: '12px',
-        fontWeight: 600,
+        fontWeight: 700,
         fontFamily: UI_FONT,
-        letterSpacing: '0.06em',
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
         cursor: 'pointer',
-        transition: 'color 0.2s, border-color 0.2s',
+        boxShadow: '0 3px 0 #2f9d4d, 0 6px 12px rgba(0,0,0,0.30)',
+        transition: 'filter 0.15s ease, transform 0.1s ease',
       }}
-      onMouseEnter={(e) => { e.target.style.color = 'rgba(200, 220, 255, 0.8)'; e.target.style.borderColor = 'rgba(120, 160, 255, 0.35)'; }}
-      onMouseLeave={(e) => { e.target.style.color = 'rgba(200, 220, 255, 0.5)'; e.target.style.borderColor = 'rgba(120, 160, 255, 0.18)'; }}
     >Give Feedback</button>
   </div>
   );
