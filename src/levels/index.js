@@ -45,6 +45,34 @@ export { levelsManager, LevelsManager } from './LevelsManager.js';
 export { progressManager, ProgressManager } from './ProgressManager.js';
 export { computeStars, getLevelPar, parSlack } from './scoring.js';
 
+// Analytic level generation from the antipodal par formula C_dir = n_A + min(n11, P−n11).
+export {
+  computeCDir,
+  targetAmbiguity,
+  enumerateConfigs,
+  parRange,
+  generateLevelState,
+  starsForMoves,
+  nextHint,
+  CAMPAIGN_TIERS,
+  tierForLevel,
+  generateCampaignLevel,
+  generateCampaign,
+  generateDailyChallenge,
+  makeRng
+} from './antipodalRandomizer.js';
+
+// Bridge from the abstract fibre par formula to playable CLASSIC flip-solve levels.
+export {
+  betaPairAnchors,
+  betaPairCount,
+  buildAntipodalFlipSequence,
+  buildPlayableAntipodalLevel,
+  buildAntipodalDescentLevels,
+  buildAntipodalDescentPack,
+  ANTIPODAL_PACK_BASE_ID
+} from './antipodalLevelBridge.js';
+
 // ============================================================================
 // SCHEMA & CONSTANTS
 // ============================================================================
@@ -77,7 +105,7 @@ export { STORY_LEVELS, getStoryLevel, getStoryLevelIds, CUBE_CAMPAIGN_LEVELS, ge
 // LEVEL PACKS
 // ============================================================================
 
-export { OFFICIAL_PACKS, BUILT_IN_PACKS, getPack, getPackIds, storyCampaign, cubeAcademy, algorithmCodex } from './packs/index.js';
+export { OFFICIAL_PACKS, BUILT_IN_PACKS, getPack, getPackIds, storyCampaign, cubeAcademy, algorithmCodex, antipodalDescent } from './packs/index.js';
 
 // ============================================================================
 // VALIDATION

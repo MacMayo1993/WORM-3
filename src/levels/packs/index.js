@@ -6,6 +6,10 @@
 import storyCampaign from './story-campaign.js';
 import cubeAcademy from './cube-academy.js';
 import algorithmCodex from './algorithm-codex.js';
+import { buildAntipodalDescentPack } from '../antipodalLevelBridge.js';
+
+// Analytically generated flip-solve pack (deterministic; exact par from C_dir).
+const antipodalDescent = buildAntipodalDescentPack();
 
 /**
  * All official level packs
@@ -14,6 +18,7 @@ export const OFFICIAL_PACKS = [
   storyCampaign,
   cubeAcademy,
   algorithmCodex,
+  antipodalDescent,
 ];
 
 /**
@@ -23,6 +28,7 @@ export const BUILT_IN_PACKS = {
   'story-campaign': storyCampaign,
   'cube-academy': cubeAcademy,
   'algorithm-codex': algorithmCodex,
+  'antipodal-descent': antipodalDescent,
 };
 
 /**
@@ -42,4 +48,4 @@ export function getPackIds() {
   return Object.keys(BUILT_IN_PACKS);
 }
 
-export { storyCampaign, cubeAcademy, algorithmCodex };
+export { storyCampaign, cubeAcademy, algorithmCodex, antipodalDescent };
