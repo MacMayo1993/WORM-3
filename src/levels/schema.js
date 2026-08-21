@@ -44,6 +44,7 @@ export const LEVEL_ID_RANGES = {
   'story-campaign': [1, 99],
   'cube-academy': [101, 199],
   'algorithm-codex': [201, 299],
+  'antipodal-descent': [301, 399],
 };
 
 export const BACKGROUNDS = {

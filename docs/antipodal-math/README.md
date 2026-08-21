@@ -77,3 +77,30 @@ The generator, campaign, daily challenge, hint engine, and star rating are all
 covered by [`src/__tests__/antipodalRandomizer.test.js`](../../src/__tests__/antipodalRandomizer.test.js),
 which also asserts the generator never touches `Math.random` (determinism/replay
 safety).
+
+### Playable levels
+
+[`src/levels/antipodalLevelBridge.js`](../../src/levels/antipodalLevelBridge.js)
+lands the abstract fibre partition on a real cube as a `createLevel` descriptor
+that the staging pipeline can open on and the CLASSIC win condition can score.
+
+Native antipodal flips are **paired** (∆-preserving), so staging can only reach
+the **symmetric sector** (`n_A = 0`): flip `n11` distinct β-pairs, and the CLASSIC
+solve un-flips each, giving an exact `par = n11 = C_dir`. Asymmetric defect pairs
+(`n_A > 0`) are exactly the ∆ ≠ 0 states the monograph proves unreachable by
+paired moves — they belong to the worm/heal move model, not classic staging, and
+are intentionally left for that pipeline.
+
+The generated **Antipodal Descent** pack (ids 301–399, registered in
+`packs/index.js`) is a deterministic 12-level par ramp built from this bridge:
+
+```js
+import { buildPlayableAntipodalLevel, buildAntipodalDescentPack } from '../levels/index.js';
+
+const pack = buildAntipodalDescentPack();          // registered as 'antipodal-descent'
+const custom = buildPlayableAntipodalLevel({ id: 350, size: 4, targetPar: 9, seed: 'daily' });
+```
+
+Covered by [`src/__tests__/antipodalLevelBridge.test.js`](../../src/__tests__/antipodalLevelBridge.test.js),
+which stages each generated level and confirms its measured fibre cost
+(`antipodalEngine.fibreCosts`) equals the authored par.
