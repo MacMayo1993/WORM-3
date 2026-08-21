@@ -127,8 +127,12 @@ describe('nextHint', () => {
     expect(many[nextHint(many).orbitIndex].bits).toEqual([0, 0]);
   });
 
-  it('reports solved when the fibre is in the solved orbit', () => {
-    expect(nextHint([{ bits: [0, 0] }, { bits: [0, 0] }]).action).toBe('solved');
+  it('reports solved for both members of the solved quotient', () => {
+    // All clean (n11 = 0).
+    expect(nextHint([{ bits: [0, 0] }, { bits: [0, 0] }])).toMatchObject({ action: 'solved', orbitIndex: -1 });
+    // All dirty (n11 = P) — the global-flip representative, reached after an
+    // optimal hint sequence collapses a dirty-majority state toward all-dirty.
+    expect(nextHint([{ bits: [1, 1] }, { bits: [1, 1] }, { bits: [1, 1] }])).toMatchObject({ action: 'solved', orbitIndex: -1 });
   });
 });
 

@@ -199,7 +199,10 @@ export function nextHint(orbits) {
     return { action: 'heal', orbitIndex: asymIndex, reason: 'Heal the broken antipodal pair (mandatory defect repair).' };
   }
   const n11 = orbits.filter((o) => o.bits[0] === 1 && o.bits[1] === 1).length;
-  if (n11 === 0) return { action: 'solved', orbitIndex: -1, reason: 'Fibre already lies in the solved orbit.' };
+  // Both members of the solved quotient are already solved: all clean (n11 = 0)
+  // and all dirty (n11 = P, the global-flip representative). Either way there is
+  // no cheaper polarity to move toward.
+  if (n11 === 0 || n11 === P) return { action: 'solved', orbitIndex: -1, reason: 'Fibre already lies in the solved orbit.' };
   if (n11 <= P - n11) {
     const idx = orbits.findIndex((o) => o.bits[0] === 1 && o.bits[1] === 1);
     return { action: 'flip', orbitIndex: idx, reason: 'Flip a dirty (1,1) pair toward the all-clean target.' };
