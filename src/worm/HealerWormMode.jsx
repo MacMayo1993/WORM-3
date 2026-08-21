@@ -528,8 +528,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
             {wormAlive && <WormTrail worm={worm} size={size} />}
             {wormAlive && <WormBody worm={worm} size={size} />}
-            {wormAlive && <RocketTailFire worm={worm} />}
-            {wormAlive && <GlowWormAura worm={worm} />}
+            {wormAlive && <RocketTailFire worm={worm} size={size} />}
+            {wormAlive && <GlowWormAura worm={worm} size={size} />}
             {wormAlive && <WormFace worm={worm} size={size} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}
             {wormAlive && <TunnelPortalFX worm={worm} size={size} />}

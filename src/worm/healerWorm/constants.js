@@ -176,6 +176,9 @@ export const ROCKET_SPEED_MULT = 4;
 export const ROCKET_FLIGHT_HEIGHT = 1.4;   // world units the worm cruises above the tiles
 export const ROCKET_FLIGHT_TAKEOFF = 0.35; // seconds to rise at launch
 export const ROCKET_FLIGHT_LANDING = 0.5;  // seconds to settle before the burn ends
+// The ramp itself lives in rocketOrbit.js (rocketOrbitT), which also owns where
+// the worm actually flies — this stays as the plain altitude for anything that
+// only wants a height, and so the two can never drift out of step.
 export const rocketFlightLift = (active, rocketT) => {
   if (!active) return 0;
   const elapsed = ROCKET_DURATION - rocketT;
