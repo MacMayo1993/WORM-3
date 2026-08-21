@@ -273,10 +273,11 @@ function SingleOrbImpl({
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Mega Mode can carry more than a hundred pickups. Rendering the full gem,
-  // cage, Möbius strip, and orbital system for every one turns those pickups
-  // into hundreds of draw calls. A single emissive gem keeps them readable at
-  // the much smaller on-screen tile size while preserving movement and pickup.
+  // Very large boards can carry more than a hundred pickups. Rendering the full
+  // gem, halos, Möbius strip, and orbital system for every one turns those
+  // pickups into hundreds of draw calls, so past the 15×15 mega tier a single
+  // emissive gem keeps them readable while preserving movement and pickup. Mega
+  // (15×15) itself now renders the full orb; the fallback only kicks in above it.
   if (reducedDetail) {
     return (
       <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
@@ -655,7 +656,7 @@ export default function ParityOrbs({
           isGlowWorm={isGlowWorm}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}
-          reducedDetail={size >= 15 && !isTunnelMode}
+          reducedDetail={size > 15 && !isTunnelMode}
         />
       ))}
     </group>
