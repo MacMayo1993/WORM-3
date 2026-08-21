@@ -15,6 +15,7 @@ import { wormBuffs } from './wormBuffs.js';
 import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { wormClock } from './wormClock.js';
+import { feel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
@@ -316,9 +317,37 @@ const ensureHudStyle = () => {
             cursor: pointer;
             user-select: none;
             font-family: ${UI_FONT};
-            transition: transform 90ms ease, background 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+            /* Release eases back over 130ms; the press itself is cut to 40ms below.
+               A key that takes as long to go down as it does to come up feels like
+               a slider, not a switch. */
+            transition: transform 130ms cubic-bezier(0.2, 0.8, 0.3, 1),
+                        background 140ms ease, box-shadow 130ms ease, border-color 140ms ease;
         }
-        .worm-hud-key:active { transform: scale(0.93); }
+        .worm-hud-key:active { transform: scale(0.93); transition-duration: 40ms; }
+
+        /* ── Tray keys travel instead of shrinking ─────────────────────────────
+           A scale reads as the key getting smaller; a real key goes DOWN onto its
+           base. Each tray key sits on a hard offset shadow — its side wall — and
+           on press it drops onto it, the wall collapsing to almost nothing while
+           the inner shading flips from a lit top edge to a shadowed one. That is
+           the whole trick: the light says raised, then it says sunk. */
+        .worm-steer-key, .worm-action {
+            box-shadow:
+                /* the side wall — lit a little, or it disappears into the drop shadow */
+                0 5px 0 rgba(46, 56, 38, 0.72),
+                0 6px 0 rgba(9, 13, 7, 0.55),
+                0 10px 20px rgba(10, 14, 8, 0.5),
+                inset 0 1.5px 0 rgba(255, 253, 242, 0.30),
+                inset 0 -3px 7px rgba(0, 0, 0, 0.26);
+        }
+        .worm-steer-key:active, .worm-action:active {
+            transform: translateY(5px);
+            box-shadow:
+                0 1px 0 rgba(9, 13, 7, 0.55),
+                0 3px 9px rgba(10, 14, 8, 0.4),
+                inset 0 3px 7px rgba(0, 0, 0, 0.34),
+                0 0 22px var(--key-glow, rgba(255, 253, 242, 0.3));
+        }
         /* The key's own surface has to live here, not inline: an inline background
            outranks any :active rule, which is exactly how the press state silently
            did nothing the first time round. */
@@ -331,24 +360,39 @@ const ensureHudStyle = () => {
             border-radius: 30px;
             flex-direction: column;
             gap: 10px;
-            /* Lighter than the status bar's plate on purpose: at a third of the
-               screen tall, two of these at the HUD's usual 0.78 opacity walled off
-               both sides of the play area. The blur still separates them from the
-               scene, and the press state is what has to be unmistakable, not the
-               resting surface. */
-            background: rgba(24, 31, 18, 0.34);
+            /* A cap, not a panel: a light top edge falling to a dark foot gives the
+               slab a dome, so it reads as something standing off the screen with a
+               top face to push on. Lighter overall than the status bar's plate on
+               purpose — at a third of the screen tall, two of these at the HUD's
+               usual 0.78 opacity walled off both sides of the play area. */
+            background:
+                linear-gradient(180deg,
+                    rgba(255, 253, 242, 0.14) 0%,
+                    rgba(255, 253, 242, 0.03) 20%,
+                    rgba(8, 12, 6, 0.10) 72%,
+                    rgba(8, 12, 6, 0.20) 100%),
+                rgba(24, 31, 18, 0.30);
             backdrop-filter: ${HUD_BLUR};
             -webkit-backdrop-filter: ${HUD_BLUR};
             border: 1px solid ${BORDER};
-            box-shadow: ${SHADOW}, inset 0 1px 0 rgba(255,253,242,0.10);
             display: flex; align-items: center; justify-content: center;
             padding: 0;
         }
+        /* Sunk: the lighting inverts. The top edge falls into shadow instead of
+           catching the light, which is what a key face looks like below its own
+           bezel — without it the pressed key is a flat coloured slab. */
         .worm-steer-key:active {
-            background: var(--key-press, rgba(255,253,242,0.22));
-            border-color: var(--key-edge, rgba(255,253,242,0.5));
-            box-shadow: 0 0 22px var(--key-glow, rgba(255,253,242,0.35));
+            background:
+                linear-gradient(180deg,
+                    rgba(0, 0, 0, 0.26) 0%,
+                    rgba(0, 0, 0, 0.05) 35%,
+                    rgba(255, 253, 242, 0.05) 100%),
+                var(--key-press, rgba(255, 253, 242, 0.22));
+            border-color: var(--key-edge, rgba(255, 253, 242, 0.5));
         }
+        /* The glyph rides the cap down with it and dims a touch, the way ink on a
+           key face falls into its own shadow when the key bottoms out. */
+        .worm-steer-key:active .worm-key-face { opacity: 0.82; }
         .worm-jump-ready {
             animation: wormJumpReady 1.5s ease-in-out infinite;
         }
@@ -567,11 +611,20 @@ function SteerKey({ side, wormAlive, wormColor, vars }) {
     return (
         <div style={STEER_CLUSTER_STYLE}>
             <button
-                onPointerDown={() => wormAlive && callWormTurn(intent)}
+                onPointerDown={() => {
+                    if (!wormAlive) return;
+                    // The click and the tick are the other half of the key: the turn
+                    // itself lands on the next tile commit, so without them the press
+                    // has no acknowledgement at the moment the thumb makes it. Routed
+                    // through feel() so both the SFX and haptics settings gate it.
+                    feel('uiKey');
+                    callWormTurn(intent);
+                }}
                 className="worm-hud-key worm-steer worm-steer-key"
                 style={{ ...vars, color: TEXT }}
                 aria-label={label}
             >
+                <span className="worm-key-face" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <Chevron dir={dir} size={'clamp(30px, 8vw, 38px)'} />
                 {/* The worm's own colour on the key, the way the old pad's dead
                     centre hub carried it — it ties the control to the thing it drives.
@@ -585,6 +638,7 @@ function SteerKey({ side, wormAlive, wormColor, vars }) {
                     boxShadow: `0 0 8px ${withAlpha(wormColor, 0.7)}`,
                     pointerEvents: 'none',
                 }} />
+                </span>
             </button>
         </div>
     );
