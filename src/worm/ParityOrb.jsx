@@ -116,8 +116,15 @@ function getOrbMaterials(gemColor, bandColor, isTarget) {
       metalness: 0, roughness: 0.1, toneMapped: false
     }),
     innerGlow: basic(gemColor, 0.18, { blending: THREE.AdditiveBlending, side: THREE.BackSide }),
-    cage: basic('#e8fbff', isTarget ? 0.6 : 0.46, { wireframe: true, blending: THREE.AdditiveBlending }),
-    axis: basic('#ffffff', 0.72),
+    // Great-circle parity halo — a smooth glowing ring in place of the old
+    // wireframe octahedron. Additive so it reads as light, not a hard frame.
+    cage: basic('#e8fbff', isTarget ? 0.55 : 0.42, { blending: THREE.AdditiveBlending }),
+    // Second, cross-tilted halo so the antipodal signature reads from any angle
+    // without any straight edges.
+    cage2: basic('#dff8ff', isTarget ? 0.38 : 0.28, { blending: THREE.AdditiveBlending }),
+    // Luminous axis connecting the antipodal poles — soft additive glow rod,
+    // no longer a flat opaque cylinder.
+    axis: basic('#ffffff', 0.5, { blending: THREE.AdditiveBlending }),
     nodeGem: new THREE.MeshBasicMaterial({ color: gemColor, toneMapped: false }),
     nodeBand: new THREE.MeshBasicMaterial({ color: bandColor, toneMapped: false }),
     band: new THREE.MeshStandardMaterial({
@@ -152,9 +159,10 @@ const _orbGeos = {
     ringB:        new THREE.TorusGeometry(0.370 * 0.92, 0.009, 6, 18),
     electron:     new THREE.SphereGeometry(0.042, 7, 7),
     glow:         new THREE.SphereGeometry(0.52, 40, 28),          // outer ambient aura — smooth round glow (was octagonal at 8 segs)
-    parityCage:   new THREE.OctahedronGeometry(0.31, 0),           // unmistakable diamond frame around the round gem
-    parityNode:   new THREE.SphereGeometry(0.055, 12, 10),         // antipodal pair at opposite cage poles
-    parityAxis:   new THREE.CylinderGeometry(0.012, 0.012, 0.54, 8),
+    parityCage:   new THREE.TorusGeometry(0.30, 0.012, 10, 48),    // smooth great-circle halo (was a diamond octahedron)
+    parityCage2:  new THREE.TorusGeometry(0.30, 0.010, 10, 48),    // cross-tilted second halo
+    parityNode:   new THREE.SphereGeometry(0.055, 14, 12),         // antipodal pair at opposite poles
+    parityAxis:   new THREE.CylinderGeometry(0.010, 0.010, 0.54, 12),
   },
   target: {
     shell:        new THREE.SphereGeometry(0.27, 36, 36),          // larger smooth gem for target
@@ -168,9 +176,10 @@ const _orbGeos = {
     electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
     glow:         new THREE.SphereGeometry(0.66, 40, 28),          // outer ambient aura — smooth round glow (was decagonal at 10 segs)
     lockRing:     new THREE.TorusGeometry(0.56, 0.03, 8, 36),
-    parityCage:   new THREE.OctahedronGeometry(0.39, 0),
-    parityNode:   new THREE.SphereGeometry(0.068, 12, 10),
-    parityAxis:   new THREE.CylinderGeometry(0.015, 0.015, 0.68, 8),
+    parityCage:   new THREE.TorusGeometry(0.38, 0.015, 10, 56),
+    parityCage2:  new THREE.TorusGeometry(0.38, 0.012, 10, 56),
+    parityNode:   new THREE.SphereGeometry(0.068, 14, 12),
+    parityAxis:   new THREE.CylinderGeometry(0.012, 0.012, 0.68, 12),
   },
 };
 
@@ -292,11 +301,13 @@ function SingleOrbImpl({
       {/* Inner additive halo — soft bloom around the core, pulsed by the animator. */}
       <mesh ref={innerGlowRef} geometry={g.innerGlow} material={mat.innerGlow} />
 
-      {/* Parity signature: a sharp diamond cage and two opposite poles connected
-          through the core. It reads as "antipodal pair" even when tile colours are
-          close, and its angular outline cannot be mistaken for either special. */}
+      {/* Parity signature: two smooth crossed great-circle halos and two opposite
+          poles connected by a luminous axis through the core. It reads as
+          "antipodal pair" even when tile colours are close, but its outline is now
+          all curves — no diamond, no hard edges. */}
       <group ref={parityMarkRef} rotation={[Math.PI / 4, 0, Math.PI / 4]}>
-        <mesh geometry={g.parityCage} material={mat.cage} />
+        <mesh geometry={g.parityCage} material={mat.cage} rotation={[Math.PI / 2, 0, 0]} />
+        <mesh geometry={g.parityCage2} material={mat.cage2} rotation={[Math.PI / 2, Math.PI / 3, 0]} />
         <mesh geometry={g.parityAxis} material={mat.axis} />
         <mesh geometry={g.parityNode} material={mat.nodeGem} position={[0, isTarget ? 0.34 : 0.27, 0]} />
         <mesh geometry={g.parityNode} material={mat.nodeBand} position={[0, isTarget ? -0.34 : -0.27, 0]} />
