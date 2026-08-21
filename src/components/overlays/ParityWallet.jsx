@@ -5,7 +5,7 @@
 //   dark    — true for dark-background contexts (main menu, betting screen)
 //             false (default) for light panels (TopMenuBar, WormHUD)
 //   neutral — drop the cyan family for white + green. The worm HUD's status bar
-//             is white text with one green accent (matching the d-pad), and a
+//             is white text with one green accent (matching the thumb tray), and a
 //             cyan chip sitting in it read as a fifth unrelated colour.
 
 import React, { useState, useEffect, useRef } from 'react';

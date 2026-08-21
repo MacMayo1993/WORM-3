@@ -196,6 +196,13 @@ const SFX = {
     noise({ dur: 0.18, type: 'highpass', freq: 3000, gain: 0.5 });
     tone({ freq: 320, freqTo: 48, dur: 0.42, type: 'sawtooth', gain: 0.34 });
   },
+  // The touch tray's keys. Dry and short — the sound of a switch bottoming out,
+  // not an event in the game. It fires on every press, so it has to sit under the
+  // game's own vocabulary rather than compete with it.
+  uiKey() {
+    noise({ dur: 0.025, type: 'highpass', freq: 2600, gain: 0.16 });
+    tone({ freq: 190, freqTo: 130, dur: 0.045, type: 'square', gain: 0.09 });
+  },
 };
 
 // ── Haptic vocabulary ──────────────────────────────────────────────────────────
@@ -222,6 +229,8 @@ const HAPTICS = {
   // Grows with the flip count, mirroring the pitch climb.
   tunnelPulse: (flips = 0) => 10 + Math.min(flips, 6) * 4, // 10 → 34ms
   tunnelSnap: [0, 60, 35, 90],
+  // Short enough to read as the key itself rather than as something happening.
+  uiKey: 10,
 };
 
 /**

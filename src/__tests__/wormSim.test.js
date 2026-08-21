@@ -157,6 +157,46 @@ describe('crawling movement', () => {
     expect(sim.pos).toEqual({ x: 0, y: 1, z: 2, dirKey: 'PZ' });
   });
 
+  it('turns relative to the heading in EITHER control mode (the thumb tray)', () => {
+    // The touch tray has two steering keys and no way to name a compass point, so
+    // it sends turnLeft/turnRight rather than left/right. In relative steering that
+    // is the same turn; in oriented mode it is the difference between steering and
+    // being stuck on two of the four directions.
+    for (const mode of ['non-oriented', 'oriented']) {
+      const sim = makeSim();
+      const ctx = makeCtx({ getControlMode: () => mode });
+      expect(sim.moveDir).toBe('up');
+      queueTurn(sim, 'turnRight');
+      run(sim, ctx, 1.05);
+      expect(sim.moveDir, mode).toBe('right');
+      queueTurn(sim, 'turnRight');
+      run(sim, ctx, 1.05);
+      expect(sim.moveDir, mode).toBe('down'); // ...and again, a quarter at a time
+    }
+  });
+
+  it('applies same-way tray turns one tile at a time, never both at once', () => {
+    // Two rights landing inside one tile is a 180 into your own neck. The relative
+    // turn goes through the same hold the keyboard's left/right has, so a fast
+    // double-tap becomes the staircase the player meant rather than a self-kill or
+    // a dropped input.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    queueTurn(sim, 'turnRight');
+    run(sim, ctx, 1.05);
+    expect(sim.moveDir).toBe('right');
+
+    queueTurn(sim, 'turnRight');
+    const headings = new Set([sim.moveDir]);
+    for (let i = 0; i < 40; i++) {
+      run(sim, ctx, 0.05);
+      headings.add(sim.moveDir);
+    }
+    // It got there — and only ever a quarter turn at a time on the way.
+    expect(sim.moveDir).toBe('down');
+    expect([...headings].sort()).toEqual(['down', 'right']);
+  });
+
   it('records framerate-independent step history while moving', () => {
     const sim = makeSim();
     const ctx = makeCtx();

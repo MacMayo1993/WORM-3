@@ -1088,9 +1088,15 @@ const PHASE_HANDLERS = {
                 // is identical, so don't drop the second — HOLD it until the next tile, so a
                 // fast right-right becomes the L-turn the player meant instead of a self-kill
                 // or a skipped layer.
-                const holdReversal = (t === 'left' || t === 'right')
-                    && ctx.getControlMode() !== 'oriented'
-                    && t === sim.lastTurnDir
+                // 'turnLeft' / 'turnRight' are the touch tray's steering: always a
+                // quarter turn from the current heading, whichever control mode is
+                // set. The tray has two buttons and no way to name an absolute
+                // direction, so it cannot use 'left'/'right' — in oriented mode
+                // those are compass points, and a player on that mode would have
+                // been left unable to steer up or down at all.
+                const relativeTurn = t === 'turnLeft' ? 'left' : t === 'turnRight' ? 'right' : null;
+                const holdReversal = (relativeTurn || ((t === 'left' || t === 'right') && ctx.getControlMode() !== 'oriented'))
+                    && (relativeTurn ?? t) === sim.lastTurnDir
                     && sim.tilesSinceTurn < 1;
                 if (!holdReversal) {
                     sim.pendingTurns.shift();
@@ -1103,6 +1109,10 @@ const PHASE_HANDLERS = {
                         }
                     } else if (t === 'jump') {
                         startJump(sim, ctx);
+                    } else if (relativeTurn) {
+                        sim.moveDir = turnWorm(sim.moveDir, relativeTurn);
+                        sim.lastTurnDir = relativeTurn;
+                        sim.tilesSinceTurn = 0;
                     } else if (ctx.getControlMode() === 'oriented') {
                         // Steering stays live during a rocket — the flight is aimable, which
                         // is most of what makes it a tool rather than a firework. A reversal
