@@ -45,6 +45,23 @@ export { levelsManager, LevelsManager } from './LevelsManager.js';
 export { progressManager, ProgressManager } from './ProgressManager.js';
 export { computeStars, getLevelPar, parSlack } from './scoring.js';
 
+// Analytic level generation from the antipodal par formula C_dir = n_A + min(n11, P−n11).
+export {
+  computeCDir,
+  targetAmbiguity,
+  enumerateConfigs,
+  parRange,
+  generateLevelState,
+  starsForMoves,
+  nextHint,
+  CAMPAIGN_TIERS,
+  tierForLevel,
+  generateCampaignLevel,
+  generateCampaign,
+  generateDailyChallenge,
+  makeRng
+} from './antipodalRandomizer.js';
+
 // ============================================================================
 // SCHEMA & CONSTANTS
 // ============================================================================
