@@ -203,12 +203,24 @@ export const MAGNET_RADIUS = 2;
 // element claimed while one is running simply replaces it.
 export const ELEMENTAL_DURATION = 10;
 // Elemental orbs spawn on their OWN track, separate from the rocket/magnet special
-// clock. Every interval the board is offered one orb of each element clustered near
-// the worm; grabbing one claims that element and wipes the rest of the offering
-// until the next cycle. The lifetime is a hair under the interval so an un-taken
-// offering fades out cleanly before the next one appears.
+// clock. Every interval the board is offered ELEMENTAL_OFFER_COUNT orbs, drawn at
+// random from the elements and placed on different face centres; grabbing one
+// claims that element and wipes the rest of the offering. The lifetime is a hair
+// under the interval so an un-taken offering fades out cleanly before the next one
+// appears.
 export const ELEMENTAL_SPAWN_INTERVAL = 12; // seconds between elemental offerings
 export const ELEMENTAL_LIFETIME = 11;       // seconds an un-taken offering stays on the board
+// How many of the elements are offered at once. Offering every element every time
+// made the choice a menu — and with one on each face, wherever the worm was there
+// was an orb near it. Two is a choice between two things, and leaves most of the
+// cube without an orb on it.
+export const ELEMENTAL_OFFER_COUNT = 2;
+// Quiet spell after an element is actually claimed, measured from the claim.
+// The spawn clock alone put the next offering on the board a couple of seconds
+// after a wash ended, so the cube was almost never without orbs on it; a claim now
+// buys a proper gap before the next one appears. Un-taken offerings do not trigger
+// it — only a claim does.
+export const ELEMENTAL_CLAIM_COOLDOWN = 30;
 // On claim the sim freezes for this long so the player can watch the element take
 // over the cube instead of crawling past it. The wash's own clock is held for the
 // beat too, so this is not taken out of ELEMENTAL_DURATION.

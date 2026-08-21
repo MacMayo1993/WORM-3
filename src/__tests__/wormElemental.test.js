@@ -13,8 +13,9 @@ import {
 } from '../worm/healerWorm/elementalDefs.js';
 import { SPECIAL_DEFS, SPECIAL_TYPES, getSpecialDef } from '../worm/healerWorm/specialDefs.js';
 import { makeWormSim, resetWormSim, stepWormSim, activateSpecial, startElemental, tileKey, faceCenterTiles } from '../worm/healerWorm/wormSim.js';
-import { ELEMENTAL_DURATION, ELEMENTAL_FOCUS_DURATION, ELEMENTAL_SPAWN_INTERVAL } from '../worm/healerWorm/constants.js';
+import { ELEMENTAL_DURATION, ELEMENTAL_FOCUS_DURATION, ELEMENTAL_SPAWN_INTERVAL, ELEMENTAL_OFFER_COUNT } from '../worm/healerWorm/constants.js';
 import { LIVING_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
+import { makeCubies } from '../game/cubeState.js';
 import { ELEMENT_MODE } from '../worm/healerWorm/elementalOrbShader.js';
 
 const SIZE = 5;
@@ -129,14 +130,17 @@ describe('elemental offering placement', () => {
     return sim.specials.filter(s => isElementalType(s.type));
   }
 
-  it('offers one orb of every element at once', () => {
-    // Five elements onto six face centres. The placement walks faces until it finds
-    // a free one, so growing the element list past four had to keep working rather
-    // than silently dropping the last orb.
+  it('offers a random handful of the elements, not the whole set', () => {
+    // Laying out every element every cycle made the offering a menu rather than a
+    // choice, and with one orb per face there was always one wherever the worm
+    // happened to be. Only ELEMENTAL_OFFER_COUNT are drawn, and never the same type
+    // twice within a cycle. The placement still walks faces until it finds a free
+    // one, so a longer element list keeps working.
     const sim = makeSim();
     const els = spawnOffering(sim, makeCtx());
-    expect(els).toHaveLength(ELEMENTAL_TYPES.length);
-    expect(new Set(els.map(e => e.type))).toEqual(new Set(ELEMENTAL_TYPES));
+    expect(els).toHaveLength(Math.min(ELEMENTAL_OFFER_COUNT, ELEMENTAL_TYPES.length));
+    expect(new Set(els.map(e => e.type)).size).toBe(els.length);
+    for (const e of els) expect(ELEMENTAL_TYPES).toContain(e.type);
   });
 
   it('puts every orb on its own tile', () => {
@@ -149,16 +153,21 @@ describe('elemental offering placement', () => {
   });
 
   it('offers what fits when faces are occupied rather than failing outright', () => {
-    // Occupancy fallback: the placement skips a taken face centre. With five types
-    // and six faces there is exactly one spare, so blocking two must still yield
-    // four orbs — never a crash and never a doubled-up tile.
+    // Occupancy fallback: the placement skips a taken face centre. Block all but one
+    // and the offering must come up short rather than crash or double up a tile.
     const sim = makeSim();
-    const ctx = makeCtx();
+    // A real cube behind the ctx: with almost every face centre blocked the worm
+    // will crawl onto one of the blockers, and the pickup path reads live stickers.
+    const ctx = { ...makeCtx(), getCubies: () => makeCubies(SIZE) };
     const centres = faceCenterTiles(SIZE);
-    sim.powerups.push({ ...centres[0], id: 'block-a' }, { ...centres[1], id: 'block-b' });
+    const blockedTiles = centres.slice(1);
+    sim.powerups.push(...blockedTiles.map((t, i) => ({ ...t, id: `block-${i}` })));
+    // Fire the offering on the very next step, before the worm can crawl over any
+    // of the blockers and eat them.
+    sim.elementalSpawnTimer = 0;
     const els = spawnOffering(sim, ctx);
-    expect(els.length).toBeGreaterThanOrEqual(ELEMENTAL_TYPES.length - 2);
-    const blocked = new Set([tileKey(centres[0]), tileKey(centres[1])]);
+    expect(els).toHaveLength(1);
+    const blocked = new Set(blockedTiles.map(tileKey));
     for (const e of els) expect(blocked.has(tileKey(e))).toBe(false);
   });
 
