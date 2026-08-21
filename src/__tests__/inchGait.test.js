@@ -1,36 +1,44 @@
-// The Inch Worm's gait. Two properties matter and neither held before:
-//   1. humps scale with body length (one per wavelength) instead of one arch
-//      stretched over the whole worm, and
-//   2. every displacement is bounded, instead of growing with the segment index —
-//      which is what made a long worm's tail whip whole tiles back and forth.
-// The monotonicity test is load-bearing for the renderer, not cosmetic: the body's
-// curve-walk marches forward through the path buffer and cannot step back.
+// The Inch Worm's gait. It has to read as inching: a tall localized loop that
+// stays put on the ground while the body pours through it, with flat body either
+// side of it — not a shimmer, not one balloon over the whole worm, and never an
+// amplitude that grows with body length (which is what used to whip a long tail
+// around whole tiles at a time).
+//
+// The monotonicity test is load-bearing, not cosmetic: the renderer's curve walk
+// marches forward through the path buffer and cannot step back.
 import { describe, it, expect } from 'vitest';
 import {
   inchGaitInto,
+  inchLoopShape,
   inchHumpCount,
   INCH_BALL_SPACING,
-  INCH_WAVELENGTH,
-  INCH_SQUISH,
-  INCH_ANCHOR_SEGMENTS
+  INCH_GATHER,
+  INCH_MAX_HUMP,
+  INCH_JUMP_FRACTION,
+  INCH_SKEW
 } from '../worm/healerWorm/inchGait.js';
+import { SURFACE_JUMP_HEIGHT } from '../worm/healerWorm/constants.js';
 
 const gait = (i, count, phase, move = 1) => {
   const out = { dist: 0, arch: 0 };
-  inchGaitInto(out, i, count, phase, move);
+  inchGaitInto(out, i, count, phase, move, inchLoopShape(count));
   return out;
 };
 
-// Count arch peaks along the body — a peak is a segment whose arch beats both
-// neighbours, which is what a player sees as one hump.
-const countHumps = (count, phase) => {
-  const arch = [];
-  for (let i = 0; i < count; i++) arch.push(gait(i, count, phase).arch);
-  let peaks = 0;
+const archProfile = (count, phase) => {
+  const a = [];
+  for (let i = 0; i < count; i++) a.push(gait(i, count, phase).arch);
+  return a;
+};
+
+// A loop the player can see: a run of lifted body with a single peak in it.
+const countLoops = (count, phase) => {
+  const a = archProfile(count, phase);
+  let loops = 0;
   for (let i = 1; i < count - 1; i++) {
-    if (arch[i] > 0.02 && arch[i] >= arch[i - 1] && arch[i] > arch[i + 1]) peaks++;
+    if (a[i] > 0.05 && a[i] >= a[i - 1] && a[i] > a[i + 1]) loops++;
   }
-  return peaks;
+  return loops;
 };
 
 describe('inch worm gait', () => {
@@ -45,11 +53,9 @@ describe('inch worm gait', () => {
   });
 
   it('places segments in order, always — the curve walk cannot go backwards', () => {
-    // Every phase, every length: dist must strictly increase with the segment index,
-    // or the renderer's forward-only walk loses its bracket and the body tangles.
     for (const count of [4, 9, 60, 500]) {
-      for (let p = 0; p < 24; p++) {
-        const phase = p * 0.137;
+      for (let p = 0; p < 40; p++) {
+        const phase = p * 0.0973;
         let prev = -Infinity;
         for (let i = 0; i < count; i++) {
           const d = gait(i, count, phase).dist;
@@ -58,16 +64,95 @@ describe('inch worm gait', () => {
         }
       }
     }
-    // The margin comes from the squish staying under 1/2π; pin that so a future
-    // "make it squishier" tweak fails here rather than in the renderer.
-    expect(INCH_SQUISH).toBeLessThan(1 / (2 * Math.PI));
+    // The margin comes from the gather staying under 1/π; pin it so a future
+    // "make it scrunch harder" tweak fails here rather than in the renderer.
+    expect(INCH_GATHER).toBeLessThan(1 / Math.PI);
   });
 
-  it('keeps displacement bounded no matter how long the worm gets', () => {
+  it('rears three quarters of the jump, once the body can make an arch that tall', () => {
+    expect(INCH_MAX_HUMP).toBeCloseTo(SURFACE_JUMP_HEIGHT * 0.75, 10);
+    expect(INCH_JUMP_FRACTION).toBe(0.75);
+    // A long worm gets the full rear-up...
+    expect(inchLoopShape(400).height).toBeCloseTo(INCH_MAX_HUMP, 10);
+    // ...a short one rears in proportion to the body it has, rather than firing a
+    // lone bead a whole tile into the air with nothing to arch from.
+    const small = inchLoopShape(4);
+    expect(small.height).toBeGreaterThan(0);
+    expect(small.height).toBeLessThan(small.bodyArc);
+    // Height grows with length and never overshoots the cap.
+    let prev = 0;
+    for (const count of [4, 12, 40, 120, 400]) {
+      const h = inchLoopShape(count).height;
+      expect(h).toBeGreaterThanOrEqual(prev);
+      expect(h).toBeLessThanOrEqual(INCH_MAX_HUMP + 1e-9);
+      prev = h;
+    }
+  });
+
+  it('keeps flat body between loops — the loop is only legible against straight worm', () => {
+    // A sine along the body left every segment mid-hump at all times, which read
+    // as a shimmer rather than an inch. Most of a long body should be down.
+    const count = 400;
+    let flat = 0;
+    const a = archProfile(count, 0.37);
+    for (const v of a) if (v === 0) flat++;
+    expect(flat / count).toBeGreaterThan(0.3);
+  });
+
+  it('grows more loops as the body grows', () => {
+    const counts = [40, 120, 400, 800];
+    const loops = counts.map((c) => countLoops(c, 0.21));
+    for (let k = 1; k < loops.length; k++) {
+      expect(loops[k]).toBeGreaterThan(loops[k - 1]);
+    }
+    for (let k = 0; k < counts.length; k++) {
+      expect(Math.abs(loops[k] - inchHumpCount(counts[k]))).toBeLessThanOrEqual(1);
+    }
+    // A fresh worm still inches — one loop passes over it at a time.
+    let sawALoop = false;
+    for (let p = 0; p < 60; p++) if (countLoops(8, p * 0.05) >= 1) sawALoop = true;
+    expect(sawALoop).toBe(true);
+  });
+
+  it('keeps each loop planted while the body pours through it', () => {
+    // The chain-fountain property: advancing the head by δ must move the crest δ
+    // closer to the head, leaving it exactly where it was on the cube. That is
+    // what makes the worm push off the ground instead of dragging a ripple along.
+    const count = 400;
+    const steps = 8;
+    const delta = steps * INCH_BALL_SPACING;
+    for (const i of [80, 150, 260]) {
+      expect(gait(i - steps, count, delta).arch).toBeCloseTo(gait(i, count, 0).arch, 6);
+    }
+  });
+
+  it('rears up gently and tips over forward', () => {
+    // Asymmetry is the push: the trailing face of the loop is longer than the
+    // leading one, so a bead climbs slowly and is thrown off the front.
+    expect(INCH_SKEW).toBeGreaterThan(0);
+    const count = 400;
+    const shape = inchLoopShape(count);
+    // Find a crest, then compare how far the lift reaches either side of it.
+    let crest = -1;
+    let best = 0;
+    const a = archProfile(count, 0);
+    for (let i = 1; i < count - 1; i++) {
+      if (a[i] > best) { best = a[i]; crest = i; }
+    }
+    expect(crest).toBeGreaterThan(0);
+    let behind = 0;
+    let ahead = 0;
+    for (let i = crest; i < count && a[i] > 0.02; i++) behind++;
+    for (let i = crest; i >= 0 && a[i] > 0.02; i--) ahead++;
+    expect(behind).toBeGreaterThan(ahead);
+    expect(shape.halfWidth).toBeGreaterThan(0);
+  });
+
+  it('bounds the accordion no matter how long the worm gets', () => {
     // The old gait scaled compression by the segment's own arc, so the tail of a
-    // 400-segment worm slid ~10 world units per cycle. The cap is now a constant.
-    const cap = INCH_WAVELENGTH * INCH_SQUISH;
+    // 400-segment worm slid ~10 world units per cycle.
     for (const count of [4, 100, 1200]) {
+      const cap = INCH_GATHER * inchLoopShape(count).spacing * 0.5;
       for (let p = 0; p < 12; p++) {
         for (let i = 0; i < count; i += Math.max(1, Math.floor(count / 40))) {
           const slip = Math.abs(gait(i, count, p * 0.31).dist - i * INCH_BALL_SPACING);
@@ -75,52 +160,18 @@ describe('inch worm gait', () => {
         }
       }
     }
-    expect(cap).toBeLessThan(INCH_BALL_SPACING);
-  });
-
-  it('grows more humps as the body grows', () => {
-    // The whole point of the rework: a short worm inches with one hump, a long one
-    // ripples with many, and the count rises monotonically with length.
-    const counts = [4, 12, 24, 48, 96];
-    const humps = counts.map((c) => countHumps(c, 0.21));
-    for (let k = 1; k < humps.length; k++) {
-      expect(humps[k]).toBeGreaterThan(humps[k - 1]);
-    }
-    expect(humps[0]).toBe(1);
-    // One hump per wavelength of body, give or take the end taper.
-    for (let k = 0; k < counts.length; k++) {
-      expect(Math.abs(humps[k] - inchHumpCount(counts[k]))).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it('keeps each hump planted in world space while the body flows through it', () => {
-    // A crest sits at (arc + phase) / wavelength = const, so advancing the head by
-    // δ must move the crest δ closer to the head — leaving it exactly where it was
-    // on the cube. That is what makes the worm push off the ground instead of
-    // dragging a ripple along with it.
-    const count = 200;
-    const step = INCH_BALL_SPACING * 8; // one wavelength of crawl
-    const arch0 = gait(100, count, 0).arch;
-    const arch1 = gait(100 - 8, count, step).arch;
-    expect(arch1).toBeCloseTo(arch0, 6);
   });
 
   it('anchors the head and the tail', () => {
-    const count = 80;
-    // Whatever the phase, the very ends never ride up as far as the middle can.
+    const count = 400;
     for (let p = 0; p < 16; p++) {
       const phase = p * 0.19;
       expect(gait(0, count, phase).arch).toBe(0);
       expect(gait(count - 1, count, phase).arch).toBe(0);
     }
-    // …and the taper is short, so the body just behind the head can still hump.
-    let bestNearHead = 0;
-    for (let p = 0; p < 40; p++) bestNearHead = Math.max(bestNearHead, gait(2, count, p * 0.07).arch);
-    expect(bestNearHead).toBeGreaterThan(0.5);
-    expect(INCH_ANCHOR_SEGMENTS).toBeLessThan(3);
   });
 
-  it('never lifts a segment further than its own hump height allows', () => {
+  it('never returns an arch outside 0..1', () => {
     for (const count of [4, 50, 600]) {
       for (let p = 0; p < 10; p++) {
         for (let i = 0; i < count; i += 3) {

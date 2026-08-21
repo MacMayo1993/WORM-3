@@ -45,7 +45,7 @@ import {
     windoutHeadS,
     rocketFlightLift,
 } from './constants.js';
-import { inchGaitInto, INCH_BALL_SPACING } from './inchGait.js';
+import { inchGaitInto, inchLoopShape, INCH_BALL_SPACING } from './inchGait.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
@@ -318,11 +318,13 @@ export function WormBody({ worm, size }) {
         gaitPhaseRef.current += _dCrawl;                  // accordion phase advances with crawl distance
         const _gaitMove = gaitMoveRef.current;
         const _gaitPhase = gaitPhaseRef.current;
-        // The gait itself is a travelling wave of fixed wavelength — see inchGait.js.
-        // One hump per wavelength, so the worm grows humps as it grows segments, and
-        // every displacement is local instead of scaling with body length.
-        const _orbCount = worm.orbPickupColorsRef.current?.length ?? 0;
-        const _humpHeight = 0.15 + Math.min(_orbCount, 14) * 0.028; // 0.15 → ~0.54 as orbs stack up
+        // Loop geometry for the current body length — see inchGait.js. Loops are
+        // pinned to world positions and the body pours through them, so the rear-up
+        // stays put like the beads climbing through the jump's stored arc. Height is
+        // three quarters of the jump's apex once the worm is long enough to make an
+        // arch that tall; a short one rears in proportion to the body it has.
+        const _inchShape = _isInch ? inchLoopShape(Math.min(MAX_TAIL, tLen)) : null;
+        const _humpHeight = _inchShape ? _inchShape.height : 0;
 
         // Rebuild path-points buffer in-place (no array allocation or spread).
         // Only fill as many step-history points as the visible body can actually walk back
@@ -479,7 +481,7 @@ export function WormBody({ worm, size }) {
                 let _inchArch = 0;
                 let targetDist;
                 if (_isInch) {
-                    inchGaitInto(_inchGait, i, visibleCount, _gaitPhase, _gaitMove);
+                    inchGaitInto(_inchGait, i, visibleCount, _gaitPhase, _gaitMove, _inchShape);
                     targetDist = _inchGait.dist;
                     _inchArch = _inchGait.arch;
                 } else {
