@@ -211,7 +211,10 @@ export function StickerInstanceProvider({ children }) {
     let matDirty = false;
     let colDirty = false;
 
-    for (const [, { groupRef, colorRef, isInstancedRef, slot }] of registryRef.current) {
+    // Iterate values(), not entries(): a for-of over the Map itself materialises a
+    // fresh [key, value] pair array for every registered sticker on every frame —
+    // 1,350 throwaway arrays a frame in 15×15 Mega Mode. The key is unused here.
+    for (const { groupRef, colorRef, isInstancedRef, slot } of registryRef.current.values()) {
       if (!isInstancedRef.current || !groupRef.current) {
         // Sticker is handled by its own mesh — blank the slot once so no
         // ghost instance lingers.  Skip if already zeroed to avoid uploading

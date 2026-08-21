@@ -960,25 +960,38 @@ const CubeAssembly = React.memo(({
     if (!animState) { liveRotation.active = false; return; }
 
     const { axis, dir, sliceIndex } = animState;
-    const animatedSlices = animState.sliceIndices?.length ? animState.sliceIndices : [sliceIndex];
-    // Per-plane directions (parallel to animatedSlices). A worm hazard turn spins two
-    // non-adjacent planes in OPPOSITE directions, so each cubie must rotate by its own
-    // plane's direction rather than a single shared `dir`.
-    const animatedDirs = animState.sliceDirs?.length ? animState.sliceDirs : animatedSlices.map(() => dir);
     const worldAxis = axis === 'col' ? _axisCol : axis === 'row' ? _axisRow : _axisDepth;
 
     // On animation start, pre-compute each in-slice ref index → its plane direction.
+    // The slice/direction lists are only needed here, so they are built inside the
+    // guard rather than allocated afresh on every frame of the tween.
     if (!sliceIndicesRef.current) {
+      const animatedSlices = animState.sliceIndices?.length ? animState.sliceIndices : [sliceIndex];
+      // Per-plane directions (parallel to animatedSlices). A worm hazard turn spins two
+      // non-adjacent planes in OPPOSITE directions, so each cubie must rotate by its own
+      // plane's direction rather than a single shared `dir`.
+      const animatedDirs = animState.sliceDirs?.length ? animState.sliceDirs : animatedSlices.map(() => dir);
       const indices = new Set();
       const dirByIdx = new Map();
-      const n = size * size * size;
-      for (let idx = 0; idx < n; idx++) {
-        const z = idx % size;
-        const y = Math.floor(idx / size) % size;
-        const x = Math.floor(idx / (size * size));
-        const coord = axis === 'col' ? x : axis === 'row' ? y : z;
-        const li = animatedSlices.indexOf(coord);
-        if (li !== -1) { indices.add(idx); dirByIdx.set(idx, animatedDirs[li]); }
+      // Walk only the cells of the turning planes (planes × size²) instead of the
+      // whole cube (size³) — 450 cells rather than 3,375 on a 15×15 board.
+      for (let li = 0; li < animatedSlices.length; li++) {
+        const coord = animatedSlices[li];
+        if (coord < 0 || coord >= size) continue;
+        const ldir = animatedDirs[li];
+        for (let a = 0; a < size; a++) {
+          for (let b = 0; b < size; b++) {
+            // idx = x*size² + y*size + z, matching the cubieRefs layout.
+            const idx = axis === 'col' ? coord * size * size + a * size + b
+              : axis === 'row' ? a * size * size + coord * size + b
+                : a * size * size + b * size + coord;
+            // First plane listed wins, matching the old indexOf() lookup if a
+            // sequence ever repeats a slice index.
+            if (indices.has(idx)) continue;
+            indices.add(idx);
+            dirByIdx.set(idx, ldir);
+          }
+        }
       }
       sliceIndicesRef.current = indices;
       sliceDirByIdxRef.current = dirByIdx;

@@ -105,6 +105,7 @@ export function RocketTailFire({ worm, size }) {
     );
 }
 // Book Worm page-flip scratch — see the isBook block in the segment loop below.
+const _NO_HINGE = { left: 0, right: 0 };
 const _pageDummy = new THREE.Object3D();
 const _bookPageColor = new THREE.Color();
 const _bookHeadDir = new THREE.Vector3();
@@ -193,6 +194,8 @@ export function WormBody({ worm, size }) {
     wormColorRef.current = wormColor;
     const glowColorRef = useRef(skin.glow);
     glowColorRef.current = skin.glow;
+    // Last hex actually pushed into the halo shader uniform (see the halo block below).
+    const lastHaloHexRef = useRef(null);
     const bellyColorRef = useRef(bellyColor);
     bellyColorRef.current = bellyColor;
     const isInchRef = useRef(isInch);
@@ -447,6 +450,9 @@ export function WormBody({ worm, size }) {
             prevCS.isGlow = _isGlow;
             prevCS.isInch = _isInch;
         }
+
+        // Book Worm page bank — one value per frame, shared by every segment below.
+        const _pageHinge = _isBook ? pageHingeAngles(bookTurnRef.current) : _NO_HINGE;
 
         beginWormSegments();
         for (let i = 0; i < visibleCount; i++) {
@@ -724,7 +730,11 @@ export function WormBody({ worm, size }) {
             // count giving the body its visible "many pages" height.
             if (_isBook && i !== 0) {
                 const pageScale = _wormDummy.scale.x; // matches the cover's current (post transit/LOD) scale
-                const { left, right } = pageHingeAngles(bookTurnRef.current);
+                // Hinge angles depend only on bookTurnRef, so they are the same for
+                // every segment — computed once above the loop instead of allocating
+                // a fresh {left,right} for each of up to MAX_TAIL segments per frame.
+                const left = _pageHinge.left;
+                const right = _pageHinge.right;
 
                 _bookHingeQuat.setFromAxisAngle(_bookZAxisUnit, left);
                 _bookPageQuat.copy(_bookQuat).multiply(_bookHingeQuat);
@@ -787,7 +797,12 @@ export function WormBody({ worm, size }) {
             haloMesh.count = _isGlow ? haloIdx : 0;
             if (haloIdx > 0) {
                 haloMesh.instanceMatrix.needsUpdate = true;
-                haloMesh.material.uniforms.uColor.value.set(glowColorRef.current);
+                // The uniform holds a THREE.Color; set(hexString) re-parses the same
+                // literal every frame. Only touch it when the equipped glow changes.
+                if (lastHaloHexRef.current !== glowColorRef.current) {
+                    lastHaloHexRef.current = glowColorRef.current;
+                    haloMesh.material.uniforms.uColor.value.set(glowColorRef.current);
+                }
             }
         }
         if (mesh.instanceColor && colorDirty) mesh.instanceColor.needsUpdate = true;

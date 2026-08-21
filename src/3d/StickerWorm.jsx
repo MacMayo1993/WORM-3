@@ -20,15 +20,21 @@ const StickerWorm = ({ position, rotation, scale = 1 }) => {
     const seg3Ref = useRef();
     const tailRef = useRef();
 
+    // One worm rides every disparate tile, so this list was an array literal plus a
+    // forEach closure per tile per frame. Built once per mount instead.
+    const segRefs = useRef(null);
+    if (segRefs.current === null) segRefs.current = [headRef, seg1Ref, seg2Ref, seg3Ref, tailRef];
+
     useFrame(({ clock }) => {
         const time = clock.elapsedTime;
         const freq = 4.2;
         const amp = 0.028 * scale;
-        const refs = [headRef, seg1Ref, seg2Ref, seg3Ref, tailRef];
-        refs.forEach((ref, i) => {
-            if (!ref.current) return;
+        const refs = segRefs.current;
+        for (let i = 0; i < refs.length; i++) {
+            const ref = refs[i];
+            if (!ref.current) continue;
             ref.current.position.y = Math.sin(time * freq - i * 0.70 + rotation) * amp;
-        });
+        }
     });
 
     const sp = 0.034 * scale; // spacing between segments along body axis
