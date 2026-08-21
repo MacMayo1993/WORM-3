@@ -74,23 +74,31 @@ export const INCH_BODY_HEIGHT_RATIO = 0.4;
  * it. Roughly 1:1 keeps the arch fuller than a semicircle without pinching into a
  * spike; the floor stops a tiny worm's loop from collapsing to nothing.
  */
-export const INCH_ARCH_ASPECT = 1.0;
+export const INCH_ARCH_ASPECT = 1.6;
 export const INCH_MIN_HALF_WIDTH = 0.3;
 
-/** Flat body left between consecutive loops. This is what makes a loop legible. */
-export const INCH_LOOP_GAP = 0.55;
+/**
+ * Flat body left between consecutive loops.
+ *
+ * This is what makes a loop legible, and it is also the pacing: loops are pinned
+ * to the ground, so the worm meets one every (2·halfWidth + gap) of crawl. Packed
+ * close, a long worm carries a dozen loops all rising and falling at once, which
+ * reads as the whole animal bobbing rather than as inching. Wide apart, most of
+ * the body lies still and each loop is an event.
+ */
+export const INCH_LOOP_GAP = 2.6;
 
 /**
- * Accordion gather, as a fraction of the half-span between loops.
+ * Accordion gather, as a fraction of a loop's half-width: how far body inside the
+ * loop is drawn toward its crest.
  *
- * The gather reaches ALL the way to the neighbouring loops, not just across the
- * arch: a loop that rears its own height needs more body than the flat ground
- * under it holds (a 1.1-high arch over a 1.1 half-width spans ~1.6 of chord for
- * 1.1 of arc), so it has to haul body in from beyond itself or the beads just
- * space out over the crest. Reaching the whole span also means the body is always
- * gathering toward its nearest loop, which is the accordion the player sees.
+ * Confined to the loop. An earlier version let the gather reach all the way to the
+ * neighbouring loops so a tall arch could haul in the extra body it needs — but
+ * that puts every bead in motion, including the tail, which slid forward and back
+ * for the whole run. Body outside a loop now holds perfectly still; the arch is
+ * wide enough (INCH_ARCH_ASPECT) not to need the extra.
  *
- * The term is A·sin(πx)·bump(x) with A = INCH_GATHER × half-span, so its steepest
+ * The term is A·sin(πx)·bump(x) with A = INCH_GATHER × halfWidth, so its steepest
  * slope is π·INCH_GATHER regardless of scale. It must stay below 1/π ≈ 0.318 or
  * `dist` stops increasing, the renderer's forward-only curve walk loses its
  * bracket, and the body tangles. At 0.20 the tightest bead spacing at a crest is
@@ -142,36 +150,36 @@ export function inchGaitInto(out, i, count, phase, move, shape) {
   if (!(move > 0) || count < 2) return out; // at rest the worm lies out flat
 
   const { halfWidth, spacing, bodyArc } = shape;
-  const gatherHalf = spacing * 0.5;
 
   // Distance from this segment to the nearest loop crest. Crests are pinned to
   // world positions, so adding the crawled distance to the arc is what makes them
   // stay put while the body flows through.
   const u = (arc + phase) / spacing;
   const d = (u - Math.floor(u + 0.5)) * spacing;
-  // Gather: every bead is drawn toward its nearest crest — the ones behind it
-  // pulled forward, the ones in front held back. That is the accordion, and it
-  // reaches the whole way to the neighbouring loops (it falls to zero exactly at
-  // the midpoint, so consecutive loops hand the body over without a seam).
-  // Symmetric on purpose; skewing this too would put a kink in the bead spacing
-  // right at the apex, where it is most visible.
-  const xg = d / gatherHalf;
-  const gbump = 0.5 * (1 + Math.cos(Math.PI * xg));
-  out.dist = arc - INCH_GATHER * gatherHalf * move * Math.sin(Math.PI * xg) * gbump;
 
-  const x = d / halfWidth; // ±1 at the arch's edge
-  if (x <= -1 || x >= 1) return out; // flat body between loops
+  const x = d / halfWidth; // ±1 at the loop's edge
+  if (x <= -1 || x >= 1) return out; // flat body between loops: still, and lying down
+
+  // Both ends stay planted — a loop needs something to push off, and the tail is
+  // the anchor the worm inches away from, so it neither lifts nor slides. The
+  // taper runs over the loop's own half-width rather than a fixed segment count
+  // (a tall rear-up would otherwise leave the last bead hanging in the air), but
+  // never over more than a quarter of the body, or a short worm could never lift.
+  const anchor = Math.min(halfWidth, bodyArc * 0.25) || 1e-6;
+  const ends = Math.min(1, arc / anchor) * Math.min(1, (bodyArc - arc) / anchor);
+  if (ends <= 0) return out;
+
+  // Gather: body inside the loop is drawn toward its crest — the beads behind it
+  // pulled forward, the ones in front held back. That is the accordion. Symmetric
+  // on purpose; skewing this too would put a kink in the bead spacing right at the
+  // apex, where it is most visible.
+  const bump = 0.5 * (1 + Math.cos(Math.PI * x));
+  out.dist = arc - INCH_GATHER * halfWidth * move * ends * Math.sin(Math.PI * x) * bump;
 
   // Arch, skewed: gentler up the trailing face, steeper down the leading one.
   const xs = x < 0 ? x / (1 - INCH_SKEW) : x / (1 + INCH_SKEW);
   const rear = xs <= -1 || xs >= 1 ? 0 : 0.5 * (1 + Math.cos(Math.PI * xs));
-
-  // Both ends stay planted — a loop needs something to push off. The taper runs
-  // over the loop's own half-width rather than a fixed segment count, or a tall
-  // rear-up would leave the last bead hanging in the air.
-  const headEnd = Math.min(1, arc / halfWidth);
-  const tailEnd = Math.min(1, (bodyArc - arc) / halfWidth);
-  out.arch = rear * headEnd * tailEnd * move;
+  out.arch = rear * ends * move;
 
   return out;
 }

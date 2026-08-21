@@ -95,12 +95,37 @@ describe('inch worm gait', () => {
     const count = 400;
     let flat = 0;
     const a = archProfile(count, 0.37);
-    for (const v of a) if (v === 0) flat++;
-    expect(flat / count).toBeGreaterThan(0.3);
+    for (const v of a) if (v < 0.02) flat++;
+    expect(flat / count).toBeGreaterThan(0.45);
+  });
+
+  it('leaves the tail, and any body outside a loop, perfectly still', () => {
+    // The gather used to reach the whole way to the neighbouring loops, which put
+    // every bead in motion — the tail slid forward and back for the entire run.
+    const count = 400;
+    const shape = inchLoopShape(count);
+    let moved = 0;
+    for (let p = 0; p < 30; p++) {
+      const phase = p * 0.37;
+      for (let i = 0; i < count; i++) {
+        const arc = i * INCH_BALL_SPACING;
+        const u = (arc + phase) / shape.spacing;
+        const d = Math.abs((u - Math.floor(u + 0.5)) * shape.spacing);
+        const g = gait(i, count, phase);
+        if (d >= shape.halfWidth) expect(g.dist).toBe(arc); // outside the loop: still
+        else if (g.dist !== arc) moved++;
+      }
+      // The tail is the anchor the worm inches away from: it never slides, and it
+      // never lifts, whatever the phase.
+      const tail = gait(count - 1, count, phase);
+      expect(tail.dist).toBe((count - 1) * INCH_BALL_SPACING);
+      expect(tail.arch).toBe(0);
+    }
+    expect(moved).toBeGreaterThan(0); // ...but the loops themselves do gather
   });
 
   it('grows more loops as the body grows', () => {
-    const counts = [40, 120, 400, 800];
+    const counts = [120, 400, 800, 1600];
     const loops = counts.map((c) => countLoops(c, 0.21));
     for (let k = 1; k < loops.length; k++) {
       expect(loops[k]).toBeGreaterThan(loops[k - 1]);
@@ -152,7 +177,7 @@ describe('inch worm gait', () => {
     // The old gait scaled compression by the segment's own arc, so the tail of a
     // 400-segment worm slid ~10 world units per cycle.
     for (const count of [4, 100, 1200]) {
-      const cap = INCH_GATHER * inchLoopShape(count).spacing * 0.5;
+      const cap = INCH_GATHER * inchLoopShape(count).halfWidth;
       for (let p = 0; p < 12; p++) {
         for (let i = 0; i < count; i += Math.max(1, Math.floor(count / 40))) {
           const slip = Math.abs(gait(i, count, p * 0.31).dist - i * INCH_BALL_SPACING);

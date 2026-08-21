@@ -10,7 +10,8 @@ import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp } from '../wormCosmeticsData.js';
-import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD, rocketFlightLift } from './constants.js';
+import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD, } from './constants.js';
+import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
 // Head radius, matching WormBody's head scale.
 const HEAD_RADIUS = 0.092;
@@ -105,9 +106,10 @@ export function WormFace({ worm, size }) {
             }
             const jumpLiftVal = worm.isJumping.current
                 ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
-            // Fly with the body during a rocket burn so the face stays on the risen head.
-            const flightLift = rocketFlightLift(worm.rocketActive.current, worm.rocketT.current);
-            _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal + flightLift);
+            _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal);
+            // Ride the same orbit the body rides during a rocket burn, so the face
+            // stays on the risen head instead of tracking its own face normal.
+            rocketOrbitInto(_faceHeadPos, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current));
         }
 
         // Eyes, pupils, smile, lenses and the hat seat all come from the shared
