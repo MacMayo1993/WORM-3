@@ -44,7 +44,10 @@ export const LEVEL_ID_RANGES = {
   'story-campaign': [1, 99],
   'cube-academy': [101, 199],
   'algorithm-codex': [201, 299],
-  'antipodal-descent': [301, 399],
+  // 301–399 is reserved for the standalone antipodal-descent builder
+  // (antipodalLevelBridge). That pack is not registered by default — the
+  // Topological Descent it generates is Story mode itself — so it is intentionally
+  // omitted from this map, which only lists registered packs.
 };
 
 export const BACKGROUNDS = {

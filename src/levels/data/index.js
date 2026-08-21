@@ -15,13 +15,15 @@ import level09 from './level-09-quotient-collapse.js';
 import level10 from './level-10-black-hole.js';
 import { CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel } from './cube-campaign.js';
 import { ALGORITHM_CODEX_LEVELS, getAlgorithmLevel, getAlgorithmLevelIds } from './algorithm-codex.js';
+import { STORY_DESCENT_LEVELS, getStoryDescentLevel, getStoryDescentLevelIds } from './story-descent.js';
 
 /**
- * The canonical Life Journey story campaign. Keep this list explicit so the
- * campaign order is obvious and the authored chapter files remain the single
- * source of truth for the player-facing story.
+ * The authored "Life Journey" arc (Daycare → Black Hole). It is no longer the
+ * active Story campaign — Topological Descent replaced it — but the ten chapter
+ * files remain the single source of truth for this arc, kept here so restoring
+ * it is one edit (`export const STORY_LEVELS = LIFE_JOURNEY_LEVELS`).
  */
-export const STORY_LEVELS = [
+export const LIFE_JOURNEY_LEVELS = [
   level01,
   level02,
   level03,
@@ -35,6 +37,14 @@ export const STORY_LEVELS = [
 ];
 
 /**
+ * The active Story campaign. Story mode = the analytically generated
+ * Topological Descent (see data/story-descent.js). Everything that asks for the
+ * "story levels" — LevelsManager, the tutorial, the dev console — resolves here,
+ * so this alias is the one switch that chooses which campaign is Story mode.
+ */
+export const STORY_LEVELS = STORY_DESCENT_LEVELS;
+
+/**
  * Individual level exports for direct access
  */
 export {
@@ -43,6 +53,9 @@ export {
   ALGORITHM_CODEX_LEVELS,
   getAlgorithmLevel,
   getAlgorithmLevelIds,
+  STORY_DESCENT_LEVELS,
+  getStoryDescentLevel,
+  getStoryDescentLevelIds,
   level01,
   level02,
   level03,

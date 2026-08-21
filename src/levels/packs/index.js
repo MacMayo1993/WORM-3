@@ -6,10 +6,12 @@
 import storyCampaign from './story-campaign.js';
 import cubeAcademy from './cube-academy.js';
 import algorithmCodex from './algorithm-codex.js';
-import { buildAntipodalDescentPack } from '../antipodalLevelBridge.js';
 
-// Analytically generated flip-solve pack (deterministic; exact par from C_dir).
-const antipodalDescent = buildAntipodalDescentPack();
+// Note: the analytically generated antipodal flip campaign is now Story mode
+// itself (the Topological Descent — see packs/story-campaign.js), so the
+// standalone 'antipodal-descent' pack is intentionally not registered here to
+// avoid two near-identical descent campaigns on the picker. The builder
+// (antipodalLevelBridge.buildAntipodalDescentPack) is still exported for reuse.
 
 /**
  * All official level packs
@@ -18,7 +20,6 @@ export const OFFICIAL_PACKS = [
   storyCampaign,
   cubeAcademy,
   algorithmCodex,
-  antipodalDescent,
 ];
 
 /**
@@ -28,7 +29,6 @@ export const BUILT_IN_PACKS = {
   'story-campaign': storyCampaign,
   'cube-academy': cubeAcademy,
   'algorithm-codex': algorithmCodex,
-  'antipodal-descent': antipodalDescent,
 };
 
 /**
@@ -48,4 +48,4 @@ export function getPackIds() {
   return Object.keys(BUILT_IN_PACKS);
 }
 
-export { storyCampaign, cubeAcademy, algorithmCodex, antipodalDescent };
+export { storyCampaign, cubeAcademy, algorithmCodex };
