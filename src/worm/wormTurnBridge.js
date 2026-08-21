@@ -9,5 +9,8 @@ let _cb = null;
 /** Called once by HealerWormMode3DWrapper when the worm hook mounts/remounts. */
 export const setWormTurnCallback = (fn) => { _cb = fn; };
 
-/** Called by WormCrawlerHUD D-pad and jump handlers. Safe to call when unmounted (_cb is null). */
+/**
+ * Called by WormCrawlerHUD's thumb tray: 'turnLeft' / 'turnRight' from the two
+ * steering keys, plus 'jump' and 'boost'. Safe to call when unmounted (_cb is null).
+ */
 export const callWormTurn = (dir) => _cb?.(dir);

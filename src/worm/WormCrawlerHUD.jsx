@@ -285,18 +285,25 @@ const ensureHudStyle = () => {
             .worm-hud-row { flex: 1 1 auto; }
             .worm-hud-reserve { order: -1; flex: 0 1 auto; min-width: 0; border-top: none; padding-top: 0; }
         }
-        .worm-dpad {
-            --cell: clamp(50px, 13.5vw, 60px);
-            grid-template-columns: repeat(3, var(--cell));
-            grid-template-rows: repeat(3, var(--cell));
+        /* Steering: one big key under each thumb, in the bottom corners where a
+           phone actually holds. Sized off the viewport WIDTH so a 412px Pixel gets
+           a ~90px target — comfortably past the 48px accessibility floor even
+           through a case, and reachable without shifting grip. */
+        .worm-steer {
+            --steer: clamp(76px, 22vw, 96px);
+            width: var(--steer);
+            height: var(--steer);
         }
-        .worm-action { --action: clamp(54px, 14.5vw, 64px); height: var(--action); }
-        .worm-jump { min-width: clamp(104px, 30vw, 148px); font-size: clamp(15px, 4.2vw, 19px); }
+        .worm-action { --action: clamp(50px, 13.5vw, 60px); height: var(--action); }
+        .worm-jump { min-width: clamp(96px, 26vw, 132px); font-size: clamp(15px, 4vw, 18px); }
         .worm-boost { width: var(--action); }
+        /* Landscape: height is the scarce axis, so the keys size off it instead —
+           and the steering keys shrink hardest, since a landscape grip has the
+           whole side of the screen to reach into. */
         @media (max-height: 520px) {
             .worm-hud-bar { padding: 6px 10px; gap: 4px; }
             .worm-hud-reserve { padding-top: 5px; }
-            .worm-dpad { --cell: clamp(40px, 12.5vh, 52px); }
+            .worm-steer { --steer: clamp(56px, 17vh, 76px); }
             .worm-action { --action: clamp(42px, 13vh, 54px); }
             .worm-jump { min-width: clamp(88px, 20vw, 124px); font-size: 15px; }
         }
@@ -312,19 +319,23 @@ const ensureHudStyle = () => {
         /* The key's own surface has to live here, not inline: an inline background
            outranks any :active rule, which is exactly how the press state silently
            did nothing the first time round. */
-        .worm-dpad-key {
-            width: 100%; height: 100%;
-            border-radius: 15px;
-            background: ${HUD_SURFACE_SOFT};
-            border: 1px solid rgba(255,245,220,0.14);
-            box-shadow: inset 0 1px 0 rgba(255,253,242,0.12);
+        /* The key's surface lives here for the same reason: an inline background
+           outranks :active, which is how the press state silently did nothing the
+           first time round. */
+        .worm-steer-key {
+            border-radius: 28px;
+            background: ${HUD_SURFACE};
+            backdrop-filter: ${HUD_BLUR};
+            -webkit-backdrop-filter: ${HUD_BLUR};
+            border: 1px solid ${BORDER};
+            box-shadow: ${SHADOW}, inset 0 1px 0 rgba(255,253,242,0.10);
             display: flex; align-items: center; justify-content: center;
             padding: 0;
         }
-        .worm-dpad-key:active {
+        .worm-steer-key:active {
             background: var(--key-press, rgba(255,253,242,0.22));
             border-color: var(--key-edge, rgba(255,253,242,0.5));
-            box-shadow: 0 0 18px var(--key-glow, rgba(255,253,242,0.35));
+            box-shadow: 0 0 22px var(--key-glow, rgba(255,253,242,0.35));
         }
         .worm-jump-ready {
             animation: wormJumpReady 1.5s ease-in-out infinite;
@@ -453,11 +464,19 @@ const RESERVE_ROW_STYLE = {
 
 // ─── Zone 3: Thumb Tray ──────────────────────────────────────────────────────
 
+// Thumb tray: steering in the two bottom corners, actions in the middle between
+// them. A phone is held at its corners, so that is where the key you press every
+// few seconds belongs — the old four-key d-pad sat entirely under the right thumb
+// and spent half its area on up and down, which relative steering never needed
+// (up is a no-op and down is a 180 into your own neck).
+//
+// Bottom offset clears the Pixel's gesture bar: the safe-area inset plus a margin,
+// so the keys sit above the swipe strip rather than fighting it for the same pixels.
 const THUMB_TRAY_STYLE = {
     position: 'absolute',
-    bottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)',
-    left: 0, right: 0,
-    padding: '0 12px',
+    bottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)',
+    left: 'calc(env(safe-area-inset-left, 0px) + 12px)',
+    right: 'calc(env(safe-area-inset-right, 0px) + 12px)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
@@ -465,16 +484,25 @@ const THUMB_TRAY_STYLE = {
     pointerEvents: 'none',
 };
 
-const LEFT_CLUSTER_STYLE = {
+// The action pair rides a little above the steering keys' bottom edge: dropping
+// JUMP to the same line put it where the hand rests, and it was getting palmed.
+const ACTION_CLUSTER_STYLE = {
     position: 'relative',
+    // Takes the space between the two steering keys and centres inside it, so the
+    // pair stays on the screen's midline whatever the steering keys measure.
+    flex: '1 1 auto',
     display: 'flex',
     alignItems: 'flex-end',
+    justifyContent: 'center',
     gap: 10,
+    paddingBottom: 6,
     pointerEvents: 'auto',
+    minWidth: 0,
 };
 
-const RIGHT_CLUSTER_STYLE = {
+const STEER_CLUSTER_STYLE = {
     pointerEvents: 'auto',
+    flexShrink: 0,
 };
 
 // Action keys share one size ramp with the d-pad (both live in the injected
@@ -510,38 +538,44 @@ const BOOST_FILL_STYLE = {
     pointerEvents: 'none',
 };
 
-// D-pad — four keys seated in one plate, so the cross reads as a control
-// surface rather than four disconnected tiles floating over the scene.
-const DPAD_STYLE = {
-    position: 'relative',
-    display: 'grid',
-    gap: 2,
-    padding: 6,
-    borderRadius: 26,
-    background: HUD_SURFACE,
-    backdropFilter: HUD_BLUR,
-    WebkitBackdropFilter: HUD_BLUR,
-    border: `1px solid ${BORDER}`,
-    boxShadow: `${SHADOW}, inset 0 1px 0 rgba(255,253,242,0.10)`,
-};
-
-const DPAD_DIRS = [
-    ['up', 1, 0, 'Turn up'],
-    ['left', 0, 1, 'Turn left'],
-    ['right', 2, 1, 'Turn right'],
-    ['down', 1, 2, 'Turn down'],
+// Steering keys. `turnLeft`/`turnRight` rather than `left`/`right`: the tray has
+// two buttons and no way to name a compass point, so it asks the sim for a quarter
+// turn from the current heading — which is what relative steering already did, and
+// what keeps oriented mode steerable from a two-key tray (see wormSim's
+// relativeTurn). The worm's own colour rides the glyph, tying the key to the thing
+// it drives, the way the old pad's centre hub did.
+const STEER_KEYS = [
+    ['left', 'turnLeft', 'Turn left'],
+    ['right', 'turnRight', 'Turn right'],
 ];
 
-// Centre hub — a dead key that gives the cross its middle and carries the
-// player's worm colour, tying the pad to the thing it drives.
-const DPAD_HUB_STYLE = {
-    gridColumn: 2,
-    gridRow: 2,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    pointerEvents: 'none',
-};
+/** One steering key. Both corners are the same key mirrored. */
+function SteerKey({ side, wormAlive, wormColor, vars }) {
+    const [dir, intent, label] = STEER_KEYS.find(([d]) => d === side);
+    return (
+        <div style={STEER_CLUSTER_STYLE}>
+            <button
+                onPointerDown={() => wormAlive && callWormTurn(intent)}
+                className="worm-hud-key worm-steer worm-steer-key"
+                style={{ ...vars, color: TEXT }}
+                aria-label={label}
+            >
+                <Chevron dir={dir} size={'clamp(30px, 8vw, 38px)'} />
+                {/* The worm's own colour on the key, the way the old pad's dead
+                    centre hub carried it — it ties the control to the thing it drives. */}
+                <span style={{
+                    position: 'absolute',
+                    bottom: 9,
+                    width: 18, height: 3, borderRadius: 2,
+                    background: wormColor,
+                    opacity: wormAlive ? 0.85 : 0.3,
+                    boxShadow: `0 0 8px ${withAlpha(wormColor, 0.7)}`,
+                    pointerEvents: 'none',
+                }} />
+            </button>
+        </div>
+    );
+}
 
 // ─── Pause Menu ──────────────────────────────────────────────────────────────
 
@@ -1458,7 +1492,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     // 6-color gradient for the status bar's accent hairline
     const gradientBorder = `linear-gradient(90deg, ${fc[1] || FACE_FALLBACKS[1]}, ${fc[2] || FACE_FALLBACKS[2]}, ${fc[3] || FACE_FALLBACKS[3]}, ${fc[4] || FACE_FALLBACKS[4]}, ${fc[5] || FACE_FALLBACKS[5]}, ${fc[6] || FACE_FALLBACKS[6]})`;
 
-    const dpadVars = {
+    const steerVars = {
+        position: 'relative',
         '--key-press': withAlpha(blue, 0.34),
         '--key-edge': withAlpha(blue, 0.75),
         '--key-glow': withAlpha(blue, 0.5),
@@ -1534,10 +1569,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {/* ── Special spawned / expired notice ── */}
             {wormAlive && <SpecialNotice />}
 
-            {/* ── Zone 3: Thumb Tray ── */}
+            {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
             <div style={THUMB_TRAY_STYLE}>
-                {/* Left cluster: Jump + Boost, with the contextual portal hint above them */}
-                <div style={LEFT_CLUSTER_STYLE}>
+                <SteerKey side="left" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
+
+                {/* Middle: Jump + Boost, with the contextual portal hint above them */}
+                <div style={ACTION_CLUSTER_STYLE}>
                     {isPortalReady && (
                         <div style={{ ...PORTAL_HINT_STYLE, color: phaseColor }}>
                             <JumpIcon size={13} />
@@ -1557,30 +1594,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     <BoostButton wormAlive={wormAlive} fc={fc} />
                 </div>
 
-                {/* Right cluster: D-pad */}
-                <div style={RIGHT_CLUSTER_STYLE}>
-                    <div className="worm-dpad" style={{ ...DPAD_STYLE, ...dpadVars }} role="group" aria-label="Steering">
-                        {DPAD_DIRS.map(([dir, col, row, label]) => (
-                            <button
-                                key={dir}
-                                onPointerDown={() => wormAlive && callWormTurn(dir)}
-                                className="worm-hud-key worm-dpad-key"
-                                style={{ gridColumn: col + 1, gridRow: row + 1, color: TEXT }}
-                                aria-label={label}
-                            >
-                                <Chevron dir={dir} size={'clamp(20px, 5.5vw, 24px)'} />
-                            </button>
-                        ))}
-                        <div style={DPAD_HUB_STYLE}>
-                            <div style={{
-                                width: 12, height: 12, borderRadius: '50%',
-                                background: wormColor,
-                                opacity: wormAlive ? 0.9 : 0.35,
-                                boxShadow: `0 0 10px ${withAlpha(wormColor, 0.7)}`,
-                            }} />
-                        </div>
-                    </div>
-                </div>
+                <SteerKey side="right" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
             </div>
 
             {/* ── Pause Menu Overlay ── */}

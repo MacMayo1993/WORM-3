@@ -143,7 +143,7 @@ const ELEM_EYE_LIFT = 1.9;   // straight up the face normal — the "on top of i
 const ELEM_EYE_BACK = 0.4;   // a touch behind the head, so the shot is a ride and not
                              // a plan view: enough tilt to see what is coming up
 const ELEM_LOOK_AHEAD = 0.65; // aim just past the worm. Longer than this and the worm
-                              // slides down the frame into the d-pad's corner.
+                              // slides down the frame into the steering key's corner.
 const ELEM_FOV_WIDEN = 8;    // lens opens up for the ride — reads as speed up close
 
 
