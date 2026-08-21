@@ -285,14 +285,15 @@ const ensureHudStyle = () => {
             .worm-hud-row { flex: 1 1 auto; }
             .worm-hud-reserve { order: -1; flex: 0 1 auto; min-width: 0; border-top: none; padding-top: 0; }
         }
-        /* Steering: one big key under each thumb, in the bottom corners where a
-           phone actually holds. Sized off the viewport WIDTH so a 412px Pixel gets
-           a ~90px target — comfortably past the 48px accessibility floor even
-           through a case, and reachable without shifting grip. */
+        /* Steering: a tall bar down each side, in the bottom corners where a phone
+           actually holds. Width is thumb-sized off the viewport (a 412px Pixel gets
+           ~90px, past the 48px accessibility floor even through a case); height is
+           a third of the screen, so the key is under the thumb wherever the hand
+           happens to sit on the side of the phone rather than only at one spot. */
         .worm-steer {
             --steer: clamp(76px, 22vw, 96px);
             width: var(--steer);
-            height: var(--steer);
+            height: clamp(160px, 33vh, 340px);
         }
         .worm-action { --action: clamp(50px, 13.5vw, 60px); height: var(--action); }
         .worm-jump { min-width: clamp(96px, 26vw, 132px); font-size: clamp(15px, 4vw, 18px); }
@@ -303,7 +304,9 @@ const ensureHudStyle = () => {
         @media (max-height: 520px) {
             .worm-hud-bar { padding: 6px 10px; gap: 4px; }
             .worm-hud-reserve { padding-top: 5px; }
-            .worm-steer { --steer: clamp(56px, 17vh, 76px); }
+            /* Landscape: a third of a 360px-tall screen is a short bar, and the
+               grip already reaches the whole side, so the keys go back to compact. */
+            .worm-steer { --steer: clamp(56px, 17vh, 76px); height: clamp(96px, 42vh, 150px); }
             .worm-action { --action: clamp(42px, 13vh, 54px); }
             .worm-jump { min-width: clamp(88px, 20vw, 124px); font-size: 15px; }
         }
@@ -322,9 +325,18 @@ const ensureHudStyle = () => {
         /* The key's surface lives here for the same reason: an inline background
            outranks :active, which is how the press state silently did nothing the
            first time round. */
+        /* No width/height here: .worm-steer (same element) owns the size, and a
+           100% would resolve against the shrink-to-fit wrapper and collapse it. */
         .worm-steer-key {
-            border-radius: 28px;
-            background: ${HUD_SURFACE};
+            border-radius: 30px;
+            flex-direction: column;
+            gap: 10px;
+            /* Lighter than the status bar's plate on purpose: at a third of the
+               screen tall, two of these at the HUD's usual 0.78 opacity walled off
+               both sides of the play area. The blur still separates them from the
+               scene, and the press state is what has to be unmistakable, not the
+               resting surface. */
+            background: rgba(24, 31, 18, 0.34);
             backdrop-filter: ${HUD_BLUR};
             -webkit-backdrop-filter: ${HUD_BLUR};
             border: 1px solid ${BORDER};
@@ -562,10 +574,11 @@ function SteerKey({ side, wormAlive, wormColor, vars }) {
             >
                 <Chevron dir={dir} size={'clamp(30px, 8vw, 38px)'} />
                 {/* The worm's own colour on the key, the way the old pad's dead
-                    centre hub carried it — it ties the control to the thing it drives. */}
+                    centre hub carried it — it ties the control to the thing it drives.
+                    Directly under the glyph, not pinned to the foot of the bar: the
+                    bar is a third of the screen tall and the two would read as
+                    unrelated marks at opposite ends of it. */}
                 <span style={{
-                    position: 'absolute',
-                    bottom: 9,
                     width: 18, height: 3, borderRadius: 2,
                     background: wormColor,
                     opacity: wormAlive ? 0.85 : 0.3,
