@@ -52,9 +52,12 @@ The paper develops the construction, states its exact assumptions, relates it to
 classical coset decoding, repetition codes, operation metrics, topological
 codes, and projective directional data, and then extends it. The central
 extension (§18) replaces one involution by `r` commuting free involutions,
-turning the disconnected two-point checks into a genuine cubical cochain complex
-in which the square relations are `d² = 0` and coupling — the ingredient absent
-from the one-involution case — appears for the first time.
+turning the disconnected two-point checks into a cubical cochain complex whose
+square relations are `d² = 0`. This exposes *two* phase changes rather than one:
+the `r = 1` coordinatewise factorisation gives way to an orbitwise factorisation
+with genuine coupling *inside* each orbit — yet still exactly solvable by
+integration — and only the further step of gluing or cross-orbit constraints
+(§19) produces genuinely nonlocal decoding.
 
 ---
 
@@ -438,9 +441,12 @@ distinguished by its exceptionally simple syndrome and its mod-2 topology.
 
 ## 18. Expansion III: several commuting involutions — a cubical cochain complex
 
-This is the extension where the factorisation deliberately breaks, and it is the
-paper's mathematical centre. Replace one involution by `r` commuting free
-involutions.
+Replace one involution by `r` commuting free involutions. This turns the finer
+`r = 1` decomposition — over individual defect coordinates — into a coarser but
+still-exact decomposition over orbits, with genuine *internal* coupling inside
+each orbit. It is a first phase change, not yet a loss of factorisation; the
+second phase change (true inter-orbit coupling) is deferred to §19. Read §18 as
+locating exactly the boundary between the two.
 
 ### 18.1 Setup and a freeness caveat
 
@@ -450,12 +456,17 @@ hypothesis, not a formality: commuting fixed-point-free involutions need not giv
 free `2^r`-element orbits — a product `τᵢτⱼ` may have fixed points, or the
 generators may be dependent, collapsing orbit size. Under freeness every orbit is
 a `G`-torsor, non-canonically identified (after choosing a basepoint) with the
-vertex set of the `r`-dimensional hypercube `Q_r`, the generators being its `r`
-edge-directions.
+vertex set of the `r`-cube.
+
+**Notation.** Write `I^r = [0,1]^r` for the *filled* cubical complex (vertices,
+edges, squares, …, up to the top `r`-cell), and reserve `Q_r = (I^r)^{(1)}` for
+its **1-skeleton**, the hypercube *graph*. The distinction is load-bearing below:
+`I^r` is contractible, whereas `Q_r` is not — the graph has many independent
+cycles for `r ≥ 2`.
 
 ### 18.2 The defect field is a coboundary
 
-Give each orbit the cubical CW structure of `Q_r`: vertices = orbit elements,
+Give each orbit the cubical CW structure of `I^r`: vertices = orbit elements,
 edges = generator-moves, squares = commuting pairs, and so on. A state
 `b : X → F₂` is a **0-cochain**. For generator `j` define the edge defect
 
@@ -464,7 +475,8 @@ edges = generator-moves, squares = commuting pairs, and so on. A state
 ```
 
 which is exactly the cubical coboundary `δ⁰ : C⁰ → C¹`. So the whole defect field
-is `Δ = δ⁰ b`, a **1-coboundary**.
+is `Δ = δ⁰ b`, a **1-coboundary** — and hence, in the model where `b` is always
+the underlying state, `[Δ] = 0 ∈ H¹` always (§18.5).
 
 ### 18.3 The square relations are `d² = 0`
 
@@ -482,55 +494,88 @@ merely "chain-complex-like": it is `δ¹ δ⁰ = 0`. The defect field of any `b`
 C⁰(orbit) →δ⁰ C¹(orbit) →δ¹ C²(orbit) → ···
 ```
 
-is the cubical cochain complex of `Q_r`. Realizability: an edge-labeling is the
-defect field of some `b` iff it is a coboundary; a labeling merely satisfying the
-square relations is a cocycle. The obstruction is `H¹`. Since a filled hypercube
-is contractible (`H¹(Q_r; F₂) = 0`), *closed = exact* per orbit: every square-
-consistent edge syndrome is realizable, and `b` is determined up to `H⁰ = F₂`
-(the per-orbit global complement). The interesting complexes arise when the
-2-cells are *not* all filled, or when orbits are glued (§19), so that `H¹ ≠ 0`.
+is the cubical cochain complex of `I^r`.
 
-### 18.4 Where coupling enters — the generalised repair theorem
+### 18.4 Two exact decoders, and where each phase change is
 
 For `r = 1` each vertex meets one edge, so a vertex toggle flips one `Δ`
-coordinate: diagonal, `wt(Δ)` repairs. For `r ≥ 2` **each vertex meets `r`
-edges**, so a single-member toggle flips `r` defect coordinates at once. The
-diagonal bound `wt(Δ)` is therefore *not* attainable in general, and it is
-replaced by a per-orbit coset weight:
+coordinate: the syndrome factorises **coordinatewise** and repair is `wt(Δ)`. For
+`r ≥ 2` **each vertex meets `r` edges**, so a single-member toggle flips `r`
+defect coordinates at once. The `r = 1` coordinatewise factorisation is gone —
+but a *coarser* factorisation survives, because distinct `G`-orbits remain
+mutually independent:
 
-> **Theorem 5 (Sector repair under `(Z₂)^r`).** Reaching the deck-invariant
-> sector `Δ = 0` requires `b` constant on each orbit. With unit-cost single-member
-> toggles, the minimum cost is
+> **Theorem 5 (Sector repair under a free `(Z₂)^r`).** Reaching the
+> deck-invariant sector `Δ = 0` requires `b` constant on each orbit. With
+> unit-cost single-member toggles, the minimum cost factorises over orbits:
 > ```
 > C_sector = Σ_{orbits o} min( k_o , 2^r − k_o ),     k_o = wt(b |_o).
 > ```
 > *Proof.* `Δ|_o = 0` iff `b` is constant on orbit `o`; making it all-`0` costs
 > `k_o` toggles, all-`1` costs `2^r − k_o`, and no non-constant state has
-> `Δ = 0`. The generator group of legal moves (per-orbit constants, `= ker δ⁰`)
-> realises exactly the all-`0`/all-`1` choice, giving the two representatives. ∎
+> `Δ = 0`. The legal moves (per-orbit constants, `= ker δ⁰`) realise exactly the
+> all-`0`/all-`1` choice. Orbits are disjoint, so the sum is achievable. ∎
 
-For `r = 1`, `min(k_o, 2 − k_o) = [k_o = 1] = Δ`, so `C_sector = wt(Δ)` — Theorem 2
-is the rank-one special case. For `r ≥ 2` the cost is a genuine coset-weight
-minimisation, `Δ` no longer decouples into independent single-edge checks, and
-the `δ¹` square relations couple the coordinates. This is precisely the transition
+**This remains an exact, closed-form decoder — not a hard one.** Because
+`Δ = δ⁰ b` determines `b` up to a constant on each connected orbit, one simply
+integrates `Δ` from a chosen basepoint to recover `b`, then takes the lighter of
+`b` and `b + 1`:
 
 ```
-one involution → disconnected edges → commuting involutions
-             → hypercubical 1-cocycles → coupled decoding,
+Δ  →(integrate from basepoint)→  {b, b+1}  →(choose lighter)→  min(wt b, 2^r − wt b),
 ```
 
-the bridge from the block-diagonal engine toward boundary-coupled (surface-code-
-like) systems. The one-involution engine is the rank-one, fully-decoupled corner
-of this family.
+still linear in orbit size. So `min(k_o, 2^r − k_o)` should be advertised as a
+*second exact decoder obtained by integration*, not as a hard coset-weight search.
+For `r = 1`, `min(k_o, 2 − k_o) = [k_o = 1] = Δ`, recovering Theorem 2. The precise
+transition is therefore
 
-### 18.5 Realizable syndromes
+```
+r = 1:  independent (coordinatewise) edge checks
+r ≥ 2:  coupled edge checks INSIDE independent G-orbits — still orbitwise
+        factorised and exactly integrable
+§19:    gluing / cross-orbit constraints — coupling BETWEEN orbit blocks,
+        where genuine nonlocal decoding can appear
+```
 
-Collecting §18.2–18.4: the space of *valid* syndromes is `Z¹` (square-consistent
-= cocycles); the *realizable-from-`b`* syndromes are `B¹` (coboundaries); their
-quotient is `H¹` of the chosen cubical complex. Characterising `H¹` for glued or
-partially-filled complexes — hence which syndromes are genuine defects and which
-are logical — is the natural open problem this extension poses, and the concrete
-form of research direction §25(2).
+Two phase changes, not one. The one-involution engine is the fully-decoupled
+corner; §18 is the middle regime; genuinely nonlocal decoding is §19's territory.
+
+### 18.5 Cocycles, coboundaries, and when `H¹` becomes operational
+
+Keep three spaces distinct:
+
+- `Z¹ = ker δ¹` — **locally square-consistent candidate edge fields** (closed).
+- `B¹ = im δ⁰` — **edge-defect fields actually induced by a global vertex state
+  `b`** (exact).
+- `H¹ = Z¹ / B¹` — the **obstruction to integrating a closed edge field to a
+  global `b`**.
+
+In the model where `b` is always the underlying physical variable,
+`Δ = δ⁰ b ∈ B¹`, so its class is always trivial, `[Δ] = 0`. One must therefore
+*not* call all of `Z¹` "valid syndromes": for a single filled cube `I^r` (which
+is contractible), `H¹(I^r; F₂) = 0`, so closed = exact and integration always
+succeeds — whereas `H¹(Q_r; F₂)` for the *graph* is generally nonzero and is a
+different object. Deleting 2-cells or gluing cubes does not *automatically*
+produce nontrivial `H¹`; it makes it *possible*, in which case `H¹` may become
+nonzero.
+
+`H¹` becomes **operational** only when the edge field is promoted to independent
+data — when a measured or noisy `η ∈ C¹` need not equal `δ⁰ b`. Then three
+increasingly coding-theoretic problems appear, and they are the concrete form of
+research direction §25(2):
+
+```
+(1) integration:     η ∈ Z¹, is η ∈ B¹?          (is the closed field exact?)
+(2) classification:  [η] ∈ H¹                     (which logical class?)
+(3) nearest-exact:   min_{β ∈ B¹} d(η, β)         (decode to a genuine defect)
+```
+
+Problem (3) is the genuine coding problem, and it is nontrivial exactly when the
+complex has `H¹ ≠ 0` and/or the metric couples across orbits — i.e. under §19's
+gluing/hybrid constraints. This cocycle-versus-coboundary separation is the same
+device homological code constructions use to tell trivial cycles from logical
+classes (Breuckmann–Terhal 2016; Bombín–Martin-Delgado 2007).
 
 ## 19. Expansion IV: hybrid diagonal and boundary-coupled codes
 
@@ -584,11 +629,16 @@ to construct.
 
 ## 23. Limitations
 
-- **The easy decoder comes from factorisation.** The closed form exists because
-  orbits are independent; once a legal constraint couples several orbits
-  (§18, `r ≥ 2`; §19) the diagonal identity `C(Δ) = Σᵢ C(Δᵢ)` fails and the
-  problem stops being closed-form. The simplicity is a theorem about diagonal
-  checks, not evidence that coupled topological decoding is easy.
+- **The easy decoder comes from factorisation, and it degrades in two stages.**
+  The `r = 1` *coordinatewise* identity `C(Δ) = Σᵢ C(Δᵢ)` holds because each
+  single edit changes one syndrome coordinate. Under a free `(Z₂)^r` action
+  (§18, `r ≥ 2`) that coordinatewise identity fails — edits inside an orbit
+  couple — **but the coarser orbitwise factorisation survives and is still exactly
+  solvable by integration** (Theorem 5). Only genuine *inter-orbit* coupling
+  (§19: gluing, cross-orbit constraints, or noisy independent edge fields) removes
+  the remaining product structure and can make decoding nonlocal. The simplicity
+  is a theorem about which decomposition holds, not evidence that coupled
+  topological decoding is easy.
 - **The binary code is classical.** `F₂`, syndromes, cosets, and homology do not
   make a system quantum: no superposition, measurement, stabilizer Hilbert space,
   quantum noise model, or fault-tolerance claim follows.
@@ -625,11 +675,20 @@ around an application-generated involution*, specifically:
 - a software interface confining domain complexity to identity and partner
   selection.
 
-The right framing is not "a new decoder" but: **an application-level free
-involution plus orbit-local generators induces a product decomposition of the
-shortest-repair problem, and adding commuting involutions turns that product into
-a cubical cochain complex where coupling appears as `d² = 0`.** The repetition-
-code result is the binary rank-one special case.
+The right framing is not "a new decoder" but a two-phase-change story:
+
+> **A free `C₂`-action gives coordinatewise factorisation. A free `(Z₂)^r`-action
+> replaces independent defect coordinates with an internally coupled cubical
+> coboundary system while retaining orbitwise exact solvability (by integration).
+> Genuine nonlocal decoding appears only after additional topology, incomplete
+> filling, noise, or cross-orbit constraints introduce nontrivial cohomology or
+> destroy the remaining product structure.**
+
+Compactly:
+`independent checks → cubically constrained but exactly integrable checks →
+genuinely topological/coupled decoding`. The repetition-code result is the binary
+rank-one corner; identifying *two* phase changes rather than one is what makes the
+claim precise enough to be hard to dismiss.
 
 ## 25. Suggested research programme
 
@@ -637,9 +696,14 @@ code result is the binary rank-one special case.
    decoder theorems under explicit assumptions; property-test `τ² = id`,
    `τ(x) ≠ x`, and `D(gb) = Db` for all legal paired `g`, with closed-form vs.
    exhaustive agreement on small instances.
-2. **Develop the `(Z₂)^r` cubical complex of §18**: characterise `H¹` for glued /
-   partially-filled complexes, i.e. which syndromes are realizable vs. logical,
-   and study min-weight decoding of Theorem 5's coset problem as coupling grows.
+2. **Develop the `(Z₂)^r` cubical complex of §18** along the progression
+   `exact cube integration → closed but non-exact edge fields → noisy/inconsistent
+   edge fields → glued complexes → hybrid decoding`. Concretely, once the edge
+   field `η ∈ C¹` is promoted to independent data: (a) the *integration* test
+   `η ∈ Z¹ ⇒ η ∈ B¹?`; (b) the *classification* `[η] ∈ H¹`; (c) the
+   *nearest-exact-field* decoder `min_{β ∈ B¹} d(η, β)` — the first genuine coding
+   problem of the family. Characterise `H¹` for glued / partially-filled complexes
+   (distinguishing the filled cube `I^r`, with `H¹ = 0`, from the graph `Q_r`).
    *(Mathematically richest.)*
 3. Prove an exact decomposition theorem for hybrid `H = [H_τ ; H_∂]` (§19).
 4. Demonstrate a projective-data pipeline (§20) where quotient-aware
@@ -710,6 +774,18 @@ something deeper.
   classical and quantum codes. *Journal of Mathematical Physics*, 48(5), 052105.
 - Sarkar, R., & Yoder, T. J. (2024). A graph-based formalism for surface codes and
   twists. *Quantum*, 8, 1416.
+- Breuckmann, N. P., & Terhal, B. M. (2016). Constructions and noise threshold of
+  hyperbolic surface codes. *IEEE Transactions on Information Theory*, 62(6),
+  3731–3744. — cocycle-vs-coboundary (`H₁ = Z₁/B₁`) separation of trivial cycles
+  from logical classes.
+- Kaczynski, T., Mischaikow, K., & Mrozek, M. (2004). *Computational Homology.*
+  Springer. — cubical complexes vs. their skeleta (the `I^r` vs. `Q_r`
+  distinction of §18.1).
+- Pilarczyk, P., & Real, P. (2015). Computation of cubical homology, cohomology,
+  and (co)homological operations via chain contraction. *Advances in Computational
+  Mathematics*, 41.
+- Barceló, H., Greene, C., Jarrah, A. S., & Welker, V. (2019). Discrete cubical
+  and path homologies of graphs. *Algebraic Combinatorics*, 2(3), 417–437.
 - Mardia, K. V. (1975). Statistics of directional data. *J. Royal Statistical
   Society: Series B*, 37(3), 349–393.
 - Bingham, C. (1974). An antipodally symmetric distribution on the sphere.
