@@ -32,12 +32,12 @@ export const MOBI_LINES_DEMO_INTRO = [
 // it as riding the worm's head. Each line names one concrete thing to do:
 // steer, collect, heal, survive.
 export const MOBI_LINES_WORM = [
-  "Aloha! I'm Mobi — and now, YOU are the worm. 🐛",
+  "Aloha! I'm Mobi, and now YOU are the worm.",
   "Tap LEFT or RIGHT to steer, like you're riding the worm's head.",
   "Glide across the cube and grab the glowing parity orbs.",
   "Crawl into a swirling wormhole to heal it shut.",
-  "Don't bite your own tail — keep moving and survive!",
-  "That's the whole game. Ready? Let's crawl. 🌀",
+  "Don't bite your own tail. Keep moving and survive!",
+  "That's the whole game. Ready? Let's crawl.",
 ];
 
 export const MOBI_LINES_FREEPLAY = [
