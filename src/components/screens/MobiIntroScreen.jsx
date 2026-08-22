@@ -26,15 +26,18 @@ export const MOBI_LINES_DEMO_INTRO = [
   "That's the whole trick. Let me show you, then you pick where to play.",
 ];
 
+// Worm mode intro. Kept short and literal: a first-timer needs to know the
+// controls and the goal, not the lore. Steering is relative ("Turn left/right"
+// from the worm's heading — see WormCrawlerHUD's STEER_KEYS), so the copy frames
+// it as riding the worm's head. Each line names one concrete thing to do:
+// steer, collect, heal, survive.
 export const MOBI_LINES_WORM = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "This ain't your mama's old Nokia SNAKE game — this is WORM³",
-  "In my world...Rubik's cubes are flat",
-  "But then one day....",
-  "We uncovered the TRUE secret of the cube.",
-  "Each tile has a twin!  And they can switch places!",
-  "But not for too long....",
+  "Aloha! I'm Mobi, and now YOU are the worm.",
+  "Tap LEFT or RIGHT to steer, like you're riding the worm's head.",
+  "Glide across the cube and grab the glowing parity orbs.",
+  "Crawl into a swirling wormhole to heal it shut.",
+  "Don't bite your own tail. Keep moving and survive!",
+  "That's the whole game. Ready? Let's crawl.",
 ];
 
 export const MOBI_LINES_FREEPLAY = [
