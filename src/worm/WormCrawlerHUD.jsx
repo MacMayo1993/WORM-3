@@ -24,7 +24,7 @@ import {
     SETTING_ROW_STYLE, SETTING_LABEL_STYLE, togglePillStyle, segmentStyle,
     primaryBtnStyle, LIST_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
-import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, Z } from '../utils/uiTheme.js';
 
 // ─── Worm Countdown Overlay ─────────────────────────────────────────────────
 const WORM_COUNTDOWN_STYLE_ID = 'worm3-countdown-style';
@@ -234,7 +234,7 @@ const withAlpha = (color, alpha) => {
 
 const ROOT_STYLE = {
     position: 'fixed', inset: 0,
-    pointerEvents: 'none', zIndex: 600,
+    pointerEvents: 'none', zIndex: Z.PANEL,
     fontFamily: FONT,
     color: TEXT,
 };
@@ -807,8 +807,10 @@ const COUNTDOWN_OVERLAY_STYLE = {
 
 // ─── Winner screen styles ────────────────────────────────────────────────────
 
+// A full-screen celebration beat that must clear the HUD and mobile controls
+// beneath it — the CELEBRATION band, not the HUD-notification band it used to sit in.
 const WINNER_SCREEN_STYLE = {
-    position: 'fixed', inset: 0, zIndex: 200,
+    position: 'fixed', inset: 0, zIndex: Z.CELEBRATION,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     background: 'radial-gradient(ellipse at 50% 30%, #1a0a3d 0%, #08051a 60%, #000 100%)',
     pointerEvents: 'auto', overflow: 'hidden', fontFamily: FONT,

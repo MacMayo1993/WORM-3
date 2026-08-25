@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Z } from '../../utils/uiTheme.js';
 
 /**
@@ -6,6 +6,14 @@ import { Z } from '../../utils/uiTheme.js';
  * Allows user to choose rotation direction with a second tap
  */
 const TileRotationSelector = ({ onRotate, onCancel, onRotateFaceCW, onRotateFaceCCW }) => {
+  // The dismiss affordance is a pointer-only backdrop; give keyboard users the
+  // same escape hatch so the modal is not a trap once it has focus.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onCancel?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
   const overlayStyle = {
     position: 'fixed',
     top: 0,

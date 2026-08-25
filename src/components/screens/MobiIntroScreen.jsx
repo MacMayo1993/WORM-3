@@ -280,12 +280,14 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
         WebkitBackdropFilter: isDismissing ? 'blur(0px)' : 'blur(5px)',
         transition: 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease',
       }} />
-      {/* ── Mobi portrait — bottom-left, behind panel (z:901 < panel z:903) ── */}
+      {/* ── Mobi portrait — bottom-left, behind panel (local z:1 < panel z:2).
+          The root establishes its own stacking context at Z.INTRO, so these are
+          local sibling-ordering values, not points on the global Z scale. ── */}
       <div style={{
         position: 'absolute',
         bottom: 0,
         left: 0,
-        zIndex: 901,
+        zIndex: 1,
         pointerEvents: 'none',
         lineHeight: 0,
         animation: mobiAnim,
@@ -329,7 +331,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
           WebkitBackdropFilter: 'blur(4px)',
           borderTop: `2px solid ${accent}`,
           boxShadow: '0 -14px 42px rgba(48, 39, 28, 0.22), inset 0 1px 0 rgba(255,255,255,0.72)',
-          zIndex: 903,
+          zIndex: 2,
           pointerEvents: 'auto',
           display: 'flex',
           flexDirection: 'column',
