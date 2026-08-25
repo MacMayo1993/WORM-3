@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   PAPER_SHEET_RAISED, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_CARD_SHADOW
 } from '../../utils/uiTheme.js';
+import { useIsMobile } from '../../hooks/index.js';
 import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
@@ -29,8 +30,6 @@ const GAME_LENGTH_OPTIONS = [
   { value: 'medium', label: 'Medium', sub: '20 shuffles' },
   { value: 'long', label: 'Long', sub: '30 shuffles' }
 ];
-
-const S = wizardLayout(ACCENT, ACCENT_SHADOW);
 
 const STEPS = ['Scene', 'Colors', 'Style', 'Gameplay', 'Size'];
 const STEP_TITLES = ['Background', 'Color Palette', 'Tile Style', 'Gameplay', 'Cube Size'];
@@ -76,6 +75,8 @@ const ToggleRow = ({ label, sub, value, onChange }) => (
 
 const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const [step, setStep] = useState(0);
+  const isMobile = useIsMobile();
+  const S = useMemo(() => wizardLayout(ACCENT, ACCENT_SHADOW, isMobile), [isMobile]);
   const cos = useWizardCosmetics({
     accent: ACCENT,
     accentShadow: ACCENT_SHADOW,

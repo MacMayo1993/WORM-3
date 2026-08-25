@@ -43,10 +43,6 @@ export const WIZARD_FOOTER_BG = 'rgba(245, 238, 222, 0.82)';
 // uses the same lead rather than picking its own grey.
 export const PENCIL_LEAD = '#35404a';
 
-// Horizontal breathing room, matched between header, body, and footer so the
-// content sits on one margin down the whole sheet.
-const GUTTER = isMobile ? 16 : 36;
-
 /**
  * Layout styles shared by every wizard, tinted with the caller's accent and its
  * darker pressed-state companion.
@@ -55,8 +51,15 @@ const GUTTER = isMobile ? 16 : 36;
  * the home indicator. A setup wizard there is a task, not a dialog floating over
  * one — and the 24px of inset plus 16px of corner radius it used to spend were
  * coming straight out of the space the actual choices had to live in.
+ *
+ * `mobile` defaults to the static breakpoint (fine for a module-scope call), but
+ * a wizard that wants to reflow on rotation passes a live value from
+ * `useIsMobile()` and recomputes this per render.
  */
-export function wizardLayout(accent, accentShadow = `${accent}99`) {
+export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMobile) {
+  // Horizontal breathing room, matched between header, body, and footer so the
+  // content sits on one margin down the whole sheet.
+  const GUTTER = mobile ? 16 : 36;
   return {
     overlay: {
       position: 'fixed',
@@ -79,22 +82,22 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
 
     sheet: {
       ...wizardPaperBackground,
-      borderRadius: isMobile ? 0 : '20px',
-      width: isMobile ? '100%' : 'min(640px, 96vw)',
-      height: isMobile ? '100%' : 'auto',
-      maxHeight: isMobile ? '100%' : '88vh',
+      borderRadius: mobile ? 0 : '20px',
+      width: mobile ? '100%' : 'min(640px, 96vw)',
+      height: mobile ? '100%' : 'auto',
+      maxHeight: mobile ? '100%' : '88vh',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      boxShadow: isMobile ? 'none' : PAPER_SHADOW,
-      border: isMobile ? 'none' : '1px solid #cec8be',
+      boxShadow: mobile ? 'none' : PAPER_SHADOW,
+      border: mobile ? 'none' : '1px solid #cec8be',
       borderTop: `3px solid ${accent}`,
       animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)'
     },
 
     header: {
       // Top padding clears the status bar / notch on a full-bleed phone sheet.
-      padding: isMobile
+      padding: mobile
         ? `calc(12px + env(safe-area-inset-top)) ${GUTTER}px 0`
         : `28px ${GUTTER}px 0`,
       flexShrink: 0
@@ -104,11 +107,11 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
-      marginBottom: isMobile ? '12px' : '20px'
+      marginBottom: mobile ? '12px' : '20px'
     },
 
     dot: (active, current) => ({
-      height: isMobile ? '5px' : '8px',
+      height: mobile ? '5px' : '8px',
       borderRadius: '3px',
       background: current ? accent : active ? `${accent}66` : PAPER_BORDER,
       flex: current ? '2' : '1',
@@ -127,7 +130,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
     },
 
     title: {
-      fontSize: isMobile ? TEXT_XL - 3 : TEXT_XL,
+      fontSize: mobile ? TEXT_XL - 3 : TEXT_XL,
       fontWeight: '700',
       letterSpacing: '-0.5px',
       color: PAPER_TEXT,
@@ -136,9 +139,9 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
     },
 
     subtitle: {
-      fontSize: isMobile ? TEXT_SM - 1 : TEXT_SM,
+      fontSize: mobile ? TEXT_SM - 1 : TEXT_SM,
       color: PAPER_TEXT_MUTED,
-      margin: isMobile ? '0 0 12px' : '0 0 18px',
+      margin: mobile ? '0 0 12px' : '0 0 18px',
       fontWeight: '400',
       lineHeight: 1.35
     },
@@ -158,7 +161,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
     },
 
     footer: {
-      padding: isMobile
+      padding: mobile
         ? `12px ${GUTTER}px calc(12px + env(safe-area-inset-bottom))`
         : `18px ${GUTTER}px 24px`,
       display: 'flex',
@@ -180,7 +183,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
       // Both footer buttons clear the 44px comfortable-tap floor; the secondary
       // one (Back) was the smaller of the two and the easier one to fat-finger.
       minHeight: TOUCH_TARGET,
-      padding: isMobile ? '11px 14px' : '10px 16px',
+      padding: mobile ? '11px 14px' : '10px 16px',
       borderRadius: '10px',
       transition: 'all 0.15s ease',
       fontFamily: 'inherit',
@@ -195,7 +198,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
       color: '#fff',
       cursor: 'pointer',
       minHeight: TOUCH_TARGET,
-      padding: isMobile ? '13px 24px' : '12px 28px',
+      padding: mobile ? '13px 24px' : '12px 28px',
       borderRadius: '10px',
       transition: 'all 0.12s ease',
       fontFamily: 'inherit',
