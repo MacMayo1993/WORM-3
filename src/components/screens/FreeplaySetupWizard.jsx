@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_BORDER_SOFT } from '../../utils/uiTheme.js';
+import { useIsMobile } from '../../hooks/index.js';
 import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
@@ -8,8 +9,6 @@ import {
 
 const ACCENT = '#1565C0';
 const ACCENT_SHADOW = '#0a3872';
-
-const S = wizardLayout(ACCENT, ACCENT_SHADOW);
 
 // Colours before style before size: the style step draws every tile in the
 // palette you just chose, and the size step shows both of them on the cube you
@@ -27,6 +26,8 @@ const STEP_SUBTITLES = [
 
 const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
+  const isMobile = useIsMobile();
+  const S = useMemo(() => wizardLayout(ACCENT, ACCENT_SHADOW, isMobile), [isMobile]);
   const cos = useWizardCosmetics({ initialSettings, accent: ACCENT, accentShadow: ACCENT_SHADOW });
 
   const finish = () => onComplete({ ...cos.settings, cubeSize: cos.cubeSize });

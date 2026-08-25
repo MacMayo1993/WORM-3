@@ -39,3 +39,4 @@ export { useAntipodalEngine } from './useAntipodalEngine.js';
 export { useParityDecay } from './useParityDecay.js';
 export { useRandomMode } from './useRandomMode.js';
 export { useDemoMode } from './useDemoMode.js';
+export { useIsMobile } from './useIsMobile.js';

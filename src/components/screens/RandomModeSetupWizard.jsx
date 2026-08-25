@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_BORDER_SOFT } from '../../utils/uiTheme.js';
+import { useIsMobile } from '../../hooks/index.js';
 import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
 import { useWizardCosmetics, SceneStep, SizeStep } from './wizardSteps/index.jsx';
 
 const ACCENT = '#C44B00';
 const ACCENT_SHADOW = '#7a2e00';
-
-const S = wizardLayout(ACCENT, ACCENT_SHADOW);
 
 const STEPS = ['Scene', 'Size'];
 const STEP_TITLES = ['Pick Your Scene', 'Cube Size'];
@@ -17,6 +16,8 @@ const STEP_SUBTITLES = [
 
 const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
+  const isMobile = useIsMobile();
+  const S = useMemo(() => wizardLayout(ACCENT, ACCENT_SHADOW, isMobile), [isMobile]);
   // Random Mode reshuffles the cosmetics as you play, so the plate wears a
   // random mix rather than pretending you picked something.
   const cos = useWizardCosmetics({

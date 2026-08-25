@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { useIsMobile } from '../../hooks/index.js';
 import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
-import { isMobile } from '../../utils/device.js';
 import {
   PAPER_SHEET_RAISED, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
@@ -27,8 +27,6 @@ const WORM_SIZE_TIERS = [
   { n: MEGA_CUBE_SIZE, name: '15×15×15', tag: 'Mega', desc: '1,350 stickers of mayhem' }
 ];
 
-const S = wizardLayout(ACCENT, ACCENT_SHADOW);
-
 const STEPS = ['Character', 'Scene', 'Colors', 'Style', 'Size'];
 const STEP_TITLES = ['Pick Worm Type', 'Background', 'Color Palette', 'Tile Style', 'Cube Size & Gameplay'];
 const STEP_SUBTITLES = [
@@ -41,6 +39,8 @@ const STEP_SUBTITLES = [
 
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
+  const isMobile = useIsMobile();
+  const S = useMemo(() => wizardLayout(ACCENT, ACCENT_SHADOW, isMobile), [isMobile]);
   const cos = useWizardCosmetics({
     initialSettings,
     accent: ACCENT,

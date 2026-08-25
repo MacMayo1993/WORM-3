@@ -15,7 +15,7 @@ import {
   DISPLAY_FONT, UI_CREAM,
   NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW
 } from '../../../utils/uiTheme.js';
-import { isMobile } from '../../../utils/device.js';
+import { useIsMobile } from '../../../hooks/index.js';
 import { WIZARD_PAPER_BASE } from '../WizardChrome.jsx';
 
 // NIGHT_SHEET's colour taken opaque — the plate sits on paper rather than over
@@ -83,6 +83,7 @@ export default function SpecimenPlate({
   sticky = false,
   children
 }) {
+  const isMobile = useIsMobile();
   const plate = (
     <div style={{
       borderRadius: '18px',

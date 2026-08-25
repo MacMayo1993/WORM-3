@@ -10,7 +10,7 @@
 
 import React from 'react';
 import CubePreviewCanvas from '../../../3d/CubePreviewCanvas.jsx';
-import { isMobile } from '../../../utils/device.js';
+import { useIsMobile } from '../../../hooks/index.js';
 import SpecimenPlate from './SpecimenPlate.jsx';
 
 export { plateSurface, plateArrow } from './SpecimenPlate.jsx';
@@ -33,6 +33,7 @@ export default function CubePlate({
   backdrop = null,
   swatches = null
 }) {
+  const isMobile = useIsMobile();
   const cubePx = isMobile ? 138 : 176;
 
   return (
