@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 /**
  * SecondaryModesSheet - Bottom sheet modal with grouped controls
@@ -45,6 +45,15 @@ const SecondaryModesSheet = ({
   // Level
   currentLevelData, onShowLevels, onFreeplay
 }) => {
+  // Backdrop click closes the sheet for pointer users; mirror it on Escape so
+  // keyboard users get the same dismissal.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const isViewsMode = mode === 'views';

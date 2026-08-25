@@ -20,8 +20,8 @@ const CLEAN_CARD = {
 // ─── Static style constants ───────────────────────────────────────────────────
 const CONTAINER_STYLE = {
   position: 'fixed',
-  right: '16px',
-  bottom: '80px',
+  right: 'calc(16px + env(safe-area-inset-right, 0px))',
+  bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
   display: 'flex',
   flexDirection: 'column-reverse',
   gap: '5px',
@@ -265,6 +265,20 @@ const DisparityHUD = () => {
           70%  { opacity: 1; transform: translateY(-10px); }
           100% { opacity: 0; transform: translateY(-16px); }
         }
+        /* These keyframes live inline in this component, so the app's per-selector
+           reduced-motion rules in App.css never reach them. Collapse them to a
+           plain fade — no scale, no travel — for players who ask for less motion. */
+        @media (prefers-reduced-motion: reduce) {
+          @keyframes disparity-face-elim {
+            0% { opacity: 0; } 100% { opacity: 1; }
+          }
+          @keyframes disparity-gain-float {
+            0% { opacity: 1; } 100% { opacity: 0; }
+          }
+          @keyframes disparity-pulse-red {
+            0%, 100% { border-color: rgba(239,68,68,0.6); }
+          }
+        }
       `}</style>
       {/* Face elimination banner */}
       {activeFaceElimination != null && (
@@ -363,7 +377,7 @@ const DeathEntry = React.memo(({ deaths }) => {
     <div style={style}>
       {isPair ? (
         <>
-          <span style={{ marginRight: '4px' }}>✝✝</span>
+          <span aria-hidden="true" style={{ marginRight: '4px' }}>✝✝</span>
           {deaths.map((d, i) => (
             <span key={d.id}>
               {i > 0 && <span style={DEATH_PAIR_SEPARATOR_STYLE}>+</span>}
@@ -373,7 +387,7 @@ const DeathEntry = React.memo(({ deaths }) => {
           ))}
         </>
       ) : (
-        <>✝ {deaths[0].gridId} — <span style={DEATH_RANK_STYLE}>#{deaths[0].rank}</span></>
+        <><span aria-hidden="true">✝</span> {deaths[0].gridId} — <span style={DEATH_RANK_STYLE}>#{deaths[0].rank}</span></>
       )}
     </div>
   );

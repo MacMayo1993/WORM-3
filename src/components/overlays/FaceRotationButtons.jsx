@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Z } from '../../utils/uiTheme.js';
 
 /**
@@ -93,6 +93,14 @@ const HINT_STYLE = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const FaceRotationButtons = ({ onRotateCW, onRotateCCW, onCancel }) => {
+  // The dismiss affordance is a pointer-only backdrop; give keyboard users the
+  // same escape hatch so the modal is not a trap once it has focus.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onCancel?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
   return (
     <>
       <style>{`

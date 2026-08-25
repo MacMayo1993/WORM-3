@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Z } from '../../utils/uiTheme.js';
+import { Z, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT } from '../../utils/uiTheme.js';
 
 const buttonStyle = {
   width: '48px',
   height: '48px',
   borderRadius: '50%',
-  border: '1px solid rgba(255, 255, 255, 0.10)',
-  background: 'rgba(14, 17, 38, 0.92)',
-  color: 'rgba(200, 220, 255, 0.80)',
+  border: `1px solid ${NIGHT_BORDER}`,
+  background: NIGHT_SHEET,
+  color: NIGHT_TEXT,
   fontSize: '18px',
   cursor: 'pointer',
   display: 'flex',
@@ -20,10 +20,12 @@ const buttonStyle = {
   touchAction: 'manipulation'
 };
 
+// 44px is the minimum comfortable tap target — keep the glyph small via fontSize
+// but never shrink the hit area below it.
 const smallButtonStyle = {
   ...buttonStyle,
-  width: '42px',
-  height: '42px',
+  width: '44px',
+  height: '44px',
   fontSize: '14px'
 };
 
@@ -64,8 +66,8 @@ const undoButtonStyle = {
 
 const toggleButtonStyle = {
   ...buttonStyle,
-  width: '40px',
-  height: '40px',
+  width: '44px',
+  height: '44px',
   fontSize: '18px',
 };
 

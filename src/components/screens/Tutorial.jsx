@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { COLORS } from '../../utils/constants.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, NIGHT_TEXT, NIGHT_TEXT_MUTED } from '../../utils/uiTheme.js';
 
 const Tutorial = ({ onClose, onMainMenu }) => {
   const [step, setStep] = useState(1);
@@ -44,7 +44,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
           </div>
 
           <p>Think of the Earth: your antipodal point is the exact opposite side of the planet—where you'd emerge if you dug straight through. In WORM³, flipping a sticker sends it on exactly that journey.</p>
-          <p style={{ fontSize: '13px', color: 'rgba(200, 220, 255, 0.70)' }}><b>Small circle on a sticker</b> = its original color, a breadcrumb of its journey through the manifold.</p>
+          <p style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED }}><b>Small circle on a sticker</b> = its original color, a breadcrumb of its journey through the manifold.</p>
         </>
       )
     },
@@ -60,7 +60,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             <p style={{ margin: 0 }}>Press <b>T</b> or use the Tunnels button to toggle tunnel visibility.</p>
           </div>
 
-          <p style={{ fontSize: '13px', color: 'rgba(200, 220, 255, 0.70)' }}>
+          <p style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED }}>
             <b>Key insight:</b> Every flip affects two stickers on opposite sides of the cube. Plan accordingly!
           </p>
         </>
@@ -123,7 +123,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             <li><b>Level 5:</b> Deep-manifold surges — strong hops with pacing</li>
           </ul>
           <p><b>AUTO Mode:</b> The cube rotates automatically based on instability — fast when chaotic, slow when stable.</p>
-          <p style={{ fontSize: '13px', color: 'rgba(200, 220, 255, 0.70)', marginTop: '6px' }}>
+          <p style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED, marginTop: '6px' }}>
             Chaos mode is used in the CHAOS game mode and can be toggled freely in Classic and Free Play.
           </p>
         </>
@@ -179,10 +179,10 @@ const Tutorial = ({ onClose, onMainMenu }) => {
     <div className="tutorial-overlay">
       <div className="tutorial-card" style={{ maxWidth: '620px' }}>
         <h2 style={{ marginBottom: '4px', color: '#e8edf8', fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '-0.01em' }}>{currentStep.title}</h2>
-        <div style={{ fontSize: '11px', color: 'rgba(200, 220, 255, 0.50)', marginBottom: '16px', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: UI_FONT }}>
+        <div style={{ fontSize: '11px', color: NIGHT_TEXT_MUTED, marginBottom: '16px', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: UI_FONT }}>
           Step {step} of {totalSteps}
         </div>
-        <div style={{ fontSize: '14px', lineHeight: '1.65', color: 'rgba(200, 220, 255, 0.88)', fontFamily: UI_FONT }}>
+        <div style={{ fontSize: '14px', lineHeight: '1.65', color: NIGHT_TEXT, fontFamily: UI_FONT }}>
           {currentStep.content}
         </div>
         <div className="tutorial-actions" style={{ marginTop: '20px' }}>

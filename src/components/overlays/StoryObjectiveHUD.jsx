@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { levelsManager } from '../../levels/index.js';
 import { getLevelPar } from '../../levels/scoring.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { MONO_FONT } from '../../utils/uiTheme.js';
+import { MONO_FONT, PAPER_WARN, PAPER_GOOD } from '../../utils/uiTheme.js';
 
 const COLLAPSE_KEY = 'worm3_objective_collapsed';
 
@@ -33,7 +33,7 @@ export default function StoryObjectiveHUD({ level }) {
   // Golf target: matching the intended solution length (par) is a 3-star run.
   const par = getLevelPar(level);
   const overPar = par != null && moves > par;
-  const parColor = overPar ? '#b06a2e' : '#426b2e';
+  const parColor = overPar ? PAPER_WARN : PAPER_GOOD;
 
   // A fresh chapter starts with its hint hidden — never leak the previous
   // chapter's revealed hint into the next one.
@@ -72,9 +72,10 @@ export default function StoryObjectiveHUD({ level }) {
           {par != null && (
             <span
               title="Moves so far / Par"
+              aria-label={`${moves} move${moves === 1 ? '' : 's'} of ${par} par`}
               style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.04em', color: parColor }}
             >
-              ⛳ {moves}/{par}
+              <span aria-hidden="true">⛳ {moves}/{par}</span>
             </span>
           )}
           <span className="story-objective-chevron" aria-hidden="true">{collapsed ? '▸' : '▾'}</span>

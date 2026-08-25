@@ -42,6 +42,10 @@ export const PAPER_FOOTER_BG = '#ede8df';
 export const PAPER_BG_MUTED = '#f0ebe2';
 export const PAPER_CARD_SHADOW = '#c4beb6';
 export const PAPER_SHADOW = '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)';
+// Semantic status inks on the paper surface — a warm terracotta for "over
+// budget" (over par) and a moss green for "on track". Read against PAPER_SHEET.
+export const PAPER_WARN = '#b06a2e';
+export const PAPER_GOOD = '#426b2e';
 
 // ─── NIGHT family (the STEP COMPLETE treatment) ───────────────────────────────
 // The second half of the field-guide system: a warm, dark surface for moments

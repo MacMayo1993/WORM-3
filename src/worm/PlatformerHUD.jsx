@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { isMobile } from '../utils/device.js';
-import { UI_FONT, UI_CREAM, UI_MOSS } from '../utils/uiTheme.js';
+import { UI_FONT, UI_CREAM, UI_MOSS, Z } from '../utils/uiTheme.js';
 import { fieldGuide } from '../components/ui/FieldGuide.jsx';
 
 export default function PlatformerHUD({
@@ -198,7 +198,7 @@ const styles = {
   container: {
     position: 'absolute', inset: 0,
     pointerEvents: 'none',
-    zIndex: 100,
+    zIndex: Z.HUD,
     fontFamily: UI_FONT,
   },
   topBar: {
@@ -269,7 +269,7 @@ const styles = {
     position: 'fixed', inset: 0,
     background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    pointerEvents: 'auto', zIndex: 200,
+    pointerEvents: 'auto', zIndex: Z.MODAL,
   },
   overlayBox: {
     textAlign: 'center', padding: isMobile ? '24px' : '40px',
