@@ -48,14 +48,17 @@ import { sparksForBudget } from './healerWorm/elementalQuality.js';
 
 // Flame footprint inside a 1×1 cell. Several small tongues per cell read as a
 // burning surface; two big ones read as a candle sitting on the sticker.
-const FLAME_W = 0.33;
-// Tongue height in cell units. Held near one tile: tall enough to lick off the
-// surface and give the cube a burning silhouette, but not so tall it throws a
-// wall of flame two or three tiles above the cube and buries the scene. The
-// earlier 0.82 stacked with the length, flicker and gust multipliers to ~3
-// cells of reach, which read as a bonfire the cube was sitting inside rather
-// than a skin burning on it.
-const FLAME_H = 0.5;
+// Wider tongues so each one covers more of its cell — a big cover cell on a mega
+// board was left mostly bare between a few narrow licks.
+const FLAME_W = 0.4;
+// Tongue height in cell units. Tuned between two failures: the original 0.82
+// stacked with the length/flicker/gust multipliers to ~3 cells of reach and threw
+// a wall of flame above the cube; dropping it to 0.5 then read as too little fire,
+// especially on mega boards where each cover cell is several tiles wide. 0.64 with
+// the gentler silhouette boost peaks near ~1.5 cells at the hottest corner and
+// sits under one cell across most of the cube — a surface that is burning, not a
+// bonfire it is standing in.
+const FLAME_H = 0.64;
 // The quad grows away from its anchor rather than being centred on it, and the
 // anchor sits just below the surface, so the base of every tongue is buried in the
 // tile instead of floating a hair above it.
@@ -218,9 +221,9 @@ const vertexShader = /* glsl */`
       float phase = (r1 + r2) * 6.2831853;
       float rate = 6.5 + r2 * 7.0;
       // Length spread: a few taller leaders over a bed of short stubs layers the
-      // fire. Kept moderate so even the leaders stay close to one tile tall rather
-      // than shooting off the top of the cube. (Was 0.42 + r2 * 0.95.)
-      float scl = 0.40 + r2 * 0.55;
+      // fire. Moderate leaders — enough variation to look alive, capped well below
+      // the original 0.42 + r2 * 0.95 that let leaders shoot off the top of the cube.
+      float scl = 0.46 + r2 * 0.66;
       // Two beats, not one: a fast lick over a slower breath, so no two tongues
       // ever quite repeat and none of them pulses like a metronome.
       float flick = 0.70 + 0.42 * sin(T * rate + phase) + 0.18 * sin(T * rate * 1.93 + phase * 1.7);
@@ -401,10 +404,9 @@ const fragmentShader = /* glsl */`
       col = mix(col, uCoreColor, smoothstep(0.62, 1.0, n) * (0.45 - 0.35 * vUv.y));
       col *= 0.85 + 0.45 * vHeat;
       // The blend is additive, so a cooling tip has to lose light, not gain black.
-      // Base kept lower (was 0.58 + 0.34): with dozens of tongues overlapping,
-      // additive blending was piling up to flat white spikes that washed the cube
-      // out — this keeps each tongue translucent so they read as layered flame.
-      a *= (0.42 + 0.30 * vHeat) * (1.0 - 0.40 * smoothstep(0.58, 1.0, vUv.y)) * vAlpha;
+      // Base sits between the original 0.58 (which blew overlaps to flat white) and
+      // the 0.42 that read too faint — richer flame that still layers translucently.
+      a *= (0.50 + 0.32 * vHeat) * (1.0 - 0.40 * smoothstep(0.58, 1.0, vUv.y)) * vAlpha;
 
     } else {
       // ── The sparks: gold at birth, cooling to ember red ────────────────────
