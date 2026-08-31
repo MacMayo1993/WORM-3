@@ -273,7 +273,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   padding: '14px 8px',
                   borderRadius: '10px',
-                  border: selected ? `2px solid ${accent}` : '2px solid #d6d0c8',
+                  border: selected ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
                   background: selected ? `${accent}14` : PAPER_SHEET_RAISED,
                   boxShadow: selected ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${PAPER_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
                   transform: selected ? 'translateY(1px)' : 'none',

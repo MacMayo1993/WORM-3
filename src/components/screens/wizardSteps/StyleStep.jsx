@@ -9,7 +9,7 @@
 import React from 'react';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../../utils/colorSchemes.js';
 import { TILE_STYLE_SECTIONS } from '../../../utils/tileStyleCatalog.js';
-import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW } from '../../../utils/uiTheme.js';
+import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
 import { WizardSection } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
 import { Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor, FACE_LABELS } from './shared.jsx';
@@ -121,7 +121,7 @@ export default function StyleStep({ cos }) {
               onClick={() => unlocked && applyGlobal(key)}
               style={{
                 display: 'block', position: 'relative', padding: 0, borderRadius: '10px',
-                border: sel ? `2px solid ${accent}` : '2px solid #d6d0c8',
+                border: sel ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
                 background: PAPER_BG_MUTED,
                 boxShadow: sel ? 'inset 0 2px 4px rgba(0,0,0,0.10)' : `0 2px 0 ${PAPER_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
                 transform: sel ? 'translateY(1px)' : 'none',
@@ -179,7 +179,7 @@ export default function StyleStep({ cos }) {
                       onChange={e => applyPerFace(faceId, e.target.value)}
                       style={{
                         fontSize: '10px', padding: '4px 6px', borderRadius: '6px',
-                        border: '1px solid #d6d0c8', background: '#f7f3ec',
+                        border: `1px solid ${PAPER_BORDER_SOFT}`, background: '#f7f3ec',
                         color: PAPER_TEXT, fontFamily: 'inherit', cursor: 'pointer',
                         appearance: 'none', WebkitAppearance: 'none'
                       }}
