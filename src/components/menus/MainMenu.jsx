@@ -1402,22 +1402,19 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
         onPointerEnter={warmDemoAssets}
         onPointerDown={warmDemoAssets}
         // Secondary action — the same green as START (one action colour), but
-        // smaller and without the pulse/glow so START stays the loud CTA.
+        // dropped down it, so START stays the loud CTA. Surface, rim, bevel and
+        // press live in .worm-menu-cta-secondary; anything set here would
+        // outrank the class and silently disable it.
         className="worm-menu-cta-secondary"
         style={{
-          background: 'linear-gradient(180deg, #7bd88a, #3fbf62)',
-          border: 'none',
           borderRadius: '100px',
           padding: '11px 34px',
-          color: '#08210f',
           fontSize: '14px',
           fontWeight: 800,
           fontFamily: UI_FONT,
           letterSpacing: '0.12em',
           cursor: 'pointer',
           textTransform: 'uppercase',
-          boxShadow: '0 4px 0 #2f9d4d, 0 8px 16px rgba(0,0,0,0.34)',
-          transition: 'filter 0.15s ease, transform 0.1s ease',
         }}
       >Start Demo</button>
     )}
@@ -1428,19 +1425,17 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
       // Same green family as START, smallest of the three so the hierarchy is
       // START → Start Demo → Give Feedback while all read as one action colour.
       style={{
-        background: 'linear-gradient(180deg, #7bd88a, #3fbf62)',
-        border: 'none',
         borderRadius: '100px',
         padding: '9px 26px',
-        color: '#08210f',
         fontSize: '12px',
         fontWeight: 700,
         fontFamily: UI_FONT,
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
         cursor: 'pointer',
-        boxShadow: '0 3px 0 #2f9d4d, 0 6px 12px rgba(0,0,0,0.30)',
-        transition: 'filter 0.15s ease, transform 0.1s ease',
+        // Quietest of the three — but ranked by size, not opacity: fading the
+        // element fades its rim and outline too, which is exactly the edge
+        // definition the scene behind it makes expensive to lose.
       }}
     >Give Feedback</button>
   </div>

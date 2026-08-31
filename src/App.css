@@ -3683,52 +3683,147 @@ select.btn-compact:disabled {
 .worm-cube-face--left   { transform: rotateY(-90deg) translateZ(14px);   background: #d8d8d8; }
 .worm-cube-face--bottom { transform: rotateX(-90deg) translateZ(14px);   background: #cccccc; }
 
+/* ── Menu CTAs ─────────────────────────────────────────────────────────────
+   The menu sits over a live 3D scene — usually grass or forest, i.e. a busy
+   mid-green field. A flat mid-green pill with near-black lettering on it was
+   camouflage: the button melted into the foliage and the label had to fight
+   the fill it sat on.
+
+   Three things fix that, and they are what the treatment below is doing:
+     1. a dark rim, so the silhouette is legible against ANY scene behind it;
+     2. cream lettering with a dark outline, instead of dark-on-mid-green;
+     3. real modelling — a gloss on the top half, a deepened base, and a
+        stacked shadow — so the pill reads as a raised object rather than a
+        coloured rectangle.
+
+   Layer order in `background` is top-most first: sheen, then gloss, then the
+   body gradient. Keeping the sheen as a BACKGROUND layer (animated via
+   background-position) rather than an ::after overlay means it can never paint
+   over the label — a pseudo-element would, since it paints after text. */
 .worm-tactile-btn {
   font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   font-size: 2.3rem;
-  color: #08210f;
-  /* Green pill CTA — speaks the same action language as the mode carousel's
-     PLAY button, so the primary action is one continuous color from the first
-     screen into the game (was a competing orange). Keeps a chunky tactile press
-     via the stacked shadow, but reads as a modern pill, not a boxed key. */
-  background: linear-gradient(180deg, #7bd88a, #3fbf62);
+  color: #fffdf2;
+  /* Outline first (four offsets), then the seated drop shadow underneath. */
+  text-shadow:
+    0 -1.5px 0 rgba(7, 38, 17, 0.78),
+    1.5px 0 0 rgba(7, 38, 17, 0.78),
+    -1.5px 0 0 rgba(7, 38, 17, 0.78),
+    0 1.5px 0 rgba(7, 38, 17, 0.78),
+    0 4px 0 rgba(7, 38, 17, 0.5),
+    0 6px 16px rgba(0, 0, 0, 0.38);
+  background:
+    linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.5) 50%, transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.07) 40%, rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, #7fe98d 0%, #45c862 44%, #279b45 100%);
+  background-size: 260% 100%, 100% 100%, 100% 100%;
+  background-position: 210% 0, 0 0, 0 0;
   padding: 16px 60px;
-  border: none;
+  border: 2px solid #1f7a3c;
   border-radius: 100px;
   cursor: pointer;
   outline: none;
-  box-shadow: 0 7px 0 #2f9d4d, 0 14px 26px rgba(0, 0, 0, 0.42), 0 0 24px rgba(63, 191, 98, 0.35);
-  transition: all 0.1s ease-in-out;
-  animation: wormIdlePulse 2s infinite ease-in-out;
+  /* inset top highlight + inset bottom shade = bevel; then the 3D base edge,
+     the cast shadow, and a soft green halo that lifts it off dark scenes. */
+  --cta-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -4px 10px rgba(12, 60, 28, 0.42),
+    0 7px 0 #1f7a3c,
+    0 10px 0 rgba(14, 52, 26, 0.55),
+    0 16px 28px rgba(0, 0, 0, 0.46),
+    0 0 30px rgba(80, 220, 120, 0.34);
+  box-shadow: var(--cta-shadow);
+  transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out, filter 0.15s ease;
+  animation: wormIdlePulse 2s infinite ease-in-out, wormCtaSheen 4.2s 1.2s ease-in-out infinite;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 
-.worm-tactile-btn:hover {
-  filter: brightness(1.06);
+/* The specular sweep. Only the first background layer moves; the gloss and body
+   stay pinned, which is why each layer needs its own position. */
+@keyframes wormCtaSheen {
+  0%   { background-position: 210% 0, 0 0, 0 0; }
+  55%  { background-position: -60% 0, 0 0, 0 0; }
+  100% { background-position: -60% 0, 0 0, 0 0; }
 }
 
+.worm-tactile-btn:hover {
+  filter: brightness(1.07) saturate(1.05);
+}
+
+/* Press: the pill travels the full height of its base edge and the base
+   collapses with it, so it reads as the button physically bottoming out. */
 .worm-tactile-btn:active {
   transform: translateY(7px);
-  box-shadow: 0 0px 0 #2f9d4d, 0 5px 12px rgba(0, 0, 0, 0.4);
+  --cta-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 8px rgba(12, 60, 28, 0.5),
+    0 0 0 #1f7a3c,
+    0 1px 0 rgba(14, 52, 26, 0.55),
+    0 4px 10px rgba(0, 0, 0, 0.42);
   animation: none;
 }
 
-/* Secondary green CTAs (Start Demo, Give Feedback) — same colour as START, one
-   press-down system, but no idle pulse so START stays the loud primary. */
-/* The two secondary menu CTAs were 38px and 32px tall — their padding alone
-   never reached the floor. Height only; the padding still sets the width and
-   the visual hierarchy under START is unchanged. */
+/* The baseline ring (further down this file) sets box-shadow outright, which on
+   these two would replace the entire bevel-and-base stack and flatten the
+   button for as long as it held focus. Composing instead: ring first so it
+   paints on top, then whatever --cta-shadow currently is — which :active
+   redefines, so the pressed button keeps a correct ring too. */
+.worm-tactile-btn:focus-visible,
+.worm-menu-cta-secondary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(255, 253, 242, 0.92),
+    0 0 0 5px var(--border-focus, #5f7f4a),
+    var(--cta-shadow);
+}
+
+/* Secondary menu CTAs (Start Demo, Give Feedback).
+   These were the same gradient, same rim and nearly the same size as START —
+   three near-identical green pills stacked up, so the eye had nothing to land
+   on and the primary action was ranked by size alone.
+
+   They stay in the one action colour the theme mandates, but drop a long way
+   down it: a deeper, desaturated green, a shallower base edge, no halo and no
+   sheen. The gloss is kept but weakened, so they still belong to the same
+   family of objects — they are the same button, further away.
+
+   Sizing (min-height) is the 44px floor; the look is here rather than inline in
+   MainMenu.jsx because an inline background outranks this class, which is what
+   made the earlier hover state a no-op. */
 .worm-menu-cta-secondary {
   min-height: 44px;
+  color: #f4fdf3;
+  text-shadow:
+    0 -1px 0 rgba(6, 30, 14, 0.7),
+    1px 0 0 rgba(6, 30, 14, 0.55),
+    -1px 0 0 rgba(6, 30, 14, 0.55),
+    0 2px 0 rgba(6, 30, 14, 0.55),
+    0 3px 9px rgba(0, 0, 0, 0.34);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.03) 44%, rgba(255, 255, 255, 0) 54%),
+    linear-gradient(180deg, #45ab5f 0%, #2c8043 100%);
+  border: 1.5px solid #1c6635;
+  --cta-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -3px 8px rgba(10, 45, 22, 0.4),
+    0 4px 0 #1c6635,
+    0 8px 16px rgba(0, 0, 0, 0.36);
+  box-shadow: var(--cta-shadow);
+  transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out, filter 0.15s ease;
 }
 
 .worm-menu-cta-secondary:hover {
-  filter: brightness(1.06);
+  filter: brightness(1.1);
 }
+
 .worm-menu-cta-secondary:active {
-  transform: translateY(3px);
-  box-shadow: 0 0 0 #2f9d4d, 0 3px 8px rgba(0, 0, 0, 0.36) !important;
+  transform: translateY(4px);
+  --cta-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -2px 6px rgba(10, 45, 22, 0.46),
+    0 0 0 #1c6635,
+    0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-reduced-motion: reduce) {
