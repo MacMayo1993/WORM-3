@@ -48,8 +48,17 @@ import { sparksForBudget } from './healerWorm/elementalQuality.js';
 
 // Flame footprint inside a 1×1 cell. Several small tongues per cell read as a
 // burning surface; two big ones read as a candle sitting on the sticker.
-const FLAME_W = 0.33;
-const FLAME_H = 0.82;
+// Wider tongues so each one covers more of its cell — a big cover cell on a mega
+// board was left mostly bare between a few narrow licks.
+const FLAME_W = 0.4;
+// Tongue height in cell units. Tuned between two failures: the original 0.82
+// stacked with the length/flicker/gust multipliers to ~3 cells of reach and threw
+// a wall of flame above the cube; dropping it to 0.5 then read as too little fire,
+// especially on mega boards where each cover cell is several tiles wide. 0.64 with
+// the gentler silhouette boost peaks near ~1.5 cells at the hottest corner and
+// sits under one cell across most of the cube — a surface that is burning, not a
+// bonfire it is standing in.
+const FLAME_H = 0.64;
 // The quad grows away from its anchor rather than being centred on it, and the
 // anchor sits just below the surface, so the base of every tongue is buried in the
 // tile instead of floating a hair above it.
@@ -174,7 +183,10 @@ const vertexShader = /* glsl */`
     // even fur of flame. Real fire also climbs, so an up-facing normal throws
     // furthest even though every face still burns along its own axis.
     float upFacing = max(0.0, dot(nrm, vec3(0.0, 1.0, 0.0)));
-    float tall = 1.0 + 0.32 * aCell.y + 0.24 * aCell.z + 0.30 * upFacing;
+    // Silhouette boost, kept gentle: edges and corners burn a little taller so the
+    // cube still has a flame outline, but not so much that the top row towers over
+    // everything else. (Was 0.32/0.24/0.30 — enough to nearly double the height.)
+    float tall = 1.0 + 0.18 * aCell.y + 0.14 * aCell.z + 0.18 * upFacing;
 
     // The claim sweep: each cell catches only when the sweep reaches it. The tail
     // (uEnv.z) stops the accents first, before the skin itself dissolves.
@@ -208,9 +220,10 @@ const vertexShader = /* glsl */`
       float r3 = h1(aSeed * 1.7 + 3.0, aIndex * 2.3 + 1.0);
       float phase = (r1 + r2) * 6.2831853;
       float rate = 6.5 + r2 * 7.0;
-      // Wide length spread: a few tall leaders over a bed of short stubs layers the
-      // fire. A narrow spread gave every cell the same fan of equal petals.
-      float scl = 0.42 + r2 * 0.95;
+      // Length spread: a few taller leaders over a bed of short stubs layers the
+      // fire. Moderate leaders — enough variation to look alive, capped well below
+      // the original 0.42 + r2 * 0.95 that let leaders shoot off the top of the cube.
+      float scl = 0.46 + r2 * 0.66;
       // Two beats, not one: a fast lick over a slower breath, so no two tongues
       // ever quite repeat and none of them pulses like a metronome.
       float flick = 0.70 + 0.42 * sin(T * rate + phase) + 0.18 * sin(T * rate * 1.93 + phase * 1.7);
@@ -295,6 +308,7 @@ const fragmentShader = /* glsl */`
   uniform vec3 uEmberColor;
   uniform vec3 uCrustColor;
   uniform vec3 uCoreColor;
+  uniform vec3 uMidColor;   // bright yellow cel band between orange body and core
   uniform float uTime;
   uniform float uAnim;
   varying vec2 vUv;
@@ -329,16 +343,17 @@ const fragmentShader = /* glsl */`
     float T = uTime * uAnim;
 
     // Turbulence, scrolling down the quad so the pattern appears to rise through the
-    // flame. Two rates: a fine field that boils and a slow wide one that leans the
-    // whole tongue, so it never reads as one repeating band.
-    float n = turbulence(vec2(vUv.x * 2.6 + vSeed, vUv.y * 4.2 - T * 2.30 + vSeed)) * 0.65
-            + turbulence(vec2(vUv.x * 1.3 - vSeed, vUv.y * 1.6 - T * 0.85)) * 0.35;
+    // flame. Coarser than a realistic fire on purpose: bigger, slower cells so the
+    // silhouette breaks into a few bold cartoon lobes rather than a fine photoreal
+    // boil. A wide slow field leans the whole tongue under a chunkier detail field.
+    float n = turbulence(vec2(vUv.x * 1.7 + vSeed, vUv.y * 2.7 - T * 1.85 + vSeed)) * 0.62
+            + turbulence(vec2(vUv.x * 0.9 - vSeed, vUv.y * 1.2 - T * 0.70)) * 0.38;
 
     // The flame sprite is a hard-edged fill, so eroding its alpha does nothing —
     // the alpha steps 0 → 1 within a pixel and every tongue keeps the same smooth
     // teardrop outline. Displacing the LOOKUP is what makes the silhouette move:
     // the edge wanders with the turbulence, more the higher up the tongue it is.
-    vec2 warp = vec2((n - 0.5) * 0.22 * smoothstep(0.05, 1.0, vUv.y), 0.0);
+    vec2 warp = vec2((n - 0.5) * 0.30 * smoothstep(0.05, 1.0, vUv.y), 0.0);
 
     // Every fetch is unconditional: a fetch inside divergent flow has undefined
     // derivatives, and three cheap fetches beat branching around them.
@@ -372,26 +387,40 @@ const fragmentShader = /* glsl */`
       a = (0.07 + 0.26 * gap + 0.24 * fissure * (0.4 + 0.6 * vHeat)) * vAlpha;
 
     } else if (vKind < 1.5) {
-      // ── The tongues: pale-gold core, orange body, ragged red tips ──────────
-      a = flameTex.a;
-      // Burn the tip away against the noise field, so the tongue ends in wisps that
-      // detach and re-form instead of the same smooth teardrop on every cell.
-      a *= 1.0 - smoothstep(0.42, 1.0, vUv.y + (n - 0.5) * 0.75);
-      // Interior mottling: the body is not a flat sheet of orange, it has hotter and
-      // cooler streaks moving through it.
-      a *= 0.55 + 0.55 * n;
-      // Feather the sides so the taper never leaves a vertical cut down the quad.
-      a *= smoothstep(0.0, 0.14, 1.0 - abs(vUv.x - 0.5) * 2.0);
+      // ── The tongues: cel-shaded cartoon flame, layered in flat colour bands ──
+      // The silhouette (mask) and the colour (heat) are computed separately: the
+      // mask is a ragged flame outline, and inside it the colour steps through hard
+      // onion-layers — deep red rim, orange body, bright yellow, white-hot core —
+      // the way a hand-drawn flame is painted, instead of one smooth gradient.
+      float mask = flameTex.a;
+      // Ragged, lobed tip — the chunky noise makes it end in a couple of rounded
+      // cartoon fingers that detach and re-form rather than one smooth teardrop.
+      mask *= 1.0 - smoothstep(0.40, 1.0, vUv.y + (n - 0.5) * 0.85);
+      // Feather the sides so the taper never leaves a hard vertical cut.
+      mask *= smoothstep(0.0, 0.12, 1.0 - abs(vUv.x - 0.5) * 2.0);
 
-      col = mix(uCoreColor, uFlameColor, smoothstep(0.04, 0.42, vUv.y));
-      col = mix(col, uEmberColor, smoothstep(0.38, 0.80, vUv.y));
-      // Internal structure: the sprite's own gradient plus the turbulence, so the
-      // body has hot veins running through it rather than a flat wash.
-      col *= 0.70 + 0.50 * flameFlat.r;
-      col = mix(col, uCoreColor, smoothstep(0.62, 1.0, n) * (0.45 - 0.35 * vUv.y));
-      col *= 0.85 + 0.45 * vHeat;
+      // Heat field: hottest at the base and along the tongue's spine, cooling as it
+      // climbs and spreads. The chunky noise shoves the bands around so the layers
+      // wobble like real cartoon flame rather than sitting in neat stripes.
+      float spine = 1.0 - abs(vUv.x - 0.5) * 2.0;
+      float heat = (1.0 - vUv.y) * 0.82 + spine * 0.30 + (n - 0.5) * 0.70;
+      heat = clamp(heat * (0.72 + 0.5 * vHeat), 0.0, 1.0);
+
+      // Posterize into four flat cel bands with crisp edges (step, not mix).
+      float band = floor(heat * 4.0);
+      col = uEmberColor;                          // 0: red rim / outer tip
+      col = mix(col, uFlameColor, step(0.5, band)); // 1: orange body
+      col = mix(col, uMidColor,   step(1.5, band)); // 2: bright yellow
+      col = mix(col, uCoreColor,  step(2.5, band)); // 3: white-hot core
+
+      // Bright edge highlight — a cartoon flame's ink outline, done as a light rim
+      // because the blend is additive (it can brighten a silhouette, not darken it).
+      float edge = smoothstep(0.02, 0.16, mask) * (1.0 - smoothstep(0.16, 0.40, mask));
+      col += uMidColor * edge * 0.55;
+      col *= 0.88 + 0.30 * vHeat;
+
       // The blend is additive, so a cooling tip has to lose light, not gain black.
-      a *= (0.58 + 0.34 * vHeat) * (1.0 - 0.40 * smoothstep(0.58, 1.0, vUv.y)) * vAlpha;
+      a = mask * (0.52 + 0.32 * vHeat) * (1.0 - 0.38 * smoothstep(0.58, 1.0, vUv.y)) * vAlpha;
 
     } else {
       // ── The sparks: gold at birth, cooling to ember red ────────────────────
@@ -418,11 +447,14 @@ function getFlameMaterial(highDetail) {
         uAnim: { value: 1 },
         uFlameTex: { value: FLAME_TEX },
         uGlowTex: { value: getSoftGlowTexture() },
-        uFlameColor: { value: new THREE.Color('#ff5a12') },
-        uEmberColor: { value: new THREE.Color('#ff4a08') },
-        // Near-black red crust → orange body → pale-gold cores.
+        // Punchy, saturated cartoon palette: the cel bands read as distinct flat
+        // colours, so each one is pushed toward its purest hue.
+        uFlameColor: { value: new THREE.Color('#ff6a12') }, // orange body
+        uEmberColor: { value: new THREE.Color('#f23205') }, // deep red rim / tip
+        uMidColor: { value: new THREE.Color('#ffcf29') },   // bright yellow band
+        // Near-black red crust → orange body → bright yellow → white-hot core.
         uCrustColor: { value: new THREE.Color('#2e0703') },
-        uCoreColor: { value: new THREE.Color('#ffd9a0') },
+        uCoreColor: { value: new THREE.Color('#fff3c8') },
         uEnv: { value: new THREE.Vector4(1, 1, 0, 0) }
       },
       vertexShader,
