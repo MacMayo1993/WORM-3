@@ -174,13 +174,19 @@ describe('elemental quality budget', () => {
   });
 
   it('steps down for phones and again for large boards', () => {
+    const desktop = resolveElementalQuality({ mobile: false, cubeSize: 3 });
     const phone = resolveElementalQuality({ mobile: true, cubeSize: 3 });
     const bigDesktop = resolveElementalQuality({ mobile: false, cubeSize: 15 });
     const bigPhone = resolveElementalQuality({ mobile: true, cubeSize: 15 });
-    expect(phone.skinGrid).toBeLessThan(5);
-    expect(bigDesktop.skinGrid).toBeLessThan(5);
-    expect(bigPhone.skinGrid).toBeLessThanOrEqual(phone.skinGrid);
+    // The step-down lives in the heavy per-frame budget (particles / adornments),
+    // NOT in skin coverage: a mega board is deliberately kept densely sheathed in
+    // the element, so its cover grid is generous even when the machine is a phone.
+    expect(phone.particleCount).toBeLessThan(desktop.particleCount);
+    expect(bigDesktop.particleCount).toBeLessThan(desktop.particleCount);
     expect(bigPhone.particleCount).toBeLessThanOrEqual(phone.particleCount);
+    // Coverage still reaches every corner on the big boards.
+    expect(bigPhone.skinGrid).toBeGreaterThanOrEqual(3);
+    expect(bigDesktop.skinGrid).toBeGreaterThanOrEqual(phone.skinGrid);
   });
 
   it('degrades density but never deletes the element', () => {

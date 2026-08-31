@@ -179,10 +179,16 @@ export default function ElementalAtmosphere({ size = 3 }) {
 
       {/* Lightning's hero beat — bolts arcing out of the charged cube into the
           worm. Pure staging: no damage, no stun, no simulation writes. Every gate
-          gate that changes at most a few times a run is passed in here; the ones
-          that change per frame (the claim freeze, the dissolve) are read from the
-          shared envelope inside its own frame loop, where they are still live. */}
-      {element === 'lightning' && quality.accents && (
+          that changes at most a few times a run is passed in here; the ones that
+          change per frame (the claim freeze, the dissolve) are read from the shared
+          envelope inside its own frame loop, where they are still live.
+
+          Gated on `animate`, not `accents`: a strike is one small pooled effect
+          (branches and pool scale down to 1 on the phone tiers below), so it can
+          run wherever motion is allowed — including mobile and mega boards, where
+          `accents` is off — while reduced motion (animate:false) still suppresses
+          it entirely, as the scheduler independently requires. */}
+      {element === 'lightning' && quality.animate && (
         <ElementalStrikes
           active
           enabled={
