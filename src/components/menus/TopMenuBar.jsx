@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import ParityWallet from '../overlays/ParityWallet.jsx';
+import { TEXT_MICRO, TEXT_MD } from '../../utils/uiTheme.js';
 
 // Must match MAX_CASCADES in useChaosMode.js — keeps the bolt display accurate
 const MAX_CASCADES = 6;
@@ -17,8 +18,10 @@ const hexToRgba = (hex, alpha = 1) => {
 // Compact stat chip — colors drawn from the cube's own face palette
 const ChaosStatItem = ({ label, value, color, dimColor, title }) => (
   <span title={title} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '4px', cursor: 'default' }}>
-    <span style={{ color: dimColor, fontSize: '9px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
-    <span style={{ color, fontWeight: 700, fontSize: '12px' }}>{value}</span>
+    <span style={{ color: dimColor, fontSize: TEXT_MICRO, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
+    {/* The number is the content; the label above is only its unit. Sized apart
+        so the chip has a hierarchy at arm's length. */}
+    <span style={{ color, fontWeight: 800, fontSize: TEXT_MD + 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
   </span>
 );
 

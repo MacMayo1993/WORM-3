@@ -148,7 +148,7 @@ export function IconButton({
       type="button"
       aria-label={label}
       title={label}
-      className={`ui-focusable ${className}`.trim()}
+      className={`ui-focusable ui-icon-button ${className}`.trim()}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -157,7 +157,9 @@ export function IconButton({
         height: size,
         flexShrink: 0,
         padding: 0,
-        background: 'transparent',
+        // Base background lives in CSS (`.ui-icon-button`) rather than here: an
+        // inline `transparent` outranks the class, so setting it here is what
+        // silently killed the hover state.
         border: 'none',
         borderRadius: RADIUS_PILL,
         color: onNight ? NIGHT_TEXT_MUTED : PAPER_TEXT_MUTED,
@@ -165,7 +167,9 @@ export function IconButton({
         fontSize: TEXT_LG,
         lineHeight: 1,
         cursor: 'pointer',
-        transition: 'background 0.15s ease, color 0.15s ease',
+        // `transform` is in the list because the shared press state in App.css
+        // scales the button; without it the scale would snap.
+        transition: 'background 0.15s ease, color 0.15s ease, transform 0.12s ease',
         WebkitTapHighlightColor: 'transparent',
         ...style
       }}

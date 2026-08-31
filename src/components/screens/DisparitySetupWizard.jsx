@@ -2,8 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   PAPER_SHEET_RAISED, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_CARD_SHADOW
-} from '../../utils/uiTheme.js';
+  PAPER_CARD_SHADOW, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { useIsMobile } from '../../hooks/index.js';
 import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
 import {
@@ -138,7 +137,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3
             }}>
               <div>{p.label}</div>
-              <div style={{ fontSize: '9px', marginTop: '2px', opacity: 0.75 }}>{p.sub}</div>
+              <div style={{ fontSize: TEXT_MICRO, marginTop: '2px', opacity: 0.75 }}>{p.sub}</div>
             </button>
           ))}
         </div>
@@ -161,7 +160,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3
             }}>
               <div>{opt.label}</div>
-              <div style={{ fontSize: '9px', marginTop: '2px', opacity: 0.75 }}>{opt.sub}</div>
+              <div style={{ fontSize: TEXT_XS, marginTop: '2px', opacity: 0.75 }}>{opt.sub}</div>
             </button>
           ))}
         </div>

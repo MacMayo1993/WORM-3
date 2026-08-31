@@ -10,7 +10,7 @@ import {
   PAPER_TEXT,
   PAPER_TEXT_MUTED,
   PAPER_TEXT_FAINT,
- Z } from '../../utils/uiTheme.js';
+ Z, TEXT_MICRO } from '../../utils/uiTheme.js';
 
 const ACCENT = '#1565C0';
 
@@ -150,7 +150,7 @@ const ModeCard = ({ item, isSelected, onClick, onPlay }) => {
             </span>
             <span
               style={{
-                fontSize: '9px',
+                fontSize: TEXT_MICRO,
                 fontWeight: 700,
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',

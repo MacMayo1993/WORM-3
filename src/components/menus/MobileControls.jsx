@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Z, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT } from '../../utils/uiTheme.js';
+import { Z, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, TEXT_XS } from '../../utils/uiTheme.js';
 
 const buttonStyle = {
   width: '48px',
@@ -104,7 +104,7 @@ const expandedMenuStyle = {
 };
 
 const flipLabelStyle = { fontSize: '10px', fontWeight: 600, letterSpacing: '0.02em' };
-const teachLabelStyle = { fontSize: '9px', fontWeight: 700 };
+const teachLabelStyle = { fontSize: TEXT_XS, fontWeight: 700 };
 const teachActiveButtonStyle = {
   ...smallButtonStyle,
   background: 'rgba(251, 191, 36, 0.8)',

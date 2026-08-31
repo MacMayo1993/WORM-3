@@ -3,7 +3,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.j
 import { useShallow } from 'zustand/react/shallow';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { countDeadTiles } from '../../game/chaosMetrics.js';
-import { UI_FONT, Z } from '../../utils/uiTheme.js';
+import { UI_FONT, Z, TEXT_XS } from '../../utils/uiTheme.js';
 
 const FACE_NAMES = { 1: 'RED', 2: 'GREEN', 3: 'WHITE', 4: 'ORANGE', 5: 'BLUE', 6: 'YELLOW' };
 const FACE_ELIMINATION_LIFETIME = 2500; // ms to show the face elimination banner
@@ -43,7 +43,7 @@ const FACE_ELIM_BANNER_STYLE = {
 };
 
 const FACE_ELIM_LABEL_STYLE = {
-  fontSize: '9px',
+  fontSize: TEXT_XS,
   color: CLEAN_CARD.subtle,
   letterSpacing: '0.12em',
   marginBottom: '2px',

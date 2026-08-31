@@ -8,8 +8,7 @@ import {
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_CARD_SHADOW,
   NIGHT_TEXT, NIGHT_TEXT_MUTED,
-  UI_CREAM
-} from '../../utils/uiTheme.js';
+  UI_CREAM, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import { WORM_SPEED_OPTIONS } from '../../worm/healerWorm/constants.js';
@@ -121,7 +120,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               background: `${activeSkin.glow}28`, border: `1px solid ${activeSkin.glow}55`,
-              color: activeSkin.glow, fontSize: '9px', fontWeight: 800,
+              color: activeSkin.glow, fontSize: TEXT_MICRO, fontWeight: 800,
               letterSpacing: '0.16em', textTransform: 'uppercase', padding: '3px 11px', borderRadius: '999px',
               transition: 'all 0.4s ease'
             }}>
@@ -183,7 +182,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   <div style={{ filter: owned ? 'none' : 'saturate(0.5)' }}>
                     <WormPreviewCanvas characterId={wormCharacterId} skinId={skin.id} size={34} />
                   </div>
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: selected ? skin.body : PAPER_TEXT_FAINT, letterSpacing: '0.05em' }}>
+                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, color: selected ? skin.body : PAPER_TEXT_FAINT, letterSpacing: '0.05em' }}>
                     {skin.label}
                   </span>
                   {!owned && <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>}
@@ -218,7 +217,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     size={34} framing="head"
                     style={{ filter: owned ? 'none' : 'saturate(0.5)' }}
                   />
-                  <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', color: selected ? ACCENT : PAPER_TEXT_MUTED, lineHeight: 1.2, textAlign: 'center' }}>
+                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.05em', color: selected ? ACCENT : PAPER_TEXT_MUTED, lineHeight: 1.2, textAlign: 'center' }}>
                     {hat.label}
                   </span>
                   {!owned && <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>}

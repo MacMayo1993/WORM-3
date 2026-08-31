@@ -16,7 +16,7 @@ import {
   PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_CREAM,
   NIGHT_TEXT_MUTED,
- Z } from '../../utils/uiTheme.js';
+ Z, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { isMobile } from '../../utils/device.js';
 import { wizardPaperBackground, WIZARD_FOOTER_BG, PENCIL_LEAD } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
@@ -229,7 +229,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
         <span style={{
           position: 'absolute', top: -7, right: -5, zIndex: 2,
           display: 'flex', alignItems: 'center', gap: '3px',
-          fontSize: '7px', fontWeight: 900, letterSpacing: '0.1em',
+          fontSize: TEXT_XS, fontWeight: 900, letterSpacing: '0.1em',
           color: '#fff', background: ac,
           borderRadius: '999px', padding: '3px 7px', fontFamily: FONT,
           boxShadow: `0 2px 5px ${ac}66`,
@@ -258,7 +258,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
       {owned ? (
         <span style={{
           marginTop: 'auto',
-          fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+          fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
           color: equipped ? ac : PAPER_TEXT_FAINT, fontFamily: FONT,
         }}>
           {equipped ? 'Equipped' : 'Owned'}
@@ -562,7 +562,7 @@ const ParityStoreScreen = ({ onClose }) => {
             boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`,
             textAlign: 'right',
           }}>
-            <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>Balance</div>
+            <div style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>Balance</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
               <PPCoin size={14} />
               <span style={{ fontSize: '19px', fontWeight: 900, color: ACCENT, letterSpacing: '-0.03em', lineHeight: 1 }}>
@@ -620,7 +620,7 @@ const ParityStoreScreen = ({ onClose }) => {
             >
               {t.label}
               <span style={{
-                fontSize: '9px', fontWeight: 800, letterSpacing: '0.02em',
+                fontSize: TEXT_XS, fontWeight: 800, letterSpacing: '0.02em',
                 padding: '2px 6px', borderRadius: '999px',
                 background: active ? 'rgba(255,255,255,0.24)' : PAPER_BG_MUTED,
                 color: active ? '#fff' : PAPER_TEXT_FAINT,
@@ -654,7 +654,7 @@ const ParityStoreScreen = ({ onClose }) => {
                   <div style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
                     background: `${heroAccent}28`, border: `1px solid ${heroAccent}55`,
-                    color: heroAccent, fontSize: '9px', fontWeight: 800,
+                    color: heroAccent, fontSize: TEXT_MICRO, fontWeight: 800,
                     letterSpacing: '0.14em', textTransform: 'uppercase',
                     padding: '3px 11px', borderRadius: '999px',
                   }}>
@@ -688,7 +688,7 @@ const ParityStoreScreen = ({ onClose }) => {
                   </div>
                 )}
                 {!heroOwned && (
-                  <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
+                  <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
                     You have {parityPoints} PP
                   </span>
                 )}
@@ -720,7 +720,7 @@ const ParityStoreScreen = ({ onClose }) => {
           boxShadow: 'inset 0 0 0 1px rgba(91,72,45,0.08)',
         }}>
           <span style={{
-            fontSize: '9px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase',
+            fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase',
             color: ACCENT, opacity: 0.85, flexShrink: 0,
           }}>Earning PP</span>
           <span style={{ fontFamily: HAND_FONT, fontSize: '17px', lineHeight: 1.25, color: PENCIL_LEAD }}>

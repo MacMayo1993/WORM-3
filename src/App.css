@@ -244,11 +244,15 @@ body {
   white-space: nowrap;
 }
 
+/* Percent solved is the one number the player checks constantly, and at 13px
+   weight 500 it was quieter than the mode label beside it. Promoted, and given
+   tabular figures so the row does not jitter as it ticks. */
 .top-bar-progress {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ui-ink-subtle);
-  letter-spacing: 0.02em;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Flip screen glow ─────────────────────────────────────────────────────
@@ -294,19 +298,23 @@ body {
 /* ── Flip / wormhole readout ──────────────────────────────────────────────
    A counter that never moves is not a reward. These punch-scale on change so
    the flip registers in the HUD, not only inside the canvas. */
+/* The value carries the size, the key is demoted. At 12px value / 9px key the
+   two were near enough the same class that the readout had no hierarchy — on a
+   phone, mid-move, you read the row rather than the number. */
 .flip-stat {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  gap: 5px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
   color: var(--ui-ink-subtle);
   transform-origin: center;
 }
 
 .flip-stat-key {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.14em;
   opacity: 0.55;
@@ -1366,8 +1374,11 @@ textarea:focus-visible,
     white-space: nowrap;
   }
 
+  /* Still stepped down from the desktop 17px because the phone bar is tight,
+     but not to 10px — the percent readout was smallest on the one device where
+     it is read most, and it stays the loudest thing on the left. */
   .top-bar-progress {
-    font-size: 10px;
+    font-size: 15px;
   }
 
   .top-bar-right {
@@ -3746,12 +3757,30 @@ select.btn-compact:disabled {
   filter: brightness(1.07);
 }
 
+/* An icon button is transparent, so the shared brightness hover above is a
+   no-op on it — brightening nothing produces nothing. It needs an actual
+   surface to appear under the glyph instead. */
+.ui-icon-button {
+  background: transparent;
+}
+
+.ui-icon-button:hover:not(:disabled) {
+  background: var(--icon-button-hover, rgba(128, 120, 108, 0.16));
+}
+
+/* Press state. A 1px nudge is a desktop affordance — under a fingertip it is
+   invisible, because the finger is covering the button. Scaling the whole
+   control down is what reads as tactile on touch, and it stays legible on
+   desktop. Paired with the shadow collapsing, so the button also loses its
+   lift rather than only shrinking. */
 .ui-focusable:active:not(:disabled) {
-  transform: translateY(1px);
-  filter: brightness(0.96);
+  transform: scale(0.96) translateY(1px);
+  filter: brightness(0.94);
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Keep the brightness dip — it is the non-motion half of the feedback — and
+     drop only the movement. */
   .ui-focusable:active:not(:disabled) {
     transform: none;
   }

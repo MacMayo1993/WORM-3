@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, TEXT_XS } from '../../utils/uiTheme.js';
 
 const FONT = UI_FONT;
 
@@ -64,7 +64,7 @@ export default function ParityWallet({ dark = false, neutral = false }) {
     >
       {/* Diamond icon */}
       <span style={{
-        fontSize: '9px',
+        fontSize: TEXT_XS,
         color: flashColor ?? baseColor,
         fontWeight: 900,
         lineHeight: 1,
@@ -84,7 +84,7 @@ export default function ParityWallet({ dark = false, neutral = false }) {
 
       {/* Unit */}
       <span style={{
-        fontSize: '9px',
+        fontSize: TEXT_XS,
         fontWeight: 600,
         color: subColor,
         fontFamily: FONT,

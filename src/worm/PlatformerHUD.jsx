@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { isMobile } from '../utils/device.js';
-import { UI_FONT, UI_CREAM, UI_MOSS, Z } from '../utils/uiTheme.js';
+import { UI_FONT, UI_CREAM, UI_MOSS, Z, TEXT_MICRO, TEXT_XS } from '../utils/uiTheme.js';
 import { fieldGuide } from '../components/ui/FieldGuide.jsx';
 
 export default function PlatformerHUD({
@@ -217,7 +217,7 @@ const styles = {
     fontSize: '16px',
   },
   controls: {
-    fontSize: '9px', color: fieldGuide.muted, letterSpacing: '0.05em',
+    fontSize: TEXT_MICRO, color: fieldGuide.muted, letterSpacing: '0.05em',
   },
   centerStats: {
     display: 'flex', gap: isMobile ? '12px' : '24px',
@@ -226,7 +226,7 @@ const styles = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px',
   },
   statLabel: {
-    fontSize: '9px', color: fieldGuide.muted, letterSpacing: '0.1em',
+    fontSize: TEXT_XS, color: fieldGuide.muted, letterSpacing: '0.1em',
   },
   statValue: {
     fontSize: isMobile ? '14px' : '16px', color: fieldGuide.ink, fontWeight: 'bold',
@@ -246,7 +246,7 @@ const styles = {
     border: '1px solid rgba(111,126,86,0.25)',
   },
   sliceLabel: { fontWeight: 'bold' },
-  axisLabel: { fontSize: '9px', color: fieldGuide.muted },
+  axisLabel: { fontSize: TEXT_XS, color: fieldGuide.muted },
   faceIndicator: {
     position: 'absolute', top: isMobile ? '70px' : '78px', right: '16px',
     fontSize: '11px', color: UI_MOSS,
@@ -254,7 +254,7 @@ const styles = {
     border: '1px solid rgba(111,126,86,0.25)',
   },
   faceLabel: { fontWeight: 'bold' },
-  speedLabel: { fontSize: '9px', color: fieldGuide.muted },
+  speedLabel: { fontSize: TEXT_XS, color: fieldGuide.muted },
   hints: {
     position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)',
     fontSize: '10px', color: fieldGuide.muted, whiteSpace: 'nowrap',

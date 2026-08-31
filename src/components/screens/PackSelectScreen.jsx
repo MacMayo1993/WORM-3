@@ -14,7 +14,7 @@ import {
   UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED,
   PAPER_CARD_SHADOW, UI_MOSS,
- Z } from '../../utils/uiTheme.js';
+ Z, TEXT_MICRO } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
 
 const STARS_PER_LEVEL = 3;
@@ -90,7 +90,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
                     {pack.name}
                   </span>
                   <span style={{
-                    fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+                    fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
                     color: accent, background: `${accent}16`, border: `1px solid ${accent}3a`,
                     borderRadius: '4px', padding: '2px 7px',
                   }}>
@@ -98,7 +98,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
                   </span>
                   {done === ids.length && ids.length > 0 && (
                     <span style={{
-                      fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+                      fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
                       color: '#fffdf5', background: UI_MOSS, borderRadius: '4px', padding: '2px 7px',
                     }}>Complete</span>
                   )}

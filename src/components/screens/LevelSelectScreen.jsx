@@ -4,7 +4,7 @@ import { getPack } from '../../levels/index.js';
 import {
   UI_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT,
   PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_MOSS,
- Z } from '../../utils/uiTheme.js';
+ Z, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
 
 // Warm amber that holds up on cream — the cream-on-blue gold used before is
@@ -33,7 +33,7 @@ const BestStats = ({ stats }) => {
   if (parts.length === 0) return null;
   return (
     <div style={{
-      marginTop: '4px', fontSize: '9px', fontWeight: 700, letterSpacing: '0.04em',
+      marginTop: '4px', fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.04em',
       color: PAPER_TEXT_MUTED, textAlign: 'center', lineHeight: 1,
     }}>
       {parts.join(' · ')}
@@ -214,7 +214,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                     {isNext && (
                       <span style={{
                         position: 'absolute', top: '8px', left: '8px',
-                        fontSize: '8px', fontWeight: 900, letterSpacing: '0.14em',
+                        fontSize: TEXT_MICRO, fontWeight: 900, letterSpacing: '0.14em',
                         textTransform: 'uppercase', color: UI_MOSS,
                       }}>Next</span>
                     )}
