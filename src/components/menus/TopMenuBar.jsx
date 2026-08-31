@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import ParityWallet from '../overlays/ParityWallet.jsx';
 import { TEXT_MICRO, TEXT_MD } from '../../utils/uiTheme.js';
+import { FACE_COLORS } from '../../utils/constants.js';
 
 // Must match MAX_CASCADES in useChaosMode.js — keeps the bolt display accurate
 const MAX_CASCADES = 6;
@@ -154,7 +155,7 @@ const TopMenuBar = ({
   }, [chaosMode, workerStats]);
 
   // Resolved face palette — safe fallbacks if faceColors not yet loaded
-  const fc = faceColors || { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#FFD500' };
+  const fc = faceColors || FACE_COLORS;
 
   // Pick stat colors based on the cube's face palette:
   //   FLIPS     → face 5 (right/blue in standard) — a cool metric readout

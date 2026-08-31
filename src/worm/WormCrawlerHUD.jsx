@@ -7,7 +7,7 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { ANTIPODAL_COLOR } from '../utils/constants.js';
+import { ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
@@ -179,7 +179,9 @@ const PHASE_META = {
     exiting: { label: 'EXITING', faceId: 4 },
 };
 
-const FACE_FALLBACKS = { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#FFD500' };
+// The standard scheme, straight from constants.js — this was a verbatim
+// copy of FACE_COLORS and would have silently disagreed if that ever moved.
+const FACE_FALLBACKS = FACE_COLORS;
 
 const toRgb = (color) => {
     if (!color || typeof color !== 'string') return null;

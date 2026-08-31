@@ -25,17 +25,18 @@ import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 import { renderTileImage } from '../../3d/TilePreviewRenderer.js';
 import LoadingPortal from './LoadingPortal.jsx';
 import './LoadingScreen.css';
+import { COLORS } from '../../utils/constants.js';
 
 const FACES = ['f-white', 'f-yellow', 'f-red', 'f-orange', 'f-green', 'f-blue'];
 
 // Each face's game color (utils/constants.js COLORS), used to tint its tile.
 const FACE_COLORS = {
-  'f-white': '#fafafa',
-  'f-yellow': '#FFD500',
-  'f-red': '#ef4444',
-  'f-orange': '#f97316',
-  'f-green': '#22c55e',
-  'f-blue': '#3b82f6'
+  'f-white': COLORS.white,
+  'f-yellow': COLORS.yellow,
+  'f-red': COLORS.red,
+  'f-orange': COLORS.orange,
+  'f-green': COLORS.green,
+  'f-blue': COLORS.blue
 };
 
 // A "supernice" slice of the real in-game tile catalog (tileStyleCatalog.js) —
