@@ -31,12 +31,15 @@ import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
 import { wormBuffs } from './wormBuffs.js';
 import { wormSegments } from './wormSegments.js';
 
-const SEGS = 9;                  // segments per bolt → SEGS + 1 points
+const SEGS = 12;                 // segments per bolt → SEGS + 1 points (a tall sky
+                                 // bolt wants more segments than a short surface arc)
 const POINTS = SEGS + 1;
 const BRANCH_SEGS = 4;
 const BRANCH_POINTS = BRANCH_SEGS + 1;
 const STRIKE_LIFE = 0.34;        // seconds from leader to gone
-const SOURCE_LIFT = 2.15;        // how far off the cube the bolt is born
+// Lateral wander of the launch point away from straight-above, so successive sky
+// bolts don't all fall down the exact same line.
+const SKY_WOBBLE = 0.55;
 
 const _target = new THREE.Vector3();
 const _source = new THREE.Vector3();
@@ -44,30 +47,25 @@ const _pt = [0, 0, 0];
 const _ndc = new THREE.Vector3();
 
 /**
- * Where a bolt comes from: out along the cube's own surface normal above the target,
- * pushed sideways so it arrives at an angle rather than dropping straight down.
+ * Where a bolt comes from: high overhead in WORLD space — above the top of the
+ * screen — so every strike falls out of the sky and comes down onto the cube,
+ * rather than arcing off the surface. The launch keeps the target's horizontal
+ * position (plus a small seeded wander) and only raises Y, so the drop stays
+ * dominantly vertical however the cube is turned.
  *
- * Derived from the target's own position rather than from a fixed corner list, so it
- * keeps working on every cube size and stays correct while a slice is turning.
+ * `skyY` is an absolute world height above the cube, supplied by the caller from
+ * the board's size, so the source clears the cube top on every board.
  */
-function strikeSource(target, seed, out) {
-  // The dominant axis of a point on a cube surface is the face it is on.
-  const ax = Math.abs(target.x), ay = Math.abs(target.y), az = Math.abs(target.z);
-  out.set(0, 0, 0);
-  if (ax >= ay && ax >= az) out.x = Math.sign(target.x) || 1;
-  else if (ay >= az) out.y = Math.sign(target.y) || 1;
-  else out.z = Math.sign(target.z) || 1;
-
-  // Two stable tangents, so the lateral offset is in the plane of the face.
-  const t1 = Math.abs(out.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-  const tanA = new THREE.Vector3().crossVectors(out, t1).normalize();
-  const tanB = new THREE.Vector3().crossVectors(out, tanA).normalize();
-
+function strikeSource(target, seed, skyY, out) {
   const ang = (seed % 360) * (Math.PI / 180);
-  return out.multiplyScalar(SOURCE_LIFT)
-    .add(target)
-    .addScaledVector(tanA, Math.cos(ang) * 0.9)
-    .addScaledVector(tanB, Math.sin(ang) * 0.9);
+  out.set(
+    target.x + Math.cos(ang) * SKY_WOBBLE,
+    // Clearly above the cube — and never below the target, for the rare hit near
+    // the very top of a mega board.
+    Math.max(skyY, target.y + 3.0),
+    target.z + Math.sin(ang) * SKY_WOBBLE
+  );
+  return out;
 }
 
 /** Write a polyline into a preallocated position buffer, padding with its last point. */
@@ -102,10 +100,11 @@ function makeLineGeometry(points) {
  *                             and could let a bolt fire during the frozen beat.
  * @param {number}  branches   from the quality budget; 0 disables forking
  * @param {number}  pool       concurrent strikes allowed
+ * @param {number}  skyY       world height the bolts launch from, above the cube
  * @param {string}  color
  * @param {string}  accent
  */
-export default function ElementalStrikes({ active, enabled, branches = 2, pool = 2, color, accent }) {
+export default function ElementalStrikes({ active, enabled, branches = 2, pool = 2, skyY = 12, color, accent }) {
   const stateRef = useRef(null);
   if (stateRef.current === null) stateRef.current = makeStrikeState(0x9e3779b1);
 
@@ -235,7 +234,7 @@ export default function ElementalStrikes({ active, enabled, branches = 2, pool =
       wormSegments.positions[i * 3 + 1],
       wormSegments.positions[i * 3 + 2]
     );
-    strikeSource(_target, strike.seed, _source);
+    strikeSource(_target, strike.seed, skyY, _source);
 
     // Both endpoints are snapshotted, not tracked. The bolt lives a third of a
     // second; re-resolving its target every frame would make it rubber-band along
@@ -243,7 +242,9 @@ export default function ElementalStrikes({ active, enabled, branches = 2, pool =
     const path = makeBoltPath(
       [_source.x, _source.y, _source.z],
       [_target.x, _target.y, _target.z],
-      { segs: SEGS, jitter: 0.16, seed: strike.seed }
+      // Lower relative jitter than the old short surface arc — the sky bolt is long,
+      // and jitter is a fraction of length, so 0.16 over this span read as too wide.
+      { segs: SEGS, jitter: 0.11, seed: strike.seed }
     );
     s.path = path;
     writePath(s.core.getAttribute('position'), path, POINTS);
