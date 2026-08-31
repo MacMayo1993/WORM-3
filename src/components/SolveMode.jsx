@@ -11,7 +11,7 @@ import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
 import { useAntipodalEngine } from '../hooks/useAntipodalEngine.js';
 import { isMobile } from '../utils/device.js';
-import { UI_FONT, DISPLAY_FONT, MONO_FONT, Z } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, MONO_FONT, Z, UI_MOSS } from '../utils/uiTheme.js';
 
 // ── Demo-screen palette (warm paper / sage / gold) ─────────────────────────────
 const CARD_BG      = 'rgba(250, 247, 238, 0.97)';
@@ -22,7 +22,7 @@ const INK_BODY     = '#43513a'; // body copy
 const GOLD         = '#7b6f45'; // eyebrow / step labels
 const OLIVE_MUTED  = '#657156'; // muted olive
 const OLIVE_FAINT  = 'rgba(101, 113, 86, 0.5)';
-const SAGE         = '#5f7f4a'; // primary accent (buttons, done)
+const SAGE         = UI_MOSS; // primary accent (buttons, done)
 const GOLD_ACCENT  = '#b88f4a'; // secondary accent (active step)
 const TERRACOTTA   = '#b0492f'; // muted error (replaces neon red)
 const CARD_SHADOW  = '0 14px 34px rgba(40, 48, 32, 0.20)';

@@ -61,7 +61,7 @@ export default function PaletteStep({ cos }) {
             width: '56px', height: '36px', borderRadius: '8px', background: PAPER_BG_MUTED,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em',
-            color: PAPER_TEXT_FAINT, flexShrink: 0, border: '1px solid #d6d0c8'
+            color: PAPER_TEXT_FAINT, flexShrink: 0, border: `1px solid ${PAPER_BORDER_SOFT}`
           }}>IMG</div>
         )}
         <div style={{ flex: 1 }}>

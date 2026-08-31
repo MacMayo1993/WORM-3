@@ -12,6 +12,7 @@ import React from 'react';
 import CubePreviewCanvas from '../../../3d/CubePreviewCanvas.jsx';
 import { useIsMobile } from '../../../hooks/index.js';
 import SpecimenPlate from './SpecimenPlate.jsx';
+import { UI_MOSS_LIGHT } from '../../../utils/uiTheme.js';
 
 export { plateSurface, plateArrow } from './SpecimenPlate.jsx';
 
@@ -29,7 +30,7 @@ export default function CubePlate({
   onPrev,
   onNext,
   cube,
-  glow = '#9fdb7a',
+  glow = UI_MOSS_LIGHT,
   backdrop = null,
   swatches = null
 }) {

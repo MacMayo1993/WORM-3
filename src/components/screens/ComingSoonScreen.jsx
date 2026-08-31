@@ -10,7 +10,7 @@ import {
   PAPER_TEXT,
   PAPER_TEXT_MUTED,
   PAPER_TEXT_FAINT,
- Z, TEXT_MICRO } from '../../utils/uiTheme.js';
+ Z, TEXT_MICRO, PAPER_BG_MUTED, PAPER_CARD_SHADOW } from '../../utils/uiTheme.js';
 
 const ACCENT = '#1565C0';
 
@@ -115,8 +115,8 @@ const ModeCard = ({ item, isSelected, onClick, onPlay }) => {
         boxShadow: isSelected
           ? `inset 0 2px 5px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.6)`
           : hovered
-            ? `0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)`
-            : `0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)`,
+            ? `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 10px rgba(0,0,0,0.06)`
+            : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 10px rgba(0,0,0,0.06)`,
         transform: isSelected ? 'translateY(1px)' : hovered ? 'translateY(-1px)' : 'none',
         fontFamily: UI_FONT,
         WebkitTapHighlightColor: 'transparent',
@@ -311,7 +311,7 @@ export default function ComingSoonScreen({ onBack, onHolonomy, onBiome, onMerge,
             alignItems: 'center',
             gap: '6px',
             padding: '8px 14px 8px 8px',
-            background: '#f0ebe2',
+            background: PAPER_BG_MUTED,
             border: `1.5px solid ${PAPER_BORDER_SOFT}`,
             borderRadius: '999px',
             cursor: 'pointer',
@@ -321,14 +321,14 @@ export default function ComingSoonScreen({ onBack, onHolonomy, onBiome, onMerge,
             fontFamily: UI_FONT,
             marginBottom: '24px',
             transition: 'all 0.15s ease',
-            boxShadow: '0 2px 0 #c4beb6',
+            boxShadow: `0 2px 0 ${PAPER_CARD_SHADOW}`,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#e8e2d8';
             e.currentTarget.style.color = PAPER_TEXT;
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#f0ebe2';
+            e.currentTarget.style.background = PAPER_BG_MUTED;
             e.currentTarget.style.color = PAPER_TEXT_MUTED;
           }}
         >

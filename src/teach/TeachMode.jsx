@@ -976,7 +976,7 @@ const TeachMode = ({
                 background: i < analysis.stageIndex
                   ? UI_MOSS_LIGHT
                   : i === analysis.stageIndex
-                    ? 'linear-gradient(90deg, #5f7f4a, rgba(95,127,74,0.30))'
+                    ? `linear-gradient(90deg, ${UI_MOSS}, rgba(95,127,74,0.30))`
                     : 'rgba(38,51,31,0.14)',
                 transition: 'background 0.3s',
               }}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -143,7 +143,7 @@ const ensureDemoShellStyle = () => {
 
     .demo-intro-button {
       padding: 11px 26px;
-      background: #5f7f4a;
+      background: ${UI_MOSS};
       color: #fffdf5;
       border: none;
       border-radius: 999px;
@@ -284,7 +284,7 @@ const ensureDemoShellStyle = () => {
       font-size: clamp(34px, 9.5vw, 62px);
       line-height: 0.95;
       letter-spacing: 0.03em;
-      color: #fffdf2;
+      color: ${UI_CREAM};
       text-shadow: 0 3px 0 rgba(43, 53, 35, 0.55), 0 10px 34px rgba(24, 31, 18, 0.6);
       margin: 0;
     }
@@ -294,7 +294,7 @@ const ensureDemoShellStyle = () => {
       font-weight: 900;
       letter-spacing: 0.22em;
       text-transform: uppercase;
-      color: #ffe9ad;
+      color: ${UI_GOLD};
       text-shadow: 0 2px 12px rgba(24, 31, 18, 0.7);
       margin: 0 0 10px;
     }
@@ -302,7 +302,7 @@ const ensureDemoShellStyle = () => {
     .demo-complete-check {
       font-size: clamp(40px, 11vw, 72px);
       line-height: 1;
-      color: #9fdb7a;
+      color: ${UI_MOSS_LIGHT};
       text-shadow: 0 4px 0 rgba(43, 53, 35, 0.5), 0 12px 38px rgba(24, 31, 18, 0.65);
       margin: 0 0 6px;
     }
@@ -425,7 +425,7 @@ const ensureDemoShellStyle = () => {
 
     .demo-coach-pill-btn {
       padding: 8px 22px;
-      background: #5f7f4a;
+      background: ${UI_MOSS};
       color: #fffdf5;
       border: none;
       border-radius: 999px;

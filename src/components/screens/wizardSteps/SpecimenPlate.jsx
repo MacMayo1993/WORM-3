@@ -13,7 +13,7 @@
 import React from 'react';
 import {
   DISPLAY_FONT, UI_CREAM,
-  NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW, TEXT_MICRO, TEXT_XS } from '../../../utils/uiTheme.js';
+  NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW, TEXT_MICRO, TEXT_XS, UI_MOSS_LIGHT } from '../../../utils/uiTheme.js';
 import { useIsMobile } from '../../../hooks/index.js';
 import { WIZARD_PAPER_BASE } from '../WizardChrome.jsx';
 import { TOUCH_TARGET } from '../../ui/Button.jsx';
@@ -79,7 +79,7 @@ export default function SpecimenPlate({
   onPrev,
   onNext,
   art,
-  glow = '#9fdb7a',
+  glow = UI_MOSS_LIGHT,
   backdrop = null,
   hint = null,
   sticky = false,

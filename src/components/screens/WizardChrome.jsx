@@ -8,7 +8,7 @@
 // at once. Each wizard still owns its accent and its own content styles.
 
 import React from 'react';
-import { UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_BORDER, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, PAPER_SHADOW, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_MD, TEXT_XL, Z } from '../../utils/uiTheme.js';
+import { UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_BORDER, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, PAPER_SHADOW, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_MD, TEXT_XL, Z, PAPER_BORDER_SOFT } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
 
@@ -90,7 +90,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       flexDirection: 'column',
       overflow: 'hidden',
       boxShadow: mobile ? 'none' : PAPER_SHADOW,
-      border: mobile ? 'none' : '1px solid #cec8be',
+      border: mobile ? 'none' : `1px solid ${PAPER_BORDER}`,
       borderTop: `3px solid ${accent}`,
       animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)'
     },
@@ -169,13 +169,13 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       alignItems: 'center',
       gap: '8px',
       flexShrink: 0,
-      borderTop: '1px solid #d6d0c8',
+      borderTop: `1px solid ${PAPER_BORDER_SOFT}`,
       background: WIZARD_FOOTER_BG
     },
 
     btnSecondary: {
       background: 'none',
-      border: '1.5px solid #d6d0c8',
+      border: `1.5px solid ${PAPER_BORDER_SOFT}`,
       fontSize: TEXT_MD,
       fontWeight: '500',
       color: PAPER_TEXT_MUTED,

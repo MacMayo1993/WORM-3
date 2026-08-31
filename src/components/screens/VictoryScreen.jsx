@@ -90,7 +90,9 @@ const VictoryScreen = ({
   const [showConfetti] = useState(true);
 
   // Warm celebratory confetti — no neon cyan / magenta.
-  const CONFETTI_COLORS = ['#ffe9ad', '#9fdb7a', '#5f7f4a', '#e0b25c', '#d98a3d', '#fffdf2', '#c94f3d'];
+  // The celebration palette is the shared theme plus three warm accents that
+  // exist only here; the tokens carry the ones that are the theme.
+  const CONFETTI_COLORS = [UI_GOLD, UI_MOSS_LIGHT, UI_MOSS, '#e0b25c', '#d98a3d', UI_CREAM, '#c94f3d'];
   const confettiParticles = useMemo(() => {
     const count = 35;
     return Array.from({ length: count }).map((_, i) => {

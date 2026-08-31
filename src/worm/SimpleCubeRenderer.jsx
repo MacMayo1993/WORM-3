@@ -4,6 +4,7 @@
 
 import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { FACE_COLORS } from '../utils/constants.js';
 
 // Shared geometries — allocated once at module level so every Sticker and SimpleCubie
 // reuses the same Three.js object instead of creating a new one per render.
@@ -17,15 +18,10 @@ const _AXIS_DEPTH = new THREE.Vector3(0, 0, 1);
 
 const STICKER_OFFSET = 0.505;
 
-// Default face color map (face ID 1-6 → hex)
-const DEFAULT_COLORS = {
-  1: '#ef4444', // Red (PZ front)
-  2: '#22c55e', // Green (NX left)
-  3: '#f8fafc', // White (PY top)
-  4: '#f97316', // Orange (NZ back)
-  5: '#3b82f6', // Blue (PX right)
-  6: '#FFD500', // Yellow (NY bottom)
-};
+// Default face color map (face ID 1-6 → hex). Taken from constants.js rather
+// than restated: the local copy had drifted, giving face 3 #f8fafc where the
+// standard scheme says #ffffff.
+const DEFAULT_COLORS = FACE_COLORS;
 
 const STICKER_CONFIG = {
   PX: { pos: [STICKER_OFFSET, 0, 0], rot: [0, Math.PI / 2, 0] },

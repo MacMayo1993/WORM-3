@@ -21,6 +21,10 @@ import { useDialogBehavior } from '../ui/Panel.jsx';
 const STARS_PER_LEVEL = 3;
 const ACCENTS = {
   'story-campaign': '#3b82f6',
+  // Deliberately literal, not UI_MOSS/PAPER_WARN: these identify a pack, and
+  // only happen to share a value with the shared action and warning inks.
+  // Pointing them at those tokens would make a pack's identity shift if the
+  // action colour ever moved.
   'cube-academy': '#5f7f4a',
   'algorithm-codex': '#b06a2e',
 };

@@ -24,7 +24,7 @@ import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
-import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z } from '../../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z, UI_GOLD } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/Button.jsx';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
@@ -1221,7 +1221,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         pointerEvents: diving ? 'none' : 'auto',
       }}>
 
-        <p style={{ margin: '0 0 6px', fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: '#ffe9ad', fontFamily: UI_FONT, textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
+        <p style={{ margin: '0 0 6px', fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: UI_GOLD, fontFamily: UI_FONT, textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
           Choose your mode
         </p>
 

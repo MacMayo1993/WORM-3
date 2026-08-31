@@ -9,7 +9,7 @@ import { COLOR_SCHEMES, SCHEME_LABELS } from '../../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../../utils/backgrounds.js';
 import { BG_PREVIEWS } from '../../../utils/bgPreviews.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../../3d/TilePreviewRenderer.js';
-import { PAPER_SHEET_RAISED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, TEXT_XS } from '../../../utils/uiTheme.js';
+import { PAPER_SHEET_RAISED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, TEXT_XS, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
 
 // ─── Catalogue data ───────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ export const cardStyle = (selected, accent) => ({
   display: 'flex',
   padding: '14px 16px',
   borderRadius: '10px',
-  border: selected ? `2px solid ${accent}` : '2px solid #d6d0c8',
+  border: selected ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
   background: selected ? `${accent}12` : PAPER_SHEET_RAISED,
   boxShadow: selected
     ? 'inset 0 2px 5px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.6)'
