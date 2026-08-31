@@ -3751,6 +3751,27 @@ select.btn-compact:disabled {
    why the game's 200-odd inline-styled buttons had no focus ring at all.
    ===================================================================== */
 
+/* Baseline keyboard focus for EVERY control, not only the ones built from the
+   ui/ primitives. The game has ~214 hand-rolled <button>s and four that use
+   ActionButton; converting them all was never going to happen quickly, but a
+   keyboard user needs a visible ring on all of them today. :focus-visible means
+   mouse and touch users see nothing, so this is invisible to most players and
+   the difference between usable and unusable for the rest.
+
+   Anything that wants a bespoke ring still wins by being more specific. */
+button:focus-visible,
+[role='button']:focus-visible,
+a[href]:focus-visible,
+summary:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(255, 253, 242, 0.92),
+    0 0 0 5px var(--border-focus, #5f7f4a);
+}
+
 .ui-focusable:focus {
   outline: none;
 }

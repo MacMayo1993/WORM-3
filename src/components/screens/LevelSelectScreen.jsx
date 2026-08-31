@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { loadProgress, progressManager } from '../../utils/levels.js';
 import { getPack } from '../../levels/index.js';
 import {
@@ -6,6 +6,7 @@ import {
   PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_MOSS,
  Z, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
+import { useDialogBehavior } from '../ui/Panel.jsx';
 
 // Warm amber that holds up on cream — the cream-on-blue gold used before is
 // invisible against paper.
@@ -86,8 +87,21 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
     (sum, id) => sum + Math.min(levelStats[id]?.stars || 0, STARS_PER_LEVEL), 0
   );
 
+  // Bespoke chrome, so this takes the dialog behaviour directly rather
+  // than becoming an <Overlay>: focus moves in on open and back out on
+  // close, Tab is trapped, and the page behind stops scrolling.
+  const dialogRef = useRef(null);
+  const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
+
   return (
-    <div style={{
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose a level"
+      tabIndex={-1}
+      onKeyDown={onDialogKeyDown}
+      style={{
       position: 'fixed',
       inset: 0,
       height: '100dvh',

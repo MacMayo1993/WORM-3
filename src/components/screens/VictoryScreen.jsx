@@ -4,9 +4,10 @@ import {
   UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
   NIGHT_BACKDROP, NIGHT_BACKDROP_BLUR, NIGHT_PANEL, NIGHT_BORDER,
   NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_TITLE_SHADOW, NIGHT_SOFT_SHADOW,
- TEXT_XS, Z } from '../../utils/uiTheme.js';
+ TEXT_XS, TEXT_SM, TEXT_LG, Z } from '../../utils/uiTheme.js';
 import { computeStars, getLevelPar } from '../../levels/scoring.js';
 import { prefersReducedMotion } from '../../utils/device.js';
+import { ActionButton } from '../ui/Button.jsx';
 
 // ─── Reward beat timings ──────────────────────────────────────────────────────
 // The stars are the payoff for the run, so they arrive one at a time rather than
@@ -158,37 +159,15 @@ const VictoryScreen = ({
     : (winConfig[winType] || winConfig.rubiks);
 
   // Shared button styles ----------------------------------------------------
-  const primaryBtn = {
-    background: GREEN,
-    border: 'none',
-    color: INK_CREAM,
-    fontSize: '13px',
-    fontWeight: 800,
-    padding: '12px 26px',
-    borderRadius: '999px',
-    cursor: 'pointer',
-    fontFamily: UI_FONT,
+  // The victory actions are the canonical primary/secondary pair, so they take
+  // <ActionButton> rather than re-declaring the pill a third time. This carries
+  // only what is genuinely local to this screen — the uppercase celebration
+  // lettering — while the surface, hover, press, focus ring and 44px hit area
+  // come from the primitive.
+  const CELEBRATION_TYPE = {
+    fontSize: TEXT_SM,
     letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    boxShadow: '0 7px 16px rgba(95,127,74,0.30)',
-    transition: 'all 0.18s',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  };
-  const outlineBtn = {
-    background: 'transparent',
-    border: `1.5px solid ${WARM_BORDER}`,
-    color: CREAM_SOFT,
-    fontSize: '13px',
-    fontWeight: 700,
-    padding: '12px 22px',
-    borderRadius: '999px',
-    cursor: 'pointer',
-    fontFamily: UI_FONT,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    transition: 'all 0.18s',
+    textTransform: 'uppercase'
   };
 
   return (
@@ -414,57 +393,39 @@ const VictoryScreen = ({
 
         {/* Buttons */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={onContinue}
-            style={outlineBtn}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,245,220,0.42)'; e.currentTarget.style.color = INK_CREAM; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = WARM_BORDER; e.currentTarget.style.color = CREAM_SOFT; }}
-          >
+          <ActionButton variant="secondary" surface="night" pill onClick={onContinue} style={CELEBRATION_TYPE}>
             Keep Playing
-          </button>
+          </ActionButton>
 
           {hasNextLevel && onNextLevel && (
-            <button
-              onClick={onNextLevel}
-              style={primaryBtn}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = '#6b8f53'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = GREEN; }}
-            >
-              Next Level <span style={{ fontSize: '16px' }}>→</span>
-            </button>
+            <ActionButton variant="primary" surface="night" pill onClick={onNextLevel} style={CELEBRATION_TYPE}>
+              Next Level <span style={{ fontSize: TEXT_LG }}>→</span>
+            </ActionButton>
           )}
 
-          <button
+          <ActionButton
+            variant={hasNextLevel ? 'secondary' : 'primary'}
+            surface="night"
+            pill
             onClick={onNewGame}
-            style={hasNextLevel ? outlineBtn : primaryBtn}
-            onMouseEnter={e => {
-              if (hasNextLevel) { e.currentTarget.style.borderColor = 'rgba(255,245,220,0.42)'; e.currentTarget.style.color = INK_CREAM; }
-              else { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = '#6b8f53'; }
-            }}
-            onMouseLeave={e => {
-              if (hasNextLevel) { e.currentTarget.style.borderColor = WARM_BORDER; e.currentTarget.style.color = CREAM_SOFT; }
-              else { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = GREEN; }
-            }}
+            style={CELEBRATION_TYPE}
           >
             {currentLevel ? 'Retry Level' : 'New Puzzle'}
-          </button>
+          </ActionButton>
         </div>
 
         {/* Main Menu escape hatch */}
         {onMainMenu && (
           <div style={{ marginTop: '16px' }}>
-            <button
+            <ActionButton
+              variant="ghost"
+              surface="night"
+              size="sm"
               onClick={onMainMenu}
-              style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: CREAM_MUTED, fontSize: '12px', padding: '4px 8px',
-                fontFamily: UI_FONT, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = INK_CREAM; }}
-              onMouseLeave={e => { e.currentTarget.style.color = CREAM_MUTED; }}
+              style={{ fontSize: TEXT_XS, letterSpacing: '0.06em', textTransform: 'uppercase' }}
             >
               ← Main Menu
-            </button>
+            </ActionButton>
           </div>
         )}
 
