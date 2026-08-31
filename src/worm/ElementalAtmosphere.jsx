@@ -200,6 +200,10 @@ export default function ElementalAtmosphere({ size = 3 }) {
           }
           branches={quality.tier === 'high' ? 3 : quality.tier === 'medium' ? 2 : 1}
           pool={quality.tier === 'high' ? 2 : 1}
+          // Launch the bolts from above the cube's top — `extent` is the particle
+          // envelope radius (≈ cube half-size + margin), so a few units past it puts
+          // the source above the board and off the top of the screen on every size.
+          skyY={extent + 5}
           color={def.color}
           accent={def.accent}
         />
