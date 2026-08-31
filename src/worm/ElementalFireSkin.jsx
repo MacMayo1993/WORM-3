@@ -51,14 +51,12 @@ import { sparksForBudget } from './healerWorm/elementalQuality.js';
 // Wider tongues so each one covers more of its cell — a big cover cell on a mega
 // board was left mostly bare between a few narrow licks.
 const FLAME_W = 0.4;
-// Tongue height in cell units. Tuned between two failures: the original 0.82
-// stacked with the length/flicker/gust multipliers to ~3 cells of reach and threw
-// a wall of flame above the cube; dropping it to 0.5 then read as too little fire,
-// especially on mega boards where each cover cell is several tiles wide. 0.64 with
-// the gentler silhouette boost peaks near ~1.5 cells at the hottest corner and
-// sits under one cell across most of the cube — a surface that is burning, not a
-// bonfire it is standing in.
-const FLAME_H = 0.64;
+// Tongue height in cell units. Density (flame count/width) carries the "on fire"
+// read now, so height is kept short: tongues lick the surface and stay mostly
+// under one cell, instead of throwing spikes a tile or more above the cube's top
+// edge. With the length spread and gentle silhouette boost this peaks near ~0.9
+// cells at the very hottest up-facing corner and sits ~0.45 across the rest.
+const FLAME_H = 0.46;
 // The quad grows away from its anchor rather than being centred on it, and the
 // anchor sits just below the surface, so the base of every tongue is buried in the
 // tile instead of floating a hair above it.
@@ -183,10 +181,11 @@ const vertexShader = /* glsl */`
     // even fur of flame. Real fire also climbs, so an up-facing normal throws
     // furthest even though every face still burns along its own axis.
     float upFacing = max(0.0, dot(nrm, vec3(0.0, 1.0, 0.0)));
-    // Silhouette boost, kept gentle: edges and corners burn a little taller so the
-    // cube still has a flame outline, but not so much that the top row towers over
-    // everything else. (Was 0.32/0.24/0.30 — enough to nearly double the height.)
-    float tall = 1.0 + 0.18 * aCell.y + 0.14 * aCell.z + 0.18 * upFacing;
+    // Silhouette boost, kept small: edges and corners burn only a touch taller so
+    // the cube keeps a flame outline without the top/up-facing row spiking above
+    // everything else — those tall spikes over the top edge were this term. (Was
+    // 0.32/0.24/0.30, then 0.18/0.14/0.18.)
+    float tall = 1.0 + 0.10 * aCell.y + 0.08 * aCell.z + 0.10 * upFacing;
 
     // The claim sweep: each cell catches only when the sweep reaches it. The tail
     // (uEnv.z) stops the accents first, before the skin itself dissolves.
@@ -221,9 +220,9 @@ const vertexShader = /* glsl */`
       float phase = (r1 + r2) * 6.2831853;
       float rate = 6.5 + r2 * 7.0;
       // Length spread: a few taller leaders over a bed of short stubs layers the
-      // fire. Moderate leaders — enough variation to look alive, capped well below
-      // the original 0.42 + r2 * 0.95 that let leaders shoot off the top of the cube.
-      float scl = 0.46 + r2 * 0.66;
+      // fire. Spread tightened so the tallest leaders stay close to the pack rather
+      // than shooting off the top edge as lone spikes.
+      float scl = 0.44 + r2 * 0.48;
       // Two beats, not one: a fast lick over a slower breath, so no two tongues
       // ever quite repeat and none of them pulses like a metronome.
       float flick = 0.70 + 0.42 * sin(T * rate + phase) + 0.18 * sin(T * rate * 1.93 + phase * 1.7);
