@@ -8,7 +8,7 @@ import {
   UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_SHEET_RAISED,
   PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
- Z } from '../../utils/uiTheme.js';
+ Z, TEXT_MICRO } from '../../utils/uiTheme.js';
 
 const ACCENT = '#C44B00';
 const ACCENT_SHADOW = '#7a2e00';
@@ -290,7 +290,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
 
                 {/* Wallet */}
                 <div style={S.wallet}>
-                  <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#a09890' }}>Balance</div>
+                  <div style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#a09890' }}>Balance</div>
                   <div style={{ fontSize: '18px', fontWeight: 900, color: PAPER_TEXT }}>{parityPoints} <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontWeight: 600 }}>PP</span></div>
                   {betStreak > 0 && (
                     <div style={{ fontSize: '10px', color: ACCENT, fontWeight: 700, marginTop: '2px' }}>
@@ -373,12 +373,12 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
                   background: `${ACCENT}0e`, border: `2px solid ${ACCENT}40`,
                 }}>
                   <div>
-                    <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a09890' }}>Potential win</div>
+                    <div style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a09890' }}>Potential win</div>
                     <div style={{ fontSize: '22px', fontWeight: 900, color: ACCENT, letterSpacing: '-0.03em' }}>+{profit} PP</div>
                     <div style={{ fontSize: '10px', color: PAPER_TEXT_FAINT, marginTop: '1px' }}>{effectiveOdds}× odds{mult > 1 ? ` · ${mult.toFixed(1)}× streak` : ''}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a09890' }}>If you lose</div>
+                    <div style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a09890' }}>If you lose</div>
                     <div style={{ fontSize: '22px', fontWeight: 900, color: '#b91c1c', letterSpacing: '-0.03em' }}>−{wager} PP</div>
                   </div>
                 </div>

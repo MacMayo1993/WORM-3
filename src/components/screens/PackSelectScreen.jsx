@@ -7,15 +7,16 @@
 //
 // Paper family: the player is deciding and the panel owns the screen.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { OFFICIAL_PACKS } from '../../levels/index.js';
 import { progressManager } from '../../utils/levels.js';
 import {
   UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED,
   PAPER_CARD_SHADOW, UI_MOSS,
- Z } from '../../utils/uiTheme.js';
+ Z, TEXT_MICRO } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
+import { useDialogBehavior } from '../ui/Panel.jsx';
 
 const STARS_PER_LEVEL = 3;
 const ACCENTS = {
@@ -34,8 +35,21 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
     setStats(progressManager.loadLevelStats());
   }, []);
 
+  // Bespoke chrome, so this takes the dialog behaviour directly rather
+  // than becoming an <Overlay>: focus moves in on open and back out on
+  // close, Tab is trapped, and the page behind stops scrolling.
+  const dialogRef = useRef(null);
+  const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
+
   return (
-    <div style={{
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose a level pack"
+      tabIndex={-1}
+      onKeyDown={onDialogKeyDown}
+      style={{
       position: 'fixed', inset: 0, height: '100dvh', zIndex: Z.MODAL_RAISED,
       ...wizardPaperBackground,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -90,7 +104,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
                     {pack.name}
                   </span>
                   <span style={{
-                    fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+                    fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
                     color: accent, background: `${accent}16`, border: `1px solid ${accent}3a`,
                     borderRadius: '4px', padding: '2px 7px',
                   }}>
@@ -98,7 +112,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
                   </span>
                   {done === ids.length && ids.length > 0 && (
                     <span style={{
-                      fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+                      fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
                       color: '#fffdf5', background: UI_MOSS, borderRadius: '4px', padding: '2px 7px',
                     }}>Complete</span>
                   )}

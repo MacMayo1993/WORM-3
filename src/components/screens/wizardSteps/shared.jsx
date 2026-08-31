@@ -9,7 +9,7 @@ import { COLOR_SCHEMES, SCHEME_LABELS } from '../../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../../utils/backgrounds.js';
 import { BG_PREVIEWS } from '../../../utils/bgPreviews.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../../3d/TilePreviewRenderer.js';
-import { PAPER_SHEET_RAISED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW } from '../../../utils/uiTheme.js';
+import { PAPER_SHEET_RAISED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, TEXT_XS } from '../../../utils/uiTheme.js';
 
 // ─── Catalogue data ───────────────────────────────────────────────────────────
 
@@ -140,7 +140,7 @@ export function PickerHeading({ label, hint, locked = 0, children }) {
       {locked > 0 && (
         <span style={{
           marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em', color: PAPER_TEXT_FAINT
+          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.06em', color: PAPER_TEXT_FAINT
         }}>
           <LockPip size={9} /> {locked} in the store
         </span>

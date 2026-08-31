@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { loadProgress, progressManager } from '../../utils/levels.js';
 import { getPack } from '../../levels/index.js';
 import {
   UI_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT,
   PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_MOSS,
- Z } from '../../utils/uiTheme.js';
+ Z, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
+import { useDialogBehavior } from '../ui/Panel.jsx';
 
 // Warm amber that holds up on cream — the cream-on-blue gold used before is
 // invisible against paper.
@@ -33,7 +34,7 @@ const BestStats = ({ stats }) => {
   if (parts.length === 0) return null;
   return (
     <div style={{
-      marginTop: '4px', fontSize: '9px', fontWeight: 700, letterSpacing: '0.04em',
+      marginTop: '4px', fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.04em',
       color: PAPER_TEXT_MUTED, textAlign: 'center', lineHeight: 1,
     }}>
       {parts.join(' · ')}
@@ -86,8 +87,21 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
     (sum, id) => sum + Math.min(levelStats[id]?.stars || 0, STARS_PER_LEVEL), 0
   );
 
+  // Bespoke chrome, so this takes the dialog behaviour directly rather
+  // than becoming an <Overlay>: focus moves in on open and back out on
+  // close, Tab is trapped, and the page behind stops scrolling.
+  const dialogRef = useRef(null);
+  const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
+
   return (
-    <div style={{
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose a level"
+      tabIndex={-1}
+      onKeyDown={onDialogKeyDown}
+      style={{
       position: 'fixed',
       inset: 0,
       height: '100dvh',
@@ -214,7 +228,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                     {isNext && (
                       <span style={{
                         position: 'absolute', top: '8px', left: '8px',
-                        fontSize: '8px', fontWeight: 900, letterSpacing: '0.14em',
+                        fontSize: TEXT_MICRO, fontWeight: 900, letterSpacing: '0.14em',
                         textTransform: 'uppercase', color: UI_MOSS,
                       }}>Next</span>
                     )}

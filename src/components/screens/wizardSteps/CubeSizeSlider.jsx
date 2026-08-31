@@ -10,7 +10,7 @@
 // semantics all come for free rather than being reimplemented badly.
 
 import React from 'react';
-import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW } from '../../../utils/uiTheme.js';
+import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, TEXT_MICRO } from '../../../utils/uiTheme.js';
 import { SIZE_TIERS, sizeTier } from './shared.jsx';
 
 const KNOB = 30;
@@ -126,7 +126,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
                 {n}
               </span>
               {n === DEFAULT_SIZE && (
-                <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>
+                <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>
                   Normal
                 </span>
               )}

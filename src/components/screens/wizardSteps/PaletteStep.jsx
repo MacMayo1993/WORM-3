@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { COLOR_SCHEMES, SCHEME_LABELS, TILE_STYLES } from '../../../utils/colorSchemes.js';
-import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
+import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_BORDER_SOFT, TEXT_MICRO } from '../../../utils/uiTheme.js';
 import CubePlate from './CubePlate.jsx';
 import {
   WIZARD_SCHEME_KEYS, SORTED_SCHEME_COLORS,
@@ -80,7 +80,7 @@ export default function PaletteStep({ cos }) {
           Presets
         </span>
         {lockedCount > 0 && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '9px', fontWeight: 700, color: PAPER_TEXT_FAINT }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: TEXT_MICRO, fontWeight: 700, color: PAPER_TEXT_FAINT }}>
             <LockPip size={9} /> {lockedCount} in the store
           </span>
         )}

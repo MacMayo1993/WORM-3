@@ -66,7 +66,7 @@ import MobiIntroScreen, {
   MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
   MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
-import { UI_FONT } from './utils/uiTheme.js';
+import { UI_FONT, TEXT_MICRO } from './utils/uiTheme.js';
 import ScreenTransition from './components/ScreenTransition.jsx';
 // Static (not lazy): a Suspense fallback must be present the instant a lazy
 // chunk starts loading, so the loading cube cannot itself live in a lazy chunk.
@@ -1501,7 +1501,7 @@ export default function WORM3() {
             position: 'absolute',
             top: '4px',
             left: '6px',
-            fontSize: '9px',
+            fontSize: TEXT_MICRO,
             fontFamily: UI_FONT,
             fontWeight: 700,
             letterSpacing: '0.1em',

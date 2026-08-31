@@ -13,10 +13,10 @@
 import React from 'react';
 import {
   DISPLAY_FONT, UI_CREAM,
-  NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW
-} from '../../../utils/uiTheme.js';
+  NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW, TEXT_MICRO, TEXT_XS } from '../../../utils/uiTheme.js';
 import { useIsMobile } from '../../../hooks/index.js';
 import { WIZARD_PAPER_BASE } from '../WizardChrome.jsx';
+import { TOUCH_TARGET } from '../../ui/Button.jsx';
 
 // NIGHT_SHEET's colour taken opaque — the plate sits on paper rather than over
 // the 3D scene — lit from behind by whatever the specimen is wearing.
@@ -36,8 +36,10 @@ export const plateArrow = {
   background: 'rgba(255,245,220,0.10)',
   border: `1.5px solid ${NIGHT_BORDER}`,
   color: UI_CREAM,
-  width: '38px',
-  height: '38px',
+  // These step through the scene/specimen carousels one item at a time, so
+  // they are tapped repeatedly — the one shape that must not be under the floor.
+  width: TOUCH_TARGET,
+  height: TOUCH_TARGET,
   borderRadius: '50%',
   cursor: 'pointer',
   fontSize: '22px',
@@ -138,12 +140,12 @@ export default function SpecimenPlate({
         {/* Caption row */}
         {(caption || index != null) && (
           <div style={{ alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 1 }}>
-            <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
+            <span style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
               {caption}
             </span>
             <div style={{ flex: 1, height: '1px', background: NIGHT_BORDER }} />
             {index != null && total != null && (
-              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.1em', color: NIGHT_TEXT_MUTED, fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.1em', color: NIGHT_TEXT_MUTED, fontVariantNumeric: 'tabular-nums' }}>
                 {index} / {total}
               </span>
             )}
@@ -164,7 +166,7 @@ export default function SpecimenPlate({
 
           {onPrev
             ? <button onClick={onPrev} aria-label={`Previous ${caption?.toLowerCase() || 'option'}`} style={plateArrow}>‹</button>
-            : <span style={{ width: '38px', flexShrink: 0 }} />}
+            : <span style={{ width: TOUCH_TARGET, flexShrink: 0 }} />}
 
           <div style={{ zIndex: 1, display: 'flex', justifyContent: 'center', flex: 1, minWidth: 0 }}>
             {art}
@@ -172,7 +174,7 @@ export default function SpecimenPlate({
 
           {onNext
             ? <button onClick={onNext} aria-label={`Next ${caption?.toLowerCase() || 'option'}`} style={plateArrow}>›</button>
-            : <span style={{ width: '38px', flexShrink: 0 }} />}
+            : <span style={{ width: TOUCH_TARGET, flexShrink: 0 }} />}
         </div>
 
         {/* Name plate */}
@@ -190,7 +192,7 @@ export default function SpecimenPlate({
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px',
                 background: `${glow}28`, border: `1px solid ${glow}55`,
-                color: glow, fontSize: '9px', fontWeight: 800,
+                color: glow, fontSize: TEXT_MICRO, fontWeight: 800,
                 letterSpacing: '0.14em', textTransform: 'uppercase',
                 padding: '3px 11px', borderRadius: '999px',
                 transition: 'all 0.4s ease'
@@ -204,7 +206,7 @@ export default function SpecimenPlate({
         {children}
 
         {hint && (
-          <div style={{ fontSize: '9px', color: NIGHT_TEXT, opacity: 0.4, letterSpacing: '0.06em', zIndex: 1 }}>
+          <div style={{ fontSize: TEXT_XS, color: NIGHT_TEXT, opacity: 0.4, letterSpacing: '0.06em', zIndex: 1 }}>
             {hint}
           </div>
         )}

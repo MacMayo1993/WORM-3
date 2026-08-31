@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { levelsManager } from '../../levels/index.js';
 import { getLevelPar } from '../../levels/scoring.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { MONO_FONT, PAPER_WARN, PAPER_GOOD } from '../../utils/uiTheme.js';
+import { MONO_FONT, PAPER_WARN, PAPER_GOOD, TEXT_MICRO } from '../../utils/uiTheme.js';
 
 const COLLAPSE_KEY = 'worm3_objective_collapsed';
 
@@ -99,7 +99,7 @@ export default function StoryObjectiveHUD({ level }) {
               background: 'rgba(30, 22, 18, 0.05)', border: '1px solid rgba(30, 22, 18, 0.10)',
             }}>
               <div style={{
-                fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em',
+                fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em',
                 textTransform: 'uppercase', color: '#7a6e62', marginBottom: '4px',
               }}>
                 {level.name} · {level.algorithm.quarterTurns} turns

@@ -1,11 +1,57 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { VICTORY } from '../../utils/constants.js';
 import {
   UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
   NIGHT_BACKDROP, NIGHT_BACKDROP_BLUR, NIGHT_PANEL, NIGHT_BORDER,
   NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_TITLE_SHADOW, NIGHT_SOFT_SHADOW,
- Z } from '../../utils/uiTheme.js';
+ TEXT_XS, TEXT_SM, TEXT_LG, Z } from '../../utils/uiTheme.js';
 import { computeStars, getLevelPar } from '../../levels/scoring.js';
+import { prefersReducedMotion } from '../../utils/device.js';
+import { ActionButton } from '../ui/Button.jsx';
+
+// ─── Reward beat timings ──────────────────────────────────────────────────────
+// The stars are the payoff for the run, so they arrive one at a time rather than
+// all at once: panel settles, then star, beat, star, beat, star, then the
+// verdict. Every genre-standard results screen sequences this reveal; landing
+// all three in the same frame throws the reward away.
+const STAR_DELAY_BASE = 0.35; // s — after the panel has finished rising
+const STAR_DELAY_STEP = 0.26; // s — between consecutive stars
+const COUNT_UP_MS = 420;
+
+/**
+ * Counts `target` up from zero once on mount, so Moves/Time read as earned
+ * rather than printed. Returns the final value immediately under reduced
+ * motion, and for anything non-numeric.
+ */
+function useCountUp(target, durationMs = COUNT_UP_MS) {
+  const numeric = typeof target === 'number' && Number.isFinite(target);
+  const [value, setValue] = useState(() => (numeric && !prefersReducedMotion() ? 0 : target));
+  const rafRef = useRef(0);
+
+  useEffect(() => {
+    if (!numeric || prefersReducedMotion()) {
+      setValue(target);
+      return undefined;
+    }
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / durationMs);
+      // Ease-out so the number decelerates into its final value.
+      setValue(Math.round(target * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [target, durationMs, numeric]);
+
+  return value;
+}
+
+/** One stat tile's value, counted up and then formatted for display. */
+const CountUpValue = ({ value, format, style }) => {
+  const shown = useCountUp(value);
+  return <div style={style}>{format ? format(shown) : shown}</div>;
+};
 
 /**
  * VictoryScreen — themed to match the demo "STEP COMPLETE" beat: a warm dark
@@ -113,37 +159,15 @@ const VictoryScreen = ({
     : (winConfig[winType] || winConfig.rubiks);
 
   // Shared button styles ----------------------------------------------------
-  const primaryBtn = {
-    background: GREEN,
-    border: 'none',
-    color: INK_CREAM,
-    fontSize: '13px',
-    fontWeight: 800,
-    padding: '12px 26px',
-    borderRadius: '999px',
-    cursor: 'pointer',
-    fontFamily: UI_FONT,
+  // The victory actions are the canonical primary/secondary pair, so they take
+  // <ActionButton> rather than re-declaring the pill a third time. This carries
+  // only what is genuinely local to this screen — the uppercase celebration
+  // lettering — while the surface, hover, press, focus ring and 44px hit area
+  // come from the primitive.
+  const CELEBRATION_TYPE = {
+    fontSize: TEXT_SM,
     letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    boxShadow: '0 7px 16px rgba(95,127,74,0.30)',
-    transition: 'all 0.18s',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  };
-  const outlineBtn = {
-    background: 'transparent',
-    border: `1.5px solid ${WARM_BORDER}`,
-    color: CREAM_SOFT,
-    fontSize: '13px',
-    fontWeight: 700,
-    padding: '12px 22px',
-    borderRadius: '999px',
-    cursor: 'pointer',
-    fontFamily: UI_FONT,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    transition: 'all 0.18s',
+    textTransform: 'uppercase'
   };
 
   return (
@@ -288,18 +312,31 @@ const VictoryScreen = ({
         {isLevelWin && (
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }} aria-label={`${stars} of 3 stars`}>
-              {[0, 1, 2].map((i) => (
-                <span key={i} style={{
-                  fontSize: '38px', lineHeight: 1,
-                  color: i < stars ? GOLD : 'rgba(255,245,220,0.16)',
-                  textShadow: i < stars ? '0 2px 10px rgba(224,178,92,0.55)' : 'none',
-                  transform: i < stars ? 'translateY(0)' : 'translateY(2px)',
-                }}>★</span>
-              ))}
+              {[0, 1, 2].map((i) => {
+                const earned = i < stars;
+                return (
+                  <span
+                    key={i}
+                    style={{
+                      fontSize: '38px', lineHeight: 1,
+                      color: earned ? GOLD : 'rgba(255,245,220,0.16)',
+                      textShadow: earned ? '0 2px 10px rgba(224,178,92,0.55)' : 'none',
+                      // Earned stars pop in one at a time; empty sockets are
+                      // present from the first frame so the row never reflows.
+                      transform: earned ? 'translateY(0)' : 'translateY(2px)',
+                      display: 'inline-block',
+                      animation: earned ? `vsStarPop 0.5s cubic-bezier(0.22, 1.4, 0.36, 1) ${STAR_DELAY_BASE + i * STAR_DELAY_STEP}s both` : 'none'
+                    }}
+                  >★</span>
+                );
+              })}
             </div>
             <div style={{
-              marginTop: '7px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.14em',
+              marginTop: '7px', fontSize: TEXT_XS, fontWeight: 800, letterSpacing: '0.14em',
               textTransform: 'uppercase', color: underPar ? GREEN_LIGHT : GOLD, fontFamily: UI_FONT,
+              // Lands after the last star, so the verdict reads as the summary
+              // of the reveal rather than racing it.
+              animation: `vsVerdictIn 0.4s ease-out ${STAR_DELAY_BASE + 3 * STAR_DELAY_STEP}s both`
             }}>
               {starVerdict}
             </div>
@@ -325,7 +362,9 @@ const VictoryScreen = ({
           {[
             { label: 'Moves', value: moves, highlight: underPar },
             ...(par != null ? [{ label: 'Par', value: par }] : []),
-            { label: 'Time', value: formatTime(time) },
+            // Counted in whole seconds, formatted on the way out, so the clock
+            // rolls up rather than appearing already stopped.
+            { label: 'Time', value: time, format: formatTime },
           ].map((stat) => (
             <div key={stat.label} style={{
               flex: 1,
@@ -340,67 +379,53 @@ const VictoryScreen = ({
                 letterSpacing: '0.14em', marginBottom: '6px', fontWeight: 800,
                 fontFamily: UI_FONT
               }}>{stat.label}</div>
-              <div style={{
-                fontSize: '26px', fontWeight: 900, color: stat.highlight ? GREEN_LIGHT : INK_CREAM,
-                fontFamily: DISPLAY_FONT
-              }}>{stat.value}</div>
+              <CountUpValue
+                value={stat.value}
+                format={stat.format}
+                style={{
+                  fontSize: '26px', fontWeight: 900, color: stat.highlight ? GREEN_LIGHT : INK_CREAM,
+                  fontFamily: DISPLAY_FONT
+                }}
+              />
             </div>
           ))}
         </div>
 
         {/* Buttons */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={onContinue}
-            style={outlineBtn}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,245,220,0.42)'; e.currentTarget.style.color = INK_CREAM; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = WARM_BORDER; e.currentTarget.style.color = CREAM_SOFT; }}
-          >
+          <ActionButton variant="secondary" surface="night" pill onClick={onContinue} style={CELEBRATION_TYPE}>
             Keep Playing
-          </button>
+          </ActionButton>
 
           {hasNextLevel && onNextLevel && (
-            <button
-              onClick={onNextLevel}
-              style={primaryBtn}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = '#6b8f53'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = GREEN; }}
-            >
-              Next Level <span style={{ fontSize: '16px' }}>→</span>
-            </button>
+            <ActionButton variant="primary" surface="night" pill onClick={onNextLevel} style={CELEBRATION_TYPE}>
+              Next Level <span style={{ fontSize: TEXT_LG }}>→</span>
+            </ActionButton>
           )}
 
-          <button
+          <ActionButton
+            variant={hasNextLevel ? 'secondary' : 'primary'}
+            surface="night"
+            pill
             onClick={onNewGame}
-            style={hasNextLevel ? outlineBtn : primaryBtn}
-            onMouseEnter={e => {
-              if (hasNextLevel) { e.currentTarget.style.borderColor = 'rgba(255,245,220,0.42)'; e.currentTarget.style.color = INK_CREAM; }
-              else { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = '#6b8f53'; }
-            }}
-            onMouseLeave={e => {
-              if (hasNextLevel) { e.currentTarget.style.borderColor = WARM_BORDER; e.currentTarget.style.color = CREAM_SOFT; }
-              else { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = GREEN; }
-            }}
+            style={CELEBRATION_TYPE}
           >
             {currentLevel ? 'Retry Level' : 'New Puzzle'}
-          </button>
+          </ActionButton>
         </div>
 
         {/* Main Menu escape hatch */}
         {onMainMenu && (
           <div style={{ marginTop: '16px' }}>
-            <button
+            <ActionButton
+              variant="ghost"
+              surface="night"
+              size="sm"
               onClick={onMainMenu}
-              style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: CREAM_MUTED, fontSize: '12px', padding: '4px 8px',
-                fontFamily: UI_FONT, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = INK_CREAM; }}
-              onMouseLeave={e => { e.currentTarget.style.color = CREAM_MUTED; }}
+              style={{ fontSize: TEXT_XS, letterSpacing: '0.06em', textTransform: 'uppercase' }}
             >
               ← Main Menu
-            </button>
+            </ActionButton>
           </div>
         )}
 
@@ -433,6 +458,12 @@ const VictoryScreen = ({
 
       <style>{`
         @keyframes vsFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes vsStarPop {
+          0%   { opacity: 0; transform: scale(0.2) translateY(6px); }
+          70%  { opacity: 1; transform: scale(1.18) translateY(0); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes vsVerdictIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes vsPanelRise { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes vsConfettiFall {
           0%   { transform: translateY(-20px) rotate(0deg) skewX(0deg); opacity: 1; }
@@ -451,6 +482,10 @@ const VictoryScreen = ({
           @keyframes vsWormWiggle   { from {} to {} }
           @keyframes vsFadeIn       { from {} to {} }
           @keyframes vsPanelRise    { from {} to {} }
+          /* Stars and the verdict still appear — they just appear at once,
+             with no scale-up, rather than being sequenced. */
+          @keyframes vsStarPop      { from { opacity: 1; } to { opacity: 1; } }
+          @keyframes vsVerdictIn    { from { opacity: 1; } to { opacity: 1; } }
         }
       `}</style>
     </div>

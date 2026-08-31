@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { MONO_FONT, Z } from '../utils/uiTheme.js';
+import { MONO_FONT, Z, TEXT_XS } from '../utils/uiTheme.js';
 import { useShallow } from 'zustand/react/shallow';
 import { tunnelState } from './tunnelProgressBridge.js';
 
@@ -70,7 +70,7 @@ export default function MobiusHUD() {
         }}>
             <div style={{
                 color: 'rgba(255,255,255,0.48)',
-                fontSize: '8px',
+                fontSize: TEXT_XS,
                 fontFamily: MONO_FONT,
                 letterSpacing: '2.5px',
                 textAlign: 'center',
