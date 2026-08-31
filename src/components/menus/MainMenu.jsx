@@ -25,6 +25,7 @@ import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
 import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z } from '../../utils/uiTheme.js';
+import { TOUCH_TARGET } from '../ui/Button.jsx';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -1195,6 +1196,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
       <style>{`
         .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
         .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
+        /* 30px tall on their own padding — raised to the 44px floor without
+           changing their width or type. */
+        .mc-pill         { min-height: 44px; }
         .mc-pill:hover   { filter: brightness(1.14); }
         .mc-pill:active  { transform: scale(0.97); }
         .mc-cube-window { height: min(47vh, 415px); }
@@ -1240,21 +1244,36 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         </div>
 
         {/* Face map — one colored tile per cube face, tap to jump */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: 0 }}>
+        {/* The gap moves onto the buttons as transparent padding so the tap
+            targets tile edge to edge instead of leaving 8px dead gutters
+            between 12px dots. The coloured bar inside is unchanged, so the
+            row looks identical — it is only the hit area that grows. */}
+        <div style={{ display: 'flex', gap: 0, alignItems: 'center', marginTop: 0 }}>
           {CAROUSEL_MODES.map((m, i) => (
             <button
               key={m.id} type="button" aria-label={`Show ${m.label} mode`} title={m.label}
               onClick={() => selectIndex(i)}
+              className="ui-focusable"
               style={{
-                width: i === activeIndex ? '26px' : '12px', height: '12px',
-                borderRadius: '4px', border: 'none', cursor: 'pointer', padding: 0,
-                background: m.tileColor,
-                opacity: i === activeIndex ? 1 : 0.45,
-                boxShadow: i === activeIndex ? `0 0 10px ${m.tileColor}` : 'none',
-                transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), opacity 200ms ease',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                height: TOUCH_TARGET, padding: '0 4px',
+                background: 'none', border: 'none', borderRadius: '8px',
+                cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
               }}
-            />
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: i === activeIndex ? '26px' : '12px', height: '12px',
+                  borderRadius: '4px',
+                  background: m.tileColor,
+                  opacity: i === activeIndex ? 1 : 0.45,
+                  boxShadow: i === activeIndex ? `0 0 10px ${m.tileColor}` : 'none',
+                  transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), opacity 200ms ease',
+                }}
+              />
+            </button>
           ))}
         </div>
 

@@ -347,8 +347,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: transparent;
   border-radius: 50%;
@@ -1004,6 +1004,7 @@ textarea:focus-visible,
   position: absolute;
   top: 30px;
   right: 30px;
+  min-height: 44px;
   padding: 12px 24px;
   background: rgba(50, 60, 80, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -1389,9 +1390,12 @@ textarea:focus-visible,
     display: none !important;
   }
 
+  /* The phone breakpoint used to shrink these to 34px — below the 44px floor,
+     on the device where they are actually touched rather than clicked. The
+     glyph inside stays small; only the target grows. */
   .top-bar-icon-btn {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
     /* Cream bar: these have to be near-black to read at all. The pale blue
        they used to inherit was all but invisible against it. */
     color: #111511;
@@ -2089,6 +2093,7 @@ textarea:focus-visible,
 
 .settings-tab {
   flex: 1;
+  min-height: 44px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -3711,6 +3716,13 @@ select.btn-compact:disabled {
 
 /* Secondary green CTAs (Start Demo, Give Feedback) — same colour as START, one
    press-down system, but no idle pulse so START stays the loud primary. */
+/* The two secondary menu CTAs were 38px and 32px tall — their padding alone
+   never reached the floor. Height only; the padding still sets the width and
+   the visual hierarchy under START is unchanged. */
+.worm-menu-cta-secondary {
+  min-height: 44px;
+}
+
 .worm-menu-cta-secondary:hover {
   filter: brightness(1.06);
 }

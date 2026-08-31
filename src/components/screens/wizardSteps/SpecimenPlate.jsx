@@ -16,6 +16,7 @@ import {
   NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW, TEXT_MICRO, TEXT_XS } from '../../../utils/uiTheme.js';
 import { useIsMobile } from '../../../hooks/index.js';
 import { WIZARD_PAPER_BASE } from '../WizardChrome.jsx';
+import { TOUCH_TARGET } from '../../ui/Button.jsx';
 
 // NIGHT_SHEET's colour taken opaque — the plate sits on paper rather than over
 // the 3D scene — lit from behind by whatever the specimen is wearing.
@@ -35,8 +36,10 @@ export const plateArrow = {
   background: 'rgba(255,245,220,0.10)',
   border: `1.5px solid ${NIGHT_BORDER}`,
   color: UI_CREAM,
-  width: '38px',
-  height: '38px',
+  // These step through the scene/specimen carousels one item at a time, so
+  // they are tapped repeatedly — the one shape that must not be under the floor.
+  width: TOUCH_TARGET,
+  height: TOUCH_TARGET,
   borderRadius: '50%',
   cursor: 'pointer',
   fontSize: '22px',
@@ -163,7 +166,7 @@ export default function SpecimenPlate({
 
           {onPrev
             ? <button onClick={onPrev} aria-label={`Previous ${caption?.toLowerCase() || 'option'}`} style={plateArrow}>‹</button>
-            : <span style={{ width: '38px', flexShrink: 0 }} />}
+            : <span style={{ width: TOUCH_TARGET, flexShrink: 0 }} />}
 
           <div style={{ zIndex: 1, display: 'flex', justifyContent: 'center', flex: 1, minWidth: 0 }}>
             {art}
@@ -171,7 +174,7 @@ export default function SpecimenPlate({
 
           {onNext
             ? <button onClick={onNext} aria-label={`Next ${caption?.toLowerCase() || 'option'}`} style={plateArrow}>›</button>
-            : <span style={{ width: '38px', flexShrink: 0 }} />}
+            : <span style={{ width: TOUCH_TARGET, flexShrink: 0 }} />}
         </div>
 
         {/* Name plate */}
