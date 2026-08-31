@@ -36,11 +36,13 @@ const LARGE_CUBE = 6;
 
 const BUDGETS = {
   minimal: {
-    // Coarse but complete: 3×3 cover cells per face still reaches every corner.
-    // Fire is one instanced mesh, so the flame count is nearly free to raise —
-    // and on a coarse grid each cover cell spans several tiles, so it needs more
-    // tongues to fill that footprint instead of reading as a few sparse licks.
-    skinGrid: 3,
+    // The mega-board floor (large boards on a phone) and the reduced-motion tier.
+    // 4×4 cover cells per face: a coarser grid than desktop but dense enough that a
+    // huge board still reads as fully sheathed in the element rather than dotted
+    // with a few patches. Fire is one instanced mesh, so its flame count is nearly
+    // free to raise — and on a coarse grid each cover cell spans several tiles, so
+    // it needs more tongues to fill that footprint instead of a few sparse licks.
+    skinGrid: 4,
     particleCount: 0,
     flamesPerCell: 6,
     // Cube-scale adornments (edge flow, corner crowns, icicles, charge rails).
@@ -57,9 +59,10 @@ const BUDGETS = {
     accents: false
   },
   medium: {
-    // Large desktop boards: a 4×4 grid of big cover cells, so pack more tongues
-    // per cell to keep a mega cube looking properly ablaze rather than dotted.
-    skinGrid: 4,
+    // Large desktop boards. Full 5×5 cover grid (same reach as the top tier) so a
+    // mega cube is densely sheathed in every element; the step down from `high` is
+    // in the particle and adornment counts, not the skin coverage.
+    skinGrid: 5,
     particleCount: 90,
     flamesPerCell: 7,
     adornments: 24,
