@@ -1,15 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { vibrate } from '../../utils/audio.js';
+import { RUBIKS_CLASSIC } from '../../utils/constants.js';
 
-// Classic Rubik's face colours
-const COLORS = {
-  red:    '#C41E3A',
-  green:  '#009B48',
-  blue:   '#0051A2',
-  orange: '#FF5800',
-  yellow: '#FFD500',
-  white:  '#F0F0F0',
-};
+// Classic Rubik's face colours. This was a local copy of the same six values
+// the mode carousel now uses; both read RUBIKS_CLASSIC so they cannot drift.
+const COLORS = RUBIKS_CLASSIC;
 
 const SPOTLIGHT_STYLE_ID = 'worm3-nav-spotlight-style';
 

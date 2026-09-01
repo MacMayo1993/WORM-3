@@ -12,6 +12,53 @@ export const COLORS = {
   wormhole: '#dda15e'
 };
 
+/**
+ * Classic Rubik's sticker palette — the physical cube's colours, as distinct
+ * from COLORS above, which is the in-game standard scheme.
+ *
+ * The two differ on purpose. The in-game scheme is tuned for the manifold's
+ * antipodal reveal and sits in a bright, screen-native register. This one is
+ * the toy: a deep crimson red rather than a light one, and a vivid orange, so
+ * red and orange separate the way they do on a real cube. Reach for it where
+ * the UI is naming the physical object — the cube-face nav tiles and the mode
+ * carousel — and for COLORS where the game is rendering play state.
+ */
+export const RUBIKS_CLASSIC = {
+  red: '#C41E3A',
+  green: '#009B48',
+  blue: '#0051A2',
+  orange: '#FF7A00',
+  yellow: '#FFD500',
+  white: '#F0F0F0'
+};
+
+/** The same palette keyed by face ID, so callers can go straight from DIR_TO_COLOR. */
+export const RUBIKS_FACE_COLORS = {
+  1: RUBIKS_CLASSIC.red,     // PZ - Front
+  2: RUBIKS_CLASSIC.green,   // NX - Left
+  3: RUBIKS_CLASSIC.white,   // PY - Top
+  4: RUBIKS_CLASSIC.orange,  // NZ - Back
+  5: RUBIKS_CLASSIC.blue,    // PX - Right
+  6: RUBIKS_CLASSIC.yellow   // NY - Bottom
+};
+
+/**
+ * Ink that stays readable on a given fill. White and yellow stickers need dark
+ * type; the rest take cream. Computed from relative luminance rather than
+ * listed per colour, so swapping a palette value cannot silently leave white
+ * text on a white tile.
+ */
+export const readableInk = (hex, { dark = '#1a1410', light = '#fffdf2' } = {}) => {
+  const h = String(hex).replace('#', '');
+  if (h.length !== 6) return light;
+  const chan = (i) => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const L = 0.2126 * chan(0) + 0.7152 * chan(2) + 0.0722 * chan(4);
+  return L > 0.42 ? dark : light;
+};
+
 // Map face ID (1-6) to color
 export const FACE_COLORS = {
   1: COLORS.red,      // PZ - Front (Red)
