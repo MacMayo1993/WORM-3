@@ -3707,7 +3707,10 @@ select.btn-compact:disabled {
    still visibly see-through. Lower them and it fails on the dark scenes only. */
 .worm-tactile-btn,
 .worm-menu-cta-secondary {
-  --menu-cta-w: min(340px, 78vw);
+  /* 10% down from min(340px, 78vw). The vw term shrinks too, so the cluster
+     keeps the same proportion of a narrow screen rather than only shrinking on
+     wide ones. */
+  --menu-cta-w: min(306px, 70vw);
   width: var(--menu-cta-w);
   box-sizing: border-box;
   display: inline-flex;
@@ -3726,17 +3729,22 @@ select.btn-compact:disabled {
 
 .worm-tactile-btn {
   font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
-  font-size: 2.1rem;
+  font-size: 1.9rem;
   color: #1f2721;
   /* A white highlight under the glyph, not a dark drop shadow: on a light
      sheet the letterform is lifted by the sheet showing through beneath it. */
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
   background:
-    linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.4) 50%, transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(246, 248, 245, 0.66) 52%, rgba(255, 255, 255, 0.72) 100%);
-  background-size: 260% 100%, 100% 100%;
-  background-position: 210% 0, 0 0;
-  padding: 18px 34px;
+    /* travelling specular sweep */
+    linear-gradient(105deg, transparent 34%, rgba(255, 255, 255, 0.85) 50%, transparent 66%),
+    /* The gloss cap. The near-opaque stop at 44% against a nearly-clear one at
+       46% is the whole trick: a hard terminator reads as a reflection sitting
+       ON the surface, where a soft fade just reads as a lighter paint. */
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.72) 44%, rgba(255, 255, 255, 0.1) 46%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(246, 248, 245, 0.66) 52%, rgba(255, 255, 255, 0.74) 100%);
+  background-size: 260% 100%, 100% 100%, 100% 100%;
+  background-position: 210% 0, 0 0, 0 0;
+  padding: 16px 30px;
   border: 1.5px solid rgba(255, 255, 255, 0.7);
   --cta-shadow:
     inset 0 1.5px 0 rgba(255, 255, 255, 0.9),
@@ -3744,15 +3752,31 @@ select.btn-compact:disabled {
     0 12px 28px rgba(0, 0, 0, 0.24),
     0 2px 6px rgba(0, 0, 0, 0.12);
   box-shadow: var(--cta-shadow);
-  animation: wormCtaSheen 4.6s 1.4s ease-in-out infinite;
+  animation: wormCtaSheen 3.4s 0.8s ease-in-out infinite, wormCtaGlow 2.8s ease-in-out infinite, wormCtaBreathe 3.6s ease-in-out infinite;
 }
 
 /* Only the sheen layer travels; the glass sheet under it stays pinned, which is
    why each layer needs its own position. */
 @keyframes wormCtaSheen {
-  0%   { background-position: 210% 0, 0 0; }
-  55%  { background-position: -60% 0, 0 0; }
-  100% { background-position: -60% 0, 0 0; }
+  0%   { background-position: 210% 0, 0 0, 0 0; }
+  48%  { background-position: -70% 0, 0 0, 0 0; }
+  100% { background-position: -70% 0, 0 0, 0 0; }
+}
+
+/* The idle shimmer. Done with drop-shadow rather than box-shadow because
+   box-shadow is already spoken for by --cta-shadow and the focus ring composes
+   onto it — animating it here would fight both. drop-shadow also follows the
+   pill's radius, so the halo is the shape of the button. */
+@keyframes wormCtaGlow {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.28)); }
+  50%      { filter: drop-shadow(0 0 17px rgba(255, 255, 255, 0.6)); }
+}
+
+/* A slow breath on the primary only, so the eye is drawn to START and not to
+   three things moving at once. */
+@keyframes wormCtaBreathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.018); }
 }
 
 .worm-tactile-btn:hover,
@@ -3762,6 +3786,7 @@ select.btn-compact:disabled {
 
 .worm-tactile-btn:active {
   transform: translateY(2px) scale(0.985);
+  filter: none;
   --cta-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 2px 10px rgba(60, 70, 62, 0.2),
@@ -3781,11 +3806,13 @@ select.btn-compact:disabled {
 /* Secondary CTAs — same sheet, same width, no sheen. They rank below START by
    height and type size, not by being harder to read. */
 .worm-menu-cta-secondary {
-  min-height: 52px;
+  min-height: 47px;
   color: #1f2721;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(246, 248, 245, 0.6) 52%, rgba(255, 255, 255, 0.68) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.66) 46%, rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(246, 248, 245, 0.62) 52%, rgba(255, 255, 255, 0.7) 100%);
+  animation: wormCtaGlow 3.4s 0.5s ease-in-out infinite;
   border: 1.5px solid rgba(255, 255, 255, 0.58);
   --cta-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.8),
@@ -3824,8 +3851,15 @@ select.btn-compact:disabled {
     transform: none !important;
   }
 
-  .worm-tactile-btn {
+  /* Both CTA classes now animate — sheen, shimmer and breathe — so both are
+     stilled here. `filter` and `transform` are reset explicitly because
+     cancelling an animation leaves the element at its declared value, not at
+     the midpoint the keyframes had reached. */
+  .worm-tactile-btn,
+  .worm-menu-cta-secondary {
     animation: none !important;
+    filter: none !important;
+    transform: none !important;
   }
 }
 
