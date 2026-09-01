@@ -18,7 +18,7 @@ import './App.css';
 // Utils
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
 import { DAILY_PACK_ID, DAILY_LEVEL_ID, ensureDailyPack } from './levels/dailyChallenge.js';
-import { recordLevelCompletion } from './levels/completion.js';
+import { recordLevelCompletion, recordFreeplaySolve } from './levels/completion.js';
 import { EARN_DAILY_CHALLENGE } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { setFeelEnabled } from './utils/feel.js';
@@ -1205,14 +1205,27 @@ export default function WORM3() {
   // The rule itself lives in levels/completion.js so it is testable and has one
   // home; every exit from the victory screen goes through this.
   const recordCompletion = useCallback(() => {
+    // The demo solves cubes on the player's behalf as part of its tour, so it
+    // must never pay out.
+    const enabled = !useGameStore.getState().demoMode;
+    const earn = (amount) => useGameStore.getState().earnCoins(amount);
+
+    if (!currentLevel) {
+      // A Freeplay / Random solve — no level behind it, but still the one thing
+      // those modes are for. Paid once per cube size (see levels/rewards.js).
+      recordFreeplaySolve({ size, earn, enabled });
+      return;
+    }
+
     recordLevelCompletion({
       levelId: currentLevel,
       levelData: currentLevelData,
       stats: { moves, time: gameTime },
-      earn: (amount) => useGameStore.getState().earnCoins(amount),
+      earn,
       dailyReward: EARN_DAILY_CHALLENGE,
+      enabled,
     });
-  }, [currentLevel, currentLevelData, moves, gameTime]);
+  }, [currentLevel, currentLevelData, moves, gameTime, size]);
 
   // Victory handlers
   const handleVictoryContinue = useCallback(() => {

@@ -4,6 +4,9 @@
 // the O(2) seam matrix to transport vector + accumulate holonomy.
 
 import { useState, useRef, useCallback } from 'react';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { progressManager } from '../levels/ProgressManager.js';
+import { awardMilestone, HOLONOMY_LOOP_KEY, HOLONOMY_MOBIUS_KEY } from '../levels/rewards.js';
 import { useFrame } from '@react-three/fiber';
 import {
     mat2Identity, mat2Mul, mat2Clone, applyMat2,
@@ -144,6 +147,23 @@ export function useHolonomyMode() {
                     setLoopClosed(true);
                     loopCooldown.current = 3.0;
                     setTimeout(() => setLoopClosed(false), 2500);
+
+                    // Holonomy's two milestones, each paid once ever. The
+                    // orientation-reversing loop is worth more because it is the
+                    // mode's actual point: a path that comes home with det(H) =
+                    // −1 is the non-orientability of RP² observed directly, not
+                    // described. Read from the live matrix rather than the React
+                    // state, which this frame has only just queued.
+                    //
+                    // This is a render-frame callback, so it must stay cheap and
+                    // write nothing back into the traced state: awardMilestone
+                    // short-circuits on an already-claimed key before it touches
+                    // the wallet, and the loop cooldown bounds how often it runs.
+                    const earn = (amount) => useGameStore.getState().earnCoins(amount);
+                    awardMilestone(HOLONOMY_LOOP_KEY, { progress: progressManager, earn });
+                    if (getOrientationParity(s.H) < 0) {
+                        awardMilestone(HOLONOMY_MOBIUS_KEY, { progress: progressManager, earn });
+                    }
                 }
             }
 

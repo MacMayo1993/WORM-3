@@ -86,6 +86,20 @@ export {
   currentStreak
 } from './dailyChallenge.js';
 
+// Where the rest of the game pays into the Parity Point wallet.
+export {
+  levelPayout,
+  MAX_LEVEL_PAYOUT,
+  freeplaySolveKey,
+  teachAlgorithmKey,
+  HOLONOMY_LOOP_KEY,
+  HOLONOMY_MOBIUS_KEY,
+  milestonePayout,
+  awardMilestone
+} from './rewards.js';
+
+export { recordLevelCompletion, recordFreeplaySolve } from './completion.js';
+
 // The player-facing names for the awards ProgressManager records.
 export {
   ACHIEVEMENTS,

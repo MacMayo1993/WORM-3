@@ -9,6 +9,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { BEGINNER_METHOD_3x3, parseAlgorithm } from './algorithms.js';
+import { progressManager } from '../levels/ProgressManager.js';
+import { awardMilestone, teachAlgorithmKey } from '../levels/rewards.js';
 import { analyzeState } from './solver3x3.js';
 
 // ---------------------------------------------------------------------------
@@ -237,8 +239,20 @@ export function useTeachMode() {
       setLayerHighlight({ axis: algoMoves[nextStep].axis, sliceIndex: algoMoves[nextStep].sliceIndex, dir: algoMoves[nextStep].dir });
     } else {
       setLayerHighlight(null);
+      // Algorithm executed to its last move — Teach mode's one real completion
+      // signal, and the only thing here worth paying for. Claimed once per
+      // algorithm (levels/rewards.js), so practising a move again is free but
+      // pays nothing, and the demo's teach cameo auto-plays so it must not pay.
+      const stage = BEGINNER_METHOD_3x3.stages[selectedAlgo?.stageIndex];
+      if (stage && selectedAlgo) {
+        awardMilestone(teachAlgorithmKey(stage.id, selectedAlgo.algoIndex), {
+          progress: progressManager,
+          earn: (amount) => useGameStore.getState().earnCoins(amount),
+          enabled: !useGameStore.getState().demoMode
+        });
+      }
     }
-  }, [algoMoves, currentStep, animState, setAnimState, setPendingMove]);
+  }, [algoMoves, currentStep, animState, selectedAlgo, setAnimState, setPendingMove]);
 
   // Advance step (for auto-play / demo mode)
   const advanceStep = useCallback(() => {
