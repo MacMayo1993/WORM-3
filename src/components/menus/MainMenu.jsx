@@ -23,7 +23,7 @@ import { vibrate } from '../../utils/audio.js';
 import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
-import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
 import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z, UI_GOLD } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/Button.jsx';
 
@@ -994,44 +994,64 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 // matches its tileColor (red PZ, green NX, white PY, orange NZ, blue PX,
 // yellow NY). Swiping the carousel rotates the live 3D menu cube to present
 // that mode's face; PLAY dives through the face into the mode.
+/**
+ * Each mode owns a cube face, and its carousel colour is simply that face's
+ * sticker colour — no longer a hand-picked hex per mode.
+ *
+ * The hand-picked set had drifted off the cube it is meant to represent: STORE
+ * sat on PY, which is the WHITE face, but was rendering teal; and the red and
+ * orange modes were #ef4444/#f97316, only ~25 degrees of hue apart at the same
+ * lightness, so the two read as a pair of reds rather than as red and orange.
+ * Deriving from RUBIKS_FACE_COLORS makes the carousel a picture of the cube,
+ * and makes a wrong colour impossible to introduce by hand.
+ *
+ * `ink` is computed from the fill's luminance, which matters now that two faces
+ * are light: every mode previously hardcoded white type, which on the yellow
+ * face was already weak and on the new white face would have been invisible.
+ */
+const withFaceColor = (mode) => {
+  const tileColor = RUBIKS_FACE_COLORS[DIR_TO_COLOR[mode.face]];
+  return { ...mode, tileColor, textColor: readableInk(tileColor) };
+};
+
 const CAROUSEL_MODES = [
   {
-    id: 'worm', label: 'WORM', tileColor: '#22c55e', textColor: '#fff', face: 'NX',
+    id: 'worm', label: 'WORM', face: 'NX',
     desc: 'Steer a worm across a living cube and heal it one tile at a time.',
     controls: ['Steer the worm with cursor or touch', 'Every tile it crosses gets healed', 'Eat orbs to grow — and to earn points', 'Touch a dead tile and the run ends'],
     cta: 'PLAY',
   },
   {
-    id: 'freeplay', label: 'CUBE', tileColor: '#FFD500', textColor: '#fff', face: 'NY',
+    id: 'freeplay', label: 'CUBE', face: 'NY',
     desc: "A real Rubik's cube, built how you like it. No timer, no objective.",
     controls: ['Any size from 2×2 up to 7×7', 'Your palette, your tiles, your world', 'Drag a face edge to turn a slice', 'Tap a tile to send it through the cube'],
     cta: 'PLAY',
   },
   {
-    id: 'cube', label: 'STORY', tileColor: '#3b82f6', textColor: '#fff', face: 'PX',
+    id: 'cube', label: 'STORY', face: 'PX',
     desc: 'Ten chapters, daycare to the singularity, one new trick at a time.',
     controls: ['Ten chapters, each unlocking the next', 'One new idea per chapter', 'Mobi walks you in before every one', 'Beat par to take all three stars'],
     cta: 'PLAY',
   },
   {
-    id: 'chaos', label: 'CHAOS', tileColor: '#f97316', textColor: '#fff', face: 'NZ',
+    id: 'chaos', label: 'CHAOS', face: 'NZ',
     desc: 'The cube flips itself apart. Bet on how long you last.',
     controls: ['Tiles start flipping on their own', 'Stake Parity Points before you start', 'Pick your chaos level, 1 to 5', 'Last pair standing ends the run'],
     cta: 'PLAY',
   },
   {
-    id: 'random', label: 'RANDOM', tileColor: '#ef4444', textColor: '#fff', face: 'PZ',
+    id: 'random', label: 'RANDOM', face: 'PZ',
     desc: 'The cube redecorates itself mid-solve. Try to keep up.',
     controls: ['New palette every 15 seconds', 'Tiles and cubelets morph as you play', 'Same puzzle, never the same twice', 'Solving through the churn is the point'],
     cta: 'PLAY',
   },
   {
-    id: 'store', label: 'STORE', tileColor: '#0891B2', textColor: '#fff', face: 'PY',
+    id: 'store', label: 'STORE', face: 'PY',
     desc: 'Turn Parity Points into worm skins, hats, palettes, and tiles.',
     controls: ['Collect orbs in Worm mode to earn', 'Win a Chaos bet for a bigger purse', 'Skins, hats, palettes, and tile styles', 'Everything you buy works in every mode'],
     cta: 'OPEN STORE',
   },
-];
+].map(withFaceColor);
 
 // Non-mode destinations live in a small utility row under the carousel — they
 // are not game modes and do not occupy cube faces.
@@ -1268,7 +1288,13 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
                   width: i === activeIndex ? '26px' : '12px', height: '12px',
                   borderRadius: '4px',
                   background: m.tileColor,
-                  opacity: i === activeIndex ? 1 : 0.45,
+                  // No dimming at all. 0.45 pushed every inactive dot toward the
+                  // scene behind it — the yellow face read as mustard, red and
+                  // orange collapsed into one brown, and the white face came out
+                  // grey, which is the one colour that cannot survive being
+                  // faded. The active dot is already marked by width and glow,
+                  // so opacity was carrying no load the shape was not.
+                  opacity: 1,
                   boxShadow: i === activeIndex ? `0 0 10px ${m.tileColor}` : 'none',
                   transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), opacity 200ms ease',
                 }}
@@ -1329,7 +1355,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
                 style={{
                   background: `${mode.tileColor}26`, border: `1.5px solid ${mode.tileColor}`,
                   borderRadius: '100px', padding: '8px 18px',
-                  color: mode.textColor, fontSize: '11.5px', fontWeight: 700,
+                  color: PILL_INK, fontSize: '11.5px', fontWeight: 700,
                   letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
                   transition: 'filter 160ms ease, background 160ms ease',
                   WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
@@ -1341,7 +1367,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
               style={{
                 background: `${mode.tileColor}26`, border: `1.5px solid ${mode.tileColor}`,
                 borderRadius: '100px', padding: '8px 18px',
-                color: mode.textColor, fontSize: '11.5px', fontWeight: 700,
+                color: PILL_INK, fontSize: '11.5px', fontWeight: 700,
                 letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
                 transition: 'filter 160ms ease, background 160ms ease',
                 WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
@@ -1441,6 +1467,13 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
   </div>
   );
 };
+
+// The utility pills are a 15%-alpha tint of the mode colour over the live
+// scene, i.e. they are dark whatever the mode is — so their ink is fixed light
+// rather than mode.textColor. textColor answers "what reads on a tile FILLED
+// with this colour", which is the opposite question, and following it here put
+// near-black type on a dark backdrop the moment the white face was added.
+const PILL_INK = 'rgba(255, 253, 242, 0.92)';
 
 const MENU_FONT = UI_FONT;
 const menuStyles = {
