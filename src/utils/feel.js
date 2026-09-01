@@ -203,6 +203,82 @@ const SFX = {
     noise({ dur: 0.025, type: 'highpass', freq: 2600, gain: 0.16 });
     tone({ freq: 190, freqTo: 130, dur: 0.045, type: 'square', gain: 0.09 });
   },
+
+  // ── The cube itself ─────────────────────────────────────────────────────────
+  // Worm mode has had this whole layer since it shipped; the cube was still
+  // calling play('/sounds/*.mp3') against files that do not exist, so the main
+  // game — the actual Rubik's cube — made no sound at all.
+
+  // A slice turn. Plastic-on-plastic: a filtered click over a short woody body.
+  // This fires on EVERY move including shuffles, so it is the quietest thing in
+  // the set by some margin — presence, not an event.
+  //
+  // Pitch steps with the slice's depth so a sequence of turns has melodic
+  // contour instead of one click repeated. Depth is small (0..size-1) and the
+  // ratio is deliberately narrow: a turn should never sound like a different
+  // event just because it happened further back.
+  cubeTurn(depth = 0) {
+    const step = 1 + (Math.min(Math.max(0, depth), 6) * 0.055); // ≤ ~1.33×
+    noise({ dur: 0.035, type: 'bandpass', freq: 1800 * step, q: 1.6, gain: 0.16 });
+    tone({ freq: 150 * step, freqTo: 110 * step, dur: 0.07, type: 'triangle', gain: 0.12 });
+  },
+
+  // The same turn during an auto-shuffle. Quieter, and deliberately absent from
+  // the haptic table: a scramble fires 25+ moves in a burst, which is pleasant
+  // to hear as a cube being worked and horrible to feel as 25 buzzes.
+  cubeShuffleTurn(depth = 0) {
+    const step = 1 + (Math.min(Math.max(0, depth), 6) * 0.055);
+    noise({ dur: 0.03, type: 'bandpass', freq: 1800 * step, q: 1.6, gain: 0.09 });
+    tone({ freq: 150 * step, freqTo: 110 * step, dur: 0.06, type: 'triangle', gain: 0.07 });
+  },
+
+  // THE signature move: a tile and its antipode swap through the middle of the
+  // cube. Three acts, timed to the same ~0.5s squish the haptic already mirrors:
+  //
+  //   seize    (t=0)     the tile is grabbed — a small dry tick
+  //   crossing (t=0.25)  it collapses through the manifold seam — pitch dives,
+  //                      because the tile is travelling INTO the cube
+  //   snap     (t=0.41)  it overshoots back out on the far side — pitch climbs
+  //                      the pentatonic with the tile's flip count, so a tile
+  //                      near its cap rings higher and the danger is audible
+  //                      before the shader's heat makes it visible
+  //
+  // The climb is the same COMBO_SCALE the orb and tunnel pulses use, so a player
+  // already reads rising pitch as "escalating" by the time they meet it here.
+  cubeFlip(flips = 0, opts = {}) {
+    const cap = opts.cap > 0 ? opts.cap : 6;
+    const danger = Math.min(1, Math.max(0, flips / cap));
+    const f = COMBO_SCALE[Math.min(Math.max(0, flips), COMBO_SCALE.length - 1)];
+
+    noise({ dur: 0.03, type: 'highpass', freq: 3200, gain: 0.13 });
+    tone({ freq: 520, freqTo: 190, dur: 0.16, type: 'sine', gain: 0.20, when: 0.25 });
+    // Gain leans on danger so a nearly spent tile snaps back harder, matching
+    // the haptic's growing kick rather than fighting it.
+    tone({ freq: f, freqTo: f * 1.5, dur: 0.14, type: 'triangle', gain: 0.26 + danger * 0.12, when: 0.41 });
+  },
+
+  // Tapping a tile that has nothing left. Currently the tap is simply ignored,
+  // which reads as an unresponsive control rather than a spent tile — this is a
+  // dull, closed thud that says "heard you, and no".
+  cubeRefuse() {
+    noise({ dur: 0.06, type: 'lowpass', freq: 300, gain: 0.22 });
+    tone({ freq: 110, freqTo: 82, dur: 0.09, type: 'square', gain: 0.10 });
+  },
+
+  // The solve. The largest sound in the game, and the only one that resolves all
+  // the way up the pentatonic — everything else stops short of the octave.
+  cubeSolved() {
+    chord([523.25, 659.25, 783.99, 1046.5], { dur: 0.85, type: 'sine', gain: 0.26 });
+    tone({ freq: 261.63, freqTo: 1046.5, dur: 0.5, type: 'triangle', gain: 0.2 });
+    chord([783.99, 1046.5, 1318.51], { dur: 0.7, type: 'sine', gain: 0.18, when: 0.34 });
+  },
+
+  // Reset / shuffle — the cube being taken back. A downward sweep under a wash
+  // of noise: the opposite shape to the solve, deliberately.
+  cubeReset() {
+    noise({ dur: 0.3, type: 'bandpass', freq: 900, q: 0.6, gain: 0.2 });
+    tone({ freq: 480, freqTo: 130, dur: 0.3, type: 'triangle', gain: 0.16 });
+  },
 };
 
 // ── Haptic vocabulary ──────────────────────────────────────────────────────────
@@ -231,6 +307,32 @@ const HAPTICS = {
   tunnelSnap: [0, 60, 35, 90],
   // Short enough to read as the key itself rather than as something happening.
   uiKey: 10,
+
+  // ── The cube itself ─────────────────────────────────────────────────────────
+  // Light enough to sit under a fast sequence of turns without buzzing the hand.
+  cubeTurn: 7,
+
+  // The flip's three-act pattern, moved here from audio.vibrateFlip so ONE
+  // dispatch owns both halves of the feedback. That also fixes a real bug: the
+  // old call site vibrated through navigator directly, so turning haptics off in
+  // settings silenced worm mode and left the cube buzzing anyway.
+  //
+  // [seize, gap, crossing, gap, snap] in ms, timed to the audio above. The
+  // crossing and snap grow with the flip count, so a tile straining near its cap
+  // snaps back with a kick you can actually feel.
+  //
+  // navigator.vibrate cancels any in-flight pattern, so during a chaos burst the
+  // last flip's pattern wins rather than stacking — which reads as one settling
+  // buzz instead of a smear.
+  cubeFlip: (flips = 0, opts = {}) => {
+    const cap = opts.cap > 0 ? opts.cap : 6;
+    const danger = Math.min(1, Math.max(0, flips / cap));
+    return [8, 235, Math.round(14 + danger * 10), 150, Math.round(26 + danger * 24)];
+  },
+
+  cubeRefuse: [0, 18, 40, 12],
+  cubeSolved: [0, 40, 60, 40, 60, 90],
+  cubeReset: 16,
 };
 
 /**
@@ -238,7 +340,12 @@ const HAPTICS = {
  * @param {string} event  key into SFX/HAPTICS (e.g. 'orb', 'heal', 'death')
  * @param {object} [opts] { combo } for escalating events — the escalation level,
  *                        whatever it counts for that event (orb pickups in a row
- *                        for 'orb', a tile's flip count for 'tunnelPulse').
+ *                        for 'orb', a tile's flip count for 'tunnelPulse' and
+ *                        'cubeFlip'). The whole opts object is passed through as
+ *                        a second argument for events that need more than one
+ *                        number — 'cubeFlip' reads `cap`, because a tile's flip
+ *                        count only means something against the cap in force
+ *                        (Disparity runs on a configurable one).
  */
 export function feel(event, opts = {}) {
   attachUnlock();
@@ -246,13 +353,13 @@ export function feel(event, opts = {}) {
     const fn = SFX[event];
     if (fn) {
       try {
-        fn(opts.combo);
+        fn(opts.combo, opts);
       } catch (_) {}
     }
   }
   if (_enabledHaptics) {
     const h = HAPTICS[event];
-    const pattern = typeof h === 'function' ? h(opts.combo) : h;
+    const pattern = typeof h === 'function' ? h(opts.combo, opts) : h;
     if (pattern != null) vibrate(pattern);
   }
 }

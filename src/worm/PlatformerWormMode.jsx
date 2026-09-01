@@ -25,7 +25,7 @@ import {
   SURFACE_OFFSET,
 } from './crawlerPhysics.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
-import { play } from '../utils/audio.js';
+import { feel } from '../utils/feel.js';
 import { isMobile as isMobileDevice } from '../utils/device.js';
 import { UI_FONT } from '../utils/uiTheme.js';
 
@@ -429,12 +429,12 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
 
   // --- Orb collection callback ---
   const handleOrbCollect = useCallback(() => {
-    play('/sounds/eat.mp3');
+    feel('orb');
     setOrbsCollected(prev => {
       const next = prev + 1;
       if (next >= CONFIG.orbCount) {
         setGameState('victory');
-        play('/sounds/victory.mp3');
+        feel('cubeSolved');
       }
       return next;
     });
@@ -442,13 +442,13 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
 
   // --- Damage callback ---
   const handleDamage = useCallback(() => {
-    play('/sounds/warp.mp3');
+    feel('exit');
     setHealth(prev => {
       const next = prev - 1;
       healthRef.current = next;
       if (next <= 0) {
         setGameState('gameover');
-        play('/sounds/gameover.mp3');
+        feel('death');
       }
       return next;
     });

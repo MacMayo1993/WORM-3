@@ -336,6 +336,42 @@ body {
   .flip-stat-punch { animation: none; }
 }
 
+/* ── Parity Point earn/spend readout ──────────────────────────────────────
+   The wallet chip used to flash a colour and never name the amount, so an
+   earn was visible only to someone already looking at the corner. This floats
+   the delta up out of the chip: the motion is what recruits the eye, the
+   number is what makes it mean something.
+
+   The keyframes own `transform` outright — the element is centred with
+   translate(-50%) inside them rather than inline, because an inline transform
+   would be overwritten mid-animation and snap the number off-centre. */
+.pp-float {
+  animation: pp-float 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Drifts UP but starts below the chip, so the whole travel stays on screen —
+   see the positioning note in ParityWallet. */
+@keyframes pp-float {
+  0%   { opacity: 0; transform: translate(-50%, 7px)   scale(0.88); }
+  16%  { opacity: 1; transform: translate(-50%, 1px)   scale(1.08); }
+  34%  { opacity: 1; transform: translate(-50%, -1px)  scale(1);    }
+  100% { opacity: 0; transform: translate(-50%, -9px)  scale(1);    }
+}
+
+/* Reduced motion still needs the number — it just holds still and fades.
+   `animation: none` is wrong here: the keyframes carry the centring, so
+   removing them would drop the number off to one side. */
+@media (prefers-reduced-motion: reduce) {
+  .pp-float {
+    animation: pp-float-still 1.4s ease-out forwards;
+  }
+}
+
+@keyframes pp-float-still {
+  0%, 78% { opacity: 1; transform: translate(-50%, 0); }
+  100%    { opacity: 0; transform: translate(-50%, 0); }
+}
+
 .top-bar-right {
   display: flex;
   align-items: center;

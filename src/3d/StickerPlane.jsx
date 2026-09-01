@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
-import { play, vibrateFlip } from '../utils/audio.js';
+import { feel } from '../utils/feel.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -1180,8 +1180,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         const dangerT = effectiveFlipCap > 0 ? Math.min(1, flips / effectiveFlipCap) : 0;
         fireFlipImpulse(_flipWorldN, 0.05 + dangerT * 0.035);
       }
-      play('/sounds/flip.mp3');
-      vibrateFlip(flips, effectiveFlipCap);
+      // One dispatch owns sound + haptics: feel() gates both on the player's
+      // settings, where the old direct vibrateFlip call ignored them.
+      feel('cubeFlip', { combo: flips, cap: effectiveFlipCap });
     }
     prevCurr.current = curr;
     prevFlips.current = flips;
