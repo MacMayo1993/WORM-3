@@ -12,7 +12,7 @@
 
 import { useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { play } from '../../utils/audio.js';
+import { feel } from '../../../utils/feel.js';
 
 /** Game event type constants shared by surface and tunnel modes. */
 export const GE = {
@@ -40,27 +40,27 @@ export function useGameEvents() {
   return useCallback((event) => {
     switch (event.type) {
       case GE.WARP:
-        play('/sounds/warp.mp3');
+        feel('exit');
         break;
 
       case GE.EAT_ORB:
-        play('/sounds/eat.mp3');
-        if (event.warpOccurred) play('/sounds/warp.mp3');
+        feel('orb');
+        if (event.warpOccurred) feel('exit');
         break;
 
       case GE.HEAL:
-        play('/sounds/eat.mp3');
+        feel('heal');
         if (event.cubies) setCubies(event.cubies);
         break;
 
       case GE.GAMEOVER:
-        play('/sounds/gameover.mp3');
+        feel('death');
         break;
 
       case GE.VICTORY:
         // eat sound plays first (the final orb was collected), then victory fanfare
-        play('/sounds/eat.mp3');
-        play('/sounds/victory.mp3');
+        feel('orb');
+        feel('cubeSolved');
         break;
 
       default:

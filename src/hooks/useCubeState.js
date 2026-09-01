@@ -12,7 +12,6 @@ import { flipStickerPair, canFlipStickerPair, findAntipodalStickerByGrid } from 
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker as healStickerState } from '../game/cubeState.js';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { play } from '../utils/audio.js';
 import { feel } from '../utils/feel.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -131,7 +130,7 @@ export function useCubeState() {
 
   // Apply rotation to cubies — single atomic setState (1 re-render instead of 3)
   const rotateSlice = useCallback((axis, sliceIndex, dir) => {
-    play('/sounds/rotate.mp3');
+    feel('cubeTurn', { combo: sliceIndex });
     useGameStore.setState((state) => ({
       cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
       rotationEpoch: state.rotationEpoch + 1,
@@ -199,7 +198,7 @@ export function useCubeState() {
             faceId: antSticker?.curr,
           },
         });
-        play('/sounds/rotate.mp3');
+        feel('cubeTurn');
         firstFlipInterceptedRef.current = true;
         firstFlipTimerRef.current = setTimeout(() => {
           firstFlipTimerRef.current = null;
@@ -377,7 +376,7 @@ export function useCubeState() {
     resetGame();
     clearHistory();
     clearRefractory();
-    play('/sounds/rotate.mp3');
+    feel('cubeReset');
   }, [size, setRotatedCubies, resetGame, clearHistory]);
 
   // Change cube size

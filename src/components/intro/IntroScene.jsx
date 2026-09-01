@@ -6,7 +6,7 @@ import IntroTunnel from '../../manifold/IntroTunnel.jsx';
 import WormParticle from '../../manifold/WormParticle.jsx';
 import ArrivalBurst from '../../manifold/ArrivalBurst.jsx';
 import { FACE_COLORS } from '../../utils/constants.js';
-import { play, vibrate } from '../../utils/audio.js';
+import { feel } from '../../utils/feel.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
 import {
   FULL_FLIP_START, FULL_FLIP_END,
@@ -366,7 +366,7 @@ const IntroScene = ({ time, onComplete }) => {
     setWormComplete(prev => ({ ...prev, [id]: true }));
     setShowBurst(prev   => ({ ...prev, [id]: true }));
     setBurstTimes(prev  => ({ ...prev, [id]: time }));
-    if (id === '1-1') { play('/sounds/flip.mp3'); vibrate(20); }
+    if (id === '1-1') { feel('cubeFlip', { combo: 0 }); }
   };
 
   // ── Pre-compute the center tile flip ───────────────────────────────────────

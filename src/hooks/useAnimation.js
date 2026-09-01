@@ -9,7 +9,7 @@ import { useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
-import { play, vibrate } from '../utils/audio.js';
+import { feel } from '../utils/feel.js';
 
 // Apply a move to the cube state. A move may turn one layer, or several parallel
 // layers at once — each with its OWN direction (the worm hazard turns two
@@ -103,7 +103,7 @@ export function useAnimation() {
       if (isUndo) {
         // Undo rotation: apply the inverse move to cubies, clear animation.
         // Do NOT increment moves or add to history — useUndo already handled both.
-        play('/sounds/rotate.mp3');
+        feel('cubeTurn', { combo: sliceIndex });
         useGameStore.setState((state) => ({
           cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
           rotationEpoch: state.rotationEpoch + 1,
@@ -123,8 +123,9 @@ export function useAnimation() {
           return;
         }
         // Shuffle move: commit silently — no moves counter, no undo history.
-        play('/sounds/rotate.mp3', 0.6);
-        vibrate(12);
+        // Sound only; see cubeShuffleTurn on why a scramble must not buzz. The
+        // vibrate(12) that used to sit here also bypassed the haptics setting.
+        feel('cubeShuffleTurn', { combo: sliceIndex });
         useGameStore.setState((state) => ({
           cubies: applyMove(state.cubies, size, axis, sliceIndex, dir, sliceIndices, sliceDirs),
           rotationEpoch: state.rotationEpoch + 1,
@@ -157,7 +158,7 @@ export function useAnimation() {
       // between them, preventing a frame where new sticker colours appear at old (rotated)
       // mesh positions (the "colour glitch after rotations").
       const numTurns = pm.numTurns ?? 1;
-      play('/sounds/rotate.mp3');
+      feel('cubeTurn', { combo: sliceIndex });
       useGameStore.setState((state) => {
         const c = applyMove(state.cubies, size, axis, sliceIndex, dir, sliceIndices, sliceDirs, numTurns);
         return {
@@ -192,7 +193,7 @@ export function useAnimation() {
     } else {
       // Apply all quarter-turns in a single atomic setState so no intermediate
       // render can fire between cubies, moves, and history updates.
-      play('/sounds/rotate.mp3');
+      feel('cubeTurn', { combo: sliceIndex });
       useGameStore.setState((state) => {
         let c = state.cubies;
         for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, state.size, axis, sliceIndex, dir);

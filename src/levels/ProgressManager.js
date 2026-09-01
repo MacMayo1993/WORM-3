@@ -23,6 +23,10 @@ const STORAGE_KEYS = {
   // completed-levels array: "done" for a daily means "done today", which a
   // set of level ids cannot express (see levels/dailyChallenge.js).
   DAILY: DAILY_STORAGE_KEY,
+  // One-time Parity Point awards that have no natural counter — a first
+  // Freeplay solve at a cube size, an algorithm run to the end, a Möbius loop.
+  // This ledger is what stops them being farmed (see levels/rewards.js).
+  MILESTONES: 'worm3_earned_milestones',
 };
 
 /**
@@ -49,6 +53,7 @@ class ProgressManager {
     this._levelStats = null;
     this._achievements = null;
     this._dailyRecord = null;
+    this._milestones = null;
 
     // Event listeners
     this._listeners = new Map();
@@ -137,6 +142,60 @@ class ProgressManager {
     }
 
     return { ...this._dailyRecord };
+  }
+
+  /**
+   * Load the claimed one-time award keys.
+   * @returns {string[]}
+   */
+  loadMilestones() {
+    if (this._milestones !== null) {
+      return [...this._milestones];
+    }
+
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.MILESTONES);
+      const parsed = saved ? JSON.parse(saved) : [];
+      // A corrupted ledger must fail CLOSED-ish: an empty list lets a player
+      // re-earn awards, which is far better than throwing on every level end.
+      this._milestones = Array.isArray(parsed) ? parsed.filter((k) => typeof k === 'string') : [];
+    } catch {
+      this._milestones = [];
+    }
+
+    return [...this._milestones];
+  }
+
+  /** Has this one-time award already been paid? */
+  hasMilestone(key) {
+    return this.loadMilestones().includes(key);
+  }
+
+  /**
+   * Claim a one-time award.
+   * @param {string} key
+   * @returns {boolean} true only on the FIRST claim — the caller pays on true
+   */
+  claimMilestone(key) {
+    if (typeof key !== 'string' || !key) return false;
+
+    const claimed = this.loadMilestones();
+    if (claimed.includes(key)) return false;
+
+    const next = [...claimed, key];
+    this._milestones = next;
+
+    if (this.autoSave) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.MILESTONES, JSON.stringify(next));
+      } catch {
+        // Ignore storage errors — the in-memory ledger still prevents a
+        // double-award inside this session.
+      }
+    }
+
+    this._emit('milestone-claimed', { key });
+    return true;
   }
 
   // ============================================================================
@@ -568,12 +627,16 @@ class ProgressManager {
     // The daily streak is progress too — leaving it behind would let a reset
     // player keep a run they can no longer see the history of.
     this._dailyRecord = emptyDailyRecord();
+    // Clearing the ledger deliberately makes the one-time awards earnable again:
+    // a reset player has to replay the levels, so they should be paid for it.
+    this._milestones = [];
 
     try {
       localStorage.removeItem(STORAGE_KEYS.COMPLETED_LEVELS);
       localStorage.removeItem(STORAGE_KEYS.LEVEL_STATS);
       localStorage.removeItem(STORAGE_KEYS.ACHIEVEMENTS);
       localStorage.removeItem(STORAGE_KEYS.DAILY);
+      localStorage.removeItem(STORAGE_KEYS.MILESTONES);
     } catch {
       // Ignore
     }

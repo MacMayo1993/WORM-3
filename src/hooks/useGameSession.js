@@ -7,6 +7,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { checkRubiksWin, allStickersFlipped } from '../game/winDetection.js';
+import { feel } from '../utils/feel.js';
 import { VICTORY } from '../utils/constants.js';
 
 /**
@@ -77,10 +78,15 @@ export function useGameSession() {
     const rubiksSolved = checkRubiksWin(cubies, size);
     const wormWin = rubiksSolved && allStickersFlipped(cubies, size);
 
+    // Solving the cube — the thing the whole mode is for — made no sound at all;
+    // the victory screen simply appeared. Fires once per win because the
+    // achievedWins guard already makes this branch once-per-session.
     if (wormWin && !achievedWins.worm) {
+      feel('cubeSolved');
       setVictory(VICTORY.WORM);
       setAchievedWins((prev) => ({ ...prev, worm: true }));
     } else if (rubiksSolved && !achievedWins.rubiks) {
+      feel('cubeSolved');
       setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));
     }

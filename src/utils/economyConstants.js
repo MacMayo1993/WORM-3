@@ -9,6 +9,24 @@ export const EARN_DISPARITY_BET_WIN = 0;        // base; multiplied by bet amoun
 export const EARN_DAILY_CHALLENGE = 100;        // flat bonus for completing daily challenge
 export const EARN_DISPARITY_TILE_RESTORE = 5;  // per tile restored from disparity in chaos game mode
 
+// ── Earning outside Worm and Chaos ────────────────────────────────────────────
+// Parity Points used to come from exactly two modes. Everything else — the three
+// campaigns, Freeplay, Random, Teach, Holonomy — paid nothing, so a player could
+// finish every authored level in the game and still be able to afford nothing in
+// the store beyond the one-off starting bankroll. These route the rest of the
+// game into the same wallet.
+//
+// All of them are ONE-TIME. A level pays on its first clear and again only for
+// stars it has never earned before (stars cap at three), and every other award
+// is claimed once against a persisted milestone key — so no amount of replaying
+// a solved level or re-running an algorithm farms points.
+export const EARN_LEVEL_FIRST_CLEAR = 15;    // any authored level, first completion
+export const EARN_LEVEL_STAR = 10;           // per NEW star, so ≤30 more per level
+export const EARN_FREEPLAY_FIRST_SOLVE = 25; // first Freeplay/Random solve at each cube size
+export const EARN_TEACH_ALGORITHM = 20;      // per algorithm executed to the end, once
+export const EARN_HOLONOMY_LOOP = 30;        // first closed holonomy loop
+export const EARN_HOLONOMY_MOBIUS = 60;      // first orientation-reversing loop — the RP² payoff
+
 // ── Disparity game lengths (shuffle counts) ───────────────────────────────────
 export const DISPARITY_GAME_LENGTHS = {
   short:  10,
