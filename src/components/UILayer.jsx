@@ -113,7 +113,7 @@ export default function UILayer({
 
   const {
     onReset, onShuffle, onShuffleForLevel, onChangeSize,
-    onSetChaosLevel, onSetAutoRotate, onSetSettings, onFaceImage, onSetVictory,
+    onSetChaosLevel, onSetAutoRotate, onSetSettings, onFaceImage,
     onTapFlip, onBackToMainMenu, onLevelSelect, onSelectPack, onBackToPackSelect, onCutsceneComplete,
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
@@ -125,7 +125,7 @@ export default function UILayer({
     onBetPlaced, onBetSkipped, speedThresholdSec,
     onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
-    onVictoryContinue, onVictoryNewGame,
+    onVictoryContinue, onVictoryNewGame, onVictoryMainMenu,
     onDemo,
     onDemoDisparityDismiss,
     demoViewSpotlight,
@@ -661,7 +661,9 @@ export default function UILayer({
             onContinue={onVictoryContinue} onNewGame={onVictoryNewGame}
             currentLevel={currentLevel} levelData={currentLevelData}
             onNextLevel={onNextLevel} hasNextLevel={hasNextLevel}
-            onMainMenu={() => { onSetVictory(null); onBackToMainMenu(); }}
+            // Records the completion before leaving — this used to clear the
+            // victory and walk out, silently discarding the solve.
+            onMainMenu={onVictoryMainMenu}
           />
         </Suspense>
       </ScreenTransition>

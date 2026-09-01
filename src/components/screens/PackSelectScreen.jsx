@@ -1,14 +1,29 @@
-// PackSelectScreen.jsx — choose a campaign.
+// PackSelectScreen.jsx — choose a campaign, or today's Daily Descent.
 //
 // Story used to open chapter 1 directly, so the chapter map was reachable only
 // from the in-game More sheet, and two shipped packs (Cube Academy, Algorithm
 // Codex) had no entry point at all. This is the front door: pick a pack, then
 // its chapter map.
 //
+// The Daily Descent sits above the campaigns because it expires — it is the one
+// thing on this screen that is different tomorrow. It is drawn by its own card
+// rather than as a fourth pack: there is no ladder to show progress against, so
+// a campaign card would have an empty progress bar and a meaningless "1 level".
+// Selecting it skips the chapter map entirely (see App.handleSelectPack).
+//
+// Achievements close the screen out. ProgressManager has recorded them since it
+// landed and nothing ever displayed them; the panel is inline and ambient, so it
+// never owns the screen and needs no hooks/uiSurfaces.js registration.
+//
 // Paper family: the player is deciding and the panel owns the screen.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { OFFICIAL_PACKS } from '../../levels/index.js';
+import {
+  DAILY_PACK_ID, dailyKeyFor, dailyLabelFor, dailyPlanFor, currentStreak,
+  msUntilNextLocalMidnight,
+} from '../../levels/dailyChallenge.js';
+import { EARN_DAILY_CHALLENGE } from '../../utils/economyConstants.js';
 import { progressManager } from '../../utils/levels.js';
 import {
   UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
@@ -17,6 +32,8 @@ import {
  Z, TEXT_MICRO } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
 import { useDialogBehavior } from '../ui/Panel.jsx';
+import DailyDescentCard from './DailyDescentCard.jsx';
+import AchievementsPanel from './AchievementsPanel.jsx';
 
 const STARS_PER_LEVEL = 3;
 const ACCENTS = {
@@ -32,12 +49,68 @@ const ACCENTS = {
 export default function PackSelectScreen({ onSelectPack, onBack }) {
   const [completed, setCompleted] = useState([]);
   const [stats, setStats] = useState({});
+  const [achievements, setAchievements] = useState([]);
   const [hovered, setHovered] = useState(null);
+
+  // Read once per render pass rather than per read, so the card cannot disagree
+  // with itself mid-paint — but NOT frozen for the life of the mount. A chooser
+  // left open across local midnight would otherwise sit on yesterday's date,
+  // par, solved state and streak while a click launched today's puzzle instead,
+  // so the card would advertise a puzzle the player does not get.
+  const [dateKey, setDateKey] = useState(() => dailyKeyFor());
+  const [daily, setDaily] = useState(null);
+
+  useEffect(() => {
+    let timer = null;
+
+    const sync = () => {
+      // Cheap and idempotent: setState with an unchanged string is a no-op, so
+      // a focus event that is not a rollover costs nothing.
+      setDateKey(dailyKeyFor());
+      clearTimeout(timer);
+      // +1s of slack so a timer that fires a hair early cannot re-read the old
+      // date and reschedule a near-zero timeout in a loop.
+      timer = setTimeout(sync, msUntilNextLocalMidnight() + 1000);
+    };
+
+    sync();
+
+    // A backgrounded tab throttles timers, and a sleeping phone stops them
+    // entirely — so returning to the screen re-checks rather than trusting that
+    // the midnight timer actually fired.
+    const onWake = () => { if (!document.hidden) sync(); };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
+  }, []);
 
   useEffect(() => {
     setCompleted(progressManager.loadProgress());
     setStats(progressManager.loadLevelStats());
-  }, []);
+    setAchievements(progressManager.loadAchievements());
+
+    // dailyPlanFor is pure arithmetic over the date — no storage, no cube build —
+    // so it is cheap enough to run on mount. A malformed stored record must not
+    // take the whole campaign chooser down with it, hence the guard.
+    try {
+      const record = progressManager.loadDailyRecord();
+      setDaily({
+        par: dailyPlanFor(dateKey).par,
+        solved: record.lastKey === dateKey,
+        streak: currentStreak(record, dateKey),
+        best: record.best ?? 0,
+        stars: record.lastKey === dateKey ? (record.lastStars ?? 0) : 0,
+        moves: record.lastKey === dateKey ? record.lastMoves : null,
+      });
+    } catch {
+      setDaily(null);
+    }
+  }, [dateKey]);
 
   // Bespoke chrome, so this takes the dialog behaviour directly rather
   // than becoming an <Overlay>: focus moves in on open and back out on
@@ -72,11 +145,26 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
             fontSize: 'clamp(26px, 7vw, 40px)', letterSpacing: '0.02em', lineHeight: 1,
           }}>Choose a campaign</h1>
           <p style={{ margin: 0, fontSize: '13px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>
-            Three of them, and they do not overtake each other — your progress in one is its own.
+            Today&rsquo;s puzzle, then three campaigns — and they do not overtake each other, so your
+            progress in one is its own.
           </p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '90px' }}>
+          {daily && (
+            <DailyDescentCard
+              dateLabel={dailyLabelFor(dateKey)}
+              par={daily.par}
+              solved={daily.solved}
+              streak={daily.streak}
+              best={daily.best}
+              stars={daily.stars}
+              moves={daily.moves}
+              reward={EARN_DAILY_CHALLENGE}
+              onPlay={() => onSelectPack(DAILY_PACK_ID)}
+            />
+          )}
+
           {OFFICIAL_PACKS.map((pack) => {
             const ids = pack.levels.map((l) => l.id);
             const done = ids.filter((id) => completed.includes(id)).length;
@@ -147,6 +235,8 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
               </button>
             );
           })}
+
+          <AchievementsPanel earned={achievements} />
         </div>
       </div>
 

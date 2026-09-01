@@ -17,7 +17,9 @@ import './App.css';
 
 // Utils
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
-import { completeLevel } from './utils/levels.js';
+import { DAILY_PACK_ID, DAILY_LEVEL_ID, ensureDailyPack } from './levels/dailyChallenge.js';
+import { recordLevelCompletion } from './levels/completion.js';
+import { EARN_DAILY_CHALLENGE } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { setFeelEnabled } from './utils/feel.js';
 import { makeCubies } from './game/cubeState.js';
@@ -777,8 +779,19 @@ export default function WORM3() {
     const st = useGameStore.getState();
     st.setActivePackId(packId);
     st.setShowPackSelect(false);
+
+    // The Daily Descent is one puzzle, not a ladder, so it skips the chapter map
+    // — a map holding a single card is a screen to click through, not a choice.
+    // Registering first is what makes getLevel(DAILY_LEVEL_ID) resolve; it also
+    // re-points the id if this session has been open since before midnight.
+    if (packId === DAILY_PACK_ID) {
+      ensureDailyPack();
+      handleLevelSelect(DAILY_LEVEL_ID);
+      return;
+    }
+
     st.setShowLevelSelect(true);
-  }, []);
+  }, [handleLevelSelect]);
 
   // The chapter map's back button returns to the chooser, not all the way out.
   const handleBackToPackSelect = useCallback(() => {
@@ -1189,24 +1202,49 @@ export default function WORM3() {
     shuffleForLevel();
   }, [levelTutorialClose, shuffleForLevel]);
 
+  // The rule itself lives in levels/completion.js so it is testable and has one
+  // home; every exit from the victory screen goes through this.
+  const recordCompletion = useCallback(() => {
+    recordLevelCompletion({
+      levelId: currentLevel,
+      levelData: currentLevelData,
+      stats: { moves, time: gameTime },
+      earn: (amount) => useGameStore.getState().earnCoins(amount),
+      dailyReward: EARN_DAILY_CHALLENGE,
+    });
+  }, [currentLevel, currentLevelData, moves, gameTime]);
+
   // Victory handlers
   const handleVictoryContinue = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
+    recordCompletion();
     setVictory(null);
-  }, [currentLevel, moves, gameTime, setVictory]);
+  }, [recordCompletion, setVictory]);
 
   const handleVictoryNewGame = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
+    recordCompletion();
     setVictory(null);
     if (currentLevelData) shuffleForLevel();
     else animatedShuffle();
-  }, [currentLevel, currentLevelData, moves, gameTime, setVictory, shuffleForLevel, animatedShuffle]);
+  }, [recordCompletion, currentLevelData, setVictory, shuffleForLevel, animatedShuffle]);
 
   const handleNextLevel = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
+    recordCompletion();
     levelHandleNextLevel();
     setVictory(null);
-  }, [currentLevel, moves, gameTime, levelHandleNextLevel, setVictory]);
+  }, [recordCompletion, levelHandleNextLevel, setVictory]);
+
+  // Leaving a solved level for the menu is still finishing it. This used to
+  // clear the victory and walk out without recording anything, so a player who
+  // solved a chapter and hit Main Menu lost the completion, its stars and the
+  // level it unlocked — and, once the daily existed, the streak and its purse
+  // too. Every exit from the victory screen records first.
+  // Routes through handleHomeFromGame, the same exit UILayer's other Main Menu
+  // buttons use, so leaving also unwinds demo mode and the Mega Mode FX override.
+  const handleVictoryMainMenu = useCallback(() => {
+    recordCompletion();
+    setVictory(null);
+    handleHomeFromGame();
+  }, [recordCompletion, setVictory, handleHomeFromGame]);
 
   // Dev console handlers
   const handlePreset = useCallback((presetId) => {
@@ -1583,7 +1621,6 @@ export default function WORM3() {
               onSetAutoRotate: setAutoRotateEnabled,
               onSetSettings: setSettings,
               onFaceImage: handleFaceImage,
-              onSetVictory: setVictory,
               onTapFlip,
               onBackToMainMenu: handleHomeFromGame,
               onLevelSelect: handleLevelSelect,
@@ -1647,6 +1684,7 @@ export default function WORM3() {
               onTileFaceRotation: handleTileFaceRotation,
               onVictoryContinue: handleVictoryContinue,
               onVictoryNewGame: handleVictoryNewGame,
+              onVictoryMainMenu: handleVictoryMainMenu,
             }}
           />
         </Suspense>

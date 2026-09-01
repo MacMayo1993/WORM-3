@@ -48,6 +48,12 @@ export const LEVEL_ID_RANGES = {
   // (antipodalLevelBridge). That pack is not registered by default — the
   // Topological Descent it generates is Story mode itself — so it is intentionally
   // omitted from this map, which only lists registered packs.
+  //
+  // 401–499 is likewise reserved, for the Daily Descent (levels/dailyChallenge.js).
+  // It holds one live id at a time: the daily pack is rebuilt and re-registered
+  // whenever the calendar date turns over, so a single id carries a different
+  // puzzle each day. Like the band above it is registered at runtime rather than
+  // shipped in BUILT_IN_PACKS, so it stays out of this map too.
 };
 
 export const BACKGROUNDS = {
