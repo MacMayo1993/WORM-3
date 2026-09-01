@@ -21,6 +21,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { OFFICIAL_PACKS } from '../../levels/index.js';
 import {
   DAILY_PACK_ID, dailyKeyFor, dailyLabelFor, dailyPlanFor, currentStreak,
+  msUntilNextLocalMidnight,
 } from '../../levels/dailyChallenge.js';
 import { EARN_DAILY_CHALLENGE } from '../../utils/economyConstants.js';
 import { progressManager } from '../../utils/levels.js';
@@ -51,10 +52,42 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
   const [achievements, setAchievements] = useState([]);
   const [hovered, setHovered] = useState(null);
 
-  // The date is read once per mount rather than per render, so the card cannot
-  // disagree with itself mid-paint if the clock rolls over between two reads.
-  const [dateKey] = useState(() => dailyKeyFor());
+  // Read once per render pass rather than per read, so the card cannot disagree
+  // with itself mid-paint — but NOT frozen for the life of the mount. A chooser
+  // left open across local midnight would otherwise sit on yesterday's date,
+  // par, solved state and streak while a click launched today's puzzle instead,
+  // so the card would advertise a puzzle the player does not get.
+  const [dateKey, setDateKey] = useState(() => dailyKeyFor());
   const [daily, setDaily] = useState(null);
+
+  useEffect(() => {
+    let timer = null;
+
+    const sync = () => {
+      // Cheap and idempotent: setState with an unchanged string is a no-op, so
+      // a focus event that is not a rollover costs nothing.
+      setDateKey(dailyKeyFor());
+      clearTimeout(timer);
+      // +1s of slack so a timer that fires a hair early cannot re-read the old
+      // date and reschedule a near-zero timeout in a loop.
+      timer = setTimeout(sync, msUntilNextLocalMidnight() + 1000);
+    };
+
+    sync();
+
+    // A backgrounded tab throttles timers, and a sleeping phone stops them
+    // entirely — so returning to the screen re-checks rather than trusting that
+    // the midnight timer actually fired.
+    const onWake = () => { if (!document.hidden) sync(); };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
+  }, []);
 
   useEffect(() => {
     setCompleted(progressManager.loadProgress());

@@ -8,6 +8,8 @@ import {
 import { levelsManager } from '../levels/LevelsManager.js';
 import { ProgressManager } from '../levels/ProgressManager.js';
 import { computeCDir } from '../levels/antipodalRandomizer.js';
+import { msUntilNextLocalMidnight } from '../levels/dailyChallenge.js';
+import { recordLevelCompletion } from '../levels/completion.js';
 import { LEVEL_ID_RANGES } from '../levels/schema.js';
 import { BUILT_IN_PACKS } from '../levels/packs/index.js';
 import { betaPairCount } from '../levels/antipodalLevelBridge.js';
@@ -194,6 +196,107 @@ describe('the daily is actually winnable, in exactly par', () => {
         }
       }
     }
+  });
+});
+
+describe('the level carries the day it is', () => {
+  it('stamps the build key onto the level', () => {
+    expect(buildDailyLevel(KEY).dailyKey).toBe(KEY);
+    expect(buildDailyLevel('2026-12-25').dailyKey).toBe('2026-12-25');
+  });
+
+  it('survives registration, so the played level still knows its date', () => {
+    _resetDailyRegistration();
+    ensureDailyPack(KEY);
+    // handleLevelSelect reads the level back out of the registry — the stamp has
+    // to survive _registerLevels' spread or the completion path loses the date.
+    expect(levelsManager.getLevel(DAILY_LEVEL_ID).dailyKey).toBe(KEY);
+    _resetDailyRegistration();
+  });
+});
+
+describe('msUntilNextLocalMidnight', () => {
+  it('measures to the next local midnight', () => {
+    // 21:00 local → 3 hours left.
+    expect(msUntilNextLocalMidnight(new Date(2026, 8, 1, 21, 0, 0))).toBe(3 * 3600_000);
+    expect(msUntilNextLocalMidnight(new Date(2026, 8, 1, 23, 59, 59))).toBe(1000);
+  });
+
+  it('never returns zero, so a midnight timer cannot spin', () => {
+    expect(msUntilNextLocalMidnight(new Date(2026, 8, 1, 0, 0, 0))).toBeGreaterThan(0);
+    expect(msUntilNextLocalMidnight(new Date(2026, 8, 1, 23, 59, 59, 999))).toBeGreaterThan(0);
+  });
+
+  it('crosses month and year ends', () => {
+    expect(msUntilNextLocalMidnight(new Date(2026, 7, 31, 23, 0, 0))).toBe(3600_000);
+    expect(msUntilNextLocalMidnight(new Date(2026, 11, 31, 23, 0, 0))).toBe(3600_000);
+  });
+});
+
+describe('recordLevelCompletion', () => {
+  let pm;
+  beforeEach(() => { pm = new ProgressManager({ testMode: false, autoSave: false }); });
+
+  const dailyLevel = (dateKey = KEY, par = 6) => ({ dailyKey: dateKey, par, id: DAILY_LEVEL_ID });
+
+  it('does nothing without a level — freeplay wins are not completions', () => {
+    expect(recordLevelCompletion({ levelId: null, progress: pm })).toEqual({ kind: 'none' });
+  });
+
+  it('records a campaign chapter through completeLevel', () => {
+    const out = recordLevelCompletion({ levelId: 1, stats: { moves: 3, time: 20 }, progress: pm });
+    expect(out.kind).toBe('level');
+    expect(pm.loadProgress()).toContain(1);
+  });
+
+  it('banks the daily against the key the LEVEL was built with, not the clock', () => {
+    // The 23:58 → 00:03 case: the level is yesterday's, so the solve is too.
+    const yesterday = '2026-09-01';
+    const out = recordLevelCompletion({
+      levelId: DAILY_LEVEL_ID,
+      levelData: dailyLevel(yesterday),
+      stats: { moves: 6 },
+      progress: pm,
+    });
+    expect(out.dateKey).toBe(yesterday);
+    expect(pm.isDailyComplete(yesterday)).toBe(true);
+    // The new day must NOT be marked complete before it has been played.
+    expect(pm.isDailyComplete('2026-09-02')).toBe(false);
+  });
+
+  it('keeps a midnight-crossing solve on the same streak rather than resetting it', () => {
+    // Solved the 1st on the 1st, then opened the 2nd's puzzle before midnight on
+    // the 2nd and finished it after — that is a two-day run, not a reset.
+    recordLevelCompletion({ levelId: DAILY_LEVEL_ID, levelData: dailyLevel('2026-09-01'), stats: { moves: 6 }, progress: pm });
+    const out = recordLevelCompletion({ levelId: DAILY_LEVEL_ID, levelData: dailyLevel('2026-09-02'), stats: { moves: 6 }, progress: pm });
+    expect(out.streak).toBe(2);
+  });
+
+  it('pays the purse once a day, however many times the day is replayed', () => {
+    const paid = [];
+    const args = { levelId: DAILY_LEVEL_ID, levelData: dailyLevel(), stats: { moves: 6 }, progress: pm, earn: (n) => paid.push(n), dailyReward: 100 };
+    recordLevelCompletion(args);
+    recordLevelCompletion(args);
+    recordLevelCompletion(args);
+    expect(paid).toEqual([100]);
+  });
+
+  it('pays nothing when no reward is configured', () => {
+    const paid = [];
+    recordLevelCompletion({ levelId: DAILY_LEVEL_ID, levelData: dailyLevel(), stats: { moves: 6 }, progress: pm, earn: (n) => paid.push(n) });
+    expect(paid).toEqual([]);
+  });
+
+  it('keeps the daily out of campaign completion', () => {
+    recordLevelCompletion({ levelId: DAILY_LEVEL_ID, levelData: dailyLevel(), stats: { moves: 6 }, progress: pm });
+    expect(pm.loadProgress()).not.toContain(DAILY_LEVEL_ID);
+  });
+
+  it('scores against the level’s own par', () => {
+    const out = recordLevelCompletion({
+      levelId: DAILY_LEVEL_ID, levelData: dailyLevel(KEY, 6), stats: { moves: 6 }, progress: pm,
+    });
+    expect(out.stars).toBe(3);
   });
 });
 

@@ -74,6 +74,7 @@ export {
   dailyKeyFor,
   previousDayKey,
   dailyLabelFor,
+  msUntilNextLocalMidnight,
   dailyPlanFor,
   dailyDifficultyFor,
   buildDailyLevel,

@@ -81,6 +81,19 @@ export function previousDayKey(dateKey) {
   return dailyKeyFor(new Date(y, m - 1, d - 1));
 }
 
+/**
+ * Milliseconds until the next local midnight — how long a rendered date key
+ * stays true. A screen that shows the day's puzzle has to re-derive its key on
+ * this boundary, or it sits on yesterday's date, par and streak indefinitely
+ * while a click launches today's puzzle instead.
+ *
+ * Always ≥ 1 so a caller scheduling a timeout cannot spin at exactly midnight.
+ */
+export function msUntilNextLocalMidnight(now = new Date()) {
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return Math.max(1, next.getTime() - now.getTime());
+}
+
 /** A human date for the header — 'Monday 1 September'. */
 export function dailyLabelFor(dateKey, locale = undefined) {
   const [y, m, d] = String(dateKey).split('-').map(Number);
@@ -141,7 +154,7 @@ export function dailyDifficultyFor(par) {
 export function buildDailyLevel(dateKey) {
   const plan = dailyPlanFor(dateKey);
 
-  return buildPlayableAntipodalLevel({
+  const level = buildPlayableAntipodalLevel({
     id: DAILY_LEVEL_ID,
     size: plan.size,
     targetPar: plan.par,
@@ -164,6 +177,15 @@ export function buildDailyLevel(dateKey) {
       requirements: { previousLevel: null, stars: 0, achievements: [] }
     }
   });
+
+  // The level carries the day it IS, so completion is recorded against the
+  // puzzle actually played rather than against whatever the clock says at the
+  // moment of victory. A player who opens the daily at 23:58 and solves it at
+  // 00:03 has solved YESTERDAY's puzzle: reading the clock afresh there would
+  // bank it under the new date, which resets or wrongly extends the streak,
+  // pays the new day's purse, and marks a puzzle complete before it is played.
+  // createLevel drops fields it does not know, so this is stamped on after.
+  return { ...level, dailyKey: dateKey };
 }
 
 /** The one-level pack the daily is played through. */
