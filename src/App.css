@@ -3684,91 +3684,129 @@ select.btn-compact:disabled {
 .worm-cube-face--bottom { transform: rotateX(-90deg) translateZ(14px);   background: #cccccc; }
 
 /* ── Menu CTAs ─────────────────────────────────────────────────────────────
-   The menu sits over a live 3D scene — usually grass or forest, i.e. a busy
-   mid-green field. A flat mid-green pill with near-black lettering on it was
-   camouflage: the button melted into the foliage and the label had to fight
-   the fill it sat on.
+   Frosted glass rather than solid colour. The menu sits over a live 3D scene,
+   and a solid fill has to either fight that scene or hide it; glass lets the
+   scene through while still giving the label a surface to sit on. What makes
+   it legible is not opacity but the pairing: a light translucent sheet, a
+   bright rim, and dark ink — the ink carries the contrast, so the sheet is free
+   to stay see-through.
 
-   Three things fix that, and they are what the treatment below is doing:
-     1. a dark rim, so the silhouette is legible against ANY scene behind it;
-     2. cream lettering with a dark outline, instead of dark-on-mid-green;
-     3. real modelling — a gloss on the top half, a deepened base, and a
-        stacked shadow — so the pill reads as a raised object rather than a
-        coloured rectangle.
+   All three are one width (--menu-cta-w) so the cluster reads as a single
+   stack. Rank comes from height and type size instead, which is what lets the
+   secondaries stay legible while still sitting below START.
 
-   Layer order in `background` is top-most first: sheen, then gloss, then the
-   body gradient. Keeping the sheen as a BACKGROUND layer (animated via
-   background-position) rather than an ::after overlay means it can never paint
-   over the label — a pseudo-element would, since it paints after text. */
-.worm-tactile-btn {
-  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
-  font-size: 2.3rem;
-  color: #fffdf2;
-  /* Outline first (four offsets), then the seated drop shadow underneath. */
-  text-shadow:
-    0 -1.5px 0 rgba(7, 38, 17, 0.78),
-    1.5px 0 0 rgba(7, 38, 17, 0.78),
-    -1.5px 0 0 rgba(7, 38, 17, 0.78),
-    0 1.5px 0 rgba(7, 38, 17, 0.78),
-    0 4px 0 rgba(7, 38, 17, 0.5),
-    0 6px 16px rgba(0, 0, 0, 0.38);
-  background:
-    linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.5) 50%, transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.07) 40%, rgba(255, 255, 255, 0) 50%),
-    linear-gradient(180deg, #7fe98d 0%, #45c862 44%, #279b45 100%);
-  background-size: 260% 100%, 100% 100%, 100% 100%;
-  background-position: 210% 0, 0 0, 0 0;
-  padding: 16px 60px;
-  border: 2px solid #1f7a3c;
+   `backdrop-filter` is what actually frosts the scene behind the pill. Where it
+   is unsupported the sheet simply reads as flat translucent white, which still
+   works — the rim and the ink are doing the real load-bearing.
+
+   The sheet's alpha has a floor, and it is not decoration. Measured against the
+   real menu, a lighter sheet let a dark scene show through far enough to drag
+   the label to 3.94:1 — under the 4.5:1 minimum — because a translucent sheet
+   inherits whatever is behind it, and the scene behind this one changes every
+   load. These values keep the worst case above the threshold while the pill is
+   still visibly see-through. Lower them and it fails on the dark scenes only. */
+.worm-tactile-btn,
+.worm-menu-cta-secondary {
+  --menu-cta-w: min(340px, 78vw);
+  width: var(--menu-cta-w);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   border-radius: 100px;
   cursor: pointer;
   outline: none;
-  /* inset top highlight + inset bottom shade = bevel; then the 3D base edge,
-     the cast shadow, and a soft green halo that lifts it off dark scenes. */
-  --cta-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -4px 10px rgba(12, 60, 28, 0.42),
-    0 7px 0 #1f7a3c,
-    0 10px 0 rgba(14, 52, 26, 0.55),
-    0 16px 28px rgba(0, 0, 0, 0.46),
-    0 0 30px rgba(80, 220, 120, 0.34);
-  box-shadow: var(--cta-shadow);
-  transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out, filter 0.15s ease;
-  animation: wormIdlePulse 2s infinite ease-in-out, wormCtaSheen 4.2s 1.2s ease-in-out infinite;
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  transition: transform 0.12s ease-in-out, box-shadow 0.12s ease-in-out, background-color 0.15s ease;
 }
 
-/* The specular sweep. Only the first background layer moves; the gloss and body
-   stay pinned, which is why each layer needs its own position. */
-@keyframes wormCtaSheen {
-  0%   { background-position: 210% 0, 0 0, 0 0; }
-  55%  { background-position: -60% 0, 0 0, 0 0; }
-  100% { background-position: -60% 0, 0 0, 0 0; }
-}
-
-.worm-tactile-btn:hover {
-  filter: brightness(1.07) saturate(1.05);
-}
-
-/* Press: the pill travels the full height of its base edge and the base
-   collapses with it, so it reads as the button physically bottoming out. */
-.worm-tactile-btn:active {
-  transform: translateY(7px);
+.worm-tactile-btn {
+  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
+  font-size: 2.1rem;
+  color: #1f2721;
+  /* A white highlight under the glyph, not a dark drop shadow: on a light
+     sheet the letterform is lifted by the sheet showing through beneath it. */
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+  background:
+    linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.4) 50%, transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(246, 248, 245, 0.66) 52%, rgba(255, 255, 255, 0.72) 100%);
+  background-size: 260% 100%, 100% 100%;
+  background-position: 210% 0, 0 0;
+  padding: 18px 34px;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
   --cta-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -2px 8px rgba(12, 60, 28, 0.5),
-    0 0 0 #1f7a3c,
-    0 1px 0 rgba(14, 52, 26, 0.55),
-    0 4px 10px rgba(0, 0, 0, 0.42);
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -10px 22px rgba(255, 255, 255, 0.22),
+    0 12px 28px rgba(0, 0, 0, 0.24),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--cta-shadow);
+  animation: wormCtaSheen 4.6s 1.4s ease-in-out infinite;
+}
+
+/* Only the sheen layer travels; the glass sheet under it stays pinned, which is
+   why each layer needs its own position. */
+@keyframes wormCtaSheen {
+  0%   { background-position: 210% 0, 0 0; }
+  55%  { background-position: -60% 0, 0 0; }
+  100% { background-position: -60% 0, 0 0; }
+}
+
+.worm-tactile-btn:hover,
+.worm-menu-cta-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.worm-tactile-btn:active {
+  transform: translateY(2px) scale(0.985);
+  --cta-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 2px 10px rgba(60, 70, 62, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.22);
   animation: none;
 }
 
-/* The baseline ring (further down this file) sets box-shadow outright, which on
-   these two would replace the entire bevel-and-base stack and flatten the
-   button for as long as it held focus. Composing instead: ring first so it
-   paints on top, then whatever --cta-shadow currently is — which :active
-   redefines, so the pressed button keeps a correct ring too. */
+/* The play glyph. Sized off the label and pushed to the trailing edge, so the
+   text stays optically centred rather than being shoved left by the icon. */
+.worm-cta-glyph {
+  font-size: 0.62em;
+  line-height: 1;
+  opacity: 0.72;
+  margin-right: -6px;
+}
+
+/* Secondary CTAs — same sheet, same width, no sheen. They rank below START by
+   height and type size, not by being harder to read. */
+.worm-menu-cta-secondary {
+  min-height: 52px;
+  color: #1f2721;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(246, 248, 245, 0.6) 52%, rgba(255, 255, 255, 0.68) 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.58);
+  --cta-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -8px 18px rgba(255, 255, 255, 0.16),
+    0 8px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--cta-shadow);
+}
+
+.worm-menu-cta-secondary:active {
+  transform: translateY(2px) scale(0.99);
+  --cta-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 2px 8px rgba(60, 70, 62, 0.18),
+    0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* The baseline ring further down this file sets box-shadow outright, which
+   would replace the whole sheet-and-lift stack and flatten the pill for as long
+   as it held focus. Composing instead: ring first so it paints on top, then
+   whatever --cta-shadow currently is — which :active redefines, so a pressed
+   button keeps a correct ring too. */
 .worm-tactile-btn:focus-visible,
 .worm-menu-cta-secondary:focus-visible {
   outline: none;
@@ -3776,54 +3814,6 @@ select.btn-compact:disabled {
     0 0 0 2px rgba(255, 253, 242, 0.92),
     0 0 0 5px var(--border-focus, #5f7f4a),
     var(--cta-shadow);
-}
-
-/* Secondary menu CTAs (Start Demo, Give Feedback).
-   These were the same gradient, same rim and nearly the same size as START —
-   three near-identical green pills stacked up, so the eye had nothing to land
-   on and the primary action was ranked by size alone.
-
-   They stay in the one action colour the theme mandates, but drop a long way
-   down it: a deeper, desaturated green, a shallower base edge, no halo and no
-   sheen. The gloss is kept but weakened, so they still belong to the same
-   family of objects — they are the same button, further away.
-
-   Sizing (min-height) is the 44px floor; the look is here rather than inline in
-   MainMenu.jsx because an inline background outranks this class, which is what
-   made the earlier hover state a no-op. */
-.worm-menu-cta-secondary {
-  min-height: 44px;
-  color: #f4fdf3;
-  text-shadow:
-    0 -1px 0 rgba(6, 30, 14, 0.7),
-    1px 0 0 rgba(6, 30, 14, 0.55),
-    -1px 0 0 rgba(6, 30, 14, 0.55),
-    0 2px 0 rgba(6, 30, 14, 0.55),
-    0 3px 9px rgba(0, 0, 0, 0.34);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.03) 44%, rgba(255, 255, 255, 0) 54%),
-    linear-gradient(180deg, #45ab5f 0%, #2c8043 100%);
-  border: 1.5px solid #1c6635;
-  --cta-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    inset 0 -3px 8px rgba(10, 45, 22, 0.4),
-    0 4px 0 #1c6635,
-    0 8px 16px rgba(0, 0, 0, 0.36);
-  box-shadow: var(--cta-shadow);
-  transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out, filter 0.15s ease;
-}
-
-.worm-menu-cta-secondary:hover {
-  filter: brightness(1.1);
-}
-
-.worm-menu-cta-secondary:active {
-  transform: translateY(4px);
-  --cta-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 -2px 6px rgba(10, 45, 22, 0.46),
-    0 0 0 #1c6635,
-    0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1418,7 +1418,10 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
       type="button"
       className="worm-tactile-btn"
       onClick={onClick}
-    >START</button>
+    >
+      START
+      <span className="worm-cta-glyph" aria-hidden="true">&#9654;</span>
+    </button>
     {onDemo && (
       <button
         type="button"
@@ -1433,13 +1436,10 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
         // outrank the class and silently disable it.
         className="worm-menu-cta-secondary"
         style={{
-          borderRadius: '100px',
-          padding: '11px 34px',
-          fontSize: '14px',
+          fontSize: '15px',
           fontWeight: 800,
           fontFamily: UI_FONT,
-          letterSpacing: '0.12em',
-          cursor: 'pointer',
+          letterSpacing: '0.1em',
           textTransform: 'uppercase',
         }}
       >Start Demo</button>
@@ -1451,17 +1451,14 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
       // Same green family as START, smallest of the three so the hierarchy is
       // START → Start Demo → Give Feedback while all read as one action colour.
       style={{
-        borderRadius: '100px',
-        padding: '9px 26px',
-        fontSize: '12px',
+        // Quietest of the three — ranked by type size, not by opacity: fading
+        // the element fades its rim too, and on a glass sheet the rim is what
+        // separates the pill from the scene showing through it.
+        fontSize: '13px',
         fontWeight: 700,
         fontFamily: UI_FONT,
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
-        cursor: 'pointer',
-        // Quietest of the three — but ranked by size, not opacity: fading the
-        // element fades its rim and outline too, which is exactly the edge
-        // definition the scene behind it makes expensive to lose.
       }}
     >Give Feedback</button>
   </div>
