@@ -1,0 +1,362 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  DAILY_LEVEL_ID, DAILY_PACK_ID, DAILY_PAR_MIN, DAILY_PAR_MAX, DAILY_CUBE_SIZE,
+  dailyKeyFor, previousDayKey, dailyPlanFor, buildDailyLevel, buildDailyPack,
+  ensureDailyPack, _resetDailyRegistration,
+  emptyDailyRecord, advanceStreak, isDailyDone, currentStreak,
+} from '../levels/dailyChallenge.js';
+import { levelsManager } from '../levels/LevelsManager.js';
+import { ProgressManager } from '../levels/ProgressManager.js';
+import { computeCDir } from '../levels/antipodalRandomizer.js';
+import { LEVEL_ID_RANGES } from '../levels/schema.js';
+import { BUILT_IN_PACKS } from '../levels/packs/index.js';
+import { betaPairCount } from '../levels/antipodalLevelBridge.js';
+import { ACHIEVEMENTS, ACHIEVEMENT_IDS, getAchievement, decorateAchievements } from '../levels/achievements.js';
+import { buildLevelStartState } from '../levels/levelStaging.js';
+import { checkRubiksWin } from '../game/winDetection.js';
+import { buildManifoldGridMap, unflipStickerPair } from '../game/manifoldLogic.js';
+import { makeCubies } from '../game/cubeState.js';
+
+const KEY = '2026-09-01';
+
+describe('dailyKeyFor / previousDayKey', () => {
+  it('formats a local calendar date, zero-padded', () => {
+    expect(dailyKeyFor(new Date(2026, 8, 1))).toBe('2026-09-01');
+    expect(dailyKeyFor(new Date(2026, 0, 9))).toBe('2026-01-09');
+  });
+
+  it('uses local time, not UTC — the key must not shift with the clock offset', () => {
+    // 23:30 local on the 1st is still the 1st, however far the UTC date has moved.
+    expect(dailyKeyFor(new Date(2026, 8, 1, 23, 30))).toBe('2026-09-01');
+    expect(dailyKeyFor(new Date(2026, 8, 1, 0, 30))).toBe('2026-09-01');
+  });
+
+  it('rejects an unusable date rather than silently keying off NaN', () => {
+    expect(() => dailyKeyFor(new Date('nonsense'))).toThrow(TypeError);
+  });
+
+  it('walks back across month, year and leap boundaries', () => {
+    expect(previousDayKey('2026-09-02')).toBe('2026-09-01');
+    expect(previousDayKey('2026-09-01')).toBe('2026-08-31');
+    expect(previousDayKey('2026-01-01')).toBe('2025-12-31');
+    expect(previousDayKey('2024-03-01')).toBe('2024-02-29'); // leap year
+    expect(previousDayKey('2026-03-01')).toBe('2026-02-28');
+  });
+});
+
+describe('dailyPlanFor', () => {
+  it('is deterministic — the same date is the same puzzle for everyone', () => {
+    expect(dailyPlanFor(KEY)).toEqual(dailyPlanFor(KEY));
+  });
+
+  it('gives different days different draws', () => {
+    const week = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05']
+      .map((k) => JSON.stringify(dailyPlanFor(k)));
+    expect(new Set(week).size).toBeGreaterThan(1);
+  });
+
+  it('keeps par inside the published band, on a cube that can hold it', () => {
+    for (let d = 1; d <= 28; d++) {
+      const plan = dailyPlanFor(`2026-09-${String(d).padStart(2, '0')}`);
+      expect(plan.par).toBeGreaterThanOrEqual(DAILY_PAR_MIN);
+      expect(plan.par).toBeLessThanOrEqual(DAILY_PAR_MAX);
+      expect(plan.par).toBeLessThanOrEqual(betaPairCount(DAILY_CUBE_SIZE));
+    }
+  });
+
+  it('draws only symmetric fibres, so classic paired flips can actually stage it', () => {
+    // n_A > 0 is unreachable by paired native flips (antipodalLevelBridge header).
+    // generateLevelState RELAXES an unsatisfiable nARange instead of throwing, so
+    // this is the assertion that catches a P too small for the requested par.
+    for (let d = 1; d <= 28; d++) {
+      const plan = dailyPlanFor(`2026-10-${String(d).padStart(2, '0')}`);
+      expect(plan.nA).toBe(0);
+      expect(plan.par).toBeLessThanOrEqual(Math.floor(plan.P / 2));
+    }
+  });
+
+  it('scores the player against the fibre’s exact analytic par', () => {
+    for (let d = 1; d <= 14; d++) {
+      const plan = dailyPlanFor(`2026-11-${String(d).padStart(2, '0')}`);
+      expect(computeCDir(plan.n00, plan.n11, plan.nA)).toBe(plan.par);
+    }
+  });
+});
+
+describe('buildDailyLevel', () => {
+  it('authors exactly par flips and no scramble turns', () => {
+    const plan = dailyPlanFor(KEY);
+    const level = buildDailyLevel(KEY);
+    expect(level.id).toBe(DAILY_LEVEL_ID);
+    expect(level.par).toBe(plan.par);
+    expect(level.flipSequence).toHaveLength(plan.par);
+    expect(level.scrambleSequence).toBeNull();
+    expect(level.cubeSize).toBe(DAILY_CUBE_SIZE);
+    expect(level.features.flips).toBe(true);
+  });
+
+  it('flips distinct β-pairs, so par is genuinely reachable in par taps', () => {
+    const level = buildDailyLevel(KEY);
+    const keys = level.flipSequence.map((f) => `${f.x},${f.y},${f.z},${f.dirKey}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('is byte-identical for the same date and different across dates', () => {
+    expect(buildDailyLevel(KEY)).toEqual(buildDailyLevel(KEY));
+    expect(buildDailyLevel(KEY)).not.toEqual(buildDailyLevel('2026-09-02'));
+  });
+
+  it('opens with no next level — a daily is one puzzle, not a ladder', () => {
+    expect(buildDailyPack(KEY).levels).toHaveLength(1);
+  });
+});
+
+describe('ensureDailyPack', () => {
+  afterEach(() => _resetDailyRegistration());
+
+  it('registers the day so the normal level routing can resolve it', () => {
+    // The whole reason the feature was unreachable: getLevel(401) returned null.
+    _resetDailyRegistration();
+    expect(levelsManager.getLevel(DAILY_LEVEL_ID)).toBeNull();
+    ensureDailyPack(KEY);
+    expect(levelsManager.getLevel(DAILY_LEVEL_ID)).not.toBeNull();
+    expect(levelsManager.getLevel(DAILY_LEVEL_ID).par).toBe(dailyPlanFor(KEY).par);
+  });
+
+  it('re-points the id at the new puzzle when the day turns over', () => {
+    ensureDailyPack(KEY);
+    const first = levelsManager.getLevel(DAILY_LEVEL_ID).flipSequence;
+    ensureDailyPack('2026-09-02');
+    const second = levelsManager.getLevel(DAILY_LEVEL_ID).flipSequence;
+    expect(second).not.toEqual(first);
+  });
+
+  it('is idempotent within a day and leaves no duplicate pack behind', () => {
+    ensureDailyPack(KEY);
+    ensureDailyPack(KEY);
+    ensureDailyPack(KEY);
+    expect(levelsManager.getPack(DAILY_PACK_ID).levels).toHaveLength(1);
+  });
+
+  it('does not offer a next level, so victory cannot walk off the end', () => {
+    ensureDailyPack(KEY);
+    expect(levelsManager.getNextLevel(DAILY_LEVEL_ID)).toBeNull();
+  });
+
+  it('leaves the story campaign’s length — and so the completionist award — alone', () => {
+    const before = levelsManager.getTotalLevels();
+    ensureDailyPack(KEY);
+    expect(levelsManager.getTotalLevels()).toBe(before);
+  });
+});
+
+describe('the daily is actually winnable, in exactly par', () => {
+  // The end-to-end guarantee the whole feature rests on: today's puzzle can be
+  // staged, and undoing its authored flips — one tap per pair, par taps total —
+  // reaches a solved cube that the live win detector accepts. A daily that
+  // generated but could not be solved would look completely fine until a player
+  // sat in front of an unwinnable board.
+  const solveByUnflipping = (level) => {
+    let state = buildLevelStartState(level, level.cubeSize);
+    expect(checkRubiksWin(state, level.cubeSize)).toBe(false); // genuinely disturbed
+    const map = buildManifoldGridMap(state, level.cubeSize);
+    for (const { x, y, z, dirKey } of level.flipSequence) {
+      state = unflipStickerPair(state, level.cubeSize, x, y, z, dirKey, map);
+    }
+    return state;
+  };
+
+  it('stages disturbed and solves in par taps', () => {
+    const level = buildDailyLevel(KEY);
+    const solved = solveByUnflipping(level);
+    expect(checkRubiksWin(solved, level.cubeSize)).toBe(true);
+    expect(level.flipSequence).toHaveLength(level.par);
+  });
+
+  it('holds for a run of consecutive days, not just a lucky one', () => {
+    for (let d = 1; d <= 12; d++) {
+      const key = `2026-12-${String(d).padStart(2, '0')}`;
+      const level = buildDailyLevel(key);
+      expect(checkRubiksWin(solveByUnflipping(level), level.cubeSize), `daily ${key} unsolvable`).toBe(true);
+    }
+  });
+
+  it('restores the cube to the solved colouring it started from', () => {
+    const level = buildDailyLevel(KEY);
+    const solved = solveByUnflipping(level);
+    const pristine = makeCubies(level.cubeSize);
+    for (let x = 0; x < level.cubeSize; x++) {
+      for (let y = 0; y < level.cubeSize; y++) {
+        for (let z = 0; z < level.cubeSize; z++) {
+          for (const dir of Object.keys(pristine[x][y][z].stickers)) {
+            expect(solved[x][y][z].stickers[dir].curr).toBe(pristine[x][y][z].stickers[dir].curr);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('daily id band', () => {
+  // The daily is registered at runtime, so it is deliberately absent from
+  // LEVEL_ID_RANGES (which algorithmCodex.test.js asserts holds only statically
+  // registered packs). These are the collision guards that map would have given.
+  it('sits inside the reserved 401–499 band', () => {
+    expect(DAILY_LEVEL_ID).toBeGreaterThanOrEqual(401);
+    expect(DAILY_LEVEL_ID).toBeLessThanOrEqual(499);
+  });
+
+  it('cannot collide with any shipped pack’s ids', () => {
+    for (const [packId, [lo, hi]] of Object.entries(LEVEL_ID_RANGES)) {
+      expect(DAILY_LEVEL_ID < lo || DAILY_LEVEL_ID > hi, `overlaps ${packId}`).toBe(true);
+    }
+    for (const pack of Object.values(BUILT_IN_PACKS)) {
+      for (const level of pack.levels) expect(level.id).not.toBe(DAILY_LEVEL_ID);
+    }
+  });
+
+  it('stays out of BUILT_IN_PACKS — the daily is built per-day, never shipped', () => {
+    expect(Object.keys(BUILT_IN_PACKS)).not.toContain(DAILY_PACK_ID);
+  });
+});
+
+describe('streak arithmetic', () => {
+  it('starts a run at one', () => {
+    expect(advanceStreak(emptyDailyRecord(), KEY)).toMatchObject({ current: 1, best: 1, total: 1, lastKey: KEY });
+  });
+
+  it('extends across consecutive days', () => {
+    let r = emptyDailyRecord();
+    for (const k of ['2026-09-01', '2026-09-02', '2026-09-03']) r = advanceStreak(r, k);
+    expect(r).toMatchObject({ current: 3, best: 3, total: 3 });
+  });
+
+  it('resets the run on a missed day but keeps the best and the total', () => {
+    let r = emptyDailyRecord();
+    for (const k of ['2026-09-01', '2026-09-02', '2026-09-03']) r = advanceStreak(r, k);
+    r = advanceStreak(r, '2026-09-05'); // skipped the 4th
+    expect(r).toMatchObject({ current: 1, best: 3, total: 4 });
+  });
+
+  it('counts a day once however many times it is replayed', () => {
+    let r = advanceStreak(emptyDailyRecord(), KEY);
+    r = advanceStreak(r, KEY);
+    r = advanceStreak(r, KEY);
+    expect(r).toMatchObject({ current: 1, total: 1 });
+  });
+
+  it('bridges a month boundary', () => {
+    let r = advanceStreak(emptyDailyRecord(), '2026-08-31');
+    r = advanceStreak(r, '2026-09-01');
+    expect(r.current).toBe(2);
+  });
+
+  it('tolerates a null or partial record from an older build', () => {
+    expect(advanceStreak(null, KEY).current).toBe(1);
+    expect(advanceStreak({ lastKey: previousDayKey(KEY), current: 4 }, KEY)).toMatchObject({ current: 5, best: 5 });
+  });
+
+  it('reports a lapsed run as zero rather than advertising a streak a solve would reset', () => {
+    const r = advanceStreak(emptyDailyRecord(), '2026-09-01');
+    expect(currentStreak(r, '2026-09-01')).toBe(1); // solved today
+    expect(currentStreak(r, '2026-09-02')).toBe(1); // still live — today is unplayed
+    expect(currentStreak(r, '2026-09-03')).toBe(0); // lapsed
+    expect(currentStreak(emptyDailyRecord(), KEY)).toBe(0);
+  });
+
+  it('knows whether today is already done', () => {
+    const r = advanceStreak(emptyDailyRecord(), KEY);
+    expect(isDailyDone(r, KEY)).toBe(true);
+    expect(isDailyDone(r, '2026-09-02')).toBe(false);
+  });
+});
+
+describe('progressManager daily record', () => {
+  let pm;
+  beforeEach(() => { pm = new ProgressManager({ testMode: false, autoSave: false }); });
+
+  it('starts empty and reports no streak', () => {
+    expect(pm.loadDailyRecord()).toMatchObject({ lastKey: null, current: 0, total: 0 });
+    expect(pm.isDailyComplete(KEY)).toBe(false);
+    expect(pm.getDailyStreak(KEY)).toBe(0);
+  });
+
+  it('records a solve, its streak and its golf stars', () => {
+    const res = pm.completeDailyChallenge(KEY, { par: 6, moves: 6, time: 40 });
+    expect(res.stars).toBe(3);          // par exactly
+    expect(res.isFirstToday).toBe(true);
+    expect(res.streak).toBe(1);
+    expect(pm.isDailyComplete(KEY)).toBe(true);
+  });
+
+  it('grades over par the same way story levels are graded', () => {
+    expect(pm.completeDailyChallenge('2026-09-10', { par: 6, moves: 8 }).stars).toBe(2);
+    expect(pm.completeDailyChallenge('2026-09-11', { par: 6, moves: 40 }).stars).toBe(1);
+  });
+
+  it('does not touch campaign completion — the daily id is not a chapter', () => {
+    pm.completeDailyChallenge(KEY, { par: 5, moves: 5 });
+    expect(pm.loadProgress()).not.toContain(DAILY_LEVEL_ID);
+  });
+
+  it('keeps the day’s best when the same day is replayed, and does not double the streak', () => {
+    pm.completeDailyChallenge(KEY, { par: 6, moves: 20 });
+    const again = pm.completeDailyChallenge(KEY, { par: 6, moves: 6 });
+    expect(again.isFirstToday).toBe(false);
+    expect(again.streak).toBe(1);
+    expect(pm.loadDailyRecord()).toMatchObject({ total: 1, lastMoves: 6, lastStars: 3 });
+  });
+
+  it('awards the daily achievements at their thresholds, once each', () => {
+    expect(pm.completeDailyChallenge('2026-09-01', { par: 6, moves: 9 }).newAchievements).toContain('daily_first');
+    expect(pm.completeDailyChallenge('2026-09-02', { par: 6, moves: 9 }).newAchievements).toEqual([]);
+    expect(pm.completeDailyChallenge('2026-09-03', { par: 6, moves: 9 }).newAchievements).toContain('daily_streak_3');
+
+    for (const d of ['04', '05', '06']) pm.completeDailyChallenge(`2026-09-${d}`, { par: 6, moves: 9 });
+    expect(pm.completeDailyChallenge('2026-09-07', { par: 6, moves: 9 }).newAchievements).toContain('daily_streak_7');
+  });
+
+  it('awards the par achievement only for a par-or-better solve', () => {
+    expect(pm.completeDailyChallenge('2026-09-01', { par: 6, moves: 9 }).newAchievements).not.toContain('daily_par');
+    expect(pm.completeDailyChallenge('2026-09-02', { par: 6, moves: 6 }).newAchievements).toContain('daily_par');
+  });
+
+  it('clears the streak when progress is reset', () => {
+    pm.completeDailyChallenge(KEY, { par: 6, moves: 6 });
+    pm.resetAllProgress(true);
+    expect(pm.loadDailyRecord()).toMatchObject({ lastKey: null, current: 0, total: 0 });
+  });
+});
+
+describe('achievement catalogue', () => {
+  it('has unique ids, and a label, description and glyph for each', () => {
+    expect(new Set(ACHIEVEMENT_IDS).size).toBe(ACHIEVEMENTS.length);
+    for (const a of ACHIEVEMENTS) {
+      expect(a.label.length).toBeGreaterThan(0);
+      expect(a.description.length).toBeGreaterThan(0);
+      expect(a.glyph.length).toBeGreaterThan(0);
+      expect(['campaign', 'daily']).toContain(a.group);
+    }
+  });
+
+  it('catalogues every id ProgressManager can actually grant', () => {
+    // A granted id with no entry here would render as a blank card.
+    const granted = ['first_steps', 'topology_master', 'speed_demon', 'perfectionist', 'completionist',
+      'daily_first', 'daily_streak_3', 'daily_streak_7', 'daily_par'];
+    for (const id of granted) expect(ACHIEVEMENT_IDS).toContain(id);
+  });
+
+  it('degrades readably for an id from another build instead of blanking', () => {
+    const unknown = getAchievement('from_the_future');
+    expect(unknown.label).toBe('From The Future');
+    expect(unknown.glyph).toBe('?');
+  });
+
+  it('marks what is earned and never drops an award the player holds', () => {
+    const decorated = decorateAchievements(['perfectionist', 'from_the_future']);
+    expect(decorated.find((a) => a.id === 'perfectionist').earned).toBe(true);
+    expect(decorated.find((a) => a.id === 'first_steps').earned).toBe(false);
+    expect(decorated.find((a) => a.id === 'from_the_future')).toMatchObject({ earned: true });
+    expect(decorateAchievements()).toHaveLength(ACHIEVEMENTS.length);
+  });
+});

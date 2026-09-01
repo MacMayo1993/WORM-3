@@ -62,6 +62,38 @@ export {
   makeRng
 } from './antipodalRandomizer.js';
 
+// The Daily Descent — one procedural antipodal puzzle a day, built on the bridge
+// below and registered into LevelsManager so the normal level routing resolves it.
+export {
+  DAILY_PACK_ID,
+  DAILY_LEVEL_ID,
+  DAILY_STORAGE_KEY,
+  DAILY_CUBE_SIZE,
+  DAILY_PAR_MIN,
+  DAILY_PAR_MAX,
+  dailyKeyFor,
+  previousDayKey,
+  dailyLabelFor,
+  dailyPlanFor,
+  dailyDifficultyFor,
+  buildDailyLevel,
+  buildDailyPack,
+  ensureDailyPack,
+  emptyDailyRecord,
+  isDailyDone,
+  advanceStreak,
+  currentStreak
+} from './dailyChallenge.js';
+
+// The player-facing names for the awards ProgressManager records.
+export {
+  ACHIEVEMENTS,
+  ACHIEVEMENT_IDS,
+  getAchievement,
+  isKnownAchievement,
+  decorateAchievements
+} from './achievements.js';
+
 // Bridge from the abstract fibre par formula to playable CLASSIC flip-solve levels.
 export {
   betaPairAnchors,

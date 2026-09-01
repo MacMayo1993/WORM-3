@@ -17,7 +17,9 @@ import './App.css';
 
 // Utils
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
-import { completeLevel } from './utils/levels.js';
+import { completeLevel, progressManager } from './utils/levels.js';
+import { DAILY_PACK_ID, DAILY_LEVEL_ID, dailyKeyFor, ensureDailyPack } from './levels/dailyChallenge.js';
+import { EARN_DAILY_CHALLENGE } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { setFeelEnabled } from './utils/feel.js';
 import { makeCubies } from './game/cubeState.js';
@@ -777,8 +779,19 @@ export default function WORM3() {
     const st = useGameStore.getState();
     st.setActivePackId(packId);
     st.setShowPackSelect(false);
+
+    // The Daily Descent is one puzzle, not a ladder, so it skips the chapter map
+    // — a map holding a single card is a screen to click through, not a choice.
+    // Registering first is what makes getLevel(DAILY_LEVEL_ID) resolve; it also
+    // re-points the id if this session has been open since before midnight.
+    if (packId === DAILY_PACK_ID) {
+      ensureDailyPack();
+      handleLevelSelect(DAILY_LEVEL_ID);
+      return;
+    }
+
     st.setShowLevelSelect(true);
-  }, []);
+  }, [handleLevelSelect]);
 
   // The chapter map's back button returns to the chooser, not all the way out.
   const handleBackToPackSelect = useCallback(() => {
@@ -1189,24 +1202,47 @@ export default function WORM3() {
     shuffleForLevel();
   }, [levelTutorialClose, shuffleForLevel]);
 
+  // Record a finished level. The Daily Descent is deliberately NOT routed through
+  // completeLevel: it reuses one level id for a different puzzle every day, so a
+  // flat "completed" flag and best-moves stats keyed on that id would be
+  // meaningless. It keeps its own dated record instead (levels/dailyChallenge.js).
+  const recordCompletion = useCallback(() => {
+    if (!currentLevel) return;
+
+    if (currentLevel === DAILY_LEVEL_ID) {
+      const dateKey = dailyKeyFor();
+      const firstToday = !progressManager.isDailyComplete(dateKey);
+      progressManager.completeDailyChallenge(dateKey, {
+        par: currentLevelData?.par ?? null,
+        moves,
+        time: gameTime,
+      });
+      // The daily's purse is paid once a day, not once per replay.
+      if (firstToday) useGameStore.getState().earnCoins(EARN_DAILY_CHALLENGE);
+      return;
+    }
+
+    completeLevel(currentLevel, { moves, time: gameTime });
+  }, [currentLevel, currentLevelData, moves, gameTime]);
+
   // Victory handlers
   const handleVictoryContinue = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
+    recordCompletion();
     setVictory(null);
-  }, [currentLevel, moves, gameTime, setVictory]);
+  }, [recordCompletion, setVictory]);
 
   const handleVictoryNewGame = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
+    recordCompletion();
     setVictory(null);
     if (currentLevelData) shuffleForLevel();
     else animatedShuffle();
-  }, [currentLevel, currentLevelData, moves, gameTime, setVictory, shuffleForLevel, animatedShuffle]);
+  }, [recordCompletion, currentLevelData, setVictory, shuffleForLevel, animatedShuffle]);
 
   const handleNextLevel = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
+    recordCompletion();
     levelHandleNextLevel();
     setVictory(null);
-  }, [currentLevel, moves, gameTime, levelHandleNextLevel, setVictory]);
+  }, [recordCompletion, levelHandleNextLevel, setVictory]);
 
   // Dev console handlers
   const handlePreset = useCallback((presetId) => {

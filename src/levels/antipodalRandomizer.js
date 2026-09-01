@@ -268,9 +268,21 @@ export function generateCampaign(seed = 20260821) {
 /**
  * The daily procedural challenge: one shared puzzle keyed off a calendar date
  * (e.g. '2026-08-21') so every player worldwide faces the identical par.
+ *
+ * `nARange` is forwarded to generateLevelState. It matters for playability: the
+ * classic staging model authors levels with *paired* native flips, which can
+ * only realise symmetric fibres (n_A = 0), so levels/dailyChallenge.js pins the
+ * band to [0, 0]. Omitting it keeps the original unconstrained draw, which is
+ * still the right shape for an abstract-fibre consumer.
  */
-export function generateDailyChallenge(dateKey, { P = 8, targetPar = 5 } = {}) {
-  const synth = generateLevelState({ P, targetPar, balance: 'highAmbiguity', seed: `daily:${dateKey}` });
+export function generateDailyChallenge(dateKey, { P = 8, targetPar = 5, nARange } = {}) {
+  const synth = generateLevelState({
+    P,
+    targetPar,
+    nARange: nARange ?? [0, P],
+    balance: 'highAmbiguity',
+    seed: `daily:${dateKey}`
+  });
   return { dateKey, name: `Daily Descent — ${dateKey}`, ...synth };
 }
 

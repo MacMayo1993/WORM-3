@@ -7,6 +7,10 @@
 
 import { levelsManager } from './LevelsManager.js';
 import { computeStars } from './scoring.js';
+import { starsForMoves } from './antipodalRandomizer.js';
+import {
+  DAILY_STORAGE_KEY, emptyDailyRecord, advanceStreak, isDailyDone, currentStreak,
+} from './dailyChallenge.js';
 import { UNLOCK_ALL } from '../utils/testUnlock.js';
 
 // Storage keys
@@ -15,6 +19,10 @@ const STORAGE_KEYS = {
   LEVEL_STATS: 'worm3_level_stats',
   ACHIEVEMENTS: 'worm3_achievements',
   SETTINGS: 'worm3_progress_settings',
+  // The Daily Descent keeps its own record rather than joining the flat
+  // completed-levels array: "done" for a daily means "done today", which a
+  // set of level ids cannot express (see levels/dailyChallenge.js).
+  DAILY: DAILY_STORAGE_KEY,
 };
 
 /**
@@ -40,6 +48,7 @@ class ProgressManager {
     this._completedLevels = null;
     this._levelStats = null;
     this._achievements = null;
+    this._dailyRecord = null;
 
     // Event listeners
     this._listeners = new Map();
@@ -106,6 +115,30 @@ class ProgressManager {
     return [...this._achievements];
   }
 
+  /**
+   * Load the Daily Descent record (streak, best, total, last result).
+   * @returns {Object} always a complete record — never null
+   */
+  loadDailyRecord() {
+    if (this._dailyRecord !== null) {
+      return { ...this._dailyRecord };
+    }
+
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.DAILY);
+      const parsed = saved ? JSON.parse(saved) : null;
+      // Merged onto the empty shape so a record written by an older build (or a
+      // hand-edited one) still has every field the UI reads.
+      this._dailyRecord = parsed && typeof parsed === 'object'
+        ? { ...emptyDailyRecord(), ...parsed }
+        : emptyDailyRecord();
+    } catch {
+      this._dailyRecord = emptyDailyRecord();
+    }
+
+    return { ...this._dailyRecord };
+  }
+
   // ============================================================================
   // PROGRESS SAVING
   // ============================================================================
@@ -163,6 +196,24 @@ class ProgressManager {
     }
 
     this._emit('achievements-updated', { achievements });
+  }
+
+  /**
+   * Persist the Daily Descent record.
+   * @param {Object} record
+   */
+  saveDailyRecord(record) {
+    this._dailyRecord = { ...record };
+
+    if (this.autoSave) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.DAILY, JSON.stringify(this._dailyRecord));
+      } catch {
+        // Ignore storage errors
+      }
+    }
+
+    this._emit('daily-updated', { record: { ...this._dailyRecord } });
   }
 
   // ============================================================================
@@ -277,6 +328,86 @@ class ProgressManager {
     }
 
     return newAchievements;
+  }
+
+  /**
+   * Grant `ids` that are not already held, persisting only if any are new.
+   * @private
+   * @returns {string[]} the ids actually newly granted
+   */
+  _awardAchievements(ids) {
+    const held = this.loadAchievements();
+    const fresh = [...new Set(ids)].filter((id) => !held.includes(id));
+    if (fresh.length > 0) this.saveAchievements([...held, ...fresh]);
+    return fresh;
+  }
+
+  // ============================================================================
+  // DAILY DESCENT
+  // ============================================================================
+
+  /**
+   * Has today's Daily Descent already been solved?
+   * @param {string} dateKey - 'YYYY-MM-DD' (see dailyChallenge.dailyKeyFor)
+   */
+  isDailyComplete(dateKey) {
+    return isDailyDone(this.loadDailyRecord(), dateKey);
+  }
+
+  /**
+   * The streak as it stands on `dateKey` — 0 once a run has lapsed, so the UI
+   * never advertises a streak that the next solve would reset.
+   * @param {string} dateKey
+   */
+  getDailyStreak(dateKey) {
+    return currentStreak(this.loadDailyRecord(), dateKey);
+  }
+
+  /**
+   * Record a Daily Descent solve.
+   *
+   * Deliberately NOT routed through completeLevel: the daily reuses one level id
+   * for a different puzzle every day, so a flat "completed" flag and best-moves
+   * stats keyed on that id would be meaningless (yesterday's 6 moves are not
+   * comparable to today's par-9 draw). Replaying the same day is a no-op on the
+   * streak but still refreshes the day's best result.
+   *
+   * @param {string} dateKey - 'YYYY-MM-DD'
+   * @param {{ par: number, moves?: number, time?: number }} result
+   * @returns {{ record, stars, isFirstToday, streak, newAchievements }}
+   */
+  completeDailyChallenge(dateKey, result = {}) {
+    const previous = this.loadDailyRecord();
+    const isFirstToday = !isDailyDone(previous, dateKey);
+
+    const par = Number.isFinite(result.par) ? result.par : null;
+    const moves = Number.isFinite(result.moves) ? result.moves : null;
+    // Golf scoring against the day's exact analytic par. Falls back to one star
+    // for a completion we cannot measure, matching computeStars' own floor.
+    const stars = par != null && moves != null ? starsForMoves(par, moves) : 1;
+
+    const advanced = advanceStreak(previous, dateKey);
+    const record = {
+      ...advanced,
+      lastPar: par,
+      // Keep the day's BEST result when the same day is replayed.
+      lastMoves: !isFirstToday && previous.lastMoves != null && moves != null
+        ? Math.min(previous.lastMoves, moves)
+        : moves,
+      lastStars: isFirstToday ? stars : Math.max(previous.lastStars ?? 0, stars),
+    };
+
+    this.saveDailyRecord(record);
+
+    const earned = ['daily_first'];
+    if (record.current >= 3) earned.push('daily_streak_3');
+    if (record.current >= 7) earned.push('daily_streak_7');
+    if (par != null && moves != null && moves <= par) earned.push('daily_par');
+    const newAchievements = this._awardAchievements(earned);
+
+    this._emit('daily-completed', { dateKey, record, stars, isFirstToday, newAchievements });
+
+    return { record, stars, isFirstToday, streak: record.current, newAchievements };
   }
 
   // ============================================================================
@@ -434,11 +565,15 @@ class ProgressManager {
     this._completedLevels = [];
     this._levelStats = {};
     this._achievements = [];
+    // The daily streak is progress too — leaving it behind would let a reset
+    // player keep a run they can no longer see the history of.
+    this._dailyRecord = emptyDailyRecord();
 
     try {
       localStorage.removeItem(STORAGE_KEYS.COMPLETED_LEVELS);
       localStorage.removeItem(STORAGE_KEYS.LEVEL_STATS);
       localStorage.removeItem(STORAGE_KEYS.ACHIEVEMENTS);
+      localStorage.removeItem(STORAGE_KEYS.DAILY);
     } catch {
       // Ignore
     }
