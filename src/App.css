@@ -4029,8 +4029,8 @@ select.btn-compact:disabled {
      as it is a night sky, and gold on yellow disappears. */
   color: #fffdf2;
   /* The scrim behind this is deliberately light, so the line carries its own
-     dark halo instead of leaning on it — the scene under the title is a bright
-     pavement as often as it is a night sky, and gold on both has to work. */
+     dark halo rather than leaning on it — cream over a sunlit pavement needs
+     the halo to hold its edge. */
   text-shadow:
     0 1px 2px rgba(10, 13, 8, 0.95),
     0 0 7px rgba(10, 13, 8, 0.85),
@@ -4073,6 +4073,14 @@ select.btn-compact:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* The backdrop's mount fade is an inline transition on the element, so a
+     plain declaration here would lose to it — !important is what actually
+     reaches it. Without this, someone who asked for no motion still got a
+     900ms full-screen opacity fade on every menu mount. */
+  .worm-menu-backdrop {
+    transition: none !important;
+  }
+
   .worm-menu-stagelight,
   .worm-menu-tagline {
     animation: none !important;
