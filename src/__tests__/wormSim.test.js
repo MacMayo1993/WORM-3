@@ -13,6 +13,7 @@ import {
   queueTurn,
   jumpLiftOf,
   tileKey,
+  CORNER_STEP_LENGTH,
 } from '../worm/healerWorm/wormSim.js';
 import {
   MAX_TICK_DELTA,
@@ -27,7 +28,9 @@ import {
   MAX_ACTIVE_TUNNEL_PAIRS,
 } from '../worm/healerWorm/constants.js';
 import { makeCubies } from '../game/cubeState.js';
+import * as THREE from 'three';
 import { liveRotation } from '../worm/liveRotation.js';
+import { inchCrawlAdvance } from '../worm/healerWorm/inchGait.js';
 import { ttAt } from '../worm/circularBuffers.js';
 
 const SIZE = 3;
@@ -604,5 +607,93 @@ describe('applyRotationToSim', () => {
     expect(sim.moveDir).toBe('up'); // untouched during scramble
     // Paused snap: render head position matches the (rotated) logical tile
     expect(sim.headInterpPos.distanceTo(sim.curWorldPos)).toBeLessThan(1e-9);
+  });
+});
+
+describe('crawl distance the Inch Worm gait rides on', () => {
+  // The gait pins its loops to spots on the cube, so it needs the distance the head
+  // has actually TRAVELLED. WormBody derives that from interpT — the sim's own
+  // progress through the current step — rather than from how far headInterpPos
+  // moved, because plenty of things move the head without it travelling. These
+  // tests hold the two properties that makes rest on: the sim's progress is
+  // untouched by anything that is not crawling, and scaling it by the step's world
+  // length recovers the real path length.
+
+  // The few lines WormBody runs each frame, kept in step with it.
+  function makeDriver() {
+    let prevInterpT = 0;
+    let phase = 0;
+    return {
+      get phase() { return phase; },
+      frame(sim) {
+        const stepLen = sim.crossingCorner || !sim.prevWorldPos
+          ? CORNER_STEP_LENGTH
+          : sim.prevWorldPos.distanceTo(sim.curWorldPos);
+        const d = sim.phase === 'crawling' ? inchCrawlAdvance(sim.interpT, prevInterpT, stepLen) : 0;
+        prevInterpT = sim.interpT;
+        phase += d;
+        return d;
+      }
+    };
+  }
+
+  it('stays at zero while the head bobs but the simulation is frozen', () => {
+    // HealerWormMode's spawn bounce and countdown breathing write headInterpPos
+    // along the face normal and return before ticking the sim. sim.phase reads
+    // 'crawling' throughout, so only the frozen interpT keeps the gait flat.
+    const sim = makeSim();
+    const driver = makeDriver();
+    driver.frame(sim); // settle the driver's previous-interpT
+    const norm = sim.currentNormal.clone();
+    for (let frame = 0; frame < 240; frame++) {
+      const breathe = Math.sin(frame * 0.06) * 0.03;
+      sim.headInterpPos.copy(sim.curWorldPos).addScaledVector(norm, 0.08 + breathe);
+      expect(driver.frame(sim)).toBe(0);
+    }
+    expect(driver.phase).toBe(0);
+  });
+
+  it('stays at zero for a stationary worm riding a turning slice', () => {
+    // A live rotation moves the head through the world without the worm crawling —
+    // and the body's path points ride the same turn, so the loops travel with the
+    // cube already. Counting the ride as travel would slide them along the body.
+    const sim = makeSim();
+    const driver = makeDriver();
+    driver.frame(sim);
+    const before = sim.interpT;
+    liveRotation.active = true;
+    liveRotation.axis = 'row';
+    liveRotation.sliceIndex = 1;
+    for (let frame = 0; frame < 60; frame++) {
+      liveRotation.angle = (frame / 60) * (Math.PI / 2);
+      sim.headInterpPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.01);
+      expect(driver.frame(sim)).toBe(0);
+    }
+    expect(sim.interpT).toBe(before); // nothing but stepWormSim writes it
+    expect(driver.phase).toBe(0);
+  });
+
+  it('matches the distance the head really travelled while crawling', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const driver = makeDriver();
+    driver.frame(sim);
+    // Trace the head's own path, sampling finely enough that the polyline is a fair
+    // stand-in for the curve — including the pivot around a cube edge.
+    let traced = 0;
+    let sawCorner = false;
+    const prev = sim.headInterpPos.clone();
+    const dt = 1 / 240;
+    for (let i = 0; i < 240 * 6; i++) {
+      stepWormSim(sim, dt, SIZE, ctx);
+      if (sim.phase !== 'crawling') break;
+      if (sim.crossingCorner) sawCorner = true;
+      traced += prev.distanceTo(sim.headInterpPos);
+      prev.copy(sim.headInterpPos);
+      driver.frame(sim);
+    }
+    expect(sawCorner).toBe(true);          // the run really did round an edge
+    expect(traced).toBeGreaterThan(2);     // ...and covered real ground
+    expect(driver.phase).toBeCloseTo(traced, 1);
   });
 });

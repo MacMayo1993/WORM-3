@@ -985,6 +985,15 @@ function spawnElementalOffering(sim, size, ctx) {
 // sim-owned vector). Returns the surface normal — a direct reference to a
 // FACE_NORMALS constant in the straight-crawl case (no allocation), or the shared
 // corner-blend scratch for the rare corner-lerp midpoint.
+/**
+ * How far off the old face the corner-crossing pivot sits. The head travels out to
+ * this vertex and back down onto the new face, so a step around a cube edge is
+ * CORNER_STEP_LENGTH of world travel rather than one tile's worth — WormBody needs
+ * that to turn the sim's progress through a step into world distance.
+ */
+export const CORNER_VERTEX_LIFT = 0.52;
+export const CORNER_STEP_LENGTH = 2 * CORNER_VERTEX_LIFT;
+
 function evaluatePosAndNormal(sim, tValue, outPos) {
     const pWorld = sim.prevWorldPos;
     const cWorld = sim.curWorldPos;
@@ -995,7 +1004,7 @@ function evaluatePosAndNormal(sim, tValue, outPos) {
         if (sim.crossingCorner) {
             const oldNormal = FACE_NORMALS[sim.prevDirKey];
             const newNormal = FACE_NORMALS[sim.pos.dirKey];
-            _evalCornerVtx.copy(pWorld).addScaledVector(newNormal, 0.52);
+            _evalCornerVtx.copy(pWorld).addScaledVector(newNormal, CORNER_VERTEX_LIFT);
 
             if (tValue < 0.45) {
                 outPos.copy(pWorld).lerp(_evalCornerVtx, tValue / 0.45);

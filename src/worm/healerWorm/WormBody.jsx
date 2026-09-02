@@ -44,7 +44,8 @@ import {
     WINDOUT_SEGMENT_DT,
     windoutHeadS,
 } from './constants.js';
-import { inchGaitInto, inchLoopShape, INCH_BALL_SPACING } from './inchGait.js';
+import { inchGaitInto, inchLoopShape, inchCrawlAdvance, INCH_BALL_SPACING } from './inchGait.js';
+import { CORNER_STEP_LENGTH } from './wormSim.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
@@ -208,8 +209,10 @@ export function WormBody({ worm, size }) {
     isWiggleRef.current = isWiggle;
     const isPrismRef = useRef(isPrism);
     isPrismRef.current = isPrism;
-    // Inch Worm accordion gait state — advances with real crawl distance (not wall-clock),
-    // so the body bunches/extends in lockstep with movement and relaxes when the worm stops.
+    // Inch Worm gait state — the phase is the distance the head has actually crawled
+    // along the surface, in world units (not wall-clock), because that is the unit
+    // inchGait.js pins its loops to the ground in. `move` eases 0..1 so the body lies
+    // back down when the worm stops.
     const gaitPhaseRef = useRef(0);
     const prevInterpTRef = useRef(0);
     const gaitMoveRef = useRef(0);
@@ -309,26 +312,32 @@ export function WormBody({ worm, size }) {
             }
         }
 
-        // ── Inch Worm accordion driver ─────────────────────────────────────────
-        // interpT runs 0→1 within each tile step; its per-frame delta (with wrap) is the
-        // distance actually crawled this frame. Accumulate it into a gait phase so the
-        // compress→extend cycle stays synced to real movement, and ease a 0..1 "moving"
-        // factor that drops to 0 when idle so the body smoothly spreads back out at rest.
+        // ── Inch Worm gait driver ──────────────────────────────────────────────
+        // How far the head crawled along the surface this frame — see inchCrawlAdvance
+        // in inchGait.js for why that is read off the simulation's own step progress
+        // rather than off how far headInterpPos moved.
         const _interpNow = worm.interpT.current;
-        let _dCrawl = _interpNow - prevInterpTRef.current;
-        if (_dCrawl < -0.5) _dCrawl += 1;                 // wrapped into the next tile
-        if (_dCrawl < 0 || _dCrawl > 0.5) _dCrawl = 0;    // reset / teleport guard
+        const _prevWP = worm.prevWorldPos.current;
+        // World length of the step in progress. A corner crossing routes out to a pivot
+        // vertex above the edge and back down onto the next face; anywhere else the head
+        // runs straight from one tile centre to the next.
+        const _stepLen = worm.crossingCorner.current || !_prevWP
+            ? CORNER_STEP_LENGTH
+            : _prevWP.distanceTo(worm.curWorldPos.current);
+        const _dCrawl = worm.phase.current === 'crawling'
+            ? inchCrawlAdvance(_interpNow, prevInterpTRef.current, _stepLen)
+            : 0;
         prevInterpTRef.current = _interpNow;
-        const _moveTarget = (worm.phase.current === 'crawling' && _dCrawl > 1e-5) ? 1 : 0;
+        const _moveTarget = _dCrawl > 0 ? 1 : 0;
         gaitMoveRef.current += (_moveTarget - gaitMoveRef.current) * Math.min(1, delta * 6);
-        gaitPhaseRef.current += _dCrawl;                  // accordion phase advances with crawl distance
+        gaitPhaseRef.current += _dCrawl;
         const _gaitMove = gaitMoveRef.current;
         const _gaitPhase = gaitPhaseRef.current;
-        // Loop geometry for the current body length — see inchGait.js. Loops are
-        // pinned to world positions and the body pours through them, so the rear-up
-        // stays put like the beads climbing through the jump's stored arc. Height is
-        // three quarters of the jump's apex once the worm is long enough to make an
-        // arch that tall; a short one rears in proportion to the body it has.
+        // Loop geometry for the current body length — see inchGait.js. Loops are pinned
+        // to world positions and the body pours through them, so the rear-up stays put
+        // like the beads climbing through the jump's stored arc. Both the width and the
+        // height of a loop come from the body's own length: a fresh worm gets one small
+        // loop scaled to itself, a grown one a train of them.
         const _inchShape = _isInch ? inchLoopShape(Math.min(MAX_TAIL, tLen)) : null;
         const _humpHeight = _inchShape ? _inchShape.height : 0;
 
@@ -482,11 +491,10 @@ export function WormBody({ worm, size }) {
                 // must not also be drawn here — two heads, one inside the other.
                 if (_isBook) _wormDummy.scale.setScalar(0.00001);
             } else {
-                // Inch Worm: a train of humps travelling up the body, one per wavelength.
-                // `dist` is where along the path this segment sits (the accordion), `arch`
-                // is how far it rides up off the surface (the hump) — both local to the
-                // segment, so a long body ripples instead of inflating and whipping. See
-                // inchGait.js for why the old length-scaled pulse came apart.
+                // Inch Worm: loops planted on the ground with the body pouring through
+                // them. `dist` is where along the path this segment sits and `arch` is how
+                // far it rides up off the surface; the two are solved together so bead
+                // spacing stays constant through a loop. See inchGait.js.
                 let _inchArch = 0;
                 let targetDist;
                 if (_isInch) {
