@@ -1492,10 +1492,10 @@ export const MenuTitleCard = ({ visible }) => (
   }}>
     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
       <div style={{ display: 'flex', transform: 'skewX(-5deg)' }}>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0s', color: '#ef4444' }}>W</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.15s', color: '#f97316' }}>O</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.30s', color: '#22c55e' }}>R</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.45s', color: '#3b82f6' }}>M</span>
+        <span className="worm-title-letter" style={{ '--bounce-delay': '0s', color: '#ef4444', '--glow': 'rgba(239,68,68,0.55)' }}>W</span>
+        <span className="worm-title-letter" style={{ '--bounce-delay': '0.15s', color: '#f97316', '--glow': 'rgba(249,115,22,0.55)' }}>O</span>
+        <span className="worm-title-letter" style={{ '--bounce-delay': '0.30s', color: '#22c55e', '--glow': 'rgba(34,197,94,0.55)' }}>R</span>
+        <span className="worm-title-letter" style={{ '--bounce-delay': '0.45s', color: '#3b82f6', '--glow': 'rgba(59,130,246,0.55)' }}>M</span>
       </div>
       <div className="worm-cube-sup">
         <div className="worm-cube-inner">
@@ -1508,6 +1508,35 @@ export const MenuTitleCard = ({ visible }) => (
         </div>
       </div>
     </div>
+    {/* One line of eyebrow type, ruled on both sides. It fills the gap between
+        the wordmark and the cube and answers the question a first-time player
+        actually has: what is the cube in front of me doing? */}
+    <div className="worm-menu-tagline">Every face is linked to its opposite</div>
+  </div>
+);
+
+// ─── Backdrop ─────────────────────────────────────────────────────────────────
+// The menu draws over whatever environment the 3D scene happened to load, and
+// those backdrops are bright, busy and mid-tone — the same range the wordmark,
+// the cube and the CTAs live in, which is why nothing separated from anything.
+// This stages the shot: a warm key light behind the cube, a vignette that drops
+// the corners, and a scrim at each end to seat the title and the button stack.
+// Purely presentational, and pointer-transparent, so the cube underneath keeps
+// its tap-to-restyle and shake-to-play behaviour.
+const MenuBackdrop = ({ visible }) => (
+  <div
+    className="worm-menu-backdrop"
+    aria-hidden="true"
+    style={{
+      position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
+      opacity: visible ? 1 : 0,
+      transition: 'opacity 0.9s ease'
+    }}
+  >
+    <div className="worm-menu-stagelight" />
+    <div className="worm-menu-vignette" />
+    <div className="worm-menu-scrim-top" />
+    <div className="worm-menu-scrim-bottom" />
   </div>
 );
 
@@ -1536,6 +1565,7 @@ const MainMenu = ({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
+      <MenuBackdrop visible={titleVisible} />
       <MenuTitleCard visible={titleVisible} />
       <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
     </div>
