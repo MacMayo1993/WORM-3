@@ -18,12 +18,14 @@ import {
   inchGaitInto,
   inchLoopShape,
   inchHumpCount,
+  inchCrawlAdvance,
   INCH_BALL_SPACING,
   INCH_ARCH_ASPECT,
   INCH_ARCH_DUTY,
   INCH_MAX_PITCH,
   INCH_SKEW
 } from '../worm/healerWorm/inchGait.js';
+import { CORNER_STEP_LENGTH } from '../worm/healerWorm/wormSim.js';
 
 const gait = (i, count, phase, move = 1) => {
   const out = { dist: 0, arch: 0 };
@@ -303,5 +305,67 @@ describe('inch worm gait', () => {
     expect(gait(0, 1, 2.5)).toEqual({ dist: 0, arch: 0 });
     expect(inchHumpCount(1)).toBe(0);
     expect(inchHumpCount(0)).toBe(0);
+  });
+});
+
+// ── The phase the gait runs on ──────────────────────────────────────────────
+// The gait is only as good as the number fed to it. An earlier version measured
+// the head's raw 3D displacement, which is not travel: HealerWormMode drives
+// headInterpPos up and down the face normal for the spawn bounce and the
+// countdown breathing while the simulation is frozen, and rideLiveRotation
+// carries a stationary worm around with a turning slice. The Inch Worm formed and
+// cycled loops through the entire pre-game idle instead of lying flat.
+describe('inchCrawlAdvance', () => {
+  const STEP = 1.0; // one tile of world travel
+
+  it('reports nothing when the simulation has not advanced', () => {
+    // The spawn bounce and the countdown breathing both move the head without
+    // ticking the sim, so interpT is unchanged frame to frame.
+    expect(inchCrawlAdvance(0.42, 0.42, STEP)).toBe(0);
+    expect(inchCrawlAdvance(1, 1, STEP)).toBe(0);
+    expect(inchCrawlAdvance(0, 0, STEP)).toBe(0);
+  });
+
+  it('scales the step progress by the world length of the step', () => {
+    expect(inchCrawlAdvance(0.5, 0.25, STEP)).toBeCloseTo(0.25, 10);
+    // A step around a cube edge routes out to a pivot vertex and back, so the same
+    // progress covers more ground than a step across a face.
+    expect(inchCrawlAdvance(0.5, 0.25, CORNER_STEP_LENGTH)).toBeCloseTo(0.25 * CORNER_STEP_LENGTH, 10);
+    expect(CORNER_STEP_LENGTH).toBeGreaterThan(STEP);
+  });
+
+  it('follows interpT restarting at zero when a step commits', () => {
+    expect(inchCrawlAdvance(0.05, 0.97, STEP)).toBeCloseTo(0.08, 10);
+  });
+
+  it('reports nothing on a reset, a teleport, or a step backwards', () => {
+    expect(inchCrawlAdvance(0, 0.4, STEP)).toBe(0);   // reset part-way through a step
+    expect(inchCrawlAdvance(0.9, 0.1, STEP)).toBe(0); // a jump no single frame can make
+    expect(inchCrawlAdvance(0.3, 0.5, STEP)).toBe(0); // backwards
+  });
+
+  it('leaves the body flat through the whole pre-game idle', () => {
+    // HealerWormMode returns before ticking the sim during 'spawning' and
+    // 'countdown', so interpT is frozen while the bounce and the breathing animate
+    // headInterpPos along the face normal. worm.phase reads 'crawling' the whole
+    // time, so nothing else stops the gait: the frozen interpT has to.
+    const count = 13;
+    const shape = inchLoopShape(count);
+    let phase = 0;
+    let move = 0;
+    const frozenInterpT = 0.37;
+    for (let frame = 0; frame < 300; frame++) {
+      const d = inchCrawlAdvance(frozenInterpT, frozenInterpT, STEP);
+      phase += d;
+      move += ((d > 0 ? 1 : 0) - move) * Math.min(1, (1 / 60) * 6);
+    }
+    expect(phase).toBe(0);
+    expect(move).toBe(0);
+    const out = { dist: 0, arch: 0 };
+    for (let i = 0; i < count; i++) {
+      inchGaitInto(out, i, count, phase, move, shape);
+      expect(out.arch).toBe(0);
+      expect(out.dist).toBeCloseTo(i * INCH_BALL_SPACING, 10);
+    }
   });
 });

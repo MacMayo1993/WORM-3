@@ -277,6 +277,37 @@ export function inchGaitInto(out, i, count, phase, move, shape) {
 }
 
 /**
+ * World distance the head crawled along the surface between two frames.
+ *
+ * The phase the gait runs on has to be travel ALONG THE SURFACE, which is not the
+ * same as how far the head moved. Plenty of things move the head without it
+ * travelling: HealerWormMode's spawn bounce and countdown breathing drive
+ * headInterpPos up and down the face normal while the simulation is frozen (it only
+ * ticks once the game phase is 'active', so worm.phase reads 'crawling' throughout
+ * the pre-game idle), and rideLiveRotation carries a stationary worm around with a
+ * turning slice. Measuring raw displacement counts all of that as travel, and the
+ * worm loops its way through the whole idle sequence instead of lying flat.
+ *
+ * `interpT` is the simulation's own progress through the current tile step, so it is
+ * deaf to every one of those — none of them tick the sim. Scaling it by the world
+ * length of the step being crossed turns that progress back into the world units the
+ * loops are pinned in, which plain `interpT` is not: a step around a cube edge goes
+ * out to a pivot vertex and back down onto the next face, so it is longer than a step
+ * across a face.
+ *
+ * @param {number} interpT      the sim's progress through the current step, 0..1
+ * @param {number} prevInterpT  the same, last frame
+ * @param {number} stepLength   world length of the step in progress
+ * @returns {number} world distance crawled, 0 whenever the sim did not advance
+ */
+export function inchCrawlAdvance(interpT, prevInterpT, stepLength) {
+  let dT = interpT - prevInterpT;
+  if (dT < -0.5) dT += 1;              // the step committed and interpT restarted at 0
+  if (!(dT > 0) || dT > 0.5) return 0; // idle, reset, or a teleport
+  return dT * stepLength;
+}
+
+/**
  * How many loops a body of `count` balls carries at once. Reporting only — the
  * gait never needs it — but it is the property the shape is tuned around, so it is
  * worth being able to state and test.

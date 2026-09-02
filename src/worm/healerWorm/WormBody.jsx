@@ -44,7 +44,8 @@ import {
     WINDOUT_SEGMENT_DT,
     windoutHeadS,
 } from './constants.js';
-import { inchGaitInto, inchLoopShape, INCH_BALL_SPACING } from './inchGait.js';
+import { inchGaitInto, inchLoopShape, inchCrawlAdvance, INCH_BALL_SPACING } from './inchGait.js';
+import { CORNER_STEP_LENGTH } from './wormSim.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
@@ -209,12 +210,11 @@ export function WormBody({ worm, size }) {
     const isPrismRef = useRef(isPrism);
     isPrismRef.current = isPrism;
     // Inch Worm gait state — the phase is the distance the head has actually crawled
-    // in world units (not wall-clock, and not tile fractions), because that is the
-    // unit inchGait.js pins its loops to the ground in. `move` eases 0..1 so the body
-    // lies back down when the worm stops.
+    // along the surface, in world units (not wall-clock), because that is the unit
+    // inchGait.js pins its loops to the ground in. `move` eases 0..1 so the body lies
+    // back down when the worm stops.
     const gaitPhaseRef = useRef(0);
-    const gaitHeadRef = useRef(new THREE.Vector3());
-    const gaitHeadInitRef = useRef(false);
+    const prevInterpTRef = useRef(0);
     const gaitMoveRef = useRef(0);
     // Tracks the inputs that affect per-segment color so the instanced color buffer
     // is only rewritten on frames where something actually changed (orb pickup,
@@ -313,18 +313,22 @@ export function WormBody({ worm, size }) {
         }
 
         // ── Inch Worm gait driver ──────────────────────────────────────────────
-        // How far the head actually moved on the surface this frame. This used to be
-        // read off interpT, which runs 0→1 within each tile step: near enough to world
-        // distance on a straight run across 1-unit tiles, but wrong wherever the head's
-        // speed along its path is not uniform in interpT — a corner crossing pauses the
-        // head at the vertex for a tenth of the step while interpT keeps ticking. The
-        // loops are pinned to the ground in world units, so measure world units.
-        const _gaitHead = worm.headInterpPos.current; // before WORM_LIFT / jump / orbit
-        let _dCrawl = gaitHeadInitRef.current ? gaitHeadRef.current.distanceTo(_gaitHead) : 0;
-        gaitHeadRef.current.copy(_gaitHead);
-        gaitHeadInitRef.current = true;
-        if (!(_dCrawl > 1e-5) || _dCrawl > 0.5) _dCrawl = 0; // idle, or a tunnel teleport
-        const _moveTarget = (worm.phase.current === 'crawling' && _dCrawl > 0) ? 1 : 0;
+        // How far the head crawled along the surface this frame — see inchCrawlAdvance
+        // in inchGait.js for why that is read off the simulation's own step progress
+        // rather than off how far headInterpPos moved.
+        const _interpNow = worm.interpT.current;
+        const _prevWP = worm.prevWorldPos.current;
+        // World length of the step in progress. A corner crossing routes out to a pivot
+        // vertex above the edge and back down onto the next face; anywhere else the head
+        // runs straight from one tile centre to the next.
+        const _stepLen = worm.crossingCorner.current || !_prevWP
+            ? CORNER_STEP_LENGTH
+            : _prevWP.distanceTo(worm.curWorldPos.current);
+        const _dCrawl = worm.phase.current === 'crawling'
+            ? inchCrawlAdvance(_interpNow, prevInterpTRef.current, _stepLen)
+            : 0;
+        prevInterpTRef.current = _interpNow;
+        const _moveTarget = _dCrawl > 0 ? 1 : 0;
         gaitMoveRef.current += (_moveTarget - gaitMoveRef.current) * Math.min(1, delta * 6);
         gaitPhaseRef.current += _dCrawl;
         const _gaitMove = gaitMoveRef.current;
