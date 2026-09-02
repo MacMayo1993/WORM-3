@@ -1502,16 +1502,16 @@ export const MenuTitleCard = ({ visible }) => (
           <div className="worm-cube-face worm-cube-face--front">3</div>
           <div className="worm-cube-face worm-cube-face--right">3</div>
           <div className="worm-cube-face worm-cube-face--top">3</div>
-          <div className="worm-cube-face worm-cube-face--back" />
+          <div className="worm-cube-face worm-cube-face--back">3</div>
           <div className="worm-cube-face worm-cube-face--left">3</div>
-          <div className="worm-cube-face worm-cube-face--bottom" />
+          <div className="worm-cube-face worm-cube-face--bottom">3</div>
         </div>
       </div>
     </div>
     {/* One line of eyebrow type, ruled on both sides. It fills the gap between
         the wordmark and the cube and answers the question a first-time player
         actually has: what is the cube in front of me doing? */}
-    <div className="worm-menu-tagline">Every face is linked to its opposite</div>
+    <div className="worm-menu-tagline">Flip through the cube</div>
   </div>
 );
 
