@@ -6,6 +6,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // The daily challenge's par is a proven optimum from an exhaustive search
+    // (levels/parSolver.js), so a handful of tests legitimately spend seconds
+    // rather than milliseconds. The 5s default left them a hair of headroom on a
+    // developer machine and none on a slower CI runner, where they timed out
+    // while testing nothing but their own patience.
+    testTimeout: 30000,
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
     exclude: ['node_modules', 'dist'],
     coverage: {

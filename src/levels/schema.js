@@ -25,15 +25,6 @@ export const WIN_CONDITIONS = {
   CLASSIC: 'classic',
   SUDOKUBE: 'sudokube',
   ULTIMATE: 'ultimate',
-  // Solved up to antipodal identification — the RP² quotient notion of solved.
-  // Every face uniform *in its antipodal class*, so the all-flipped board (every
-  // sticker showing its antipode) counts as a solve alongside the literal one.
-  //
-  // This is what makes the polarity choice of C_dir = n_A + min(n11, P − n11)
-  // playable: the formula's `P − n11` branch IS the all-dirty target, and a level
-  // scored against that par is unfair under CLASSIC, which only ever accepts the
-  // all-clean branch. Levels that want the choice must opt in here.
-  ANTIPODAL: 'antipodal',
 };
 
 /**
