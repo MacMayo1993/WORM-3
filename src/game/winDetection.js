@@ -16,15 +16,6 @@ export const colorClass = (c) => Math.min(c, ANTIPODAL_COLOR[c]);
 // identification — a face is "solved" if every sticker belongs to that face's
 // antipodal class, so a tile flipped through a wormhole (showing its antipode)
 // still counts as solved. This is the RP² quotient notion of solved.
-//
-// This is the win condition for WIN_CONDITIONS.ANTIPODAL levels, where the
-// MANIFOLD is what gets solved rather than the literal colouring: opposite
-// faces are one face of the real projective plane, so a tile showing its
-// antipode is showing its own manifold and is home. Two consequences worth
-// knowing before relying on it — a flip can never move a sticker out of its
-// colour class, so flips neither help nor hinder such a solve (they are
-// accepted, never required); and a 180° turn carries every tile to its
-// antipodal face, so it leaves the cube solved at zero cost.
 export const checkRubiksSolved = (cubies, size, { antipodal = false } = {}) => {
   const key = antipodal ? (c) => colorClass(c) : (c) => c;
 

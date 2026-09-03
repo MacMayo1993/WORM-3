@@ -4,18 +4,19 @@ import {
   dailyKeyFor, previousDayKey, dailyPlanFor, buildDailyLevel,
   ensureDailyPack, _resetDailyRegistration,
   emptyDailyRecord, advanceStreak, isDailyDone, currentStreak,
-  DAILY_SCRAMBLE_TURNS, DAILY_DECOY_FLIPS, _resetDailyPlanCache,
+  DAILY_SCRAMBLE_TURNS, DAILY_FLIPPED_PAIRS, _resetDailyPlanCache,
 } from '../levels/dailyChallenge.js';
 import { levelsManager } from '../levels/LevelsManager.js';
 import { ProgressManager } from '../levels/ProgressManager.js';
-import { buildMoveTable, quotientPar, quotientSolution } from '../levels/quotientSolver.js';
+import { buildMoveTable, solveCost, solveLine } from '../levels/parSolver.js';
+import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { msUntilNextLocalMidnight } from '../levels/dailyChallenge.js';
 import { recordLevelCompletion } from '../levels/completion.js';
 import { LEVEL_ID_RANGES, WIN_CONDITIONS } from '../levels/schema.js';
 import { BUILT_IN_PACKS } from '../levels/packs/index.js';
 import { ACHIEVEMENTS, ACHIEVEMENT_IDS, getAchievement, decorateAchievements } from '../levels/achievements.js';
 import { buildLevelStartState } from '../levels/levelStaging.js';
-import { checkRubiksSolved, checkRubiksSolvedAntipodal } from '../game/winDetection.js';
+import { checkRubiksWin } from '../game/winDetection.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 
 const KEY = '2026-09-01';
@@ -67,32 +68,37 @@ describe('dailyPlanFor', () => {
     }
   });
 
-  it('reports par as the solver’s proven optimum, not the scramble length', () => {
-    // The quotient goal is a far larger target than the literal solved cube, so
-    // a scramble routinely collapses to something shorter. Shipping its length
-    // as par would score a player against a cost the board does not have.
+  it('reports par as the solver’s proven optimum for the board actually staged', () => {
+    // Par must be measured on the cube the player sees — turns AND flips — not
+    // on the scramble alone, or the flips come out free.
     const table = buildMoveTable(DAILY_CUBE_SIZE);
-    for (let d = 1; d <= 20; d++) {
+    for (let d = 1; d <= 14; d++) {
       const key = `2026-10-${String(d).padStart(2, '0')}`;
       const plan = dailyPlanFor(key);
       const staged = buildLevelStartState(buildDailyLevel(key), DAILY_CUBE_SIZE);
-      expect(quotientPar(staged, DAILY_CUBE_SIZE, { maxDepth: DAILY_PAR_MAX, table }), `daily ${key}`).toBe(plan.par);
-      expect(plan.par).toBeLessThanOrEqual(plan.scramble.length);
-      expect(plan.slack).toBe(plan.scramble.length - plan.par);
+      expect(solveCost(staged, DAILY_CUBE_SIZE, { maxMoves: DAILY_PAR_MAX, table }), `daily ${key}`).toBe(plan.par);
+      expect(plan.par).toBeLessThanOrEqual(plan.scramble.length + plan.flips.length);
+      expect(plan.slack).toBe(plan.scramble.length + plan.flips.length - plan.par);
     }
   });
 
-  it('collapses some scrambles — proving the search is doing real work', () => {
-    // If par always equalled the scramble length the solver would be pointless
-    // and a formula would do. Turning quarter turns into a quotient solve is
-    // exactly where the saving comes from.
-    const slacks = Array.from({ length: 40 }, (_, i) => dailyPlanFor(`2027-03-${String((i % 28) + 1).padStart(2, '0')}`).slack);
-    expect(Math.max(...slacks)).toBeGreaterThan(0);
+  it('prices the flips — they are work, not decoration', () => {
+    // The old daily's flips were the whole puzzle and each cost exactly one tap.
+    // These still cost, so a par that ignored them would be short by three.
+    const table = buildMoveTable(DAILY_CUBE_SIZE);
+    for (let d = 1; d <= 8; d++) {
+      const key = `2026-11-${String(d).padStart(2, '0')}`;
+      const level = buildDailyLevel(key);
+      const withFlips = buildLevelStartState(level, DAILY_CUBE_SIZE);
+      const without = buildLevelStartState({ ...level, flipSequence: [] }, DAILY_CUBE_SIZE);
+      expect(solveCost(withFlips, DAILY_CUBE_SIZE, { maxMoves: DAILY_PAR_MAX, table }))
+        .toBeGreaterThan(solveCost(without, DAILY_CUBE_SIZE, { maxMoves: DAILY_PAR_MAX, table }));
+    }
   });
 
   it('authors a canonical scramble — nothing that cancels into something shorter', () => {
     for (let d = 1; d <= 28; d++) {
-      const { scramble } = dailyPlanFor(`2026-11-${String(d).padStart(2, '0')}`);
+      const { scramble } = dailyPlanFor(`2026-12-${String(d).padStart(2, '0')}`);
       expect(scramble).toHaveLength(DAILY_SCRAMBLE_TURNS);
       let run = 0;
       scramble.forEach((m, i) => {
@@ -108,36 +114,23 @@ describe('dailyPlanFor', () => {
 });
 
 describe('buildDailyLevel', () => {
-  it('authors the scramble and the decoy flips', () => {
+  it('authors both the scramble and the flipped pairs', () => {
     const plan = dailyPlanFor(KEY);
     const level = buildDailyLevel(KEY);
     expect(level.id).toBe(DAILY_LEVEL_ID);
     expect(level.par).toBe(plan.par);
     expect(level.scrambleSequence).toEqual(plan.scramble);
-    expect(level.flipSequence).toHaveLength(DAILY_DECOY_FLIPS);
+    expect(level.flipSequence).toHaveLength(DAILY_FLIPPED_PAIRS);
     expect(level.cubeSize).toBe(DAILY_CUBE_SIZE);
     expect(level.features.flips).toBe(true);
     expect(level.features.rotations).toBe(true);
   });
 
-  it('solves the manifold, so the level says so', () => {
+  it('uses the ordinary win condition — the colour showing is what counts', () => {
+    // Nothing exotic: a flipped tile displaying the colour its face wants is
+    // finished, which the strict check has always accepted.
     for (let d = 1; d <= 10; d++) {
-      expect(buildDailyLevel(`2026-12-${String(d).padStart(2, '0')}`).winCondition).toBe(WIN_CONDITIONS.ANTIPODAL);
-    }
-  });
-
-  it('stages decoy flips that cost the player nothing to leave alone', () => {
-    // A flip cannot move a sticker out of its colour class, so it cannot change
-    // the quotient distance. The decoys are visible and free — which is the
-    // whole trap, and is worth pinning so nobody later "fixes" par to count them.
-    const table = buildMoveTable(DAILY_CUBE_SIZE);
-    for (let d = 1; d <= 10; d++) {
-      const key = `2027-04-${String(d).padStart(2, '0')}`;
-      const level = buildDailyLevel(key);
-      const withDecoys = buildLevelStartState(level, DAILY_CUBE_SIZE);
-      const without = buildLevelStartState({ ...level, flipSequence: [] }, DAILY_CUBE_SIZE);
-      expect(quotientPar(withDecoys, DAILY_CUBE_SIZE, { maxDepth: DAILY_PAR_MAX, table }))
-        .toBe(quotientPar(without, DAILY_CUBE_SIZE, { maxDepth: DAILY_PAR_MAX, table }));
+      expect(buildDailyLevel(`2027-01-${String(d).padStart(2, '0')}`).winCondition).toBe(WIN_CONDITIONS.CLASSIC);
     }
   });
 
@@ -197,43 +190,48 @@ describe('the daily is actually winnable, in exactly par', () => {
   const table = buildMoveTable(DAILY_CUBE_SIZE);
 
   const playOptimally = (level) => {
-    let state = buildLevelStartState(level, DAILY_CUBE_SIZE);
-    expect(checkRubiksSolvedAntipodal(state, DAILY_CUBE_SIZE), 'opens already solved').toBe(false);
-    const solution = quotientSolution(state, DAILY_CUBE_SIZE, { maxDepth: DAILY_PAR_MAX, table });
-    expect(solution, 'no solution within the par band').not.toBeNull();
+    const board = buildLevelStartState(level, DAILY_CUBE_SIZE);
+    expect(checkRubiksWin(board, DAILY_CUBE_SIZE), 'opens already solved').toBe(false);
+    const line = solveLine(board, DAILY_CUBE_SIZE, { maxMoves: level.par, table });
+    expect(line, 'no solution within par').not.toBeNull();
+
+    let state = board;
     const wonAfter = [];
-    for (const { axis, sliceIndex, dir } of solution) {
-      state = rotateSliceCubies(state, DAILY_CUBE_SIZE, axis, sliceIndex, dir);
-      wonAfter.push(checkRubiksSolvedAntipodal(state, DAILY_CUBE_SIZE));
+    for (const m of line.turns) {
+      state = rotateSliceCubies(state, DAILY_CUBE_SIZE, m.axis, m.sliceIndex, m.dir);
+      wonAfter.push(checkRubiksWin(state, DAILY_CUBE_SIZE));
     }
-    return { state, solution, firstWin: wonAfter.indexOf(true) + 1 };
+    for (const a of line.flips) {
+      state = flipStickerPair(state, DAILY_CUBE_SIZE, a.x, a.y, a.z, a.dirKey, buildManifoldGridMap(state, DAILY_CUBE_SIZE));
+      wonAfter.push(checkRubiksWin(state, DAILY_CUBE_SIZE));
+    }
+    return { line, firstWin: wonAfter.indexOf(true) + 1 };
   };
 
-  it('stages disturbed and solves in exactly par turns', () => {
+  it('stages disturbed and solves in exactly par moves', () => {
     const level = buildDailyLevel(KEY);
-    const { solution, firstWin } = playOptimally(level);
-    expect(solution).toHaveLength(level.par);
-    // Not one turn sooner: an earlier win would mean par overstates the cost.
+    const { line, firstWin } = playOptimally(level);
+    expect(line.cost).toBe(level.par);
+    // Not one move sooner: an earlier win would mean par overstates the cost.
     expect(firstWin).toBe(level.par);
   });
 
   it('holds for a run of consecutive days, not just a lucky one', () => {
-    for (let d = 1; d <= 12; d++) {
-      const key = `2026-12-${String(d).padStart(2, '0')}`;
+    for (let d = 1; d <= 10; d++) {
+      const key = `2027-02-${String(d).padStart(2, '0')}`;
       const level = buildDailyLevel(key);
-      const { firstWin } = playOptimally(level);
-      expect(firstWin, `daily ${key}`).toBe(level.par);
+      expect(playOptimally(level).firstWin, `daily ${key}`).toBe(level.par);
     }
   });
 
-  it('accepts a board still carrying flips — the manifold is what is solved', () => {
-    // The decoys are never undone by the optimal line, so the winning board has
-    // tiles showing their antipode. If the win demanded the literal colouring
-    // this would fail, and the player would be forced to spend moves undoing
-    // free flips.
-    const { state } = playOptimally(buildDailyLevel(KEY));
-    expect(checkRubiksSolvedAntipodal(state, DAILY_CUBE_SIZE)).toBe(true);
-    expect(checkRubiksSolved(state, DAILY_CUBE_SIZE), 'won on the literal colouring, so the test proves nothing').toBe(false);
+  it('solves with both move types — the flip is a real tool, not scenery', () => {
+    // If the optimal line never flipped, the staged flips would just be turns
+    // in disguise and the mode would have no reason to exist.
+    for (let d = 1; d <= 10; d++) {
+      const { line } = playOptimally(buildDailyLevel(`2027-03-${String(d).padStart(2, '0')}`));
+      expect(line.flips.length).toBeGreaterThan(0);
+      expect(line.cost).toBe(line.turns.length + line.flips.length);
+    }
   });
 });
 

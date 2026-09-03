@@ -6,8 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { checkRubiksWin, checkRubiksSolvedAntipodal, allStickersFlipped } from '../game/winDetection.js';
-import { WIN_CONDITIONS } from '../levels/schema.js';
+import { checkRubiksWin, allStickersFlipped } from '../game/winDetection.js';
 import { feel } from '../utils/feel.js';
 import { VICTORY } from '../utils/constants.js';
 
@@ -76,27 +75,8 @@ export function useGameSession() {
     // player who makes every face uniform in any orientation registers the solve
     // — the strict home-orientation check would reject 23 of a 2×2's 24 solved
     // states, leaving the cube visibly solved with no win.
-    // A level may declare that a tile counts as home when it shows EITHER
-    // polarity of its own manifold. Red and orange are the same manifold under
-    // the RP² identification, so a tile sitting in its home position showing its
-    // antipode is where it belongs — the cube is solved with that flip still
-    // active, and the player never has to undo it.
-    //
-    // Per tile, not per cube: this is not "the whole board is inverted", it is
-    // "each tile matches the manifold it is standing on". A flip is therefore a
-    // genuine repair alongside a turn — which is what makes it worth having on a
-    // scrambled board, where a tile that has travelled to its antipodal face can
-    // be flipped into place instead of turned back.
-    const acceptAntipodal = currentLevelData?.winCondition === WIN_CONDITIONS.ANTIPODAL;
-    const rubiksSolved = acceptAntipodal ? checkRubiksSolvedAntipodal(cubies, size) : checkRubiksWin(cubies, size);
-
-    // The Worm secret win is a Classic-mode surprise: solve the cube having sent
-    // every sticker through the manifold at least once. On an antipodal level the
-    // all-dirty route satisfies it *by construction* — reaching that polarity
-    // means flipping every β-pair — so it would hijack the level's own victory
-    // every time the player took the cheaper target. Levels that opened the
-    // antipodal door do not also hand out the secret behind it.
-    const wormWin = !acceptAntipodal && rubiksSolved && allStickersFlipped(cubies, size);
+    const rubiksSolved = checkRubiksWin(cubies, size);
+    const wormWin = rubiksSolved && allStickersFlipped(cubies, size);
 
     // Solving the cube — the thing the whole mode is for — made no sound at all;
     // the victory screen simply appeared. Fires once per win because the
