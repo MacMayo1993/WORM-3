@@ -14,14 +14,7 @@
 // This bridge therefore realises the **Invariant Plane** sector exactly:
 //
 //     flip n11 distinct β-pairs  →  n_A = 0, dirty pairs = n11
-//     par = C_dir = min(n11, P − n11)
-//
-// Both branches of that minimum are authorable. Below P/2 the cheap target is
-// all-clean: undo each staged flip, and CLASSIC scores it. Above P/2 the cheap
-// target is all-dirty — flip the P − n11 pairs that still look right and the
-// board is solved up to antipodal identification, which only WIN_CONDITIONS
-// .ANTIPODAL accepts. That second branch is the whole "polarity choice" idea:
-// the board that looks worst is the one closest to a solve.
+//     CLASSIC solve un-flips each →  par = n11   (= C_dir when n_A = 0)
 //
 // Everything is deterministic from a seed: the same seed selects the same
 // β-pairs, so a generated pack is stable across builds and players.
@@ -62,55 +55,26 @@ export function buildAntipodalFlipSequence(size, flipCount, seed = 0) {
 }
 
 /**
- * Build one playable flip-solve level with an exact par.
- *
- * `flipCount` is how many β-pairs the board is staged with; `targetPar` is what
- * the player is scored against. They are equal for the all-clean target, which
- * is the only one CLASSIC accepts — undo each staged flip, par = n11.
- *
- * They come apart on the other branch of C_dir. Staging n11 > P/2 flips makes
- * the *complement* the cheap route: flip the P − n11 pairs that still look
- * right, and the board lands all-dirty — solved up to antipodal identification.
- * A level doing that must set `meta.winCondition` to WIN_CONDITIONS.ANTIPODAL,
- * or the target it is scored against is not a win at all. Guarded below rather
- * than left to the author, because the failure is silent and only shows up as a
- * player hitting par and getting no victory screen.
+ * Build one playable CLASSIC flip-solve level with an exact par.
  *
  * @param {object} opts
  * @param {number} opts.id         globally unique level id (see LEVEL_ID_RANGES)
  * @param {number} [opts.size]     cube size (default 3)
- * @param {number} opts.targetPar  exact solve cost (= C_dir, n_A=0)
- * @param {number} [opts.flipCount] β-pairs to stage (default: targetPar)
+ * @param {number} opts.targetPar  exact number of flips to undo (= C_dir, n_A=0)
  * @param {number|string} [opts.seed]
  * @param {object} [opts.meta]     name / description / background / tutorial etc.
  * @returns a createLevel descriptor with an authored flipSequence and `par`.
  */
-export function buildPlayableAntipodalLevel({ id, size = 3, targetPar, flipCount = targetPar, seed = 0, meta = {} }) {
+export function buildPlayableAntipodalLevel({ id, size = 3, targetPar, seed = 0, meta = {} }) {
   const P = betaPairCount(size);
   if (targetPar < 0 || targetPar > P) {
     throw new RangeError(`targetPar ${targetPar} unreachable on a ${size}×${size} cube (P=${P}, par ∈ [0, ${P}])`);
   }
-  if (flipCount < 0 || flipCount > P) {
-    throw new RangeError(`flipCount ${flipCount} unreachable on a ${size}×${size} cube (P=${P})`);
-  }
-  // n_A = 0 here by construction (paired flips only), so C_dir collapses to the
-  // polarity minimum. A par that disagrees would mis-score every run.
-  const cDir = Math.min(flipCount, P - flipCount);
-  if (cDir !== targetPar) {
-    throw new RangeError(`par ${targetPar} contradicts ${flipCount} staged flips on P=${P}: C_dir = min(${flipCount}, ${P - flipCount}) = ${cDir}`);
-  }
-  const winCondition = meta.winCondition ?? WIN_CONDITIONS.CLASSIC;
-  if (flipCount > P - flipCount && winCondition !== WIN_CONDITIONS.ANTIPODAL) {
-    throw new RangeError(
-      `level ${id} stages ${flipCount} of ${P} flips, so par ${targetPar} is the all-dirty target — ` +
-        'that is only a win under WIN_CONDITIONS.ANTIPODAL'
-    );
-  }
-  const flipSequence = buildAntipodalFlipSequence(size, flipCount, `${seed}:lvl:${id}`);
+  const flipSequence = buildAntipodalFlipSequence(size, targetPar, `${seed}:lvl:${id}`);
   return createLevel({
     id,
     name: meta.name ?? `Antipodal Descent ${id}`,
-    description: meta.description ?? `Flip ${flipCount} antipodal pair${flipCount === 1 ? '' : 's'} back home`,
+    description: meta.description ?? `Flip ${targetPar} antipodal pair${targetPar === 1 ? '' : 's'} back home`,
     cubeSize: size,
     scrambleSequence: null,
     scrambleMoves: 0, // no random turns on top of the authored flips
@@ -135,7 +99,7 @@ export function buildPlayableAntipodalLevel({ id, size = 3, targetPar, flipCount
       objective: `Return every flipped pair. Par is ${targetPar} flip${targetPar === 1 ? '' : 's'}.`,
       tip: 'A flipped pair shows its antipode. Tapping either member sends both home.'
     },
-    winCondition,
+    winCondition: WIN_CONDITIONS.CLASSIC,
     winMessage: meta.winMessage ?? 'Fibre restored — every pair back home. ⭐',
     difficulty: meta.difficulty ?? DIFFICULTY.MEDIUM,
     tags: meta.tags ?? [LEVEL_TAGS.PUZZLE],

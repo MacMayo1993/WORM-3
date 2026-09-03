@@ -6,7 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { checkRubiksWin, checkRubiksSolvedEitherPolarity, allStickersFlipped } from '../game/winDetection.js';
+import { checkRubiksWin, checkRubiksSolvedAntipodal, allStickersFlipped } from '../game/winDetection.js';
 import { WIN_CONDITIONS } from '../levels/schema.js';
 import { feel } from '../utils/feel.js';
 import { VICTORY } from '../utils/constants.js';
@@ -76,13 +76,19 @@ export function useGameSession() {
     // player who makes every face uniform in any orientation registers the solve
     // — the strict home-orientation check would reject 23 of a 2×2's 24 solved
     // states, leaving the cube visibly solved with no win.
-    // A level may declare that either polarity of the solved fibre counts, in
-    // which case the all-dirty board (every sticker showing its antipode) is a
-    // win too. That is the `P − n11` branch of C_dir made reachable: a puzzle
-    // whose par is the cheaper polarity is unwinnable at par without it, because
-    // the strict check only ever accepts the all-clean target.
+    // A level may declare that a tile counts as home when it shows EITHER
+    // polarity of its own manifold. Red and orange are the same manifold under
+    // the RP² identification, so a tile sitting in its home position showing its
+    // antipode is where it belongs — the cube is solved with that flip still
+    // active, and the player never has to undo it.
+    //
+    // Per tile, not per cube: this is not "the whole board is inverted", it is
+    // "each tile matches the manifold it is standing on". A flip is therefore a
+    // genuine repair alongside a turn — which is what makes it worth having on a
+    // scrambled board, where a tile that has travelled to its antipodal face can
+    // be flipped into place instead of turned back.
     const acceptAntipodal = currentLevelData?.winCondition === WIN_CONDITIONS.ANTIPODAL;
-    const rubiksSolved = acceptAntipodal ? checkRubiksSolvedEitherPolarity(cubies, size) : checkRubiksWin(cubies, size);
+    const rubiksSolved = acceptAntipodal ? checkRubiksSolvedAntipodal(cubies, size) : checkRubiksWin(cubies, size);
 
     // The Worm secret win is a Classic-mode surprise: solve the cube having sent
     // every sticker through the manifold at least once. On an antipodal level the

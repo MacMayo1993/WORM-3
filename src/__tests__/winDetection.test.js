@@ -2,10 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   checkRubiksSolved,
   checkRubiksSolvedAntipodal,
-  checkRubiksSolvedInverted,
-  checkRubiksSolvedEitherPolarity,
-  manifoldInversion,
-  isSolidButSplitManifold,
   checkRubiksSolvedRotationInvariant,
   checkRubiksWin,
   colorClass,
@@ -263,117 +259,5 @@ describe('antipodal (RP²) quotient solved detection', () => {
   it('a scrambled cube is not antipodally solved', () => {
     const cubies = rotateSliceCubies(makeCubies(3), 3, 'col', 0, 1);
     expect(checkRubiksSolvedAntipodal(cubies, 3)).toBe(false);
-  });
-});
-
-describe('the two polarities of the solved fibre', () => {
-  // Flip every β-pair by recolouring both members of each antipodal position
-  // pair. Equivalent to the real all-dirty board without pulling in the
-  // manifold machinery.
-  const invertEverySticker = (size) => {
-    const cubies = makeCubies(size);
-    for (let x = 0; x < size; x++) {
-      for (let y = 0; y < size; y++) {
-        for (let z = 0; z < size; z++) {
-          for (const dir of Object.keys(cubies[x][y][z].stickers)) flipSticker(cubies, x, y, z, dir);
-        }
-      }
-    }
-    return cubies;
-  };
-
-  it('accepts the home board and the fully inverted board, and nothing between', () => {
-    const home = makeCubies(3);
-    const inverted = invertEverySticker(3);
-    const partial = makeCubies(3);
-    flipSticker(partial, 0, 0, 2, 'PZ');
-
-    expect(checkRubiksSolvedInverted(home, 3)).toBe(false);
-    expect(checkRubiksSolvedInverted(inverted, 3)).toBe(true);
-
-    expect(checkRubiksSolvedEitherPolarity(home, 3)).toBe(true);
-    expect(checkRubiksSolvedEitherPolarity(inverted, 3)).toBe(true);
-    expect(checkRubiksSolvedEitherPolarity(partial, 3)).toBe(false);
-  });
-
-  it('rejects a half-inverted board, which per-face uniformity would wrongly accept', () => {
-    // Flip both faces of ONE antipodal face-pair (PZ and NZ). Every face still
-    // shows a single colour, so the rotation-invariant check passes it — but its
-    // cost is not a branch of min(n11, P − n11), so it must not be a win.
-    const cubies = makeCubies(3);
-    for (let x = 0; x < 3; x++) {
-      for (let y = 0; y < 3; y++) {
-        flipSticker(cubies, x, y, 2, 'PZ');
-        flipSticker(cubies, x, y, 0, 'NZ');
-      }
-    }
-    expect(checkRubiksSolvedRotationInvariant(cubies, 3)).toBe(true); // uniform per face
-    expect(checkRubiksSolvedEitherPolarity(cubies, 3)).toBe(false);   // but not a polarity
-  });
-
-  it('is not the quotient check, which is blind to flips on an unturned cube', () => {
-    // Guards against "simplifying" checkRubiksSolvedEitherPolarity down to
-    // checkRubiksSolvedAntipodal: flipping never leaves the colour class, so the
-    // quotient check passes a flip-only board no matter how disturbed it is —
-    // it would fire victory the instant a flip puzzle loaded.
-    const barelyStarted = makeCubies(3);
-    flipSticker(barelyStarted, 0, 0, 2, 'PZ');
-    expect(checkRubiksSolvedAntipodal(barelyStarted, 3)).toBe(true);
-    expect(checkRubiksSolvedEitherPolarity(barelyStarted, 3)).toBe(false);
-  });
-});
-
-describe('reading the manifold state', () => {
-  const invertBlock = (cubies, size, dirA, dirB, pick) => {
-    for (let i = 0; i < size; i++) {
-      for (let j = 0; j < size; j++) {
-        const [a, b] = pick(i, j);
-        flipSticker(cubies, ...a, dirA);
-        flipSticker(cubies, ...b, dirB);
-      }
-    }
-    return cubies;
-  };
-  // The Y block: every β-pair straddling PY (white) and NY (yellow).
-  const invertYBlock = (size) =>
-    invertBlock(makeCubies(size), size, 'PY', 'NY', (x, z) => [[x, size - 1, z], [x, 0, z]]);
-
-  it('counts pairs showing their antipode, and both distances', () => {
-    expect(manifoldInversion(makeCubies(3), 3)).toMatchObject({ pairs: 0, totalPairs: 27, uniform: true });
-
-    const oneOff = makeCubies(3);
-    flipSticker(oneOff, 1, 2, 1, 'PY'); // white centre
-    flipSticker(oneOff, 1, 0, 1, 'NY'); // its β-partner, the yellow centre
-    // 1 tap from all-home, 26 from all-flipped: the two numbers the polarity
-    // decision is made on.
-    expect(manifoldInversion(oneOff, 3)).toMatchObject({ pairs: 1, totalPairs: 27, uniform: false });
-  });
-
-  it('is independent of layer turns, unlike a comparison against the face colour', () => {
-    // A sticker carried to another face by a turn shows the same colour it
-    // always did. Only a flip changes what a sticker shows, so the count is
-    // taken against each sticker's own origin.
-    const turned = rotateSliceCubies(makeCubies(3), 3, 'col', 0, 1);
-    expect(manifoldInversion(turned, 3)).toMatchObject({ pairs: 0, uniform: true });
-  });
-
-  it('flags the board that looks solved but is split across the manifold', () => {
-    const yInverted = invertYBlock(3);
-    // White face solid yellow, yellow face solid white, everything else home.
-    expect(manifoldInversion(yInverted, 3)).toMatchObject({ pairs: 9, totalPairs: 27, uniform: false });
-    expect(isSolidButSplitManifold(yInverted, 3)).toBe(true);
-    expect(checkRubiksSolvedEitherPolarity(yInverted, 3)).toBe(false);
-  });
-
-  it('does not flag the two states that genuinely win, nor an unsolved board', () => {
-    const home = makeCubies(3);
-    expect(isSolidButSplitManifold(home, 3)).toBe(false);
-
-    const partial = makeCubies(3);
-    flipSticker(partial, 0, 0, 2, 'PZ');
-    expect(isSolidButSplitManifold(partial, 3)).toBe(false); // not solid at all
-
-    const scrambled = rotateSliceCubies(makeCubies(3), 3, 'col', 0, 1);
-    expect(isSolidButSplitManifold(scrambled, 3)).toBe(false);
   });
 });

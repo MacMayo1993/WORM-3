@@ -12,23 +12,21 @@ const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
 export const colorClass = (c) => Math.min(c, ANTIPODAL_COLOR[c]);
 
 // Check if classic Rubik's cube is solved (all faces uniform color).
+// When `antipodal` is true, stickers are compared up to antipodal
+// identification — a face is "solved" if every sticker belongs to that face's
+// antipodal class, so a tile flipped through a wormhole (showing its antipode)
+// still counts as solved. This is the RP² quotient notion of solved.
 //
-// `antipodal` compares stickers up to antipodal identification — a face is
-// "solved" if every sticker belongs to that face's antipodal class, so a tile
-// flipped through a wormhole still counts. This is the RP² quotient notion.
-// Note it is BLIND to flips on an unturned cube: flipping only ever swaps a
-// colour for its antipode, which is in the same class, so a board disturbed by
-// flips alone already passes. It says something about a cube that has been
-// TURNED, and nothing at all about one that has only been flipped.
-//
-// `inverted` compares against each face's antipodal colour instead of its home
-// colour — the global-flip representative of the solved fibre, i.e. every
-// sticker showing its opposite. Unlike `antipodal` this is a strict, exact
-// target, and it is the one flip-only puzzles need (see
-// checkRubiksSolvedEitherPolarity).
-export const checkRubiksSolved = (cubies, size, { antipodal = false, inverted = false } = {}) => {
+// This is the win condition for WIN_CONDITIONS.ANTIPODAL levels, where the
+// MANIFOLD is what gets solved rather than the literal colouring: opposite
+// faces are one face of the real projective plane, so a tile showing its
+// antipode is showing its own manifold and is home. Two consequences worth
+// knowing before relying on it — a flip can never move a sticker out of its
+// colour class, so flips neither help nor hinder such a solve (they are
+// accepted, never required); and a 180° turn carries every tile to its
+// antipodal face, so it leaves the cube solved at zero cost.
+export const checkRubiksSolved = (cubies, size, { antipodal = false } = {}) => {
   const key = antipodal ? (c) => colorClass(c) : (c) => c;
-  const home = inverted ? (dirKey) => ANTIPODAL_COLOR[DIR_TO_FACE[dirKey]] : (dirKey) => DIR_TO_FACE[dirKey];
 
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
@@ -37,7 +35,7 @@ export const checkRubiksSolved = (cubies, size, { antipodal = false, inverted = 
         if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
         const c = cubies[x][y][z];
         for (const [dirKey, st] of Object.entries(c.stickers)) {
-          if (key(st.curr) !== key(home(dirKey))) return false;
+          if (key(st.curr) !== key(DIR_TO_FACE[dirKey])) return false;
         }
       }
     }
@@ -47,73 +45,6 @@ export const checkRubiksSolved = (cubies, size, { antipodal = false, inverted = 
 
 // Convenience wrapper: solved up to antipodal identification (flips allowed).
 export const checkRubiksSolvedAntipodal = (cubies, size) => checkRubiksSolved(cubies, size, { antipodal: true });
-
-// Every sticker showing its antipode: the cube solved "inside out". Together
-// with the home state these are the two representatives of the solved fibre.
-export const checkRubiksSolvedInverted = (cubies, size) => checkRubiksSolved(cubies, size, { inverted: true });
-
-// The win condition for a puzzle scored against C_dir = n_A + min(n11, P − n11).
-// That minimum has two branches and the player may take either: drive the board
-// all-clean (home colours) or all-dirty (every sticker inverted). Both are
-// solved in the RP² quotient; exactly these two boards count, and nothing
-// between them does.
-//
-// Deliberately strict about orientation and about the two targets, rather than
-// reusing checkRubiksSolvedAntipodal or the rotation-invariant check. Those
-// accept far more boards — the quotient check passes any flip-only board at all,
-// and per-face uniformity would also admit the six "half-inverted" states where
-// one antipodal face-pair is flipped and the rest are home. Admitting those
-// would put win states at costs the par formula does not describe, which is the
-// one guarantee these puzzles sell.
-export const checkRubiksSolvedEitherPolarity = (cubies, size) =>
-  checkRubiksSolved(cubies, size) || checkRubiksSolvedInverted(cubies, size);
-
-// How much of the manifold is currently showing its antipode, and whether that
-// is UNIFORM across the whole cube — the property the two-polarity win turns on.
-//
-// Measured against each sticker's own `orig` colour rather than the colour its
-// current face wants, so it is independent of layer turns: rotating moves a
-// sticker without changing what it shows, and only a flip changes `curr` away
-// from `orig`. A board mid-turn still reports its true manifold state.
-//
-// `inverted` counts stickers; flips are atomic across a β-pair, so `pairs` is
-// the number of player taps that separate this board from all-clean, and
-// `totalPairs − pairs` the taps to all-dirty. Those are the two distances the
-// polarity decision is made on, which is why the HUD can show them.
-export const manifoldInversion = (cubies, size) => {
-  let inverted = 0;
-  let total = 0;
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      for (let z = 0; z < size; z++) {
-        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
-        for (const st of Object.values(cubies[x][y][z].stickers)) {
-          total++;
-          if (st.curr !== st.orig) inverted++;
-        }
-      }
-    }
-  }
-  return {
-    inverted,
-    total,
-    pairs: inverted / 2,
-    totalPairs: total / 2,
-    uniform: inverted === 0 || inverted === total
-  };
-};
-
-// A board every face of which is a single solid colour, but whose manifold is
-// NOT uniform — some antipodal face-pairs inverted and others home.
-//
-// It reads as solved and is not: the solved fibre has exactly two elements (the
-// deck group of S² → RP² has order 2), and this is neither. Worth naming
-// because it is cheap to stumble into — the 27 β-pairs of a 3×3 split into
-// three independent blocks of 9, one per antipodal face-pair, so inverting any
-// one block leaves every face solid — and a player who reaches one deserves to
-// be told why the cube they are looking at did not win.
-export const isSolidButSplitManifold = (cubies, size) =>
-  checkRubiksSolvedRotationInvariant(cubies, size) && !checkRubiksSolvedEitherPolarity(cubies, size);
 
 // Rotation-invariant solved check: every face shows a SINGLE colour, regardless
 // of which absolute face that colour "belongs" to. Because stickers are

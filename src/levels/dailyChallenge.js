@@ -9,47 +9,37 @@
 // antipodalLevelBridge, and owns the pure streak arithmetic that
 // ProgressManager persists.
 //
-// ── What the daily can and cannot realise ────────────────────────────────────
-// A draw is a fibre partition (n00, n11, n_A) over P antipodal β-orbit pairs,
-// whose exact solve cost is the directed canonical formula
+// ── What the daily is ────────────────────────────────────────────────────────
+// A short scramble solved in the RP² QUOTIENT. Opposite faces are one face of
+// the real projective plane, so red is orange, green is blue, white is yellow —
+// a tile showing its antipode is showing its own manifold and is home. The cube
+// is solved when every face is uniform in its colour CLASS.
 //
-//     C_dir = n_A + min(n11, P − n11).
+// Two consequences shape the whole puzzle, and both are the point rather than
+// concessions. A flip cannot move a sticker out of its colour class, so flips
+// are accepted but never required: a tile flipped in place is already home and
+// undoing it is wasted moves. And a 180° turn carries every tile to its
+// antipodal face, so it costs nothing to leave in — the quotient forgives it.
+// Solving here is genuinely cheaper than solving a Rubik's cube, which is what
+// keeps a daily inside one sitting.
 //
-// Classic staging authors a level with *paired* native flips, and a paired move
-// toggles both members of a β-pair at once — so it can only ever produce
-// SYMMETRIC states (n_A = 0). Asymmetric defect pairs are exactly the ∆ ≠ 0
-// states the monograph proves unreachable by paired moves; they belong to the
-// worm/heal move model. See the header of antipodalLevelBridge.js.
+// ── Why it is not the flip puzzle it used to be ──────────────────────────────
+// The daily used to stage a solved cube plus a handful of paired flips and ask
+// the player to tap them back, scored against C_dir = n_A + min(n11, P − n11).
+// Under the quotient that puzzle does not exist: a board disturbed by flips
+// alone is already solved, because flipping never leaves the colour class. Only
+// turns can move a tile out of its manifold, so only turns can make work — the
+// daily has to scramble, and the flips it still stages are there to be
+// recognised as free, not repaired.
 //
-// So the daily lives on the invariant plane (n_A = 0), where the formula
-// collapses to C_dir = min(n11, P − n11) = the day's par, exactly.
-//
-// P here is the cube's REAL β-pair count — betaPairCount(3) = 27 — not a
-// notional orbit count. It used to be a free parameter (2·par + 0/2/4) fed to
-// the abstract randomizer, which made the reported n00/n11/ambiguity describe a
-// fibre nobody was playing: the board always carried exactly `par` flips out of
-// 27 whatever P said, and `ambiguity` was computed against the fiction. Every
-// number this module reports is now measured on the board that gets staged.
-//
-// ── The polarity choice ──────────────────────────────────────────────────────
-// min(n11, P − n11) has two branches, and the daily draws between them:
-//
-//   LOW  (n11 = par ≤ 13)      the board shows `par` wrong pairs. Tap them home.
-//   HIGH (n11 = 27 − par ≥ 17) the board shows 17–23 wrong pairs — and the cheap
-//                              route is NOT to fix them. Flip the `par` pairs
-//                              that still look RIGHT and the cube lands
-//                              all-dirty: every sticker showing its antipode,
-//                              which is solved in the RP² quotient.
-//
-// Par is `par` either way, so a high day punishes the reflex to repair what
-// looks broken: 23 taps and a 1-star finish, against 4 taps for par. That is the
-// day's actual puzzle — count, decide, commit — and it needs no cube-solving
-// skill, which is what keeps the daily a single sitting.
-//
-// A high day is only winnable through WIN_CONDITIONS.ANTIPODAL; under CLASSIC
-// the all-dirty target is not a win at all, so the level declares it and
-// useGameSession honours it. buildPlayableAntipodalLevel refuses the pairing in
-// the other direction rather than shipping an unwinnable par.
+// ── Par ──────────────────────────────────────────────────────────────────────
+// Par is the exact minimum number of quarter turns that reaches a quotient-
+// solved cube, found by iterative deepening in quotientSolver.js. Not the
+// scramble length: a scramble of five quarter turns frequently solves in three
+// (and occasionally in one), because the quotient goal is a much larger target
+// than the literal solved cube. Par is proven optimal, so matching it is a
+// genuine achievement and beating it is impossible — the same guarantee the old
+// closed-form par carried, bought with a search instead of a formula.
 //
 // ── Determinism ──────────────────────────────────────────────────────────────
 // Nothing here touches Math.random or reads the clock except through an
@@ -57,9 +47,14 @@
 // — descends from the date key, so two players on the same calendar date face
 // byte-identical puzzles and can compare move counts honestly.
 
-import { makeRng, computeCDir, targetAmbiguity } from './antipodalRandomizer.js';
-import { buildPlayableAntipodalLevel, betaPairCount } from './antipodalLevelBridge.js';
-import { createLevelPack, BACKGROUNDS, DIFFICULTY, LEVEL_TAGS, WIN_CONDITIONS } from './schema.js';
+import { makeRng } from './antipodalRandomizer.js';
+import { betaPairAnchors } from './antipodalLevelBridge.js';
+import { buildMoveTable, quotientPar } from './quotientSolver.js';
+import { makeCubies } from '../game/cubeState.js';
+import { rotateSliceCubies } from '../game/cubeRotation.js';
+import {
+  createLevel, createLevelPack, GAME_MODES, WIN_CONDITIONS, BACKGROUNDS, DIFFICULTY, LEVEL_TAGS
+} from './schema.js';
 import { levelsManager } from './LevelsManager.js';
 
 export const DAILY_PACK_ID = 'daily-challenge';
@@ -73,19 +68,25 @@ export const DAILY_STORAGE_KEY = 'worm3_daily_record';
 
 export const DAILY_CUBE_SIZE = 3;
 
-// The par band. The floor keeps a daily from being a two-tap formality; the
-// ceiling keeps it inside a single sitting, which is the whole point of a daily.
+// The par band, in quarter turns — the same unit the game's move counter uses.
 //
-// The ceiling also has to stay strictly under P/2 = 13.5, or the two polarities
-// stop being distinguishable and `par` would no longer be the cheaper of them.
-export const DAILY_PAR_MIN = 4;
-export const DAILY_PAR_MAX = 10;
+// The ceiling is as much a performance limit as a design one. Proving a par of
+// N optimal means exhausting every sequence shorter than N, and that grows ~17×
+// per turn: par 3 resolves in under a millisecond, par 5 in about 60ms, par 6
+// in roughly a second. Six is past what a screen mount should spend, so the
+// daily draws inside a band it can prove instantly.
+export const DAILY_PAR_MIN = 3;
+export const DAILY_PAR_MAX = 5;
 
-// How often the day draws the HIGH polarity — the board that looks nearly ruined
-// but is `par` taps from the all-dirty solve. Kept under half so the reflex read
-// ("fix what's wrong") is right more often than not; a player who never checks
-// still solves most days, and pays for it on the rest.
-export const DAILY_HIGH_POLARITY_RATE = 0.35;
+// Quarter turns applied when staging. Par is DERIVED from the result, never
+// equal to this by assumption — the quotient collapses a scramble to something
+// shorter surprisingly often, and always to the same parity.
+export const DAILY_SCRAMBLE_TURNS = 5;
+
+// Flips staged on top. They are free under the quotient (a flip never leaves
+// the colour class), so they cost the player nothing to leave alone — and cost
+// two moves each to "repair", which is the trap that teaches the rule.
+export const DAILY_DECOY_FLIPS = 3;
 
 // ─── Calendar keys ───────────────────────────────────────────────────────────
 // Keys are LOCAL calendar dates, not UTC. A player's "today" should turn over at
@@ -139,99 +140,163 @@ export function dailyLabelFor(dateKey, locale = undefined) {
 // ─── The day's puzzle ────────────────────────────────────────────────────────
 
 /**
- * The analytic plan for one day: its exact par, the polarity it wants, and the
- * fibre partition of the board that will actually be staged.
+ * A deterministic scramble: `turns` quarter turns drawn from the seeded stream,
+ * in canonical form — never a move immediately undone, never a third
+ * consecutive turn of one slice. Both cancel into something shorter, so a
+ * scramble containing them is not the depth it claims to be.
  *
- * `n11` is the number of β-pairs the board opens flipped, so it is also the
- * number of visibly wrong pairs the player sees. `par` is min(n11, P − n11) —
- * the LOW day's par is what is on screen, the HIGH day's par is what is not.
+ * Two consecutive turns of one slice ARE allowed: that is a 180°, and under the
+ * quotient it is free, which makes it one of the day's better traps.
+ */
+export function buildDailyScramble(dateKey, turns = DAILY_SCRAMBLE_TURNS, attempt = 0) {
+  const rng = makeRng(`daily-scramble:${dateKey}:${attempt}`);
+  const { moves } = buildMoveTable(DAILY_CUBE_SIZE);
+  const seq = [];
+  let run = 0;
+  while (seq.length < turns) {
+    const m = moves[Math.floor(rng() * moves.length)];
+    const prev = seq[seq.length - 1];
+    if (prev) {
+      const sameSlice = prev.axis === m.axis && prev.sliceIndex === m.sliceIndex;
+      if (sameSlice && prev.dir !== m.dir) continue;   // immediately undone
+      if (sameSlice && run >= 2) continue;             // a third identical turn
+      run = sameSlice ? run + 1 : 1;
+    } else {
+      run = 1;
+    }
+    seq.push({ axis: m.axis, sliceIndex: m.sliceIndex, dir: m.dir, numTurns: 1 });
+  }
+  return seq;
+}
+
+/** The cube a scramble produces, with no flips applied. */
+function scrambledCube(scramble) {
+  let state = makeCubies(DAILY_CUBE_SIZE);
+  for (const { axis, sliceIndex, dir } of scramble) {
+    state = rotateSliceCubies(state, DAILY_CUBE_SIZE, axis, sliceIndex, dir);
+  }
+  return state;
+}
+
+/**
+ * Which β-pairs open flipped. Decoys: free to leave, costly to "fix". Chosen
+ * from the pairs of a SOLVED cube, which is where levelStaging applies them, and
+ * they are invisible to par because a flip cannot change a colour class.
+ */
+function buildDailyDecoys(dateKey, count = DAILY_DECOY_FLIPS) {
+  const rng = makeRng(`daily-decoys:${dateKey}`);
+  const anchors = betaPairAnchors(DAILY_CUBE_SIZE);
+  const order = anchors.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order.slice(0, count).map((i) => anchors[i]);
+}
+
+// dailyPlanFor runs a proof-of-optimality search, which is cheap but not free,
+// and several screens ask for the same day. Memoised so a mount costs nothing
+// after the first. Keyed by date, so a session crossing midnight still recomputes.
+const _planCache = new Map();
+
+/**
+ * The plan for one day: its scramble, its decoy flips, and its EXACT par.
  *
- * Deterministic in `dateKey` alone: two players on the same calendar date face
- * byte-identical boards and can compare move counts honestly.
+ * Par comes from the solver, so a scramble whose par falls below the band is
+ * redrawn rather than shipped — the quotient collapses some scrambles to almost
+ * nothing, and a par-1 daily is not a daily. Redraws are seeded by attempt
+ * number, so the day is still identical for every player.
+ *
+ * Deterministic in `dateKey` alone.
  */
 export function dailyPlanFor(dateKey) {
-  const rng = makeRng(`daily-plan:${dateKey}`);
+  const cached = _planCache.get(dateKey);
+  if (cached) return cached;
 
-  const P = betaPairCount(DAILY_CUBE_SIZE);
-  const par = DAILY_PAR_MIN + Math.floor(rng() * (DAILY_PAR_MAX - DAILY_PAR_MIN + 1));
-  if (2 * par >= P) {
-    throw new RangeError(`Daily par ${par} is not strictly under half of the ${P} β-pairs of a ${DAILY_CUBE_SIZE}×${DAILY_CUBE_SIZE} cube`);
+  const table = buildMoveTable(DAILY_CUBE_SIZE);
+  let scramble = null;
+  let par = null;
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const candidate = buildDailyScramble(dateKey, DAILY_SCRAMBLE_TURNS, attempt);
+    const found = quotientPar(scrambledCube(candidate), DAILY_CUBE_SIZE, { maxDepth: DAILY_PAR_MAX, table });
+    if (found !== null && found >= DAILY_PAR_MIN) {
+      scramble = candidate;
+      par = found;
+      break;
+    }
+  }
+  if (scramble === null) {
+    throw new RangeError(`Daily ${dateKey}: no scramble landed a par in [${DAILY_PAR_MIN}, ${DAILY_PAR_MAX}] in 24 attempts`);
   }
 
-  // Draw the polarity from its own stream position, after par, so the two are
-  // independent: a high day is not correlated with a particular par.
-  const polarity = rng() < DAILY_HIGH_POLARITY_RATE ? 'high' : 'low';
-  const n11 = polarity === 'high' ? P - par : par;
-  const nA = 0;
-  const n00 = P - n11 - nA;
-
-  // The formula is the authority on par, not the arithmetic above. If these ever
-  // disagree the level would be scored against a cost no route can achieve.
-  const cDir = computeCDir(n00, n11, nA);
-  if (cDir !== par) {
-    throw new RangeError(`Daily ${dateKey}: C_dir(${n00}, ${n11}, ${nA}) = ${cDir} contradicts par ${par}`);
-  }
-
-  return {
+  const plan = {
     dateKey,
     par,
     size: DAILY_CUBE_SIZE,
-    P,
-    polarity,
-    n00,
-    n11,
-    nA,
-    // Δ = |P − 2·n11|. Odd P (27 at 3×3) makes Δ = 0 unreachable, so the two
-    // targets are never equally priced — there is always a right answer.
-    ambiguity: targetAmbiguity(P, n11)
+    scramble,
+    decoys: buildDailyDecoys(dateKey),
+    // How far the quotient shortened the scramble. 0 means the scramble was
+    // already optimal; 2 or 4 means some of it cancelled for free.
+    slack: scramble.length - par
   };
+  _planCache.set(dateKey, plan);
+  return plan;
+}
+
+/** Test seam — forget memoised plans. */
+export function _resetDailyPlanCache() {
+  _planCache.clear();
 }
 
 /** Difficulty band for the day's par — drives the card's tone, not the rules. */
 export function dailyDifficultyFor(par) {
-  if (par <= 5) return DIFFICULTY.EASY;
-  if (par <= 8) return DIFFICULTY.MEDIUM;
+  if (par <= 3) return DIFFICULTY.EASY;
+  if (par <= 4) return DIFFICULTY.MEDIUM;
   return DIFFICULTY.HARD;
 }
 
 /**
- * Today's playable level. One flip-solve puzzle with an exact par and no layer
- * turns to undo — the fastest honest expression of the antipodal idea.
+ * Today's playable level.
  *
- * The copy states the RULE (two targets, par is the cheaper one) but never the
- * day's ANSWER. Naming the polarity would hand over the only decision in the
- * puzzle; the count is on screen for anyone willing to make it.
+ * The copy teaches the RULE — the manifold is what gets solved, opposite
+ * colours are the same colour — and never the day's answer. It is worth saying
+ * plainly that flipped tiles are already home, because a player who does not
+ * know that will spend moves undoing them and lose stars to a misunderstanding
+ * rather than to the puzzle.
  */
 export function buildDailyLevel(dateKey) {
   const plan = dailyPlanFor(dateKey);
 
-  const level = buildPlayableAntipodalLevel({
+  const level = createLevel({
     id: DAILY_LEVEL_ID,
-    size: plan.size,
-    targetPar: plan.par,
-    flipCount: plan.n11,
-    seed: `daily:${dateKey}`,
-    meta: {
-      // Every day accepts both targets, so a low day plays exactly as before and
-      // a high day is winnable at all. Declaring it per-polarity would leak the
-      // answer into the level data.
-      winCondition: WIN_CONDITIONS.ANTIPODAL,
-      name: `Daily Descent — ${dateKey}`,
-      description: `${plan.n11} antipodal pairs are showing their opposite. Everyone playing today gets this exact puzzle.`,
-      background: BACKGROUNDS.NASA,
-      difficulty: dailyDifficultyFor(plan.par),
-      tags: [LEVEL_TAGS.PUZZLE],
-      tutorial: {
-        title: 'Daily Descent',
-        text:
-          `${plan.n11} of the cube's ${plan.P} pairs show their antipodal twin. Two boards count as solved: every pair home, ` +
-          'or every pair flipped. No layer turns are needed today.',
-        objective: `Par is ${plan.par} flip${plan.par === 1 ? '' : 's'}. Match it for all three stars.`,
-        tip: 'Par is the shorter road to whichever target is nearer. Count both before you tap.'
-      },
-      winMessage: 'Daily Descent solved. ⭐',
-      requirements: { previousLevel: null, stars: 0, achievements: [] }
-    }
+    name: `Daily Descent — ${dateKey}`,
+    description: `A ${plan.scramble.length}-turn scramble that solves in ${plan.par}. Everyone playing today gets this exact cube.`,
+    cubeSize: plan.size,
+    scrambleSequence: plan.scramble,
+    scrambleMoves: 0,
+    flipSequence: plan.decoys,
+    par: plan.par,
+    chaosLevel: 0,
+    mode: GAME_MODES.CLASSIC,
+    background: BACKGROUNDS.NASA,
+    features: { rotations: true, tunnels: false, flips: true, chaos: false, explode: false, parity: true, net: false },
+    tutorial: {
+      title: 'Daily Descent',
+      text:
+        'Solve the manifold, not the colours. Opposite faces are the same face here — red is orange, green is blue, ' +
+        'white is yellow — so a face counts as done when it shows one colour PAIR, not one colour.',
+      objective: `Par is ${plan.par} turn${plan.par === 1 ? '' : 's'}. Match it for all three stars.`,
+      tip:
+        'Tiles showing their opposite are already home — flipping them back only spends moves. ' +
+        'And a half turn costs you nothing: it lands every tile on its twin.'
+    },
+    // The manifold is what is being solved, so a tile showing its antipode is
+    // home and a 180° turn is free. See winDetection.checkRubiksSolved.
+    winCondition: WIN_CONDITIONS.ANTIPODAL,
+    winMessage: 'Daily Descent solved. ⭐',
+    difficulty: dailyDifficultyFor(plan.par),
+    tags: [LEVEL_TAGS.PUZZLE],
+    requirements: { previousLevel: null, stars: 0, achievements: [] }
   });
 
   // The level carries the day it IS, so completion is recorded against the
