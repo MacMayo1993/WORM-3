@@ -46,8 +46,7 @@
 // byte-identical puzzles and can compare move counts honestly.
 
 import { makeRng } from './antipodalRandomizer.js';
-import { betaPairAnchors } from './antipodalLevelBridge.js';
-import { buildMoveTable, solveCost } from './parSolver.js';
+import { buildMoveTable, encodeBoard, solveCost } from './parSolver.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
@@ -162,16 +161,18 @@ export function buildDailyScramble(dateKey, turns = DAILY_SCRAMBLE_TURNS, attemp
   return seq;
 }
 
-/**
- * The cube a staging produces — turns then flips, matching the order
- * levelStaging.buildLevelStartState applies them in. Pricing anything else would
- * price a board the player never sees.
- */
-function stageBoard(scramble, flips) {
+/** The cube after the authored turns, before any flip is applied. */
+function scrambledBoard(scramble) {
   let state = makeCubies(DAILY_CUBE_SIZE);
   for (const { axis, sliceIndex, dir } of scramble) {
     state = rotateSliceCubies(state, DAILY_CUBE_SIZE, axis, sliceIndex, dir);
   }
+  return state;
+}
+
+/** Apply flip anchors to a board, the way levelStaging will. */
+function applyFlips(board, flips) {
+  let state = board;
   for (const { x, y, z, dirKey } of flips) {
     state = flipStickerPair(state, DAILY_CUBE_SIZE, x, y, z, dirKey, buildManifoldGridMap(state, DAILY_CUBE_SIZE));
   }
@@ -184,18 +185,39 @@ function stageBoard(scramble, flips) {
  * carries it somewhere its current colour is the one wanted, which is exactly
  * the trade the solver prices and the player can learn to see.
  *
- * Chosen from the pairs of a SOLVED cube, which is where levelStaging applies
- * them; the pairing then rides along with the stickers through every turn.
+ * Anchors are chosen from the SCRAMBLED board, and deduplicated by the IDENTITY
+ * pair standing at each position rather than by position itself.
+ *
+ * Position is the wrong key. A β-pair is a pair of sticker identities, and
+ * flipStickerPair finds the partner through the manifold grid id, so the pairing
+ * travels with the stickers as turns move them. Two positions that hold
+ * different pairs on a solved cube can hold the two members of ONE pair after a
+ * scramble — and levelStaging applies these anchors after the scramble. Picking
+ * both then flips that pair twice, which cancels, while an intended third pair
+ * is never flipped at all. The board opens easier than advertised, and silently:
+ * on 2026-01-22 three anchors resolved to two pairs and one visible flip.
  */
-function buildDailyFlips(dateKey, count = DAILY_FLIPPED_PAIRS) {
-  const rng = makeRng(`daily-flips:${dateKey}`);
-  const anchors = betaPairAnchors(DAILY_CUBE_SIZE);
-  const order = anchors.map((_, i) => i);
-  for (let i = order.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [order[i], order[j]] = [order[j], order[i]];
+function buildDailyFlips(dateKey, board, count = DAILY_FLIPPED_PAIRS, attempt = 0, table = buildMoveTable(DAILY_CUBE_SIZE)) {
+  const { occupant } = encodeBoard(board, DAILY_CUBE_SIZE, table);
+
+  // One representative position per identity pair actually present on the board.
+  const byPair = new Map();
+  for (let slot = 0; slot < occupant.length; slot++) {
+    const identity = occupant[slot];
+    const pairKey = Math.min(identity, table.partner[identity]);
+    if (!byPair.has(pairKey)) byPair.set(pairKey, slot);
   }
-  return order.slice(0, count).map((i) => anchors[i]);
+
+  const slots = [...byPair.values()];
+  const rng = makeRng(`daily-flips:${dateKey}:${attempt}`);
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+  }
+  return slots.slice(0, count).map((slot) => {
+    const { x, y, z, dirKey } = table.slots[slot];
+    return { x, y, z, dirKey };
+  });
 }
 
 // dailyPlanFor runs a proof-of-optimality search, which is cheap but not free,
@@ -218,17 +240,23 @@ export function dailyPlanFor(dateKey) {
   if (cached) return cached;
 
   const table = buildMoveTable(DAILY_CUBE_SIZE);
-  const flips = buildDailyFlips(dateKey);
   let scramble = null;
+  let flips = null;
   let par = null;
   for (let attempt = 0; attempt < 24; attempt++) {
     const candidate = buildDailyScramble(dateKey, DAILY_SCRAMBLE_TURNS, attempt);
+    // Flips are chosen against the SCRAMBLED board, because that is where they
+    // land — the identity pairing has already moved by then, and picking on the
+    // solved cube can select both members of one pair (see buildDailyFlips).
+    const scrambled = scrambledBoard(candidate);
+    const candidateFlips = buildDailyFlips(dateKey, scrambled, DAILY_FLIPPED_PAIRS, attempt, table);
     // Price the board the player will actually see: turns first, then flips,
     // the same order levelStaging applies them in.
-    const board = stageBoard(candidate, flips);
+    const board = applyFlips(scrambled, candidateFlips);
     const found = solveCost(board, DAILY_CUBE_SIZE, { maxMoves: DAILY_PAR_MAX, table });
     if (found !== null && found >= DAILY_PAR_MIN) {
       scramble = candidate;
+      flips = candidateFlips;
       par = found;
       break;
     }
