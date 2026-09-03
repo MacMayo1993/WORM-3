@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { levelsManager } from '../../levels/index.js';
 import { getLevelPar } from '../../levels/scoring.js';
+import { WIN_CONDITIONS } from '../../levels/schema.js';
+import { manifoldInversion, isSolidButSplitManifold } from '../../game/winDetection.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { MONO_FONT, PAPER_WARN, PAPER_GOOD, TEXT_MICRO, PAPER_TEXT, PAPER_TEXT_MUTED } from '../../utils/uiTheme.js';
 
@@ -25,10 +27,22 @@ export default function StoryObjectiveHUD({ level }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [showHint, setShowHint] = useState(false);
   const moves = useGameStore((s) => s.moves);
+  const cubies = useGameStore((s) => s.cubies);
+  const size = useGameStore((s) => s.size);
 
   const tutorial = level?.tutorial;
   const objective = tutorial?.objective || tutorial?.text;
   const levelId = level?.id;
+
+  // On a level where either polarity wins, the player's decision is a COUNT:
+  // how many pairs from all-clean against how many from all-dirty. Both numbers
+  // are on the cube but nobody can tally 27 pairs by eye, so the HUD keeps them.
+  // It reports the state, never which target to pick — that is the puzzle.
+  const eitherPolarity = level?.winCondition === WIN_CONDITIONS.ANTIPODAL;
+  const manifold = useMemo(() => {
+    if (!eitherPolarity || !cubies?.length || cubies.length !== size) return null;
+    return { ...manifoldInversion(cubies, size), solidButSplit: isSolidButSplitManifold(cubies, size) };
+  }, [eitherPolarity, cubies, size]);
 
   // Golf target: matching the intended solution length (par) is a 3-star run.
   const par = getLevelPar(level);
@@ -123,6 +137,35 @@ export default function StoryObjectiveHUD({ level }) {
               {overPar && <span style={{ opacity: 0.85 }}>(over par)</span>}
             </div>
           )}
+          {manifold && (
+            <div style={{ marginTop: '9px' }}>
+              <div style={{
+                fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em',
+                textTransform: 'uppercase', color: PAPER_TEXT_MUTED, marginBottom: '4px',
+              }}>
+                Manifold
+              </div>
+              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.03em', color: PAPER_TEXT }}>
+                <span>{manifold.pairs} of {manifold.totalPairs} pairs flipped</span>
+                <span aria-hidden="true"> · </span>
+                <span style={{ color: PAPER_TEXT_MUTED }}>
+                  {manifold.pairs} to all home, {manifold.totalPairs - manifold.pairs} to all flipped
+                </span>
+              </div>
+              {/* The one board that looks solved and is not. Silence here reads
+                  as a broken win detector. */}
+              {manifold.solidButSplit && (
+                <p style={{
+                  margin: '6px 0 0', fontSize: '11px', fontWeight: 700, lineHeight: 1.45, color: PAPER_WARN,
+                }}>
+                  Every face is solid, but the manifold is split — {manifold.pairs} pairs are flipped and{' '}
+                  {manifold.totalPairs - manifold.pairs} are not. The cube is solved only when every pair agrees:
+                  all home, or all flipped.
+                </p>
+              )}
+            </div>
+          )}
+
           {tutorial?.tip && (
             <>
               <button

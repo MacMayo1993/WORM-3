@@ -68,6 +68,53 @@ export const checkRubiksSolvedInverted = (cubies, size) => checkRubiksSolved(cub
 export const checkRubiksSolvedEitherPolarity = (cubies, size) =>
   checkRubiksSolved(cubies, size) || checkRubiksSolvedInverted(cubies, size);
 
+// How much of the manifold is currently showing its antipode, and whether that
+// is UNIFORM across the whole cube — the property the two-polarity win turns on.
+//
+// Measured against each sticker's own `orig` colour rather than the colour its
+// current face wants, so it is independent of layer turns: rotating moves a
+// sticker without changing what it shows, and only a flip changes `curr` away
+// from `orig`. A board mid-turn still reports its true manifold state.
+//
+// `inverted` counts stickers; flips are atomic across a β-pair, so `pairs` is
+// the number of player taps that separate this board from all-clean, and
+// `totalPairs − pairs` the taps to all-dirty. Those are the two distances the
+// polarity decision is made on, which is why the HUD can show them.
+export const manifoldInversion = (cubies, size) => {
+  let inverted = 0;
+  let total = 0;
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
+        for (const st of Object.values(cubies[x][y][z].stickers)) {
+          total++;
+          if (st.curr !== st.orig) inverted++;
+        }
+      }
+    }
+  }
+  return {
+    inverted,
+    total,
+    pairs: inverted / 2,
+    totalPairs: total / 2,
+    uniform: inverted === 0 || inverted === total
+  };
+};
+
+// A board every face of which is a single solid colour, but whose manifold is
+// NOT uniform — some antipodal face-pairs inverted and others home.
+//
+// It reads as solved and is not: the solved fibre has exactly two elements (the
+// deck group of S² → RP² has order 2), and this is neither. Worth naming
+// because it is cheap to stumble into — the 27 β-pairs of a 3×3 split into
+// three independent blocks of 9, one per antipodal face-pair, so inverting any
+// one block leaves every face solid — and a player who reaches one deserves to
+// be told why the cube they are looking at did not win.
+export const isSolidButSplitManifold = (cubies, size) =>
+  checkRubiksSolvedRotationInvariant(cubies, size) && !checkRubiksSolvedEitherPolarity(cubies, size);
+
 // Rotation-invariant solved check: every face shows a SINGLE colour, regardless
 // of which absolute face that colour "belongs" to. Because stickers are
 // conserved (exactly size² of each colour), all six faces being uniform means
