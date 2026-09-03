@@ -23,6 +23,7 @@ import { vibrate } from '../../utils/audio.js';
 import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
+import MenuGridGlow from './MenuGridGlow.jsx';
 import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
 import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z, UI_GOLD } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/Button.jsx';
@@ -361,15 +362,35 @@ const ShufflingCube = ({ onFlip }) => {
   const staticCubies = rotating ? flatCubies.filter(c => c[axProp] !== rotating.sl) : flatCubies;
   const sliceCubies  = rotating ? flatCubies.filter(c => c[axProp] === rotating.sl) : [];
 
+  // The grid glow is split the same way the cubies are, so the light on a
+  // turning slice rides with it inside sliceGroupRef instead of staying behind
+  // on the rest frame. `rotating` is one object for the length of a turn, so
+  // these rebuild once per turn rather than per frame.
+  const staticGlowFilter = useMemo(() => {
+    if (!rotating) return undefined; // whole cube
+    const prop = AX_PROP[rotating.ax], sl = rotating.sl;
+    return (x, y, z) => ({ x, y, z })[prop] !== sl;
+  }, [rotating]);
+  const sliceGlowFilter = useMemo(() => {
+    if (!rotating) return null;
+    const prop = AX_PROP[rotating.ax], sl = rotating.sl;
+    return (x, y, z) => ({ x, y, z })[prop] === sl;
+  }, [rotating]);
+
   return (
     <>
       {staticCubies.map(c => (
         <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} hideStickers={hideStickers} />
       ))}
+      {/* The teaching rim, standing still — see MenuGridGlow. Off while the
+          carousel presents its mode plates, for the same reason the stickers
+          are: nothing should draw over the plates. */}
+      {!hideStickers && <MenuGridGlow size={3} includeCubie={staticGlowFilter} />}
       <group ref={sliceGroupRef}>
         {sliceCubies.map(c => (
           <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} hideStickers={hideStickers} />
         ))}
+        {!hideStickers && sliceGlowFilter && <MenuGridGlow size={3} includeCubie={sliceGlowFilter} />}
       </group>
       {flipWaves.map(wave => (
         <MenuFlipWave
@@ -1424,7 +1445,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingBottom: padBottom,
     display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-    gap: '14px',
+    gap: '11px',
     zIndex: 4,
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
@@ -1453,7 +1474,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
         // outrank the class and silently disable it.
         className="worm-menu-cta-secondary"
         style={{
-          fontSize: '15px',
+          fontSize: '12px',
           fontWeight: 800,
           fontFamily: UI_FONT,
           letterSpacing: '0.1em',
@@ -1471,7 +1492,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
         // Quietest of the three — ranked by type size, not by opacity: fading
         // the element fades its rim too, and on a glass sheet the rim is what
         // separates the pill from the scene showing through it.
-        fontSize: '13px',
+        fontSize: '10px',
         fontWeight: 700,
         fontFamily: UI_FONT,
         letterSpacing: '0.08em',
