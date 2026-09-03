@@ -21,13 +21,35 @@
 // states the monograph proves unreachable by paired moves; they belong to the
 // worm/heal move model. See the header of antipodalLevelBridge.js.
 //
-// So the daily pins the draw to the invariant plane (nARange [0, 0]), where the
-// formula collapses to C_dir = min(n11, P − n11) = targetPar. The par the player
-// is scored against is therefore the day's *exact* analytic par, not an
-// approximation of it — the same guarantee Story mode's own descent chapters
-// carry. P is chosen as 2·par (+0/2/4) so a symmetric config always exists:
-// generateLevelState relaxes an unsatisfiable band rather than throwing, and a
-// relaxed band would silently hand back an unplayable n_A > 0 state.
+// So the daily lives on the invariant plane (n_A = 0), where the formula
+// collapses to C_dir = min(n11, P − n11) = the day's par, exactly.
+//
+// P here is the cube's REAL β-pair count — betaPairCount(3) = 27 — not a
+// notional orbit count. It used to be a free parameter (2·par + 0/2/4) fed to
+// the abstract randomizer, which made the reported n00/n11/ambiguity describe a
+// fibre nobody was playing: the board always carried exactly `par` flips out of
+// 27 whatever P said, and `ambiguity` was computed against the fiction. Every
+// number this module reports is now measured on the board that gets staged.
+//
+// ── The polarity choice ──────────────────────────────────────────────────────
+// min(n11, P − n11) has two branches, and the daily draws between them:
+//
+//   LOW  (n11 = par ≤ 13)      the board shows `par` wrong pairs. Tap them home.
+//   HIGH (n11 = 27 − par ≥ 17) the board shows 17–23 wrong pairs — and the cheap
+//                              route is NOT to fix them. Flip the `par` pairs
+//                              that still look RIGHT and the cube lands
+//                              all-dirty: every sticker showing its antipode,
+//                              which is solved in the RP² quotient.
+//
+// Par is `par` either way, so a high day punishes the reflex to repair what
+// looks broken: 23 taps and a 1-star finish, against 4 taps for par. That is the
+// day's actual puzzle — count, decide, commit — and it needs no cube-solving
+// skill, which is what keeps the daily a single sitting.
+//
+// A high day is only winnable through WIN_CONDITIONS.ANTIPODAL; under CLASSIC
+// the all-dirty target is not a win at all, so the level declares it and
+// useGameSession honours it. buildPlayableAntipodalLevel refuses the pairing in
+// the other direction rather than shipping an unwinnable par.
 //
 // ── Determinism ──────────────────────────────────────────────────────────────
 // Nothing here touches Math.random or reads the clock except through an
@@ -35,9 +57,9 @@
 // — descends from the date key, so two players on the same calendar date face
 // byte-identical puzzles and can compare move counts honestly.
 
-import { generateDailyChallenge, makeRng } from './antipodalRandomizer.js';
+import { makeRng, computeCDir, targetAmbiguity } from './antipodalRandomizer.js';
 import { buildPlayableAntipodalLevel, betaPairCount } from './antipodalLevelBridge.js';
-import { createLevelPack, BACKGROUNDS, DIFFICULTY, LEVEL_TAGS } from './schema.js';
+import { createLevelPack, BACKGROUNDS, DIFFICULTY, LEVEL_TAGS, WIN_CONDITIONS } from './schema.js';
 import { levelsManager } from './LevelsManager.js';
 
 export const DAILY_PACK_ID = 'daily-challenge';
@@ -53,8 +75,17 @@ export const DAILY_CUBE_SIZE = 3;
 
 // The par band. The floor keeps a daily from being a two-tap formality; the
 // ceiling keeps it inside a single sitting, which is the whole point of a daily.
+//
+// The ceiling also has to stay strictly under P/2 = 13.5, or the two polarities
+// stop being distinguishable and `par` would no longer be the cheaper of them.
 export const DAILY_PAR_MIN = 4;
 export const DAILY_PAR_MAX = 10;
+
+// How often the day draws the HIGH polarity — the board that looks nearly ruined
+// but is `par` taps from the all-dirty solve. Kept under half so the reflex read
+// ("fix what's wrong") is right more often than not; a player who never checks
+// still solves most days, and pays for it on the rest.
+export const DAILY_HIGH_POLARITY_RATE = 0.35;
 
 // ─── Calendar keys ───────────────────────────────────────────────────────────
 // Keys are LOCAL calendar dates, not UTC. A player's "today" should turn over at
@@ -108,35 +139,51 @@ export function dailyLabelFor(dateKey, locale = undefined) {
 // ─── The day's puzzle ────────────────────────────────────────────────────────
 
 /**
- * The analytic plan for one day: its exact par, the fibre it was drawn from,
- * and the ambiguity of that fibre (Δ = 0 means both polarities cost the same,
- * so the day offers a genuine choice rather than one obvious attractor).
+ * The analytic plan for one day: its exact par, the polarity it wants, and the
+ * fibre partition of the board that will actually be staged.
  *
- * Deterministic in `dateKey` alone.
+ * `n11` is the number of β-pairs the board opens flipped, so it is also the
+ * number of visibly wrong pairs the player sees. `par` is min(n11, P − n11) —
+ * the LOW day's par is what is on screen, the HIGH day's par is what is not.
+ *
+ * Deterministic in `dateKey` alone: two players on the same calendar date face
+ * byte-identical boards and can compare move counts honestly.
  */
 export function dailyPlanFor(dateKey) {
   const rng = makeRng(`daily-plan:${dateKey}`);
 
+  const P = betaPairCount(DAILY_CUBE_SIZE);
   const par = DAILY_PAR_MIN + Math.floor(rng() * (DAILY_PAR_MAX - DAILY_PAR_MIN + 1));
-  // min(n11, P − n11) = par is only satisfiable when par ≤ ⌊P/2⌋.
-  const P = 2 * par + 2 * Math.floor(rng() * 3);
-
-  const physicalPairs = betaPairCount(DAILY_CUBE_SIZE);
-  if (par > physicalPairs) {
-    throw new RangeError(`Daily par ${par} exceeds the ${physicalPairs} β-pairs of a ${DAILY_CUBE_SIZE}×${DAILY_CUBE_SIZE} cube`);
+  if (2 * par >= P) {
+    throw new RangeError(`Daily par ${par} is not strictly under half of the ${P} β-pairs of a ${DAILY_CUBE_SIZE}×${DAILY_CUBE_SIZE} cube`);
   }
 
-  const draw = generateDailyChallenge(dateKey, { P, targetPar: par, nARange: [0, 0] });
+  // Draw the polarity from its own stream position, after par, so the two are
+  // independent: a high day is not correlated with a particular par.
+  const polarity = rng() < DAILY_HIGH_POLARITY_RATE ? 'high' : 'low';
+  const n11 = polarity === 'high' ? P - par : par;
+  const nA = 0;
+  const n00 = P - n11 - nA;
+
+  // The formula is the authority on par, not the arithmetic above. If these ever
+  // disagree the level would be scored against a cost no route can achieve.
+  const cDir = computeCDir(n00, n11, nA);
+  if (cDir !== par) {
+    throw new RangeError(`Daily ${dateKey}: C_dir(${n00}, ${n11}, ${nA}) = ${cDir} contradicts par ${par}`);
+  }
 
   return {
     dateKey,
     par,
     size: DAILY_CUBE_SIZE,
     P,
-    n00: draw.params.n00,
-    n11: draw.params.n11,
-    nA: draw.params.nA,
-    ambiguity: draw.ambiguity
+    polarity,
+    n00,
+    n11,
+    nA,
+    // Δ = |P − 2·n11|. Odd P (27 at 3×3) makes Δ = 0 unreachable, so the two
+    // targets are never equally priced — there is always a right answer.
+    ambiguity: targetAmbiguity(P, n11)
   };
 }
 
@@ -148,8 +195,12 @@ export function dailyDifficultyFor(par) {
 }
 
 /**
- * Today's playable level. One CLASSIC flip-solve puzzle with an exact par and no
- * layer turns to undo — the fastest honest expression of the antipodal idea.
+ * Today's playable level. One flip-solve puzzle with an exact par and no layer
+ * turns to undo — the fastest honest expression of the antipodal idea.
+ *
+ * The copy states the RULE (two targets, par is the cheaper one) but never the
+ * day's ANSWER. Naming the polarity would hand over the only decision in the
+ * puzzle; the count is on screen for anyone willing to make it.
  */
 export function buildDailyLevel(dateKey) {
   const plan = dailyPlanFor(dateKey);
@@ -158,20 +209,25 @@ export function buildDailyLevel(dateKey) {
     id: DAILY_LEVEL_ID,
     size: plan.size,
     targetPar: plan.par,
+    flipCount: plan.n11,
     seed: `daily:${dateKey}`,
     meta: {
+      // Every day accepts both targets, so a low day plays exactly as before and
+      // a high day is winnable at all. Declaring it per-polarity would leak the
+      // answer into the level data.
+      winCondition: WIN_CONDITIONS.ANTIPODAL,
       name: `Daily Descent — ${dateKey}`,
-      description: `${plan.par} antipodal pairs are showing their opposite. Everyone playing today gets this exact puzzle.`,
+      description: `${plan.n11} antipodal pairs are showing their opposite. Everyone playing today gets this exact puzzle.`,
       background: BACKGROUNDS.NASA,
       difficulty: dailyDifficultyFor(plan.par),
       tags: [LEVEL_TAGS.PUZZLE],
       tutorial: {
         title: 'Daily Descent',
-        text: `${plan.par} pairs show their antipodal twin. Tap each one back home — no layer turns are needed today.`,
+        text:
+          `${plan.n11} of the cube's ${plan.P} pairs show their antipodal twin. Two boards count as solved: every pair home, ` +
+          'or every pair flipped. No layer turns are needed today.',
         objective: `Par is ${plan.par} flip${plan.par === 1 ? '' : 's'}. Match it for all three stars.`,
-        tip: plan.ambiguity === 0
-          ? 'Both polarities cost the same today — either target is a par solve.'
-          : 'One polarity is cheaper than the other. Count before you tap.'
+        tip: 'Par is the shorter road to whichever target is nearer. Count both before you tap.'
       },
       winMessage: 'Daily Descent solved. ⭐',
       requirements: { previousLevel: null, stars: 0, achievements: [] }

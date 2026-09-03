@@ -12,12 +12,23 @@ const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
 export const colorClass = (c) => Math.min(c, ANTIPODAL_COLOR[c]);
 
 // Check if classic Rubik's cube is solved (all faces uniform color).
-// When `antipodal` is true, stickers are compared up to antipodal
-// identification — a face is "solved" if every sticker belongs to that face's
-// antipodal class, so a tile flipped through a wormhole (showing its antipode)
-// still counts as solved. This is the RP² quotient notion of solved.
-export const checkRubiksSolved = (cubies, size, { antipodal = false } = {}) => {
+//
+// `antipodal` compares stickers up to antipodal identification — a face is
+// "solved" if every sticker belongs to that face's antipodal class, so a tile
+// flipped through a wormhole still counts. This is the RP² quotient notion.
+// Note it is BLIND to flips on an unturned cube: flipping only ever swaps a
+// colour for its antipode, which is in the same class, so a board disturbed by
+// flips alone already passes. It says something about a cube that has been
+// TURNED, and nothing at all about one that has only been flipped.
+//
+// `inverted` compares against each face's antipodal colour instead of its home
+// colour — the global-flip representative of the solved fibre, i.e. every
+// sticker showing its opposite. Unlike `antipodal` this is a strict, exact
+// target, and it is the one flip-only puzzles need (see
+// checkRubiksSolvedEitherPolarity).
+export const checkRubiksSolved = (cubies, size, { antipodal = false, inverted = false } = {}) => {
   const key = antipodal ? (c) => colorClass(c) : (c) => c;
+  const home = inverted ? (dirKey) => ANTIPODAL_COLOR[DIR_TO_FACE[dirKey]] : (dirKey) => DIR_TO_FACE[dirKey];
 
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
@@ -26,7 +37,7 @@ export const checkRubiksSolved = (cubies, size, { antipodal = false } = {}) => {
         if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
         const c = cubies[x][y][z];
         for (const [dirKey, st] of Object.entries(c.stickers)) {
-          if (key(st.curr) !== key(DIR_TO_FACE[dirKey])) return false;
+          if (key(st.curr) !== key(home(dirKey))) return false;
         }
       }
     }
@@ -36,6 +47,26 @@ export const checkRubiksSolved = (cubies, size, { antipodal = false } = {}) => {
 
 // Convenience wrapper: solved up to antipodal identification (flips allowed).
 export const checkRubiksSolvedAntipodal = (cubies, size) => checkRubiksSolved(cubies, size, { antipodal: true });
+
+// Every sticker showing its antipode: the cube solved "inside out". Together
+// with the home state these are the two representatives of the solved fibre.
+export const checkRubiksSolvedInverted = (cubies, size) => checkRubiksSolved(cubies, size, { inverted: true });
+
+// The win condition for a puzzle scored against C_dir = n_A + min(n11, P − n11).
+// That minimum has two branches and the player may take either: drive the board
+// all-clean (home colours) or all-dirty (every sticker inverted). Both are
+// solved in the RP² quotient; exactly these two boards count, and nothing
+// between them does.
+//
+// Deliberately strict about orientation and about the two targets, rather than
+// reusing checkRubiksSolvedAntipodal or the rotation-invariant check. Those
+// accept far more boards — the quotient check passes any flip-only board at all,
+// and per-face uniformity would also admit the six "half-inverted" states where
+// one antipodal face-pair is flipped and the rest are home. Admitting those
+// would put win states at costs the par formula does not describe, which is the
+// one guarantee these puzzles sell.
+export const checkRubiksSolvedEitherPolarity = (cubies, size) =>
+  checkRubiksSolved(cubies, size) || checkRubiksSolvedInverted(cubies, size);
 
 // Rotation-invariant solved check: every face shows a SINGLE colour, regardless
 // of which absolute face that colour "belongs" to. Because stickers are
