@@ -3743,10 +3743,11 @@ select.btn-compact:disabled {
    still visibly see-through. Lower them and it fails on the dark scenes only. */
 .worm-tactile-btn,
 .worm-menu-cta-secondary {
-  /* 10% down from min(340px, 78vw). The vw term shrinks too, so the cluster
-     keeps the same proportion of a narrow screen rather than only shrinking on
-     wide ones. */
-  --menu-cta-w: min(306px, 70vw);
+  /* A further 20% down from min(306px, 70vw), itself 10% down from the original
+     min(340px, 78vw). The vw term shrinks with it, so the cluster keeps the
+     same proportion of a narrow screen rather than only shrinking on wide
+     ones. */
+  --menu-cta-w: min(245px, 56vw);
   width: var(--menu-cta-w);
   box-sizing: border-box;
   display: inline-flex;
@@ -3765,7 +3766,9 @@ select.btn-compact:disabled {
 
 .worm-tactile-btn {
   font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
-  font-size: 1.9rem;
+  /* 20% down from 1.9rem, with the padding cut to match, so the pill shrinks
+     as one piece rather than turning into small type in a big lozenge. */
+  font-size: 1.52rem;
   color: #1f2721;
   /* A white highlight under the glyph, not a dark drop shadow: on a light
      sheet the letterform is lifted by the sheet showing through beneath it. */
@@ -3780,7 +3783,7 @@ select.btn-compact:disabled {
     linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(246, 248, 245, 0.66) 52%, rgba(255, 255, 255, 0.74) 100%);
   background-size: 260% 100%, 100% 100%, 100% 100%;
   background-position: 210% 0, 0 0, 0 0;
-  padding: 16px 30px;
+  padding: 13px 24px;
   border: 1.5px solid rgba(255, 255, 255, 0.7);
   --cta-shadow:
     inset 0 1.5px 0 rgba(255, 255, 255, 0.9),
@@ -3842,7 +3845,10 @@ select.btn-compact:disabled {
 /* Secondary CTAs — same sheet, same width, no sheen. They rank below START by
    height and type size, not by being harder to read. */
 .worm-menu-cta-secondary {
-  min-height: 47px;
+  /* 20% of 47px is 37.6px, which is below the 44px minimum touch target the
+     rest of the game holds itself to (TOUCH_TARGET in ui/Button.jsx). The pill
+     stops shrinking here; its width and type took the full 20%. */
+  min-height: 44px;
   color: #1f2721;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
   background:
