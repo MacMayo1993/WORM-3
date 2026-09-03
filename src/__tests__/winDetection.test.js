@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   checkRubiksSolved,
   checkRubiksSolvedAntipodal,
+  checkRubiksSolvedInverted,
+  checkRubiksSolvedEitherPolarity,
   checkRubiksSolvedRotationInvariant,
   checkRubiksWin,
   colorClass,
@@ -259,5 +261,62 @@ describe('antipodal (RP²) quotient solved detection', () => {
   it('a scrambled cube is not antipodally solved', () => {
     const cubies = rotateSliceCubies(makeCubies(3), 3, 'col', 0, 1);
     expect(checkRubiksSolvedAntipodal(cubies, 3)).toBe(false);
+  });
+});
+
+describe('the two polarities of the solved fibre', () => {
+  // Flip every β-pair by recolouring both members of each antipodal position
+  // pair. Equivalent to the real all-dirty board without pulling in the
+  // manifold machinery.
+  const invertEverySticker = (size) => {
+    const cubies = makeCubies(size);
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        for (let z = 0; z < size; z++) {
+          for (const dir of Object.keys(cubies[x][y][z].stickers)) flipSticker(cubies, x, y, z, dir);
+        }
+      }
+    }
+    return cubies;
+  };
+
+  it('accepts the home board and the fully inverted board, and nothing between', () => {
+    const home = makeCubies(3);
+    const inverted = invertEverySticker(3);
+    const partial = makeCubies(3);
+    flipSticker(partial, 0, 0, 2, 'PZ');
+
+    expect(checkRubiksSolvedInverted(home, 3)).toBe(false);
+    expect(checkRubiksSolvedInverted(inverted, 3)).toBe(true);
+
+    expect(checkRubiksSolvedEitherPolarity(home, 3)).toBe(true);
+    expect(checkRubiksSolvedEitherPolarity(inverted, 3)).toBe(true);
+    expect(checkRubiksSolvedEitherPolarity(partial, 3)).toBe(false);
+  });
+
+  it('rejects a half-inverted board, which per-face uniformity would wrongly accept', () => {
+    // Flip both faces of ONE antipodal face-pair (PZ and NZ). Every face still
+    // shows a single colour, so the rotation-invariant check passes it — but its
+    // cost is not a branch of min(n11, P − n11), so it must not be a win.
+    const cubies = makeCubies(3);
+    for (let x = 0; x < 3; x++) {
+      for (let y = 0; y < 3; y++) {
+        flipSticker(cubies, x, y, 2, 'PZ');
+        flipSticker(cubies, x, y, 0, 'NZ');
+      }
+    }
+    expect(checkRubiksSolvedRotationInvariant(cubies, 3)).toBe(true); // uniform per face
+    expect(checkRubiksSolvedEitherPolarity(cubies, 3)).toBe(false);   // but not a polarity
+  });
+
+  it('is not the quotient check, which is blind to flips on an unturned cube', () => {
+    // Guards against "simplifying" checkRubiksSolvedEitherPolarity down to
+    // checkRubiksSolvedAntipodal: flipping never leaves the colour class, so the
+    // quotient check passes a flip-only board no matter how disturbed it is —
+    // it would fire victory the instant a flip puzzle loaded.
+    const barelyStarted = makeCubies(3);
+    flipSticker(barelyStarted, 0, 0, 2, 'PZ');
+    expect(checkRubiksSolvedAntipodal(barelyStarted, 3)).toBe(true);
+    expect(checkRubiksSolvedEitherPolarity(barelyStarted, 3)).toBe(false);
   });
 });

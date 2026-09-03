@@ -4,19 +4,21 @@ import {
   dailyKeyFor, previousDayKey, dailyPlanFor, buildDailyLevel, buildDailyPack,
   ensureDailyPack, _resetDailyRegistration,
   emptyDailyRecord, advanceStreak, isDailyDone, currentStreak,
+  DAILY_HIGH_POLARITY_RATE,
 } from '../levels/dailyChallenge.js';
 import { levelsManager } from '../levels/LevelsManager.js';
 import { ProgressManager } from '../levels/ProgressManager.js';
 import { computeCDir } from '../levels/antipodalRandomizer.js';
+import { computeStars } from '../levels/scoring.js';
 import { msUntilNextLocalMidnight } from '../levels/dailyChallenge.js';
 import { recordLevelCompletion } from '../levels/completion.js';
-import { LEVEL_ID_RANGES } from '../levels/schema.js';
+import { LEVEL_ID_RANGES, WIN_CONDITIONS } from '../levels/schema.js';
 import { BUILT_IN_PACKS } from '../levels/packs/index.js';
-import { betaPairCount } from '../levels/antipodalLevelBridge.js';
+import { betaPairCount, betaPairAnchors, buildPlayableAntipodalLevel } from '../levels/antipodalLevelBridge.js';
 import { ACHIEVEMENTS, ACHIEVEMENT_IDS, getAchievement, decorateAchievements } from '../levels/achievements.js';
 import { buildLevelStartState } from '../levels/levelStaging.js';
-import { checkRubiksWin } from '../game/winDetection.js';
-import { buildManifoldGridMap, unflipStickerPair } from '../game/manifoldLogic.js';
+import { checkRubiksWin, checkRubiksSolvedEitherPolarity } from '../game/winDetection.js';
+import { buildManifoldGridMap, flipStickerPair, unflipStickerPair } from '../game/manifoldLogic.js';
 import { makeCubies } from '../game/cubeState.js';
 
 const KEY = '2026-09-01';
@@ -68,12 +70,23 @@ describe('dailyPlanFor', () => {
 
   it('draws only symmetric fibres, so classic paired flips can actually stage it', () => {
     // n_A > 0 is unreachable by paired native flips (antipodalLevelBridge header).
-    // generateLevelState RELAXES an unsatisfiable nARange instead of throwing, so
-    // this is the assertion that catches a P too small for the requested par.
     for (let d = 1; d <= 28; d++) {
       const plan = dailyPlanFor(`2026-10-${String(d).padStart(2, '0')}`);
       expect(plan.nA).toBe(0);
       expect(plan.par).toBeLessThanOrEqual(Math.floor(plan.P / 2));
+    }
+  });
+
+  it('reports the fibre of the board that is actually staged, not a notional one', () => {
+    // P used to be a free parameter (2·par + 0/2/4) handed to the abstract
+    // randomizer while the board always carried `par` flips out of the cube's
+    // real 27 β-pairs — so n00/n11/ambiguity described a fibre nobody played.
+    for (let d = 1; d <= 28; d++) {
+      const key = `2027-01-${String(d).padStart(2, '0')}`;
+      const plan = dailyPlanFor(key);
+      expect(plan.P).toBe(betaPairCount(DAILY_CUBE_SIZE));
+      expect(plan.n00 + plan.n11 + plan.nA).toBe(plan.P);
+      expect(buildDailyLevel(key).flipSequence).toHaveLength(plan.n11);
     }
   });
 
@@ -86,15 +99,26 @@ describe('dailyPlanFor', () => {
 });
 
 describe('buildDailyLevel', () => {
-  it('authors exactly par flips and no scramble turns', () => {
+  it('authors exactly n11 flips and no scramble turns', () => {
     const plan = dailyPlanFor(KEY);
     const level = buildDailyLevel(KEY);
     expect(level.id).toBe(DAILY_LEVEL_ID);
     expect(level.par).toBe(plan.par);
-    expect(level.flipSequence).toHaveLength(plan.par);
+    // n11 flips are staged; par is min(n11, P − n11), which equals n11 only on a
+    // low-polarity day. Asserting `par` here would silently pin the test to that
+    // branch and stop covering half the calendar.
+    expect(level.flipSequence).toHaveLength(plan.n11);
     expect(level.scrambleSequence).toBeNull();
     expect(level.cubeSize).toBe(DAILY_CUBE_SIZE);
     expect(level.features.flips).toBe(true);
+  });
+
+  it('accepts either polarity as a win, every day', () => {
+    // Declared unconditionally: gating it on the day's polarity would leak the
+    // answer into the level data, where a curious player can read it.
+    for (let d = 1; d <= 14; d++) {
+      expect(buildDailyLevel(`2027-02-${String(d).padStart(2, '0')}`).winCondition).toBe(WIN_CONDITIONS.ANTIPODAL);
+    }
   });
 
   it('flips distinct β-pairs, so par is genuinely reachable in par taps', () => {
@@ -461,5 +485,135 @@ describe('achievement catalogue', () => {
     expect(decorated.find((a) => a.id === 'first_steps').earned).toBe(false);
     expect(decorated.find((a) => a.id === 'from_the_future')).toMatchObject({ earned: true });
     expect(decorateAchievements()).toHaveLength(ACHIEVEMENTS.length);
+  });
+});
+
+describe('the polarity choice', () => {
+  // The day's real puzzle. C_dir = min(n11, P − n11) has two branches and the
+  // daily draws between them: on a LOW day the board shows `par` wrong pairs and
+  // you tap them home; on a HIGH day it shows 17–23 wrong pairs and the cheap
+  // route is to flip the `par` that still look RIGHT, landing the board
+  // all-dirty. Before this, every day was low and the daily was "tap the
+  // obviously wrong tiles" with nothing to decide.
+  const anchorKey = (a) => `${a.x},${a.y},${a.z},${a.dirKey}`;
+  const year = (m) => Array.from({ length: 28 }, (_, i) => `2027-${m}-${String(i + 1).padStart(2, '0')}`);
+
+  // The par route: on a high day flip the pairs the staging left alone, on a low
+  // day undo the ones it flipped. Either way exactly `par` taps.
+  const parRoute = (level, plan) => {
+    if (plan.polarity !== 'high') return level.flipSequence;
+    const staged = new Set(level.flipSequence.map(anchorKey));
+    return betaPairAnchors(plan.size).filter((a) => !staged.has(anchorKey(a)));
+  };
+
+  const tapAll = (level, anchors) => {
+    let state = buildLevelStartState(level, level.cubeSize);
+    const wonAfter = [];
+    for (const { x, y, z, dirKey } of anchors) {
+      state = flipStickerPair(state, level.cubeSize, x, y, z, dirKey, buildManifoldGridMap(state, level.cubeSize));
+      wonAfter.push(checkRubiksSolvedEitherPolarity(state, level.cubeSize));
+    }
+    return { state, firstWin: wonAfter.indexOf(true) === -1 ? null : wonAfter.indexOf(true) + 1 };
+  };
+
+  it('draws both polarities across a month, at roughly the published rate', () => {
+    const polarities = year('03').map((k) => dailyPlanFor(k).polarity);
+    const high = polarities.filter((p) => p === 'high').length;
+    expect(high).toBeGreaterThan(0);
+    expect(high).toBeLessThan(polarities.length);
+    // A loose band — the point is that the constant steers the draw at all, not
+    // that 28 samples land on it.
+    expect(high / polarities.length).toBeLessThan(DAILY_HIGH_POLARITY_RATE * 2);
+  });
+
+  it('stages the complement on a high day, and par stays the cheaper side', () => {
+    for (const key of year('04')) {
+      const plan = dailyPlanFor(key);
+      expect(plan.n11).toBe(plan.polarity === 'high' ? plan.P - plan.par : plan.par);
+      expect(Math.min(plan.n11, plan.P - plan.n11)).toBe(plan.par);
+      expect(buildDailyLevel(key).flipSequence).toHaveLength(plan.n11);
+    }
+  });
+
+  it('never opens on a board that is already a win', () => {
+    // The trap this feature walked into once: the RP² quotient check passes any
+    // flip-only board, so wiring the daily to it fired victory on load.
+    for (const key of year('05')) {
+      const level = buildDailyLevel(key);
+      expect(checkRubiksSolvedEitherPolarity(buildLevelStartState(level, level.cubeSize), level.cubeSize), `daily ${key} opens solved`).toBe(false);
+    }
+  });
+
+  it('wins on the par route in exactly par taps, on both polarities', () => {
+    for (const key of year('06')) {
+      const plan = dailyPlanFor(key);
+      const level = buildDailyLevel(key);
+      const route = parRoute(level, plan);
+      expect(route, `daily ${key} par route length`).toHaveLength(plan.par);
+      // Not one tap sooner: an earlier win would mean a cheaper solve exists and
+      // par is not the exact cost the card advertises.
+      expect(tapAll(level, route).firstWin, `daily ${key} par route`).toBe(plan.par);
+    }
+  });
+
+  it('still lets the reflex route finish, at a worse score', () => {
+    // A high day must never be a dead end for a player who does not spot it:
+    // repairing all 17–23 wrong pairs reaches the home board and wins. It just
+    // costs a 1-star finish against par's 3.
+    const highKeys = year('07').filter((k) => dailyPlanFor(k).polarity === 'high');
+    expect(highKeys.length).toBeGreaterThan(0);
+    for (const key of highKeys) {
+      const plan = dailyPlanFor(key);
+      const level = buildDailyLevel(key);
+      const { firstWin } = tapAll(level, level.flipSequence);
+      expect(firstWin, `daily ${key} reflex route`).toBe(plan.n11);
+      expect(firstWin).toBeGreaterThan(plan.par);
+      expect(computeStars(level, { moves: firstWin })).toBe(1);
+      expect(computeStars(level, { moves: plan.par })).toBe(3);
+    }
+  });
+
+  it('always has a right answer — the two targets are never equally priced', () => {
+    // Δ = |P − 2·n11| with P = 27 (odd) can never be 0, so there is always a
+    // strictly cheaper polarity. The old copy promised days where "either target
+    // is a par solve"; on this cube no such day exists.
+    for (const key of year('08')) {
+      const plan = dailyPlanFor(key);
+      expect(plan.ambiguity).toBeGreaterThan(0);
+      expect(plan.ambiguity).toBe(Math.abs(plan.P - 2 * plan.n11));
+    }
+  });
+
+  it('states the rule in its copy but never the day’s answer', () => {
+    for (const key of year('09')) {
+      const plan = dailyPlanFor(key);
+      const { tutorial } = buildDailyLevel(key);
+      const copy = `${tutorial.text} ${tutorial.objective} ${tutorial.tip}`.toLowerCase();
+      expect(copy).toContain('two boards count as solved');
+      expect(copy).not.toContain(plan.polarity);
+    }
+  });
+});
+
+describe('buildPlayableAntipodalLevel polarity guards', () => {
+  const P = betaPairCount(3);
+
+  it('refuses a par that contradicts the staged flip count', () => {
+    expect(() => buildPlayableAntipodalLevel({ id: 1, size: 3, targetPar: 5, flipCount: 7 })).toThrow(RangeError);
+  });
+
+  it('refuses to ship an all-dirty par under CLASSIC, which cannot score it', () => {
+    // The silent failure this guards: the player hits par, the board is
+    // all-dirty, and the strict win check simply never fires.
+    expect(() => buildPlayableAntipodalLevel({ id: 1, size: 3, targetPar: 5, flipCount: P - 5 })).toThrow(/ANTIPODAL/);
+    expect(() =>
+      buildPlayableAntipodalLevel({ id: 1, size: 3, targetPar: 5, flipCount: P - 5, meta: { winCondition: WIN_CONDITIONS.ANTIPODAL } })
+    ).not.toThrow();
+  });
+
+  it('still defaults to the all-clean target under CLASSIC', () => {
+    const level = buildPlayableAntipodalLevel({ id: 1, size: 3, targetPar: 5 });
+    expect(level.flipSequence).toHaveLength(5);
+    expect(level.winCondition).toBe(WIN_CONDITIONS.CLASSIC);
   });
 });
