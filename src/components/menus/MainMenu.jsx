@@ -722,6 +722,23 @@ const _wobbleQ = new THREE.Quaternion();
 const _presentQ = new THREE.Quaternion();
 const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the camera
 
+// ─── Idle spin ───────────────────────────────────────────────────────────────
+// The cube pirouettes on its own corner: its (1,1,1) body diagonal is aimed
+// down +Z at the camera, and it turns about that diagonal at a steady rate.
+// Three faces stay in view the whole time, meeting at the corner pointed at the
+// player, which is the pose that shows the tile grid off best — the light now
+// coming out of the seams reads as three lit planes rather than one flat one.
+//
+// The alignment quaternion is built once; the spin is composed onto it each
+// frame. Both are module-level so the frame loop allocates nothing.
+const _DIAG_AXIS = new THREE.Vector3(0, 0, 1);
+const _DIAG_ALIGN_Q = new THREE.Quaternion().setFromUnitVectors(
+  new THREE.Vector3(1, 1, 1).normalize(),
+  new THREE.Vector3(0, 0, 1)
+);
+const _spinQ = new THREE.Quaternion();
+const DIAG_SPIN_RATE = 0.32; // rad/s — a full turn in roughly twenty seconds
+
 // ─── Menu cube scale ─────────────────────────────────────────────────────────
 // The idle menu cube renders 20% smaller than it used to: at full size it
 // crowded the wordmark above it and ran under the START pill below, leaving no
@@ -990,10 +1007,12 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         cubeRef.current.position.z = Math.sin(t * 31 + 2) * intensity * 0.3;
       }
     } else {
-      // Compound rotation shows all 6 faces over time
-      cubeRef.current.rotation.y = t * 0.24 + Math.sin(t * 0.108) * 0.55;
-      cubeRef.current.rotation.x = Math.sin(t * 0.156) * 0.48;
-      cubeRef.current.rotation.z = Math.sin(t * 0.084) * 0.18;
+      // A steady turn about the body diagonal aimed at the camera — see the
+      // idle-spin constants. Replaces the old compound Euler wobble, which
+      // tumbled the cube through all six faces and never held a pose long
+      // enough for the lit grid to read.
+      _spinQ.setFromAxisAngle(_DIAG_AXIS, t * DIAG_SPIN_RATE);
+      cubeRef.current.quaternion.copy(_DIAG_ALIGN_Q).premultiply(_spinQ);
       cubeRef.current.position.set(0, 0.45, 0);
     }
   });
