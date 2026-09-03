@@ -725,19 +725,30 @@ const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the cam
 // ─── Idle spin ───────────────────────────────────────────────────────────────
 // The cube pirouettes on its own corner: its (1,1,1) body diagonal is aimed
 // down +Z at the camera, and it turns about that diagonal at a steady rate.
-// Three faces stay in view the whole time, meeting at the corner pointed at the
-// player, which is the pose that shows the tile grid off best — the light now
-// coming out of the seams reads as three lit planes rather than one flat one.
+// Three faces meet at the corner pointed at the player, which is the pose that
+// shows the tile grid off best — the light coming out of the seams reads as
+// three lit planes rather than one flat one.
 //
-// The alignment quaternion is built once; the spin is composed onto it each
-// frame. Both are module-level so the frame loop allocates nothing.
+// A pirouette on a fixed axis would only ever show those three faces, so the
+// axis itself drifts: a slow yaw carries it right around, and a slow nod tips
+// it, which walks the cube through its other corners and brings every face
+// past the camera in turn. The drift is deliberately several times slower than
+// the spin — it is the thing you notice second, not a return of the old tumble.
+//
+// Composition is drift ∘ spin ∘ align, applied by premultiplying outward.
+// Everything here is module-level so the frame loop allocates nothing.
 const _DIAG_AXIS = new THREE.Vector3(0, 0, 1);
 const _DIAG_ALIGN_Q = new THREE.Quaternion().setFromUnitVectors(
   new THREE.Vector3(1, 1, 1).normalize(),
   new THREE.Vector3(0, 0, 1)
 );
 const _spinQ = new THREE.Quaternion();
+const _driftEuler = new THREE.Euler();
+const _driftQ = new THREE.Quaternion();
 const DIAG_SPIN_RATE = 0.32; // rad/s — a full turn in roughly twenty seconds
+const DRIFT_YAW_RATE = 0.075; // rad/s — the spin axis comes right around in ~84s
+const DRIFT_NOD_RATE = 0.043; // rad/s — and tips, on a period that does not
+const DRIFT_NOD_AMP = 0.60; //   divide the yaw's, so the pose never quite repeats
 
 // ─── Menu cube scale ─────────────────────────────────────────────────────────
 // The idle menu cube renders 20% smaller than it used to: at full size it
@@ -1007,12 +1018,14 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         cubeRef.current.position.z = Math.sin(t * 31 + 2) * intensity * 0.3;
       }
     } else {
-      // A steady turn about the body diagonal aimed at the camera — see the
-      // idle-spin constants. Replaces the old compound Euler wobble, which
-      // tumbled the cube through all six faces and never held a pose long
-      // enough for the lit grid to read.
+      // A steady turn about the body diagonal, on an axis that itself drifts —
+      // see the idle-spin constants. Replaces the old compound Euler wobble,
+      // which tumbled the cube and never held a pose long enough for the lit
+      // grid to read.
       _spinQ.setFromAxisAngle(_DIAG_AXIS, t * DIAG_SPIN_RATE);
-      cubeRef.current.quaternion.copy(_DIAG_ALIGN_Q).premultiply(_spinQ);
+      _driftEuler.set(Math.sin(t * DRIFT_NOD_RATE) * DRIFT_NOD_AMP, t * DRIFT_YAW_RATE, 0);
+      _driftQ.setFromEuler(_driftEuler);
+      cubeRef.current.quaternion.copy(_DIAG_ALIGN_Q).premultiply(_spinQ).premultiply(_driftQ);
       cubeRef.current.position.set(0, 0.45, 0);
     }
   });
