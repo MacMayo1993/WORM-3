@@ -701,6 +701,23 @@ const _wobbleQ = new THREE.Quaternion();
 const _presentQ = new THREE.Quaternion();
 const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the camera
 
+// ─── Menu cube scale ─────────────────────────────────────────────────────────
+// The idle menu cube renders 20% smaller than it used to: at full size it
+// crowded the wordmark above it and ran under the START pill below, leaving no
+// air anywhere in the frame. Dollying the camera back would have done the same
+// job optically — the backdrop is a panorama at infinity, so pulling back only
+// shrinks the cube — but the mode carousel borrows this same camera, and its
+// cube is presenting a face and wants the frame. Scaling the group instead
+// keeps that one untouched.
+//
+// The three idle poses stay in proportion to each other; only their common
+// factor moved. Carousel and dive scales are deliberately not derived from
+// these.
+const MENU_CUBE_ZOOM = 0.8;
+const MENU_REST_SCALE = 1.022 * MENU_CUBE_ZOOM;
+const MENU_PRESS_SCALE = 0.968 * MENU_CUBE_ZOOM; // finger down on the cube
+const MENU_SHAKE_SCALE = 0.950 * MENU_CUBE_ZOOM; // the shake that precedes play
+
 // Bevel overlay: a top-left highlight and bottom-right shadow baked into a
 // transparent texture, layered over the tile so the inset face reads as a
 // raised, chamfered cube sticker lit from the upper-left.
@@ -821,8 +838,8 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const shaking = useRef(false);
   const shakeStart = useRef(0);
   const shakeIsExternalRef = useRef(false); // true = START button, false = direct tap
-  const cubeTargetScale = useRef(1.022);
-  const cubeCurrentScale = useRef(1.022);
+  const cubeTargetScale = useRef(MENU_REST_SCALE);
+  const cubeCurrentScale = useRef(MENU_REST_SCALE);
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
   // R3F's clock belongs to the persistent Canvas, not the menu. Keep a menu
@@ -914,9 +931,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     // Carousel closed — clear any finished dive so idle animation resumes clean.
     if (diveRef.current) {
       diveRef.current = null;
-      cubeCurrentScale.current = 1.022;
-      cubeTargetScale.current = 1.022;
-      cubeRef.current.scale.setScalar(1.022);
+      cubeCurrentScale.current = MENU_REST_SCALE;
+      cubeTargetScale.current = MENU_REST_SCALE;
+      cubeRef.current.scale.setScalar(MENU_REST_SCALE);
     }
     updateSharedTime(t);
 
@@ -925,7 +942,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       shakeIsExternalRef.current = true;
       shaking.current = true;
       shakeStart.current = Date.now();
-      cubeTargetScale.current = 0.950;
+      cubeTargetScale.current = MENU_SHAKE_SCALE;
     }
 
     cubeCurrentScale.current += (cubeTargetScale.current - cubeCurrentScale.current) * Math.min(1, delta * 18);
@@ -935,7 +952,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       const elapsed = Date.now() - shakeStart.current;
       if (elapsed > 540) {
         shaking.current = false;
-        cubeTargetScale.current = 1.022;
+        cubeTargetScale.current = MENU_REST_SCALE;
         cubeRef.current.position.set(0, 0.45, 0);
         if (shakeIsExternalRef.current) {
           shakeIsExternalRef.current = false;
@@ -966,8 +983,8 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     shaking.current = true;
     shakeStart.current = Date.now();
   };
-  const handleCubeDown = () => { cubeTargetScale.current = 0.968; };
-  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 1.022; };
+  const handleCubeDown = () => { cubeTargetScale.current = MENU_PRESS_SCALE; };
+  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = MENU_REST_SCALE; };
 
   return (
     <>
