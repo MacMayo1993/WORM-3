@@ -197,7 +197,7 @@ function applyFlips(board, flips) {
  * is never flipped at all. The board opens easier than advertised, and silently:
  * on 2026-01-22 three anchors resolved to two pairs and one visible flip.
  */
-function buildDailyFlips(dateKey, board, count = DAILY_FLIPPED_PAIRS, attempt = 0, table = buildMoveTable(DAILY_CUBE_SIZE)) {
+export function buildDailyFlips(dateKey, board, count = DAILY_FLIPPED_PAIRS, attempt = 0, table = buildMoveTable(DAILY_CUBE_SIZE)) {
   const { occupant } = encodeBoard(board, DAILY_CUBE_SIZE, table);
 
   // One representative position per identity pair actually present on the board.

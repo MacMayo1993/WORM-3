@@ -4,12 +4,13 @@ import {
   dailyKeyFor, previousDayKey, dailyPlanFor, buildDailyLevel,
   ensureDailyPack, _resetDailyRegistration,
   emptyDailyRecord, advanceStreak, isDailyDone, currentStreak,
-  DAILY_SCRAMBLE_TURNS, DAILY_FLIPPED_PAIRS, _resetDailyPlanCache,
+  DAILY_SCRAMBLE_TURNS, DAILY_FLIPPED_PAIRS, buildDailyFlips, _resetDailyPlanCache,
 } from '../levels/dailyChallenge.js';
 import { levelsManager } from '../levels/LevelsManager.js';
 import { ProgressManager } from '../levels/ProgressManager.js';
 import { buildMoveTable, encodeBoard, solveCost, solveLine } from '../levels/parSolver.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+import { makeRng } from '../levels/antipodalRandomizer.js';
 import { msUntilNextLocalMidnight } from '../levels/dailyChallenge.js';
 import { recordLevelCompletion } from '../levels/completion.js';
 import { LEVEL_ID_RANGES, WIN_CONDITIONS } from '../levels/schema.js';
@@ -142,21 +143,11 @@ describe('buildDailyLevel', () => {
     // on a solved cube can hold the two members of ONE pair afterwards — flipping
     // both cancels, and a third intended pair never gets flipped. 2026-01-22
     // shipped three anchors that resolved to two pairs and one visible flip.
-    const table = buildMoveTable(DAILY_CUBE_SIZE);
-    const slotOf = new Map(table.slots.map((s, i) => [`${s.x},${s.y},${s.z},${s.dirKey}`, i]));
-
-    const audit = (key) => {
-      const plan = dailyPlanFor(key);
-      // Where the anchors actually land: after the turns, before the flips.
-      let scrambled = makeCubies(DAILY_CUBE_SIZE);
-      for (const m of plan.scramble) scrambled = rotateSliceCubies(scrambled, DAILY_CUBE_SIZE, m.axis, m.sliceIndex, m.dir);
-      const { occupant } = encodeBoard(scrambled, DAILY_CUBE_SIZE, table);
-      const pairs = plan.flips.map((a) => {
-        const id = occupant[slotOf.get(`${a.x},${a.y},${a.z},${a.dirKey}`)];
-        return Math.min(id, table.partner[id]);
-      });
-
-      // And what the player actually sees once staging has run.
+    //
+    // End-to-end through the real staging path. Kept to a few dates because each
+    // one runs the par search; buildDailyFlips is swept properly below, where it
+    // costs nothing.
+    for (const key of ['2026-01-22', '2026-04-05', '2026-07-11', '2026-09-15']) {
       const staged = buildLevelStartState(buildDailyLevel(key), DAILY_CUBE_SIZE);
       let showingFlipped = 0;
       for (let x = 0; x < DAILY_CUBE_SIZE; x++) {
@@ -166,18 +157,52 @@ describe('buildDailyLevel', () => {
           }
         }
       }
-      return { distinctPairs: new Set(pairs).size, visiblePairs: showingFlipped / 2 };
-    };
+      expect(showingFlipped / 2, `daily ${key} opens with fewer pairs flipped than it staged`).toBe(DAILY_FLIPPED_PAIRS);
+    }
+  });
 
-    // The date that exposed it, then a wide sweep — the collision hit 13 of 336
-    // days, so a handful of samples would have missed it.
-    expect(audit('2026-01-22')).toEqual({ distinctPairs: DAILY_FLIPPED_PAIRS, visiblePairs: DAILY_FLIPPED_PAIRS });
-    for (let m = 1; m <= 12; m++) {
-      for (let d = 1; d <= 28; d += 3) {
-        const key = `2026-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        expect(audit(key), `daily ${key} stages fewer pairs than it advertises`)
-          .toEqual({ distinctPairs: DAILY_FLIPPED_PAIRS, visiblePairs: DAILY_FLIPPED_PAIRS });
+  it('picks anchors that are distinct β-pairs on the board they land on', () => {
+    // The unit under the regression above, swept hard because it is pure: no par
+    // search, so hundreds of adversarial boards cost less than four dates do.
+    const table = buildMoveTable(DAILY_CUBE_SIZE);
+    const slotOf = new Map(table.slots.map((sl, i) => [`${sl.x},${sl.y},${sl.z},${sl.dirKey}`, i]));
+    const rng = makeRng('anchor-sweep');
+
+    for (let trial = 0; trial < 300; trial++) {
+      // Scramble depths well past the daily's own, so the pairing is thoroughly
+      // rearranged rather than barely disturbed.
+      let board = makeCubies(DAILY_CUBE_SIZE);
+      const depth = 1 + Math.floor(rng() * 8);
+      for (let i = 0; i < depth; i++) {
+        const m = table.moves[Math.floor(rng() * table.moves.length)];
+        board = rotateSliceCubies(board, DAILY_CUBE_SIZE, m.axis, m.sliceIndex, m.dir);
       }
+
+      const flips = buildDailyFlips(`sweep-${trial}`, board, DAILY_FLIPPED_PAIRS, trial, table);
+      expect(flips).toHaveLength(DAILY_FLIPPED_PAIRS);
+
+      // Distinct as IDENTITY pairs, which is what flipStickerPair actually acts on.
+      const { occupant } = encodeBoard(board, DAILY_CUBE_SIZE, table);
+      const pairs = flips.map((a) => {
+        const id = occupant[slotOf.get(`${a.x},${a.y},${a.z},${a.dirKey}`)];
+        return Math.min(id, table.partner[id]);
+      });
+      expect(new Set(pairs).size, `trial ${trial} (depth ${depth}) selected the same pair twice`).toBe(DAILY_FLIPPED_PAIRS);
+
+      // And they survive being applied: nothing cancels.
+      let flipped = board;
+      for (const a of flips) {
+        flipped = flipStickerPair(flipped, DAILY_CUBE_SIZE, a.x, a.y, a.z, a.dirKey, buildManifoldGridMap(flipped, DAILY_CUBE_SIZE));
+      }
+      let showing = 0;
+      for (let x = 0; x < DAILY_CUBE_SIZE; x++) {
+        for (let y = 0; y < DAILY_CUBE_SIZE; y++) {
+          for (let z = 0; z < DAILY_CUBE_SIZE; z++) {
+            for (const st of Object.values(flipped[x][y][z].stickers)) if (st.curr !== st.orig) showing++;
+          }
+        }
+      }
+      expect(showing / 2, `trial ${trial} (depth ${depth}) lost a flip to cancellation`).toBe(DAILY_FLIPPED_PAIRS);
     }
   });
 
