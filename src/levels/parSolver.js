@@ -164,9 +164,37 @@ export function flipsToFinish(occupant, showing, table) {
  * a solution using `d` turns costs at least `d`, so once the best found is no
  * more than the next depth, that best is proven optimal.
  */
-export function solveCost(cubies, size, { maxMoves = 6, table = buildMoveTable(size) } = {}) {
-  const found = solveLine(cubies, size, { maxMoves, table });
+export function solveCost(cubies, size, { maxMoves = 6, table = buildMoveTable(size), allowFlips = true } = {}) {
+  const found = solveLine(cubies, size, { maxMoves, table, allowFlips });
   return found === null ? null : found.cost;
+}
+
+/**
+ * Whether a board genuinely needs BOTH kinds of move — the property a level
+ * claiming to teach turns AND flips has to actually have.
+ *
+ * Not "the solution I found happens to use both": that would pass a board with
+ * an equally short all-turn alternative sitting next to it. Turns are mandatory
+ * when no all-flip solution matches par, and flips are mandatory when no
+ * all-turn solution does, each established by re-running the search with that
+ * move type withheld.
+ *
+ * @returns {{ par, turnOnly, flipOnly, turnsMandatory, flipsMandatory }}
+ */
+export function analyseMoveMix(cubies, size, { maxMoves = 8, table = buildMoveTable(size) } = {}) {
+  const par = solveCost(cubies, size, { maxMoves, table });
+  const turnOnly = solveCost(cubies, size, { maxMoves, table, allowFlips: false });
+  const { occupant, showing } = encodeBoard(cubies, size, table);
+  const flipOnly = flipsToFinish(occupant, showing, table); // zero turns, by definition
+  return {
+    par,
+    turnOnly,
+    flipOnly,
+    // A cheaper single-type route cannot exist, so par is unreachable without
+    // the other type. `null` means that route cannot solve the board at all.
+    turnsMandatory: par !== null && (flipOnly === null || flipOnly > par),
+    flipsMandatory: par !== null && (turnOnly === null || turnOnly > par)
+  };
 }
 
 /**
@@ -174,7 +202,7 @@ export function solveCost(cubies, size, { maxMoves = 6, table = buildMoveTable(s
  * `turns` is a move list and `flips` a list of β-pair anchors to tap afterwards.
  * `cost === turns.length + flips.length`.
  */
-export function solveLine(cubies, size, { maxMoves = 6, table = buildMoveTable(size) } = {}) {
+export function solveLine(cubies, size, { maxMoves = 6, table = buildMoveTable(size), allowFlips = true } = {}) {
   const { perms, inverse, sliceOf, moves, partner, slots } = table;
   const { occupant, showing } = encodeBoard(cubies, size, table);
   const n = occupant.length;
@@ -183,6 +211,9 @@ export function solveLine(cubies, size, { maxMoves = 6, table = buildMoveTable(s
   const consider = (state, depth, path) => {
     const flips = flipsToFinish(state, showing, table);
     if (flips === null) return;
+    // `allowFlips: false` asks what turns alone can do — used to prove that a
+    // level's flips are load-bearing rather than a convenience.
+    if (!allowFlips && flips > 0) return;
     const cost = depth + flips;
     // `maxMoves` caps the TOTAL, turns and flips together. Capping only the turn
     // depth would let a shallow-turn, many-flip line through and report a cost

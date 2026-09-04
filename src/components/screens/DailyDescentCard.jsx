@@ -71,7 +71,7 @@ export default function DailyDescentCard({
       onMouseLeave={() => setHover(false)}
       aria-label={solved
         ? `Daily Descent for ${dateLabel}, already solved in ${moves ?? par} moves. Play again.`
-        : `Play the Daily Descent for ${dateLabel}. Par is ${par} flips.`}
+        : `Play the Daily Descent for ${dateLabel}. Par is ${par} move${par === 1 ? '' : 's'}.`}
       style={{
         textAlign: 'left', padding: '18px 20px', borderRadius: '16px',
         border: `1.5px solid ${hover ? accent : PAPER_BORDER_SOFT}`,
