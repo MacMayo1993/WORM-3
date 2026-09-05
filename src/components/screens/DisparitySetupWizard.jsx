@@ -165,7 +165,8 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       title: 'Background',
       subtitle: 'Choose your play environment',
       summary: sceneLabel(settings),
-      content: <SceneStep cos={cos} />
+      hero: <SceneStep cos={cos} slot="hero" />,
+      content: <SceneStep cos={cos} slot="body" />
     },
     {
       key: 'colors',
@@ -174,7 +175,8 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       title: 'Color Palette',
       subtitle: 'Pick a palette — the cube wears it as you go',
       summary: paletteLabel(settings),
-      content: <PaletteStep cos={cos} />
+      hero: <PaletteStep cos={cos} slot="hero" />,
+      content: <PaletteStep cos={cos} slot="body" />
     },
     styleCategory(cos),
     {
@@ -195,7 +197,8 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       title: 'Cube Size',
       subtitle: 'Slide to size — this is the cube that has to survive',
       summary: sizeLabel(cos.cubeSize),
-      content: <SizeStep cos={cos} />
+      hero: <SizeStep cos={cos} slot="hero" />,
+      content: <SizeStep cos={cos} slot="body" />
     }
   ];
 
@@ -211,6 +214,22 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
     <div style={S.overlay}>
       <WizardImageInput cos={cos} />
       <div style={S.sheet}>
+        <div style={S.hero}>
+          <div style={S.header}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
+              fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff',
+              boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
+            }}>
+              DISPARITY MODE
+            </div>
+            <h2 style={S.title}>{active.title}</h2>
+            <p style={S.subtitle}>{active.subtitle}</p>
+          </div>
+          {active.hero}
+        </div>
+
         <div style={S.main}>
           <WizardRail
             styles={S}
@@ -222,19 +241,6 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           />
 
           <div style={S.pane}>
-            <div style={S.header}>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
-                fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff',
-                boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
-              }}>
-                DISPARITY MODE
-              </div>
-              <h2 style={S.title}>{active.title}</h2>
-              <p style={S.subtitle}>{active.subtitle}</p>
-            </div>
-
             <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
               <div style={{ paddingBottom: '24px' }}>{active.content}</div>
             </div>

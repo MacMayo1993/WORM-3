@@ -32,7 +32,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Pick Your Scene',
       subtitle: 'Choose your play environment',
       summary: sceneLabel(cos.settings),
-      content: <SceneStep cos={cos} />
+      hero: <SceneStep cos={cos} slot="hero" />,
+      content: <SceneStep cos={cos} slot="body" />
     },
     {
       key: 'colors',
@@ -41,7 +42,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Color Palette',
       subtitle: 'Pick a palette — the cube wears it as you go',
       summary: paletteLabel(cos.settings),
-      content: <PaletteStep cos={cos} />
+      hero: <PaletteStep cos={cos} slot="hero" />,
+      content: <PaletteStep cos={cos} slot="body" />
     },
     styleCategory(cos),
     {
@@ -51,7 +53,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Cube Size',
       subtitle: 'Slide to size — everything else is already decided',
       summary: sizeLabel(cos.cubeSize),
-      content: <SizeStep cos={cos} />
+      hero: <SizeStep cos={cos} slot="hero" />,
+      content: <SizeStep cos={cos} slot="body" />
     }
   ];
 
@@ -66,6 +69,14 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       <WizardImageInput cos={cos} />
 
       <div style={S.sheet}>
+        <div style={S.hero}>
+          <div style={S.header}>
+            <h2 style={S.title}>{active.title}</h2>
+            <p style={S.subtitle}>{active.subtitle}</p>
+          </div>
+          {active.hero}
+        </div>
+
         <div style={S.main}>
           <WizardRail
             styles={S}
@@ -77,11 +88,6 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           />
 
           <div style={S.pane}>
-            <div style={S.header}>
-              <h2 style={S.title}>{active.title}</h2>
-              <p style={S.subtitle}>{active.subtitle}</p>
-            </div>
-
             <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
               <div style={{ paddingBottom: '24px' }}>{active.content}</div>
             </div>

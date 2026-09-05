@@ -56,7 +56,8 @@ export function styleCategory(cos) {
     children,
     activeChild: family,
     onSelectChild: setStyleFamily,
-    content: <StyleStep cos={cos} family={family} />
+    hero: <StyleStep cos={cos} family={family} slot="hero" />,
+    content: <StyleStep cos={cos} family={family} slot="body" />
   };
 }
 

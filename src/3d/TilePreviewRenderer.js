@@ -145,7 +145,7 @@ function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
         const sy = Math.floor((h - 1 - dy) * PREVIEW_SIZE / h); // flip Y
         const rowStart = sy * PREVIEW_SIZE;
         let di = dy * w * 4;
-        for (let dx = 0; dx < w; dx++) {
+        for (let dx = 0; dx < w; dx++, di += 4) {
           const si = (rowStart + Math.floor(dx * PREVIEW_SIZE / w)) * 4;
           dst[di    ] = _pixelBuf[si    ];
           dst[di + 1] = _pixelBuf[si + 1];

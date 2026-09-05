@@ -67,7 +67,8 @@ export const plateArrow = {
  * @param glow      hex tinting the plate wash, the floor glow, and the pill
  * @param backdrop  { thumbnail, gradient } shown dimmed behind the specimen
  * @param hint      faint line at the bottom ("drag the cube to turn it")
- * @param sticky    pin to the top of a scrolling parent (the wizards do)
+ * @param sticky    pin to the top of a scrolling parent (the store does; the
+ *                  wizards stand their plate in the hero band instead)
  * @param children  anything else below the name plate — swatches, a price, dots
  */
 export default function SpecimenPlate({

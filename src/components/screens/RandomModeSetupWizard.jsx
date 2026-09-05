@@ -30,7 +30,8 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Pick Your Scene',
       subtitle: 'This stays fixed — color schemes, tile styles, and a per-cubelet mix of view styles will cycle automatically every 10 seconds.',
       summary: sceneLabel(cos.settings),
-      content: <SceneStep cos={cos} />
+      hero: <SceneStep cos={cos} slot="hero" />,
+      content: <SceneStep cos={cos} slot="body" />
     },
     {
       key: 'size',
@@ -39,7 +40,8 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Cube Size',
       subtitle: 'Slide to size — this stays fixed during play.',
       summary: sizeLabel(cos.cubeSize),
-      content: <SizeStep cos={cos} />
+      hero: <SizeStep cos={cos} slot="hero" />,
+      content: <SizeStep cos={cos} slot="body" />
     }
   ];
 
@@ -54,6 +56,23 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   return (
     <div style={S.overlay}>
       <div style={S.sheet}>
+        <div style={S.hero}>
+          <div style={S.header}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px', background: ACCENT,
+              borderRadius: '6px', padding: '4px 12px', marginBottom: '14px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
+            }}>
+              <span style={{ fontSize: '13px' }}>🎲</span>
+              <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>
+                Random Mode
+              </span>
+            </div>
+            <h2 style={S.title}>{active.title}</h2>
+            <p style={S.subtitle}>{active.subtitle}</p>
+          </div>
+          {active.hero}
+        </div>
+
         <div style={S.main}>
           <WizardRail
             styles={S}
@@ -65,20 +84,6 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           />
 
           <div style={S.pane}>
-            <div style={S.header}>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px', background: ACCENT,
-                borderRadius: '6px', padding: '4px 12px', marginBottom: '14px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
-              }}>
-                <span style={{ fontSize: '13px' }}>🎲</span>
-                <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>
-                  Random Mode
-                </span>
-              </div>
-              <h2 style={S.title}>{active.title}</h2>
-              <p style={S.subtitle}>{active.subtitle}</p>
-            </div>
-
             <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
               <div style={{ paddingBottom: '24px' }}>{active.content}</div>
             </div>

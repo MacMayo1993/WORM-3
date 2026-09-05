@@ -22,11 +22,13 @@ import {
 let putCount = 0;
 
 function fakeCanvas(size = 56) {
+  const canvas = { width: size, height: size };
   const ctx = {
     createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
-    putImageData: () => { putCount++; }
+    putImageData: img => { putCount++; canvas.lastFrame = img; }
   };
-  return { width: size, height: size, getContext: () => ctx };
+  canvas.getContext = () => ctx;
+  return canvas;
 }
 
 // A stand-in for the main R3F renderer: the readback is the expensive part we
@@ -36,7 +38,19 @@ const fakeGl = {
   setRenderTarget: () => {},
   clear: () => {},
   render: () => {},
-  readRenderTargetPixels: () => {}
+  // A horizontal ramp: every column of the 64² target has a distinct red value,
+  // which is what makes a mis-copied row visible in the test below.
+  readRenderTargetPixels: (_rt, _x, _y, w, h, buf) => {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        buf[i] = x * 4;
+        buf[i + 1] = 0;
+        buf[i + 2] = 0;
+        buf[i + 3] = 255;
+      }
+    }
+  }
 };
 
 setSharedRenderer(fakeGl);
@@ -64,6 +78,25 @@ describe('tile preview redraw budget', () => {
     // per-frame redraw would cost.
     expect(drawn).toBeGreaterThan(15);
     expect(drawn).toBeLessThanOrEqual(22);
+  });
+
+  it('scales the readback across the whole canvas', () => {
+    // A 56px thumbnail is not the 64² render target, so every frame is resampled
+    // by hand. Getting the destination index wrong paints one column and leaves
+    // the rest of the row transparent — which reads as a blank tile, not a crash.
+    const canvas = fakeCanvas(56);
+    const id = registerTilePreview(canvas, 'solid', '#ff0000');
+    run(0.05);
+    unregisterTilePreview(id);
+
+    const { data } = canvas.lastFrame;
+    const rowStart = data[0];
+    const rowEnd = data[(56 - 1) * 4];
+    expect(rowEnd).toBeGreaterThan(rowStart); // the ramp survived the resample
+    expect(data[(56 - 1) * 4 + 3]).toBe(255); // and the last column was written
+    // Every pixel of the last row, too — not just the first.
+    const lastRow = (56 * 55) * 4;
+    expect(data[lastRow + (30 * 4) + 3]).toBe(255);
   });
 
   it('never redraws a static style after its first frame', () => {

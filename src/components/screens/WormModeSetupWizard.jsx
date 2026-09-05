@@ -70,7 +70,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   // ── Step 0: Character ───────────────────────────────────────────────────────
 
-  const renderCharacter = () => {
+  const renderCharacter = slot => {
     const chipBase = {
       border: 'none', cursor: 'pointer', borderRadius: '10px',
       transition: 'all 0.18s ease', fontFamily: 'inherit'
@@ -92,6 +92,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {/* ── Character plate ── */}
+        {slot !== 'body' && (
         <SpecimenPlate
           caption="Specimen"
           index={charIndex + 1}
@@ -148,7 +149,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             ))}
           </div>
         </SpecimenPlate>
+        )}
 
+        {slot !== 'hero' && (
+        <>
         {/* ── Skin picker ── */}
         <div>
           <PickerHeading label="Skin" locked={lockedSkins} />
@@ -245,6 +249,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             })}
           </div>
         </div>
+        </>
+        )}
       </div>
     );
   };
@@ -317,7 +323,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   const renderSize = () => (
     <>
-      <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} />
+      <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="body" />
       <button
         type="button"
         aria-pressed={cos.cubeSize === MEGA_CUBE_SIZE}
@@ -357,7 +363,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Pick Worm Type',
       subtitle: 'Select your character, then customize skin & hat',
       summary: `${activeCharacter.label} · ${activeSkin.label}`,
-      content: renderCharacter()
+      hero: renderCharacter('hero'),
+      content: renderCharacter('body')
     },
     {
       key: 'scene',
@@ -366,7 +373,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Background',
       subtitle: 'Choose your play environment',
       summary: sceneLabel(settings),
-      content: <SceneStep cos={cos} />
+      hero: <SceneStep cos={cos} slot="hero" />,
+      content: <SceneStep cos={cos} slot="body" />
     },
     {
       key: 'colors',
@@ -375,7 +383,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Color Palette',
       subtitle: 'Pick a palette — the cube wears it as you go',
       summary: paletteLabel(settings),
-      content: <PaletteStep cos={cos} />
+      hero: <PaletteStep cos={cos} slot="hero" />,
+      content: <PaletteStep cos={cos} slot="body" />
     },
     styleCategory(cos),
     {
@@ -385,6 +394,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Cube Size',
       subtitle: 'Choose the cube your worm has to cross',
       summary: cos.cubeSize === MEGA_CUBE_SIZE ? 'Mega 15×15×15' : sizeLabel(cos.cubeSize, WORM_SIZE_TIERS),
+      hero: <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="hero" />,
       content: renderSize()
     },
     {
@@ -415,6 +425,24 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       <WizardImageInput cos={cos} />
 
       <div style={S.sheet}>
+        <div style={S.hero}>
+          <div style={S.header}>
+            {/* Mode identity badge */}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
+              fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em',
+              textTransform: 'uppercase', color: '#fff',
+              boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
+            }}>
+              WORM MODE
+            </div>
+            <h2 style={S.title}>{active.title}</h2>
+            <p style={S.subtitle}>{active.subtitle}</p>
+          </div>
+          {active.hero}
+        </div>
+
         <div style={S.main}>
           <WizardRail
             styles={S}
@@ -426,21 +454,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           />
 
           <div style={S.pane}>
-            <div style={S.header}>
-              {/* Mode identity badge */}
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
-                fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em',
-                textTransform: 'uppercase', color: '#fff',
-                boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
-              }}>
-                WORM MODE
-              </div>
-              <h2 style={S.title}>{active.title}</h2>
-              <p style={S.subtitle}>{active.subtitle}</p>
-            </div>
-
             <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
               <div style={{ paddingBottom: '24px' }}>{active.content}</div>
             </div>

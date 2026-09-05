@@ -13,7 +13,7 @@ import {
   Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor
 } from './shared.jsx';
 
-export default function PaletteStep({ cos }) {
+export default function PaletteStep({ cos, slot }) {
   const { settings, select, cubeSize, colors, accent, accentShadow, ownedItems, customPreview, openImagePicker } = cos;
 
   const owned = key => key === 'custom' || ownedItems.includes(`scheme_${key}`);
@@ -35,6 +35,7 @@ export default function PaletteStep({ cos }) {
 
   return (
     <>
+      {slot !== 'body' && (
       <CubePlate
         caption="Palette"
         index={atIndex === -1 ? undefined : atIndex + 1}
@@ -48,7 +49,10 @@ export default function PaletteStep({ cos }) {
         backdrop={bgOptionFor(settings.backgroundTheme)}
         swatches={[1, 2, 3, 4, 5, 6].map(id => colors[id])}
       />
+      )}
 
+      {slot !== 'hero' && (
+      <>
       {/* Extract from image */}
       <button
         style={{ ...cardStyle(isCustom, accent), flexDirection: 'row', alignItems: 'center', gap: '14px', marginBottom: '14px' }}
@@ -127,6 +131,8 @@ export default function PaletteStep({ cos }) {
           );
         })}
       </div>
+      </>
+      )}
     </>
   );
 }
