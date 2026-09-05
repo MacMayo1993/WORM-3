@@ -3,13 +3,8 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { useIsMobile } from '../../hooks/index.js';
 import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
-import {
-  PAPER_SHEET_RAISED, PAPER_BORDER_SOFT,
-  PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_CARD_SHADOW,
-  NIGHT_TEXT, NIGHT_TEXT_MUTED,
-  UI_CREAM, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
-import { wizardLayout, WizardRail, WIZARD_PANEL_ID } from './WizardChrome.jsx';
+import { NIGHT_TEXT, NIGHT_TEXT_MUTED, UI_CREAM, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
+import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_SURFACE, WIZ_CARD_SHADOW, WIZ_SURFACE_RAISED, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import { WORM_SPEED_OPTIONS } from '../../worm/healerWorm/constants.js';
 import {
@@ -94,6 +89,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         {/* ── Character plate ── */}
         {slot !== 'body' && (
         <SpecimenPlate
+          flush={isMobile}
           caption="Specimen"
           index={charIndex + 1}
           total={WORM_CHARACTERS.length}
@@ -164,9 +160,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <button key={skin.id} onClick={() => owned && setWormSkin(skin.id)} style={{
                   ...chipBase, flexShrink: 0,
                   padding: '7px 9px 6px',
-                  background: selected ? PAPER_SHEET_RAISED : 'rgba(255,255,255,0.62)',
-                  border: selected ? `2px solid ${skin.body}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                  boxShadow: selected ? `0 3px 0 ${skin.body}66, 0 5px 14px ${skin.glow}3d` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+                  background: selected ? `${activeSkin.body}22` : WIZ_SURFACE,
+                  border: selected ? `2px solid ${skin.body}` : `2px solid ${WIZ_BORDER_SOFT}`,
+                  boxShadow: selected ? `0 3px 0 ${skin.body}66, 0 5px 14px ${skin.glow}3d` : `0 2px 0 ${WIZ_CARD_SHADOW}`,
                   transform: selected ? 'translateY(-1px)' : 'none',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
                   opacity: owned ? 1 : 0.5,
@@ -179,7 +175,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   <div style={{ filter: owned ? 'none' : 'saturate(0.5)' }}>
                     <WormPreviewCanvas characterId={wormCharacterId} skinId={skin.id} size={34} />
                   </div>
-                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, color: selected ? skin.body : PAPER_TEXT_FAINT, letterSpacing: '0.05em' }}>
+                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, color: selected ? skin.body : WIZ_TEXT_FAINT, letterSpacing: '0.05em' }}>
                     {skin.label}
                   </span>
                   {!owned && <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>}
@@ -200,9 +196,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <button key={hat.id} onClick={() => owned && setWormHat(hat.id)} style={{
                   ...chipBase,
                   padding: '8px 6px 6px',
-                  background: selected ? `${ACCENT}12` : 'rgba(255,255,255,0.62)',
-                  border: selected ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                  boxShadow: selected ? 'inset 0 2px 4px rgba(83,72,56,0.12)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+                  background: selected ? `${ACCENT}2e` : WIZ_SURFACE,
+                  border: selected ? `2px solid ${ACCENT}` : `2px solid ${WIZ_BORDER_SOFT}`,
+                  boxShadow: selected ? 'inset 0 2px 4px rgba(83,72,56,0.12)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
                   transform: selected ? 'translateY(1px)' : 'none',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
                   opacity: owned ? 1 : 0.5,
@@ -214,7 +210,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     size={34} framing="head"
                     style={{ filter: owned ? 'none' : 'saturate(0.5)' }}
                   />
-                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.05em', color: selected ? ACCENT : PAPER_TEXT_MUTED, lineHeight: 1.2, textAlign: 'center' }}>
+                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.05em', color: selected ? ACCENT : WIZ_TEXT_MUTED, lineHeight: 1.2, textAlign: 'center' }}>
                     {hat.label}
                   </span>
                   {!owned && <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>}
@@ -235,13 +231,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <button key={String(val)} onClick={() => setWormShowTrail(val)} style={{
                   ...chipBase,
                   padding: '9px 24px',
-                  background: selected ? `${accent}18` : 'rgba(255,255,255,0.62)',
-                  border: selected ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                  boxShadow: selected ? 'inset 0 2px 4px rgba(83,72,56,0.12)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+                  background: selected ? `${accent}2e` : WIZ_SURFACE,
+                  border: selected ? `2px solid ${accent}` : `2px solid ${WIZ_BORDER_SOFT}`,
+                  boxShadow: selected ? 'inset 0 2px 4px rgba(83,72,56,0.12)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
                   transform: selected ? 'translateY(1px)' : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: selected ? accent : PAPER_TEXT_MUTED }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: selected ? accent : WIZ_TEXT_MUTED }}>
                     {label}
                   </span>
                 </button>
@@ -264,7 +260,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const renderGameplay = () => {
     const OptionGroup = ({ label, options, value, onChange, accent }) => (
       <div style={{ display: 'grid', gap: '8px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: PAPER_TEXT_MUTED, letterSpacing: '0.04em' }}>{label}</div>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: WIZ_TEXT_MUTED, letterSpacing: '0.04em' }}>{label}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
           {options.map(opt => {
             const selected = value === opt.value;
@@ -276,9 +272,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   padding: '14px 8px',
                   borderRadius: '10px',
-                  border: selected ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                  background: selected ? `${accent}14` : PAPER_SHEET_RAISED,
-                  boxShadow: selected ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${PAPER_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
+                  border: selected ? `2px solid ${accent}` : `2px solid ${WIZ_BORDER_SOFT}`,
+                  background: selected ? `${accent}14` : WIZ_SURFACE_RAISED,
+                  boxShadow: selected ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${WIZ_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
                   transform: selected ? 'translateY(1px)' : 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
@@ -286,7 +282,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   fontFamily: 'inherit'
                 }}
               >
-                <span style={{ fontSize: '13px', fontWeight: 700, color: selected ? accent : PAPER_TEXT_MUTED, letterSpacing: '-0.2px' }}>{opt.label}</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: selected ? accent : WIZ_TEXT_MUTED, letterSpacing: '-0.2px' }}>{opt.label}</span>
               </button>
             );
           })}
@@ -348,7 +344,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         </span>
       </button>
       {cos.cubeSize === MEGA_CUBE_SIZE && (
-        <p style={{ margin: '9px 4px 0', fontSize: '10px', color: PAPER_TEXT_MUTED, lineHeight: 1.45 }}>
+        <p style={{ margin: '9px 4px 0', fontSize: '10px', color: WIZ_TEXT_MUTED, lineHeight: 1.45 }}>
           Mega Mode automatically scales orb density to fill the larger surface and uses optimized effects for smoother play.
         </p>
       )}
@@ -408,7 +404,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     }
   ];
 
-  const active = categories[step];
 
   const handleNext = () => {
     if (step < categories.length - 1) setStep(step + 1);
@@ -421,68 +416,20 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   return (
-    <div style={S.overlay}>
+    <WizardShell
+      styles={S}
+      mode="WORM MODE"
+      accent={ACCENT}
+      categories={categories}
+      active={step}
+      onSelect={setStep}
+      onBack={handleBack}
+      onPrimary={handleNext}
+      finishLabel="Start Playing"
+      mobile={isMobile}
+    >
       <WizardImageInput cos={cos} />
-
-      <div style={S.sheet}>
-        <div style={S.hero}>
-          <div style={S.header}>
-            {/* Mode identity badge */}
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
-              fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em',
-              textTransform: 'uppercase', color: '#fff',
-              boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
-            }}>
-              WORM MODE
-            </div>
-            <h2 style={S.title}>{active.title}</h2>
-            <p style={S.subtitle}>{active.subtitle}</p>
-          </div>
-          {active.hero}
-        </div>
-
-        <div style={S.main}>
-          <WizardRail
-            styles={S}
-            categories={categories}
-            active={step}
-            onSelect={setStep}
-            accent={ACCENT}
-            mobile={isMobile}
-          />
-
-          <div style={S.pane}>
-            <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
-              <div style={{ paddingBottom: '24px' }}>{active.content}</div>
-            </div>
-          </div>
-        </div>
-
-        <div style={S.footer}>
-          <button
-            style={S.btnSecondary}
-            onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = PAPER_TEXT; e.currentTarget.style.borderColor = '#b8b2aa'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = PAPER_TEXT_MUTED; e.currentTarget.style.borderColor = PAPER_BORDER_SOFT; }}
-          >
-            {step === 0 ? 'Cancel' : 'Back'}
-          </button>
-
-          <button
-            style={S.btnPrimary}
-            onClick={handleNext}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'none'; }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${ACCENT_SHADOW}`; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`; }}
-          >
-            {step === categories.length - 1 ? 'Start Playing' : 'Continue'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </WizardShell>
   );
 };
 

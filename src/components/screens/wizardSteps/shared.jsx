@@ -9,7 +9,8 @@ import { COLOR_SCHEMES, SCHEME_LABELS, TILE_STYLES } from '../../../utils/colorS
 import { BACKGROUNDS, getBackgroundUrl } from '../../../utils/backgrounds.js';
 import { BG_PREVIEWS } from '../../../utils/bgPreviews.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview, setTilePreviewVisible } from '../../../3d/TilePreviewRenderer.js';
-import { PAPER_SHEET_RAISED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, TEXT_XS, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
+import { TEXT_XS } from '../../../utils/uiTheme.js';
+import { WIZ_SURFACE, WIZ_SURFACE_RAISED, WIZ_BORDER, WIZ_BORDER_SOFT, WIZ_TEXT, WIZ_TEXT_MUTED, WIZ_TEXT_FAINT, WIZ_CARD_SHADOW } from '../WizardChrome.jsx';
 
 // ─── Catalogue data ───────────────────────────────────────────────────────────
 
@@ -109,17 +110,21 @@ export function resolveWizardColors(settings) {
 
 // ─── Card chrome ──────────────────────────────────────────────────────────────
 
-/** The raised paper card every picker option sits on, pressed in when selected. */
+/**
+ * The card every picker option sits on. On the dark sheet a selected card lights
+ * up rather than pressing in: the paper version leaned on an inset shadow and a
+ * white top edge, and neither reads on near-black.
+ */
 export const cardStyle = (selected, accent) => ({
   display: 'flex',
   padding: '14px 16px',
   borderRadius: '10px',
-  border: selected ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
-  background: selected ? `${accent}12` : PAPER_SHEET_RAISED,
+  border: `2px solid ${selected ? accent : WIZ_BORDER_SOFT}`,
+  background: selected ? `${accent}26` : WIZ_SURFACE,
   boxShadow: selected
-    ? 'inset 0 2px 5px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.6)'
-    : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 10px rgba(0,0,0,0.06)`,
-  transform: selected ? 'translateY(1px)' : 'none',
+    ? `0 0 18px ${accent}44, inset 0 0 22px ${accent}22`
+    : `0 2px 10px ${WIZ_CARD_SHADOW}`,
+  color: WIZ_TEXT,
   cursor: 'pointer',
   transition: 'all 0.15s ease',
   WebkitTapHighlightColor: 'transparent',
@@ -150,7 +155,7 @@ export function Checkmark({ accent, accentShadow, size = 20 }) {
 }
 
 /** Small padlock for cosmetics that have to be bought in the Parity Store first. */
-export function LockPip({ size = 10, color = PAPER_TEXT_FAINT }) {
+export function LockPip({ size = 10, color = WIZ_TEXT_FAINT }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" style={{ display: 'block', flexShrink: 0 }} aria-hidden="true">
       <path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
@@ -163,15 +168,15 @@ export function LockPip({ size = 10, color = PAPER_TEXT_FAINT }) {
 export function PickerHeading({ label, hint, locked = 0, children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: '9px', margin: '0 0 8px' }}>
-      <span style={{ fontSize: '11px', fontWeight: 700, color: PAPER_TEXT_FAINT, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+      <span style={{ fontSize: '11px', fontWeight: 700, color: WIZ_TEXT_MUTED, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
         {label}
       </span>
-      {hint && <span style={{ fontSize: '10px', color: PAPER_TEXT_FAINT }}>{hint}</span>}
+      {hint && <span style={{ fontSize: '10px', color: WIZ_TEXT_FAINT }}>{hint}</span>}
       {children}
       {locked > 0 && (
         <span style={{
           marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.06em', color: PAPER_TEXT_FAINT
+          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.06em', color: WIZ_TEXT_FAINT
         }}>
           <LockPip size={9} /> {locked} in the store
         </span>

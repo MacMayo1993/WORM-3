@@ -6,7 +6,8 @@
 
 import React from 'react';
 import { COLOR_SCHEMES, SCHEME_LABELS, TILE_STYLES } from '../../../utils/colorSchemes.js';
-import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_BORDER_SOFT, TEXT_MICRO } from '../../../utils/uiTheme.js';
+import { TEXT_MICRO } from '../../../utils/uiTheme.js';
+import { WIZ_BORDER_SOFT, WIZ_SURFACE, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
 import {
   WIZARD_SCHEME_KEYS, SORTED_SCHEME_COLORS,
@@ -62,15 +63,15 @@ export default function PaletteStep({ cos, slot }) {
           <img src={customPreview} alt="Uploaded" style={{ width: '56px', height: '36px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
         ) : (
           <div style={{
-            width: '56px', height: '36px', borderRadius: '8px', background: PAPER_BG_MUTED,
+            width: '56px', height: '36px', borderRadius: '8px', background: WIZ_SURFACE,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em',
-            color: PAPER_TEXT_FAINT, flexShrink: 0, border: `1px solid ${PAPER_BORDER_SOFT}`
+            color: WIZ_TEXT_FAINT, flexShrink: 0, border: `1px solid ${WIZ_BORDER_SOFT}`
           }}>IMG</div>
         )}
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '14px', fontWeight: isCustom ? 600 : 500, color: PAPER_TEXT }}>Extract from Image</div>
-          <div style={{ fontSize: '12px', color: PAPER_TEXT_MUTED, marginTop: '2px' }}>
+          <div style={{ fontSize: '14px', fontWeight: isCustom ? 600 : 500, color: WIZ_TEXT }}>Extract from Image</div>
+          <div style={{ fontSize: '12px', color: WIZ_TEXT_MUTED, marginTop: '2px' }}>
             {customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}
           </div>
         </div>
@@ -79,16 +80,16 @@ export default function PaletteStep({ cos, slot }) {
 
       {/* Divider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-        <div style={{ flex: 1, height: '1px', background: PAPER_BORDER_SOFT }} />
-        <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>
+        <div style={{ flex: 1, height: '1px', background: WIZ_BORDER_SOFT }} />
+        <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT }}>
           Presets
         </span>
         {lockedCount > 0 && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: TEXT_MICRO, fontWeight: 700, color: PAPER_TEXT_FAINT }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: TEXT_MICRO, fontWeight: 700, color: WIZ_TEXT_FAINT }}>
             <LockPip size={9} /> {lockedCount} in the store
           </span>
         )}
-        <div style={{ flex: 1, height: '1px', background: PAPER_BORDER_SOFT }} />
+        <div style={{ flex: 1, height: '1px', background: WIZ_BORDER_SOFT }} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
@@ -106,7 +107,7 @@ export default function PaletteStep({ cos, slot }) {
                 ...(unlockedHere ? {} : { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' })
               }}
             >
-              <span style={{ fontSize: '12px', fontWeight: selected ? 600 : 400, color: selected ? PAPER_TEXT : PAPER_TEXT_MUTED, lineHeight: 1.2 }}>
+              <span style={{ fontSize: '12px', fontWeight: selected ? 600 : 400, color: selected ? WIZ_TEXT : WIZ_TEXT_MUTED, lineHeight: 1.2 }}>
                 {SCHEME_LABELS[key]}{!unlockedHere ? ' 🔒' : ''}
               </span>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

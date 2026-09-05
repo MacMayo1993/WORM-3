@@ -1,10 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import {
-  PAPER_SHEET_RAISED, PAPER_BORDER_SOFT,
-  PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_CARD_SHADOW, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
+import { TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { useIsMobile } from '../../hooks/index.js';
-import { wizardLayout, WizardRail, WIZARD_PANEL_ID } from './WizardChrome.jsx';
+import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_CARD_SHADOW, WIZ_SURFACE_RAISED, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from './WizardChrome.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, SizeStep, styleCategory,
@@ -44,12 +41,12 @@ const ToggleRow = ({ label, sub, value, onChange }) => (
     }}
   >
     <div>
-      <div style={{ fontSize: '14px', fontWeight: 600, color: PAPER_TEXT }}>{label}</div>
-      {sub && <div style={{ fontSize: '12px', color: PAPER_TEXT_MUTED, marginTop: '1px' }}>{sub}</div>}
+      <div style={{ fontSize: '14px', fontWeight: 600, color: WIZ_TEXT }}>{label}</div>
+      {sub && <div style={{ fontSize: '12px', color: WIZ_TEXT_MUTED, marginTop: '1px' }}>{sub}</div>}
     </div>
     <div style={{
       width: '44px', height: '26px', borderRadius: '14px',
-      background: value ? ACCENT : PAPER_BORDER_SOFT, position: 'relative',
+      background: value ? ACCENT : WIZ_BORDER_SOFT, position: 'relative',
       transition: 'background 0.2s ease', flexShrink: 0,
       boxShadow: value ? `0 2px 0 ${ACCENT_SHADOW}` : '0 2px 0 #b8b2aa'
     }}>
@@ -85,18 +82,18 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const renderGameplay = () => (
     <div style={{ display: 'grid', gap: '18px' }}>
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Disparity Level <span style={{ color: levelAccent }}>{LEVEL_LABELS[settings.disparityLevel]}</span>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {[1, 2, 3, 4, 5].map(n => (
             <button key={n} onClick={() => select('disparityLevel', n)} style={{
               flex: 1, padding: '9px 0',
-              border: `2px solid ${settings.disparityLevel === n ? LEVEL_ACCENT[n] : PAPER_BORDER_SOFT}`,
+              border: `2px solid ${settings.disparityLevel === n ? LEVEL_ACCENT[n] : WIZ_BORDER_SOFT}`,
               borderRadius: '10px', fontSize: '14px', fontWeight: settings.disparityLevel === n ? 700 : 500,
-              background: settings.disparityLevel === n ? `${LEVEL_ACCENT[n]}18` : PAPER_SHEET_RAISED,
-              color: settings.disparityLevel === n ? LEVEL_ACCENT[n] : PAPER_TEXT_FAINT,
-              boxShadow: settings.disparityLevel === n ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+              background: settings.disparityLevel === n ? `${LEVEL_ACCENT[n]}18` : WIZ_SURFACE_RAISED,
+              color: settings.disparityLevel === n ? LEVEL_ACCENT[n] : WIZ_TEXT_FAINT,
+              boxShadow: settings.disparityLevel === n ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
               transform: settings.disparityLevel === n ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit'
             }}>{n}</button>
@@ -105,18 +102,18 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Tile Endurance
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {FLIP_CAP_PRESETS.map(p => (
             <button key={p.value} onClick={() => select('flipCap', p.value)} style={{
               flex: 1, padding: '8px 4px',
-              border: `2px solid ${settings.flipCap === p.value ? levelAccent : PAPER_BORDER_SOFT}`,
+              border: `2px solid ${settings.flipCap === p.value ? levelAccent : WIZ_BORDER_SOFT}`,
               borderRadius: '10px', fontSize: '11px', fontWeight: settings.flipCap === p.value ? 700 : 500,
-              background: settings.flipCap === p.value ? `${levelAccent}18` : PAPER_SHEET_RAISED,
-              color: settings.flipCap === p.value ? levelAccent : PAPER_TEXT_FAINT,
-              boxShadow: settings.flipCap === p.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+              background: settings.flipCap === p.value ? `${levelAccent}18` : WIZ_SURFACE_RAISED,
+              color: settings.flipCap === p.value ? levelAccent : WIZ_TEXT_FAINT,
+              boxShadow: settings.flipCap === p.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
               transform: settings.flipCap === p.value ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3
             }}>
@@ -128,18 +125,18 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Game Length
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {GAME_LENGTH_OPTIONS.map(opt => (
             <button key={opt.value} onClick={() => select('gameLength', opt.value)} style={{
               flex: 1, padding: '8px 4px',
-              border: `2px solid ${settings.gameLength === opt.value ? levelAccent : PAPER_BORDER_SOFT}`,
+              border: `2px solid ${settings.gameLength === opt.value ? levelAccent : WIZ_BORDER_SOFT}`,
               borderRadius: '10px', fontSize: '11px', fontWeight: settings.gameLength === opt.value ? 700 : 500,
-              background: settings.gameLength === opt.value ? `${levelAccent}18` : PAPER_SHEET_RAISED,
-              color: settings.gameLength === opt.value ? levelAccent : PAPER_TEXT_FAINT,
-              boxShadow: settings.gameLength === opt.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+              background: settings.gameLength === opt.value ? `${levelAccent}18` : WIZ_SURFACE_RAISED,
+              color: settings.gameLength === opt.value ? levelAccent : WIZ_TEXT_FAINT,
+              boxShadow: settings.gameLength === opt.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
               transform: settings.gameLength === opt.value ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3
             }}>
@@ -202,7 +199,6 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
     }
   ];
 
-  const active = categories[step];
 
   const handleNext = () => {
     if (step < categories.length - 1) setStep(step + 1);
@@ -211,64 +207,20 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   return (
-    <div style={S.overlay}>
+    <WizardShell
+      styles={S}
+      mode="DISPARITY MODE"
+      accent={ACCENT}
+      categories={categories}
+      active={step}
+      onSelect={setStep}
+      onBack={handleBack}
+      onPrimary={handleNext}
+      finishLabel="Start Playing"
+      mobile={isMobile}
+    >
       <WizardImageInput cos={cos} />
-      <div style={S.sheet}>
-        <div style={S.hero}>
-          <div style={S.header}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
-              fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff',
-              boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
-            }}>
-              DISPARITY MODE
-            </div>
-            <h2 style={S.title}>{active.title}</h2>
-            <p style={S.subtitle}>{active.subtitle}</p>
-          </div>
-          {active.hero}
-        </div>
-
-        <div style={S.main}>
-          <WizardRail
-            styles={S}
-            categories={categories}
-            active={step}
-            onSelect={setStep}
-            accent={ACCENT}
-            mobile={isMobile}
-          />
-
-          <div style={S.pane}>
-            <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
-              <div style={{ paddingBottom: '24px' }}>{active.content}</div>
-            </div>
-          </div>
-        </div>
-
-        <div style={S.footer}>
-          <button
-            style={S.btnSecondary}
-            onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = PAPER_TEXT; e.currentTarget.style.borderColor = '#b8b2aa'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = PAPER_TEXT_MUTED; e.currentTarget.style.borderColor = PAPER_BORDER_SOFT; }}
-          >
-            {step === 0 ? 'Cancel' : 'Back'}
-          </button>
-          <button
-            style={S.btnPrimary}
-            onClick={handleNext}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'none'; }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${ACCENT_SHADOW}`; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`; }}
-          >
-            {step === categories.length - 1 ? 'Start Playing' : 'Continue'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </WizardShell>
   );
 };
 

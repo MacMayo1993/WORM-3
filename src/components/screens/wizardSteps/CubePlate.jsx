@@ -44,6 +44,7 @@ export default function CubePlate({
 
   return (
     <SpecimenPlate
+      flush={isMobile}
       caption={caption}
       index={index}
       total={total}

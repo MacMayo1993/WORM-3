@@ -10,7 +10,8 @@
 // semantics all come for free rather than being reimplemented badly.
 
 import React from 'react';
-import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, TEXT_MICRO } from '../../../utils/uiTheme.js';
+import { TEXT_MICRO } from '../../../utils/uiTheme.js';
+import { WIZ_BORDER_SOFT, WIZ_CARD_SHADOW, WIZ_SURFACE, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from '../WizardChrome.jsx';
 import { SIZE_TIERS, sizeTier } from './shared.jsx';
 
 const KNOB = 30;
@@ -32,20 +33,20 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
   return (
     <div style={{ padding: '4px 2px 0' }}>
       <div style={{ position: 'relative', height: `${KNOB + 6}px`, display: 'flex', alignItems: 'center' }}>
-        {/* Track — sunk into the paper, dark enough that the unfilled stretch
-            still reads as a rail on the wizard's cream sheet. */}
+        {/* Track — a channel cut into the dark sheet, dark enough that the
+            unfilled stretch still reads as a rail under the lit fill. */}
         <div style={{
           position: 'absolute', left: 0, right: 0, height: '10px', borderRadius: '6px',
-          background: '#ddd6ca',
-          boxShadow: 'inset 0 2px 5px rgba(83,72,56,0.30), 0 1px 0 rgba(255,255,255,0.65)',
-          border: '1px solid #c9c1b5'
+          background: 'rgba(0,0,0,0.45)',
+          boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.6)',
+          border: `1px solid ${WIZ_BORDER_SOFT}`
         }} />
 
         {/* Filled portion */}
         <div style={{
           position: 'absolute', left: 0, height: '10px', borderRadius: '6px',
           width: knobLeft,
-          background: `linear-gradient(90deg, ${accent}bb, ${accent})`,
+          background: `linear-gradient(90deg, ${accentShadow}, ${accent})`,
           boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25)`,
           transition: 'width 0.16s cubic-bezier(0.22,1,0.36,1)'
         }} />
@@ -60,7 +61,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
               left: stopAt(n, tiers),
               transform: 'translateX(-50%)',
               width: '4px', height: '4px', borderRadius: '50%',
-              background: n <= value ? 'rgba(255,255,255,0.75)' : '#a89f92',
+              background: n <= value ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.22)',
               transition: 'background 0.16s ease'
             }}
           />
@@ -72,11 +73,11 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
           left: knobLeft,
           transform: 'translateX(-50%)',
           width: `${KNOB}px`, height: `${KNOB}px`, borderRadius: '50%',
-          background: '#fffdf7',
+          background: '#0f141c',
           border: `2.5px solid ${accent}`,
-          boxShadow: `0 3px 0 ${accentShadow}55, 0 5px 14px ${accent}44`,
+          boxShadow: `0 0 16px ${accent}77, 0 4px 12px rgba(0,0,0,0.6)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '13px', fontWeight: 800, color: accent,
+          fontSize: '13px', fontWeight: 800, color: '#fff',
           transition: 'left 0.16s cubic-bezier(0.22,1,0.36,1)',
           pointerEvents: 'none'
         }}>
@@ -120,13 +121,13 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
             >
               <span style={{
                 fontSize: '11px', fontWeight: selected ? 800 : 600,
-                color: selected ? accent : PAPER_TEXT_FAINT,
+                color: selected ? accent : WIZ_TEXT_FAINT,
                 transition: 'color 0.16s ease'
               }}>
                 {n}
               </span>
               {n === DEFAULT_SIZE && (
-                <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>
+                <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT }}>
                   Normal
                 </span>
               )}
@@ -138,13 +139,13 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
       {/* What you just landed on */}
       <div style={{
         marginTop: '10px', padding: '12px 14px', borderRadius: '12px',
-        background: 'rgba(255,255,255,0.55)', border: `1.5px solid ${accent}33`,
-        boxShadow: `0 2px 0 ${PAPER_CARD_SHADOW}`,
+        background: WIZ_SURFACE, border: `1.5px solid ${accent}44`,
+        boxShadow: `0 2px 10px ${WIZ_CARD_SHADOW}`,
         display: 'flex', alignItems: 'baseline', gap: '8px'
       }}>
-        <span style={{ fontSize: '17px', fontWeight: 800, color: PAPER_TEXT, letterSpacing: '-0.4px' }}>{tier.name}</span>
+        <span style={{ fontSize: '17px', fontWeight: 800, color: WIZ_TEXT, letterSpacing: '-0.4px' }}>{tier.name}</span>
         <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: accent }}>{tier.tag}</span>
-        <span style={{ marginLeft: 'auto', fontSize: '12px', color: PAPER_TEXT_MUTED, textAlign: 'right' }}>{tier.desc}</span>
+        <span style={{ marginLeft: 'auto', fontSize: '12px', color: WIZ_TEXT_MUTED, textAlign: 'right' }}>{tier.desc}</span>
       </div>
     </div>
   );
