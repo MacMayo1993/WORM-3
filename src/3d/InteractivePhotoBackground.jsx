@@ -12,7 +12,7 @@
 // background-less <SafeEnvironment> still supplies the image-based reflections
 // the cube relies on. This keeps the drift working on the three version we ship
 // without touching the rest of the render pipeline.
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { BackSide, RepeatWrapping } from 'three';
 import { useEnvironment } from '@react-three/drei';
@@ -52,6 +52,12 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity }) {
     clone.needsUpdate = true;
     return clone;
   }, [texture]);
+
+  // The clone carries its own GPU upload — the source texture's cache entry does
+  // not cover it — so switching backgrounds leaks a full panorama's worth of
+  // texture memory unless the outgoing clone is disposed. The source stays alive
+  // in drei's environment cache and is not ours to free.
+  useEffect(() => () => skyTexture.dispose(), [skyTexture]);
 
   useFrame((state, delta) => {
     const mesh = meshRef.current;
