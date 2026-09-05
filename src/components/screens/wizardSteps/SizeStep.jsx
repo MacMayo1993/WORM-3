@@ -5,7 +5,7 @@
 // both.
 
 import React from 'react';
-import { PAPER_TEXT_MUTED } from '../../../utils/uiTheme.js';
+import { WIZ_TEXT_MUTED } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
 import CubeSizeSlider from './CubeSizeSlider.jsx';
 import { SIZE_TIERS, sizeTier, bgOptionFor, paletteLabel, styleLabel } from './shared.jsx';
@@ -39,7 +39,7 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS, slot }) {
       <>
       <CubeSizeSlider value={cubeSize} onChange={setCubeSize} accent={accent} accentShadow={accentShadow} tiers={tiers} />
 
-      <p style={{ fontSize: '11px', color: PAPER_TEXT_MUTED, lineHeight: 1.5, margin: '14px 2px 8px' }}>
+      <p style={{ fontSize: '11px', color: WIZ_TEXT_MUTED, lineHeight: 1.5, margin: '14px 2px 8px' }}>
         Bigger cubes keep the same rules — antipodal identification, the same flips — with more
         pieces to carry through them.
       </p>

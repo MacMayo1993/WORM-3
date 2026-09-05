@@ -15,7 +15,7 @@
 import React from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../../utils/colorSchemes.js';
 import { TILE_STYLE_SECTIONS } from '../../../utils/tileStyleCatalog.js';
-import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
+import { WIZ_BORDER_SOFT, WIZ_CARD_SHADOW, WIZ_SURFACE, WIZ_TEXT, WIZ_TEXT_MUTED } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
 import { useIsMobile } from '../../../hooks/index.js';
 import { Checkmark, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor, FACE_LABELS, paletteLabel, styleLabel, uniformStyle } from './shared.jsx';
@@ -71,11 +71,15 @@ export default function StyleStep({ cos, family, slot }) {
 
       {slot !== 'hero' && (showingPerFace ? (
         <>
-          <p style={{ fontSize: '11px', color: PAPER_TEXT_MUTED, lineHeight: 1.5, margin: '2px 2px 12px' }}>
+          <p style={{ fontSize: '11px', color: WIZ_TEXT_MUTED, lineHeight: 1.5, margin: '2px 2px 12px' }}>
             Give each face its own surface. Every face starts on the style you picked, so change
             only the ones you want to differ.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 3}, minmax(0, 1fr))`, gap: '8px' }}>
+          {/* Three across on every screen. Two was right when this lived in a
+              pane beside the rail; across the whole sheet it grew each face's
+              preview to half a phone's width, and six of those is four screens
+              of scrolling to change one face. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
             {[1, 2, 3, 4, 5, 6].map(faceId => {
               const fallback = settings.tileStyle === 'random' ? 'solid' : settings.tileStyle || 'solid';
               const raw = perFace?.[faceId] || fallback;
@@ -84,12 +88,12 @@ export default function StyleStep({ cos, family, slot }) {
               return (
                 <div key={faceId} style={{
                   display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0,
-                  padding: '10px', borderRadius: '10px', background: PAPER_BG_MUTED,
+                  padding: '8px', borderRadius: '10px', background: WIZ_SURFACE,
                   border: `2px solid ${faceColor}55`
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: faceColor, flexShrink: 0, boxShadow: '0 1px 0 rgba(0,0,0,0.20)' }} />
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: PAPER_TEXT_MUTED }}>{FACE_LABELS[faceId]}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: WIZ_TEXT_MUTED }}>{FACE_LABELS[faceId]}</span>
                   </div>
                   <TilePreviewCanvas
                     styleKey={faceStyle === 'random' ? 'solid' : faceStyle}
@@ -102,8 +106,8 @@ export default function StyleStep({ cos, family, slot }) {
                     onChange={e => applyPerFace(faceId, e.target.value)}
                     style={{
                       fontSize: '10px', padding: '4px 6px', borderRadius: '6px',
-                      border: `1px solid ${PAPER_BORDER_SOFT}`, background: '#f7f3ec',
-                      color: PAPER_TEXT, fontFamily: 'inherit', cursor: 'pointer',
+                      border: `1px solid ${WIZ_BORDER_SOFT}`, background: '#151a22',
+                      color: WIZ_TEXT, fontFamily: 'inherit', cursor: 'pointer',
                       appearance: 'none', WebkitAppearance: 'none',
                       // Without these the select's intrinsic width sets the grid
                       // column and the whole panel scrolls sideways.
@@ -129,8 +133,8 @@ export default function StyleStep({ cos, family, slot }) {
             onClick={() => applyGlobal('random')}
           >
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: PAPER_TEXT }}>Random Mix</div>
-              <div style={{ fontSize: '11px', color: PAPER_TEXT_MUTED, marginTop: '2px' }}>A different style on every face</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: WIZ_TEXT }}>Random Mix</div>
+              <div style={{ fontSize: '11px', color: WIZ_TEXT_MUTED, marginTop: '2px' }}>A different style on every face</div>
             </div>
             {isRandom && <Checkmark accent={accent} accentShadow={accentShadow} />}
           </button>
@@ -148,9 +152,9 @@ export default function StyleStep({ cos, family, slot }) {
                   onClick={() => unlocked && applyGlobal(key)}
                   style={{
                     display: 'block', position: 'relative', padding: 0, borderRadius: '10px',
-                    border: sel ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                    background: PAPER_BG_MUTED,
-                    boxShadow: sel ? 'inset 0 2px 4px rgba(0,0,0,0.10)' : `0 2px 0 ${PAPER_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
+                    border: sel ? `2px solid ${accent}` : `2px solid ${WIZ_BORDER_SOFT}`,
+                    background: WIZ_SURFACE,
+                    boxShadow: sel ? 'inset 0 2px 4px rgba(0,0,0,0.10)' : `0 2px 0 ${WIZ_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
                     transform: sel ? 'translateY(1px)' : 'none',
                     cursor: unlocked ? 'pointer' : 'not-allowed',
                     opacity: unlocked ? 1 : 0.42,

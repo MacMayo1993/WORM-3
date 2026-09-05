@@ -69,6 +69,9 @@ export const plateArrow = {
  * @param hint      faint line at the bottom ("drag the cube to turn it")
  * @param sticky    pin to the top of a scrolling parent (the store does; the
  *                  wizards stand their plate in the hero band instead)
+ * @param flush     drop the frame's corners and border — the wizard runs the
+ *                  plate edge to edge on a phone, where a rounded card inset in
+ *                  a 390px screen spends its margins on nothing
  * @param children  anything else below the name plate — swatches, a price, dots
  */
 export default function SpecimenPlate({
@@ -84,15 +87,17 @@ export default function SpecimenPlate({
   backdrop = null,
   hint = null,
   sticky = false,
+  flush = false,
   children
 }) {
   const isMobile = useIsMobile();
   const plate = (
     <div style={{
-      borderRadius: '18px',
+      borderRadius: flush ? 0 : '18px',
       overflow: 'hidden',
-      border: `1.5px solid ${NIGHT_BORDER}`,
-      boxShadow: NIGHT_SHADOW
+      border: flush ? 'none' : `1.5px solid ${NIGHT_BORDER}`,
+      borderBottom: flush ? `1px solid ${NIGHT_BORDER}` : `1.5px solid ${NIGHT_BORDER}`,
+      boxShadow: flush ? 'none' : NIGHT_SHADOW
     }}>
       <div style={{
         ...plateSurface(glow),

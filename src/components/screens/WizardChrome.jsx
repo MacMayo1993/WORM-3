@@ -1,34 +1,51 @@
 // WizardChrome.jsx — shared visual chrome and layout for every mode setup wizard.
 //
-// All four setup wizards (Freeplay/cube, Worm, Disparity, Random) share one look:
-// a page torn from Mobi's graph-paper notebook. They also shared four hand-copied
-// versions of the same overlay/sheet/header/body/footer styles, which is how they
-// drifted apart on phones — one full-bleed at 92vh, one floating at 88vh with
-// desktop padding. The layout lives here now, so a phone fix lands in all of them
-// at once. Each wizard still owns its accent and its own content styles.
+// All four setup wizards (Freeplay/cube, Worm, Disparity, Random) share one look
+// and, since the stack below, one shell: they hand <WizardShell> their categories
+// and their accent and it draws the whole sheet. They used to hand-copy the
+// overlay/sheet/header/body/footer JSX four times, which is how they drifted
+// apart on phones — one full-bleed at 92vh, one floating at 88vh with desktop
+// padding.
 //
-// The sheet is a hero band over a category rail plus one pane, not a slideshow.
-// The band runs the full width of the sheet: the live cube (or the worm) is the
-// subject of every cosmetic category, and penning it into the pane's column left
-// it small next to a rail whose bottom half was empty paper. The rail and the
-// list both start under it, on the same line. A wizard used to
-// be a walk: one category on screen, the rest reduced to anonymous progress dots,
-// and the only way from Size back to Colors was to step backwards through
-// everything in between. What you had already chosen went with it — nothing on
-// the Style screen told you the palette was Sunset. The rail keeps every category
-// in view down the left edge with its current value written under its name, so
-// the whole configuration reads at a glance and any part of it is one click away.
-// Back/Continue still walk the same index for anyone who wants the guided path.
+// ── The layout ────────────────────────────────────────────────────────────────
+// Everything stacks, full width, in the order you make the decisions in:
+//
+//     mode bar          ← back, and which mode you are configuring
+//     specimen          ← the live cube (or worm), edge to edge
+//     family chips      ← horizontally scrolling, only where a category has them
+//     category bar      ← Character · Scene · Colors · Style · Size · Play
+//     the choices       ← the scrolling grid
+//     one wide action   ← confirm and go on
+//
+// This replaced a vertical rail down the left edge. The rail kept every category
+// in view — which is the thing worth keeping, and the category bar still does it
+// — but it did so by taking a quarter of a phone's width off the pane for its
+// whole height, so the cube sat in a column narrower than the grid beneath it and
+// the bottom half of the rail was empty paper. A phone has width to spend and
+// height to hoard; this spends the width.
+//
+// ── The dark ──────────────────────────────────────────────────────────────────
+// The wizards used to be a page from Mobi's graph-paper notebook. They are now a
+// dark instrument panel: the specimen plate was already a lit case on the NIGHT
+// surface, the cube previews and tile shaders are all emissive, and every one of
+// them read better with the paper taken out from behind it. The paper exports
+// below stay put — the store, level select, the pack screen and the merge picker
+// are still notebook pages, and this is not their change.
+//
+// The grid survives the move. Same 18px/90px ruling, drawn in the mode's accent
+// at a few percent over near-black, so a wizard still reads as ruled paper —
+// backlit rather than printed.
 
 import React from 'react';
-import { UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_BORDER, PAPER_SHEET_RAISED, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, PAPER_SHADOW, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_MD, TEXT_XL, Z, PAPER_BORDER_SOFT } from '../../utils/uiTheme.js';
+import { UI_FONT, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
 
+// ─── Paper (kept for the notebook screens) ────────────────────────────────────
 // Graph-paper panel background — the exact recipe from the Mobi dialogue panel
 // (MobiIntroScreen): a warm paper base, a fine 18px grid, a 90px major grid, and
-// a soft corner highlight + diagonal wash. Spread onto a wizard's sheet in place
-// of the flat cream fill.
+// a soft corner highlight + diagonal wash. Still worn by the store, level select,
+// the pack picker and the merge theme picker; no longer by the wizards.
 const GRAPH_LINE = 'rgba(80, 142, 190, 0.20)';
 const GRAPH_MAJOR = 'rgba(80, 142, 190, 0.32)';
 export const WIZARD_PAPER_BASE = '#fbf7e9';
@@ -56,6 +73,42 @@ export const WIZARD_FOOTER_BG = 'rgba(245, 238, 222, 0.82)';
 // uses the same lead rather than picking its own grey.
 export const PENCIL_LEAD = '#35404a';
 
+// ─── The wizard's dark surface ────────────────────────────────────────────────
+//
+// One family, used by the chrome here and by every step's cards (wizardSteps).
+// Deliberately neutral rather than a second accent: the mode's own colour does
+// the accenting, and six of the app's palettes end up on screen at once in the
+// palette step. Alphas over the base rather than opaque hexes, so a card sitting
+// on the ruled ground still shows the ruling through it.
+
+export const WIZ_BASE = '#0c0f14';
+export const WIZ_SURFACE = 'rgba(255,255,255,0.045)';
+export const WIZ_SURFACE_RAISED = 'rgba(255,255,255,0.075)';
+export const WIZ_BORDER = 'rgba(255,255,255,0.13)';
+export const WIZ_BORDER_SOFT = 'rgba(255,255,255,0.08)';
+export const WIZ_TEXT = 'rgba(247,250,255,0.94)';
+export const WIZ_TEXT_MUTED = 'rgba(247,250,255,0.62)';
+export const WIZ_TEXT_FAINT = 'rgba(247,250,255,0.40)';
+export const WIZ_SHADOW = '0 24px 70px rgba(0,0,0,0.62)';
+export const WIZ_CARD_SHADOW = 'rgba(0,0,0,0.5)';
+
+/** The ruled dark ground, ruled in the mode's own colour. */
+export const wizardDarkBackground = accent => ({
+  backgroundColor: WIZ_BASE,
+  backgroundImage: [
+    `linear-gradient(${accent}14 1px, transparent 1px)`,
+    `linear-gradient(90deg, ${accent}14 1px, transparent 1px)`,
+    `linear-gradient(${accent}22 1px, transparent 1px)`,
+    `linear-gradient(90deg, ${accent}22 1px, transparent 1px)`,
+    // A wash of the accent from the top corner, so the sheet is lit from where
+    // the specimen is rather than being an even field of black.
+    `radial-gradient(120% 60% at 50% 0%, ${accent}26, transparent 62%)`,
+    'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.35))'
+  ].join(','),
+  backgroundSize: '18px 18px, 18px 18px, 90px 90px, 90px 90px, 100% 100%, 100% 100%',
+  backgroundPosition: '0 0, 0 0, -1px -1px, -1px -1px, 0 0, 0 0'
+});
+
 /**
  * Layout styles shared by every wizard, tinted with the caller's accent and its
  * darker pressed-state companion.
@@ -70,16 +123,9 @@ export const PENCIL_LEAD = '#35404a';
  * `useIsMobile()` and recomputes this per render.
  */
 export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMobile) {
-  // Horizontal breathing room, matched between header, body, and footer so the
-  // content sits on one margin down the whole sheet. The pane runs a tighter one
-  // on phones, where the rail has already taken its width off a 390px screen.
-  const GUTTER = mobile ? 16 : 36;
-  const PANE_GUTTER = mobile ? 12 : 28;
-  // A phone rail is an icon strip until a category opens sub-rows under it, at
-  // which point it has to be wide enough to spell "Antipodal Op Art". The desktop
-  // rail is already wide enough for both states.
-  const RAIL_WIDTH = mobile ? 66 : 176;
-  const RAIL_WIDTH_OPEN = mobile ? 116 : 176;
+  // Horizontal breathing room, matched down the whole sheet so everything sits on
+  // one margin. The specimen is the exception: it runs to the edges.
+  const GUTTER = mobile ? 14 : 28;
   return {
     overlay: {
       position: 'fixed',
@@ -87,7 +133,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: PAPER_BACKDROP,
+      background: 'rgba(4,6,10,0.72)',
       backdropFilter: PAPER_BACKDROP_BLUR,
       WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
       zIndex: Z.MODAL,
@@ -101,143 +147,175 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
     },
 
     sheet: {
-      ...wizardPaperBackground,
+      ...wizardDarkBackground(accent),
       borderRadius: mobile ? 0 : '20px',
-      // The rail is added width, not width taken from the content: the pane to
-      // its right still gets the ~640px the sheet used to hand a single step, so
-      // nothing a step already renders has to reflow.
-      width: mobile ? '100%' : 'min(900px, 96vw)',
+      width: mobile ? '100%' : 'min(720px, 96vw)',
       height: mobile ? '100%' : 'auto',
-      maxHeight: mobile ? '100%' : '88vh',
+      maxHeight: mobile ? '100%' : '92vh',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      boxShadow: mobile ? 'none' : PAPER_SHADOW,
-      border: mobile ? 'none' : `1px solid ${PAPER_BORDER}`,
+      boxShadow: mobile ? 'none' : WIZ_SHADOW,
+      border: mobile ? 'none' : `1px solid ${WIZ_BORDER}`,
       borderTop: `3px solid ${accent}`,
+      color: WIZ_TEXT,
       animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)'
     },
 
-    // The full-width band across the top of the sheet: this category's heading
-    // and the specimen it is about. It sits above the rail rather than beside
-    // it, so the cube gets the sheet's whole width and the rail starts level
-    // with the list it drives.
-    hero: {
-      flexShrink: 0,
-      padding: mobile
-        ? `calc(12px + env(safe-area-inset-top)) ${PANE_GUTTER}px 12px`
-        : `20px ${GUTTER}px 14px`,
-      borderBottom: `1px solid ${PAPER_BORDER_SOFT}`
-    },
-
-    // Everything between the hero band and the footer: the rail, then the pane
-    // holding this category's scrolling controls.
-    main: {
-      flex: 1,
-      minHeight: 0,
-      display: 'flex',
-      flexDirection: 'row'
-    },
-
-    rail: expanded => ({
-      flexShrink: 0,
-      width: `${expanded ? RAIL_WIDTH_OPEN : RAIL_WIDTH}px`,
-      transition: 'width 0.2s cubic-bezier(0.22, 1, 0.36, 1)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: mobile ? '2px' : '3px',
-      // The hero band above owns the notch, so the rail starts on an ordinary
-      // margin — level with the first row of the list beside it.
-      padding: mobile ? '10px 5px 10px' : '16px 10px 16px',
-      borderRight: `1px solid ${PAPER_BORDER_SOFT}`,
-      // A margin column ruled off the graph paper rather than a separate panel.
-      background: 'rgba(255,255,255,0.30)',
-      overflowY: 'auto',
-      overscrollBehavior: 'contain',
-      scrollbarWidth: 'none'
-    }),
-
-    // On a phone there is no room for the value line, so the tab stacks to an
-    // icon over its name and the summary is dropped rather than truncated to
-    // something unreadable.
-    railTab: active => ({
-      display: 'flex',
-      flexDirection: mobile ? 'column' : 'row',
-      alignItems: mobile ? 'center' : 'center',
-      justifyContent: mobile ? 'center' : 'flex-start',
-      gap: mobile ? '4px' : '9px',
-      width: '100%',
-      minHeight: mobile ? '52px' : TOUCH_TARGET,
-      padding: mobile ? '7px 2px' : '9px 10px',
-      borderRadius: '10px',
-      border: 'none',
-      background: active ? PAPER_SHEET_RAISED : 'transparent',
-      boxShadow: active ? `inset 3px 0 0 ${accent}, 0 1px 0 ${PAPER_CARD_SHADOW}` : 'none',
-      cursor: 'pointer',
-      textAlign: 'left',
-      fontFamily: 'inherit',
-      WebkitTapHighlightColor: 'transparent',
-      transition: 'background 0.15s ease, box-shadow 0.15s ease'
-    }),
-
-    // One sub-row under an open category. Indented rather than iconed: at this
-    // depth the name is the whole point, and a second column of glyphs would
-    // just eat the width the names need.
-    railChild: active => ({
+    // Back, and the name of the mode being configured. The step's own name is on
+    // the specimen plate right under it, so this row never repeats it.
+    modeBar: {
       display: 'flex',
       alignItems: 'center',
-      gap: '6px',
-      width: '100%',
-      minHeight: '32px',
-      padding: mobile ? '6px 5px 6px 8px' : '6px 8px 6px 11px',
-      borderRadius: '8px',
-      border: 'none',
-      background: active ? `${accent}16` : 'transparent',
-      cursor: 'pointer',
-      textAlign: 'left',
-      fontFamily: 'inherit',
-      WebkitTapHighlightColor: 'transparent',
-      transition: 'background 0.15s ease'
-    }),
-
-    pane: {
-      flex: 1,
-      minWidth: 0,
-      display: 'flex',
-      flexDirection: 'column'
+      gap: 8,
+      flexShrink: 0,
+      padding: mobile
+        ? `calc(8px + env(safe-area-inset-top)) ${GUTTER}px 8px`
+        : `14px ${GUTTER}px 12px`,
+      borderBottom: `1px solid ${WIZ_BORDER_SOFT}`
     },
 
-    // The heading sits inside the hero band, which already carries the sheet's
-    // margin and clears the notch.
-    header: {
-      flexShrink: 0
+    backBtn: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      minHeight: TOUCH_TARGET,
+      minWidth: TOUCH_TARGET,
+      padding: '6px 10px 6px 4px',
+      marginLeft: -4,
+      background: 'none',
+      border: 'none',
+      color: WIZ_TEXT_MUTED,
+      fontSize: TEXT_SM,
+      fontWeight: 600,
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+      WebkitTapHighlightColor: 'transparent'
+    },
+
+    modeName: {
+      flex: 1,
+      textAlign: 'center',
+      fontSize: mobile ? TEXT_XS : TEXT_SM,
+      fontWeight: 800,
+      letterSpacing: '0.22em',
+      textTransform: 'uppercase',
+      color: WIZ_TEXT,
+      textShadow: `0 0 18px ${accent}88`,
+      // Balances the back button so the name sits on the sheet's centre line.
+      paddingRight: TOUCH_TARGET
+    },
+
+    // The specimen runs edge to edge on a phone: the plate is the picture, and a
+    // margin around a picture on a 390px screen is 28px of nothing.
+    hero: {
+      flexShrink: 0,
+      padding: mobile ? 0 : `14px ${GUTTER}px 0`
+    },
+
+    // Categories with no specimen (gameplay tuning) get their name here instead.
+    heroHeading: {
+      flexShrink: 0,
+      padding: mobile ? `14px ${GUTTER}px 4px` : `18px ${GUTTER}px 4px`
     },
 
     title: {
       fontSize: mobile ? TEXT_XL - 3 : TEXT_XL,
       fontWeight: '700',
       letterSpacing: '-0.5px',
-      color: PAPER_TEXT,
+      color: WIZ_TEXT,
       margin: '0 0 2px',
       lineHeight: 1.15
     },
 
     subtitle: {
       fontSize: mobile ? TEXT_SM - 1 : TEXT_SM,
-      color: PAPER_TEXT_MUTED,
-      margin: mobile ? '0 0 10px' : '0 0 14px',
+      color: WIZ_TEXT_MUTED,
+      margin: '0 0 10px',
       fontWeight: '400',
       lineHeight: 1.35
     },
 
+    // Families of the open category (tile styles), as one scrolling row. They
+    // were a column of rail sub-rows; a row is what a phone has space for.
+    chipRow: {
+      flexShrink: 0,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 7,
+      padding: `10px ${GUTTER}px`,
+      overflowX: 'auto',
+      overscrollBehaviorX: 'contain',
+      WebkitOverflowScrolling: 'touch',
+      scrollbarWidth: 'none'
+    },
+
+    chip: active => ({
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 5,
+      flexShrink: 0,
+      minHeight: 34,
+      padding: '7px 14px',
+      borderRadius: 999,
+      border: `1px solid ${active ? accent : WIZ_BORDER}`,
+      background: active ? `${accent}2e` : WIZ_SURFACE,
+      color: active ? '#fff' : WIZ_TEXT_MUTED,
+      boxShadow: active ? `0 0 14px ${accent}55, inset 0 0 12px ${accent}33` : 'none',
+      fontSize: TEXT_XS,
+      fontWeight: active ? 800 : 600,
+      letterSpacing: '0.04em',
+      whiteSpace: 'nowrap',
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+      WebkitTapHighlightColor: 'transparent',
+      transition: 'background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease'
+    }),
+
+    // The rail's job, laid on its side. Scrolls horizontally when a mode has more
+    // categories than fit — six on a 360px phone is the worst case.
+    categoryBar: {
+      flexShrink: 0,
+      display: 'flex',
+      alignItems: 'stretch',
+      gap: 2,
+      padding: `0 ${Math.max(GUTTER - 8, 6)}px`,
+      borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
+      borderBottom: `1px solid ${WIZ_BORDER_SOFT}`,
+      background: 'rgba(0,0,0,0.28)',
+      overflowX: 'auto',
+      overscrollBehaviorX: 'contain',
+      WebkitOverflowScrolling: 'touch',
+      scrollbarWidth: 'none'
+    },
+
+    categoryTab: active => ({
+      flex: '1 0 auto',
+      minWidth: mobile ? 62 : 88,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 3,
+      padding: mobile ? '8px 6px 7px' : '10px 10px 9px',
+      border: 'none',
+      borderBottom: `2px solid ${active ? accent : 'transparent'}`,
+      background: 'transparent',
+      cursor: 'pointer',
+      fontFamily: 'inherit',
+      WebkitTapHighlightColor: 'transparent',
+      transition: 'border-color 0.15s ease, background 0.15s ease'
+    }),
+
     body: {
-      padding: mobile ? `12px ${PANE_GUTTER}px 0` : `16px ${PANE_GUTTER}px 0`,
+      padding: `12px ${GUTTER}px 0`,
       overflowY: 'auto',
       overscrollBehavior: 'contain',
       WebkitOverflowScrolling: 'touch',
       flex: 1,
+      minHeight: 0,
       scrollbarWidth: 'thin',
-      scrollbarColor: `${PAPER_CARD_SHADOW} transparent`,
+      scrollbarColor: `rgba(255,255,255,0.18) transparent`,
       // Fade the last few pixels so a list that continues under the footer reads
       // as scrollable instead of as a hard crop.
       maskImage: 'linear-gradient(to bottom, #000 calc(100% - 20px), transparent)',
@@ -246,48 +324,50 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
 
     footer: {
       padding: mobile
-        ? `12px ${GUTTER}px calc(12px + env(safe-area-inset-bottom))`
-        : `18px ${GUTTER}px 24px`,
+        ? `10px ${GUTTER}px calc(10px + env(safe-area-inset-bottom))`
+        : `14px ${GUTTER}px 18px`,
       display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: '8px',
+      flexDirection: 'column',
+      gap: 8,
       flexShrink: 0,
-      borderTop: `1px solid ${PAPER_BORDER_SOFT}`,
-      background: WIZARD_FOOTER_BG
+      borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
+      background: 'rgba(0,0,0,0.42)'
+    },
+
+    // One wide action. A wizard has exactly one thing to do next, and on a phone
+    // it belongs across the thumb rather than in a corner.
+    btnPrimary: {
+      width: '100%',
+      background: `linear-gradient(135deg, ${accent}, ${accentShadow})`,
+      border: `1px solid ${accent}`,
+      fontSize: TEXT_SM,
+      fontWeight: '800',
+      letterSpacing: '0.10em',
+      textTransform: 'uppercase',
+      color: '#fff',
+      cursor: 'pointer',
+      minHeight: TOUCH_TARGET + 4,
+      padding: '13px 20px',
+      borderRadius: '12px',
+      transition: 'all 0.12s ease',
+      fontFamily: 'inherit',
+      WebkitTapHighlightColor: 'transparent',
+      boxShadow: `0 6px 22px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.22)`
     },
 
     btnSecondary: {
       background: 'none',
-      border: `1.5px solid ${PAPER_BORDER_SOFT}`,
-      fontSize: TEXT_MD,
-      fontWeight: '500',
-      color: PAPER_TEXT_MUTED,
+      border: 'none',
+      fontSize: TEXT_XS,
+      fontWeight: '600',
+      color: WIZ_TEXT_FAINT,
       cursor: 'pointer',
-      // Both footer buttons clear the 44px comfortable-tap floor; the secondary
-      // one (Back) was the smaller of the two and the easier one to fat-finger.
-      minHeight: TOUCH_TARGET,
-      padding: mobile ? '11px 14px' : '10px 16px',
-      borderRadius: '10px',
-      transition: 'all 0.15s ease',
+      minHeight: 32,
+      padding: '4px 8px',
+      alignSelf: 'center',
+      transition: 'color 0.15s ease',
       fontFamily: 'inherit',
       WebkitTapHighlightColor: 'transparent'
-    },
-
-    btnPrimary: {
-      background: accent,
-      border: 'none',
-      fontSize: TEXT_MD,
-      fontWeight: '700',
-      color: '#fff',
-      cursor: 'pointer',
-      minHeight: TOUCH_TARGET,
-      padding: mobile ? '13px 24px' : '12px 28px',
-      borderRadius: '10px',
-      transition: 'all 0.12s ease',
-      fontFamily: 'inherit',
-      WebkitTapHighlightColor: 'transparent',
-      boxShadow: `0 4px 0 ${accentShadow}, 0 6px 16px ${accent}44`
     }
   };
 }
@@ -310,8 +390,8 @@ export function WizardSectionHeading({ children, style }) {
         fontWeight: '700',
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
-        color: PAPER_TEXT_FAINT,
-        background: `linear-gradient(${WIZARD_PAPER_BASE} 70%, rgba(251,247,233,0))`,
+        color: WIZ_TEXT_FAINT,
+        background: `linear-gradient(${WIZ_BASE} 70%, rgba(12,15,20,0))`,
         ...style
       }}
     >
@@ -320,12 +400,12 @@ export function WizardSectionHeading({ children, style }) {
   );
 }
 
-// The scrolling pane the rail drives. Fixed rather than generated: only one
-// wizard is ever mounted, and the rail and the wizard both have to name it.
+// The scrolling pane the category bar drives. Fixed rather than generated: only
+// one wizard is ever mounted, and the bar and the wizard both have to name it.
 export const WIZARD_PANEL_ID = 'wizard-category-panel';
 
 // One glyph per category kind, drawn at 16×16 on the current stroke colour. Small
-// enough to read at the 18px the phone rail gives them, which rules out anything
+// enough to read at the 18px the phone bar gives them, which rules out anything
 // with interior detail.
 const ICON_GLYPHS = {
   scene: (
@@ -392,28 +472,53 @@ export function WizardIcon({ name, size = 17, color = 'currentColor' }) {
 }
 
 /**
- * The category rail: every category a wizard offers, stacked down the left edge
- * with the value it currently holds.
+ * The families of the open category, as a scrolling row of chips.
+ *
+ * Only the tile-style category has any: seven of them, which used to be a
+ * horizontally scrolling pill row *inside* the panel (a phone showed four and hid
+ * the rest behind a swipe you had no reason to try), then rail sub-rows, and are
+ * now the row directly under the specimen — where the thing they change is the
+ * next thing on screen.
+ */
+export function WizardChipRow({ styles, families, activeChild, onSelect, label }) {
+  if (!families?.length) return null;
+  return (
+    <div role="group" aria-label={label} style={styles.chipRow}>
+      {families.map(child => {
+        const active = child.key === activeChild;
+        return (
+          <button
+            key={child.key}
+            type="button"
+            aria-pressed={active}
+            className="ui-focusable"
+            onClick={() => onSelect(child.key)}
+            style={styles.chip(active)}
+          >
+            {child.label}
+            {child.locked > 0 && <LockPip size={9} color={active ? '#fff' : WIZ_TEXT_FAINT} />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Every category the wizard offers, across the sheet, with the value it currently
+ * holds written under its name.
  *
  * The value line is the point of the thing. A tab strip alone would still only
- * tell you where you are; `summary` is what you already picked, so the palette
- * you chose two categories ago is legible while you are choosing tiles.
+ * tell you where you are; `summary` is what you already picked, so the palette you
+ * chose two categories ago is legible while you are choosing tiles. On a phone it
+ * is one truncated word — still enough to catch "Sunset" changing to "Neon".
  *
- * A category may carry `children` — the tile-style families do — which open as
- * indented sub-rows beneath it. They were a horizontally scrolling pill row
- * inside the panel, where a phone showed four of the seven and you had to swipe
- * to learn the rest existed. Stacked in the rail they are all on screen at once,
- * and the cube preview above the grid never moves.
- *
- * Marked up as navigation with disclosure rather than as a tablist: ARIA has no
- * nested-tab role, and a tablist whose children are sometimes groups of sub-rows
- * is not a tablist. Every row is a normal tab stop; arrow keys additionally move
- * between categories and take the selection with them.
+ * Marked up as navigation rather than as a tablist: every tab is a normal tab
+ * stop, and arrow keys additionally move between categories and take the
+ * selection with them.
  */
-export function WizardRail({ styles, categories, active, onSelect, accent, mobile }) {
+export function WizardCategoryBar({ styles, categories, active, onSelect, accent, mobile }) {
   const tabs = React.useRef([]);
-  const open = categories[active];
-  const children = open?.children ?? [];
 
   const focus = index => {
     onSelect(index);
@@ -422,8 +527,8 @@ export function WizardRail({ styles, categories, active, onSelect, accent, mobil
 
   const handleKeyDown = (e, i) => {
     const last = categories.length - 1;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') focus(i === last ? 0 : i + 1);
-    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') focus(i === 0 ? last : i - 1);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') focus(i === last ? 0 : i + 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') focus(i === 0 ? last : i - 1);
     else if (e.key === 'Home') focus(0);
     else if (e.key === 'End') focus(last);
     else return;
@@ -431,102 +536,160 @@ export function WizardRail({ styles, categories, active, onSelect, accent, mobil
   };
 
   return (
-    <nav aria-label="Setup categories" style={styles.rail(children.length > 0)}>
+    <nav aria-label="Setup categories" style={styles.categoryBar}>
       {categories.map((cat, i) => {
         const isActive = i === active;
         return (
-          <React.Fragment key={cat.key}>
           <button
+            key={cat.key}
             ref={el => { tabs.current[i] = el; }}
             type="button"
             aria-current={isActive ? 'true' : undefined}
             aria-controls={WIZARD_PANEL_ID}
-            aria-expanded={cat.children?.length ? isActive : undefined}
             className="ui-focusable"
             onClick={() => onSelect(i)}
             onKeyDown={e => handleKeyDown(e, i)}
-            style={styles.railTab(isActive)}
+            style={styles.categoryTab(isActive)}
           >
-            <WizardIcon name={cat.icon} size={mobile ? 18 : 17} color={isActive ? accent : PAPER_TEXT_FAINT} />
-            <span style={{ minWidth: 0, maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            <WizardIcon name={cat.icon} size={mobile ? 17 : 18} color={isActive ? accent : WIZ_TEXT_FAINT} />
+            <span
+              style={{
+                fontSize: mobile ? 9 : TEXT_MICRO,
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                lineHeight: 1.2,
+                color: isActive ? WIZ_TEXT : WIZ_TEXT_MUTED,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {cat.label}
+            </span>
+            {cat.summary && (
               <span
                 style={{
-                  fontSize: mobile ? 9 : TEXT_XS,
-                  fontWeight: 700,
-                  letterSpacing: mobile ? '0.02em' : '0.05em',
+                  maxWidth: mobile ? 62 : 96,
+                  fontSize: mobile ? 8 : 9,
+                  fontWeight: 600,
                   lineHeight: 1.2,
-                  color: isActive ? accent : PAPER_TEXT_MUTED,
+                  color: isActive ? accent : WIZ_TEXT_FAINT,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
                 }}
               >
-                {cat.label}
+                {cat.summary}
               </span>
-              {!mobile && cat.summary && (
-                <span
-                  style={{
-                    fontSize: TEXT_MICRO,
-                    fontWeight: 600,
-                    lineHeight: 1.25,
-                    color: PAPER_TEXT_FAINT,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {cat.summary}
-                </span>
-              )}
-            </span>
+            )}
           </button>
-
-          {isActive && cat.children?.length > 0 && (
-            <div
-              role="group"
-              aria-label={`${cat.label} groups`}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1px',
-                margin: '1px 0 5px',
-                marginLeft: mobile ? '7px' : '13px',
-                borderLeft: `1.5px solid ${accent}33`
-              }}
-            >
-              {cat.children.map(child => {
-                const childActive = child.key === cat.activeChild;
-                return (
-                  <button
-                    key={child.key}
-                    type="button"
-                    aria-pressed={childActive}
-                    className="ui-focusable"
-                    onClick={() => cat.onSelectChild(child.key)}
-                    style={styles.railChild(childActive)}
-                  >
-                    <span
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: mobile ? 9 : TEXT_MICRO,
-                        fontWeight: childActive ? 800 : 600,
-                        lineHeight: 1.25,
-                        color: childActive ? accent : PAPER_TEXT_MUTED
-                      }}
-                    >
-                      {child.label}
-                    </span>
-                    {child.locked > 0 && <LockPip size={8} color={childActive ? accent : PAPER_TEXT_FAINT} />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          </React.Fragment>
         );
       })}
     </nav>
+  );
+}
+
+/**
+ * The whole sheet: mode bar, specimen, chips, categories, choices, action.
+ *
+ * A wizard builds its `categories` — each `{ key, icon, label, title, subtitle,
+ * summary, hero, content }`, plus `children`/`activeChild`/`onSelectChild` for a
+ * category with families — and hands them over. Everything else here is the same
+ * for all four, which is exactly why it lives here: the four hand-copied shells
+ * this replaced had already drifted on sheet height, gutters and footer padding.
+ *
+ * @param mode       the badge across the top ("WORM MODE")
+ * @param onBack     back one category, or leave the wizard from the first
+ * @param onPrimary  confirm this category and go on; finishes on the last
+ * @param finishLabel   what the action says on the last category
+ * @param secondary  optional { label, onClick } escape hatch under the action
+ */
+export function WizardShell({
+  styles,
+  mode,
+  accent,
+  categories,
+  active,
+  onSelect,
+  onBack,
+  onPrimary,
+  finishLabel = 'Start Playing',
+  secondary = null,
+  mobile = isMobile,
+  children
+}) {
+  const cat = categories[active];
+  const last = active === categories.length - 1;
+
+  return (
+    <div style={styles.overlay}>
+      {children}
+
+      <div style={styles.sheet}>
+        <div style={styles.modeBar}>
+          <button type="button" onClick={onBack} className="ui-focusable" style={styles.backBtn} aria-label="Back">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10 3L5 8l5 5" />
+            </svg>
+            {!mobile && (active === 0 ? 'Cancel' : 'Back')}
+          </button>
+          <span style={styles.modeName}>{mode}</span>
+        </div>
+
+        {cat.hero ? (
+          <div style={styles.hero}>{cat.hero}</div>
+        ) : (
+          <div style={styles.heroHeading}>
+            <h2 style={styles.title}>{cat.title}</h2>
+            <p style={styles.subtitle}>{cat.subtitle}</p>
+          </div>
+        )}
+
+        <WizardChipRow
+          styles={styles}
+          families={cat.children}
+          activeChild={cat.activeChild}
+          onSelect={cat.onSelectChild}
+          label={`${cat.label} groups`}
+        />
+
+        <WizardCategoryBar
+          styles={styles}
+          categories={categories}
+          active={active}
+          onSelect={onSelect}
+          accent={accent}
+          mobile={mobile}
+        />
+
+        <div style={styles.body} id={WIZARD_PANEL_ID} role="region" aria-label={cat.label}>
+          <div style={{ paddingBottom: '24px' }}>{cat.content}</div>
+        </div>
+
+        <div style={styles.footer}>
+          <button
+            type="button"
+            style={styles.btnPrimary}
+            onClick={onPrimary}
+            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.08)'; }}
+            onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
+          >
+            {last ? finishLabel : `Confirm ${cat.label} & Continue`}
+          </button>
+
+          {secondary && (
+            <button
+              type="button"
+              style={styles.btnSecondary}
+              onClick={secondary.onClick}
+              onMouseEnter={e => { e.currentTarget.style.color = WIZ_TEXT; }}
+              onMouseLeave={e => { e.currentTarget.style.color = WIZ_TEXT_FAINT; }}
+            >
+              {secondary.label}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

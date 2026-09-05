@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_BORDER_SOFT } from '../../utils/uiTheme.js';
 import { useIsMobile } from '../../hooks/index.js';
-import { wizardLayout, WizardRail, WIZARD_PANEL_ID } from './WizardChrome.jsx';
+import { wizardLayout, WizardShell } from './WizardChrome.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, SizeStep, styleCategory,
@@ -58,78 +57,27 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     }
   ];
 
-  const active = categories[step];
   const finish = () => onComplete({ ...cos.settings, cubeSize: cos.cubeSize });
 
   const handleNext = () => (step < categories.length - 1 ? setStep(step + 1) : finish());
   const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   return (
-    <div style={S.overlay}>
+    <WizardShell
+      styles={S}
+      mode="CUBE MODE"
+      accent={ACCENT}
+      categories={categories}
+      active={step}
+      onSelect={setStep}
+      onBack={handleBack}
+      onPrimary={handleNext}
+      finishLabel="Start Playing"
+      mobile={isMobile}
+      secondary={step < categories.length - 1 ? { label: 'Just play — 3×3 with what is set', onClick: finish } : null}
+    >
       <WizardImageInput cos={cos} />
-
-      <div style={S.sheet}>
-        <div style={S.hero}>
-          <div style={S.header}>
-            <h2 style={S.title}>{active.title}</h2>
-            <p style={S.subtitle}>{active.subtitle}</p>
-          </div>
-          {active.hero}
-        </div>
-
-        <div style={S.main}>
-          <WizardRail
-            styles={S}
-            categories={categories}
-            active={step}
-            onSelect={setStep}
-            accent={ACCENT}
-            mobile={isMobile}
-          />
-
-          <div style={S.pane}>
-            <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
-              <div style={{ paddingBottom: '24px' }}>{active.content}</div>
-            </div>
-          </div>
-        </div>
-
-        <div style={S.footer}>
-          <button
-            style={S.btnSecondary}
-            onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = PAPER_TEXT; e.currentTarget.style.borderColor = '#b8b2aa'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = PAPER_TEXT_MUTED; e.currentTarget.style.borderColor = PAPER_BORDER_SOFT; }}
-          >
-            {step === 0 ? 'Cancel' : 'Back'}
-          </button>
-
-          {/* Every choice here has a sane default, so a player who only wants a
-              3×3 can leave at any point. */}
-          {step < categories.length - 1 && (
-            <button
-              style={{ ...S.btnSecondary, marginLeft: 'auto', marginRight: '10px' }}
-              onClick={finish}
-              onMouseEnter={e => { e.currentTarget.style.color = PAPER_TEXT; e.currentTarget.style.borderColor = '#b8b2aa'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = PAPER_TEXT_MUTED; e.currentTarget.style.borderColor = PAPER_BORDER_SOFT; }}
-            >
-              Just play
-            </button>
-          )}
-
-          <button
-            style={S.btnPrimary}
-            onClick={handleNext}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'none'; }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${ACCENT_SHADOW}`; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`; }}
-          >
-            {step === categories.length - 1 ? 'Start Playing' : 'Continue'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </WizardShell>
   );
 };
 
