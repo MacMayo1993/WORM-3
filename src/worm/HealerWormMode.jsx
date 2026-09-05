@@ -65,6 +65,7 @@ import {
     checkBlastHitWorm,
 } from './healerWorm/bombs.js';
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
+import { rotationClock, resetRotationClock } from './healerWorm/rotationClockBridge.js';
 import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
 import { ThunkEffect, CollisionGlow } from './healerWorm/impactFx.jsx';
 import { buildWormScramble, invertWormScramble } from './healerWorm/scramble.js';
@@ -111,7 +112,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
     // ── Auto-rotation hazard state ─────────────────────────────────────────────
     const autoTimerRef      = useRef(0);
-    const pendingRotRef     = useRef(null);   // {axis,dir,sliceIndex} during warning window
+    // The next move, armed as soon as the cycle starts rather than only for the
+    // last few seconds: the layer it names is lit the whole time, so the player can
+    // see which slice is coming and plan around it instead of being told about it
+    // once the turn is nearly on top of them.
+    const pendingRotRef     = useRef(null);   // {axis,dir,sliceIndex} for the whole cycle
     const warningProgressRef = useRef(0);     // 0→1 through warning window
     const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
 
@@ -132,6 +137,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         return () => { setWormTurnCallback(null); };
     }, [worm.queueTurn]);
 
+    // The countdown readout lives in the DOM HUD and reads this bridge, so leaving
+    // the mode has to blank it — otherwise the last run's clock is still showing
+    // when the next one mounts.
+    useEffect(() => () => resetRotationClock(), []);
+
     // Build a fresh scramble whenever a new run starts (or on first mount).
     useEffect(() => {
         const generateScramble = () => {
@@ -148,6 +158,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             autoTimerRef.current      = 0;
             pendingRotRef.current     = null;
             warningProgressRef.current = 0;
+            resetRotationClock();
             bombsRef.current          = [];
             bombMembershipRef.current++;
             bombTimerRef.current      = BOMB_SPAWN_INTERVAL;
@@ -269,6 +280,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     autoTimerRef.current = 0;
                     pendingRotRef.current = null;
                     warningProgressRef.current = 0;
+                    resetRotationClock();
                     // Give the player a full interval of breathing room before the
                     // first bomb spawns (the rotation hazard already ramps in slowly).
                     bombTimerRef.current = BOMB_SPAWN_INTERVAL;
@@ -311,17 +323,17 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         // Pause the rotation hazard entirely while the worm is inside a wormhole: freeze the
         // clock and the warning beam so nothing charges or fires until it emerges (crawling).
-        if (worm.phase.current !== 'crawling') return;
+        if (worm.phase.current !== 'crawling') { rotationClock.held = true; return; }
 
         // Freeze the hazard clock in lockstep with the body-cut freeze frame: the sim is
         // frozen for this beat (see stepWormSim), so hold the auto-rotate timer and warning
         // beam steady too — otherwise the clock keeps charging behind the camera swing and
         // the next turn can fire the instant the worm resumes.
-        if (worm.cutFocusT.current > 0) return;
+        if (worm.cutFocusT.current > 0) { rotationClock.held = true; return; }
 
         // Same for the elemental-claim beat — the sim is frozen for it, so the
         // auto-rotate clock must not keep charging behind the camera move.
-        if ((worm.elementalFocusT?.current ?? 0) > 0) return;
+        if ((worm.elementalFocusT?.current ?? 0) > 0) { rotationClock.held = true; return; }
 
         // ── Bomb hazard: spawn → fuse → disarm-by-encircle → detonation ────────
         {
@@ -433,11 +445,15 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             }
         }
 
+        rotationClock.held = false;
         autoTimerRef.current += delta;
         const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
 
-        // Arm warning with the NEXT inverse move (peek, don't dequeue yet)
-        if (autoTimerRef.current >= warningStart && !pendingRotRef.current) {
+        // Arm with the NEXT inverse move the moment the cycle starts (peek, don't
+        // dequeue yet). The layer stays lit for the whole ten seconds — softly at
+        // first, hard through the telegraph window — so "which slice, which way"
+        // is answered before the countdown gets short.
+        if (!pendingRotRef.current) {
             if (inverseQueueRef.current.length === 0) {
                 // All inverse moves exhausted — enter final healing phase.
                 // Wormhole spawning is now blocked (checked in worm.tick).
@@ -446,6 +462,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 finalHealCheckTimer.current = 0.5; // check immediately next frame batch
                 pendingRotRef.current = null;
                 warningProgressRef.current = 0;
+                resetRotationClock();
                 useGameStore.setState({ wormGamePhase: 'finalHealing' });
                 return;
             }
@@ -458,6 +475,16 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const elapsed = autoTimerRef.current - warningStart;
             warningProgressRef.current = Math.min(1, Math.max(0, elapsed / AUTO_ROTATE_WARNING));
         }
+
+        // Publish the clock for the HUD's countdown. A plain object rather than
+        // store state — this changes every frame and the readout paints itself
+        // from a ref (see rotationClockBridge).
+        rotationClock.armed = !!pendingRotRef.current;
+        rotationClock.secondsLeft = Math.max(0, ACTIVE_ROTATE_INTERVAL - autoTimerRef.current);
+        rotationClock.total = ACTIVE_ROTATE_INTERVAL;
+        rotationClock.warning = warningProgressRef.current;
+        rotationClock.axis = pendingRotRef.current?.axis ?? null;
+        rotationClock.sliceIndex = pendingRotRef.current?.sliceIndex ?? null;
 
         // Fire rotation at the fixed 10-second mark
         if (autoTimerRef.current >= ACTIVE_ROTATE_INTERVAL && pendingRotRef.current) {
@@ -566,7 +593,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormAlive && <MagnetFX worm={worm} />}
             <PowerupOrbs size={size} />
             <SpecialOrbs size={size} hidden={wormInTunnel} />
-            <SliceWarningLights pendingRotRef={pendingRotRef} size={size} />
+            <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />
         </>

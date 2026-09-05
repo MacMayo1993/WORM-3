@@ -39,6 +39,7 @@ const rimFragmentShader = `
   uniform float uDir;    // +1 / -1 → the sweep travels with the turn
   uniform float uEdge;   // tile outline in uv space
   uniform float uOpacity;
+  uniform float uGain;   // thickens the rim itself (1 = the solver's hint)
   varying vec2  vUv;
   varying float vPhase;  // this face's angular position around the turn axis, [0,1)
   #define TAU 6.28318530718
@@ -75,7 +76,7 @@ const rimFragmentShader = `
     }
     sweep = clamp(sweep, 0.0, 1.25);
 
-    float glow = (line * 0.40 + halo * 0.60) * (0.45 + sweep * 1.05) + fill * (0.03 + sweep * 0.055);
+    float glow = ((line * 0.40 + halo * 0.60) * (0.45 + sweep * 1.05) + fill * (0.03 + sweep * 0.055)) * uGain;
     if (glow < 0.004) discard;
 
     vec3 col = mix(uDeep, uCore, clamp(sweep * 0.6 + line * 0.3, 0.0, 1.0));
@@ -251,7 +252,15 @@ const sparkFragmentShader = `
 
 const STREAMERS = 3;
 
-const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1 }) => {
+/**
+ * @param opacity     static alpha for the whole effect
+ * @param opacityRef  a ref whose current value overrides `opacity` every frame —
+ *                    for a caller that ramps the hint (worm mode's turn warning
+ *                    breathes, then bears down) without re-rendering it
+ * @param gain        thickens the rim on the tiles themselves; 1 is the solver's
+ *                    hint, higher reads as a hazard rather than a suggestion
+ */
+const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1, opacityRef = null, gain = 1 }) => {
   const spinnerRef = useRef();
   const turn = dir === 1 ? 1 : -1;
 
@@ -264,6 +273,9 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
   // effect (worm mode runs it a touch softer than the solver's hints).
   const uOpacity = useMemo(() => ({ value: opacity }), []); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { uOpacity.value = opacity; }, [opacity, uOpacity]);
+
+  const uGain = useMemo(() => ({ value: gain }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { uGain.value = gain; }, [gain, uGain]);
 
   // Gold by default (the instructor's hint). When a caller passes a colour — worm
   // mode hands in the player's chosen worm colour — use it for the deep tone and a
@@ -297,8 +309,8 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
   React.useEffect(() => () => rimGeometry.dispose(), [rimGeometry]);
 
   const rimUniforms = useMemo(() => ({
-    ...palette, uTime, uDir, uOpacity, uEdge: { value: EDGE_UV }
-  }), [palette, uTime, uDir, uOpacity]);
+    ...palette, uTime, uDir, uOpacity, uGain, uEdge: { value: EDGE_UV }
+  }), [palette, uTime, uDir, uOpacity, uGain]);
 
   // The belt the streamers and motes ride: outside the layer's corner diagonal,
   // so nothing ever clips through the cube however it is oriented.
@@ -373,6 +385,9 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
 
   useFrame((state, delta) => {
     uTime.value = state.clock.elapsedTime;
+    // A caller driving the intensity per frame owns it outright — this is the
+    // one write, so nothing re-renders to make the hint brighten.
+    if (opacityRef) uOpacity.value = opacityRef.current;
     // Carry the streamers around the belt the way the layer will turn.
     if (spinnerRef.current) spinnerRef.current.rotation.z += delta * turn * 0.85;
   });
