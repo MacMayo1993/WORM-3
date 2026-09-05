@@ -5,7 +5,7 @@
 // step ended up with a different tile thumbnail in each mode. They live here now.
 
 import React, { useRef } from 'react';
-import { COLOR_SCHEMES, SCHEME_LABELS } from '../../../utils/colorSchemes.js';
+import { COLOR_SCHEMES, SCHEME_LABELS, TILE_STYLES } from '../../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../../utils/backgrounds.js';
 import { BG_PREVIEWS } from '../../../utils/bgPreviews.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../../3d/TilePreviewRenderer.js';
@@ -50,6 +50,35 @@ export const MIN_CUBE_SIZE = SIZE_TIERS[0].n;
 export const MAX_CUBE_SIZE = SIZE_TIERS[SIZE_TIERS.length - 1].n;
 
 export const sizeTier = (n, tiers = SIZE_TIERS) => tiers.find(t => t.n === n) || tiers[1];
+
+// ─── Category value labels ────────────────────────────────────────────────────
+//
+// What each wizard category currently holds, in one line. The rail writes these
+// under its category names and the specimen plates put them under the cube, so
+// they have to be the same words — three steps used to compute their own and had
+// already drifted on what an uploaded palette is called.
+
+export const sceneLabel = settings => bgOptionFor(settings.backgroundTheme)?.label || 'Scene';
+
+export const paletteLabel = settings =>
+  (settings.colorScheme === 'custom' ? 'Your Photo' : SCHEME_LABELS[settings.colorScheme] || 'Standard');
+
+/**
+ * Six faces set to the same style read as that style, not as "Per Face" — the
+ * override map being non-null is not the same thing as the faces disagreeing.
+ */
+export const styleLabel = settings => {
+  const perFace = settings.perFaceStyles;
+  if (perFace) {
+    const values = [1, 2, 3, 4, 5, 6].map(id => perFace[id] || settings.tileStyle || 'solid');
+    const uniform = values.every(v => v === values[0]) ? values[0] : null;
+    return uniform ? TILE_STYLES[uniform]?.label || uniform : 'Per Face';
+  }
+  if (settings.tileStyle === 'random') return 'Random Mix';
+  return TILE_STYLES[settings.tileStyle]?.label || 'Solid';
+};
+
+export const sizeLabel = (n, tiers = SIZE_TIERS) => sizeTier(n, tiers).name;
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 

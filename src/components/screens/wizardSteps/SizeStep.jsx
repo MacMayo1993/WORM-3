@@ -1,18 +1,15 @@
 // SizeStep.jsx — the size slider, with the cube growing under it.
 
 import React from 'react';
-import { TILE_STYLES, SCHEME_LABELS } from '../../../utils/colorSchemes.js';
 import { PAPER_TEXT_MUTED } from '../../../utils/uiTheme.js';
 import CubePlate from './CubePlate.jsx';
 import CubeSizeSlider from './CubeSizeSlider.jsx';
-import { SIZE_TIERS, sizeTier, bgOptionFor } from './shared.jsx';
+import { SIZE_TIERS, sizeTier, bgOptionFor, paletteLabel, styleLabel } from './shared.jsx';
 
 export default function SizeStep({ cos, tiers = SIZE_TIERS }) {
   const { settings, cubeSize, setCubeSize, colors, accent, accentShadow } = cos;
 
   const tier = sizeTier(cubeSize, tiers);
-  const styleLabel = settings.tileStyle === 'random' ? 'Random Mix' : TILE_STYLES[settings.tileStyle]?.label || 'Solid';
-  const paletteLabel = settings.colorScheme === 'custom' ? 'Your Photo' : SCHEME_LABELS[settings.colorScheme] || 'Standard';
 
   const sizeIndex = Math.max(0, tiers.findIndex(option => option.n === cubeSize));
   const adjacentSize = offset => tiers[Math.max(0, Math.min(tiers.length - 1, sizeIndex + offset))].n;
@@ -24,7 +21,7 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS }) {
         index={sizeIndex + 1}
         total={tiers.length}
         title={tier.name}
-        subtitle={`${paletteLabel} · ${styleLabel}`}
+        subtitle={`${paletteLabel(settings)} · ${styleLabel(settings)}`}
         onPrev={() => setCubeSize(adjacentSize(-1))}
         onNext={() => setCubeSize(adjacentSize(1))}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}

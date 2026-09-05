@@ -4,11 +4,11 @@ import {
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_CARD_SHADOW, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { useIsMobile } from '../../hooks/index.js';
-import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
+import { wizardLayout, WizardRail, WIZARD_PANEL_ID } from './WizardChrome.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, StyleStep, SizeStep,
-  cardStyle
+  cardStyle, sceneLabel, paletteLabel, styleLabel, sizeLabel
 } from './wizardSteps/index.jsx';
 
 const ACCENT = '#C44B00';
@@ -28,16 +28,6 @@ const GAME_LENGTH_OPTIONS = [
   { value: 'short', label: 'Short', sub: '10 shuffles' },
   { value: 'medium', label: 'Medium', sub: '20 shuffles' },
   { value: 'long', label: 'Long', sub: '30 shuffles' }
-];
-
-const STEPS = ['Scene', 'Colors', 'Style', 'Gameplay', 'Size'];
-const STEP_TITLES = ['Background', 'Color Palette', 'Tile Style', 'Gameplay', 'Cube Size'];
-const STEP_SUBTITLES = [
-  'Choose your play environment',
-  'Pick a palette — the cube wears it as you go',
-  'Choose how your tiles look and feel',
-  'Tune disparity intensity and survival rules',
-  'Slide to size — this is the cube that has to survive'
 ];
 
 const ToggleRow = ({ label, sub, value, onChange }) => (
@@ -89,12 +79,6 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
     }
   });
   const { settings, select } = cos;
-
-  const handleNext = () => {
-    if (step < STEPS.length - 1) setStep(step + 1);
-    else onStart({ ...settings, cubeSize: cos.cubeSize });
-  };
-  const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   const levelAccent = LEVEL_ACCENT[settings.disparityLevel];
 
@@ -173,33 +157,97 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
     </div>
   );
 
-  const stepContent = [
-    <SceneStep key="scene" cos={cos} />,
-    <PaletteStep key="palette" cos={cos} />,
-    <StyleStep key="style" cos={cos} />,
-    renderGameplay(),
-    <SizeStep key="size" cos={cos} />
+  const categories = [
+    {
+      key: 'scene',
+      icon: 'scene',
+      label: 'Scene',
+      title: 'Background',
+      subtitle: 'Choose your play environment',
+      summary: sceneLabel(settings),
+      content: <SceneStep cos={cos} />
+    },
+    {
+      key: 'colors',
+      icon: 'colors',
+      label: 'Colors',
+      title: 'Color Palette',
+      subtitle: 'Pick a palette — the cube wears it as you go',
+      summary: paletteLabel(settings),
+      content: <PaletteStep cos={cos} />
+    },
+    {
+      key: 'style',
+      icon: 'style',
+      label: 'Style',
+      title: 'Tile Style',
+      subtitle: 'Choose how your tiles look and feel',
+      summary: styleLabel(settings),
+      content: <StyleStep cos={cos} />
+    },
+    {
+      key: 'gameplay',
+      icon: 'gameplay',
+      label: 'Gameplay',
+      title: 'Gameplay',
+      subtitle: 'Tune disparity intensity and survival rules',
+      // The two settings that decide how long the cube lasts, which is what a
+      // player checks this category for.
+      summary: `${LEVEL_LABELS[settings.disparityLevel]} · ${FLIP_CAP_PRESETS.find(p => p.value === settings.flipCap)?.label || 'Custom'}`,
+      content: renderGameplay()
+    },
+    {
+      key: 'size',
+      icon: 'size',
+      label: 'Size',
+      title: 'Cube Size',
+      subtitle: 'Slide to size — this is the cube that has to survive',
+      summary: sizeLabel(cos.cubeSize),
+      content: <SizeStep cos={cos} />
+    }
   ];
+
+  const active = categories[step];
+
+  const handleNext = () => {
+    if (step < categories.length - 1) setStep(step + 1);
+    else onStart({ ...settings, cubeSize: cos.cubeSize });
+  };
+  const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   return (
     <div style={S.overlay}>
       <WizardImageInput cos={cos} />
       <div style={S.sheet}>
-        <div style={S.header}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
-            fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff',
-            boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
-          }}>
-            DISPARITY MODE
-          </div>
-          <WizardSteps styles={S} steps={STEPS} step={step} />
-          <h2 style={S.title}>{STEP_TITLES[step]}</h2>
-          <p style={S.subtitle}>{STEP_SUBTITLES[step]}</p>
-        </div>
+        <div style={S.main}>
+          <WizardRail
+            styles={S}
+            categories={categories}
+            active={step}
+            onSelect={setStep}
+            accent={ACCENT}
+            mobile={isMobile}
+          />
 
-        <div style={S.body}><div style={{ paddingBottom: '24px' }}>{stepContent[step]}</div></div>
+          <div style={S.pane}>
+            <div style={S.header}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
+                fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff',
+                boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
+              }}>
+                DISPARITY MODE
+              </div>
+              <h2 style={S.title}>{active.title}</h2>
+              <p style={S.subtitle}>{active.subtitle}</p>
+            </div>
+
+            <div style={S.body} id={WIZARD_PANEL_ID} role="tabpanel" aria-label={active.label}>
+              <div style={{ paddingBottom: '24px' }}>{active.content}</div>
+            </div>
+          </div>
+        </div>
 
         <div style={S.footer}>
           <button
@@ -218,7 +266,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${ACCENT_SHADOW}`; }}
             onMouseUp={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`; }}
           >
-            {step === STEPS.length - 1 ? 'Start Playing' : 'Continue'}
+            {step === categories.length - 1 ? 'Start Playing' : 'Continue'}
           </button>
         </div>
       </div>

@@ -9,13 +9,14 @@ import {
   PAPER_CARD_SHADOW,
   NIGHT_TEXT, NIGHT_TEXT_MUTED,
   UI_CREAM, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
-import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
+import { wizardLayout, WizardRail, WIZARD_PANEL_ID } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import { WORM_SPEED_OPTIONS } from '../../worm/healerWorm/constants.js';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, StyleStep, SizeStep,
-  SpecimenPlate, LockPip, PickerHeading, SIZE_TIERS
+  SpecimenPlate, LockPip, PickerHeading, SIZE_TIERS,
+  sceneLabel, paletteLabel, styleLabel, sizeLabel
 } from './wizardSteps/index.jsx';
 
 const ACCENT = '#6A2C91';
@@ -26,14 +27,16 @@ const WORM_SIZE_TIERS = [
   { n: MEGA_CUBE_SIZE, name: '15×15×15', tag: 'Mega', desc: '1,350 stickers of mayhem' }
 ];
 
-const STEPS = ['Character', 'Scene', 'Colors', 'Style', 'Size'];
-const STEP_TITLES = ['Pick Worm Type', 'Background', 'Color Palette', 'Tile Style', 'Cube Size & Gameplay'];
-const STEP_SUBTITLES = [
-  'Select your character, then customize skin & hat',
-  'Choose your play environment',
-  'Pick a palette — the cube wears it as you go',
-  'Choose how your tiles look and feel',
-  'Choose your cube, then tune how fast and chaotic your worm run feels'
+const ORB_COUNT_OPTIONS = [
+  { value: 6, label: 'Less' },
+  { value: 16, label: 'Average' },
+  { value: 30, label: 'More' }
+];
+
+const WORMHOLE_OPTIONS = [
+  { value: 20, label: 'Slow' },
+  { value: 10, label: 'Average' },
+  { value: 5, label: 'Fast' }
 ];
 
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
@@ -64,16 +67,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   const activeSkin = WORM_SKINS.find(s => s.id === wormSkinId) ?? WORM_SKINS[0];
   const activeCharacter = WORM_CHARACTERS.find(c => c.id === wormCharacterId) ?? WORM_CHARACTERS[0];
-
-  const handleNext = () => {
-    if (step < STEPS.length - 1) setStep(step + 1);
-    else onComplete({
-      ...settings,
-      cubeSize: cos.cubeSize,
-      megaMode: cos.cubeSize === MEGA_CUBE_SIZE
-    });
-  };
-  const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   // ── Step 0: Character ───────────────────────────────────────────────────────
 
@@ -256,7 +249,11 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     );
   };
 
-  // ── Final step: cube size and gameplay ─────────────────────────────────────
+  // ── Play: how the run itself feels ─────────────────────────────────────────
+  //
+  // These used to hang off the bottom of the size step, which made it the
+  // longest scroll in any wizard — they were bundled there only because a sixth
+  // step cost a sixth screen to walk through. With the rail a category is free.
 
   const renderGameplay = () => {
     const OptionGroup = ({ label, options, value, onChange, accent }) => (
@@ -305,33 +302,21 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           accent={ACCENT}
           value={settings.wormOrbCount}
           onChange={v => select('wormOrbCount', v)}
-          options={[
-            { value: 6, label: 'Less' },
-            { value: 16, label: 'Average' },
-            { value: 30, label: 'More' }
-          ]}
+          options={ORB_COUNT_OPTIONS}
         />
         <OptionGroup
           label="Wormhole Duration"
           accent="#b58a00"
           value={settings.wormholeInterval}
           onChange={v => select('wormholeInterval', v)}
-          options={[
-            { value: 20, label: 'Slow' },
-            { value: 10, label: 'Average' },
-            { value: 5, label: 'Fast' }
-          ]}
+          options={WORMHOLE_OPTIONS}
         />
       </div>
     );
   };
 
-  const stepContent = [
-    renderCharacter(),
-    <SceneStep key="scene" cos={cos} />,
-    <PaletteStep key="palette" cos={cos} />,
-    <StyleStep key="style" cos={cos} />,
-    <div key="size">
+  const renderSize = () => (
+    <>
       <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} />
       <button
         type="button"
@@ -361,35 +346,113 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           Mega Mode automatically scales orb density to fill the larger surface and uses optimized effects for smoother play.
         </p>
       )}
-      <div style={{ marginTop: '24px' }}>
-        {renderGameplay()}
-      </div>
-    </div>
+    </>
+  );
+
+  const categories = [
+    {
+      key: 'character',
+      icon: 'character',
+      label: 'Character',
+      title: 'Pick Worm Type',
+      subtitle: 'Select your character, then customize skin & hat',
+      summary: `${activeCharacter.label} · ${activeSkin.label}`,
+      content: renderCharacter()
+    },
+    {
+      key: 'scene',
+      icon: 'scene',
+      label: 'Scene',
+      title: 'Background',
+      subtitle: 'Choose your play environment',
+      summary: sceneLabel(settings),
+      content: <SceneStep cos={cos} />
+    },
+    {
+      key: 'colors',
+      icon: 'colors',
+      label: 'Colors',
+      title: 'Color Palette',
+      subtitle: 'Pick a palette — the cube wears it as you go',
+      summary: paletteLabel(settings),
+      content: <PaletteStep cos={cos} />
+    },
+    {
+      key: 'style',
+      icon: 'style',
+      label: 'Style',
+      title: 'Tile Style',
+      subtitle: 'Choose how your tiles look and feel',
+      summary: styleLabel(settings),
+      content: <StyleStep cos={cos} />
+    },
+    {
+      key: 'size',
+      icon: 'size',
+      label: 'Size',
+      title: 'Cube Size',
+      subtitle: 'Choose the cube your worm has to cross',
+      summary: cos.cubeSize === MEGA_CUBE_SIZE ? 'Mega 15×15×15' : sizeLabel(cos.cubeSize, WORM_SIZE_TIERS),
+      content: renderSize()
+    },
+    {
+      key: 'play',
+      icon: 'gameplay',
+      label: 'Play',
+      title: 'Gameplay',
+      subtitle: 'Tune how fast and chaotic your worm run feels',
+      summary: `${WORM_SPEED_OPTIONS.find(o => o.value === settings.wormSpeed)?.label || 'Custom'} · ${ORB_COUNT_OPTIONS.find(o => o.value === settings.wormOrbCount)?.label || 'Custom'}`,
+      content: renderGameplay()
+    }
   ];
+
+  const active = categories[step];
+
+  const handleNext = () => {
+    if (step < categories.length - 1) setStep(step + 1);
+    else onComplete({
+      ...settings,
+      cubeSize: cos.cubeSize,
+      megaMode: cos.cubeSize === MEGA_CUBE_SIZE
+    });
+  };
+  const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
   return (
     <div style={S.overlay}>
       <WizardImageInput cos={cos} />
 
       <div style={S.sheet}>
-        <div style={S.header}>
-          {/* Mode identity badge */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
-            fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em',
-            textTransform: 'uppercase', color: '#fff',
-            boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
-          }}>
-            WORM MODE
-          </div>
-          <WizardSteps styles={S} steps={STEPS} step={step} />
-          <h2 style={S.title}>{STEP_TITLES[step]}</h2>
-          <p style={S.subtitle}>{STEP_SUBTITLES[step]}</p>
-        </div>
+        <div style={S.main}>
+          <WizardRail
+            styles={S}
+            categories={categories}
+            active={step}
+            onSelect={setStep}
+            accent={ACCENT}
+            mobile={isMobile}
+          />
 
-        <div style={S.body}>
-          <div style={{ paddingBottom: '24px' }}>{stepContent[step]}</div>
+          <div style={S.pane}>
+            <div style={S.header}>
+              {/* Mode identity badge */}
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
+                fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em',
+                textTransform: 'uppercase', color: '#fff',
+                boxShadow: `0 2px 0 ${ACCENT_SHADOW}`
+              }}>
+                WORM MODE
+              </div>
+              <h2 style={S.title}>{active.title}</h2>
+              <p style={S.subtitle}>{active.subtitle}</p>
+            </div>
+
+            <div style={S.body} id={WIZARD_PANEL_ID} role="tabpanel" aria-label={active.label}>
+              <div style={{ paddingBottom: '24px' }}>{active.content}</div>
+            </div>
+          </div>
         </div>
 
         <div style={S.footer}>
@@ -410,7 +473,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${ACCENT_SHADOW}`; }}
             onMouseUp={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`; }}
           >
-            {step === STEPS.length - 1 ? 'Start Playing' : 'Continue'}
+            {step === categories.length - 1 ? 'Start Playing' : 'Continue'}
           </button>
         </div>
       </div>

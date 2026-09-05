@@ -1,9 +1,8 @@
 // SceneStep.jsx — pick the environment, with the cube standing in it.
 
 import React from 'react';
-import { TILE_STYLES } from '../../../utils/colorSchemes.js';
 import CubePlate from './CubePlate.jsx';
-import { BG_OPTIONS, Checkmark, sizeTier } from './shared.jsx';
+import { BG_OPTIONS, Checkmark, sizeTier, styleLabel } from './shared.jsx';
 
 export default function SceneStep({ cos }) {
   const { settings, select, cubeSize, colors, accent, accentShadow } = cos;
@@ -12,8 +11,6 @@ export default function SceneStep({ cos }) {
   const current = BG_OPTIONS[index];
   const step = delta => select('backgroundTheme', BG_OPTIONS[(index + delta + BG_OPTIONS.length) % BG_OPTIONS.length].value);
 
-  const styleLabel = settings.tileStyle === 'random' ? 'Random Mix' : TILE_STYLES[settings.tileStyle]?.label || 'Solid';
-
   return (
     <>
       <CubePlate
@@ -21,7 +18,7 @@ export default function SceneStep({ cos }) {
         index={index + 1}
         total={BG_OPTIONS.length}
         title={current?.label || 'Scene'}
-        subtitle={`${styleLabel} · ${sizeTier(cubeSize).name}`}
+        subtitle={`${styleLabel(settings)} · ${sizeTier(cubeSize).name}`}
         onPrev={() => step(-1)}
         onNext={() => step(1)}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}
