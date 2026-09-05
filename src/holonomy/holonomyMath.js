@@ -164,6 +164,42 @@ export const clampAfterCross = (u, v, edge, eps = 0.015) => {
     }
 };
 
+// ─── Swirl field arrows ───────────────────────────────────────────────────────
+// One row of short arrows per face, showing which way the swirl carries a vector
+// at the current twist. Pure, and writes into a caller-owned Float32Array so the
+// renderer can update a live BufferGeometry in place instead of rebuilding one
+// (and leaking the old one) on every animation frame.
+//
+// Layout: 2 points × 3 floats per arrow — [baseXYZ, tipXYZ] repeated.
+export const SWIRL_ARROW_LEN = 0.07;
+
+export const swirlArrowPositions = (faceKey, twist, count, out) => {
+    const f = FACE_GEOMETRY[faceKey];
+    if (!f) return out;
+    const step = 1.0 / (count + 1);
+    const half = 0.5;
+    // Twist is clamped away from 0 so the field never collapses to zero-length
+    // arrows at the bottom of the schedule.
+    const t = Math.max(twist, 0.05);
+    for (let i = 0; i < count; i++) {
+        const ub = -half + step * (i + 1);
+        const vb = -half + step * Math.floor(count / 2);
+        const [su, sv] = swirlUV(ub, vb, t, faceKey);
+        const angle = Math.atan2(sv - vb, su - ub);
+        const c = Math.cos(angle) * SWIRL_ARROW_LEN;
+        const s = Math.sin(angle) * SWIRL_ARROW_LEN;
+        const base = chartToWorld(faceKey, ub, vb, 0, 0.54);
+        const o = i * 6;
+        out[o] = base[0];
+        out[o + 1] = base[1];
+        out[o + 2] = base[2];
+        out[o + 3] = base[0] + c * f.a1[0] + s * f.a2[0];
+        out[o + 4] = base[1] + c * f.a1[1] + s * f.a2[1];
+        out[o + 5] = base[2] + c * f.a1[2] + s * f.a2[2];
+    }
+    return out;
+};
+
 // ─── Twist schedule (animation) ───────────────────────────────────────────────
 // Matches Python: 0.5 - 0.5*cos(2π·k/twist_period)
 export const twistSchedule = (time, period = 14.0) => {

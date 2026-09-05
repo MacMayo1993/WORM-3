@@ -9,8 +9,40 @@ import { FACE_COLORS } from '../../utils/constants.js';
 import { vibrate } from '../../utils/audio.js';
 import { UI_FONT, MONO_FONT } from '../../utils/uiTheme.js';
 
-// Simplified cubie for cutscene performance
-const CutsceneCubie = ({ position, size, scale = 1, emissiveIntensity = 0 }) => {
+// A 5×5 shell is 98 cubies carrying ~250 stickers. Building a geometry and a
+// material per sticker meant ~350 GPU resources for six distinct looks, and the
+// emissive pulse below rebuilt every one of those React elements each frame.
+// Sharing by face colour collapses that to two geometries and seven materials —
+// and, more importantly, lets the pulse be a handful of property writes instead
+// of a render of the whole cube.
+const CORE_GEO = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+const STICKER_GEO = new THREE.PlaneGeometry(0.85, 0.85);
+const CORE_MAT = new THREE.MeshStandardMaterial({ color: '#111' });
+
+const STICKER_MATS = new Map();
+const stickerMaterial = (color) => {
+  let mat = STICKER_MATS.get(color);
+  if (!mat) {
+    mat = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0,
+      side: THREE.DoubleSide
+    });
+    STICKER_MATS.set(color, mat);
+  }
+  return mat;
+};
+
+// The one write the cutscene's frame loop needs.
+const setStickerEmissive = (intensity) => {
+  for (const mat of STICKER_MATS.values()) mat.emissiveIntensity = intensity;
+};
+
+// Simplified cubie for cutscene performance.
+// Memoised and prop-stable: once mounted these never re-render — the emissive
+// pulse reaches them through the shared materials above.
+const CutsceneCubie = React.memo(({ position, size, scale = 1 }) => {
   const groupRef = useRef();
   const k = (size - 1) / 2;
 
@@ -28,25 +60,21 @@ const CutsceneCubie = ({ position, size, scale = 1, emissiveIntensity = 0 }) => 
   return (
     <group ref={groupRef} position={position} scale={scale}>
       {/* Black core */}
-      <mesh>
-        <boxGeometry args={[0.95, 0.95, 0.95]} />
-        <meshStandardMaterial color="#111" />
-      </mesh>
+      <mesh geometry={CORE_GEO} material={CORE_MAT} dispose={null} />
       {/* Colored stickers */}
       {faces.map((face, idx) => (
-        <mesh key={idx} position={face.normal.map(n => n * 0.48)}>
-          <planeGeometry args={[0.85, 0.85]} />
-          <meshStandardMaterial
-            color={face.color}
-            emissive={face.color}
-            emissiveIntensity={emissiveIntensity}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
+        <mesh
+          key={idx}
+          position={face.normal.map(n => n * 0.48)}
+          geometry={STICKER_GEO}
+          material={stickerMaterial(face.color)}
+          dispose={null}
+        />
       ))}
     </group>
   );
-};
+});
+CutsceneCubie.displayName = 'CutsceneCubie';
 
 // Wormhole tunnel effect
 const WormholeTunnel = ({ start, end, color, progress, opacity = 1 }) => {
@@ -158,7 +186,10 @@ const CutsceneScene = ({ progress, onComplete: _onComplete }) => {
   const size = 5; // 5x5 cube for epic feel
   const tlRef = useRef(null);
   const [blackHolePulse, setBlackHolePulse] = useState(0);
-  const [emissive, setEmissive] = useState(0);
+  // Each pulse window fires once. Guarding on `progress > 55 && progress < 56`
+  // alone meant every frame inside that band queued a fresh Date.now(), so a
+  // single dramatic beat cost a burst of commits instead of one.
+  const firedPulses = useRef(new Set());
 
   // Phase tracking
   const phase = useMemo(() => {
@@ -274,24 +305,32 @@ const CutsceneScene = ({ progress, onComplete: _onComplete }) => {
     }
   }, [progress]);
 
-  // Emissive pulsing during hyperspace
+  // Emissive pulsing during hyperspace. Writes straight to the shared sticker
+  // materials — no React state, so a 15-second cutscene renders the cube once.
   useFrame((state, _delta) => {
     if (phase === 'hyperspace' || phase === 'eventHorizon') {
-      setEmissive(0.2 + Math.sin(state.clock.elapsedTime * 5) * 0.15);
+      setStickerEmissive(0.2 + Math.sin(state.clock.elapsedTime * 5) * 0.15);
     } else if (phase === 'ignite') {
-      setEmissive(0.1);
+      setStickerEmissive(0.1);
     } else {
-      setEmissive(0.05);
+      setStickerEmissive(0.05);
     }
 
-    // Black hole pulse on phase change
-    if (phase === 'eventHorizon' && progress > 55 && progress < 56) {
-      setBlackHolePulse(Date.now());
-    }
-    if (phase === 'ignite' && progress > 85 && progress < 86) {
+    // Black hole pulse on phase change — one commit per beat, not per frame.
+    const beat =
+      phase === 'eventHorizon' && progress > 55 && progress < 56 ? 'eventHorizon'
+      : phase === 'ignite' && progress > 85 && progress < 86 ? 'ignite'
+      : null;
+    if (beat && !firedPulses.current.has(beat)) {
+      firedPulses.current.add(beat);
       setBlackHolePulse(Date.now());
     }
   });
+
+  // A replay restarts progress at 0, so the beats must be re-armable.
+  useEffect(() => {
+    if (progress < 1) firedPulses.current.clear();
+  }, [progress]);
 
   // Generate cube pieces
   const cubies = useMemo(() => {
@@ -345,7 +384,6 @@ const CutsceneScene = ({ progress, onComplete: _onComplete }) => {
             key={cubie.key}
             position={cubie.position}
             size={size}
-            emissiveIntensity={emissive}
           />
         ))}
       </group>

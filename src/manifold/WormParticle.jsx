@@ -2,11 +2,22 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+// Frame scratch, shared across instances. Each useFrame body runs to completion
+// synchronously, so two worms in the same frame take turns rather than aliasing.
 const _faceN   = new THREE.Vector3();
 const _perp    = new THREE.Vector3();
+const _arcFwd  = new THREE.Vector3();
 const _arcDir  = new THREE.Vector3();
 const _wigDir  = new THREE.Vector3();
 const _tangent = new THREE.Vector3();
+const _origin  = new THREE.Vector3();
+const _headPos = new THREE.Vector3();
+const _headFwd = new THREE.Vector3();
+const _segPos  = new THREE.Vector3();
+
+const UP_Y    = new THREE.Vector3(0, 1, 0);
+const UP_X    = new THREE.Vector3(1, 0, 0);
+const FORWARD = new THREE.Vector3(0, 0, 1);
 
 const SEG_COLORS   = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
 const TIP_COLOR    = '#b0ffda';
@@ -62,6 +73,18 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
   const blinkTimerRef = useRef(0);
   const isBlinkingRef = useRef(false);
 
+  // The arc is rebuilt every frame (it breathes with `wLive`), but its storage
+  // is not: five waypoints and one curve are allocated once per worm and then
+  // mutated in place. CatmullRomCurve3.getPoint reads `points` on every call and
+  // caches nothing, so in-place mutation is equivalent to rebuilding the curve.
+  const arc = useMemo(() => {
+    const waypoints = [
+      new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(),
+      new THREE.Vector3(), new THREE.Vector3()
+    ];
+    return { waypoints, curve: new THREE.CatmullRomCurve3(waypoints) };
+  }, []);
+
   useFrame(({ clock }) => {
     const clockTime = clock.getElapsedTime();
     const animTime  = currentTime !== undefined ? currentTime : clockTime;
@@ -82,50 +105,47 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
     _faceN.set(...start).normalize();
 
     // Two stable perpendiculars to faceNormal
-    const basePerp = Math.abs(_faceN.y) < 0.8
-      ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    _perp.crossVectors(_faceN, basePerp).normalize();
-    const arcFwdVec = new THREE.Vector3().crossVectors(_perp, _faceN).normalize();
+    _perp.crossVectors(_faceN, Math.abs(_faceN.y) < 0.8 ? UP_Y : UP_X).normalize();
+    _arcFwd.crossVectors(_perp, _faceN).normalize();
 
     // Rotate arc direction by arcPhase so each instance faces differently
     const cosP = Math.cos(p.arcPhase);
     const sinP = Math.sin(p.arcPhase);
-    _arcDir.copy(_perp).multiplyScalar(cosP).addScaledVector(arcFwdVec, sinP);
-    _wigDir.copy(_perp).multiplyScalar(-sinP).addScaledVector(arcFwdVec, cosP);
+    _arcDir.copy(_perp).multiplyScalar(cosP).addScaledVector(_arcFwd, sinP);
+    _wigDir.copy(_perp).multiplyScalar(-sinP).addScaledVector(_arcFwd, cosP);
 
     const wLive = Math.sin(clockTime * 2.5) * 0.05;
-    const origin = new THREE.Vector3(...start);
+    _origin.set(start[0], start[1], start[2]);
 
     // Arc: wp0 inside cube (hidden by depth), head arcs outward
-    const wp0 = origin.clone().addScaledVector(_faceN, -0.20);
-    const wp1 = origin.clone().addScaledVector(_faceN,  0.14);
-    const wp2 = origin.clone()
+    const [wp0, wp1, wp2, wp3, wp4] = arc.waypoints;
+    wp0.copy(_origin).addScaledVector(_faceN, -0.20);
+    wp1.copy(_origin).addScaledVector(_faceN,  0.14);
+    wp2.copy(_origin)
       .addScaledVector(_faceN,  0.42)
       .addScaledVector(_arcDir, 0.22)
       .addScaledVector(_wigDir, wLive);
-    const wp3 = origin.clone()
+    wp3.copy(_origin)
       .addScaledVector(_faceN,  0.54)
       .addScaledVector(_arcDir, 0.42)
       .addScaledVector(_wigDir, wLive * 1.5);
-    const wp4 = origin.clone()
+    wp4.copy(_origin)
       .addScaledVector(_faceN,  0.38)
       .addScaledVector(_arcDir, 0.56)
       .addScaledVector(_wigDir, wLive * 2.0);
 
-    const curve = new THREE.CatmullRomCurve3([wp0, wp1, wp2, wp3, wp4]);
+    const curve = arc.curve;
 
     // Head
-    const headPos = curve.getPoint(progress);
-    const headFwd = curve.getPoint(Math.min(progress + 0.03, 1));
+    const headPos = curve.getPoint(progress, _headPos);
+    const headFwd = curve.getPoint(Math.min(progress + 0.03, 1), _headFwd);
     _tangent.subVectors(headFwd, headPos).normalize();
 
     if (headGroupRef.current) {
       headGroupRef.current.visible = alpha > 0.02;
       headGroupRef.current.position.copy(headPos);
       if (_tangent.lengthSq() > 0.001) {
-        headGroupRef.current.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1), _tangent
-        );
+        headGroupRef.current.quaternion.setFromUnitVectors(FORWARD, _tangent);
       }
       const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
       headGroupRef.current.scale.set(1 + squish * 0.3, 1 - squish * 0.15, 1 + squish * 0.3);
@@ -165,7 +185,7 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
       if (!seg) continue;
       const lag  = (i + 1) / (SEGMENT_COUNT + 1);
       const segT = Math.max(0, progress * (1 - lag));
-      const segPos = curve.getPoint(segT);
+      const segPos = curve.getPoint(segT, _segPos);
       const wave   = Math.sin(clockTime * p.squishFreq - i * 0.8) * p.squishAmp;
       const taper  = 1 - (i / (SEGMENT_COUNT - 1)) * 0.20; // gentle taper
       seg.position.copy(segPos);

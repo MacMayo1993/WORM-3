@@ -8,7 +8,7 @@ description: Build, launch, and drive WORM-3 in a browser to verify changes at t
 ## Launch
 
 ```bash
-npm install --legacy-peer-deps        # once
+npm ci                                 # once (.npmrc pins legacy-peer-deps)
 npm run dev                            # Vite on http://localhost:5173/WORM-3/  (note the /WORM-3/ base path)
 ```
 

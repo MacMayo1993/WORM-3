@@ -43,7 +43,8 @@ const _center = new THREE.Vector3();
 
 // ── GLB asset registry ────────────────────────────────────────────────────────
 // null  = use procedural CityBuildings (no change to existing behaviour)
-// string = path relative to public/, prefixed with Vite base /WORM-3/
+// string = path relative to public/, resolved through ASSET_BASE (Vite's
+//          import.meta.env.BASE_URL) so a preview/CDN base needs no source edits
 //
 // Blender export checklist (see public/models/biomes/README.md for full spec):
 //   □ Format: GLB binary
@@ -52,13 +53,15 @@ const _center = new THREE.Vector3();
 //   □ All geometry above z = 0 in model space
 //   □ Footprint: XY ≤ ±0.42 units, Height Z ≤ 0.65 units
 //   □ Target: < 3 000 triangles, ≤ 4 materials
+const ASSET_BASE = import.meta.env.BASE_URL;
+
 export const BIOME_GLB_PATHS = {
-  bioDome:         '/WORM-3/models/biomes/Green/GreenManifold4-tree.glb',
-  frozenCitadel:   '/WORM-3/models/biomes/White/snowglobe.glb',
-  deepStation:     '/WORM-3/models/biomes/Blue/island.glb',
-  volcanicFoundry: '/WORM-3/models/biomes/Red/volcano.glb',
-  neuralHub:       '/WORM-3/models/biomes/Orange/colosseum.glb',
-  solarArcology:   '/WORM-3/models/biomes/Yellow/floatingisland.glb',
+  bioDome:         `${ASSET_BASE}models/biomes/Green/GreenManifold4-tree.glb`,
+  frozenCitadel:   `${ASSET_BASE}models/biomes/White/snowglobe.glb`,
+  deepStation:     `${ASSET_BASE}models/biomes/Blue/island.glb`,
+  volcanicFoundry: `${ASSET_BASE}models/biomes/Red/volcano.glb`,
+  neuralHub:       `${ASSET_BASE}models/biomes/Orange/colosseum.glb`,
+  solarArcology:   `${ASSET_BASE}models/biomes/Yellow/floatingisland.glb`,
 };
 
 // Secondary per-tile structure — one instance placed alongside the main GLB cluster.
@@ -76,12 +79,12 @@ export const BIOME_CABIN_PATHS = {
 // Scaled to fill the full 0.85×0.85 tile, placed flush at z=0 before the main model.
 // null = no base override (sticker plane surface shows as-is).
 export const BIOME_BASE_PATHS = {
-  bioDome:         '/WORM-3/models/biomes/Green/grass.glb',
+  bioDome:         `${ASSET_BASE}models/biomes/Green/grass.glb`,
   frozenCitadel:   null,
-  deepStation:     '/WORM-3/models/biomes/Blue/oceanwave.glb',
+  deepStation:     `${ASSET_BASE}models/biomes/Blue/oceanwave.glb`,
   volcanicFoundry: null,
-  neuralHub:       '/WORM-3/models/biomes/Orange/base.sand.glb',
-  solarArcology:   '/WORM-3/models/biomes/Yellow/cloud.glb',
+  neuralHub:       `${ASSET_BASE}models/biomes/Orange/base.sand.glb`,
+  solarArcology:   `${ASSET_BASE}models/biomes/Yellow/cloud.glb`,
 };
 
 // Per-biome base layer overrides.

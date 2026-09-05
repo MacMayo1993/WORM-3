@@ -10,7 +10,7 @@
  *   2 → theme character PNG floats above tile with a gentle pulse animation
  *   3 → final-form PNG pops forward on the z-axis with a brief scale-up burst
  *
- * Asset path: /WORM-3/merge-mode/<themeId>/color<colorIndex>/tier<N>.png
+ * Asset path: <BASE_URL>merge-mode/<themeId>/color<colorIndex>/tier<N>.png
  * Missing assets are silently ignored (THREE.TextureLoader onError callback).
  */
 
@@ -21,6 +21,10 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 
 // Shared loader — reused across all overlay instances.
 const _loader = new THREE.TextureLoader();
+
+// Vite's deploy base. Hard-coding '/WORM-3/' here broke any preview build or CDN
+// prefix that does not sit at that path.
+const ASSET_BASE = import.meta.env.BASE_URL;
 
 /**
  * Loads a texture by URL and calls onLoad/onError.
@@ -43,7 +47,7 @@ function loadTexture(url, onLoad, onError) {
  */
 function TierMesh({ themeId, colorIndex, tier, meshRef }) {
   const [tex, setTex] = useState(null);
-  const url = `/WORM-3/merge-mode/${themeId}/color${colorIndex}/tier${tier}.png`;
+  const url = `${ASSET_BASE}merge-mode/${themeId}/color${colorIndex}/tier${tier}.png`;
 
   useEffect(() => {
     setTex(null); // clear old texture immediately on url change

@@ -50,7 +50,12 @@ export function useHolonomyMode() {
     const [seamCount, setSeamCount] = useState(0);
     const [mobiusCount, setMobiusCount] = useState(0);
     const [loopClosed, setLoopClosed] = useState(false);
-    const [twist, setTwist] = useState(0);
+
+    // Twist is a continuous 14-second cosine consumed only by the swirl field in
+    // HolonomyTracer, which mutates its own geometry. Holding it in React state
+    // forced a commit on literally every animation frame; a ref publishes the
+    // same value to the renderer with no reconciliation at all.
+    const twistRef = useRef(0);
 
     // Mutable simulation state (not in React state — updated every frame for perf)
     const sim = useRef({
@@ -87,8 +92,7 @@ export function useHolonomyMode() {
         const s = sim.current;
 
         // Update twist animation
-        const newTwist = twistSchedule(s.time);
-        setTwist(newTwist);
+        twistRef.current = twistSchedule(s.time);
 
         // Step once (or multiple if frame was slow)
         while (stepAcc.current >= STEP_INTERVAL) {
@@ -208,7 +212,7 @@ export function useHolonomyMode() {
         setSeamCount(0);
         setMobiusCount(0);
         setLoopClosed(false);
-        setTwist(0);
+        twistRef.current = 0;
     }, []);
 
     return {
@@ -218,7 +222,7 @@ export function useHolonomyMode() {
         tracerV,
         // Gauge transport
         transportVec,
-        twist,
+        twistRef,
         // Holonomy
         holonomyMatrix,
         holonomyAngle,

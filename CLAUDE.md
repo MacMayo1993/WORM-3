@@ -9,7 +9,7 @@ WORM-3 (World of Rubik's Manifolds) is a 3D Rubik's Cube puzzle game built on re
 ## Build & Development Commands
 
 ```bash
-npm install --legacy-peer-deps   # Install dependencies (legacy-peer-deps required)
+npm ci                           # Deterministic install from package-lock.json
 npm run dev                      # Start Vite dev server on port 5173
 npm run build                    # Production build to dist/
 npm run preview                  # Preview production build
@@ -18,10 +18,18 @@ npm run lint:fix                 # ESLint auto-fix
 npm run test                     # Run tests once (vitest run)
 npm run test:watch               # Watch mode tests
 npm run test:coverage            # Tests with V8 coverage report
-npm run ci                       # Full CI pipeline: lint → test → build
+npm run bundle:check             # Per-asset + initial-route bundle budgets
+npm run ci                       # Full CI pipeline: lint → test → build → bundle:check
 ```
 
-Always use `--legacy-peer-deps` when installing dependencies.
+Use `npm ci`, not `npm install`. The R3F peer-dependency conflicts still require
+npm's legacy resolver, but the flag now lives in `.npmrc` (`legacy-peer-deps=true`)
+so every install — local, devcontainer, CI — resolves the same tree the lockfile
+was generated from. Passing `--legacy-peer-deps` by hand is harmless but redundant;
+running a bare `npm install` is what silently rewrites the lockfile and makes
+bundle/performance baselines incomparable between runs.
+
+Supported toolchain: **Node 20** (`.nvmrc`, `engines`, CI, devcontainer all agree).
 
 ## Testing
 

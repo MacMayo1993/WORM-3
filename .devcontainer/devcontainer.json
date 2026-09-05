@@ -1,10 +1,10 @@
 {
   "name": "Worm3 Puzzle Development",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
 
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "18"
+      "version": "20"
     }
   },
 
@@ -16,7 +16,7 @@
     }
   },
 
-  "postCreateCommand": "npm install --legacy-peer-deps",
+  "postCreateCommand": "npm ci",
 
   "customizations": {
     "vscode": {

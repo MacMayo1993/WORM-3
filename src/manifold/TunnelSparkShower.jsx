@@ -5,7 +5,16 @@ import * as THREE from 'three';
 const SPARK_COUNT = 24;
 const DURATION = 0.35;
 
+// Frame scratch. Every use is confined to a single synchronous useFrame body —
+// no awaits, no re-entry — so instances that render in the same frame take turns
+// rather than sharing state. Allocating these per frame is what made a shower of
+// 24 sparks cost three Vector3s per instance per frame in the GC.
 const _v = new THREE.Vector3();
+const _up = new THREE.Vector3();
+const _perp1 = new THREE.Vector3();
+const _perp2 = new THREE.Vector3();
+const UP_Y = new THREE.Vector3(0, 1, 0);
+const UP_X = new THREE.Vector3(1, 0, 0);
 
 const TunnelSparkShower = ({ position, normal, color, startTime }) => {
   const pointsRef = useRef();
@@ -45,11 +54,10 @@ const TunnelSparkShower = ({ position, normal, color, startTime }) => {
     const t = elapsed / DURATION;
     const fade = 1 - t * t;
 
-    _v.set(...normal).normalize();
-    const perp1 = new THREE.Vector3();
-    const up = Math.abs(_v.y) < 0.8 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    perp1.crossVectors(_v, up).normalize();
-    const perp2 = new THREE.Vector3().crossVectors(_v, perp1).normalize();
+    _v.set(normal[0], normal[1], normal[2]).normalize();
+    _up.copy(Math.abs(_v.y) < 0.8 ? UP_Y : UP_X);
+    const perp1 = _perp1.crossVectors(_v, _up).normalize();
+    const perp2 = _perp2.crossVectors(_v, perp1).normalize();
 
     for (let i = 0; i < SPARK_COUNT; i++) {
       const s = seeds[i];

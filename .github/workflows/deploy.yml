@@ -33,7 +33,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci
 
       - name: Run ESLint
         run: npm run lint
@@ -52,7 +52,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci
 
       - name: Run tests
         run: npm run test
@@ -72,10 +72,15 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci
 
       - name: Build
         run: npm run build
+
+      # Budget gate: per-asset ceilings plus the initial-route aggregate, so a
+      # regression that arrives as several sub-threshold chunks still fails.
+      - name: Check bundle budgets
+        run: npm run bundle:check
 
       - name: Setup Pages
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
