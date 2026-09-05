@@ -67,6 +67,7 @@ function useTilePattern(styleKey, colorHex) {
 }
 
 const OrbCoin = ({ color, styleKey, count, coinSize, fontSize }) => {
+  const empty = count === 0;
   const pattern = useTilePattern(styleKey, color);
   // The highlight sits on top either way, so a patterned coin still reads as a
   // domed disc rather than a flat sticker punched into a circle.
@@ -85,6 +86,12 @@ const OrbCoin = ({ color, styleKey, count, coinSize, fontSize }) => {
         background: pattern ? `${highlight}, url(${pattern}) center/cover` : `${highlight}, ${color}`,
         border: '1.5px solid rgba(255, 253, 242, 0.55)',
         boxShadow: '0 2px 6px rgba(10, 14, 8, 0.45), inset 0 -2px 4px rgba(0, 0, 0, 0.28)',
+        // A colour the worm is not carrying keeps its place in the row, dimmed:
+        // the gap is the information — which face you still need — and a row that
+        // reflows every pickup is a row you have to re-read every pickup.
+        opacity: empty ? 0.26 : 1,
+        filter: empty ? 'saturate(0.5)' : 'none',
+        transition: 'opacity 0.2s ease, filter 0.2s ease',
       }}
     >
       <span
@@ -100,7 +107,7 @@ const OrbCoin = ({ color, styleKey, count, coinSize, fontSize }) => {
           textShadow: '0 1px 3px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.6)',
         }}
       >
-        {count}
+        {empty ? '·' : count}
       </span>
     </div>
   );
@@ -109,14 +116,11 @@ const OrbCoin = ({ color, styleKey, count, coinSize, fontSize }) => {
 export default function OrbInventoryHUD({ orbInventory, faceColors, tileStyles, mobile = false }) {
   if (!orbInventory || !faceColors) return null;
 
-  const activeEntries = FACE_ORDER.filter((faceId) => (orbInventory[faceId] ?? 0) > 0);
-  const total = FACE_ORDER.reduce((sum, faceId) => sum + (orbInventory[faceId] ?? 0), 0);
-
   const coinSize = mobile ? 26 : 30;
   const coinFont = mobile ? 11 : 13;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? 8 : 10, minWidth: 0, flex: '1 1 auto' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? 8 : 12, minWidth: 0, flex: '1 1 auto' }}>
       <span
         style={{
           fontSize: 8,
@@ -131,34 +135,34 @@ export default function OrbInventoryHUD({ orbInventory, faceColors, tileStyles, 
         Reserve
       </span>
 
-      {total === 0 ? (
-        <span style={{ fontSize: 10.5, color: NIGHT_TEXT_MUTED, fontFamily: FONT, letterSpacing: 0.3 }}>
-          collect orbs to heal tunnels
-        </span>
-      ) : (
-        // Overflowing palettes scroll rather than squeeze the coins out of the bar.
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: mobile ? 6 : 8,
-            overflowX: 'auto',
-            scrollbarWidth: 'none',
-            color: NIGHT_TEXT,
-          }}
-        >
-          {activeEntries.map((faceId) => (
-            <OrbCoin
-              key={faceId}
-              color={faceColors[faceId] ?? '#888888'}
-              styleKey={tileStyles?.[faceId]}
-              count={orbInventory[faceId]}
-              coinSize={coinSize}
-              fontSize={coinFont}
-            />
-          ))}
-        </div>
-      )}
+      {/* All six faces, spread across the bar. The row used to hold only the
+          colours the worm was carrying, packed against the label — which left two
+          thirds of the strip empty on a fresh run and shuffled the coins under the
+          player's eye every time a new colour was picked up. Six fixed positions
+          spend the width the bar already has and read as an inventory: what you
+          hold, and what you are still missing. */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: mobile ? 6 : 8,
+          flex: '1 1 auto',
+          minWidth: 0,
+          color: NIGHT_TEXT,
+        }}
+      >
+        {FACE_ORDER.map((faceId) => (
+          <OrbCoin
+            key={faceId}
+            color={faceColors[faceId] ?? '#888888'}
+            styleKey={tileStyles?.[faceId]}
+            count={orbInventory[faceId] ?? 0}
+            coinSize={coinSize}
+            fontSize={coinFont}
+          />
+        ))}
+      </div>
     </div>
   );
 }

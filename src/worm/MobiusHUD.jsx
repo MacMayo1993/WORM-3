@@ -60,7 +60,9 @@ export default function MobiusHUD() {
     return (
         <div style={{
             position: 'fixed',
-            top: '62px',
+            // Below the status bar and the rotation clock — at 62px it landed on
+            // top of the HUD bar's second row and the two read as one jammed strip.
+            top: 'calc(env(safe-area-inset-top, 0px) + 150px)',
             left: '50%',
             transform: `translateX(-50%) translateY(${isActive ? '0' : '-20px'})`,
             pointerEvents: 'none',
