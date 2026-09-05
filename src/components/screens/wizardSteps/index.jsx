@@ -24,6 +24,7 @@ export { default as CubeSizeSlider } from './CubeSizeSlider.jsx';
 export { default as SceneStep } from './SceneStep.jsx';
 export { default as PaletteStep } from './PaletteStep.jsx';
 export { default as StyleStep } from './StyleStep.jsx';
+export { styleCategory, resolveStyleFamily, PER_FACE_FAMILY } from './styleCategory.jsx';
 export { default as SizeStep } from './SizeStep.jsx';
 export * from './shared.jsx';
 

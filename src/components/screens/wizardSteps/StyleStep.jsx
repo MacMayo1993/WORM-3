@@ -1,43 +1,40 @@
 // StyleStep.jsx — pick the tile surface, applied to the live cube as you pick it.
 //
-// The catalogue is ~95 styles in four families. Laid out flat it was about three
-// thousand pixels of scrolling, so it used to be four collapsing accordions —
-// which kept the list short but pushed the thing you were previewing off screen
-// the moment you opened one. Families are tabs now: the cube stays put at the
-// top, and every style in a family is one tap away underneath it.
+// The catalogue is ~95 styles in six families. Flat it was three thousand pixels
+// of scrolling; as accordions the family you opened pushed the cube preview off
+// screen; as a pill row across the top it fit four families on a phone and hid
+// the other three behind a horizontal swipe. The families live in the wizard
+// rail now (see styleCategory.jsx) — all of them visible, none of them costing
+// this panel any vertical space. What is left here is the preview and the grid
+// for whichever family the rail has selected.
 
 import React from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../../utils/colorSchemes.js';
 import { TILE_STYLE_SECTIONS } from '../../../utils/tileStyleCatalog.js';
-import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
-import { WizardSection } from '../WizardChrome.jsx';
+import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
 import CubePlate from './CubePlate.jsx';
 import { useIsMobile } from '../../../hooks/index.js';
-import { Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor, FACE_LABELS, paletteLabel, styleLabel } from './shared.jsx';
+import { Checkmark, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor, FACE_LABELS, paletteLabel, styleLabel, uniformStyle } from './shared.jsx';
+import { resolveStyleFamily, PER_FACE_FAMILY } from './styleCategory.jsx';
 
-export default function StyleStep({ cos }) {
+export default function StyleStep({ cos, family }) {
   const isMobile = useIsMobile();
-  const {
-    settings, setSettings, cubeSize, colors,
-    accent, accentShadow, ownedItems, styleFamily, setStyleFamily,
-    showPerFace = true
-  } = cos;
+  const { settings, setSettings, cubeSize, colors, accent, accentShadow, ownedItems } = cos;
 
   const owned = key => ownedItems.includes(`tile_${key}`);
 
   const perFace = settings.perFaceStyles;
-  const faceValues = [1, 2, 3, 4, 5, 6].map(id => perFace?.[id] || settings.tileStyle || 'solid');
-  const globalStyle = faceValues.every(v => v === faceValues[0]) ? faceValues[0] : null;
+  const globalStyle = uniformStyle(settings);
   const isRandom = settings.tileStyle === 'random' && !perFace;
 
   const applyGlobal = key => setSettings(s => ({ ...s, tileStyle: key, perFaceStyles: null }));
   const applyPerFace = (faceId, key) =>
     setSettings(s => ({ ...s, perFaceStyles: { ...(s.perFaceStyles || {}), [faceId]: key } }));
 
-  // The family holding your current style is the one that opens, until you pick
-  // a different tab.
-  const homeFamily = TILE_STYLE_SECTIONS.find(sec => sec.keys.includes(globalStyle))?.key ?? 'classic';
-  const activeFamily = styleFamily ?? homeFamily;
+  // The rail resolves this and passes it down; the fallback keeps the panel
+  // standing on its own if it is ever rendered without one.
+  const activeFamily = family ?? resolveStyleFamily(settings, cos.styleFamily);
+  const showingPerFace = activeFamily === PER_FACE_FAMILY;
   const section = TILE_STYLE_SECTIONS.find(sec => sec.key === activeFamily) || TILE_STYLE_SECTIONS[0];
 
   // Arrows walk the owned styles of the family on screen.
@@ -54,149 +51,121 @@ export default function StyleStep({ cos }) {
   return (
     <>
       <CubePlate
-        caption={section.label}
-        index={atIndex === -1 ? undefined : atIndex + 1}
-        total={atIndex === -1 ? undefined : walkable.length}
+        caption={showingPerFace ? 'Per Face' : section.label}
+        index={showingPerFace || atIndex === -1 ? undefined : atIndex + 1}
+        total={showingPerFace || atIndex === -1 ? undefined : walkable.length}
         title={styleLabel(settings)}
         subtitle={`${paletteLabel(settings)} · ${sizeTier(cubeSize).name}`}
-        onPrev={() => stepStyle(-1)}
-        onNext={() => stepStyle(1)}
+        onPrev={showingPerFace ? undefined : () => stepStyle(-1)}
+        onNext={showingPerFace ? undefined : () => stepStyle(1)}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}
         glow={swatchColor}
         backdrop={bgOptionFor(settings.backgroundTheme)}
       />
 
-      {/* Family tabs */}
-      <div style={{
-        display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '10px',
-        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch'
-      }}>
-        {TILE_STYLE_SECTIONS.map(sec => {
-          const active = sec.key === activeFamily;
-          const lockedHere = sec.keys.filter(k => !owned(k)).length;
-          return (
-            <button
-              key={sec.key}
-              onClick={() => setStyleFamily(sec.key)}
-              style={{
-                flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '8px 13px', borderRadius: '999px',
-                border: active ? `2px solid ${accent}` : '2px solid #ded7cb',
-                background: active ? `${accent}14` : 'rgba(255,255,255,0.62)',
-                boxShadow: active ? 'inset 0 2px 4px rgba(83,72,56,0.10)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-                transform: active ? 'translateY(1px)' : 'none',
-                cursor: 'pointer', fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.15s ease',
-                fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em',
-                color: active ? accent : PAPER_TEXT_MUTED, whiteSpace: 'nowrap'
-              }}
-            >
-              {sec.label}
-              {lockedHere > 0 && <LockPip size={9} color={active ? accent : PAPER_TEXT_FAINT} />}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Random Mix */}
-      <button
-        style={{ ...cardStyle(isRandom, accent), flexDirection: 'row', alignItems: 'center', gap: '14px', marginBottom: '12px', padding: '11px 14px' }}
-        onClick={() => applyGlobal('random')}
-      >
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: PAPER_TEXT }}>Random Mix</div>
-          <div style={{ fontSize: '11px', color: PAPER_TEXT_MUTED, marginTop: '2px' }}>A different style on every face</div>
-        </div>
-        {isRandom && <Checkmark accent={accent} accentShadow={accentShadow} />}
-      </button>
-
-      {/* Styles in the active family. Three across on a phone — the rail takes
-          its width off the pane, and four thumbnails there stop being readable. */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 4}, 1fr)`, gap: '7px' }}>
-        {section.keys.map(key => {
-          const sel = globalStyle === key;
-          const unlocked = owned(key);
-          return (
-            <button
-              key={key}
-              onClick={() => unlocked && applyGlobal(key)}
-              style={{
-                display: 'block', position: 'relative', padding: 0, borderRadius: '10px',
-                border: sel ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                background: PAPER_BG_MUTED,
-                boxShadow: sel ? 'inset 0 2px 4px rgba(0,0,0,0.10)' : `0 2px 0 ${PAPER_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
-                transform: sel ? 'translateY(1px)' : 'none',
-                cursor: unlocked ? 'pointer' : 'not-allowed',
-                opacity: unlocked ? 1 : 0.42,
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.15s ease', fontFamily: 'inherit', overflow: 'hidden'
-              }}
-            >
-              <TilePreviewCanvas styleKey={key} colorHex={swatchColor} size={56} canvasStyle={{ width: '100%', height: 'auto', borderRadius: 0 }} />
-              <span style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
-                padding: '14px 3px 4px', fontSize: '10px', fontWeight: sel ? 700 : 500,
-                color: '#fff', textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
-                lineHeight: 1.2, background: 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, transparent 100%)'
-              }}>
-                {TILE_STYLES[key]?.label || key}{!unlocked ? ' 🔒' : ''}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Per-face overrides — folded away; most players never want a different
-          style on each face, and the ones who do go looking for it. */}
-      {showPerFace && (
-        <div style={{ marginTop: '12px' }}>
-          <WizardSection
-            label="Per Face"
-            accent={accent}
-            note={perFace ? 'Custom' : 'Advanced'}
-            open={styleFamily === 'perFace'}
-            onToggle={() => setStyleFamily(styleFamily === 'perFace' ? homeFamily : 'perFace')}
-            sticky={false}
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-              {[1, 2, 3, 4, 5, 6].map(faceId => {
-                const fallback = settings.tileStyle === 'random' ? 'solid' : settings.tileStyle || 'solid';
-                const raw = perFace?.[faceId] || fallback;
-                const faceStyle = owned(raw) ? raw : 'solid';
-                const faceColor = colors[faceId] || COLOR_SCHEMES.standard[faceId];
-                return (
-                  <div key={faceId} style={{
-                    display: 'flex', flexDirection: 'column', gap: '6px',
-                    padding: '10px', borderRadius: '10px', background: PAPER_BG_MUTED,
-                    border: `2px solid ${faceColor}55`
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: faceColor, flexShrink: 0, boxShadow: '0 1px 0 rgba(0,0,0,0.20)' }} />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: PAPER_TEXT_MUTED }}>{FACE_LABELS[faceId]}</span>
-                    </div>
-                    <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
-                    <select
-                      value={faceStyle}
-                      onChange={e => applyPerFace(faceId, e.target.value)}
-                      style={{
-                        fontSize: '10px', padding: '4px 6px', borderRadius: '6px',
-                        border: `1px solid ${PAPER_BORDER_SOFT}`, background: '#f7f3ec',
-                        color: PAPER_TEXT, fontFamily: 'inherit', cursor: 'pointer',
-                        appearance: 'none', WebkitAppearance: 'none'
-                      }}
-                    >
-                      {TILE_STYLE_SECTIONS.map(sec => (
-                        <optgroup key={sec.key} label={sec.label}>
-                          {sec.keys.filter(owned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label || k}</option>)}
-                        </optgroup>
-                      ))}
-                    </select>
+      {showingPerFace ? (
+        <>
+          <p style={{ fontSize: '11px', color: PAPER_TEXT_MUTED, lineHeight: 1.5, margin: '2px 2px 12px' }}>
+            Give each face its own surface. Every face starts on the style you picked, so change
+            only the ones you want to differ.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 3}, minmax(0, 1fr))`, gap: '8px' }}>
+            {[1, 2, 3, 4, 5, 6].map(faceId => {
+              const fallback = settings.tileStyle === 'random' ? 'solid' : settings.tileStyle || 'solid';
+              const raw = perFace?.[faceId] || fallback;
+              const faceStyle = owned(raw) ? raw : 'solid';
+              const faceColor = colors[faceId] || COLOR_SCHEMES.standard[faceId];
+              return (
+                <div key={faceId} style={{
+                  display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0,
+                  padding: '10px', borderRadius: '10px', background: PAPER_BG_MUTED,
+                  border: `2px solid ${faceColor}55`
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: faceColor, flexShrink: 0, boxShadow: '0 1px 0 rgba(0,0,0,0.20)' }} />
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: PAPER_TEXT_MUTED }}>{FACE_LABELS[faceId]}</span>
                   </div>
-                );
-              })}
+                  <TilePreviewCanvas
+                    styleKey={faceStyle === 'random' ? 'solid' : faceStyle}
+                    colorHex={faceColor}
+                    size={96}
+                    canvasStyle={{ width: '100%', height: 'auto' }}
+                  />
+                  <select
+                    value={faceStyle}
+                    onChange={e => applyPerFace(faceId, e.target.value)}
+                    style={{
+                      fontSize: '10px', padding: '4px 6px', borderRadius: '6px',
+                      border: `1px solid ${PAPER_BORDER_SOFT}`, background: '#f7f3ec',
+                      color: PAPER_TEXT, fontFamily: 'inherit', cursor: 'pointer',
+                      appearance: 'none', WebkitAppearance: 'none',
+                      // Without these the select's intrinsic width sets the grid
+                      // column and the whole panel scrolls sideways.
+                      width: '100%', minWidth: 0, boxSizing: 'border-box'
+                    }}
+                  >
+                    {TILE_STYLE_SECTIONS.map(sec => (
+                      <optgroup key={sec.key} label={sec.label}>
+                        {sec.keys.filter(owned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label || k}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Random Mix */}
+          <button
+            style={{ ...cardStyle(isRandom, accent), flexDirection: 'row', alignItems: 'center', gap: '14px', marginBottom: '12px', padding: '11px 14px' }}
+            onClick={() => applyGlobal('random')}
+          >
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: PAPER_TEXT }}>Random Mix</div>
+              <div style={{ fontSize: '11px', color: PAPER_TEXT_MUTED, marginTop: '2px' }}>A different style on every face</div>
             </div>
-          </WizardSection>
-        </div>
+            {isRandom && <Checkmark accent={accent} accentShadow={accentShadow} />}
+          </button>
+
+          {/* Styles in the family the rail has selected. Three across on a phone —
+              the rail takes its width off the pane, and four thumbnails there
+              stop being readable. */}
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 4}, minmax(0, 1fr))`, gap: '7px' }}>
+            {section.keys.map(key => {
+              const sel = globalStyle === key;
+              const unlocked = owned(key);
+              return (
+                <button
+                  key={key}
+                  onClick={() => unlocked && applyGlobal(key)}
+                  style={{
+                    display: 'block', position: 'relative', padding: 0, borderRadius: '10px',
+                    border: sel ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
+                    background: PAPER_BG_MUTED,
+                    boxShadow: sel ? 'inset 0 2px 4px rgba(0,0,0,0.10)' : `0 2px 0 ${PAPER_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
+                    transform: sel ? 'translateY(1px)' : 'none',
+                    cursor: unlocked ? 'pointer' : 'not-allowed',
+                    opacity: unlocked ? 1 : 0.42,
+                    WebkitTapHighlightColor: 'transparent',
+                    transition: 'all 0.15s ease', fontFamily: 'inherit', overflow: 'hidden'
+                  }}
+                >
+                  <TilePreviewCanvas styleKey={key} colorHex={swatchColor} size={56} canvasStyle={{ width: '100%', height: 'auto', borderRadius: 0 }} />
+                  <span style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
+                    padding: '14px 3px 4px', fontSize: '10px', fontWeight: sel ? 700 : 500,
+                    color: '#fff', textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
+                    lineHeight: 1.2, background: 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, transparent 100%)'
+                  }}>
+                    {TILE_STYLES[key]?.label || key}{!unlocked ? ' 🔒' : ''}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
     </>
   );

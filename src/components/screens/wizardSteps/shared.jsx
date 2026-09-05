@@ -64,18 +64,20 @@ export const paletteLabel = settings =>
   (settings.colorScheme === 'custom' ? 'Your Photo' : SCHEME_LABELS[settings.colorScheme] || 'Standard');
 
 /**
- * Six faces set to the same style read as that style, not as "Per Face" — the
- * override map being non-null is not the same thing as the faces disagreeing.
+ * The one style all six faces are wearing, or null when they disagree. Faces
+ * left out of the override map fall back to the global style, so a non-null map
+ * is not by itself a mixed cube.
  */
-export const styleLabel = settings => {
+export const uniformStyle = settings => {
   const perFace = settings.perFaceStyles;
-  if (perFace) {
-    const values = [1, 2, 3, 4, 5, 6].map(id => perFace[id] || settings.tileStyle || 'solid');
-    const uniform = values.every(v => v === values[0]) ? values[0] : null;
-    return uniform ? TILE_STYLES[uniform]?.label || uniform : 'Per Face';
-  }
-  if (settings.tileStyle === 'random') return 'Random Mix';
-  return TILE_STYLES[settings.tileStyle]?.label || 'Solid';
+  const values = [1, 2, 3, 4, 5, 6].map(id => perFace?.[id] || settings.tileStyle || 'solid');
+  return values.every(v => v === values[0]) ? values[0] : null;
+};
+
+export const styleLabel = settings => {
+  if (settings.tileStyle === 'random' && !settings.perFaceStyles) return 'Random Mix';
+  const uniform = uniformStyle(settings);
+  return uniform ? TILE_STYLES[uniform]?.label || uniform : 'Per Face';
 };
 
 export const sizeLabel = (n, tiers = SIZE_TIERS) => sizeTier(n, tiers).name;
