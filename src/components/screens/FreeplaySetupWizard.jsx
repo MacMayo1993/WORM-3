@@ -4,8 +4,8 @@ import { useIsMobile } from '../../hooks/index.js';
 import { wizardLayout, WizardRail, WIZARD_PANEL_ID } from './WizardChrome.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
-  SceneStep, PaletteStep, StyleStep, SizeStep,
-  sceneLabel, paletteLabel, styleLabel, sizeLabel
+  SceneStep, PaletteStep, SizeStep, styleCategory,
+  sceneLabel, paletteLabel, sizeLabel
 } from './wizardSteps/index.jsx';
 
 const ACCENT = '#1565C0';
@@ -43,15 +43,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       summary: paletteLabel(cos.settings),
       content: <PaletteStep cos={cos} />
     },
-    {
-      key: 'style',
-      icon: 'style',
-      label: 'Style',
-      title: 'Tile Style',
-      subtitle: 'Choose how your tiles look and feel',
-      summary: styleLabel(cos.settings),
-      content: <StyleStep cos={cos} />
-    },
+    styleCategory(cos),
     {
       key: 'size',
       icon: 'size',
@@ -90,7 +82,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               <p style={S.subtitle}>{active.subtitle}</p>
             </div>
 
-            <div style={S.body} id={WIZARD_PANEL_ID} role="tabpanel" aria-label={active.label}>
+            <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
               <div style={{ paddingBottom: '24px' }}>{active.content}</div>
             </div>
           </div>

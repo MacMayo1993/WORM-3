@@ -79,7 +79,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               <p style={S.subtitle}>{active.subtitle}</p>
             </div>
 
-            <div style={S.body} id={WIZARD_PANEL_ID} role="tabpanel" aria-label={active.label}>
+            <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
               <div style={{ paddingBottom: '24px' }}>{active.content}</div>
             </div>
           </div>

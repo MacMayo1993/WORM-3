@@ -14,9 +14,9 @@ import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import { WORM_SPEED_OPTIONS } from '../../worm/healerWorm/constants.js';
 import {
   useWizardCosmetics, WizardImageInput,
-  SceneStep, PaletteStep, StyleStep, SizeStep,
+  SceneStep, PaletteStep, SizeStep, styleCategory,
   SpecimenPlate, LockPip, PickerHeading, SIZE_TIERS,
-  sceneLabel, paletteLabel, styleLabel, sizeLabel
+  sceneLabel, paletteLabel, sizeLabel
 } from './wizardSteps/index.jsx';
 
 const ACCENT = '#6A2C91';
@@ -377,15 +377,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       summary: paletteLabel(settings),
       content: <PaletteStep cos={cos} />
     },
-    {
-      key: 'style',
-      icon: 'style',
-      label: 'Style',
-      title: 'Tile Style',
-      subtitle: 'Choose how your tiles look and feel',
-      summary: styleLabel(settings),
-      content: <StyleStep cos={cos} />
-    },
+    styleCategory(cos),
     {
       key: 'size',
       icon: 'size',
@@ -449,7 +441,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               <p style={S.subtitle}>{active.subtitle}</p>
             </div>
 
-            <div style={S.body} id={WIZARD_PANEL_ID} role="tabpanel" aria-label={active.label}>
+            <div style={S.body} id={WIZARD_PANEL_ID} role="region" aria-label={active.label}>
               <div style={{ paddingBottom: '24px' }}>{active.content}</div>
             </div>
           </div>

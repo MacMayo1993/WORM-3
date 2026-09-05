@@ -71,7 +71,11 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
   // on phones, where the rail has already taken its width off a 390px screen.
   const GUTTER = mobile ? 16 : 36;
   const PANE_GUTTER = mobile ? 12 : 28;
+  // A phone rail is an icon strip until a category opens sub-rows under it, at
+  // which point it has to be wide enough to spell "Antipodal Op Art". The desktop
+  // rail is already wide enough for both states.
   const RAIL_WIDTH = mobile ? 66 : 176;
+  const RAIL_WIDTH_OPEN = mobile ? 116 : 176;
   return {
     overlay: {
       position: 'fixed',
@@ -119,9 +123,10 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       flexDirection: 'row'
     },
 
-    rail: {
+    rail: expanded => ({
       flexShrink: 0,
-      width: `${RAIL_WIDTH}px`,
+      width: `${expanded ? RAIL_WIDTH_OPEN : RAIL_WIDTH}px`,
+      transition: 'width 0.2s cubic-bezier(0.22, 1, 0.36, 1)',
       display: 'flex',
       flexDirection: 'column',
       gap: mobile ? '2px' : '3px',
@@ -136,7 +141,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       overflowY: 'auto',
       overscrollBehavior: 'contain',
       scrollbarWidth: 'none'
-    },
+    }),
 
     // On a phone there is no room for the value line, so the tab stacks to an
     // icon over its name and the summary is dropped rather than truncated to
@@ -159,6 +164,26 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       fontFamily: 'inherit',
       WebkitTapHighlightColor: 'transparent',
       transition: 'background 0.15s ease, box-shadow 0.15s ease'
+    }),
+
+    // One sub-row under an open category. Indented rather than iconed: at this
+    // depth the name is the whole point, and a second column of glyphs would
+    // just eat the width the names need.
+    railChild: active => ({
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      width: '100%',
+      minHeight: '32px',
+      padding: mobile ? '6px 5px 6px 8px' : '6px 8px 6px 11px',
+      borderRadius: '8px',
+      border: 'none',
+      background: active ? `${accent}16` : 'transparent',
+      cursor: 'pointer',
+      textAlign: 'left',
+      fontFamily: 'inherit',
+      WebkitTapHighlightColor: 'transparent',
+      transition: 'background 0.15s ease'
     }),
 
     pane: {
@@ -283,108 +308,6 @@ export function WizardSectionHeading({ children, style }) {
   );
 }
 
-/**
- * One collapsible family in a long grouped list.
- *
- * The tile catalogue is ~90 styles in four families; laid out flat it is about
- * three thousand pixels of scrolling on a phone, and the family you actually
- * want is usually the one you are already using. Collapsed, each family is a
- * single tappable row, so the whole catalogue fits on one screen and opening a
- * family costs one tap.
- *
- * The header stays sticky while its own contents scroll, so a long open family
- * never leaves you wondering which one you are in. Pass `sticky={false}` where
- * something else already owns the top of the scroller — the wizards' cube plate
- * does — so two elements aren't competing for the same perch.
- */
-export function WizardSection({ label, note, accent, open, onToggle, sticky = true, children }) {
-  const ref = React.useRef(null);
-  const wasOpen = React.useRef(open);
-
-  // Opening a section that sits below the fold should bring it to you — the
-  // family you just asked for is otherwise off-screen, under the one that
-  // collapsed above it.
-  React.useEffect(() => {
-    if (open && !wasOpen.current) {
-      ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    }
-    wasOpen.current = open;
-  }, [open]);
-
-  return (
-    <div
-      ref={ref}
-      style={{
-        marginBottom: '8px',
-        borderRadius: '12px',
-        border: `1.5px solid ${open ? `${accent}55` : '#ded7cb'}`,
-        background: open ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.34)',
-        boxShadow: open ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-        // Not `overflow: hidden` — that would trap the sticky header inside a
-        // box that scrolls away, which is the whole thing it exists to avoid.
-        // The header rounds its own corners instead.
-        transition: 'border-color 0.18s ease, background 0.18s ease'
-      }}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="ui-focusable"
-        style={{
-          position: sticky ? 'sticky' : 'static',
-          top: 0,
-          zIndex: 2,
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          minHeight: TOUCH_TARGET,
-          padding: '13px 12px',
-          background: open ? 'rgba(252,249,241,0.97)' : 'transparent',
-          border: 'none',
-          borderRadius: open ? '11px 11px 0 0' : '11px',
-          borderBottom: open ? '1px solid #e4ddd0' : 'none',
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-          textAlign: 'left',
-          WebkitTapHighlightColor: 'transparent'
-        }}
-      >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          style={{
-            flexShrink: 0,
-            transform: open ? 'rotate(90deg)' : 'none',
-            transition: 'transform 0.2s cubic-bezier(0.22,1,0.36,1)'
-          }}
-          aria-hidden="true"
-        >
-          <path d="M3 1L7 5L3 9" fill="none" stroke={open ? accent : PAPER_TEXT_FAINT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span
-          style={{
-            flex: 1,
-            fontSize: TEXT_XS,
-            fontWeight: 800,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: open ? accent : PAPER_TEXT_MUTED
-          }}
-        >
-          {label}
-        </span>
-        {note && (
-          <span style={{ fontSize: TEXT_MICRO, fontWeight: 600, color: PAPER_TEXT_FAINT, flexShrink: 0 }}>{note}</span>
-        )}
-      </button>
-      {open && <div style={{ padding: '10px 10px 12px' }}>{children}</div>}
-    </div>
-  );
-}
-
 // The scrolling pane the rail drives. Fixed rather than generated: only one
 // wizard is ever mounted, and the rail and the wizard both have to name it.
 export const WIZARD_PANEL_ID = 'wizard-category-panel';
@@ -464,12 +387,21 @@ export function WizardIcon({ name, size = 17, color = 'currentColor' }) {
  * tell you where you are; `summary` is what you already picked, so the palette
  * you chose two categories ago is legible while you are choosing tiles.
  *
- * Arrow keys move between tabs and take the selection with them, per the tabs
- * pattern — so only the active tab is a tab stop, and Tab itself leaves the rail
- * for the panel it controls.
+ * A category may carry `children` — the tile-style families do — which open as
+ * indented sub-rows beneath it. They were a horizontally scrolling pill row
+ * inside the panel, where a phone showed four of the seven and you had to swipe
+ * to learn the rest existed. Stacked in the rail they are all on screen at once,
+ * and the cube preview above the grid never moves.
+ *
+ * Marked up as navigation with disclosure rather than as a tablist: ARIA has no
+ * nested-tab role, and a tablist whose children are sometimes groups of sub-rows
+ * is not a tablist. Every row is a normal tab stop; arrow keys additionally move
+ * between categories and take the selection with them.
  */
 export function WizardRail({ styles, categories, active, onSelect, accent, mobile }) {
   const tabs = React.useRef([]);
+  const open = categories[active];
+  const children = open?.children ?? [];
 
   const focus = index => {
     onSelect(index);
@@ -487,18 +419,17 @@ export function WizardRail({ styles, categories, active, onSelect, accent, mobil
   };
 
   return (
-    <div role="tablist" aria-orientation="vertical" aria-label="Setup categories" style={styles.rail}>
+    <nav aria-label="Setup categories" style={styles.rail(children.length > 0)}>
       {categories.map((cat, i) => {
         const isActive = i === active;
         return (
+          <React.Fragment key={cat.key}>
           <button
-            key={cat.key}
             ref={el => { tabs.current[i] = el; }}
             type="button"
-            role="tab"
-            aria-selected={isActive}
+            aria-current={isActive ? 'true' : undefined}
             aria-controls={WIZARD_PANEL_ID}
-            tabIndex={isActive ? 0 : -1}
+            aria-expanded={cat.children?.length ? isActive : undefined}
             className="ui-focusable"
             onClick={() => onSelect(i)}
             onKeyDown={e => handleKeyDown(e, i)}
@@ -537,8 +468,69 @@ export function WizardRail({ styles, categories, active, onSelect, accent, mobil
               )}
             </span>
           </button>
+
+          {isActive && cat.children?.length > 0 && (
+            <div
+              role="group"
+              aria-label={`${cat.label} groups`}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1px',
+                margin: '1px 0 5px',
+                marginLeft: mobile ? '7px' : '13px',
+                borderLeft: `1.5px solid ${accent}33`
+              }}
+            >
+              {cat.children.map(child => {
+                const childActive = child.key === cat.activeChild;
+                return (
+                  <button
+                    key={child.key}
+                    type="button"
+                    aria-pressed={childActive}
+                    className="ui-focusable"
+                    onClick={() => cat.onSelectChild(child.key)}
+                    style={styles.railChild(childActive)}
+                  >
+                    <span
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: mobile ? 9 : TEXT_MICRO,
+                        fontWeight: childActive ? 800 : 600,
+                        lineHeight: 1.25,
+                        color: childActive ? accent : PAPER_TEXT_MUTED
+                      }}
+                    >
+                      {child.label}
+                    </span>
+                    {child.locked > 0 && <LockPip size={8} color={childActive ? accent : PAPER_TEXT_FAINT} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          </React.Fragment>
         );
       })}
-    </div>
+    </nav>
+  );
+}
+
+/**
+ * Small padlock, matching the one the pickers use for unbought cosmetics.
+ *
+ * Deliberately not the one in wizardSteps/shared.jsx: that module reaches the
+ * tile-preview renderer and Three.js behind it, and WizardChrome is imported by
+ * the store, level select, and pack screens, which have no business paying for
+ * that. Eight lines of SVG is the cheaper duplicate.
+ */
+function LockPip({ size = 10, color = PAPER_TEXT_FAINT }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" style={{ display: 'block', flexShrink: 0 }} aria-hidden="true">
+      <path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <rect x="3.2" y="7" width="9.6" height="7" rx="2" fill={color} />
+    </svg>
   );
 }
