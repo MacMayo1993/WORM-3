@@ -91,7 +91,41 @@ const MOTES_PER_LIVE = 5;
 // The mote plume below is the intended always-on portal marker.
 const DEMO_TAPE_ON_ALL_PORTALS = true;
 
-export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef }) {
+// The caution tape strip. Constant for the life of the page, so it is drawn and
+// uploaded once rather than per mount — a restart used to redraw a 512×64 canvas
+// and hand the GPU a fresh texture before the first frame of the new run.
+let _cautionTexture = null;
+function getCautionTexture() {
+    if (_cautionTexture) return _cautionTexture;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffe000';
+    ctx.fillRect(0, 0, 512, 64);
+    ctx.fillStyle = '#111111';
+    ctx.font = 'bold 44px "Arial Black", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CAUTION', 256, 36);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(3, 1);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    _cautionTexture = tex;
+    return tex;
+}
+
+/**
+ * `hidden` hides the exterior portal decoration without unmounting it — the camera
+ * is inside the cube during a tunnel ride, so none of this is visible then, but
+ * unmounting it meant rebuilding nine InstancedMeshes (~4 800 instances at size 5),
+ * a 512×64 caution CanvasTexture and the seed table on every single exit. That
+ * rebuild was the hitch players felt coming out of a tunnel. An invisible group
+ * costs the renderer nothing; the frame loop below throttles itself instead.
+ */
+export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef, hidden = false }) {
     // Patched incrementally instead of rebuilt from scratch on every debounce tick (see
     // buildManifoldGridMapIncremental) — only the cells that changed since the last tick
     // get their gridId entries recomputed.
@@ -106,25 +140,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     const tapeRef = useRef();       // caution tape strips
     const voidFrameRef = useRef();  // bright square frame on fully voided tiles
 
-    const cautionTexture = React.useMemo(() => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 64;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffe000';
-        ctx.fillRect(0, 0, 512, 64);
-        ctx.fillStyle = '#111111';
-        ctx.font = 'bold 44px "Arial Black", Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('CAUTION', 256, 36);
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(3, 1);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        return tex;
-    }, []);
+    const cautionTexture = getCautionTexture();
 
     // Stable random seeds per (position × bubble) slot — no per-frame allocation
     const MAX_RINGS = 6 * size * size;
@@ -227,6 +243,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     // - During normal crawling, animate rings at a lower cadence to cut per-frame CPU load.
     const frameBudgetRef = useRef(0);
     const lastPhaseRef = useRef('crawling');
+    const lastHiddenRef = useRef(false);
     const clearedRef = useRef(false);
 
     // Instance capacities. Writes are contiguous from slot 0, so the frame loop sets
@@ -243,13 +260,20 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     useFrame(({ clock }, delta) => {
         const phase = worm?.phase?.current ?? 'crawling';
         const inTunnelPhase = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
-        const targetStep = inTunnelPhase ? (1 / 60) : (1 / 20);
+        // Hidden, the rings are off-camera inside the cube: keep them ticking slowly
+        // so they are never more than a fifth of a second stale, at ~1/12th the CPU.
+        const targetStep = hidden ? (1 / 5) : (inTunnelPhase ? (1 / 60) : (1 / 20));
 
         if (lastPhaseRef.current !== phase) {
             // Prevent carrying large accumulated delta across phase changes.
             frameBudgetRef.current = 0;
             lastPhaseRef.current = phase;
         }
+
+        // Becoming visible again must not wait out a throttle window — the player
+        // is looking straight at these the instant they leave the tunnel.
+        if (lastHiddenRef.current && !hidden) frameBudgetRef.current = targetStep;
+        lastHiddenRef.current = hidden;
 
         frameBudgetRef.current += delta;
         if (frameBudgetRef.current < targetStep) return;
@@ -576,7 +600,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     });
 
     return (
-        <>
+        <group visible={!hidden}>
             {/* Live wormhole rings — bright neon pink, fast spin */}
             <instancedMesh ref={liveRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
                 <torusGeometry args={[0.42, 0.025, 8, 32]} />
@@ -632,6 +656,6 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 <boxGeometry args={[1, 1, 1]} />
                 <meshBasicMaterial color="#9aff00" transparent opacity={0.95} blending={THREE.AdditiveBlending} depthWrite={false} />
             </instancedMesh>
-        </>
+        </group>
     );
 }

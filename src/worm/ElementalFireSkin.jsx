@@ -434,8 +434,10 @@ const fragmentShader = /* glsl */`
 // Shared materials, one per detail level. Module-scoped and never disposed by a
 // mounting component — the transient geometry is per-mount, but these outlive it,
 // exactly like the surface elements' cached material.
+// Exported so the elemental warm-up can pre-compile both detail levels during the
+// frozen scramble phase rather than at the moment a FIRE orb is claimed.
 const _fireMats = new Map();
-function getFlameMaterial(highDetail) {
+export function getFlameMaterial(highDetail) {
   const key = highDetail ? 'hq' : 'lq';
   let mat = _fireMats.get(key);
   if (!mat) {

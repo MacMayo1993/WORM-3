@@ -1,12 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { normalizeBase } from './scripts/normalizeBase.mjs'
 
 // Deploy base. GitHub Pages serves this repo from /WORM-3/, but the PWA manifest,
 // the navigation fallback and the media runtime-cache rule all used to repeat that
 // literal, so a preview build or a CDN prefix could not be smoke-tested without
 // editing source. VITE_BASE overrides it for exactly that case.
-const BASE = process.env.VITE_BASE || '/WORM-3/'
+//
+// Normalised before use: Vite would happily accept `VITE_BASE=/preview` and serve
+// from `/preview/`, but the concatenations below would then build
+// `/previewindex.html` and `/previewenvironments/…`. See scripts/normalizeBase.mjs.
+const BASE = normalizeBase(process.env.VITE_BASE || '/WORM-3/')
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // https://vite.dev/config/
