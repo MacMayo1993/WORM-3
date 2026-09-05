@@ -85,14 +85,15 @@ const grassFragmentShader = `
   }
 `;
 
-export default function GrassBlades({ faceColor }) {
-  const meshRef = useRef();
+/**
+ * The blade material for one face colour, shared across every grass sticker that
+ * uses it. Exported so the elemental warm-up can hand it to `renderer.compile()`
+ * during the frozen scramble phase — otherwise the NATURE orb pays the GLSL
+ * compile the first time a player claims one, mid-crawl.
+ */
+export function getGrassBladeMaterial(faceColor) {
   const colorKey = faceColor || '#22c55e';
-
-  const geometry = getBladeGeometry();
-
-  // Material shared across all grass stickers of the same face colour.
-  const material = getVolumeResource(`grass_bladeMat_${colorKey}`, () => {
+  return getVolumeResource(`grass_bladeMat_${colorKey}`, () => {
     // Green palette with subtle face-color tinting
     const fc = new THREE.Color(colorKey);
     const root = new THREE.Color(0x1a3d0f);
@@ -111,6 +112,12 @@ export default function GrassBlades({ faceColor }) {
       side: THREE.DoubleSide,
     });
   });
+}
+
+export default function GrassBlades({ faceColor }) {
+  const meshRef = useRef();
+  const geometry = getBladeGeometry();
+  const material = getGrassBladeMaterial(faceColor);
 
   // Populate instance matrices. material changes identity when faceColor
   // changes, which makes R3F recreate the instancedMesh (args change) — so

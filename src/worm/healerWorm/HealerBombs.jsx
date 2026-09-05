@@ -316,7 +316,7 @@ function WarmUp() {
  * @param {{ bombsRef: {current: Array}, membershipRef: {current: number},
  *          blastApiRef: {current: any}, size: number }} props
  */
-export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size }) {
+export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size, hidden = false }) {
   const [ids, setIds] = useState([]);
   const lastMembershipRef = useRef(-1);
   const [bursts, setBursts] = useState([]);
@@ -356,8 +356,10 @@ export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size }) {
   });
 
   const live = bombsRef.current ?? [];
+  // `hidden` covers the tunnel ride. Unmounting instead would throw away every live
+  // bomb's countdown canvas and CanvasTexture and rebuild them on the way out.
   return (
-    <>
+    <group visible={!hidden}>
       <WarmUp />
       {ids.map((id) => {
         const bomb = live.find((b) => b.id === id);
@@ -370,6 +372,6 @@ export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size }) {
           onDone={() => setBursts((b) => b.filter((x) => x.id !== burst.id))}
         />
       ))}
-    </>
+    </group>
   );
 }

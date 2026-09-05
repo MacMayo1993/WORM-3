@@ -12,7 +12,7 @@
 // needed): TunnelSurfFX, WormInteriorGlass, TunnelPortalRings.
 
 import { useRef, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
@@ -43,6 +43,7 @@ import { useWormCrawler } from './useWormCrawler.js';
 import WormChaseCamera from './WormChaseCamera.jsx';
 import WormSwipeControls from './WormSwipeControls.jsx';
 import { TunnelInteriorView } from './healerWorm/TunnelInteriorView.jsx';
+import { warmUpElementalSkins } from './healerWorm/elementalWarmup.js';
 import { TunnelTube } from './healerWorm/TunnelTube.jsx';
 import { WormBody, RocketTailFire, GlowWormAura } from './healerWorm/WormBody.jsx';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
@@ -92,6 +93,16 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
     const wormGamePhase = useGameStore(s => s.wormGamePhase ?? 'scrambling');
     const wormPhaseReactive = useGameStore(s => s.wormPhase ?? 'crawling');
+
+    // Compile every elemental skin's GLSL now, while the board is still scrambling
+    // and the player cannot act. Without this the first claim of each element paid
+    // the driver's shader compile in the same frame the wash mounted, which is the
+    // hitch players reported when a power-up appeared. Same treatment CubeAssembly
+    // gives tile styles and HealerBombs' <WarmUp> gives bombs.
+    const { gl, camera } = useThree();
+    useEffect(() => {
+        warmUpElementalSkins(gl, camera);
+    }, [gl, camera]);
 
     // Keep the feel layer's SFX/haptics channels in sync with the player's settings.
     const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
@@ -533,21 +544,28 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormAlive && <WormFace worm={worm} size={size} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}
             {wormAlive && <TunnelPortalFX worm={worm} size={size} />}
-            {!wormInTunnel && <WormholeRings
+            {/* Hidden, not unmounted, for the tunnel ride. The camera is inside the
+                cube then so none of this exterior decoration is visible either way,
+                but tearing it down and rebuilding it cost a rebuild of nine
+                InstancedMeshes, a canvas texture and every live bomb's countdown
+                texture — twice per trip, once going in and once coming out. That
+                rebuild is the stutter players felt entering and leaving a tunnel. */}
+            <WormholeRings
                 cubies={cubies}
                 size={size}
                 worm={worm}
                 voidTunnelKeysRef={worm.voidTunnelKeysRef}
                 tunnelUseCountsRef={worm.tunnelUseCountsRef}
-            />}
-            {!wormInTunnel && <HealerBombs bombsRef={bombsRef} membershipRef={bombMembershipRef} blastApiRef={blastApiRef} size={size} />}
+                hidden={wormInTunnel}
+            />
+            <HealerBombs bombsRef={bombsRef} membershipRef={bombMembershipRef} blastApiRef={blastApiRef} size={size} hidden={wormInTunnel} />
             <TunnelHealProgress size={size} />
             <HealBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
             <SpecialFlashSystem worm={worm} />
             {wormAlive && <MagnetFX worm={worm} />}
             <PowerupOrbs size={size} />
-            {!wormInTunnel && <SpecialOrbs size={size} />}
+            <SpecialOrbs size={size} hidden={wormInTunnel} />
             <SliceWarningLights pendingRotRef={pendingRotRef} size={size} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />

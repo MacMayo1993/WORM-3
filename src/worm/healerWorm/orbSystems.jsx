@@ -271,17 +271,20 @@ function SpecialOrb({ special, size }) {
     );
 }
 
-export function SpecialOrbs({ size }) {
+// `hidden` is the tunnel ride: the orbs sit on the cube's exterior, out of view
+// from inside it. Hiding rather than unmounting keeps each orb's shader materials
+// bound and its lifetime intact across a trip.
+export function SpecialOrbs({ size, hidden = false }) {
     const specials = useGameStore(s => s.wormSpecials);
     if (!specials || specials.length === 0) return null;
     return (
-        <>
+        <group visible={!hidden}>
             {specials.map(sp => (
                 isElementalType(sp.type)
                     ? <ElementalOrb key={sp.id} special={sp} size={size} />
                     : <SpecialOrb key={sp.id} special={sp} size={size} />
             ))}
-        </>
+        </group>
     );
 }
 
