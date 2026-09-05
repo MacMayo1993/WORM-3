@@ -425,16 +425,19 @@ Static assets live under `public/`:
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 9+
+- Node.js 20 (see `.nvmrc` — CI, the devcontainer and `engines` all pin the same major)
+- npm 10+
 
 ### Install
 
 ```bash
-npm install --legacy-peer-deps
+npm ci
 ```
 
-> `--legacy-peer-deps` is required due to peer-dependency conflicts in the R3F ecosystem.
+> The R3F ecosystem has peer-dependency conflicts that only resolve under npm's
+> legacy algorithm. `.npmrc` sets `legacy-peer-deps=true`, so `npm ci` reproduces
+> exactly the tree in `package-lock.json` without any extra flags. Prefer `npm ci`
+> over `npm install`: the latter rewrites the lockfile in place.
 
 ### Start Dev Server
 

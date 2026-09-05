@@ -1338,7 +1338,11 @@ export default function WORM3() {
 
   const handleSaveState = useCallback(() => {
     setSavedCubeState({
-      cubies: JSON.parse(JSON.stringify(cubies)),
+      // structuredClone, not a JSON round-trip: same deep copy without
+      // serialising the whole 7×7 cube to a string and reparsing it, and it
+      // survives values (Map, typed arrays, undefined) that JSON silently drops
+      // if the cubie shape ever grows past plain numbers.
+      cubies: structuredClone(cubies),
       moves,
       size,
       timestamp: Date.now()

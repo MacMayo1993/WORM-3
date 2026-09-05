@@ -19,7 +19,7 @@ export default function HolonomyWrapper() {
                 tracerU={game.tracerU}
                 tracerV={game.tracerV}
                 transportVec={game.transportVec}
-                twist={game.twist}
+                twistRef={game.twistRef}
                 seamCount={game.seamCount}
                 mobiusCount={game.mobiusCount}
                 loopClosed={game.loopClosed}

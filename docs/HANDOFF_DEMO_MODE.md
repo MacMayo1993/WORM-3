@@ -16,7 +16,7 @@ what was done, how demo mode works, the forward roadmap, and the gotchas.
   on the branch is **NOT live until merged to `main`.**
 - Stack: React 18 + Three.js/R3F + Zustand. `npm run dev` (port 5173, base
   `/WORM-3/`), `npm run build`, `npm run test` (vitest), `npm run lint`.
-  Install with `--legacy-peer-deps`.
+  Install with `npm ci` (`.npmrc` pins `legacy-peer-deps=true`).
 - Commit trailers required:
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` and the
   `Claude-Session:` line. Do NOT put the model id anywhere in commits.

@@ -3,11 +3,11 @@
 // Renders: tracer sphere, transported-vector arrow, fading trail,
 // seam-flash/loop-closed burst effects, and per-face swirl field lines.
 
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-    chartToWorld, localVecToWorld, FACE_KEYS, FACE_GEOMETRY, FACE_CHARGE, swirlUV,
+    chartToWorld, localVecToWorld, FACE_KEYS, FACE_CHARGE, swirlArrowPositions,
 } from './holonomyMath.js';
 
 // Colours
@@ -21,45 +21,51 @@ const SWIRL_LINES_PER_FACE = 12;
 const _dummy = new THREE.Object3D();
 
 // ─── Per-face swirl field visualization ──────────────────────────────────────
-function SwirlFieldLines({ faceKey, twist }) {
-    const linesRef = useRef();
-
-    const points = useMemo(() => {
-        const pts = [];
-        const n = SWIRL_LINES_PER_FACE;
-        const step = 1.0 / (n + 1);
-        const half = 0.5;
-        for (let i = 0; i < n; i++) {
-            const ub = -half + step * (i + 1);
-            const vb = -half + step * (Math.floor(n / 2));
-            // Short arrow: base → tip
-            const [su, sv] = swirlUV(ub, vb, Math.max(twist, 0.05), faceKey);
-            const len = 0.07;
-            const angle = Math.atan2(sv - vb, su - ub);
-            const c = Math.cos(angle) * len, s = Math.sin(angle) * len;
-            const base = chartToWorld(faceKey, ub, vb, 0, 0.54);
-            // local arrow direction → world
-            const f = FACE_GEOMETRY[faceKey];
-            const tip = [
-                base[0] + c * f.a1[0] + s * f.a2[0],
-                base[1] + c * f.a1[1] + s * f.a2[1],
-                base[2] + c * f.a1[2] + s * f.a2[2],
-            ];
-            pts.push(new THREE.Vector3(...base), new THREE.Vector3(...tip));
-        }
-        return pts;
-    }, [faceKey, twist]);
-
+// `twist` animates continuously, so this used to rebuild 24 Vector3s AND a fresh
+// BufferGeometry per face per frame — six undisposed GPU buffers a frame, which
+// is a leak, not just garbage. The arrow field now owns one geometry for its
+// lifetime and rewrites the position attribute in place, reading twist from a ref
+// so an animating field costs no React render at all.
+function SwirlFieldLines({ faceKey, twistRef }) {
     const geom = useMemo(() => {
-        const g = new THREE.BufferGeometry().setFromPoints(points);
+        const g = new THREE.BufferGeometry();
+        g.setAttribute(
+            'position',
+            new THREE.BufferAttribute(new Float32Array(SWIRL_LINES_PER_FACE * 2 * 3), 3)
+        );
         return g;
-    }, [points]);
+    }, []);
+
+    useEffect(() => () => geom.dispose(), [geom]);
+
+    // Last twist actually written, so a paused/steady field skips the rewrite.
+    const writtenTwist = useRef(NaN);
+
+    const writeArrows = useCallback((twist) => {
+        swirlArrowPositions(faceKey, twist, SWIRL_LINES_PER_FACE, geom.attributes.position.array);
+        geom.attributes.position.needsUpdate = true;
+        geom.computeBoundingSphere();
+    }, [faceKey, geom]);
+
+    // Seed before the first frame so the field is never briefly collapsed at the
+    // origin, and re-seed when the face changes identity under the same geometry.
+    useEffect(() => {
+        writtenTwist.current = NaN;
+        writeArrows(twistRef?.current ?? 0);
+    }, [writeArrows, twistRef]);
+
+    useFrame(() => {
+        const twist = twistRef?.current ?? 0;
+        if (twist === writtenTwist.current) return;
+        writtenTwist.current = twist;
+        writeArrows(twist);
+    });
 
     const charge = FACE_CHARGE[FACE_KEYS.indexOf(faceKey)];
     const col = charge === 0 ? '#004455' : '#440055';
 
     return (
-        <lineSegments ref={linesRef} geometry={geom}>
+        <lineSegments geometry={geom}>
             <lineBasicMaterial color={col} transparent opacity={0.35} />
         </lineSegments>
     );
@@ -71,7 +77,7 @@ export default function HolonomyTracer({
     tracerU,
     tracerV,
     transportVec,
-    twist = 0,
+    twistRef,
     seamCount = 0,
     mobiusCount = 0,
     loopClosed = false,
@@ -182,7 +188,7 @@ export default function HolonomyTracer({
         <group>
             {/* Swirl field lines on each face */}
             {FACE_KEYS.map(fk => (
-                <SwirlFieldLines key={fk} faceKey={fk} twist={twist} />
+                <SwirlFieldLines key={fk} faceKey={fk} twistRef={twistRef} />
             ))}
 
             {/* Trail */}

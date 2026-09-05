@@ -2,6 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Deploy base. GitHub Pages serves this repo from /WORM-3/, but the PWA manifest,
+// the navigation fallback and the media runtime-cache rule all used to repeat that
+// literal, so a preview build or a CDN prefix could not be smoke-tested without
+// editing source. VITE_BASE overrides it for exactly that case.
+const BASE = process.env.VITE_BASE || '/WORM-3/'
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -26,8 +33,8 @@ export default defineConfig({
         name: 'WORM³ — World of Rubik\'s Manifolds',
         short_name: 'WORM³',
         description: '3D Rubik\'s Cube puzzle on real projective plane topology',
-        start_url: '/WORM-3/',
-        scope: '/WORM-3/',
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
         background_color: '#060a18',
         theme_color: '#060a18',
@@ -37,12 +44,12 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,woff2,woff,svg}', 'Mobi.webp'],
         globIgnores: ['environments/**', 'models/**', 'images/**', 'merge-mode/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-        navigateFallback: '/WORM-3/index.html',
+        navigateFallback: `${BASE}index.html`,
         runtimeCaching: [
           {
             // Big media: cache-first after first use, capped so the quota
             // never balloons past a few environment maps + models.
-            urlPattern: /\/WORM-3\/(environments|models|images|merge-mode)\//,
+            urlPattern: new RegExp(`${escapeRe(BASE)}(environments|models|images|merge-mode)/`),
             handler: 'CacheFirst',
             options: {
               cacheName: 'worm3-media',
@@ -57,12 +64,16 @@ export default defineConfig({
       },
     }),
   ],
-  base: '/WORM-3/',
+  base: BASE,
   optimizeDeps: {
     include: ['kociemba-wasm'],
   },
   build: {
     chunkSizeWarningLimit: 680,
+    // Emitted so scripts/check-bundle-size.mjs can walk the entry's static import
+    // graph instead of only looking at each file in isolation — a route can
+    // regress badly while every individual chunk stays under its ceiling.
+    manifest: true,
     rollupOptions: {
       output: {
         manualChunks(id) {
