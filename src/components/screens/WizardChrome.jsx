@@ -6,9 +6,18 @@
 // drifted apart on phones — one full-bleed at 92vh, one floating at 88vh with
 // desktop padding. The layout lives here now, so a phone fix lands in all of them
 // at once. Each wizard still owns its accent and its own content styles.
+//
+// The sheet is a category rail plus one pane, not a slideshow. A wizard used to
+// be a walk: one category on screen, the rest reduced to anonymous progress dots,
+// and the only way from Size back to Colors was to step backwards through
+// everything in between. What you had already chosen went with it — nothing on
+// the Style screen told you the palette was Sunset. The rail keeps every category
+// in view down the left edge with its current value written under its name, so
+// the whole configuration reads at a glance and any part of it is one click away.
+// Back/Continue still walk the same index for anyone who wants the guided path.
 
 import React from 'react';
-import { UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_BORDER, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, PAPER_SHADOW, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_MD, TEXT_XL, Z, PAPER_BORDER_SOFT } from '../../utils/uiTheme.js';
+import { UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_BORDER, PAPER_SHEET_RAISED, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, PAPER_SHADOW, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_MD, TEXT_XL, Z, PAPER_BORDER_SOFT } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
 
@@ -58,8 +67,11 @@ export const PENCIL_LEAD = '#35404a';
  */
 export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMobile) {
   // Horizontal breathing room, matched between header, body, and footer so the
-  // content sits on one margin down the whole sheet.
+  // content sits on one margin down the whole sheet. The pane runs a tighter one
+  // on phones, where the rail has already taken its width off a 390px screen.
   const GUTTER = mobile ? 16 : 36;
+  const PANE_GUTTER = mobile ? 12 : 28;
+  const RAIL_WIDTH = mobile ? 66 : 176;
   return {
     overlay: {
       position: 'fixed',
@@ -83,7 +95,10 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
     sheet: {
       ...wizardPaperBackground,
       borderRadius: mobile ? 0 : '20px',
-      width: mobile ? '100%' : 'min(640px, 96vw)',
+      // The rail is added width, not width taken from the content: the pane to
+      // its right still gets the ~640px the sheet used to hand a single step, so
+      // nothing a step already renders has to reflow.
+      width: mobile ? '100%' : 'min(900px, 96vw)',
       height: mobile ? '100%' : 'auto',
       maxHeight: mobile ? '100%' : '88vh',
       display: 'flex',
@@ -95,38 +110,70 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)'
     },
 
+    // Everything between the sheet's top border and its footer: the rail, then
+    // the pane holding this category's heading and its scrolling controls.
+    main: {
+      flex: 1,
+      minHeight: 0,
+      display: 'flex',
+      flexDirection: 'row'
+    },
+
+    rail: {
+      flexShrink: 0,
+      width: `${RAIL_WIDTH}px`,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: mobile ? '2px' : '3px',
+      // The rail owns the notch on a phone, since it now runs to the top of the
+      // full-bleed sheet rather than starting under the header.
+      padding: mobile
+        ? `calc(10px + env(safe-area-inset-top)) 5px 10px`
+        : '22px 10px 16px',
+      borderRight: `1px solid ${PAPER_BORDER_SOFT}`,
+      // A margin column ruled off the graph paper rather than a separate panel.
+      background: 'rgba(255,255,255,0.30)',
+      overflowY: 'auto',
+      overscrollBehavior: 'contain',
+      scrollbarWidth: 'none'
+    },
+
+    // On a phone there is no room for the value line, so the tab stacks to an
+    // icon over its name and the summary is dropped rather than truncated to
+    // something unreadable.
+    railTab: active => ({
+      display: 'flex',
+      flexDirection: mobile ? 'column' : 'row',
+      alignItems: mobile ? 'center' : 'center',
+      justifyContent: mobile ? 'center' : 'flex-start',
+      gap: mobile ? '4px' : '9px',
+      width: '100%',
+      minHeight: mobile ? '52px' : TOUCH_TARGET,
+      padding: mobile ? '7px 2px' : '9px 10px',
+      borderRadius: '10px',
+      border: 'none',
+      background: active ? PAPER_SHEET_RAISED : 'transparent',
+      boxShadow: active ? `inset 3px 0 0 ${accent}, 0 1px 0 ${PAPER_CARD_SHADOW}` : 'none',
+      cursor: 'pointer',
+      textAlign: 'left',
+      fontFamily: 'inherit',
+      WebkitTapHighlightColor: 'transparent',
+      transition: 'background 0.15s ease, box-shadow 0.15s ease'
+    }),
+
+    pane: {
+      flex: 1,
+      minWidth: 0,
+      display: 'flex',
+      flexDirection: 'column'
+    },
+
     header: {
       // Top padding clears the status bar / notch on a full-bleed phone sheet.
       padding: mobile
-        ? `calc(12px + env(safe-area-inset-top)) ${GUTTER}px 0`
-        : `28px ${GUTTER}px 0`,
+        ? `calc(12px + env(safe-area-inset-top)) ${PANE_GUTTER}px 0`
+        : `26px ${PANE_GUTTER}px 0`,
       flexShrink: 0
-    },
-
-    stepIndicator: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      marginBottom: mobile ? '12px' : '20px'
-    },
-
-    dot: (active, current) => ({
-      height: mobile ? '5px' : '8px',
-      borderRadius: '3px',
-      background: current ? accent : active ? `${accent}66` : PAPER_BORDER,
-      flex: current ? '2' : '1',
-      transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
-      boxShadow: current ? `0 1px 4px ${accent}55` : 'none'
-    }),
-
-    stepCount: {
-      flexShrink: 0,
-      marginLeft: '4px',
-      fontSize: TEXT_MICRO,
-      fontWeight: 800,
-      letterSpacing: '0.12em',
-      color: PAPER_TEXT_FAINT,
-      fontVariantNumeric: 'tabular-nums'
     },
 
     title: {
@@ -147,7 +194,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
     },
 
     body: {
-      padding: `0 ${GUTTER}px`,
+      padding: `0 ${PANE_GUTTER}px`,
       overflowY: 'auto',
       overscrollBehavior: 'contain',
       WebkitOverflowScrolling: 'touch',
@@ -338,17 +385,160 @@ export function WizardSection({ label, note, accent, open, onToggle, sticky = tr
   );
 }
 
-/**
- * Progress bars plus a step count. The count is the part that survives on a
- * phone, where the bars get thin enough to read as decoration.
- */
-export function WizardSteps({ styles, steps, step }) {
+// The scrolling pane the rail drives. Fixed rather than generated: only one
+// wizard is ever mounted, and the rail and the wizard both have to name it.
+export const WIZARD_PANEL_ID = 'wizard-category-panel';
+
+// One glyph per category kind, drawn at 16×16 on the current stroke colour. Small
+// enough to read at the 18px the phone rail gives them, which rules out anything
+// with interior detail.
+const ICON_GLYPHS = {
+  scene: (
+    <>
+      <path d="M2 12.5h12" />
+      <path d="M3 12.5l3.4-4.7 2.3 3 1.9-2.4L14 12.5" />
+      <circle cx="11.3" cy="4.4" r="1.5" />
+    </>
+  ),
+  colors: (
+    <>
+      <circle cx="6.1" cy="6.2" r="3.3" />
+      <circle cx="9.9" cy="6.2" r="3.3" />
+      <circle cx="8" cy="10" r="3.3" />
+    </>
+  ),
+  style: (
+    <>
+      <rect x="2.2" y="2.2" width="5.1" height="5.1" rx="1.2" />
+      <rect x="8.7" y="2.2" width="5.1" height="5.1" rx="1.2" />
+      <rect x="2.2" y="8.7" width="5.1" height="5.1" rx="1.2" />
+      <rect x="8.7" y="8.7" width="5.1" height="5.1" rx="1.2" />
+    </>
+  ),
+  size: (
+    <>
+      <rect x="2" y="2" width="7.2" height="7.2" rx="1.2" />
+      <path d="M6.8 6.8h7.2v7.2H6.8" />
+    </>
+  ),
+  gameplay: (
+    <>
+      <path d="M2.5 4.6h11M2.5 11.4h11" />
+      <circle cx="5.9" cy="4.6" r="1.8" />
+      <circle cx="10.1" cy="11.4" r="1.8" />
+    </>
+  ),
+  character: (
+    <>
+      <path d="M1.8 11.2c1.5 0 1.5-3.1 3-3.1s1.5 3.1 3 3.1 1.5-3.1 3-3.1 1.5 3.1 3.4 3.1" />
+      <circle cx="12.6" cy="4.6" r="1.5" />
+    </>
+  )
+};
+
+/** A category glyph. Falls back to the tile grid for an unknown name. */
+export function WizardIcon({ name, size = 17, color = 'currentColor' }) {
   return (
-    <div style={styles.stepIndicator}>
-      {steps.map((_, i) => (
-        <div key={i} style={styles.dot(i <= step, i === step)} />
-      ))}
-      <span style={styles.stepCount}>{step + 1}/{steps.length}</span>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: 'block', flexShrink: 0 }}
+      aria-hidden="true"
+    >
+      {ICON_GLYPHS[name] || ICON_GLYPHS.style}
+    </svg>
+  );
+}
+
+/**
+ * The category rail: every category a wizard offers, stacked down the left edge
+ * with the value it currently holds.
+ *
+ * The value line is the point of the thing. A tab strip alone would still only
+ * tell you where you are; `summary` is what you already picked, so the palette
+ * you chose two categories ago is legible while you are choosing tiles.
+ *
+ * Arrow keys move between tabs and take the selection with them, per the tabs
+ * pattern — so only the active tab is a tab stop, and Tab itself leaves the rail
+ * for the panel it controls.
+ */
+export function WizardRail({ styles, categories, active, onSelect, accent, mobile }) {
+  const tabs = React.useRef([]);
+
+  const focus = index => {
+    onSelect(index);
+    tabs.current[index]?.focus();
+  };
+
+  const handleKeyDown = (e, i) => {
+    const last = categories.length - 1;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') focus(i === last ? 0 : i + 1);
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') focus(i === 0 ? last : i - 1);
+    else if (e.key === 'Home') focus(0);
+    else if (e.key === 'End') focus(last);
+    else return;
+    e.preventDefault();
+  };
+
+  return (
+    <div role="tablist" aria-orientation="vertical" aria-label="Setup categories" style={styles.rail}>
+      {categories.map((cat, i) => {
+        const isActive = i === active;
+        return (
+          <button
+            key={cat.key}
+            ref={el => { tabs.current[i] = el; }}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={WIZARD_PANEL_ID}
+            tabIndex={isActive ? 0 : -1}
+            className="ui-focusable"
+            onClick={() => onSelect(i)}
+            onKeyDown={e => handleKeyDown(e, i)}
+            style={styles.railTab(isActive)}
+          >
+            <WizardIcon name={cat.icon} size={mobile ? 18 : 17} color={isActive ? accent : PAPER_TEXT_FAINT} />
+            <span style={{ minWidth: 0, maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <span
+                style={{
+                  fontSize: mobile ? 9 : TEXT_XS,
+                  fontWeight: 700,
+                  letterSpacing: mobile ? '0.02em' : '0.05em',
+                  lineHeight: 1.2,
+                  color: isActive ? accent : PAPER_TEXT_MUTED,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {cat.label}
+              </span>
+              {!mobile && cat.summary && (
+                <span
+                  style={{
+                    fontSize: TEXT_MICRO,
+                    fontWeight: 600,
+                    lineHeight: 1.25,
+                    color: PAPER_TEXT_FAINT,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {cat.summary}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

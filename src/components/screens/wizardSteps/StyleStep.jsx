@@ -7,14 +7,16 @@
 // top, and every style in a family is one tap away underneath it.
 
 import React from 'react';
-import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../../utils/colorSchemes.js';
+import { COLOR_SCHEMES, TILE_STYLES } from '../../../utils/colorSchemes.js';
 import { TILE_STYLE_SECTIONS } from '../../../utils/tileStyleCatalog.js';
 import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
 import { WizardSection } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
-import { Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor, FACE_LABELS } from './shared.jsx';
+import { useIsMobile } from '../../../hooks/index.js';
+import { Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor, FACE_LABELS, paletteLabel, styleLabel } from './shared.jsx';
 
 export default function StyleStep({ cos }) {
+  const isMobile = useIsMobile();
   const {
     settings, setSettings, cubeSize, colors,
     accent, accentShadow, ownedItems, styleFamily, setStyleFamily,
@@ -47,8 +49,6 @@ export default function StyleStep({ cos }) {
     applyGlobal(walkable[(from + delta + walkable.length) % walkable.length]);
   };
 
-  const title = isRandom ? 'Random Mix' : TILE_STYLES[globalStyle]?.label || (perFace ? 'Per Face' : 'Solid');
-  const paletteLabel = settings.colorScheme === 'custom' ? 'Your Photo' : SCHEME_LABELS[settings.colorScheme] || 'Standard';
   const swatchColor = colors[1] || '#4a7fa5';
 
   return (
@@ -57,8 +57,8 @@ export default function StyleStep({ cos }) {
         caption={section.label}
         index={atIndex === -1 ? undefined : atIndex + 1}
         total={atIndex === -1 ? undefined : walkable.length}
-        title={title}
-        subtitle={`${paletteLabel} · ${sizeTier(cubeSize).name}`}
+        title={styleLabel(settings)}
+        subtitle={`${paletteLabel(settings)} · ${sizeTier(cubeSize).name}`}
         onPrev={() => stepStyle(-1)}
         onNext={() => stepStyle(1)}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}
@@ -110,8 +110,9 @@ export default function StyleStep({ cos }) {
         {isRandom && <Checkmark accent={accent} accentShadow={accentShadow} />}
       </button>
 
-      {/* Styles in the active family */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
+      {/* Styles in the active family. Three across on a phone — the rail takes
+          its width off the pane, and four thumbnails there stop being readable. */}
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 4}, 1fr)`, gap: '7px' }}>
         {section.keys.map(key => {
           const sel = globalStyle === key;
           const unlocked = owned(key);
