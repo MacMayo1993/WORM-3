@@ -5,8 +5,9 @@
 // same display case (SpecimenPlate), with a name plate that re-labels itself for
 // whichever choice the current step is making.
 //
-// It sticks to the top of the wizard body, so the palette you scroll to on the
-// far side of the list still lands on a cube you can see.
+// It stands in the wizard's hero band, across the full width of the sheet and
+// above both the rail and the list, so the palette you scroll to on the far side
+// of the list still lands on a cube you can see.
 
 import React from 'react';
 import CubePreviewCanvas from '../../../3d/CubePreviewCanvas.jsx';
@@ -35,11 +36,14 @@ export default function CubePlate({
   swatches = null
 }) {
   const isMobile = useIsMobile();
-  const cubePx = isMobile ? 138 : 176;
+  // The plate spans the sheet now rather than one column of it, so the cube can
+  // give a little height back: what it costs here comes straight off the rail
+  // and the list underneath, and both of them have rows to lose before the cube
+  // stops reading.
+  const cubePx = isMobile ? 132 : 152;
 
   return (
     <SpecimenPlate
-      sticky
       caption={caption}
       index={index}
       total={total}

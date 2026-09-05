@@ -8,7 +8,7 @@ import React, { useRef } from 'react';
 import { COLOR_SCHEMES, SCHEME_LABELS, TILE_STYLES } from '../../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../../utils/backgrounds.js';
 import { BG_PREVIEWS } from '../../../utils/bgPreviews.js';
-import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../../3d/TilePreviewRenderer.js';
+import { registerTilePreview, updateTilePreview, unregisterTilePreview, setTilePreviewVisible } from '../../../3d/TilePreviewRenderer.js';
 import { PAPER_SHEET_RAISED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, TEXT_XS, PAPER_BORDER_SOFT } from '../../../utils/uiTheme.js';
 
 // ─── Catalogue data ───────────────────────────────────────────────────────────
@@ -195,8 +195,30 @@ export function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, c
     if (!canvas) return;
     canvas.width = size;
     canvas.height = size;
-    idRef.current = registerTilePreview(canvas, styleKey, colorHex);
-    return () => { if (idRef.current !== null) unregisterTilePreview(idRef.current); };
+    const id = registerTilePreview(canvas, styleKey, colorHex);
+    idRef.current = id;
+
+    // A style family is a scrolling grid of dozens of these, and every animated
+    // one costs a GPU readback per drawn frame. Only the tiles actually in the
+    // scroller's viewport need to keep moving; the rest hold their last frame
+    // until they come back into view. No IntersectionObserver (jsdom, old
+    // WebViews) just means everything animates, as before.
+    let observer = null;
+    if (typeof IntersectionObserver === 'function') {
+      setTilePreviewVisible(id, false);
+      observer = new IntersectionObserver(
+        entries => { for (const entry of entries) setTilePreviewVisible(id, entry.isIntersecting); },
+        // A little margin so a tile is already moving by the time it is read.
+        { rootMargin: '120px' }
+      );
+      observer.observe(canvas);
+    }
+
+    return () => {
+      observer?.disconnect();
+      unregisterTilePreview(id);
+      idRef.current = null;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {

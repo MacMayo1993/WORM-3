@@ -7,6 +7,10 @@
 // rail now (see styleCategory.jsx) — all of them visible, none of them costing
 // this panel any vertical space. What is left here is the preview and the grid
 // for whichever family the rail has selected.
+//
+// Rendered twice by the wizard: `slot="hero"` for the full-width plate across
+// the top of the sheet, `slot="body"` for the grid under it. No slot renders
+// both.
 
 import React from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../../utils/colorSchemes.js';
@@ -17,7 +21,7 @@ import { useIsMobile } from '../../../hooks/index.js';
 import { Checkmark, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor, FACE_LABELS, paletteLabel, styleLabel, uniformStyle } from './shared.jsx';
 import { resolveStyleFamily, PER_FACE_FAMILY } from './styleCategory.jsx';
 
-export default function StyleStep({ cos, family }) {
+export default function StyleStep({ cos, family, slot }) {
   const isMobile = useIsMobile();
   const { settings, setSettings, cubeSize, colors, accent, accentShadow, ownedItems } = cos;
 
@@ -50,6 +54,7 @@ export default function StyleStep({ cos, family }) {
 
   return (
     <>
+      {slot !== 'body' && (
       <CubePlate
         caption={showingPerFace ? 'Per Face' : section.label}
         index={showingPerFace || atIndex === -1 ? undefined : atIndex + 1}
@@ -62,8 +67,9 @@ export default function StyleStep({ cos, family }) {
         glow={swatchColor}
         backdrop={bgOptionFor(settings.backgroundTheme)}
       />
+      )}
 
-      {showingPerFace ? (
+      {slot !== 'hero' && (showingPerFace ? (
         <>
           <p style={{ fontSize: '11px', color: PAPER_TEXT_MUTED, lineHeight: 1.5, margin: '2px 2px 12px' }}>
             Give each face its own surface. Every face starts on the style you picked, so change
@@ -166,7 +172,7 @@ export default function StyleStep({ cos, family }) {
             })}
           </div>
         </>
-      )}
+      ))}
     </>
   );
 }

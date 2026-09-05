@@ -1,10 +1,15 @@
 // SceneStep.jsx — pick the environment, with the cube standing in it.
+//
+// Rendered twice by the wizard: once as `slot="hero"` for the full-width plate
+// across the top of the sheet, once as `slot="body"` for the scrolling picker
+// under it. Passing no slot renders both, which is what a caller outside the
+// wizard chrome wants.
 
 import React from 'react';
 import CubePlate from './CubePlate.jsx';
 import { BG_OPTIONS, Checkmark, sizeTier, styleLabel } from './shared.jsx';
 
-export default function SceneStep({ cos }) {
+export default function SceneStep({ cos, slot }) {
   const { settings, select, cubeSize, colors, accent, accentShadow } = cos;
 
   const index = Math.max(0, BG_OPTIONS.findIndex(o => o.value === settings.backgroundTheme));
@@ -13,6 +18,7 @@ export default function SceneStep({ cos }) {
 
   return (
     <>
+      {slot !== 'body' && (
       <CubePlate
         caption="Scene"
         index={index + 1}
@@ -25,7 +31,9 @@ export default function SceneStep({ cos }) {
         glow={colors[1]}
         backdrop={current}
       />
+      )}
 
+      {slot !== 'hero' && (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingBottom: '8px' }}>
         {BG_OPTIONS.map(opt => {
           const selected = settings.backgroundTheme === opt.value;
@@ -64,6 +72,7 @@ export default function SceneStep({ cos }) {
           );
         })}
       </div>
+      )}
     </>
   );
 }

@@ -7,7 +7,11 @@
 // desktop padding. The layout lives here now, so a phone fix lands in all of them
 // at once. Each wizard still owns its accent and its own content styles.
 //
-// The sheet is a category rail plus one pane, not a slideshow. A wizard used to
+// The sheet is a hero band over a category rail plus one pane, not a slideshow.
+// The band runs the full width of the sheet: the live cube (or the worm) is the
+// subject of every cosmetic category, and penning it into the pane's column left
+// it small next to a rail whose bottom half was empty paper. The rail and the
+// list both start under it, on the same line. A wizard used to
 // be a walk: one category on screen, the rest reduced to anonymous progress dots,
 // and the only way from Size back to Colors was to step backwards through
 // everything in between. What you had already chosen went with it — nothing on
@@ -114,8 +118,20 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)'
     },
 
-    // Everything between the sheet's top border and its footer: the rail, then
-    // the pane holding this category's heading and its scrolling controls.
+    // The full-width band across the top of the sheet: this category's heading
+    // and the specimen it is about. It sits above the rail rather than beside
+    // it, so the cube gets the sheet's whole width and the rail starts level
+    // with the list it drives.
+    hero: {
+      flexShrink: 0,
+      padding: mobile
+        ? `calc(12px + env(safe-area-inset-top)) ${PANE_GUTTER}px 12px`
+        : `20px ${GUTTER}px 14px`,
+      borderBottom: `1px solid ${PAPER_BORDER_SOFT}`
+    },
+
+    // Everything between the hero band and the footer: the rail, then the pane
+    // holding this category's scrolling controls.
     main: {
       flex: 1,
       minHeight: 0,
@@ -130,11 +146,9 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       display: 'flex',
       flexDirection: 'column',
       gap: mobile ? '2px' : '3px',
-      // The rail owns the notch on a phone, since it now runs to the top of the
-      // full-bleed sheet rather than starting under the header.
-      padding: mobile
-        ? `calc(10px + env(safe-area-inset-top)) 5px 10px`
-        : '22px 10px 16px',
+      // The hero band above owns the notch, so the rail starts on an ordinary
+      // margin — level with the first row of the list beside it.
+      padding: mobile ? '10px 5px 10px' : '16px 10px 16px',
       borderRight: `1px solid ${PAPER_BORDER_SOFT}`,
       // A margin column ruled off the graph paper rather than a separate panel.
       background: 'rgba(255,255,255,0.30)',
@@ -193,11 +207,9 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       flexDirection: 'column'
     },
 
+    // The heading sits inside the hero band, which already carries the sheet's
+    // margin and clears the notch.
     header: {
-      // Top padding clears the status bar / notch on a full-bleed phone sheet.
-      padding: mobile
-        ? `calc(12px + env(safe-area-inset-top)) ${PANE_GUTTER}px 0`
-        : `26px ${PANE_GUTTER}px 0`,
       flexShrink: 0
     },
 
@@ -213,13 +225,13 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
     subtitle: {
       fontSize: mobile ? TEXT_SM - 1 : TEXT_SM,
       color: PAPER_TEXT_MUTED,
-      margin: mobile ? '0 0 12px' : '0 0 18px',
+      margin: mobile ? '0 0 10px' : '0 0 14px',
       fontWeight: '400',
       lineHeight: 1.35
     },
 
     body: {
-      padding: `0 ${PANE_GUTTER}px`,
+      padding: mobile ? `12px ${PANE_GUTTER}px 0` : `16px ${PANE_GUTTER}px 0`,
       overflowY: 'auto',
       overscrollBehavior: 'contain',
       WebkitOverflowScrolling: 'touch',

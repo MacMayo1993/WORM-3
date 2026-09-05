@@ -1,4 +1,8 @@
 // SizeStep.jsx — the size slider, with the cube growing under it.
+//
+// Rendered twice by the wizard: `slot="hero"` for the full-width plate across
+// the top of the sheet, `slot="body"` for the slider under it. No slot renders
+// both.
 
 import React from 'react';
 import { PAPER_TEXT_MUTED } from '../../../utils/uiTheme.js';
@@ -6,7 +10,7 @@ import CubePlate from './CubePlate.jsx';
 import CubeSizeSlider from './CubeSizeSlider.jsx';
 import { SIZE_TIERS, sizeTier, bgOptionFor, paletteLabel, styleLabel } from './shared.jsx';
 
-export default function SizeStep({ cos, tiers = SIZE_TIERS }) {
+export default function SizeStep({ cos, tiers = SIZE_TIERS, slot }) {
   const { settings, cubeSize, setCubeSize, colors, accent, accentShadow } = cos;
 
   const tier = sizeTier(cubeSize, tiers);
@@ -16,6 +20,7 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS }) {
 
   return (
     <>
+      {slot !== 'body' && (
       <CubePlate
         caption="Cube Size"
         index={sizeIndex + 1}
@@ -28,13 +33,18 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS }) {
         glow={colors[1]}
         backdrop={bgOptionFor(settings.backgroundTheme)}
       />
+      )}
 
+      {slot !== 'hero' && (
+      <>
       <CubeSizeSlider value={cubeSize} onChange={setCubeSize} accent={accent} accentShadow={accentShadow} tiers={tiers} />
 
       <p style={{ fontSize: '11px', color: PAPER_TEXT_MUTED, lineHeight: 1.5, margin: '14px 2px 8px' }}>
         Bigger cubes keep the same rules — antipodal identification, the same flips — with more
         pieces to carry through them.
       </p>
+      </>
+      )}
     </>
   );
 }
