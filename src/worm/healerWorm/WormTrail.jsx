@@ -8,7 +8,9 @@ import { SURFACE_OFFSET } from '../../utils/constants.js';
 import { liveCubies } from '../liveCubies.js';
 import { ttAt } from '../circularBuffers.js';
 import { getSkin, getTrail } from '../wormCosmeticsData.js';
+import { liveRotation } from '../liveRotation.js';
 import { FACE_NORMALS, BODY_BALL_SPACING } from './constants.js';
+import { fxBudget } from './fxBudget.js';
 
 // ─── Worm Trail scratch — zero per-frame allocation ───────────────────────────
 const _trailDummy = new THREE.Object3D();
@@ -36,7 +38,10 @@ const _trailStretch = new THREE.Vector3(); // wavy-path tangent toward the previ
 // (reset only when it dives through a Möbius tunnel). Older history is rendered with
 // progressively coarser tile-LOD + daub spacing so per-frame work and the instanced-disc
 // budget stay bounded no matter how long the run gets.
-const TRAIL_DAUB_CAP = 4000;    // instanced discs painted along the (LOD-thinned) full route
+// How many daubs a board may paint, and how often, is the fx budget's call —
+// a Mega run rebuilds this stroke from thousands of live cubie lookups, and the
+// budget is where the game decides that is too much (see fxBudget.js).
+const TRAIL_DAUB_CAP = 4000;    // ceiling any board may ask for; the budget picks the real cap
 const TRAIL_SUB_STEP = 0.09; // base spacing between daubs near the head (world units); grows with age
 const TRAIL_FADE_FLOOR = 0.22; // oldest daubs never fade below this, so the whole route stays a faint "where I've been" map
 // Local additive glow halo over the recent trail daubs — mirrors the Glow worm's glowAltRef
@@ -90,9 +95,18 @@ function resolveTrailTile(trail, i, lSize, outPos, outNorm) {
 // smooth interpolation has caught up), so it is used only as a stretch target for
 // index 1's daub and is never rendered itself — this keeps the trail entirely behind
 // the head instead of flashing a disc out in front of it.
-export function WormTrail({ worm, size: _size }) {
+export function WormTrail({ worm, size }) {
     const meshRef = useRef();
     const glowRef = useRef(); // additive glow-halo overlay for the recent trail
+    const budget = fxBudget(size);
+    const daubCap = Math.min(TRAIL_DAUB_CAP, budget.trailDaubCap);
+    const glowCap = Math.min(TRAIL_GLOW_CAP, budget.trailGlowCap);
+    // Time since the stroke was last rebuilt. The trail is paint on a surface:
+    // repainting it at 30Hz instead of 60 halves thousands of tile resolutions,
+    // interpolations, quaternions and two buffer uploads, and on a still cube you
+    // cannot see the difference. While a slice is actually turning it goes back to
+    // every frame — there the paint has to stay glued to tiles that are moving.
+    const sinceRepaint = useRef(0);
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormShowTrail = useGameStore(s => s.wormShowTrail ?? true);
     const skin = getSkin(wormSkinId);
@@ -127,7 +141,7 @@ export function WormTrail({ worm, size: _size }) {
         gaitRef.current = trailGaitParams(wormCharacterId);
     }
 
-    useFrame(() => {
+    useFrame((_state, delta) => {
         const mesh = meshRef.current;
         if (!mesh) return;
         const glowMesh = glowRef.current;
@@ -142,6 +156,14 @@ export function WormTrail({ worm, size: _size }) {
         const trail = worm.pathHistory.current;
         const count = trail.count;
         if (count < 2) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+
+        // Repaint budget. Deliberately after the three guards above: hiding the
+        // trail has to happen on the frame it is asked for (the camera is about to
+        // be inside the cube, where surface daubs would shine through), while
+        // repainting it can wait for the budget's tick.
+        sinceRepaint.current += delta;
+        if (!liveRotation.active && sinceRepaint.current < 1 / budget.trailHz) return;
+        sinceRepaint.current = 0;
 
         const lSize = liveCubies.size;
         const capCount = count; // render the full retained route, not a fixed window
@@ -169,7 +191,7 @@ export function WormTrail({ worm, size: _size }) {
         // spacing so the whole route fits inside the daub budget at bounded per-frame cost. `i`
         // advances by lodStep (in tiles); subStep widens the daub spacing to match.
         let i = aIdx;
-        while (i < capCount && visible < TRAIL_DAUB_CAP) {
+        while (i < capCount && visible < daubCap) {
             const age = i - aIdx;
             const lodStep = age < 60 ? 1 : age < 180 ? 2 : age < 500 ? 4 : 8;
             const subStep = age < 60 ? TRAIL_SUB_STEP : age < 180 ? 0.22 : age < 500 ? 0.45 : 0.9;
@@ -183,14 +205,14 @@ export function WormTrail({ worm, size: _size }) {
             if (segLen > 1e-5) {
                 _trailTangent.multiplyScalar(1 / segLen);
                 const nSub = Math.max(1, Math.ceil(segLen / subStep));
-                for (let s = 0; s < nSub && visible < TRAIL_DAUB_CAP; s++) {
+                for (let s = 0; s < nSub && visible < daubCap; s++) {
                     const t = s / nSub; // 0 at A (newer) → 1 at B (older)
                     _trailSub.lerpVectors(_trailCA, _trailCB, t);
                     _trailSubN.lerpVectors(_trailNA, _trailNB, t).normalize();
 
                     // Newest = bright/wide, oldest = dim/thin, but floored so the full route
                     // stays visible as a faint "where I've been" map instead of fading to nothing.
-                    const fade = Math.max(TRAIL_FADE_FLOOR, 1 - visible / TRAIL_DAUB_CAP);
+                    const fade = Math.max(TRAIL_FADE_FLOOR, 1 - visible / daubCap);
                     const fs   = fade * fade * (3 - 2 * fade);  // smoothstep
 
                     // Frozen lateral wiggle baked along the path — this is the gait signature that
@@ -230,7 +252,7 @@ export function WormTrail({ worm, size: _size }) {
 
                     // Recent daubs also get a soft additive glow halo in the skin's glow colour,
                     // scaled up from the same daub transform. Purely local geometry — no bloom pass.
-                    if (glowMesh && visible < TRAIL_GLOW_CAP) {
+                    if (glowMesh && visible < glowCap) {
                         _trailDummy.scale.multiplyScalar(TRAIL_GLOW_SCALE);
                         _trailDummy.updateMatrix();
                         glowMesh.setMatrixAt(visible, _trailDummy.matrix);
@@ -264,7 +286,7 @@ export function WormTrail({ worm, size: _size }) {
 
     return (
         <>
-            <instancedMesh ref={meshRef} args={[undefined, undefined, TRAIL_DAUB_CAP]} frustumCulled={false}>
+            <instancedMesh ref={meshRef} args={[undefined, undefined, daubCap]} frustumCulled={false}>
                 {/* Thin, elongated discs stretched toward the next-newer tile read as a continuous
                     painted slime stroke behind the worm. Low roughness + normal blending gives a
                     wet, translucent sheen that catches the scene lights as the worm crawls, instead
@@ -285,7 +307,7 @@ export function WormTrail({ worm, size: _size }) {
             </instancedMesh>
             {/* Additive glow halo over the recent trail — local geometry only, never a screen
                 pass, so it can't touch the background or the cube interior. */}
-            <instancedMesh ref={glowRef} args={[undefined, undefined, TRAIL_GLOW_CAP]} frustumCulled={false}>
+            <instancedMesh ref={glowRef} args={[undefined, undefined, glowCap]} frustumCulled={false}>
                 <circleGeometry args={[0.5, 16]} />
                 <meshBasicMaterial
                     color="white"

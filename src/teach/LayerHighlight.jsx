@@ -17,7 +17,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 // Face basis, quad sizing, gold palette, noise and the merged-quad builder are
 // shared with the menu's ambient grid glow — see teach/layerGlow.js.
-import { EDGE_UV, GOLD_DEEP, GOLD_CORE, NOISE_GLSL, buildRimGeometry } from './layerGlow.js';
+import { EDGE_UV, GOLD_DEEP, GOLD_CORE, NOISE_GLSL, getSliceRimGeometry } from './layerGlow.js';
 
 // ─── 1. Layer rim ─────────────────────────────────────────────────────────────
 
@@ -32,7 +32,14 @@ const rimVertexShader = `
   }
 `;
 
-const rimFragmentShader = `
+// The rim comes in two programs. The full one wanders and frays through three
+// octaves of noise per fragment; the lite one drops the noise entirely and keeps
+// the filament, the halo and the sweep. On a 15×15 the rim covers 225 tiles per
+// plane at 1.7× the tile footprint each, additively blended over an already busy
+// scene, and it can be two planes at once — fbm across all of that, every frame,
+// for the whole ten-second cycle, is the frame killer. What the lite rim still
+// says is the part that matters: this layer, this way, and it is getting close.
+export const rimFragmentShader = lite => `
   uniform vec3  uDeep;
   uniform vec3  uCore;
   uniform float uTime;
@@ -43,7 +50,7 @@ const rimFragmentShader = `
   varying vec2  vUv;
   varying float vPhase;  // this face's angular position around the turn axis, [0,1)
   #define TAU 6.28318530718
-  ${NOISE_GLSL}
+  ${lite ? '' : NOISE_GLSL}
 
   void main() {
     vec2 p = vUv - 0.5;
@@ -58,9 +65,10 @@ const rimFragmentShader = `
     else if (-p.y >= a.x) s = 0.50 + (0.5 - p.x) * 0.25;
     else                  s = 0.75 + (p.y + 0.5) * 0.25;
 
-    // The rim breathes and frays instead of sitting still.
+    // The rim breathes and frays instead of sitting still. Without the noise it
+    // only breathes — same movement, none of the per-fragment octaves.
     float wander = 1.0 + 0.20 * sin(s * TAU * 3.0 - uTime * 2.0)
-                       + 0.45 * (fbm(vec2(s * 6.0, uTime * 0.5)) - 0.5);
+                       ${lite ? '' : '+ 0.45 * (fbm(vec2(s * 6.0, uTime * 0.5)) - 0.5)'};
     float bw   = 0.052 * wander;
     float line = exp(-pow(abs(d) / max(bw, 0.012), 1.7));       // filament on the outline
     float halo = exp(-pow(max(d, 0.0) / (bw * 3.0), 2.0)) * 0.4; // soft bleed outward
@@ -259,8 +267,14 @@ const STREAMERS = 3;
  *                    breathes, then bears down) without re-rendering it
  * @param gain        thickens the rim on the tiles themselves; 1 is the solver's
  *                    hint, higher reads as a hazard rather than a suggestion
+ * @param lite        rim only, and a rim with no noise in it: no streamers, no
+ *                    haze, no flares, no motes. The spectacle is what costs — six
+ *                    translucent wisps whose thickness scales with the cube, plus
+ *                    44 motes, orbiting a belt that is itself size-scaled — and on
+ *                    a 15×15 it costs more than the frame has. The information is
+ *                    in the rim, so the rim is what a big cube keeps.
  */
-const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1, opacityRef = null, gain = 1 }) => {
+const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1, opacityRef = null, gain = 1, lite = false }) => {
   const spinnerRef = useRef();
   const turn = dir === 1 ? 1 : -1;
 
@@ -286,27 +300,17 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
     return { uDeep: { value: deep }, uCore: { value: core } };
   }, [color]);
 
-  // One merged geometry of every exposed cubie face in the target slice. The
-  // phase is the face's angular position around the rotation axis, which is
-  // what makes the sweep read as travelling the way the layer will turn.
-  const rimGeometry = useMemo(() => {
-    const inSlice = (x, y, z) =>
-      axis === 'col' ? x === sliceIndex : axis === 'row' ? y === sliceIndex : z === sliceIndex;
+  // One merged geometry of every exposed cubie face in the target slice, with each
+  // face's angular position around the rotation axis baked in — that phase is what
+  // makes the sweep read as travelling the way the layer will turn.
+  //
+  // It comes from layerGlow's cache and is NOT disposed here: the same few dozen
+  // rims are asked for over and over (the worm's hazard arms a new one every ten
+  // seconds), and rebuilding one walks size³ cubies for a geometry identical to the
+  // one just thrown away.
+  const rimGeometry = useMemo(() => getSliceRimGeometry(size, axis, sliceIndex), [axis, sliceIndex, size]);
 
-    return buildRimGeometry(size, {
-      includeCubie: inSlice,
-      phaseOf: ({ fx, fy, fz }) => {
-        // In-plane coords depend on the turn axis.
-        let c1, c2;
-        if (axis === 'col') { c1 = fy; c2 = fz; }        // X axis
-        else if (axis === 'row') { c1 = fz; c2 = fx; }   // Y axis
-        else { c1 = fx; c2 = fy; }                        // Z axis
-        return Math.atan2(c2, c1) / (Math.PI * 2) + 0.5;
-      }
-    });
-  }, [axis, sliceIndex, size]);
-
-  React.useEffect(() => () => rimGeometry.dispose(), [rimGeometry]);
+  const rimFragment = useMemo(() => rimFragmentShader(lite), [lite]);
 
   const rimUniforms = useMemo(() => ({
     ...palette, uTime, uDir, uOpacity, uGain, uEdge: { value: EDGE_UV }
@@ -333,6 +337,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
 
   // Streamer body, the haze around it, and a flare at each leading tip.
   const streamers = useMemo(() => {
+    if (lite) return null;
     const thickness = 0.13 + size * 0.03;
     const { geo, tip } = buildWisp(belt.radius, 1.5, turn, thickness);
     const { geo: aura } = buildWisp(belt.radius, 1.5, turn, thickness * 2.4);
@@ -349,16 +354,17 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
     flare.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     flare.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
     return { geo, aura, flare };
-  }, [belt.radius, turn, size]);
+  }, [belt.radius, turn, size, lite]);
 
   React.useEffect(() => () => {
-    streamers.geo.dispose();
-    streamers.aura.dispose();
-    streamers.flare.dispose();
+    streamers?.geo.dispose();
+    streamers?.aura.dispose();
+    streamers?.flare.dispose();
   }, [streamers]);
 
   // Loose motes scattered around the belt, always outside the cube.
   const motes = useMemo(() => {
+    if (lite) return null;
     const COUNT = 44;
     const pts = [];
     const seeds = [];
@@ -374,9 +380,9 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
     geo.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
     geo.setAttribute('aAngle', new THREE.Float32BufferAttribute(angles, 1));
     return geo;
-  }, [belt.radius]);
+  }, [belt.radius, lite]);
 
-  React.useEffect(() => () => motes.dispose(), [motes]);
+  React.useEffect(() => () => motes?.dispose(), [motes]);
 
   const wispUniforms = useMemo(() => ({ ...palette, uTime, uOpacity, uSoft: { value: 0 } }), [palette, uTime, uOpacity]);
   const auraUniforms = useMemo(() => ({ ...palette, uTime, uOpacity, uSoft: { value: 1 } }), [palette, uTime, uOpacity]);
@@ -398,7 +404,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
       <mesh geometry={rimGeometry} raycast={() => null}>
         <shaderMaterial
           vertexShader={rimVertexShader}
-          fragmentShader={rimFragmentShader}
+          fragmentShader={rimFragment}
           uniforms={rimUniforms}
           transparent
           side={THREE.DoubleSide}
@@ -407,6 +413,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
         />
       </mesh>
 
+      {!lite && (
       <group quaternion={belt.quaternion} position={belt.position}>
         {/* Streamers orbiting the layer, tips leading the way round */}
         <group ref={spinnerRef}>
@@ -462,6 +469,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
           />
         </points>
       </group>
+      )}
     </group>
   );
 };

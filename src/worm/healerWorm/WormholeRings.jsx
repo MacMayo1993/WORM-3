@@ -89,7 +89,7 @@ const MOTES_PER_LIVE = 5;
 // step off the exit); painting it on every portal spends that alarm on the most
 // common object in the game and leaves nothing to distinguish the deadly ones.
 // The mote plume below is the intended always-on portal marker.
-const DEMO_TAPE_ON_ALL_PORTALS = true;
+const DEMO_TAPE_ON_ALL_PORTALS = false;
 
 // The caution tape strip. Constant for the life of the page, so it is drawn and
 // uploaded once rather than per mount — a restart used to redraw a 512×64 canvas

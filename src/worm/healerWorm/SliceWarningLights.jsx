@@ -22,7 +22,10 @@ import { useFrame } from '@react-three/fiber';
 import LayerHighlight from '../../teach/LayerHighlight.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getSkin } from '../wormCosmeticsData.js';
+import { fxBudget } from './fxBudget.js';
 
+// Which tier this board's warning runs at is the fx budget's call, not this
+// file's — see fxBudget.js for why Mega gives the spectacle up.
 // Alpha at each end of the cycle. The floor has to carry across a busy cube from
 // the chase camera — a hint you cannot find is not a warning — and the ceiling
 // goes past 1 deliberately: the shader multiplies its clamped glow by this, so
@@ -31,8 +34,10 @@ const IDLE_ALPHA = 0.8;
 const PEAK_ALPHA = 1.9;
 // Rim thickness on the slice's own tiles. The solver's hint runs at 1; the hazard
 // wants to be seen past the worm, the orbs and whatever the elemental skin is
-// doing to the same tiles.
+// doing to the same tiles. A lite rim carries the whole warning on its own, so it
+// burns a little harder still.
 const RIM_GAIN = 2.1;
+const RIM_GAIN_LITE = 2.6;
 
 export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) {
     // Tint the turn warning with the worm the player is actually looking at — its body
@@ -73,6 +78,7 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
     // will turn (the two hazard planes turn opposite ways).
     const indices = pending.sliceIndices?.length ? pending.sliceIndices : [pending.sliceIndex];
     const dirs = pending.sliceDirs?.length ? pending.sliceDirs : indices.map(() => pending.dir);
+    const lite = fxBudget(size).warning === 'lite';
     return (
         <>
             {indices.map((sliceIndex, i) => (
@@ -84,7 +90,8 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
                     size={size}
                     color={wormColor}
                     opacityRef={alphaRef}
-                    gain={RIM_GAIN}
+                    gain={lite ? RIM_GAIN_LITE : RIM_GAIN}
+                    lite={lite}
                 />
             ))}
         </>

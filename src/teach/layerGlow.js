@@ -135,3 +135,44 @@ export function buildRimGeometry(size, { includeCubie, phaseOf } = {}) {
   geo.setIndex(indices);
   return geo;
 }
+
+// ─── Slice rims, built once ───────────────────────────────────────────────────
+//
+// A layer rim is fully determined by (size, axis, sliceIndex), and the worm's
+// hazard asks for a new one every ten seconds for the length of a run. Building
+// it walks size³ cubies × six faces — 20,250 face tests on a 15×15 — and hands
+// back four fresh arrays plus a geometry to upload, which is a hitch you can feel
+// on the frame a warning arms. There are only 3 × size of them, so they are built
+// once and kept.
+//
+// The cache owns them: a consumer must NOT dispose a geometry it got from here.
+const _rimCache = new Map();
+
+/** The merged rim geometry for one slice, from the cache when it has been asked for before. */
+export function getSliceRimGeometry(size, axis, sliceIndex) {
+  const key = `${size}:${axis}:${sliceIndex}`;
+  const hit = _rimCache.get(key);
+  if (hit) return hit;
+
+  const inSlice = (x, y, z) =>
+    axis === 'col' ? x === sliceIndex : axis === 'row' ? y === sliceIndex : z === sliceIndex;
+
+  const geo = buildRimGeometry(size, {
+    includeCubie: inSlice,
+    phaseOf: ({ fx, fy, fz }) => {
+      // In-plane coords depend on the turn axis.
+      let c1, c2;
+      if (axis === 'col') { c1 = fy; c2 = fz; }        // X axis
+      else if (axis === 'row') { c1 = fz; c2 = fx; }   // Y axis
+      else { c1 = fx; c2 = fy; }                        // Z axis
+      return Math.atan2(c2, c1) / (Math.PI * 2) + 0.5;
+    }
+  });
+  _rimCache.set(key, geo);
+  return geo;
+}
+
+/** Test seam: how many rims the cache is holding. */
+export function rimCacheSize() {
+  return _rimCache.size;
+}
