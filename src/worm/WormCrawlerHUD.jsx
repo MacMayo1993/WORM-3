@@ -1329,6 +1329,8 @@ function BoostButton({ wormAlive, fc }) {
 function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc }) {
     const green = fc[2] || FACE_FALLBACKS[2];
     const blue = fc[5] || FACE_FALLBACKS[5];
+    const cameraHorizon = useGameStore(s => s.wormCameraHorizon ?? 'face');
+    const toggleCameraHorizon = useGameStore(s => s.toggleWormCameraHorizon);
     const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
     const hapticsOn = useGameStore(s => s.settings?.haptics ?? true);
     const setSettings = useGameStore(s => s.setSettings);
@@ -1381,6 +1383,20 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                         style={togglePillStyle(wormControlMode === 'oriented', blue)}
                     >
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
+                    </button>
+                </div>
+
+                {/* Which way is up while crawling. A feel call rather than a right
+                    answer, and one you can only judge in motion, so it is here in
+                    the run rather than buried in setup: FACE rolls the horizon with
+                    the cube face you are on, LEVEL keeps it world-up. */}
+                <div style={SETTING_ROW_STYLE}>
+                    <span style={SETTING_LABEL_STYLE}>Horizon</span>
+                    <button
+                        onPointerDown={() => toggleCameraHorizon?.()}
+                        style={togglePillStyle(cameraHorizon === 'face', blue)}
+                    >
+                        {cameraHorizon === 'face' ? 'FOLLOWS FACE' : 'LEVEL'}
                     </button>
                 </div>
 

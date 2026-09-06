@@ -54,6 +54,9 @@ const loadPersistedState = () => {
     const wormTrail = localStorage.getItem('worm3_trail') || 'classic';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const wormShowTrail = localStorage.getItem('worm3_show_trail') !== 'false'; // default true
+    // 'face' rolls the horizon with the face the worm is on; 'level' keeps it
+    // world-up. A feel call, so it is a setting rather than a constant.
+    const wormCameraHorizon = localStorage.getItem('worm3_camera_horizon') === 'level' ? 'level' : 'face';
     // A missing key means a brand-new player: seed the starting bankroll so the
     // betting feature is reachable on day one. (An existing "0" stays 0 — the
     // player spent it; the grant is one-time by construction since every
@@ -102,6 +105,7 @@ const loadPersistedState = () => {
       wormTrail: safeTrail,
       wormCharacter,
       wormShowTrail,
+      wormCameraHorizon,
       parityPoints: safeParityPoints,
       ownedItems,
       betStreak,
@@ -118,6 +122,7 @@ const loadPersistedState = () => {
       wormTrail: 'classic',
       wormCharacter: 'classic',
       wormShowTrail: true,
+      wormCameraHorizon: 'face',
       parityPoints: STARTING_BANKROLL, // storage unavailable — new-player experience
       ownedItems: [...DEFAULT_OWNED],
       betStreak: 0,

@@ -37,6 +37,12 @@ import { elementalRideBlend } from './healerWorm/elementalLifecycle.js';
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
 const _camForward = new THREE.Vector3();
 const _camUp = new THREE.Vector3();
+// Orientation scratch — the chase view's roll is a rotation, not an up vector
+// handed to lookAt (see aimCamera below).
+const _aimBasis = new THREE.Matrix4();
+const _aimQuat = new THREE.Quaternion();
+const _aimDir = new THREE.Vector3();
+const _aimUp = new THREE.Vector3();
 const _camWormWorld = new THREE.Vector3();
 const _camNormal = new THREE.Vector3();
 const _camTargetCam = new THREE.Vector3();
@@ -45,6 +51,48 @@ const _camTunnelTangent = new THREE.Vector3();
 // Face-transition blend scratch — slerp normal and lerp forward over ~250ms
 const _rawNormal = new THREE.Vector3();
 const _rawForward = new THREE.Vector3();
+/**
+ * Point the camera at `look` from `eye` with `upHint` overhead, as a rotation the
+ * camera is slerped toward rather than a call to lookAt.
+ *
+ * This is the fix for the chase view rolling by itself around a face. lookAt
+ * derives roll from `right = normalize(cross(viewDir, up))`, so it has two failure
+ * modes, and crawling a cube walks into both:
+ *
+ *   • As viewDir approaches the up axis that cross product collapses, and its
+ *     direction is then decided by whatever rounding noise is left. Rounding an
+ *     edge onto the top or bottom face swings the view a long way while nothing
+ *     else appears to move.
+ *   • Under the cube the up vector has to flip sign, and smoothing +Y toward -Y
+ *     passes through the zero vector, where roll is undefined outright.
+ *
+ * A quaternion has neither problem: the target orientation is built once, the
+ * camera slerps toward it along the shortest arc, and a 180° change is a
+ * controlled roll rather than a spin through a singularity. The up hint is also
+ * orthogonalised against the view direction first, and falls back to the camera's
+ * current up if the two are collinear, so the basis is always well formed.
+ */
+export function aimCamera(camera, eye, look, upHint, alpha) {
+  _aimDir.subVectors(look, eye);
+  if (_aimDir.lengthSq() < 1e-8) return;
+  _aimDir.normalize();
+
+  _aimUp.copy(upHint).addScaledVector(_aimDir, -upHint.dot(_aimDir));
+  if (_aimUp.lengthSq() < 1e-6) {
+    _aimUp.copy(camera.up).addScaledVector(_aimDir, -camera.up.dot(_aimDir));
+    if (_aimUp.lengthSq() < 1e-6) _aimUp.set(0, 1, 0).addScaledVector(_aimDir, -_aimDir.y);
+    if (_aimUp.lengthSq() < 1e-6) _aimUp.set(1, 0, 0);
+  }
+  _aimUp.normalize();
+
+  _aimBasis.lookAt(eye, look, _aimUp);
+  _aimQuat.setFromRotationMatrix(_aimBasis);
+  camera.quaternion.slerp(_aimQuat, alpha);
+  // Kept in step so the branches that still use lookAt (tunnel rides, the death
+  // freeze) start from the orientation the chase actually ended on.
+  camera.up.copy(_aimUp);
+}
+
 const FACE_TRANS_DURATION = 0.25;
 // Victory flourish: radians/sec the camera orbits the solved cube (~10s per revolution).
 const SOLVED_ORBIT_SPEED = 0.6;
@@ -187,6 +235,10 @@ export default function WormChaseCamera({ worm, size }) {
     useFrame((_, delta) => {
         const gameState = useGameStore.getState();
         const gamePhase = gameState.wormGamePhase ?? 'active';
+        // Read per frame rather than through a subscription: this callback already
+        // reads the store, and a re-render of the camera on a settings change would
+        // reset the smoothing refs mid-crawl.
+        const horizonMode = gameState.wormCameraHorizon ?? 'face';
         const phase = worm.phase.current;
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
@@ -403,17 +455,18 @@ export default function WormChaseCamera({ worm, size }) {
             // Centre the spawning worm first; ease out to the chase aim as the pull expires.
             _camTargetLook.lerp(_camWormWorld, pull * 0.8);
 
-            _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
+            // Same horizon the chase will use, so the countdown reveal hands over to
+            // live play without the view rolling on the first crawling frame.
+            if (horizonMode === 'face') _camUp.copy(_camNormal);
+            else _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
 
+            const revealA = enteredReveal ? 1 : Math.min(1, CAM_LERP * delta);
             if (enteredReveal) {
                 camPosRef.current.copy(_camTargetCam);
                 lookAtRef.current.copy(_camTargetLook);
-                camUpRef.current.copy(_camUp);
             } else {
-                const a = Math.min(1, CAM_LERP * delta);
-                camPosRef.current.lerp(_camTargetCam, a);
-                lookAtRef.current.lerp(_camTargetLook, a);
-                camUpRef.current.lerp(_camUp, a).normalize();
+                camPosRef.current.lerp(_camTargetCam, revealA);
+                lookAtRef.current.lerp(_camTargetLook, revealA);
             }
 
             // Seed the crawl branch's face-blend state so 'active' takes over
@@ -424,8 +477,8 @@ export default function WormChaseCamera({ worm, size }) {
             faceTransT.current = 0;
 
             camera.position.copy(camPosRef.current);
-            camera.up.copy(camUpRef.current);
-            camera.lookAt(lookAtRef.current);
+            aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, revealA);
+            camUpRef.current.copy(camera.up);
             prevPhaseRef.current = phase;
             return;
         }
@@ -521,9 +574,13 @@ export default function WormChaseCamera({ worm, size }) {
                 }
             }
 
-            // Camera UP: always world-Y so the horizon stays level.
-            // Bottom face is the only case where Y-up would flip the view.
-            _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
+            // Which way is up. 'face' takes it from the surface the worm is on, so
+            // the horizon rolls with the cube and the basis is never degenerate —
+            // the camera looks along the face, never down its own up axis. 'level'
+            // keeps the old world-Y horizon; it still has to flip under the cube,
+            // but the flip is now a slerped roll rather than a lerp through zero.
+            if (horizonMode === 'face') _camUp.copy(_camNormal);
+            else _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
 
             // Body-cut beat: a rotating layer sheared off part of the tail but the
             // worm lived. The game freezes for this beat (the sim and the rotation
@@ -618,9 +675,8 @@ export default function WormChaseCamera({ worm, size }) {
             camPosRef.current.lerp(_camTargetCam, alpha);
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
-            camUpRef.current.lerp(_camUp, Math.min(1, crawlK * delta)).normalize();
-            camera.up.copy(camUpRef.current);
-            camera.lookAt(lookAtRef.current);
+            aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, alpha);
+            camUpRef.current.copy(camera.up);
         } else if (phase === 'windup' && worm.activeTunnel.current) {
             // Entry-side external view: the windup spiral is watched from outside so the
             // player sees the worm swirl down onto the entry hole against the cube face.

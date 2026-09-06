@@ -56,6 +56,17 @@ export const createWormSlice = (set, _get) => ({
     set({ wormShowTrail: v });
   },
 
+  // Which way is up while crawling. 'face' builds the camera's roll from the face
+  // the worm is on, 'level' from world Y. See WormChaseCamera for why this is a
+  // choice at all: a world-up camera has to flip its up vector under the cube and
+  // has no defined roll when the view lines up with that axis.
+  wormCameraHorizon: persistedState.wormCameraHorizon ?? 'face',
+  toggleWormCameraHorizon: () => set((state) => {
+    const next = state.wormCameraHorizon === 'face' ? 'level' : 'face';
+    try { localStorage.setItem('worm3_camera_horizon', next); } catch { }
+    return { wormCameraHorizon: next };
+  }),
+
   // ── Controls ──────────────────────────────────────────────────────────────
   wormControlMode: 'non-oriented',
   setWormControlMode: (v) => set({ wormControlMode: v }),
