@@ -1,5 +1,19 @@
 // src/worm/healerWorm/WormTrail.jsx
-// Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
+// Extracted from HealerWormMode.jsx (2026-07 monolith split).
+//
+// ── Parked ────────────────────────────────────────────────────────────────────
+// This is not mounted (see TRAIL_PAINTING_ENABLED below and HealerWormMode's
+// render). The painted route was never wrong so much as unreadable: the stroke is
+// pinned to tiles, so every hazard turn carries a slab of old paint away with the
+// slice it was painted on, and after a few turns the route reads as scattered
+// fragments rather than as anywhere the worm has been. On a 15×15, where the
+// hazard turns two planes every ten seconds, that happens to most of the route.
+//
+// Kept whole rather than deleted because the idea is worth reviving as something
+// you pick up — a paintbrush that paints for a while and then wears off, which is
+// short enough that no turn has time to shred it. The sim still records
+// pathHistory, the store still sells seven trail colours, and the skin/trail
+// plumbing below still resolves them: flipping the constant is all it takes.
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -11,6 +25,9 @@ import { getSkin, getTrail } from '../wormCosmeticsData.js';
 import { liveRotation } from '../liveRotation.js';
 import { FACE_NORMALS, BODY_BALL_SPACING } from './constants.js';
 import { fxBudget } from './fxBudget.js';
+
+/** Whether the painted route is drawn at all. See the note at the top. */
+export const TRAIL_PAINTING_ENABLED = false;
 
 // ─── Worm Trail scratch — zero per-frame allocation ───────────────────────────
 const _trailDummy = new THREE.Object3D();

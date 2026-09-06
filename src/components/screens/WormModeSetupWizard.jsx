@@ -54,11 +54,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
   const wormHatId = useGameStore(s => s.wormHat ?? 'none');
   const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
-  const wormShowTrail = useGameStore(s => s.wormShowTrail ?? true);
   const setWormSkin = useGameStore(s => s.setWormSkin);
   const setWormHat = useGameStore(s => s.setWormHat);
   const setWormCharacter = useGameStore(s => s.setWormCharacter);
-  const setWormShowTrail = useGameStore(s => s.setWormShowTrail);
 
   const activeSkin = WORM_SKINS.find(s => s.id === wormSkinId) ?? WORM_SKINS[0];
   const activeCharacter = WORM_CHARACTERS.find(c => c.id === wormCharacterId) ?? WORM_CHARACTERS[0];
@@ -220,31 +218,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </div>
         </div>
 
-        {/* ── Trail toggle ── */}
-        <div>
-          <PickerHeading label="Trail" hint="Mark tiles you've visited" />
-          <div style={{ display: 'flex', gap: '7px' }}>
-            {[{ val: true, label: 'On' }, { val: false, label: 'Off' }].map(({ val, label }) => {
-              const selected = wormShowTrail === val;
-              const accent = activeSkin.glow;
-              return (
-                <button key={String(val)} onClick={() => setWormShowTrail(val)} style={{
-                  ...chipBase,
-                  padding: '9px 24px',
-                  background: selected ? `${accent}2e` : WIZ_SURFACE,
-                  border: selected ? `2px solid ${accent}` : `2px solid ${WIZ_BORDER_SOFT}`,
-                  boxShadow: selected ? 'inset 0 2px 4px rgba(83,72,56,0.12)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
-                  transform: selected ? 'translateY(1px)' : 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: selected ? accent : WIZ_TEXT_MUTED }}>
-                    {label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
         </>
         )}
       </div>

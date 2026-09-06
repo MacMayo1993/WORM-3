@@ -46,6 +46,10 @@ export const createWormSlice = (set, _get) => ({
     try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
     set({ wormCharacter: id });
   },
+  // Nothing writes this any more: the painted route is parked (see
+  // WormTrail.jsx's TRAIL_PAINTING_ENABLED), so the wizard no longer offers the
+  // toggle. Kept wired, and kept persisted, so whatever a save already holds
+  // survives and the switch works the day the trail comes back as a pickup.
   wormShowTrail: persistedState.wormShowTrail ?? true,
   setWormShowTrail: (v) => {
     try { localStorage.setItem('worm3_show_trail', String(v)); } catch { }
