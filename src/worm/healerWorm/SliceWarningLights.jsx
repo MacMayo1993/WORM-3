@@ -22,16 +22,10 @@ import { useFrame } from '@react-three/fiber';
 import LayerHighlight from '../../teach/LayerHighlight.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getSkin } from '../wormCosmeticsData.js';
+import { fxBudget } from './fxBudget.js';
 
-// Above this the warning drops to its rim: Mega's 15×15 is 225 tiles per threatened
-// plane, up to two planes at once, each rim quad shading 1.7× its tile's footprint
-// with additive blending — and the belt of six translucent wisps around it scales
-// its thickness with the cube (0.13 + 0.03n, the haze 2.4× that again). Running the
-// full effect there for the whole ten-second cycle is what turned Mega's frame rate
-// into a stutter. The rim alone still answers which layer and which way, which is
-// the part the player is actually reading.
-const LITE_FROM_SIZE = 8;
-
+// Which tier this board's warning runs at is the fx budget's call, not this
+// file's — see fxBudget.js for why Mega gives the spectacle up.
 // Alpha at each end of the cycle. The floor has to carry across a busy cube from
 // the chase camera — a hint you cannot find is not a warning — and the ceiling
 // goes past 1 deliberately: the shader multiplies its clamped glow by this, so
@@ -84,7 +78,7 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
     // will turn (the two hazard planes turn opposite ways).
     const indices = pending.sliceIndices?.length ? pending.sliceIndices : [pending.sliceIndex];
     const dirs = pending.sliceDirs?.length ? pending.sliceDirs : indices.map(() => pending.dir);
-    const lite = size >= LITE_FROM_SIZE;
+    const lite = fxBudget(size).warning === 'lite';
     return (
         <>
             {indices.map((sliceIndex, i) => (

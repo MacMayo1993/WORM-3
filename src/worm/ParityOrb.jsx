@@ -7,6 +7,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
+import { fxBudget } from './healerWorm/fxBudget.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 
@@ -656,7 +657,7 @@ export default function ParityOrbs({
           isGlowWorm={isGlowWorm}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}
-          reducedDetail={size > 15 && !isTunnelMode}
+          reducedDetail={fxBudget(size).orbDetail === 'reduced' && !isTunnelMode}
         />
       ))}
     </group>
