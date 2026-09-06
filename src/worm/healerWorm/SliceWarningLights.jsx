@@ -23,6 +23,15 @@ import LayerHighlight from '../../teach/LayerHighlight.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getSkin } from '../wormCosmeticsData.js';
 
+// Above this the warning drops to its rim: Mega's 15×15 is 225 tiles per threatened
+// plane, up to two planes at once, each rim quad shading 1.7× its tile's footprint
+// with additive blending — and the belt of six translucent wisps around it scales
+// its thickness with the cube (0.13 + 0.03n, the haze 2.4× that again). Running the
+// full effect there for the whole ten-second cycle is what turned Mega's frame rate
+// into a stutter. The rim alone still answers which layer and which way, which is
+// the part the player is actually reading.
+const LITE_FROM_SIZE = 8;
+
 // Alpha at each end of the cycle. The floor has to carry across a busy cube from
 // the chase camera — a hint you cannot find is not a warning — and the ceiling
 // goes past 1 deliberately: the shader multiplies its clamped glow by this, so
@@ -31,8 +40,10 @@ const IDLE_ALPHA = 0.8;
 const PEAK_ALPHA = 1.9;
 // Rim thickness on the slice's own tiles. The solver's hint runs at 1; the hazard
 // wants to be seen past the worm, the orbs and whatever the elemental skin is
-// doing to the same tiles.
+// doing to the same tiles. A lite rim carries the whole warning on its own, so it
+// burns a little harder still.
 const RIM_GAIN = 2.1;
+const RIM_GAIN_LITE = 2.6;
 
 export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) {
     // Tint the turn warning with the worm the player is actually looking at — its body
@@ -73,6 +84,7 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
     // will turn (the two hazard planes turn opposite ways).
     const indices = pending.sliceIndices?.length ? pending.sliceIndices : [pending.sliceIndex];
     const dirs = pending.sliceDirs?.length ? pending.sliceDirs : indices.map(() => pending.dir);
+    const lite = size >= LITE_FROM_SIZE;
     return (
         <>
             {indices.map((sliceIndex, i) => (
@@ -84,7 +96,8 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
                     size={size}
                     color={wormColor}
                     opacityRef={alphaRef}
-                    gain={RIM_GAIN}
+                    gain={lite ? RIM_GAIN_LITE : RIM_GAIN}
+                    lite={lite}
                 />
             ))}
         </>
