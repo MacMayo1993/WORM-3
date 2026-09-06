@@ -46,11 +46,26 @@ export const createWormSlice = (set, _get) => ({
     try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
     set({ wormCharacter: id });
   },
+  // Nothing writes this any more: the painted route is parked (see
+  // WormTrail.jsx's TRAIL_PAINTING_ENABLED), so the wizard no longer offers the
+  // toggle. Kept wired, and kept persisted, so whatever a save already holds
+  // survives and the switch works the day the trail comes back as a pickup.
   wormShowTrail: persistedState.wormShowTrail ?? true,
   setWormShowTrail: (v) => {
     try { localStorage.setItem('worm3_show_trail', String(v)); } catch { }
     set({ wormShowTrail: v });
   },
+
+  // Which way is up while crawling. 'face' builds the camera's roll from the face
+  // the worm is on, 'level' from world Y. See WormChaseCamera for why this is a
+  // choice at all: a world-up camera has to flip its up vector under the cube and
+  // has no defined roll when the view lines up with that axis.
+  wormCameraHorizon: persistedState.wormCameraHorizon ?? 'face',
+  toggleWormCameraHorizon: () => set((state) => {
+    const next = state.wormCameraHorizon === 'face' ? 'level' : 'face';
+    try { localStorage.setItem('worm3_camera_horizon', next); } catch { }
+    return { wormCameraHorizon: next };
+  }),
 
   // ── Controls ──────────────────────────────────────────────────────────────
   wormControlMode: 'non-oriented',

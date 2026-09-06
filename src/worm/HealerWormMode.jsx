@@ -46,7 +46,7 @@ import { TunnelInteriorView } from './healerWorm/TunnelInteriorView.jsx';
 import { warmUpElementalSkins } from './healerWorm/elementalWarmup.js';
 import { TunnelTube } from './healerWorm/TunnelTube.jsx';
 import { WormBody, RocketTailFire, GlowWormAura } from './healerWorm/WormBody.jsx';
-import { WormTrail } from './healerWorm/WormTrail.jsx';
+import { WormTrail, TRAIL_PAINTING_ENABLED } from './healerWorm/WormTrail.jsx';
 import { WormFace } from './healerWorm/WormFace.jsx';
 import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem, MagnetFX } from './healerWorm/orbSystems.jsx';
 import ElementalAtmosphere from './ElementalAtmosphere.jsx';
@@ -564,7 +564,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}
             <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
-            {wormAlive && <WormTrail worm={worm} size={size} />}
+            {/* Parked, not deleted — the painted route survives a hazard turn only
+                in pieces, since the paint rides the slice it sits on. See
+                WormTrail.jsx; the plan is to bring it back as a pickup. */}
+            {wormAlive && TRAIL_PAINTING_ENABLED && <WormTrail worm={worm} size={size} />}
             {wormAlive && <WormBody worm={worm} size={size} />}
             {wormAlive && <RocketTailFire worm={worm} size={size} />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
