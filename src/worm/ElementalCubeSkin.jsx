@@ -272,7 +272,7 @@ export default function ElementalCubeSkin({ size = 3 }) {
       // they read it to gate the sweep and the dissolve, so no per-instance work is
       // needed for either.
       const u = inst.material?.uniforms?.uEnv;
-      if (u) u.value.set(env.intensity, env.claim, env.release, 0);
+      if (u) u.value.set(env.intensity, env.claim, env.release, quality.animate ? 1 : 0);
     }
   });
 
@@ -323,7 +323,8 @@ export default function ElementalCubeSkin({ size = 3 }) {
           quaternion={c.restQuat}
           scale={[c.cell * 0.01, c.cell * 0.01, 0.01]}
         >
-          <GrassBlades faceColor={def.color} />
+          <GrassBlades faceColor={def.color} elemental animate={quality.animate}
+            count={quality.accents ? 110 : 64} seed={cellData.cell[i * 4 + 3]} />
         </group>
       ))}
     </group>
