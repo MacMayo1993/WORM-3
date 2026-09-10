@@ -59,8 +59,9 @@ export function deactivateSticker(key) {
   if (key) activeKeys.delete(key);
 }
 
-export function runActiveStickers(state, delta) {
+export function runActiveStickers(state, delta, prefix = null) {
   for (const key of activeKeys) {
+    if (prefix && !key.startsWith(prefix)) continue;
     const tick = tickFns.get(key);
     if (tick) tick(state, delta);
     else activeKeys.delete(key); // defensive: unregister normally removes this first
