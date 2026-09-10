@@ -25,7 +25,7 @@ import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import MenuGridGlow from './MenuGridGlow.jsx';
 import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
-import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z, UI_GOLD } from '../../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, PAPER_SHEET, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_BORDER, Z } from '../../utils/uiTheme.js';
 import { ActionButton, IconButton, TOUCH_TARGET } from '../ui/Button.jsx';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
@@ -1262,9 +1262,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   const opacity = show ? 1 : 0;
 
   const arrowStyle = {
-    background: 'rgba(255,255,255,0.08)', border: '1.5px solid rgba(255,255,255,0.30)',
-    borderRadius: '50%', width: '44px', height: '44px', flexShrink: 0,
-    color: '#fff', fontSize: '24px', lineHeight: 1,
+    background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
+    borderRadius: '50%', width: '48px', height: '48px', flexShrink: 0,
+    color: PAPER_TEXT, fontSize: '24px', lineHeight: 1,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
     pointerEvents: 'auto',
@@ -1294,15 +1294,14 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
       {/* Edge vignette only — the center stays clear so the live 3D cube
           (rotating to the active mode's face) reads through the overlay. */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle at 50% 38%, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 36%, rgba(2,3,10,0.50) 74%, rgba(2,3,10,0.85) 100%)',
+        background: 'radial-gradient(circle at 50% 38%, rgba(245,240,232,0) 0%, rgba(245,240,232,0) 36%, rgba(245,240,232,0.78) 74%, rgba(245,240,232,0.97) 100%)',
       }} />
 
       <style>{`
-        .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
+        .mc-arrow:active { background: #ede8df !important; }
         .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
-        /* 30px tall on their own padding — raised to the 44px floor without
-           changing their width or type. */
-        .mc-pill         { min-height: 44px; }
+        /* Keep utility actions comfortable to tap on phones. */
+        .mc-pill         { min-height: 48px; }
         .mc-pill:hover   { filter: brightness(1.14); }
         .mc-pill:active  { transform: scale(0.97); }
         .mc-cube-window { height: min(47vh, 415px); }
@@ -1325,7 +1324,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         pointerEvents: diving ? 'none' : 'auto',
       }}>
 
-        <p style={{ margin: '0 0 6px', fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: UI_GOLD, fontFamily: UI_FONT, textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
+        <p style={{ margin: '0 0 6px', fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: PAPER_TEXT, fontFamily: UI_FONT, background: PAPER_SHEET, border: `1px solid ${PAPER_BORDER}`, borderRadius: '100px', padding: '8px 16px' }}>
           Choose your mode
         </p>
 
@@ -1376,10 +1375,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
                   // scene behind it — the yellow face read as mustard, red and
                   // orange collapsed into one brown, and the white face came out
                   // grey, which is the one colour that cannot survive being
-                  // faded. The active dot is already marked by width and glow,
+                  // faded. The active dot is already marked by width and outline,
                   // so opacity was carrying no load the shape was not.
                   opacity: 1,
-                  boxShadow: i === activeIndex ? `0 0 10px ${m.tileColor}` : 'none',
+                  boxShadow: i === activeIndex ? `0 0 0 2px ${PAPER_TEXT}` : `0 0 0 1px ${PAPER_BORDER}`,
                   transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), opacity 200ms ease',
                 }}
               />
@@ -1391,21 +1390,21 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         <div style={{ width: 'min(400px, 94vw)', marginTop: '10px', opacity, transition: 'opacity 150ms ease' }}>
           <div style={{
             borderRadius: '16px',
-            background: 'linear-gradient(180deg, rgba(34,42,26,0.94), rgba(20,26,15,0.96))',
-            border: `1px solid ${NIGHT_BORDER}`,
+            background: PAPER_SHEET,
+            border: `1px solid ${PAPER_BORDER}`,
             padding: '14px 18px', position: 'relative', overflow: 'hidden',
           }} aria-label={`${mode.label} mode details`}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
             {/* The one-line hook: what this mode actually is, in plain sentence
                 case. The bullets below are the details, not the pitch. */}
-            <p style={{ margin: 0, textAlign: 'center', fontSize: 'clamp(12px, 3.2vw, 13.5px)', lineHeight: 1.45, color: 'rgba(255,253,242,0.72)', fontFamily: UI_FONT, fontWeight: 500 }}>
+            <p style={{ margin: 0, textAlign: 'center', fontSize: 'clamp(12px, 3.2vw, 13.5px)', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: UI_FONT, fontWeight: 500 }}>
               {mode.desc}
             </p>
             <div style={{ marginTop: '14px' }}>
               {mode.controls.map((ctrl, i) => (
                 <div key={i} style={{ display: 'flex', gap: '10px', margin: '6px 0', alignItems: 'flex-start' }}>
-                  <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '2px', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '5px', flexShrink: 0 }} />
-                  <span style={{ fontSize: 'clamp(10.5px, 2.8vw, 12px)', fontWeight: 700, letterSpacing: '0.05em', lineHeight: 1.5, textTransform: 'uppercase', color: 'rgba(255,253,242,0.86)', fontFamily: UI_FONT }}>{ctrl}</span>
+                  <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '2px', background: mode.tileColor, border: `1px solid ${PAPER_BORDER}`, marginTop: '5px', flexShrink: 0 }} />
+                  <span style={{ fontSize: 'clamp(10.5px, 2.8vw, 12px)', fontWeight: 700, letterSpacing: '0.05em', lineHeight: 1.5, textTransform: 'uppercase', color: PAPER_TEXT, fontFamily: UI_FONT }}>{ctrl}</span>
                 </div>
               ))}
             </div>
@@ -1428,18 +1427,15 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             }}
           >{mode.cta || 'PLAY'}</button>
 
-          {/* Utility row — destinations that are not game modes. The pills carry
-              the active mode's colour (a translucent fill + solid rim of
-              mode.tileColor) so they read as the same system as the PLAY button
-              above, just quieter. */}
+          {/* Paper utility actions keep their labels readable over every panorama. */}
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
             {UTILITY_MODES.map((u) => (
               <button
                 key={u.id} type="button" className="mc-pill" onClick={() => launch(u.id)}
                 style={{
-                  background: `${mode.tileColor}26`, border: `1.5px solid ${mode.tileColor}`,
+                  background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
                   borderRadius: '100px', padding: '8px 18px',
-                  color: PILL_INK, fontSize: '11.5px', fontWeight: 700,
+                  color: PAPER_TEXT, fontSize: '11.5px', fontWeight: 700,
                   letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
                   transition: 'filter 160ms ease, background 160ms ease',
                   WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
@@ -1449,9 +1445,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             <button
               type="button" className="mc-pill" onClick={onBack}
               style={{
-                background: `${mode.tileColor}26`, border: `1.5px solid ${mode.tileColor}`,
+                background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
                 borderRadius: '100px', padding: '8px 18px',
-                color: PILL_INK, fontSize: '11.5px', fontWeight: 700,
+                color: PAPER_TEXT, fontSize: '11.5px', fontWeight: 700,
                 letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
                 transition: 'filter 160ms ease, background 160ms ease',
                 WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
@@ -1483,13 +1479,6 @@ const MenuStartButton = ({ visible, onClick, onDemo, onModes, onStore }) => (
     <a className="home-feedback" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">Give feedback</a>
   </div>
 );
-
-// The utility pills are a 15%-alpha tint of the mode colour over the live
-// scene, i.e. they are dark whatever the mode is — so their ink is fixed light
-// rather than mode.textColor. textColor answers "what reads on a tile FILLED
-// with this colour", which is the opposite question, and following it here put
-// near-black type on a dark backdrop the moment the white face was added.
-const PILL_INK = 'rgba(255, 253, 242, 0.92)';
 
 const MENU_FONT = UI_FONT;
 // ─── Main component ───────────────────────────────────────────────────────────
