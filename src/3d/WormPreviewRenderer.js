@@ -17,6 +17,7 @@
 //     unregisterWormPreview (see WormPreviewCanvas.jsx).
 
 import * as THREE from 'three';
+import { createMobiModel, animateMobi, orientMobi, MOBI_RADIUS } from '../worm/mobiModel.js';
 import { getSkin } from '../worm/wormCosmeticsData.js';
 import { getHatParts } from '../worm/wormHatParts.js';
 import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
@@ -85,6 +86,10 @@ function _buildRig() {
   const pageGeo = createBookPageGeometry(1);
   const rightPageGeo = createBookPageGeometry(-1);
 
+  const mobi = createMobiModel();
+  group.add(mobi.group);
+  const mobiTailGeo = new THREE.BoxGeometry(1.12, 1.12, 1.12);
+  const mobiTails = [];
   const beads = [];
   const boxes = [];
   // Soft camera-facing halos — the Glow Worm's light spilling past its body. See
@@ -105,6 +110,11 @@ function _buildRig() {
     // Rendered before the beads so the body reads as sitting IN the glow.
     halo.renderOrder = -1;
     group.add(bead, box, halo);
+    const mobiTail = new THREE.Mesh(mobiTailGeo, new THREE.MeshPhysicalMaterial({
+      roughness: 0.15, clearcoat: 1, iridescence: 1, transparent: true, opacity: 0.65,
+    }));
+    group.add(mobiTail);
+    mobiTails.push(mobiTail);
     beads.push(bead); boxes.push(box); halos.push(halo);
 
     const leftLayers = [];
@@ -155,7 +165,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
+  return { group, mobi, mobiTails, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -311,6 +321,8 @@ function _poseWorm(opts, time) {
   const isGlow = characterId === 'glow';
   const isBook = characterId === 'book';
   const isPrism = characterId === 'prism';
+  const isMobi = characterId === 'mobi';
+  rig.mobi.group.visible = isMobi;
 
   // Skin FX (material personality + surface displacement + ambient particles)
   // only need reapplying when the equipped/browsed skin actually changes —
@@ -345,7 +357,7 @@ function _poseWorm(opts, time) {
     const body = bookBodySeg ? box : bead;
 
     const shown = !headOnly || i <= 2;
-    bead.visible = shown && !bookBodySeg;
+    bead.visible = shown && !bookBodySeg && !isMobi;
     box.visible = shown && bookBodySeg;
     const pagesShown = shown && bookBodySeg && i % BOOK_SEGMENT_STRIDE === 0;
     for (const l of leftLayers) l.visible = pagesShown;
@@ -382,6 +394,14 @@ function _poseWorm(opts, time) {
       _color.set(skin.body);
     }
     body.material.color.copy(_color);
+    const mobiTail = rig.mobiTails[i];
+    mobiTail.visible = isMobi && shown && i !== 0;
+    if (mobiTail.visible) {
+      mobiTail.position.copy(_off);
+      mobiTail.scale.setScalar(BODY_SCALE);
+      orientMobi(mobiTail, FWD, UP);
+      mobiTail.material.color.copy(_color);
+    }
 
     // Book Worm: orient the cover to face the direction of travel (derived
     // from consecutive segment offsets, since the preview has no real turn
@@ -492,6 +512,17 @@ function _poseWorm(opts, time) {
   if (blink !== 1) {
     rig.eyes.forEach(eye => { eye.scale.y *= blink; });
     rig.pupils.forEach(pupil => { pupil.scale.y *= blink; });
+  }
+
+  rig.eyes.forEach(eye => { eye.visible = !isMobi; });
+  rig.pupils.forEach(eye => { eye.visible = !isMobi; });
+  rig.mouth.visible = !isMobi;
+  if (isMobi) {
+    rig.mobi.group.position.copy(_anchor);
+    orientMobi(rig.mobi.group, FWD, UP);
+    animateMobi(rig.mobi, time);
+    rig.hatGroup.position.copy(_anchor).addScaledVector(UP, MOBI_RADIUS * 1.1);
+    rig.hatGroup.quaternion.copy(rig.mobi.group.quaternion);
   }
 
   // Hat — rebuilt only when the hat changes, then parked above the head.
