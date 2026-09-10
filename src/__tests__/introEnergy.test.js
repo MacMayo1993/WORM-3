@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { INTRO_END } from '../components/intro/introChoreography.js';
 import { introEnergy, introMote } from '../components/intro/introEnergy.js';
 
 describe('opening atmosphere bounds', () => {
   it('disables every accent in reduced motion and clears visible effects at completion', () => {
-    for (let t = 0; t < 9; t += 0.02) {
+    for (let t = 0; t < INTRO_END; t += 0.02) {
       expect(Object.values(introEnergy(t, true)).every(v => v === 0)).toBe(true);
       for (const value of Object.values(introEnergy(t))) {
         expect(value).toBeGreaterThanOrEqual(0);
         expect(value).toBeLessThanOrEqual(1);
       }
     }
-    const end = introEnergy(8.5);
+    const end = introEnergy(INTRO_END);
     expect(end.charge + end.burst + end.dust + end.push).toBe(0);
   });
   it('keeps motes bounded and preserves their positions between quality tiers', () => {

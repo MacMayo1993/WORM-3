@@ -1,15 +1,16 @@
 import React from 'react';
 import { INTRO_END, ramp, windowOpacity } from './introChoreography.js';
 import './intro.css';
+import { TITLE_START, TITLE_END, IMPLODE_START } from './introTiming.js';
 
 const BEATS = [
   { start: 0.1, end: 2.2, eyebrow: 'Every tile has a twin', text: 'What if opposite…' },
-  { start: 2.3, end: 6.8, eyebrow: '27 pairs. One connected cube.', text: 'was the same place?' }
+  { start: 2.3, end: IMPLODE_START + 0.4, eyebrow: '27 pairs. One connected cube.', text: 'was the same place?' }
 ];
 
 export default function TextOverlay({ time, reducedMotion = false }) {
   const beat = BEATS.find(b => time >= b.start && time <= b.end);
-  const title = reducedMotion ? 1 : ramp(time, 6.9, 7.4);
+  const title = reducedMotion ? 1 : ramp(time, TITLE_START, TITLE_END);
   return (
     <>
       <div className="opening-edge" aria-hidden="true" />

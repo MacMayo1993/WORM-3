@@ -3,9 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
-import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
-import { applyDemoOverrides } from '../../utils/demoSettings.js';
-import { flipPose } from '../../utils/flipPose.js';
+import StickerPlane from '../../3d/StickerPlane.jsx';
+import { runActiveStickers, wispyTime } from '../../3d/StickerAnimationManager.js';
+import { INTRO_STICKERS, INTRO_PRESENTATION, introStickerStage } from './introStickers.js';
+import { INTRO_SCALE, fitIntroFrame } from './introFraming.js';
 import IntroTunnels from './IntroTunnels.jsx';
 import { INTRO_END, sampleIntro, introCameraDistance } from './introChoreography.js';
 import IntroEnergy from './IntroEnergy.jsx';
@@ -14,6 +15,9 @@ import { WORM_START } from './introTiming.js';
 import { FACES, CELLS, TILES, PAIRS, flippedColor, pairPoint } from './introTopology.js';
 
 const WORM_SEGMENTS = 10;
+const TILE_OFFSETS = TILES.map(tile => {
+  const p = [0, 0, 0]; p[tile.face.axis] = 0.51 * tile.face.sign; return p;
+});
 
 // All 54 gameplay-style stickers and 27 connections; bodies and worms are instanced.
 // Connections use an x-ray presentation so back-face pairs remain visible.
@@ -25,27 +29,30 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
   const eyes = useRef();
   const gates = useRef();
   const finished = useRef(false);
+  const previousTime = useRef(time);
+  const stickerStage = introStickerStage(time, reducedMotion);
   const assets = useMemo(() => ({
     body: new RoundedBoxGeometry(0.96, 0.96, 0.96, 2, 0.065),
-    tile: new THREE.PlaneGeometry(0.84, 0.84),
-    tileMaterials: FACES.map(f => getTileStyleMaterial(applyDemoOverrides({}).manifoldStyles[f.color], COLOR_SCHEMES.standard[f.color]).clone()),
     dummy: new THREE.Object3D(), color: new THREE.Color(),
-    faceRotation: new THREE.Quaternion(),
     euler: new THREE.Euler(),
     colors: Object.fromEntries(FACES.map(f => [f.color, new THREE.Color(COLOR_SCHEMES.standard[f.color])]))
   }), []);
-  useEffect(() => () => { assets.body.dispose(); assets.tile.dispose(); assets.tileMaterials.forEach(m => m.dispose()); }, [assets]);
+  useEffect(() => () => { assets.body.dispose(); }, [assets]);
   useEffect(() => {
     if (time >= INTRO_END && !finished.current) { finished.current = true; onComplete?.(); }
   }, [time, onComplete]);
 
-  useFrame(({ camera }) => {
+  useFrame((state) => {
+    const { camera } = state;
+    const delta = Math.min(0.1, Math.max(0, time - previousTime.current));
+    previousTime.current = time;
+    wispyTime.value = reducedMotion ? 0 : time;
+    runActiveStickers({ ...state, clock: { elapsedTime: reducedMotion ? 0 : time } }, reducedMotion ? 0 : delta, 'intro:');
     const pose = sampleIntro(time, reducedMotion);
     const energy = introEnergy(time, reducedMotion);
-    const { dummy, color, faceRotation, euler } = assets;
+    const { dummy, color, euler } = assets;
     const spacing = 1 + 1.5 * pose.open;
     const lift = 0.51;
-    const snap = flipPose(pose.flip / Math.PI, 1 / 3);
     root.current.rotation.set(0.12 + 0.1 * pose.open, pose.turn, 0);
     root.current.position.y = 0.25;
     bodies.current.material.opacity = 1 - 0.82 * pose.open;
@@ -56,14 +63,8 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
       dummy.updateMatrix();
       bodies.current.setMatrixAt(i, dummy.matrix);
     });
-    TILES.forEach(({ position: p, face: f, faceIndex }, i) => {
-      const tile = tiles.current[i];
-      tile.position.set(p[0] * spacing, p[1] * spacing, p[2] * spacing);
-      tile.position.setComponent(f.axis, tile.position.getComponent(f.axis) + lift * f.sign);
-      faceRotation.setFromEuler(euler.set(...f.rotation));
-      tile.quaternion.copy(faceRotation);
-      tile.scale.set(snap.mainScale, snap.crossScale, 1);
-      tile.material = assets.tileMaterials[pose.flip >= Math.PI / 2 ? faceIndex ^ 1 : faceIndex];
+    TILES.forEach(({ position: p }, i) => {
+      tiles.current[i].position.set(p[0] * spacing, p[1] * spacing, p[2] * spacing);
     });
     bodies.current.instanceMatrix.needsUpdate = true;
     gates.current.visible = pose.passage > 0.001;
@@ -113,16 +114,19 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
     camera.position.set(Math.sin(pose.orbit) * distance, distance * 0.32, Math.cos(pose.orbit) * distance);
     camera.up.set(0, 1, 0);
     camera.lookAt(0, -0.55, 0);
+    fitIntroFrame(camera, root.current, spacing + 0.56);
   });
 
   return (
-    <group ref={root}>
+    <group ref={root} scale={INTRO_SCALE}>
       <IntroEnergy time={time} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <instancedMesh ref={bodies} args={[assets.body, null, CELLS.length]} frustumCulled={false}>
         <meshStandardMaterial color="#293329" roughness={0.32} metalness={0.2} transparent depthWrite={false} />
       </instancedMesh>
-      {TILES.map((tile, i) => <mesh key={i} ref={node => { tiles.current[i] = node; }} geometry={assets.tile}
-        material={assets.tileMaterials[tile.faceIndex]} dispose={null} />)}
+      {TILES.map((tile, i) => <group key={i} ref={node => { tiles.current[i] = node; }}>
+        <StickerPlane meta={INTRO_STICKERS[stickerStage][i]} pos={TILE_OFFSETS[i]} rot={tile.face.rotation}
+          mode="classic" faceSize={3} presentation={INTRO_PRESENTATION} />
+      </group>)}
       <IntroTunnels time={time} reducedMotion={reducedMotion} />
       <instancedMesh ref={gates} args={[null, null, PAIRS.length * 2]} frustumCulled={false} renderOrder={3}>
         <torusGeometry args={[0.29, 0.025, 6, 24]} />

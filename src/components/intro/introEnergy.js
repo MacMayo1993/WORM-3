@@ -1,3 +1,4 @@
+import { IMPLODE_START, TITLE_END } from './introTiming.js';
 import { ramp, windowOpacity } from './introChoreography.js';
 
 // Envelopes are slow, local accents: no full-screen flash or camera shake.
@@ -7,8 +8,8 @@ export function introEnergy(time, reducedMotion = false) {
     charge: windowOpacity(time, 0.55, 2.2),
     burst: windowOpacity(time, 2.25, 3.75),
     release: ramp(time, 2.25, 3.75),
-    dust: windowOpacity(time, 0.4, 7.35),
-    push: windowOpacity(time, 4.0, 6.25)
+    dust: windowOpacity(time, 0.4, TITLE_END),
+    push: windowOpacity(time, 4.0, IMPLODE_START - 0.15)
   };
 }
 

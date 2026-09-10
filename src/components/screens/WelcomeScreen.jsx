@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect } from 'react';
+import { TITLE_END } from '../intro/introTiming.js';
 import TextOverlay from '../intro/TextOverlay.jsx';
 
 const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
@@ -46,7 +47,7 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
         Skip →
       </button>
 
-      {(introSeen || reducedMotion || introTime >= 7.4) && (
+      {(introSeen || reducedMotion || introTime >= TITLE_END) && (
         <button
           type="button"
           aria-label="Enter game"

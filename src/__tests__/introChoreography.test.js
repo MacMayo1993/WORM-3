@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from 'three';
 import { TILES, PAIRS, flippedColor, pairPoint } from '../components/intro/introTopology.js';
-import { WORM_START, IMPLODE_START } from '../components/intro/introTiming.js';
+import { WORM_START, IMPLODE_START, IMPLODE_END, TITLE_START, TITLE_END } from '../components/intro/introTiming.js';
 import { INTRO_END, sampleIntro, introCameraDistance } from '../components/intro/introChoreography.js';
 
 // These protect animation failure modes: discontinuous cuts, clipped framing,
 // mistaken antipodes, and a supposedly reduced-motion path that still moves.
 describe('opening cinematic choreography', () => {
   it('has no jumps at camera or animation beat boundaries', () => {
-    for (const t of [0.1, 0.6, 1.0, 2.1, 2.2, 2.3, 3.2, 3.3, 6.4, 6.9, 7.2, 7.4]) {
+    for (const t of [0.1, 0.6, 1.0, 2.1, 2.2, 2.3, 3.2, 3.3, IMPLODE_START, TITLE_START, IMPLODE_END, TITLE_END]) {
       const before = sampleIntro(t - 0.00001);
       const after = sampleIntro(t + 0.00001);
       for (const key of ['open', 'reveal', 'turn', 'orbit', 'distance', 'flip', 'passage', 'title']) {
@@ -57,7 +57,7 @@ describe('all-pairs reveal', () => {
   it('changes all 54 tile colors during the flip and restores them on return', () => {
     const before = sampleIntro(0.9).flip;
     const flipped = sampleIntro(2.15).flip;
-    const restored = sampleIntro(8).flip;
+    const restored = sampleIntro(INTRO_END).flip;
     for (const tile of TILES) {
       expect(flippedColor(tile.faceIndex, before)).toBe(tile.face.color);
       expect(flippedColor(tile.faceIndex, flipped)).not.toBe(tile.face.color);
@@ -67,6 +67,7 @@ describe('all-pairs reveal', () => {
   it('lets even the last worm tail arrive before the cube closes', () => {
     const lastArrival = WORM_START + (PAIRS.length - 1) * 0.012 + (1 + 9 * 0.016) * 2.2;
     expect(lastArrival).toBeLessThan(IMPLODE_START);
-    expect(INTRO_END).toBeLessThanOrEqual(9);
+    expect(IMPLODE_START - lastArrival).toBeGreaterThan(3);
+    expect(INTRO_END).toBeLessThanOrEqual(12);
   });
 });

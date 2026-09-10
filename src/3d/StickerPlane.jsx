@@ -696,10 +696,10 @@ function TombstoneGhost() {
   );
 }
 
-const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir, surfaceTileKey }) {
+const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir, surfaceTileKey, presentation = null }) {
   // Static game config — set once at game start, rarely changes during active play.
   // Kept in one shallow selector so tile-style/palette changes still reach all stickers.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme, wormHealerMode, perfReducedFX } = useGameStore(
+  const gameConfig = useGameStore(
     useShallow((s) => ({
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
@@ -712,6 +712,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       perfReducedFX: s.perfReducedFX ?? false,
     }))
   );
+  // Cinematics render real stickers with local styling, never changing saved settings.
+  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
     [settings]
@@ -923,7 +925,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // keys by grid slot (StickerPlane persists across turns to avoid the rotation-end
   // remount storm), so the id can change under a live component — recompute it every
   // render and keep the ref (read by the tick + FX-map cleanup) in sync.
-  const stickerGridId = meta ? getManifoldGridId(meta, faceSize) : null;
+  const stickerGridId = meta ? `${presentation ? 'intro:' : ''}${getManifoldGridId(meta, faceSize)}` : null;
   const stickerGridIdRef = useRef(stickerGridId);
   stickerGridIdRef.current = stickerGridId;
   // Per-sticker dynamic selectors — subscribe only to this sticker's own derived values.
@@ -1175,7 +1177,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       glowT.current = 0;
       // Camera micro-kick along the tile's outward normal (recoil out); the tile
       // itself punches the other way in tickImpl (innerGroupRef −Z, into the cube).
-      if (groupRef.current) {
+      if (!presentation && groupRef.current) {
         groupRef.current.getWorldQuaternion(_flipWorldQuat);
         _flipWorldN.set(0, 0, 1).applyQuaternion(_flipWorldQuat);
         const dangerT = effectiveFlipCap > 0 ? Math.min(1, flips / effectiveFlipCap) : 0;
@@ -1183,7 +1185,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       // One dispatch owns sound + haptics: feel() gates both on the player's
       // settings, where the old direct vibrateFlip call ignored them.
-      feel('cubeFlip', { combo: flips, cap: effectiveFlipCap });
+      if (!presentation) feel('cubeFlip', { combo: flips, cap: effectiveFlipCap });
     }
     prevCurr.current = curr;
     prevFlips.current = flips;
@@ -2423,6 +2425,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 // these extra checks never fire (no added re-renders). pos/rot are stable module
 // constants so reference equality is sufficient.
 function stickerPropsAreEqual(prev, next) {
+  if (prev.presentation !== next.presentation) return false;
   if (prev.pos !== next.pos || prev.rot !== next.rot) return false;
   if (prev.mode !== next.mode || prev.hollow !== next.hollow) return false;
   if (prev.faceSize !== next.faceSize) return false;
