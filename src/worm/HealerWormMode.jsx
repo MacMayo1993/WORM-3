@@ -38,7 +38,7 @@ import { feel, setFeelEnabled } from '../utils/feel.js';
 import { EARN_ORB_COLLECT } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
 import { shAt } from './circularBuffers.js';
-import { rideLiveRotation, checkWormHitBySlice, cutWormTail } from './wormHelpers.js';
+import { rideLiveRotation, resolveSliceHits, cutWormTail } from './wormHelpers.js';
 import { useWormCrawler } from './useWormCrawler.js';
 import WormChaseCamera from './WormChaseCamera.jsx';
 import WormSwipeControls from './WormSwipeControls.jsx';
@@ -497,13 +497,22 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const { axis, dir, sliceIndex, sliceIndices, sliceDirs } = pendingRotRef.current;
             inverseQueueRef.current.shift(); // now dequeue
 
-            // Hit detection — the worm can be caught by EITHER spinning plane.
+            // Hit detection — the worm can be caught by EITHER spinning plane, so both
+            // are resolved before anything is applied. Taking the first plane that
+            // reported a hit made the outcome depend on the order the planes were listed
+            // in: a tail cut on plane 0 masked a death on plane 2 and the worm walked
+            // away from a turn that had it trapped. See resolveSliceHits.
+            //
+            // TIMING (unchanged, and deliberately so): this is evaluated once, on the
+            // frame the turn is dequeued and the animation starts. `worm.pos` is the
+            // destination of the step in flight, not where the head is on screen, so a
+            // worm mid-step is judged by where it is going. Making this continuous would
+            // need a rule for what a crossing worm is allowed to do — it would otherwise
+            // re-damage the same body every frame of the tween and punish exactly the
+            // crossings rest-read protection exists to allow — so it stays a single
+            // decision at the start of the turn until that rule is designed.
             const layers = sliceIndices?.length ? sliceIndices : [sliceIndex];
-            let hit = null;
-            for (const layer of layers) {
-                hit = checkWormHitBySlice(worm, axis, layer);
-                if (hit) break;
-            }
+            const hit = resolveSliceHits(worm, axis, layers);
             if (hit) {
                 const histEntry = hit.type === 'cut'
                     ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)
@@ -518,7 +527,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     colors: cutColors.length ? cutColors : ['#ffdd44', '#ff8800'],
                 };
                 if (hit.type === 'death') {
-                    worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex });
+                    // The plane that actually caught the worm, not the anchor.
+                    worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex: hit.sliceIndex ?? sliceIndex });
                 } else {
                     cutWormTail(worm, hit.cutTrailIdx);
                     feel('cut');

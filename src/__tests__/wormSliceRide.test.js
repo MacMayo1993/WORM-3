@@ -26,50 +26,63 @@ describe('isTileInSlice', () => {
   });
 });
 
+// A stand-in for the live-rotation bridge. The real one publishes every turning
+// plane and a transaction id; tests build the same shape by hand.
+const live = (axis, sliceIndices, txnId = 1) => ({ active: true, axis, sliceIndices, txnId });
+const idle = { active: false, axis: null, sliceIndices: [], txnId: 1 };
+
 describe('nextRestRead — end-of-rotation read for steps crossing a mid-rotation slice', () => {
   // 5×5 cube, row slice y=2 rotating. Static tiles have y≠2; slice tiles have y=2.
   const staticA = { x: 0, y: 1, z: 4 };
   const staticB = { x: 0, y: 0, z: 4 };
   const sliceA = { x: 0, y: 2, z: 4 };
   const sliceB = { x: 1, y: 2, z: 4 };
-  const armed = { axis: 'row', sliceIndex: 2 };
+  const row2 = live('row', [2]);
+  const armed = { txnId: 1, axis: 'row', layers: [2] };
 
   it('stays clear when no rotation is animating', () => {
-    expect(nextRestRead(null, false, 'row', 2, staticA, sliceA)).toBeNull();
-    expect(nextRestRead(armed, false, 'row', 2, staticA, sliceA)).toBeNull();
+    expect(nextRestRead(null, idle, staticA, sliceA)).toBeNull();
+    expect(nextRestRead(armed, idle, staticA, sliceA)).toBeNull();
   });
 
   it('arms when crossing from static ground onto the rotating slice', () => {
-    expect(nextRestRead(null, true, 'row', 2, staticA, sliceA)).toEqual({ axis: 'row', sliceIndex: 2 });
+    expect(nextRestRead(null, row2, staticA, sliceA)).toEqual(armed);
   });
 
   it('arms on the first step (no source tile yet) onto the rotating slice', () => {
-    expect(nextRestRead(null, true, 'row', 2, null, sliceA)).toEqual({ axis: 'row', sliceIndex: 2 });
+    expect(nextRestRead(null, row2, null, sliceA)).toEqual(armed);
   });
 
   it('stays armed while stepping along the rotating slice', () => {
-    expect(nextRestRead(armed, true, 'row', 2, sliceA, sliceB)).toBe(armed);
+    expect(nextRestRead(armed, row2, sliceA, sliceB)).toBe(armed);
   });
 
   it('stays armed while stepping back off the slice (the lerp source is still a rest-read cell)', () => {
-    expect(nextRestRead(armed, true, 'row', 2, sliceA, staticA)).toBe(armed);
+    expect(nextRestRead(armed, row2, sliceA, staticA)).toBe(armed);
   });
 
   it('clears once both step endpoints are on static ground', () => {
-    expect(nextRestRead(armed, true, 'row', 2, staticA, staticB)).toBeNull();
+    expect(nextRestRead(armed, row2, staticA, staticB)).toBeNull();
   });
 
   it('keeps a rider riding: a worm already on the slice never arms by stepping within it', () => {
-    expect(nextRestRead(null, true, 'row', 2, sliceA, sliceB)).toBeNull();
-    expect(nextRestRead(null, true, 'row', 2, sliceA, staticA)).toBeNull();
+    expect(nextRestRead(null, row2, sliceA, sliceB)).toBeNull();
+    expect(nextRestRead(null, row2, sliceA, staticA)).toBeNull();
   });
 
   it('drops a descriptor from a previous rotation when a different one is animating', () => {
     // Same step shape, but the live rotation is now col/0 — the old row/2 state must not leak.
-    expect(nextRestRead(armed, true, 'col', 3, sliceA, sliceB)).toBeNull();
+    expect(nextRestRead(armed, live('col', [3], 2), sliceA, sliceB)).toBeNull();
     // And crossing into the NEW rotating slice re-arms for that rotation.
-    expect(nextRestRead(armed, true, 'col', 0, { x: 1, y: 2, z: 4 }, { x: 0, y: 2, z: 4 }))
-      .toEqual({ axis: 'col', sliceIndex: 0 });
+    expect(nextRestRead(armed, live('col', [0], 2), { x: 1, y: 2, z: 4 }, { x: 0, y: 2, z: 4 }))
+      .toEqual({ txnId: 2, axis: 'col', layers: [0] });
+  });
+
+  it('does not inherit protection from an earlier rotation of the SAME axis and layer', () => {
+    // The cancelled turn's descriptor names row 2 under transaction 1. A new turn of
+    // row 2 (transaction 2) starts; the worm is already on the slice, so it is a rider
+    // for the new turn and must not be handed the old turn's protection.
+    expect(nextRestRead(armed, live('row', [2], 2), sliceA, sliceB)).toBeNull();
   });
 });
 
@@ -78,17 +91,17 @@ describe('nextRestReadDuringStep — rotations that begin mid-traversal', () => 
   const sliceTile = { x: 0, y: 2, z: 4 };
 
   it('arms a static-to-slice crossing when rotation begins 60% through the step', () => {
-    expect(nextRestReadDuringStep(null, true, 'row', 2, 0.6, staticTile, sliceTile))
-      .toEqual({ axis: 'row', sliceIndex: 2 });
+    expect(nextRestReadDuringStep(null, live('row', [2]), 0.6, staticTile, sliceTile))
+      .toEqual({ txnId: 1, axis: 'row', layers: [2] });
   });
 
   it('does not reclassify a completed step because the worm is already a slice rider', () => {
-    expect(nextRestReadDuringStep(null, true, 'row', 2, 1, staticTile, sliceTile)).toBeNull();
+    expect(nextRestReadDuringStep(null, live('row', [2]), 1, staticTile, sliceTile)).toBeNull();
   });
 
   it('clears a crossing if the live rotation is cancelled before commit', () => {
-    const armed = { axis: 'row', sliceIndex: 2 };
-    expect(nextRestReadDuringStep(armed, false, 'row', 2, 0.7, staticTile, sliceTile)).toBeNull();
+    const armed = { txnId: 1, axis: 'row', layers: [2] };
+    expect(nextRestReadDuringStep(armed, idle, 0.7, staticTile, sliceTile)).toBeNull();
   });
 });
 

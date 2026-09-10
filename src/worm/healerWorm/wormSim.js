@@ -42,6 +42,7 @@ import {
     isTileInSlice,
     nextRestRead,
     nextRestReadDuringStep,
+    restReadProtectsTile,
     rotateMoveDir,
     collectManifoldRing,
     findCoveredWormholeRing,
@@ -170,11 +171,19 @@ export function makeWormSim(size) {
         lastRecordedT: 0,
 
         // ── Rest-read (mid-rotation slice crossing) ───────────────────────────
-        // Non-null while the current step must read a mid-rotation slice at its
-        // committed (end-of-rotation) state. See nextRestRead in wormLogic.js.
-        restReadSlice: null,
-        // Trail keys laid down while rest-reading — skipped by the commit-time remap.
-        restReadTileKeys: new Set(),
+        // Non-null while the HEAD's current step must read a mid-rotation slice at
+        // its committed (end-of-rotation) state: { txnId, axis, layers[] }. A move can
+        // turn several planes at once, so this names every plane the head is crossing
+        // into. See nextRestRead in wormLogic.js.
+        restRead: null,
+        // Cells occupied in destination space, and which rotation put them there:
+        // tileKey → { txnId, axis, sliceIndex }. This is the HISTORICAL protection, and
+        // it deliberately outlives `restRead`: once the head steps off the plane it is
+        // no longer crossing, but the trail entries and body samples it laid down in
+        // destination space still must not be rotated again when the turn commits.
+        // Per-entry provenance rather than a bare Set of coordinates, so a later visit
+        // to the same cell under a different rotation cannot inherit protection.
+        restReadTiles: new Map(),
 
         // ── Jump ───────────────────────────────────────────────────────────────
         jumpT: 0,                 // 0 = grounded, >0 = in air
@@ -309,8 +318,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.lastFlipped = false;
     sim.prevDirKey = null;
     sim.prevTile = null;
-    sim.restReadSlice = null;
-    sim.restReadTileKeys.clear();
+    sim.restRead = null;
+    sim.restReadTiles.clear();
     sim.crossingCorner = false;
     sim.interpT = 1;
     sim.prevWorldPos = null;
@@ -1060,33 +1069,35 @@ const PHASE_HANDLERS = {
             // land, rather than attaching the head to the outgoing cubie and teleporting
             // there. The step-boundary check below remains necessary for turns already
             // active when a new traversal begins.
-            const previousRestRead = sim.restReadSlice;
-            sim.restReadSlice = nextRestReadDuringStep(
-                previousRestRead, liveRotation.active, liveRotation.axis, liveRotation.sliceIndex,
-                sim.interpT, sim.prevTile, sim.pos
+            const previousRestRead = sim.restRead;
+            sim.restRead = nextRestReadDuringStep(
+                previousRestRead, liveRotation, sim.interpT, sim.prevTile, sim.pos
             );
-            if (sim.restReadSlice && sim.restReadSlice !== previousRestRead) {
-                sim.restReadTileKeys.add(tileKey(sim.pos));
+            if (sim.restRead && sim.restRead !== previousRestRead) {
+                markRestReadTile(sim, tileKey(sim.pos), sim.restRead, sim.pos.x, sim.pos.y, sim.pos.z);
                 // Some samples from this same traversal may have been recorded before
                 // the rotation began. Re-tag just those recent samples as rest-space;
                 // otherwise the body (though not the head) still gets baked toward the
-                // outgoing tile when the turn commits.
+                // outgoing tile when the turn commits. Every crossed plane is re-tagged,
+                // not just the anchor.
                 const samplesInStep = Math.min(
                     sim.stepHistory.count,
                     Math.ceil(sim.lastRecordedT * STEPS_PER_TILE) + 1
                 );
                 for (let i = 0; i < samplesInStep; i++) {
                     const sample = shAt(sim.stepHistory, i);
-                    if (sample.tx >= 0 && isTileInSlice(
-                        sim.restReadSlice.axis, sim.restReadSlice.sliceIndex,
-                        sample.tx, sample.ty, sample.tz
-                    )) {
+                    if (sample.tx >= 0 &&
+                        restReadProtectsTile(sim.restRead, sample.tx, sample.ty, sample.tz)) {
                         sample.tx = sample.ty = sample.tz = -1;
                     }
                 }
-            } else if (!sim.restReadSlice) {
-                sim.restReadTileKeys.clear();
             }
+            // NOTE: protected cells are NOT dropped when the head stops crossing. The
+            // head can step off the plane while the trail entries and body samples it
+            // laid down in destination space are still waiting for the commit. They are
+            // released by the commit itself, or dropped here once a DIFFERENT rotation
+            // starts — at which point they can no longer belong to anything pending.
+            if (liveRotation.active) dropStaleRestReadTiles(sim, liveRotation.txnId);
 
             // Apply pending turn — RELATIVE to current heading
             if (sim.pendingTurns.length > 0) {
@@ -1260,8 +1271,8 @@ const PHASE_HANDLERS = {
                 // Points recorded while rest-reading a mid-rotation slice already sit at
                 // their committed positions — the -1 sentinel opts them out of the body
                 // ride/bake, which would otherwise swing them along with the outgoing slice.
-                const _rrs = sim.restReadSlice;
-                if (_rrs && isTileInSlice(_rrs.axis, _rrs.sliceIndex, _htx, _hty, _htz)) {
+                const _rrs = sim.restRead;
+                if (_rrs && restReadProtectsTile(_rrs, _htx, _hty, _htz)) {
                     shPush(sim.stepHistory, _evalLiftedPos, ptNorm, -1, -1, -1);
                 } else {
                     shPush(sim.stepHistory, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
@@ -1298,11 +1309,7 @@ const PHASE_HANDLERS = {
                     // End-of-rotation read: a step crossing onto a mid-rotation slice
                     // targets the cell's committed state instead of chasing the tile
                     // that is currently rotating away.
-                    sim.restReadSlice = nextRestRead(
-                        sim.restReadSlice, liveRotation.active, liveRotation.axis, liveRotation.sliceIndex,
-                        sim.prevTile, nextPos
-                    );
-                    if (!sim.restReadSlice) sim.restReadTileKeys.clear();
+                    sim.restRead = nextRestRead(sim.restRead, liveRotation, sim.prevTile, nextPos);
                     // tailLength is measured in visual balls, not tiles. Convert to
                     // approximate occupied tile count so collision checks align with what
                     // players see.
@@ -1328,17 +1335,13 @@ const PHASE_HANDLERS = {
                         sim.tilesSinceTurn++;
                         ttPush(sim.tileTrail, nextKey);
                         ttPush(sim.pathHistory, nextKey);
-                        const _rr = sim.restReadSlice;
-                        if (_rr && isTileInSlice(_rr.axis, _rr.sliceIndex, nextPos.x, nextPos.y, nextPos.z)) {
-                            sim.restReadTileKeys.add(nextKey);
-                        }
+                        const _rr = sim.restRead;
+                        markRestReadTile(sim, nextKey, _rr, nextPos.x, nextPos.y, nextPos.z);
                         // A rest-read destination is already expressed in committed
                         // coordinates, but the cube/tunnel lookup is still pre-commit.
                         // Mixing those frames can heal the outgoing (wrong) tunnel.
                         // applyRotationToSim re-runs this check after the turn commits.
-                        if (!(_rr && isTileInSlice(
-                            _rr.axis, _rr.sliceIndex, nextPos.x, nextPos.y, nextPos.z
-                        ))) {
+                        if (!restReadProtectsTile(_rr, nextPos.x, nextPos.y, nextPos.z)) {
                             tryWormholeRingHeal(sim, size, ctx);
                         }
                     }
@@ -1370,8 +1373,7 @@ const PHASE_HANDLERS = {
                 // still mid-flight — what actually lands here is only knowable at commit,
                 // so pickup and flipped-tile detection are deferred. applyRotationToSim
                 // re-runs both on the landed contents.
-                const destMidRotation = !!(sim.restReadSlice &&
-                    isTileInSlice(sim.restReadSlice.axis, sim.restReadSlice.sliceIndex, x, y, z));
+                const destMidRotation = restReadProtectsTile(sim.restRead, x, y, z);
                 if (!destMidRotation) {
                     tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
                     trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
@@ -1820,21 +1822,104 @@ export function stepWormSim(sim, delta, size, ctx) {
  * @param {object} rot - { axis, dir, sliceIndex } of the committed move
  * @param {object} opts - { inOpeningScramble, paused } snapshot flags
  */
+/**
+ * Mark a cell as occupied in destination space by the rotation currently live, so
+ * neither the commit-time trail remap nor the body bake turns it a second time.
+ * Provenance is per entry: a later visit to the same cell under a different rotation
+ * records its own entry rather than inheriting this one.
+ */
+function markRestReadTile(sim, key, restRead, x, y, z) {
+    if (!restRead) return;
+    const { axis, layers } = restRead;
+    for (let i = 0; i < layers.length; i++) {
+        if (isTileInSlice(axis, layers[i], x, y, z)) {
+            sim.restReadTiles.set(key, { txnId: restRead.txnId, axis, sliceIndex: layers[i] });
+            return;
+        }
+    }
+}
+
+/** Drop protection recorded by rotations other than the one now running. */
+function dropStaleRestReadTiles(sim, txnId) {
+    const tiles = sim.restReadTiles;
+    if (tiles.size === 0) return;
+    for (const [key, prov] of tiles) {
+        if (prov.txnId !== txnId) tiles.delete(key);
+    }
+}
+
+/**
+ * Apply ONE committed rotation — every plane it turned — to the sim.
+ *
+ * This is a transaction, not a per-layer loop the caller runs N times. It used to be
+ * the latter, and the first layer unconditionally cleared `restReadSlice` and the
+ * protected-cell set before the second layer was applied: a worm whose crossing
+ * protection belonged to the second plane lost it, and its destination was rotated
+ * out from under it. (Reproduction: size 3, destination {0,2,2,PZ} protected on row 2,
+ * commit row 0 dir +1 then row 2 dir -1 — the head came out at {0,2,0,NX}.) Running
+ * every layer inside one call also means the deferred pickup/tunnel resolution happens
+ * once, against fully committed coordinates, rather than once per layer against
+ * half-rotated ones.
+ *
+ * @param {object} rot - { axis, dir, sliceIndex } and optionally { sliceIndices, sliceDirs }
+ *                       for a move that turned several planes at once.
+ * @param {object} opts - { inOpeningScramble, paused } snapshot flags
+ */
 export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, paused }) {
     const { axis, dir, sliceIndex } = rot;
+    // Every plane this move turned, each with its own direction. A hazard turn spins
+    // two non-adjacent planes in opposite directions; a plane's own dir is the only
+    // correct one to remap its cells by.
+    const layers = rot.sliceIndices?.length ? rot.sliceIndices : [sliceIndex];
+    const dirs = rot.sliceDirs?.length ? rot.sliceDirs : layers.map(() => dir);
+    /** The direction for the plane a cell sits on, or null when it is on none of them. */
+    const dirForTile = (x, y, z) => {
+        for (let i = 0; i < layers.length; i++) {
+            if (isTileInSlice(axis, layers[i], x, y, z)) return dirs[i];
+        }
+        return null;
+    };
+    /** Rotate a tile by its own plane's direction. Returns the same object when off-plane. */
+    const rotateByOwnLayer = (tile) => {
+        for (let i = 0; i < layers.length; i++) {
+            const r = rotateTilePosition(tile, axis, layers[i], dirs[i], size);
+            if (r !== tile) return r;
+        }
+        return tile;
+    };
 
-    // Steps taken in rest-read mode did NOT ride this slice: the worm targeted its
-    // cells' committed rest positions, so its position, heading, lerp source and the
-    // trail entries it laid down stay put at commit instead of being carried 90°.
-    const restRead = sim.restReadSlice;
-    const restMatches = !!(restRead && restRead.axis === axis && restRead.sliceIndex === sliceIndex);
-    sim.restReadSlice = null;
-    const restKeys = sim.restReadTileKeys;
+    // Steps taken in rest-read mode did NOT ride the plane they crossed onto: the worm
+    // targeted its cells' committed rest positions, so its position, heading, lerp
+    // source and the trail entries it laid down stay put at commit instead of being
+    // carried 90°. Snapshot the protection for the WHOLE transaction, and release it
+    // once at the end — never per layer.
+    const restRead = sim.restRead;
+    // Protection is consumed only by the rotation it was armed under, identified by the
+    // transaction id the bridge records when it resets — which happens synchronously
+    // before the store update that drives this commit, in both the animated and the
+    // drag path. Matching the LIVE transaction too would let a rotation that has
+    // already started (and armed its own protection) have that protection consumed by
+    // the commit of the previous one.
+    const txnMatches = !restRead || restRead.txnId === liveRotation.completedTxnId;
+    const protectedLayers = (restRead && restRead.axis === axis && txnMatches)
+        ? layers.filter(l => restRead.layers.includes(l))
+        : [];
+    const headProtected = restReadProtectsTile(
+        protectedLayers.length ? { axis, layers: protectedLayers } : null,
+        sim.pos.x, sim.pos.y, sim.pos.z
+    );
+    const restTiles = sim.restReadTiles;
+    /** Was this trail key laid down in destination space by THIS transaction? */
+    const tileProtected = (key) => {
+        const prov = restTiles.get(key);
+        return !!prov && prov.axis === axis && layers.includes(prov.sliceIndex) &&
+            prov.txnId === liveRotation.completedTxnId;
+    };
 
-    // Rotate powerups
+    // Rotate powerups — each by its own plane's direction, then publish once.
     if (sim.powerups.length) {
         const pu = sim.powerups;
-        for (let i = 0; i < pu.length; i++) pu[i] = rotateTilePosition(pu[i], axis, sliceIndex, dir, size);
+        for (let i = 0; i < pu.length; i++) pu[i] = rotateByOwnLayer(pu[i]);
         ctx.onPowerupsChanged(pu.slice());
     }
 
@@ -1842,15 +1927,16 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     // the hazard turn (rotateTilePosition carries type/ttl/id across on the copy).
     if (sim.specials.length) {
         const sp = sim.specials;
-        for (let i = 0; i < sp.length; i++) sp[i] = rotateTilePosition(sp[i], axis, sliceIndex, dir, size);
+        for (let i = 0; i < sp.length; i++) sp[i] = rotateByOwnLayer(sp[i]);
         ctx.onSpecialsChanged(sp.slice());
     }
 
     // Rotate the worm's logical grid position so it stays on its tile.
-    // rotateTilePosition returns the SAME object when the tile wasn't in the slice,
-    // so `newPos !== oldPos` is an exact "did this tile ride the slice" test.
+    // rotateByOwnLayer returns the SAME object when the tile wasn't on any turning
+    // plane, so `newPos !== oldPos` is an exact "did this tile ride" test.
     const oldPos = sim.pos;
-    const newPos = restMatches ? oldPos : rotateTilePosition(oldPos, axis, sliceIndex, dir, size);
+    const headLayerDir = dirForTile(oldPos.x, oldPos.y, oldPos.z);
+    const newPos = headProtected ? oldPos : rotateByOwnLayer(oldPos);
     sim.pos = newPos;
     setCurWorldPosFromTile(sim, size);
 
@@ -1863,15 +1949,24 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     // commit its heading update — otherwise the worm resumes crawling in the wrong
     // direction after unpause because its logical heading was left in the old face frame.
     if (newPos !== oldPos && !inOpeningScramble) {
-        sim.moveDir = rotateMoveDir(sim.moveDir, oldPos.dirKey, newPos.dirKey, axis, dir);
+        // By the head's OWN plane's direction — the two planes of a hazard turn spin
+        // opposite ways, and the shared anchor `dir` is the wrong one half the time.
+        sim.moveDir = rotateMoveDir(sim.moveDir, oldPos.dirKey, newPos.dirKey, axis, headLayerDir ?? dir);
     }
 
     // Keep the interpolation SOURCE glued to the surface: if the worm is mid-step and
     // the tile it is coming FROM also rode the slice, rotate that source tile + world
     // position too. Without this the head lerps from the pre-rotation source and
     // visibly snaps to where the tile used to be at the end of the turn.
-    if (sim.prevTile && !restMatches) {
-        const rPrev = rotateTilePosition(sim.prevTile, axis, sliceIndex, dir, size);
+    // A protected source tile is already expressed in destination space, so it stays
+    // where it is; anything else rides its own plane.
+    const prevProtected = !!sim.prevTile && (
+        (protectedLayers.length > 0 &&
+            restReadProtectsTile({ axis, layers: protectedLayers }, sim.prevTile.x, sim.prevTile.y, sim.prevTile.z)) ||
+        tileProtected(tileKey(sim.prevTile))
+    );
+    if (sim.prevTile && !prevProtected) {
+        const rPrev = rotateByOwnLayer(sim.prevTile);
         if (rPrev !== sim.prevTile) {
             sim.prevTile = rPrev;
             sim.prevDirKey = rPrev.dirKey;
@@ -1890,19 +1985,21 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
 
     // Rotate the self-collision tile trail AND the render-only path history so the
     // painted route stays glued to the surface through the turn (same remap fn).
+    // One pass for the whole transaction: each key rides its own plane, and a key that
+    // was laid down in destination space (by this transaction) stays put. Remapping
+    // per layer would re-rotate a cell whose protection the previous layer had already
+    // discarded.
     const _remapTileKey = key => {
-        // Cells occupied in rest space didn't ride the slice — their keys stay put.
-        if (restMatches && restKeys.has(key)) return key;
+        if (tileProtected(key)) return key;
         parseTileKey(key, _parseTile);
-        const r = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
-        return `${r.x},${r.y},${r.z},${r.dirKey}`;
+        const r = rotateByOwnLayer(_parseTile);
+        return r === _parseTile ? key : `${r.x},${r.y},${r.z},${r.dirKey}`;
     };
     ttMapInPlace(sim.tileTrail, _remapTileKey);
     ttMapInPlace(sim.pathHistory, _remapTileKey);
     // Pressure uses the same positional keys as the trail, so its displacement
     // and velocity must ride the slice instead of rebounding in the vacated cell.
     remapWormPress(_remapTileKey);
-    restKeys.clear();
 
     // Deferred pickup + flipped-tile detection for a rest-read landing: the step
     // onto this cell couldn't read its contents (the occupant was mid-flight). Now
@@ -1911,8 +2008,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     // above, so the lookup sees committed coordinates). Void-zone refinement is
     // skipped here — beginTunnelTransition re-resolves the tunnel (and handles
     // void kills) when the trigger actually fires.
-    if (restMatches && sim.phase === 'crawling' &&
-        isTileInSlice(axis, sliceIndex, sim.pos.x, sim.pos.y, sim.pos.z)) {
+    if (headProtected && sim.phase === 'crawling') {
         const { x, y, z, dirKey } = sim.pos;
         tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
         trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
@@ -1938,7 +2034,6 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         const sh = sim.stepHistory;
         if (sh.count > 0) {
             const k = (size - 1) / 2;
-            const ang = dir * (Math.PI / 2);
             _bakeAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
             // Only bake as far back as the visible body can walk — the same reach
             // cap (×2 headroom for corner arcs + 2 spare tiles) WormBody uses for
@@ -1950,10 +2045,15 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
             const bakeLimit = Math.min(sh.count, Math.ceil(bakeReach * STEPS_PER_TILE * 2) + STEPS_PER_TILE * 2);
             for (let i = 0; i < bakeLimit; i++) {
                 const slot = sh.buf[(sh.head - 1 - i + sh.capacity) % sh.capacity];
-                if (slot.tx < 0 || !isTileInSlice(axis, sliceIndex, slot.tx, slot.ty, slot.tz)) continue;
+                // tx < 0 is the sentinel for a sample recorded in destination space:
+                // it never rode, so it must not be baked either.
+                if (slot.tx < 0) continue;
+                const slotDir = dirForTile(slot.tx, slot.ty, slot.tz);
+                if (slotDir === null) continue;
+                const ang = slotDir * (Math.PI / 2);
                 slot.pos.applyAxisAngle(_bakeAxis, ang);
                 slot.normal.applyAxisAngle(_bakeAxis, ang).normalize();
-                const [rx, ry, rz] = rotateVec90(slot.tx - k, slot.ty - k, slot.tz - k, axis, dir);
+                const [rx, ry, rz] = rotateVec90(slot.tx - k, slot.ty - k, slot.tz - k, axis, slotDir);
                 slot.tx = Math.round(rx + k);
                 slot.ty = Math.round(ry + k);
                 slot.tz = Math.round(rz + k);
@@ -1964,8 +2064,8 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     // If mid-tunnel, rotate active tunnel endpoints so exit snap lands on the correct tile
     const rotateTunnel = (t) => ({
         ...t,
-        entry: rotateTilePosition(t.entry, axis, sliceIndex, dir, size),
-        exit: rotateTilePosition(t.exit, axis, sliceIndex, dir, size),
+        entry: rotateByOwnLayer(t.entry),
+        exit: rotateByOwnLayer(t.exit),
     });
     const preRotationTunnel = sim.activeTunnel;
     if (sim.activeTunnel) sim.activeTunnel = rotateTunnel(sim.activeTunnel);
@@ -1998,9 +2098,16 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     // slot the exit no longer occupies, so the collapse fires a step early or late.
     if (sim.pendingVoidKill?.exitTileKey) {
         parseTileKey(sim.pendingVoidKill.exitTileKey, _parseTile);
-        const rotated = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
+        const rotated = rotateByOwnLayer(_parseTile);
         if (rotated !== _parseTile) {
             sim.pendingVoidKill = { ...sim.pendingVoidKill, exitTileKey: tileKey(rotated) };
         }
     }
+
+    // The transaction is finished: every plane has been applied and every deferred
+    // coordinate resolved against the committed state. Release the crossing protection
+    // exactly once, here — releasing it per layer is what let the first plane of a
+    // two-plane turn erase the protection belonging to the second.
+    sim.restRead = null;
+    restTiles.clear();
 }

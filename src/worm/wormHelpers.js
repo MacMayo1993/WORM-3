@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { ANTIPODAL_COLOR, DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
-import { isTileInSlice } from './wormLogic.js';
+import { restReadProtectsTile } from './wormLogic.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from './liveCubies.js';
-import { liveRotation } from './liveRotation.js';
+import { liveRotation, liveLayerAngle } from './liveRotation.js';
 import { ttAt, ttTrimTo, shTrimTo } from './circularBuffers.js';
 import {
     FACE_NORMALS,
@@ -50,15 +50,23 @@ export function rideLiveRotation(worm) {
     // end-of-rotation positions, so skip live anchoring entirely — following the live
     // meshes here would chase the outgoing tile (a visible teleport onto the rotating
     // layer) and then snap when the rotation commits.
-    const rr = worm.restReadSlice?.current;
-    if (rr && liveRotation.active && rr.axis === liveRotation.axis && rr.sliceIndex === liveRotation.sliceIndex) {
+    //
+    // Tested against EVERY protected plane, not the anchor: a crossing onto the second
+    // plane of a two-plane turn is just as protected, and matching only the anchor sent
+    // the head chasing the outgoing cubie there.
+    const rr = worm.restRead?.current;
+    if (rr && liveRotation.active && rr.axis === liveRotation.axis &&
+        restReadProtectsTile(rr, cur.x, cur.y, cur.z)) {
         return false;
     }
 
     if (worm.crossingCorner.current) {
         if (!liveRotation.active) return false;
-        const { axis, sliceIndex, angle } = liveRotation;
-        if (!isTileInSlice(axis, sliceIndex, cur.x, cur.y, cur.z)) return false;
+        // The head's own plane's angle — the two planes of a hazard turn spin opposite
+        // ways, so the anchor's angle is the wrong one half the time.
+        const angle = liveLayerAngle(cur.x, cur.y, cur.z);
+        if (angle === null) return false;
+        const axis = liveRotation.axis;
         _liveAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
         worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
         worm.currentNormal.current.applyAxisAngle(_liveAxis, angle).normalize();
@@ -211,6 +219,38 @@ export function checkWormHitBySlice(worm, axis, sliceIndex) {
         }
     }
     return null;
+}
+
+/**
+ * Resolve the hazard turn's damage across EVERY turning plane, as one decision.
+ *
+ * The caller used to loop the planes and stop at the first one that reported a hit,
+ * which made the outcome depend on the order the planes happened to be listed in: a
+ * worm whose body crossed plane 0 (a tail cut) and whose head was trapped on plane 2
+ * (death) survived with a cut, because plane 0 was evaluated first and the loop broke.
+ *
+ * Every plane is evaluated, then one result is chosen:
+ *   • any death wins — being caught on a plane is fatal regardless of what else happened,
+ *   • otherwise the cut nearest the head wins, since that is the one that actually
+ *     severs the body; the cuts further back are inside the part already removed.
+ * The plane that produced the chosen result travels with it, for death metadata and
+ * for aiming the impact effects.
+ *
+ * @returns {null|{type:'death'|'cut', cutTrailIdx?:number, sliceIndex:number}}
+ */
+export function resolveSliceHits(worm, axis, layers) {
+    let death = null;
+    let cut = null;
+    for (const layer of layers) {
+        const hit = checkWormHitBySlice(worm, axis, layer);
+        if (!hit) continue;
+        if (hit.type === 'death') {
+            if (!death) death = { ...hit, sliceIndex: layer };
+            continue;
+        }
+        if (!cut || hit.cutTrailIdx < cut.cutTrailIdx) cut = { ...hit, sliceIndex: layer };
+    }
+    return death ?? cut;
 }
 
 // Remove all worm segments at and beyond cutTrailIdx.
