@@ -18,7 +18,7 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
     <div style={{
       position: 'fixed', inset: 0, zIndex: 11500,
       display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center', justifyContent: 'safe center', overflowY: 'auto', boxSizing: 'border-box',
       background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
       backdropFilter: 'blur(9px) saturate(1.03)',
       fontFamily: UI_FONT, textAlign: 'center', padding: 24,
@@ -38,15 +38,15 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
       <p style={{
         color: 'rgba(255,253,242,0.86)', fontSize: 14, margin: '0 0 28px', maxWidth: 320,
       }}>
-        Tiles are about to start jumping to their twins at random. Opposite faces
-        go down together — one pair of colours will outlast the rest. Pick it.
+        Choose the color pair you think will survive. Then tap Confirm pick to start.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 280 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 280, flexShrink: 0 }}>
         {PAIRS.map((pair) => (
           <button
             key={pair.id}
             type="button"
+            aria-pressed={selected === pair.id}
             onClick={() => setSelected(pair.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
@@ -82,7 +82,7 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
           if (pair) onPick(pair);
         }}
         style={{
-          marginTop: 28, padding: '12px 44px',
+          minHeight: 48, flexShrink: 0, marginTop: 28, padding: '12px 44px',
           background: selected ? UI_MOSS : 'rgba(95,127,74,0.30)',
           color: UI_CREAM, border: selected ? '1px solid rgba(159,219,122,0.55)' : '1px solid transparent', borderRadius: 999,
           fontFamily: UI_FONT, fontSize: 13, fontWeight: 800,
@@ -92,7 +92,7 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
           transition: 'all 0.2s ease',
         }}
       >
-        Lock In
+        {selected ? 'Confirm pick' : 'Choose a pair'}
       </button>
 
       {onSkip && (
@@ -100,7 +100,7 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
           type="button"
           onClick={onSkip}
           style={{
-            marginTop: 14, padding: '10px 32px',
+            minHeight: 48, flexShrink: 0, marginTop: 14, padding: '10px 32px',
             background: 'transparent',
             color: 'rgba(255,253,242,0.72)', border: 'none', borderRadius: 10,
             fontFamily: UI_FONT, fontSize: 13, fontWeight: 600,

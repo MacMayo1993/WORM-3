@@ -30,7 +30,7 @@ const DEMO_STEPS = [
 // one: now that the player has felt two tiles move together, naming the formal
 // concept costs nothing and rewards the curious.
 const STEP_COMPLETE_NOTE = {
-  'learn-to-solve': 'That gold guide is Teach Mode. The full lesson — every stage of a real solve, at your pace — lives in the menu under Learn to Solve.',
+  'learn-to-solve': 'That was Teach Mode. Choose Learn to Solve from the menu for the full lesson.',
   'twin-paradox': TWIN_ASIDE,
 };
 
@@ -106,6 +106,9 @@ const ensureDemoShellStyle = () => {
     }
 
     .demo-intro-card {
+      max-height: calc(100dvh - 140px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
       width: min(420px, calc(100vw - 32px));
       padding: 16px 18px 18px;
       border-radius: 22px;
@@ -449,6 +452,8 @@ const ensureDemoShellStyle = () => {
       bottom: calc(env(safe-area-inset-bottom, 0px) + 144px);
     }
 
+    .demo-intro-button, .demo-coach-pill-btn { min-height: 48px; touch-action: manipulation; }
+
     .demo-coach-pill-btn {
       padding: 8px 22px;
       background: ${UI_MOSS};
@@ -619,7 +624,7 @@ const DemoStepIntro = ({ step, onContinue, onSkip }) => {
       key={step}
       lines={lines}
       modeName={`Step ${info.num} · ${info.label}`}
-      primaryLabel="Start ▶"
+      primaryLabel="Let’s try it"
       onComplete={onContinue}
       skipLabel="Skip Step ▶"
       onSkip={onSkip}
@@ -745,14 +750,14 @@ const DEMO_LEVEL_CONFIGS = {
 // theory, and keep it to one breath — this pill has to read at a glance while
 // the player's thumb is already on the cube.
 const TRY_COPY = {
-  'baby-cube': 'Drag across a row to twist it. Drag the space around the cube to spin the whole thing. Red <strong>Reset</strong> undoes the mess.',
+  'baby-cube': 'Drag a row or column to twist it. Drag outside the cube to change your view. <strong>Reset</strong> restores the cube.',
   'learn-to-solve': 'Follow the <strong>gold ring</strong> — drag the glowing layer the way the light sweeps. It always knows the way home.',
-  'twin-paradox': 'Tap any tile — the tile dead opposite it flips at the same moment.',
-  'flip-gateway': 'Tap the front tiles to send them through the middle, then tap them again to bring them home.',
+  'twin-paradox': 'With Flip on, tap a tile. Its opposite twin moves with it.',
+  'flip-gateway': 'Tap nine different pairs to send them across. Then tap the moved tiles to bring them back.',
   'make-it-yours': 'Try the <strong>Colors</strong>, <strong>Tiles</strong> and <strong>Scene</strong> tabs. Close Settings when you like what you see.',
-  'worm-traversal': 'Grab orbs, heal tiles, and dive through a glowing tunnel. Skip ahead anytime.',
-  'chaos-forecast': 'Watch the pairs die off — yours has to be the last one standing.',
-  'random-showcase': 'Every run rerolls the rules and the look. Skip when you have seen enough.',
+  'worm-traversal': 'Steer left or right. Collect orbs and enter tunnels to heal the cube.',
+  'chaos-forecast': 'Watch which color pair survives. Will it be your pick?',
+  'random-showcase': 'Watch the rules and look change. Tap Next step when you’re ready.',
 };
 
 // Coach: the guidance already played inside the step-intro dialogue and the hint
@@ -773,7 +778,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
         key={copyOverride}
         lines={[copyOverride]}
         modeName={info ? `Step ${info.num} · ${info.label}` : 'Demo'}
-        primaryLabel="Got It ▶"
+        primaryLabel="Got it"
         onComplete={() => onCopySeen?.()}
         skipLabel="Exit Demo"
         onSkip={onExit}
@@ -785,7 +790,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
   return (
     <div className={`demo-coach-pill${wormHealerMode ? ' demo-coach-pill--bottom' : ''}`}>
       <button type="button" onClick={onNext} className="demo-coach-pill-btn">
-        Next ▶
+        Next step →
       </button>
     </div>
   );
@@ -830,33 +835,33 @@ const CONTROL_TOUR_SEQUENCE = [
     key: 'reset',
     slot: 1,
     title: 'Reset',
-    copy: 'Puts the cube back exactly as you found it. Nothing you do here is unfixable — press it.',
+    copy: 'Tap Reset to restore the cube.',
   },
   {
     key: 'shuffle',
     slot: 2,
     title: 'Shuffle',
-    copy: 'Mixes the cube up for a fresh puzzle whenever you want one. Give it a press.',
+    copy: 'Tap Shuffle to mix up the cube.',
   },
   {
     key: 'flip',
     slot: 3,
     title: 'Flip',
-    copy: 'The big one. With Flip on, tapping a tile sends it through the cube to its twin. Turn it on.',
+    copy: 'Turn on Flip. Taps will move paired tiles through the cube.',
   },
   {
     key: 'views',
     slot: 4,
     sheetBeat: true,
     title: 'Views',
-    copy: 'Every look the cube can wear, plus Explode, Net and Hollow. Open it, have a look, then close it again.',
+    copy: 'Open Views to explore how the cube is shown. Close the panel to continue.',
   },
   {
     key: 'more',
     slot: 5,
     sheetBeat: true,
     title: 'More',
-    copy: 'Extra modes — and the two helpers: Solve does it for you, Teach shows you how. Open it, then close it to finish.',
+    copy: 'Open More to find extra tools, including Solve and Teach. Close it to continue.',
   },
 ];
 
@@ -910,70 +915,70 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'grid',
     title: 'Grid',
-    copy: 'Guide lines on every face, so you can call out a tile by its row and column.',
+    copy: 'Grid lines make rows and columns easier to follow.',
     apply: (s) => s.setVisualMode('grid'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'sudokube',
     title: 'Sudoku',
-    copy: 'Numbers instead of colors — every face has to end up with all nine, no repeats.',
+    copy: 'Numbered tiles give you another way to recognize each face.',
     apply: (s) => s.setVisualMode('sudokube'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'wireframe',
     title: 'Wireframe',
-    copy: 'Tiles stripped back to their outlines. Clean and minimal.',
+    copy: 'Wireframe shows the outlines of the tiles.',
     apply: (s) => s.setVisualMode('wireframe'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'glass',
     title: 'Glass',
-    copy: 'See-through tiles, so you can look straight through the cube to the far side.',
+    copy: 'Glass makes the tiles transparent.',
     apply: (s) => s.setVisualMode('glass'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'chrome',
     title: 'Chrome',
-    copy: 'Polished metal tiles that mirror whatever is around them.',
+    copy: 'Chrome gives the tiles a reflective metal finish.',
     apply: (s) => s.setVisualMode('chrome'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'neon',
     title: 'Neon',
-    copy: 'Every tile edge lit up like a sign.',
+    copy: 'Neon lights up the tile edges.',
     apply: (s) => s.setVisualMode('neon'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'gap',
     title: 'Gap',
-    copy: 'Space between the tiles, so each one reads on its own.',
+    copy: 'Gaps separate the tiles so you can see each one clearly.',
     apply: (s) => s.setVisualMode('gap'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'lego',
     title: 'Lego',
-    copy: 'Every tile becomes a studded brick.',
+    copy: 'Lego gives each tile a studded-brick look.',
     apply: (s) => s.setVisualMode('lego'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'explode',
     title: 'Explode',
-    copy: 'The faces float apart so you can see all six at once — including the ones facing away.',
+    copy: 'Explode separates the cubies so you can look between them.',
     apply: (s) => s.setExploded(true),
     cleanup: (s) => s.setExploded(false),
   },
   {
     key: 'tunnels',
     title: 'Tunnels',
-    copy: 'Here is the twin link made visible: send a tile through and a tunnel opens between it and the tile dead opposite. With the cube apart, you can watch it thread through the middle.',
+    copy: 'Watch the tunnel connect a tile to its opposite twin. Explode makes the connection easier to see.',
     // Keep the previous beat's exploded view (the tunnel is invisible inside a
     // closed cube) and flip the front-face center tile so exactly one
     // antipodal tunnel lights up.
@@ -1000,7 +1005,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'mirror',
     title: 'Far Side',
-    copy: 'The little window watches the cube from exactly the opposite side. One tile is sent through here — find it in both pictures, and you are looking at one tile from two places at once.',
+    copy: 'The small window shows the opposite view. Watch both views as the paired tiles flip.',
     // This is the one view whose subject is in the top-left corner rather than
     // in the middle of the screen, so the card has to get out of the window's
     // way — see .demo-intro-root--clear-pip.
@@ -1025,7 +1030,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'hollow',
     title: 'Hollow',
-    copy: 'The inside is gone — only the shell is left, so you can see right through the middle.',
+    copy: 'Hollow lets you look inside the cube’s shell.',
     apply: (s) => s.setHollowMode(true),
     cleanup: (s) => s.setHollowMode(false),
   },
@@ -1156,7 +1161,7 @@ const DemoFlipSpotlightHint = ({ onSkip }) => {
   return (
     <div className="demo-spotlight-hint demo-spotlight-hint--flip" role="status" aria-live="polite">
       <p className="demo-intro-copy" style={{ marginBottom: 8 }}>
-        Tap the glowing <strong>Flip</strong> button below to arm tile-flipping.
+        Tap the glowing <strong>Flip</strong> button to turn on tile flips.
       </p>
       {onSkip && (
         <button

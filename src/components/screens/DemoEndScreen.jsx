@@ -13,7 +13,7 @@ const MODES = [
   {
     id: 'worm',
     name: 'WORM',
-    blurb: 'Play the action-healing version of what you just learned.',
+    blurb: 'Steer a worm, collect orbs, and heal the cube.',
     primary: true,
   },
   { id: 'story', name: 'STORY', blurb: 'Ten guided levels that build up one rule at a time.' },
@@ -134,7 +134,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           color: '#657156', fontSize: 12, lineHeight: 1.45,
           margin: '16px auto 0', maxWidth: 340,
         }}>
-          Stuck in any mode? The <strong style={{ color: '#43513a' }}>More</strong> button on the
+          While playing a cube puzzle, the <strong style={{ color: '#43513a' }}>More</strong> button on the
           bottom bar has <strong style={{ color: '#43513a' }}>Solve</strong> (watch it solve itself)
           and <strong style={{ color: '#43513a' }}>Teach</strong> (learn to do it yourself).
         </p>
@@ -144,7 +144,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
             type="button"
             onClick={onReplay}
             style={{
-              flex: 1, padding: '11px 0',
+              flex: 1, minHeight: 48, padding: '11px 0',
               background: 'transparent',
               color: '#43513a',
               border: '1px solid rgba(111,126,86,0.25)',
@@ -159,7 +159,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
             type="button"
             onClick={onExit}
             style={{
-              flex: 1, padding: '11px 0',
+              flex: 1, minHeight: 48, padding: '11px 0',
               background: 'transparent',
               color: '#657156',
               border: 'none',
