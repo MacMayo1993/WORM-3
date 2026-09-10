@@ -71,6 +71,40 @@ export const MAX_POWERUP_RENDER = 24;
 export const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
 export const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
 export const SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL = 4;
+
+// Steps of self-collision immunity granted after a layer turn actually carries the
+// worm's body. A turn does not kill directly — the only deaths are self-collision
+// and voided tunnels — but on a small board it folds a third to a half of the
+// surface, WITH the worm's own tail on it, into a new arrangement in front of the
+// head. The player had no reaction window, so the resulting tail-bite is not a
+// mistake they made. This is the same argument that already earns grace on tunnel
+// exit (above), applied to the other event that teleports the body.
+//
+// It scales with how much of the board the turn moved: a 2x2 turn relocates half
+// the world, a 7x7 turn a quarter of it, and above that the board is roomy enough
+// that the pre-existing behaviour stands.
+export function selfCollisionGraceAfterRotation(size) {
+  if (size <= 2) return 5;
+  if (size === 3) return 4;
+  if (size <= 5) return 3;
+  return 0;
+}
+
+// ─── Safe lane ────────────────────────────────────────────────────────────────
+// A pending turn only moves cells whose coordinate on its axis matches, so any
+// other slice on that axis is wholly safe — see safeLane.js for why that is the
+// useful framing. Small boards get it drawn for them, because that is where the
+// 1/N chance of being caught is punishing enough that "where do I go" needs an
+// answer on screen rather than in the player's head. Bigger boards have room to
+// read the gold rim and step off it, and do not need a second full-slice rim
+// competing with it.
+export const SAFE_LANE_MAX_SIZE = 5;
+// Chance that an eaten orb respawns inside the current safe lane. Bias, not a
+// rule: orbs still appear on threatened ground, so running the lane is a choice
+// with an upside rather than the only place the game lets you feed. Nothing is
+// ever moved out from under a player who is already chasing it — this only steers
+// where the NEXT orb lands.
+export const SAFE_LANE_ORB_BIAS = 0.7;
 export const WORMHOLE_MAX_TRAVERSALS = 3;
 
 // Hard ceiling on how many tunnel pairs may be active at once. A pair is one antipodal

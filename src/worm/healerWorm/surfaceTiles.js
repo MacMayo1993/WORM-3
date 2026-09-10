@@ -43,11 +43,25 @@ export function isSurfaceTilePos(p, size) {
     return p.x === 0 || p.x === size - 1 || p.y === 0 || p.y === size - 1 || p.z === 0 || p.z === size - 1;
 }
 
-export function randomFreeTile(size, exclude) {
+/**
+ * A free surface tile to drop something on.
+ *
+ * `prefer` biases — never restricts — where it lands. When given a predicate and a
+ * bias in [0,1], that fraction of picks come from the free tiles the predicate
+ * accepts, and the rest from the whole free pool. The safe lane uses this so orbs
+ * accumulate where the next turn cannot reach them without ever making the rest of
+ * the board barren, and it degrades to the old uniform pick whenever the preferred
+ * subset is empty (no lane armed, or the lane is already full of orbs).
+ */
+export function randomFreeTile(size, exclude, prefer = null, bias = 0) {
     const all = getAllSurfaceTiles(size);
     const excludeKeys = new Set(exclude.map((e) => `${e.x},${e.y},${e.z},${e.dirKey}`));
     const free = all.filter((t) => !excludeKeys.has(`${t.x},${t.y},${t.z},${t.dirKey}`));
     const pool = free.length > 0 ? free : all;
+    if (prefer && bias > 0 && Math.random() < bias) {
+        const preferred = pool.filter(prefer);
+        if (preferred.length > 0) return preferred[Math.floor(Math.random() * preferred.length)];
+    }
     return pool[Math.floor(Math.random() * pool.length)];
 }
 

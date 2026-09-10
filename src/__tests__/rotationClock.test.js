@@ -20,9 +20,22 @@ describe('rotation clock bridge', () => {
     Object.assign(rotationClock, {
       armed: true, secondsLeft: 4.2, total: 10, warning: 0.6, held: true, axis: 'row', sliceIndex: 2
     });
+    rotationClock.sliceIndices.push(2, 5);
     resetRotationClock();
     expect(rotationClock).toEqual({
-      armed: false, secondsLeft: 0, total: 0, warning: 0, held: false, axis: null, sliceIndex: null
+      armed: false, secondsLeft: 0, total: 0, warning: 0, held: false,
+      axis: null, sliceIndex: null, sliceIndices: []
     });
+  });
+
+  it('truncates the plane list in place rather than replacing it', () => {
+    // The writer copies into this array every frame and the sim reads it on orb
+    // respawn — swapping in a fresh array would leave either side holding a stale
+    // reference, so the reset has to empty the one they already share.
+    const planes = rotationClock.sliceIndices;
+    planes.push(1, 3);
+    resetRotationClock();
+    expect(rotationClock.sliceIndices).toBe(planes);
+    expect(planes).toHaveLength(0);
   });
 });

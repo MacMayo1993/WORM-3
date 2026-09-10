@@ -56,6 +56,8 @@ import {
 } from '../circularBuffers.js';
 import { isSurfaceTilePos, randomFreeTile, randomUnflippedTile } from './surfaceTiles.js';
 import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady } from './economy.js';
+import { rotationClock } from './rotationClockBridge.js';
+import { chooseSafeLane, isTileOnLane } from './safeLane.js';
 import {
     makeSpecialPicker,
     drawSpecialType,
@@ -83,6 +85,9 @@ import {
     TUNNEL_TRIGGER_PROGRESS,
     SELF_COLLISION_TRIGGER_PROGRESS,
     SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
+    selfCollisionGraceAfterRotation,
+    SAFE_LANE_MAX_SIZE,
+    SAFE_LANE_ORB_BIAS,
     MAX_TAIL,
     SURFACE_JUMP_HEIGHT,
     SURFACE_JUMP_TILE_SPAN,
@@ -587,6 +592,34 @@ function applyOrbPickupGrowth(sim, ctx, color, faceId) {
     ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength), color, sim.orbCombo);
 }
 
+/**
+ * Where a freshly eaten orb comes back.
+ *
+ * On the small boards this is biased into the currently armed safe lane — the
+ * slice the next turn cannot reach (see safeLane.js). That is the whole reward
+ * half of the "run to the safe lane" loop: the lane is drawn for the player, and
+ * over a run the food drifts into it, so leaving the threatened slice pays off
+ * instead of merely costing tempo. It is a bias and not a rule, so the rest of the
+ * board never goes barren, and it steers only where the NEXT orb lands — an orb
+ * the player is already chasing is never moved.
+ *
+ * Reads the armed move off rotationClock, the same shared-mutable arrangement the
+ * sim already uses for liveRotation. With nothing armed, or on a board big enough
+ * not to need the help, this is the plain uniform pick it always was.
+ */
+function respawnTile(size, exclude) {
+    if (size > SAFE_LANE_MAX_SIZE || !rotationClock.armed || !rotationClock.axis) {
+        return randomFreeTile(size, exclude);
+    }
+    const lane = chooseSafeLane(size, {
+        axis: rotationClock.axis,
+        sliceIndex: rotationClock.sliceIndex,
+        sliceIndices: rotationClock.sliceIndices,
+    });
+    if (!lane) return randomFreeTile(size, exclude);
+    return randomFreeTile(size, exclude, (t) => isTileOnLane(lane, t.x, t.y, t.z), SAFE_LANE_ORB_BIAS);
+}
+
 // Reusable scratch for the magnet's manifold reach — rebuilt in place per check.
 const _magnetReach = new Set();
 
@@ -650,7 +683,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
             }
         }
         ctx.feel('orb', { combo: sim.orbCombo });
-        sim.powerups[puIdx] = { ...randomFreeTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
+        sim.powerups[puIdx] = { ...respawnTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
         collectedAny = true;
     }
 
@@ -2113,6 +2146,34 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         const rotated = rotateByOwnLayer(_parseTile);
         if (rotated !== _parseTile) {
             sim.pendingVoidKill = { ...sim.pendingVoidKill, exitTileKey: tileKey(rotated) };
+        }
+    }
+
+    // A turn that carried any of the visible body earns a few steps of self-collision
+    // immunity on the small boards. The turn itself never kills — but it can drop the
+    // worm's own tail across the head's path with no warning the player could have
+    // acted on, and a tail-bite the player had no window to avoid is not a mistake.
+    // Same reasoning as the grace granted on tunnel exit; same mechanism, too.
+    //
+    // Gated on the body ACTUALLY riding: a turn on the far side of the cube rearranges
+    // nothing in front of the worm, and handing out immunity for it would just make the
+    // worm intermittently ghostly. Off-board (size > 5) this is a no-op.
+    const rotationGrace = selfCollisionGraceAfterRotation(size);
+    if (rotationGrace > 0) {
+        const occupied = Math.min(
+            sim.tileTrail.count,
+            Math.max(1, Math.ceil((sim.tailLength * BODY_BALL_SPACING) / 1.0)),
+        );
+        for (let i = 0; i < occupied; i++) {
+            parseTileKey(ttAt(sim.tileTrail, i), _parseTile);
+            if (dirForTile(_parseTile.x, _parseTile.y, _parseTile.z) !== null) {
+                sim.selfCollisionGraceSteps = Math.max(sim.selfCollisionGraceSteps, rotationGrace);
+                // A hit armed by the pre-turn layout is exactly the unfair case this
+                // grace exists for — drop it rather than letting it resolve on the
+                // 40% penetration check a moment from now.
+                sim.pendingSelfCollision = null;
+                break;
+            }
         }
     }
 
