@@ -19,7 +19,7 @@ export default function TextOverlay({ time, reducedMotion = false }) {
           <p className="opening-eyebrow">{beat.eyebrow}</p>
           <h1>{beat.text}</h1>
         </div>}
-        {title > 0 && <div style={{ opacity: title }}>
+        {title > 0 && <div style={{ opacity: title, transform: reducedMotion ? undefined : `translateY(${(1 - title) * 12}px) scale(${0.9 + title * 0.1})` }}>
           <h1 className="opening-title">WORM<sup>3</sup></h1>
           <p className="opening-tagline">Opposite is closer than you think.</p>
         </div>}

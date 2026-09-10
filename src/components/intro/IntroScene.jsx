@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { INTRO_END, sampleIntro, introCameraDistance } from './introChoreography.js';
+import IntroEnergy from './IntroEnergy.jsx';
+import { introEnergy } from './introEnergy.js';
 import { WORM_START } from './introTiming.js';
 import { FACES, CELLS, TILES, PAIRS, flippedColor, pairPoint } from './introTopology.js';
 
@@ -12,7 +14,7 @@ const WORM_SEGMENTS = 10;
 
 // All 54 stickers and 27 connections, with one instanced draw per visual layer.
 // Connections use an x-ray presentation so back-face pairs remain visible.
-export default function IntroScene({ time, onComplete, reducedMotion = false }) {
+export default function IntroScene({ time, onComplete, reducedMotion = false, performanceMode = false }) {
   const root = useRef();
   const bodies = useRef();
   const tiles = useRef();
@@ -37,6 +39,7 @@ export default function IntroScene({ time, onComplete, reducedMotion = false }) 
 
   useFrame(({ camera }) => {
     const pose = sampleIntro(time, reducedMotion);
+    const energy = introEnergy(time, reducedMotion);
     const { dummy, color, faceRotation, flipRotation, xAxis, yAxis, euler, a, b, direction } = assets;
     const spacing = 1 + 1.5 * pose.open;
     const lift = 0.51 + 0.48 * Math.sin(pose.flip);
@@ -62,6 +65,10 @@ export default function IntroScene({ time, onComplete, reducedMotion = false }) 
       tiles.current.setMatrixAt(i, dummy.matrix);
       // Swap at the edge-on midpoint, not before the player sees the flip.
       color.copy(assets.dark).lerp(assets.colors[flippedColor(faceIndex, pose.flip)], pose.reveal);
+      // A broad diagonal charge sweep picks out rows as the flip approaches.
+      const phase = p[0] * 0.19 + p[1] * 0.13 + p[2] * 0.17;
+      const crest = Math.max(0, 1 - Math.abs(time - 1.3 - phase) / 0.4) * energy.charge;
+      color.lerp(assets.colors[3], crest * 0.32);
       tiles.current.setColorAt(i, color);
     });
     bodies.current.instanceMatrix.needsUpdate = true;
@@ -74,6 +81,7 @@ export default function IntroScene({ time, onComplete, reducedMotion = false }) 
     gates.current.material.opacity = pose.passage * 0.9;
     if (lines.current.visible) {
       PAIRS.forEach((pair, pairIndex) => {
+        const progress = (time - WORM_START - pairIndex * 0.012) / 2.2;
         const first = assets.colors[flippedColor(pair.faceIndex, pose.flip)];
         const second = assets.colors[flippedColor(pair.faceIndex ^ 1, pose.flip)];
         for (let j = 0; j < LINE_SEGMENTS; j++) {
@@ -83,11 +91,14 @@ export default function IntroScene({ time, onComplete, reducedMotion = false }) 
           const length = direction.length();
           dummy.position.copy(a).add(b).multiplyScalar(0.5);
           dummy.quaternion.setFromUnitVectors(yAxis, direction.multiplyScalar(1 / length));
-          dummy.scale.set(0.022, length, 0.022);
+          const u = j / (LINE_SEGMENTS - 1);
+          const wake = pose.wormVisible ? Math.max(0, 1 - Math.abs(u - progress) / 0.16) : 0;
+          const width = 0.017 + wake * 0.015;
+          dummy.scale.set(width, length, width);
           dummy.updateMatrix();
           const index = pairIndex * LINE_SEGMENTS + j;
           lines.current.setMatrixAt(index, dummy.matrix);
-          lines.current.setColorAt(index, color.copy(first).lerp(second, j / (LINE_SEGMENTS - 1)));
+          lines.current.setColorAt(index, color.copy(first).lerp(second, u).lerp(assets.colors[3], wake * 0.6));
         }
         for (let side = 0; side < 2; side++) {
           pairPoint(pair, side, spacing, dummy.position, lift);
@@ -99,7 +110,6 @@ export default function IntroScene({ time, onComplete, reducedMotion = false }) 
         }
         if (!pose.wormVisible) return;
         // Small deterministic stagger, with every worm completing before collapse.
-        const progress = (time - WORM_START - pairIndex * 0.012) / 2.2;
         for (let j = 0; j < WORM_SEGMENTS; j++) {
           const u = progress - j * 0.016;
           pairPoint(pair, u, spacing, dummy.position, lift);
@@ -125,7 +135,7 @@ export default function IntroScene({ time, onComplete, reducedMotion = false }) 
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       }
     }
-    const distance = introCameraDistance(pose.distance, camera.aspect, camera.fov);
+    const distance = introCameraDistance(pose.distance - energy.push * 1.0, camera.aspect, camera.fov);
     camera.position.set(Math.sin(pose.orbit) * distance, distance * 0.32, Math.cos(pose.orbit) * distance);
     camera.up.set(0, 1, 0);
     camera.lookAt(0, -0.55, 0);
@@ -133,6 +143,7 @@ export default function IntroScene({ time, onComplete, reducedMotion = false }) 
 
   return (
     <group ref={root}>
+      <IntroEnergy time={time} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <instancedMesh ref={bodies} args={[assets.body, null, CELLS.length]} frustumCulled={false}>
         <meshStandardMaterial color="#293329" roughness={0.32} metalness={0.2} transparent depthWrite={false} />
       </instancedMesh>

@@ -125,7 +125,7 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
         structure={0.9}
         performanceMode={performanceMode}
       />
-      <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} />
+      <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <SafeEnvironment preset="city" />
       {!performanceMode && (
         <EffectComposer>
