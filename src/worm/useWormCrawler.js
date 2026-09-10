@@ -460,24 +460,20 @@ export function useWormCrawler(size, cubies) {
                 lookupCache.prevCubies = st.cubies;
                 lookupCache.prevEpoch = st.rotationEpoch;
                 lookupCache.size = sizeRef.current;
-                const layers = rot.sliceIndices?.length ? rot.sliceIndices : [rot.sliceIndex];
-                // Each plane can turn a DIFFERENT direction (the hazard spins two
-                // non-adjacent planes opposite ways). Remap every layer's cells —
-                // worm, trail, powerups — by THAT plane's own direction, not the
-                // shared anchor `dir`; otherwise the opposite-spinning plane is
-                // remapped backwards and whatever sits on it teleports.
-                const dirs = rot.sliceDirs?.length ? rot.sliceDirs : layers.map(() => rot.dir);
-                const opts = {
-                    inOpeningScramble: st.wormGamePhase === 'scrambling',
-                    paused: st.wormPaused ?? false,
-                };
-                layers.forEach((sliceIndex, li) => {
-                    applyRotationToSim(
-                        simRef.current, sizeRef.current, ctxRef.current,
-                        { ...rot, sliceIndex, dir: dirs[li], sliceIndices: null, sliceDirs: null },
-                        opts
-                    );
-                });
+                // ONE call for the whole move, however many planes it turned. This used
+                // to loop applyRotationToSim once per layer, and the first layer cleared
+                // the worm's crossing protection before the second was applied — so a
+                // worm crossing into the second plane had its destination rotated away
+                // (size 3, protected destination {0,2,2,PZ}, commit row 0 then row 2:
+                // it came out at {0,2,0,NX}). Each plane still remaps its own cells by
+                // its own direction; that now happens inside the transaction.
+                applyRotationToSim(
+                    simRef.current, sizeRef.current, ctxRef.current, rot,
+                    {
+                        inOpeningScramble: st.wormGamePhase === 'scrambling',
+                        paused: st.wormPaused ?? false,
+                    }
+                );
             }
         );
         return unsub;
@@ -506,7 +502,7 @@ export function useWormCrawler(size, cubies) {
             prevWorldPos: f('prevWorldPos'),
             curWorldPos: f('curWorldPos'),
             prevTile: f('prevTile'),
-            restReadSlice: f('restReadSlice'),
+            restRead: f('restRead'),
             crossingCorner: f('crossingCorner'),
             jumpT: f('jumpT'),
             isJumping: f('isJumping'),
