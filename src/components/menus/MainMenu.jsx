@@ -816,7 +816,7 @@ function makeGlossTexture() {
   return tex;
 }
 
-// Renders a beveled, glossy topographic-style tile on every cube face, with the
+// Renders a beveled, glossy solid-color tile on every cube face, with the
 // mode LABEL on all six faces so the words wrap the whole cube. Fully opaque,
 // depth-writing tiles occlude the faces behind them, so only the words on
 // visible faces read — hidden faces are naturally masked by the front tile.
@@ -840,10 +840,10 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               <planeGeometry args={[3.12, 3.12]} />
               <meshBasicMaterial color="#070a18" />
             </mesh>
-            {/* Mode color plate — topographic contour tile style */}
+            {/* Mode color plate — plain Rubik’s-style sticker */}
             <mesh position={[0, 0, 0.01]} renderOrder={31}>
               <planeGeometry args={[2.94, 2.94]} />
-              <primitive object={getTileStyleMaterial('topographic', m.tileColor)} attach="material" />
+              <meshBasicMaterial color={m.tileColor} />
             </mesh>
             {/* Bevel: top-left highlight / bottom-right shadow around the inset tile */}
             {bevelTex && (
@@ -1101,48 +1101,35 @@ const withFaceColor = (mode) => {
 const CAROUSEL_MODES = [
   {
     id: 'worm', label: 'WORM', face: 'NX',
-    desc: 'Steer a worm across a living cube and heal it one tile at a time.',
-    controls: ['Steer the worm with cursor or touch', 'Every tile it crosses gets healed', 'Eat orbs to grow — and to earn points', 'Touch a dead tile and the run ends'],
+    desc: 'Steer your worm through tunnels to heal the cube.',
     cta: 'PLAY',
   },
   {
     id: 'freeplay', label: 'CUBE', face: 'NY',
-    desc: "A real Rubik's cube, built how you like it. No timer, no objective.",
-    controls: ['Any size from 2×2 up to 7×7', 'Your palette, your tiles, your world', 'Drag a face edge to turn a slice', 'Tap a tile to send it through the cube'],
+    desc: "Solve a cube your way, with no time limit.",
     cta: 'PLAY',
   },
   {
     id: 'cube', label: 'STORY', face: 'PX',
-    desc: 'Ten chapters, daycare to the singularity, one new trick at a time.',
-    controls: ['Ten chapters, each unlocking the next', 'One new idea per chapter', 'Mobi walks you in before every one', 'Beat par to take all three stars'],
+    desc: 'Learn one new trick at a time across ten chapters.',
     cta: 'PLAY',
   },
   {
     id: 'chaos', label: 'CHAOS', face: 'NZ',
-    desc: 'The cube flips itself apart. Bet on how long you last.',
-    controls: ['Tiles start flipping on their own', 'Stake Parity Points before you start', 'Pick your chaos level, 1 to 5', 'Last pair standing ends the run'],
+    desc: 'Predict the last surviving pair as the cube flips itself.',
     cta: 'PLAY',
   },
   {
     id: 'random', label: 'RANDOM', face: 'PZ',
-    desc: 'The cube redecorates itself mid-solve. Try to keep up.',
-    controls: ['New palette every 15 seconds', 'Tiles and cubelets morph as you play', 'Same puzzle, never the same twice', 'Solving through the churn is the point'],
+    desc: 'Solve a cube that changes its look as you play.',
     cta: 'PLAY',
   },
   {
     id: 'store', label: 'STORE', face: 'PY',
-    desc: 'Turn Parity Points into worm skins, hats, palettes, and tiles.',
-    controls: ['Collect orbs in Worm mode to earn', 'Win a Chaos bet for a bigger purse', 'Skins, hats, palettes, and tile styles', 'Everything you buy works in every mode'],
+    desc: 'Spend Parity Points on worms, skins, and tile styles.',
     cta: 'OPEN STORE',
   },
 ].map(withFaceColor);
-
-// Non-mode destinations live in a small utility row under the carousel — they
-// are not game modes and do not occupy cube faces.
-const UTILITY_MODES = [
-  { id: 'how-to-play', label: 'How to Play' },
-  { id: 'learn-to-solve', label: 'Learn to Solve' },
-];
 
 const LAST_MODE_KEY = 'worm3_last_mode_id';
 
@@ -1151,7 +1138,7 @@ const LAST_MODE_KEY = 'worm3_last_mode_id';
 // no CSS transform transitions on positioned elements → no GPU compositor ordering
 // issues on mobile Chrome.
 
-export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay, onLearnToSolve }) => {
+export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon }) => {
   // Open on the last-played mode so returning players are one tap from their game.
   const [activeIndex, setActiveIndex] = useState(() => {
     try {
@@ -1224,9 +1211,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     else if (id === 'random')      onRandom?.();
     else if (id === 'store')       onStore?.();
     else if (id === 'coming-soon') onComingSoon?.();
-    else if (id === 'how-to-play') onHowToPlay?.();
-    else if (id === 'learn-to-solve') onLearnToSolve?.();
-  }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay, onLearnToSolve]);
+  }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon]);
 
   // PLAY: dive through the presented face, then launch. The 3D cube consumes
   // the dive request and fires the callback when the face fills the screen;
@@ -1395,19 +1380,11 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             padding: '14px 18px', position: 'relative', overflow: 'hidden',
           }} aria-label={`${mode.label} mode details`}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
-            {/* The one-line hook: what this mode actually is, in plain sentence
-                case. The bullets below are the details, not the pitch. */}
+            {/* One short explanation per mode. */}
             <p style={{ margin: 0, textAlign: 'center', fontSize: 'clamp(12px, 3.2vw, 13.5px)', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: UI_FONT, fontWeight: 500 }}>
               {mode.desc}
             </p>
-            <div style={{ marginTop: '14px' }}>
-              {mode.controls.map((ctrl, i) => (
-                <div key={i} style={{ display: 'flex', gap: '10px', margin: '6px 0', alignItems: 'flex-start' }}>
-                  <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '2px', background: mode.tileColor, border: `1px solid ${PAPER_BORDER}`, marginTop: '5px', flexShrink: 0 }} />
-                  <span style={{ fontSize: 'clamp(10.5px, 2.8vw, 12px)', fontWeight: 700, letterSpacing: '0.05em', lineHeight: 1.5, textTransform: 'uppercase', color: PAPER_TEXT, fontFamily: UI_FONT }}>{ctrl}</span>
-                </div>
-              ))}
-            </div>
+
           </div>
         </div>
 
@@ -1429,19 +1406,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
           {/* Paper utility actions keep their labels readable over every panorama. */}
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
-            {UTILITY_MODES.map((u) => (
-              <button
-                key={u.id} type="button" className="mc-pill" onClick={() => launch(u.id)}
-                style={{
-                  background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
-                  borderRadius: '100px', padding: '8px 18px',
-                  color: PAPER_TEXT, fontSize: '11.5px', fontWeight: 700,
-                  letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
-                  transition: 'filter 160ms ease, background 160ms ease',
-                  WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-                }}
-              >{u.label}</button>
-            ))}
+
             <button
               type="button" className="mc-pill" onClick={onBack}
               style={{
