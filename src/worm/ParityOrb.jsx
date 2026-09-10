@@ -639,26 +639,26 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
     const t = timeRef.current;
 
     const mesh = meshRef.current;
-    if (mesh && t < 0.5) {
-      const alpha = Math.max(0, 1 - t * 2);
+    if (mesh && t < 0.65) {
+      const alpha = Math.max(0, 1 - t / 0.65);
       for (let i = 0; i < COLLECT_PARTICLE_COUNT; i++) {
         const v = velocities[i];
         _collectDummy.position.set(v.x * t * 3, v.y * t * 3, v.z * t * 3);
-        _collectDummy.scale.setScalar(alpha);
+        _collectDummy.scale.setScalar(alpha * 1.3);
         _collectDummy.updateMatrix();
         mesh.setMatrixAt(i, _collectDummy.matrix);
       }
       mesh.instanceMatrix.needsUpdate = true;
-      mesh.material.opacity = alpha;
+      mesh.material.opacity = Math.sqrt(alpha);
     }
 
     if (bloomRef.current) {
-      const bloomT = Math.min(1, t / 0.45);
+      const bloomT = Math.min(1, t / 0.6);
       bloomRef.current.scale.setScalar(0.3 + bloomT * 3.2);
-      bloomRef.current.material.opacity = Math.max(0, 0.65 * (1 - bloomT));
+      bloomRef.current.material.opacity = Math.max(0, 0.85 * (1 - bloomT));
     }
 
-    if (t >= 0.5 && !calledDoneRef.current) {
+    if (t >= 0.65 && !calledDoneRef.current) {
       calledDoneRef.current = true;
       onDone?.();
     }
@@ -681,7 +681,7 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
         <meshBasicMaterial
           color={color}
           transparent
-          opacity={0.65}
+          opacity={0.85}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           side={THREE.BackSide}

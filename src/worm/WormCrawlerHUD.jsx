@@ -971,10 +971,10 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
 // the screen edges.
 //
 // Deliberately a vignette rather than a full wash: it never sits over the cube, and
-// it stays faint (peak ≈ 0.14–0.26 alpha) because pickups can come a second apart —
-// or several at once under a magnet. prefers-reduced-motion softens it further.
+// Its stronger color stays at the edges so the route remains readable, even
+// during magnet pickups. prefers-reduced-motion softens it further.
 
-const ORB_FLASH_MS = 380;
+const ORB_FLASH_MS = 480;
 
 function OrbPickupFlash() {
     const flash = useGameStore(s => s.wormOrbFlash);
@@ -985,21 +985,21 @@ function OrbPickupFlash() {
         if (!flash?.color) return;
         setShown(flash);
         clearTimeout(timer.current);
-        timer.current = setTimeout(() => setShown(null), ORB_FLASH_MS + 60);
+        timer.current = setTimeout(() => setShown(null), Math.max(ORB_FLASH_MS, 520) + 60);
         return () => clearTimeout(timer.current);
     }, [flash]);
 
     if (!shown) return null;
 
     // Escalates with the pickup combo, mirroring the rising pitch of the pickup sound.
-    const peak = Math.min(0.14 + Math.min(shown.combo ?? 0, 6) * 0.02, 0.26);
+    const peak = Math.min(0.28 + Math.min(shown.combo ?? 0, 6) * 0.03, 0.46);
 
     return (
         <>
             <style>{`
                 @keyframes wormOrbFlash {
                     0%   { opacity: 0; }
-                    18%  { opacity: calc(var(--orb-flash-peak) * var(--orb-flash-scale, 1)); }
+                    14%  { opacity: calc(var(--orb-flash-peak) * var(--orb-flash-scale, 1)); }
                     100% { opacity: 0; }
                 }
                 .worm-orb-flash {
@@ -1016,7 +1016,7 @@ function OrbPickupFlash() {
                     position: 'fixed', inset: 0,
                     pointerEvents: 'none',
                     opacity: 0,
-                    background: `radial-gradient(ellipse at center, transparent 38%, ${shown.color} 135%)`,
+                    background: `radial-gradient(ellipse at center, transparent 38%, ${shown.color} 100%)`,
                     '--orb-flash-peak': peak,
                 }}
             />
