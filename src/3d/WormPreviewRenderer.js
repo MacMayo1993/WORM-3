@@ -182,6 +182,8 @@ function _buildRig() {
 // all, and wrong at hero size — a halo or a wizard's point sits well above the
 // crown and was being cut off by the top of the frame.
 const FRAMING = {
+  // Level runway: travel along X projects horizontally onto the menu's floor.
+  runway: { pos: [-0.36, 0.62, 1.68], look: [-0.36, 0.02, 0], yaw: 0 },
   body: { pos: [0.34, 0.66, 0.97], look: [-0.30, 0.05, -0.12], yaw: -0.38 },
   head: { pos: [0.20, 0.30, 0.40], look: [0.0, 0.05, -0.02], yaw: -0.55 },
   portrait: { pos: [0.34, 0.52, 0.68], look: [0.0, 0.10, -0.02], yaw: -0.55 },
@@ -266,7 +268,7 @@ function _bufferFor(size, ctx) {
 // Where segment `i` sits, in the worm's local space. Each character moves
 // differently in game, so each one stands differently here: the inch worm
 // arches, the wiggle worm snakes, everything else trails in a lazy S.
-function _segmentOffset(i, character, time, out) {
+function _segmentOffset(i, character, time, out, crawling = false) {
   const inch = character === 'inch';
   const wiggle = character === 'wiggle';
   const book = character === 'book';
@@ -277,12 +279,12 @@ function _segmentOffset(i, character, time, out) {
   let z = 0;
   if (inch) {
     const shape = inchLoopShape(SEGMENTS);
-    inchGaitInto(previewGait, i, SEGMENTS, time * 0.35, 1, shape);
+    inchGaitInto(previewGait, i, SEGMENTS, time * (crawling ? 0.8 : 0.35), 1, shape);
     d = previewGait.dist;
     y = previewGait.arch * shape.height;
   } else if (wiggle) {
-    z = Math.sin(d * 13 - time * 2.2) * 0.055 * Math.min(1, i / 1.5);
-    y = Math.sin(d * 9 - time * 2.2) * 0.006;
+    z = Math.sin(d * 13 - time * (crawling ? 5.5 : 2.2)) * (crawling ? 0.11 : 0.055) * Math.min(1, i / 1.5);
+    y = crawling ? 0 : Math.sin(d * 9 - time * 2.2) * 0.006;
   } else if (book) {
     // Straight spine, no wiggle: the per-segment orientation for the open-book
     // body is derived from consecutive offsets (see _poseWorm's isBook block),
@@ -290,8 +292,8 @@ function _segmentOffset(i, character, time, out) {
     // once amplified into a flat page's full 3D orientation — a stiff book
     // doesn't undulate like a soft-bodied worm.
   } else {
-    z = Math.sin(d * 5.2 - time * 1.1) * 0.022 * Math.min(1, i / 1.2);
-    y = Math.sin(time * 1.4 + d * 3) * 0.004;
+    z = Math.sin(d * (crawling ? 12 : 5.2) - time * (crawling ? 5 : 1.1)) * (crawling ? 0.075 : 0.022) * Math.min(1, i / 1.2);
+    y = crawling ? 0 : Math.sin(time * 1.4 + d * 3) * 0.004;
   }
   out.set(-d, y, z);
   return out;
@@ -345,7 +347,7 @@ function _poseWorm(opts, time) {
   for (let i = 0; i < SEGMENTS; i++) updateWormSkinMaterialTime(rig.beads[i].material, time);
 
   for (let i = 0; i < SEGMENTS; i++) {
-    _segmentOffset(i, characterId, time, _off);
+    _segmentOffset(i, characterId, time, _off, opts.framing === 'runway');
     const bead = rig.beads[i];
     const box = rig.boxes[i];
     const halo = rig.halos[i];
@@ -409,7 +411,7 @@ function _poseWorm(opts, time) {
     // sway — so the preview shows the actual resting shape instead of a
     // moment frozen mid-turn.
     if (pagesShown) {
-      _segmentOffset(i - 1, characterId, time, _pbPrevOff);
+      _segmentOffset(i - 1, characterId, time, _pbPrevOff, opts.framing === 'runway');
       _pbPrevOff.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y; // same constant raise _off already has — a uniform lift shouldn't skew the segment-to-segment direction
       _pbZ.subVectors(_off, _pbPrevOff).normalize(); // backward = away from the segment ahead
       if (_pbZ.lengthSq() < 1e-8) _pbZ.set(0, 0, 1);
@@ -492,7 +494,7 @@ function _poseWorm(opts, time) {
   }
 
   // Face — same layout the played worm uses.
-  _segmentOffset(0, characterId, time, _anchor);
+  _segmentOffset(0, characterId, time, _anchor, opts.framing === 'runway');
   rig.glasses.forEach(g => { g.visible = isBook; });
   _faceParts.eyes[0] = rig.eyes[0];
   _faceParts.eyes[1] = rig.eyes[1];

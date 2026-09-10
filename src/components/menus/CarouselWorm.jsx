@@ -26,11 +26,13 @@ export default function CarouselWorm({ disabled = false }) {
   return <button type="button" className="carousel-worm" disabled={disabled}
     aria-label="Make your selected worm jump" data-paused={paused}
     onClick={() => { setTouched(true); setJumping(!reduced); }}>
+    <span className="carousel-worm-floor" aria-hidden="true" />
     <span className="carousel-worm-runner">
+      <span className="carousel-worm-shadow" aria-hidden="true" data-jumping={jumping} />
       <span className="carousel-worm-facing">
         <span className="carousel-worm-jump" data-jumping={jumping}
           onAnimationEnd={() => setJumping(false)}>
-          <WormPreviewCanvas characterId={characterId} skinId={skinId} hatId={hatId} size={96} animated={!paused} />
+          <WormPreviewCanvas characterId={characterId} skinId={skinId} hatId={hatId} size={180} framing="runway" animated={!paused} />
         </span>
       </span>
     </span>
