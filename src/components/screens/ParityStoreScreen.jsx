@@ -12,7 +12,7 @@ import {
 } from '../../3d/TilePreviewRenderer.js';
 import {
   UI_FONT, DISPLAY_FONT, HAND_FONT,
-  PAPER_SHEET_RAISED,
+  PAPER_SHEET_RAISED, UI_MOSS, UI_ACTION_SHADOW,
   PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_CREAM,
   NIGHT_TEXT_MUTED,
@@ -24,8 +24,8 @@ import CubePreviewCanvas from '../../3d/CubePreviewCanvas.jsx';
 import { SpecimenPlate, resolveWizardColors, bgOptionFor } from './wizardSteps/index.jsx';
 import './ParityStoreScreen.css';
 
-const ACCENT = '#0891B2';
-const ACCENT_SHADOW = '#0e6985';
+const ACCENT = UI_MOSS;
+const ACCENT_SHADOW = '#405832';
 const FONT = UI_FONT;
 const TOUCH = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' };
 
@@ -495,12 +495,12 @@ const ParityStoreScreen = ({ onClose }) => {
   const canAfford = focused ? parityPoints >= focused.price : false;
 
   const heroActionStyle = {
-    ...TOUCH, padding: '12px 26px', borderRadius: '12px',
-    background: heroAccent, border: 'none',
+    ...TOUCH, minHeight: 48, padding: '12px 26px', borderRadius: '12px',
+    background: UI_MOSS, border: 'none',
     color: '#fff', fontSize: '14px', fontWeight: 800, letterSpacing: '0.04em',
     cursor: 'pointer', fontFamily: FONT,
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    boxShadow: `0 4px 0 ${heroAccent}aa, 0 6px 16px ${heroAccent}44`,
+    boxShadow: UI_ACTION_SHADOW,
   };
 
   return (
@@ -575,10 +575,10 @@ const ParityStoreScreen = ({ onClose }) => {
           {/* Close */}
           <button
             className="store-icon-btn"
-            onPointerDown={onClose}
+            onClick={onClose}
             aria-label="Close store"
             style={{
-              ...TOUCH, width: 40, height: 40, borderRadius: '12px',
+              ...TOUCH, width: 48, height: 48, borderRadius: '12px',
               background: 'rgba(255,255,255,0.82)', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
               color: PAPER_TEXT_MUTED, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -604,18 +604,19 @@ const ParityStoreScreen = ({ onClose }) => {
           return (
             <button
               key={t.id}
+              aria-pressed={active}
               className={`store-tab${active ? ' is-active' : ''}`}
-              onPointerDown={() => { setTab(t.id); setFocusedId(null); }}
+              onClick={() => { setTab(t.id); setFocusedId(null); }}
               style={{
-                ...TOUCH,
+                ...TOUCH, minHeight: 48,
                 display: 'flex', alignItems: 'center', gap: '7px',
                 padding: '8px 14px', borderRadius: '999px', cursor: 'pointer',
-                background: active ? t.accent : 'rgba(255,255,255,0.72)',
-                border: active ? `2px solid ${t.accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
+                background: active ? UI_MOSS : 'rgba(255,255,255,0.72)',
+                border: active ? `2px solid ${UI_MOSS}` : `2px solid ${PAPER_BORDER_SOFT}`,
                 color: active ? '#fff' : PAPER_TEXT_MUTED,
                 fontSize: '12px', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
                 fontFamily: FONT, whiteSpace: 'nowrap',
-                boxShadow: active ? `0 3px 0 ${t.accent}88, 0 5px 14px ${t.accent}44` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+                boxShadow: active ? UI_ACTION_SHADOW : `0 2px 0 ${PAPER_CARD_SHADOW}`,
               }}
             >
               {t.label}

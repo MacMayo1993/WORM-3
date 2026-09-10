@@ -37,7 +37,7 @@
 // backlit rather than printed.
 
 import React from 'react';
-import { UI_FONT, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
+import { UI_FONT, UI_MOSS, UI_ACTION_SHADOW, PAPER_SHEET, NIGHT_SHEET, NIGHT_PANEL, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
 
@@ -46,9 +46,9 @@ import { isMobile } from '../../utils/device.js';
 // (MobiIntroScreen): a warm paper base, a fine 18px grid, a 90px major grid, and
 // a soft corner highlight + diagonal wash. Still worn by the store, level select,
 // the pack picker and the merge theme picker; no longer by the wizards.
-const GRAPH_LINE = 'rgba(80, 142, 190, 0.20)';
-const GRAPH_MAJOR = 'rgba(80, 142, 190, 0.32)';
-export const WIZARD_PAPER_BASE = '#fbf7e9';
+const GRAPH_LINE = 'rgba(122,110,98,0.04)';
+const GRAPH_MAJOR = 'rgba(122,110,98,0.06)';
+export const WIZARD_PAPER_BASE = PAPER_SHEET;
 
 export const wizardPaperBackground = {
   backgroundColor: WIZARD_PAPER_BASE,
@@ -81,14 +81,14 @@ export const PENCIL_LEAD = '#35404a';
 // palette step. Alphas over the base rather than opaque hexes, so a card sitting
 // on the ruled ground still shows the ruling through it.
 
-export const WIZ_BASE = '#0c0f14';
-export const WIZ_SURFACE = 'rgba(255,255,255,0.045)';
+export const WIZ_BASE = NIGHT_SHEET;
+export const WIZ_SURFACE = NIGHT_PANEL;
 export const WIZ_SURFACE_RAISED = 'rgba(255,255,255,0.075)';
-export const WIZ_BORDER = 'rgba(255,255,255,0.13)';
+export const WIZ_BORDER = NIGHT_BORDER;
 export const WIZ_BORDER_SOFT = 'rgba(255,255,255,0.08)';
-export const WIZ_TEXT = 'rgba(247,250,255,0.94)';
-export const WIZ_TEXT_MUTED = 'rgba(247,250,255,0.62)';
-export const WIZ_TEXT_FAINT = 'rgba(247,250,255,0.40)';
+export const WIZ_TEXT = NIGHT_TEXT;
+export const WIZ_TEXT_MUTED = NIGHT_TEXT_MUTED;
+export const WIZ_TEXT_FAINT = 'rgba(255,253,242,0.60)';
 export const WIZ_SHADOW = '0 24px 70px rgba(0,0,0,0.62)';
 export const WIZ_CARD_SHADOW = 'rgba(0,0,0,0.5)';
 
@@ -122,7 +122,7 @@ export const wizardDarkBackground = accent => ({
  * a wizard that wants to reflow on rotation passes a live value from
  * `useIsMobile()` and recomputes this per render.
  */
-export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMobile) {
+export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isMobile) {
   // Horizontal breathing room, matched down the whole sheet so everything sits on
   // one margin. The specimen is the exception: it runs to the edges.
   const GUTTER = mobile ? 14 : 28;
@@ -133,7 +133,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'rgba(4,6,10,0.72)',
+      background: 'rgba(28,35,22,0.72)',
       backdropFilter: PAPER_BACKDROP_BLUR,
       WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
       zIndex: Z.MODAL,
@@ -255,7 +255,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       alignItems: 'center',
       gap: 5,
       flexShrink: 0,
-      minHeight: 34,
+      minHeight: TOUCH_TARGET,
       padding: '7px 14px',
       borderRadius: 999,
       border: `1px solid ${active ? accent : WIZ_BORDER}`,
@@ -338,8 +338,8 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
     // it belongs across the thumb rather than in a corner.
     btnPrimary: {
       width: '100%',
-      background: `linear-gradient(135deg, ${accent}, ${accentShadow})`,
-      border: `1px solid ${accent}`,
+      background: UI_MOSS,
+      border: `1px solid ${UI_MOSS}`,
       fontSize: TEXT_SM,
       fontWeight: '800',
       letterSpacing: '0.10em',
@@ -352,7 +352,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       transition: 'all 0.12s ease',
       fontFamily: 'inherit',
       WebkitTapHighlightColor: 'transparent',
-      boxShadow: `0 6px 22px ${accent}55, inset 0 1px 0 rgba(255,255,255,0.22)`
+      boxShadow: UI_ACTION_SHADOW
     },
 
     btnSecondary: {
@@ -362,7 +362,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`, mobile = isMo
       fontWeight: '600',
       color: WIZ_TEXT_FAINT,
       cursor: 'pointer',
-      minHeight: 32,
+      minHeight: TOUCH_TARGET,
       padding: '4px 8px',
       alignSelf: 'center',
       transition: 'color 0.15s ease',

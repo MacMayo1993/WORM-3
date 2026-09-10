@@ -24,7 +24,8 @@ import {
     SETTING_ROW_STYLE, SETTING_LABEL_STYLE, togglePillStyle, segmentStyle,
     primaryBtnStyle, LIST_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
-import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, Z } from '../utils/uiTheme.js';
+import { useDialogBehavior } from '../components/ui/Panel.jsx';
+import { UI_FONT, DISPLAY_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, Z } from '../utils/uiTheme.js';
 
 // ─── Worm Countdown Overlay ─────────────────────────────────────────────────
 const WORM_COUNTDOWN_STYLE_ID = 'worm3-countdown-style';
@@ -813,9 +814,10 @@ const COUNTDOWN_OVERLAY_STYLE = {
 // beneath it — the CELEBRATION band, not the HUD-notification band it used to sit in.
 const WINNER_SCREEN_STYLE = {
     position: 'fixed', inset: 0, zIndex: Z.CELEBRATION,
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    background: 'radial-gradient(ellipse at 50% 30%, #1a0a3d 0%, #08051a 60%, #000 100%)',
-    pointerEvents: 'auto', overflow: 'hidden', fontFamily: FONT,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'safe center',
+    background: NIGHT_SHEET,
+    pointerEvents: 'auto', overflowY: 'auto', fontFamily: FONT, boxSizing: 'border-box',
+    padding: 'max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom))',
 };
 
 const WINNER_STARS_STYLE = {
@@ -831,9 +833,9 @@ const WINNER_STARS_STYLE = {
 
 const WINNER_TITLE_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 'clamp(52px, 11vw, 96px)', fontWeight: 900, letterSpacing: '-2px',
-    color: '#ffdd00',
-    textShadow: '-4px -4px 0 #cc2200, 4px -4px 0 #cc2200, -4px 4px 0 #cc2200, 4px 4px 0 #cc2200, 0 0 40px rgba(255,221,0,0.5)',
+    fontSize: 'clamp(30px, 8vw, 64px)', fontWeight: 900, letterSpacing: '-2px',
+    color: UI_GOLD,
+    textShadow: '0 3px 0 rgba(0,0,0,0.2)',
     userSelect: 'none', marginBottom: 4, lineHeight: 1, textAlign: 'center',
 };
 
@@ -842,7 +844,7 @@ const WINNER_SUB_STYLE = {
 };
 
 const WINNER_STATS_STYLE = {
-    display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', justifyContent: 'center',
+    display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', justifyContent: 'safe center',
 };
 
 const WINNER_STAT_BOX_STYLE = {
@@ -859,32 +861,19 @@ const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 800, color: '#fff', 
 
 const WINNER_PP_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 'clamp(28px, 6vw, 44px)', color: '#c4b5fd', letterSpacing: '-1px',
-    textShadow: '-2px -2px 0 #5b21b6, 2px -2px 0 #5b21b6, -2px 2px 0 #5b21b6, 2px 2px 0 #5b21b6',
+    fontSize: 'clamp(28px, 6vw, 44px)', color: UI_GOLD, letterSpacing: '-1px',
+    textShadow: '0 3px 0 rgba(0,0,0,0.2)',
     marginBottom: 6, textAlign: 'center',
 };
 
 const WINNER_PP_NOTE_STYLE = {
-    fontSize: 11, color: 'rgba(196,181,253,0.65)', marginBottom: 22, textAlign: 'center',
+    fontSize: 11, color: NIGHT_TEXT_MUTED, marginBottom: 22, textAlign: 'center',
 };
 
-const WINNER_BTN_ROW_STYLE = { display: 'flex', gap: 12, justifyContent: 'center' };
+const WINNER_BTN_ROW_STYLE = { display: 'flex', gap: 12, justifyContent: 'safe center' };
 
-const WINNER_PLAY_AGAIN_STYLE = {
-    minWidth: 140, borderRadius: 14, padding: '12px 20px',
-    fontSize: 15, fontWeight: 800, letterSpacing: 0.6, color: '#fff',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    border: '2px solid rgba(139,92,246,0.6)', cursor: 'pointer',
-    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-    boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
-};
-
-const WINNER_NEW_GAME_STYLE = {
-    minWidth: 120, borderRadius: 14, padding: '12px 20px',
-    fontSize: 15, fontWeight: 800, letterSpacing: 0.6, color: 'rgba(255,255,255,0.8)',
-    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)',
-    cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-};
+const WINNER_PLAY_AGAIN_STYLE = { ...primaryBtnStyle(), minWidth: 140 };
+const WINNER_NEW_GAME_STYLE = { ...LIST_BTN_STYLE, width: 'auto', minWidth: 120, justifyContent: 'center' };
 
 const PODIUM_WRAP_STYLE = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22, position: 'relative',
@@ -963,13 +952,13 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                 ].map(([label, value]) => (
                     <div key={label} style={WINNER_STAT_BOX_STYLE}>
                         <div style={WINNER_STAT_LABEL_STYLE}>{label}</div>
-                        <div style={{ ...WINNER_STAT_VALUE_STYLE, ...(label === 'TOTAL PPs' ? { color: '#c4b5fd' } : {}) }}>{value}</div>
+                        <div style={{ ...WINNER_STAT_VALUE_STYLE, ...(label === 'TOTAL PPs' ? { color: UI_GOLD } : {}) }}>{value}</div>
                     </div>
                 ))}
             </div>
             <div style={WINNER_BTN_ROW_STYLE}>
-                <button onPointerDown={onRetry} style={WINNER_PLAY_AGAIN_STYLE}>Play Again</button>
-                <button onPointerDown={onNewGame} style={WINNER_NEW_GAME_STYLE}>New Game</button>
+                <button onClick={onRetry} style={WINNER_PLAY_AGAIN_STYLE}>Play Again</button>
+                <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New Game</button>
             </div>
         </div>
     );
@@ -1326,9 +1315,11 @@ function BoostButton({ wormAlive, fc }) {
 
 // ─── Pause Menu Overlay ──────────────────────────────────────────────────────
 
-function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc }) {
-    const green = fc[2] || FACE_FALLBACKS[2];
-    const blue = fc[5] || FACE_FALLBACKS[5];
+function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc: _fc }) {
+    const green = UI_MOSS_LIGHT;
+    const blue = UI_MOSS_LIGHT;
+    const dialogRef = useRef(null);
+    const onDialogKeyDown = useDialogBehavior(dialogRef, onResume);
     const cameraHorizon = useGameStore(s => s.wormCameraHorizon ?? 'face');
     const toggleCameraHorizon = useGameStore(s => s.toggleWormCameraHorizon);
     const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
@@ -1343,11 +1334,11 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
     return (
         // Not fixed: the pause menu lives inside the HUD's stacking context and must
         // not escape it, so the scrim is absolute against that instead of the viewport.
-        <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onPointerDown={onResume}>
-            <div style={overlayCardStyle(green, { width: 380 })} onPointerDown={e => e.stopPropagation()}>
+        <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onClick={onResume}>
+            <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className="worm-pause-card" role="dialog" aria-modal="true" aria-label="Game paused" style={overlayCardStyle(green, { width: 420 })} onClick={e => e.stopPropagation()}>
                 <Eyebrow accent={green}>Paused</Eyebrow>
                 <OverlayTitle size="clamp(26px, min(9vw, 8vh), 44px)" outline="#14310f" glow={`${green}55`}>
-                    WORM MODE
+                    TAKE A BREATHER
                 </OverlayTitle>
 
                 <StatTiles columns={2} stats={[
@@ -1366,7 +1357,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                                 key={option.label}
                                 type="button"
                                 disabled={!wormAlive}
-                                onPointerDown={() => wormAlive && setWormSpeed(option.value)}
+                                onClick={() => wormAlive && setWormSpeed(option.value)}
                                 style={segmentStyle(wormSpeed === option.value, blue, wormAlive)}
                             >
                                 {option.label}
@@ -1379,7 +1370,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                 <div style={SETTING_ROW_STYLE}>
                     <span style={SETTING_LABEL_STYLE}>Controls</span>
                     <button
-                        onPointerDown={() => toggleWormControlMode()}
+                        onClick={() => toggleWormControlMode()}
                         style={togglePillStyle(wormControlMode === 'oriented', blue)}
                     >
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
@@ -1393,7 +1384,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                 <div style={SETTING_ROW_STYLE}>
                     <span style={SETTING_LABEL_STYLE}>Horizon</span>
                     <button
-                        onPointerDown={() => toggleCameraHorizon?.()}
+                        onClick={() => toggleCameraHorizon?.()}
                         style={togglePillStyle(cameraHorizon === 'face', blue)}
                     >
                         {cameraHorizon === 'face' ? 'FOLLOWS FACE' : 'LEVEL'}
@@ -1404,13 +1395,13 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     <span style={SETTING_LABEL_STYLE}>Feel</span>
                     <div style={{ display: 'flex', gap: 6 }}>
                         <button
-                            onPointerDown={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))}
+                            onClick={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))}
                             style={togglePillStyle(sfxOn, green)}
                         >
                             {sfxOn ? 'SFX ON' : 'SFX OFF'}
                         </button>
                         <button
-                            onPointerDown={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))}
+                            onClick={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))}
                             style={togglePillStyle(hapticsOn, green)}
                         >
                             {hapticsOn ? 'HAPTICS ON' : 'HAPTICS OFF'}
@@ -1422,7 +1413,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'clamp(10px, 2vh, 14px)' }}>
                     {onToggleAntipodal && (
                         <button
-                            onPointerDown={onToggleAntipodal}
+                            onClick={onToggleAntipodal}
                             style={{
                                 ...LIST_BTN_STYLE,
                                 ...(antipodalActive ? { background: `${blue}26`, borderColor: `${blue}66`, color: '#fff' } : {}),
@@ -1433,13 +1424,13 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                         </button>
                     )}
                     {onSettings && (
-                        <button onPointerDown={onSettings} style={LIST_BTN_STYLE}>
+                        <button onClick={onSettings} style={LIST_BTN_STYLE}>
                             <span aria-hidden="true">⚙</span>
                             <span>Settings</span>
                         </button>
                     )}
                     {onHome && (
-                        <button onPointerDown={onHome} style={LIST_BTN_STYLE}>
+                        <button onClick={onHome} style={LIST_BTN_STYLE}>
                             <span aria-hidden="true">⌂</span>
                             <span>Main Menu</span>
                         </button>
@@ -1448,7 +1439,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
 
                 {/* Resume is the only primary — the reason the player opened this. */}
                 <div style={ACTION_ROW_STYLE}>
-                    <button onPointerDown={onResume} style={primaryBtnStyle(green, blue)}>RESUME</button>
+                    <button onClick={onResume} style={primaryBtnStyle(green, blue)}>RESUME</button>
                 </div>
             </div>
         </div>

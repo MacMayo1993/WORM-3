@@ -26,7 +26,7 @@ import MenuTileOverlay from './MenuTileOverlay.jsx';
 import MenuGridGlow from './MenuGridGlow.jsx';
 import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
 import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z, UI_GOLD } from '../../utils/uiTheme.js';
-import { TOUCH_TARGET } from '../ui/Button.jsx';
+import { ActionButton, IconButton, TOUCH_TARGET } from '../ui/Button.jsx';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -995,14 +995,28 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     }
 
     cubeCurrentScale.current += (cubeTargetScale.current - cubeCurrentScale.current) * Math.min(1, delta * 18);
-    cubeRef.current.scale.setScalar(cubeCurrentScale.current);
+    // Reserve real space for the mobile heading and action stack. This is only
+    // the idle home pose; the carousel/dive paths above keep their own framing.
+    const { width, height } = state.size;
+    const landscape = width > height && height <= 600;
+    const heroTop = landscape ? 130 : height <= 740 ? 130 : 200;
+    const heroBottom = landscape ? height - 16 : height - 320;
+    const heroHeight = Math.max(64, heroBottom - heroTop);
+    const homeScale = Math.min(1, heroHeight / (height * 4 / state.viewport.height));
+    cubeRef.current.scale.setScalar(cubeCurrentScale.current * homeScale);
+    const screenX = landscape ? -0.26 * state.viewport.width : 0;
+    const screenY = (0.5 - (heroTop + heroBottom) / (2 * height)) * state.viewport.height;
+    const basis = state.camera.matrixWorld.elements;
+    const homeX = basis[0] * screenX + basis[4] * screenY;
+    const homeY = basis[1] * screenX + basis[5] * screenY;
+    const homeZ = basis[2] * screenX + basis[6] * screenY;
 
     if (shaking.current) {
       const elapsed = Date.now() - shakeStart.current;
       if (elapsed > 540) {
         shaking.current = false;
         cubeTargetScale.current = MENU_REST_SCALE;
-        cubeRef.current.position.set(0, 0.45, 0);
+        cubeRef.current.position.set(homeX, homeY, homeZ);
         if (shakeIsExternalRef.current) {
           shakeIsExternalRef.current = false;
           _onShakeComplete?.();
@@ -1013,9 +1027,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         }
       } else {
         const intensity = 0.10 * (1 - elapsed / 540);
-        cubeRef.current.position.x = Math.sin(t * 42) * intensity;
-        cubeRef.current.position.y = 0.45 + Math.sin(t * 37 + 1) * intensity * 0.5;
-        cubeRef.current.position.z = Math.sin(t * 31 + 2) * intensity * 0.3;
+        cubeRef.current.position.x = homeX + Math.sin(t * 42) * intensity;
+        cubeRef.current.position.y = homeY + Math.sin(t * 37 + 1) * intensity * 0.5;
+        cubeRef.current.position.z = homeZ + Math.sin(t * 31 + 2) * intensity * 0.3;
       }
     } else {
       // A steady turn about the body diagonal, on an axis that itself drifts —
@@ -1026,7 +1040,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       _driftEuler.set(Math.sin(t * DRIFT_NOD_RATE) * DRIFT_NOD_AMP, t * DRIFT_YAW_RATE, 0);
       _driftQ.setFromEuler(_driftEuler);
       cubeRef.current.quaternion.copy(_DIAG_ALIGN_Q).premultiply(_spinQ).premultiply(_driftQ);
-      cubeRef.current.position.set(0, 0.45, 0);
+      cubeRef.current.position.set(homeX, homeY, homeZ);
     }
   });
 
@@ -1454,86 +1468,21 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 // ─── Start button ─────────────────────────────────────────────────────────────
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScYKKOXc6c3vdqpmWWv0J3lMd90-GOfp0TxxxHelxjIjMdrvw/viewform';
 
-const MenuStartButton = ({ visible, onClick, onDemo }) => {
-  // On phones the cluster sat ~120px off the bottom, leaving a big dead gap.
-  // Drop it near the bottom in portrait; keep the roomier desktop spacing.
-  const [portrait, setPortrait] = React.useState(
-    typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false
-  );
-  React.useEffect(() => {
-    const onResize = () => setPortrait(window.innerHeight > window.innerWidth);
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
-    };
-  }, []);
-  const padBottom = portrait
-    ? 'max(40px, env(safe-area-inset-bottom, 40px))'
-    : 'max(120px, env(safe-area-inset-bottom, 120px))';
-  return (
-  <div style={{
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingBottom: padBottom,
-    display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-    gap: '11px',
-    zIndex: 4,
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'none' : 'translateY(16px)',
-    transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
-    pointerEvents: 'all',
-  }}>
-    <button
-      type="button"
-      className="worm-tactile-btn"
-      onClick={onClick}
-    >
-      START
-      <span className="worm-cta-glyph" aria-hidden="true">&#9654;</span>
-    </button>
-    {onDemo && (
-      <button
-        type="button"
-        onClick={onDemo}
-        // Warm the demo's desert env map the instant the player signals intent,
-        // so it's cached by the time the demo scene mounts.
-        onPointerEnter={warmDemoAssets}
-        onPointerDown={warmDemoAssets}
-        // Secondary action — the same green as START (one action colour), but
-        // dropped down it, so START stays the loud CTA. Surface, rim, bevel and
-        // press live in .worm-menu-cta-secondary; anything set here would
-        // outrank the class and silently disable it.
-        className="worm-menu-cta-secondary"
-        style={{
-          fontSize: '12px',
-          fontWeight: 800,
-          fontFamily: UI_FONT,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-        }}
-      >Start Demo</button>
-    )}
-    <button
-      type="button"
-      className="worm-menu-cta-secondary"
-      onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}
-      // Same green family as START, smallest of the three so the hierarchy is
-      // START → Start Demo → Give Feedback while all read as one action colour.
-      style={{
-        // Quietest of the three — ranked by type size, not by opacity: fading
-        // the element fades its rim too, and on a glass sheet the rim is what
-        // separates the pill from the scene showing through it.
-        fontSize: '10px',
-        fontWeight: 700,
-        fontFamily: UI_FONT,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-      }}
-    >Give Feedback</button>
+const MenuStartButton = ({ visible, onClick, onDemo, onModes, onStore }) => (
+  <div className="home-actions" style={{ opacity: visible ? 1 : 0 }}>
+    <div className="home-mode-card">
+      <div><span className="home-eyebrow">GAME MODE</span><strong>Worm</strong><p>Cross edges. Find the other side.</p></div>
+      <button type="button" className="home-text-button" onClick={onModes}>Change <span aria-hidden="true">↗</span></button>
+    </div>
+    <ActionButton size="lg" fullWidth onClick={onClick}>LET’S PLAY <span aria-hidden="true">▶</span></ActionButton>
+    <nav className="home-nav" aria-label="Main navigation">
+      <button type="button" onClick={onModes}><span aria-hidden="true">▷</span>Modes</button>
+      <button type="button" onClick={onStore}><span aria-hidden="true">▦</span>Collection / Store</button>
+      {onDemo && <button type="button" onClick={onDemo} onPointerEnter={warmDemoAssets} onPointerDown={warmDemoAssets}><span aria-hidden="true">◎</span>Demo</button>}
+    </nav>
+    <a className="home-feedback" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">Give feedback</a>
   </div>
-  );
-};
+);
 
 // The utility pills are a 15%-alpha tint of the mode colour over the live
 // scene, i.e. they are dark whatever the mode is — so their ink is fixed light
@@ -1543,80 +1492,12 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
 const PILL_INK = 'rgba(255, 253, 242, 0.92)';
 
 const MENU_FONT = UI_FONT;
-const menuStyles = {
-  titleWrap: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    paddingTop: 'max(44px, env(safe-area-inset-top,44px))',
-    paddingLeft: '16px', paddingRight: '16px',
-    zIndex: 4,
-    transition: 'all 0.75s cubic-bezier(0.22,1,0.36,1)',
-  },
-};
-
-export const MenuTitleCard = ({ visible }) => (
-  <div style={{
-    ...menuStyles.titleWrap,
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'translateY(0)' : 'translateY(-18px)',
-  }}>
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-      <div style={{ display: 'flex', transform: 'skewX(-5deg)' }}>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0s', color: '#ef4444', '--glow': 'rgba(239,68,68,0.55)' }}>W</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.15s', color: '#f97316', '--glow': 'rgba(249,115,22,0.55)' }}>O</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.30s', color: '#22c55e', '--glow': 'rgba(34,197,94,0.55)' }}>R</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.45s', color: '#3b82f6', '--glow': 'rgba(59,130,246,0.55)' }}>M</span>
-      </div>
-      <div className="worm-cube-sup">
-        <div className="worm-cube-inner">
-          <div className="worm-cube-face worm-cube-face--front">3</div>
-          <div className="worm-cube-face worm-cube-face--right">3</div>
-          <div className="worm-cube-face worm-cube-face--top">3</div>
-          <div className="worm-cube-face worm-cube-face--back">3</div>
-          <div className="worm-cube-face worm-cube-face--left">3</div>
-          <div className="worm-cube-face worm-cube-face--bottom">3</div>
-        </div>
-      </div>
-    </div>
-    {/* One line of eyebrow type, ruled on both sides. It fills the gap between
-        the wordmark and the cube and answers the question a first-time player
-        actually has: what is the cube in front of me doing? */}
-    <div className="worm-menu-tagline">Flip through the cube</div>
-  </div>
-);
-
-// ─── Backdrop ─────────────────────────────────────────────────────────────────
-// The menu draws over whatever environment the 3D scene happened to load, and
-// those backdrops are bright, busy and mid-tone — the same range the wordmark,
-// the cube and the CTAs live in, which is why nothing separated from anything.
-// This stages the shot: a warm key light behind the cube, a vignette that drops
-// the corners, and a scrim at each end to seat the title and the button stack.
-// Purely presentational, and pointer-transparent, so the cube underneath keeps
-// its tap-to-restyle and shake-to-play behaviour.
-const MenuBackdrop = ({ visible }) => (
-  <div
-    className="worm-menu-backdrop"
-    aria-hidden="true"
-    style={{
-      position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
-      opacity: visible ? 1 : 0,
-      transition: 'opacity 0.9s ease'
-    }}
-  >
-    <div className="worm-menu-stagelight" />
-    <div className="worm-menu-vignette" />
-    <div className="worm-menu-scrim-top" />
-    <div className="worm-menu-scrim-bottom" />
-  </div>
-);
-
-
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
   onPlay: _onPlay, onLevels: _onLevels, onFreeplay: _onFreeplay, onRandom: _onRandom, onCoop: _onCoop, onTeach: _onTeach,
-  onSettings: _onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
-  onWormHealer: _onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
-  onStore: _onStore, onComingSoon: _onComingSoon, onMobiusCubelet: _onMobiusCubelet, onOpenModeSelect,
+  onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
+  onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
+  onStore, onComingSoon: _onComingSoon, onMobiusCubelet: _onMobiusCubelet, onOpenModeSelect,
   onDemo,
 }) => {
   const [titleVisible, setTitleVisible] = useState(false);
@@ -1634,11 +1515,17 @@ const MainMenu = ({
   }, [onOpenModeSelect]);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
-      <MenuBackdrop visible={titleVisible} />
-      <MenuTitleCard visible={titleVisible} />
-      <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
-    </div>
+    <main className="worm-home">
+      <header className="home-header">
+        <span className="home-wordmark">WORM<sup>3</sup></span>
+        {onSettings && <IconButton label="Settings" onClick={onSettings}>⚙</IconButton>}
+      </header>
+      <div className="home-heading" style={{ opacity: titleVisible ? 1 : 0 }}>
+        <span className="home-eyebrow">A LITTLE CURIOSITY GOES A LONG WAY</span>
+        <h1>A SMALL WORM.<br />A STRANGE WORLD.</h1>
+      </div>
+      <MenuStartButton visible={bottomVisible} onClick={onWormHealer} onModes={() => { _externalShakeNeeded = true; }} onStore={onStore} onDemo={onDemo} />
+    </main>
   );
 };
 

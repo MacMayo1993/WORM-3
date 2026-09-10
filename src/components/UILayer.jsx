@@ -477,7 +477,7 @@ export default function UILayer({
         <StoryObjectiveHUD level={currentLevelData} />
       )}
 
-      {showMainMenu && !showModeSelect && (
+      {showMainMenu && !showModeSelect && !showSettings && (
         <MainMenu
           onOpenModeSelect={onOpenModeSelect}
           onPlay={onMenuPlay}
