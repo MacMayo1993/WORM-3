@@ -1,34 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from 'three';
-import { INTRO_END, sampleIntro, passagePoint, introCameraDistance } from '../components/intro/introChoreography.js';
+import { TILES, PAIRS, flippedColor, pairPoint } from '../components/intro/introTopology.js';
+import { WORM_START, IMPLODE_START } from '../components/intro/introTiming.js';
+import { INTRO_END, sampleIntro, introCameraDistance } from '../components/intro/introChoreography.js';
 
 // These protect animation failure modes: discontinuous cuts, clipped framing,
 // mistaken antipodes, and a supposedly reduced-motion path that still moves.
 describe('opening cinematic choreography', () => {
-  it('uses exact antipodal endpoints at every explosion extent', () => {
-    for (const extent of [1.51, 2, 3.01]) {
-      const a = passagePoint(0, extent, new Vector3());
-      const b = passagePoint(1, extent, new Vector3());
-      expect(a.add(b).length()).toBeLessThan(1e-12);
-    }
-  });
-  it('keeps the worm clear of the remaining cubies during its passage', () => {
-    for (let i = 0; i <= 100; i++) {
-      const t = 11 + 1.3 * i / 100;
-      const pose = sampleIntro(t);
-      const spacing = 1 + 1.5 * pose.open;
-      const p = passagePoint(pose.worm, spacing + 0.51, new Vector3());
-      for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
-        if (!x && !y) continue; // Core and the open center pair.
-        const dx = Math.max(0, Math.abs(p.x - x * spacing) - 0.55);
-        const dy = Math.max(0, Math.abs(p.y - y * spacing) - 0.55);
-        const dz = Math.max(0, Math.abs(p.z - z * spacing) - 0.55);
-        expect(Math.hypot(dx, dy, dz)).toBeGreaterThan(0.15);
-      }
-    }
-  });
   it('has no jumps at camera or animation beat boundaries', () => {
-    for (const t of [0.6, 2.8, 3.2, 6.2, 6.5, 8.2, 8.7, 10.5, 12.5, 14.5]) {
+    for (const t of [0.1, 0.6, 1.0, 2.1, 2.2, 2.3, 3.2, 3.3, 6.4, 6.9, 7.2, 7.4]) {
       const before = sampleIntro(t - 0.00001);
       const after = sampleIntro(t + 0.00001);
       for (const key of ['open', 'reveal', 'turn', 'orbit', 'distance', 'flip', 'passage', 'title']) {
@@ -52,5 +32,41 @@ describe('opening cinematic choreography', () => {
       for (const key of ['open', 'turn', 'orbit', 'distance', 'flip', 'reveal', 'passage', 'title']) expect(pose[key]).toBe(first[key]);
       expect(pose.wormVisible).toBe(false);
     }
+  });
+});
+
+
+describe('all-pairs reveal', () => {
+  it('covers every sticker exactly once with 27 distinct antipodal pairs', () => {
+    const key = (p, f) => `${p.join(',')}:${f.axis}:${f.sign}`;
+    const endpoints = PAIRS.flatMap(pair => [key(pair.position, pair.face), key(pair.position.map(v => -v), { ...pair.face, sign: -1 })]);
+    expect(PAIRS).toHaveLength(27);
+    expect(TILES).toHaveLength(54);
+    expect(new Set(endpoints).size).toBe(54);
+    expect(endpoints.sort()).toEqual(TILES.map(t => key(t.position, t.face)).sort());
+  });
+  it('anchors every connection to opposite sticker centers throughout expansion', () => {
+    for (const spacing of [1, 1.6, 2.5]) for (const pair of PAIRS) {
+      const a = pairPoint(pair, 0, spacing, new Vector3());
+      const b = pairPoint(pair, 1, spacing, new Vector3());
+      expect(a.clone().add(b).length()).toBeLessThan(1e-12);
+      expect(a.getComponent(pair.face.axis)).toBeCloseTo(spacing + 0.51);
+      expect(a.toArray().every(Number.isFinite)).toBe(true);
+    }
+  });
+  it('changes all 54 tile colors during the flip and restores them on return', () => {
+    const before = sampleIntro(0.9).flip;
+    const flipped = sampleIntro(2.15).flip;
+    const restored = sampleIntro(8).flip;
+    for (const tile of TILES) {
+      expect(flippedColor(tile.faceIndex, before)).toBe(tile.face.color);
+      expect(flippedColor(tile.faceIndex, flipped)).not.toBe(tile.face.color);
+      expect(flippedColor(tile.faceIndex, restored)).toBe(tile.face.color);
+    }
+  });
+  it('lets even the last worm tail arrive before the cube closes', () => {
+    const lastArrival = WORM_START + (PAIRS.length - 1) * 0.012 + (1 + 9 * 0.016) * 2.2;
+    expect(lastArrival).toBeLessThan(IMPLODE_START);
+    expect(INTRO_END).toBeLessThanOrEqual(9);
   });
 });
