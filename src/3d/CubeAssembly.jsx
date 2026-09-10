@@ -19,7 +19,11 @@ import CameraFlipKick from './CameraFlipKick.jsx';
 import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
+import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
+// Scratch layer/angle lists handed to setLiveRotation every frame — it copies out
+// of them, so they are reused rather than reallocated per frame.
+const _liveLayers = [];
+const _liveAngles = [];
 import { liveCubies } from '../worm/liveCubies.js';
 import { collectHealWave, healTilePair, isHealable } from '../game/chaosHeal.js';
 import { buildManifoldGridMap } from '../game/manifoldLogic.js';
@@ -949,10 +953,10 @@ const CubeAssembly = React.memo(({
           g.quaternion.premultiply(_rotQuat);
         }
       });
-      liveRotation.active = true;
-      liveRotation.axis = ld.axis;
-      liveRotation.sliceIndex = ld.sliceIndex;
-      liveRotation.angle = angle;
+      // A drag turns exactly one plane, so the layer list is that one plane.
+      _liveLayers.length = 1; _liveAngles.length = 1;
+      _liveLayers[0] = ld.sliceIndex; _liveAngles[0] = angle;
+      setLiveRotation(ld.axis, _liveLayers, _liveAngles, ld.sliceIndex, angle);
       return; // Skip animState processing during live drag
     }
 
@@ -1002,10 +1006,19 @@ const CubeAssembly = React.memo(({
     const animTurns = animState.numTurns ?? 1;
     const quarterTurns = (Math.PI / 2) * animTurns;
     const baseAngle = currentProgress * quarterTurns; // unsigned; each plane applies its own sign
-    liveRotation.active = true;
-    liveRotation.axis = axis;
-    liveRotation.sliceIndex = sliceIndex;
-    liveRotation.angle = baseAngle * dir; // anchor plane's signed angle (the one the worm rides)
+    // Publish EVERY turning plane with its own signed angle. A hazard turn spins two
+    // planes opposite ways, and a consumer handed only the anchor cannot see the
+    // second one at all — the worm, its body samples and the orbs on that plane sit
+    // still through the tween and jump at commit.
+    const animLayers = animState.sliceIndices?.length ? animState.sliceIndices : [sliceIndex];
+    const animDirs = animState.sliceDirs?.length ? animState.sliceDirs : animLayers.map(() => dir);
+    _liveLayers.length = animLayers.length;
+    _liveAngles.length = animLayers.length;
+    for (let li = 0; li < animLayers.length; li++) {
+      _liveLayers[li] = animLayers[li];
+      _liveAngles[li] = baseAngle * (animDirs[li] ?? dir);
+    }
+    setLiveRotation(axis, _liveLayers, _liveAngles, sliceIndex, baseAngle * dir);
     // Mega: spin each band chassis with its own plane so it backs the rotating tiles
     // (in the right direction) instead of the static full box occluding them.
     const mc = megaChassisRef.current;

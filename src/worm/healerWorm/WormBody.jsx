@@ -5,14 +5,13 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import {
-    isTileInSlice,
     makeTunnelCenterline,
     buildTunnelCenterlineInto,
     tunnelTToArc,
     getTunnelArcPosSmoothInto,
     getWindWorldPosInto,
 } from '../wormLogic.js';
-import { liveRotation } from '../liveRotation.js';
+import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { shAt, makeStepPathCursor, resetStepPathCursor, advanceStepPathCursor } from '../circularBuffers.js';
 import { beginWormSegments, pushWormSegment, endWormSegments } from '../wormSegments.js';
 import { getWormHaloGeometry, getWormHaloMaterial } from '../wormGlowHalo.js';
@@ -356,14 +355,19 @@ export function WormBody({ worm, size }) {
         // because commit bakes the same turn into history, there is no snap when it lands.
         const _ride = liveRotation.active;
         const _rAxis = liveRotation.axis;
-        const _rSlice = liveRotation.sliceIndex;
-        const _rAngle = liveRotation.angle;
         if (_ride) _bodyRideAxis.set(_rAxis === 'col' ? 1 : 0, _rAxis === 'row' ? 1 : 0, _rAxis === 'depth' ? 1 : 0);
         // Returns the effective (possibly ridden) world position for a path point, writing into
         // `out` only when a rotation is applied; otherwise returns the point's own vector.
+        //
+        // Each point rides ITS OWN plane at that plane's signed angle. Riding the anchor
+        // plane's angle meant a body sample on the second plane of a two-plane turn sat
+        // still through the tween and jumped when the turn committed — and on a hazard
+        // turn, whose planes spin opposite ways, half the body was doing that. Points
+        // tagged tx < 0 were recorded in destination space (a crossing) and never ride.
         const effPos = (pt, out) => {
-            if (_ride && pt.tx >= 0 && isTileInSlice(_rAxis, _rSlice, pt.tx, pt.ty, pt.tz)) {
-                return out.copy(pt.pos).applyAxisAngle(_bodyRideAxis, _rAngle);
+            if (_ride && pt.tx >= 0) {
+                const ang = liveLayerAngle(pt.tx, pt.ty, pt.tz);
+                if (ang !== null) return out.copy(pt.pos).applyAxisAngle(_bodyRideAxis, ang);
             }
             return pt.pos;
         };
@@ -514,8 +518,9 @@ export function WormBody({ worm, size }) {
                         _bodyCloneNormal.lerpVectors(ptA.normal, ptB.normal, t).normalize();
                         // Keep the surface normal consistent with a ridden segment so the
                         // wiggle/orientation track the rotating face rather than the old one.
-                        if (_ride && ptA.tx >= 0 && isTileInSlice(_rAxis, _rSlice, ptA.tx, ptA.ty, ptA.tz)) {
-                            _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, _rAngle).normalize();
+                        if (_ride && ptA.tx >= 0) {
+                            const nAng = liveLayerAngle(ptA.tx, ptA.ty, ptA.tz);
+                            if (nAng !== null) _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, nAng).normalize();
                         }
 
                         // Calculate forward/side vector for the wiggle at this exact localized point

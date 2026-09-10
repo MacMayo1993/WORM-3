@@ -39,7 +39,7 @@ export function isTileInSlice(axis, sliceIndex, x, y, z) {
 }
 
 /**
- * Advance the worm's "rest-read" state at a step commit.
+ * Advance the worm's "rest-read" (crossing) state at a step commit.
  *
  * While a slice is mid-rotation, a worm crossing onto one of its cells from static ground
  * is stepping onto the CELL — whose occupant is still in flight — not riding the slice.
@@ -47,44 +47,84 @@ export function isTileInSlice(axis, sliceIndex, x, y, z) {
  * position and stay on the cell when the rotation commits, instead of chasing the outgoing
  * tile and being carried to wherever it lands (a visible teleport, then a snap at commit).
  *
- * Transition rules for the returned descriptor (null | {axis, sliceIndex}):
- *   • crossing from static ground onto the rotating slice arms it,
- *   • steps that still touch the same rotating slice (along it, or back off it) keep the
- *     current state — a rider keeps riding, a rest-read crosser keeps rest-reading,
- *   • a step fully on static ground, no active rotation, or a different rotation clears it.
+ * A move can turn several planes at once (the worm hazard turns two, in opposite
+ * directions), so this is decided PER PLANE and the descriptor carries every plane the
+ * worm is currently crossing into. Deciding it for the anchor plane alone left a crossing
+ * onto the second plane unprotected — the head attached to the outgoing cubie and
+ * teleported with it.
  *
- * @param {null|{axis:string,sliceIndex:number}} current - descriptor from the previous step
- * @param {boolean} rotationActive - is a slice rotation currently animating
- * @param {string} axis - active rotation axis ('col'|'row'|'depth')
- * @param {number} sliceIndex - active rotation slice index
+ * Transition rules, applied to each turning plane independently:
+ *   • crossing onto the plane from off it arms that plane,
+ *   • a step that stays on (or steps back off) a plane keeps whatever that plane had —
+ *     a rider keeps riding, a crosser keeps crossing,
+ *   • a step with neither endpoint on the plane leaves it unarmed.
+ * No active rotation, or a rotation from a different transaction, clears everything.
+ *
+ * @param {null|{txnId:number,axis:string,layers:number[]}} current - previous descriptor
+ * @param {{active:boolean,axis:string,sliceIndices:number[],txnId:number}} live - the live
+ *        rotation bridge (or any object with that shape, for tests)
  * @param {null|{x,y,z}} prevTile - tile the step leaves from (null on the first step)
  * @param {{x,y,z}} nextTile - tile the step lands on
- * @returns {null|{axis:string,sliceIndex:number}} the new rest-read descriptor
+ * @returns {null|{txnId:number,axis:string,layers:number[]}} the new descriptor
  */
-export function nextRestRead(current, rotationActive, axis, sliceIndex, prevTile, nextTile) {
-  if (!rotationActive) return null;
-  const kept = current && current.axis === axis && current.sliceIndex === sliceIndex ? current : null;
-  const prevIn = !!prevTile && isTileInSlice(axis, sliceIndex, prevTile.x, prevTile.y, prevTile.z);
-  const nextIn = isTileInSlice(axis, sliceIndex, nextTile.x, nextTile.y, nextTile.z);
-  if (!prevIn && nextIn) return kept ?? { axis, sliceIndex };
-  if (!prevIn && !nextIn) return null;
-  return kept;
+export function nextRestRead(current, live, prevTile, nextTile) {
+  if (!live || !live.active) return null;
+  const { axis, txnId } = live;
+  const liveLayers = live.sliceIndices ?? [];
+  // Protection armed under a DIFFERENT rotation is not inherited. Two consecutive
+  // turns of the same axis and layer are otherwise indistinguishable, and the second
+  // one would silently consume the first one's crossing state.
+  const kept = current && current.txnId === txnId && current.axis === axis ? current : null;
+
+  let layers = null;
+  for (let i = 0; i < liveLayers.length; i++) {
+    const layer = liveLayers[i];
+    const prevIn = !!prevTile && isTileInSlice(axis, layer, prevTile.x, prevTile.y, prevTile.z);
+    const nextIn = isTileInSlice(axis, layer, nextTile.x, nextTile.y, nextTile.z);
+    const hadLayer = !!kept && kept.layers.includes(layer);
+    // Crossing in from off the plane arms it; staying on it (or stepping back off)
+    // keeps what it had; touching neither end leaves it alone.
+    const armed = (!prevIn && nextIn) || (prevIn && hadLayer);
+    if (!armed) continue;
+    (layers ??= []).push(layer);
+  }
+  if (!layers) return null;
+  // Nothing changed — hand back the same object so callers can use identity to detect
+  // a newly armed crossing.
+  if (kept && kept.layers.length === layers.length &&
+    layers.every((l, i) => kept.layers[i] === l)) return kept;
+  return { txnId, axis, layers };
 }
 
 /**
- * Detect a rotation that starts after an inter-tile step has already begun.
+ * Same decision, re-evaluated mid-traversal.
  *
- * Step destinations are chosen at the previous step boundary, so only calling
- * nextRestRead there misses a slice that starts rotating midway through the
- * traversal. A completed traversal must not be reclassified: at that point the
- * worm was already standing on the tile when the turn began and should ride it.
+ * A rotation can begin AFTER a step's destination was chosen, so the crossing has to be
+ * recognised while the head is still in flight rather than only at step boundaries.
+ * A completed step (interpT >= 1) is not reclassified: a worm that finished its step onto
+ * a tile before the rotation began is a rider, and must stay one.
  */
-export function nextRestReadDuringStep(current, rotationActive, axis, sliceIndex, interpT, prevTile, nextTile) {
-  if (!rotationActive) return null;
+export function nextRestReadDuringStep(current, live, interpT, prevTile, nextTile) {
+  if (!live || !live.active) return null;
   if (interpT >= 1) {
-    return current && current.axis === axis && current.sliceIndex === sliceIndex ? current : null;
+    return current && current.txnId === live.txnId && current.axis === live.axis ? current : null;
   }
-  return nextRestRead(current, rotationActive, axis, sliceIndex, prevTile, nextTile);
+  return nextRestRead(current, live, prevTile, nextTile);
+}
+
+/** Whether a crossing descriptor protects a given plane. */
+export function restReadHasLayer(restRead, axis, sliceIndex) {
+  return !!restRead && restRead.axis === axis && restRead.layers.includes(sliceIndex);
+}
+
+/** Whether a crossing descriptor protects the plane a grid cell sits on. */
+export function restReadProtectsTile(restRead, x, y, z) {
+  if (!restRead) return false;
+  const { axis, layers } = restRead;
+  for (let i = 0; i < layers.length; i++) {
+    if (isTileInSlice(axis, layers[i], x, y, z)) return true;
+  }
+  return false;
 }
 
 /**
