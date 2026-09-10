@@ -4,8 +4,8 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { createMobiModel, animateMobi, disposeMobi } from './mobiModel.js';
 
 // Platformer adapter. The parent supplies the existing surface-facing transform.
-export default function MobiModel({ radius = 0.28, orbCount = 0, alive = true }) {
-  const rig = useMemo(() => createMobiModel(), []);
+export default function MobiModel({ radius = 0.28, orbCount = 0, alive = true, face = true }) {
+  const rig = useMemo(() => createMobiModel({ face }), [face]);
   const time = useRef(0);
   const pulse = useRef(0);
   const previous = useRef(orbCount);

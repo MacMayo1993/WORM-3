@@ -24,7 +24,7 @@ export function orientMobi(object, forward, up) {
   object.quaternion.setFromRotationMatrix(_basis);
 }
 
-export function createMobiModel() {
+export function createMobiModel({ face = true } = {}) {
   const group = new THREE.Group();
   group.name = 'MOBI';
   const light = (color) => new THREE.MeshBasicMaterial({ color, toneMapped: false });
@@ -71,6 +71,12 @@ export function createMobiModel() {
     new THREE.MeshStandardMaterial({ color: '#bd92ff', emissive: '#805ec8', emissiveIntensity: 0.7, roughness: 0.24 }));
   core.add(band);
   group.add(core);
+
+  if (!face) {
+    dark.dispose();
+    group.scale.setScalar(MOBI_RADIUS);
+    return { group, core, gem, band, eyes: [], shellMaterial, lastTime: null, transitRoll: 0 };
+  }
 
   // The guide's tiny Rubik's-cube eyes, kept above the core's sight line.
   const eyes = [];

@@ -24,6 +24,7 @@ const HALO_STRIDE = 2;
 const HALO_MAX = 48;
 const _haloDummy = new THREE.Object3D();
 import { getSkin } from '../wormCosmeticsData.js';
+import { createMobiSegmentAssets, disposeMobiSegmentAssets, MOBI_SEGMENT_RADIUS } from '../mobiSegments.js';
 import { getWormCharacter } from '../wormCharacterData.js';
 import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../wormSkinMaterial.js';
@@ -49,6 +50,8 @@ import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
+const _mobiCoreMatrix = new THREE.Matrix4();
+const _mobiSpinMatrix = new THREE.Matrix4();
 // Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
 const _bodyColor = new THREE.Color();
 const _fireTail = new THREE.Vector3();
@@ -180,6 +183,10 @@ export function WormBody({ worm, size }) {
     const isWiggle = wormCharacter.id === 'wiggle';
     const isPrism = wormCharacter.id === 'prism';
     const isMobi = wormCharacter.id === 'mobi';
+    const mobiAssets = useMemo(() => isMobi ? createMobiSegmentAssets() : null, [isMobi]);
+    useEffect(() => () => { if (mobiAssets) disposeMobiSegmentAssets(mobiAssets); }, [mobiAssets]);
+    const mobiCoreRef = useRef();
+    const mobiFrameRef = useRef();
     const skin = getSkin(wormSkinId);
     const wormColor = skin.body;
     const bellyColor = skin.belly;
@@ -307,6 +314,7 @@ export function WormBody({ worm, size }) {
         const tLen = worm.tailLength.current;
         const steps = worm.stepHistory.current;
         const time = characterTimeRef.current;
+        if (isMobi) _mobiSpinMatrix.makeRotationY(time * 0.48);
         updateWormSkinMaterialTime(skinMaterial, time);
 
         // Ambient skin FX (embers/bubbles/sparkle/...) hover just off the head,
@@ -376,6 +384,8 @@ export function WormBody({ worm, size }) {
             beginWormSegments();
             endWormSegments();
             mesh.count = 0;
+            if (mobiCoreRef.current) mobiCoreRef.current.count = 0;
+            if (mobiFrameRef.current) mobiFrameRef.current.count = 0;
             if (haloRef.current) haloRef.current.count = 0;
             if (leftPageRef.current) leftPageRef.current.count = 0;
             if (rightPageRef.current) rightPageRef.current.count = 0;
@@ -632,6 +642,8 @@ export function WormBody({ worm, size }) {
                     _wormDummy.scale.setScalar(sc);
                 } else if (_isBook) {
                     _wormDummy.scale.set(0.088, 0.055, 0.1);
+                } else if (isMobi) {
+                    _wormDummy.scale.setScalar(MOBI_SEGMENT_RADIUS);
                 } else if (_isGlow) {
                     // Slightly varied glow segment sizes
                     const glowSc = 0.088 + Math.sin(time * 3.5 + i * 1.6) * 0.01;
@@ -668,6 +680,11 @@ export function WormBody({ worm, size }) {
             }
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(writeIdx, _wormDummy.matrix);
+            if (isMobi) {
+                mobiFrameRef.current?.setMatrixAt(writeIdx, _wormDummy.matrix);
+                _mobiCoreMatrix.copy(_wormDummy.matrix).multiply(_mobiSpinMatrix);
+                mobiCoreRef.current?.setMatrixAt(writeIdx, _mobiCoreMatrix);
+            }
             // Publish where this segment actually ended up, for effects that need to
             // aim at the body (the lightning theme's strikes). Recorded here rather
             // than recomputed elsewhere because this position has already been
@@ -721,7 +738,9 @@ export function WormBody({ worm, size }) {
                 } else {
                     _bodyColor.set(baseColor);
                 }
-                mesh.setColorAt(writeIdx, _bodyColor);
+                // Keep every glass exterior clear; carried parity colors live inside it.
+                if (isMobi) mobiCoreRef.current?.setColorAt(writeIdx, _bodyColor);
+                else mesh.setColorAt(writeIdx, _bodyColor);
             }
 
             // Book Worm: a stack of thin page layers hinged along the cover's
@@ -779,6 +798,14 @@ export function WormBody({ worm, size }) {
             writeIdx++;
         }
 
+        if (isMobi) {
+            for (const part of [mobiCoreRef.current, mobiFrameRef.current]) {
+                if (!part) continue;
+                part.count = writeIdx;
+                part.instanceMatrix.needsUpdate = true;
+                if (part.instanceColor && colorDirty) part.instanceColor.needsUpdate = true;
+            }
+        }
         mesh.count = writeIdx;
         mesh.instanceMatrix.needsUpdate = true;
         endWormSegments();
@@ -856,16 +883,20 @@ export function WormBody({ worm, size }) {
            pass through unmodified. Three.js multiplies instanceColor × material.color,
            so any non-white material color taints every orb pickup color. */
         <>
-            <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-                {isMobi ? <boxGeometry args={[1.12, 1.12, 1.12]} /> : <sphereGeometry args={[1, 16, 16]} />}
+            <instancedMesh key={isMobi ? 'mobi' : 'worm'} ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false} renderOrder={isMobi ? 2 : 0}>
+                {isMobi ? <primitive object={mobiAssets.shellGeometry} attach="geometry" /> : <sphereGeometry args={[1, 16, 16]} />}
                 {/* Wet-slime clearcoat is just the "slime" skin's starting point now —
                     the skin's own FX profile (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + body-surface displacement) drives this
                     material instead. color MUST stay white so the per-instance orb
                     colours (setColorAt) pass through untinted. */}
-                {isMobi ? <meshPhysicalMaterial color="white" roughness={0.15} clearcoat={1} iridescence={1} transparent opacity={0.65} />
+                {isMobi ? <primitive object={mobiAssets.shellMaterial} attach="material" />
                     : <primitive object={skinMaterial} attach="material" />}
             </instancedMesh>
+            {isMobi && <>
+                <instancedMesh ref={mobiFrameRef} args={[mobiAssets.frameGeometry, mobiAssets.frameMaterial, MAX_TAIL]} frustumCulled={false} dispose={null} />
+                <instancedMesh ref={mobiCoreRef} args={[mobiAssets.coreGeometry, mobiAssets.coreMaterial, MAX_TAIL]} frustumCulled={false} dispose={null} />
+            </>}
             {isGlow && (
                 <instancedMesh
                     ref={haloRef}

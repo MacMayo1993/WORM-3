@@ -395,8 +395,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
           return (
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble + bookRaise, zOff]}>
-              {isMobi && isHead && <MobiModel radius={segScale} orbCount={orbCount} alive={alive} />}
-              <mesh visible={!(isMobi && isHead)} scale={[segScale * breathe * stretch, segScale * breathe * (isBook && !isHead ? 0.78 : 1), segScale * (isBook && !isHead ? 1.15 : 1)]}>
+              {isMobi && <MobiModel radius={isHead ? segScale : segScale * 0.6} face={isHead} orbCount={orbCount} alive={alive} />}
+              <mesh visible={!isMobi} scale={[segScale * breathe * stretch, segScale * breathe * (isBook && !isHead ? 0.78 : 1), segScale * (isBook && !isHead ? 1.15 : 1)]}>
                 {isMobi ? <boxGeometry args={[1.12, 1.12, 1.12]} /> : isBook && !isHead ? <boxGeometry args={SPINE_GEO_ARGS} /> : <sphereGeometry args={[1, 12, 12]} />}
                 {/* Skin-themed material (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + surface displacement) drives the PBR

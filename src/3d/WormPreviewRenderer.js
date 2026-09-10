@@ -17,6 +17,7 @@
 //     unregisterWormPreview (see WormPreviewCanvas.jsx).
 
 import * as THREE from 'three';
+import { createMobiSegmentAssets, createMobiSegment, MOBI_SEGMENT_RADIUS } from '../worm/mobiSegments.js';
 import { createMobiModel, animateMobi, orientMobi, MOBI_RADIUS } from '../worm/mobiModel.js';
 import { getSkin } from '../worm/wormCosmeticsData.js';
 import { getHatParts } from '../worm/wormHatParts.js';
@@ -88,7 +89,7 @@ function _buildRig() {
 
   const mobi = createMobiModel();
   group.add(mobi.group);
-  const mobiTailGeo = new THREE.BoxGeometry(1.12, 1.12, 1.12);
+  const mobiAssets = createMobiSegmentAssets();
   const mobiTails = [];
   const beads = [];
   const boxes = [];
@@ -110,10 +111,8 @@ function _buildRig() {
     // Rendered before the beads so the body reads as sitting IN the glow.
     halo.renderOrder = -1;
     group.add(bead, box, halo);
-    const mobiTail = new THREE.Mesh(mobiTailGeo, new THREE.MeshPhysicalMaterial({
-      roughness: 0.15, clearcoat: 1, iridescence: 1, transparent: true, opacity: 0.65,
-    }));
-    group.add(mobiTail);
+    const mobiTail = createMobiSegment(mobiAssets);
+    group.add(mobiTail.group);
     mobiTails.push(mobiTail);
     beads.push(bead); boxes.push(box); halos.push(halo);
 
@@ -395,12 +394,13 @@ function _poseWorm(opts, time) {
     }
     body.material.color.copy(_color);
     const mobiTail = rig.mobiTails[i];
-    mobiTail.visible = isMobi && shown && i !== 0;
-    if (mobiTail.visible) {
-      mobiTail.position.copy(_off);
-      mobiTail.scale.setScalar(BODY_SCALE);
-      orientMobi(mobiTail, FWD, UP);
-      mobiTail.material.color.copy(_color);
+    mobiTail.group.visible = isMobi && shown && i !== 0;
+    if (mobiTail.group.visible) {
+      mobiTail.group.position.copy(_off);
+      mobiTail.group.scale.setScalar(MOBI_SEGMENT_RADIUS);
+      orientMobi(mobiTail.group, FWD, UP);
+      mobiTail.core.material.color.copy(_color);
+      mobiTail.core.rotation.y = time * 0.48;
     }
 
     // Book Worm: orient the cover to face the direction of travel (derived
