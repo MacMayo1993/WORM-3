@@ -9,9 +9,9 @@
 import React, { useEffect } from 'react';
 import TextOverlay from '../intro/TextOverlay.jsx';
 
-const WelcomeScreen = ({ onEnter, introTime }) => {
+const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
   // Returning players have seen the cinematic — give them ENTER immediately
-  // instead of making them wait 10 s for it to appear.
+  // instead of making them wait for the title reveal.
   const [introSeen] = React.useState(() => {
     try { return localStorage.getItem('worm3_intro_seen') === '1'; } catch { return false; }
   });
@@ -34,32 +34,27 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
       className="welcome-screen"
       style={{ background: 'transparent', pointerEvents: 'none' }}
     >
-      <TextOverlay time={introTime} />
+      <p className="opening-accessible">WORM cubed. What if opposite was the same place?</p>
+      <TextOverlay time={introTime} reducedMotion={reducedMotion} />
 
       <button
         type="button"
         aria-label="Skip intro and enter game"
-        className="skip-intro-btn"
+        className="opening-skip"
         onClick={onEnter}
-        style={{
-          background: 'rgba(255,255,255,0.1)',
-          color: 'rgba(255,255,255,0.75)',
-          border: '1px solid rgba(255,255,255,0.2)',
-          pointerEvents: 'auto',
-        }}
       >
-        Skip ►
+        Skip →
       </button>
 
-      {(introSeen || introTime >= 10) && (
+      {(introSeen || reducedMotion || introTime >= 14.2) && (
         <button
           type="button"
           aria-label="Enter game"
-          className="enter-btn"
+          className="opening-enter"
           onClick={onEnter}
           style={{ pointerEvents: 'auto' }}
         >
-          ENTER
+          LET’S PLAY
         </button>
       )}
     </div>
