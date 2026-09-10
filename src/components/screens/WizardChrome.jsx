@@ -589,7 +589,8 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
 }
 
 /**
- * The whole sheet: mode bar, specimen, chips, categories, choices, action.
+ * The shared setup sheet. Tile styles place categories and family chips before
+ * the specimen; other steps retain their preview-first layout.
  *
  * A wizard builds its `categories` — each `{ key, icon, label, title, subtitle,
  * summary, hero, content }`, plus `children`/`activeChild`/`onSelectChild` for a
@@ -619,6 +620,26 @@ export function WizardShell({
 }) {
   const cat = categories[active];
   const last = active === categories.length - 1;
+  // Keep tile-family labels and preview details below the setup selector.
+  const isStyle = cat.key === 'style';
+  const specimen = cat.hero ? (
+    <div style={styles.hero}>{cat.hero}</div>
+  ) : (
+    <div style={styles.heroHeading}>
+      <h2 style={styles.title}>{cat.title}</h2>
+      <p style={styles.subtitle}>{cat.subtitle}</p>
+    </div>
+  );
+  const categoryBar = (
+    <WizardCategoryBar
+      styles={styles}
+      categories={categories}
+      active={active}
+      onSelect={onSelect}
+      accent={accent}
+      mobile={mobile}
+    />
+  );
 
   return (
     <div style={styles.overlay}>
@@ -635,14 +656,8 @@ export function WizardShell({
           <span style={styles.modeName}>{mode}</span>
         </div>
 
-        {cat.hero ? (
-          <div style={styles.hero}>{cat.hero}</div>
-        ) : (
-          <div style={styles.heroHeading}>
-            <h2 style={styles.title}>{cat.title}</h2>
-            <p style={styles.subtitle}>{cat.subtitle}</p>
-          </div>
-        )}
+        {isStyle && categoryBar}
+        {!isStyle && specimen}
 
         <WizardChipRow
           styles={styles}
@@ -652,14 +667,8 @@ export function WizardShell({
           label={`${cat.label} groups`}
         />
 
-        <WizardCategoryBar
-          styles={styles}
-          categories={categories}
-          active={active}
-          onSelect={onSelect}
-          accent={accent}
-          mobile={mobile}
-        />
+        {!isStyle && categoryBar}
+        {isStyle && specimen}
 
         <div style={styles.body} id={WIZARD_PANEL_ID} role="region" aria-label={cat.label}>
           <div style={{ paddingBottom: '24px' }}>{cat.content}</div>
