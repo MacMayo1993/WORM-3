@@ -1,3 +1,5 @@
+import { Vector3 } from 'three';
+import { tunnelPoint } from '../../manifold/tunnelPath.js';
 // Every surface sticker appears in exactly one antipodal pair.
 export const FACES = [
   { axis: 2, sign: 1, color: 1, rotation: [0, 0, 0] },
@@ -16,19 +18,17 @@ export const TILES = CELLS.flatMap(position => FACES.flatMap((face, faceIndex) =
 export const PAIRS = TILES.filter(tile => tile.face.sign === 1);
 export const flippedColor = (faceIndex, angle) => FACES[angle >= Math.PI / 2 ? faceIndex ^ 1 : faceIndex].color;
 
-// Bow each connection away from the common center. Both coordinates in the
-// sticker plane reverse at the far endpoint as well as the face normal.
-export function pairPoint(pair, u, spacing, out, offset = 0.51) {
-  const p = Math.max(0, Math.min(1, u));
-  const f = pair.face.axis;
-  const x = pair.position[0] * spacing + (f === 0 ? offset : 0);
-  const y = pair.position[1] * spacing + (f === 1 ? offset : 0);
-  const z = pair.position[2] * spacing + (f === 2 ? offset : 0);
-  const axis = (pair.face.axis + 1) % 3;
-  const next = (axis + 1) % 3;
-  const bow = Math.sin(Math.PI * p);
-  out.set(x * (1 - 2 * p), y * (1 - 2 * p), z * (1 - 2 * p));
-  out.setComponent(axis, out.getComponent(axis) + bow * (0.8 + pair.position[axis] * 0.24));
-  out.setComponent(next, out.getComponent(next) + bow * pair.position[next] * 0.24);
-  return out;
+const start = new Vector3(), end = new Vector3(), center = new Vector3();
+const right = new Vector3(), up = new Vector3(), direction = new Vector3();
+export function pairPoint(pair, u, spacing, out, offset = 0.51, time = 0) {
+  start.set(...pair.position).multiplyScalar(spacing);
+  start.setComponent(pair.face.axis, start.getComponent(pair.face.axis) + offset);
+  end.copy(start).negate();
+  direction.subVectors(end, start).normalize();
+  up.set(0, 1, 0);
+  right.crossVectors(direction, up);
+  if (right.lengthSq() < 0.001) right.crossVectors(direction, up.set(0, 0, 1));
+  right.normalize(); up.crossVectors(right, direction).normalize();
+  const isCenter = pair.position.every((v, axis) => axis === pair.face.axis || v === 0);
+  return tunnelPoint(start, end, center, right, up, Math.max(0, Math.min(1, u)), time, isCenter, out);
 }

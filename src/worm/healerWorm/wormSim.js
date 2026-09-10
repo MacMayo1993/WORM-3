@@ -1121,6 +1121,7 @@ const PHASE_HANDLERS = {
                     && (relativeTurn ?? t) === sim.lastTurnDir
                     && sim.tilesSinceTurn < 1;
                 if (!holdReversal) {
+                    const previousDirection = sim.moveDir;
                     sim.pendingTurns.shift();
                     if (t === 'boost') {
                         // Ignore if already boosting or recharging.
@@ -1155,6 +1156,7 @@ const PHASE_HANDLERS = {
                             sim.moveDir = turnWorm(turnWorm(sim.moveDir, 'left'), 'left');
                         }
                     }
+                    if (sim.moveDir !== previousDirection) ctx.onSteer?.();
                 }
             }
 

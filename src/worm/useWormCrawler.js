@@ -192,7 +192,8 @@ export function useWormCrawler(size, cubies) {
                 });
                 // Let death state land first, then reveal menu for clearer sequencing.
                 deathMenuTimer.current = setTimeout(() => {
-                    useGameStore.setState({ showWormDeathMenu: true });
+                    const current = useGameStore.getState();
+                    if (!current.demoMode) useGameStore.setState({ showWormDeathMenu: true });
                     deathMenuTimer.current = null;
                 }, 520);
             },
@@ -219,6 +220,12 @@ export function useWormCrawler(size, cubies) {
                 });
             },
             onPhase: (phase) => useGameStore.getState().setWormPhase(phase),
+            onSteer: () => {
+                const state = useGameStore.getState();
+                if (state.demoMode && state.demoStep === 'worm-traversal' && !state.demoWormSteered) {
+                    useGameStore.setState({ demoWormSteered: true });
+                }
+            },
             onBoostState: (state) => useGameStore.getState().setWormBoostState(state),
             onSurvivalTick: () => useGameStore.getState().earnCoins(EARN_WORM_SURVIVAL_TICK),
             spawnWormholePair: (tile) => {

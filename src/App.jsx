@@ -599,6 +599,7 @@ export default function WORM3() {
     handleDemoCoachCopySeen, demoHintStep,
     onTapFlipRef,
     handleStartDemo, handleDemoStepContinue, advanceDemoStep,
+    handleDemoExplore,
     handleDemoReplay, handleDemoFreeplay, handleExitDemo,
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
@@ -1712,8 +1713,8 @@ export default function WORM3() {
       )}
       {/* Worm-step steer hint — shows during active play, before the skip pill. */}
       {demoMode && demoStep === 'worm-traversal' && !demoColdOpenVisible && !demoChromeQuiet &&
-        !demoStepIntroVisible && !demoLaunchStep && !demoTryVisible && !demoCelebrationStep && (
-        <DemoWormControlHint />
+        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
+        <DemoWormControlHint onRetry={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       )}
       {/* Flip-gateway progress — bounded front-face flip/restore counter. */}
       {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible && !demoChromeQuiet &&
@@ -1755,6 +1756,7 @@ export default function WORM3() {
             onChaos={() => { handleExitDemo(); handleMenuDisparity(); }}
             onRandom={() => { handleExitDemo(); handleMenuRandomMode(); }}
             onStore={() => { handleExitDemo(); handleOpenStore(); }}
+            onExplore={handleDemoExplore}
             onReplay={handleDemoReplay}
             onExit={handleExitDemo}
           />

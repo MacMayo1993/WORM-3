@@ -145,11 +145,10 @@ export function useDemoMode({
   // Player tapped the held STEP COMPLETE stamp (or its Next Step button):
   // clear the celebration and advance to the next step.
   const dismissDemoCelebration = useCallback(() => {
-    setDemoCelebrationStep((cur) => {
-      if (cur) advanceDemoStepRef.current?.(cur);
-      return null;
-    });
-  }, []);
+    if (!demoCelebrationStep) return;
+    setDemoCelebrationStep(null);
+    advanceDemoStepRef.current?.(demoCelebrationStep);
+  }, [demoCelebrationStep]);
 
   const restoreWormCharacter = useCallback(() => {
     if (preDemoWormCharacterRef.current != null) {
@@ -215,6 +214,7 @@ export function useDemoMode({
     applyDemoSettings();
 
     if (config.type === 'worm') {
+      useGameStore.setState({ demoWormSteered: false });
       const targetSize = config.cubeSize || 3;
       if (targetSize !== store.size) changeSize(targetSize);
       else reset();
@@ -588,7 +588,7 @@ export function useDemoMode({
       setDemoViewSpotlight(false);
     }
     const idx = DEMO_STEP_IDS.indexOf(fromStep);
-    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
+    const nextStep = fromStep === 'worm-traversal' ? 'end' : DEMO_STEP_IDS[idx + 1] || 'end';
     store.setDemoStep(nextStep);
     // Pre-stage plain cube steps so the intro dialogue blurs the upcoming
     // scene. Other types (worm/chaos/showcase/random) start on Continue —
@@ -609,12 +609,9 @@ export function useDemoMode({
       return;
     }
 
-    // The WORM step swaps in the Shanghai skybox and jumps the cube to 6×6 —
-    // the heaviest transition in the demo. Hold the loading cube over it for a
-    // guaranteed 2.5s — eager, so it shows even though the rebuild isn't a clean
-    // asset load — above the demo chrome so the player never watches it pop in.
+    // Keep the real asset-loading gate, with no artificial minimum hold.
     if (step === 'worm-traversal') {
-      armSceneGate?.('Worm Mode', { eager: true, holdMs: 2500, z: 10600 });
+      armSceneGate?.('Worm Mode', { eager: true, holdMs: 0, z: 10600 });
     }
 
     applyDemoStepConfig(step);
@@ -631,10 +628,8 @@ export function useDemoMode({
 
     const config = DEMO_LEVEL_CONFIGS[step];
 
-    // Launch punch: title stamp + flash over the freshly staged scene, with a
-    // camera orbit kick on the cube-centric steps.
-    setDemoLaunchStep(step);
-    demoWatchTimers.current.push(setTimeout(() => setDemoLaunchStep(null), 2750));
+    // Hand the scene over without another blocking title stamp.
+    setDemoLaunchStep(null);
     if (config && config.type !== 'worm' && config.type !== 'chaos') {
       useGameStore.getState().triggerCameraOrbit?.('cw');
     }
@@ -1059,26 +1054,29 @@ export function useDemoMode({
     return () => clearTimeout(timer);
   }, [demoMode, demoStep, wormGamePhase, celebrateStep]);
 
-  // Show the skip coach as soon as the first wormhole tunnel is traversed.
+  // Finish only after the worm has emerged, not when it enters the tunnel.
   const wormTunnelCount = useGameStore((s) => s.wormTunnelCount);
+  const wormPhase = useGameStore((s) => s.wormPhase);
   useEffect(() => {
-    if (!demoMode || demoStep !== 'worm-traversal') return;
-    if (wormTunnelCount < 1) return;
-    setDemoTryVisible(true);
-  }, [demoMode, demoStep, wormTunnelCount]);
+    if (!demoMode || demoStep !== 'worm-traversal' || wormTunnelCount < 1 || wormPhase !== 'crawling') return;
+    useGameStore.getState().setWormPaused(true);
+    celebrateStep('worm-traversal');
+  }, [demoMode, demoStep, wormTunnelCount, wormPhase, celebrateStep]);
 
-  // On death during the worm demo step, suppress the death screen and advance.
+  // A failed attempt stays in the lesson. The hint supplies retry and skip.
   const wormAlive = useGameStore((s) => s.wormAlive);
   useEffect(() => {
-    if (!demoMode || demoStep !== 'worm-traversal') return;
-    if (wormAlive !== false) return;
+    if (!demoMode || demoStep !== 'worm-traversal' || wormAlive !== false) return;
     useGameStore.getState().setShowWormDeathMenu(false);
-    const timer = setTimeout(() => {
-      useGameStore.getState().clearDisparityGame();
-      advanceDemoStep('worm-traversal');
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [demoMode, demoStep, wormAlive, advanceDemoStep]);
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
+  }, [demoMode, demoStep, wormAlive, clearDemoWatchTimers]);
+
+  const handleDemoExplore = useCallback(() => {
+    useGameStore.getState().setDemoStep('learn-to-solve');
+    applyDemoStepConfig('learn-to-solve');
+    setDemoStepIntroVisible(true);
+  }, [applyDemoStepConfig]);
 
   // Safety net: advance when disparity winner screen is dismissed.
   useEffect(() => {
@@ -1116,6 +1114,7 @@ export function useDemoMode({
     handleStartDemo,
     handleDemoStepContinue,
     advanceDemoStep,
+    handleDemoExplore,
     handleDemoReplay,
     handleDemoFreeplay,
     handleExitDemo,

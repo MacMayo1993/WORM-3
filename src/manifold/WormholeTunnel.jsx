@@ -1,3 +1,5 @@
+import { tubeVertexShader, tubeFragmentShader } from './tunnelSurface.js';
+import { tunnelPoint } from './tunnelPath.js';
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -70,59 +72,6 @@ const dangerRangeFor = (flipCap) => Math.max(1, flipCap - 1 - DANGER_START);
 const STREAK_COUNT_LOW = 10;
 const STREAK_COUNT_HIGH = 18;
 const STREAK_COUNT_MAX = STREAK_COUNT_HIGH;
-
-const tubeVertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const tubeFragmentShader = `
-  uniform vec3 uColor1;
-  uniform vec3 uColor2;
-  uniform float uDanger;
-  uniform float uTime;
-  uniform float uPulse;
-  uniform float uBurst;
-  uniform float uDead;
-  
-  varying vec2 vUv;
-  
-  void main() {
-    if (uDead > 0.5) {
-      gl_FragColor = vec4(0.2, 0.2, 0.2, 0.15);
-      return;
-    }
-    
-    // Wait until it hits the VoidCore at the center (0.5), then switch colors
-    vec3 baseColor = mix(uColor1, uColor2, smoothstep(0.48, 0.52, vUv.x));
-    
-    if (uDanger > 0.0) {
-      // Saturate hue
-      baseColor = mix(baseColor, baseColor * 1.5, uDanger * 0.5);
-    }
-    
-    // Energy pulses traveling along the tube
-    float scroll = fract(vUv.x * 3.0 - uTime * 2.0);
-    float energy = smoothstep(0.4, 0.6, scroll) * smoothstep(0.8, 0.6, scroll);
-    
-    // Brighten the core
-    vec3 finalColor = baseColor + (baseColor * energy * 0.8 * uPulse);
-    finalColor += (vec3(1.0) * uBurst * 0.8);
-    
-    // Gap in middle (disappear inside VoidCore)
-    float centerDist = abs(vUv.x - 0.5);
-    float coreHide = smoothstep(0.08, 0.12, centerDist);
-    
-    // Edges are more transparent (vUv.y is the circumference)
-    float edgeAlpha = sin(vUv.y * 3.14159);
-    float alpha = clamp((0.4 + energy * 0.3) * uPulse + (uBurst * 0.5), 0.0, 1.0) * mix(0.5, 1.0, edgeAlpha) * coreHide;
-    
-    gl_FragColor = vec4(finalColor, alpha);
-  }
-`;
 
 const strandVertexShader = `
   attribute vec3 instanceColor;
@@ -327,25 +276,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       for (let i = 0; i < LIGHTNING_PTS; i++) {
         const u = i / (LIGHTNING_PTS - 1);
 
-        // Base uniform line from start to cp1 to end
-        if (u < 0.5) {
-          _lPt.copy(_vStart).lerp(_cp1, u * 2.0);
-        } else {
-          _lPt.copy(_cp1).lerp(_vEnd, (u - 0.5) * 2.0);
-        }
-
-        // Envelope: 0 at ends, max at the core (0.5). Straight if it's a center face connection.
-        const env = isCenter ? 0 : Math.pow(Math.sin(u * Math.PI), 3);
-
-        // Corkscrew sine wave displacement
-        const waveAng = u * Math.PI * 10.0 - t * 4.0;
-        const r_wave = 0.25;
-        const rx = Math.sin(waveAng) * r_wave * env;
-        const ry = Math.cos(waveAng) * r_wave * env;
-
-        curveRef.current.points[i].copy(_lPt)
-          .addScaledVector(_right, rx)
-          .addScaledVector(_trueUp, ry);
+        tunnelPoint(_vStart, _vEnd, _cp1, _right, _trueUp, u, t, isCenter, curveRef.current.points[i]);
       }
 
       // Regenerate geometry explicitly instead of mutating array to ensure

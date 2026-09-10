@@ -13,13 +13,13 @@ import MobiIntroScreen from './MobiIntroScreen.jsx';
 // sequence and know what they just did.
 const DEMO_STEPS = [
   { id: 'baby-cube', label: 'First Twist', num: 1 },
-  { id: 'learn-to-solve', label: 'Learn to Solve', num: 2 },
-  { id: 'control-tour', label: 'Your Controls', num: 3 },
-  { id: 'twin-paradox', label: 'Meet the Twins', num: 4 },
-  { id: 'flip-gateway', label: 'Through the Middle', num: 5 },
-  { id: 'view-showcase', label: 'Every Look', num: 6 },
-  { id: 'make-it-yours', label: 'Make It Yours', num: 7 },
-  { id: 'worm-traversal', label: 'Worm Run', num: 8 },
+  { id: 'twin-paradox', label: 'Meet the Twins', num: 2 },
+  { id: 'flip-gateway', label: 'Through the Middle', num: 3 },
+  { id: 'worm-traversal', label: 'First Tunnel', num: 4 },
+  { id: 'learn-to-solve', label: 'Learn to Solve', num: 5 },
+  { id: 'control-tour', label: 'Your Controls', num: 6 },
+  { id: 'view-showcase', label: 'Every Look', num: 7 },
+  { id: 'make-it-yours', label: 'Make It Yours', num: 8 },
   { id: 'chaos-forecast', label: 'Call the Winner', num: 9 },
   { id: 'random-showcase', label: 'Surprise Cube', num: 10 },
   { id: 'cosmetic-reward', label: 'Spend Your Points', num: 11 },
@@ -595,17 +595,19 @@ const DemoProgressBar = ({ currentStep }) => {
   // Worm mode's glance strip owns the top edge — dock the pill at the bottom there.
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const idx = DEMO_STEPS.findIndex(s => s.id === currentStep);
-  const total = DEMO_STEPS.length - 1;
-  const progress = idx >= 0 ? idx / total : 0;
+  const optional = idx >= 4 && currentStep !== 'end';
+  const total = optional ? 7 : 4;
+  const current = currentStep === 'end' ? 4 : optional ? idx - 3 : idx + 1;
+  const progress = current / total;
 
   return (
     <div className={`demo-progress-pill${wormHealerMode ? ' demo-progress-pill--bottom' : ''}`}>
-      <span className="demo-progress-label">DEMO</span>
+      <span className="demo-progress-label">{optional ? 'EXPLORE' : 'DEMO'}</span>
       <div className="demo-progress-track">
         <div className="demo-progress-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <span className="demo-progress-count">
-        {idx + 1} / {total + 1}
+        {current} / {total}
       </span>
     </div>
   );
@@ -717,9 +719,9 @@ const DEMO_LEVEL_CONFIGS = {
   'worm-traversal': {
     type: 'worm',
     cubeSize: 6,
-    wormSpeed: 2.5,
+    wormSpeed: 1.5,
     wormOrbCount: 25,
-    wormholeInterval: 8,
+    wormholeInterval: 4,
     wormColor: '#33ff66',
     wormCharacter: 'glow',
     wormSkin: 'lava',
@@ -804,7 +806,7 @@ const DemoStepHint = ({ step }) => {
   ensureDemoShellStyle();
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const copy = TRY_COPY[step];
-  if (!copy) return null;
+  if (!copy || step === 'worm-traversal') return null;
   return (
     <div
       className={`demo-step-hint${wormHealerMode ? ' demo-step-hint--worm' : ''}`}
@@ -1181,13 +1183,24 @@ const DemoFlipSpotlightHint = ({ onSkip }) => {
 // Worm-step control hint: the healer worm crawls on its own and shows no
 // controls of its own, so the demo names the steer gesture while the player
 // plays. Non-interactive; the parent unmounts it once the worm makes progress.
-const DemoWormControlHint = () => {
+const DemoWormControlHint = ({ onRetry, onSkip }) => {
   ensureDemoShellStyle();
-  return (
-    <div className="demo-worm-hint" role="status" aria-live="polite">
-      The worm crawls on its own — <strong>swipe ← →</strong> (or arrow keys) to steer it toward orbs and tunnels.
-    </div>
-  );
+  const alive = useGameStore(s => s.wormAlive);
+  const steered = useGameStore(s => s.demoWormSteered);
+  const orbs = useGameStore(s => s.wormSessionOrbs);
+  const tunnels = useGameStore(s => s.wormTunnelCount);
+  const details = useGameStore(s => s.wormDeathDetails);
+  const text = !steered ? 'First, swipe left or right to steer. You can also use the turn buttons.'
+    : !orbs ? 'Nice! Steer toward a glowing orb to collect it.'
+    : !tunnels ? 'Now steer onto a glowing tunnel tile. The worm will travel through automatically.'
+    : 'Through the middle—and out the opposite side!';
+  return <div className="demo-worm-hint" role="status" aria-live="polite" style={{ pointerEvents: alive === false ? 'auto' : 'none', ...(alive === false ? { bottom: 'max(100px, 20dvh)', maxHeight: '60dvh', overflowY: 'auto' } : {}) }}>
+    {alive === false ? <>
+      <p style={{ margin: '0 0 8px' }}>That run ended. {details?.cause === 'self' ? 'Leave room for your tail when you turn.' : 'Try a wider turn and aim for a glowing tunnel tile.'}</p>
+      <button className="demo-intro-button" onClick={onRetry}>Try again</button>
+      <button className="demo-intro-button" onClick={onSkip}>Skip step</button>
+    </> : text}
+  </div>;
 };
 
 // Flip-gateway progress: a bounded count of how many tile pairs have been sent

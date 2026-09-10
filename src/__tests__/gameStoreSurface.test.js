@@ -23,7 +23,7 @@ const EXPECTED_KEYS = [
   'clearLastBetResult', 'clearLevel', 'completeCurrentLevel', 'completedLevels',
   'cubiePops', 'cubies', 'currentLevel', 'currentLevelData',
   'cursor', 'cycleTunnelDetail', 'cycleVisualMode', 'demoMode',
-  'demoStep', 'disparityDeathByGridId', 'disparityDeaths', 'disparityEliminatedFaces',
+  'demoWormSteered', 'demoStep', 'disparityDeathByGridId', 'disparityDeaths', 'disparityEliminatedFaces',
   'disparityFlipCap', 'disparityGameLength', 'disparityParityScore', 'disparityRoundId',
   'disparityWinner', 'earnCoins', 'exitDemo', 'exploded',
   'explosionT', 'faceImages', 'faceRotationTarget', 'faceTextures',
