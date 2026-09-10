@@ -17,9 +17,8 @@ import {
   RADIUS_MD, RADIUS_PILL, TEXT_MD, TEXT_LG
 } from '../../utils/uiTheme.js';
 
-// Comfortable minimum hit area. 44px is the figure both Apple's and Google's
-// guidelines land on, and only two places in the game were honouring it.
-export const TOUCH_TARGET = 44;
+// Shared mobile target, in CSS pixels.
+export const TOUCH_TARGET = 48;
 
 /**
  * Variant recipes, resolved against the surface the button sits on.
@@ -153,8 +152,8 @@ export function IconButton({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: size,
-        height: size,
+        width: Math.max(size, TOUCH_TARGET),
+        height: Math.max(size, TOUCH_TARGET),
         flexShrink: 0,
         padding: 0,
         // Base background lives in CSS (`.ui-icon-button`) rather than here: an

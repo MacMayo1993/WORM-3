@@ -30,7 +30,7 @@ export const HAND_FONT = "'Annie Use Your Telescope', 'Bradley Hand', 'Segoe Pri
 
 // ─── PAPER family (light modal sheets) ────────────────────────────────────────
 export const PAPER_BACKDROP = 'rgba(160,152,140,0.60)';
-export const PAPER_BACKDROP_BLUR = 'blur(18px)';
+export const PAPER_BACKDROP_BLUR = 'var(--paper-blur, blur(8px))';
 export const PAPER_SHEET = '#f5f0e8';
 export const PAPER_SHEET_RAISED = '#ffffff';
 export const PAPER_BORDER = '#cec8be';
@@ -62,7 +62,7 @@ export const PAPER_GOOD = '#426b2e';
 // These values were previously copied by hand into VictoryScreen and SolveMode;
 // they live here now so the treatment stays one thing.
 export const NIGHT_BACKDROP = 'radial-gradient(ellipse at center, rgba(24,31,18,0.55) 0%, rgba(24,31,18,0.86) 100%)';
-export const NIGHT_BACKDROP_BLUR = 'blur(9px) saturate(1.03)';
+export const NIGHT_BACKDROP_BLUR = 'var(--night-blur, blur(6px))';
 export const NIGHT_SHEET = 'rgba(28,35,22,0.94)';
 export const NIGHT_PANEL = 'rgba(250,247,238,0.08)';
 export const NIGHT_BORDER = 'rgba(255,245,220,0.18)';
@@ -78,7 +78,7 @@ export const UI_CREAM = '#fffdf2';
 export const UI_GOLD = '#ffe9ad';
 export const UI_MOSS = '#5f7f4a';
 export const UI_MOSS_LIGHT = '#9fdb7a';
-export const UI_ACTION_SHADOW = '0 8px 20px rgba(95,127,74,0.32)';
+export const UI_ACTION_SHADOW = '0 4px 0 #405832, 0 6px 12px rgba(30,22,18,0.12)';
 
 // ─── Shared radii ─────────────────────────────────────────────────────────────
 export const RADIUS_SM = '8px';
@@ -155,4 +155,26 @@ export const Z = {
   DEMO: 12000, // guided demo chrome, above the UI it is pointing at
   TOAST: 99999, // store purchase confirmations
   DEBUG: 100000 // dev console — always on top, by definition
+};
+
+/** CSS screens consume the same tokens as inline React styles. */
+export const UI_CSS_VARS = {
+  '--bg-primary': PAPER_SHEET,
+  '--bg-secondary': PAPER_FOOTER_BG,
+  '--bg-elevated': PAPER_SHEET_RAISED,
+  '--text-primary': PAPER_TEXT,
+  '--text-secondary': PAPER_TEXT_MUTED,
+  '--ui-font': UI_FONT,
+  '--ui-ink': PAPER_TEXT,
+  '--ui-ink-subtle': PAPER_TEXT_MUTED,
+  '--ui-border': PAPER_BORDER_SOFT,
+  '--night-sheet': NIGHT_SHEET,
+  '--night-backdrop': NIGHT_BACKDROP,
+  '--night-panel': NIGHT_PANEL,
+  '--night-border': NIGHT_BORDER,
+  '--night-text': NIGHT_TEXT,
+  '--night-text-muted': NIGHT_TEXT_MUTED,
+  '--night-shadow': NIGHT_SHADOW,
+  '--ui-moss': UI_MOSS,
+  '--ui-action-shadow': UI_ACTION_SHADOW,
 };

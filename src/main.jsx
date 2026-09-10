@@ -24,7 +24,12 @@ for (const href of [bungeeWoff2, annieWoff2]) {
   document.head.appendChild(link)
 }
 import App from './App.jsx'
-import './App.css' // Import App.css instead of index.css
+import './App.css'
+import { UI_CSS_VARS } from './utils/uiTheme.js'
+
+for (const [name, value] of Object.entries(UI_CSS_VARS)) {
+  document.documentElement.style.setProperty(name, value)
+}
 
 // Service worker: precaches the app shell so deploys are atomic and repeat
 // visits load from local cache (see VitePWA config). Registration is deferred
@@ -40,11 +45,11 @@ const showUpdateToast = (reload) => {
   toast.id = 'worm3-update-toast'
   toast.setAttribute('role', 'status')
   toast.style.cssText = [
-    'position:fixed', 'left:50%', 'bottom:20px', 'transform:translateX(-50%)',
+    'position:fixed', 'left:50%', 'bottom:max(20px, env(safe-area-inset-bottom))', 'transform:translateX(-50%)',
     'z-index:99999', 'display:flex', 'align-items:center', 'gap:12px',
     'padding:10px 14px', 'border-radius:12px',
-    'background:rgba(10,16,36,0.94)', 'color:#e8eeff',
-    'border:1px solid rgba(120,160,255,0.28)',
+    'background:var(--night-sheet)', 'color:var(--night-text)',
+    'border:1px solid var(--night-border)',
     'box-shadow:0 8px 28px rgba(0,0,0,0.45)',
     'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif',
     'font-size:13px', 'max-width:min(92vw,420px)',
@@ -59,8 +64,8 @@ const showUpdateToast = (reload) => {
   refresh.textContent = 'Refresh'
   refresh.style.cssText = [
     'border:none', 'cursor:pointer', 'border-radius:8px',
-    'padding:6px 14px', 'font:inherit', 'font-weight:700', 'color:#fff',
-    'background:linear-gradient(135deg,#3b82f6,#6366f1)',
+    'padding:6px 14px', 'min-height:48px', 'font:inherit', 'font-weight:700', 'color:#fff',
+    'background:var(--ui-moss)',
   ].join(';')
   refresh.addEventListener('click', () => reload())
 
@@ -70,7 +75,7 @@ const showUpdateToast = (reload) => {
   dismiss.textContent = '✕'
   dismiss.style.cssText = [
     'border:none', 'cursor:pointer', 'background:transparent',
-    'color:#9fb2e0', 'font:inherit', 'font-size:15px', 'padding:2px 4px',
+    'color:var(--night-text-muted)', 'min-width:48px', 'min-height:48px', 'font:inherit', 'font-size:15px', 'padding:2px 4px',
   ].join(';')
   dismiss.addEventListener('click', () => toast.remove())
 

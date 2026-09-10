@@ -53,11 +53,9 @@ import {
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
 import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
-import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 import { setWormSharedRenderer, tickWormPreviews, hasActiveWormPreviews } from './3d/WormPreviewRenderer.js';
 import { setCubeSharedRenderer, tickCubePreviews, hasActiveCubePreviews } from './3d/CubePreviewRenderer.js';
-import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -244,37 +242,17 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * MenuScene — the rotating black cube shown in the main menu.
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
-function MenuScene({ onCubeClick, background }) {
+function MenuScene({ onCubeClick }) {
   return (
     <>
-      {/* Each app launch chooses one photo panorama from MENU_BACKGROUNDS. The
-          warm field-guide controls stay readable regardless of the setting.
-          SafeEnvironment keeps the solid backdrop if the HDRI cannot load. */}
-      <color attach="background" args={['#38513d']} />
+      <color attach="background" args={['#f5f0e8']} />
       <ambientLight intensity={1.7} color="#e8e3c5" />
       <pointLight position={[8, 8, 10]} intensity={4.0} color="#f0d89b" />
       <pointLight position={[-9, -5, 7]} intensity={1.9} color="#78956b" />
       <pointLight position={[0, -6, -8]} intensity={1.0} color="#456556" />
       <Suspense fallback={null}>
-        <InteractivePhotoBackground
-          files={getBackgroundUrl(background.file)}
-          // Counter-rotate the panorama against the menu cube. The faster but
-          // still gentle orbit lets a player read the whole environment instead
-          // of waiting on one static horizon.
-          rotationSpeed={isMobile ? -0.025 : -0.055}
-          intensity={isMobile ? 0.84 : 0.98}
-          blurriness={0}
-        />
-      </Suspense>
-      <Suspense fallback={null}>
         <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
-      {!isMobile && (
-        <EffectComposer>
-          <Bloom intensity={0.12} luminanceThreshold={0.86} luminanceSmoothing={0.92} mipmapBlur />
-          <Vignette offset={0.46} darkness={0.23} />
-        </EffectComposer>
-      )}
     </>
   );
 }
@@ -483,12 +461,6 @@ export default function WORM3() {
 
   // Intro time — drives IntroBranch (3D) and WelcomeScreen DOM overlay in sync
   const [introTime, setIntroTime] = useState(0);
-
-  // Stable for this app launch: never reroll while settings, menus, or overlays
-  // mount/unmount. MENU_BACKGROUNDS contains only file-backed photo panoramas.
-  const [menuBackground] = useState(() => (
-    MENU_BACKGROUNDS[Math.floor(Math.random() * MENU_BACKGROUNDS.length)]
- ));
 
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
@@ -757,13 +729,11 @@ export default function WORM3() {
   const handleWelcomeComplete = useCallback(() => {
     setShowWelcome(false);
     markIntroSeen();
-    // The cinematic owns the first paint. Once the player enters/skips, hold
-    // the loading cube over the menu while this launch's randomly-selected
-    // panorama decodes instead of masking the opening animation with a boot cover.
-    armSceneGate(`Now entering ${menuBackground.label}`, { eager: true, holdMs: 1600, z: 10000 });
+    // Cover the first cube frame after the opening cinematic.
+    armSceneGate('Welcome to WORM³', { eager: true, holdMs: 300, z: 10000 });
     // Show main menu after intro (not tutorial).
     useGameStore.getState().setShowMainMenu(true);
-  }, [setShowWelcome, markIntroSeen, armSceneGate, menuBackground]);
+  }, [setShowWelcome, markIntroSeen, armSceneGate]);
 
   // Main menu action handlers
   const handleStartCampaign = useCallback(() => {
@@ -1508,7 +1478,7 @@ export default function WORM3() {
           ) : showMainMenu ? (
             // Stop the cube/worm animation when a full-screen overlay covers the menu
             showSettings ? <color attach="background" args={['#000005']} /> : (
-              <MenuScene onCubeClick={handleMenuCube} background={menuBackground} />
+              <MenuScene onCubeClick={handleMenuCube} />
             )
           ) : (
             <Suspense fallback={null}>

@@ -15,7 +15,7 @@
 import React from 'react';
 import {
     UI_FONT, DISPLAY_FONT, MONO_FONT,
-    NIGHT_BACKDROP_BLUR, NIGHT_TEXT, NIGHT_TEXT_MUTED,
+    NIGHT_BACKDROP_BLUR, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHEET, NIGHT_BORDER, UI_MOSS, UI_ACTION_SHADOW,
 } from '../utils/uiTheme.js';
 
 // ─── Scrim ────────────────────────────────────────────────────────────────────
@@ -68,12 +68,12 @@ export function overlayCardStyle(accent, { width = 460 } = {}) {
         position: 'relative',
         zIndex: 1,
         width: `min(94vw, ${width}px)`,
-        maxHeight: '92vh',
+        maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)',
         overflowY: 'auto',
-        background: 'linear-gradient(180deg, rgba(24,27,20,0.94) 0%, rgba(14,16,12,0.96) 100%)',
-        border: '1px solid rgba(255,245,220,0.14)',
+        background: NIGHT_SHEET,
+        border: `1px solid ${NIGHT_BORDER}`,
         borderTop: `2px solid ${accent}`,
-        borderRadius: 22,
+        borderRadius: 20,
         padding: 'clamp(15px, 3.2vh, 26px) 22px clamp(14px, 2.6vh, 22px)',
         boxShadow: '0 28px 80px rgba(0,0,0,0.6)',
         boxSizing: 'border-box',
@@ -91,7 +91,7 @@ export function Eyebrow({ accent, children }) {
     );
 }
 
-export function OverlayTitle({ children, size, outline, glow, animation }) {
+export function OverlayTitle({ children, size, outline: _outline, glow: _glow, animation }) {
     return (
         <div style={{
             fontFamily: DISPLAY_FONT,
@@ -100,7 +100,7 @@ export function OverlayTitle({ children, size, outline, glow, animation }) {
             letterSpacing: '-1px',
             color: '#fff',
             marginTop: 6,
-            textShadow: `0 2px 0 ${outline}, 0 0 42px ${glow}`,
+            textShadow: '0 2px 0 rgba(0,0,0,0.2)',
             animation,
         }}>{children}</div>
     );
@@ -224,7 +224,7 @@ export function togglePillStyle(on, accent) {
         borderRadius: 999,
         border: `1px solid ${on ? `${accent}88` : 'rgba(255,245,220,0.16)'}`,
         background: on ? `${accent}26` : 'rgba(255,255,255,0.05)',
-        padding: '6px 12px',
+        padding: '6px 12px', minHeight: 48,
         fontSize: 11.5,
         fontWeight: 700,
         color: on ? '#fff' : NIGHT_TEXT_MUTED,
@@ -238,7 +238,7 @@ export function togglePillStyle(on, accent) {
 export function segmentStyle(selected, accent, enabled = true) {
     return {
         flex: 1,
-        padding: '7px 4px',
+        padding: '7px 4px', minHeight: 48,
         borderRadius: 9,
         border: `1px solid ${selected ? accent : 'rgba(255,245,220,0.14)'}`,
         background: selected ? `${accent}2e` : 'rgba(255,255,255,0.04)',
@@ -265,28 +265,26 @@ const BTN_BASE = {
 };
 
 /**
- * The single primary action. `from`/`to` are passed rather than derived from the
- * accent because an accent is not always a usable button ground — a near-white
- * accent leaves white label text on a near-white field.
+ * Affirmative actions always use moss; cause/face colours belong to status accents.
  */
-export function primaryBtnStyle(from, to) {
+export function primaryBtnStyle() {
     return {
         ...BTN_BASE,
         flex: '1 1 0',
-        minHeight: 44,
+        minHeight: 48,
         padding: 'clamp(10px, 1.9vh, 13px) 18px',
         fontSize: 15,
         color: '#fff',
-        background: `linear-gradient(135deg, ${from}, ${to})`,
-        border: `1px solid ${from}`,
-        boxShadow: `0 6px 24px ${from}44`,
+        background: UI_MOSS,
+        border: `1px solid ${UI_MOSS}`,
+        boxShadow: UI_ACTION_SHADOW,
     };
 }
 
 export const SECONDARY_BTN_STYLE = {
     ...BTN_BASE,
     flex: '1 1 0',
-    minHeight: 44,
+    minHeight: 48,
     padding: 'clamp(10px, 1.9vh, 13px) 18px',
     fontSize: 15,
     color: 'rgba(255,253,242,0.88)',
@@ -299,7 +297,7 @@ export const TERTIARY_BTN_STYLE = {
     ...BTN_BASE,
     marginTop: 'clamp(7px, 1.4vh, 12px)',
     width: '100%',
-    minHeight: 40,
+    minHeight: 48,
     padding: '9px 12px',
     fontSize: 12.5,
     fontWeight: 700,
@@ -315,7 +313,7 @@ export const TERTIARY_BTN_STYLE = {
 export const LIST_BTN_STYLE = {
     ...BTN_BASE,
     width: '100%',
-    minHeight: 42,
+    minHeight: 48,
     padding: '10px 14px',
     fontSize: 13,
     fontWeight: 700,

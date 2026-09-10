@@ -6,8 +6,8 @@
   --topbar-h: 56px;
 
   /* Mobi's paper surfaces */
-  --bg-primary: #f6f1e2;
-  --bg-secondary: #eee7d7;
+  --bg-primary: #f5f0e8;
+  --bg-secondary: #ede8df;
   --bg-tertiary: #e4dbc8;
   --bg-elevated: #faf7ee;
 
@@ -20,8 +20,8 @@
   --rubiks-white: #fafafa;
 
   /* Text Colors */
-  --text-primary: #26331f;
-  --text-secondary: #526046;
+  --text-primary: #1e1612;
+  --text-secondary: #7a6e62;
   --text-tertiary: #738067;
   --text-disabled: #a49d8d;
 
@@ -45,7 +45,7 @@
   --ui-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
   --ui-panel: rgba(250, 247, 238, 0.90);
   --ui-panel-strong: rgba(250, 247, 238, 0.96);
-  --ui-ink: #26331f;
+  --ui-ink: #1e1612;
   --ui-ink-subtle: #657156;
   --ui-border: rgba(111, 126, 86, 0.25);
 
@@ -403,7 +403,7 @@ body {
 
 .top-bar-icon-btn:hover {
   background: rgba(95, 127, 74, 0.12);
-  color: #26331f;
+  color: #1e1612;
 }
 
 .top-bar-icon-btn:focus-visible {
@@ -3458,7 +3458,7 @@ select.btn-compact:disabled {
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-/* These labels resolved to --ui-ink (#26331f) — near-black text on the
+/* These labels resolved to --ui-ink (#1e1612) — near-black text on the
    near-black settings panel, about 1.1:1 contrast and effectively invisible.
    The rule is shared with .wizard-option, which sits on cream paper where
    --ui-ink is correct, so the settings cases are scoped off it here. */
@@ -4191,4 +4191,67 @@ textarea:focus-visible {
   .screen-fallback-spinner {
     animation: none !important;
   }
+}
+
+/* Home: paper field guide around the live, pointer-accessible cube. */
+.worm-home {
+  position: fixed; inset: 0; z-index: 10000; height: 100dvh;
+  pointer-events: none; color: var(--text-primary); font-family: var(--ui-font);
+}
+.home-header {
+  position: absolute; top: 0; left: 0; right: 0; display: flex;
+  align-items: center; justify-content: space-between;
+  padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
+}
+.home-header button, .home-actions { pointer-events: auto; }
+.home-wordmark { font-family: 'Bungee', sans-serif; font-size: 22px; letter-spacing: -.06em; }
+.home-wordmark sup { font-size: 12px; vertical-align: super; }
+.home-heading { position: absolute; top: max(84px, calc(env(safe-area-inset-top) + 64px)); left: 16px; right: 16px; text-align: center; transition: opacity .3s; }
+.home-eyebrow { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; color: var(--text-secondary); }
+.home-heading h1 { font-family: 'Bungee', sans-serif; font-size: clamp(24px, 6vw, 38px); line-height: 1.2; margin: 12px 0; font-weight: 400; }
+.home-actions { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, 420px); box-sizing: border-box; padding: 12px 20px max(4px, env(safe-area-inset-bottom)); display: grid; gap: 12px; transition: opacity .3s; }
+.home-mode-card { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 16px; border: 1px solid #cec8be; border-radius: 20px; background: #fffdf2; box-shadow: 0 3px 0 #d6d0c8; }
+.home-mode-card strong { display: block; font-family: 'Bungee', sans-serif; font-weight: 400; font-size: 23px; margin: 4px 0; }
+.home-mode-card p { font-size: 13px; margin: 0; color: var(--text-secondary); line-height: 1.4; }
+.home-text-button { flex-shrink: 0; min-height: 48px; padding: 0 8px; border: 0; border-radius: 12px; background: #ede8df; color: #426b2e; font: inherit; font-size: 12px; font-weight: 700; }
+.home-nav { display: flex; justify-content: space-around; border-top: 1px solid #d6d0c8; padding-top: 6px; margin-top: 4px; }
+.home-nav button { flex: 1; min-height: 56px; background: transparent; border: 0; border-radius: 12px; color: var(--text-secondary); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.home-nav span { display: block; font-size: 22px; line-height: 1.2; margin-bottom: 4px; color: #426b2e; }
+.home-feedback { display: flex; align-items: center; justify-content: center; min-height: 48px; font-size: 11px; color: var(--text-secondary); margin-top: -12px; }
+.home-actions button { touch-action: manipulation; }
+.home-actions button:focus-visible, .home-feedback:focus-visible, .store-tab:focus-visible, .store-card:focus-visible, .store-icon-btn:focus-visible, .worm-pause-card button:focus-visible { outline: 3px solid #5f7f4a; outline-offset: 3px; }
+.worm-pause-card { overscroll-behavior: contain; }
+.worm-pause-card > div:last-child { position: sticky; bottom: -14px; padding: 10px 0; background: #1c2316; }
+@media (hover: hover) and (pointer: fine) {
+  .home-nav button:hover, .home-text-button:hover { background: #ede8df; }
+}
+@media (max-height: 740px) and (orientation: portrait) {
+  .home-heading { top: max(66px, calc(env(safe-area-inset-top) + 52px)); }
+  .home-heading .home-eyebrow { display: none; }
+  .home-heading h1 { font-size: 25px; margin: 4px 0; }
+  .home-mode-card { padding: 10px 14px; }
+  .home-actions { gap: 10px; }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .home-heading { left: 20px; right: 52%; top: 76px; }
+  .home-heading h1 { font-size: clamp(18px, 3vw, 28px); }
+  .home-heading .home-eyebrow { display: none; }
+  .home-actions { left: auto; right: env(safe-area-inset-right, 0px); top: max(64px, env(safe-area-inset-top)); width: 48%; transform: none; overflow-y: auto; overscroll-behavior: contain; background: #f5f0e8; }
+  .home-mode-card { padding: 10px; }
+  .home-mode-card p { font-size: 12px; }
+}
+/* Avoid full-screen blur passes on touch devices and respect reduced motion. */
+@media (pointer: coarse), (prefers-reduced-motion: reduce) {
+  :root { --paper-blur: none; --night-blur: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-heading, .home-actions { transition: none; }
+}
+
+.settings-overlay { backdrop-filter: var(--night-blur, blur(6px)); }
+.settings-close-btn, .settings-tab { min-height: 48px; }
+.settings-close-btn { min-width: 48px; }
+/* Even very short windows retain a scroll path to every home action. */
+@media (max-height: 560px) and (orientation: portrait) {
+  .home-actions { max-height: calc(100dvh - 130px); overflow-y: auto; background: var(--bg-primary); }
 }
