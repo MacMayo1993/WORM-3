@@ -4,8 +4,8 @@
  * character portrait on the left peaking above, nameplate tab on top-left edge.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { UI_FONT, HAND_FONT, Z } from '../../utils/uiTheme.js';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { UI_FONT, HAND_FONT, PAPER_BACKDROP_BLUR, Z } from '../../utils/uiTheme.js';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
@@ -19,11 +19,9 @@ import { UI_FONT, HAND_FONT, Z } from '../../utils/uiTheme.js';
 // instead of at the theory. The formal name shows up once, later, as an aside
 // (TWIN_ASIDE in demoStepCopy.js).
 export const MOBI_LINES_DEMO_INTRO = [
-  "Aloha! I'm Mobi.",
-  "Looks like an ordinary Rubik's cube, right? Look again.",
-  "Pick a tile. Now find the tile dead opposite it — straight through the middle.",
-  "Those two are twins. Tap one and it travels through the cube to the other.",
-  "That's the whole trick. Let me show you, then you pick where to play.",
+  "Aloha! I’m Mobi. What if opposite was the same place?",
+  "On this cube, each tile has an opposite twin. Flip one and the pair moves together.",
+  "I’ll show you the controls, then you can try them. Skip any step whenever you like."
 ];
 
 // Worm mode intro. Kept short and literal: a first-timer needs to know the
@@ -189,27 +187,43 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
 //                  bar's height). Dialogues that play while the in-game HUD is
 //                  up pass this so the bar stays above the dim + blur instead
 //                  of being buried under it.
-const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, topInset }) => {
+const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, topInset }) => {
   const [index, setIndex]           = useState(0);
   const [isDismissing, setDismissing] = useState(false);
   const isLast = index === lines.length - 1;
+  const dismissTimer = useRef(null);
+  const dismissed = useRef(false);
+  const primaryRef = useRef(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    primaryRef.current?.focus();
+    return () => {
+      clearTimeout(dismissTimer.current);
+      if (previous?.isConnected) previous.focus();
+    };
+  }, []);
+  useEffect(() => {
+    if (!lines.length && !dismissed.current) {
+      dismissed.current = true;
+      onComplete();
+    }
+  }, [lines.length, onComplete]);
 
   // webp is ~10x smaller than the source png; fall back to png on decode error.
   const mobiImgSrc = `${import.meta.env.BASE_URL}Mobi.webp`;
   const mobiImgFallback = `${import.meta.env.BASE_URL}Mobi.png`;
 
-  // Trigger dissolve then hand off to parent after animation finishes
-  const dismiss = useCallback(() => {
+  // One cancellable completion: rapid taps and a parent unmount cannot launch
+  // the next step twice or fire an old step’s callback over a newer screen.
+  const finish = useCallback((done) => {
+    if (dismissed.current) return;
+    dismissed.current = true;
     setDismissing(true);
-    setTimeout(() => onComplete(), 750);
-  }, [onComplete]);
-
-  const skip = useCallback(() => {
-    if (isDismissing) return;
-    setDismissing(true);
-    const done = onSkip || onComplete;
-    setTimeout(() => done(), 750);
-  }, [isDismissing, onSkip, onComplete]);
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    dismissTimer.current = setTimeout(done, reduced ? 0 : 250);
+  }, []);
+  const dismiss = useCallback(() => finish(onComplete), [finish, onComplete]);
+  const skip = useCallback(() => finish(onSkip || onComplete), [finish, onSkip, onComplete]);
 
   const advance = useCallback(() => {
     if (isDismissing) return;
@@ -219,10 +233,14 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
 
   useEffect(() => {
     const onKey = (e) => {
+      // Focused controls own Enter/Space; otherwise Skip incorrectly advances.
+      if (e.key !== 'Escape' && e.target?.closest?.('button, a, input, select, textarea, [contenteditable]')) return;
+      if (e.repeat) return;
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') {
         e.preventDefault();
         advance();
       } else if (e.key === 'Escape') {
+        e.preventDefault();
         skip();
       }
     };
@@ -230,10 +248,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
     return () => window.removeEventListener('keydown', onKey);
   }, [advance, skip]);
 
-  if (!lines || lines.length === 0) {
-    onComplete();
-    return null;
-  }
+  if (!lines.length) return null;
 
   const accent      = 'rgba(98, 132, 164, 0.78)';
   const accentSolid = '#486f95';
@@ -245,16 +260,17 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
   const NAMEPLATE_H = 34;
 
   const mobiAnim = isDismissing
-    ? 'mobiDissolveOut 0.55s ease forwards'
+    ? 'mobiDissolveOut 0.25s ease forwards'
     : 'mobiSlideIn 0.45s cubic-bezier(0.16,1,0.3,1) forwards';
 
   const uiAnim = isDismissing
-    ? 'panelFadeDown 0.35s ease forwards'
+    ? 'panelFadeDown 0.25s ease forwards'
     : 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards';
 
   return (
     <div
-      onClick={advance}
+      role="region"
+      aria-label={`${modeName || 'Game'} · Mobi’s instructions`}
       style={{
         position: 'fixed',
         inset: 0,
@@ -267,7 +283,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
         zIndex: Z.INTRO,
         background: 'linear-gradient(to top, rgba(34, 31, 25, 0.38) 0%, rgba(34, 31, 25, 0.10) 42%, transparent 68%)',
         pointerEvents: isDismissing ? 'none' : 'auto',
-        cursor: isDismissing ? 'default' : 'pointer',
+        cursor: 'default',
       }}
     >
       {/* Background blur layer — always transitioning so backdrop-filter animates correctly */}
@@ -276,8 +292,8 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
         inset: 0,
         zIndex: 0,
         pointerEvents: 'none',
-        backdropFilter:       isDismissing ? 'blur(0px)' : 'blur(5px)',
-        WebkitBackdropFilter: isDismissing ? 'blur(0px)' : 'blur(5px)',
+        backdropFilter:       isDismissing ? 'none' : PAPER_BACKDROP_BLUR,
+        WebkitBackdropFilter: isDismissing ? 'none' : PAPER_BACKDROP_BLUR,
         transition: 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease',
       }} />
       {/* ── Mobi portrait — bottom-left, behind panel (local z:1 < panel z:2).
@@ -295,7 +311,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
         <img
           src={mobiImgSrc}
           alt="Mobi"
-          style={{ display: 'block', height: 'clamp(384px, 62vh, 672px)', width: 'auto' }}
+          style={{ display: 'block', height: 'min(62dvh, 560px)', width: 'auto' }}
           onError={e => {
             if (e.currentTarget.src !== mobiImgFallback) e.currentTarget.src = mobiImgFallback;
             else e.currentTarget.style.display = 'none';
@@ -315,7 +331,8 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
           bottom: 0,
           left: 0,
           right: 0,
-          minHeight: PANEL_H,
+          minHeight: `min(${PANEL_H}, 65dvh)`,
+          maxHeight: 'calc(100dvh - 100px)',
           backgroundColor: paperBase,
           backgroundImage: `
             linear-gradient(${graphLine} 1px, transparent 1px),
@@ -327,8 +344,6 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
           `,
           backgroundSize: '18px 18px, 18px 18px, 90px 90px, 90px 90px, 100% 100%, 100% 100%',
           backgroundPosition: '0 0, 0 0, -1px -1px, -1px -1px, 0 0, 0 0',
-          backdropFilter: 'blur(4px)',
-          WebkitBackdropFilter: 'blur(4px)',
           borderTop: `2px solid ${accent}`,
           boxShadow: '0 -14px 42px rgba(48, 39, 28, 0.22), inset 0 1px 0 rgba(255,255,255,0.72)',
           zIndex: 2,
@@ -400,15 +415,16 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
           key={index}
           style={{
             flex: 1,
-            display: 'flex',
-            alignItems: 'center',
+            minHeight: 0,
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
             animation: 'textFadeIn 0.2s ease forwards',
           }}
         >
           <p style={{
             margin: 0,
             fontFamily: HAND_FONT,
-            fontSize: 'clamp(30px, 7vw, 42px)',
+            fontSize: 'clamp(24px, 5.5vw, 34px)',
             fontWeight: '400',
             color: pencilLead,
             lineHeight: 1.45,
@@ -416,21 +432,12 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
             textShadow: '0.35px 0.35px 0 rgba(53,64,74,0.22), -0.25px 0 rgba(53,64,74,0.12)',
           }}>
             {lines[index]}
-            <span style={{
-              display: 'inline-block',
-              width: '2px',
-              height: '1em',
-              background: pencilLead,
-              marginLeft: '5px',
-              verticalAlign: 'middle',
-              opacity: 0.7,
-              animation: 'cursorBlink 1s step-end infinite, pencilCursorWiggle 1.4s ease-in-out infinite',
-            }} />
+
           </p>
         </div>
 
         {/* Footer: dots + buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
             {lines.map((_, i) => (
               <div key={i} style={{
@@ -446,14 +453,17 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               type="button"
+              disabled={isDismissing}
               onClick={(e) => { e.stopPropagation(); skip(); }}
               style={{
                 background: 'none',
                 border: '1px solid rgba(53,64,74,0.22)',
-                color: 'rgba(53,64,74,0.58)',
+                color: pencilLead,
                 fontSize: '11px',
                 fontWeight: '500',
-                padding: '5px 12px',
+                minHeight: 48,
+                touchAction: 'manipulation',
+                padding: '8px 14px',
                 borderRadius: '999px',
                 cursor: 'pointer',
                 fontFamily: UI_FONT,
@@ -461,13 +471,15 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
                 transition: 'all 0.15s',
               }}
               onMouseEnter={e => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.42)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(53,64,74,0.58)'; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
             >
               {skipLabel || 'Skip'}
             </button>
 
             <button
               type="button"
+              ref={primaryRef}
+              disabled={isDismissing}
               onClick={(e) => { e.stopPropagation(); advance(); }}
               style={{
                 background: isLast ? pencilLead : 'rgba(251,247,233,0.72)',
@@ -475,7 +487,9 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
                 color: isLast ? '#fbf7e9' : accentSolid,
                 fontSize: '12px',
                 fontWeight: '700',
-                padding: '5px 20px',
+                minHeight: 48,
+                touchAction: 'manipulation',
+                padding: '8px 20px',
                 borderRadius: '999px',
                 cursor: 'pointer',
                 fontFamily: UI_FONT,

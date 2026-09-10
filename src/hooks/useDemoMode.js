@@ -1012,7 +1012,7 @@ export function useDemoMode({
       setDemoFlipProgress({ phase, done: Math.min(away, total), total });
       if (away >= total) {
         demoFlipPhaseRef.current = 'unflip-all';
-        setDemoCoachCopy('Those tiles are all living on their twins\' side now. Tap them again to bring them home.');
+        setDemoCoachCopy('Nine pairs are across! Tap the moved tiles again until the counter shows they’re all home.');
       }
     } else if (phase === 'unflip-all') {
       setDemoFlipProgress({ phase, done: Math.max(0, total - away), total });
