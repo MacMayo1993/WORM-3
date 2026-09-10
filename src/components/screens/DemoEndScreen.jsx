@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   UI_FONT, DISPLAY_FONT,
   UI_CREAM, UI_MOSS, UI_ACTION_SHADOW,
@@ -23,7 +23,8 @@ const MODES = [
   { id: 'store', name: 'STORE', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
 ];
 
-const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit }) => {
+const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit, onExplore }) => {
+  const [expanded, setExpanded] = useState(false);
   const handlers = { worm: onWorm, story: onStory, freeplay: onFreeplay, chaos: onChaos, random: onRandom, store: onStore };
 
   return (
@@ -60,7 +61,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           margin: '0 0 8px',
           letterSpacing: '0.04em',
         }}>
-          Pick where to go next
+          Ready for your first run?
         </h1>
         <p style={{
           color: '#43513a', fontSize: 13.5, lineHeight: 1.5,
@@ -72,7 +73,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-          {MODES.map((mode) => (
+          {MODES.filter(mode => mode.primary || expanded).map((mode) => (
             <button
               key={mode.id}
               type="button"
@@ -97,7 +98,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
                   display: 'flex', alignItems: 'center', gap: 8,
                   color: mode.primary ? UI_CREAM : '#26331f', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em',
                 }}>
-                  {mode.name}
+                  {mode.primary ? 'Play WORM' : mode.name}
                   {mode.primary && (
                     <span style={{
                       fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
@@ -127,6 +128,14 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           ))}
         </div>
 
+        <button type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}
+          style={{ minHeight: 48, marginTop: 12, background: 'transparent', border: 0, color: '#43513a', font: 'inherit' }}>
+          {expanded ? 'Fewer choices' : 'Explore other modes'}
+        </button>
+        <button type="button" onClick={onExplore}
+          style={{ display: 'block', width: '100%', minHeight: 48, background: 'transparent', border: '1px solid #cec8be', borderRadius: 12, color: '#43513a', font: 'inherit' }}>
+          Continue the optional tour
+        </button>
         {/* The solver and the step-by-step teacher live behind the nav bar's
             More button — the demo never opens that sheet, so name it here
             rather than leave two of the game's biggest helps undiscovered. */}

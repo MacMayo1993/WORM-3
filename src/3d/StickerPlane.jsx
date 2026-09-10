@@ -1,3 +1,4 @@
+import { flipPose } from '../utils/flipPose.js';
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text, Billboard } from '@react-three/drei';
@@ -1365,31 +1366,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Card-flip squish: compress to 0 at midpoint then expand back.
       // Eyelid (disparity) → squish scale.y (vertical, top+bottom converge to center).
       // Normal flip → squish scale.x (horizontal card rotation).
-      const halfT = p < 0.5 ? p * 2.0 : (p - 0.5) * 2.0;
-      const easedHalf = halfT * halfT * (3.0 - 2.0 * halfT);
-      // Shader-facing squish stays a clean 0→1 (drives dissolve / eyelid uniforms below).
-      const flipSquish = Math.max(0.001, p < 0.5 ? 1.0 - easedHalf : easedHalf);
-
-      // ── The snap ────────────────────────────────────────────────────────────
-      // First half collapses cleanly to the seam. Second half does NOT ease flat to
-      // rest — it OVERSHOOTS past full size then settles (easeOutBack), the tactile
-      // "click into place". The overshoot bites harder the closer the tile is to its
-      // flip cap, so a strained tile snaps back with visible violence. The cross axis
-      // conserves apparent volume (bulge while thin, pinch on the overshoot) so the
-      // whole tile reads as a physical membrane snapping, not a flat scale tween.
-      let mainScale;
-      if (p < 0.5) {
-        mainScale = flipSquish;
-      } else {
-        const dangerT = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
-        const c1 = 1.70158 * (1.0 + dangerT * 0.7);
-        const c3 = c1 + 1.0;
-        const tb = halfT - 1.0;
-        mainScale = Math.max(0.001, 1.0 + c3 * tb * tb * tb + c1 * tb * tb);
-      }
-      const squash = Math.min(1.0, mainScale);
-      const overshoot = Math.max(0.0, mainScale - 1.0);
-      const crossScale = 1.0 + (1.0 - squash) * 0.16 - overshoot * 0.6;
+      const danger = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
+      const { flipSquish, mainScale, crossScale } = flipPose(p, danger);
+      const squash = Math.min(1, mainScale);
       if (isDisparityFlipRef.current) {
         groupRef.current.scale.set(crossScale, mainScale, 1);
       } else {

@@ -7,6 +7,7 @@ import { STEP_COPY } from '../utils/demoStepCopy.js';
 // Mirrors advanceDemoStep in useDemoMode.js: next id, or 'end' past the last.
 const IDS = DEMO_STEPS.map((s) => s.id);
 const advance = (from) => {
+  if (from === 'worm-traversal') return 'end';
   const i = IDS.indexOf(from);
   return IDS[i + 1] || 'end';
 };
@@ -15,13 +16,13 @@ describe('demo flow state machine', () => {
   it('has the expected 12-step order ending in end', () => {
     expect(IDS).toEqual([
       'baby-cube',
-      'learn-to-solve',
-      'control-tour',
       'twin-paradox',
       'flip-gateway',
+      'worm-traversal',
+      'learn-to-solve',
+      'control-tour',
       'view-showcase',
       'make-it-yours',
-      'worm-traversal',
       'chaos-forecast',
       'random-showcase',
       'cosmetic-reward',
@@ -39,8 +40,7 @@ describe('demo flow state machine', () => {
       step = advance(step);
     }
     expect(step).toBe('end');
-    // every non-terminal step was visited on the way
-    expect(seen.size).toBe(IDS.length - 1);
+    expect([...seen]).toEqual(['baby-cube', 'twin-paradox', 'flip-gateway', 'worm-traversal']);
   });
 
   it('numbers steps 1..n in order, so the progress pill never disagrees with the stamps', () => {
@@ -75,9 +75,9 @@ describe('demo flow state machine', () => {
     expect(DEMO_LEVEL_CONFIGS['control-tour'].type).toBe('tour');
   });
 
-  it('worm-traversal is skippable via the coach (has TRY_COPY + advances on death or solved)', () => {
+  it('worm-traversal has an escape hatch and ends the core tour', () => {
     expect(TRY_COPY['worm-traversal']).toBeTruthy();
-    expect(advance('worm-traversal')).toBe('chaos-forecast');
+    expect(advance('worm-traversal')).toBe('end');
   });
 
   // ── Coverage: every step the player can stand in has to say something ──────

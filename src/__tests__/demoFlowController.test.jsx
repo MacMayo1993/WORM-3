@@ -12,13 +12,13 @@ describe('demo flow configuration', () => {
   it('keeps the shipped demo in the intended stage order plus end state', () => {
     expect(DEMO_STEP_IDS).toEqual([
       'baby-cube',
-      'learn-to-solve',
-      'control-tour',
       'twin-paradox',
       'flip-gateway',
+      'worm-traversal',
+      'learn-to-solve',
+      'control-tour',
       'view-showcase',
       'make-it-yours',
-      'worm-traversal',
       'chaos-forecast',
       'random-showcase',
       'cosmetic-reward',
