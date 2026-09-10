@@ -14,7 +14,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getManifoldGridId } from '../game/coordinates.js';
-import { buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
+import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
 import { flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker } from '../game/cubeState.js';
@@ -125,29 +125,14 @@ export function useWormCrawler(size, cubies) {
 
     const deathMenuTimer = useRef(null);
 
-    // O(1) tunnel endpoint lookup — kept exact (not debounced) because the crawler
-    // resolves it every step. This effect reruns on every cubies change, which is
-    // ~12×/sec at chaos L4.
+    // Simulation and portal visuals share one exact snapshot of committed cubies.
+    // Rotation commits refresh this synchronously below; flips refresh in this effect.
     const tunnelLookupRef = useRef(new Map());
-    // Tracks the inputs of the last lookup build so the effect can do a cheap
-    // incremental update (only the cubies that actually changed) on a flip, falling
-    // back to a full rebuild only on first run, a size change, or a rotation (which
-    // advances rotationEpoch and rebuilds the shared manifold map). A flip swaps both
-    // antipodal endpoint cubie objects together at a fixed geometry, so the
-    // incremental pass stays exact — see updateTunnelLookupIncremental.
-    const tunnelLookupCacheRef = useRef({ prevCubies: null, prevEpoch: null, size: null });
+    const activeTunnelsRef = useRef([]);
     useEffect(() => {
-        const manifoldMap = getManifoldMap(cubies, size, rotationEpoch);
-        const cache = tunnelLookupCacheRef.current;
-        const canIncrement = cache.prevCubies && cache.size === size && cache.prevEpoch === rotationEpoch;
-        if (canIncrement) {
-            updateTunnelLookupIncremental(tunnelLookupRef.current, cubies, cache.prevCubies, size, manifoldMap);
-        } else {
-            tunnelLookupRef.current = buildTunnelLookup(cubies, size, manifoldMap);
-        }
-        cache.prevCubies = cubies;
-        cache.prevEpoch = rotationEpoch;
-        cache.size = size;
+        const snapshot = getWormTunnelSnapshot(cubies, size, rotationEpoch);
+        tunnelLookupRef.current = snapshot.lookup;
+        activeTunnelsRef.current = snapshot.tunnels;
     }, [cubies, size, rotationEpoch]);
 
     // ── The ctx port: everything the sim needs from React-land / the store ──────
@@ -172,13 +157,7 @@ export function useWormCrawler(size, cubies) {
                 const liveColors = resolveColors(useGameStore.getState().settings);
                 return getOrbColor(faceId, liveColors);
             },
-            getActiveTunnels: () => {
-                const tunnels = [];
-                for (const hit of tunnelLookupRef.current.values()) {
-                    if (!hit.reversed) tunnels.push(hit);
-                }
-                return tunnels;
-            },
+            getActiveTunnels: () => activeTunnelsRef.current,
             resolveTunnel: (x, y, z, dirKey) => {
                 const hit = tunnelLookupRef.current.get(`${x},${y},${z},${dirKey}`);
                 if (!hit) return null;
@@ -454,12 +433,9 @@ export function useWormCrawler(size, cubies) {
                 // Keep coordinate readers synchronous with the committed cubies.
                 // applyRotationToSim may immediately re-check a rest-read ring; waiting
                 // for the React effect below would expose the pre-commit tunnel mouths.
-                const committedMap = getManifoldMap(st.cubies, sizeRef.current, st.rotationEpoch);
-                tunnelLookupRef.current = buildTunnelLookup(st.cubies, sizeRef.current, committedMap);
-                const lookupCache = tunnelLookupCacheRef.current;
-                lookupCache.prevCubies = st.cubies;
-                lookupCache.prevEpoch = st.rotationEpoch;
-                lookupCache.size = sizeRef.current;
+                const snapshot = getWormTunnelSnapshot(st.cubies, sizeRef.current, st.rotationEpoch);
+                tunnelLookupRef.current = snapshot.lookup;
+                activeTunnelsRef.current = snapshot.tunnels;
                 const layers = rot.sliceIndices?.length ? rot.sliceIndices : [rot.sliceIndex];
                 // Each plane can turn a DIFFERENT direction (the hazard spins two
                 // non-adjacent planes opposite ways). Remap every layer's cells —

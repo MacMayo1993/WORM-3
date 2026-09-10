@@ -27,6 +27,25 @@ export function shPush(sh, pos, normal, tx, ty, tz) {
 export function shAt(sh, i) {
     return sh.buf[(sh.head - 1 - i + sh.capacity) % sh.capacity];
 }
+// Render-only cursor over live head + newest-to-oldest history. Keep each pair
+// while placing all segments that fall between it; advance without a modulo or
+// a temporary array. Original records preserve live rotation/provenance semantics.
+export function makeStepPathCursor() {
+    return { history: null, index: 0, slot: 0, a: null, b: null };
+}
+export function resetStepPathCursor(cursor, history, headPoint) {
+    cursor.history = history;
+    cursor.index = 0;
+    cursor.slot = history.head === 0 ? history.capacity - 1 : history.head - 1;
+    cursor.a = headPoint;
+    cursor.b = history.count > 0 ? history.buf[cursor.slot] : null;
+}
+export function advanceStepPathCursor(cursor) {
+    cursor.a = cursor.b;
+    cursor.index++;
+    cursor.slot = cursor.slot === 0 ? cursor.history.capacity - 1 : cursor.slot - 1;
+    cursor.b = cursor.index < cursor.history.count ? cursor.history.buf[cursor.slot] : null;
+}
 export function shTrimTo(sh, maxCount) {
     if (maxCount < sh.count) sh.count = maxCount;
 }
