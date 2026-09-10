@@ -12,7 +12,7 @@ import {
     getWindWorldPosInto,
 } from '../wormLogic.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
-import { shAt } from '../circularBuffers.js';
+import { shAt, makeStepPathCursor, resetStepPathCursor, advanceStepPathCursor } from '../circularBuffers.js';
 import { beginWormSegments, pushWormSegment, endWormSegments } from '../wormSegments.js';
 import { getWormHaloGeometry, getWormHaloMaterial } from '../wormGlowHalo.js';
 
@@ -146,10 +146,9 @@ const MOUTH_SQUEEZE_ARC = 0.3;
 // Scratch for the suck-in / spit-out tunnel funnel (body segments streamed along the ribbon).
 // Centerline is sampled by world arc-length so segments stay evenly spaced (no stretched beads).
 const _funnelCenterline = makeTunnelCenterline();
-// Stable path-points buffer: reused every frame to avoid spread-array allocation.
 // The head point carries a sentinel tile (tx<0) so the body ride never rotates it —
 // the head's world position is already ridden upstream in the main worm useFrame.
-const _pathPointsBuffer = [];
+const _pathCursor = makeStepPathCursor();
 const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal, tx: -1, ty: -1, tz: -1 };
 
 export function WormBody({ worm, size }) {
@@ -340,22 +339,14 @@ export function WormBody({ worm, size }) {
         const _inchShape = _isInch ? inchLoopShape(Math.min(MAX_TAIL, tLen)) : null;
         const _humpHeight = _inchShape ? _inchShape.height : 0;
 
-        // Rebuild path-points buffer in-place (no array allocation or spread).
-        // Only fill as many step-history points as the visible body can actually walk back
-        // to. The tail reaches ~visibleCount × spacing world units behind the head, and the
-        // ring stores STEPS_PER_TILE points per ~1-unit tile, so the curve-walk below never
-        // needs more than that many points. The ring's `count` saturates to its full capacity
-        // (MAX_TAIL × STEPS_PER_TILE = 60 000) over a long run regardless of how short the worm
-        // actually is, so capping here keeps this per-frame copy proportional to body length
-        // instead of paying for 60 000 ref writes every frame for a 4-segment worm.
+        // Walk the ring directly. Keep the existing reach cap, but avoid copying
+        // up to 10,900 history references before positioning a long worm each frame.
         const _bodyReach = Math.min(MAX_TAIL, tLen) * (_isInch ? INCH_BALL_SPACING : BODY_BALL_SPACING);
         // ×2 headroom covers corner arcs (which lengthen the path) + 2 spare tiles of margin,
         // so the walk's last segment finds its bracket rather than freezing at the buffer end.
         const _neededSteps = Math.ceil(_bodyReach * STEPS_PER_TILE * 2) + STEPS_PER_TILE * 2;
         const _fillCount = Math.min(steps.count, _neededSteps);
-        _pathPointsBuffer.length = _fillCount + 1;
-        _pathPointsBuffer[0] = _headPathPoint;
-        for (let j = 0; j < _fillCount; j++) _pathPointsBuffer[j + 1] = shAt(steps, j);
+        const pathPointCount = _fillCount + 1;
 
         // Ride: while a slice is mid-rotation, body points sitting in that slice must turn
         // with the cube. We rotate their world position about the slice axis on the fly (into
@@ -435,7 +426,7 @@ export function WormBody({ worm, size }) {
             ? windoutHeadS(worm.tunnelProgress.current, tLen)
             : 0;
 
-        let walkIndex = 0;
+        resetStepPathCursor(_pathCursor, steps, _headPathPoint);
         let cumulativeDist = 0;
         let writeIdx = 0; // compacted instance slot — advances only for segments actually drawn
         let haloIdx = 0;  // compacted slot into the glow-halo overlay
@@ -512,9 +503,9 @@ export function WormBody({ worm, size }) {
                 // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
 
-                while (walkIndex < _pathPointsBuffer.length - 1) {
-                    const ptA = _pathPointsBuffer[walkIndex];
-                    const ptB = _pathPointsBuffer[walkIndex + 1];
+                while (_pathCursor.index < pathPointCount - 1) {
+                    const ptA = _pathCursor.a;
+                    const ptB = _pathCursor.b;
                     const aPos = effPos(ptA, _bodyEffA);
                     const bPos = effPos(ptB, _bodyEffB);
                     const distToNext = aPos.distanceTo(bPos);
@@ -552,12 +543,12 @@ export function WormBody({ worm, size }) {
                         break;
                     }
                     cumulativeDist += distToNext;
-                    walkIndex++;
+                    advanceStepPathCursor(_pathCursor);
                 }
 
                 // If the track runs out (just spawned and moving), freeze at the last known point.
-                if (!foundPosition && _pathPointsBuffer.length > 0) {
-                    _bodyClonePos.copy(effPos(_pathPointsBuffer[_pathPointsBuffer.length - 1], _bodyEffA));
+                if (!foundPosition && pathPointCount > 0) {
+                    _bodyClonePos.copy(effPos((_fillCount > 0 ? shAt(steps, _fillCount - 1) : _headPathPoint), _bodyEffA));
                 }
 
                 // Funnel override: pull segments that have crossed the mouth onto the ribbon.

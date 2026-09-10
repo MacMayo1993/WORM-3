@@ -2039,7 +2039,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
         {/* 3D style volumes — suppressed for full-face GLBs that cover the entire tile,
             and at size >= 6 as a performance fallback (see suppressVolumeFX above) */}
-        <group visible={!glbFullFace && !suppressVolumeFX}>
+        {!glbFullFace && !suppressVolumeFX && <group>
           {/* 3D grass blades overlay */}
           {tileStyle === 'grass' && !isGlass && !isSudokube && !currTexture && (
             <GrassBlades faceColor={baseColor} />
@@ -2079,7 +2079,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           {tileStyle === 'wood' && !isGlass && !isSudokube && !currTexture && (
             <WoodVolume faceColor={baseColor} />
           )}
-        </group>
+        </group>}
       </group>
 
       {/* Color-bleed overlay removed — it was mounted (and drawn) on every sticker but

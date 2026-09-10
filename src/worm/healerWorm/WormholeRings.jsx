@@ -1,24 +1,13 @@
 // src/worm/healerWorm/WormholeRings.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getStickerWorldPos } from '../../game/coordinates.js';
-import { buildManifoldGridMapIncremental } from '../../game/manifoldLogic.js';
-import { getActiveTunnels } from '../wormLogic.js';
+import { getWormTunnelSnapshot } from '../tunnelSnapshot.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { FACE_COLORS } from '../../utils/constants.js';
-import { FACE_NORMALS, WORMHOLE_MAX_TRAVERSALS } from './constants.js';
-
-// ─── Module-level helpers for canonical tunnel key (mirrors useWormCrawler logic) ─
-// Used by WormholeRings to check void-tunnel membership without prop-drilling.
-const _tileKeyStr = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
-const _canonicalTunnelKeyStr = (tunnel) => {
-    const a = _tileKeyStr(tunnel.entry);
-    const b = _tileKeyStr(tunnel.exit);
-    return a < b ? `${a}|${b}` : `${b}|${a}`;
-};
+import { WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
 // ─── Wormhole portal rings — spinning neon rings at every flipped tile ────────
 // Gives players a clear visual cue for all wormhole locations on the cube surface.
@@ -126,10 +115,6 @@ function getCautionTexture() {
  * costs the renderer nothing; the frame loop below throttles itself instead.
  */
 export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef, hidden = false }) {
-    // Patched incrementally instead of rebuilt from scratch on every debounce tick (see
-    // buildManifoldGridMapIncremental) — only the cells that changed since the last tick
-    // get their gridId entries recomputed.
-    const manifoldMapCacheRef = useRef({ map: null, prevCubies: null, size: null });
     const liveRef = useRef();       // live wormhole rings (tinted to the face they charge)
     const moteRef = useRef();       // calm plume rising off safe portals
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
@@ -154,75 +139,13 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         return s;
     }, [MAX_RINGS]);
 
-    // Debounce cubies so the O(size³×6) scan only reruns every 200-400 ms instead
-    // of on every individual sticker flip (~12×/sec at chaos L4). Crawling phase can
-    // tolerate the longer delay since the rings already throttle to 20 Hz there; tunnel
-    // phases (entering/tunnel/exiting) keep the tighter delay for the 60 Hz ring cadence.
-    const [debouncedCubies, setDebouncedCubies] = useState(cubies);
-    useEffect(() => {
-        const phase = worm?.phase?.current ?? 'crawling';
-        const delayMs = phase === 'crawling' ? 400 : 200;
-        const timer = setTimeout(() => setDebouncedCubies(cubies), delayMs);
-        return () => clearTimeout(timer);
-    }, [cubies, worm]);
-
-    // All flipped surface positions, augmented with canonical tunnel key so
-    // WormholeRings can tell live vs void without re-running manifold logic per frame.
-    const allPositions = React.useMemo(() => {
-        const manifoldMap = buildManifoldGridMapIncremental(debouncedCubies, size, manifoldMapCacheRef.current);
-        const tunnels = getActiveTunnels(debouncedCubies, size, manifoldMap);
-        // Build tile-key → canonical-tunnel-key lookup (covers both entry and exit)
-        const tunnelKeyMap = new Map();
-        for (const t of tunnels) {
-            const ck = _canonicalTunnelKeyStr(t);
-            tunnelKeyMap.set(_tileKeyStr(t.entry), ck);
-            tunnelKeyMap.set(_tileKeyStr(t.exit), ck);
-        }
-
-        const result = [];
-        const dirs = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
-        for (let x = 0; x < size; x++) {
-            const xOuter = x === 0 || x === size - 1;
-            for (let y = 0; y < size; y++) {
-                const yOuter = y === 0 || y === size - 1;
-                for (let z = 0; z < size; z++) {
-                    // Only the shell can carry a visible sticker; the isVisible test
-                    // below rejects every interior cubie anyway. Skipping them here
-                    // drops the scan from 3,375 cells to 1,352 on a 15×15 board.
-                    if (!xOuter && !yOuter && z !== 0 && z !== size - 1) continue;
-                    const cubie = debouncedCubies?.[x]?.[y]?.[z];
-                    if (!cubie) continue;
-                    for (const dk of dirs) {
-                        const st = cubie.stickers?.[dk];
-                        if (!st || st.curr === st.orig) continue;
-                        const isVisible = (
-                            (dk === 'PX' && x === size - 1) || (dk === 'NX' && x === 0) ||
-                            (dk === 'PY' && y === size - 1) || (dk === 'NY' && y === 0) ||
-                            (dk === 'PZ' && z === size - 1) || (dk === 'NZ' && z === 0)
-                        );
-                        if (!isVisible) continue;
-                        result.push({
-                            x, y, z, dirKey: dk,
-                            tunnelKey: tunnelKeyMap.get(`${x},${y},${z},${dk}`) ?? null,
-                            // The sticker's CURRENT face id. Entering the tunnel here
-                            // charges orbs of exactly this colour — wormSim reads
-                            // `entryFaceId = entrySticker.curr` and computeOrbDeposit
-                            // pays from `inventory[entryFaceId]`. Colouring per tile
-                            // (not per tunnel) is therefore correct: a tunnel's two
-                            // mouths can sit on different colours, and each one
-                            // charges its own.
-                            faceId: st.curr,
-                            // Cache world position + normal once — constant for the lifetime
-                            // of this entry, so the frame loop never recomputes/reallocates.
-                            wp: getStickerWorldPos(x, y, z, dk, size, 0),
-                            normal: FACE_NORMALS[dk] ?? FACE_NORMALS.PZ
-                        });
-                    }
-                }
-            }
-        }
-        return result;
-    }, [debouncedCubies, size]);
+    // Share the crawler's exact committed data. Animation remains throttled below,
+    // but continuous flips can no longer postpone a trailing debounce indefinitely.
+    const rotationEpoch = useGameStore(s => s.rotationEpoch);
+    const allPositions = React.useMemo(
+        () => getWormTunnelSnapshot(cubies, size, rotationEpoch).positions,
+        [cubies, size, rotationEpoch]
+    );
 
     // Face id → THREE.Color for the portal tints. Built once per palette change and
     // read in the frame loop, so the hot path never parses a hex string or allocates
