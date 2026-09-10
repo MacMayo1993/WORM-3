@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { makeStepHistory, shPush, shAt, makeStepPathCursor, resetStepPathCursor, advanceStepPathCursor, shTrimTo, shReset } from '../worm/circularBuffers.js';
-import { makeCubies, isSurfaceSticker } from '../game/cubeState.js';
+import { makeCubies, healSticker, isSurfaceSticker } from '../game/cubeState.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { resetManifoldMap } from '../game/manifoldMapStore.js';
@@ -123,5 +123,48 @@ describe('shared committed tunnel snapshots', () => {
         const key = first.positions[0].key;
         expect(second.positions.find(p => p.key === key).wp).toBe(first.positions[0].wp);
         checkSnapshot(makeCubies(5), 5, 1);
+    });
+});
+
+
+describe('one-sided tunnel invalidation', () => {
+    for (const endpoint of ['entry', 'exit']) {
+        it(`rebuilds both endpoints when only ${endpoint} is healed`, () => {
+            let cube = makeCubies(3);
+            cube = flipStickerPair(cube, 3, 0, 0, 2, 'PZ', buildManifoldGridMap(cube, 3));
+            const before = checkSnapshot(cube, 3, 0);
+            const previousEntries = sortedEntries(before.lookup);
+            const tunnel = before.tunnels[0].tunnel;
+            const a = tunnel[endpoint];
+            const b = tunnel[endpoint === 'entry' ? 'exit' : 'entry'];
+            const healedA = healSticker(cube, 3, a.x, a.y, a.z, a.dirKey);
+            expect(healedA[b.x][b.y][b.z]).toBe(cube[b.x][b.y][b.z]);
+            const partial = checkSnapshot(healedA, 3, 0);
+            // Full rebuild still resolves a pair from the remaining flipped mouth.
+            expect(partial.lookup.size).toBe(2);
+            expect(partial.positions).toHaveLength(1);
+            expect(sortedEntries(before.lookup)).toEqual(previousEntries);
+            const healedB = healSticker(healedA, 3, b.x, b.y, b.z, b.dirKey);
+            const cleared = checkSnapshot(healedB, 3, 0);
+            expect(cleared.lookup.size).toBe(0);
+            expect(cleared.positions).toHaveLength(0);
+            expect(partial.lookup.size).toBe(2);
+        });
+    }
+
+    it('preserves other pairs sharing a cubie during successive one-sided heals', () => {
+        let cube = makeCubies(3);
+        for (const dir of ['PX', 'PY', 'PZ']) {
+            cube = flipStickerPair(cube, 3, 2, 2, 2, dir, buildManifoldGridMap(cube, 3));
+        }
+        const initial = checkSnapshot(cube, 3, 0);
+        const mouths = initial.tunnels.flatMap(hit => [hit.tunnel.entry, hit.tunnel.exit]);
+        // Heal every mouth independently, checking the entire lookup each time.
+        for (const mouth of mouths) {
+            cube = healSticker(cube, 3, mouth.x, mouth.y, mouth.z, mouth.dirKey);
+            checkSnapshot(cube, 3, 0);
+        }
+        expect(getWormTunnelSnapshot(cube, 3, 0).lookup.size).toBe(0);
+        expect(initial.lookup.size).toBe(6);
     });
 });

@@ -277,31 +277,40 @@ export function buildTunnelLookup(cubies, size, manifoldMap) {
   return lookup;
 }
 
-// Incremental update — only re-examines cubies whose object identity changed since
-// `prevCubies`. Valid ONLY when geometry is unchanged (same rotation epoch): a flip
-// or heal swaps the two endpoint cubie objects together, so any tunnel touching a
-// changed cubie is fully rebuilt below, and tunnels on untouched cubies keep their
-// (still-correct) entries. Mutates `lookup` in place and returns it.
+// Incremental update at unchanged geometry. A heal can replace only ONE endpoint
+// cubie, so invalidate both entries of every affected pair and revisit its partner
+// even if that cubie's identity is unchanged. Mutates lookup, never its records.
 export function updateTunnelLookupIncremental(lookup, cubies, prevCubies, size, manifoldMap) {
-  const changed = [];
+  const invalidKeys = new Set();
+  const rebuild = new Map();
+  const revisit = (x, y, z) => rebuild.set((x * size + y) * size + z, { x, y, z });
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
       for (let z = 0; z < size; z++) {
         const c = cubies[x]?.[y]?.[z];
         if (c === prevCubies?.[x]?.[y]?.[z]) continue;
-        changed.push(x, y, z);
-        // Drop every tileKey this cubie could own; pass 2 re-adds whatever is still a
-        // tunnel. Deleting a non-existent key is a harmless no-op.
-        for (let d = 0; d < _TUNNEL_DIRS.length; d++) lookup.delete(`${x},${y},${z},${_TUNNEL_DIRS[d]}`);
+        revisit(x, y, z);
+        for (const dirKey of _TUNNEL_DIRS) {
+          const key = `${x},${y},${z},${dirKey}`;
+          invalidKeys.add(key);
+          const hit = lookup.get(key);
+          if (!hit) continue;
+          // Collect before deleting: another changed cubie may share this pair.
+          for (const endpoint of [hit.tunnel.entry, hit.tunnel.exit]) {
+            invalidKeys.add(`${endpoint.x},${endpoint.y},${endpoint.z},${endpoint.dirKey}`);
+            revisit(endpoint.x, endpoint.y, endpoint.z);
+          }
+        }
       }
     }
   }
-  if (changed.length === 0) return lookup;
-  // Pass 2 after all deletes, so a tunnel spanning two changed cubies isn't clobbered
-  // by the second cubie's delete sweep after the first cubie re-adds it.
+  if (rebuild.size === 0) return lookup;
+  for (const key of invalidKeys) lookup.delete(key);
+  // Invalidate only the affected pair keys, not every key on partner cubies.
+  // Rebuilding an unchanged partner may also refresh its other pairs; their two
+  // entries are overwritten together, so shared corner cubies stay consistent.
   const seen = new Set();
-  for (let i = 0; i < changed.length; i += 3) {
-    const x = changed[i], y = changed[i + 1], z = changed[i + 2];
+  for (const { x, y, z } of rebuild.values()) {
     _addTunnelsForCubie(lookup, cubies[x]?.[y]?.[z], x, y, z, manifoldMap, size, seen);
   }
   return lookup;
