@@ -375,8 +375,8 @@ const fragmentShader = /* glsl */`
       // sticker. The ramp is wide and pushed outward, so the heat is concentrated in
       // the last of the tile and falls off gently toward the middle.
       float rim = max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0;
-      float gap = smoothstep(0.30, 1.02, rim + (n - 0.5) * 0.42);
-      float fissure = smoothstep(0.52, 0.90, n) * smoothstep(0.15, 0.75, rim);
+      float gap = smoothstep(0.48, 1.02, rim + (n - 0.5) * 0.42);
+      float fissure = smoothstep(0.52, 0.90, n) * smoothstep(0.35, 0.85, rim);
       col = mix(uCrustColor, uEmberColor, clamp(gap * (0.45 + 0.55 * vHeat) + fissure * 0.5 * vHeat, 0.0, 1.0));
       col = mix(col, uCoreColor, fissure * gap * 0.30 * vHeat);
       // Shaped by the gaps and the fissures, NOT by a radial glow sprite: the glow
@@ -416,7 +416,11 @@ const fragmentShader = /* glsl */`
       // because the blend is additive (it can brighten a silhouette, not darken it).
       float edge = smoothstep(0.02, 0.16, mask) * (1.0 - smoothstep(0.16, 0.40, mask));
       col += uMidColor * edge * 0.55;
-      col *= 0.88 + 0.30 * vHeat;
+      // Narrow pale cores inside the warm cel bands keep neighbouring tongues
+      // distinct instead of merging into a flat yellow sheet.
+      float inner = pow(max(0.0, spine), 4.0) * (1.0 - smoothstep(0.18, 0.64, vUv.y));
+      col = mix(col, uCoreColor, inner * 0.55);
+      col *= 0.78 + 0.26 * vHeat;
 
       // The blend is additive, so a cooling tip has to lose light, not gain black.
       a = mask * (0.52 + 0.32 * vHeat) * (1.0 - 0.38 * smoothstep(0.58, 1.0, vUv.y)) * vAlpha;

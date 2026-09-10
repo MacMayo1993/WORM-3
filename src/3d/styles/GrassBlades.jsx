@@ -4,6 +4,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
+import { natureBlade } from '../../utils/elementalGrowth.js';
 import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const BLADE_COUNT = 220;
@@ -28,11 +29,14 @@ function getBladeGeometry() {
 // Wind direction is consistent in sticker-local space across all blades.
 const grassVertexShader = `
   uniform float time;
+  uniform float elemental;
   varying vec2 vUv;
   varying float vBladeTint;
 
   void main() {
-    vUv = uv;
+    // rotateX(-PI/2) puts UV.y=1 at the root. Nature reverses that
+    // coordinate so taper and wind act on the tip, leaving the root anchored.
+    vUv = vec2(uv.x, mix(uv.y, 1.0 - uv.y, elemental));
 
     vec3 pos = position;
 
@@ -43,7 +47,7 @@ const grassVertexShader = `
     float phase = localPos.x * 12.0 + localPos.y * 9.0;
 
     // Height factor: quadratic so base stays anchored, tip moves most
-    float hf = uv.y * uv.y;
+    float hf = vUv.y * vUv.y;
 
     // Extract blade height from instance scale (Z column length)
     float bladeH = length(vec3(instanceMatrix[2][0], instanceMatrix[2][1], instanceMatrix[2][2]));
@@ -66,12 +70,17 @@ const grassVertexShader = `
 
 // ----- Fragment Shader -----
 const grassFragmentShader = `
+  uniform float elemental;
   uniform vec3 rootColor;
   uniform vec3 tipColor;
   varying vec2 vUv;
   varying float vBladeTint;
 
   void main() {
+    // Nature grows tapered leaves, with a fine midrib and occasional gold tips.
+    // The ordinary grass tile style retains its existing silhouette.
+    float across = abs(vUv.x - 0.5) * 2.0;
+    if (elemental > 0.5 && across > pow(1.0 - vUv.y, 0.55)) discard;
     // Gradient from dark root to bright tip
     vec3 color = mix(rootColor, tipColor, vUv.y);
 
@@ -81,6 +90,10 @@ const grassFragmentShader = `
     // Darken at very base (soil shadow)
     color *= 0.6 + 0.4 * smoothstep(0.0, 0.12, vUv.y);
 
+    float vein = 1.0 - smoothstep(0.025, 0.13, across);
+    color += vec3(0.12, 0.20, 0.055) * vein * vUv.y * elemental;
+    float flower = step(0.965, vBladeTint) * smoothstep(0.78, 1.0, vUv.y) * elemental;
+    color = mix(color, vec3(1.0, 0.82, 0.42), flower * 0.85);
     gl_FragColor = vec4(color, 1.0);
   }
 `;
@@ -91,9 +104,9 @@ const grassFragmentShader = `
  * during the frozen scramble phase — otherwise the NATURE orb pays the GLSL
  * compile the first time a player claims one, mid-crawl.
  */
-export function getGrassBladeMaterial(faceColor) {
+export function getGrassBladeMaterial(faceColor, elemental = false, animate = true) {
   const colorKey = faceColor || '#22c55e';
-  return getVolumeResource(`grass_bladeMat_${colorKey}`, () => {
+  return getVolumeResource(`grass_bladeMat_${colorKey}_${elemental}_${animate}`, () => {
     // Green palette with subtle face-color tinting
     const fc = new THREE.Color(colorKey);
     const root = new THREE.Color(0x1a3d0f);
@@ -103,7 +116,8 @@ export function getGrassBladeMaterial(faceColor) {
 
     return new THREE.ShaderMaterial({
       uniforms: {
-        time: sharedUniforms.time,
+        time: animate ? sharedUniforms.time : { value: 0 },
+        elemental: { value: elemental ? 1 : 0 },
         rootColor: { value: root },
         tipColor: { value: tip },
       },
@@ -114,10 +128,10 @@ export function getGrassBladeMaterial(faceColor) {
   });
 }
 
-export default function GrassBlades({ faceColor }) {
+export default function GrassBlades({ faceColor, elemental = false, animate = true, count = BLADE_COUNT, seed = 1 }) {
   const meshRef = useRef();
   const geometry = getBladeGeometry();
-  const material = getGrassBladeMaterial(faceColor);
+  const material = getGrassBladeMaterial(faceColor, elemental, animate);
 
   // Populate instance matrices. material changes identity when faceColor
   // changes, which makes R3F recreate the instancedMesh (args change) — so
@@ -128,12 +142,13 @@ export default function GrassBlades({ faceColor }) {
     const dummy = new THREE.Object3D();
     const range = STICKER_HALF - 0.04; // small margin from edge
 
-    for (let i = 0; i < BLADE_COUNT; i++) {
-      const x = (Math.random() * 2 - 1) * range;
-      const y = (Math.random() * 2 - 1) * range;
-      const height = 0.06 + Math.random() * 0.14;          // 0.06 – 0.20
-      const widthScale = 0.6 + Math.random() * 0.8;        // width variation
-      const angle = Math.random() * Math.PI;                // random facing
+    for (let i = 0; i < count; i++) {
+      const blade = elemental ? natureBlade(seed, i) : null;
+      const x = blade ? blade.x : (Math.random() * 2 - 1) * range;
+      const y = blade ? blade.y : (Math.random() * 2 - 1) * range;
+      const height = blade ? blade.height : 0.06 + Math.random() * 0.14;          // 0.06 – 0.20
+      const widthScale = blade ? blade.width : 0.6 + Math.random() * 0.8;        // width variation
+      const angle = blade ? blade.angle : Math.random() * Math.PI;                // random facing
 
       dummy.position.set(x, y, 0);
       dummy.rotation.set(0, 0, angle);
@@ -142,12 +157,12 @@ export default function GrassBlades({ faceColor }) {
       meshRef.current.setMatrixAt(i, dummy.matrix);
     }
     meshRef.current.instanceMatrix.needsUpdate = true;
-  }, [material]);
+  }, [material, elemental, seed, count]);
 
   return (
     <instancedMesh
       ref={meshRef}
-      args={[geometry, material, BLADE_COUNT]}
+      args={[geometry, material, count]}
       dispose={null}
       frustumCulled={false}
       raycast={() => null}

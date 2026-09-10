@@ -50,7 +50,7 @@ function collectElementalMaterials() {
         materials.push(getFlameMaterial(true), getFlameMaterial(false));
         break;
       case 'blades':
-        materials.push(getGrassBladeMaterial(def.color));
+        materials.push(getGrassBladeMaterial(def.color, true));
         break;
       default:
         break;

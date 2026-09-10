@@ -110,7 +110,7 @@ const ICE_CELLS = /* glsl */`
 const vertexShader = /* glsl */`
   uniform float uTime;
   uniform int uMode;
-  // (intensity, claim, release, unused) — the shared elemental envelope, written
+  // (intensity, claim, release, animate) — the shared elemental envelope, written
   // once per frame by ElementalCubeSkin. See elementalLifecycle.js.
   uniform vec4 uEnv;
   // Per cover cell: (rim, edge, corner, seed). Where the cell sits on the cube —
@@ -166,9 +166,9 @@ const vertexShader = /* glsl */`
 
     vec4 wp = cellMatrix * vec4(position, 1.0);
     vWorld = wp.xyz;
-    float w = wfield(wp.xyz, uTime);
+    float w = wfield(wp.xyz, uTime * uEnv.w);
     vWave = w;
-    vSwell = swellField(wp.xyz, uTime);
+    vSwell = swellField(wp.xyz, uTime * uEnv.w);
     // Local +Z is the outward face normal for every cell; in world space it is the
     // instance matrix's Z column, which is how the surface knows which way is up on
     // a cube whose faces all point somewhere different.
@@ -227,7 +227,7 @@ const fragmentShader = /* glsl */`
 
   void main() {
     vec3 vd = normalize(vView);
-    float t = uTime;
+    float t = uTime * uEnv.w;
     vec3 lightDir = normalize(vec3(0.4, 0.8, 0.5));
 
     // Distance from this cell's own centre, 0 → 1 at its border. Everything the
@@ -235,7 +235,12 @@ const fragmentShader = /* glsl */`
     // sits in the middle of a tile, so the element is thinned there and its
     // strongest cues are pushed out to the gaps between tiles.
     float cellRim = clamp(max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0, 0.0, 1.0);
-    float readable = mix(0.66, 1.0, smoothstep(0.10, 0.92, cellRim));
+    float readable = mix(0.38, 1.0, smoothstep(0.22, 0.88, cellRim));
+    // vView is in camera space; normals must be in that space too. Using a
+    // screen-facing (0,0,1) normal made every face catch the same highlight.
+    vec3 faceN = normalize(mat3(viewMatrix) * vFaceNormal);
+    vec3 tangent = normalize(cross(abs(faceN.y) > 0.95 ? vec3(1.0,0.0,0.0) : vec3(0.0,1.0,0.0), faceN));
+    vec3 bitangent = cross(faceN, tangent);
 
     vec3 col;
     float alpha;
@@ -245,8 +250,12 @@ const fragmentShader = /* glsl */`
       // Surface normal from the wave gradient (screen-space derivatives).
       float dx = dFdx(vWave);
       float dy = dFdy(vWave);
-      vec3 n = normalize(vec3(-dx * 6.0, -dy * 6.0, 1.0));
-      float fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.2);
+      vec3 dpdx = dFdx(-vView), dpdy = dFdy(-vView);
+      vec3 r1 = cross(dpdy, faceN), r2 = cross(faceN, dpdx);
+      float det = dot(dpdx, r1);
+      vec3 gradient = (r1 * dx + r2 * dy) * sign(det) / max(abs(det), 0.00001);
+      vec3 n = normalize(faceN - gradient * 0.12);
+      float fres = pow(1.0 - clamp(abs(dot(n, vd)), 0.0, 1.0), 3.0);
 
       // Depth tint: troughs hold the deep colour, crests lift toward the accent,
       // so the swell reads as a body of water with volume rather than as a flat
@@ -264,7 +273,7 @@ const fragmentShader = /* glsl */`
       float caustic = clamp(
         pow(1.0 - abs(n1 * 2.0 - 1.0), 7.0) + 0.85 * pow(1.0 - abs(n2 * 2.0 - 1.0), 7.0),
         0.0, 1.4);
-      col += uAccent * caustic * 0.95;
+      col += uAccent * caustic * mix(0.28, 0.72, readable);
 
       // Foam, but only on the crests and broken up by noise, so it collects along
       // the tops of the swell the way real foam does instead of frosting evenly.
@@ -336,11 +345,14 @@ const fragmentShader = /* glsl */`
       // A dark conductive sheen, so the white-hot cores have contrast to be hot
       // against. Nearly black at the tile centre, which also leaves the sticker
       // and its markings readable straight through the charge.
-      float sheen = pow(clamp(dot(normalize(vFaceNormal), normalize(vView)), 0.0, 1.0), 1.5);
+      float sheen = pow(clamp(dot(faceN, vd), 0.0, 1.0), 1.5);
       col = mix(uColor * 0.10, uColor * 0.42, sheen * 0.7 + 0.3 * vCellMask.x);
       col += uColor * vein * (0.35 + 0.75 * pulse);
       col += uAccent * vein * pulse * 1.15;          // white-hot cores, only mid-burst
-      col += uAccent * rail * 0.55;
+      // A narrow current rides inside the broad rail, giving the silhouette
+      // a white core and violet shoulder without a full-face flash.
+      float core = pow(clamp(vein / 1.5, 0.0, 1.0), 3.0);
+      col += uAccent * (rail * 0.55 + core * (0.3 + 0.55 * pulse));
       float fres = pow(1.0 - clamp(sheen, 0.0, 1.0), 2.0);
       col = mix(col, uAccent, fres * 0.16);
 
@@ -356,8 +368,8 @@ const fragmentShader = /* glsl */`
       vec3 rnd = hash33(cid);
       // Generous tilt range: the facets only read if neighbouring plates catch the
       // light differently enough to separate from each other.
-      vec3 n = normalize(vec3((rnd.xy - 0.5) * 1.6, 1.0));
-      float fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.2);
+      vec3 n = normalize(faceN + tangent * (rnd.x - 0.5) * 0.75 + bitangent * (rnd.y - 0.5) * 0.75);
+      float fres = pow(1.0 - clamp(abs(dot(n, vd)), 0.0, 1.0), 2.2);
       float lam = clamp(dot(n, lightDir), 0.0, 1.0);
 
       // Crack lines along the plate walls. The cell INDEX is piecewise constant, so
@@ -375,7 +387,7 @@ const fragmentShader = /* glsl */`
       // Fine frost grain over the plates, and a sparse twinkle that re-rolls a few
       // times a second so the surface glitters as the camera moves across it.
       float frost = vnoise(vWorld * 14.0) * 0.5 + vnoise(vWorld * 28.0) * 0.5;
-      float twinkle = pow(vnoise(vWorld * 26.0 + floor(t * 6.0) * 7.3), 16.0) * 4.0;
+      float twinkle = pow(vnoise(vWorld * 26.0), 12.0) * pow(0.5 + 0.5 * sin(t * 1.3 + id * 31.0), 6.0) * 1.2;
       // Per-plate glint. Broad enough that a facet flares as the camera swings past
       // it, which is what sells the surface as hard and polished rather than matte.
       float spec = pow(max(dot(reflect(-lightDir, n), vd), 0.0), 24.0);
@@ -396,11 +408,11 @@ const fragmentShader = /* glsl */`
       col += vec3(0.85, 0.95, 1.0) * spec * 0.9;
       col += vec3(0.90, 0.97, 1.0) * twinkle;
       col = mix(col, uAccent, fres * 0.30);
-      // Ice is a solid, not a film. At the surface layer's usual ~0.6 the lit tile
-      // underneath (a healed tile glows green) came through hard enough to turn the
-      // whole frozen cube green; this is opaque enough to actually freeze the face
-      // while the tile's colour and markings still read through it.
-      alpha = 0.80 + fres * 0.14 + crack * 0.12;
+      // White frost carries the solid silhouette; the quieter inset keeps
+      // sticker colors and gameplay marks visible under the glacial layer.
+      float rimFrost = smoothstep(0.55, 0.94, cellRim) * (0.55 + frost * 0.45);
+      col = mix(col, vec3(0.86, 0.96, 1.0), rimFrost * 0.65);
+      alpha = mix(0.36, 0.88, smoothstep(0.25, 0.85, cellRim)) + fres * 0.08 + crack * 0.10;
     }
 
     // The cell has not been reached by the claim sweep yet, or the wash is
@@ -423,7 +435,7 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex) {
         uColor: { value: new THREE.Color(colorHex) },
         uAccent: { value: new THREE.Color(accentHex) },
         // Written once per frame by the skin's transform loop, never per instance.
-        uEnv: { value: new THREE.Vector4(1, 1, 0, 0) }
+        uEnv: { value: new THREE.Vector4(1, 1, 0, 1) }
       },
       vertexShader,
       fragmentShader,
