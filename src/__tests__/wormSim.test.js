@@ -697,3 +697,32 @@ describe('crawl distance the Inch Worm gait rides on', () => {
     expect(driver.phase).toBeCloseTo(traced, 1);
   });
 });
+
+describe('character crawl-distance driver', () => {
+  it('counts travel across tile resets and corners without counting paused frames', () => {
+    const sim = makeSim();
+    sim.specialTimer = Infinity;
+    sim.elementalSpawnTimer = Infinity;
+    let paused = false;
+    const ctx = makeCtx({ isPaused: () => paused });
+    let sawCommit = false, sawCorner = false;
+    for (let frame = 0; frame < 500; frame++) {
+      const before = sim.crawlDistance;
+      const t = sim.interpT;
+      const corner = sim.crossingCorner;
+      stepWormSim(sim, 1 / 30, SIZE, ctx);
+      expect(sim.crawlDistance).toBeGreaterThanOrEqual(before);
+      expect(sim.crawlDistance - before).toBeLessThan(0.2);
+      if (t > sim.interpT) sawCommit = true;
+      if (corner && sim.crawlDistance > before) sawCorner = true;
+    }
+    expect(sawCommit).toBe(true);
+    expect(sawCorner).toBe(true);
+    const before = sim.crawlDistance;
+    paused = true;
+    run(sim, ctx, 1);
+    expect(sim.crawlDistance).toBe(before);
+    resetWormSim(sim, SIZE, { orbCount: 0 });
+    expect(sim.crawlDistance).toBe(0);
+  });
+});

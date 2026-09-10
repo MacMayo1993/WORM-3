@@ -173,8 +173,8 @@ let memoShape = null;
  * rears, how far apart consecutive loops sit, and the ground↔arc map that lets a
  * segment's body arc be turned into a place on the ground.
  */
-export function inchLoopShape(count) {
-  if (count === memoCount) return memoShape;
+export function inchLoopShape(count, reusable) {
+  if (!reusable && count === memoCount) return memoShape;
 
   const bodyArc = Math.max(0, count - 1) * INCH_BALL_SPACING;
   // One loop until the body outgrows INCH_MAX_PITCH, then a train of them.
@@ -186,7 +186,7 @@ export function inchLoopShape(count) {
 
   // arcAt[j] = body arc from the start of a loop period (half a pitch ahead of the
   // crest) to the ground position j/MAP_SAMPLES of the way through it.
-  const arcAt = new Float64Array(MAP_SAMPLES + 1);
+  const arcAt = reusable?.arcAt ?? new Float64Array(MAP_SAMPLES + 1);
   const dg = spacing / MAP_SAMPLES;
   let excess = 0;
   for (let j = 1; j <= MAP_SAMPLES; j++) {
@@ -199,7 +199,7 @@ export function inchLoopShape(count) {
 
   // ...and its inverse, sampled evenly in arc: groundAt[k] = the ground offset
   // (in pitches, from the crest) at body arc k/MAP_SAMPLES of the way through.
-  const groundAt = new Float64Array(MAP_SAMPLES + 1);
+  const groundAt = reusable?.groundAt ?? new Float64Array(MAP_SAMPLES + 1);
   for (let k = 0, j = 0; k <= MAP_SAMPLES; k++) {
     const target = (k / MAP_SAMPLES) * arcPitch;
     while (j < MAP_SAMPLES - 1 && arcAt[j + 1] < target) j++;
@@ -208,9 +208,9 @@ export function inchLoopShape(count) {
     groundAt[k] = -0.5 + (j + (a1 > a0 ? (target - a0) / (a1 - a0) : 0)) / MAP_SAMPLES;
   }
 
-  memoCount = count;
-  memoShape = { bodyArc, height: halfWidth / INCH_ARCH_ASPECT, halfWidth, spacing, arcPitch, arcAt, groundAt };
-  return memoShape;
+  const shape = Object.assign(reusable ?? {}, { bodyArc, height: halfWidth / INCH_ARCH_ASPECT, halfWidth, spacing, arcPitch, arcAt, groundAt });
+  if (!reusable) { memoCount = count; memoShape = shape; }
+  return shape;
 }
 
 /** Body arc from the loop lattice's origin to lattice position `v`. */
@@ -321,4 +321,26 @@ export function inchHumpCount(count) {
   const shape = inchLoopShape(count);
   if (count < 2 || shape.arcPitch <= 0) return 0;
   return Math.max(1, Math.round(shape.bodyArc / shape.arcPitch));
+}
+
+/** Persistent render gait. A corner dwell or heal pause must hold the contraction,
+ * not expand the whole tail backwards. Only a new run resets it to a flat body.
+ */
+export function makeInchGaitState(count = 4) {
+  return { crawled: 0, phase: 0, move: 0, count, shape: {} };
+}
+
+export function advanceInchGaitState(state, crawled, count, delta, frozen = false) {
+  const reset = crawled < state.crawled;
+  const advance = Math.max(0, crawled - state.crawled);
+  state.crawled = crawled;
+  if (reset) { state.phase = 0; state.move = 0; state.count = count; }
+  if (!frozen) {
+    state.phase += advance;
+    if (advance > 0) state.move += (1 - state.move) * (1 - Math.exp(-Math.max(0, delta) * 6));
+    state.count += (count - state.count) * (1 - Math.exp(-Math.max(0, delta) * 5));
+    if (Math.abs(state.count - count) < 0.001) state.count = count;
+  }
+  state.shape = inchLoopShape(state.count, state.shape);
+  return state;
 }

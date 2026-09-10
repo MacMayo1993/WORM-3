@@ -4255,3 +4255,14 @@ textarea:focus-visible {
 @media (max-height: 560px) and (orientation: portrait) {
   .home-actions { max-height: calc(100dvh - 130px); overflow-y: auto; background: var(--bg-primary); }
 }
+
+/* The field guide is UI chrome, not a replacement for the menu's panorama. */
+.home-header { background: linear-gradient(rgba(245,240,232,.97), rgba(245,240,232,0)); }
+.home-wordmark { text-shadow: 0 1px 4px #fffdf2; }
+.home-heading { background: rgba(245,240,232,.92); border-radius: 20px; padding: 8px; max-width: 520px; margin: 0 auto; }
+.home-nav { background: rgba(245,240,232,.96); border: 1px solid #d6d0c8; border-radius: 16px; padding: 6px 0; }
+.home-feedback { color: #fffdf2; text-shadow: 0 1px 4px #1c2316, 0 1px 8px #1c2316; }
+@media (orientation: landscape) and (max-height: 600px), (orientation: portrait) and (max-height: 560px) {
+  .home-actions { background: rgba(245,240,232,.92); border-radius: 20px; }
+  .home-feedback { color: var(--text-secondary); text-shadow: none; }
+}

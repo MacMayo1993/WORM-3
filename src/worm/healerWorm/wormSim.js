@@ -135,6 +135,7 @@ export function makeWormSim(size) {
         // ── Core movement ──────────────────────────────────────────────────────
         pos: INITIAL_POS(size),
         moveDir: INITIAL_DIR,
+        crawlDistance: 0,
         phase: 'crawling',
         prevPhase: 'crawling',
         alive: true,
@@ -322,6 +323,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.restReadTiles.clear();
     sim.crossingCorner = false;
     sim.interpT = 1;
+    sim.crawlDistance = 0;
     sim.prevWorldPos = null;
     setCurWorldPosFromTile(sim, size);
     sim.headInterpPos.copy(sim.curWorldPos);
@@ -1158,7 +1160,15 @@ const PHASE_HANDLERS = {
 
             // Advance interpolation
             if (sim.interpT < 1) {
+                const before = sim.interpT;
                 sim.interpT = Math.min(1, sim.interpT + delta / STEP_SEC);
+                // The corner pivot holds position from .45 to .55; count only
+                // movement, and use the step being traversed, not the next tile.
+                const progress = t => t < 0.45 ? t / 0.9 : t <= 0.55 ? 0.5 : 0.5 + (t - 0.55) / 0.9;
+                const distance = sim.crossingCorner
+                    ? (progress(sim.interpT) - progress(before)) * CORNER_STEP_LENGTH
+                    : (sim.interpT - before) * (sim.prevWorldPos ? sim.prevWorldPos.distanceTo(sim.curWorldPos) : 0);
+                sim.crawlDistance += distance;
             }
 
             if (sim.pendingVoidKill?.armed) {

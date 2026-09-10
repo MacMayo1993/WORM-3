@@ -30,7 +30,7 @@ import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMateria
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
     PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-    BOOK_HEAD_RADIUS, BOOK_HEAD_LIFT, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
+    BOOK_HEAD_RADIUS, BOOK_HEAD_LIFT, BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
 import {
@@ -43,8 +43,8 @@ import {
     WINDOUT_SEGMENT_DT,
     windoutHeadS,
 } from './constants.js';
-import { inchGaitInto, inchLoopShape, inchCrawlAdvance, INCH_BALL_SPACING } from './inchGait.js';
-import { CORNER_STEP_LENGTH } from './wormSim.js';
+import { inchGaitInto, makeInchGaitState, advanceInchGaitState, INCH_BALL_SPACING } from './inchGait.js';
+import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto } from './bodySurface.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
@@ -132,6 +132,8 @@ const _bodySideVec = new THREE.Vector3();
 const _bodyRideAxis = new THREE.Vector3();
 const _bodyEffA = new THREE.Vector3();
 const _bodyEffB = new THREE.Vector3();
+const _normalA = new THREE.Vector3();
+const _normalB = new THREE.Vector3();
 // Camera-proximity cull while riding a wormhole: fully hidden inside CAM_CULL_HIDE
 // of the lens, back to full size by CAM_CULL_FULL. See the cull block in the
 // segment loop for why the camera ends up inside its own worm at all.
@@ -152,6 +154,9 @@ const _pathCursor = makeStepPathCursor();
 const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal, tx: -1, ty: -1, tz: -1 };
 
 export function WormBody({ worm, size }) {
+    const surface = useMemo(() => createBodySurface(), []);
+    const bookPages = useMemo(() => [createBookPageGeometry(1), createBookPageGeometry(-1)], []);
+    useEffect(() => () => bookPages.forEach(g => g.dispose()), [bookPages]);
     const meshRef = useRef();       // sphere body (classic / inch / glow)
     const boxMeshRef = useRef();    // box body (book worm only)
     const leftPageRef = useRef();   // book worm only — left page-stack overlay
@@ -209,17 +214,21 @@ export function WormBody({ worm, size }) {
     isPrismRef.current = isPrism;
     // Inch Worm gait state — the phase is the distance the head has actually crawled
     // along the surface, in world units (not wall-clock), because that is the unit
-    // inchGait.js pins its loops to the ground in. `move` eases 0..1 so the body lies
-    // back down when the worm stops.
-    const gaitPhaseRef = useRef(0);
-    const prevInterpTRef = useRef(0);
-    const gaitMoveRef = useRef(0);
+    // inchGait.js pins its loops to the ground in. Stops hold the contraction;
+    // flattening it would drag a long tail backwards.
+    const inchStateRef = useRef(null);
+    if (!inchStateRef.current) inchStateRef.current = makeInchGaitState();
+    const characterTimeRef = useRef(0);
     // Tracks the inputs that affect per-segment color so the instanced color buffer
     // is only rewritten on frames where something actually changed (orb pickup,
     // skin/character swap, or tail length change) instead of every frame.
     const prevColorStateRef = useRef({ epoch: -1, visibleCount: -1, baseColor: null, bellyCol: null, isGlow: null, isInch: null });
 
     useFrame((state, delta) => {
+        const frozen = useGameStore.getState().wormPaused || !useGameStore.getState().wormAlive;
+        const animationDelta = frozen ? 0 : delta;
+        characterTimeRef.current += animationDelta;
+        updateBodySurface(surface, size, liveRotation);
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
         _bodyHeadPos.copy(worm.headInterpPos.current);
         _bodyNormal.copy(worm.currentNormal.current);
@@ -261,8 +270,8 @@ export function WormBody({ worm, size }) {
                 if (_bookHeadDir.lengthSq() > 1e-10) {
                     _bookHeadDir.normalize();
                     if (prevHeadDirRef.current.lengthSq() > 0) {
-                        const rawTurn = turnSignalFromDirections(prevHeadDirRef.current, _bookHeadDir, _bodyNormal) * TURN_SIGNAL_GAIN;
-                        bookTurnRef.current = smoothTurn(bookTurnRef.current, THREE.MathUtils.clamp(rawTurn, -1, 1), delta);
+                        const rawTurn = turnSignalFromDirections(prevHeadDirRef.current, _bookHeadDir, _bodyNormal, delta) * TURN_SIGNAL_GAIN;
+                        bookTurnRef.current = smoothTurn(bookTurnRef.current, THREE.MathUtils.clamp(rawTurn, -1, 1), animationDelta);
                     }
                     prevHeadDirRef.current.copy(_bookHeadDir);
                 }
@@ -296,7 +305,7 @@ export function WormBody({ worm, size }) {
 
         const tLen = worm.tailLength.current;
         const steps = worm.stepHistory.current;
-        const time = state.clock.getElapsedTime();
+        const time = characterTimeRef.current;
         updateWormSkinMaterialTime(skinMaterial, time);
 
         // Ambient skin FX (embers/bubbles/sparkle/...) hover just off the head,
@@ -311,32 +320,13 @@ export function WormBody({ worm, size }) {
         }
 
         // ── Inch Worm gait driver ──────────────────────────────────────────────
-        // How far the head crawled along the surface this frame — see inchCrawlAdvance
-        // in inchGait.js for why that is read off the simulation's own step progress
-        // rather than off how far headInterpPos moved.
-        const _interpNow = worm.interpT.current;
-        const _prevWP = worm.prevWorldPos.current;
-        // World length of the step in progress. A corner crossing routes out to a pivot
-        // vertex above the edge and back down onto the next face; anywhere else the head
-        // runs straight from one tile centre to the next.
-        const _stepLen = worm.crossingCorner.current || !_prevWP
-            ? CORNER_STEP_LENGTH
-            : _prevWP.distanceTo(worm.curWorldPos.current);
-        const _dCrawl = worm.phase.current === 'crawling'
-            ? inchCrawlAdvance(_interpNow, prevInterpTRef.current, _stepLen)
-            : 0;
-        prevInterpTRef.current = _interpNow;
-        const _moveTarget = _dCrawl > 0 ? 1 : 0;
-        gaitMoveRef.current += (_moveTarget - gaitMoveRef.current) * Math.min(1, delta * 6);
-        gaitPhaseRef.current += _dCrawl;
-        const _gaitMove = gaitMoveRef.current;
-        const _gaitPhase = gaitPhaseRef.current;
-        // Loop geometry for the current body length — see inchGait.js. Loops are pinned
-        // to world positions and the body pours through them, so the rear-up stays put
-        // like the beads climbing through the jump's stored arc. Both the width and the
-        // height of a loop come from the body's own length: a fresh worm gets one small
-        // loop scaled to itself, a grown one a train of them.
-        const _inchShape = _isInch ? inchLoopShape(Math.min(MAX_TAIL, tLen)) : null;
+        // Consume the simulation's accumulated surface travel, including tile commits.
+        // Slice rides and spawn bounces never advance this counter.
+        const gait = inchStateRef.current;
+        if (_isInch) advanceInchGaitState(gait, worm.crawlDistance.current, Math.min(MAX_TAIL, tLen), delta, frozen);
+        const _gaitMove = gait.move;
+        const _gaitPhase = gait.phase;
+        const _inchShape = _isInch ? gait.shape : null;
         const _humpHeight = _inchShape ? _inchShape.height : 0;
 
         // Walk the ring directly. Keep the existing reach cap, but avoid copying
@@ -444,9 +434,10 @@ export function WormBody({ worm, size }) {
         const prevCS = prevColorStateRef.current;
         // Prism cycles its hue continuously, so its color buffer must be rewritten every
         // frame; all other characters only recolor when an input actually changes.
-        const colorDirty = _isPrism || colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
+        const colorDirty = prevCS.mesh !== mesh || _transitCull || _isPrism || colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
             baseColor !== prevCS.baseColor || bellyCol !== prevCS.bellyCol || _isGlow !== prevCS.isGlow || _isInch !== prevCS.isInch;
         if (colorDirty) {
+            prevCS.mesh = mesh;
             prevCS.epoch = colorEpoch;
             prevCS.visibleCount = visibleCount;
             prevCS.baseColor = baseColor;
@@ -515,13 +506,10 @@ export function WormBody({ worm, size }) {
                         const t = distToNext > 0 ? (targetDist - cumulativeDist) / distToNext : 0;
                         // Use scratch vectors instead of .clone() to avoid GC pressure
                         _bodyClonePos.lerpVectors(aPos, bPos, t);
-                        _bodyCloneNormal.lerpVectors(ptA.normal, ptB.normal, t).normalize();
-                        // Keep the surface normal consistent with a ridden segment so the
-                        // wiggle/orientation track the rotating face rather than the old one.
-                        if (_ride && ptA.tx >= 0) {
-                            const nAng = liveLayerAngle(ptA.tx, ptA.ty, ptA.tz);
-                            if (nAng !== null) _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, nAng).normalize();
-                        }
+                        blendBodyNormalInto(_bodyCloneNormal, ptA.normal, ptB.normal, t, _bodyRideAxis,
+                            _ride && ptA.tx >= 0 ? liveLayerAngle(ptA.tx, ptA.ty, ptA.tz) : null,
+                            _ride && ptB.tx >= 0 ? liveLayerAngle(ptB.tx, ptB.ty, ptB.tz) : null,
+                            _normalA, _normalB);
 
                         // Calculate forward/side vector for the wiggle at this exact localized point
                         _bodySegForward.subVectors(aPos, bPos).normalize();
@@ -548,7 +536,12 @@ export function WormBody({ worm, size }) {
 
                 // If the track runs out (just spawned and moving), freeze at the last known point.
                 if (!foundPosition && pathPointCount > 0) {
-                    _bodyClonePos.copy(effPos((_fillCount > 0 ? shAt(steps, _fillCount - 1) : _headPathPoint), _bodyEffA));
+                    const last = _fillCount > 0 ? shAt(steps, _fillCount - 1) : _headPathPoint;
+                    _bodyClonePos.copy(effPos(last, _bodyEffA));
+                    _bodyCloneNormal.copy(last.normal);
+                    const angle = _ride && last.tx >= 0 ? liveLayerAngle(last.tx, last.ty, last.tz) : null;
+                    if (angle !== null) _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, angle);
+                    _bodySegForward.set(0, 0, 0);
                 }
 
                 // Funnel override: pull segments that have crossed the mouth onto the ribbon.
@@ -599,6 +592,9 @@ export function WormBody({ worm, size }) {
                     }
                 }
 
+                if (_phase === 'crawling' && foundPosition) {
+                    clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : 0.10, surface);
+                }
                 if (_isBook) {
                     // Book worm rides on top of the surface, lifted by its own
                     // height, instead of centered/embedded at the usual crawl
@@ -732,8 +728,8 @@ export function WormBody({ worm, size }) {
             // turn (bookTurnRef, computed above from the head's frame-to-
             // frame direction swing) — the whole stack banks together, layer
             // count giving the body its visible "many pages" height.
-            if (_isBook && i !== 0) {
-                const pageScale = _wormDummy.scale.x; // matches the cover's current (post transit/LOD) scale
+            if (_isBook && i !== 0 && i % BOOK_SEGMENT_STRIDE === 0) {
+                const pageScale = _wormDummy.scale.x * BOOK_PAGE_SCALE; // matches the cover's current (post transit/LOD) scale
                 // Hinge angles depend only on bookTurnRef, so they are the same for
                 // every segment — computed once above the loop instead of allocating
                 // a fresh {left,right} for each of up to MAX_TAIL segments per frame.
@@ -749,12 +745,7 @@ export function WormBody({ worm, size }) {
                         .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
                         .addScaledVector(_bookPageOffset, pageScale);
                     _pageDummy.quaternion.copy(_bookPageQuat);
-                    if (layer === PAGE_LAYER_COUNT - 1) {
-                        const flutter = time * 3.1 + i * 1.37;
-                        _pageDummy.position.addScaledVector(_bookY, pageScale * (0.12 + (Math.sin(flutter) * 0.5 + 0.5) * 0.24));
-                        _pageDummy.rotateX(Math.sin(flutter * 0.7) * 0.42);
-                        _pageDummy.rotateY(Math.cos(flutter) * 0.32);
-                    }
+
                     _pageDummy.scale.setScalar(pageScale);
                     _pageDummy.updateMatrix();
                     if (leftPageRef.current) leftPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
@@ -769,12 +760,7 @@ export function WormBody({ worm, size }) {
                         .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
                         .addScaledVector(_bookPageOffset, pageScale);
                     _pageDummy.quaternion.copy(_bookPageQuat);
-                    if (layer === PAGE_LAYER_COUNT - 1) {
-                        const flutter = time * 3.1 + i * 1.37;
-                        _pageDummy.position.addScaledVector(_bookY, pageScale * (0.1 + (Math.cos(flutter) * 0.5 + 0.5) * 0.22));
-                        _pageDummy.rotateX(-Math.sin(flutter * 0.8) * 0.38);
-                        _pageDummy.rotateY(-Math.cos(flutter * 0.9) * 0.3);
-                    }
+
                     _pageDummy.scale.setScalar(pageScale);
                     _pageDummy.updateMatrix();
                     if (rightPageRef.current) rightPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
@@ -782,7 +768,7 @@ export function WormBody({ worm, size }) {
 
                 if (colorDirty) {
                     for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
-                        _bookPageColor.set(PAGE_COLORS[layer % PAGE_COLORS.length]);
+                        _bookPageColor.set(layer === 0 ? baseColor : PAGE_COLORS[layer % PAGE_COLORS.length]);
                         if (leftPageRef.current) leftPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
                         if (rightPageRef.current) rightPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
                     }
@@ -832,7 +818,7 @@ export function WormBody({ worm, size }) {
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
                 {/* Thin spine/binding — the pages (below) are the visible body now, not a
                     flat square slab the pages ride on top of. */}
-                <boxGeometry args={[SPINE_X_SCALE, 0.68, 1.12]} />
+                <boxGeometry args={SPINE_GEO_ARGS} />
                 <meshStandardMaterial
                     color="white"
                     emissive="white"
@@ -842,11 +828,11 @@ export function WormBody({ worm, size }) {
                 />
             </instancedMesh>
             <instancedMesh ref={leftPageRef} args={[undefined, undefined, MAX_TAIL * PAGE_LAYER_COUNT]} frustumCulled={false}>
-                <boxGeometry args={PAGE_GEO_ARGS} />
+                <primitive object={bookPages[0]} attach="geometry" />
                 <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
             </instancedMesh>
             <instancedMesh ref={rightPageRef} args={[undefined, undefined, MAX_TAIL * PAGE_LAYER_COUNT]} frustumCulled={false}>
-                <boxGeometry args={PAGE_GEO_ARGS} />
+                <primitive object={bookPages[1]} attach="geometry" />
                 <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
             </instancedMesh>
             {/* Round head orb — the same sphere the other worms wear, so the
