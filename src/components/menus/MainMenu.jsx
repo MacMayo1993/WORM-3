@@ -1,3 +1,4 @@
+import CarouselWorm from './CarouselWorm.jsx';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Edges, Text } from '@react-three/drei';
@@ -1236,7 +1237,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     const fn = (e) => {
       if (e.key === 'ArrowLeft') navigate(-1);
       if (e.key === 'ArrowRight') navigate(1);
-      if (e.key === 'Enter') handlePlay();
+      if (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a, input, select, textarea'))) handlePlay();
       if (e.key === 'Escape') onBack();
     };
     window.addEventListener('keydown', fn);
@@ -1309,9 +1310,22 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         pointerEvents: diving ? 'none' : 'auto',
       }}>
 
-        <p style={{ margin: '0 0 6px', fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: PAPER_TEXT, fontFamily: UI_FONT, background: PAPER_SHEET, border: `1px solid ${PAPER_BORDER}`, borderRadius: '100px', padding: '8px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: 'min(560px, 100%)', minHeight: 48 }}>
+            <button
+              type="button" className="mc-pill" onClick={onBack}
+              style={{
+                background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
+                borderRadius: '100px', padding: '8px 18px',
+                color: PAPER_TEXT, fontSize: '11.5px', fontWeight: 700,
+                letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
+                transition: 'filter 160ms ease, background 160ms ease',
+                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+              }}
+            >Back</button>
+        <p style={{ margin: 0, fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: PAPER_TEXT, fontFamily: UI_FONT, background: PAPER_SHEET, border: `1px solid ${PAPER_BORDER}`, borderRadius: '100px', padding: '8px 16px' }}>
           Choose your mode
         </p>
+        </div>
 
         {/* Cube window — transparent stage for the live 3D cube behind this
             overlay. Swipe here (or use the arrows) to rotate the cube from
@@ -1388,8 +1402,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div style={{ width: 'min(400px, 94vw)', marginTop: '12px' }}>
+        {/* Bottom action area grows into the available space on tall phones. */}
+        <div style={{ width: 'min(400px, 94vw)', marginTop: 'auto', paddingTop: 12 }}>
+          <CarouselWorm disabled={diving} />
           <button
             type="button" className="mc-play" onClick={handlePlay}
             style={{
@@ -1404,21 +1419,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             }}
           >{mode.cta || 'PLAY'}</button>
 
-          {/* Paper utility actions keep their labels readable over every panorama. */}
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
 
-            <button
-              type="button" className="mc-pill" onClick={onBack}
-              style={{
-                background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
-                borderRadius: '100px', padding: '8px 18px',
-                color: PAPER_TEXT, fontSize: '11.5px', fontWeight: 700,
-                letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
-                transition: 'filter 160ms ease, background 160ms ease',
-                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-              }}
-            >Back</button>
-          </div>
         </div>
 
       </div>
