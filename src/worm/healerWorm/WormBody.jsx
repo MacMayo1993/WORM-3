@@ -179,6 +179,7 @@ export function WormBody({ worm, size }) {
     const isBook = wormCharacter.id === 'book';
     const isWiggle = wormCharacter.id === 'wiggle';
     const isPrism = wormCharacter.id === 'prism';
+    const isMobi = wormCharacter.id === 'mobi';
     const skin = getSkin(wormSkinId);
     const wormColor = skin.body;
     const bellyColor = skin.belly;
@@ -475,7 +476,7 @@ export function WormBody({ worm, size }) {
                 _wormDummy.scale.setScalar(0.092);
                 // Book Worm draws its head as the orb above, so the spine box
                 // must not also be drawn here — two heads, one inside the other.
-                if (_isBook) _wormDummy.scale.setScalar(0.00001);
+                if (_isBook || isMobi) _wormDummy.scale.setScalar(0.00001);
             } else {
                 // Inch Worm: loops planted on the ground with the body pouring through
                 // them. `dist` is where along the path this segment sits and `arch` is how
@@ -610,7 +611,7 @@ export function WormBody({ worm, size }) {
                 // (tunnel/wind own their path).
                 if (orbitT > 0 && !_bodyTransit) rocketOrbitInto(_bodyClonePos, size, orbitT);
                 _wormDummy.position.copy(_bodyClonePos);
-                if (_isBook) {
+                if (_isBook || isMobi) {
                     // Orient the cover to face the direction of travel, using the same
                     // lookAt convention CrawlerCharacter.jsx uses (local -Z = forward),
                     // so the page-flap hinge math below (wormBookFX.js) matches exactly.
@@ -856,13 +857,14 @@ export function WormBody({ worm, size }) {
            so any non-white material color taints every orb pickup color. */
         <>
             <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-                <sphereGeometry args={[1, 16, 16]} />
+                {isMobi ? <boxGeometry args={[1.12, 1.12, 1.12]} /> : <sphereGeometry args={[1, 16, 16]} />}
                 {/* Wet-slime clearcoat is just the "slime" skin's starting point now —
                     the skin's own FX profile (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + body-surface displacement) drives this
                     material instead. color MUST stay white so the per-instance orb
                     colours (setColorAt) pass through untinted. */}
-                <primitive object={skinMaterial} attach="material" />
+                {isMobi ? <meshPhysicalMaterial color="white" roughness={0.15} clearcoat={1} iridescence={1} transparent opacity={0.65} />
+                    : <primitive object={skinMaterial} attach="material" />}
             </instancedMesh>
             {isGlow && (
                 <instancedMesh

@@ -7,6 +7,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_NORMALS } from './crawlerPhysics.js';
 import { useGameStore } from '../hooks/useGameStore.js';
+import MobiModel from './MobiModel.jsx';
 import WormHat3D from './wormCosmetics.jsx';
 import { MOUTH_ARC } from './wormFaceLayout.js';
 import { getSkin } from './wormCosmeticsData.js';
@@ -86,6 +87,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const isBook = wormCharacter.id === 'book';
   const isWiggle = wormCharacter.id === 'wiggle';
   const isPrism = wormCharacter.id === 'prism';
+  const isMobi = wormCharacter.id === 'mobi';
   const segmentOffsets = isInch ? [0, -0.18, -0.38] : [0, -0.28, -0.52, -0.73];
   const historyStep = isInch ? 11 : HISTORY_STEP;
 
@@ -393,8 +395,9 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
           return (
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble + bookRaise, zOff]}>
-              <mesh scale={[segScale * breathe * stretch, segScale * breathe * (isBook && !isHead ? 0.78 : 1), segScale * (isBook && !isHead ? 1.15 : 1)]}>
-                {isBook && !isHead ? <boxGeometry args={SPINE_GEO_ARGS} /> : <sphereGeometry args={[1, 12, 12]} />}
+              {isMobi && isHead && <MobiModel radius={segScale} orbCount={orbCount} alive={alive} />}
+              <mesh visible={!(isMobi && isHead)} scale={[segScale * breathe * stretch, segScale * breathe * (isBook && !isHead ? 0.78 : 1), segScale * (isBook && !isHead ? 1.15 : 1)]}>
+                {isMobi ? <boxGeometry args={[1.12, 1.12, 1.12]} /> : isBook && !isHead ? <boxGeometry args={SPINE_GEO_ARGS} /> : <sphereGeometry args={[1, 12, 12]} />}
                 {/* Skin-themed material (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + surface displacement) drives the PBR
                     look; only color/emissive and the glow-worm's alternating
@@ -405,8 +408,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   color={segColor}
                   emissive={segColor}
                   {...(isGlow ? { emissiveIntensity: isHead ? 2.4 : 1.6 } : {})}
-                  transparent={!alive}
-                  opacity={opacity}
+                  transparent={isMobi || !alive}
+                  opacity={isMobi ? opacity * 0.65 : opacity}
                 />
               </mesh>
               {isHead && (
@@ -450,7 +453,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                 </>
               )}
               {/* Tiny legs on body segments — inch worm only has prolegs at the very back */}
-              {!isHead && !isGlow && !(isInch && i < segmentOffsets.length - 1) && (
+              {!isMobi && !isHead && !isGlow && !(isInch && i < segmentOffsets.length - 1) && (
                 <>
                   <mesh position={[segScale * 0.8, -segScale * 0.5, 0]}
                     rotation={[0, 0, Math.sin(t * 8 + i) * 0.4]}>
@@ -474,7 +477,10 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
               )}
 
               {/* ── Head-only: hat, eyes, mouth, glasses, antennae ── */}
-              {isHead && (
+              {isMobi && isHead && <group position={[0, segScale * 1.1, 0]}>
+                <WormHat3D type={wormHatId} scale={segScale * 0.78} />
+              </group>}
+              {isHead && !isMobi && (
                 <>
                   {/* Hat on top of head */}
                   <group position={[0, segScale, 0]}>
@@ -583,7 +589,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
         })}
 
         {/* Connector cylinders — bridge gaps between body spheres, making the worm continuous */}
-        {segmentOffsets.slice(0, -1).map((_, ci) => {
+        {!isMobi && segmentOffsets.slice(0, -1).map((_, ci) => {
           // Radius ≈ average of the two adjacent segment scales × 0.92 (slightly narrower than spheres)
           const rA = isInch ? (ci === 0 ? 0.24 : 0.17) : (ci === 0 ? 0.28 : 0.24 - ci * 0.02);
           const rB = isInch ? (ci === 0 ? 0.17 : 0.15) : (0.24 - (ci + 1) * 0.02);
@@ -615,7 +621,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
         )}
 
         {/* Glow halo */}
-        {alive && (
+        {alive && !isMobi && (
           <mesh>
             <sphereGeometry args={[isGlow ? 0.82 : 0.45, 16, 16]} />
             <meshBasicMaterial

@@ -3,6 +3,14 @@
 
 export const WORM_CHARACTERS = [
   {
+    id: 'mobi',
+    label: 'MOBI',
+    type: 'Intelligence Unit',
+    subtitle: 'Multi Orientable Block Intelligence',
+    stats: { speed: 55, healing: 60, agility: 65, glow: 45 },
+    special: 'Parity Core — a living parity core turns inside a transparent cube body',
+  },
+  {
     id: 'classic',
     label: 'Classic',
     type: 'Ranger',
@@ -53,5 +61,5 @@ export const WORM_CHARACTERS = [
 ];
 
 export function getWormCharacter(id) {
-  return WORM_CHARACTERS.find(c => c.id === id) ?? WORM_CHARACTERS[0];
+  return WORM_CHARACTERS.find(c => c.id === id) ?? WORM_CHARACTERS.find(c => c.id === 'classic');
 }
