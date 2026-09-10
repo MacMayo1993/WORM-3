@@ -1,6 +1,7 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { WORM_CHARACTERS } from '../worm/wormCharacterData.js';
 import CarouselWorm from '../components/menus/CarouselWorm.jsx';
 
 vi.mock('../hooks/useGameStore.js', () => ({ useGameStore: selector => selector({ wormCharacter: 'book', wormSkin: 'lava', wormHat: 'crown' }) }));
@@ -13,23 +14,26 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
-it('shows the equipped worm and responds to a tap without launching a mode', () => {
+it('shows every character and only makes the tapped worm hop', () => {
   act(() => root.render(<CarouselWorm />));
-  const preview = host.querySelector('[data-character]');
+  expect([...host.querySelectorAll('[data-character]')].map(p => p.dataset.character)).toEqual(WORM_CHARACTERS.map(c => c.id));
+  const preview = host.querySelector('[data-character=book]');
   expect(preview.dataset).toMatchObject({ character: 'book', skin: 'lava', hat: 'crown' });
-  act(() => host.querySelector('button').click());
-  expect(host.querySelector('.carousel-worm-jump').dataset.jumping).toBe('true');
-  expect(host.textContent).not.toContain('Tap to hop');
-  act(() => host.querySelector('.carousel-worm-jump').dispatchEvent(new Event('animationend', { bubbles: true })));
-  expect(host.querySelector('.carousel-worm-jump').dataset.jumping).toBe('false');
+  const button = preview.closest('button');
+  act(() => button.click());
+  expect(host.querySelectorAll('[data-jumping=true].carousel-worm-jump')).toHaveLength(1);
+  expect(button.querySelector('.carousel-worm-jump').dataset.jumping).toBe('true');
+  expect(host.textContent).not.toContain('Tap a worm to hop');
+  act(() => button.querySelector('.carousel-worm-jump').dispatchEvent(new Event('animationend', { bubbles: true })));
+  expect(button.querySelector('.carousel-worm-jump').dataset.jumping).toBe('false');
 });
 it('acknowledges reduced-motion taps without animating, and disables interaction during launch', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   act(() => root.render(<CarouselWorm />));
-  expect(host.querySelector('[data-animated]').dataset.animated).toBe('false');
+  expect([...host.querySelectorAll('[data-animated]')].every(p => p.dataset.animated === 'false')).toBe(true);
   act(() => host.querySelector('button').click());
   expect(host.textContent).toContain('Hello!');
   expect(host.querySelector('.carousel-worm-jump').dataset.jumping).toBe('false');
   act(() => root.render(<CarouselWorm disabled />));
-  expect(host.querySelector('button').disabled).toBe(true);
+  expect([...host.querySelectorAll('button')].every(button => button.disabled)).toBe(true);
 });
