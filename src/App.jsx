@@ -6,13 +6,11 @@
  * Original 2343 lines reduced to ~700 lines with modular architecture.
  */
 
-import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import SafeEnvironment from './3d/SafeEnvironment.jsx';
-import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
-import { BlendFunction } from 'postprocessing';
-import { Vector2 } from 'three';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import './App.css';
 
 // Utils
@@ -88,7 +86,6 @@ const ModeCarousel = React.lazy(() =>
 import { useTeachMode } from './teach/useTeachMode.js';
 import { isMobile } from './utils/device.js';
 import { preloadAppAssets } from './utils/preloadAssets.js';
-import { GREEN_SHOW_START, FULL_FLIP_START, EXPLOSION_START, EXPLOSION_END, IMPLODE_START, IMPLODE_END } from './components/intro/introTiming.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
@@ -102,11 +99,6 @@ import {
 } from './components/screens/DemoFlowController.jsx';
 
 
-const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
-const _ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
-const _prog = (t, s, e) => _clamp((t - s) / (e - s));
-const _chromaticVec = new Vector2(0, 0);
-
 // The shared Canvas camera's resting FOV. Modes that reframe the camera restore
 // this; CameraManager re-applies it on every screen transition.
 const DEFAULT_CAMERA_FOV = 40;
@@ -117,70 +109,35 @@ const DEFAULT_CAMERA_FOV = 40;
  * Unmounting is avoided by conditionally hiding it (never fully unmounting the Canvas).
  */
 function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode = false }) {
-  const bloomIntensity = useMemo(() => {
-    const base = reducedMotion ? 0.25 : 0.6;
-
-    // All-manifold grid-line flash: +33 % bloom bell-curve from GREEN_SHOW+0.4
-    // through FULL_FLIP_START (the window when all face-pair seams light up).
-    const GRID_FLASH_START = GREEN_SHOW_START + 0.4; // ≈ 5.2 s
-    const GRID_FLASH_END   = FULL_FLIP_START;         // 6.5 s
-    const gridFlash =
-      time >= GRID_FLASH_START && time < GRID_FLASH_END
-        ? Math.sin(_prog(time, GRID_FLASH_START, GRID_FLASH_END) * Math.PI) * (base * 0.33)
-        : 0;
-
-    if (time < EXPLOSION_START) return base + gridFlash;
-    if (time < EXPLOSION_END) return base + _ease(_prog(time, EXPLOSION_START, EXPLOSION_END)) * (reducedMotion ? 0.9 : 2.4);
-    if (time < IMPLODE_START) return reducedMotion ? 1.1 : 3.0;
-    if (time < IMPLODE_END) return (reducedMotion ? 1.1 : 3.0) - _ease(_prog(time, IMPLODE_START, IMPLODE_END)) * (reducedMotion ? 0.7 : 2.2);
-    return reducedMotion ? 0.3 : 0.8;
-  }, [time, reducedMotion]);
-
-  const chromaticOffset = useMemo(() => {
-    let mag = 0;
-    if (time >= EXPLOSION_START && time < EXPLOSION_START + 0.4) {
-      mag = _ease(_prog(time, EXPLOSION_START, EXPLOSION_START + 0.4)) * (reducedMotion ? 0.0015 : 0.008);
-    } else if (time >= EXPLOSION_START + 0.4 && time < EXPLOSION_START + 1.8) {
-      mag = _ease(1 - _prog(time, EXPLOSION_START + 0.4, EXPLOSION_START + 1.8)) * (reducedMotion ? 0.001 : 0.005);
-    }
-    _chromaticVec.set(mag, mag * 0.4);
-    return _chromaticVec;
-  }, [time, reducedMotion]);
-
   return (
     <>
-      <color attach="background" args={['#05050f']} />
+      <color attach="background" args={['#17291f']} />
       <ambientLight intensity={1.0} />
       <pointLight position={[10, 10, 10]} intensity={2.2} />
       <pointLight position={[-10, -10, -10]} intensity={1.6} />
       <pointLight position={[-6, 2, 8]} intensity={1.4} color="#4a7ccc" />
       <pointLight position={[5, -4, -6]} intensity={0.8} color="#2a4a8a" />
-      {/* Volumetric nebula backdrop shared with the main menu. */}
+      {/* Slow atmospheric backdrop; static when reduced motion is requested. */}
       <NebulaEnvironment
         variant="intro"
-        speed={reducedMotion ? 0.25 : 0.7}
-        density={performanceMode ? 0.65 : 1}
+        speed={reducedMotion ? 0 : 0.18}
+        density={performanceMode ? 0.35 : 0.5}
         structure={0.9}
         performanceMode={performanceMode}
       />
-      <IntroScene time={time} onComplete={onComplete} />
+      <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} />
       <SafeEnvironment preset="city" />
       {!performanceMode && (
         <EffectComposer>
           <Bloom
-            intensity={bloomIntensity}
-            luminanceThreshold={0.15}
+            intensity={0.35}
+            luminanceThreshold={0.85}
             luminanceSmoothing={0.85}
             mipmapBlur
           />
-          <ChromaticAberration
-            offset={chromaticOffset}
-            blendFunction={BlendFunction.NORMAL}
-          />
           <Vignette
             offset={0.35}
-            darkness={0.75}
-            blendFunction={BlendFunction.NORMAL}
+            darkness={0.35}
           />
         </EffectComposer>
       )}
@@ -705,14 +662,22 @@ export default function WORM3() {
   // ========================================================================
   useEffect(() => {
     if (!showWelcome) return;
-    const start = performance.now();
+    let previous = performance.now();
+    let elapsed = 0;
     let raf;
+    const resetTick = () => { previous = performance.now(); };
+    document.addEventListener('visibilitychange', resetTick);
     const tick = (now) => {
-      setIntroTime((now - start) / 1000);
+      if (!document.hidden) elapsed += Math.min(0.1, Math.max(0, (now - previous) / 1000));
+      previous = now;
+      setIntroTime(elapsed);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', resetTick);
+    };
   }, [showWelcome]);
 
   // ========================================================================
@@ -1568,7 +1533,7 @@ export default function WORM3() {
 
       {/* Welcome DOM overlay — transparent background, Canvas shows through */}
       {showWelcome && (
-        <WelcomeScreen onEnter={handleWelcomeComplete} introTime={introTime} />
+        <WelcomeScreen onEnter={handleWelcomeComplete} introTime={introTime} reducedMotion={prefersReducedMotion} />
       )}
 
       {!showWelcome && (
