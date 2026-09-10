@@ -485,6 +485,18 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         rotationClock.warning = warningProgressRef.current;
         rotationClock.axis = pendingRotRef.current?.axis ?? null;
         rotationClock.sliceIndex = pendingRotRef.current?.sliceIndex ?? null;
+        // Publish every plane the armed move turns, not just the anchor — the safe
+        // lane has to exclude all of them. Copied in place: the sim reads this every
+        // respawn and the pending move object is a ref the queue reuses.
+        {
+            const _si = rotationClock.sliceIndices;
+            const _pending = pendingRotRef.current;
+            const _layers = _pending?.sliceIndices?.length
+                ? _pending.sliceIndices
+                : (typeof _pending?.sliceIndex === 'number' ? [_pending.sliceIndex] : []);
+            _si.length = _layers.length;
+            for (let i = 0; i < _layers.length; i++) _si[i] = _layers[i];
+        }
 
         // Fire rotation at the fixed 10-second mark
         if (autoTimerRef.current >= ACTIVE_ROTATE_INTERVAL && pendingRotRef.current) {

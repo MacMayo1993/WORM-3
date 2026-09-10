@@ -10,7 +10,11 @@ export const rotationClock = {
   warning: 0,         // 0→1 through the final telegraph window
   held: false,        // the countdown is paused (tunnel transit, focus beat)
   axis: null,         // 'col' | 'row' | 'depth' — which way the layer turns
-  sliceIndex: null
+  sliceIndex: null,   // the anchor plane, for consumers that want one number
+  // Every plane the armed move will turn. A hazard turn spins two at once, and the
+  // safe-lane pick has to exclude both — the anchor alone would advertise a lane
+  // that is about to rotate. Mutated in place like the rest of this bridge.
+  sliceIndices: []
 };
 
 export function resetRotationClock() {
@@ -21,4 +25,5 @@ export function resetRotationClock() {
   rotationClock.held = false;
   rotationClock.axis = null;
   rotationClock.sliceIndex = null;
+  rotationClock.sliceIndices.length = 0;
 }

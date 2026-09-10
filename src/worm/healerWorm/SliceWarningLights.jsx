@@ -23,6 +23,8 @@ import LayerHighlight from '../../teach/LayerHighlight.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getSkin } from '../wormCosmeticsData.js';
 import { fxBudget } from './fxBudget.js';
+import { chooseSafeLane } from './safeLane.js';
+import { SAFE_LANE_MAX_SIZE } from './constants.js';
 
 // Which tier this board's warning runs at is the fx budget's call, not this
 // file's — see fxBudget.js for why Mega gives the spectacle up.
@@ -39,6 +41,27 @@ const PEAK_ALPHA = 1.9;
 const RIM_GAIN = 2.1;
 const RIM_GAIN_LITE = 2.6;
 
+// ─── Safe lane ────────────────────────────────────────────────────────────────
+// The gold rim answers "where is the danger". On a 2x2 or 3x3 that is not enough:
+// a turn catches any given tile with probability 1/N, so half the 2x2 is about to
+// move, and the player needs the other half pointed out while there is still time
+// to run for it. The complement of a slice is an awkward shape, but any OTHER
+// slice on the same axis is entirely safe and is itself a slice — so the same
+// LayerHighlight draws it, with no new geometry. See safeLane.js.
+//
+// A fixed cool cyan, deliberately not the worm's colour: the hazard rim is already
+// tinted with the equipped skin, and on a green skin a green safe lane would read
+// as the same signal twice. Cyan is used nowhere else on the cube.
+const SAFE_COLOR = '#3fe0d0';
+// Dimmer than the hazard at both ends, and it brightens on the same ramp so the
+// two rims read as one sentence — "not here, there" — getting more urgent together.
+// It never pulses; the beat belongs to the threat.
+const SAFE_IDLE_ALPHA = 0.22;
+const SAFE_PEAK_ALPHA = 0.7;
+// A thin rim, well under the hazard's. The safe lane is an invitation, not an alarm,
+// and it must not compete with the gold for the player's eye.
+const SAFE_RIM_GAIN = 1.0;
+
 export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) {
     // Tint the turn warning with the worm the player is actually looking at — its body
     // colour comes from the equipped skin (getSkin(...).body), the same source WormBody
@@ -52,6 +75,8 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
     const lastKeyRef = useRef(null);
     // Live alpha, handed to every LayerHighlight below and written once a frame.
     const alphaRef = useRef(IDLE_ALPHA);
+    // The safe lane's own alpha — same ramp, lower range, no pulse.
+    const safeAlphaRef = useRef(SAFE_IDLE_ALPHA);
 
     useFrame((state) => {
         const p = pendingRotRef.current;
@@ -70,6 +95,7 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
         const ramp = w * w;
         const pulse = w > 0 ? 0.18 * w * Math.sin(state.clock.elapsedTime * 9.0) : 0;
         alphaRef.current = IDLE_ALPHA + (PEAK_ALPHA - IDLE_ALPHA) * ramp + pulse;
+        safeAlphaRef.current = SAFE_IDLE_ALPHA + (SAFE_PEAK_ALPHA - SAFE_IDLE_ALPHA) * ramp;
     });
 
     if (!pending) return null;
@@ -79,8 +105,27 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
     const indices = pending.sliceIndices?.length ? pending.sliceIndices : [pending.sliceIndex];
     const dirs = pending.sliceDirs?.length ? pending.sliceDirs : indices.map(() => pending.dir);
     const lite = fxBudget(size).warning === 'lite';
+    // Only the small boards get a lane drawn. Above SAFE_LANE_MAX_SIZE there is
+    // room to simply step off the gold, and a second full-slice rim would cost a
+    // draw over an already busy cube to say something the player can see anyway.
+    const safeLane = size <= SAFE_LANE_MAX_SIZE
+        ? chooseSafeLane(size, { axis: pending.axis, sliceIndex: pending.sliceIndex, sliceIndices: pending.sliceIndices })
+        : null;
     return (
         <>
+            {safeLane && (
+                <LayerHighlight
+                    key={`safe-${safeLane.sliceIndex}`}
+                    axis={safeLane.axis}
+                    sliceIndex={safeLane.sliceIndex}
+                    dir={dirs[0]}
+                    size={size}
+                    color={SAFE_COLOR}
+                    opacityRef={safeAlphaRef}
+                    gain={SAFE_RIM_GAIN}
+                    lite
+                />
+            )}
             {indices.map((sliceIndex, i) => (
                 <LayerHighlight
                     key={sliceIndex}
