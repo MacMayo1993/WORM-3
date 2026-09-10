@@ -3,15 +3,13 @@ import { INTRO_END, ramp, windowOpacity } from './introChoreography.js';
 import './intro.css';
 
 const BEATS = [
-  { start: 0.3, end: 3.1, eyebrow: 'A different kind of puzzle', text: 'What if…' },
-  { start: 3.2, end: 6.4, eyebrow: 'Turn your perspective', text: 'Front was back?' },
-  { start: 6.5, end: 9.8, eyebrow: 'Two sides. One connection.', text: 'What if opposite…' },
-  { start: 9.9, end: 13.6, eyebrow: 'Follow the worm', text: 'was the same place?' }
+  { start: 0.1, end: 2.2, eyebrow: 'Every tile has a twin', text: 'What if opposite…' },
+  { start: 2.3, end: 6.8, eyebrow: '27 pairs. One connected cube.', text: 'was the same place?' }
 ];
 
 export default function TextOverlay({ time, reducedMotion = false }) {
   const beat = BEATS.find(b => time >= b.start && time <= b.end);
-  const title = reducedMotion ? 1 : ramp(time, 13.7, 14.5);
+  const title = reducedMotion ? 1 : ramp(time, 6.9, 7.4);
   return (
     <>
       <div className="opening-edge" aria-hidden="true" />

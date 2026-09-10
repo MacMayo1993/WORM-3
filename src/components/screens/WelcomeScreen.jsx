@@ -46,7 +46,7 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
         Skip →
       </button>
 
-      {(introSeen || reducedMotion || introTime >= 14.2) && (
+      {(introSeen || reducedMotion || introTime >= 7.4) && (
         <button
           type="button"
           aria-label="Enter game"
