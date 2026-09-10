@@ -475,6 +475,7 @@ export function useWormCrawler(size, cubies) {
             activeTunnel: f('activeTunnel'),
             onFlippedTile: f('onFlippedTile'),
             interpT: f('interpT'),
+            crawlDistance: f('crawlDistance'),
             prevWorldPos: f('prevWorldPos'),
             curWorldPos: f('curWorldPos'),
             prevTile: f('prevTile'),

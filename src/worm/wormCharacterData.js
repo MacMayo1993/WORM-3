@@ -16,7 +16,7 @@ export const WORM_CHARACTERS = [
     type: 'Brute',
     subtitle: 'Accordion-style movement',
     stats: { speed: 30, healing: 85, agility: 35, glow: 10 },
-    special: 'Accordion Step — heals 2× on every third tile cleared',
+    special: 'Accordion Step — gathers into low arches as it crawls',
   },
   {
     id: 'glow',
@@ -24,15 +24,15 @@ export const WORM_CHARACTERS = [
     type: 'Scout',
     subtitle: 'Bioluminescent trail crawler',
     stats: { speed: 90, healing: 40, agility: 80, glow: 100 },
-    special: 'Bioluminescence — reveals hidden stickers on all adjacent faces',
+    special: 'Bioluminescence — lights nearby tiles and adds a glow to surface orbs',
   },
   {
     id: 'book',
     label: 'Book Worm',
     type: 'Sage',
-    subtitle: 'Scholar worm with specs',
+    subtitle: 'Open-book body with specs',
     stats: { speed: 40, healing: 75, agility: 50, glow: 15 },
-    special: "Scholar's Eye — highlights the most efficient heal path once per run",
+    special: "Page Turner — curved pages and a coloured binding bank gently into turns",
   },
   {
     id: 'wiggle',
@@ -40,7 +40,7 @@ export const WORM_CHARACTERS = [
     type: 'Dancer',
     subtitle: 'Hyper-flexible sidewinder',
     stats: { speed: 80, healing: 50, agility: 100, glow: 20 },
-    special: 'Sidewinder — body slithers in a wide snaking wave, the most agile crawler',
+    special: 'Sidewinder — a wide lateral wave follows the cube surface',
   },
   {
     id: 'prism',

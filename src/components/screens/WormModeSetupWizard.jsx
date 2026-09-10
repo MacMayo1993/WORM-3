@@ -106,7 +106,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           }
           subtitle={
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px',
               background: `${activeSkin.glow}28`, border: `1px solid ${activeSkin.glow}55`,
               color: activeSkin.glow, fontSize: TEXT_MICRO, fontWeight: 800,
               letterSpacing: '0.16em', textTransform: 'uppercase', padding: '3px 11px', borderRadius: '999px',
@@ -123,23 +123,23 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           {/* Signature trait */}
           <div style={{ alignSelf: 'stretch', display: 'flex', gap: '9px', alignItems: 'flex-start', paddingLeft: '2px', zIndex: 1 }}>
             <span style={{ color: activeSkin.glow, fontSize: '10px', lineHeight: 1.6, flexShrink: 0 }}>◆</span>
-            <span style={{ fontSize: '11px', color: NIGHT_TEXT_MUTED, lineHeight: 1.5 }}>
+            <span style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED, lineHeight: 1.5 }}>
               <span style={{ color: NIGHT_TEXT, fontWeight: 700 }}>{traitName}</span>
               {traitDetail ? ` — ${traitDetail}` : ''}
             </span>
           </div>
 
-          {/* Page dots */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', zIndex: 1 }}>
+          {/* Page dots: the marker stays small, the touch area does not. */}
+          <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', alignItems: 'center', zIndex: 1 }}>
             {WORM_CHARACTERS.map(c => (
-              <button key={c.id} onClick={() => setWormCharacter(c.id)} aria-label={c.label} style={{
-                width: c.id === wormCharacterId ? '22px' : '7px',
-                height: '7px', borderRadius: '4px',
-                background: c.id === wormCharacterId ? UI_CREAM : 'rgba(255,245,220,0.28)',
-                border: 'none', cursor: 'pointer', padding: 0,
-                transition: 'all 0.28s cubic-bezier(0.4,0,0.2,1)',
-                WebkitTapHighlightColor: 'transparent'
-              }} />
+              <button key={c.id} type="button" onClick={() => setWormCharacter(c.id)} aria-label={c.label} aria-pressed={c.id === wormCharacterId} style={{
+                width: 48, height: 48, borderRadius: 12, display: 'grid', placeItems: 'center',
+                background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}>
+                <span aria-hidden="true" style={{ width: c.id === wormCharacterId ? 22 : 7, height: 7, borderRadius: 4,
+                  background: c.id === wormCharacterId ? UI_CREAM : 'rgba(255,245,220,0.28)' }} />
+              </button>
             ))}
           </div>
         </SpecimenPlate>

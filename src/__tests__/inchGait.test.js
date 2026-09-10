@@ -16,6 +16,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   inchGaitInto,
+  makeInchGaitState,
+  advanceInchGaitState,
   inchLoopShape,
   inchHumpCount,
   inchCrawlAdvance,
@@ -367,5 +369,44 @@ describe('inchCrawlAdvance', () => {
       expect(out.arch).toBe(0);
       expect(out.dist).toBeCloseTo(i * INCH_BALL_SPACING, 10);
     }
+  });
+});
+
+
+describe('inch gait continuity in gameplay', () => {
+  it('holds a long tail still during corner dwells, heal pauses and explicit pause', () => {
+    const state = makeInchGaitState(400);
+    for (let frame = 1; frame <= 120; frame++) advanceInchGaitState(state, frame / 60, 400, 1 / 60);
+    const before = {};
+    inchGaitInto(before, 399, 400, state.phase, state.move, state.shape);
+    for (let frame = 0; frame < 60; frame++) advanceInchGaitState(state, 2, 400, 1 / 60, frame > 30);
+    const after = {};
+    inchGaitInto(after, 399, 400, state.phase, state.move, state.shape);
+    expect(after).toEqual(before);
+  });
+
+  it('eases an orb growth change without replacing the arc lookup buffers', () => {
+    const state = makeInchGaitState(9);
+    advanceInchGaitState(state, .5, 9, .1);
+    const shape = state.shape;
+    const arcAt = shape.arcAt;
+    advanceInchGaitState(state, .51, 12, 1 / 60);
+    expect(state.count).toBeGreaterThan(9);
+    expect(state.count).toBeLessThan(9.3);
+    expect(state.shape).toBe(shape);
+    expect(state.shape.arcAt).toBe(arcAt);
+    advanceInchGaitState(state, 0, 4, 1 / 60);
+    expect(state.move).toBe(0);
+    expect(state.phase).toBe(0);
+    expect(state.count).toBe(4);
+  });
+
+  it('keeps gameplay growth separate from the cached preview shape', () => {
+    const preview = inchLoopShape(9);
+    const height = preview.height;
+    const state = makeInchGaitState(9);
+    advanceInchGaitState(state, 1, 40, .1);
+    expect(state.shape).not.toBe(preview);
+    expect(inchLoopShape(9).height).toBe(height);
   });
 });

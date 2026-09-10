@@ -1,6 +1,6 @@
 # Mobile field-guide theme
 
-The home screen uses cream paper, ink headings and moss actions around the live cube. Settings and setup retain dark specimen surfaces, now drawn from the same warm NIGHT tokens as pause and results. Cosmetics and cube-face colours continue to identify game content.
+The home screen retains its rotating photo panorama behind the live cube, with cream paper, ink headings and moss actions on the controls. The paper theme does not replace the environment. Settings and setup retain dark specimen surfaces, now drawn from the same warm NIGHT tokens as pause and results. Cosmetics and cube-face colours continue to identify game content.
 
 `src/utils/uiTheme.js` owns semantic colours, fonts and action shadows. `UI_CSS_VARS` is installed by `main.jsx` so CSS screens receive the same values. Use `ActionButton` and `IconButton` for new controls; the shared target is 48 CSS pixels. Status accents should not replace the moss primary action.
 

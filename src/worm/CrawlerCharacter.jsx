@@ -16,7 +16,7 @@ import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMateria
 import WormSkinParticles from './WormSkinParticles.jsx';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
+  SPINE_GEO_ARGS, createBookPageGeometry, turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from './wormBookFX.js';
 
 const PAGE_LAYERS = Array.from({ length: PAGE_LAYER_COUNT }, (_, i) => i);
@@ -79,6 +79,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const BELLY_COLOR = skin.belly;
   const ANTENNA_COLOR = skin.antenna;
   const GLOW_COLOR = skin.glow;
+  const bookPages = useMemo(() => [createBookPageGeometry(1), createBookPageGeometry(-1)], []);
+  useEffect(() => () => bookPages.forEach(g => g.dispose()), [bookPages]);
   const isInch = wormCharacter.id === 'inch';
   const isGlow = wormCharacter.id === 'glow';
   const isBook = wormCharacter.id === 'book';
@@ -155,7 +157,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       _bookFwd.copy(forward).normalize();
       if (prevForwardRef.current.lengthSq() > 0) {
         const up = FACE_NORMALS[face] || _localUp;
-        const rawTurn = turnSignalFromDirections(prevForwardRef.current, _bookFwd, up) * 14;
+        const rawTurn = turnSignalFromDirections(prevForwardRef.current, _bookFwd, up, delta) * 14;
         bookTurnRef.current = smoothTurn(bookTurnRef.current, THREE.MathUtils.clamp(rawTurn, -1, 1), delta);
       }
       prevForwardRef.current.copy(_bookFwd);
@@ -170,16 +172,16 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
         if (lp) lp.rotation.z = left;
         if (rp) rp.rotation.z = right;
         const flutter = timeRef.current * 3.2 + i * 1.37;
-        const lift = 0.12 + (Math.sin(flutter) * 0.5 + 0.5) * 0.24;
+        const lift = PAGE_LAYER_GAP + (Math.sin(flutter) * 0.5 + 0.5) * 0.01;
         const looseLeft = leftLoosePageRefs.current[i];
         const looseRight = rightLoosePageRefs.current[i];
         if (looseLeft) {
           looseLeft.position.y = (PAGE_LAYER_COUNT - 1) * PAGE_LAYER_GAP + lift;
-          looseLeft.rotation.set(Math.sin(flutter * 0.7) * 0.42, Math.cos(flutter) * 0.32, Math.sin(flutter * 0.9) * 0.22);
+          looseLeft.rotation.set(0, 0, Math.sin(flutter) * 0.025);
         }
         if (looseRight) {
           looseRight.position.y = (PAGE_LAYER_COUNT - 1) * PAGE_LAYER_GAP + lift * 0.8;
-          looseRight.rotation.set(-Math.sin(flutter * 0.8) * 0.38, -Math.cos(flutter * 0.9) * 0.3, -Math.sin(flutter) * 0.2);
+          looseRight.rotation.set(0, 0, -Math.sin(flutter) * 0.025);
         }
       }
     }
@@ -392,7 +394,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
           return (
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble + bookRaise, zOff]}>
               <mesh scale={[segScale * breathe * stretch, segScale * breathe * (isBook && !isHead ? 0.78 : 1), segScale * (isBook && !isHead ? 1.15 : 1)]}>
-                {isBook && !isHead ? <boxGeometry args={[SPINE_X_SCALE, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
+                {isBook && !isHead ? <boxGeometry args={SPINE_GEO_ARGS} /> : <sphereGeometry args={[1, 12, 12]} />}
                 {/* Skin-themed material (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + surface displacement) drives the PBR
                     look; only color/emissive and the glow-worm's alternating
@@ -424,24 +426,24 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   <group ref={el => (leftPageRefs.current[i] = el)} scale={segScale} position={[PAGE_HINGE_X * segScale, segScale * PAGE_HINGE_Y, 0]}>
                     {PAGE_LAYERS.map(layer => (
                       <mesh key={layer} position={[PAGE_GEO_ARGS[0] / 2, layer * PAGE_LAYER_GAP, 0]}>
-                        <boxGeometry args={PAGE_GEO_ARGS} />
-                        <meshStandardMaterial color={PAGE_COLORS[layer % PAGE_COLORS.length]} roughness={0.9} metalness={0} />
+                        <primitive object={bookPages[0]} attach="geometry" />
+                        <meshStandardMaterial color={layer === 0 ? BODY_COLOR : PAGE_COLORS[layer % PAGE_COLORS.length]} roughness={0.9} metalness={0} />
                       </mesh>
                     ))}
                     <mesh ref={el => (leftLoosePageRefs.current[i] = el)} position={[PAGE_GEO_ARGS[0] / 2, PAGE_LAYER_COUNT * PAGE_LAYER_GAP, 0]}>
-                      <boxGeometry args={PAGE_GEO_ARGS} />
+                      <primitive object={bookPages[0]} attach="geometry" />
                       <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} />
                     </mesh>
                   </group>
                   <group ref={el => (rightPageRefs.current[i] = el)} scale={segScale} position={[-PAGE_HINGE_X * segScale, segScale * PAGE_HINGE_Y, 0]}>
                     {PAGE_LAYERS.map(layer => (
                       <mesh key={layer} position={[-PAGE_GEO_ARGS[0] / 2, layer * PAGE_LAYER_GAP, 0]}>
-                        <boxGeometry args={PAGE_GEO_ARGS} />
-                        <meshStandardMaterial color={PAGE_COLORS[layer % PAGE_COLORS.length]} roughness={0.9} metalness={0} />
+                        <primitive object={bookPages[1]} attach="geometry" />
+                        <meshStandardMaterial color={layer === 0 ? BODY_COLOR : PAGE_COLORS[layer % PAGE_COLORS.length]} roughness={0.9} metalness={0} />
                       </mesh>
                     ))}
                     <mesh ref={el => (rightLoosePageRefs.current[i] = el)} position={[-PAGE_GEO_ARGS[0] / 2, PAGE_LAYER_COUNT * PAGE_LAYER_GAP, 0]}>
-                      <boxGeometry args={PAGE_GEO_ARGS} />
+                      <primitive object={bookPages[1]} attach="geometry" />
                       <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} />
                     </mesh>
                   </group>

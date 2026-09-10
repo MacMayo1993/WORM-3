@@ -26,8 +26,10 @@ import { makeWormHaloSprite, HALO_SCALE } from '../worm/wormGlowHalo.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  SPINE_X_SCALE, pageHingeAngles,
+  BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, pageHingeAngles,
 } from '../worm/wormBookFX.js';
+
+import { inchGaitInto, inchLoopShape, INCH_BALL_SPACING } from '../worm/healerWorm/inchGait.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
 // Straight from healerWorm/WormBody.jsx and WormFace.jsx so the preview worm is
@@ -37,7 +39,8 @@ const BODY_SCALE = 0.09;
 const INCH_BODY_SCALE = 0.082;
 const BOOK_BODY_SCALE = [0.088, 0.055, 0.1];
 const SPACING = 0.09;
-const INCH_SPACING = 0.095;
+const INCH_SPACING = INCH_BALL_SPACING;
+const previewGait = { dist: 0, arch: 0 };
 const SEGMENTS = 9;          // head + 8 beads — a readable stretch of worm
 // Face features and the hat seat come from the shared layout (wormFaceLayout),
 // which is also what the played worm uses.
@@ -72,14 +75,15 @@ function _buildRig() {
   const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
   // Thin spine/binding — the pages (below) are the visible body now, not a
   // flat square slab the pages ride on top of.
-  const boxGeo = new THREE.BoxGeometry(SPINE_X_SCALE, 0.68, 1.12);
+  const boxGeo = new THREE.BoxGeometry(...SPINE_GEO_ARGS);
 
   // Book Worm's page flaps — same geometry/hinge recipe as WormBody.jsx /
   // CrawlerCharacter.jsx, posed manually per-frame in _poseWorm() (an idle
   // sway stands in for the turn-force signal, since the preview never turns).
   // PAGE_LAYER_COUNT thin layers per side per segment, so the stack reads as
   // multiple pages instead of one flat slab.
-  const pageGeo = new THREE.BoxGeometry(...PAGE_GEO_ARGS);
+  const pageGeo = createBookPageGeometry(1);
+  const rightPageGeo = createBookPageGeometry(-1);
 
   const beads = [];
   const boxes = [];
@@ -108,7 +112,7 @@ function _buildRig() {
     for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
       const paperColor = PAGE_COLORS[layer % PAGE_COLORS.length];
       const leftPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ color: paperColor, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
-      const rightPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ color: paperColor, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
+      const rightPage = new THREE.Mesh(rightPageGeo, new THREE.MeshStandardMaterial({ color: paperColor, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
       group.add(leftPage, rightPage);
       leftLayers.push(leftPage); rightLayers.push(rightPage);
     }
@@ -257,15 +261,15 @@ function _segmentOffset(i, character, time, out) {
   const wiggle = character === 'wiggle';
   const book = character === 'book';
   const spacing = inch ? INCH_SPACING : SPACING;
-  const d = i * spacing;
+  let d = i * spacing;
 
   let y = 0;
   let z = 0;
   if (inch) {
-    // Accordion hump, peaking mid-body and breathing in and out.
-    const arch = SEGMENTS > 1 ? Math.sin(Math.PI * (i / (SEGMENTS - 1))) : 0;
-    y = arch * 0.085 * (0.72 + 0.28 * Math.sin(time * 1.6));
-    z = Math.sin(d * 4 + time) * 0.008;
+    const shape = inchLoopShape(SEGMENTS);
+    inchGaitInto(previewGait, i, SEGMENTS, time * 0.35, 1, shape);
+    d = previewGait.dist;
+    y = previewGait.arch * shape.height;
   } else if (wiggle) {
     z = Math.sin(d * 13 - time * 2.2) * 0.055 * Math.min(1, i / 1.5);
     y = Math.sin(d * 9 - time * 2.2) * 0.006;
@@ -343,7 +347,7 @@ function _poseWorm(opts, time) {
     const shown = !headOnly || i <= 2;
     bead.visible = shown && !bookBodySeg;
     box.visible = shown && bookBodySeg;
-    const pagesShown = shown && bookBodySeg;
+    const pagesShown = shown && bookBodySeg && i % BOOK_SEGMENT_STRIDE === 0;
     for (const l of leftLayers) l.visible = pagesShown;
     for (const l of rightLayers) l.visible = pagesShown;
 
@@ -396,25 +400,21 @@ function _poseWorm(opts, time) {
       body.quaternion.copy(_pbQuat);
 
       const { left, right } = pageHingeAngles(0);
-      const pageScale = body.scale.x;
+      const pageScale = body.scale.x * BOOK_PAGE_SCALE;
 
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, left);
       _pbPageQuat.copy(_pbQuat).multiply(_pbHingeQuat);
       _pbPageOffset.set(PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_pbPageQuat);
       for (let layer = 0; layer < leftLayers.length; layer++) {
         const l = leftLayers[layer];
+        l.material.color.set(layer === 0 ? skin.body : PAGE_COLORS[layer % PAGE_COLORS.length]);
         l.position.copy(_off)
           .addScaledVector(_pbX, PAGE_HINGE_X * pageScale)
           .addScaledVector(_pbY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
           .addScaledVector(_pbPageOffset, pageScale);
         l.quaternion.copy(_pbPageQuat);
         l.scale.setScalar(pageScale);
-        if (layer === leftLayers.length - 1) {
-          const flutter = time * 3.1 + i * 1.37;
-          l.position.addScaledVector(_pbY, pageScale * (0.12 + (Math.sin(flutter) * 0.5 + 0.5) * 0.24));
-          l.rotateX(Math.sin(flutter * 0.7) * 0.42);
-          l.rotateY(Math.cos(flutter) * 0.32);
-        }
+
       }
 
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, right);
@@ -422,18 +422,14 @@ function _poseWorm(opts, time) {
       _pbPageOffset.set(-PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_pbPageQuat);
       for (let layer = 0; layer < rightLayers.length; layer++) {
         const r = rightLayers[layer];
+        r.material.color.set(layer === 0 ? skin.body : PAGE_COLORS[layer % PAGE_COLORS.length]);
         r.position.copy(_off)
           .addScaledVector(_pbX, -PAGE_HINGE_X * pageScale)
           .addScaledVector(_pbY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
           .addScaledVector(_pbPageOffset, pageScale);
         r.quaternion.copy(_pbPageQuat);
         r.scale.setScalar(pageScale);
-        if (layer === rightLayers.length - 1) {
-          const flutter = time * 3.1 + i * 1.37;
-          r.position.addScaledVector(_pbY, pageScale * (0.1 + (Math.cos(flutter) * 0.5 + 0.5) * 0.22));
-          r.rotateX(-Math.sin(flutter * 0.8) * 0.38);
-          r.rotateY(-Math.cos(flutter * 0.9) * 0.3);
-        }
+
       }
     } else if (isBook) {
       body.quaternion.identity();
