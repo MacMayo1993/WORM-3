@@ -533,3 +533,34 @@ describe('two-plane turn, detection through commit', () => {
     expect(sim.restReadTiles.has(staleKey)).toBe(false);
   });
 });
+
+
+describe('frozen corner tracking during a live rotation', () => {
+  for (const freeze of ['cutFocusT', 'healPauseT', 'elementalFocusT', 'paused']) {
+    it(`does not accumulate the slice angle while ${freeze} freezes the sim`, () => {
+      const sim = makeSim();
+      sim.pos = { x: 0, y: 2, z: 2, dirKey: 'PZ' };
+      sim.prevDirKey = 'PX';
+      sim.prevWorldPos = new THREE.Vector3(1.5, 1, 1);
+      sim.curWorldPos.set(1, 1, 1.5);
+      sim.crossingCorner = true;
+      sim.interpT = 0.5;
+      sim.restRead = null;
+      if (freeze !== 'paused') sim[freeze] = 2;
+      const ctx = makeCtx({ isPaused: () => freeze === 'paused' });
+      beginTurn('row', [0, 2], [1, -1], 0.5);
+      const worm = asWorm(sim);
+      stepWormSim(sim, 1 / 60, SIZE, ctx);
+      rideLiveRotation(worm);
+      const position = sim.headInterpPos.clone();
+      const normal = sim.currentNormal.clone();
+      for (let frame = 0; frame < 30; frame++) {
+        stepWormSim(sim, 1 / 60, SIZE, ctx);
+        rideLiveRotation(worm);
+        expect(sim.headInterpPos.distanceTo(position)).toBeLessThan(1e-9);
+        expect(sim.currentNormal.distanceTo(normal)).toBeLessThan(1e-9);
+      }
+      expect(sim.interpT).toBe(0.5);
+    });
+  }
+});
