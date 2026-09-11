@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { TrackballControls } from '@react-three/drei';
+import PuzzleOrbitControls from './PuzzleOrbitControls.jsx';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import Cubie from './Cubie.jsx';
@@ -631,7 +631,7 @@ const CubeAssembly = React.memo(({
 
   // Lock camera to Home Grip POV when hands mode is enabled
   useEffect(() => {
-    if (handsMode) {
+    if (handsMode && !wormHealerMode) {
       camera.position.set(0, 1.2, 10);
       camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
@@ -641,16 +641,10 @@ const CubeAssembly = React.memo(({
         controlsRef.current.reset();
       }
     }
-  }, [handsMode, camera]);
+  }, [handsMode, wormHealerMode, camera]);
 
-  // Flush TrackballControls internal state when worm mode activates so its
-  // damping momentum doesn't fight the WormChaseCamera on the first frames.
-  useEffect(() => {
-    if (wormHealerMode && controlsRef.current) {
-      controlsRef.current.target.set(0, 0, 0);
-      controlsRef.current.reset();
-    }
-  }, [wormHealerMode]);
+  // PuzzleOrbitControls unmounts while chase mode owns the camera. Pointer
+  // cleanup must never be able to reactivate a dormant orbit controller.
 
   // Programmatic camera orbit for mobile view-rotation buttons.
   // Rotates the camera position 45° around the world Y axis so the user can
@@ -1277,8 +1271,9 @@ const CubeAssembly = React.memo(({
             />
           )}
           {/* DragGuide removed - real-time cube rotation provides visual feedback */}
-          <TrackballControls
-            ref={controlsRef}
+          <PuzzleOrbitControls
+            chaseActive={wormHealerMode}
+            controlsRef={controlsRef}
             noPan={true}
             noZoom={handsMode && explosionFactor === 0}
             noRotate={handsMode ? true : false}
