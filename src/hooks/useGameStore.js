@@ -31,6 +31,7 @@ import {
   PARITY_POINTS_KEY,
   OWNED_ITEMS_KEY,
   BET_STREAK_KEY,
+  MODE_PLAYS_KEY,
 } from './storeSlices/index.js';
 
 export { MAX_UNDO_HISTORY } from './storeSlices/sessionDefaults.js';
@@ -120,3 +121,4 @@ useGameStore.subscribe(
 useGameStore.subscribe((state) => state.parityPoints, persist(PARITY_POINTS_KEY));
 useGameStore.subscribe((state) => state.ownedItems, persist(OWNED_ITEMS_KEY, JSON.stringify));
 useGameStore.subscribe((state) => state.betStreak, persist(BET_STREAK_KEY));
+useGameStore.subscribe((state) => state.modePlays, persist(MODE_PLAYS_KEY, JSON.stringify));

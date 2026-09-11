@@ -21,5 +21,5 @@ export { createUiSlice } from './uiSlice.js';
 export { createModesSlice } from './modesSlice.js';
 export { createSettingsSlice } from './settingsSlice.js';
 
-export { persistedState, SETTINGS_STORAGE_KEY, SETTINGS_VERSION_KEY, CURRENT_SETTINGS_VERSION, PARITY_POINTS_KEY, OWNED_ITEMS_KEY, BET_STREAK_KEY } from './persistedState.js';
+export { persistedState, SETTINGS_STORAGE_KEY, SETTINGS_VERSION_KEY, CURRENT_SETTINGS_VERSION, PARITY_POINTS_KEY, OWNED_ITEMS_KEY, BET_STREAK_KEY, MODE_PLAYS_KEY } from './persistedState.js';
 export { makeDisparityRuntimeDefaults, makeWormSessionDefaults, MAX_UNDO_HISTORY } from './sessionDefaults.js';
