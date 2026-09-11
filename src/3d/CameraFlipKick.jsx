@@ -12,11 +12,19 @@ import { flipImpulse } from './flipImpulse.js';
 const _target = new THREE.Vector3();
 const _dO = new THREE.Vector3();
 
-export default function CameraFlipKick({ controlsRef }) {
+export default function CameraFlipKick({ controlsRef, enabled = true }) {
   const { camera } = useThree();
   const applied = useRef(new THREE.Vector3());
 
   useFrame((_state, delta) => {
+    // Chase mode owns an absolute camera pose every frame. Applying the delta
+    // of an old recoil offset to that fresh pose produces alternating nudges;
+    // it also moves the inactive orbit target. Discard impulses in this mode.
+    if (!enabled) {
+      applied.current.set(0, 0, 0);
+      flipImpulse.t = 0;
+      return;
+    }
     _target.set(0, 0, 0);
     if (flipImpulse.t > 0) {
       flipImpulse.t = Math.max(0, flipImpulse.t - delta);
