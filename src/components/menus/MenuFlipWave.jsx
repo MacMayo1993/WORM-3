@@ -1,140 +1,59 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import MenuWormParticle from './MenuWormParticle.jsx';
 import { isCarouselActive } from './menuCarouselState.js';
 
-// Shared geometries — created once for all MenuFlipWave instances
-const sharedWaveRingGeometry = new THREE.RingGeometry(0.8, 1.0, 32);
-const sharedInnerRingGeometry = new THREE.RingGeometry(0.3, 0.6, 32);
-const sharedFlashDisc = new THREE.CircleGeometry(0.52, 32);
+const waveGeometry = new THREE.RingGeometry(0.8, 1, 32);
+const portalGeometry = new THREE.RingGeometry(0.19, 0.23, 40);
 
-const WORM_TOTAL_DURATION = 3.0 + 0.15; // must match MenuWormParticle TRANSIT_DUR + buffer
-
-/**
- * Brief bright disc that pops open on the tile face when a flip triggers.
- */
-const TileFlash = ({ startTime, color }) => {
-  const discRef = useRef();
-  const flashDur = 0.45;
-
-  useFrame((state) => {
-    if (!discRef.current) return;
-    const t = Math.min(state.clock.getElapsedTime() - startTime, flashDur);
-    const p = t / flashDur;
-    const s = 0.3 + p * 1.4;
-    discRef.current.scale.set(s, s, 1);
-    discRef.current.material.opacity = (1 - p) * 1.1;
-  });
-
-  return (
-    <mesh ref={discRef} scale={[0.3, 0.3, 1]} geometry={sharedFlashDisc}>
-      <meshBasicMaterial
-        color={color} transparent opacity={1.1}
-        blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide}
-      />
-    </mesh>
-  );
-};
-
-/**
- * MenuFlipWave — menu-only flip wave: expanding rings + TileFlash + MenuWormParticle.
- * Progress is tracked via useRef (never useState) so useFrame never triggers React re-renders.
- */
-const MenuFlipWave = ({ origins, startTime, onComplete }) => {
-  // Single shared arc phase so both worms ride the same great circle, 180° apart.
-  // Worm A uses +phase, worm B uses -phase → arcDir_B = -arcDir_A → antipodal on the circle.
-  const sharedArcPhase = useMemo(() => Math.random() * Math.PI, []);
-  const rootRef = useRef();
-  const progressRef = useRef(0);
-  const ringsRef = useRef([]);
-  const onCompleteCalledRef = useRef(false);
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
-  const wormsCompletedRef = useRef(0);
-
-  // Fallback timeout in case worm's onComplete is never called
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!onCompleteCalledRef.current) {
-        onCompleteCalledRef.current = true;
-        onCompleteRef.current?.();
-      }
-    }, (WORM_TOTAL_DURATION + 0.3) * 1000);
-    return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    return () => { ringsRef.current = []; };
-  }, []);
-
+// One paused clock drives the pair, their portal pulses and tail completion.
+// There is deliberately no wall-clock timeout that can rotate a cube mid-worm.
+export default function MenuFlipWave({ origins, onComplete }) {
+  const phase = useMemo(() => Math.random() * Math.PI * 2, []);
+  const elapsed = useRef(0);
+  const root = useRef();
+  const waves = useRef([]);
+  const portals = useRef([]);
+  const completed = useRef(0);
+  const finished = useRef(false);
   useFrame((_state, delta) => {
-    // Hide the whole wave while the six-faces selector owns the cube — a
-    // frozen mid-flight worm/ring floating over the mode plates reads as a bug.
-    if (rootRef.current) rootRef.current.visible = !isCarouselActive();
-    if (isCarouselActive() || progressRef.current >= 1) return;
-    progressRef.current = Math.min(1, progressRef.current + delta * 1.2);
-    const easeOut = 1 - Math.pow(1 - progressRef.current, 3);
-    ringsRef.current.forEach((ring) => {
+    if (root.current) root.current.visible = !isCarouselActive();
+    if (isCarouselActive() || document.hidden) return;
+    elapsed.current += Math.min(delta, 0.05);
+    const p = Math.min(1, elapsed.current / 0.8);
+    const eased = 1 - (1 - p) ** 3;
+    waves.current.forEach(ring => {
       if (!ring) return;
-      const scale = easeOut * 4 + 0.5;
-      ring.scale.setScalar(scale);
-      if (ring.material) ring.material.opacity = (1 - easeOut) * 0.8;
+      ring.scale.setScalar(0.2 + eased * 0.65);
+      ring.material.opacity = (1 - eased) * 0.6;
+    });
+    portals.current.forEach(ring => {
+      if (!ring) return;
+      ring.scale.setScalar(1 + Math.sin(elapsed.current * 3) * 0.06);
+      ring.material.opacity = 0.38 + Math.sin(elapsed.current * 3) * 0.12;
     });
   });
-
-  if (!origins || origins.length === 0) return null;
-
+  if (!origins || origins.length < 2) return null;
   const wormCompleted = () => {
-    wormsCompletedRef.current += 1;
-    if (wormsCompletedRef.current < 2) return;
-    if (onCompleteCalledRef.current) return;
-    onCompleteCalledRef.current = true;
-    onComplete?.();
+    completed.current += 1;
+    if (completed.current === 2 && !finished.current) {
+      finished.current = true;
+      onComplete?.();
+    }
   };
-
-  return (
-    <group ref={rootRef}>
-      {origins.map((origin, idx) => (
-        <group key={idx} position={origin.position} rotation={origin.rotation || [0, 0, 0]}>
-          {/* Expanding ring — hidden initially so no flash on mount */}
-          <mesh ref={el => ringsRef.current[idx] = el} geometry={sharedWaveRingGeometry} scale={[0.01, 0.01, 0.01]}>
-            <meshBasicMaterial
-              color={origin.color} transparent opacity={0}
-              side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false}
-            />
-          </mesh>
-          <mesh geometry={sharedInnerRingGeometry} scale={[0.01, 0.01, 0.01]}>
-            <meshBasicMaterial
-              color={origin.color} transparent opacity={0}
-              side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false}
-            />
-          </mesh>
-          <TileFlash startTime={startTime} color={origin.color} />
-        </group>
-      ))}
-
-      {/* Two antipodal worms on the same great circle, 180° apart */}
-      <MenuWormParticle
-        key="transit-a"
-        start={origins[0].position}
-        end={origins[1].position}
-        color1={origins[0].color}
-        startTime={startTime}
-        arcPhase={sharedArcPhase}
-        onComplete={wormCompleted}
-      />
-      <MenuWormParticle
-        key="transit-b"
-        start={origins[1].position}
-        end={origins[0].position}
-        color1={origins[1].color}
-        startTime={startTime}
-        arcPhase={-sharedArcPhase}
-        onComplete={wormCompleted}
-      />
-    </group>
-  );
-};
-
-export default MenuFlipWave;
+  return <group ref={root}>
+    {origins.map((origin, i) => <group key={i} position={origin.position} rotation={origin.rotation}>
+      <mesh position={[0, 0, 0.012]} ref={el => { waves.current[i] = el; }} geometry={waveGeometry} scale={0.01}>
+        <meshBasicMaterial color={origin.color} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, 0, 0.014]} ref={el => { portals.current[i] = el; }} geometry={portalGeometry}>
+        <meshBasicMaterial color={origin.color} transparent opacity={0.38} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+    </group>)}
+    {[0, 1].map(i => <MenuWormParticle key={i}
+      start={origins[0].position} antipodal={i === 1}
+      color1={origins[i].color} elapsed={elapsed} arcPhase={phase} onComplete={wormCompleted}
+    />)}
+  </group>;
+}
