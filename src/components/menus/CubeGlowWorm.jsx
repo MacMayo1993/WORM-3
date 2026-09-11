@@ -7,7 +7,7 @@ import { createWormSkinMaterial, applyBioluminescence, updateWormSkinMaterialTim
 import { makeWormHaloSprite, HALO_SCALE } from '../../worm/wormGlowHalo.js';
 import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../../worm/wormFaceLayout.js';
 import { isCarouselActive } from './menuCarouselState.js';
-import { sampleCubeWorm } from './cubeWormPath.js';
+import { sampleWigglingCubeWorm } from './cubeWormPath.js';
 
 // Mounted INSIDE the cube's transform. No screen coordinates or independent
 // world-space movement: carousel turns, wobble, scale and dive carry every part.
@@ -15,7 +15,7 @@ function GlowWorm({ distance, antipodal = false }) {
   const model = useMemo(() => {
     const group = new THREE.Group();
     group.renderOrder = 40;
-    const skin = { ...getSkin('bubble'), body: '#bd68d8', glow: '#ee8bd5' };
+    const skin = { ...getSkin('bubble'), body: antipodal ? '#45dccc' : '#db79f0', glow: antipodal ? '#91fff0' : '#ff9ddb' };
     const geometry = new THREE.SphereGeometry(1, 16, 12);
     const material = createWormSkinMaterial({ color: skin.body, roughness: 0.3, clearcoat: 0.7 });
     applyBioluminescence(material, skin.glow, true);
@@ -40,14 +40,14 @@ function GlowWorm({ distance, antipodal = false }) {
     return { group, beads, halos, material, face: { eyes, pupils, mouth, glasses: [null, null], hat: null },
       position: new THREE.Vector3(), normal: new THREE.Vector3(), forward: new THREE.Vector3(),
       dispose() { disposeEyes(); geometry.dispose(); material.dispose(); white.dispose(); black.dispose(); mouthGeo.dispose(); halos.forEach(h => h.material.dispose()); } };
-  }, []);
+  }, [antipodal]);
   useEffect(() => () => model.dispose(), [model]);
   useFrame(() => {
     model.group.visible = isCarouselActive();
     if (!model.group.visible) return;
     updateWormSkinMaterialTime(model.material, distance.current / 0.65);
     model.beads.forEach((bead, i) => {
-      sampleCubeWorm(distance.current - i * 0.18, model.position, model.normal, model.forward, antipodal);
+      sampleWigglingCubeWorm(distance.current - i * 0.18, i, distance.current / 0.65, model.position, model.normal, model.forward, antipodal);
       bead.position.copy(model.position);
       model.halos[i].position.copy(model.position);
       if (i === 0) layoutWormFace(model.position, model.forward, model.normal, 0.14, model.face);

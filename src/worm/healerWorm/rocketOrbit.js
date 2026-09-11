@@ -28,7 +28,7 @@
 
 import * as THREE from 'three';
 import { SURFACE_OFFSET } from '../../utils/constants.js';
-import { ROCKET_DURATION, ROCKET_FLIGHT_HEIGHT, ROCKET_FLIGHT_TAKEOFF, ROCKET_FLIGHT_LANDING } from './constants.js';
+import { ROCKET_FLIGHT_HEIGHT, rocketFlightLift } from './constants.js';
 
 /** Clearance the orbit keeps from the cube's own box, at full altitude. */
 export const ROCKET_ORBIT_CLEARANCE = 0.55;
@@ -40,12 +40,8 @@ const _dir = new THREE.Vector3();
  * over the landing. This is the shape `rocketFlightLift` has always had; it is
  * pulled out so height and orbit share one clock.
  */
-export function rocketOrbitT(active, rocketT) {
-  if (!active) return 0;
-  const elapsed = ROCKET_DURATION - rocketT;
-  const up = Math.min(1, elapsed / ROCKET_FLIGHT_TAKEOFF);
-  const down = Math.min(1, rocketT / ROCKET_FLIGHT_LANDING);
-  return Math.max(0, Math.min(up, down));
+export function rocketOrbitT(active, rocketT, flightPhase) {
+  return rocketFlightLift(active, rocketT, flightPhase) / ROCKET_FLIGHT_HEIGHT;
 }
 
 /** Half-extent of the cube's own box, sticker faces included. */

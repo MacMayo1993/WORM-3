@@ -124,7 +124,7 @@ export function WormFace({ worm, size }) {
             _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal);
             // Ride the same orbit the body rides during a rocket burn, so the face
             // stays on the risen head instead of tracking its own face normal.
-            rocketOrbitInto(_faceHeadPos, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current));
+            rocketOrbitInto(_faceHeadPos, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
         }
 
         if (mobi) {
@@ -143,7 +143,7 @@ export function WormFace({ worm, size }) {
                 const jump = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
                 mobi.group.position.addScaledVector(normal, WORM_LIFT + jump);
             }
-            rocketOrbitInto(mobi.group.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current));
+            rocketOrbitInto(mobi.group.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
             if (!inTransit && liveRotation.active) {
                 const { x, y, z } = worm.pos.current;
                 const angle = liveLayerAngle(x, y, z);

@@ -72,7 +72,7 @@ export function RocketTailFire({ worm, size }) {
         _fireTail.copy(tail.pos);
         _fireInner.copy(inner.pos);
         // Ride the orbit with the body so the flame stays glued to the risen tail.
-        const orbitT = rocketOrbitT(true, worm.rocketT.current);
+        const orbitT = rocketOrbitT(true, worm.rocketT.current, worm.rocketFlight?.current);
         if (orbitT > 0) {
             rocketOrbitInto(_fireTail, size, orbitT);
             rocketOrbitInto(_fireInner, size, orbitT);
@@ -230,7 +230,7 @@ export function WormBody({ worm, size }) {
         // Rocket burn: the whole worm rides an orbit around the cube — a shell at
         // constant altitude that rounds every edge — rather than each part offsetting
         // itself along whichever face normal it happens to hold. See rocketOrbit.js.
-        const orbitT = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current);
+        const orbitT = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
         // During transit (entering/tunnel/exiting) and the windout spiral the body segments ride
         // the ribbon/spiral centerline exactly — no face-normal lift, or the head floats off.
         // windout uses getWindWorldPosInto which supplies its own lift, so WORM_LIFT must not
@@ -819,7 +819,7 @@ export function GlowWormAura({ worm, size }) {
         if (lightRef.current) {
             lightRef.current.position.copy(worm.headInterpPos.current)
                 .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
-            rocketOrbitInto(lightRef.current.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current));
+            rocketOrbitInto(lightRef.current.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
             // Zero out only while inside the Möbius ribbon — worm is visible during entering/exiting
             const inTunnel = worm.phase.current === 'tunnel';
             lightRef.current.intensity = inTunnel ? 0 : 1.2 + Math.sin(t * 4.0) * 0.4;

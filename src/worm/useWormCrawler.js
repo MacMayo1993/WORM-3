@@ -493,6 +493,7 @@ export function useWormCrawler(size, cubies) {
             isJumping: f('isJumping'),
             rocketActive: f('rocketActive'),
             rocketT: f('rocketT'),
+            rocketFlight: f('rocketFlight'),
             landingGraceT: f('landingGraceT'),
             magnetT: f('magnetT'),
             pendingOrbAttractionsRef: f('pendingOrbAttractions'),
