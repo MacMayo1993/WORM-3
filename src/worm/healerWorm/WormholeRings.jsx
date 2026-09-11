@@ -7,6 +7,7 @@ import { getWormTunnelSnapshot } from '../tunnelSnapshot.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { FACE_COLORS } from '../../utils/constants.js';
+import { portalSparkPose } from './portalSparks.js';
 import { WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
 // ─── Wormhole portal rings — spinning neon rings at every flipped tile ────────
@@ -29,7 +30,8 @@ const _moteColor = new THREE.Color();
 // Fallback when a face id has no resolved colour — the old uniform neon pink, so
 // a missing palette entry degrades to the previous look rather than to black.
 const _faceColorFallback = new THREE.Color('#ff44ff');
-const _WHITE = new THREE.Color('#ffffff');
+const _sparkAmber = new THREE.Color('#ffc24a');
+const _sparkHot = new THREE.Color('#ff7438');
 
 // Void swamp palette — sickly, stagnant, antipodality-gone-wrong
 const VOID_OUTER_COLOR = '#b8b1ff';   // inverted-feel rim over dark tiles
@@ -64,10 +66,8 @@ const SPARKS_PER_CRITICAL = 7;
 const POLES_PER_TILE = 4;
 const TAPES_PER_TILE = 4;
 const FRAME_SEGMENTS_PER_VOID = 4;
-// Calm motes rising off every SAFE portal. This is the bottom rung of the hazard
-// ladder: before this existed the critical tier's sparks arrived out of nowhere,
-// because a safe portal emitted nothing at all for them to escalate from.
-const MOTES_PER_LIVE = 5;
+// Capacity for the strongest fountain; ordinary portals use five slots per burst.
+const MOTES_PER_LIVE = 7; // five safe sparks, seven dangerous sparks
 
 // ── DEMO FLAG ────────────────────────────────────────────────────────────────
 // Puts the caution poles + tape on EVERY flipped tile, not just the ones that
@@ -77,7 +77,7 @@ const MOTES_PER_LIVE = 5;
 // means "entering this is fatal" (void kills on contact, critical kills when you
 // step off the exit); painting it on every portal spends that alarm on the most
 // common object in the game and leaves nothing to distinguish the deadly ones.
-// The mote plume below is the intended always-on portal marker.
+// Flat caution borders and the spark fountains mark ordinary flipped tiles.
 const DEMO_TAPE_ON_ALL_PORTALS = false;
 
 // The caution tape strip. Constant for the life of the page, so it is drawn and
@@ -116,7 +116,7 @@ function getCautionTexture() {
  */
 export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef, hidden = false }) {
     const liveRef = useRef();       // live wormhole rings (tinted to the face they charge)
-    const moteRef = useRef();       // calm plume rising off safe portals
+    const moteRef = useRef();       // amber spark bursts on all flipped tiles
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
@@ -302,32 +302,6 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 liveMesh.setColorAt(liveIdx, _liveColor);
                 liveIdx++;
 
-                // ── Bottom rung of the ladder: a calm plume off SAFE portals ──
-                // Not drawn once the portal is critical — the sparks below take over,
-                // so the escalation is a change of behaviour and not just more stuff.
-                if (!isCritical) {
-                    for (let m = 0; m < MOTES_PER_LIVE && moteIdx < MAX_MOTES; m++) {
-                        const si = (i * MOTES_PER_LIVE + m) * 3;
-                        const phase = (t * 0.42 + bubbleSeeds[si + 2]) % 1;
-                        const lift = 0.06 + phase * 0.55;
-                        const envelope = Math.sin(phase * Math.PI); // 0→1→0 over lifetime
-                        _moteDummy.position.set(
-                            wp[0] + n.x * lift + bubbleSeeds[si] * envelope * 1.6,
-                            wp[1] + n.y * lift + bubbleSeeds[si + 1] * envelope * 1.6,
-                            wp[2] + n.z * lift + bubbleSeeds[si] * envelope * 0.9
-                        );
-                        _moteDummy.scale.setScalar(Math.max(0, envelope * 0.055));
-                        _moteDummy.updateMatrix();
-                        motes.setMatrixAt(moteIdx, _moteDummy.matrix);
-                        // Brightened well past the tile colour: these are small and
-                        // additive over a sticker of the same hue, so at face value
-                        // they vanish into the tile they are rising off.
-                        _moteColor.copy(faceColor).lerp(_WHITE, 0.45).multiplyScalar(1.8);
-                        motes.setColorAt(moteIdx, _moteColor);
-                        moteIdx++;
-                    }
-                }
-
                 if (isCritical) {
                     _voidArcRight.crossVectors(n, _voidArcAxisY);
                     if (_voidArcRight.lengthSq() < 1e-4) _voidArcRight.set(1, 0, 0);
@@ -354,6 +328,18 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                         sparkIdx++;
                     }
                 }
+            }
+
+            // Amber bursts rise far enough to peek past nearby cube edges.
+            // Reuse the old plume's instanced draw instead of adding another effect.
+            const dangerous = isVoid || isCritical;
+            const burstSeed = ((wp[0] * 0.173 + wp[1] * 0.317 + wp[2] * 0.571
+                + n.x * 0.113 + n.y * 0.257 + n.z * 0.419) % 1 + 1) % 1;
+            for (let m = 0; m < (dangerous ? 7 : 5) && moteIdx < MAX_MOTES; m++) {
+                if (!portalSparkPose(_moteDummy, wp, n, t, burstSeed, m, dangerous)) continue;
+                motes.setMatrixAt(moteIdx, _moteDummy.matrix);
+                _moteColor.copy(dangerous ? _sparkHot : _sparkAmber).multiplyScalar(2.0);
+                motes.setColorAt(moteIdx++, _moteColor);
             }
 
             if (isVoid || isCritical || DEMO_TAPE_ON_ALL_PORTALS) {
@@ -566,12 +552,10 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 <meshBasicMaterial map={cautionTexture} color="#ffffff" side={THREE.DoubleSide} transparent opacity={0.98} depthWrite={false} />
             </instancedMesh>
 
-            {/* Calm plume off safe portals — tinted to the face colour that portal
-                charges, so a flipped tile is spottable from across the board and the
-                orb colour it wants is legible without reading anything. */}
+            {/* Staggered surface-normal spark fountains on every flipped tile. */}
             <instancedMesh ref={moteRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
-                <sphereGeometry args={[1, 6, 6]} />
-                <meshBasicMaterial vertexColors transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                <cylinderGeometry args={[0.35, 1, 1, 4]} />
+                <meshBasicMaterial vertexColors transparent opacity={0.95} depthTest={true} depthWrite={false} toneMapped={false} />
             </instancedMesh>
 
             {/* Void tile frame booster — brighter than neighbor tile frames */}

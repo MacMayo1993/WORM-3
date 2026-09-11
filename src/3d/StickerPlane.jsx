@@ -37,6 +37,7 @@ import HealParticles from './HealParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
+import TileBoundary from './TileBoundary.jsx';
 import { MergeTileOverlay } from '../modes/merge/index.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
@@ -1932,6 +1933,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
+      {/* A static surface marking stays legible when bloom and moving portal
+          effects wash out. Raised hazard fences still identify deadly portals. */}
+      {wormHealerMode && !isDead && !isSudokube && <TileBoundary flipped={isWormhole} />}
       {/* Ghost spider web on the back of flipped tiles. Mounted only once a tile has
           any flip history — a never-flipped tile can never show it, so on a 15×15
           Mega shell the ~1,300 untouched tiles skip this mesh (and every transient
