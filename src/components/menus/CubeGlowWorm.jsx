@@ -11,9 +11,7 @@ import { sampleCubeWorm } from './cubeWormPath.js';
 
 // Mounted INSIDE the cube's transform. No screen coordinates or independent
 // world-space movement: carousel turns, wobble, scale and dive carry every part.
-export default function CubeGlowWorm() {
-  const distance = useRef(1.8);
-  const reduced = useRef(false);
+function GlowWorm({ distance, antipodal = false }) {
   const model = useMemo(() => {
     const group = new THREE.Group();
     group.renderOrder = 40;
@@ -43,23 +41,40 @@ export default function CubeGlowWorm() {
       position: new THREE.Vector3(), normal: new THREE.Vector3(), forward: new THREE.Vector3(),
       dispose() { disposeEyes(); geometry.dispose(); material.dispose(); white.dispose(); black.dispose(); mouthGeo.dispose(); halos.forEach(h => h.material.dispose()); } };
   }, []);
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => { reduced.current = media.matches; };
-    update(); media.addEventListener('change', update);
-    return () => { media.removeEventListener('change', update); model.dispose(); };
-  }, [model]);
-  useFrame((_state, delta) => {
+  useEffect(() => () => model.dispose(), [model]);
+  useFrame(() => {
     model.group.visible = isCarouselActive();
     if (!model.group.visible) return;
-    if (!reduced.current && !document.hidden) distance.current += Math.min(delta, 0.05) * 0.65;
     updateWormSkinMaterialTime(model.material, distance.current / 0.65);
     model.beads.forEach((bead, i) => {
-      sampleCubeWorm(distance.current - i * 0.18, model.position, model.normal, model.forward);
+      sampleCubeWorm(distance.current - i * 0.18, model.position, model.normal, model.forward, antipodal);
       bead.position.copy(model.position);
       model.halos[i].position.copy(model.position);
       if (i === 0) layoutWormFace(model.position, model.forward, model.normal, 0.14, model.face);
     });
   });
   return <primitive object={model.group} dispose={null} />;
+}
+
+// One clock drives both models: each corresponding body segment is antipodal,
+// even at rounded edges and while reduced motion holds the pair still.
+export default function CubeGlowWorm() {
+  const distance = useRef(1.8);
+  const reduced = useRef(false);
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => { reduced.current = media.matches; };
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  useFrame((_state, delta) => {
+    if (isCarouselActive() && !reduced.current && !document.hidden) {
+      distance.current += Math.min(delta, 0.05) * 0.65;
+    }
+  });
+  return <>
+    <GlowWorm distance={distance} />
+    <GlowWorm distance={distance} antipodal />
+  </>;
 }
