@@ -110,20 +110,16 @@ export function resolveWizardColors(settings) {
 
 // ─── Card chrome ──────────────────────────────────────────────────────────────
 
-/**
- * The card every picker option sits on. On the dark sheet a selected card lights
- * up rather than pressing in: the paper version leaned on an inset shadow and a
- * white top edge, and neither reads on near-black.
- */
+// Paper cards use a clear accent border and a subtle pressed selection.
 export const cardStyle = (selected, accent) => ({
   display: 'flex',
   padding: '14px 16px',
   borderRadius: '10px',
   border: `2px solid ${selected ? accent : WIZ_BORDER_SOFT}`,
-  background: selected ? `${accent}26` : WIZ_SURFACE,
+  background: selected ? `${accent}12` : WIZ_SURFACE_RAISED,
   boxShadow: selected
-    ? `0 0 18px ${accent}44, inset 0 0 22px ${accent}22`
-    : `0 2px 10px ${WIZ_CARD_SHADOW}`,
+    ? `inset 0 0 0 1px ${accent}22`
+    : `0 2px 0 ${WIZ_CARD_SHADOW}`,
   color: WIZ_TEXT,
   cursor: 'pointer',
   transition: 'all 0.15s ease',

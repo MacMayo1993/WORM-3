@@ -173,7 +173,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   <div style={{ filter: owned ? 'none' : 'saturate(0.5)' }}>
                     <WormPreviewCanvas characterId={wormCharacterId} skinId={skin.id} size={34} />
                   </div>
-                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, color: selected ? skin.body : WIZ_TEXT_FAINT, letterSpacing: '0.05em' }}>
+                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, color: selected ? WIZ_TEXT : WIZ_TEXT_FAINT, letterSpacing: '0.05em' }}>
                     {skin.label}
                   </span>
                   {!owned && <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>}
