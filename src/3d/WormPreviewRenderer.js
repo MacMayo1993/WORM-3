@@ -17,6 +17,7 @@
 //     unregisterWormPreview (see WormPreviewCanvas.jsx).
 
 import * as THREE from 'three';
+import { stepMenuWorm, menuWormSegment } from './menuWormMotion.js';
 import { createMobiSegmentAssets, createMobiSegment, MOBI_SEGMENT_RADIUS } from '../worm/mobiSegments.js';
 import { createMobiModel, animateMobi, orientMobi, MOBI_RADIUS } from '../worm/mobiModel.js';
 import { getSkin } from '../worm/wormCosmeticsData.js';
@@ -63,6 +64,8 @@ const _buffers = new Map();   // size → { pixels: Uint8Array, image: ImageData
 
 let scene = null;
 let camera = null;
+let companionCamera = null;
+let contactShadows = [];
 let rig = null;             // built lazily, reconfigured per render
 
 const _color = new THREE.Color();
@@ -204,6 +207,20 @@ function _initScene() {
 
   camera = new THREE.PerspectiveCamera(30, 1, 0.01, 10);
   _frameCamera('body');
+  companionCamera = new THREE.OrthographicCamera(-0.9, 0.9, 0.9, -0.9, 0.01, 10);
+  companionCamera.position.set(0, 3, 3);
+  companionCamera.lookAt(0, 0, 0);
+  const shadowGeo = new THREE.PlaneGeometry(1, 1);
+  const shadowMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: 'varying vec2 vUv; void main(){float a=pow(max(0.,1.-length((vUv-.5)*2.)),2.);gl_FragColor=vec4(.12,.16,.08,a*.32);}'
+  });
+  contactShadows = Array.from({ length: SEGMENTS }, () => {
+    const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+    shadow.rotation.x = -Math.PI / 2; shadow.scale.setScalar(0.3); shadow.visible = false;
+    scene.add(shadow); return shadow;
+  });
 
   // Warm key + cool fill, enough to show the clearcoat highlight rolling over
   // the beads without an environment map.
@@ -300,6 +317,7 @@ function _segmentOffset(i, character, time, out, crawling = false) {
 
 const _off = new THREE.Vector3();
 const _anchor = new THREE.Vector3();
+const _menuForward = new THREE.Vector3();
 const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, null], mouth: null, hat: null };
 
 // Book Worm page-flip scratch (preview only — see the isBook block in _poseWorm).
@@ -346,7 +364,10 @@ function _poseWorm(opts, time) {
   for (let i = 0; i < SEGMENTS; i++) updateWormSkinMaterialTime(rig.beads[i].material, time);
 
   for (let i = 0; i < SEGMENTS; i++) {
-    _segmentOffset(i, characterId, time, _off, opts.framing === 'runway');
+    if (opts.companion) menuWormSegment(opts.companion, i, _off);
+    else _segmentOffset(i, characterId, time, _off, opts.framing === 'runway');
+    contactShadows[i].visible = !!opts.companion;
+    if (opts.companion) contactShadows[i].position.set(_off.x, 0.001, _off.z);
     const bead = rig.beads[i];
     const box = rig.boxes[i];
     const halo = rig.halos[i];
@@ -494,7 +515,8 @@ function _poseWorm(opts, time) {
   }
 
   // Face — same layout the played worm uses.
-  _segmentOffset(0, characterId, time, _anchor, opts.framing === 'runway');
+  if (opts.companion) menuWormSegment(opts.companion, 0, _anchor);
+  else _segmentOffset(0, characterId, time, _anchor, opts.framing === 'runway');
   rig.glasses.forEach(g => { g.visible = isBook; });
   _faceParts.eyes[0] = rig.eyes[0];
   _faceParts.eyes[1] = rig.eyes[1];
@@ -507,7 +529,8 @@ function _poseWorm(opts, time) {
   // The Book Worm's head is a sphere now, so every character shares one layout.
   // Its head rides at the book body's height, matching WormFace in gameplay.
   if (isBook) _anchor.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y;
-  layoutWormFace(_anchor, FWD, UP, HEAD_SCALE, _faceParts);
+  if (opts.companion) _menuForward.set(Math.cos(opts.companion.heading), 0, Math.sin(opts.companion.heading));
+  layoutWormFace(_anchor, opts.companion ? _menuForward : FWD, UP, HEAD_SCALE, _faceParts);
 
   // An occasional blink, squashing the eye and its pupil together.
   const blink = Math.sin(time * 0.9) > 0.985 ? 0.2 : 1;
@@ -577,6 +600,7 @@ function renderToCanvas(opts, time, targetCanvas) {
   if (!size) return;
   _frameCamera(opts.framing);
   _poseWorm(opts, time);
+  const renderCamera = opts.companion ? companionCamera : camera;
 
   const ctx = targetCanvas.getContext('2d');
 
@@ -591,7 +615,7 @@ function renderToCanvas(opts, time, targetCanvas) {
     renderer.setRenderTarget(target);
     renderer.setClearAlpha(0);
     renderer.clear();
-    renderer.render(scene, camera);
+    renderer.render(scene, renderCamera);
     renderer.readRenderTargetPixels(target, 0, 0, size, size, buf.pixels);
     renderer.setRenderTarget(prevTarget);
     renderer.setClearAlpha(prevAlpha);
@@ -607,7 +631,7 @@ function renderToCanvas(opts, time, targetCanvas) {
   } else {
     renderer.setSize(size, size, false);
     renderer.setClearAlpha(0);
-    renderer.render(scene, camera);
+    renderer.render(scene, renderCamera);
     ctx.clearRect(0, 0, size, size);
     ctx.drawImage(renderer.domElement, 0, 0, size, size);
   }
@@ -638,6 +662,7 @@ const ANIMATED_STEP = 1 / ANIMATED_FPS;
 export function tickWormPreviews(delta) {
   simTime += delta;
   for (const info of registry.values()) {
+    if (info.animated && info.opts.companion) stepMenuWorm(info.opts.companion, delta);
     if (info.dirty) {
       renderToCanvas(info.opts, simTime, info.canvas);
       info.dirty = false;
