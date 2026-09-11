@@ -1540,9 +1540,16 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     <div style={{ position: 'fixed', inset: 0, zIndex: Z.MENU, overflowY: 'auto' }}>
 
       {/* Edge vignette only — the center stays clear so the live 3D cube
-          (rotating to the active mode's face) reads through the overlay. */}
+          (rotating to the active mode's face) reads through the overlay.
+          It had stopped being an edge: 0.78 opaque by 74% of the radius and
+          0.97 at the corner, which is past a frame and into fog. It washed the
+          backdrop out to near-paper and left the edges of the screen BRIGHTER
+          than its middle, the opposite of what a vignette is for. The controls
+          do not depend on it — the pills, arrows and card all carry their own
+          PAPER_SHEET backgrounds — so it only has to soften the photo where it
+          meets the frame. */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle at 50% 38%, rgba(245,240,232,0) 0%, rgba(245,240,232,0) 36%, rgba(245,240,232,0.78) 74%, rgba(245,240,232,0.97) 100%)',
+        background: 'radial-gradient(circle at 50% 38%, rgba(245,240,232,0) 0%, rgba(245,240,232,0) 55%, rgba(245,240,232,0.30) 86%, rgba(245,240,232,0.62) 100%)',
       }} />
 
       <style>{`
