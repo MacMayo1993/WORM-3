@@ -26,8 +26,10 @@ import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import MenuGridGlow from './MenuGridGlow.jsx';
 import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
-import { UI_FONT, DISPLAY_FONT, PAPER_SHEET, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_BORDER, Z } from '../../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, PAPER_SHEET, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_BG_MUTED, Z } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/Button.jsx';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { progressManager } from '../../levels/ProgressManager.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -68,6 +70,8 @@ import {
   isCarouselActive,
   requestModeDive,
   consumeModeDive,
+  setCarouselStage,
+  getCarouselStage,
 } from './menuCarouselState.js';
 
 // ─── Carousel-active flag ─────────────────────────────────────────────────────
@@ -768,6 +772,23 @@ const MENU_REST_SCALE = 1.022 * MENU_CUBE_ZOOM;
 const MENU_PRESS_SCALE = 0.968 * MENU_CUBE_ZOOM; // finger down on the cube
 const MENU_SHAKE_SCALE = 0.950 * MENU_CUBE_ZOOM; // the shake that precedes play
 
+// ─── Contact shadow ──────────────────────────────────────────────────────────
+// The mode face is 3.12 world units across, so half a cube is 1.56 — that is
+// how far below the centre the cube's bottom edge sits when a face is squared
+// up to the camera. The pool then drops a little further so it reads as ground
+// the cube is above rather than as a skirt welded to it, and spreads wider than
+// the cube so the falloff has somewhere to go.
+const CUBE_HALF = 1.56;
+const SHADOW_DROP = 0.14;
+const SHADOW_SPREAD = 3.5;
+const SHADOW_SQUASH = 0.30;
+// How much of the grown stage is kept clear beneath the cube, in CSS pixels, so
+// the pool has somewhere to be. Read as a lift applied to the cube.
+const SHADOW_BAND_PX = 26;
+// Fraction of the stage's spare height the cube actually takes. The rest is what
+// keeps it off the dots below it.
+const STAGE_GAIN_DAMPING = 0.62;
+
 // Bevel overlay: a top-left highlight and bottom-right shadow baked into a
 // transparent texture, layered over the tile so the inset face reads as a
 // raised, chamfered cube sticker lit from the upper-left.
@@ -792,6 +813,32 @@ function makeBevelTexture() {
   g = ctx.createLinearGradient(s, 0, s - edge, 0);          // right shadow
   g.addColorStop(0, 'rgba(0,0,0,0.42)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   strip(g, s - edge, 0, edge, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Contact shadow: a soft dark pool the presented cube sits on. Without it the
+// cube floats in front of whatever photograph the scene picked, with nothing
+// under it — which is what made the space below read as a hole rather than as
+// deliberate air. A radial falloff, squashed into an ellipse by the mesh scale.
+function makeContactShadowTexture() {
+  if (typeof document === 'undefined') return null;
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  if (!ctx) return null;
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  // Two inner stops rather than one: a single linear falloff reads as a grey
+  // disc with a hard-ish rim, and a shadow wants a dense core that gives out
+  // well before the edge of its own geometry.
+  g.addColorStop(0.00, 'rgba(0,0,0,0.46)');
+  g.addColorStop(0.35, 'rgba(0,0,0,0.30)');
+  g.addColorStop(0.70, 'rgba(0,0,0,0.08)');
+  g.addColorStop(1.00, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
   const tex = new THREE.CanvasTexture(c);
   tex.needsUpdate = true;
   return tex;
@@ -901,6 +948,10 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   // ModeFacePlates is always mounted; this loop owns its visibility so the
   // plates and the cube's pose can never disagree.
   const platesRef = useRef();
+  // The contact shadow is a sibling of the cube group, not a child: it must stay
+  // flat on the floor while the cube above it tumbles.
+  const shadowRef = useRef();
+  const contactShadowTex = useMemo(() => makeContactShadowTexture(), []);
   const diveRef = useRef(null); // { t, onComplete, done } during a PLAY dive
 
   useFrame((state, delta) => {
@@ -934,8 +985,34 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       const portrait = state.size.height > state.size.width;
       // On portrait (phone) the presented mode cube sits higher with a large empty
       // gap below it, so drop it down into that space and size it up ~10%.
-      const presentY = portrait ? 1.75 : 1.2;
-      const presentScale = portrait ? 0.79 : 1.0;
+      let presentY = portrait ? 1.75 : 1.2;
+      let presentScale = portrait ? 0.79 : 1.0;
+
+      // Grow into whatever height the DOM stage actually claimed. The overlay
+      // measures itself and posts { height, baseline } (see menuCarouselState);
+      // scaling by their ratio means a stage that did not grow reproduces the
+      // framing above exactly, and only genuine free space changes anything.
+      //
+      // The stage's top edge is pinned by the header, so all of its growth
+      // happens below: its centre drops by half the gain, and the cube follows
+      // it down rather than drifting up out of its own window.
+      const stage = getCarouselStage();
+      const worldPerPx = state.viewport.height / state.size.height;
+      if (stage && stage.baseline > 0 && stage.height > stage.baseline) {
+        // Damped, not one-for-one. The cube's bottom edge already sat right on
+        // the face-colour dots at the old size, so handing it every pixel of the
+        // gain walks it straight through them — and leaves nothing underneath
+        // for the shadow that is supposed to ground it.
+        const gain = Math.min(stage.height / stage.baseline, MAX_STAGE_GROWTH);
+        const damped = 1 + (gain - 1) * STAGE_GAIN_DAMPING;
+        presentScale *= damped;
+        const grownPx = stage.baseline * (damped - 1);
+        presentY -= (grownPx / 2) * worldPerPx;
+      }
+      // Float the cube just clear of the stage floor so the contact shadow has a
+      // band to live in. Without this the pool renders behind the description
+      // card, where it grounds nothing.
+      presentY += SHADOW_BAND_PX * worldPerPx;
 
       // The selector can open after the cube has been off-screen for a long
       // game. Snap to the requested face on entry instead of showing a frame
@@ -948,6 +1025,16 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       }
       carouselWasActive.current = true;
       cubeRef.current.position.set(0, presentY + Math.sin(t * 0.8) * 0.045, 0);
+
+      // Park the contact shadow under the cube. It tracks the cube's settled
+      // scale rather than its bobbing Y, so the pool stays put on the floor and
+      // the cube reads as rising off it instead of dragging it along.
+      if (shadowRef.current) {
+        const settled = cubeCurrentScale.current;
+        shadowRef.current.visible = true;
+        shadowRef.current.position.set(0, presentY - CUBE_HALF * settled - SHADOW_DROP * settled, -0.2);
+        shadowRef.current.scale.set(SHADOW_SPREAD * settled, SHADOW_SPREAD * SHADOW_SQUASH * settled, 1);
+      }
 
       // PLAY dive: the presented face accelerates into the camera.
       if (!diveRef.current) {
@@ -977,6 +1064,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     }
 
     carouselWasActive.current = false;
+    if (shadowRef.current) shadowRef.current.visible = false;
 
     // Carousel closed — clear any finished dive so idle animation resumes clean.
     if (diveRef.current) {
@@ -1069,6 +1157,22 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
             the plates only on frames where it presents a mode face. */}
         <ModeFacePlates ref={platesRef} />
       </group>
+      {/* Ground for the presented cube. Outside the cube group on purpose: as a
+          child it would inherit the tumble and swing up the wall. Hidden on
+          every frame that is not presenting a mode face.
+          renderOrder stays positive: a negative one draws the pool before the
+          opaque backdrop, which then paints straight over it. */}
+      {contactShadowTex && (
+        <mesh ref={shadowRef} visible={false} renderOrder={20}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={contactShadowTex}
+            transparent
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
     </>
   );
 };
@@ -1099,40 +1203,136 @@ const withFaceColor = (mode) => {
   return { ...mode, tileColor, textColor: readableInk(tileColor) };
 };
 
+// `desc` says what the mode is; `how` says how it ends, which is the question a
+// one-liner kept leaving open ("solve it your way" — and then what?). `chips`
+// are the two facts worth knowing before committing: how big the cube gets, and
+// what kind of session it is.
 const CAROUSEL_MODES = [
   {
     id: 'worm', label: 'WORM', face: 'NX',
     desc: 'Steer your worm through tunnels to heal the cube.',
+    how: 'Heal every flipped tile before the worm runs out of room.',
+    chips: ['2×2 – Mega', 'Arcade'],
     cta: 'PLAY',
   },
   {
     id: 'freeplay', label: 'CUBE', face: 'NY',
     desc: "Solve a cube your way, with no time limit.",
+    how: 'Done when all six faces show a single colour.',
+    chips: ['2×2 – 7×7', 'Relaxed'],
     cta: 'PLAY',
   },
   {
     id: 'cube', label: 'STORY', face: 'PX',
-    desc: 'Learn one new trick at a time across ten chapters.',
+    // No chapter count in the copy: it said "ten" while the campaign has had
+    // twelve for some time. The chip carries the number now, derived from the
+    // level data (see chipsFor) so it cannot drift again.
+    desc: 'Learn one new trick at a time, chapter by chapter.',
+    how: 'Clear a chapter to unlock the next one.',
+    chips: ['Campaign', 'Guided'],
     cta: 'PLAY',
   },
   {
     id: 'chaos', label: 'CHAOS', face: 'NZ',
     desc: 'Predict the last surviving pair as the cube flips itself.',
+    how: 'Back the pair that outlasts the rest to win Parity Points.',
+    chips: ['2×2 – 7×7', 'Wager'],
     cta: 'PLAY',
   },
   {
     id: 'random', label: 'RANDOM', face: 'PZ',
     desc: 'Solve a cube that changes its look as you play.',
+    how: 'Same goal as CUBE — the colours keep moving under you.',
+    chips: ['2×2 – 7×7', 'Twist'],
     cta: 'PLAY',
   },
   {
     id: 'store', label: 'STORE', face: 'PY',
     desc: 'Spend Parity Points on worms, skins, and tile styles.',
+    how: 'Earn points by playing; everything you buy is yours for good.',
+    chips: ['No cube', 'Cosmetic'],
     cta: 'OPEN STORE',
   },
 ].map(withFaceColor);
 
 const LAST_MODE_KEY = 'worm3_last_mode_id';
+
+// ─── Per-mode stats ──────────────────────────────────────────────────────────
+// What the card can honestly say about your history with a mode.
+//
+// Almost nothing is recorded per mode anywhere in the game: STORY has real
+// progress through ProgressManager, STORE has the wallet and your purchases,
+// and every other mode has only the play count this menu itself keeps (see
+// modesSlice's modePlays). So rather than invent a stat line per mode, each one
+// reports whichever of those it actually has, and a mode you have never opened
+// says so instead of showing a row of zeroes.
+const RELATIVE_DAY = [
+  [0, 'Today'],
+  [1, 'Yesterday'],
+];
+const lastPlayedLabel = (ts, now = Date.now()) => {
+  if (!ts) return null;
+  const days = Math.floor((now - ts) / 86400000);
+  if (days < 0) return 'Today';           // clock moved backwards; do not say "-3d ago"
+  for (const [n, label] of RELATIVE_DAY) if (days === n) return label;
+  if (days < 7) return `${days}d ago`;
+  if (days < 365) return `${Math.floor(days / 7)}w ago`;
+  return 'A while ago';
+};
+
+/**
+ * Two short facts for a mode's card, or an empty list when there is nothing
+ * true to say yet.
+ *
+ * @param mode     the CAROUSEL_MODES entry
+ * @param ctx      { plays, story: { completed, total, stars }, points, owned }
+ * @returns        [{ label, value }] — at most two
+ */
+/**
+ * The mode's chips, with any count resolved against live data rather than
+ * hardcoded. STORY is the one that needs it — its chapter count is level data,
+ * and the description used to state it from memory and be wrong.
+ */
+export function chipsFor(mode, ctx) {
+  if (mode.id === 'cube' && ctx?.story?.total > 0) {
+    return [`${ctx.story.total} chapters`, ...mode.chips.slice(1)];
+  }
+  return mode.chips;
+}
+
+export function modeStatItems(mode, ctx) {
+  const play = ctx.plays?.[mode.id];
+  const stats = [];
+
+  if (mode.id === 'cube') {
+    stats.push({ label: 'Chapters', value: `${ctx.story.completed}/${ctx.story.total}` });
+    if (ctx.story.stars > 0) stats.push({ label: 'Stars', value: `${ctx.story.stars}★` });
+    return stats;
+  }
+
+  if (mode.id === 'store') {
+    stats.push({ label: 'Balance', value: `${ctx.points.toLocaleString()} PP` });
+    if (ctx.owned > 0) stats.push({ label: 'Owned', value: String(ctx.owned) });
+    return stats;
+  }
+
+  if (!play) return [];
+  stats.push({ label: 'Played', value: play.plays === 1 ? 'Once' : `${play.plays}×` });
+  const last = lastPlayedLabel(play.lastPlayed);
+  if (last) stats.push({ label: 'Last', value: last });
+  return stats;
+}
+
+// ─── Cube stage sizing ───────────────────────────────────────────────────────
+// The height the cube window gets before it is allowed to grow. These are the
+// values the stylesheet used to hold; they moved into JS so the DOM measurement
+// and the 3D cube's scale are driven by one source of truth rather than by a
+// media query one side cannot read.
+const stageBaselineFor = (w, h) => (w <= 600 ? Math.min(0.45 * h, 395) : Math.min(0.47 * h, 415));
+// A ceiling on how far the stage may stretch. Without it a very tall, narrow
+// window would hand the cube the whole column and crowd the controls it is
+// supposed to be giving room to.
+const MAX_STAGE_GROWTH = 1.45;
 
 // ─── Mode carousel overlay ───────────────────────────────────────────────────
 // Clean, single-card implementation. No overlapping absolutely-positioned tiles,
@@ -1149,6 +1349,28 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   });
   const [show, setShow] = useState(true);
   const [diving, setDiving] = useState(false);
+
+  // Stats for the card. STORY's progress lives outside the store in
+  // ProgressManager, so it is read once on open rather than subscribed to —
+  // nothing can complete a chapter while this overlay is up.
+  const modePlays = useGameStore(s => s.modePlays);
+  const parityPoints = useGameStore(s => s.parityPoints);
+  const ownedItems = useGameStore(s => s.ownedItems);
+  const recordModePlay = useGameStore(s => s.recordModePlay);
+  // STORY's progress lives outside the store, in ProgressManager. Read once on
+  // open rather than subscribed to: nothing can complete a chapter while this
+  // overlay is up. A static import costs nothing here — useLevelSystem already
+  // puts the level catalogue on the initial route — and reading it synchronously
+  // avoids the chip visibly changing from its placeholder a frame later.
+  const storyProgress = useMemo(() => {
+    try {
+      const summary = progressManager.getProgressSummary();
+      return { completed: summary.completedLevels, total: summary.totalLevels, stars: summary.totalStars };
+    } catch {
+      return { completed: 0, total: 0, stars: 0 };
+    }
+  }, []);
+
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
   const animatingRef = useRef(false);
@@ -1223,6 +1445,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     setDiving(true);
     vibrate(18);
     const id = CAROUSEL_MODES[activeIndexRef.current].id;
+    recordModePlay(id);
     let fired = false;
     const fire = () => {
       if (fired) return;
@@ -1231,7 +1454,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     };
     requestModeDive(fire);
     fallbackTimerRef.current = setTimeout(fire, 850);
-  }, [launch]);
+  }, [launch, recordModePlay]);
 
   useEffect(() => {
     const fn = (e) => {
@@ -1244,7 +1467,46 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     return () => window.removeEventListener('keydown', fn);
   }, [navigate, handlePlay, onBack]);
 
+  // The stage measures itself and posts its height to the cube behind it. A
+  // ResizeObserver rather than a resize listener: the height is flex-derived, so
+  // it also changes when something else in the column grows (a longer mode
+  // description, a stat row appearing), not only when the window resizes.
+  const stageRef = useRef(null);
+  const [stageBaseline, setStageBaseline] = useState(
+    () => stageBaselineFor(window.innerWidth, window.innerHeight)
+  );
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const publish = () => {
+      const baseline = stageBaselineFor(window.innerWidth, window.innerHeight);
+      setStageBaseline(baseline);
+      setCarouselStage({ height: el.getBoundingClientRect().height, baseline });
+    };
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    window.addEventListener('resize', publish);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', publish);
+      // Leave no stale height behind: the cube reads this on its next carousel
+      // frame, and a measurement from a closed overlay is not a stage.
+      setCarouselStage(null);
+    };
+  }, []);
+
   const mode = CAROUSEL_MODES[activeIndex];
+  const modeChips = useMemo(() => chipsFor(mode, { story: storyProgress }), [mode, storyProgress]);
+  const statItems = useMemo(
+    () => modeStatItems(mode, {
+      plays: modePlays,
+      story: storyProgress,
+      points: parityPoints ?? 0,
+      owned: ownedItems?.length ?? 0,
+    }),
+    [mode, modePlays, storyProgress, parityPoints, ownedItems]
+  );
   const opacity = show ? 1 : 0;
 
   const arrowStyle = {
@@ -1278,9 +1540,16 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     <div style={{ position: 'fixed', inset: 0, zIndex: Z.MENU, overflowY: 'auto' }}>
 
       {/* Edge vignette only — the center stays clear so the live 3D cube
-          (rotating to the active mode's face) reads through the overlay. */}
+          (rotating to the active mode's face) reads through the overlay.
+          It had stopped being an edge: 0.78 opaque by 74% of the radius and
+          0.97 at the corner, which is past a frame and into fog. It washed the
+          backdrop out to near-paper and left the edges of the screen BRIGHTER
+          than its middle, the opposite of what a vignette is for. The controls
+          do not depend on it — the pills, arrows and card all carry their own
+          PAPER_SHEET backgrounds — so it only has to soften the photo where it
+          meets the frame. */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle at 50% 38%, rgba(245,240,232,0) 0%, rgba(245,240,232,0) 36%, rgba(245,240,232,0.78) 74%, rgba(245,240,232,0.97) 100%)',
+        background: 'radial-gradient(circle at 50% 38%, rgba(245,240,232,0) 0%, rgba(245,240,232,0) 55%, rgba(245,240,232,0.30) 86%, rgba(245,240,232,0.62) 100%)',
       }} />
 
       <style>{`
@@ -1290,10 +1559,6 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         .mc-pill         { min-height: 48px; }
         .mc-pill:hover   { filter: brightness(1.14); }
         .mc-pill:active  { transform: scale(0.97); }
-        .mc-cube-window { height: min(47vh, 415px); }
-        @media (max-width: 600px) {
-          .mc-cube-window { height: min(45vh, 395px); }
-        }
       `}</style>
 
       {/* Scroll column — DOM fades out during the PLAY dive so the cube face
@@ -1332,10 +1597,16 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             face to face; every mode owns one of the six faces. */}
         <div
           {...swipeHandlers}
+          ref={stageRef}
           className="mc-cube-window"
           style={{
             position: 'relative', width: 'min(560px, 96vw)',
-            flexShrink: 0,
+            // The stage used to be a fixed height that refused to shrink, so a
+            // tall viewport's leftover pixels fell past it and pooled as dead
+            // space above PLAY. Growing into that space is what turns the gap
+            // into a bigger cube. The old height stays as the floor, so nothing
+            // about a short screen changes.
+            flex: '1 1 auto', minHeight: stageBaseline, maxHeight: stageBaseline * MAX_STAGE_GROWTH,
             userSelect: 'none', touchAction: 'pan-y',
           }}
         >
@@ -1394,11 +1665,50 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             padding: '14px 18px', position: 'relative', overflow: 'hidden',
           }} aria-label={`${mode.label} mode details`}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
-            {/* One short explanation per mode. */}
-            <p style={{ margin: 0, textAlign: 'center', fontSize: 'clamp(12px, 3.2vw, 13.5px)', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: UI_FONT, fontWeight: 500 }}>
+            {/* What the mode is. */}
+            <p style={{ margin: 0, textAlign: 'center', fontSize: 'clamp(12.5px, 3.4vw, 14.5px)', lineHeight: 1.4, color: PAPER_TEXT, fontFamily: UI_FONT, fontWeight: 600 }}>
               {mode.desc}
             </p>
+            {/* …and how it ends, which the one-liner alone always left open. */}
+            <p style={{ margin: '6px 0 0', textAlign: 'center', fontSize: 'clamp(11.5px, 3vw, 12.5px)', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: UI_FONT, fontWeight: 500 }}>
+              {mode.how}
+            </p>
 
+            {/* The two facts worth knowing before committing to a session. */}
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              {modeChips.map((chip) => (
+                <span key={chip} style={{
+                  fontFamily: UI_FONT, fontSize: '10.5px', fontWeight: 700,
+                  letterSpacing: '0.06em', textTransform: 'uppercase',
+                  color: PAPER_TEXT_MUTED, background: PAPER_BG_MUTED,
+                  border: `1px solid ${PAPER_BORDER_SOFT}`, borderRadius: '100px',
+                  padding: '4px 10px', whiteSpace: 'nowrap',
+                }}>{chip}</span>
+              ))}
+            </div>
+
+            {/* Your history with this mode, when there is any. A mode you have
+                never opened shows nothing rather than a row of zeroes — see
+                modeStatItems for why that is most of them. */}
+            {statItems.length > 0 && (
+              <div style={{
+                display: 'flex', justifyContent: 'center', gap: 22,
+                marginTop: 10, paddingTop: 10, borderTop: `1px solid ${PAPER_BORDER_SOFT}`,
+              }}>
+                {statItems.map((stat) => (
+                  <div key={stat.label} style={{ textAlign: 'center', minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: UI_FONT, fontSize: '9.5px', fontWeight: 700,
+                      letterSpacing: '0.12em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT,
+                    }}>{stat.label}</div>
+                    <div style={{
+                      fontFamily: UI_FONT, fontSize: '14px', fontWeight: 800,
+                      color: PAPER_TEXT, marginTop: 2, whiteSpace: 'nowrap',
+                    }}>{stat.value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

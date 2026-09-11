@@ -1,37 +1,29 @@
 .carousel-worm {
-  position: relative; width: 100%; padding: 12px 0 22px; color: #43513a;
+  display: block; position: relative; width: 100%; height: 182px;
+  padding: 0; border: 0; background: transparent; color: #43513a;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
-/* Four shallow lanes keep all seven silhouettes visible, even on a phone.
-   Movement stays inside each half-lane so neighbours never cover one another. */
-.carousel-worm-gathering { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 4px; }
-.carousel-worm-lane { position: relative; height: 66px; min-width: 0; }
-.carousel-worm-lane:last-child:nth-child(odd) { grid-column: 1 / -1; width: 50%; justify-self: center; }
-.carousel-worm-runner {
-  position: absolute; inset: 0; width: 100%; padding: 0; border: 0;
-  background: transparent; cursor: pointer; touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  animation: carousel-roam var(--duration) ease-in-out var(--delay) infinite alternate;
-}
-.carousel-worm-runner:focus-visible { outline: 2px solid #43513a; border-radius: 16px; outline-offset: 2px; }
-.carousel-worm-runner:focus-visible { animation-play-state: paused; }
-.carousel-worm-facing {
-  position: absolute; width: min(180px, 100%); left: 0; right: 0; margin: auto; bottom: -54px;
-  pointer-events: none; animation: carousel-face var(--cycle) step-end var(--delay) infinite;
-}
-.carousel-worm-jump { display: block; width: 100%; }
+.carousel-worm:focus-visible { outline: 2px solid #43513a; border-radius: 16px; outline-offset: 2px; }
+.carousel-worm-runner { position: absolute; left: 0; top: -8px; width: calc(100% - 180px); height: 180px; animation: carousel-roam 8s ease-in-out infinite alternate; }
+.carousel-worm-facing { display: block; width: 180px; animation: carousel-face 16s step-end infinite; }
+.carousel-worm-jump { display: block; width: 180px; }
 .carousel-worm-jump[data-jumping="true"] { animation: carousel-hop 550ms ease-out; }
-.carousel-worm-hint { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font: 500 12px/1.5 system-ui, sans-serif; }
+.carousel-worm-hint { position: absolute; bottom: 0; left: 0; right: 0; font: 500 12px/1.5 system-ui, sans-serif; }
 .carousel-worm[data-paused="true"] .carousel-worm-runner,
 .carousel-worm[data-paused="true"] .carousel-worm-shadow,
 .carousel-worm[data-paused="true"] .carousel-worm-jump,
 .carousel-worm[data-paused="true"] .carousel-worm-facing { animation-play-state: paused; }
-@keyframes carousel-roam { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
+@keyframes carousel-roam { from { transform: translateX(0); } to { transform: translateX(100%); } }
 @keyframes carousel-face { 0% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
-@keyframes carousel-hop { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-28px) rotate(-5deg); } }
-.carousel-worm-shadow { position: absolute; left: 15%; bottom: 5px; width: 70%; height: 12px; background: radial-gradient(ellipse, rgba(49, 38, 20, 0.28), transparent 70%); pointer-events: none; }
+@keyframes carousel-hop { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-42px) rotate(-5deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .carousel-worm-runner { animation: none; left: calc(50% - 90px); }
+  .carousel-worm-facing { animation: none; }
+  .carousel-worm-jump[data-jumping="true"] { animation: none; }
+}
+
+.carousel-worm-floor { position: absolute; left: 8px; right: 8px; bottom: 68px; height: 12px; border-radius: 50%; background: linear-gradient(transparent, rgba(83, 68, 42, 0.12), transparent); }
+.carousel-worm-shadow { position: absolute; left: 20px; top: 104px; width: 140px; height: 12px; background: radial-gradient(ellipse, rgba(49, 38, 20, 0.28), transparent 70%); pointer-events: none; }
 .carousel-worm-shadow[data-jumping="true"] { animation: carousel-shadow-hop 550ms ease-out; }
 @keyframes carousel-shadow-hop { 0%, 100% { transform: scaleX(1); opacity: 1; } 45% { transform: scaleX(0.7); opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) {
-  .carousel-worm-runner, .carousel-worm-facing,
-  .carousel-worm-jump[data-jumping="true"], .carousel-worm-shadow[data-jumping="true"] { animation: none; }
-}
+@media (prefers-reduced-motion: reduce) { .carousel-worm-shadow[data-jumping="true"] { animation: none; } }

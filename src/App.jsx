@@ -228,7 +228,12 @@ function MenuScene({ onCubeClick, background }) {
       </Suspense>
       {!isMobile && (
         <EffectComposer>
-          <Bloom intensity={0.12} luminanceThreshold={0.86} luminanceSmoothing={0.92} mipmapBlur />
+          {/* The menu is lit hot — ambient 1.7 plus three point lights over a
+              bright photo panorama — so a 0.86 threshold put roughly 7% of the
+              frame into the bloom pass and the whole scene glowed. Raised so
+              only real highlights (the cube's gloss, the sun in the backdrop)
+              bloom, and the intensity trimmed to match. */}
+          <Bloom intensity={0.07} luminanceThreshold={0.93} luminanceSmoothing={0.9} mipmapBlur />
           <Vignette offset={0.46} darkness={0.23} />
         </EffectComposer>
       )}

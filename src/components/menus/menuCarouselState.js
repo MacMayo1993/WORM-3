@@ -41,3 +41,20 @@ export const consumeModeDive = () => {
   _diveRequest = null;
   return d;
 };
+
+// ─── Cube stage ───────────────────────────────────────────────────────────────
+// How tall the DOM's cube window actually is, in CSS pixels, alongside the
+// height it would have had before it was allowed to flex.
+//
+// The window used to be a fixed `min(47vh, 415px)` with flex-shrink: 0, so every
+// leftover pixel of a tall viewport fell through it and pooled as dead space
+// above the PLAY button. It now grows into that space instead — but the 3D cube
+// lives behind the overlay and cannot see CSS, so the DOM measures itself and
+// posts the result here, the same way it already posts the presented face.
+//
+// `baseline` is what the window measured before growing; the cube scales by the
+// ratio of the two, which means an ungrown stage reproduces the old framing
+// exactly and only a genuinely taller one changes anything.
+let _stage = null; // { height, baseline } in CSS px
+export const setCarouselStage = (stage) => { _stage = stage; };
+export const getCarouselStage = () => _stage;

@@ -17,6 +17,11 @@ export const CURRENT_SETTINGS_VERSION = 1;
 export const PARITY_POINTS_KEY = 'worm3_parity_points';
 export const OWNED_ITEMS_KEY = 'worm3_owned_items';
 export const BET_STREAK_KEY = 'worm3_bet_streak';
+// Per-mode play record: { [modeId]: { plays, lastPlayed } }, lastPlayed an epoch
+// ms. The carousel's stat row is the only reader — nothing else in the game
+// records anything per mode, so without this every mode but STORY has literally
+// nothing true to say about itself.
+export const MODE_PLAYS_KEY = 'worm3_mode_plays';
 const WORM_CHARACTER_KEY = 'worm3_character';
 
 // Dev/preview builds get a padded wallet and a fully unlocked store so the
@@ -53,6 +58,24 @@ const loadPersistedState = () => {
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const wormTrail = localStorage.getItem('worm3_trail') || 'classic';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
+    // Shape-checked on read: this is player-writable storage, and a malformed
+    // entry must not be able to put NaN through the carousel's stat row.
+    let modePlays = {};
+    try {
+      const raw = JSON.parse(localStorage.getItem(MODE_PLAYS_KEY) || '{}');
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        for (const [id, rec] of Object.entries(raw)) {
+          const plays = Number(rec?.plays);
+          if (Number.isFinite(plays) && plays > 0) {
+            const lastPlayed = Number(rec?.lastPlayed);
+            modePlays[id] = {
+              plays: Math.floor(plays),
+              lastPlayed: Number.isFinite(lastPlayed) ? lastPlayed : 0,
+            };
+          }
+        }
+      }
+    } catch { modePlays = {}; }
     const wormShowTrail = localStorage.getItem('worm3_show_trail') !== 'false'; // default true
     // 'face' rolls the horizon with the face the worm is on; 'level' keeps it
     // world-up. A feel call, so it is a setting rather than a constant.
@@ -107,6 +130,7 @@ const loadPersistedState = () => {
       wormShowTrail,
       wormCameraHorizon,
       parityPoints: safeParityPoints,
+      modePlays,
       ownedItems,
       betStreak,
     };
@@ -124,6 +148,7 @@ const loadPersistedState = () => {
       wormShowTrail: true,
       wormCameraHorizon: 'face',
       parityPoints: STARTING_BANKROLL, // storage unavailable — new-player experience
+      modePlays: {},
       ownedItems: [...DEFAULT_OWNED],
       betStreak: 0,
     };
