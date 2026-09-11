@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
-import { useGameStore } from '../../hooks/useGameStore.js';
+import { createMenuWormMotion, aimMenuWorm } from '../../3d/menuWormMotion.js';
 import './carouselWorm.css';
 
 export default function CarouselWorm({ disabled = false }) {
-  const characterId = useGameStore(s => s.wormCharacter);
-  const skinId = useGameStore(s => s.wormSkin);
-  const hatId = useGameStore(s => s.wormHat);
-  const [jumping, setJumping] = useState(false);
+  const [companion] = useState(createMenuWormMotion);
   const [touched, setTouched] = useState(false);
   const [reduced, setReduced] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
   const [hidden, setHidden] = useState(() => document.hidden);
@@ -24,18 +21,20 @@ export default function CarouselWorm({ disabled = false }) {
   }, []);
   const paused = disabled || hidden || reduced;
   return <button type="button" className="carousel-worm" disabled={disabled}
-    aria-label="Make your selected worm jump" data-paused={paused}
-    onClick={() => { setTouched(true); setJumping(!reduced); }}>
-    <span className="carousel-worm-floor" aria-hidden="true" />
-    <span className="carousel-worm-runner">
-      <span className="carousel-worm-shadow" aria-hidden="true" data-jumping={jumping} />
-      <span className="carousel-worm-facing">
-        <span className="carousel-worm-jump" data-jumping={jumping}
-          onAnimationEnd={() => setJumping(false)}>
-          <WormPreviewCanvas characterId={characterId} skinId={skinId} hatId={hatId} size={180} framing="runway" animated={!paused} />
-        </span>
-      </span>
+    aria-label="Tap a spot for Glow Worm to follow" data-paused={paused}
+    onClick={event => {
+      setTouched(true);
+      if (paused) return;
+      const rect = event.currentTarget.querySelector('canvas')?.getBoundingClientRect();
+      // Keyboard activation calls the worm to the middle of its ground plane.
+      const u = event.detail && rect?.width ? (event.clientX - rect.left) / rect.width : 0.5;
+      const v = event.detail && rect?.height ? (event.clientY - rect.top) / rect.height : 0.5;
+      aimMenuWorm(companion, u, v);
+    }}>
+    <span className="carousel-worm-scene" aria-hidden="true">
+      <WormPreviewCanvas characterId="glow" skinId="slime" hatId="none" size={400}
+        framing="runway" companion={companion} animated={!paused} style={{ width: '100%', height: 'auto' }} />
     </span>
-    <span className="carousel-worm-hint">{!touched ? 'Tap to hop' : reduced ? 'Hello!' : '\u00a0'}</span>
+    <span className="carousel-worm-hint" aria-live="polite">{!touched ? 'Tap a spot — I’ll follow' : reduced ? 'Hello!' : '\u00a0'}</span>
   </button>;
 }

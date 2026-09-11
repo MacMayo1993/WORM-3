@@ -34,6 +34,7 @@ export default function WormPreviewCanvas({
   animated = false,
   maxPixelRatio = 2,
   framing = 'body',
+  companion,
   style,
 }) {
   const canvasRef = useRef(null);
@@ -45,7 +46,7 @@ export default function WormPreviewCanvas({
     const px = Math.min(MAX_RENDER_PX, Math.round(size * renderScale(maxPixelRatio)));
     canvas.width = px;
     canvas.height = px;
-    idRef.current = registerWormPreview(canvas, { characterId, skinId, hatId, animated, framing });
+    idRef.current = registerWormPreview(canvas, { characterId, skinId, hatId, animated, framing, companion });
     return () => {
       if (idRef.current !== null) unregisterWormPreview(idRef.current);
       idRef.current = null;
@@ -55,8 +56,8 @@ export default function WormPreviewCanvas({
   }, [size, maxPixelRatio]);
 
   useEffect(() => {
-    if (idRef.current !== null) updateWormPreview(idRef.current, { characterId, skinId, hatId, animated, framing });
-  }, [characterId, skinId, hatId, animated, framing]);
+    if (idRef.current !== null) updateWormPreview(idRef.current, { characterId, skinId, hatId, animated, framing, companion });
+  }, [characterId, skinId, hatId, animated, framing, companion]);
 
   return (
     <canvas
