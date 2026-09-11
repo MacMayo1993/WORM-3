@@ -98,6 +98,9 @@ import {
     SPECIAL_LIFETIME,
     ROCKET_DURATION,
     ROCKET_SPEED_MULT,
+    ROCKET_FLIGHT_TAKEOFF,
+    ROCKET_FLIGHT_LANDING,
+    ROCKET_LANDING_GRACE,
     MAGNET_DURATION,
     MAGNET_RADIUS,
     ELEMENTAL_DURATION,
@@ -214,6 +217,7 @@ export function makeWormSim(size) {
         specialPicker: makeSpecialPicker(),
         rocketActive: false,      // protected three-second overdrive
         rocketT: 0,
+        rocketFlight: 0, // launch/landing progress, independent of refreshed fuel
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalType: null,      // active elemental wash ('water'|'fire'|'grass'|'ice'|null)
@@ -344,6 +348,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.specialPicker = makeSpecialPicker();
     sim.rocketActive = false;
     sim.rocketT = 0;
+    sim.rocketFlight = 0;
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.elementalType = null;
@@ -422,6 +427,7 @@ export function startRocket(sim, ctx) {
         return;
     }
     sim.rocketActive = true;
+    sim.rocketFlight = 0;
     sim.rocketT = ROCKET_DURATION;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -1370,7 +1376,7 @@ const PHASE_HANDLERS = {
                         if (ttAt(sim.tileTrail, ti) === nextKey) { bodyHit = true; break; }
                     }
                     const nextOnSurface = isSurfaceTilePos(nextPos, size);
-                    const selfHit = nextOnSurface && !sim.rocketActive && sim.selfCollisionGraceSteps <= 0 && bodyHit;
+                    const selfHit = nextOnSurface && !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 && bodyHit;
                     if (selfHit) {
                         // Defer self-hit until we've penetrated the tile by 40%.
                         // This gives players a short reaction window to jump over their body.
@@ -1440,7 +1446,7 @@ const PHASE_HANDLERS = {
                     ctx.onFlippedTile(sim.onFlippedTile);
                 }
 
-                if (isFlipped && !sim.rocketActive) {
+                if (isFlipped && !sim.rocketActive && sim.landingGraceT <= 0) {
                     sim.pendingTunnelTrigger = { x, y, z, dirKey };
                     // Swept-entry guard: if the step accumulator remainder indicates the worm
                     // has already spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on
@@ -1717,8 +1723,14 @@ export function stepWormSim(sim, delta, size, ctx) {
     }
     if (sim.phase === 'crawling' && sim.rocketT > 0) {
         sim.rocketT = Math.max(0, sim.rocketT - delta);
+        sim.rocketFlight = Math.max(0, Math.min(
+            1, (sim.rocketFlight ?? 0) + delta / ROCKET_FLIGHT_TAKEOFF,
+            sim.rocketT / ROCKET_FLIGHT_LANDING
+        ));
         if (sim.rocketT === 0) {
             sim.rocketActive = false;
+            sim.landingGraceT = ROCKET_LANDING_GRACE;
+            sim.selfCollisionGraceSteps = Math.max(sim.selfCollisionGraceSteps, STEPS_PER_TILE);
             sim.pendingSelfCollision = null;
             sim.pendingTunnelTrigger = null;
             ctx.feel('rocketLand');
@@ -1727,8 +1739,11 @@ export function stepWormSim(sim, delta, size, ctx) {
     }
 
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
-    // Rocket is 4× the user's current speed; the normal boost does not stack.
-    const speedMult = sim.rocketActive ? ROCKET_SPEED_MULT : boostMult;
+    // Throttle follows the same smooth flight phase as the rendered body.
+    // Blend back to any remaining ordinary boost instead of snapping at touchdown.
+    const flight = sim.rocketFlight ?? 0;
+    const throttle = flight * flight * (3 - 2 * flight);
+    const speedMult = sim.rocketActive ? boostMult + (ROCKET_SPEED_MULT - boostMult) * throttle : boostMult;
     const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step
@@ -2070,7 +2085,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
             sim.lastFlipped = landedFlipped;
             ctx.onFlippedTile(landedFlipped);
         }
-        if (landedFlipped && !sim.rocketActive) sim.pendingTunnelTrigger = { x, y, z, dirKey };
+        if (landedFlipped && !sim.rocketActive && sim.landingGraceT <= 0) sim.pendingTunnelTrigger = { x, y, z, dirKey };
         // The trail and head now share the committed coordinate frame with the
         // refreshed tunnel lookup, so the ring check skipped during traversal is safe.
         tryWormholeRingHeal(sim, size, ctx);

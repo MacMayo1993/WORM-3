@@ -1053,3 +1053,41 @@ describe('buff readout (HUD presentation rules)', () => {
     expect(r.rocketActive).toBe(false);
   });
 });
+
+describe('rocket launch, refresh and touchdown continuity', () => {
+  it('ramps up instead of starting at full throttle', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    expect(sim.rocketFlight).toBe(0);
+    run(sim, ctx, 0.1);
+    expect(sim.rocketFlight).toBeGreaterThan(0);
+    expect(sim.rocketFlight).toBeLessThan(1);
+    run(sim, ctx, 0.5);
+    expect(sim.rocketFlight).toBe(1);
+  });
+  it('refreshes fuel without resetting altitude, including during descent', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION - 0.2);
+    const phase = sim.rocketFlight;
+    const height = rocketFlightLift(true, sim.rocketT, phase);
+    expect(phase).toBeGreaterThan(0);
+    expect(phase).toBeLessThan(1);
+    startRocket(sim, ctx);
+    expect(sim.rocketFlight).toBe(phase);
+    expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBe(height);
+    run(sim, ctx, 0.1);
+    expect(sim.rocketFlight).toBeGreaterThan(phase);
+  });
+  it('grants landing grace and clears flight state on reset', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION + 0.1);
+    expect(sim.rocketActive).toBe(false);
+    expect(sim.rocketFlight).toBe(0);
+    expect(sim.landingGraceT).toBeGreaterThan(0.8);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.rocketFlight).toBe(0);
+    expect(sim.landingGraceT).toBe(0);
+  });
+});

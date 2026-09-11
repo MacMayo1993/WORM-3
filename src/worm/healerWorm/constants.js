@@ -191,7 +191,7 @@ export const SPECIAL_TUNNEL_RADIUS = 2;
 // long instead of falling back to an arbitrary tile somewhere on the cube.
 export const SPECIAL_SPAWN_RETRY = 2;
 
-// Rocket — a short, grounded overdrive. It quadruples the player's configured speed
+// Rocket — protected flight with a smooth ramp up to four times the configured speed
 // (rather than replacing it with a jump), ignores collisions and wormhole mouths,
 // and advertises the protected window with a flame at the tail.
 export const ROCKET_DURATION = 3;
@@ -207,12 +207,13 @@ export const ROCKET_FLIGHT_LANDING = 0.5;  // seconds to settle before the burn 
 // The ramp itself lives in rocketOrbit.js (rocketOrbitT), which also owns where
 // the worm actually flies — this stays as the plain altitude for anything that
 // only wants a height, and so the two can never drift out of step.
-export const rocketFlightLift = (active, rocketT) => {
+export const rocketFlightLift = (active, rocketT, flightPhase) => {
   if (!active) return 0;
   const elapsed = ROCKET_DURATION - rocketT;
   const up = Math.min(1, elapsed / ROCKET_FLIGHT_TAKEOFF);
   const down = Math.min(1, rocketT / ROCKET_FLIGHT_LANDING);
-  return Math.max(0, Math.min(up, down)) * ROCKET_FLIGHT_HEIGHT;
+  const phase = Math.max(0, Math.min(1, flightPhase ?? Math.min(up, down)));
+  return phase * phase * (3 - 2 * phase) * ROCKET_FLIGHT_HEIGHT;
 };
 // Seconds of protection after a rocket touches down, ≈ one tile at base speed. A
 // flight that ends on top of your own tail, a wormhole mouth or a turning slice

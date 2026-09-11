@@ -47,3 +47,17 @@ export function sampleCubeWorm(distance, position, normal, forward, antipodal = 
     forward.negate();
   }
 }
+
+const wiggleSide = new Vector3();
+// Reproject the lateral body wave onto the rounded surface at every edge.
+export function sampleWigglingCubeWorm(distance, segment, time, position, normal, forward, antipodal = false) {
+  sampleCubeWorm(distance, position, normal, forward);
+  wiggleSide.crossVectors(normal, forward).normalize();
+  const amplitude = 0.035 + 0.18 * Math.sin(Math.min(1, segment / 8) * Math.PI * 0.8);
+  position.addScaledVector(wiggleSide, Math.sin(segment * 0.85 - time * 7) * amplitude);
+  const x = clamp(position.x), y = clamp(position.y), z = clamp(position.z);
+  normal.set(position.x - x, position.y - y, position.z - z).normalize();
+  position.set(x, y, z).addScaledVector(normal, CUBE_WORM_CLEARANCE);
+  forward.addScaledVector(normal, -forward.dot(normal)).normalize();
+  if (antipodal) { position.negate(); normal.negate(); forward.negate(); }
+}
