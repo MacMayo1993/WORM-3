@@ -1,26 +1,44 @@
-// A rounded perimeter outside the mode plates, expressed entirely in cube space.
-// Straight runs stay on a face; quarter-circles carry the body around each edge.
+import { CatmullRomCurve3, Vector3 } from 'three';
+
 export const CUBE_WORM_HALF = 1.58;
 export const CUBE_WORM_CLEARANCE = 0.16;
-export const CUBE_WORM_LAP = 4 * (2 * CUBE_WORM_HALF + Math.PI * CUBE_WORM_CLEARANCE / 2);
-export function sampleCubeWorm(distance, position, normal, forward) {
-  const h = CUBE_WORM_HALF, r = CUBE_WORM_CLEARANCE;
-  const side = CUBE_WORM_LAP / 4;
-  const s = ((distance % CUBE_WORM_LAP) + CUBE_WORM_LAP) % CUBE_WORM_LAP;
-  const quarter = Math.floor(s / side), u = s - quarter * side;
-  let x, z, nx, nz, tx, tz;
-  if (u < 2 * h) {
-    x = -h + u; z = h + r; nx = 0; nz = 1; tx = 1; tz = 0;
-  } else {
-    const angle = (u - 2 * h) / r;
-    nx = Math.sin(angle); nz = Math.cos(angle);
-    x = h + r * nx; z = h + r * nz; tx = nz; tz = -nx;
+// A closed route through front, right, top, back, left, bottom. Project onto
+// the rounded cube, never interpolate a chord through the cube's interior.
+const route = new CatmullRomCurve3([
+  [0.6, 0.65, 3], [3, 0.6, -0.6], [0.5, 3, -0.6],
+  [-0.6, 0.6, -3], [-3, -0.6, 0.6], [0.6, -3, 0.6]
+].map(p => new Vector3(...p)), true, 'centripetal');
+const direction = new Vector3(), next = new Vector3(), scratchNormal = new Vector3();
+const clamp = v => Math.max(-CUBE_WORM_HALF, Math.min(CUBE_WORM_HALF, v));
+function project(t, position, normal) {
+  route.getPoint(((t % 1) + 1) % 1, direction).normalize();
+  let low = 0, high = 4;
+  for (let i = 0; i < 28; i++) {
+    const mid = (low + high) / 2;
+    const x = direction.x * mid, y = direction.y * mid, z = direction.z * mid;
+    if (Math.hypot(x - clamp(x), y - clamp(y), z - clamp(z)) > CUBE_WORM_CLEARANCE) high = mid;
+    else low = mid;
   }
-  const angle = quarter * Math.PI / 2, c = Math.cos(angle), t = Math.sin(angle);
-  // The same traveling wave is sampled by every bead, so the tail follows the head.
-  const y = 1.03 + 0.10 * Math.sin(s * 24 * Math.PI / CUBE_WORM_LAP);
-  const dy = 0.10 * 24 * Math.PI / CUBE_WORM_LAP * Math.cos(s * 24 * Math.PI / CUBE_WORM_LAP);
-  position.set(c * x + t * z, y, -t * x + c * z);
-  normal.set(c * nx + t * nz, 0, -t * nx + c * nz);
-  forward.set(c * tx + t * tz, dy, -t * tx + c * tz).normalize();
+  position.copy(direction).multiplyScalar((low + high) / 2);
+  normal.set(position.x - clamp(position.x), position.y - clamp(position.y), position.z - clamp(position.z)).normalize();
+}
+// Fixed arc-length table keeps climbing speed and body spacing consistent.
+const SAMPLES = 512;
+const lengths = new Float64Array(SAMPLES + 1);
+const previous = new Vector3(), point = new Vector3();
+project(0, previous, scratchNormal);
+for (let i = 1; i <= SAMPLES; i++) {
+  project(i / SAMPLES, point, scratchNormal);
+  lengths[i] = lengths[i - 1] + previous.distanceTo(point);
+  previous.copy(point);
+}
+export const CUBE_WORM_LAP = lengths[SAMPLES];
+export function sampleCubeWorm(distance, position, normal, forward) {
+  const s = ((distance % CUBE_WORM_LAP) + CUBE_WORM_LAP) % CUBE_WORM_LAP;
+  let lo = 0, hi = SAMPLES;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (lengths[mid] <= s) lo = mid; else hi = mid; }
+  const t = (lo + (s - lengths[lo]) / (lengths[hi] - lengths[lo])) / SAMPLES;
+  project(t, position, normal);
+  project(t + 0.00001, next, scratchNormal);
+  forward.subVectors(next, position).addScaledVector(normal, -forward.dot(normal)).normalize();
 }
