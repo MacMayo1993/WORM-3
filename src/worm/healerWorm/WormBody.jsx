@@ -29,7 +29,6 @@ import { createMobiSegmentAssets, disposeMobiSegmentAssets, MOBI_SEGMENT_RADIUS 
 import { getWormCharacter } from '../wormCharacterData.js';
 import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../wormSkinMaterial.js';
-import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
     PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
     BOOK_HEAD_RADIUS, BOOK_HEAD_LIFT, BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, TURN_SIGNAL_GAIN,
@@ -166,7 +165,6 @@ export function WormBody({ worm, size }) {
     const leftPageRef = useRef();   // book worm only — left page-stack overlay
     const rightPageRef = useRef();  // book worm only — right page-stack overlay
     const bookHeadRef = useRef();   // book worm only — the round head orb
-    const particlesGroupRef = useRef(); // ambient skin FX (embers/bubbles/sparkle/...), anchored to the head
     // Book Worm: turn force inferred from how fast the head's direction of
     // travel is swinging frame to frame (no continuous turn signal exists in
     // Healer mode's tile-based movement, so we derive one from position deltas).
@@ -317,17 +315,6 @@ export function WormBody({ worm, size }) {
         const time = characterTimeRef.current;
         if (isMobi) _mobiSpinMatrix.makeRotationY(time * 0.48);
         updateWormSkinMaterialTime(skinMaterial, time);
-
-        // Ambient skin FX (embers/bubbles/sparkle/...) hover just off the head,
-        // and hide whenever the body itself is hidden (mid-tunnel dissolve, or
-        // the worm not on the surface at all).
-        if (particlesGroupRef.current) {
-            const _particlesVisible = worm.phase.current === 'crawling' && transitScaleRef.current >= 0.015;
-            particlesGroupRef.current.visible = _particlesVisible;
-            if (_particlesVisible) {
-                particlesGroupRef.current.position.copy(_bodyHeadPos).addScaledVector(_bodyNormal, 0.05);
-            }
-        }
 
         // ── Inch Worm gait driver ──────────────────────────────────────────────
         // Consume the simulation's accumulated surface travel, including tile commits.
@@ -875,9 +862,6 @@ export function WormBody({ worm, size }) {
                 <sphereGeometry args={[1, 16, 16]} />
                 <primitive object={skinMaterial} attach="material" />
             </instancedMesh>
-            <group ref={particlesGroupRef}>
-                <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />
-            </group>
         </>
     ) : (
         /* Sphere body — Classic, Inch Worm, Glow Worm.
@@ -908,9 +892,6 @@ export function WormBody({ worm, size }) {
                     renderOrder={-1}
                 />
             )}
-            <group ref={particlesGroupRef}>
-                <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />
-            </group>
         </>
     );
 }

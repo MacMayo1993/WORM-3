@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
-import { getSkins, getHats, getTrails, getSchemes, getTiles } from '../../utils/storeCatalog.js';
+import { getSkins, getHats, getSchemes, getTiles } from '../../utils/storeCatalog.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import { TILE_STYLE_SECTIONS } from '../../utils/tileStyleCatalog.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
@@ -31,19 +31,17 @@ const TOUCH = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transpare
 
 const SKINS   = getSkins();
 const HATS    = getHats();
-const TRAILS  = getTrails();
 const SCHEMES = getSchemes();
 const TILES   = getTiles();
 
 const TABS = [
   { id: 'skins',   label: 'Skins',    accent: '#2D7A3A', items: SKINS },
   { id: 'hats',    label: 'Hats',     accent: '#6A2C91', items: HATS },
-  { id: 'trails',  label: 'Trails',   accent: '#0D9488', items: TRAILS },
   { id: 'schemes', label: 'Palettes', accent: '#1565C0', items: SCHEMES },
   { id: 'tiles',   label: 'Tiles',    accent: '#C44B00', items: TILES },
 ];
 
-const ALL_ITEMS = [...SKINS, ...HATS, ...TRAILS, ...SCHEMES, ...TILES];
+const ALL_ITEMS = [...SKINS, ...HATS, ...SCHEMES, ...TILES];
 
 // The store is full-bleed, but the collection itself is a column: past ~1000px
 // the cards stop spreading so the masthead, tabs, grid, and footnote stay in one
@@ -307,7 +305,7 @@ const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
 // catalogue order.
 const TILE_ORDER = TILE_SECTIONS.flatMap(s => s.items);
 
-const TAB_ITEMS = { skins: SKINS, hats: HATS, trails: TRAILS, schemes: SCHEMES, tiles: TILE_ORDER };
+const TAB_ITEMS = { skins: SKINS, hats: HATS, schemes: SCHEMES, tiles: TILE_ORDER };
 
 // ── Viewport ──────────────────────────────────────────────────────────────────
 // The plate is sized from the screen rather than a fixed px so a phone spends

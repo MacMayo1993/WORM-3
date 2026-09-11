@@ -14,7 +14,6 @@ import { getSkin } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
 import { getSkinFX } from './wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from './wormSkinMaterial.js';
-import WormSkinParticles from './WormSkinParticles.jsx';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
   SPINE_GEO_ARGS, createBookPageGeometry, turnSignalFromDirections, smoothTurn, pageHingeAngles,
@@ -412,9 +411,6 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   opacity={isMobi ? opacity * 0.65 : opacity}
                 />
               </mesh>
-              {isHead && (
-                <WormSkinParticles skinId={wormSkinId} glowColor={GLOW_COLOR} />
-              )}
 
               {/* Book Worm: a stack of thin page layers hinged along the
                   cover's spine (local Z, the direction of travel in this
