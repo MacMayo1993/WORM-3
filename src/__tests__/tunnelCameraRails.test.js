@@ -10,10 +10,16 @@ import {
   portalDist,
   portalUp,
   ENTER_END_T,
-  projectToTileCenterAxisInto
+  projectToTileCenterAxisInto,
+  blendTunnelPosesInto,
+  tunnelExitPoseInto,
+  tunnelEntryPoseInto,
 } from '../worm/tunnelCameraRails.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { tunnelBoreRadiusAt as tubeRadiusAt } from '../utils/tunnelPath.js';
+import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
+import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
+import { getTunnelWorldPosInto } from '../worm/wormLogic.js';
 
 // A tunnel joining the middle tile of +Y to the middle tile of −Y on an n×n
 // cube: the antipodal pair with the longest, straightest path, so distances
@@ -52,18 +58,99 @@ const cornerTunnel = (size) => {
 const heightAboveEntryFace = (pos, size) => pos.y - ((size - 1) / 2 + SURFACE_OFFSET);
 
 describe('diveEase', () => {
-  it('is a back-loaded cubic pinned at both ends', () => {
+  it('eases into and out of the dive with zero endpoint velocity', () => {
     expect(diveEase(0)).toBe(0);
     expect(diveEase(1)).toBe(1);
-    // Half way through the phase the camera has covered only an eighth of the
-    // distance — that back-loading is what makes it read as a rush rather than
-    // a drift, and is what keeps the camera outside the cube until the handoff.
-    expect(diveEase(0.5)).toBeCloseTo(0.125, 6);
+    // Smooth position, velocity and acceleration at both handoffs.
+    expect(diveEase(0.5)).toBeCloseTo(0.5, 6);
+    const h = 1e-4;
+    expect(diveEase(h) / h).toBeLessThan(1e-6);
+    expect((1 - diveEase(1 - h)) / h).toBeLessThan(1e-6);
   });
 
   it('clamps out-of-range progress', () => {
     expect(diveEase(-3)).toBe(0);
     expect(diveEase(4)).toBe(1);
+  });
+});
+
+describe('tunnel camera phase transitions', () => {
+  it('blends opposite up vectors as rotations, without collapsing the view', () => {
+    const a = makeTunnelCamPose();
+    a.cam.set(0, 0, 4); a.look.set(0, 0, 0); a.up.set(0, 1, 0);
+    const b = makeTunnelCamPose();
+    b.cam.copy(a.cam); b.look.copy(a.look); b.up.set(0, -1, 0);
+    const out = makeTunnelCamPose();
+    for (let t = 0; t <= 1; t += 0.01) {
+      blendTunnelPosesInto(out, a, b, t);
+      expect(out.up.length()).toBeCloseTo(1, 8);
+      expect(out.look.distanceTo(out.cam)).toBeGreaterThan(1);
+      expect(Math.abs(out.up.dot(out.look.clone().sub(out.cam).normalize()))).toBeLessThan(1e-7);
+    }
+  });
+
+  it('uses the exit aperture before moving sideways on every face', () => {
+    for (const size of [3, 5, 15]) {
+      const m = Math.floor(size / 2), n = size - 1;
+      const tile = key => ({
+        x: key === 'PX' ? n : key === 'NX' ? 0 : m,
+        y: key === 'PY' ? n : key === 'NY' ? 0 : m,
+        z: key === 'PZ' ? n : key === 'NZ' ? 0 : m, dirKey: key,
+      });
+      for (const key of Object.keys(FACE_NORMALS)) {
+        const opposite = (key[0] === 'P' ? 'N' : 'P') + key[1];
+        const tunnel = { entry: tile(opposite), exit: tile(key) };
+        const exit = getTunnelWorldPosInto(new THREE.Vector3(), tunnel, 1, size);
+        const normal = FACE_NORMALS[key];
+        const pose = makeTunnelCamPose();
+        let checkedMouth = false;
+        let previous = null;
+        for (let i = 0; i <= 1000; i++) {
+          tunnelExitPoseInto(pose, tunnel, i / 1000, size);
+          expect([...pose.cam, ...pose.look, ...pose.up].every(Number.isFinite)).toBe(true);
+          expect(pose.look.distanceTo(pose.cam)).toBeGreaterThan(1);
+          if (previous) expect(pose.cam.distanceTo(previous)).toBeLessThan(0.15);
+          previous = pose.cam.clone();
+          const delta = pose.cam.clone().sub(exit);
+          const height = delta.dot(normal);
+          if (Math.abs(height) < 0.1) {
+            checkedMouth = true;
+            expect(delta.addScaledVector(normal, -height).length()).toBeLessThan(0.08);
+          }
+        }
+        expect(checkedMouth).toBe(true);
+        expect(tunnelCameraInside(pose.cam, size, 'exiting')).toBe(false);
+      }
+    }
+  });
+
+  it('dives through the entry tile on corner tunnels, including mega cubes', () => {
+    for (const size of [3, 5, 15]) {
+      const tunnel = cornerTunnel(size);
+      const entry = getTunnelWorldPosInto(new THREE.Vector3(), tunnel, 0, size);
+      const start = makeTunnelCamPose(), out = makeTunnelCamPose(), end = makeTunnelCamPose();
+      start.cam.copy(entry).addScaledVector(FACE_NORMALS.PY, portalDist(size));
+      start.look.copy(entry); start.up.set(1, 0, 0);
+      let checked = false;
+      for (let i = 0; i <= 1000; i++) {
+        tunnelEntryPoseInto(out, tunnel, i / 1000, size, start);
+        if (Math.abs(out.cam.y - entry.y) < 0.1) {
+          checked = true;
+          expect(Math.hypot(out.cam.x - entry.x, out.cam.z - entry.z)).toBeLessThan(1e-6);
+        }
+      }
+      expect(checked).toBe(true);
+      tunnelCamPoseInto(end, tunnel, ENTER_END_T, size);
+      expect(out.cam.distanceTo(end.cam)).toBeLessThan(1e-8);
+      expect(out.look.distanceTo(end.look)).toBeLessThan(1e-8);
+    }
+  });
+
+  it('shows the interior during a dive only once the lens crosses the surface', () => {
+    expect(tunnelCameraInside(new THREE.Vector3(0, 0, 2), 3, 'entering')).toBe(false);
+    expect(tunnelCameraInside(new THREE.Vector3(0, 0, 1.4), 3, 'entering')).toBe(true);
+    expect(tunnelCameraInside(new THREE.Vector3(0, 0, 1.6), 3, 'exiting')).toBe(false);
+    expect(tunnelCameraInside(new THREE.Vector3(0, 0, 0), 3, 'crawling')).toBe(false);
   });
 });
 

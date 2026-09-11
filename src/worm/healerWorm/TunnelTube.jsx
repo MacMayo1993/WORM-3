@@ -21,6 +21,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getTunnelWorldPosInto } from '../wormLogic.js';
+import { diveProgress } from '../tunnelCameraRails.js';
 import { tunnelBoreRadiusAt } from '../../utils/tunnelPath.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
@@ -168,7 +169,10 @@ const fragmentShader = `
     // has depth instead of being uniformly lit end to end. The falloff has to be
     // wide: anchoring tunnels on their tiles made each arm ~5x longer, so a tight
     // pool leaves almost the whole shaft unlit.
-    float headGlow = exp(-pow((vUv.y - uHead) / 0.32, 2.0));
+    float headGlow = exp(-pow((vUv.y - uHead) / 0.22, 2.0));
+    float wake = step(vUv.y, uHead) * exp(-(uHead - vUv.y) * 5.0);
+    // One luminous seam visibly carries the half-twist through the shaft.
+    float twistStripe = pow(max(0.0, cos(vUv.x * 6.2831853 - vUv.y * 3.14159265)), 36.0);
 
     // Both mouths open out to nothing so the tube never ends in a hard disc, and
     // so the ends do not read as geometry hanging outside the cube.
@@ -195,6 +199,7 @@ const fragmentShader = `
     col += vec3(1.0) * pow(streak, 3.0) * 0.22;
     col += accent * rings  * 0.55;
     col += base   * ribs   * 0.30;
+    col += accent * twistStripe * (0.18 + 0.4 * wake);
     col += vec3(1.0) * seam * 1.10;
 
     // Wall and seam are summed separately: the seam peaks exactly where coreFade
@@ -232,6 +237,7 @@ export function TunnelTube({ worm, size }) {
   const meshRef = useRef();
   const opacityRef = useRef(0);
   const builtForRef = useRef(null);
+  const lastTunnelRef = useRef(null);
 
   const geo = useMemo(() => createTubeGeometry(), []);
   const uniforms = useMemo(() => ({
@@ -305,19 +311,24 @@ export function TunnelTube({ worm, size }) {
 
   useFrame((_state, delta) => {
     const phase = worm.phase.current;
-    const tunnel = worm.activeTunnel.current;
+    const tailPassage = worm.tunnelPassages?.current?.at(-1);
+    const occupyingTunnel = worm.activeTunnel.current ?? tailPassage?.tunnel;
+    if (occupyingTunnel) lastTunnelRef.current = occupyingTunnel;
+    const tunnel = occupyingTunnel ?? lastTunnelRef.current;
     const riding = phase === 'tunnel' || phase === 'exiting';
     const entering = phase === 'entering';
 
-    // Same cubic the camera dives on (WormChaseCamera), so wall strength and
+    // Same easing the camera dives on (WormChaseCamera), so wall strength and
     // approach speed are the same curve.
     const enterP = Math.min(1, Math.max(0, worm.tunnelProgress.current ?? 0));
-    const dive = enterP * enterP * enterP;
-    const target = riding ? OP_RIDE : entering ? OP_ENTER + (OP_RIDE - OP_ENTER) * dive : 0;
+    const dive = diveProgress(enterP);
+    const target = riding ? OP_RIDE : entering ? OP_ENTER + (OP_RIDE - OP_ENTER) * dive
+      : (phase === 'windout' || tailPassage) ? OP_ENTER : 0;
     const lerp = target > opacityRef.current ? OP_LERP_IN : OP_LERP_OUT;
     opacityRef.current += (target - opacityRef.current) * Math.min(1, delta * lerp);
 
-    uniforms.uTime.value += delta;
+    const st = useGameStore.getState();
+    if (!st.wormPaused && st.wormAlive) uniforms.uTime.value += delta;
     uniforms.uOpacity.value = opacityRef.current;
 
     if (!meshRef.current) return;
@@ -328,7 +339,7 @@ export function TunnelTube({ worm, size }) {
     }
     meshRef.current.visible = true;
 
-    const key = tunnel.pairId ?? `${tunnel.entry?.dirKey}-${tunnel.exit?.dirKey}`;
+    const key = `${size}:${tunnel.entry.x},${tunnel.entry.y},${tunnel.entry.z},${tunnel.entry.dirKey}:${tunnel.exit.x},${tunnel.exit.y},${tunnel.exit.z},${tunnel.exit.dirKey}`;
     if (builtForRef.current !== key) {
       const st = useGameStore.getState();
       const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
@@ -343,7 +354,7 @@ export function TunnelTube({ worm, size }) {
     const tp = worm.tunnelProgress.current ?? 0;
     uniforms.uHead.value = phase === 'tunnel' ? 0.33 + tp * 0.34
       : phase === 'exiting' ? 0.67 + tp * 0.33
-        : tp * 0.33;
+        : phase === 'entering' ? tp * 0.33 : 1;
   });
 
   return (

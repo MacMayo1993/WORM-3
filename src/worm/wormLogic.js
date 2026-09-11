@@ -8,8 +8,8 @@ import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap 
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { isSurfaceSticker } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
-import { DIR_FORWARD } from './healerWorm/constants.js';
-import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { DIR_FORWARD, WORM_LIFT } from './healerWorm/constants.js';
+import { TUNNEL_ANCHOR_OFFSET, SURFACE_OFFSET } from '../utils/constants.js';
 import {
   makeTunnelPath,
   buildTunnelPathInto,
@@ -534,7 +534,7 @@ export const getWindWorldPosInto = (out, tunnel, side, s, size) => {
   const env = Math.sin(cl * Math.PI);
   const radius = WIND_RADIUS * env;
   const angle = cl * WIND_TURNS * Math.PI * 2;
-  const lift = WIND_LIFT * env + 0.06; // just above the surface at both ends
+  const lift = WIND_LIFT * env + THREE.MathUtils.lerp(WORM_LIFT, TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, cl); // just above the surface at both ends
   const cos = Math.cos(angle) * radius;
   const sin = Math.sin(angle) * radius;
   out.set(

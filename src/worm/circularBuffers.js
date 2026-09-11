@@ -7,19 +7,22 @@ import * as THREE from 'three';
 // can ride a mid-rotation slice (and bake the turn at commit) without snapping.
 export function makeStepHistory(capacity) {
     return {
-        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3(), tx: -1, ty: -1, tz: -1 })),
+        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3(), tx: -1, ty: -1, tz: -1, transit: false })),
+        distance: 0, // monotonic length of the recorded route, including tunnel travel
         head: 0,   // next write slot; newest entry is at (head-1+capacity)%capacity
         count: 0,
         capacity,
     };
 }
-export function shPush(sh, pos, normal, tx, ty, tz) {
+export function shPush(sh, pos, normal, tx, ty, tz, transit = false) {
+    if (sh.count > 0) sh.distance += shAt(sh, 0).pos.distanceTo(pos);
     const slot = sh.buf[sh.head];
     slot.pos.copy(pos);
     slot.normal.copy(normal);
     slot.tx = tx;
     slot.ty = ty;
     slot.tz = tz;
+    slot.transit = transit;
     sh.head = (sh.head + 1) % sh.capacity;
     if (sh.count < sh.capacity) sh.count++;
 }
@@ -49,7 +52,7 @@ export function advanceStepPathCursor(cursor) {
 export function shTrimTo(sh, maxCount) {
     if (maxCount < sh.count) sh.count = maxCount;
 }
-export function shReset(sh) { sh.head = 0; sh.count = 0; }
+export function shReset(sh) { sh.head = 0; sh.count = 0; sh.distance = 0; }
 
 // ─── Tile Trail Circular Buffer ───────────────────────────────────────────────
 // O(1) push replaces the O(N) unshift on a 1 200-entry string array.

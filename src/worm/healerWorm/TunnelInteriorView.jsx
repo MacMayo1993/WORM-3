@@ -1,5 +1,6 @@
 // src/worm/healerWorm/TunnelInteriorView.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
+import { tunnelCameraInside } from '../tunnelVisibility.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -137,19 +138,17 @@ export function TunnelInteriorView({ worm, size }) {
         edgeGeo.dispose(); planeGeo.dispose(); backingGeo.dispose(); dimGeo.dispose();
     }, [edgeGeo, planeGeo, backingGeo, dimGeo]);
 
-    useFrame((_, delta) => {
+    useFrame((_state, delta) => {
         const phase = worm.phase.current;
         const prevPhase = prevPhaseRef.current;
-        // Only DRAWN while the camera is genuinely inside. Including 'entering' meant
-        // the interior shell was drawn during the dive, which — with the real cube
-        // hidden at the same time — let the player see straight through the near walls
-        // to the far inner faces. The dive is an exterior shot; the cube must look solid.
-        const active = phase === 'tunnel' || phase === 'exiting';
+        // The camera can cross a mouth partway through entering/exiting.
+        // Use the same lens boundary as the exterior instead of hiding by phase.
+        const active = tunnelCameraInside(_state.camera.position, size, phase);
         // ...but the traversal as a whole starts at 'entering', which is when the
         // sticker materials get assigned. These have to be separate: keying the
         // assignment's lifetime off `active` cleared it one frame after it was set,
         // so the stickers were never revealed and the cube read as solid black.
-        const inTraversal = active || phase === 'entering';
+        const inTraversal = phase !== 'crawling';
 
         // Batch-assign sticker materials ONCE on tunnel entry (opacity still ~0, so no visible pop).
         // Avoids 54+ per-frame GPU state changes that caused hitching on the first visible frame.

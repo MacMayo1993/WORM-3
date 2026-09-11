@@ -35,8 +35,6 @@ import { getStickerSafe } from '../../game/cubeState.js';
 import { rotateVec90 } from '../../game/cubeRotation.js';
 import {
     getNextSurfacePosition,
-    getTunnelWorldPosSmoothInto,
-    getWindWorldPosInto,
     turnWorm,
     getStableKey,
     isTileInSlice,
@@ -78,7 +76,6 @@ import {
     STEPS_PER_TILE,
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
-    windoutHeadS,
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
     MAX_JUMPS,
     HEAL_PAUSE_DURATION,
@@ -116,6 +113,8 @@ import {
     MAX_ORB_ATTRACTION_FX,
     activeTunnelCap,
 } from './constants.js';
+
+import { advanceTunnelHead, tunnelTailCleared } from './tunnelTrail.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
 const _bakeAxis = new THREE.Vector3();
@@ -233,6 +232,7 @@ export function makeWormSim(size) {
         rand: Math.random,
 
         // ── Tunnels / wormholes ────────────────────────────────────────────────
+        tunnelApproach: new THREE.Vector3(),
         tunnelProgress: 0,
         activeTunnel: null,
         pendingTunnelTrigger: null,
@@ -246,7 +246,7 @@ export function makeWormSim(size) {
         currentTunnelStableKey: null, // stable key of the tunnel being traversed
         currentTunnelKey: null,       // canonical key (for use-count cleanup on heal)
         pendingTunnelHeal: null,      // resolved only after the tail clears the exit
-        windoutTailCleared: false,    // holds one rendered frame at full emergence before heal FX
+        tunnelPassages: [], // completed head transits whose tails still occupy their routes
         ringHealedTunnelKeys: new Set(), // suppress repeat fires while the healed lookup retires
 
         // ── Collision ──────────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.currentTunnelStableKey = null;
     sim.currentTunnelKey = null;
     sim.pendingTunnelHeal = null;
-    sim.windoutTailCleared = false;
+    sim.tunnelPassages = [];
     sim.ringHealedTunnelKeys.clear();
     sim.willHeal = false;
     sim.healFired = false;
@@ -565,6 +565,8 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
     const postDepositProgress = ctx.getHealingProgress()?.[stableKey];
     sim.willHeal = isHealReady(postDepositProgress?.deposited);
 
+    sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
+    sim.headInterpPos.copy(sim.tunnelApproach);
     sim.activeTunnel = tunnel;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -1462,13 +1464,9 @@ const PHASE_HANDLERS = {
     // publishes wormPhase:'windup' via ctx.onTunnelEnter, so no enter() here.
     windup: {
         update(sim, size, _ctx, delta) {
-            sim.tunnelProgress += delta * (1.5 * TUNNEL_SPEED_SCALE);
-            if (sim.activeTunnel) {
-                const s = Math.min(1, sim.tunnelProgress); // 0 (far/lifted) → 1 (on hole)
-                getWindWorldPosInto(sim.headInterpPos, sim.activeTunnel, 'entry', s, size);
-                const entryN = FACE_NORMALS[sim.activeTunnel.entry.dirKey];
-                if (entryN) sim.currentNormal.copy(entryN);
-            }
+            const nextProgress = sim.tunnelProgress + delta * (1.5 * TUNNEL_SPEED_SCALE);
+            advanceTunnelHead(sim, 'windup', nextProgress, size);
+            sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
                 sim.tunnelProgress = 0;
                 sim.phase = 'entering'; // entering.enter() fires next tick
@@ -1482,14 +1480,9 @@ const PHASE_HANDLERS = {
             ctx.onPhase('entering');
         },
         update(sim, size, _ctx, delta) {
-            sim.tunnelProgress += delta * (1.2 * TUNNEL_SPEED_SCALE);
-            if (sim.activeTunnel) {
-                // Head travels first third of the tunnel (entry face → cube interior)
-                const tunnelT = sim.tunnelProgress * 0.33;
-                getTunnelWorldPosSmoothInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
-                const entryN = FACE_NORMALS[sim.activeTunnel.entry.dirKey];
-                if (entryN) sim.currentNormal.copy(entryN);
-            }
+            const nextProgress = sim.tunnelProgress + delta * (1.2 * TUNNEL_SPEED_SCALE);
+            advanceTunnelHead(sim, 'entering', nextProgress, size);
+            sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
                 sim.tunnelProgress = 0;
                 sim.phase = 'tunnel';
@@ -1504,17 +1497,9 @@ const PHASE_HANDLERS = {
             ctx.onPhase('tunnel');
         },
         update(sim, size, _ctx, delta) {
-            sim.tunnelProgress += delta * (0.65 * TUNNEL_SPEED_SCALE);
-            if (sim.activeTunnel) {
-                // Head travels middle third of the tunnel (through cube core)
-                const tunnelT = 0.33 + sim.tunnelProgress * 0.34;
-                getTunnelWorldPosSmoothInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
-                // Switch normal to exit face at the midpoint
-                const n = sim.tunnelProgress > 0.5
-                    ? FACE_NORMALS[sim.activeTunnel.exit.dirKey]
-                    : FACE_NORMALS[sim.activeTunnel.entry.dirKey];
-                if (n) sim.currentNormal.copy(n);
-            }
+            const nextProgress = sim.tunnelProgress + delta * (0.65 * TUNNEL_SPEED_SCALE);
+            advanceTunnelHead(sim, 'tunnel', nextProgress, size);
+            sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
                 sim.tunnelProgress = 0;
                 sim.phase = 'exiting';
@@ -1536,14 +1521,9 @@ const PHASE_HANDLERS = {
             }
         },
         update(sim, size, ctx, delta) {
-            sim.tunnelProgress += delta * (1.0 * TUNNEL_SPEED_SCALE);
-            if (sim.activeTunnel) {
-                // Head travels final third of the tunnel (cube interior → exit face)
-                const tunnelT = 0.67 + sim.tunnelProgress * 0.33;
-                getTunnelWorldPosSmoothInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
-                const exitN = FACE_NORMALS[sim.activeTunnel.exit.dirKey];
-                if (exitN) sim.currentNormal.copy(exitN);
-            }
+            const nextProgress = sim.tunnelProgress + delta * (1.0 * TUNNEL_SPEED_SCALE);
+            advanceTunnelHead(sim, 'exiting', nextProgress, size);
+            sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
                 const voidKillState = sim.pendingVoidKill;
                 const exitedTunnel = sim.activeTunnel; // capture (kept alive for windout)
@@ -1557,10 +1537,10 @@ const PHASE_HANDLERS = {
                 }
 
                 // Arm the heal now, but leave both flipped tiles and the tunnel intact
-                // until windout has streamed the worm's final segment through the exit.
+                // until the recorded route proves the final segment has cleared the exit.
                 const exitProgress = exitStableKey ? (ctx.getHealingProgress()?.[exitStableKey]) : null;
                 const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel;
-                if (didHeal) {
+                if (didHeal && !sim.tunnelPassages.some(p => p.heal?.tunnelKey === exitTunnelKey)) {
                     sim.pendingTunnelHeal = {
                         tunnel: exitedTunnel,
                         stableKey: exitStableKey,
@@ -1572,6 +1552,15 @@ const PHASE_HANDLERS = {
                 // One resolution cue per traversal: triumphant chime on a heal, otherwise
                 // a plain pop as the worm bursts back out of the exit hole.
                 if (!didHeal) ctx.feel('exit');
+
+                sim.tunnelPassages.push({
+                    tunnel: exitedTunnel,
+                    tunnelKey: exitTunnelKey,
+                    exitDistance: sim.stepHistory.distance,
+                    heal: sim.pendingTunnelHeal,
+                    clearFrame: false,
+                });
+                sim.pendingTunnelHeal = null;
 
                 // Tunnel travel complete — windout spiral plays before resuming crawl.
                 // sim.activeTunnel stays alive so windout can animate the exit spiral.
@@ -1586,47 +1575,24 @@ const PHASE_HANDLERS = {
     // s runs 1→0: start at exit hole (s=1, env=0), rise to peak orbit (s=0.5, env=1),
     // settle on surface tile (s=0, env=0).
     windout: {
-        enter(sim, _size, ctx) {
+        enter(_sim, _size, ctx) {
             ctx.onPhase('windout');
-            sim.windoutTailCleared = false;
         },
         update(sim, size, ctx, delta) {
-            sim.tunnelProgress += delta * (1.5 * TUNNEL_SPEED_SCALE);
-            if (sim.activeTunnel) {
-                const s = windoutHeadS(sim.tunnelProgress, sim.tailLength);
-                getWindWorldPosInto(sim.headInterpPos, sim.activeTunnel, 'exit', s, size);
-                const exitN = FACE_NORMALS[sim.activeTunnel.exit.dirKey];
-                if (exitN) sim.currentNormal.copy(exitN);
-            }
+            const nextProgress = sim.tunnelProgress + delta * (1.5 * TUNNEL_SPEED_SCALE);
+            advanceTunnelHead(sim, 'windout', nextProgress, size);
+            sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
-                // Do not close the tunnel on the same simulation tick that brings
-                // the tail to the surface. Clamp here for one complete rendered
-                // frame so WormBody can draw the very last segment fully out while
-                // both endpoint stickers remain flipped. The following tick starts
-                // the manual flip + cubie-pop heal animation.
-                if (!sim.windoutTailCleared) {
-                    sim.tunnelProgress = 1;
-                    sim.windoutTailCleared = true;
-                    return false;
-                }
-                const pending = sim.pendingTunnelHeal;
-                if (pending) {
-                    const { tunnel, stableKey, tunnelKey } = pending;
-                    sim.healFired = true;
-                    sim.healed += 1;
-                    ctx.applyHeal(tunnel.entry, tunnel.exit, stableKey, sim.healed);
-                    sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
-                    spawnSpecial(sim, size, ctx, tunnel.exit);
-                    if (tunnelKey) {
-                        sim.tunnelUseCounts.delete(tunnelKey);
-                        sim.voidTunnelKeys.delete(tunnelKey);
-                        if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
-                    }
-                    ctx.feel('heal');
-                    sim.pendingTunnelHeal = null;
-                }
+                // Resume from the exit pose, never interpolate from the old entry tile.
+                sim.headInterpPos.copy(sim.curWorldPos);
+                sim.prevWorldPos = null;
+                sim.prevTile = null;
+                sim.crossingCorner = false;
+                sim.restRead = null;
+                sim.interpT = 1;
+                sim.stepAcc = 0;
+                sim.lastRecordedT = 1 + 1 / STEPS_PER_TILE;
                 sim.tunnelProgress = 0;
-                sim.windoutTailCleared = false;
                 sim.activeTunnel = null;
                 sim.phase = 'crawling';
                 // crawling.enter() fires next tick → grace steps + crawl-resume publish
@@ -1865,6 +1831,37 @@ export function stepWormSim(sim, delta, size, ctx) {
         sim.prevPhase = currentPhase;
     }
     PHASE_HANDLERS[currentPhase].update(sim, size, ctx, delta, STEP_SEC);
+    for (let i = sim.tunnelPassages.length - 1; i >= 0; i--) {
+        const passage = sim.tunnelPassages[i];
+        // Re-entering a still-occupied pair must not close it around the new
+        // traversal. Keep one heal, and wait for the newest tail through it.
+        const reused = passage.heal && (sim.currentTunnelKey === passage.tunnelKey ||
+            sim.tunnelPassages.some(other => other !== passage && other.tunnelKey === passage.tunnelKey &&
+                !tunnelTailCleared(other, sim.stepHistory, sim.tailLength)));
+        if (reused || !tunnelTailCleared(passage, sim.stepHistory, sim.tailLength)) {
+            passage.clearFrame = false;
+            continue;
+        }
+        // One rendered frame with the tail clear before healing changes the tiles.
+        if (!passage.clearFrame) { passage.clearFrame = true; continue; }
+        const pending = passage.heal;
+        if (pending) {
+            const { tunnel, stableKey, tunnelKey } = pending;
+            sim.healFired = true;
+            sim.healed += 1;
+            ctx.applyHeal(tunnel.entry, tunnel.exit, stableKey, sim.healed);
+            sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
+            spawnSpecial(sim, size, ctx, tunnel.exit);
+            if (tunnelKey) {
+                sim.tunnelUseCounts.delete(tunnelKey);
+                sim.voidTunnelKeys.delete(tunnelKey);
+                if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
+            }
+            ctx.feel('heal');
+        }
+        sim.tunnelPassages.splice(i, 1);
+    }
+
 }
 
 /**
@@ -2145,6 +2142,11 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
                 ? sim.activeTunnel
                 : rotateTunnel(sim.pendingTunnelHeal.tunnel),
         };
+    }
+
+    for (const passage of sim.tunnelPassages) {
+        passage.tunnel = rotateTunnel(passage.tunnel);
+        if (passage.heal) passage.heal = { ...passage.heal, tunnel: passage.tunnel };
     }
 
     // The armed void kill compares the head's CURRENT tile against the exit tile it

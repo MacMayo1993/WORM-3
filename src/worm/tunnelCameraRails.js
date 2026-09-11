@@ -15,7 +15,7 @@
 // start pose.
 
 import * as THREE from 'three';
-import { buildTunnelPathForTunnel } from './wormLogic.js';
+import { buildTunnelPathForTunnel, getTunnelArcPosSmoothInto } from './wormLogic.js';
 import { makeTunnelPath, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from '../utils/tunnelPath.js';
 
 // Offset from the centerline while riding.
@@ -72,13 +72,13 @@ export function cameraUpForHead(tHead) {
 }
 
 /**
- * Ease for the dive through the entry hole: cubic, so the camera is nearly
- * still for most of the phase and then rushes. Same curve as the mode
- * selector's cube dive (MainMenu), which is the feel this is modelled on.
+ * Quintic ease for the dive: zero first and second derivatives at each end.
+ * The moving rail target supplies the velocity at handoff, without the old
+ * cubic acceleration spike.
  */
 export const diveEase = (p) => {
   const c = p < 0 ? 0 : p > 1 ? 1 : p;
-  return c * c * c;
+  return c * c * c * (c * (c * 6 - 15) + 10);
 };
 
 /**
@@ -92,7 +92,7 @@ export const diveEase = (p) => {
  * happens, so the worm merely stopped existing. Held here, the player watches the
  * body drain into the hole from outside, and only then falls in after it.
  */
-export const DIVE_HOLD = 0.34;
+export const DIVE_HOLD = 0.18;
 
 /** Dive progress (0→1) for a given 'entering' phase progress, including the hold. */
 export const diveProgress = (tp) => diveEase((tp - DIVE_HOLD) / (1 - DIVE_HOLD));
@@ -143,7 +143,33 @@ const LOOK_AHEAD_ARC = 1.6;
 // majority bounds how far the shot can swing at the core's right-angle bend.
 const LEAD_TANGENT_MIX = 0.62;
 
+function cameraArcPointInto(out, path, arc) {
+  return arc < 0 || arc > path.total
+    ? tunnelPathArcPointExtendedInto(out, path, arc)
+    : getTunnelArcPosSmoothInto(out, path, arc);
+}
+
 const _lead = new THREE.Vector3();
+const _framePrev = new THREE.Vector3();
+const _frameNext = new THREE.Vector3();
+const _frameTurn = new THREE.Quaternion();
+
+// Parallel-transport the entry frame around the bends. Re-selecting world-up
+// from a tangent threshold caused a discontinuous roll on top/bottom tunnels.
+function routeUpInto(out, path, arc, tangent, roll) {
+  _framePrev.copy(path.nStart).negate();
+  out.set(Math.abs(_framePrev.y) > 0.9 ? 1 : 0, Math.abs(_framePrev.y) > 0.9 ? 0 : 1, 0);
+  out.addScaledVector(_framePrev, -out.dot(_framePrev)).normalize();
+  for (let i = 0; i < path.legLen.length; i++) {
+    if (path.legArc0[i] >= arc || path.legLen[i] < 1e-8) break;
+    _frameNext.subVectors(path.legB[i], path.legA[i]).normalize();
+    if (path.legArc0[i] + path.legLen[i] >= arc) break;
+    out.applyQuaternion(_frameTurn.setFromUnitVectors(_framePrev, _frameNext));
+    _framePrev.copy(_frameNext);
+  }
+  out.applyQuaternion(_frameTurn.setFromUnitVectors(_framePrev, tangent));
+  return out.normalize().applyAxisAngle(tangent, roll);
+}
 
 /**
  * Write the on-rails camera pose at `tHead` into `out`.
@@ -167,12 +193,12 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   const headArc = tunnelPathTToArc(_camPath, tHead);
   const camArc = headArc - backForHead(tHead, size);
 
-  tunnelPathArcPointExtendedInto(out.cam, _camPath, camArc);
+  cameraArcPointInto(out.cam, _camPath, camArc);
 
   // Direction of travel AT THE CAMERA, not at the head: it is what the camera's
   // own up-vector and look-ahead are built from, and while the head is already
   // round the bend the camera is still coming down the throat.
-  tunnelPathArcPointExtendedInto(_fwd, _camPath, camArc + TANGENT_EPS);
+  cameraArcPointInto(_fwd, _camPath, camArc + TANGENT_EPS);
   out.tangent.subVectors(_fwd, out.cam);
   if (out.tangent.lengthSq() < 1e-12) out.tangent.copy(_camPath.nStart).negate();
   out.tangent.normalize();
@@ -185,11 +211,7 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   // wormhole through RP2 rather than a pipe. Rolling the up-vector by the same
   // angle inverts the world by the time you reach the far tile — the
   // non-orientability, felt rather than observed.
-  out.up.set(0, 1, 0);
-  if (Math.abs(out.tangent.y) > 0.95) out.up.set(0, 0, 1);
-  out.up.addScaledVector(out.tangent, -out.up.dot(out.tangent));
-  if (out.up.lengthSq() < 1e-6) out.up.set(0, 0, 1);
-  out.up.normalize().applyAxisAngle(out.tangent, tHead * Math.PI);
+  routeUpInto(out.up, _camPath, camArc, out.tangent, tHead * Math.PI);
 
   // Aim: mostly straight down the direction of travel, leaned toward where the
   // route goes next. Aiming *only* at the route point ahead swings the shot into a
@@ -225,3 +247,83 @@ export const makeTunnelCamPose = () => ({
   up: new THREE.Vector3(),
   tangent: new THREE.Vector3()
 });
+
+const _poseMatrix = new THREE.Matrix4();
+const _poseA = new THREE.Quaternion();
+const _poseB = new THREE.Quaternion();
+const _poseDir = new THREE.Vector3();
+const _poseUp = new THREE.Vector3();
+function poseQuaternionInto(out, pose) {
+  _poseDir.subVectors(pose.look, pose.cam).normalize();
+  _poseUp.copy(pose.up).addScaledVector(_poseDir, -pose.up.dot(_poseDir));
+  if (_poseUp.lengthSq() < 1e-8) {
+    _poseUp.set(Math.abs(_poseDir.y) > 0.9 ? 1 : 0, Math.abs(_poseDir.y) > 0.9 ? 0 : 1, 0);
+    _poseUp.addScaledVector(_poseDir, -_poseUp.dot(_poseDir));
+  }
+  return out.setFromRotationMatrix(_poseMatrix.lookAt(pose.cam, pose.look, _poseUp.normalize()));
+}
+
+/** Blend full rotations; opposing look/up vectors never pass through zero. */
+export function blendTunnelPosesInto(out, from, to, t) {
+  poseQuaternionInto(_poseA, from);
+  poseQuaternionInto(_poseB, to);
+  _poseA.slerp(_poseB, t);
+  out.cam.lerpVectors(from.cam, to.cam, t);
+  out.up.set(0, 1, 0).applyQuaternion(_poseA);
+  out.look.set(0, 0, -LOOK_AHEAD_ARC).applyQuaternion(_poseA).add(out.cam);
+  return out;
+}
+
+const _exitRail = makeTunnelCamPose();
+const _exitOutside = makeTunnelCamPose();
+const _exitSideRail = new THREE.Vector3();
+const _entryRide = makeTunnelCamPose();
+const _entryLateral = new THREE.Vector3();
+
+/** Dive along route distance, so corner-tile tunnels use their own opening too. */
+export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
+  const p = THREE.MathUtils.clamp(progress, 0, 1);
+  const tHead = p * ENTER_END_T;
+  tunnelCamPoseInto(_entryRide, tunnel, tHead, size);
+  const blend = diveProgress(p);
+  blendTunnelPosesInto(out, from, _entryRide, blend);
+  _entryLateral.subVectors(from.cam, _camPath.vStart);
+  const height = _entryLateral.dot(_camPath.nStart);
+  _entryLateral.addScaledVector(_camPath.nStart, -height);
+  const arc = THREE.MathUtils.lerp(-height,
+    tunnelPathTToArc(_camPath, tHead) - backForHead(tHead, size), blend);
+  _poseDir.subVectors(out.look, out.cam);
+  cameraArcPointInto(out.cam, _camPath, arc);
+  out.cam.addScaledVector(_entryLateral, diveEase(-arc / Math.max(0.1, height * 0.5)));
+  out.look.copy(out.cam).add(_poseDir);
+  return out;
+}
+
+/** One exit shot shared by exiting's endpoint and windout's starting pose. */
+export function tunnelExitPoseInto(out, tunnel, progress, size) {
+  const p = THREE.MathUtils.clamp(progress, 0, 1);
+  const tHead = 0.67 + p * 0.33;
+  tunnelCamPoseInto(_exitRail, tunnel, tHead, size);
+  const blend = diveEase((p - 0.50) / 0.50);
+  _exitSideRail.set(0, 1, 0).cross(_camPath.nEnd);
+  if (_exitSideRail.lengthSq() < 1e-8) _exitSideRail.set(1, 0, 0);
+  _exitSideRail.normalize();
+  const outsideDistance = 1.7 + size * 0.34;
+  _exitOutside.cam.copy(_camPath.vEnd).addScaledVector(_camPath.nEnd, outsideDistance)
+    .addScaledVector(_exitSideRail, 1.2 + size * 0.22);
+  _exitOutside.look.copy(_camPath.vEnd);
+  _exitOutside.up.copy(_camPath.nEnd);
+  blendTunnelPosesInto(out, _exitRail, _exitOutside, blend);
+
+  // Move along the actual route until the lens clears the mouth. Only then
+  // introduce the side offset; a straight chord cuts through neighbouring tiles.
+  const arc = THREE.MathUtils.lerp(tunnelPathTToArc(_camPath, tHead) - backForHead(tHead, size),
+    _camPath.total + outsideDistance, blend);
+  const sideBlend = diveEase((arc - _camPath.total - 0.35) / (outsideDistance - 0.35));
+  _poseDir.subVectors(out.look, out.cam);
+  cameraArcPointInto(out.cam, _camPath, arc);
+  out.cam.addScaledVector(_exitRail.up, cameraUpForHead(tHead) * (1 - blend))
+    .addScaledVector(_exitSideRail, (1.2 + size * 0.22) * sideBlend);
+  out.look.copy(out.cam).add(_poseDir);
+  return out;
+}

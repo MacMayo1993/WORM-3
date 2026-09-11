@@ -320,9 +320,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
 
-        // Pause the rotation hazard entirely while the worm is inside a wormhole: freeze the
-        // clock and the warning beam so nothing charges or fires until it emerges (crawling).
-        if (worm.phase.current !== 'crawling') { rotationClock.held = true; return; }
+        // Pause the rotation hazard until the whole worm clears its wormhole: freeze the
+        // clock and warning beam while even the trailing segments are still inside.
+        if (worm.phase.current !== 'crawling' || worm.tunnelPassages.current.length > 0) { rotationClock.held = true; return; }
 
         // Freeze the hazard clock in lockstep with the body-cut freeze frame: the sim is
         // frozen for this beat (see stepWormSim), so hold the auto-rotate timer and warning

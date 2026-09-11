@@ -5,13 +5,6 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import {
-    makeTunnelCenterline,
-    buildTunnelCenterlineInto,
-    tunnelTToArc,
-    getTunnelArcPosSmoothInto,
-    getWindWorldPosInto,
-} from '../wormLogic.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { shAt, makeStepPathCursor, resetStepPathCursor, advanceStepPathCursor } from '../circularBuffers.js';
 import { beginWormSegments, pushWormSegment, endWormSegments } from '../wormSegments.js';
@@ -41,8 +34,6 @@ import {
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
     MAX_TAIL,
-    WINDOUT_SEGMENT_DT,
-    windoutHeadS,
 } from './constants.js';
 import { inchGaitInto, makeInchGaitState, advanceInchGaitState, INCH_BALL_SPACING } from './inchGait.js';
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto } from './bodySurface.js';
@@ -143,14 +134,6 @@ const _normalB = new THREE.Vector3();
 const CAM_CULL_HIDE = 0.30;
 const CAM_CULL_FULL = 0.52;
 const _camWorldPos = new THREE.Vector3();
-// Suck-in shaping: how much a segment necks down at the entry aperture, and over how
-// much arc-length inside the mouth it recovers. Deliberately shorter than the throat
-// (utils/tunnelPath) so the whole squeeze happens while the hole is still on screen.
-const MOUTH_SQUEEZE = 0.42;
-const MOUTH_SQUEEZE_ARC = 0.3;
-// Scratch for the suck-in / spit-out tunnel funnel (body segments streamed along the ribbon).
-// Centerline is sampled by world arc-length so segments stay evenly spaced (no stretched beads).
-const _funnelCenterline = makeTunnelCenterline();
 // The head point carries a sentinel tile (tx<0) so the body ride never rotates it —
 // the head's world position is already ridden upstream in the main worm useFrame.
 const _pathCursor = makeStepPathCursor();
@@ -252,8 +235,9 @@ export function WormBody({ worm, size }) {
         // the ribbon/spiral centerline exactly — no face-normal lift, or the head floats off.
         // windout uses getWindWorldPosInto which supplies its own lift, so WORM_LIFT must not
         // be added again here (face is already placed at headInterpPos + 0.09, consistent).
-        const _bodyTransit = worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
+        const _bodyTransit = worm.phase.current === 'windup' || worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
         _bodyHeadPos.addScaledVector(_bodyNormal, _bodyTransit ? 0 : WORM_LIFT + currentJumpVal);
+        _headPathPoint.transit = _bodyTransit;
         // Only the in-tunnel shots put the lens on the body's own line — the surface
         // chase camera sits well above and behind it, so nothing there needs culling
         // and gating on the phase keeps segments from blinking out during a jump.
@@ -361,7 +345,6 @@ export function WormBody({ worm, size }) {
 
         // Worm stays visible through the whole Möbius ride now (the tunnel camera rides inside on
         // the band, so the player watches the worm ride it). No dissolve.
-        const _phase = worm.phase.current;
         const targetTS = 1.0;
         transitScaleRef.current += (targetTS - transitScaleRef.current) * Math.min(1, delta * 9);
         const transitScale = transitScaleRef.current;
@@ -381,40 +364,9 @@ export function WormBody({ worm, size }) {
             return;
         }
 
-        // ── Suck-in / spit-out funnel ──────────────────────────────────────────
-        // During entering/exiting the head already follows the Möbius ribbon (the main worm
-        // useFrame writes headInterpPos along the tunnel). Stream the body behind it along the
-        // same ribbon: each segment sits one spacing further back in tunnel-parameter space, so
-        // as the head dives in the body gets vacuumed through the entry hole, and as the head
-        // climbs out the body is spat from the exit hole. Segments that haven't reached the
-        // mouth yet stay on the surface (entering) or are hidden until they emerge (exiting).
-        const _funnelTunnel = worm.activeTunnel.current;
-        const _funnelOn = (_phase === 'entering' || _phase === 'tunnel' || _phase === 'exiting') && !!_funnelTunnel;
-        let _headTunArc = -1;
-        if (_funnelOn) {
-            const _tprog = worm.tunnelProgress.current;
-            const _headTunT = _phase === 'entering' ? _tprog * 0.33
-                            : _phase === 'tunnel'   ? 0.33 + _tprog * 0.34
-                            :                         0.67 + _tprog * 0.33;
-            // Build the centerline once per frame, then place each body segment by world
-            // arc-length behind the head so they stay evenly spaced (matches surface spacing).
-            buildTunnelCenterlineInto(_funnelCenterline, _funnelTunnel, size);
-            _headTunArc = tunnelTToArc(_funnelCenterline, _headTunT);
-        }
-
-        // Wind-up: body coils behind the head along the spiral above the entry hole.
-        const _windOn = _phase === 'windup' && !!_funnelTunnel;
-        const _windSegDt = 0.07; // spacing between segments in spiral-s units
-        const _windHeadS = _windOn ? Math.min(1, worm.tunnelProgress.current) : 0;
-
-        // Wind-out: segments emerge from the exit one by one. The head continues
-        // virtually past s=0 (getWindWorldPosInto clamps it on the surface) until
-        // even the final segment reaches s=0 and has cleared the aperture.
-        const _windOutOn = _phase === 'windout' && !!_funnelTunnel;
-        const _windOutHeadS = _windOutOn
-            ? windoutHeadS(worm.tunnelProgress.current, tLen)
-            : 0;
-
+        // Transit samples live in the same history ring as surface travel. Keep
+        // following that route after the head returns to crawling: a segment's
+        // location determines whether it is inside, never the head's phase.
         resetStepPathCursor(_pathCursor, steps, _headPathPoint);
         let cumulativeDist = 0;
         let writeIdx = 0; // compacted instance slot — advances only for segments actually drawn
@@ -492,6 +444,7 @@ export function WormBody({ worm, size }) {
 
                 // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
+                let segmentTransit = false;
 
                 while (_pathCursor.index < pathPointCount - 1) {
                     const ptA = _pathCursor.a;
@@ -502,6 +455,7 @@ export function WormBody({ worm, size }) {
 
                     if (cumulativeDist + distToNext >= targetDist) {
                         // Found the bracket on the curve! Interpolate exact point.
+                        segmentTransit = !!(ptA.transit || ptB.transit);
                         const t = distToNext > 0 ? (targetDist - cumulativeDist) / distToNext : 0;
                         // Use scratch vectors instead of .clone() to avoid GC pressure
                         _bodyClonePos.lerpVectors(aPos, bPos, t);
@@ -519,13 +473,13 @@ export function WormBody({ worm, size }) {
                         // segments (small phase-step → long spatial wavelength); a large
                         // phase-step would alias the closely-spaced (0.09 apart) segments into
                         // a jagged scatter instead of a coherent S-curve.
-                        const wiggleAmp = _isInch ? 0.0 : (_isWiggle ? 0.26 : 0.08) * Math.sin(fade * Math.PI);
+                        const wiggleAmp = (_isInch || segmentTransit) ? 0.0 : (_isWiggle ? 0.26 : 0.08) * Math.sin(fade * Math.PI);
                         const wigglePhase = i * (_isWiggle ? 0.5 : 0.8) - time * (_isWiggle ? 8.0 : 6.0);
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         // Inch Worm: ride up off the surface along the normal wherever the
                         // wave has bunched the body, so each compression reads as a hump —
                         // taller with every orb carried.
-                        if (_isInch) _bodyClonePos.addScaledVector(_bodyCloneNormal, _inchArch * _humpHeight);
+                        if (_isInch && !segmentTransit) _bodyClonePos.addScaledVector(_bodyCloneNormal, _inchArch * _humpHeight);
                         foundPosition = true;
                         break;
                     }
@@ -537,64 +491,17 @@ export function WormBody({ worm, size }) {
                 if (!foundPosition && pathPointCount > 0) {
                     const last = _fillCount > 0 ? shAt(steps, _fillCount - 1) : _headPathPoint;
                     _bodyClonePos.copy(effPos(last, _bodyEffA));
+                    segmentTransit = !!last.transit;
                     _bodyCloneNormal.copy(last.normal);
                     const angle = _ride && last.tx >= 0 ? liveLayerAngle(last.tx, last.ty, last.tz) : null;
                     if (angle !== null) _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, angle);
                     _bodySegForward.set(0, 0, 0);
                 }
 
-                // Funnel override: pull segments that have crossed the mouth onto the ribbon.
-                let _funnelHide = false;
-                let _funnelPop = 1;
-                if (_funnelOn) {
-                    // Each segment sits a fixed world distance (0.09 — the surface spacing)
-                    // further back along the centerline, so the body reads as a continuous
-                    // worm through the tunnel instead of stretched, separated beads.
-                    const _segArc = _headTunArc - i * 0.09;
-                    if (_segArc >= 0) {
-                        // In the tunnel — ride the ribbon one spacing behind the segment ahead.
-                        getTunnelArcPosSmoothInto(_bodyClonePos, _funnelCenterline, _segArc);
-                        if (_phase === 'exiting') {
-                            // Squash-and-pop: each segment bulges as it bursts out of the exit
-                            // mouth (arc ≈ total), then settles back to normal size as it travels out.
-                            const _d = Math.abs(_segArc - _funnelCenterline.total);
-                            _funnelPop = 1 + 0.6 * Math.max(0, 1 - _d / 0.18);
-                        } else {
-                            // …and the mirror of it on the way in: a segment necks down as the
-                            // hole swallows it, so the body visibly *drains* through the
-                            // aperture instead of simply ceasing to be on the surface. Ends
-                            // (and is back to full size) within the throat, where the mouth
-                            // still frames it.
-                            _funnelPop = 1 - MOUTH_SQUEEZE * Math.max(0, 1 - _segArc / MOUTH_SQUEEZE_ARC);
-                        }
-                    } else if (_phase === 'exiting') {
-                        // Tail hasn't emerged from the exit hole yet — keep it hidden rather than
-                        // show it on the now-stale entry-side surface trail.
-                        _funnelHide = true;
-                    }
-                    // entering & _segArc < 0: leave it on the surface, trailing toward the hole.
-                } else if (_windOn) {
-                    // Coil the body behind the head along the entry spiral; segments trail
-                    // OUTWARD (smaller s). _segS < 0 → still on the surface trail (keep normal).
-                    const _segS = _windHeadS - i * _windSegDt;
-                    if (_segS >= 0 && _segS <= 1) {
-                        getWindWorldPosInto(_bodyClonePos, _funnelTunnel, 'entry', _segS, size);
-                    }
-                } else if (_windOutOn) {
-                    // Exit spiral: segments emerge from hole one by one as the head rises.
-                    // _segS > 1 means not yet surfaced — hide until they pop out.
-                    const _segS = _windOutHeadS + i * WINDOUT_SEGMENT_DT;
-                    if (_segS <= 1.0) {
-                        getWindWorldPosInto(_bodyClonePos, _funnelTunnel, 'exit', _segS, size);
-                    } else {
-                        _funnelHide = true;
-                    }
-                }
-
-                if (_phase === 'crawling' && foundPosition) {
+                if (!segmentTransit && foundPosition) {
                     clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : 0.10, surface);
                 }
-                if (_isBook) {
+                if (_isBook && !segmentTransit) {
                     // Book worm rides on top of the surface, lifted by its own
                     // height, instead of centered/embedded at the usual crawl
                     // height — a real book resting on the ground, not floating
@@ -607,7 +514,7 @@ export function WormBody({ worm, size }) {
                 // head, so the body flies level and rounds edges together instead of each
                 // segment swinging out along its own face's normal. Skipped in transit
                 // (tunnel/wind own their path).
-                if (orbitT > 0 && !_bodyTransit) rocketOrbitInto(_bodyClonePos, size, orbitT);
+                if (orbitT > 0 && !segmentTransit) rocketOrbitInto(_bodyClonePos, size, orbitT);
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isBook || isMobi) {
                     // Orient the cover to face the direction of travel, using the same
@@ -639,8 +546,6 @@ export function WormBody({ worm, size }) {
                 } else {
                     _wormDummy.scale.setScalar(0.09);
                 }
-                if (_funnelHide) _wormDummy.scale.setScalar(0.00001); // tail not yet spat out
-                else if (_funnelPop !== 1) _wormDummy.scale.multiplyScalar(_funnelPop); // burst-out pop
             }
 
             _wormDummy.scale.multiplyScalar(wormBodyTaper(i, tLen, wormCharacterId));
