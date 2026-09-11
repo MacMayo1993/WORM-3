@@ -1,5 +1,6 @@
 // src/worm/healerWorm/WormFace.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
+import { finishWormEyes } from '../wormCharacterFinish.js';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -44,6 +45,10 @@ export function WormFace({ worm, size }) {
     const isMobi = wormCharacterId === 'mobi';
     const mobi = useMemo(() => isMobi ? createMobiModel() : null, [isMobi]);
     useEffect(() => () => { if (mobi) disposeMobi(mobi); }, [mobi]);
+    useEffect(() => {
+        if (isMobi) return;
+        return finishWormEyes([leftEyeRef.current, rightEyeRef.current], [leftPupilRef.current, rightPupilRef.current]);
+    }, [isMobi]);
     const mobiTime = useRef(0);
     const mobiPulse = useRef(0);
     const previousOrbs = useRef(0);
@@ -192,11 +197,11 @@ export function WormFace({ worm, size }) {
         <>
             <mesh ref={leftEyeRef}>
                 <sphereGeometry args={[1, 12, 12]} />
-                <meshBasicMaterial color="white" />
+                <meshPhysicalMaterial color="#f1f3e9" roughness={0.22} clearcoat={1} />
             </mesh>
             <mesh ref={rightEyeRef}>
                 <sphereGeometry args={[1, 12, 12]} />
-                <meshBasicMaterial color="white" />
+                <meshPhysicalMaterial color="#f1f3e9" roughness={0.22} clearcoat={1} />
             </mesh>
             {/* Pupils — a blank white eye reads as no eye at all once the worm
                 is thumbnail-sized. */}

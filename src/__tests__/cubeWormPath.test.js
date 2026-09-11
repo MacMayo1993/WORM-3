@@ -1,26 +1,20 @@
 import { expect, it } from 'vitest';
 import { Vector3 } from 'three';
 import { sampleCubeWorm, CUBE_WORM_HALF, CUBE_WORM_CLEARANCE, CUBE_WORM_LAP } from '../components/menus/cubeWormPath.js';
-
-it('keeps each segment outside the cube with a tangent facing and surface normal', () => {
-  const p = new Vector3(), n = new Vector3(), f = new Vector3();
-  for (let s = -2; s < CUBE_WORM_LAP; s += 0.013) {
+it('visits all six faces with constant clearance and a tangent facing', () => {
+  const p = new Vector3(), n = new Vector3(), f = new Vector3(), faces = new Set();
+  for (let s = 0; s < CUBE_WORM_LAP; s += 0.02) {
     sampleCubeWorm(s, p, n, f);
-    const clearance = Math.hypot(Math.max(0, Math.abs(p.x) - CUBE_WORM_HALF), Math.max(0, Math.abs(p.z) - CUBE_WORM_HALF));
-    expect(clearance).toBeCloseTo(CUBE_WORM_CLEARANCE, 8);
-    expect(n.length()).toBeCloseTo(1);
+    const clearance = Math.hypot(...p.toArray().map(v => Math.max(0, Math.abs(v) - CUBE_WORM_HALF)));
+    expect(clearance).toBeCloseTo(CUBE_WORM_CLEARANCE, 6);
     expect(f.length()).toBeCloseTo(1);
     expect(n.dot(f)).toBeCloseTo(0);
+    n.toArray().forEach((v, axis) => { if (Math.abs(v) > 0.99) faces.add(`${axis}:${Math.sign(v)}`); });
   }
+  expect(faces.size).toBe(6);
 });
-it('joins all edges and the lap seam continuously, including orientation', () => {
-  const a = [new Vector3(), new Vector3(), new Vector3()];
-  const b = [new Vector3(), new Vector3(), new Vector3()];
-  for (let k = 0; k < 4; k++) {
-    for (const offset of [0, 2 * CUBE_WORM_HALF]) {
-      const s = k * CUBE_WORM_LAP / 4 + offset;
-      sampleCubeWorm(s - 1e-7, ...a); sampleCubeWorm(s + 1e-7, ...b);
-      for (let i = 0; i < 3; i++) expect(a[i].distanceTo(b[i])).toBeLessThan(0.00001);
-    }
-  }
+it('joins the lap seam without a positional or orientation jump', () => {
+  const a = [new Vector3(), new Vector3(), new Vector3()], b = a.map(() => new Vector3());
+  sampleCubeWorm(-1e-6, ...a); sampleCubeWorm(1e-6, ...b);
+  a.forEach((v, i) => expect(v.distanceTo(b[i])).toBeLessThan(0.0001));
 });

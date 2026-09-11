@@ -1,3 +1,4 @@
+import { wormBodyTaper } from '../wormCharacterFinish.js';
 // src/worm/healerWorm/WormBody.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import { useEffect, useMemo, useRef } from 'react';
@@ -655,6 +656,7 @@ export function WormBody({ worm, size }) {
                 else if (_funnelPop !== 1) _wormDummy.scale.multiplyScalar(_funnelPop); // burst-out pop
             }
 
+            _wormDummy.scale.multiplyScalar(wormBodyTaper(i, tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
             // LOD removes distant instances to control cost, but must never make
             // the survivors larger: that produced an abrupt size jump at segment

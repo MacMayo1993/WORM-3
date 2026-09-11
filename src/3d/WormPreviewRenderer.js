@@ -16,6 +16,7 @@
 //   • UI components call registerWormPreview / updateWormPreview /
 //     unregisterWormPreview (see WormPreviewCanvas.jsx).
 
+import { finishWormEyes, wormBodyTaper } from '../worm/wormCharacterFinish.js';
 import * as THREE from 'three';
 import { stepMenuWorm, menuWormSegment } from './menuWormMotion.js';
 import { createMobiSegmentAssets, createMobiSegment, MOBI_SEGMENT_RADIUS } from '../worm/mobiSegments.js';
@@ -147,9 +148,10 @@ function _buildRig() {
   const eyeGeo = new THREE.SphereGeometry(1, 14, 14);
   const pupilGeo = new THREE.SphereGeometry(1, 10, 10);
   const mouthGeo = new THREE.TorusGeometry(1, FACE_LAYOUT.mouthTube / FACE_LAYOUT.mouthRadius, 8, 22, MOUTH_ARC);
-  const eyes = [0, 1].map(() => new THREE.Mesh(eyeGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })));
+  const eyes = [0, 1].map(() => new THREE.Mesh(eyeGeo, new THREE.MeshPhysicalMaterial({ color: 0xf1f3e9, roughness: 0.22, clearcoat: 1 })));
   const pupils = [0, 1].map(() => new THREE.Mesh(pupilGeo, new THREE.MeshBasicMaterial({ color: 0x12131a })));
   const mouth = new THREE.Mesh(mouthGeo, new THREE.MeshBasicMaterial({ color: 0x12131a }));
+  finishWormEyes(eyes, pupils);
   eyes.forEach(m => group.add(m));
   pupils.forEach(m => group.add(m));
   group.add(mouth);
@@ -402,6 +404,8 @@ function _poseWorm(opts, time) {
     } else {
       body.scale.setScalar(BODY_SCALE);
     }
+
+    body.scale.multiplyScalar(wormBodyTaper(i, SEGMENTS, characterId));
 
     // Segment colour, following WormBody: prism cycles the spectrum, the inch
     // worm bands body/belly, everything else is the skin's body colour.

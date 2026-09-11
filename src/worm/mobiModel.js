@@ -80,12 +80,12 @@ export function createMobiModel({ face = true } = {}) {
 
   // The guide's tiny Rubik's-cube eyes, kept above the core's sight line.
   const eyes = [];
-  const eyeGeo = new THREE.BoxGeometry(0.52, 0.52, 0.52);
+  const eyeGeo = new RoundedBoxGeometry(0.52, 0.52, 0.52, 2, 0.055);
   const tileGeo = new THREE.PlaneGeometry(0.145, 0.145);
   const tileMaterials = ['#ecfbff', '#63d7ef', '#b4a3f5'].map(light);
   for (const sign of [-1, 1]) {
     const eye = new THREE.Group();
-    eye.position.set(sign * 0.48, 0.60, -1.02);
+    eye.position.set(sign * 0.45, 0.58, -1.02);
     eye.add(new THREE.Mesh(eyeGeo, dark));
     for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
       const front = new THREE.Mesh(tileGeo, row === 1 && col === 1 ? dark : tileMaterials[(row + col) % 3]);
@@ -104,9 +104,10 @@ export function createMobiModel({ face = true } = {}) {
     antenna.rotation.z = -sign * 0.22;
     group.add(antenna);
   }
-  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.035, 6, 24, Math.PI), cyan);
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.017, 6, 24, Math.PI), cyan);
   smile.position.set(0, -0.46, -1.015);
   smile.rotation.z = Math.PI;
+  smile.scale.y = 0.45;
   group.add(smile);
   group.scale.setScalar(MOBI_RADIUS);
   return { group, core, gem, band, eyes, shellMaterial, lastTime: null, transitRoll: 0 };

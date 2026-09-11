@@ -20,18 +20,18 @@ export const FACE_LAYOUT = {
   dirUp: 0.62,
   dirFwd: 0.79,
 
-  eyeSide: 0.33,     // sideways offset of each eye
+  eyeSide: 0.36,     // sideways offset of each eye
   eyeUp: 0.20,       // offset up the face
-  eyeRadius: 0.27,
-  pupilRadius: 0.13,
-  pupilOut: 0.20,    // how far the pupil stands off the eye
+  eyeRadius: 0.25,
+  pupilRadius: 0.115,
+  pupilOut: 0.12,    // how far the pupil stands off the eye
 
-  mouthDown: 0.30,   // offset down the face
-  mouthRadius: 0.30, // the smile's arc radius
-  mouthTube: 0.075,
+  mouthDown: 0.26,   // offset down the face
+  mouthRadius: 0.24, // the smile's arc radius
+  mouthTube: 0.025,
 
   glassRadius: 0.33, // book worm lenses, drawn around the eyes
-  glassTube: 0.055,
+  glassTube: 0.035,
   glassOut: 0.06,    // stand-off from the eye, so the rim clears the eyeball
 
   // Hats sit on the crown. With the face off the crown this can be a seat
@@ -87,16 +87,22 @@ export function layoutWormFace(center, forward, up, radius, parts) {
   const eyeSide = radius * L.eyeSide;
   const eyeUp = radius * L.eyeUp;
 
+  _basisY.copy(_right).negate();
+  _matrix.makeBasis(_basisY, _faceUp, _faceDir);
+  _quat.setFromRotationMatrix(_matrix);
+
   if (parts.eyes) {
     for (let i = 0; i < 2; i++) {
       const eye = parts.eyes[i];
       if (!eye) continue;
       eye.position.copy(place(i === 0 ? eyeSide : -eyeSide, eyeUp));
-      eye.scale.setScalar(radius * L.eyeRadius);
+      eye.quaternion.copy(_quat);
+      eye.scale.set(radius * L.eyeRadius, radius * L.eyeRadius * 0.82, radius * L.eyeRadius * 0.52);
       if (parts.pupils?.[i]) {
         const pupil = parts.pupils[i];
         pupil.position.copy(eye.position).addScaledVector(_faceDir, radius * L.pupilOut);
-        pupil.scale.setScalar(radius * L.pupilRadius);
+        pupil.quaternion.copy(_quat);
+        pupil.scale.set(radius * L.pupilRadius, radius * L.pupilRadius, radius * L.pupilRadius * 0.3);
       }
     }
   }
@@ -112,7 +118,8 @@ export function layoutWormFace(center, forward, up, radius, parts) {
     // surround, where the head swallowed most of it.
     _basisY.copy(_faceUp);
     _basisZ.copy(_faceDir);
-    _matrix.makeBasis(_right, _basisY, _basisZ);
+    _pos.copy(_right).negate();
+    _matrix.makeBasis(_pos, _basisY, _basisZ);
     _quat.setFromRotationMatrix(_matrix);
     for (let i = 0; i < 2; i++) {
       const glass = parts.glasses[i];
@@ -132,7 +139,7 @@ export function layoutWormFace(center, forward, up, radius, parts) {
     _quat.setFromRotationMatrix(_matrix);
     parts.mouth.position.copy(place(0, -radius * L.mouthDown, radius * L.mouthRadius));
     parts.mouth.quaternion.copy(_quat);
-    parts.mouth.scale.setScalar(radius * L.mouthRadius);
+    parts.mouth.scale.set(radius * L.mouthRadius, radius * L.mouthRadius * 0.45, radius * L.mouthRadius);
   }
 
   if (parts.hat) {

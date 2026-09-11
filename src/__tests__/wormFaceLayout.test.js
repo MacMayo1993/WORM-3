@@ -125,3 +125,16 @@ describe('book worm face layout', () => {
     }
   });
 });
+
+it('keeps the sculpted eye depth axis pointing out of the face on every cube side', () => {
+  for (const up of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]) {
+    const forward = up[0] ? [0,1,0] : [1,0,0];
+    const parts = layout({ up, forward });
+    const outward = new THREE.Vector3(...up).multiplyScalar(FACE_LAYOUT.dirUp)
+      .addScaledVector(new THREE.Vector3(...forward), FACE_LAYOUT.dirFwd).normalize();
+    for (const eye of [...parts.eyes, ...parts.pupils]) {
+      expect(new THREE.Vector3(0,0,1).applyQuaternion(eye.quaternion).dot(outward)).toBeCloseTo(1, 8);
+      expect(eye.scale.z).toBeLessThan(eye.scale.x);
+    }
+  }
+});
