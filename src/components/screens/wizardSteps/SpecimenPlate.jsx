@@ -24,11 +24,9 @@ export const plateSurface = glow => ({
   backgroundColor: '#1c2316',
   backgroundImage: [
     `radial-gradient(ellipse at 50% 46%, ${glow}30 0%, transparent 64%)`,
-    'linear-gradient(rgba(255,245,220,0.05) 1px, transparent 1px)',
-    'linear-gradient(90deg, rgba(255,245,220,0.05) 1px, transparent 1px)',
     'linear-gradient(165deg, rgba(255,245,220,0.07), rgba(12,16,9,0.55))'
   ].join(','),
-  backgroundSize: '100% 100%, 22px 22px, 22px 22px, 100% 100%',
+  backgroundSize: '100% 100%, 100% 100%',
   transition: 'background-image 0.4s ease'
 });
 
@@ -212,7 +210,7 @@ export default function SpecimenPlate({
         {children}
 
         {hint && (
-          <div style={{ fontSize: TEXT_XS, color: NIGHT_TEXT, opacity: 0.4, letterSpacing: '0.06em', zIndex: 1 }}>
+          <div style={{ fontSize: TEXT_XS, color: NIGHT_TEXT, letterSpacing: '0.06em', zIndex: 1 }}>
             {hint}
           </div>
         )}

@@ -24,20 +24,10 @@
 // the bottom half of the rail was empty paper. A phone has width to spend and
 // height to hoard; this spends the width.
 //
-// ── The dark ──────────────────────────────────────────────────────────────────
-// The wizards used to be a page from Mobi's graph-paper notebook. They are now a
-// dark instrument panel: the specimen plate was already a lit case on the NIGHT
-// surface, the cube previews and tile shaders are all emissive, and every one of
-// them read better with the paper taken out from behind it. The paper exports
-// below stay put — the store, level select, the pack screen and the merge picker
-// are still notebook pages, and this is not their change.
-//
-// The grid survives the move. Same 18px/90px ruling, drawn in the mode's accent
-// at a few percent over near-black, so a wizard still reads as ruled paper —
-// backlit rather than printed.
+// Setup uses shared warm paper; live specimens retain their selected scenes.
 
 import React from 'react';
-import { UI_FONT, UI_MOSS, UI_ACTION_SHADOW, PAPER_SHEET, NIGHT_SHEET, NIGHT_PANEL, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
+import { UI_FONT, UI_MOSS, UI_ACTION_SHADOW, PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BG_MUTED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_SHADOW, PAPER_CARD_SHADOW, PAPER_BACKDROP, PAPER_FOOTER_BG, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
 
@@ -45,7 +35,7 @@ import { isMobile } from '../../utils/device.js';
 // Graph-paper panel background — the exact recipe from the Mobi dialogue panel
 // (MobiIntroScreen): a warm paper base, a fine 18px grid, a 90px major grid, and
 // a soft corner highlight + diagonal wash. Still worn by the store, level select,
-// the pack picker and the merge theme picker; no longer by the wizards.
+// the pack picker and the merge theme picker.
 const GRAPH_LINE = 'rgba(122,110,98,0.04)';
 const GRAPH_MAJOR = 'rgba(122,110,98,0.06)';
 export const WIZARD_PAPER_BASE = PAPER_SHEET;
@@ -73,40 +63,26 @@ export const WIZARD_FOOTER_BG = 'rgba(245, 238, 222, 0.82)';
 // uses the same lead rather than picking its own grey.
 export const PENCIL_LEAD = '#35404a';
 
-// ─── The wizard's dark surface ────────────────────────────────────────────────
-//
-// One family, used by the chrome here and by every step's cards (wizardSteps).
-// Deliberately neutral rather than a second accent: the mode's own colour does
-// the accenting, and six of the app's palettes end up on screen at once in the
-// palette step. Alphas over the base rather than opaque hexes, so a card sitting
-// on the ruled ground still shows the ruling through it.
+// Shared paper surfaces keep every mode in the same field-guide family.
+export const WIZ_BASE = PAPER_SHEET;
+export const WIZ_SURFACE = PAPER_BG_MUTED;
+export const WIZ_SURFACE_RAISED = PAPER_SHEET_RAISED;
+export const WIZ_BORDER = PAPER_BORDER;
+export const WIZ_BORDER_SOFT = PAPER_BORDER_SOFT;
+export const WIZ_TEXT = PAPER_TEXT;
+export const WIZ_TEXT_MUTED = PAPER_TEXT_MUTED;
+// Small interactive labels need the stronger secondary ink on cream.
+export const WIZ_TEXT_FAINT = PAPER_TEXT_MUTED;
+export const WIZ_SHADOW = PAPER_SHADOW;
+export const WIZ_CARD_SHADOW = PAPER_CARD_SHADOW;
 
-export const WIZ_BASE = NIGHT_SHEET;
-export const WIZ_SURFACE = NIGHT_PANEL;
-export const WIZ_SURFACE_RAISED = 'rgba(255,255,255,0.075)';
-export const WIZ_BORDER = NIGHT_BORDER;
-export const WIZ_BORDER_SOFT = 'rgba(255,255,255,0.08)';
-export const WIZ_TEXT = NIGHT_TEXT;
-export const WIZ_TEXT_MUTED = NIGHT_TEXT_MUTED;
-export const WIZ_TEXT_FAINT = 'rgba(255,253,242,0.60)';
-export const WIZ_SHADOW = '0 24px 70px rgba(0,0,0,0.62)';
-export const WIZ_CARD_SHADOW = 'rgba(0,0,0,0.5)';
-
-/** The ruled dark ground, ruled in the mode's own colour. */
-export const wizardDarkBackground = accent => ({
+/** Unruled paper with a restrained wash of the mode's accent. */
+export const wizardBackground = accent => ({
   backgroundColor: WIZ_BASE,
   backgroundImage: [
-    `linear-gradient(${accent}14 1px, transparent 1px)`,
-    `linear-gradient(90deg, ${accent}14 1px, transparent 1px)`,
-    `linear-gradient(${accent}22 1px, transparent 1px)`,
-    `linear-gradient(90deg, ${accent}22 1px, transparent 1px)`,
-    // A wash of the accent from the top corner, so the sheet is lit from where
-    // the specimen is rather than being an even field of black.
-    `radial-gradient(120% 60% at 50% 0%, ${accent}26, transparent 62%)`,
-    'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.35))'
-  ].join(','),
-  backgroundSize: '18px 18px, 18px 18px, 90px 90px, 90px 90px, 100% 100%, 100% 100%',
-  backgroundPosition: '0 0, 0 0, -1px -1px, -1px -1px, 0 0, 0 0'
+    `radial-gradient(ellipse at 100% 0%, ${accent}0c, transparent 55%)`,
+    'radial-gradient(ellipse at 0% 0%, rgba(255,255,255,0.7), transparent 65%)'
+  ].join(',')
 });
 
 /**
@@ -133,7 +109,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'rgba(28,35,22,0.72)',
+      background: PAPER_BACKDROP,
       backdropFilter: PAPER_BACKDROP_BLUR,
       WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
       zIndex: Z.MODAL,
@@ -147,7 +123,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
     },
 
     sheet: {
-      ...wizardDarkBackground(accent),
+      ...wizardBackground(accent),
       borderRadius: mobile ? 0 : '20px',
       width: mobile ? '100%' : 'min(720px, 96vw)',
       height: mobile ? '100%' : 'auto',
@@ -201,7 +177,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       letterSpacing: '0.22em',
       textTransform: 'uppercase',
       color: WIZ_TEXT,
-      textShadow: `0 0 18px ${accent}88`,
+      textShadow: 'none',
       // Balances the back button so the name sits on the sheet's centre line.
       paddingRight: TOUCH_TARGET
     },
@@ -259,9 +235,9 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       padding: '7px 14px',
       borderRadius: 999,
       border: `1px solid ${active ? accent : WIZ_BORDER}`,
-      background: active ? `${accent}2e` : WIZ_SURFACE,
-      color: active ? '#fff' : WIZ_TEXT_MUTED,
-      boxShadow: active ? `0 0 14px ${accent}55, inset 0 0 12px ${accent}33` : 'none',
+      background: active ? `${accent}14` : WIZ_SURFACE_RAISED,
+      color: active ? WIZ_TEXT : WIZ_TEXT_MUTED,
+      boxShadow: active ? `inset 0 0 0 1px ${accent}33` : 'none',
       fontSize: TEXT_XS,
       fontWeight: active ? 800 : 600,
       letterSpacing: '0.04em',
@@ -282,7 +258,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       padding: `0 ${Math.max(GUTTER - 8, 6)}px`,
       borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
       borderBottom: `1px solid ${WIZ_BORDER_SOFT}`,
-      background: 'rgba(0,0,0,0.28)',
+      background: PAPER_BG_MUTED,
       overflowX: 'auto',
       overscrollBehaviorX: 'contain',
       WebkitOverflowScrolling: 'touch',
@@ -315,7 +291,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       flex: 1,
       minHeight: 0,
       scrollbarWidth: 'thin',
-      scrollbarColor: `rgba(255,255,255,0.18) transparent`,
+      scrollbarColor: `${WIZ_BORDER} transparent`,
       // Fade the last few pixels so a list that continues under the footer reads
       // as scrollable instead of as a hard crop.
       maskImage: 'linear-gradient(to bottom, #000 calc(100% - 20px), transparent)',
@@ -331,7 +307,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       gap: 8,
       flexShrink: 0,
       borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
-      background: 'rgba(0,0,0,0.42)'
+      background: PAPER_FOOTER_BG
     },
 
     // One wide action. A wizard has exactly one thing to do next, and on a phone
@@ -391,7 +367,7 @@ export function WizardSectionHeading({ children, style }) {
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
         color: WIZ_TEXT_FAINT,
-        background: `linear-gradient(${WIZ_BASE} 70%, rgba(12,15,20,0))`,
+        background: `linear-gradient(${WIZ_BASE} 70%, rgba(245,240,232,0))`,
         ...style
       }}
     >
@@ -496,7 +472,7 @@ export function WizardChipRow({ styles, families, activeChild, onSelect, label }
             style={styles.chip(active)}
           >
             {child.label}
-            {child.locked > 0 && <LockPip size={9} color={active ? '#fff' : WIZ_TEXT_FAINT} />}
+            {child.locked > 0 && <LockPip size={9} color={active ? WIZ_TEXT : WIZ_TEXT_FAINT} />}
           </button>
         );
       })}
@@ -554,7 +530,7 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
             <WizardIcon name={cat.icon} size={mobile ? 17 : 18} color={isActive ? accent : WIZ_TEXT_FAINT} />
             <span
               style={{
-                fontSize: mobile ? 9 : TEXT_MICRO,
+                fontSize: TEXT_MICRO,
                 fontWeight: 800,
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
@@ -569,7 +545,7 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
               <span
                 style={{
                   maxWidth: mobile ? 62 : 96,
-                  fontSize: mobile ? 8 : 9,
+                  fontSize: TEXT_MICRO,
                   fontWeight: 600,
                   lineHeight: 1.2,
                   color: isActive ? accent : WIZ_TEXT_FAINT,

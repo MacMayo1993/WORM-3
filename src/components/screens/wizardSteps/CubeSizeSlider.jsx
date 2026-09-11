@@ -33,12 +33,11 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
   return (
     <div style={{ padding: '4px 2px 0' }}>
       <div style={{ position: 'relative', height: `${KNOB + 6}px`, display: 'flex', alignItems: 'center' }}>
-        {/* Track — a channel cut into the dark sheet, dark enough that the
-            unfilled stretch still reads as a rail under the lit fill. */}
+        {/* Track — a shallow channel in the shared paper surface. */}
         <div style={{
           position: 'absolute', left: 0, right: 0, height: '10px', borderRadius: '6px',
-          background: 'rgba(0,0,0,0.45)',
-          boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.6)',
+          background: WIZ_BORDER_SOFT,
+          boxShadow: 'inset 0 1px 3px rgba(30,22,18,0.12)',
           border: `1px solid ${WIZ_BORDER_SOFT}`
         }} />
 
@@ -61,7 +60,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
               left: stopAt(n, tiers),
               transform: 'translateX(-50%)',
               width: '4px', height: '4px', borderRadius: '50%',
-              background: n <= value ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.22)',
+              background: n <= value ? 'rgba(255,255,255,0.85)' : WIZ_TEXT_MUTED,
               transition: 'background 0.16s ease'
             }}
           />
@@ -73,11 +72,11 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
           left: knobLeft,
           transform: 'translateX(-50%)',
           width: `${KNOB}px`, height: `${KNOB}px`, borderRadius: '50%',
-          background: '#0f141c',
+          background: WIZ_SURFACE,
           border: `2.5px solid ${accent}`,
-          boxShadow: `0 0 16px ${accent}77, 0 4px 12px rgba(0,0,0,0.6)`,
+          boxShadow: `0 2px 0 ${WIZ_CARD_SHADOW}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '13px', fontWeight: 800, color: '#fff',
+          fontSize: '13px', fontWeight: 800, color: WIZ_TEXT,
           transition: 'left 0.16s cubic-bezier(0.22,1,0.36,1)',
           pointerEvents: 'none'
         }}>
