@@ -67,7 +67,8 @@ describe('all-pairs reveal', () => {
   it('lets even the last worm tail arrive before the cube closes', () => {
     const lastArrival = WORM_START + (PAIRS.length - 1) * 0.012 + (1 + 9 * 0.016) * 2.2;
     expect(lastArrival).toBeLessThan(IMPLODE_START);
-    expect(IMPLODE_START - lastArrival).toBeGreaterThan(3);
-    expect(INTRO_END).toBeLessThanOrEqual(12);
+    expect(IMPLODE_START - lastArrival).toBeGreaterThan(0.25);
+    expect(IMPLODE_START - lastArrival).toBeLessThan(0.6);
+    expect(INTRO_END).toBeLessThanOrEqual(8.5);
   });
 });

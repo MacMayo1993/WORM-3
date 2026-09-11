@@ -11,9 +11,9 @@ export const TUNNEL_FORM_START = 2.2;
 export const EXPLOSION_START = 2.3;
 export const EXPLOSION_END = 3.2;
 export const WORM_START = 3.3;
-export const IMPLODE_START = 9.4;
-export const IMPLODE_END = 10.2;
+export const IMPLODE_START = 6.5;
+export const IMPLODE_END = 7.3;
 
-export const TITLE_START = 9.9;
-export const TITLE_END = 10.4;
-export const INTRO_FINISH = 11.5;
+export const TITLE_START = 7.0;
+export const TITLE_END = 7.5;
+export const INTRO_FINISH = 8.3;
