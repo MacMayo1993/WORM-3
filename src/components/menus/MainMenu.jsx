@@ -1,4 +1,4 @@
-import CarouselWorm from './CarouselWorm.jsx';
+import CubeGlowWorm from './CubeGlowWorm.jsx';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Edges, Text } from '@react-three/drei';
@@ -1012,7 +1012,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       // Float the cube just clear of the stage floor so the contact shadow has a
       // band to live in. Without this the pool renders behind the description
       // card, where it grounds nothing.
-      presentY += SHADOW_BAND_PX * worldPerPx;
+      presentY += (SHADOW_BAND_PX - 32) * worldPerPx;
 
       // The selector can open after the cube has been off-screen for a long
       // game. Snap to the requested face on entry instead of showing a frame
@@ -1156,6 +1156,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         {/* Always mounted (no mount-timing flash); the frame loop above shows
             the plates only on frames where it presents a mode face. */}
         <ModeFacePlates ref={platesRef} />
+        <CubeGlowWorm />
       </group>
       {/* Ground for the presented cube. Outside the cube group on purpose: as a
           child it would inherit the tumble and swing up the wall. Hidden on
@@ -1600,7 +1601,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           ref={stageRef}
           className="mc-cube-window"
           style={{
-            position: 'relative', width: 'min(560px, 96vw)',
+            position: 'relative', width: 'min(560px, 96vw)', marginTop: 32,
             // The stage used to be a fixed height that refused to shrink, so a
             // tall viewport's leftover pixels fell past it and pooled as dead
             // space above PLAY. Growing into that space is what turns the gap
@@ -1714,7 +1715,6 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
         {/* Bottom action area grows into the available space on tall phones. */}
         <div style={{ width: 'min(400px, 94vw)', marginTop: 'auto', paddingTop: 12 }}>
-          <CarouselWorm disabled={diving} />
           <button
             type="button" className="mc-play" onClick={handlePlay}
             style={{
