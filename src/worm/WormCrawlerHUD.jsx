@@ -1,13 +1,13 @@
 // src/worm/WormCrawlerHUD.jsx
 // Mobile-first "Antipodal HUD" for WORM Chase-Cam Mode.
 // Three-zone layout: Glance Strip (top, info-only) · Game Scene · Thumb Tray (bottom, all controls).
-// Colors derived from the cube's face palette in antipodal pairs.
+// Neutral instruments keep face colours on the cube and inventory samples.
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
+import { FACE_COLORS } from '../utils/constants.js';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
@@ -25,7 +25,7 @@ import {
     primaryBtnStyle, LIST_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
 import { useDialogBehavior } from '../components/ui/Panel.jsx';
-import { UI_FONT, DISPLAY_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, Z } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEET, NIGHT_TEXT_MUTED, GAME_HUD, GAME_HUD_VARS, Z } from '../utils/uiTheme.js';
 
 // ─── Worm Countdown Overlay ─────────────────────────────────────────────────
 const WORM_COUNTDOWN_STYLE_ID = 'worm3-countdown-style';
@@ -196,14 +196,6 @@ const toRgb = (color) => {
     return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
 };
 
-const colorDistance = (a, b) => {
-    if (!a || !b) return Number.POSITIVE_INFINITY;
-    const dr = a.r - b.r;
-    const dg = a.g - b.g;
-    const db = a.b - b.b;
-    return dr * dr + dg * dg + db * db;
-};
-
 // ─── Style constants ─────────────────────────────────────────────────────────
 //
 // The HUD sits on top of a live 3D scene that can be any colour — grass, lava,
@@ -213,19 +205,14 @@ const colorDistance = (a, b) => {
 // stickers pasted on the game rather than part of it.
 
 const FONT = UI_FONT;
-const SHADOW = '0 6px 22px rgba(10, 14, 8, 0.45)';
-const BORDER = NIGHT_BORDER;
-const HUD_SURFACE = 'rgba(24, 31, 18, 0.78)';
-const HUD_SURFACE_SOFT = 'rgba(250, 247, 238, 0.07)';
+const SHADOW = '0 3px 0 #141711, 0 6px 18px rgba(10,14,8,0.22)';
+const BORDER = GAME_HUD.border;
+const HUD_SURFACE = GAME_HUD.surface;
+const HUD_SURFACE_SOFT = GAME_HUD.raised;
 const HUD_BLUR = 'blur(14px) saturate(1.05)';
-const TEXT = NIGHT_TEXT;
-const TEXT_MUTED = NIGHT_TEXT_MUTED;
-// The status bar's one accent. It used to tint itself from the face palette —
-// the phase chip, the two stat values and the PP chip each took a different
-// manifold colour, so the bar changed hue with the scheme and read as four
-// unrelated readouts. It is white text with one green accent now, the same
-// neutral-plate/white-glyph/green-hub language as the d-pad below it.
-const HUD_ACCENT = '#4ade80';
+const TEXT = GAME_HUD.text;
+const TEXT_MUTED = GAME_HUD.muted;
+const HUD_ACCENT = GAME_HUD.accent;
 
 // Paper token, still used by the pause card / overlays that own the screen.
 const PANEL_BORDER = 'rgba(15, 23, 42, 0.12)';
@@ -236,6 +223,7 @@ const withAlpha = (color, alpha) => {
 };
 
 const ROOT_STYLE = {
+    ...GAME_HUD_VARS,
     position: 'fixed', inset: 0,
     pointerEvents: 'none', zIndex: Z.PANEL,
     fontFamily: FONT,
@@ -269,7 +257,7 @@ const ensureHudStyle = () => {
         @media (min-width: 900px) {
             .worm-hud-bar {
                 left: 50%; right: auto;
-                width: min(880px, calc(100% - 32px));
+                width: min(600px, calc(100% - 32px));
                 transform: translateX(-50%);
             }
         }
@@ -284,20 +272,17 @@ const ensureHudStyle = () => {
             .worm-hud-stats { gap: 8px; }
         }
         /* Landscape: fold the reserve onto the same line — height is the scarce axis. */
-        @media (max-height: 520px) {
+        @media (max-height: 520px) and (min-width: 600px) {
             .worm-hud-bar { flex-direction: row; align-items: center; gap: 12px; }
             .worm-hud-row { flex: 1 1 auto; }
-            .worm-hud-reserve { order: -1; flex: 0 1 auto; min-width: 0; border-top: none; padding-top: 0; }
+            .worm-hud-reserve { order: -1; flex: 1 1 340px; min-width: 0; border-top: none; padding-top: 0; }
         }
-        /* Steering: a tall bar down each side, in the bottom corners where a phone
-           actually holds. Width is thumb-sized off the viewport (a 412px Pixel gets
-           ~90px, past the 48px accessibility floor even through a case); height is
-           a third of the screen, so the key is under the thumb wherever the hand
-           happens to sit on the side of the phone rather than only at one spot. */
+        /* Compact corner keys leave the lower scene visible while keeping
+           comfortable touch targets. */
         .worm-steer {
-            --steer: clamp(76px, 22vw, 96px);
+            --steer: clamp(56px, 17vw, 76px);
             width: var(--steer);
-            height: clamp(160px, 33vh, 340px);
+            height: clamp(76px, 12vh, 100px);
         }
         .worm-action { --action: clamp(50px, 13.5vw, 60px); height: var(--action); }
         .worm-jump { min-width: clamp(96px, 26vw, 132px); font-size: clamp(15px, 4vw, 18px); }
@@ -308,10 +293,9 @@ const ensureHudStyle = () => {
         @media (max-height: 520px) {
             .worm-hud-bar { padding: 6px 10px; gap: 4px; }
             .worm-hud-reserve { padding-top: 5px; }
-            /* Landscape: a third of a 360px-tall screen is a short bar, and the
-               grip already reaches the whole side, so the keys go back to compact. */
-            .worm-steer { --steer: clamp(56px, 17vh, 76px); height: clamp(96px, 42vh, 150px); }
-            .worm-action { --action: clamp(42px, 13vh, 54px); }
+            /* Landscape keys retain a 56px minimum width. */
+            .worm-steer { --steer: clamp(56px, 17vh, 76px); height: clamp(64px, 19vh, 80px); }
+            .worm-action { --action: clamp(44px, 13vh, 54px); }
             .worm-jump { min-width: clamp(88px, 20vw, 124px); font-size: 15px; }
         }
         .worm-hud-key {
@@ -335,21 +319,11 @@ const ensureHudStyle = () => {
            the inner shading flips from a lit top edge to a shadowed one. That is
            the whole trick: the light says raised, then it says sunk. */
         .worm-steer-key, .worm-action {
-            box-shadow:
-                /* the side wall — lit a little, or it disappears into the drop shadow */
-                0 5px 0 rgba(46, 56, 38, 0.72),
-                0 6px 0 rgba(9, 13, 7, 0.55),
-                0 10px 20px rgba(10, 14, 8, 0.5),
-                inset 0 1.5px 0 rgba(255, 253, 242, 0.30),
-                inset 0 -3px 7px rgba(0, 0, 0, 0.26);
+            box-shadow: 0 3px 0 #141711, 0 6px 18px rgba(10,14,8,0.22), inset 0 1px 0 rgba(255,245,220,0.09);
         }
         .worm-steer-key:active, .worm-action:active {
-            transform: translateY(5px);
-            box-shadow:
-                0 1px 0 rgba(9, 13, 7, 0.55),
-                0 3px 9px rgba(10, 14, 8, 0.4),
-                inset 0 3px 7px rgba(0, 0, 0, 0.34),
-                0 0 22px var(--key-glow, rgba(255, 253, 242, 0.3));
+            transform: translateY(2px);
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.28);
         }
         /* The key's own surface has to live here, not inline: an inline background
            outranks any :active rule, which is exactly how the press state silently
@@ -360,21 +334,11 @@ const ensureHudStyle = () => {
         /* No width/height here: .worm-steer (same element) owns the size, and a
            100% would resolve against the shrink-to-fit wrapper and collapse it. */
         .worm-steer-key {
-            border-radius: 30px;
+            border-radius: 16px;
             flex-direction: column;
             gap: 10px;
-            /* A cap, not a panel: a light top edge falling to a dark foot gives the
-               slab a dome, so it reads as something standing off the screen with a
-               top face to push on. Lighter overall than the status bar's plate on
-               purpose — at a third of the screen tall, two of these at the HUD's
-               usual 0.78 opacity walled off both sides of the play area. */
-            background:
-                linear-gradient(180deg,
-                    rgba(255, 253, 242, 0.14) 0%,
-                    rgba(255, 253, 242, 0.03) 20%,
-                    rgba(8, 12, 6, 0.10) 72%,
-                    rgba(8, 12, 6, 0.20) 100%),
-                rgba(24, 31, 18, 0.30);
+            /* A quiet neutral face matches the action pair. */
+            background: ${GAME_HUD.surface};
             backdrop-filter: ${HUD_BLUR};
             -webkit-backdrop-filter: ${HUD_BLUR};
             border: 1px solid ${BORDER};
@@ -397,7 +361,7 @@ const ensureHudStyle = () => {
            key face falls into its own shadow when the key bottoms out. */
         .worm-steer-key:active .worm-key-face { opacity: 0.82; }
         .worm-jump-ready {
-            animation: wormJumpReady 1.5s ease-in-out infinite;
+            outline: 1px solid ${HUD_ACCENT}; outline-offset: 3px;
         }
         @keyframes wormJumpReady {
             0%, 100% { box-shadow: 0 6px 22px rgba(10,14,8,0.45), 0 0 0 0 var(--jump-glow, rgba(255,255,255,0.4)); }
@@ -491,7 +455,7 @@ const GLANCE_CHIP_STYLE = {
 };
 
 const GLANCE_LABEL_STYLE = {
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: 700,
     letterSpacing: 1.1,
     color: TEXT_MUTED,
@@ -505,13 +469,6 @@ const GLANCE_VALUE_STYLE = {
     fontWeight: 800,
     lineHeight: 1,
     fontVariantNumeric: 'tabular-nums',
-};
-
-const STAT_DIVIDER_STYLE = {
-    width: 1,
-    height: 20,
-    background: 'rgba(255,245,220,0.14)',
-    flexShrink: 0,
 };
 
 const RESERVE_ROW_STYLE = {
@@ -609,7 +566,7 @@ const STEER_KEYS = [
 ];
 
 /** One steering key. Both corners are the same key mirrored. */
-function SteerKey({ side, wormAlive, wormColor, vars }) {
+function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
     const [dir, intent, label] = STEER_KEYS.find(([d]) => d === side);
     return (
         <div style={STEER_CLUSTER_STYLE}>
@@ -623,6 +580,8 @@ function SteerKey({ side, wormAlive, wormColor, vars }) {
                     feel('uiKey');
                     callWormTurn(intent);
                 }}
+                onClick={e => { if (e.detail === 0 && wormAlive) { feel('uiKey'); callWormTurn(intent); } }}
+                disabled={!wormAlive}
                 className="worm-hud-key worm-steer worm-steer-key"
                 style={{ ...vars, color: TEXT }}
                 aria-label={label}
@@ -636,9 +595,9 @@ function SteerKey({ side, wormAlive, wormColor, vars }) {
                     unrelated marks at opposite ends of it. */}
                 <span style={{
                     width: 18, height: 3, borderRadius: 2,
-                    background: wormColor,
+                    background: HUD_ACCENT,
                     opacity: wormAlive ? 0.85 : 0.3,
-                    boxShadow: `0 0 8px ${withAlpha(wormColor, 0.7)}`,
+                    boxShadow: 'none',
                     pointerEvents: 'none',
                 }} />
                 </span>
@@ -1237,7 +1196,7 @@ function SpecialNotice() {
 
 // ─── Boost button ────────────────────────────────────────────────────────────
 
-function BoostButton({ wormAlive, fc }) {
+function BoostButton({ wormAlive }) {
     const boostState = useGameStore(s => s.wormBoostState ?? 'ready');
     const [fillPct, setFillPct] = useState(100);
 
@@ -1261,35 +1220,17 @@ function BoostButton({ wormAlive, fc }) {
         callWormTurn('boost');
     };
 
-    const yellow = fc[6] || FACE_FALLBACKS[6];
-    const white = fc[3] || FACE_FALLBACKS[3];
-
     const readyStyle = {
-        ...BOOST_BTN_BASE,
-        background: `linear-gradient(160deg, ${yellow}, ${fc[4] || FACE_FALLBACKS[4]})`,
-        border: `1px solid ${withAlpha(yellow, 0.85)}`,
-        color: '#2a1c05',
-        boxShadow: `${SHADOW}, 0 0 16px ${withAlpha(yellow, 0.55)}`,
+        ...BOOST_BTN_BASE, background: GAME_HUD.raised,
+        border: `1px solid ${HUD_ACCENT}`, color: TEXT,
     };
-
     const activeStyle = {
-        ...BOOST_BTN_BASE,
-        background: `linear-gradient(160deg, ${white}, ${yellow})`,
-        border: `1px solid ${withAlpha(white, 0.9)}`,
-        color: '#2a1c05',
-        boxShadow: `${SHADOW}, 0 0 22px ${withAlpha(white, 0.7)}, 0 0 44px ${withAlpha(yellow, 0.5)}`,
+        ...BOOST_BTN_BASE, background: GAME_HUD.active,
+        border: `1px solid ${HUD_ACCENT}`, color: HUD_ACCENT,
     };
-
-    // Cooldown keeps the dark-glass shell of the tray and refills with the boost
-    // colour, so the button reads as "recharging" instead of "broken".
     const cooldownStyle = {
-        ...BOOST_BTN_BASE,
-        background: HUD_SURFACE,
-        backdropFilter: HUD_BLUR,
-        WebkitBackdropFilter: HUD_BLUR,
-        border: `1px solid ${BORDER}`,
-        cursor: 'default',
-        color: withAlpha(yellow, 0.45),
+        ...BOOST_BTN_BASE, background: HUD_SURFACE,
+        border: `1px solid ${BORDER}`, cursor: 'default', color: TEXT_MUTED,
     };
 
     const style = boostState === 'active' ? activeStyle
@@ -1299,16 +1240,17 @@ function BoostButton({ wormAlive, fc }) {
     return (
         <button
             onPointerDown={handleBoost}
-            onTouchStart={e => { e.preventDefault(); handleBoost(); }}
+            onClick={e => { if (e.detail === 0) handleBoost(); }}
             className={`worm-action worm-boost${boostState === 'cooldown' ? '' : ' worm-hud-key'}`}
             style={style}
             aria-label="Boost"
-            aria-disabled={boostState === 'cooldown'}
+            aria-disabled={!wormAlive || boostState !== 'ready'}
+            title={boostState === 'cooldown' ? 'Boost recharging' : 'Boost'}
         >
             {boostState === 'cooldown' && (
-                <div style={{ ...BOOST_FILL_STYLE, height: `${fillPct}%`, background: withAlpha(yellow, 0.42) }} />
+                <div style={{ ...BOOST_FILL_STYLE, height: `${fillPct}%`, background: withAlpha(HUD_ACCENT, 0.18) }} />
             )}
-            <span style={{ position: 'relative', zIndex: 1, display: 'flex' }}><BoltIcon size={26} /></span>
+            <span style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}><BoltIcon size={20} /><span style={{ fontSize: 10 }}>Boost</span></span>
         </button>
     );
 }
@@ -1337,6 +1279,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
         <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onClick={onResume}>
             <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className="worm-pause-card" role="dialog" aria-modal="true" aria-label="Game paused" style={overlayCardStyle(green, { width: 420 })} onClick={e => e.stopPropagation()}>
                 <Eyebrow accent={green}>Paused</Eyebrow>
+                <ParityWallet dark neutral />
                 <OverlayTitle size="clamp(26px, min(9vw, 8vh), 44px)" outline="#14310f" glow={`${green}55`}>
                     TAKE A BREATHER
                 </OverlayTitle>
@@ -1488,23 +1431,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         return resolveColors(safeSettings, safeSettings?.biomeMode?.faceAssignment) || FACE_FALLBACKS;
     }, [settings]);
 
-    const jumpEdgeColor = useMemo(() => {
-        const wormRgb = toRgb(wormColor);
-        let nearestFaceId = 2;
-        let nearestDistance = Number.POSITIVE_INFINITY;
-        [1, 2, 3, 4, 5, 6].forEach(faceId => {
-            const faceRgb = toRgb(fc[faceId]);
-            const dist = colorDistance(wormRgb, faceRgb);
-            if (dist < nearestDistance) {
-                nearestDistance = dist;
-                nearestFaceId = faceId;
-            }
-        });
-        const antipodalFace = ANTIPODAL_COLOR[nearestFaceId] ?? 5;
-        const antipodalColor = fc[antipodalFace];
-        return toRgb(antipodalColor) ? antipodalColor : '#8b5cf6';
-    }, [fc, wormColor]);
-
     const formatTime = useCallback((secs) => {
         const m = Math.floor(secs / 60);
         const s = secs % 60;
@@ -1535,27 +1461,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const phaseColor = fc[phaseMeta.faceId] || FACE_FALLBACKS[phaseMeta.faceId];
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
-    const orbTotal = useMemo(() =>
-        [1, 2, 3, 4, 5, 6].reduce((sum, id) => sum + (wormOrbInventory[id] ?? 0), 0),
-        [wormOrbInventory]
-    );
-
-    // Antipodal-paired colors for action buttons. The status bar's readouts no
-    // longer draw from the palette — see HUD_ACCENT.
-    const red = fc[1] || FACE_FALLBACKS[1];
-    const orange = fc[4] || FACE_FALLBACKS[4];
-    const blue = fc[5] || FACE_FALLBACKS[5];
-
-    // Jump button — Red→Orange antipodal gradient once a wormhole is under the
-    // worm; otherwise it sits in the tray's own dark glass so the lit state is
-    // unmistakable at a glance.
     const jumpReadyStyle = {
-        ...JUMP_BTN_BASE,
-        background: `linear-gradient(150deg, ${red}, ${orange})`,
-        border: `1px solid ${withAlpha(jumpEdgeColor, 0.9)}`,
-        color: '#fff8ec',
-        textShadow: '0 1px 3px rgba(0,0,0,0.35)',
-        '--jump-glow': withAlpha(jumpEdgeColor, 0.75),
+        ...JUMP_BTN_BASE, background: GAME_HUD.active,
+        border: `1px solid ${HUD_ACCENT}`, color: TEXT,
     };
 
     const jumpIdleStyle = {
@@ -1567,27 +1475,21 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         color: TEXT,
     };
 
-    // 6-color gradient for the status bar's accent hairline
-    const gradientBorder = `linear-gradient(90deg, ${fc[1] || FACE_FALLBACKS[1]}, ${fc[2] || FACE_FALLBACKS[2]}, ${fc[3] || FACE_FALLBACKS[3]}, ${fc[4] || FACE_FALLBACKS[4]}, ${fc[5] || FACE_FALLBACKS[5]}, ${fc[6] || FACE_FALLBACKS[6]})`;
-
     const steerVars = {
         position: 'relative',
-        '--key-press': withAlpha(blue, 0.34),
-        '--key-edge': withAlpha(blue, 0.75),
-        '--key-glow': withAlpha(blue, 0.5),
+        '--key-press': GAME_HUD.active,
+        '--key-edge': HUD_ACCENT,
+        '--key-glow': 'transparent',
     };
 
     return (
-        <div style={ROOT_STYLE}>
+        <div className="worm-instrument" style={ROOT_STYLE}>
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <OrbPickupFlash />}
 
             {/* ── Zone 1: Status bar — glance info + pause, one object ── */}
             <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
-                {/* Face-palette hairline along the top edge */}
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: gradientBorder, opacity: 0.9, pointerEvents: 'none' }} />
-
                 <div className="worm-hud-row" style={HUD_ROW_STYLE}>
                     {/* Phase label */}
                     <div className="worm-hud-phase" style={{
@@ -1599,7 +1501,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         <div style={{
                             width: 6, height: 6, borderRadius: '50%',
                             background: HUD_ACCENT,
-                            boxShadow: `0 0 6px ${HUD_ACCENT}`,
+                            boxShadow: 'none',
                         }} />
                         {phaseMeta.label}
                     </div>
@@ -1607,23 +1509,14 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     {/* Stat group — length, orbs, PP, pause */}
                     <div className="worm-hud-stats" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <span style={GLANCE_LABEL_STYLE}>Worm</span>
+                            <span style={GLANCE_LABEL_STYLE}>Length</span>
                             <span style={{ ...GLANCE_VALUE_STYLE, color: TEXT }}>{wormBodyTiles}</span>
                         </div>
 
-                        <div style={STAT_DIVIDER_STYLE} />
-
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <span style={GLANCE_LABEL_STYLE}>Orbs</span>
-                            <span style={{ ...GLANCE_VALUE_STYLE, color: HUD_ACCENT }}>{orbTotal}</span>
-                        </div>
-
-                        <div style={STAT_DIVIDER_STYLE} />
-
-                        <ParityWallet dark neutral />
-
                         <button
                             onPointerDown={handlePause}
+                            onClick={e => { if (e.detail === 0) handlePause(); }}
+                            disabled={!canPause}
                             className="worm-hud-key"
                             style={PAUSE_BTN_STYLE}
                             aria-label="Pause"
@@ -1661,15 +1554,17 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     )}
                     <button
                         onPointerDown={handleJumpAction}
-                        onTouchStart={e => { e.preventDefault(); handleJumpAction(); }}
+                        onClick={e => { if (e.detail === 0) handleJumpAction(); }}
+
                         className={`worm-hud-key worm-action worm-jump${isPortalReady ? ' worm-jump-ready' : ''}`}
                         style={isPortalReady ? jumpReadyStyle : jumpIdleStyle}
                         aria-label="Jump"
+                        disabled={!wormAlive}
                     >
                         <JumpIcon size={19} />
                         JUMP
                     </button>
-                    <BoostButton wormAlive={wormAlive} fc={fc} />
+                    <BoostButton wormAlive={wormAlive} />
                 </div>
 
                 <SteerKey side="right" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
