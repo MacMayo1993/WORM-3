@@ -339,8 +339,8 @@ const ShufflingCube = ({ onFlip }) => {
         id: wid,
         startTime: t,
         origins: [
-          { position: sA.pos, rotation: sA.rot, color: MENU_FACE_COLORS[stA.curr] },
-          { position: sB.pos, rotation: sB.rot, color: MENU_FACE_COLORS[stB.curr] },
+          { position: sA.pos, rotation: sA.rot, color: MENU_FACE_COLORS[ANTIPODAL_COLOR[stA.curr]] },
+          { position: sB.pos, rotation: sB.rot, color: MENU_FACE_COLORS[ANTIPODAL_COLOR[stB.curr]] },
         ],
       };
 
