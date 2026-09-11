@@ -29,7 +29,7 @@ const _wispyRingFrag = `
     float phase=angle*turns-uTime*speed;
     float rA=r0+weave*sin(phase);
     float rB=r0+weave*sin(phase+3.14159265);
-    float sigma=0.013;
+    float sigma=0.022;
     float gA=exp(-pow(dist-rA,2.0)/(2.0*sigma*sigma));
     float gB=exp(-pow(dist-rB,2.0)/(2.0*sigma*sigma));
     gA*=0.75+0.25*sin(phase*2.0);
@@ -38,7 +38,7 @@ const _wispyRingFrag = `
     float total=gA+gB;
     vec3 col=total>0.001?(uColor*gA+uAntiColor*gB)/total:uColor;
     float alpha=clamp(total,0.0,1.0)*0.92;
-    gl_FragColor=vec4(col*1.3,alpha);
+    gl_FragColor=vec4(mix(col,vec3(1.0),0.25)*1.5,alpha);
   }
 `;
 
@@ -99,9 +99,9 @@ const _seamLeakFrag = `
     float seamMask=edgeBand*(1.0-centerBlock);
     float waveX=sin((uv.x*18.0+uTime*4.0));
     float waveY=cos((uv.y*22.0-uTime*3.2));
-    float pulse=0.55+(waveX*waveY)*0.25+sin(uTime*7.5)*0.2;
+    float pulse=0.85+(waveX*waveY)*0.08+sin(uTime*2.0)*0.07;
     float alpha=clamp(seamMask*pulse*uIntensity,0.0,1.0);
-    gl_FragColor=vec4(uColor*1.7,alpha);
+    gl_FragColor=vec4(mix(uColor,vec3(1.0),0.7)*1.5,alpha);
   }
 `;
 
@@ -128,18 +128,23 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
   const [crackU] = React.useState(() => ({
     uColor:     { value: new THREE.Color(colorHex) },
     uTime:      _menuOverlayT,
-    uIntensity: { value: 0.30 },
+    uIntensity: { value: 0.48 },
   }));
   const [seamU] = React.useState(() => ({
     uColor:     { value: new THREE.Color(colorHex) },
     uTime:      _menuOverlayT,
-    uIntensity: { value: 0.45 },
+    uIntensity: { value: 0.9 },
   }));
   const [rimU] = React.useState(() => ({
     uColor:     { value: new THREE.Color(colorHex) },
     uTime:      _menuOverlayT,
-    uIntensity: { value: 1.0 },
+    uIntensity: { value: 1.25 },
   }));
+
+  React.useEffect(() => {
+    [wispyU, crackU, seamU, rimU].forEach(uniforms => uniforms.uColor.value.set(colorHex));
+    wispyU.uAntiColor.value.set(antiColorHex || '#888888');
+  }, [colorHex, antiColorHex, wispyU, crackU, seamU, rimU]);
 
   const rootRef = React.useRef();
 
