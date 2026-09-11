@@ -139,19 +139,21 @@ export default function StyleStep({ cos, family, slot }) {
             {isRandom && <Checkmark accent={accent} accentShadow={accentShadow} />}
           </button>
 
-          {/* Styles in the family the rail has selected. Three across on a phone —
-              the rail takes its width off the pane, and four thumbnails there
-              stop being readable. */}
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 4}, minmax(0, 1fr))`, gap: '7px' }}>
+          {/* Six compact previews across on phones; labels sit below the art. */}
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 6 : 4}, minmax(0, 1fr))`, gap: isMobile ? '4px' : '7px' }}>
             {section.keys.map(key => {
               const sel = globalStyle === key;
               const unlocked = owned(key);
               return (
                 <button
                   key={key}
+                  title={TILE_STYLES[key]?.label || key}
+                  aria-label={`${TILE_STYLES[key]?.label || key}${unlocked ? '' : ' (locked)'}`}
+                  aria-pressed={sel}
+                  aria-disabled={!unlocked}
                   onClick={() => unlocked && applyGlobal(key)}
                   style={{
-                    display: 'block', position: 'relative', padding: 0, borderRadius: '10px',
+                    display: 'block', position: 'relative', minWidth: 0, padding: 0, borderRadius: isMobile ? '6px' : '10px',
                     border: sel ? `2px solid ${accent}` : `2px solid ${WIZ_BORDER_SOFT}`,
                     background: WIZ_SURFACE,
                     boxShadow: sel ? 'inset 0 2px 4px rgba(0,0,0,0.10)' : `0 2px 0 ${WIZ_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
@@ -164,10 +166,11 @@ export default function StyleStep({ cos, family, slot }) {
                 >
                   <TilePreviewCanvas styleKey={key} colorHex={swatchColor} size={56} canvasStyle={{ width: '100%', height: 'auto', borderRadius: 0 }} />
                   <span style={{
-                    position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
-                    padding: '14px 3px 4px', fontSize: '10px', fontWeight: sel ? 700 : 500,
+                    position: isMobile ? 'relative' : 'absolute', display: 'block', bottom: 0, left: 0, right: 0, textAlign: 'center',
+                    overflowWrap: 'anywhere', minHeight: isMobile ? '24px' : undefined,
+                    padding: isMobile ? '3px 1px' : '14px 3px 4px', fontSize: isMobile ? '9px' : '10px', fontWeight: sel ? 700 : 500,
                     color: '#fff', textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
-                    lineHeight: 1.2, background: 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, transparent 100%)'
+                    lineHeight: 1.2, background: isMobile ? '#263029' : 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, transparent 100%)'
                   }}>
                     {TILE_STYLES[key]?.label || key}{!unlocked ? ' 🔒' : ''}
                   </span>
