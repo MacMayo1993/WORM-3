@@ -596,7 +596,7 @@ export function WizardShell({
 }) {
   const cat = categories[active];
   const last = active === categories.length - 1;
-  // Keep tile-family labels and preview details below the setup selector.
+  // Keep the cube above the setup selector and its style-family controls.
   const isStyle = cat.key === 'style';
   const specimen = cat.hero ? (
     <div style={styles.hero}>{cat.hero}</div>
@@ -632,8 +632,8 @@ export function WizardShell({
           <span style={styles.modeName}>{mode}</span>
         </div>
 
+        {specimen}
         {isStyle && categoryBar}
-        {!isStyle && specimen}
 
         <WizardChipRow
           styles={styles}
@@ -644,7 +644,6 @@ export function WizardShell({
         />
 
         {!isStyle && categoryBar}
-        {isStyle && specimen}
 
         <div style={styles.body} id={WIZARD_PANEL_ID} role="region" aria-label={cat.label}>
           <div style={{ paddingBottom: '24px' }}>{cat.content}</div>
