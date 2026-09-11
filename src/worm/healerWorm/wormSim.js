@@ -1643,7 +1643,16 @@ const PHASE_HANDLERS = {
  */
 export function stepWormSim(sim, delta, size, ctx) {
     if (!sim.alive) return;
-    if (ctx.isPaused()) return;
+    const paused = ctx.isPaused();
+    if (sim.phase === 'crawling' &&
+        (paused || sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0)) {
+        // The render bridge applies the slice's ABSOLUTE angle after each tick.
+        // A frozen tick must still restore the unrotated surface pose, otherwise
+        // corner riding rotates yesterday's output again on every display frame.
+        // Re-evaluate the fixed interpolation point without advancing gameplay.
+        sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
+    }
+    if (paused) return;
 
     // Heal pause: freeze the whole crawl for a beat after a ring heal so the tile pops out
     // and heals in view. The pop/particle FX are store- and clock-driven, so they play on
