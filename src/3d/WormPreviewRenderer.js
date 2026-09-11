@@ -27,7 +27,6 @@ import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.j
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../worm/wormSkinMaterial.js';
 import { makeWormHaloSprite, HALO_SCALE } from '../worm/wormGlowHalo.js';
-import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
   BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, pageHingeAngles,
@@ -135,15 +134,6 @@ function _buildRig() {
   // The Book Worm's head is the ordinary sphere bead (see _poseWorm), not a
   // standing cover panel with paper leaves — it reads as a head at thumbnail
   // size, where the flat book did not.
-  // Ambient skin FX (embers/bubbles/sparkle/...). Parented to an unscaled
-  // anchor (not the head bead itself, whose own scale would otherwise shrink
-  // every particle down with it) and repositioned to the head each frame in
-  // _poseWorm().
-  const particles = new WormParticleSystem();
-  const particlesAnchor = new THREE.Object3D();
-  particlesAnchor.add(particles.mesh);
-  group.add(particlesAnchor);
-
   // Face — eyes with pupils and a curved smile, as in WormFace.
   const eyeGeo = new THREE.SphereGeometry(1, 14, 14);
   const pupilGeo = new THREE.SphereGeometry(1, 10, 10);
@@ -169,7 +159,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, mobi, mobiTails, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
+  return { group, mobi, mobiTails, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -345,7 +335,7 @@ function _poseWorm(opts, time) {
   const isMobi = characterId === 'mobi';
   rig.mobi.group.visible = isMobi;
 
-  // Skin FX (material personality + surface displacement + ambient particles)
+  // Skin FX (material personality + surface displacement)
   // only need reapplying when the equipped/browsed skin actually changes —
   // not every frame, so browsing the store doesn't force a shader-uniform
   // rewrite on every render.
@@ -360,7 +350,6 @@ function _poseWorm(opts, time) {
       applySkinMaterialProfile(rig.beads[i].material, fx, i);
       applyBioluminescence(rig.beads[i].material, skin.glow, isGlow);
     }
-    rig.particles.configure(fx.particle, skin.glow);
     rig.skinKey = fxKey;
   }
   for (let i = 0; i < SEGMENTS; i++) updateWormSkinMaterialTime(rig.beads[i].material, time);
@@ -498,9 +487,7 @@ function _poseWorm(opts, time) {
       halo.material.color.set(skin.glow);
     }
 
-    if (i === 0) rig.particlesAnchor.position.copy(_off);
   }
-  rig.particles.update(time);
 
   // The Glow Worm's bioluminescence is THIS LIGHT, and only this light.
   //

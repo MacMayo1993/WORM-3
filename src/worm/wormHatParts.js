@@ -1,121 +1,97 @@
-// src/worm/wormHatParts.js
-// One description of every 3D hat, shared by the in-game hat (WormHat3D, R3F)
-// and the worm preview renderer (imperative three.js in WormPreviewRenderer).
-//
-// The hats used to exist only as JSX inside wormCosmetics.jsx, so anything that
-// could not mount an R3F tree — the store, the character picker — had to draw
-// its own flat lookalike. A crown was three different drawings depending on
-// where you were standing. Everything now builds from these parts, so a hat is
-// the same object wherever it appears.
-//
-// Parts are in the parent's local space with +Y outward from the head, and `s`
-// is the head sphere radius in world units. Group offsets from the original JSX
-// are baked into each part's position so the list stays flat.
-
-/**
- * @param {string} type  hat id ('tophat', 'crown', …); 'none'/unknown → []
- * @param {number} s     head radius in world units
- * @returns {Array<{geo: [string, number[]], pos: number[], rot?: number[], scale?: number[], mat: object}>}
- */
+// Shared, head-relative models for gameplay and every worm preview.
+// +Y points out of the head. Keep to geometry supported by both renderers.
 export function getHatParts(type, s = 0.28) {
-  if (!type || type === 'none') return [];
+  const parts = [];
+  const cloth = (color) => ({ color, roughness: 0.88, metalness: 0 });
+  const metal = (color) => ({ color, roughness: 0.28, metalness: 0.65 });
+  const gold = metal('#e9b957');
+  const cream = cloth('#fff1d2');
+  const add = (geo, args, pos, mat, rot, scale) => {
+    parts.push({ geo: [geo, args], pos: pos.map(v => v * s), mat, ...(rot && { rot }), ...(scale && { scale }) });
+  };
+  const cylinder = (top, bottom, height, pos, mat, rot) => add('cylinder', [top*s, bottom*s, height*s, 24], pos, mat, rot);
+  const ball = (radius, pos, mat, scale) => add('sphere', [radius*s, 12, 10], pos, mat, undefined, scale);
+  const ring = (radius, tube, y, mat) => add('torus', [radius*s, tube*s, 8, 32], [0,y,0], mat, [Math.PI/2,0,0]);
+  const box = (dims, pos, mat, rot) => add('box', dims.map(v=>v*s), pos, mat, rot);
+  const gem = (radius, pos, color) => add('octahedron', [radius*s,0], pos, { ...metal(color), emissive: color, emissiveIntensity: 0.12 });
+  const around = (n, fn) => { for (let i=0;i<n;i++) fn(i*2*Math.PI/n,i); };
 
   if (type === 'tophat') {
-    const felt = { color: '#111111', roughness: 0.4, metalness: 0.1 };
-    return [
-      { geo: ['cylinder', [s * 1.35, s * 1.35, s * 0.18, 16]], pos: [0, s * 0.9, 0], mat: felt },
-      { geo: ['cylinder', [s * 0.74, s * 0.82, s * 1.6, 16]], pos: [0, s * 1.8, 0], mat: felt },
-      { geo: ['cylinder', [s * 0.84, s * 0.84, s * 0.22, 16]], pos: [0, s * 1.08, 0], mat: { color: '#ef4444', roughness: 0.3 } }
-    ];
+    const felt = cloth('#272235');
+    cylinder(1.34,1.3,0.13,[0,0.9,0],felt);
+    ring(1.3,0.045,0.96,cloth('#51465e'));
+    cylinder(0.77,0.85,1.45,[0,1.65,0],felt);
+    ring(0.77,0.045,2.38,cloth('#51465e'));
+    cylinder(0.84,0.86,0.28,[0,1.12,0],cloth('#9f3156'));
+    box([0.34,0.25,0.07],[0,1.14,0.87],gold);
+    box([0.2,0.13,0.08],[0,1.14,0.91],felt);
+    ball(0.35,[-0.74,1.66,0.18],cloth('#c5a7d9'),[0.3,1.8,0.65]);
+  } else if (type === 'party') {
+    const purple = cloth('#713ead');
+    add('cone',[0.84*s,2.2*s,24],[0,1.92,0],purple);
+    ring(0.83,0.1,0.85,cream);
+    ring(0.55,0.045,1.62,metal('#e9b957'));
+    ring(0.29,0.045,2.3,cloth('#ed91b5'));
+    around(7,(a,i)=>ball(0.085,[Math.cos(a)*0.69,1.27,Math.sin(a)*0.69],i%2?cream:cloth('#ed91b5')));
+    ball(0.2,[0,3.06,0],cream);
+    around(5,a=>ball(0.11,[Math.cos(a)*0.15,3.08,Math.sin(a)*0.15],cream));
+  } else if (type === 'crown') {
+    cylinder(1.02,0.96,0.45,[0,0.98,0],gold);
+    cylinder(0.87,0.85,0.4,[0,1.17,0],cloth('#802347'));
+    ring(0.99,0.075,0.78,gold);
+    ring(1.02,0.055,1.2,gold);
+    around(6,(a,i)=>{
+      const x=Math.cos(a),z=Math.sin(a);
+      add('cone',[0.22*s,0.64*s,4],[x*0.91,1.5,z*0.91],gold);
+      ball(0.08,[x*0.91,1.84,z*0.91],gold);
+      gem(0.14,[x*1.035,0.98,z*1.035],i%2?'#55cbb8':'#c83c76');
+    });
+  } else if (type === 'halo') {
+    ring(0.87,0.075,1.9,gold);
+    ring(0.87,0.025,1.98,{color:'#fff6d8',emissive:'#ffdc88',emissiveIntensity:0.65,roughness:0.3});
+    ring(0.72,0.025,1.9,gold);
+    around(6,a=>gem(0.07,[Math.cos(a)*0.87,1.98,Math.sin(a)*0.87],'#fff1d2'));
+  } else if (type === 'beanie') {
+    const knit=cloth('#85508f'), rib=cloth('#a870ad');
+    add('sphere',[1.02*s,24,16,0,Math.PI*2,0,Math.PI*0.5],[0,0.79,0],knit);
+    ring(0.98,0.17,0.85,cloth('#623968'));
+    around(16,a=>ball(0.055,[Math.cos(a)*1.08,0.88,Math.sin(a)*1.08],rib,[1,2.1,1]));
+    // Raised seams follow the dome instead of floating above the fabric.
+    around(8,a=>{ for(let j=1;j<5;j++){const t=j*Math.PI/10;ball(0.035,[Math.cos(a)*Math.sin(t)*1.025,0.79+Math.cos(t)*1.025,Math.sin(a)*Math.sin(t)*1.025],rib,[1,1.5,1]);} });
+    ball(0.24,[0,1.92,0],cream);
+    around(6,a=>ball(0.12,[Math.cos(a)*0.16,1.94,Math.sin(a)*0.16],cream));
+    box([0.31,0.23,0.055],[0,0.91,1.14],cream);
+    box([0.13,0.1,0.06],[0,0.91,1.17],knit);
+  } else if (type === 'wizard') {
+    const fabric=cloth('#44345e');
+    cylinder(1.4,1.48,0.13,[0,0.88,0],fabric);
+    ring(1.42,0.05,0.94,gold);
+    cylinder(0.24,0.9,1.65,[0,1.74,0],fabric);
+    add('cone',[0.27*s,0.8*s,24],[0.19,2.87,0],fabric,[0,0,-0.5]);
+    cylinder(0.85,0.89,0.23,[0,1.02,0],cloth('#a477ad'));
+    gem(0.2,[0,1.04,0.9],'#70cbbb');
+    gem(0.13,[-0.27,1.58,0.66],'#efcd83');
+    gem(0.1,[0.12,2.12,0.43],'#efcd83');
+    ball(0.1,[0.39,3.2,0],gold);
+  } else if (type === 'flower') {
+    cylinder(0.07,0.09,0.55,[0,1.02,0],cloth('#477451'));
+    ball(0.34,[-0.25,1.01,0],cloth('#79a65a'),[1.3,0.2,0.65]);
+    around(8,a=>ball(0.38,[Math.cos(a)*0.48,1.39,Math.sin(a)*0.48],cloth('#cf638e'),[1,0.38,1]));
+    around(6,a=>ball(0.29,[Math.cos(a)*0.29,1.5,Math.sin(a)*0.29],cloth('#f3a3bb'),[1,0.4,1]));
+    ball(0.26,[0,1.6,0],cloth('#e8b84c'),[1,0.55,1]);
+    around(7,a=>ball(0.035,[Math.cos(a)*0.16,1.73,Math.sin(a)*0.16],cloth('#8f602f')));
+  } else if (type === 'grad') {
+    const felt=cloth('#2c293b');
+    cylinder(0.78,0.85,0.45,[0,0.98,0],felt);
+    ring(0.82,0.04,0.78,cloth('#554d64'));
+    box([2.05,0.12,2.05],[0,1.25,0],felt);
+    box([1.96,0.025,1.96],[0,1.32,0],cloth('#454052'));
+    ball(0.09,[0,1.38,0],gold);
+    // Continuous cord reaches from the button to the board's corner.
+    cylinder(0.025,0.025,1.29,[0.46,1.37,0.46],gold,[Math.PI/2,0,-Math.PI/4]);
+    cylinder(0.035,0.035,0.57,[0.93,1.09,0.93],gold);
+    ball(0.08,[0.93,0.79,0.93],gold);
+    around(7,a=>cylinder(0.017,0.026,0.31,[0.93+Math.cos(a)*0.07,0.62,0.93+Math.sin(a)*0.07],gold));
   }
-
-  if (type === 'party') {
-    return [
-      { geo: ['cone', [s * 0.82, s * 2.4, 12]], pos: [0, s * 1.8, 0], mat: { color: '#f97316', emissive: '#f97316', emissiveIntensity: 0.2, roughness: 0.5 } },
-      { geo: ['torus', [s * 0.72, s * 0.07, 6, 16]], pos: [0, s * 0.85, 0], mat: { color: '#ef4444' } },
-      { geo: ['torus', [s * 0.42, s * 0.07, 6, 16]], pos: [0, s * 1.45, 0], mat: { color: '#FFD500' } },
-      { geo: ['sphere', [s * 0.2, 8, 8]], pos: [0, s * 3.0, 0], mat: { color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.5 } }
-    ];
-  }
-
-  if (type === 'crown') {
-    const base = s * 0.82;
-    const gold = { color: '#fbbf24', emissive: '#fbbf24', emissiveIntensity: 0.5, metalness: 0.6, roughness: 0.2 };
-    const spikes = 5;
-    return [
-      { geo: ['cylinder', [s * 1.1, s * 1.0, s * 0.55, 20]], pos: [0, base, 0], mat: { color: '#f59e0b', emissive: '#f59e0b', emissiveIntensity: 0.4, metalness: 0.6, roughness: 0.2 } },
-      ...Array.from({ length: spikes }, (_, i) => {
-        const angle = (i / spikes) * Math.PI * 2;
-        return {
-          geo: ['cone', [s * 0.2, s * 0.75, 6]],
-          pos: [Math.cos(angle) * s * 0.95, base + s * 0.65, Math.sin(angle) * s * 0.95],
-          mat: gold
-        };
-      })
-    ];
-  }
-
-  if (type === 'halo') {
-    return [
-      // Laid flat over the crown. A TorusGeometry stands in the XY plane by
-      // default, which pointed the ring at the camera like an archway — read as
-      // a yellow "U" behind the head rather than a halo hovering above it.
-      { geo: ['torus', [s * 0.8, s * 0.09, 8, 32]], pos: [0, s * 1.9, 0], rot: [Math.PI / 2, 0, 0], mat: { color: '#fde68a', emissive: '#fde68a', emissiveIntensity: 1.4 } }
-    ];
-  }
-
-  if (type === 'beanie') {
-    return [
-      // Snug knit dome (top hemisphere only)
-      { geo: ['sphere', [s * 1.04, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55]], pos: [0, s * 0.78, 0], mat: { color: '#6d28d9', roughness: 0.9, metalness: 0 } },
-      { geo: ['torus', [s * 0.98, s * 0.22, 10, 24]], pos: [0, s * 0.84, 0], rot: [Math.PI / 2, 0, 0], mat: { color: '#5b21b6', roughness: 0.95 } },
-      { geo: ['sphere', [s * 0.28, 10, 10]], pos: [0, s * 1.72, 0], mat: { color: '#ede9fe', roughness: 1 } }
-    ];
-  }
-
-  if (type === 'wizard') {
-    const star = { color: '#fde68a', emissive: '#fde68a', emissiveIntensity: 1.2 };
-    const stars = [
-      [s * 0.34, s * 1.6, s * 0.55],
-      [-s * 0.42, s * 2.35, s * 0.32],
-      [s * 0.12, s * 2.95, -s * 0.4]
-    ];
-    return [
-      { geo: ['cylinder', [s * 1.55, s * 1.55, s * 0.1, 24]], pos: [0, s * 0.88, 0], mat: { color: '#3b0764', roughness: 0.6 } },
-      { geo: ['cone', [s * 0.95, s * 2.6, 24]], pos: [0, s * 2.15, 0], mat: { color: '#4c1d95', emissive: '#1e1b4b', emissiveIntensity: 0.25, roughness: 0.6 } },
-      ...stars.map(pos => ({ geo: ['octahedron', [s * 0.16, 0]], pos, mat: star }))
-    ];
-  }
-
-  if (type === 'flower') {
-    const base = s * 1.1;
-    const petals = 6;
-    return [
-      { geo: ['cylinder', [s * 0.06, s * 0.06, s * 0.7, 8]], pos: [0, base - s * 0.45, 0], mat: { color: '#16a34a', roughness: 0.7 } },
-      ...Array.from({ length: petals }, (_, i) => {
-        const a = (i / petals) * Math.PI * 2;
-        return {
-          geo: ['sphere', [1, 10, 10]],
-          pos: [Math.cos(a) * s * 0.5, base, Math.sin(a) * s * 0.5],
-          scale: [s * 0.42, s * 0.16, s * 0.26],
-          mat: { color: '#f472b6', roughness: 0.55 }
-        };
-      }),
-      { geo: ['sphere', [s * 0.3, 12, 12]], pos: [0, base, 0], mat: { color: '#facc15', emissive: '#facc15', emissiveIntensity: 0.45 } }
-    ];
-  }
-
-  if (type === 'grad') {
-    const base = s * 0.95;
-    return [
-      { geo: ['cylinder', [s * 0.78, s * 0.86, s * 0.5, 16]], pos: [0, base, 0], mat: { color: '#111827', roughness: 0.7 } },
-      { geo: ['box', [s * 2.0, s * 0.12, s * 2.0]], pos: [0, base + s * 0.3, 0], mat: { color: '#111827', roughness: 0.55 } },
-      { geo: ['sphere', [s * 0.12, 8, 8]], pos: [0, base + s * 0.4, 0], mat: { color: '#fbbf24', metalness: 0.5, roughness: 0.3 } },
-      // Tassel cord + knob hanging off one corner
-      { geo: ['cylinder', [s * 0.03, s * 0.03, s * 0.7, 6]], pos: [s * 0.9, base + s * 0.16, s * 0.9], mat: { color: '#fbbf24' } },
-      { geo: ['sphere', [s * 0.14, 8, 8]], pos: [s * 0.9, base - s * 0.18, s * 0.9], mat: { color: '#fbbf24', emissive: '#fbbf24', emissiveIntensity: 0.3 } }
-    ];
-  }
-
-  return [];
+  return parts;
 }
