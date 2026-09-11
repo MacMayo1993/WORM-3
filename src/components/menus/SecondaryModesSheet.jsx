@@ -23,6 +23,7 @@ const SheetItem = ({ label, active, onClick, color, locked, icon }) => (
 const SecondaryModesSheet = ({
   open,
   onClose,
+  onReset, onShuffle,
   mode, // 'more' or 'views'
   // Core toggles
   chaosMode, chaosLevel, onToggleChaos, onSetChaosLevel, chaosLocked, maxChaosLevel,
@@ -63,6 +64,14 @@ const SecondaryModesSheet = ({
       <div className="sheet-backdrop" onClick={onClose} />
       <div className={`sheet-container ${open ? 'sheet-open' : ''}`}>
         <div className="sheet-handle" />
+
+        {!isViewsMode && <div className="sheet-group">
+          <div className="sheet-group-title">Session</div>
+          <div className="sheet-grid">
+            {onShuffle && !chaosMode && <SheetItem label="Shuffle" onClick={onShuffle} />}
+            {onReset && <SheetItem label="Reset" onClick={onReset} />}
+          </div>
+        </div>}
 
         {isViewsMode ? (
           <>

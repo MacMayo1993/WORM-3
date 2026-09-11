@@ -376,6 +376,8 @@ export default function UILayer({
         {/* Bottom Navigation Bar — hidden while a demo dialogue is presenting */}
         {showGameHUD && !demoDialogueVisible && (
           <BottomNavBar
+            onUndo={undo}
+            canUndo={canUndo}
             // Every tile reports its press to the demo (onDemoNavTap) AFTER
             // running its real action, so the control tour can advance on the
             // press that actually did the thing. Outside the demo the callback
@@ -410,6 +412,8 @@ export default function UILayer({
 
       {/* Secondary Modes Bottom Sheet */}
       {showGameHUD && <SecondaryModesSheet
+        onReset={() => { onReset(); setSheetOpen(false); }}
+        onShuffle={() => { (currentLevelData ? onShuffleForLevel : onShuffle)(); setSheetOpen(false); }}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         mode={sheetMode}
@@ -721,7 +725,7 @@ export default function UILayer({
           showUndo={
             // Teach mode's compact practice card occupies the same corner as the undo
             // pill, and carries its own ↺ — keep a single control in that spot.
-            !demoDialogueVisible && !teachMode.active
+            !showGameHUD && !demoDialogueVisible && !teachMode.active
           }
           teachModeActive={teachMode.active}
           onToggleTeachMode={() => { if (teachMode.active) teachMode.exitTeachMode(); else teachMode.enterTeachMode(); }}

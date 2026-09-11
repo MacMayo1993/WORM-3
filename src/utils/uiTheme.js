@@ -184,3 +184,20 @@ export const UI_CSS_VARS = {
   '--ui-moss': UI_MOSS,
   '--ui-action-shadow': UI_ACTION_SHADOW,
 };
+
+// In-game instruments: neutral warm charcoal with one active-control accent.
+// Face colours remain reserved for the cube and its inventory samples.
+export const GAME_HUD = {
+  surface: 'rgba(32,35,29,0.94)',
+  raised: '#34372f',
+  inset: '#1b1e19',
+  border: 'rgba(255,245,220,0.18)',
+  text: '#fff6e8',
+  muted: '#b8b6aa',
+  accent: '#d8a1cf',
+  active: '#574052',
+  warning: '#eab879',
+};
+export const GAME_HUD_VARS = Object.fromEntries(
+  Object.entries(GAME_HUD).map(([key, value]) => [`--hud-${key}`, value])
+);
