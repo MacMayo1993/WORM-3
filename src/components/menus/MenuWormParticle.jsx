@@ -9,14 +9,15 @@ import { makeMenuTunnelWormPath, sampleMenuTunnelWorm, MENU_WORM_RADIUS, MENU_WO
 
 // Mounted INSIDE the cube's transform. No screen coordinates or independent
 // world-space movement: carousel turns, wobble, scale and dive carry every part.
-export default function MenuWormParticle({ start, color1, elapsed, arcPhase = 0, antipodal = false, onComplete }) {
+export default function MenuWormParticle({ start, color1, elapsed, arcPhase = 0, antipodal = false, delay = 0, onComplete }) {
   const path = useMemo(() => makeMenuTunnelWormPath(start, arcPhase), [start, arcPhase]);
   const completed = useRef(false);
   const model = useMemo(() => {
     const group = new THREE.Group();
     group.visible = false;
     const geometry = new THREE.SphereGeometry(1, 16, 12);
-    const material = createWormSkinMaterial({ color: color1, emissive: '#000000', roughness: 0.38, clearcoat: 0.7 });
+    const tint = new THREE.Color(color1).lerp(new THREE.Color('#ffffff'), 0.24);
+    const material = createWormSkinMaterial({ color: tint, emissive: tint, emissiveIntensity: 0.65, roughness: 0.3, clearcoat: 0.8 });
     const beads = [];
     for (let i = 0; i < MENU_WORM_SEGMENTS; i++) {
       const bead = new THREE.Mesh(geometry, material);
@@ -39,7 +40,8 @@ export default function MenuWormParticle({ start, color1, elapsed, arcPhase = 0,
   useFrame(() => {
     model.group.visible = !isCarouselActive();
     if (!model.group.visible) return;
-    const distance = elapsed.current * MENU_WORM_SPEED;
+    const time = elapsed.current - delay;
+    const distance = time * MENU_WORM_SPEED;
     updateWormSkinMaterialTime(model.material, elapsed.current);
     model.beads.forEach((bead, i) => {
       bead.visible = sampleMenuTunnelWorm(path, distance - i * MENU_WORM_SPACING, model.position, model.normal, model.forward);
@@ -50,7 +52,7 @@ export default function MenuWormParticle({ start, color1, elapsed, arcPhase = 0,
         [...model.face.eyes, ...model.face.pupils, model.face.mouth].forEach(part => { part.visible = bead.visible; });
       }
     });
-    if (!completed.current && elapsed.current >= path.duration) {
+    if (!completed.current && time >= path.duration) {
       completed.current = true;
       onComplete?.();
     }

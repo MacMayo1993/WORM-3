@@ -7,7 +7,7 @@ import { isCarouselActive } from './menuCarouselState.js';
 const waveGeometry = new THREE.RingGeometry(0.8, 1, 32);
 const portalGeometry = new THREE.RingGeometry(0.19, 0.23, 40);
 
-// One paused clock drives the pair, their portal pulses and tail completion.
+// One paused clock drives both staggered pairs, their portal pulses and tail completion.
 // There is deliberately no wall-clock timeout that can rotate a cube mid-worm.
 export default function MenuFlipWave({ origins, onComplete }) {
   const phase = useMemo(() => Math.random() * Math.PI * 2, []);
@@ -37,7 +37,7 @@ export default function MenuFlipWave({ origins, onComplete }) {
   if (!origins || origins.length < 2) return null;
   const wormCompleted = () => {
     completed.current += 1;
-    if (completed.current === 2 && !finished.current) {
+    if (completed.current === 4 && !finished.current) {
       finished.current = true;
       onComplete?.();
     }
@@ -51,9 +51,9 @@ export default function MenuFlipWave({ origins, onComplete }) {
         <meshBasicMaterial color={origin.color} transparent opacity={0.38} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
     </group>)}
-    {[0, 1].map(i => <MenuWormParticle key={i}
-      start={origins[0].position} antipodal={i === 1}
-      color1={origins[i].color} elapsed={elapsed} arcPhase={phase} onComplete={wormCompleted}
+    {[0, 1, 2, 3].map(i => <MenuWormParticle key={i}
+      start={origins[0].position} antipodal={i % 2 === 1} delay={i >= 2 ? 2.4 : 0}
+      color1={origins[i % 2].color} elapsed={elapsed} arcPhase={phase + (i >= 2 ? Math.PI / 2 : 0)} onComplete={wormCompleted}
     />)}
   </group>;
 }
