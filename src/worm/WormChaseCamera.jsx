@@ -32,6 +32,7 @@ import {
     ELEMENTAL_FOCUS_DURATION,
     ELEMENTAL_DURATION,
 } from './healerWorm/constants.js';
+import { dampingAlpha, blendSurfaceFrame } from './cameraMotion.js';
 import { elementalRideBlend } from './healerWorm/elementalLifecycle.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
@@ -48,7 +49,7 @@ const _camNormal = new THREE.Vector3();
 const _camTargetCam = new THREE.Vector3();
 const _camTargetLook = new THREE.Vector3();
 const _camTunnelTangent = new THREE.Vector3();
-// Face-transition blend scratch — slerp normal and lerp forward over ~250ms
+// Face-transition scratch — rotate the surface frame together over ~250ms
 const _rawNormal = new THREE.Vector3();
 const _rawForward = new THREE.Vector3();
 /**
@@ -88,9 +89,9 @@ export function aimCamera(camera, eye, look, upHint, alpha) {
   _aimBasis.lookAt(eye, look, _aimUp);
   _aimQuat.setFromRotationMatrix(_aimBasis);
   camera.quaternion.slerp(_aimQuat, alpha);
-  // Kept in step so the branches that still use lookAt (tunnel rides, the death
-  // freeze) start from the orientation the chase actually ended on.
-  camera.up.copy(_aimUp);
+  // Preserve the actual smoothed orientation for singularity fallback and
+  // handoffs, rather than exposing the target roll before the camera reaches it.
+  camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
 }
 
 const FACE_TRANS_DURATION = 0.25;
@@ -317,8 +318,8 @@ export default function WormChaseCamera({ worm, size }) {
                 prevDirKeyRef.current = null;
                 faceTransT.current = 0;
             } else {
-                camPosRef.current.lerp(_camTargetCam, Math.min(1, delta * 2.5));
-                lookAtRef.current.lerp(_camTargetLook, Math.min(1, delta * 2.5));
+                camPosRef.current.lerp(_camTargetCam, dampingAlpha(2.5, delta));
+                lookAtRef.current.lerp(_camTargetLook, dampingAlpha(2.5, delta));
             }
             camera.position.copy(camPosRef.current);
             camera.up.set(0, 1, 0);
@@ -346,7 +347,7 @@ export default function WormChaseCamera({ worm, size }) {
                 Math.sin(solvedAngleRef.current) * dist
             );
             _camTargetLook.set(0, 0, 0);
-            const a = Math.min(1, delta * 2.0);
+            const a = dampingAlpha(2.0, delta);
             camPosRef.current.lerp(_camTargetCam, a);
             lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);
@@ -390,7 +391,7 @@ export default function WormChaseCamera({ worm, size }) {
 
         const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix)
             + ELEM_FOV_WIDEN * elemRideBlend; // widen for the portal/tunnel view and the elemental ride
-        const fovAlpha = Math.min(1, delta * 6);
+        const fovAlpha = dampingAlpha(6, delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
             camera.fov = nextFov;
@@ -460,7 +461,7 @@ export default function WormChaseCamera({ worm, size }) {
             if (horizonMode === 'face') _camUp.copy(_camNormal);
             else _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
 
-            const revealA = enteredReveal ? 1 : Math.min(1, CAM_LERP * delta);
+            const revealA = enteredReveal ? 1 : dampingAlpha(CAM_LERP, delta);
             if (enteredReveal) {
                 camPosRef.current.copy(_camTargetCam);
                 lookAtRef.current.copy(_camTargetLook);
@@ -520,11 +521,11 @@ export default function WormChaseCamera({ worm, size }) {
                 faceTransT.current = Math.max(0, faceTransT.current - delta);
                 const t = 1 - faceTransT.current / FACE_TRANS_DURATION;
                 const eased = t * t * (3 - 2 * t); // smoothstep
-                _camNormal.copy(oldNormalRef.current).lerp(_rawNormal, eased).normalize();
-                _camForward.copy(oldForwardRef.current).lerp(_rawForward, eased).normalize();
+                blendSurfaceFrame(_camNormal, _camForward, oldNormalRef.current,
+                    oldForwardRef.current, _rawNormal, _rawForward, eased);
             } else {
-                _camNormal.copy(_rawNormal);
-                _camForward.copy(_rawForward);
+                blendSurfaceFrame(_camNormal, _camForward, _rawNormal,
+                    _rawForward, _rawNormal, _rawForward, 1);
             }
 
             lastNormalRef.current.copy(_camNormal);
@@ -671,7 +672,7 @@ export default function WormChaseCamera({ worm, size }) {
                 crawlK = THREE.MathUtils.lerp(3.0, CAM_LERP, 1 - postTunnelEaseRef.current / 0.7);
             }
 
-            const alpha = Math.min(1, crawlK * delta);
+            const alpha = dampingAlpha(crawlK, delta);
             camPosRef.current.lerp(_camTargetCam, alpha);
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
@@ -697,15 +698,14 @@ export default function WormChaseCamera({ worm, size }) {
             _camTargetLook.copy(_entryTileCenter);
             _camUp.set(0, entN.y < -0.85 ? -1 : 1, 0);
 
-            const a = Math.min(1, 3.0 * delta);
+            const a = dampingAlpha(3.0, delta);
             camPosRef.current.lerp(_camTargetCam, a);
             lookAtRef.current.lerp(_camTargetLook, a);
             projectToTileCenterAxisInto(camPosRef.current, camPosRef.current, _entryTileCenter, entN);
             projectToTileCenterAxisInto(lookAtRef.current, lookAtRef.current, _entryTileCenter, entN);
             camera.position.copy(camPosRef.current);
-            camUpRef.current.lerp(_camUp, a).normalize();
-            camera.up.copy(camUpRef.current);
-            camera.lookAt(lookAtRef.current);
+            aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, a);
+            camUpRef.current.copy(camera.up);
         } else if (phase === 'entering' && worm.activeTunnel.current) {
             // ── The dive ─────────────────────────────────────────────────────────
             // 'entering' used to be a second exterior shot: the camera hung where the
@@ -767,7 +767,7 @@ export default function WormChaseCamera({ worm, size }) {
             // camera never actually arrives — it would hand over to the next branch
             // still outside the hole, reintroducing the cut this whole branch exists
             // to remove. The second pull converges on the target as the dive closes.
-            const a = Math.min(1, 3.0 * delta);
+            const a = dampingAlpha(3.0, delta);
             const snap = Math.max(a, dive * dive);
             camPosRef.current.lerp(_camTargetCam, a).lerp(_camTargetCam, dive * dive);
             lookAtRef.current.lerp(_camTargetLook, a).lerp(_camTargetLook, dive * dive);
@@ -777,9 +777,8 @@ export default function WormChaseCamera({ worm, size }) {
             projectToTileCenterAxisInto(camPosRef.current, camPosRef.current, _entryTileCenter, entN);
             projectToTileCenterAxisInto(lookAtRef.current, lookAtRef.current, _entryTileCenter, entN);
             camera.position.copy(camPosRef.current);
-            camUpRef.current.lerp(_camUp, snap).normalize();
-            camera.up.copy(camUpRef.current);
-            camera.lookAt(lookAtRef.current);
+            aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, snap);
+            camUpRef.current.copy(camera.up);
         } else if ((phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
             // Inside ribbon camera: follows the worm along the full ribbon ride, including the
             // entire exit arm, so the player sees the whole Möbius strip exit climb up close.
@@ -834,13 +833,12 @@ export default function WormChaseCamera({ worm, size }) {
                 _camUp.normalize();
             }
 
-            const a = Math.min(1, 2.5 * delta);
+            const a = dampingAlpha(2.5, delta);
             camPosRef.current.lerp(_camTargetCam, a);
             lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);
-            camUpRef.current.lerp(_camUp, a).normalize();
-            camera.up.copy(camUpRef.current);
-            camera.lookAt(lookAtRef.current);
+            aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, a);
+            camUpRef.current.copy(camera.up);
         } else if (phase === 'windout' && worm.activeTunnel.current) {
             // Exit-side external view: the windout spiral flourish above the exit tile,
             // watched from outside the cube once the worm has fully ridden the exit ribbon.
@@ -860,13 +858,12 @@ export default function WormChaseCamera({ worm, size }) {
             _camTargetLook.copy(_ribVEnd);
             _camUp.set(0, extN.y < -0.85 ? -1 : 1, 0);
 
-            const a = Math.min(1, 3.0 * delta);
+            const a = dampingAlpha(3.0, delta);
             camPosRef.current.lerp(_camTargetCam, a);
             lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);
-            camUpRef.current.lerp(_camUp, a).normalize();
-            camera.up.copy(camUpRef.current);
-            camera.lookAt(lookAtRef.current);
+            aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, a);
+            camUpRef.current.copy(camera.up);
         } else {
             tunnelState.active = false;
             tunnelState.t = 0;

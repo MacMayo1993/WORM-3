@@ -80,3 +80,11 @@ describe('chase camera aim', () => {
     expect(up.dot(n)).toBeGreaterThan(0.7);
   });
 });
+
+// A phase handoff must inherit what was rendered, not the unsmoothed target.
+it('keeps camera.up aligned with the rendered roll during a partial turn', () => {
+  const c = cam();
+  aimCamera(c, new THREE.Vector3(0, 0, 4), new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0.15);
+  const renderedUp = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
+  expect(c.up.distanceTo(renderedUp)).toBeLessThan(1e-10);
+});
