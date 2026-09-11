@@ -480,6 +480,7 @@ export function useWormCrawler(size, cubies) {
             phase: f('phase'),
             tunnelProgress: f('tunnelProgress'),
             activeTunnel: f('activeTunnel'),
+            tunnelPassages: f('tunnelPassages'),
             onFlippedTile: f('onFlippedTile'),
             interpT: f('interpT'),
             crawlDistance: f('crawlDistance'),

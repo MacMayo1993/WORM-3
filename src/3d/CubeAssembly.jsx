@@ -24,6 +24,7 @@ import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRo
 // of them, so they are reused rather than reallocated per frame.
 const _liveLayers = [];
 const _liveAngles = [];
+import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { collectHealWave, healTilePair, isHealable } from '../game/chaosHeal.js';
 import { buildManifoldGridMap } from '../game/manifoldLogic.js';
@@ -93,8 +94,6 @@ const CubeAssembly = React.memo(({
     handsMode,
     wormHealerMode,
     wormTunnelActive,
-    wormExitRideActive,
-    wormholeBodyHidden,
     isBiomeMode,
     rotationEpoch,
     settings,
@@ -111,26 +110,9 @@ const CubeAssembly = React.memo(({
       flipWaveOrigins: s.flipWaveOrigins,
       handsMode: s.handsMode,
       wormHealerMode: s.wormHealerMode,
-      // Hide the exterior cube ONLY during the immersive 'tunnel' beat (camera rides inside the
-      // hollow cube on the Möbius ribbon). During windup/entering the camera watches the
-      // entry hole from OUTSIDE, so the cube must stay visible to see the worm get sucked in.
+      // Keep puzzle controls disabled through the tunnel ride. Exterior visibility
+      // is handled per frame from the lens position below.
       wormTunnelActive: s.wormHealerMode && s.wormPhase === 'tunnel',
-      // The camera also rides inside the cube for the whole 'exiting' phase (the trip back up
-      // the exit arm), but unlike 'tunnel' we still want the per-cubie groups mounted so the
-      // antipodal back-face stickers render — only the opaque solid body needs to disappear so
-      // it stops occluding them from the inside.
-      wormExitRideActive: s.wormHealerMode && s.wormPhase === 'exiting',
-      // Hides the solid cube body (and unrelated interaction overlays) so it doesn't z-fight
-      // with TunnelInteriorView's coincident antipodal stickers.
-      // Deliberately does NOT cover WormholeNetwork/VoidCore below — the Möbius ribbons and the
-      // void-core swirl are the wormhole's own visual and must stay visible through the trip.
-      //
-      // Scoped to the phases where the camera is actually INSIDE. This used to include
-      // 'entering', which contradicted the wormTunnelActive comment three lines up ("the camera
-      // watches the entry hole from OUTSIDE, so the cube must stay visible") and was the reason
-      // the near walls vanished mid-dive: the real cube was hidden while TunnelInteriorView drew
-      // the interior, so from outside you saw straight through to the far inner walls.
-      wormholeBodyHidden: s.wormHealerMode && (s.wormPhase === 'tunnel' || s.wormPhase === 'exiting'),
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
@@ -139,6 +121,12 @@ const CubeAssembly = React.memo(({
       cameraOrbitDir: s.cameraOrbitDir,
     }))
   );
+  const exteriorRef = useRef(null);
+  useFrame(({ camera }) => {
+    const state = useGameStore.getState();
+    if (exteriorRef.current) exteriorRef.current.visible = !state.wormHealerMode ||
+      !tunnelCameraInside(camera.position, size, state.wormPhase);
+  });
   const cubieRefs = useRef([]);
   // Expose cubie refs + size to ParityOrbs so orbs can read live cubie transforms each frame.
   liveCubies.refs = cubieRefs.current;
@@ -1160,9 +1148,9 @@ const CubeAssembly = React.memo(({
         />
         {/* VoidCore: swirling wormhole-color rings at the cube's hollow center */}
         <VoidCore />
-        {/* Solid body + interaction overlays only — hidden for the whole tunnel traversal so they
-            don't z-fight with TunnelInteriorView, while the Möbius ribbons and VoidCore above stay visible. */}
-        <group visible={!wormholeBodyHidden}>
+        {/* Keep cubies mounted for stable anchors; hide the exterior only while the
+            lens is inside. The ribbons and VoidCore remain visible throughout. */}
+        <group ref={exteriorRef}>
           {megaChassis && megaChassis.rest && (
             /* Mega omits 1,178 individual rounded cubie bodies for performance,
                but still needs a continuous dark chassis beneath the sticker grid.
@@ -1228,7 +1216,7 @@ const CubeAssembly = React.memo(({
               onComplete={onFlipWaveComplete}
             />
           )}
-          {!wormTunnelActive && <group>
+          <group>
             {items.map((it, idx) => {
               // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
               const isCenterVoid = size % 2 !== 0 &&
@@ -1247,7 +1235,7 @@ const CubeAssembly = React.memo(({
                   cubie={it.cubie}
                   size={size}
                   wormMode={wormHealerMode}
-                  hideBody={wormExitRideActive}
+                  hideBody={false}
                   // Mega Mode's individual rounded bodies account for more than
                   // a thousand transparent draw calls and R3F geometry nodes. The
                   // stickers remain the complete surface; the chassis (and its
@@ -1261,7 +1249,7 @@ const CubeAssembly = React.memo(({
                 />
               );
             })}
-          </group>}
+          </group>
           {showCursor && cursor && (
             <CursorHighlight />
           )}

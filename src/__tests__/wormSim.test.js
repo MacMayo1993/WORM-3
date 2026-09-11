@@ -22,7 +22,6 @@ import {
   MAX_JUMPS,
   BASE_TAIL_LENGTH,
   ORB_SEGMENT_GROWTH,
-  WINDOUT_SEGMENT_DT,
   windoutHeadS,
   activeTunnelCap,
   MAX_ACTIVE_TUNNEL_PAIRS,
@@ -376,11 +375,11 @@ describe('active tunnel pair cap', () => {
 });
 
 describe('flipped tiles and tunnel traversal', () => {
-  it('keeps windout active until the last body segment clears the portal', () => {
-    const tailLength = 40;
-    const finalHeadS = windoutHeadS(1, tailLength);
-    const finalTailS = finalHeadS + (tailLength - 1) * WINDOUT_SEGMENT_DT;
-    expect(finalTailS).toBeCloseTo(0, 10);
+  it('keeps the head flourish independent of body length', () => {
+    for (const count of [10, 40, 100, 1200]) {
+      expect(windoutHeadS(0.5, count)).toBe(0.5);
+      expect(windoutHeadS(1, count)).toBe(0);
+    }
   });
 
   // Flip the tile directly above the spawn point (the first tile the worm reaches)
@@ -433,9 +432,10 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(sim.pos.dirKey).toBe('NZ');
   });
 
-  it('heals on exit when enough orbs were deposited', () => {
+  it('resumes crawling with a long tail inside and heals only after it clears', () => {
     const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
     const sim = makeSim();
+    sim.tailLength = 100;
     const stableKey = 'PZ-1-2-2';
     const ctx = makeCtx({
       getCubies: () => cubies,
@@ -445,14 +445,15 @@ describe('flipped tiles and tunnel traversal', () => {
     const reachedWindout = runUntil(sim, ctx, () => sim.phase === 'windout');
     expect(reachedWindout).toBe(true);
     expect(eventsOf(ctx, 'heal')).toHaveLength(0);
-    expect(sim.pendingTunnelHeal?.tunnel).toBe(tunnel);
+    expect(sim.tunnelPassages[0]?.heal?.tunnel).toBe(tunnel);
 
-    // Reaching full windout only exposes the last segment. The tunnel remains
-    // flipped for that rendered frame; healing fires on the following sim tick.
-    const tailCleared = runUntil(sim, ctx, () => sim.windoutTailCleared);
-    expect(tailCleared).toBe(true);
-    expect(sim.phase).toBe('windout');
-    expect(sim.tunnelProgress).toBe(1);
+    // The head regains control while the body keeps following the tunnel history.
+    expect(runUntil(sim, ctx, () => sim.phase === 'crawling')).toBe(true);
+    ctx.resolveTunnel = () => null; // do not start another trip in this stub world
+    expect(sim.tunnelPassages).toHaveLength(1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    const passage = sim.tunnelPassages[0];
+    expect(runUntil(sim, ctx, () => passage.clearFrame)).toBe(true);
     expect(eventsOf(ctx, 'heal')).toHaveLength(0);
     stepWormSim(sim, 0.05, SIZE, ctx);
 

@@ -69,7 +69,7 @@ export function WormFace({ worm, size }) {
         if (!faceVisible) return;
 
         const phase = worm.phase.current;
-        const inTransit = (phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout') && worm.activeTunnel.current;
+        const inTransit = (phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout') && worm.activeTunnel.current;
 
         let normal;
         if (inTransit) {
@@ -78,12 +78,13 @@ export function WormFace({ worm, size }) {
             _faceHeadPos.copy(worm.headInterpPos.current);
             normal = worm.currentNormal.current;
 
-            if (phase === 'windout') {
+            if (phase === 'windout' || phase === 'windup') {
                 // Tangent from the exit spiral: look slightly ahead in s (s decreases as prog rises)
                 const prog = worm.tunnelProgress.current;
-                const sHead = 1.0 - prog;
-                const sAhead = Math.max(0, sHead - 0.05);
-                getWindWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, 'exit', sAhead, size);
+                const exiting = phase === 'windout';
+                const sHead = exiting ? 1 - prog : prog;
+                const sAhead = Math.max(0, Math.min(1, sHead + (exiting ? -0.02 : 0.02)));
+                getWindWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, exiting ? 'exit' : 'entry', sAhead, size);
                 _faceForward.copy(_faceTunnelAhead).sub(_faceHeadPos);
                 if (_faceForward.lengthSq() < 0.0001) _faceForward.set(0, 0, 1);
                 _faceForward.normalize();
@@ -135,7 +136,7 @@ export function WormFace({ worm, size }) {
             if (count > previousOrbs.current) mobiPulse.current = 1;
             previousOrbs.current = count;
             mobiPulse.current = Math.max(0, mobiPulse.current - dt * 2);
-            const bodyTransit = phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout';
+            const bodyTransit = phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout';
             normal = worm.currentNormal.current;
             mobi.group.position.copy(worm.headInterpPos.current);
             if (!bodyTransit) {
