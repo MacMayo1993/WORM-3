@@ -659,12 +659,12 @@ const CubeAssembly = React.memo(({
   useEffect(() => {
     if (cameraOrbitRequest === prevCameraOrbitRequestRef.current) return;
     prevCameraOrbitRequestRef.current = cameraOrbitRequest;
-    if (!cameraOrbitDir || handsMode) return;
+    if (!cameraOrbitDir || handsMode || wormHealerMode) return;
     const angle = cameraOrbitDir === 'cw' ? -Math.PI / 4 : Math.PI / 4;
     camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     camera.lookAt(0, 0, 0);
     if (controlsRef.current) controlsRef.current.update();
-  }, [cameraOrbitRequest, cameraOrbitDir, handsMode, camera]);
+  }, [cameraOrbitRequest, cameraOrbitDir, handsMode, wormHealerMode, camera]);
 
   // Store refs for values accessed in useFrame to avoid stale closures
   const onAnimCompleteRef = useRef(onAnimComplete);
@@ -740,7 +740,7 @@ const CubeAssembly = React.memo(({
     const efAnimating = Math.abs(ef - prevEfRef2.current) > 0.001;
     prevEfRef2.current = ef;
 
-    if (preExplodeDist.current > 0 && efAnimating) {
+    if (!wormHealerMode && preExplodeDist.current > 0 && efAnimating) {
       const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
       const zoomFactor = 1 + ef * explosionMultiplier * 0.55;
       const targetDist = preExplodeDist.current * zoomFactor;
@@ -1290,7 +1290,7 @@ const CubeAssembly = React.memo(({
             rotateSpeed={isTouchDevice ? 0.8 : 1.2}
           />
           {/* Micro-kicks the camera along the flipped tile's normal on each flip. */}
-          <CameraFlipKick controlsRef={controlsRef} />
+          <CameraFlipKick controlsRef={controlsRef} enabled={!wormHealerMode} />
         </group>
       </group>
     </StickerInstanceProvider>

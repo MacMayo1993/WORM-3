@@ -18,3 +18,17 @@ it('joins the lap seam without a positional or orientation jump', () => {
   sampleCubeWorm(-1e-6, ...a); sampleCubeWorm(1e-6, ...b);
   a.forEach((v, i) => expect(v.distanceTo(b[i])).toBeLessThan(0.0001));
 });
+it('keeps every paired segment antipodal throughout the lap and after cube rotation', () => {
+  const a = [new Vector3(), new Vector3(), new Vector3()], b = a.map(() => new Vector3());
+  const axis = new Vector3(1, 2, -3).normalize();
+  for (let s = 0; s < CUBE_WORM_LAP; s += 0.17) {
+    for (let bead = 0; bead < 9; bead++) {
+      sampleCubeWorm(s - bead * 0.18, ...a);
+      sampleCubeWorm(s - bead * 0.18, ...b, true);
+      a.forEach((v, i) => {
+        expect(v.clone().add(b[i]).length()).toBeLessThan(1e-10);
+        expect(v.clone().applyAxisAngle(axis, 1.3).add(b[i].clone().applyAxisAngle(axis, 1.3)).length()).toBeLessThan(1e-10);
+      });
+    }
+  }
+});

@@ -33,7 +33,7 @@ for (let i = 1; i <= SAMPLES; i++) {
   previous.copy(point);
 }
 export const CUBE_WORM_LAP = lengths[SAMPLES];
-export function sampleCubeWorm(distance, position, normal, forward) {
+export function sampleCubeWorm(distance, position, normal, forward, antipodal = false) {
   const s = ((distance % CUBE_WORM_LAP) + CUBE_WORM_LAP) % CUBE_WORM_LAP;
   let lo = 0, hi = SAMPLES;
   while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (lengths[mid] <= s) lo = mid; else hi = mid; }
@@ -41,4 +41,9 @@ export function sampleCubeWorm(distance, position, normal, forward) {
   project(t, position, normal);
   project(t + 0.00001, next, scratchNormal);
   forward.subVectors(next, position).addScaledVector(normal, -forward.dot(normal)).normalize();
+  if (antipodal) {
+    position.negate();
+    normal.negate();
+    forward.negate();
+  }
 }
