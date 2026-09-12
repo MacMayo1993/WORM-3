@@ -23,7 +23,7 @@ it('selects owned palettes and keeps locked swatches colored without allowing pu
   expect(cos.select).toHaveBeenCalledWith('colorScheme', 'neon');
   const locked = button('Pastel, available in the store');
   expect(locked.disabled).toBe(true);
-  expect(locked.querySelector('.palette-pair span').style.background).not.toBe('');
+  expect(locked.querySelector('.palette-card-colors span').style.background).not.toBe('');
   act(() => locked.click());
   expect(cos.select).toHaveBeenCalledTimes(1);
 });
