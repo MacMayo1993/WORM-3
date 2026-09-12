@@ -62,5 +62,7 @@ export function ElementalPatches({ worm, size }) {
             mesh.geometry.attributes.patchAlpha.needsUpdate = true;
         }
     });
-    return <><primitive object={resources.fire} dispose={null} /><primitive object={resources.grass} dispose={null} /></>;
+    // R3F never auto-disposes primitives. Keep the actual mesh disposal method
+    // intact for our explicit geometry/material/instance cleanup above.
+    return <><primitive object={resources.fire} /><primitive object={resources.grass} /></>;
 }
