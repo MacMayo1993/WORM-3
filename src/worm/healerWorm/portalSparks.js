@@ -7,7 +7,7 @@ const axis = new Vector3(0, 1, 0);
 // Analytic bursts need no particle allocation or simulation history. All offsets
 // are in the tile's tangent frame, including on the underside of the cube.
 export function portalSparkPose(out, origin, normal, time, seed, index, dangerous) {
-    const period = dangerous ? 1.25 : 1.9;
+    const period = dangerous ? 1.05 : 1.15;
     const age = ((time + seed * period) % period + period) % period - index * 0.035;
     const life = dangerous ? 0.95 : 0.8;
     if (age <= 0 || age >= life) return false;
@@ -24,8 +24,8 @@ export function portalSparkPose(out, origin, normal, time, seed, index, dangerou
         .addScaledVector(tangent, Math.sin(angle) * spread);
     out.quaternion.setFromUnitVectors(axis, normal);
     const fade = Math.sin(Math.PI * p);
-    const width = (dangerous ? 0.023 : 0.017) * fade;
-    out.scale.set(width, (dangerous ? 0.26 : 0.19) * fade, width);
+    const width = (dangerous ? 0.045 : 0.035) * fade;
+    out.scale.set(width, (dangerous ? 0.42 : 0.32) * fade, width);
     out.updateMatrix();
     return true;
 }
