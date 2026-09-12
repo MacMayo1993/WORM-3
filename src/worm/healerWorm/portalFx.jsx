@@ -110,7 +110,7 @@ const holeFragmentShader = `
     col += uColor * rings;
 
     // Glow from something arriving.
-    col += uColor * uCharge * 0.35 * (1.0 - d);
+    col += mix(uColor, vec3(1.0, 0.96, 0.78), 0.6) * uCharge * 0.75 * (1.0 - d);
 
     gl_FragColor = vec4(col, 1.0);
   }
@@ -138,14 +138,19 @@ export function TunnelPortalFX({ worm, size }) {
     const burstRef = useRef();
     const burstFlashRef = useRef();
     const burstTRef = useRef(-1);   // -1 idle, else 0..1 burst progress
+    const lastTunnelRef = useRef(null);
     const firedRef = useRef(false); // one-shot guard per traversal
 
     const entryUniforms = useHoleUniforms(entryColor);
     const exitUniforms = useHoleUniforms(exitColor);
 
     useFrame((_state, delta) => {
+        if (useGameStore.getState().wormPaused) return;
         const phase = worm.phase.current;
-        const tunnel = worm.activeTunnel.current;
+        const tailPassage = worm.tunnelPassages?.current?.at(-1);
+        const occupied = worm.activeTunnel.current ?? tailPassage?.tunnel;
+        if (occupied) lastTunnelRef.current = occupied;
+        const tunnel = occupied ?? lastTunnelRef.current;
         const prog = worm.tunnelProgress.current;
 
         entryUniforms.uTime.value += delta;
@@ -159,8 +164,8 @@ export function TunnelPortalFX({ worm, size }) {
         // through 'tunnel' and 'exiting' the body is hidden and the camera is
         // within the shaft, so a disc pinned to a tile would just be a slab
         // floating in the middle of the ride.
-        const openTarget = tunnel && phase !== 'crawling' ? 1 : 0;
-        const drawable = !!tunnel && (phase === 'windup' || phase === 'entering' || phase === 'windout');
+        const openTarget = occupied ? 1 : 0;
+        const drawable = !!tunnel && (phase === 'windup' || phase === 'entering' || phase === 'windout' || phase === 'crawling');
 
         const trip = traversalProgress(phase, prog);
         entryOpenRef.current += (openTarget - entryOpenRef.current) * Math.min(1, delta * 7);
@@ -196,7 +201,7 @@ export function TunnelPortalFX({ worm, size }) {
                 xh.quaternion.copy(_fxQuat);
                 exitUniforms.uOpen.value = exitOpenRef.current;
                 // Builds as the worm approaches, so the arrival is telegraphed.
-                exitUniforms.uCharge.value = Math.pow(trip, 2.0);
+                exitUniforms.uCharge.value = 0.2 + 0.8 * Math.pow(trip, 1.2);
             }
         }
 

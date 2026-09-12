@@ -1,3 +1,4 @@
+import { pickupPulse, PICKUP_PULSE_DURATION } from './pickupPulse.js';
 import { wormBodyTaper } from '../wormCharacterFinish.js';
 // src/worm/healerWorm/WormBody.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
@@ -209,6 +210,9 @@ export function WormBody({ worm, size }) {
     const inchStateRef = useRef(null);
     if (!inchStateRef.current) inchStateRef.current = makeInchGaitState();
     const characterTimeRef = useRef(0);
+    const pickupRef = useRef({ seq: useGameStore.getState().wormOrbFlash?.seq, age: Infinity, active: false });
+    const pickupColor = useMemo(() => new THREE.Color(), []);
+    const reducedPickupMotion = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
     // Tracks the inputs that affect per-segment color so the instanced color buffer
     // is only rewritten on frames where something actually changed (orb pickup,
     // skin/character swap, or tail length change) instead of every frame.
@@ -218,6 +222,16 @@ export function WormBody({ worm, size }) {
         const frozen = useGameStore.getState().wormPaused || !useGameStore.getState().wormAlive;
         const animationDelta = frozen ? 0 : delta;
         characterTimeRef.current += animationDelta;
+        const pickup = pickupRef.current;
+        const flash = useGameStore.getState().wormOrbFlash;
+        if (flash?.seq !== pickup.seq) {
+            pickup.seq = flash?.seq;
+            pickup.age = flash?.color ? 0 : Infinity;
+            if (flash?.color) pickupColor.set(flash.color).lerp(new THREE.Color('#fff4c9'), 0.35);
+        }
+        const wasPickupActive = pickup.active;
+        pickup.age += animationDelta;
+        pickup.active = pickup.age < PICKUP_PULSE_DURATION;
         updateBodySurface(surface, size, liveRotation);
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
         _bodyHeadPos.copy(worm.headInterpPos.current);
@@ -385,7 +399,7 @@ export function WormBody({ worm, size }) {
         const prevCS = prevColorStateRef.current;
         // Prism cycles its hue continuously, so its color buffer must be rewritten every
         // frame; all other characters only recolor when an input actually changes.
-        const colorDirty = prevCS.mesh !== mesh || _transitCull || _isPrism || colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
+        const colorDirty = pickup.active || wasPickupActive || prevCS.mesh !== mesh || _transitCull || _isPrism || colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
             baseColor !== prevCS.baseColor || bellyCol !== prevCS.bellyCol || _isGlow !== prevCS.isGlow || _isInch !== prevCS.isInch;
         if (colorDirty) {
             prevCS.mesh = mesh;
@@ -548,6 +562,12 @@ export function WormBody({ worm, size }) {
                 }
             }
 
+            const pickupWave = pickupPulse(pickup.age, i, tLen);
+            if (!reducedPickupMotion) {
+                _wormDummy.scale.x *= 1 + 0.12 * pickupWave;
+                _wormDummy.scale.y *= 1 + 0.12 * pickupWave;
+                _wormDummy.scale.z *= 1 - 0.16 * pickupWave;
+            }
             _wormDummy.scale.multiplyScalar(wormBodyTaper(i, tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
             // LOD removes distant instances to control cost, but must never make
@@ -632,6 +652,7 @@ export function WormBody({ worm, size }) {
                 } else {
                     _bodyColor.set(baseColor);
                 }
+                _bodyColor.lerp(pickupColor, pickupWave * 0.85);
                 // Keep every glass exterior clear; carried parity colors live inside it.
                 if (isMobi) mobiCoreRef.current?.setColorAt(writeIdx, _bodyColor);
                 else mesh.setColorAt(writeIdx, _bodyColor);
