@@ -1473,7 +1473,6 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
       <style>{`
         .mc-arrow:active { background: #ede8df !important; }
-        .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
         /* Keep utility actions comfortable to tap on phones. */
         .mc-pill         { min-height: 48px; }
         .mc-pill:hover   { filter: brightness(1.14); }
@@ -1639,17 +1638,8 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         <div style={{ width: 'min(400px, 94vw)', marginTop: 'auto', paddingTop: 12 }}>
           <button
             type="button" className="mc-play" onClick={handlePlay}
-            style={{
-              display: 'block', width: '100%', padding: '15px', borderRadius: '100px',
-              border: '1.5px solid rgba(255,255,255,0.55)',
-              background: mode.tileColor, color: mode.textColor,
-              fontWeight: 800, fontSize: '14px', letterSpacing: '0.22em',
-              textTransform: 'uppercase', cursor: 'pointer', fontFamily: DISPLAY_FONT,
-              boxShadow: '0 2px 16px rgba(0,0,0,0.30)',
-              transition: 'opacity 160ms ease, transform 100ms ease, background 200ms ease',
-              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-            }}
-          >{mode.cta || 'PLAY'}</button>
+            style={{ '--play-color': mode.tileColor, '--play-ink': mode.textColor, fontFamily: DISPLAY_FONT }}
+          ><span className="worm-cta-emblem"><MenuCubeGlyph /></span><span className="worm-cta-label">{mode.cta || 'PLAY'}</span><span className="worm-cta-glyph" aria-hidden="true">→</span></button>
 
 
         </div>
@@ -1661,6 +1651,13 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
 // ─── Start button ─────────────────────────────────────────────────────────────
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScYKKOXc6c3vdqpmWWv0J3lMd90-GOfp0TxxxHelxjIjMdrvw/viewform';
+
+const MenuCubeGlyph = () => (
+  <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+    <path d="M16 3 28 10v13l-12 7-12-7V10Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    <path d="m4 10 12 7 12-7M16 17v13M10 6.5l12 7M10 13.5v13" stroke="currentColor" strokeWidth="1.5" />
+  </svg>
+);
 
 const MenuStartButton = ({ visible, onClick, onDemo }) => {
   // On phones the cluster sat ~120px off the bottom, leaving a big dead gap.
@@ -1690,55 +1687,31 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
     transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
-    pointerEvents: 'all',
-  }}>
+    pointerEvents: visible ? 'auto' : 'none',
+  }} inert={visible ? undefined : ''}>
+    <div className="worm-menu-actions">
     <button
       type="button"
       className="worm-tactile-btn"
       onClick={onClick}
     >
-      START
-      <span className="worm-cta-glyph" aria-hidden="true">&#9654;</span>
+      <span className="worm-cta-emblem"><MenuCubeGlyph /></span>
+      <span className="worm-cta-label">START</span>
+      <span className="worm-cta-glyph" aria-hidden="true">→</span>
     </button>
-    {onDemo && (
-      <button
-        type="button"
-        onClick={onDemo}
-        // Warm the demo's desert env map the instant the player signals intent,
-        // so it's cached by the time the demo scene mounts.
-        onPointerEnter={warmDemoAssets}
-        onPointerDown={warmDemoAssets}
-        // Secondary action — the same green as START (one action colour), but
-        // dropped down it, so START stays the loud CTA. Surface, rim, bevel and
-        // press live in .worm-menu-cta-secondary; anything set here would
-        // outrank the class and silently disable it.
-        className="worm-menu-cta-secondary"
-        style={{
-          fontSize: '12px',
-          fontWeight: 800,
-          fontFamily: UI_FONT,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-        }}
-      >Start Demo</button>
-    )}
-    <button
-      type="button"
-      className="worm-menu-cta-secondary"
-      onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}
-      // Same green family as START, smallest of the three so the hierarchy is
-      // START → Start Demo → Give Feedback while all read as one action colour.
-      style={{
-        // Quietest of the three — ranked by type size, not by opacity: fading
-        // the element fades its rim too, and on a glass sheet the rim is what
-        // separates the pill from the scene showing through it.
-        fontSize: '10px',
-        fontWeight: 700,
-        fontFamily: UI_FONT,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-      }}
-    >Give Feedback</button>
+    <div className="worm-menu-utilities">
+      {onDemo && <button type="button" onClick={onDemo}
+        onPointerEnter={warmDemoAssets} onPointerDown={warmDemoAssets}
+        className="worm-menu-cta-secondary">
+        <span aria-hidden="true">▷</span>Demo
+      </button>}
+      <button type="button" className="worm-menu-cta-secondary"
+        onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v12H10l-6 4V4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
+        Feedback
+      </button>
+    </div>
+    </div>
   </div>
   );
 };
