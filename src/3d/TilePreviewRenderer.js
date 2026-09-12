@@ -1,3 +1,4 @@
+import { prefersReducedMotion, isMobile } from '../utils/device.js';
 import { LIVING_SURFACE_KEYS } from '../utils/livingSurfaceCatalog.js';
 // TilePreviewRenderer.js
 // Renders tile-style preview thumbnails using the shared R3F renderer so no
@@ -207,19 +208,22 @@ function drawPreview(info) {
   info.phased = true;
 }
 
+let previewCursor = 0;
 function tick(delta) {
   if (registry.size === 0) return;
-  simTime += delta;
-  for (const info of registry.values()) {
-    if (info.dirty) {
-      // A style/colour change has to show up whether or not the tile is on
-      // screen: the canvas keeps its last frame until something redraws it.
-      drawPreview(info);
-      continue;
-    }
-    if (!info.animated || !info.visible) continue;
-    if (simTime < info.nextFrame) continue;
+  const reduced = prefersReducedMotion();
+  if (!reduced) simTime += Math.min(delta, 0.1);
+  const entries = [...registry.values()];
+  const start = previewCursor % entries.length;
+  let budget = isMobile ? 2 : 4;
+  for (let offset = 0; offset < entries.length; offset++) {
+    const index = (start + offset) % entries.length;
+    const info = entries[index];
+    if (!info.visible) continue;
+    if (!info.dirty && (reduced || !info.animated || simTime < info.nextFrame)) continue;
     drawPreview(info);
+    previewCursor = (index + 1) % entries.length;
+    if (--budget === 0) break;
   }
 }
 
@@ -286,8 +290,8 @@ export function updateTilePreview(id, styleKey, colorHex) {
 /**
  * Report whether a preview is on screen. Off-screen previews stop animating —
  * the style grid is a scrolling list of ~46 tiles in the Living family alone and
- * only a handful are ever in view. A style change still redraws immediately, so
- * a tile that scrolls back in is never stale.
+ * only a handful are ever in view. Changed previews redraw on their next visible,
+ * budgeted frame.
  */
 export function setTilePreviewVisible(id, visible) {
   const info = registry.get(id);

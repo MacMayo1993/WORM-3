@@ -14,6 +14,9 @@
 // or mid-tunnel, the displayed countdown freezes exactly when gameplay does. That is
 // the property a wall-clock (Date.now) countdown could never get right.
 export const wormBuffs = {
+  waterMomentum: 0,
+  springReady: false,
+  springCount: 0,
   magnetT: 0,        // seconds of magnet reach remaining
   magnetMaxT: 0,     // duration of the active magnet, for the fill fraction
   rocketActive: false,
@@ -48,6 +51,9 @@ export function buffReadout(buffs = wormBuffs) {
 
 /** Zero the readout — run reset, death, and mode unmount all go through here. */
 export function resetWormBuffs() {
+  wormBuffs.waterMomentum = 0;
+  wormBuffs.springReady = false;
+  wormBuffs.springCount = 0;
   wormBuffs.magnetT = 0;
   wormBuffs.magnetMaxT = 0;
   wormBuffs.rocketActive = false;

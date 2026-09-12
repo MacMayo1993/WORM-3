@@ -411,6 +411,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     const { keys, arms, center } = computeBlastTiles(bomb, size);
                     const flames = [];
                     const pushFlame = (t, delay) => {
+                        if (isHotTile(worm.elementalPatches.current, t)) return;
                         const wp = getStickerWorldPos(t.x, t.y, t.z, t.dirKey, size, 0);
                         const n = FACE_NORMALS[t.dirKey] ?? FACE_NORMALS.PZ;
                         // Flames sit just off the surface (along the normal) but lick UP
