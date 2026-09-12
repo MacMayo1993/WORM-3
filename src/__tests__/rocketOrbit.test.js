@@ -107,30 +107,23 @@ describe('rocket orbit', () => {
     }
   });
 
-  it('rounds an edge instead of turning the corner', () => {
-    // Walking a path across an edge, the flight position must move smoothly: no
-    // step bigger than the step on the ground plus a small bend allowance. The
-    // normal-offset version teleported a quarter-circle here.
+  it('rounds an edge continuously at the higher flight altitude', () => {
     const size = 3;
     const a = cubeHalfExtent(size);
-    const path = [];
-    const N = 200;
-    for (let s = 0; s <= N; s++) {
-      // A quarter turn around the +X/+Y edge at z = 0, at the cube's own radius.
-      const ang = (s / N) * (Math.PI / 2);
-      path.push(new THREE.Vector3(Math.cos(ang), Math.sin(ang), 0).multiplyScalar(a * Math.SQRT2));
-    }
-    let prev = null;
-    let maxStep = 0;
-    for (const p of path) {
-      const out = p.clone();
-      rocketOrbitInto(out, size, 1);
-      expect(gapToCube(out, size)).toBeGreaterThanOrEqual(ROCKET_ORBIT_CLEARANCE - 1e-6);
-      if (prev) maxStep = Math.max(maxStep, out.distanceTo(prev));
-      prev = out;
-    }
-    const groundStep = (a * Math.SQRT2 * Math.PI) / 2 / N;
-    expect(maxStep).toBeLessThan(groundStep * 4);
+    const largestStep = samples => {
+      let previous = null, maximum = 0;
+      for (let i = 0; i <= samples; i++) {
+        const angle = i / samples * Math.PI / 2;
+        const point = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0).multiplyScalar(a * Math.SQRT2);
+        rocketOrbitInto(point, size, 1);
+        expect(gapToCube(point, size)).toBeGreaterThanOrEqual(ROCKET_ORBIT_CLEARANCE - 1e-6);
+        if (previous) maximum = Math.max(maximum, point.distanceTo(previous));
+        previous = point;
+      }
+      return maximum;
+    };
+    // A continuous bend shrinks with the sampling step; a teleport does not.
+    expect(largestStep(400)).toBeLessThan(largestStep(200) * 0.55);
   });
 
   it('takes a face normal over a face and a bisector at an edge', () => {

@@ -474,7 +474,7 @@ export function hasJumpClearance(sim) {
     return headHeight - obstacleHeight > 0.45;
 }
 
-/** Start or refresh the grounded, protected rocket overdrive. */
+/** Start or refresh the protected rocket arc. */
 export function startRocket(sim, ctx) {
     if (sim.rocketActive) {
         sim.rocketT = ROCKET_DURATION;

@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
+import { rocketOrbitInto, rocketOrbitT } from './healerWorm/rocketOrbit.js';
 import { tunnelState } from './tunnelProgressBridge.js';
 import {
     makeTunnelCamPose,
@@ -469,6 +470,10 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.activeTunnelId = null;
             // Smooth interpolated worm world position (copy into scratch — no .clone())
             _camWormWorld.copy(worm.headInterpPos.current);
+            // Track the same elevated shell as the body throughout the rocket arc.
+            rocketOrbitInto(_camWormWorld, size, rocketOrbitT(
+                worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current
+            ));
 
             const { dirKey } = worm.pos.current;
 

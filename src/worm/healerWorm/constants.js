@@ -196,17 +196,12 @@ export const SPECIAL_SPAWN_RETRY = 2;
 // and advertises the protected window with a flame at the tail.
 export const ROCKET_DURATION = 3;
 export const ROCKET_SPEED_MULT = 4;
-// A rocket doesn't just speed the worm up — it lifts it off the surface to FLY for the
-// whole overdrive: the worm rises to ROCKET_FLIGHT_HEIGHT, cruises there, then settles
-// back down as the burn ends. Purely visual (the rocket's speed + hazard immunity are
-// the gameplay). rocketFlightLift maps the burn countdown to a height with a takeoff and
-// a landing ramp so the worm lifts and lands smoothly instead of popping.
-export const ROCKET_FLIGHT_HEIGHT = 1.4;   // world units the worm cruises above the tiles
-export const ROCKET_FLIGHT_TAKEOFF = 0.35; // seconds to rise at launch
-export const ROCKET_FLIGHT_LANDING = 0.5;  // seconds to settle before the burn ends
-// The ramp itself lives in rocketOrbit.js (rocketOrbitT), which also owns where
-// the worm actually flies — this stays as the plain altitude for anything that
-// only wants a height, and so the two can never drift out of step.
+// Spend the full burn climbing and descending, with no flat cruising section.
+// Smoothstep on each half gives zero vertical velocity at launch, apex and landing.
+// The shared flight phase also ramps thrust and preserves altitude on fuel refresh.
+export const ROCKET_FLIGHT_HEIGHT = 3.2;
+export const ROCKET_FLIGHT_TAKEOFF = ROCKET_DURATION / 2;
+export const ROCKET_FLIGHT_LANDING = ROCKET_DURATION / 2;
 export const rocketFlightLift = (active, rocketT, flightPhase) => {
   if (!active) return 0;
   const elapsed = ROCKET_DURATION - rocketT;

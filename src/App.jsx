@@ -1,3 +1,4 @@
+import { scaledWormOrbCount } from './worm/wormDifficulty.js';
 // src/App.jsx
 /**
  * WORM³ Main Application
@@ -914,13 +915,9 @@ export default function WORM3() {
       reset();
     }
 
-    // Keep the same orb density as a normal large Worm board. A 15×15 face has
-    // roughly 4.6× the area of a 7×7 face, so using the unscaled wizard count
-    // makes Mega Mode feel almost empty.
-    const megaAreaScale = wizardSettings.megaMode ? (15 * 15) / (7 * 7) : 1;
     const wormParams = {
       wormSpeed: wizardSettings.wormSpeed ?? 2.0,
-      wormOrbCount: Math.round((wizardSettings.wormOrbCount ?? 5) * megaAreaScale),
+      wormOrbCount: scaledWormOrbCount(wizardSettings.wormOrbCount ?? 40, targetSize),
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
