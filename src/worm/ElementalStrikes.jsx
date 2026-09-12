@@ -16,27 +16,24 @@
 // touches chaos.
 //
 // ── Cost ─────────────────────────────────────────────────────────────────────
-// A fixed pool, sized by the quality budget and never grown. Each slot owns one
-// core line, one glow line, one branch line and a contact flash, allocated once at
-// mount and rewritten in place — a strike costs no allocation and no React render.
-// Position buffers are preallocated at full length and drawn with setDrawRange, so
-// a bolt with fewer points does not resize a buffer mid-frame.
+// A fixed pool bounds concurrent strikes. Core and halo tubes are rebuilt only
+// when a new strike is born; replaced geometry is disposed immediately. Branch
+// segment buffers are reused, and no geometry changes during a strike's lifetime.
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { makeBoltPath, makeBoltBranches, boltPointAt } from '../manifold/boltPath.js';
 import { makeStrikeState, tickStrikes } from './healerWorm/strikeScheduler.js';
+import { STRIKE_LIFE, strikeVisuals } from './healerWorm/strikeVisuals.js';
 import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
 import { wormBuffs } from './wormBuffs.js';
 import { wormSegments } from './wormSegments.js';
 
-const SEGS = 12;                 // segments per bolt → SEGS + 1 points (a tall sky
+const SEGS = 20;                 // segments per bolt → SEGS + 1 points (a tall sky
                                  // bolt wants more segments than a short surface arc)
 const POINTS = SEGS + 1;
 const BRANCH_SEGS = 4;
-const BRANCH_POINTS = BRANCH_SEGS + 1;
-const STRIKE_LIFE = 0.34;        // seconds from leader to gone
 // Lateral wander of the launch point away from straight-above, so successive sky
 // bolts don't all fall down the exact same line.
 const SKY_WOBBLE = 0.55;
@@ -66,20 +63,6 @@ function strikeSource(target, seed, skyY, out) {
     target.z + Math.sin(ang) * SKY_WOBBLE
   );
   return out;
-}
-
-/** Write a polyline into a preallocated position buffer, padding with its last point. */
-function writePath(attr, path, capacity) {
-  const arr = attr.array;
-  const n = Math.min(path.length, capacity);
-  for (let i = 0; i < capacity; i++) {
-    const p = path[Math.min(i, n - 1)];
-    arr[i * 3] = p[0];
-    arr[i * 3 + 1] = p[1];
-    arr[i * 3 + 2] = p[2];
-  }
-  attr.needsUpdate = true;
-  return n;
 }
 
 function makeLineGeometry(points) {
@@ -115,7 +98,7 @@ export default function ElementalStrikes({ active, enabled, branches = 2, pool =
         alive: 0,           // seconds of life left, 0 = free
         core: makeLineGeometry(POINTS),
         glow: makeLineGeometry(POINTS),
-        branch: makeLineGeometry(BRANCH_POINTS * 3), // up to three forks, end to end
+        branch: makeLineGeometry(BRANCH_SEGS * 2 * 3), // up to three forks, end to end
         branchCount: 0,
         flash: new THREE.Vector3(),
         path: null
@@ -139,7 +122,7 @@ export default function ElementalStrikes({ active, enabled, branches = 2, pool =
   const elapsedRef = useRef(0);
 
   useFrame(({ camera }, delta) => {
-    const dt = Math.min(delta, 0.05);
+    const dt = enabled ? Math.min(delta, 0.05) : 0;
     elapsedRef.current += dt;
 
     // ── Age the live bolts ────────────────────────────────────────────────
@@ -159,44 +142,29 @@ export default function ElementalStrikes({ active, enabled, branches = 2, pool =
         continue;
       }
       s.alive = Math.max(0, s.alive - dt);
-      // p: 0 at the flash of contact → 1 as the last of the charge dies.
-      const p = 1 - s.alive / STRIKE_LIFE;
-
+      const age = STRIKE_LIFE - s.alive;
+      const visual = strikeVisuals(age);
       if (core) {
-        // The leader draws itself along the path, then the whole thing fades.
-        const drawn = Math.max(2, Math.ceil(Math.min(1, p / 0.35) * (POINTS - 1)) + 1);
-        core.geometry.setDrawRange(0, drawn);
-        core.material.opacity = p < 0.35 ? 1 : Math.max(0, 1 - (p - 0.35) / 0.65);
+        core.geometry.setDrawRange(0, Infinity);
+        core.material.opacity = visual.core;
       }
       if (glow) {
-        glow.geometry.setDrawRange(0, POINTS);
-        glow.material.opacity = Math.max(0, 0.6 * (1 - p) * (1 - p));
+        glow.geometry.setDrawRange(0, Infinity);
+        glow.material.opacity = visual.glow;
       }
       if (branch) {
-        // Forks arrive late and die before the leader does, so they add texture
-        // near the impact without competing with it.
-        const show = p > 0.28 && p < 0.7 && s.branchCount > 0;
-        branch.geometry.setDrawRange(0, show ? s.branchCount * BRANCH_POINTS : 0);
-        branch.material.opacity = show ? 0.55 * (1 - (p - 0.28) / 0.42) : 0;
+        branch.geometry.setDrawRange(0, s.branchCount * BRANCH_SEGS * 2);
+        branch.material.opacity = visual.branches;
       }
       if (head && s.path) {
-        // Spark head riding the leader. WebGL draws `line` at one pixel whatever
-        // linewidth says, so the bolt on its own is a hairline at any resolution —
-        // this is what gives the strike visible mass while it travels, the same job
-        // the head sphere does for a chaos bolt.
-        const lead = Math.min(1, p / 0.35);
-        boltPointAt(_pt, s.path, lead);
+        boltPointAt(_pt, s.path, visual.leader);
         head.position.set(_pt[0], _pt[1], _pt[2]);
-        head.material.opacity = p < 0.35 ? 0.95 : Math.max(0, 0.95 - (p - 0.35) * 3.4);
-        head.scale.setScalar(0.16 * (1 - p * 0.4));
+        head.material.opacity = visual.leader < 1 ? 0.45 * visual.leader : 0;
+        head.scale.setScalar(0.10);
       }
       if (flash) {
-        // Contact: a hard white-blue pop where the bolt lands, gone fast. Sized to
-        // read from the overview camera without becoming a screen-wide flash — the
-        // accessibility line here is "localized and brief", not "bright".
-        const bang = p < 0.5 ? Math.sin(Math.min(1, p / 0.5) * Math.PI) : 0;
-        flash.material.opacity = bang * 0.95;
-        flash.scale.setScalar(0.26 + bang * 0.85);
+        flash.material.opacity = visual.impact * 0.7;
+        flash.scale.setScalar(0.2 + visual.impact * 0.45);
         flash.position.copy(s.flash);
       }
     }
@@ -236,8 +204,7 @@ export default function ElementalStrikes({ active, enabled, branches = 2, pool =
     );
     strikeSource(_target, strike.seed, skyY, _source);
 
-    // Both endpoints are snapshotted, not tracked. The bolt lives a third of a
-    // second; re-resolving its target every frame would make it rubber-band along
+    // Both endpoints are snapshotted, not tracked. The charge and afterglow keep one stable silhouette; re-resolving its target every frame would make it rubber-band along
     // behind a crawling worm instead of landing.
     const path = makeBoltPath(
       [_source.x, _source.y, _source.z],
@@ -247,22 +214,30 @@ export default function ElementalStrikes({ active, enabled, branches = 2, pool =
       { segs: SEGS, jitter: 0.11, seed: strike.seed }
     );
     s.path = path;
-    writePath(s.core.getAttribute('position'), path, POINTS);
-    writePath(s.glow.getAttribute('position'), path, POINTS);
+    // Build width once per strike; do not regenerate its jagged shape per frame.
+    const curve = new THREE.CurvePath();
+    for (let k = 1; k < path.length; k++) {
+      curve.add(new THREE.LineCurve3(new THREE.Vector3(...path[k - 1]), new THREE.Vector3(...path[k])));
+    }
+    s.core.dispose(); s.glow.dispose();
+    s.core = new THREE.TubeGeometry(curve, SEGS * 3, 0.022, 4, false);
+    s.glow = new THREE.TubeGeometry(curve, SEGS * 3, 0.065, 4, false);
+    if (coreRefs.current[free]) coreRefs.current[free].geometry = s.core;
+    if (glowRefs.current[free]) glowRefs.current[free].geometry = s.glow;
 
     const forks = branches > 0 ? makeBoltBranches(path, { count: Math.min(3, branches), seed: strike.seed, segs: BRANCH_SEGS }) : [];
     s.branchCount = forks.length;
     if (forks.length) {
-      // All forks share one line, laid end to end. A LineSegments-style break would
-      // need a second draw; joining them costs one stray connecting segment that is
-      // invisible at these opacities and saves a draw call per strike.
+      // Independent line segments prevent a spurious bridge between forks.
       const attr = s.branch.getAttribute('position');
       const arr = attr.array;
       for (let f = 0; f < forks.length; f++) {
-        for (let k = 0; k < BRANCH_POINTS; k++) {
-          const p = forks[f][Math.min(k, forks[f].length - 1)];
-          const o = (f * BRANCH_POINTS + k) * 3;
-          arr[o] = p[0]; arr[o + 1] = p[1]; arr[o + 2] = p[2];
+        for (let k = 0; k < BRANCH_SEGS; k++) {
+          for (let end = 0; end < 2; end++) {
+            const p = forks[f][Math.min(k + end, forks[f].length - 1)];
+            const o = (f * BRANCH_SEGS * 2 + k * 2 + end) * 3;
+            arr[o] = p[0]; arr[o + 1] = p[1]; arr[o + 2] = p[2];
+          }
         }
       }
       attr.needsUpdate = true;
@@ -279,15 +254,15 @@ export default function ElementalStrikes({ active, enabled, branches = 2, pool =
     <group>
       {slots.map((s, i) => (
         <group key={i}>
-          <line ref={(el) => { glowRefs.current[i] = el; }} geometry={s.glow} raycast={() => null}>
+          <mesh ref={(el) => { glowRefs.current[i] = el; }} geometry={s.glow} raycast={() => null}>
+            <meshBasicMaterial color={color} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <mesh ref={(el) => { coreRefs.current[i] = el; }} geometry={s.core} raycast={() => null}>
+            <meshBasicMaterial color="#ffffff" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <lineSegments ref={(el) => { branchRefs.current[i] = el; }} geometry={s.branch} raycast={() => null}>
             <lineBasicMaterial color={color} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-          </line>
-          <line ref={(el) => { coreRefs.current[i] = el; }} geometry={s.core} raycast={() => null}>
-            <lineBasicMaterial color={accent} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-          </line>
-          <line ref={(el) => { branchRefs.current[i] = el; }} geometry={s.branch} raycast={() => null}>
-            <lineBasicMaterial color={color} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-          </line>
+          </lineSegments>
           <mesh ref={(el) => { headRefs.current[i] = el; }} raycast={() => null}>
             <sphereGeometry args={[1, 8, 8]} />
             <meshBasicMaterial color={accent} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />

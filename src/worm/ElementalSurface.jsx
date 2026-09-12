@@ -324,8 +324,8 @@ const fragmentShader = /* glsl */`
       //
       // Ridged noise gives the branching filaments (the same trick water's caustics
       // use); weighting it by the gap band is what pins them to the seams.
-      float n1 = vnoise(vWorld * 5.2 + vec3(0.0, t * 0.9, t * 0.4));
-      float n2 = vnoise(vWorld * 9.5 - vec3(t * 0.7, 0.0, t * 0.5));
+      float n1 = vnoise(vWorld * 5.2 + vec3(0.0, t * 0.22, t * 0.10));
+      float n2 = vnoise(vWorld * 9.5 - vec3(t * 0.18, 0.0, t * 0.12));
       float vein = clamp(pow(1.0 - abs(n1 * 2.0 - 1.0), 9.0) + 0.7 * pow(1.0 - abs(n2 * 2.0 - 1.0), 11.0), 0.0, 1.5);
       float gapBand = smoothstep(0.30, 0.95, cellRim);
       vein *= 0.25 + 1.05 * gapBand;
@@ -334,13 +334,13 @@ const fragmentShader = /* glsl */`
       // the cell's own seed, so neighbouring cells are never in phase and the cube
       // crackles instead of strobing as one object.
       float phase = fract(vCellMask.x * 0.37 + hash13(floor(vWorld * 1.7)) * 3.1);
-      float pulse = pow(0.5 + 0.5 * sin(t * 4.2 + phase * 6.2831853), 8.0);
+      float pulse = pow(0.5 + 0.5 * sin(t * 1.7 + phase * 6.2831853), 3.0);
 
       // Charge rails: current gathers along the cube's own edges, brightest at the
       // corners where three faces meet. This is the cube-scale read — from the
       // overview camera the silhouette is traced in light.
       float rail = vCellMask.y * smoothstep(0.55, 0.94, cellRim) * (0.6 + 0.4 * vCellMask.z);
-      rail *= 0.45 + 0.55 * pow(0.5 + 0.5 * sin(t * 2.3 - vWorld.y * 1.4), 3.0);
+      rail *= 0.45 + 0.55 * pow(0.5 + 0.5 * sin(t * 1.1 - vWorld.y * 1.4), 3.0);
 
       // A dark conductive sheen, so the white-hot cores have contrast to be hot
       // against. Nearly black at the tile centre, which also leaves the sticker
