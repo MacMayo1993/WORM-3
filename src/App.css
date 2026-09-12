@@ -3719,190 +3719,49 @@ select.btn-compact:disabled {
 .worm-cube-face--left   { transform: rotateY(-90deg) translateZ(14px);   background: #d8d8d8; }
 .worm-cube-face--bottom { transform: rotateX(-90deg) translateZ(14px);   background: #cccccc; }
 
-/* ── Menu CTAs ─────────────────────────────────────────────────────────────
-   Frosted glass rather than solid colour. The menu sits over a live 3D scene,
-   and a solid fill has to either fight that scene or hide it; glass lets the
-   scene through while still giving the label a surface to sit on. What makes
-   it legible is not opacity but the pairing: a light translucent sheet, a
-   bright rim, and dark ink — the ink carries the contrast, so the sheet is free
-   to stay see-through.
-
-   All three are one width (--menu-cta-w) so the cluster reads as a single
-   stack. Rank comes from height and type size instead, which is what lets the
-   secondaries stay legible while still sitting below START.
-
-   `backdrop-filter` is what actually frosts the scene behind the pill. Where it
-   is unsupported the sheet simply reads as flat translucent white, which still
-   works — the rim and the ink are doing the real load-bearing.
-
-   The sheet's alpha has a floor, and it is not decoration. Measured against the
-   real menu, a lighter sheet let a dark scene show through far enough to drag
-   the label to 3.94:1 — under the 4.5:1 minimum — because a translucent sheet
-   inherits whatever is behind it, and the scene behind this one changes every
-   load. These values keep the worst case above the threshold while the pill is
-   still visibly see-through. Lower them and it fails on the dark scenes only. */
-.worm-tactile-btn,
-.worm-menu-cta-secondary {
-  /* A further 20% down from min(306px, 70vw), itself 10% down from the original
-     min(340px, 78vw). The vw term shrinks with it, so the cluster keeps the
-     same proportion of a narrow screen rather than only shrinking on wide
-     ones. */
-  --menu-cta-w: min(245px, 56vw);
-  width: var(--menu-cta-w);
+/* Menu actions: raised tile surfaces echo the cube without covering the scene. */
+.worm-menu-actions { width: min(340px, calc(100vw - 40px)); display: grid; gap: 14px; }
+.worm-menu-utilities { display: flex; gap: 10px; }
+.worm-tactile-btn, .worm-menu-cta-secondary, .mc-play {
   box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  border-radius: 100px;
-  cursor: pointer;
-  outline: none;
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  transition: transform 0.12s ease-in-out, box-shadow 0.12s ease-in-out, background-color 0.15s ease;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  border: 1px solid rgba(255,255,255,.24);
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
-
-.worm-tactile-btn {
-  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
-  /* 20% down from 1.9rem, with the padding cut to match, so the pill shrinks
-     as one piece rather than turning into small type in a big lozenge. */
-  font-size: 1.52rem;
-  color: #1f2721;
-  /* A white highlight under the glyph, not a dark drop shadow: on a light
-     sheet the letterform is lifted by the sheet showing through beneath it. */
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
-  background:
-    /* travelling specular sweep */
-    linear-gradient(105deg, transparent 34%, rgba(255, 255, 255, 0.85) 50%, transparent 66%),
-    /* The gloss cap. The near-opaque stop at 44% against a nearly-clear one at
-       46% is the whole trick: a hard terminator reads as a reflection sitting
-       ON the surface, where a soft fade just reads as a lighter paint. */
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.72) 44%, rgba(255, 255, 255, 0.1) 46%, rgba(255, 255, 255, 0) 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(246, 248, 245, 0.66) 52%, rgba(255, 255, 255, 0.74) 100%);
-  background-size: 260% 100%, 100% 100%, 100% 100%;
-  background-position: 210% 0, 0 0, 0 0;
-  padding: 13px 24px;
-  border: 1.5px solid rgba(255, 255, 255, 0.7);
-  --cta-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -10px 22px rgba(255, 255, 255, 0.22),
-    0 12px 28px rgba(0, 0, 0, 0.24),
-    0 2px 6px rgba(0, 0, 0, 0.12);
-  box-shadow: var(--cta-shadow);
-  animation: wormCtaSheen 3.4s 0.8s ease-in-out infinite, wormCtaGlow 2.8s ease-in-out infinite, wormCtaBreathe 3.6s ease-in-out infinite;
+.worm-tactile-btn, .mc-play {
+  width: 100%; min-height: 70px; padding: 10px 16px 10px 10px;
+  border-radius: 18px 18px 18px 6px;
+  background: var(--play-color, #e8efce); color: var(--play-ink, #202d25);
+  font-family: 'Bungee', 'Arial Black', sans-serif; font-size: 22px; letter-spacing: .06em;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 6px 0 #344638, 0 10px 18px rgba(0,0,0,.24);
 }
-
-/* Only the sheen layer travels; the glass sheet under it stays pinned, which is
-   why each layer needs its own position. */
-@keyframes wormCtaSheen {
-  0%   { background-position: 210% 0, 0 0, 0 0; }
-  48%  { background-position: -70% 0, 0 0, 0 0; }
-  100% { background-position: -70% 0, 0 0, 0 0; }
+.worm-cta-emblem {
+  width: 46px; height: 46px; flex: 0 0 46px; display: grid; place-items: center;
+  border-radius: 12px 12px 12px 4px; border: 1px solid currentColor;
+  background: rgba(0,0,0,.06);
 }
-
-/* The idle shimmer. Done with drop-shadow rather than box-shadow because
-   box-shadow is already spoken for by --cta-shadow and the focus ring composes
-   onto it — animating it here would fight both. drop-shadow also follows the
-   pill's radius, so the halo is the shape of the button. */
-@keyframes wormCtaGlow {
-  0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.28)); }
-  50%      { filter: drop-shadow(0 0 17px rgba(255, 255, 255, 0.6)); }
-}
-
-/* A slow breath on the primary only, so the eye is drawn to START and not to
-   three things moving at once. */
-@keyframes wormCtaBreathe {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.018); }
-}
-
-.worm-tactile-btn:hover,
-.worm-menu-cta-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.16);
-}
-
-.worm-tactile-btn:active {
-  transform: translateY(2px) scale(0.985);
-  filter: none;
-  --cta-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    inset 0 2px 10px rgba(60, 70, 62, 0.2),
-    0 4px 12px rgba(0, 0, 0, 0.22);
-  animation: none;
-}
-
-/* The play glyph. Sized off the label and pushed to the trailing edge, so the
-   text stays optically centred rather than being shoved left by the icon. */
-.worm-cta-glyph {
-  font-size: 0.62em;
-  line-height: 1;
-  opacity: 0.72;
-  margin-right: -6px;
-}
-
-/* Secondary CTAs — same sheet, same width, no sheen. They rank below START by
-   height and type size, not by being harder to read. */
+.worm-cta-label { flex: 1; text-align: left; }
+.worm-cta-glyph { font-family: Arial, sans-serif; font-size: 28px; line-height: 1; }
+.mc-play { font-size: 16px; }
 .worm-menu-cta-secondary {
-  /* 20% of 47px is 37.6px, which is below the 44px minimum touch target the
-     rest of the game holds itself to (TOUCH_TARGET in ui/Button.jsx). The pill
-     stops shrinking here; its width and type took the full 20%. */
-  min-height: 44px;
-  color: #1f2721;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.66) 46%, rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0) 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(246, 248, 245, 0.62) 52%, rgba(255, 255, 255, 0.7) 100%);
-  animation: wormCtaGlow 3.4s 0.5s ease-in-out infinite;
-  border: 1.5px solid rgba(255, 255, 255, 0.58);
-  --cta-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    inset 0 -8px 18px rgba(255, 255, 255, 0.16),
-    0 8px 20px rgba(0, 0, 0, 0.2);
-  box-shadow: var(--cta-shadow);
+  flex: 1; min-width: 0; min-height: 48px; padding: 10px 12px; border-radius: 12px 12px 12px 4px;
+  background: #25372e; color: #f1efdc; font: inherit; font-size: 13px; font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 3px 0 #122019;
 }
-
-.worm-menu-cta-secondary:active {
-  transform: translateY(2px) scale(0.99);
-  --cta-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 2px 8px rgba(60, 70, 62, 0.18),
-    0 3px 10px rgba(0, 0, 0, 0.2);
+.worm-menu-cta-secondary > span { font-size: 22px; line-height: 1; }
+@media (hover: hover) {
+  .worm-tactile-btn:hover, .mc-play:hover { transform: translateY(-2px); border-color: #fff7d9; }
+  .worm-menu-cta-secondary:hover { transform: translateY(-1px); border-color: #c3d9af; }
 }
-
-/* The baseline ring further down this file sets box-shadow outright, which
-   would replace the whole sheet-and-lift stack and flatten the pill for as long
-   as it held focus. Composing instead: ring first so it paints on top, then
-   whatever --cta-shadow currently is — which :active redefines, so a pressed
-   button keeps a correct ring too. */
-.worm-tactile-btn:focus-visible,
-.worm-menu-cta-secondary:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px rgba(255, 253, 242, 0.92),
-    0 0 0 5px var(--border-focus, #5f7f4a),
-    var(--cta-shadow);
+.worm-tactile-btn:active, .mc-play:active { transform: translateY(4px); box-shadow: inset 0 2px 0 rgba(255,255,255,.25), 0 2px 0 #344638; }
+.worm-menu-cta-secondary:active { transform: translateY(2px); box-shadow: 0 1px 0 #122019; }
+.worm-tactile-btn:focus-visible, .worm-menu-cta-secondary:focus-visible, .mc-play:focus-visible {
+  outline: 3px solid #fff7d9; outline-offset: 5px;
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .worm-title-letter,
-  .worm-cube-sup {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  /* Both CTA classes now animate — sheen, shimmer and breathe — so both are
-     stilled here. `filter` and `transform` are reset explicitly because
-     cancelling an animation leaves the element at its declared value, not at
-     the midpoint the keyframes had reached. */
-  .worm-tactile-btn,
-  .worm-menu-cta-secondary {
-    animation: none !important;
-    filter: none !important;
-    transform: none !important;
-  }
+  .worm-title-letter, .worm-cube-sup { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .worm-tactile-btn, .worm-menu-cta-secondary, .mc-play { transition: none; transform: none !important; }
 }
 
 /* ── Menu backdrop ─────────────────────────────────────────────────────────
