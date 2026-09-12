@@ -40,8 +40,8 @@ const VERT_COUNT = (RINGS + 1) * (SIDES + 1);
 // of the shaft while the camera is still hanging outside — and is driven up to
 // the full ride value by the dive, so the bore is at full strength at the exact
 // moment the camera passes through the mouth rather than snapping on afterwards.
-// The fade-out is quick so the tube is gone by the time the exterior exit shot
-// settles.
+// Retain the shaft while any body segment occupies it; fade only after the
+// recorded tail passage clears.
 const OP_RIDE = 1.0;
 const OP_ENTER = 0.20;
 const OP_LERP_IN = 6;
@@ -170,6 +170,7 @@ const fragmentShader = `
     // wide: anchoring tunnels on their tiles made each arm ~5x longer, so a tight
     // pool leaves almost the whole shaft unlit.
     float headGlow = exp(-pow((vUv.y - uHead) / 0.22, 2.0));
+    float travelPulse = exp(-pow((vUv.y - uHead) / 0.035, 2.0));
     float wake = step(vUv.y, uHead) * exp(-(uHead - vUv.y) * 5.0);
     // One luminous seam visibly carries the half-twist through the shaft.
     float twistStripe = pow(max(0.0, cos(vUv.x * 6.2831853 - vUv.y * 3.14159265)), 36.0);
@@ -197,7 +198,8 @@ const fragmentShader = `
     vec3 accent = mix(base, vec3(1.0), 0.55);
     col += accent * streak * 0.80;
     col += vec3(1.0) * pow(streak, 3.0) * 0.22;
-    col += accent * rings  * 0.55;
+    col += accent * rings  * 0.32;
+    col += mix(accent, vec3(1.0, 0.96, 0.78), 0.5) * travelPulse * 0.85;
     col += base   * ribs   * 0.30;
     col += accent * twistStripe * (0.18 + 0.4 * wake);
     col += vec3(1.0) * seam * 1.10;
@@ -322,8 +324,8 @@ export function TunnelTube({ worm, size }) {
     // approach speed are the same curve.
     const enterP = Math.min(1, Math.max(0, worm.tunnelProgress.current ?? 0));
     const dive = diveProgress(enterP);
-    const target = riding ? OP_RIDE : entering ? OP_ENTER + (OP_RIDE - OP_ENTER) * dive
-      : (phase === 'windout' || tailPassage) ? OP_ENTER : 0;
+    const target = entering ? OP_ENTER + (OP_RIDE - OP_ENTER) * dive : (riding || tailPassage) ? OP_RIDE
+      : phase === 'windout' ? OP_ENTER : 0;
     const lerp = target > opacityRef.current ? OP_LERP_IN : OP_LERP_OUT;
     opacityRef.current += (target - opacityRef.current) * Math.min(1, delta * lerp);
 

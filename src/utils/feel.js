@@ -113,7 +113,8 @@ const COMBO_SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 131
 const SFX = {
   orb(combo = 0) {
     const f = COMBO_SCALE[Math.min(combo, COMBO_SCALE.length - 1)];
-    tone({ freq: f, freqTo: f * 1.5, dur: 0.1, type: 'triangle', gain: 0.5 });
+    tone({ freq: f, freqTo: f * 1.5, dur: 0.1, type: 'triangle', gain: 0.42 });
+    tone({ freq: f * 2, freqTo: f * 2, dur: 0.14, type: 'sine', gain: 0.12 });
   },
   jump() {
     tone({ freq: 300, freqTo: 640, dur: 0.09, type: 'sine', gain: 0.35 });

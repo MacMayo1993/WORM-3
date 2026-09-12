@@ -787,6 +787,20 @@ function makeContactShadowTexture() {
 // depth-writing tiles occlude the faces behind them, so only the words on
 // visible faces read — hidden faces are naturally masked by the front tile.
 const ModeFacePlates = React.forwardRef((_props, rootRef) => {
+  const enamelRefs = useRef({});
+  const faceColors = useMemo(() => Object.fromEntries(CAROUSEL_MODES.map(m => [m.face, new THREE.Color(m.tileColor)])), []);
+  const targetColor = useMemo(() => new THREE.Color(), []);
+  useFrame((_state, delta) => {
+    if (!isCarouselActive()) return;
+    const selected = getCarouselFace() || 'PZ';
+    for (const [face, material] of Object.entries(enamelRefs.current)) {
+      if (!material) continue;
+      targetColor.copy(faceColors[face]).multiplyScalar(face === selected ? 1 : 0.55);
+      material.color.lerp(targetColor, 1 - Math.exp(-8 * delta));
+      material.roughness = face === selected ? 0.3 : 0.55;
+      material.clearcoat = face === selected ? 1 : 0.25;
+    }
+  });
   // Visibility is owned by RotatingBlackCube's frame loop (not React state, and
   // not a second useFrame here): the same frame that decides to present a mode
   // face turns the plates on. Two independent readers of the carousel flag
@@ -808,7 +822,7 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               <meshPhysicalMaterial color="#667389" metalness={0.8} roughness={0.26} envMapIntensity={0.45} />
             </mesh>
             <mesh geometry={carouselPlateGeometry} renderOrder={31}>
-              <meshPhysicalMaterial color={m.tileColor} metalness={0.08} roughness={0.3}
+              <meshPhysicalMaterial ref={material => { enamelRefs.current[m.face] = material; }} color={m.tileColor} metalness={0.08} roughness={0.3}
                 clearcoat={1} clearcoatRoughness={0.2} envMapIntensity={0.3} />
             </mesh>
             {/* Label on every face — the mode words wrap the whole cube */}
@@ -875,8 +889,8 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       // with a slow breathing wobble so the cube stays alive while parked.
       const face = getCarouselFace() || 'PZ';
       _wobbleEuler.set(
-        -0.13 + Math.sin(t * 0.9) * 0.035,
-        0.20 + Math.sin(t * 0.7 + 1.7) * 0.045,
+        -0.13 + Math.sin(t * 0.65) * 0.012,
+        0.20 + Math.sin(t * 0.5 + 1.7) * 0.016,
         0
       );
       _wobbleQ.setFromEuler(_wobbleEuler);
