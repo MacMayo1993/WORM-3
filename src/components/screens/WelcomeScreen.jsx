@@ -35,7 +35,7 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
       className="welcome-screen"
       style={{ background: 'transparent', pointerEvents: 'none' }}
     >
-      <p className="opening-accessible">WORM cubed. What if opposite was the same place?</p>
+      <p className="opening-accessible">WORM cubed. One day… Front left, and flipped right to Back.</p>
       <TextOverlay time={introTime} reducedMotion={reducedMotion} />
 
       <button
