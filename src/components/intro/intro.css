@@ -35,3 +35,10 @@
   .opening-copy .opening-title { font-size: min(8vh, 42px); }
   .opening-enter { bottom: max(14px, env(safe-area-inset-bottom)); }
 }
+
+/* Reserve each word's space before revealing it, so the line never re-centers. */
+.opening-poem-word { display: inline-block; }
+.opening-copy .opening-poem-line { font-size: clamp(17px, 4.7vw, 30px); }
+@media (orientation: landscape) and (max-height: 500px) {
+  .opening-copy .opening-poem-line { font-size: min(5vh, 26px); }
+}
