@@ -1,3 +1,4 @@
+import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 // src/worm/healerWorm/wormSim.js
 //
@@ -222,6 +223,8 @@ export function makeWormSim(size) {
         rocketFlight: 0, // launch/landing progress, independent of refreshed fuel
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
+        elementalPatches: new Map(),
+        waterMomentum: 0,
         elementalType: null,      // active elemental wash ('water'|'fire'|'grass'|'ice'|null)
         elementalT: 0,            // seconds of elemental wash remaining
         elementalMaxT: 0,         // duration of the active wash, for the HUD's fill
@@ -354,6 +357,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.rocketFlight = 0;
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
+    sim.elementalPatches.clear();
+    sim.waterMomentum = 0;
     sim.elementalType = null;
     sim.elementalT = 0;
     sim.elementalMaxT = 0;
@@ -409,6 +414,7 @@ export const jumpLiftOf = (sim) => sim.isJumping
 
 export function startJump(sim, ctx, size) {
     if (sim.phase !== 'crawling') return;
+    const grounded = !sim.isJumping;
     // A deliberate dive reads only settled tile contents. Never resolve the
     // outgoing sticker while a layer is moving or a destination is rest-read.
     if (size && !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead) {
@@ -433,6 +439,10 @@ export function startJump(sim, ctx, size) {
         sim.jumpSpan = 1.6;
         sim.jumpHeight = 1.7;
         // An in-progress corner keeps its existing path; changing it mid-step would snap.
+    }
+    if (grounded && !sim.restRead && !liveRotation.active && consumeSpring(sim)) {
+        sim.jumpSpan = 2.2;
+        sim.jumpHeight = 2.1;
     }
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
@@ -493,8 +503,8 @@ export function startMagnet(sim, ctx) {
 }
 
 /**
- * Start — or replace — an elemental wash. Unlike the buffs this grants no
- * mechanical advantage; it hands the renderer an element to bathe the cube in
+ * Start — or replace — an elemental wash and its associated movement effect
+ * while handing the renderer an element to bathe the cube in
  * for ELEMENTAL_DURATION seconds. Claiming a second element simply swaps the
  * active one, so the cube never shows two elements at once.
  */
@@ -1202,7 +1212,12 @@ const PHASE_HANDLERS = {
             // starts — at which point they can no longer belong to anything pending.
 
             // Apply pending turn — RELATIVE to current heading
-            if (sim.pendingTurns.length > 0) {
+            if (iceHoldsTurn(sim, delta, STEP_SEC)) {
+                const action = sim.pendingTurns.findIndex(t => t === 'jump' || t === 'boost');
+                if (action > 0) sim.pendingTurns.unshift(sim.pendingTurns.splice(action, 1)[0]);
+            }
+            if (sim.pendingTurns.length > 0 && (!iceHoldsTurn(sim, delta, STEP_SEC)
+                || sim.pendingTurns[0] === 'jump' || sim.pendingTurns[0] === 'boost')) {
                 const t = sim.pendingTurns[0]; // peek — a held turn stays queued
                 // Two same-direction turns are a 180 relative to the original heading: fine
                 // as a staircase if the worm moved a tile between them, but an instant kill
@@ -1257,7 +1272,10 @@ const PHASE_HANDLERS = {
                             sim.moveDir = turnWorm(turnWorm(sim.moveDir, 'left'), 'left');
                         }
                     }
-                    if (sim.moveDir !== previousDirection) ctx.onSteer?.();
+                    if (sim.moveDir !== previousDirection) {
+                        sim.waterMomentum *= 0.35;
+                        ctx.onSteer?.();
+                    }
                 }
             }
 
@@ -1411,6 +1429,9 @@ const PHASE_HANDLERS = {
                 sim.prevDirKey = sim.pos.dirKey;
                 // Snapshot the tile we're leaving as the interpolation source so a
                 // mid-step slice rotation can ride/commit it correctly.
+                if (sim.elementalType === 'fire' && sim.elementalT > 0 && !sim.isJumping && !liveRotation.active && !sim.restRead) {
+                    addElementalPatch(sim, sim.pos, 'fire');
+                }
                 sim.prevTile = { x: sim.pos.x, y: sim.pos.y, z: sim.pos.z, dirKey: sim.pos.dirKey };
 
                 const oldDirKey = sim.pos.dirKey;
@@ -1771,7 +1792,7 @@ export function stepWormSim(sim, delta, size, ctx) {
 
     // Elemental wash: drain the mood timer on the same crawling-only clock as the
     // buffs, so a pause or tunnel transit freezes it rather than letting it lapse
-    // off-screen. Purely cosmetic — nothing about gameplay reads it.
+    // off-screen. Movement effects read the same remaining duration.
     if (sim.phase === 'crawling' && sim.elementalT > 0) {
         sim.elementalT -= delta;
         if (sim.elementalT <= 0) {
@@ -1804,12 +1825,13 @@ export function stepWormSim(sim, delta, size, ctx) {
         }
     }
 
+    tickElementalGameplay(sim, delta);
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
     // Throttle follows the same smooth flight phase as the rendered body.
     // Blend back to any remaining ordinary boost instead of snapping at touchdown.
     const flight = sim.rocketFlight ?? 0;
     const throttle = flight * flight * (3 - 2 * flight);
-    const speedMult = sim.rocketActive ? boostMult + (ROCKET_SPEED_MULT - boostMult) * throttle : boostMult;
+    const speedMult = sim.rocketActive ? boostMult + (ROCKET_SPEED_MULT - boostMult) * throttle : boostMult * (1 + 0.25 * sim.waterMomentum);
     const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step
@@ -1896,6 +1918,9 @@ export function stepWormSim(sim, delta, size, ctx) {
         // jump distance. Rocket overdrive no longer changes the ordinary jump arc.
         sim.jumpT += (delta / STEP_SEC) / sim.jumpSpan;
         if (sim.jumpT >= 1) {
+            if (sim.elementalType === 'grass' && sim.elementalT > 0 && !liveRotation.active && !sim.restRead) {
+                addElementalPatch(sim, sim.pos, 'grass');
+            }
             sim.jumpT = 0;
             sim.isJumping = false;
             sim.jumpCount = 0;
@@ -2073,6 +2098,8 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     }
 
     // Rotate the worm's logical grid position so it stays on its tile.
+    rotateElementalPatches(sim, rotateByOwnLayer);
+
     // rotateByOwnLayer returns the SAME object when the tile wasn't on any turning
     // plane, so `newPos !== oldPos` is an exact "did this tile ride" test.
     const oldPos = sim.pos;

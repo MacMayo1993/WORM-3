@@ -334,9 +334,12 @@ describe('elemental offering', () => {
     // Run out most of the cooldown: still nothing on the board.
     run(sim, ctx, ELEMENTAL_CLAIM_COOLDOWN - 2);
     expect(sim.specials.filter(s => isElementalType(s.type))).toHaveLength(0);
-    // ...and then the next offering arrives.
+    // Observe publication, not remaining orbs: water momentum can carry the
+    // player into the freshly spawned offering before this time window ends.
+    ctx.events.length = 0;
     run(sim, ctx, 4);
-    expect(sim.specials.filter(s => isElementalType(s.type)).length).toBeGreaterThan(0);
+    expect(ctx.events.some(e => e.type === 'specials'
+      && e.args[0].some(s => isElementalType(s.type)))).toBe(true);
   });
 
   it('an offering that simply expires does not buy the cooldown', () => {

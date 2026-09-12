@@ -466,6 +466,7 @@ export function useWormCrawler(size, cubies) {
             set current(v) { simRef.current[key] = v; },
         });
         apiRef.current = {
+            elementalPatches: f('elementalPatches'),
             pos: f('pos'),
             moveDir: f('moveDir'),
             phase: f('phase'),
