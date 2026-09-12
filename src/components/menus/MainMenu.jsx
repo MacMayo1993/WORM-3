@@ -1543,7 +1543,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         <div style={{ display: 'flex', gap: 0, alignItems: 'center', marginTop: 0 }}>
           {CAROUSEL_MODES.map((m, i) => (
             <button
-              key={m.id} type="button" aria-label={`Show ${m.label} mode`} title={m.label}
+              key={m.id} type="button" aria-label={`Show ${m.label} mode`} aria-current={i === activeIndex ? "true" : undefined} title={m.label}
               onClick={() => selectIndex(i)}
               className="ui-focusable"
               style={{
@@ -1568,7 +1568,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
                   // so opacity was carrying no load the shape was not.
                   opacity: 1,
                   boxShadow: i === activeIndex ? `0 0 0 2px ${PAPER_TEXT}` : `0 0 0 1px ${PAPER_BORDER}`,
-                  transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), opacity 200ms ease',
+                  transition: 'width 200ms ease, opacity 200ms ease',
                 }}
               />
             </button>
@@ -1584,11 +1584,14 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             padding: '14px 18px', position: 'relative', overflow: 'hidden',
           }} aria-label={`${mode.label} mode details`}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
+            <h2 style={{ margin: '0 0 8px', textAlign: 'center', fontFamily: DISPLAY_FONT, fontSize: 18, lineHeight: 1.35, color: PAPER_TEXT }}>{mode.label}</h2>
             {/* What the mode is. */}
             <p style={{ margin: 0, textAlign: 'center', fontSize: 'clamp(12.5px, 3.4vw, 14.5px)', lineHeight: 1.4, color: PAPER_TEXT, fontFamily: UI_FONT, fontWeight: 600 }}>
               {mode.desc}
             </p>
-            {/* …and how it ends, which the one-liner alone always left open. */}
+            <details key={mode.id} style={{ marginTop: 10 }}>
+              <summary className="ui-focusable" style={{ cursor: 'pointer', textAlign: 'center', fontFamily: UI_FONT, fontSize: 12, color: PAPER_TEXT_MUTED, padding: '10px 0', minHeight: 24 }}>How it works &amp; your progress</summary>
+            {/* Rules and history remain available without competing with Play. */}
             <p style={{ margin: '6px 0 0', textAlign: 'center', fontSize: 'clamp(11.5px, 3vw, 12.5px)', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: UI_FONT, fontWeight: 500 }}>
               {mode.how}
             </p>
@@ -1628,6 +1631,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
                 ))}
               </div>
             )}
+            </details>
           </div>
         </div>
 
