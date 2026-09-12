@@ -1,3 +1,4 @@
+import { liveRotation } from './liveRotation.js';
 // src/worm/useWormCrawler.js
 //
 // React adapter around the pure worm simulation core (healerWorm/wormSim.js).
@@ -348,6 +349,13 @@ export function useWormCrawler(size, cubies) {
         wormClock.countdown = sim.wormholeCountdown;
         // Mirror the authoritative buff clocks for the HUD. Plain field writes, so a
         // per-frame refresh costs nothing and freezes whenever the sim does.
+        wormBuffs.waterMomentum = sim.waterMomentum;
+        const tile = sim.pos;
+        wormBuffs.springReady = !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead
+            && sim.phase === 'crawling' && sim.elementalPatches.get(`${tile.x},${tile.y},${tile.z},${tile.dirKey}`)?.type === 'grass';
+        let springs = 0;
+        for (const patch of sim.elementalPatches.values()) if (patch.type === 'grass') springs++;
+        wormBuffs.springCount = springs;
         wormBuffs.magnetT = sim.magnetT;
         wormBuffs.magnetMaxT = sim.magnetMaxT;
         wormBuffs.rocketActive = sim.rocketActive;

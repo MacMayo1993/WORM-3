@@ -1,3 +1,4 @@
+import { elementalFeedback } from './healerWorm/elementalFeedback.js';
 // src/worm/WormCrawlerHUD.jsx
 // Mobile-first "Antipodal HUD" for WORM Chase-Cam Mode.
 // Three-zone layout: Glance Strip (top, info-only) · Game Scene · Thumb Tray (bottom, all controls).
@@ -1015,6 +1016,8 @@ function BuffStrip() {
     const secondsRef = useRef(null);
     const elemFillRef = useRef(null);
     const elemSecondsRef = useRef(null);
+    const feedbackRef = useRef(null);
+    const momentumRef = useRef(null);
 
     useEffect(() => {
         if (!magnetActive) return;
@@ -1044,6 +1047,9 @@ function BuffStrip() {
             const frac = elementalMaxT > 0 ? Math.max(0, Math.min(1, elementalT / elementalMaxT)) : 0;
             if (elemFillRef.current) elemFillRef.current.style.strokeDashoffset = `${ELEM_RING_CIRC * (1 - frac)}`;
             if (elemSecondsRef.current) elemSecondsRef.current.textContent = `${Math.max(0, elementalT).toFixed(0)}s`;
+            const feedback = elementalFeedback(elementalTheme, wormBuffs);
+            if (feedbackRef.current && feedbackRef.current.textContent !== feedback.text) feedbackRef.current.textContent = feedback.text;
+            if (momentumRef.current) momentumRef.current.style.transform = `scaleX(${feedback.fraction})`;
             raf = requestAnimationFrame(paint);
         };
         paint();
@@ -1057,7 +1063,7 @@ function BuffStrip() {
     const elemDef = elementalTheme ? getElementalDef(elementalTheme) : null;
 
     return (
-        <div style={BUFF_STRIP_STYLE} role="status" aria-live="polite">
+        <div style={{ ...BUFF_STRIP_STYLE, flexWrap: 'wrap', justifyContent: 'center', width: 'min(420px, calc(100vw - 16px))' }} role="status" aria-live="polite">
             {rocketActive && (
                 <div
                     style={{
@@ -1149,6 +1155,12 @@ function BuffStrip() {
                     <span ref={elemSecondsRef} aria-hidden="true" style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 24, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} />
                 </div>
             )}
+            {elemDef && <div style={{ flexBasis: '100%', textAlign: 'center', borderRadius: 8, background: 'rgba(12,23,24,.88)', padding: '5px 8px', fontSize: 11, lineHeight: 1.4, color: '#f6f3df' }} aria-label={elemDef.description}>
+                <span ref={feedbackRef} aria-hidden="true" />
+                {elementalTheme === 'water' && <div aria-hidden="true" style={{ height: 3, marginTop: 4, background: '#344b50', borderRadius: 3, overflow: 'hidden' }}>
+                    <div ref={momentumRef} style={{ height: '100%', background: '#8bebff', transformOrigin: 'left', transform: 'scaleX(0)' }} />
+                </div>}
+            </div>}
         </div>
     );
 }
@@ -1160,6 +1172,7 @@ function BuffStrip() {
 const NOTICE_MS = 2200;
 
 function SpecialNotice() {
+    const elementalActive = useGameStore(s => !!s.wormElementalTheme);
     const notice = useGameStore(s => s.wormSpecialNotice);
     const [shown, setShown] = useState(null);
     const timer = useRef(null);
@@ -1181,6 +1194,7 @@ function SpecialNotice() {
             key={shown.seq}
             style={{
                 ...SPECIAL_NOTICE_STYLE,
+                top: `calc(env(safe-area-inset-top, 0px) + ${SPECIAL_NOTICE_TOP + (elementalActive ? 58 : 0)}px)`,
                 color: expired ? 'rgba(255,255,255,0.72)' : def.color,
                 border: `1px solid ${expired ? 'rgba(255,255,255,0.22)' : def.color}`,
                 opacity: expired ? 0.75 : 1,

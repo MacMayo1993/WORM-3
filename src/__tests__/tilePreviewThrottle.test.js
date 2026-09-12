@@ -110,7 +110,7 @@ describe('tile preview redraw budget', () => {
     const id = registerTilePreview(fakeCanvas(), 'lava', '#ff0000');
     setTilePreviewVisible(id, false);
     const hidden = run(1);
-    expect(hidden).toBe(1); // the mount frame only
+    expect(hidden).toBe(0); // hidden mounts wait until visible
 
     setTilePreviewVisible(id, true);
     const shown = run(1);
@@ -118,15 +118,17 @@ describe('tile preview redraw budget', () => {
     expect(shown).toBeGreaterThan(15);
   });
 
-  it('redraws an off-screen preview when its style changes', () => {
+  it('defers an off-screen style change until it becomes visible', () => {
     const id = registerTilePreview(fakeCanvas(), 'lava', '#ff0000');
     setTilePreviewVisible(id, false);
     run(0.5);
     putCount = 0;
     updateTilePreview(id, 'galaxy', '#00ff00');
     const drawn = run(0.5);
+    expect(drawn).toBe(0);
+    setTilePreviewVisible(id, true);
+    expect(run(0.1)).toBeGreaterThan(0);
     unregisterTilePreview(id);
-    expect(drawn).toBe(1);
   });
 
   it('spreads the redraws of a grid mounted on one frame across the interval', () => {
@@ -143,4 +145,24 @@ describe('tile preview redraw budget', () => {
     ids.forEach(unregisterTilePreview);
     expect(frames.size).toBeGreaterThan(20);
   });
+});
+
+
+it('caps a newly mounted grid and eventually draws every visible tile', () => {
+  const canvases = Array.from({ length: 30 }, () => fakeCanvas());
+  const ids = canvases.map(canvas => registerTilePreview(canvas, 'solid', '#abcdef'));
+  for (let i = 0; i < 20; i++) {
+    const before = putCount;
+    tickPreviews(1 / 60);
+    expect(putCount - before).toBeLessThanOrEqual(4);
+  }
+  expect(canvases.every(canvas => !!canvas.lastFrame)).toBe(true);
+  ids.forEach(unregisterTilePreview);
+});
+
+it('holds animated thumbnails still when reduced motion is requested', () => {
+  const previous = window.matchMedia;
+  window.matchMedia = () => ({ matches: true });
+  const id = registerTilePreview(fakeCanvas(), 'lava', '#abcdef');
+  try { expect(run(1)).toBe(1); } finally { unregisterTilePreview(id); window.matchMedia = previous; }
 });
