@@ -26,7 +26,7 @@ const stopAt = (n, tiers) => {
   return `calc(${p * 100}% + ${(0.5 - p) * KNOB}px)`;
 };
 
-export default function CubeSizeSlider({ value, onChange, accent, accentShadow, tiers = SIZE_TIERS }) {
+export default function CubeSizeSlider({ value, onChange, accent, accentShadow, tiers = SIZE_TIERS, compact = false }) {
   const tier = sizeTier(value, tiers);
   const knobLeft = stopAt(value, tiers);
 
@@ -125,7 +125,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
               }}>
                 {n}
               </span>
-              {n === DEFAULT_SIZE && (
+              {!compact && n === DEFAULT_SIZE && (
                 <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT }}>
                   Normal
                 </span>
@@ -136,7 +136,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
       </div>
 
       {/* What you just landed on */}
-      <div style={{
+      {!compact && <div style={{
         marginTop: '10px', padding: '12px 14px', borderRadius: '12px',
         background: WIZ_SURFACE, border: `1.5px solid ${accent}44`,
         boxShadow: `0 2px 10px ${WIZ_CARD_SHADOW}`,
@@ -145,7 +145,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
         <span style={{ fontSize: '17px', fontWeight: 800, color: WIZ_TEXT, letterSpacing: '-0.4px' }}>{tier.name}</span>
         <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: accent }}>{tier.tag}</span>
         <span style={{ marginLeft: 'auto', fontSize: '12px', color: WIZ_TEXT_MUTED, textAlign: 'right' }}>{tier.desc}</span>
-      </div>
+      </div>}
     </div>
   );
 }

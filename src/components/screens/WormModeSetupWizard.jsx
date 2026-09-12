@@ -6,7 +6,7 @@ import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { NIGHT_TEXT, NIGHT_TEXT_MUTED, UI_CREAM, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_SURFACE, WIZ_CARD_SHADOW, WIZ_SURFACE_RAISED, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
-import { WORM_SPEED_OPTIONS } from '../../worm/healerWorm/constants.js';
+import { WORM_DIFFICULTIES } from '../../worm/wormDifficulty.js';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, SizeStep, styleCategory,
@@ -22,18 +22,6 @@ const WORM_SIZE_TIERS = [
   { n: MEGA_CUBE_SIZE, name: '15×15×15', tag: 'Mega', desc: '1,350 stickers of mayhem' }
 ];
 
-const ORB_COUNT_OPTIONS = [
-  { value: 6, label: 'Less' },
-  { value: 16, label: 'Average' },
-  { value: 30, label: 'More' }
-];
-
-const WORMHOLE_OPTIONS = [
-  { value: 20, label: 'Slow' },
-  { value: 10, label: 'Average' },
-  { value: 5, label: 'Fast' }
-];
-
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
   const isMobile = useIsMobile();
@@ -43,13 +31,12 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     accent: ACCENT,
     accentShadow: ACCENT_SHADOW,
     extra: {
-      wormSpeed: 2.0,
-      wormOrbCount: 16,
-      wormholeInterval: 10,
+      ...WORM_DIFFICULTIES[1].settings,
       wormColor: '#33ff66'
     }
   });
-  const { settings, select, ownedItems } = cos;
+  const { settings, ownedItems } = cos;
+  const difficulty = WORM_DIFFICULTIES.find(option => option.settings.wormSpeed === settings.wormSpeed) || WORM_DIFFICULTIES[1];
 
   const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
   const wormHatId = useGameStore(s => s.wormHat ?? 'none');
@@ -224,104 +211,24 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     );
   };
 
-  // ── Play: how the run itself feels ─────────────────────────────────────────
-  //
-  // These used to hang off the bottom of the size step, which made it the
-  // longest scroll in any wizard — they were bundled there only because a sixth
-  // step cost a sixth screen to walk through. With the rail a category is free.
-
-  const renderGameplay = () => {
-    const OptionGroup = ({ label, options, value, onChange, accent }) => (
-      <div style={{ display: 'grid', gap: '8px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: WIZ_TEXT_MUTED, letterSpacing: '0.04em' }}>{label}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-          {options.map(opt => {
-            const selected = value === opt.value;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => onChange(opt.value)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '14px 8px',
-                  borderRadius: '10px',
-                  border: selected ? `2px solid ${accent}` : `2px solid ${WIZ_BORDER_SOFT}`,
-                  background: selected ? `${accent}14` : WIZ_SURFACE_RAISED,
-                  boxShadow: selected ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${WIZ_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
-                  transform: selected ? 'translateY(1px)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  WebkitTapHighlightColor: 'transparent',
-                  fontFamily: 'inherit'
-                }}
-              >
-                <span style={{ fontSize: '13px', fontWeight: 700, color: selected ? accent : WIZ_TEXT_MUTED, letterSpacing: '-0.2px' }}>{opt.label}</span>
-              </button>
-            );
-          })}
+  const renderPlay = () => (
+    <div style={{ display: 'grid', gap: 18 }}>
+      <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="body" compact />
+      <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <legend style={{ fontSize: 13, fontWeight: 700, color: WIZ_TEXT, marginBottom: 10 }}>Difficulty</legend>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+          {WORM_DIFFICULTIES.map(option => <button
+            type="button" key={option.id} aria-pressed={difficulty.id === option.id}
+            onClick={() => cos.setSettings(current => ({ ...current, ...option.settings }))}
+            style={{ minHeight: 48, padding: '12px 6px', borderRadius: 10,
+              border: `2px solid ${difficulty.id === option.id ? ACCENT : WIZ_BORDER_SOFT}`,
+              background: difficulty.id === option.id ? ACCENT : WIZ_SURFACE_RAISED,
+              color: difficulty.id === option.id ? '#fff' : WIZ_TEXT,
+              cursor: 'pointer', font: 'inherit', fontSize: 14, fontWeight: 700 }}
+          >{option.label}</button>)}
         </div>
-      </div>
-    );
-
-    return (
-      <div style={{ display: 'grid', gap: '20px' }}>
-        <OptionGroup
-          label="Worm Speed"
-          accent="#1565C0"
-          value={settings.wormSpeed}
-          onChange={v => select('wormSpeed', v)}
-          options={WORM_SPEED_OPTIONS}
-        />
-        <OptionGroup
-          label="Orb Count"
-          accent={ACCENT}
-          value={settings.wormOrbCount}
-          onChange={v => select('wormOrbCount', v)}
-          options={ORB_COUNT_OPTIONS}
-        />
-        <OptionGroup
-          label="Wormhole Duration"
-          accent="#b58a00"
-          value={settings.wormholeInterval}
-          onChange={v => select('wormholeInterval', v)}
-          options={WORMHOLE_OPTIONS}
-        />
-      </div>
-    );
-  };
-
-  const renderSize = () => (
-    <>
-      <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="body" />
-      <button
-        type="button"
-        aria-pressed={cos.cubeSize === MEGA_CUBE_SIZE}
-        onClick={() => cos.setCubeSize(MEGA_CUBE_SIZE)}
-        style={{
-          width: '100%', marginTop: '10px', padding: '15px 18px', borderRadius: '12px',
-          border: cos.cubeSize === MEGA_CUBE_SIZE ? `2px solid ${ACCENT}` : `2px solid ${ACCENT}77`,
-          background: cos.cubeSize === MEGA_CUBE_SIZE
-            ? `linear-gradient(135deg, ${ACCENT}, #9b4dca)`
-            : `linear-gradient(135deg, ${ACCENT}12, ${ACCENT}24)`,
-          color: cos.cubeSize === MEGA_CUBE_SIZE ? '#fff' : ACCENT,
-          boxShadow: cos.cubeSize === MEGA_CUBE_SIZE
-            ? `0 4px 0 ${ACCENT_SHADOW}, 0 8px 20px ${ACCENT}44`
-            : `0 3px 0 ${ACCENT}33`,
-          cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.18s ease',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px'
-        }}
-      >
-        <span style={{ fontSize: '14px', fontWeight: 900, letterSpacing: '0.12em' }}>MEGA MODE</span>
-        <span style={{ fontSize: '11px', fontWeight: 700, opacity: 0.85 }}>
-          {cos.cubeSize === MEGA_CUBE_SIZE ? '15×15×15 selected' : 'Play on 15×15×15'}
-        </span>
-      </button>
-      {cos.cubeSize === MEGA_CUBE_SIZE && (
-        <p style={{ margin: '9px 4px 0', fontSize: '10px', color: WIZ_TEXT_MUTED, lineHeight: 1.45 }}>
-          Mega Mode automatically scales orb density to fill the larger surface and uses optimized effects for smoother play.
-        </p>
-      )}
-    </>
+      </fieldset>
+    </div>
   );
 
   const categories = [
@@ -357,23 +264,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     },
     styleCategory(cos),
     {
-      key: 'size',
-      icon: 'size',
-      label: 'Size',
-      title: 'Cube Size',
-      subtitle: 'Choose the cube your worm has to cross',
-      summary: cos.cubeSize === MEGA_CUBE_SIZE ? 'Mega 15×15×15' : sizeLabel(cos.cubeSize, WORM_SIZE_TIERS),
-      hero: <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="hero" />,
-      content: renderSize()
-    },
-    {
       key: 'play',
       icon: 'gameplay',
       label: 'Play',
-      title: 'Gameplay',
-      subtitle: 'Tune how fast and chaotic your worm run feels',
-      summary: `${WORM_SPEED_OPTIONS.find(o => o.value === settings.wormSpeed)?.label || 'Custom'} · ${ORB_COUNT_OPTIONS.find(o => o.value === settings.wormOrbCount)?.label || 'Custom'}`,
-      content: renderGameplay()
+      title: 'Size & Difficulty',
+      summary: `${sizeLabel(cos.cubeSize, WORM_SIZE_TIERS)} · ${difficulty.label}`,
+      hero: <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="hero" compact />,
+      content: renderPlay()
     }
   ];
 

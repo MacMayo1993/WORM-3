@@ -5,12 +5,11 @@
 // both.
 
 import React from 'react';
-import { WIZ_TEXT_MUTED } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
 import CubeSizeSlider from './CubeSizeSlider.jsx';
 import { SIZE_TIERS, sizeTier, bgOptionFor, paletteLabel, styleLabel } from './shared.jsx';
 
-export default function SizeStep({ cos, tiers = SIZE_TIERS, slot }) {
+export default function SizeStep({ cos, tiers = SIZE_TIERS, slot, compact = false }) {
   const { settings, cubeSize, setCubeSize, colors, accent, accentShadow } = cos;
 
   const tier = sizeTier(cubeSize, tiers);
@@ -23,10 +22,10 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS, slot }) {
       {slot !== 'body' && (
       <CubePlate
         caption="Cube Size"
-        index={sizeIndex + 1}
-        total={tiers.length}
+        index={compact ? undefined : sizeIndex + 1}
+        total={compact ? undefined : tiers.length}
         title={tier.name}
-        subtitle={`${paletteLabel(settings)} · ${styleLabel(settings)}`}
+        subtitle={compact ? undefined : `${paletteLabel(settings)} · ${styleLabel(settings)}`}
         onPrev={() => setCubeSize(adjacentSize(-1))}
         onNext={() => setCubeSize(adjacentSize(1))}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}
@@ -37,12 +36,8 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS, slot }) {
 
       {slot !== 'hero' && (
       <>
-      <CubeSizeSlider value={cubeSize} onChange={setCubeSize} accent={accent} accentShadow={accentShadow} tiers={tiers} />
+      <CubeSizeSlider value={cubeSize} onChange={setCubeSize} accent={accent} accentShadow={accentShadow} tiers={tiers} compact={compact} />
 
-      <p style={{ fontSize: '11px', color: WIZ_TEXT_MUTED, lineHeight: 1.5, margin: '14px 2px 8px' }}>
-        Bigger cubes keep the same rules — antipodal identification, the same flips — with more
-        pieces to carry through them.
-      </p>
       </>
       )}
     </>
