@@ -1,3 +1,4 @@
+import { carouselPlateGeometry } from './carouselPlateGeometry.js';
 import CubeGlowWorm from './CubeGlowWorm.jsx';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -789,35 +790,6 @@ const SHADOW_BAND_PX = 26;
 // keeps it off the dots below it.
 const STAGE_GAIN_DAMPING = 0.62;
 
-// Bevel overlay: a top-left highlight and bottom-right shadow baked into a
-// transparent texture, layered over the tile so the inset face reads as a
-// raised, chamfered cube sticker lit from the upper-left.
-function makeBevelTexture() {
-  if (typeof document === 'undefined') return null;
-  const s = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = s;
-  const ctx = c.getContext('2d');
-  if (!ctx) return null;
-  const edge = s * 0.16;
-  const strip = (grad, x, y, w, h) => { ctx.fillStyle = grad; ctx.fillRect(x, y, w, h); };
-  let g = ctx.createLinearGradient(0, 0, 0, edge);          // top highlight
-  g.addColorStop(0, 'rgba(255,255,255,0.60)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-  strip(g, 0, 0, s, edge);
-  g = ctx.createLinearGradient(0, 0, edge, 0);              // left highlight
-  g.addColorStop(0, 'rgba(255,255,255,0.40)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-  strip(g, 0, 0, edge, s);
-  g = ctx.createLinearGradient(0, s, 0, s - edge);          // bottom shadow
-  g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-  strip(g, 0, s - edge, s, edge);
-  g = ctx.createLinearGradient(s, 0, s - edge, 0);          // right shadow
-  g.addColorStop(0, 'rgba(0,0,0,0.42)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-  strip(g, s - edge, 0, edge, s);
-  const tex = new THREE.CanvasTexture(c);
-  tex.needsUpdate = true;
-  return tex;
-}
-
 // Contact shadow: a soft dark pool the presented cube sits on. Without it the
 // cube floats in front of whatever photograph the scene picked, with nothing
 // under it — which is what made the space below read as a hole rather than as
@@ -844,26 +816,6 @@ function makeContactShadowTexture() {
   return tex;
 }
 
-// Gloss overlay: a soft elliptical sheen near the top of the tile, blended
-// additively so the sticker looks glossy/wet without hiding the pattern.
-function makeGlossTexture() {
-  if (typeof document === 'undefined') return null;
-  const s = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = s;
-  const ctx = c.getContext('2d');
-  if (!ctx) return null;
-  const g = ctx.createRadialGradient(s * 0.5, s * 0.26, s * 0.04, s * 0.5, s * 0.3, s * 0.62);
-  g.addColorStop(0, 'rgba(255,255,255,0.45)');
-  g.addColorStop(0.5, 'rgba(255,255,255,0.11)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, s, s);
-  const tex = new THREE.CanvasTexture(c);
-  tex.needsUpdate = true;
-  return tex;
-}
-
 // Renders a beveled, glossy solid-color tile on every cube face, with the
 // mode LABEL on all six faces so the words wrap the whole cube. Fully opaque,
 // depth-writing tiles occlude the faces behind them, so only the words on
@@ -875,48 +827,34 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
   // could disagree, and a frame with the plates up but the cube still in its
   // free-spin pose is the glitch — labels sliced by neighbouring plates on a
   // cube drifting off centre.
-  const bevelTex = useMemo(() => makeBevelTexture(), []);
-  const glossTex = useMemo(() => makeGlossTexture(), []);
   return (
     <group ref={rootRef} visible={false}>
       {CAROUSEL_MODES.map((m) => {
         const cfg = MODE_FACE_CFG[m.face];
         return (
           <group key={m.id} position={cfg.pos} rotation={cfg.rot}>
-            {/* Dark bevel frame */}
-            <mesh renderOrder={30}>
-              <planeGeometry args={[3.12, 3.12]} />
-              <meshBasicMaterial color="#070a18" />
+            {/* Graphite chassis, a fine metal reveal, and a beveled enamel insert. */}
+            <mesh position={[0, 0, -0.045]} renderOrder={30}>
+              <boxGeometry args={[3.12, 3.12, 0.07]} />
+              <meshPhysicalMaterial color="#172030" metalness={0.65} roughness={0.32} clearcoat={0.45} envMapIntensity={0.35} />
             </mesh>
-            {/* Mode color plate — plain Rubik’s-style sticker */}
-            <mesh position={[0, 0, 0.01]} renderOrder={31}>
-              <planeGeometry args={[2.94, 2.94]} />
-              <meshBasicMaterial color={m.tileColor} />
+            <mesh geometry={carouselPlateGeometry} scale={[1.025, 1.025, 1]} position={[0, 0, -0.008]} renderOrder={30}>
+              <meshPhysicalMaterial color="#667389" metalness={0.8} roughness={0.26} envMapIntensity={0.45} />
             </mesh>
-            {/* Bevel: top-left highlight / bottom-right shadow around the inset tile */}
-            {bevelTex && (
-              <mesh position={[0, 0, 0.018]} renderOrder={32}>
-                <planeGeometry args={[2.94, 2.94]} />
-                <meshBasicMaterial map={bevelTex} transparent depthWrite={false} toneMapped={false} />
-              </mesh>
-            )}
-            {/* Gloss: soft sheen highlight across the upper face */}
-            {glossTex && (
-              <mesh position={[0, 0, 0.022]} renderOrder={33}>
-                <planeGeometry args={[2.94, 2.94]} />
-                <meshBasicMaterial map={glossTex} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-              </mesh>
-            )}
+            <mesh geometry={carouselPlateGeometry} renderOrder={31}>
+              <meshPhysicalMaterial color={m.tileColor} metalness={0.08} roughness={0.3}
+                clearcoat={1} clearcoatRoughness={0.2} envMapIntensity={0.3} />
+            </mesh>
             {/* Label on every face — the mode words wrap the whole cube */}
             <Text
               position={[0, 0, 0.03]}
               font={bungeeWoffUrl}
               fontSize={m.label.length > 5 ? 0.58 : 0.74}
-              color="#ffffff"
+              color={m.textColor}
               anchorX="center"
               anchorY="middle"
-              outlineWidth={0.04}
-              outlineColor="#141631"
+              outlineWidth={0.012}
+              outlineColor={m.textColor === '#fffdf2' ? '#162035' : '#f4f1e8'}
               renderOrder={34}
             >
               {m.label}

@@ -208,10 +208,10 @@ function MenuScene({ onCubeClick, background }) {
           warm field-guide controls stay readable regardless of the setting.
           SafeEnvironment keeps the solid backdrop if the HDRI cannot load. */}
       <color attach="background" args={['#38513d']} />
-      <ambientLight intensity={1.7} color="#e8e3c5" />
-      <pointLight position={[8, 8, 10]} intensity={4.0} color="#f0d89b" />
-      <pointLight position={[-9, -5, 7]} intensity={1.9} color="#78956b" />
-      <pointLight position={[0, -6, -8]} intensity={1.0} color="#456556" />
+      <ambientLight intensity={0.75} color="#ffffff" />
+      <directionalLight position={[4, 6, 8]} intensity={2.1} color="#fff8f0" />
+      <directionalLight position={[-5, 1, 4]} intensity={0.75} color="#d6e6ff" />
+      <directionalLight position={[2, 4, -6]} intensity={1.3} color="#e6edff" />
       <Suspense fallback={null}>
         <InteractivePhotoBackground
           files={getBackgroundUrl(background.file)}
@@ -228,12 +228,7 @@ function MenuScene({ onCubeClick, background }) {
       </Suspense>
       {!isMobile && (
         <EffectComposer>
-          {/* The menu is lit hot — ambient 1.7 plus three point lights over a
-              bright photo panorama — so a 0.86 threshold put roughly 7% of the
-              frame into the bloom pass and the whole scene glowed. Raised so
-              only real highlights (the cube's gloss, the sun in the backdrop)
-              bloom, and the intensity trimmed to match. */}
-          <Bloom intensity={0.07} luminanceThreshold={0.93} luminanceSmoothing={0.9} mipmapBlur />
+          {/* Enamel highlights stay crisp; menu glow comes only from local effects. */}
           <Vignette offset={0.46} darkness={0.23} />
         </EffectComposer>
       )}
