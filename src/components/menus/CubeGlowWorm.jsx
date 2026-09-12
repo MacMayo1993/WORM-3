@@ -1,4 +1,4 @@
-import { finishWormEyes, wormBodyTaper } from '../../worm/wormCharacterFinish.js';
+import { finishWormEyes } from '../../worm/wormCharacterFinish.js';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -23,10 +23,21 @@ function GlowWorm({ distance, antipodal = false }) {
     applyBioluminescence(material, skin.glow, true);
     material.emissiveIntensity = 0.32;
     material.userData.pulse = { base: 0.32, amp: 0.12, speed: 2.4 };
-    const beads = [], halos = [];
+    const ringGeometry = new THREE.TorusGeometry(1, 0.055, 6, 20);
+    const ringMaterial = createWormSkinMaterial({ color: new THREE.Color(skin.body).multiplyScalar(0.65), emissive: skin.body, emissiveIntensity: 0.1, roughness: 0.6 });
+    const collarMaterial = createWormSkinMaterial({ color: new THREE.Color(skin.body).lerp(new THREE.Color('#ffe4cf'), 0.35), emissive: skin.body, emissiveIntensity: 0.12, roughness: 0.45 });
+    const beads = [], halos = [], rings = [];
     for (let i = 0; i < 9; i++) {
       const bead = new THREE.Mesh(geometry, material);
-      bead.scale.setScalar((i === 0 ? 0.14 : 0.12) * wormBodyTaper(i, 9, 'glow'));
+      const radius = i === 0 ? 0.17 : i === 8 ? 0.13 : 0.15;
+      bead.userData.radius = radius;
+      bead.scale.setScalar(radius);
+      // Fine annuli and a broad clitellum give the body an earthworm silhouette.
+      if (i > 0) {
+        const ring = new THREE.Mesh(ringGeometry, i === 3 ? collarMaterial : ringMaterial);
+        group.add(ring); rings[i] = ring;
+      }
+      if (i === 3) bead.material = collarMaterial;
       const halo = makeWormHaloSprite();
       halo.visible = true;
       halo.material.color.set(skin.glow);
@@ -42,20 +53,34 @@ function GlowWorm({ distance, antipodal = false }) {
     const mouthGeo = new THREE.TorusGeometry(1, FACE_LAYOUT.mouthTube / FACE_LAYOUT.mouthRadius, 8, 22, MOUTH_ARC);
     const mouth = new THREE.Mesh(mouthGeo, black);
     group.add(...eyes, ...pupils, mouth);
-    return { group, beads, halos, material, face: { eyes, pupils, mouth, glasses: [null, null], hat: null },
-      position: new THREE.Vector3(), normal: new THREE.Vector3(), forward: new THREE.Vector3(),
-      dispose() { disposeEyes(); geometry.dispose(); material.dispose(); white.dispose(); black.dispose(); mouthGeo.dispose(); halos.forEach(h => h.material.dispose()); } };
+    return { group, beads, halos, rings, material, face: { eyes, pupils, mouth, glasses: [null, null], hat: null },
+      position: new THREE.Vector3(), normal: new THREE.Vector3(), forward: new THREE.Vector3(), axis: new THREE.Vector3(0, 0, 1),
+      dispose() { disposeEyes(); geometry.dispose(); ringGeometry.dispose(); ringMaterial.dispose(); collarMaterial.dispose(); material.dispose(); white.dispose(); black.dispose(); mouthGeo.dispose(); halos.forEach(h => h.material.dispose()); } };
   }, [antipodal]);
   useEffect(() => () => model.dispose(), [model]);
   useFrame(() => {
     model.group.visible = isCarouselActive();
     if (!model.group.visible) return;
-    updateWormSkinMaterialTime(model.material, distance.current / CAROUSEL_WORM_SPEED);
+    const time = distance.current / CAROUSEL_WORM_SPEED;
+    updateWormSkinMaterialTime(model.material, time);
     model.beads.forEach((bead, i) => {
-      sampleWigglingCubeWorm(distance.current - i * 0.18, i, distance.current / CAROUSEL_WORM_SPEED, model.position, model.normal, model.forward, antipodal);
+      // Compression travels down the body; spacing stays positive and beads overlap.
+      const contraction = Math.sin(time * 6 - i * 0.7);
+      const lag = i * 0.14 + 0.045 * (contraction - Math.sin(time * 6));
+      sampleWigglingCubeWorm(distance.current - lag, i, time, model.position, model.normal, model.forward, antipodal);
       bead.position.copy(model.position);
+      bead.quaternion.setFromUnitVectors(model.axis, model.forward);
+      const radius = bead.userData.radius;
+      const bulge = i === 0 ? 1 : 1 + 0.07 * contraction;
+      bead.scale.set(radius * bulge, radius * bulge, radius * (i === 0 ? 1 : 0.88 / bulge));
+      if (model.rings[i]) {
+        const ring = model.rings[i];
+        ring.position.copy(model.position);
+        ring.quaternion.copy(bead.quaternion);
+        ring.scale.setScalar(radius * bulge);
+      }
       model.halos[i].position.copy(model.position);
-      if (i === 0) layoutWormFace(model.position, model.forward, model.normal, 0.14, model.face);
+      if (i === 0) layoutWormFace(model.position, model.forward, model.normal, 0.17, model.face);
     });
   });
   return <primitive object={model.group} dispose={null} />;

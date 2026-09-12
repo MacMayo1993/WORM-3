@@ -53,7 +53,7 @@ const wiggleSide = new Vector3();
 export function sampleWigglingCubeWorm(distance, segment, time, position, normal, forward, antipodal = false) {
   sampleCubeWorm(distance, position, normal, forward);
   wiggleSide.crossVectors(normal, forward).normalize();
-  const amplitude = 0.035 + 0.18 * Math.sin(Math.min(1, segment / 8) * Math.PI * 0.8);
+  const amplitude = 0.018 + 0.05 * Math.sin(Math.min(1, segment / 8) * Math.PI * 0.8);
   position.addScaledVector(wiggleSide, Math.sin(segment * 0.85 - time * 7) * amplitude);
   const x = clamp(position.x), y = clamp(position.y), z = clamp(position.z);
   normal.set(position.x - x, position.y - y, position.z - z).normalize();
