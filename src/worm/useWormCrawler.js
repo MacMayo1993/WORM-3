@@ -417,26 +417,17 @@ export function useWormCrawler(size, cubies) {
         useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null });
     }, []);
 
-    // Track the last pending rotation so we can apply it to the sim when the
-    // animation commits (rotationEpoch increments).
-    const lastPendingMoveRef = useRef(null);
-    useEffect(() => {
-        const unsub = useGameStore.subscribe(
-            s => s.animState,
-            animState => { if (animState) lastPendingMoveRef.current = animState; }
-        );
-        return unsub;
-    }, []);
-
     // When a cube rotation commits, transform the whole sim (worm, powerups, trails,
     // step-history bake, in-flight tunnel) so everything follows its tile.
     useEffect(() => {
+        let lastCommittedRotation = useGameStore.getState().lastRotation;
         const unsub = useGameStore.subscribe(
             s => s.rotationEpoch,
             () => {
-                const rot = lastPendingMoveRef.current;
-                if (!rot) return;
                 const st = useGameStore.getState();
+                const rot = st.lastRotation;
+                if (!rot || rot === lastCommittedRotation) return;
+                lastCommittedRotation = rot;
                 // Keep coordinate readers synchronous with the committed cubies.
                 // applyRotationToSim may immediately re-check a rest-read ring; waiting
                 // for the React effect below would expose the pre-commit tunnel mouths.

@@ -166,3 +166,17 @@ export const resetLiveRotation = () => {
   liveRotation.sliceIndex = 0;
   liveRotation.angle = 0;
 };
+
+/** Gate frame writers against the synchronous store, never a stale React turn. */
+export function syncRotationFrame(authoritativeAnim, initializedAnim) {
+  if (!authoritativeAnim) {
+    liveRotation.active = false;
+    return false;
+  }
+  if (authoritativeAnim !== initializedAnim) {
+    const layers = authoritativeAnim.sliceIndices?.length ? authoritativeAnim.sliceIndices : [authoritativeAnim.sliceIndex];
+    setLiveRotation(authoritativeAnim.axis, layers, layers.map(() => 0), authoritativeAnim.sliceIndex, 0);
+    return false;
+  }
+  return true;
+}

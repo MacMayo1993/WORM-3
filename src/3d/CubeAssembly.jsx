@@ -19,7 +19,7 @@ import CameraFlipKick from './CameraFlipKick.jsx';
 import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
+import { liveRotation, setLiveRotation, resetLiveRotation, syncRotationFrame } from '../worm/liveRotation.js';
 // Scratch layer/angle lists handed to setLiveRotation every frame — it copies out
 // of them, so they are reused rather than reallocated per frame.
 const _liveLayers = [];
@@ -135,6 +135,7 @@ const CubeAssembly = React.memo(({
   const controlsEnabledRef = useRef(true); // Track controls state with ref for immediate updates
   const cubeGroupRef = useRef(null);
   const gsapAnimRef = useRef(null);
+  const initializedMoveRef = useRef(null);
   const animProgressRef = useRef({ value: 0 });
   const { camera, gl } = useThree();
   const [dragStart, setDragStart] = useState(null);
@@ -745,6 +746,8 @@ const CubeAssembly = React.memo(({
 
   // Start GSAP animation when animState changes
   useEffect(() => {
+    initializedMoveRef.current = null;
+    if (useGameStore.getState().animState !== animState) return;
     if (!animState) {
       // Reset progress refs when animation ends
       animProgressRef.current.value = 0;
@@ -774,6 +777,8 @@ const CubeAssembly = React.memo(({
     animProgressRef.current.value = 0;
     prevProgressRef.current = 0;
 
+    initializedMoveRef.current = animState;
+
     // Use GSAP to animate the progress value with snappy easing
     // Hands mode and shuffle moves use faster, crisper animations
     const isHands = handsModeRef.current;
@@ -793,10 +798,15 @@ const CubeAssembly = React.memo(({
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
       value: 1,
       duration: isWormHazard ? baseDuration * 4.0 : baseDuration,
-      ease: isFast ? "power2.out" : "back.out(1.4)",
+      ease: isWormHazard ? "power2.inOut" : isFast ? "power2.out" : "back.out(1.4)",
       onComplete: () => {
+        if (useGameStore.getState().animState !== animState) return;
         gsapAnimRef.current = null;
         sliceIndicesRef.current = null;
+        const layers = animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex];
+        const dirs = animState.sliceDirs?.length ? animState.sliceDirs : layers.map(() => animState.dir);
+        const finalAngle = Math.PI / 2 * (animState.numTurns ?? 1);
+        setLiveRotation(animState.axis, layers, dirs.map(d => d * finalAngle), animState.sliceIndex, animState.dir * finalAngle);
         resetLiveRotation();
         vibrate(isFast ? 8 : 14);
         onAnimCompleteRef.current();
@@ -823,12 +833,14 @@ const CubeAssembly = React.memo(({
   // matrixWorld, producing a one-frame flash of new colours at wrong positions.
 
   useFrame(() => {
+    // Store commits are synchronous; React props may still describe the old turn.
+    const committed = useGameStore.getState();
     const wasAnimating = prevAnimStateRef.current !== null;
-    const nowAnimating = animStateRef.current !== null;
-    const epochChanged = rotationEpoch !== prevRotationEpochRef.current;
+    const nowAnimating = committed.animState !== null;
+    const epochChanged = committed.rotationEpoch !== prevRotationEpochRef.current;
 
-    prevAnimStateRef.current = animStateRef.current;
-    prevRotationEpochRef.current = rotationEpoch;
+    prevAnimStateRef.current = committed.animState;
+    prevRotationEpochRef.current = committed.rotationEpoch;
 
     // Snap if we just finished an animation OR if the logical state jumped (drag snap)
     if ((wasAnimating && !nowAnimating) || epochChanged) {
@@ -943,7 +955,7 @@ const CubeAssembly = React.memo(({
     }
 
     // Handle GSAP snap animation (completing rotation after release)
-    if (!animState) { liveRotation.active = false; return; }
+    if (!syncRotationFrame(useGameStore.getState().animState, initializedMoveRef.current)) return;
 
     const { axis, dir, sliceIndex } = animState;
     const worldAxis = axis === 'col' ? _axisCol : axis === 'row' ? _axisRow : _axisDepth;

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 // can ride a mid-rotation slice (and bake the turn at commit) without snapping.
 export function makeStepHistory(capacity) {
     return {
-        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3(), tx: -1, ty: -1, tz: -1, transit: false })),
+        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3(), tx: -1, ty: -1, tz: -1, restTxn: 0, restTx: -1, restTy: -1, restTz: -1, transit: false })),
         distance: 0, // monotonic length of the recorded route, including tunnel travel
         head: 0,   // next write slot; newest entry is at (head-1+capacity)%capacity
         count: 0,
@@ -23,8 +23,21 @@ export function shPush(sh, pos, normal, tx, ty, tz, transit = false) {
     slot.ty = ty;
     slot.tz = tz;
     slot.transit = transit;
+    slot.restTxn = 0;
     sh.head = (sh.head + 1) % sh.capacity;
     if (sh.count < sh.capacity) sh.count++;
+}
+// Crossing samples skip only the transaction they were recorded under.
+export function shMarkRestRead(slot, txnId) {
+    if (slot.tx < 0) return;
+    slot.restTxn = txnId;
+    slot.restTx = slot.tx; slot.restTy = slot.ty; slot.restTz = slot.tz;
+    slot.tx = slot.ty = slot.tz = -1;
+}
+export function shReleaseRestRead(slot) {
+    if (!slot.restTxn) return;
+    slot.tx = slot.restTx; slot.ty = slot.restTy; slot.tz = slot.restTz;
+    slot.restTxn = 0;
 }
 // i=0 → newest, i=count-1 → oldest
 export function shAt(sh, i) {

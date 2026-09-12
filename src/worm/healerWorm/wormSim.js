@@ -49,7 +49,7 @@ import { liveRotation } from '../liveRotation.js';
 import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
 import { remapWormPress } from '../tilePressBridge.js';
 import {
-    makeStepHistory, shPush, shAt, shReset,
+    makeStepHistory, shPush, shAt, shReset, shMarkRestRead, shReleaseRestRead,
     makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace,
 } from '../circularBuffers.js';
 import { isSurfaceTilePos, randomFreeTile, randomUnflippedTile } from './surfaceTiles.js';
@@ -1112,6 +1112,8 @@ const PHASE_HANDLERS = {
             // land, rather than attaching the head to the outgoing cubie and teleporting
             // there. The step-boundary check below remains necessary for turns already
             // active when a new traversal begins.
+            // Release cancelled-turn provenance before this turn can reuse a tile key.
+            if (liveRotation.active) dropStaleRestReadTiles(sim, liveRotation.txnId);
             const previousRestRead = sim.restRead;
             sim.restRead = nextRestReadDuringStep(
                 previousRestRead, liveRotation, sim.interpT, sim.prevTile, sim.pos
@@ -1131,7 +1133,7 @@ const PHASE_HANDLERS = {
                     const sample = shAt(sim.stepHistory, i);
                     if (sample.tx >= 0 &&
                         restReadProtectsTile(sim.restRead, sample.tx, sample.ty, sample.tz)) {
-                        sample.tx = sample.ty = sample.tz = -1;
+                        shMarkRestRead(sample, sim.restRead.txnId);
                     }
                 }
             }
@@ -1140,7 +1142,6 @@ const PHASE_HANDLERS = {
             // laid down in destination space are still waiting for the commit. They are
             // released by the commit itself, or dropped here once a DIFFERENT rotation
             // starts — at which point they can no longer belong to anything pending.
-            if (liveRotation.active) dropStaleRestReadTiles(sim, liveRotation.txnId);
 
             // Apply pending turn — RELATIVE to current heading
             if (sim.pendingTurns.length > 0) {
@@ -1326,7 +1327,8 @@ const PHASE_HANDLERS = {
                 // ride/bake, which would otherwise swing them along with the outgoing slice.
                 const _rrs = sim.restRead;
                 if (_rrs && restReadProtectsTile(_rrs, _htx, _hty, _htz)) {
-                    shPush(sim.stepHistory, _evalLiftedPos, ptNorm, -1, -1, -1);
+                    shPush(sim.stepHistory, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
+                    shMarkRestRead(shAt(sim.stepHistory, 0), _rrs.txnId);
                 } else {
                     shPush(sim.stepHistory, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
                 }
@@ -1909,8 +1911,15 @@ function markRestReadTile(sim, key, restRead, x, y, z) {
 function dropStaleRestReadTiles(sim, txnId) {
     const tiles = sim.restReadTiles;
     if (tiles.size === 0) return;
+    let stale = false;
     for (const [key, prov] of tiles) {
-        if (prov.txnId !== txnId) tiles.delete(key);
+        if (prov.txnId !== txnId) { tiles.delete(key); stale = true; }
+    }
+    if (stale) {
+        for (let i = 0; i < sim.stepHistory.count; i++) {
+            const sample = shAt(sim.stepHistory, i);
+            if (sample.restTxn && sample.restTxn !== txnId) shReleaseRestRead(sample);
+        }
     }
 }
 
@@ -1933,6 +1942,7 @@ function dropStaleRestReadTiles(sim, txnId) {
  */
 export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, paused }) {
     const { axis, dir, sliceIndex } = rot;
+    const numTurns = rot.numTurns ?? 1;
     // Every plane this move turned, each with its own direction. A hazard turn spins
     // two non-adjacent planes in opposite directions; a plane's own dir is the only
     // correct one to remap its cells by.
@@ -1948,7 +1958,8 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     /** Rotate a tile by its own plane's direction. Returns the same object when off-plane. */
     const rotateByOwnLayer = (tile) => {
         for (let i = 0; i < layers.length; i++) {
-            const r = rotateTilePosition(tile, axis, layers[i], dirs[i], size);
+            let r = tile;
+            for (let turn = 0; turn < numTurns; turn++) r = rotateTilePosition(r, axis, layers[i], dirs[i], size);
             if (r !== tile) return r;
         }
         return tile;
@@ -2017,7 +2028,14 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     if (newPos !== oldPos && !inOpeningScramble) {
         // By the head's OWN plane's direction — the two planes of a hazard turn spin
         // opposite ways, and the shared anchor `dir` is the wrong one half the time.
-        sim.moveDir = rotateMoveDir(sim.moveDir, oldPos.dirKey, newPos.dirKey, axis, headLayerDir ?? dir);
+        let headingTile = oldPos;
+        for (let turn = 0; turn < numTurns; turn++) {
+            const nextTile = rotateTilePosition(headingTile, axis,
+                axis === 'col' ? oldPos.x : axis === 'row' ? oldPos.y : oldPos.z,
+                headLayerDir ?? dir, size);
+            sim.moveDir = rotateMoveDir(sim.moveDir, headingTile.dirKey, nextTile.dirKey, axis, headLayerDir ?? dir);
+            headingTile = nextTile;
+        }
     }
 
     // Keep the interpolation SOURCE glued to the surface: if the worm is mid-step and
@@ -2113,16 +2131,23 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
                 const slot = sh.buf[(sh.head - 1 - i + sh.capacity) % sh.capacity];
                 // tx < 0 is the sentinel for a sample recorded in destination space:
                 // it never rode, so it must not be baked either.
+                if (slot.restTxn) {
+                    const crossedThisTurn = slot.restTxn === liveRotation.completedTxnId;
+                    shReleaseRestRead(slot);
+                    if (crossedThisTurn) continue;
+                }
                 if (slot.tx < 0) continue;
                 const slotDir = dirForTile(slot.tx, slot.ty, slot.tz);
                 if (slotDir === null) continue;
-                const ang = slotDir * (Math.PI / 2);
+                const ang = slotDir * (Math.PI / 2) * numTurns;
                 slot.pos.applyAxisAngle(_bakeAxis, ang);
                 slot.normal.applyAxisAngle(_bakeAxis, ang).normalize();
-                const [rx, ry, rz] = rotateVec90(slot.tx - k, slot.ty - k, slot.tz - k, axis, slotDir);
-                slot.tx = Math.round(rx + k);
-                slot.ty = Math.round(ry + k);
-                slot.tz = Math.round(rz + k);
+                for (let turn = 0; turn < numTurns; turn++) {
+                    const [rx, ry, rz] = rotateVec90(slot.tx - k, slot.ty - k, slot.tz - k, axis, slotDir);
+                    slot.tx = Math.round(rx + k);
+                    slot.ty = Math.round(ry + k);
+                    slot.tz = Math.round(rz + k);
+                }
             }
         }
     }
