@@ -194,7 +194,10 @@ export function tileKeyCoordAt(key, idx) {
 // head, while still allowing the normal tail-cut behavior.
 export function checkWormHitBySlice(worm, axis, sliceIndex) {
     if (worm.rocketActive?.current) return null;
-    const head = worm.pos.current;
+    // pos is the traversal destination, chosen before the head reaches it.
+    // Damage must classify the occupied half of the step, not that future tile.
+    const previous = worm.prevTile?.current;
+    const head = previous && (worm.interpT?.current ?? 1) < 0.5 ? previous : worm.pos.current;
     const axisCoord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
     const coordIdx  = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
     const airborne = (worm.landingGraceT?.current ?? 0) > 0;
