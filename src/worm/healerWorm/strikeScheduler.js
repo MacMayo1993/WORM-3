@@ -23,8 +23,8 @@
 // tests and must not perturb replay or network determinism.
 
 /** Shortest and longest wait between strikes, in seconds. */
-export const STRIKE_MIN_GAP = 0.85;
-export const STRIKE_MAX_GAP = 2.3;
+export const STRIKE_MIN_GAP = 1.8;
+export const STRIKE_MAX_GAP = 3.2;
 /** Wait before re-checking when the schedule fires but nothing is strikeable. */
 export const STRIKE_RETRY_GAP = 0.25;
 
