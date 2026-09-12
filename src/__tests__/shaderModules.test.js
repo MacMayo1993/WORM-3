@@ -8,6 +8,7 @@ import { newStyleShaders } from '../3d/styles/shaders/newStyleShaders.js';
 import { livingShaders } from '../3d/styles/shaders/livingShaders.js';
 import { nonEuclideanShaders } from '../3d/styles/shaders/nonEuclideanShaders.js';
 import { impossibleShaders } from '../3d/styles/shaders/impossibleShaders.js';
+import { livingIllusionShaders } from '../3d/styles/shaders/livingIllusionShaders.js';
 import { surrealShaders } from '../3d/styles/shaders/surrealShaders.js';
 import { isAnimatedStyle, ANTIPODAL_STYLES } from '../3d/styles/TileStyleMaterials.jsx';
 import { isAnimatedPreviewStyle } from '../3d/TilePreviewRenderer.js';
@@ -27,6 +28,7 @@ const modules = [
   ['nonEuclideanShaders', nonEuclideanShaders],
   ['impossibleShaders', impossibleShaders],
   ['surrealShaders', surrealShaders],
+  ['livingIllusionShaders', livingIllusionShaders],
 ];
 
 const allShaders = Object.assign({}, ...modules.map(([, mod]) => mod));

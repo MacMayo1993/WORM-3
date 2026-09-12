@@ -12,6 +12,7 @@ import { newStyleShaders } from './shaders/newStyleShaders.js';
 import { livingShaders } from './shaders/livingShaders.js';
 import { nonEuclideanShaders } from './shaders/nonEuclideanShaders.js';
 import { impossibleShaders } from './shaders/impossibleShaders.js';
+import { livingIllusionShaders } from './shaders/livingIllusionShaders.js';
 import { surrealShaders } from './shaders/surrealShaders.js';
 
 // Shared time uniform updated by useFrame in parent
@@ -141,12 +142,13 @@ const fragmentShaders = {
   ...nonEuclideanShaders,
   ...impossibleShaders,
   ...surrealShaders,
+  ...livingIllusionShaders,
 };
 
 // Dev-time guard: silent key collisions from spread merges are very hard to debug.
 // This throws immediately at module load so the problem is impossible to miss.
 if (import.meta.env.DEV) {
-  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders, nonEuclideanShaders, impossibleShaders, surrealShaders];
+  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders, nonEuclideanShaders, impossibleShaders, surrealShaders, livingIllusionShaders];
   const _seen = new Map();
   for (const mod of _shaderModules) {
     for (const key of Object.keys(mod)) {
@@ -219,6 +221,7 @@ export function getVolumeResource(key, create) {
 // uniform, i.e. BLACK, with no warning from anywhere — exported so a test can
 // hold the two in sync.
 export const ANTIPODAL_STYLES = new Set([
+  'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
   'polkaDots', 'zigzag', 'checkerboard', 'diagStripes',
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
@@ -343,6 +346,7 @@ export function clearMaterialCache() {
 // Module-level Set: O(1) lookup instead of allocating an array + O(N) includes
 // every time isAnimatedStyle is called (which happens per sticker per render).
 const ANIMATED_STYLES = new Set([
+  'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
   'holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural',
   'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave',
   'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
