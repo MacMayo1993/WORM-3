@@ -1,3 +1,5 @@
+import { isHotTile } from './healerWorm/elementalGameplay.js';
+import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
 // src/worm/HealerWormMode.jsx
 // WORM Chase-Cam Mode — top-level wrapper and game-phase driver.
 // Chase camera follows the worm crawling on the cube exterior.
@@ -400,7 +402,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                         feel('heal');
                         continue;
                     }
-                    bomb.fuse -= bdelta;
+                    bomb.fuse -= bdelta * (isHotTile(worm.elementalPatches.current, bomb.tile) ? 3 : 1);
                     if (bomb.fuse > 0) { bombs[kept++] = bomb; continue; }
 
                     // Detonate: shoot fire out along the arms, then resolve the hit.
@@ -421,6 +423,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     blastApiRef.current?.spawn(flames);
                     feel('cut');
 
+                    // The hot route is a firebreak, not blanket blast immunity.
+                    for (const key of keys) {
+                        if (isHotTile(worm.elementalPatches.current, key)) keys.delete(key);
+                    }
                     const hit = checkBlastHitWorm(worm, keys);
                     if (hit) {
                         const histEntry = hit.type === 'cut'
@@ -586,6 +592,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}
             <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
+            {wormAlive && <ElementalPatches worm={worm} size={size} />}
             {wormAlive && <WormBody worm={worm} size={size} />}
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}

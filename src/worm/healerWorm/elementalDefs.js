@@ -36,7 +36,7 @@ export const ELEMENTAL_DEFS = {
     // A teardrop.
     iconPath: 'M12 2.2c3.6 4.7 6.2 8.3 6.2 11.6a6.2 6.2 0 0 1-12.4 0c0-3.3 2.6-6.9 6.2-11.6z',
     iconAccent: 'M9.2 12.6a2 2 0 1 1 0 4 2 2 0 0 1 0-4z',
-    description: 'Floods the whole cube with water — a blue tide and rising bubbles wash over every face.',
+    description: 'Build up to 25% extra speed on straight routes; turning sheds momentum.',
   },
   fire: {
     label: 'FIRE',
@@ -53,7 +53,7 @@ export const ELEMENTAL_DEFS = {
     // A flame.
     iconPath: 'M13.5 1.8c.6 3-1.2 4.6-2.8 6.4-1.6 1.8-3.2 3.7-3.2 6.6a6.5 6.5 0 0 0 13 0c0-2-.9-3.6-2-5 .1 1.6-.6 2.6-1.6 3-.1-2.6-1.4-4.6-3.4-6.4 1-1.6 1.2-3 0-4.6z',
     iconAccent: 'M12 12.4c1.4 1 2.1 2.2 2.1 3.5a2.1 2.1 0 0 1-4.2 0c0-1.3.7-2.5 2.1-3.5z',
-    description: 'Sets the whole cube alight — flames lick up off every face and embers rise off the board.',
+    description: 'Leave three-second fire trails: hot tiles burn bomb fuses faster and block blast damage.',
   },
   grass: {
     label: 'NATURE',
@@ -67,7 +67,7 @@ export const ELEMENTAL_DEFS = {
     // A sprouting leaf pair.
     iconPath: 'M12 22V9m0 0C11 5 8 3 3 3c0 5 2 8 6 9m2 0c1-4 4-6 9-6 0 5-2 8-6 9z',
     iconAccent: '',
-    description: 'Overgrows the whole cube — a verdant haze and drifting spores settle across every face.',
+    description: 'Land to grow an eight-second spring pad. Jump from it for a longer, higher leap.',
   },
   ice: {
     label: 'ICE',
@@ -81,7 +81,7 @@ export const ELEMENTAL_DEFS = {
     // A six-point snowflake.
     iconPath: 'M12 1.5v21M3.2 6.6l17.6 10.2M20.8 6.6L3.2 16.8M12 5.2l2.6-2.6M12 5.2 9.4 2.6M12 18.8l2.6 2.6M12 18.8l-2.6 2.6',
     iconAccent: '',
-    description: 'Freezes the whole cube — a pale frost and falling flakes drift across every face.',
+    description: 'Slide to the next tile before turning. Jump to regain immediate steering.',
   },
   lightning: {
     label: 'LIGHTNING',

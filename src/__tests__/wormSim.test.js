@@ -816,3 +816,43 @@ it('predicts a landing across an edge using transported steering', () => {
   expect(tile.z).toBeLessThan(2);
   expect(jumpLandingTile(start, 'up', SIZE, 0.2, 0.95, 1)).toBe(start);
 });
+
+
+describe('elemental movement integration', () => {
+  it('water accelerates while keeping tile interpolation and step time aligned', () => {
+    const sim = makeSim();
+    run(sim, makeCtx(), 1.2, 0.01);
+    sim.elementalType = 'water';
+    sim.elementalT = 10;
+    run(sim, makeCtx(), 0.5, 0.01);
+    expect(sim.prevStepSec).toBeLessThan(1);
+    expect(sim.prevStepSec).toBeGreaterThanOrEqual(0.8);
+    expect(sim.interpT).toBeCloseTo(sim.stepAcc / sim.prevStepSec, 2);
+  });
+  it('ice keeps a turn queued and releases it at the tile boundary', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    run(sim, ctx, 1.3);
+    sim.elementalType = 'ice';
+    sim.elementalT = 10;
+    const before = sim.moveDir;
+    queueTurn(sim, 'turnRight');
+    run(sim, ctx, 0.05);
+    expect(sim.moveDir).toBe(before);
+    expect(sim.pendingTurns).toContain('turnRight');
+    run(sim, ctx, 0.8);
+    expect(sim.pendingTurns).not.toContain('turnRight');
+  });
+  it('a Nature landing creates a spring and fire movement leaves a hot route', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.elementalType = 'grass';
+    sim.elementalT = 10;
+    queueTurn(sim, 'jump');
+    run(sim, ctx, 1.1);
+    expect([...sim.elementalPatches.values()].some(p => p.type === 'grass')).toBe(true);
+    sim.elementalType = 'fire';
+    run(sim, ctx, 2);
+    expect([...sim.elementalPatches.values()].some(p => p.type === 'fire')).toBe(true);
+  });
+});
