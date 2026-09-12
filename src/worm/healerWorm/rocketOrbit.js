@@ -18,7 +18,7 @@
 // rounded cube: perpendicular over a face, along the bisector over an edge, along
 // the diagonal at a corner. That surface is the cube grown by the flight height in
 // every direction — the Minkowski sum of the cube and a ball — so the path is a
-// smooth orbit at constant altitude that rounds every edge instead of cutting it.
+// smooth orbit at the current arc altitude that rounds every edge instead of cutting it.
 //
 // The clearance check at the end is the guarantee: whatever the input, the result
 // sits outside the cube's own box by at least ROCKET_ORBIT_CLEARANCE × t. Nothing
@@ -36,9 +36,8 @@ export const ROCKET_ORBIT_CLEARANCE = 0.55;
 const _dir = new THREE.Vector3();
 
 /**
- * Flight ramp, 0..1: rises over the takeoff, holds through the cruise, settles
- * over the landing. This is the shape `rocketFlightLift` has always had; it is
- * pulled out so height and orbit share one clock.
+ * Flight arc, 0..1: rises to a single apex and then descends. Height and
+ * orbit share the simulation phase, including during a fuel refresh.
  */
 export function rocketOrbitT(active, rocketT, flightPhase) {
   return rocketFlightLift(active, rocketT, flightPhase) / ROCKET_FLIGHT_HEIGHT;
@@ -78,7 +77,7 @@ export function cubeShellDirInto(out, pos, size) {
  * @param {THREE.Vector3} out  position to raise (safe to pass the same vector in)
  * @param {number} size        cube size
  * @param {number} t           0..1 flight ramp, from rocketOrbitT
- * @param {number} [height]    cruise altitude at t = 1
+ * @param {number} [height]    apex altitude at t = 1
  */
 export function rocketOrbitInto(out, size, t, height = ROCKET_FLIGHT_HEIGHT) {
   if (!(t > 0)) return out;

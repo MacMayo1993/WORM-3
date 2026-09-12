@@ -15,7 +15,7 @@ vi.mock('../components/screens/WizardChrome.jsx', async importOriginal => ({
 import WormModeSetupWizard from '../components/screens/WormModeSetupWizard.jsx';
 
 it.each([
-  ['Easy', 2, 30, 20], ['Medium', 2.75, 16, 10], ['Hard', 3.5, 6, 5],
+  ['Easy', 2, 45, 20], ['Medium', 2.75, 40, 10], ['Hard', 3.5, 36, 5],
 ])('starts %s with the selected size and complete difficulty settings', (label, speed, orbs, interval) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement('div'); document.body.appendChild(host);
