@@ -7,21 +7,20 @@ describe('menu surface and antipodal tunnel trail', () => {
   for (const axis of [[1.501, 0, 0], [0, 1.501, 0], [0, 0, 1.501]]) {
     it(`crawls on both faces and crosses the center for ${axis}`, () => {
       const path = makeMenuTunnelWormPath(axis, 0.73);
-      let source = 0, exit = 0, core = false;
-      const h = 1.501 + MENU_WORM_RADIUS * 0.86;
-      path.points.forEach(point => {
-        const axial = point.dot(path.normal);
-        const lateral = point.clone().addScaledVector(path.normal, -axial).length();
-        expect(Math.abs(axial)).toBeLessThanOrEqual(h + 1e-9);
-        expect(lateral).toBeLessThan(1.3);
-        if (Math.abs(axial - h) < 1e-8) source++;
-        if (Math.abs(axial + h) < 1e-8) exit++;
-        if (point.length() < 0.01) core = true;
-        if (Math.abs(axial) < 1) expect(lateral).toBeLessThan(0.13);
-      });
-      expect(source).toBeGreaterThan(250);
-      expect(exit).toBeGreaterThan(250);
-      expect(core).toBe(true);
+      expect(path.portals.source.distanceTo(path.portals.entry)).toBeGreaterThan(2);
+      expect(path.portals.exit.distanceTo(path.portals.destination)).toBeGreaterThan(2);
+      expect(path.portals.entry.clone().add(path.portals.exit).length()).toBeLessThan(1e-8);
+      for (const portal of Object.values(path.portals)) {
+        expect(portal.toArray().filter(v => Math.abs(v) > 1e-8)).toHaveLength(1);
+        expect(portal.length()).toBeCloseTo(1.501);
+      }
+      for (const [from, to] of path.surfaceRanges) {
+        for (let i = from; i < to; i++) {
+          const clearance = Math.hypot(...path.points[i].toArray().map(v => Math.max(0, Math.abs(v) - 1.501)));
+          expect(clearance).toBeCloseTo(MENU_WORM_RADIUS * 0.86, 6);
+        }
+      }
+      expect(path.points.some(point => point.length() < 0.01)).toBe(true);
     });
   }
   it('keeps following beads on the same continuous arc-length trail after head exit', () => {
