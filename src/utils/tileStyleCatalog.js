@@ -1,3 +1,4 @@
+import { LIVING_SURFACE_KEYS } from './livingSurfaceCatalog.js';
 export const CLASSIC_STYLE_KEYS = [
   'solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic',
   'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid',
@@ -56,6 +57,7 @@ export const TILE_STYLE_SECTIONS = [
   { key: 'classic', label: 'Classic', keys: CLASSIC_STYLE_KEYS },
   { key: 'antipodal', label: 'Antipodal Op Art', keys: ANTIPODAL_STYLE_KEYS },
   { key: 'living', label: 'Living', keys: LIVING_STYLE_KEYS },
+  { key: 'livingSurfaces', label: 'Living Surfaces', keys: LIVING_SURFACE_KEYS },
   { key: 'nonEuclidean', label: 'Non-Euclidean', keys: NON_EUCLIDEAN_STYLE_KEYS },
   { key: 'impossible', label: 'Impossible', keys: IMPOSSIBLE_STYLE_KEYS },
   { key: 'surreal', label: 'Surreal', keys: SURREAL_STYLE_KEYS },

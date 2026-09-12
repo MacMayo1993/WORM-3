@@ -1,3 +1,5 @@
+import { livingSurfaceShaders } from '../3d/styles/shaders/livingSurfaceShaders.js';
+import { LIVING_SURFACE_KEYS } from '../utils/livingSurfaceCatalog.js';
 import { describe, it, expect } from 'vitest';
 import { basicShaders } from '../3d/styles/shaders/basicShaders.js';
 import { techShaders } from '../3d/styles/shaders/techShaders.js';
@@ -18,6 +20,7 @@ import { TILE_STYLES } from '../utils/colorSchemes.js';
 import { STORE_TILES } from '../utils/storeCatalog.js';
 
 const modules = [
+  ['livingSurfaceShaders', livingSurfaceShaders],
   ['basicShaders', basicShaders],
   ['techShaders', techShaders],
   ['natureShaders', natureShaders],
@@ -239,4 +242,16 @@ describe('impossible & surreal shaders', () => {
     const BACK = parseFloat(stair.match(/float BACK\s*=\s*([\d.]+)/)[1]);
     expect(OUT - BACK).toBeCloseTo(4 * H, 4);
   });
+});
+
+
+it('adds exactly twenty distinct full-tile living surfaces with animated previews', () => {
+  expect(Object.keys(livingSurfaceShaders).sort()).toEqual([...LIVING_SURFACE_KEYS].sort());
+  expect(LIVING_SURFACE_KEYS).toHaveLength(20);
+  expect(new Set(Object.values(livingSurfaceShaders)).size).toBe(20);
+  for (const key of LIVING_SURFACE_KEYS) {
+    expect(isAnimatedStyle(key)).toBe(true);
+    expect(isAnimatedPreviewStyle(key)).toBe(true);
+    expect(livingSurfaceShaders[key]).not.toContain('discard');
+  }
 });
