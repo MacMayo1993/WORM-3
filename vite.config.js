@@ -1,3 +1,4 @@
+import { compactShaderSources } from './scripts/compact-shader-sources.mjs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -17,6 +18,7 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    compactShaderSources(),
     react(),
     // Service worker precache: makes deploys atomic for clients. Hashed
     // app assets (JS/CSS/HTML/fonts/Mobi) are versioned and swapped as a

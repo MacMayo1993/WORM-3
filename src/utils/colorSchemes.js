@@ -1,3 +1,4 @@
+import { LIVING_SURFACE_STYLES } from './livingSurfaceCatalog.js';
 // Color scheme presets and settings utilities
 // Face antipodal pairs: 1↔4  |  2↔5  |  3↔6
 // High contrast within each pair is essential — the manifold flip reveals the opposite face
@@ -115,6 +116,7 @@ export const PALETTE_INFO = {
 // ── TILE STYLES ───────────────────────────────────────────────────────────────
 
 export const TILE_STYLES = {
+  ...LIVING_SURFACE_STYLES,
   solid:       { label: 'Solid',        cost: 'low', type: 'static' },
   glossy:      { label: 'Glossy',       cost: 'low', type: 'static' },
   matte:       { label: 'Matte',        cost: 'low', type: 'static' },

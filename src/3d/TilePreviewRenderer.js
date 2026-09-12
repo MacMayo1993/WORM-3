@@ -1,3 +1,4 @@
+import { LIVING_SURFACE_KEYS } from '../utils/livingSurfaceCatalog.js';
 // TilePreviewRenderer.js
 // Renders tile-style preview thumbnails using the shared R3F renderer so no
 // second WebGL context is ever created (which would crash on mobile).
@@ -15,6 +16,7 @@ const PREVIEW_SIZE = 64;
 
 // Styles that need continuous per-frame animation
 const ANIMATED_STYLE_SET = new Set([
+  ...LIVING_SURFACE_KEYS,
   'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
   'holographic', 'pulse', 'lava', 'galaxy', 'circuit',
   'grass', 'ice', 'sand', 'water', 'neural',
