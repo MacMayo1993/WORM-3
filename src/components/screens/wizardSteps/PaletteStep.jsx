@@ -5,13 +5,6 @@ import CubePlate from './CubePlate.jsx';
 import { WIZARD_SCHEME_KEYS, Checkmark, LockPip, sizeTier, bgOptionFor } from './shared.jsx';
 import './PaletteStep.css';
 
-// Choose ink for small swatch labels; the general cube ink helper favors
-// luminous lettering, which loses contrast on these mid-lightness samples.
-const swatchInk = hex => {
-  const rgb = [1, 3, 5].map(i => parseInt(String(hex).slice(i, i + 2), 16) / 255)
-    .map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-  return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722 > 0.18 ? '#090909' : '#ffffff';
-};
 const PAIRS = [[1, 4], [2, 5], [3, 6]];
 const FACE_NAMES = { 1: 'Front', 4: 'Back', 2: 'Left', 5: 'Right', 3: 'Top', 6: 'Bottom' };
 
@@ -42,11 +35,11 @@ export default function PaletteStep({ cos, slot }) {
     {slot !== 'hero' && <div className="palette-browser" style={{ '--palette-accent': accent }}>
       <div className="palette-intro">
         <strong>Six colors. Three opposite pairs.</strong>
-        <p>Each column shows the two faces that meet through a flip.</p>
+        <p>Explore the colors below. Paired faces meet through a flip.</p>
       </div>
       <div className="palette-current" aria-label="Current opposite face colors">
         {PAIRS.map(pair => <div className="palette-pair" key={pair[0]}>
-          {pair.map(id => <span key={id} style={{ background: colors[id], color: swatchInk(colors[id]) }}>{FACE_NAMES[id]}</span>)}
+          {pair.map(id => <span className="palette-face" key={id}><span className="palette-face-color" aria-hidden="true" style={{ background: colors[id] }} /><span className="palette-face-label">{FACE_NAMES[id]}</span></span>)}
         </div>)}
       </div>
       <div className="palette-filters" role="group" aria-label="Palette families">
@@ -64,15 +57,13 @@ export default function PaletteStep({ cos, slot }) {
           return <button type="button" key={key} className="palette-card" aria-pressed={selected}
             disabled={!available} aria-label={`${SCHEME_LABELS[key]}${available ? '' : ', available in the store'}`}
             onClick={() => select('colorScheme', key)}>
+            <span className="palette-card-colors" aria-hidden="true">
+              {[1, 2, 3, 4, 5, 6].map(id => <span key={id} style={{ background: COLOR_SCHEMES[key][id] }} />)}
+            </span>
             <span className="palette-card-heading"><strong>{SCHEME_LABELS[key]}</strong>
               {selected ? <Checkmark accent={accent} accentShadow={accentShadow} /> : !available ? <LockPip size={12} /> : null}
             </span>
             <span className="palette-card-description">{PALETTE_INFO[key]?.description}</span>
-            <span className="palette-card-colors" aria-hidden="true">
-              {PAIRS.map(pair => <span className="palette-pair" key={pair[0]}>{pair.map(id =>
-                <span key={id} style={{ background: COLOR_SCHEMES[key][id], color: swatchInk(COLOR_SCHEMES[key][id]) }}>{id}</span>
-              )}</span>)}
-            </span>
             <span className="palette-card-status">{selected ? 'Selected' : available ? PALETTE_INFO[key]?.group : 'In the store'}</span>
           </button>;
         })}
