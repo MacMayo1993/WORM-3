@@ -18,14 +18,15 @@ import {
 } from '../worm/healerWorm/wormSim.js';
 import {
   liveRotation,
+  syncRotationFrame,
   setLiveRotation,
   resetLiveRotation,
   liveLayerAngle,
   isTileInLiveRotation,
 } from '../worm/liveRotation.js';
 import { nextRestRead, nextRestReadDuringStep, restReadProtectsTile } from '../worm/wormLogic.js';
-import { resolveSliceHits, rideLiveRotation } from '../worm/wormHelpers.js';
-import { ttAt, ttPush, makeTileTrail } from '../worm/circularBuffers.js';
+import { resolveSliceHits, rideLiveRotation, rotateTilePosition } from '../worm/wormHelpers.js';
+import { ttAt, ttPush, makeTileTrail, shPush, shAt } from '../worm/circularBuffers.js';
 import { BODY_BALL_SPACING, BASE_TAIL_LENGTH } from '../worm/healerWorm/constants.js';
 
 const SIZE = 3;
@@ -564,3 +565,94 @@ describe('frozen corner tracking during a live rotation', () => {
     });
   }
 });
+
+it('restores crossed body samples after commit so the next rotation can carry them', () => {
+  const sim = makeSim(), ctx = makeCtx();
+  sim.pos = { x: 0, y: 2, z: 2, dirKey: 'PZ' };
+  sim.prevTile = { x: 0, y: 1, z: 2, dirKey: 'PZ' };
+  sim.prevWorldPos = new THREE.Vector3(-1, 0, 1.5);
+  sim.curWorldPos.set(-1, 1, 1.5);
+  sim.interpT = 0.8;
+  sim.stepAcc = 0.8;
+  sim.lastRecordedT = 0.6;
+  beginTurn('row', [2], [1]);
+  stepWormSim(sim, 0.01, SIZE, ctx);
+  const samples = sim.stepHistory.buf.filter(slot => slot.tx === -1 && slot.pos.lengthSq() > 0 && !slot.transit);
+  expect(samples.length).toBeGreaterThan(0);
+  const positions = samples.map(slot => slot.pos.clone());
+  resetLiveRotation();
+  applyRotationToSim(sim, SIZE, ctx, { axis: 'row', sliceIndex: 2, dir: 1 }, { inOpeningScramble: false, paused: false });
+  samples.forEach((slot, i) => {
+    expect(slot.tx).toBeGreaterThanOrEqual(0);
+    expect(slot.pos.distanceTo(positions[i])).toBeLessThan(1e-8);
+  });
+  beginTurn('row', [2], [1]);
+  resetLiveRotation();
+  applyRotationToSim(sim, SIZE, ctx, { axis: 'row', sliceIndex: 2, dir: 1 }, { inOpeningScramble: false, paused: false });
+  samples.forEach((slot, i) => expect(slot.pos.distanceTo(positions[i].applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2))).toBeLessThan(1e-8));
+});
+
+it('does not resurrect a committed turn while React still exposes its old animation', () => {
+  const old = { axis: 'row', sliceIndex: 2, dir: 1 };
+  beginTurn('row', [2], [1], 0.98);
+  const txn = liveRotation.txnId;
+  resetLiveRotation();
+  expect(syncRotationFrame(null, old)).toBe(false);
+  expect(liveRotation.active).toBe(false);
+  expect(liveRotation.completedTxnId).toBe(txn);
+  const next = { axis: 'row', sliceIndex: 2, dir: -1 };
+  expect(syncRotationFrame(next, old)).toBe(false);
+  expect(liveRotation.angle).toBe(0);
+  expect(liveRotation.txnId).toBe(txn + 1);
+  expect(syncRotationFrame(next, next)).toBe(true);
+});
+it('classifies a cut or kill by the occupied side of a crossing, not its future destination', () => {
+  const sim = makeSim();
+  sim.prevTile = { x: 0, y: 1, z: 2, dirKey: 'PZ' };
+  sim.pos = { x: 0, y: 2, z: 2, dirKey: 'PZ' };
+  sim.interpT = 0.1;
+  sim.tileTrail = makeTileTrail(10);
+  ttPush(sim.tileTrail, '0,2,2,PZ');
+  ttPush(sim.tileTrail, '0,1,2,PZ');
+  ttPush(sim.tileTrail, '0,2,2,PZ');
+  sim.tailLength = 30;
+  const worm = asWorm(sim);
+  expect(resolveSliceHits(worm, 'row', [2])).toMatchObject({ type: 'cut' });
+  sim.interpT = 0.9;
+  expect(resolveSliceHits(worm, 'row', [2])).toMatchObject({ type: 'death' });
+});
+
+it('transports an atomic half-turn by both quarter-turns', () => {
+  const sim = makeSim();
+  sim.pos = { x: 0, y: 2, z: 2, dirKey: 'PZ' };
+  const expected = rotateTilePosition(rotateTilePosition(sim.pos, 'row', 2, 1, SIZE), 'row', 2, 1, SIZE);
+  applyRotationToSim(sim, SIZE, makeCtx(), { axis: 'row', sliceIndex: 2, dir: 1, numTurns: 2 }, { inOpeningScramble: false, paused: false });
+  expect(sim.pos).toEqual(expected);
+});
+
+for (const [axis, sliceIndex] of [['col', 0], ['row', 2], ['depth', 2]]) {
+  for (const numTurns of [1, 2, 3]) {
+    it(`round-trips head, heading, carried objects and body through ${axis} ${numTurns}-turn transport`, () => {
+      const sim = makeSim();
+      const tile = { x: 0, y: 2, z: 2, dirKey: 'PZ' };
+      sim.pos = { ...tile };
+      sim.prevTile = { ...tile };
+      sim.powerups = [{ ...tile, id: 'orb' }];
+      sim.specials = [{ ...tile, id: 'rocket', type: 'rocket' }];
+      const point = new THREE.Vector3(-1, 1, 1.5);
+      shPush(sim.stepHistory, point, new THREE.Vector3(0, 0, 1), 0, 2, 2);
+      const heading = sim.moveDir;
+      const options = { inOpeningScramble: false, paused: true };
+      const ctx = makeCtx();
+      applyRotationToSim(sim, SIZE, ctx, { axis, sliceIndex, dir: 1, numTurns }, options);
+      applyRotationToSim(sim, SIZE, ctx, { axis, sliceIndex, dir: -1, numTurns }, options);
+      expect(sim.pos).toEqual(tile);
+      expect(sim.prevTile).toEqual(tile);
+      expect(sim.moveDir).toBe(heading);
+      expect(sim.powerups[0]).toEqual({ ...tile, id: 'orb' });
+      expect(sim.specials[0]).toEqual({ ...tile, id: 'rocket', type: 'rocket' });
+      expect(shAt(sim.stepHistory, 0).pos.distanceTo(point)).toBeLessThan(1e-8);
+      expect(shAt(sim.stepHistory, 0).normal.distanceTo(new THREE.Vector3(0, 0, 1))).toBeLessThan(1e-8);
+    });
+  }
+}
