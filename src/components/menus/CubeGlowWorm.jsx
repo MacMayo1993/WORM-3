@@ -9,6 +9,8 @@ import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../../worm/wormFaceLayou
 import { isCarouselActive } from './menuCarouselState.js';
 import { sampleWigglingCubeWorm } from './cubeWormPath.js';
 
+const CAROUSEL_WORM_SPEED = 1.1;
+
 // Mounted INSIDE the cube's transform. No screen coordinates or independent
 // world-space movement: carousel turns, wobble, scale and dive carry every part.
 function GlowWorm({ distance, antipodal = false }) {
@@ -19,6 +21,8 @@ function GlowWorm({ distance, antipodal = false }) {
     const geometry = new THREE.SphereGeometry(1, 16, 12);
     const material = createWormSkinMaterial({ color: skin.body, roughness: 0.3, clearcoat: 0.7 });
     applyBioluminescence(material, skin.glow, true);
+    material.emissiveIntensity = 0.32;
+    material.userData.pulse = { base: 0.32, amp: 0.12, speed: 2.4 };
     const beads = [], halos = [];
     for (let i = 0; i < 9; i++) {
       const bead = new THREE.Mesh(geometry, material);
@@ -26,7 +30,8 @@ function GlowWorm({ distance, antipodal = false }) {
       const halo = makeWormHaloSprite();
       halo.visible = true;
       halo.material.color.set(skin.glow);
-      halo.scale.setScalar(0.12 * HALO_SCALE);
+      halo.material.opacity *= 0.3;
+      halo.scale.setScalar(0.12 * HALO_SCALE * 0.7);
       group.add(bead, halo); beads.push(bead); halos.push(halo);
     }
     const white = new THREE.MeshPhysicalMaterial({ color: '#f1f3e9', roughness: 0.22, clearcoat: 1 });
@@ -45,9 +50,9 @@ function GlowWorm({ distance, antipodal = false }) {
   useFrame(() => {
     model.group.visible = isCarouselActive();
     if (!model.group.visible) return;
-    updateWormSkinMaterialTime(model.material, distance.current / 0.65);
+    updateWormSkinMaterialTime(model.material, distance.current / CAROUSEL_WORM_SPEED);
     model.beads.forEach((bead, i) => {
-      sampleWigglingCubeWorm(distance.current - i * 0.18, i, distance.current / 0.65, model.position, model.normal, model.forward, antipodal);
+      sampleWigglingCubeWorm(distance.current - i * 0.18, i, distance.current / CAROUSEL_WORM_SPEED, model.position, model.normal, model.forward, antipodal);
       bead.position.copy(model.position);
       model.halos[i].position.copy(model.position);
       if (i === 0) layoutWormFace(model.position, model.forward, model.normal, 0.14, model.face);
@@ -70,7 +75,7 @@ export default function CubeGlowWorm() {
   }, []);
   useFrame((_state, delta) => {
     if (isCarouselActive() && !reduced.current && !document.hidden) {
-      distance.current += Math.min(delta, 0.05) * 0.65;
+      distance.current += Math.min(delta, 0.05) * CAROUSEL_WORM_SPEED;
     }
   });
   return <>
