@@ -177,6 +177,7 @@ export function makeWormSim(size) {
         // position and snap when the turn commits.
         prevTile: null,
         crossingCorner: false,
+        cornerVault: false,
         lastRecordedT: 0,
 
         // ── Rest-read (mid-rotation slice crossing) ───────────────────────────
@@ -332,6 +333,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.restRead = null;
     sim.restReadTiles.clear();
     sim.crossingCorner = false;
+    sim.cornerVault = false;
     sim.interpT = 1;
     sim.crawlDistance = 0;
     sim.prevWorldPos = null;
@@ -405,7 +407,18 @@ export const jumpLiftOf = (sim) => sim.isJumping
     ? Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight
     : 0;
 
-export function startJump(sim, ctx) {
+export function startJump(sim, ctx, size) {
+    if (sim.phase !== 'crawling') return;
+    // A deliberate dive reads only settled tile contents. Never resolve the
+    // outgoing sticker while a layer is moving or a destination is rest-read.
+    if (size && !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead) {
+        const { x, y, z, dirKey } = sim.pos;
+        const sticker = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+        if (sticker && sticker.curr !== sticker.orig && ctx.resolveTunnel(x, y, z, dirKey)) {
+            beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
+            return;
+        }
+    }
     // A rocket flight owns the arc until it lands — a mid-flight jump press would
     // reset jumpT and cut the launch short.
     if (sim.rocketActive) return;
@@ -415,9 +428,40 @@ export function startJump(sim, ctx) {
     sim.jumpCount += 1;
     sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
+    const next = size ? getNextSurfacePosition(sim.pos, sim.moveDir, size) : null;
+    if (sim.crossingCorner || (next && next.dirKey !== sim.pos.dirKey)) {
+        sim.jumpSpan = 1.6;
+        sim.jumpHeight = 1.7;
+        // An in-progress corner keeps its existing path; changing it mid-step would snap.
+    }
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
     sim.pendingTunnelTrigger = null;
+}
+
+/** Compare head height with the nearby, recorded body, including raised hops. */
+export function hasJumpClearance(sim) {
+    const normal = evaluatePosAndNormal(sim, sim.interpT, _evalHPos);
+    const headHeight = _evalHPos.dot(normal) + WORM_LIFT + jumpLiftOf(sim);
+    let obstacleHeight = _evalHPos.dot(normal) + WORM_LIFT;
+    let distance = 0;
+    const history = sim.stepHistory;
+    const reach = sim.tailLength * BODY_BALL_SPACING;
+    for (let i = 1; i < history.count; i++) {
+        const point = shAt(history, i);
+        distance += point.pos.distanceTo(shAt(history, i - 1).pos);
+        if (distance > reach) break;
+        if (distance < 1 || point.transit || point.normal.dot(normal) < 0.9) continue;
+        const height = point.pos.dot(normal);
+        const dx = point.pos.x - _evalHPos.x;
+        const dy = point.pos.y - _evalHPos.y;
+        const dz = point.pos.z - _evalHPos.z;
+        const vertical = height - _evalHPos.dot(normal);
+        if (dx * dx + dy * dy + dz * dz - vertical * vertical < 0.25) {
+            obstacleHeight = Math.max(obstacleHeight, height);
+        }
+    }
+    return headHeight - obstacleHeight > 0.45;
 }
 
 /** Start or refresh the grounded, protected rocket overdrive. */
@@ -1047,7 +1091,7 @@ function spawnElementalOffering(sim, size, ctx) {
 export const CORNER_VERTEX_LIFT = 0.52;
 export const CORNER_STEP_LENGTH = 2 * CORNER_VERTEX_LIFT;
 
-function evaluatePosAndNormal(sim, tValue, outPos) {
+export function evaluatePosAndNormal(sim, tValue, outPos) {
     const pWorld = sim.prevWorldPos;
     const cWorld = sim.curWorldPos;
     outPos.copy(cWorld);
@@ -1059,7 +1103,20 @@ function evaluatePosAndNormal(sim, tValue, outPos) {
             const newNormal = FACE_NORMALS[sim.pos.dirKey];
             _evalCornerVtx.copy(pWorld).addScaledVector(newNormal, CORNER_VERTEX_LIFT);
 
-            if (tValue < 0.45) {
+            if (sim.cornerVault) {
+                // One continuous quadratic arc; the recorded route is also the
+                // body's route, including after the head lands on the new face.
+                // Push the control point outside both planes: a quadratic
+                // through the bare vertex would cut through the cube at landing.
+                _evalCornerVtx.addScaledVector(oldNormal, CORNER_VERTEX_LIFT)
+                    .addScaledVector(newNormal, CORNER_VERTEX_LIFT);
+                const u = 1 - tValue;
+                outPos.copy(pWorld).multiplyScalar(u * u)
+                    .addScaledVector(_evalCornerVtx, 2 * u * tValue)
+                    .addScaledVector(cWorld, tValue * tValue);
+                _evalCornerNorm.lerpVectors(oldNormal, newNormal, tValue).normalize();
+                cNorm = _evalCornerNorm;
+            } else if (tValue < 0.45) {
                 outPos.copy(pWorld).lerp(_evalCornerVtx, tValue / 0.45);
                 cNorm = oldNormal;
             } else if (tValue > 0.55) {
@@ -1174,7 +1231,8 @@ const PHASE_HANDLERS = {
                             ctx.feel('boost');
                         }
                     } else if (t === 'jump') {
-                        startJump(sim, ctx);
+                        startJump(sim, ctx, size);
+                        if (sim.phase !== 'crawling') return true;
                     } else if (relativeTurn) {
                         sim.moveDir = turnWorm(sim.moveDir, relativeTurn);
                         sim.lastTurnDir = relativeTurn;
@@ -1210,7 +1268,7 @@ const PHASE_HANDLERS = {
                 // The corner pivot holds position from .45 to .55; count only
                 // movement, and use the step being traversed, not the next tile.
                 const progress = t => t < 0.45 ? t / 0.9 : t <= 0.55 ? 0.5 : 0.5 + (t - 0.55) / 0.9;
-                const distance = sim.crossingCorner
+                const distance = sim.crossingCorner && !sim.cornerVault
                     ? (progress(sim.interpT) - progress(before)) * CORNER_STEP_LENGTH
                     : (sim.interpT - before) * (sim.prevWorldPos ? sim.prevWorldPos.distanceTo(sim.curWorldPos) : 0);
                 sim.crawlDistance += distance;
@@ -1249,10 +1307,13 @@ const PHASE_HANDLERS = {
                 } else if (sim.rocketActive || sim.landingGraceT > 0) {
                     // Protected buffs and post-jump grace both suppress a pending hit.
                     sim.pendingSelfCollision = null;
-                } else if (sim.isJumping) {
-                    // Allow jumping over your own body tile before impact threshold.
-                    sim.pendingSelfCollision = null;
-                } else if (sim.pendingTunnelTrigger) {
+                } else if (sim.isJumping && sim.interpT < SELF_COLLISION_TRIGGER_PROGRESS) {
+                    // Keep the contact armed until the crossing: pressing jump
+                    // alone must not grant immunity to a low or late hop.
+                } else if (sim.isJumping && hasJumpClearance(sim)) {
+                    // Retain the candidate until we leave the tile, so landing
+                    // back onto the body cannot inherit an apex-only exemption.
+                } else if (sim.pendingTunnelTrigger && !sim.isJumping) {
                     // Prioritize wormhole entry over self-collision on the same tile.
                     // This fixes the bug where entering a wormhole whose entrance is occupied
                     // by your tail (almost always true for the first few tiles of a jump)
@@ -1357,6 +1418,7 @@ const PHASE_HANDLERS = {
 
                 // We clear the corner navigation flag unless we're about to cross one right now
                 sim.crossingCorner = false;
+                sim.cornerVault = false;
 
                 if (next) {
                     const crossedFace = next.dirKey !== oldDirKey;
@@ -1405,6 +1467,7 @@ const PHASE_HANDLERS = {
 
                     if (crossedFace) {
                         sim.crossingCorner = true;
+                        sim.cornerVault = sim.isJumping;
                     }
 
                     sim.pendingTunnelTrigger = null;

@@ -45,6 +45,7 @@ import WormSwipeControls from './WormSwipeControls.jsx';
 import { TunnelInteriorView } from './healerWorm/TunnelInteriorView.jsx';
 import { warmUpElementalSkins } from './healerWorm/elementalWarmup.js';
 import { TunnelTube } from './healerWorm/TunnelTube.jsx';
+import { JumpLandingMarker } from './healerWorm/JumpLandingMarker.jsx';
 import { WormBody, GlowWormAura } from './healerWorm/WormBody.jsx';
 import { WormFace } from './healerWorm/WormFace.jsx';
 import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem, MagnetFX } from './healerWorm/orbSystems.jsx';
@@ -586,6 +587,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
             {wormAlive && <WormBody worm={worm} size={size} />}
+            {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
             {wormAlive && <WormFace worm={worm} size={size} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}

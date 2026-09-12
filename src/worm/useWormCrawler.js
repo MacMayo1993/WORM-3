@@ -481,6 +481,7 @@ export function useWormCrawler(size, cubies) {
             restRead: f('restRead'),
             crossingCorner: f('crossingCorner'),
             jumpT: f('jumpT'),
+            jumpSpan: f('jumpSpan'),
             isJumping: f('isJumping'),
             rocketActive: f('rocketActive'),
             rocketT: f('rocketT'),
