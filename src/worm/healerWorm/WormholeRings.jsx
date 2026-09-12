@@ -30,8 +30,8 @@ const _moteColor = new THREE.Color();
 // Fallback when a face id has no resolved colour — the old uniform neon pink, so
 // a missing palette entry degrades to the previous look rather than to black.
 const _faceColorFallback = new THREE.Color('#ff44ff');
-const _sparkAmber = new THREE.Color('#ffc24a');
-const _sparkHot = new THREE.Color('#ff7438');
+const _sparkWarmWhite = new THREE.Color('#fff5bd');
+const _sparkWhiteHot = new THREE.Color('#fffbe8');
 
 // Void swamp palette — sickly, stagnant, antipodality-gone-wrong
 const VOID_OUTER_COLOR = '#b8b1ff';   // inverted-feel rim over dark tiles
@@ -116,7 +116,7 @@ function getCautionTexture() {
  */
 export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef, hidden = false }) {
     const liveRef = useRef();       // live wormhole rings (tinted to the face they charge)
-    const moteRef = useRef();       // amber spark bursts on all flipped tiles
+    const moteRef = useRef();       // white-yellow flare sparks on all flipped tiles
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
@@ -338,7 +338,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             for (let m = 0; m < (dangerous ? 7 : 5) && moteIdx < MAX_MOTES; m++) {
                 if (!portalSparkPose(_moteDummy, wp, n, t, burstSeed, m, dangerous)) continue;
                 motes.setMatrixAt(moteIdx, _moteDummy.matrix);
-                _moteColor.copy(dangerous ? _sparkHot : _sparkAmber).multiplyScalar(2.0);
+                _moteColor.copy(dangerous ? _sparkWhiteHot : _sparkWarmWhite).multiplyScalar(2.0);
                 motes.setColorAt(moteIdx++, _moteColor);
             }
 
@@ -555,7 +555,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             {/* Staggered surface-normal spark fountains on every flipped tile. */}
             <instancedMesh ref={moteRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
                 <cylinderGeometry args={[0.35, 1, 1, 4]} />
-                <meshBasicMaterial vertexColors transparent opacity={0.95} depthTest={true} depthWrite={false} toneMapped={false} />
+                <meshBasicMaterial color="#ffffff" transparent opacity={1} blending={THREE.AdditiveBlending} depthTest={true} depthWrite={false} toneMapped={false} />
             </instancedMesh>
 
             {/* Void tile frame booster — brighter than neighbor tile frames */}

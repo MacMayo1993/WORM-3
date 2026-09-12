@@ -1,3 +1,4 @@
+import { MENU_FLIP_PAIRS, flipMenuCenters } from './menuCenterPortals.js';
 import { carouselPlateGeometry } from './carouselPlateGeometry.js';
 import CubeGlowWorm from './CubeGlowWorm.jsx';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -106,20 +107,7 @@ const easeIO = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 // Antipodal center-sticker pairs used for the sporadic menu flips.
 // Positions are in ShufflingCube local space (cubies centred at –1/0/+1,
 // sticker planes sit 0.501 beyond that, so surface ≈ ±1.501).
-const MENU_FLIP_PAIRS = [
-  [
-    { dir: 'PZ', cubie: [1, 1, 2], pos: [0, 0,  1.501], rot: [0, 0, 0] },
-    { dir: 'NZ', cubie: [1, 1, 0], pos: [0, 0, -1.501], rot: [0, Math.PI, 0] },
-  ],
-  [
-    { dir: 'PX', cubie: [2, 1, 1], pos: [ 1.501, 0, 0], rot: [0,  Math.PI / 2, 0] },
-    { dir: 'NX', cubie: [0, 1, 1], pos: [-1.501, 0, 0], rot: [0, -Math.PI / 2, 0] },
-  ],
-  [
-    { dir: 'PY', cubie: [1, 2, 1], pos: [0,  1.501, 0], rot: [-Math.PI / 2, 0, 0] },
-    { dir: 'NY', cubie: [1, 0, 1], pos: [0, -1.501, 0], rot: [ Math.PI / 2, 0, 0] },
-  ],
-];
+
 const INITIAL_WORM_DELAY = 2.5; // seconds before the very first worm spawns
 
 // ─── Menu cube view-style geometry (mirrors Random Mode's per-cubelet styles) ──
@@ -191,10 +179,10 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
           {showEdges && <Edges color={edgeColor} />}
         </mesh>
 
-        {/* Stickers — hidden in wireframe */}
-        {!isWire && STICKER_CFG.map(({ dir, pos, rot }) => {
+        {/* Keep portal centers visible even on wireframe cubies. */}
+        {!hideStickers && STICKER_CFG.map(({ dir, pos, rot }) => {
           const sticker = cubie.stickers?.[dir];
-          if (!sticker) return null;
+          if (!sticker || (isWire && sticker.curr === sticker.orig)) return null;
           const colorHex      = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
           const antiColorHex  = MENU_FACE_COLORS[ANTIPODAL_COLOR[sticker.curr]] ?? '#888888';
           // Show the full tile overlay stack on stickers that a worm has passed through.
@@ -234,7 +222,7 @@ const ShufflingCube = ({ onFlip }) => {
       const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
       cubies = rotateSliceCubies(cubies, 3, m.ax, m.sl, m.d);
     }
-    return { cubies, rotating: null };
+    return { cubies: flipMenuCenters(cubies), rotating: null };
   });
 
   const [flipWaves, setFlipWaves] = useState([]);
@@ -253,7 +241,7 @@ const ShufflingCube = ({ onFlip }) => {
   // 'worm'     → worm is active, cube is still; wormCompleted ref gates the next step
   // 'rotating' → playing the middle-slice rotation animation
   const pipelineRef      = useRef('idle');
-  const wormCompletedRef = useRef(false);
+  const wormCompletedRef = useRef(0);
   // The shared Canvas clock keeps advancing while a game is running, even
   // though this menu subtree is unmounted. Initialise against the first menu
   // frame rather than an absolute 2.5-second timestamp so a returning menu
@@ -262,7 +250,7 @@ const ShufflingCube = ({ onFlip }) => {
 
   // Called by MenuFlipWave when the worm animation finishes
   const handleWormComplete = useCallback(() => {
-    wormCompletedRef.current = true;
+    wormCompletedRef.current += 1;
   }, []);
 
   // Register the style-refresh callback so RotatingBlackCube can trigger a full
@@ -275,7 +263,7 @@ const ShufflingCube = ({ onFlip }) => {
         const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
         cubies = rotateSliceCubies(cubies, 3, m.ax, m.sl, m.d);
       }
-      setCubeState({ cubies, rotating: null });
+      setCubeState({ cubies: flipMenuCenters(cubies), rotating: null });
       setFlipWaves([]);
       pipelineRef.current = 'idle';
       nextSpawnAt.current = null;
@@ -312,49 +300,27 @@ const ShufflingCube = ({ onFlip }) => {
 
     // ── Pipeline state machine ────────────────────────────────────────────────
     if (pipelineRef.current === 'idle' && t >= nextSpawnAt.current) {
-      // Pick a random antipodal pair and spawn a worm
-      const pair = MENU_FLIP_PAIRS[Math.floor(Math.random() * MENU_FLIP_PAIRS.length)];
-      const [sA, sB] = pair;
-      const [ax, ay, az] = sA.cubie;
-      const [bx, by, bz] = sB.cubie;
-      const stA = cubies[ax][ay][az].stickers[sA.dir];
-      const stB = cubies[bx][by][bz].stickers[sB.dir];
-
-      // Flip the two center sticker colors
-      const newCubies = cubies.map((plane, xi) =>
-        plane.map((row, yi) =>
-          row.map((cubie, zi) => {
-            if (xi === ax && yi === ay && zi === az) {
-              return { ...cubie, stickers: { ...cubie.stickers, [sA.dir]: { ...stA, curr: ANTIPODAL_COLOR[stA.curr] } } };
-            }
-            if (xi === bx && yi === by && zi === bz) {
-              return { ...cubie, stickers: { ...cubie.stickers, [sB.dir]: { ...stB, curr: ANTIPODAL_COLOR[stB.curr] } } };
-            }
-            return cubie;
-          })
-        )
-      );
-
-      const wid = ++flipIdRef.current;
-      const wave = {
-        id: wid,
+      const newCubies = flipMenuCenters(cubies);
+      const waves = MENU_FLIP_PAIRS.map(pair => ({
+        id: ++flipIdRef.current,
         startTime: t,
-        origins: [
-          { position: sA.pos, rotation: sA.rot, color: MENU_FACE_COLORS[ANTIPODAL_COLOR[stA.curr]] },
-          { position: sB.pos, rotation: sB.rot, color: MENU_FACE_COLORS[ANTIPODAL_COLOR[stB.curr]] },
-        ],
-      };
+        origins: pair.map(face => {
+          const [x, y, z] = face.cubie;
+          return { position: face.pos, rotation: face.rot,
+            color: MENU_FACE_COLORS[newCubies[x][y][z].stickers[face.dir].curr] };
+        }),
+      }));
 
-      wormCompletedRef.current = false;
+      wormCompletedRef.current = 0;
       pipelineRef.current = 'worm';
       setCubeState({ cubies: newCubies, rotating: null });
-      setFlipWaves([wave]);
+      setFlipWaves(waves);
       onFlip?.();
     }
 
-    if (pipelineRef.current === 'worm' && wormCompletedRef.current) {
+    if (pipelineRef.current === 'worm' && wormCompletedRef.current === MENU_FLIP_PAIRS.length) {
       // Worm fully retreated — start the middle-slice rotation
-      wormCompletedRef.current = false;
+      wormCompletedRef.current = 0;
       pipelineRef.current = 'rotating';
       const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
       setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));

@@ -14,10 +14,10 @@ it('launches outside all six faces with equal height and bounded tangent spread'
         expect(out.matrix.elements.every(Number.isFinite)).toBe(true);
     }
 });
-it('has quiet gaps, staggered bursts, and a stronger danger fountain', () => {
+it('has short gaps, staggered bursts, and a stronger danger fountain', () => {
     const out = new Object3D(), n = new Vector3(0,0,1);
-    expect(portalSparkPose(out, [0,0,0], n, 1.2, 0, 0, false)).toBe(false);
-    expect(portalSparkPose(out, [0,0,0], n, 1.2, 0.5, 0, false)).toBe(true);
+    expect(portalSparkPose(out, [0,0,0], n, 1.0, 0, 0, false)).toBe(false);
+    expect(portalSparkPose(out, [0,0,0], n, 1.0, 0.5, 0, false)).toBe(true);
     portalSparkPose(out, [0,0,0], n, 0.4, 0, 0, false);
     const safeHeight = out.position.z;
     portalSparkPose(out, [0,0,0], n, 0.475, 0, 0, true);
