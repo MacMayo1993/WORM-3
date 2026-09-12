@@ -1549,7 +1549,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     {isPortalReady && (
                         <div style={{ ...PORTAL_HINT_STYLE, color: phaseColor }}>
                             <JumpIcon size={13} />
-                            WORMHOLE BELOW
+                            TAP TO DIVE
                         </div>
                     )}
                     <button
@@ -1558,11 +1558,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                         className={`worm-hud-key worm-action worm-jump${isPortalReady ? ' worm-jump-ready' : ''}`}
                         style={isPortalReady ? jumpReadyStyle : jumpIdleStyle}
-                        aria-label="Jump"
+                        aria-label={isPortalReady ? "Dive through wormhole" : "Jump over body or vault an edge"}
                         disabled={!wormAlive}
                     >
                         <JumpIcon size={19} />
-                        JUMP
+                        {isPortalReady ? 'DIVE' : 'JUMP'}
                     </button>
                     <BoostButton wormAlive={wormAlive} />
                 </div>

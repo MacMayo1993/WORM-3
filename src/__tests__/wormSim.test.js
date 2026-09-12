@@ -3,6 +3,7 @@
 // no store, no renderer. This is the test surface the wormSim extraction exists
 // to provide: crawl/turn/jump/boost/tunnel/rotation logic asserted directly on
 // the plain state object.
+import { jumpLandingTile } from '../worm/healerWorm/jumpLanding.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeWormSim,
@@ -12,6 +13,9 @@ import {
   killWormSim,
   queueTurn,
   jumpLiftOf,
+  startJump,
+  hasJumpClearance,
+  evaluatePosAndNormal,
   tileKey,
   CORNER_STEP_LENGTH,
 } from '../worm/healerWorm/wormSim.js';
@@ -30,7 +34,7 @@ import { makeCubies } from '../game/cubeState.js';
 import * as THREE from 'three';
 import { liveRotation } from '../worm/liveRotation.js';
 import { inchCrawlAdvance } from '../worm/healerWorm/inchGait.js';
-import { ttAt } from '../worm/circularBuffers.js';
+import { shPush, shReset, ttAt } from '../worm/circularBuffers.js';
 
 const SIZE = 3;
 
@@ -726,4 +730,89 @@ describe('character crawl-distance driver', () => {
     resetWormSim(sim, SIZE, { orbCount: 0 });
     expect(sim.crawlDistance).toBe(0);
   });
+});
+
+
+describe('contextual jump mechanics', () => {
+  it('deliberately dives on a settled flipped tile before automatic entry', () => {
+    const sim = makeSim();
+    const cubies = makeCubies(SIZE);
+    const entry = { ...sim.pos };
+    const exit = { x: 1, y: 1, z: 0, dirKey: 'NZ' };
+    const sticker = cubies[entry.x][entry.y][entry.z].stickers[entry.dirKey];
+    sticker.curr = sticker.orig === 4 ? 1 : 4;
+    const tunnel = { entry, exit, entryColor: 4, exitColor: 1 };
+    const ctx = makeCtx({ getCubies: () => cubies, resolveTunnel: () => ({ tunnel, tunnelKey: 'manual' }) });
+    startJump(sim, ctx, SIZE);
+    expect(sim.phase).toBe('windup');
+    expect(sim.isJumping).toBe(false);
+    expect(sim.activeTunnel).toBe(tunnel);
+    expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
+  });
+
+  it('does not dive into a sticker that is still rotating into place', () => {
+    const sim = makeSim();
+    const cubies = makeCubies(SIZE);
+    const p = sim.pos;
+    const sticker = cubies[p.x][p.y][p.z].stickers[p.dirKey];
+    sticker.curr = sticker.orig === 4 ? 1 : 4;
+    liveRotation.active = true;
+    const ctx = makeCtx({ getCubies: () => cubies, resolveTunnel: () => { throw Error('premature lookup'); } });
+    startJump(sim, ctx, SIZE);
+    expect(sim.phase).toBe('crawling');
+    expect(sim.isJumping).toBe(true);
+    liveRotation.active = false;
+  });
+
+  it('extends an edge leap and samples a continuous corner path for head and body', () => {
+    const sim = makeSim();
+    sim.pos = { x: 1, y: 2, z: 2, dirKey: 'PZ' };
+    sim.moveDir = 'up';
+    startJump(sim, makeCtx(), SIZE);
+    expect(sim.jumpSpan).toBe(1.6);
+    sim.crossingCorner = true;
+    sim.cornerVault = true;
+    sim.prevDirKey = 'PZ';
+    sim.pos.dirKey = 'PY';
+    sim.prevWorldPos = new THREE.Vector3(0, 1, 1.52);
+    sim.curWorldPos = new THREE.Vector3(0, 1.52, 1);
+    const a = new THREE.Vector3(), b = new THREE.Vector3();
+    evaluatePosAndNormal(sim, 0.49, a);
+    evaluatePosAndNormal(sim, 0.51, b);
+    expect(Math.max(a.y, a.z)).toBeGreaterThanOrEqual(1.52);
+    expect(a.distanceTo(b)).toBeGreaterThan(0.005);
+    expect(a.distanceTo(b)).toBeLessThan(0.03);
+    evaluatePosAndNormal(sim, 0, a);
+    evaluatePosAndNormal(sim, 1, b);
+    expect(a.distanceTo(sim.prevWorldPos)).toBeLessThan(1e-10);
+    expect(b.distanceTo(sim.curWorldPos)).toBeLessThan(1e-10);
+  });
+
+  it('requires real clearance and detects an already airborne body underneath', () => {
+    const sim = makeSim();
+    sim.interpT = 1;
+    sim.curWorldPos = new THREE.Vector3(0, 0, 1.52);
+    sim.pos.dirKey = 'PZ';
+    sim.isJumping = true;
+    sim.jumpHeight = 1.5;
+    sim.jumpT = 0.02;
+    expect(hasJumpClearance(sim)).toBe(false);
+    sim.jumpT = 0.5;
+    expect(hasJumpClearance(sim)).toBe(true);
+    shReset(sim.stepHistory);
+    const n = new THREE.Vector3(0, 0, 1);
+    shPush(sim.stepHistory, new THREE.Vector3(0, 0, 3), n, 1, 1, 2);
+    shPush(sim.stepHistory, new THREE.Vector3(2, 0, 3), n, 2, 1, 2);
+    sim.tailLength = 100;
+    expect(hasJumpClearance(sim)).toBe(false);
+  });
+});
+
+
+it('predicts a landing across an edge using transported steering', () => {
+  const start = { x: 1, y: 2, z: 2, dirKey: 'PZ' };
+  const tile = jumpLandingTile(start, 'up', SIZE, 0.8, 0, 1.6);
+  expect(tile.dirKey).toBe('PY');
+  expect(tile.z).toBeLessThan(2);
+  expect(jumpLandingTile(start, 'up', SIZE, 0.2, 0.95, 1)).toBe(start);
 });
