@@ -14,6 +14,7 @@ export const ANTIPODAL_STYLE_KEYS = [
 ];
 
 export const LIVING_STYLE_KEYS = [
+  'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
   'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse',
   'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel',
   'vortex', 'shockwave', 'solar',

@@ -121,6 +121,7 @@ const TILE_PRICES = {
   // Living batch 2. The three that answer the player's turns are top of the tier;
   // the rest sit with the other animated styles.
   compass: 225, spiritLevel: 200, snowGlobe: 200, lichtenberg: 175, rainGlass: 200,
+  liquidCheckers: 175, velvetFolds: 175, dreamMarble: 175, paradoxWeave: 175,
   pond: 150, sundial: 175, crystalGrowth: 175, cymatics: 225, turing: 175,
   // Non-Euclidean — the heaviest shaders in the catalog (iterated inversion,
   // Möbius transport), priced as the top tier.

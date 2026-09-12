@@ -15,6 +15,7 @@ const PREVIEW_SIZE = 64;
 
 // Styles that need continuous per-frame animation
 const ANIMATED_STYLE_SET = new Set([
+  'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
   'holographic', 'pulse', 'lava', 'galaxy', 'circuit',
   'grass', 'ice', 'sand', 'water', 'neural',
   'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave',
