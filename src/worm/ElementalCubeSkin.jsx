@@ -213,10 +213,12 @@ export default function ElementalCubeSkin({ size = 3 }) {
 
   useFrame((_, delta) => {
     if (!renderer) return;
-    elapsedRef.current += delta;
+    if (useGameStore.getState().wormPaused) return;
+    if (lastOriginRef.current !== wormBuffs.elementalOrigin) elapsedRef.current = 0;
+    elapsedRef.current += Math.min(delta, 0.1);
     // One envelope, shared with the fill light and the particles. wormBuffs mirrors
     // the sim clock, so it freezes on pause and during tunnel transit.
-    const env = elementalEnvelope({ elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
+    const env = elementalEnvelope({ element, elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
     // Uniform grow drives BOTH coverage and thickness, so the layer visibly wells
     // up from nothing and shrinks away — changing scale.z alone would leave the top
     // plane at full size and full shader alpha the whole time, never fading.
@@ -252,8 +254,11 @@ export default function ElementalCubeSkin({ size = 3 }) {
       // Billboarded renderers take their on-screen size from world scale, so the
       // surface layers' squashed (cell, cell, grow) scale would distort them; they
       // get a uniform scale that still carries both cell size and the ramp.
-      if (renderer.uniformScale) _scale.setScalar(c.cell * g);
-      else _scale.set(c.cell * g, c.cell * g, g);
+      const arrival = renderer.key === 'blades'
+        ? THREE.MathUtils.smoothstep(env.claim, cellData.sweep[i], cellData.sweep[i] + 0.3) : 1;
+      const cellGrow = g * arrival;
+      if (renderer.uniformScale) _scale.setScalar(c.cell * Math.max(0.001, cellGrow));
+      else _scale.set(c.cell * g, c.cell * g, Math.max(0.001, cellGrow));
 
       if (inst) {
         _matrix.compose(_livePos, _quat, _scale);
@@ -261,6 +266,7 @@ export default function ElementalCubeSkin({ size = 3 }) {
       } else {
         const grp = groups[i];
         if (!grp) continue;
+        grp.visible = arrival > 0.001;
         grp.position.copy(_livePos);
         grp.quaternion.copy(_quat);
         grp.scale.copy(_scale);

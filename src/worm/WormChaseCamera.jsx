@@ -30,10 +30,8 @@ import {
     ORB_SEGMENT_GROWTH,
     HEAL_PAUSE_DURATION,
     CUT_FOCUS_DURATION,
-    ELEMENTAL_FOCUS_DURATION,
-    ELEMENTAL_DURATION,
 } from './healerWorm/constants.js';
-import { elementalRideBlend } from './healerWorm/elementalLifecycle.js';
+import { makeElementalRevealOrbit, sampleElementalRevealOrbit } from './elementalRevealOrbit.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
 const _camForward = new THREE.Vector3();
@@ -144,41 +142,6 @@ const _cutCam = new THREE.Vector3();
 const _cutUp = new THREE.Vector3();
 const CUT_FOCUS_PEAK = 0.9; // how far toward the impact shot the swing goes (0..1)
 
-// ── Elemental ride scratch ───────────────────────────────────────────────────
-// While a wash is active the camera drops out of the chase and rides the worm
-// close, so the player is driving through the element rather than watching it
-// from across the board.
-//
-// Two earlier attempts got this wrong in the same way. The first pulled out to
-// the opening overview, which showed the whole re-skinned cube but from so far
-// off that the element — flames licking the stickers, frost creeping, caustics —
-// was a few pixels tall. The second came in close but along a FIXED WORLD vector,
-// so where the eye landed relative to the worm depended entirely on which cube
-// face the worm happened to be on: overhead on some faces, off to the side on
-// others, and the shot changed character every time the worm turned a corner.
-//
-// The pose is therefore built in the worm's OWN frame — lift along the face
-// normal, setback along its heading — which is the same basis the chase framing
-// above already uses. Directly on top of the worm on every face, at the same
-// angle, with the heading always up the screen.
-const _elemFocusCam = new THREE.Vector3();
-const _elemFocusLook = new THREE.Vector3();
-const _elemFocusUp = new THREE.Vector3();
-// Lift / setback / look-ahead together set the pitch, and the pitch is the whole
-// character of the shot. These give ~61 degrees below horizontal: steep enough that
-// the surface fills the frame and the camera reads as sitting on top of the worm,
-// shallow enough to still see the tiles coming. A shallower rake (the first pass
-// ran ~37 degrees) puts the horizon across the middle and hands a third of the
-// screen to empty space, which on a phone is the third the element should be using.
-const ELEM_FOCUS_PEAK = 1.0; // fully committed to the ride once it has eased in
-const ELEM_EYE_LIFT = 1.9;   // straight up the face normal — the "on top of it" height
-const ELEM_EYE_BACK = 0.4;   // a touch behind the head, so the shot is a ride and not
-                             // a plan view: enough tilt to see what is coming up
-const ELEM_LOOK_AHEAD = 0.65; // aim just past the worm. Longer than this and the worm
-                              // slides down the frame into the steering key's corner.
-const ELEM_FOV_WIDEN = 8;    // lens opens up for the ride — reads as speed up close
-
-
 export default function WormChaseCamera({ worm, size }) {
     const { camera, size: viewportSize } = useThree();
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
@@ -201,6 +164,7 @@ export default function WormChaseCamera({ worm, size }) {
     const sliceFreezeFovRef = useRef(70);       // FOV captured the instant the freeze began
     const phaseStartPose = useRef(makeTunnelCamPose());
     const transitionPose = useRef(makeTunnelCamPose());
+    const elementalOrbitRef = useRef(null);
     const revealTRef = useRef(1);               // countdown reveal dolly progress (0 = fully pulled back)
 
     // This camera is the app's shared one, and the chase view leaves it wide
@@ -275,6 +239,36 @@ export default function WormChaseCamera({ worm, size }) {
         }
         // Left the freeze (retry/reset) — re-arm so the next slice death re-snaps.
         if (sliceFreezeActiveRef.current) sliceFreezeActiveRef.current = false;
+
+        // Capture once, orbit at the existing radius/FOV, and return exactly to
+        // the captured view before handing control back to normal chase smoothing.
+        const focusRemaining = worm.elementalFocusT?.current ?? 0;
+        if (phase !== 'crawling' || gamePhase === 'scrambling' || gameState.wormAlive === false) {
+            elementalOrbitRef.current = null;
+        } else if (focusRemaining > 0 || elementalOrbitRef.current) {
+            if (!elementalOrbitRef.current) {
+                elementalOrbitRef.current = makeElementalRevealOrbit(camera, lookAtRef.current);
+                elementalOrbitRef.current.duration = focusRemaining;
+            }
+            const orbit = elementalOrbitRef.current;
+            const progress = 1 - focusRemaining / orbit.duration;
+            sampleElementalRevealOrbit(orbit, progress, camPosRef.current, lookAtRef.current, camUpRef.current);
+            camera.position.copy(camPosRef.current);
+            camera.fov = orbit.fov;
+            aimCamera(camera, camPosRef.current, lookAtRef.current, camUpRef.current, 1);
+            if (focusRemaining <= 0) {
+                camera.position.copy(orbit.position);
+                camera.quaternion.copy(orbit.quaternion);
+                camera.up.copy(orbit.up);
+                camPosRef.current.copy(orbit.position);
+                camUpRef.current.copy(orbit.up);
+                lookAtRef.current.copy(orbit.look);
+                elementalOrbitRef.current = null;
+            }
+            prevPhaseRef.current = phase;
+            prevGamePhaseRef.current = gamePhase;
+            return;
+        }
 
         // Only use the overview during the INITIAL scramble. wormGamePhase is set to
         // 'scrambling' exactly once, at game start (mid-game auto-rotation hazards only
@@ -361,18 +355,7 @@ export default function WormChaseCamera({ worm, size }) {
             : phase === 'entering' ? diveProgress(_enterP)
             : phase === 'exiting' ? 1 - diveEase((_enterP - 0.5) / 0.5)
             : 0;
-        // Elemental ride blend: in on the claim beat, a short linger, then back out
-        // to the chase. See elementalLifecycle.elementalRideBlend for why it is no
-        // longer held for the whole wash.
-        const elemRideBlend = elementalRideBlend({
-            focusT: worm.elementalFocusT?.current ?? 0,
-            remaining: worm.elementalT?.current ?? 0,
-            maxT: worm.elementalMaxT?.current || ELEMENTAL_DURATION,
-            focusDuration: ELEMENTAL_FOCUS_DURATION
-        }) * ELEM_FOCUS_PEAK;
-
-        const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix)
-            + ELEM_FOV_WIDEN * elemRideBlend; // widen for the portal/tunnel view and the elemental ride
+        const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix);
         const fovAlpha = Math.min(1, delta * 6);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -625,42 +608,6 @@ export default function WormChaseCamera({ worm, size }) {
                     if (_camUp.lengthSq() < 1e-6) _camUp.copy(_cutUp);
                     _camUp.normalize();
                 }
-            }
-
-            // Elemental ride: for as long as the wash is up, leave the chase and sit
-            // right on top of the worm, looking down its heading. Built entirely from
-            // _camNormal / _camForward — the same face-relative basis the chase pose
-            // above uses, already smoothed across face transitions by the blend a few
-            // lines up — so the eye is directly over the worm on every face and stays
-            // there through corners, instead of swinging to the side whenever the
-            // worm moved onto a face that a fixed world direction did not suit.
-            if (elemRideBlend > 0.001) {
-                // Eye: straight up the face normal, with a small setback along the
-                // heading. Pure overhead would be a plan view with no sense of travel;
-                // the setback tilts it just enough to see the ground coming.
-                _elemFocusCam.copy(_camWormWorld)
-                    .addScaledVector(_camNormal, ELEM_EYE_LIFT)
-                    .addScaledVector(_camForward, -ELEM_EYE_BACK);
-                // Aim past the worm, down the heading and onto the surface. Note this
-                // deliberately skips the CAM_CENTER_BIAS pull toward the cube's centre
-                // that the chase look-target gets: that bias is what keeps the whole
-                // cube in frame from a distance, and at this range it is exactly what
-                // would drag the worm off to the side of the shot.
-                _elemFocusLook.copy(_camWormWorld).addScaledVector(_camForward, ELEM_LOOK_AHEAD);
-
-                _camTargetCam.lerp(_elemFocusCam, elemRideBlend);
-                _camTargetLook.lerp(_elemFocusLook, elemRideBlend);
-
-                // Up is the heading itself, not world-Y. Looking almost straight down
-                // the face normal, world-Y is nearly parallel to the view direction on
-                // four of the six faces and the roll becomes unstable — and it is the
-                // heading being up the screen that makes this read as driving.
-                _elemFocusUp.copy(_camForward);
-                if (_elemFocusUp.lengthSq() < 1e-6) _elemFocusUp.set(0, 1, 0);
-                _elemFocusUp.normalize();
-                _camUp.lerp(_elemFocusUp, elemRideBlend);
-                if (_camUp.lengthSq() < 1e-6) _camUp.copy(_elemFocusUp);
-                _camUp.normalize();
             }
 
             // Just resumed crawling after a tunnel: ease the camera back to the chase framing

@@ -186,7 +186,7 @@ const vertexShader = /* glsl */`
     if (uMode == 0) {
       // Ripple plus the broad swell, both gated by the sweep so a cell rises into
       // the water rather than snapping to full displacement the moment it arrives.
-      pos.z += (w * 0.035 + vSwell * 0.05) * vArrive;
+      pos.z += (w * 0.035 + vSwell * 0.065 + 0.11 * sin(vArrive * 3.141593)) * vArrive;
     } else if (uMode == 2) {
       // Lightning is a charge crawling ON the surface, not a body sitting on it —
       // it stays flat. Any displacement here would lift the veins off the tile and
@@ -195,7 +195,7 @@ const vertexShader = /* glsl */`
       // Each crystal plate sits at its own height, so the frozen surface is
       // genuinely faceted instead of a flat quad with facets painted on. The
       // steps land between vertices and read as chipped, which is what ice does.
-      pos.z += (hash13(iceCell(wp.xyz)) - 0.5) * 0.075;
+      pos.z += pow(hash13(iceCell(wp.xyz)), 3.0) * 0.13 * vArrive;
     }
     // viewMatrix * cellMatrix, not modelViewMatrix: the latter folds in only the
     // parent group, and under instancing that would leave every cell shaded as if
@@ -297,7 +297,10 @@ const fragmentShader = /* glsl */`
       float meniscus = vCellMask.y * gapBand * (0.55 + 0.45 * vCellMask.z);
       // Broken up so the waterline crawls rather than sitting as a painted stripe.
       meniscus *= 0.55 + 0.75 * vnoise(vWorld * 7.0 + vec3(0.0, t * 0.6, t * 0.35));
-      float rimFoam = meniscus * (0.5 + 0.5 * crest);
+      float tideFront = sin(vArrive * 3.141593);
+      float rimFoam = meniscus * (0.5 + 0.5 * crest) + tideFront * 0.6;
+      float ripple = pow(0.5 + 0.5 * sin(length(vWorld.xz) * 8.0 - t * 2.0 + vWorld.y), 12.0);
+      col += uAccent * ripple * 0.15 * (1.0 - uEnv.z);
 
       // Restrained: a waterline is a bright EDGE on a blue body. Pushed harder it
       // stops reading as water piling up and starts reading as frost.
@@ -386,6 +389,14 @@ const fragmentShader = /* glsl */`
 
       // Fine frost grain over the plates, and a sparse twinkle that re-rolls a few
       // times a second so the surface glitters as the camera moves across it.
+      vec2 frostP = (vUv - 0.5) * 2.0;
+      float frostR = length(frostP);
+      float frostA = atan(frostP.y, frostP.x + 0.00001);
+      float arm = abs(sin(frostA * 3.0)) * frostR;
+      float branch = 1.0 - smoothstep(0.015, 0.055, arm);
+      float offshoot = (1.0 - smoothstep(0.02, 0.075, abs(sin(frostR * 23.0 + frostA * 6.0)))) * exp(-arm * 9.0);
+      float frostReach = smoothstep(frostR * 0.65, frostR * 0.65 + 0.2, vArrive);
+      float dendrite = max(branch, offshoot * 0.65) * frostReach;
       float frost = vnoise(vWorld * 14.0) * 0.5 + vnoise(vWorld * 28.0) * 0.5;
       float twinkle = pow(vnoise(vWorld * 26.0), 12.0) * pow(0.5 + 0.5 * sin(t * 1.3 + id * 31.0), 6.0) * 1.2;
       // Per-plate glint. Broad enough that a facet flares as the camera swings past
@@ -404,7 +415,8 @@ const fragmentShader = /* glsl */`
       col = mix(uColor * vec3(0.30, 0.42, 0.62), mix(uColor, vec3(1.0), 0.5),
                 0.18 + 0.55 * lam + 0.30 * id);
       col = mix(col, vec3(1.0), frost * 0.12);
-      col += vec3(1.0) * crack * 0.55;
+      col += vec3(1.0) * crack * 0.4;
+      col = mix(col, vec3(0.88, 0.97, 1.0), dendrite * 0.62 * (1.0 - uEnv.z));
       col += vec3(0.85, 0.95, 1.0) * spec * 0.9;
       col += vec3(0.90, 0.97, 1.0) * twinkle;
       col = mix(col, uAccent, fres * 0.30);
@@ -417,7 +429,7 @@ const fragmentShader = /* glsl */`
 
     // The cell has not been reached by the claim sweep yet, or the wash is
     // dissolving. Both are the same statement about how much element is here.
-    alpha *= vArrive;
+    alpha *= vArrive * (uMode == 2 ? 1.0 : 1.0 - uEnv.z);
     gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
   }
 `;

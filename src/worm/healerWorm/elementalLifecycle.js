@@ -1,3 +1,4 @@
+import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 // src/worm/healerWorm/elementalLifecycle.js
 //
 // The one envelope every elemental visual runs on.
@@ -55,12 +56,13 @@ const clamp01 = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v);
  * }}
  */
 export function elementalEnvelope({
+  element = null,
   elapsed = 0,
   remaining = 0,
   focus = 0,
   fadeIn = ELEMENTAL_FADE_IN,
-  fadeOut = ELEMENTAL_FADE_OUT,
-  sweep = 1.8
+  fadeOut = ELEMENTAL_EXPERIENCE[element]?.fadeOut ?? ELEMENTAL_FADE_OUT,
+  sweep = ELEMENTAL_EXPERIENCE[element]?.sweep ?? 1.8
 } = {}) {
   const rise = fadeIn > 0 ? clamp01(elapsed / fadeIn) : 1;
   const fall = fadeOut > 0 ? clamp01(remaining / fadeOut) : 1;

@@ -17,6 +17,7 @@
 // Call once, inside the Canvas, while the board is still scrambling.
 
 import * as THREE from 'three';
+import { getElementalParticleMaterial } from './elementalParticleMaterial.js';
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
 import { getElementalSurfaceMaterial } from '../ElementalSurface.jsx';
 import { getFlameMaterial } from '../ElementalFireSkin.jsx';
@@ -33,6 +34,9 @@ function collectElementalMaterials() {
   const materials = [];
   for (const [element, def] of Object.entries(ELEMENTAL_DEFS)) {
     if (!def) continue;
+    const particles = getElementalParticleMaterial(def.particle, element === 'fire' ? def.color : def.accent);
+    particles.userData.elementalPoints = true;
+    materials.push(particles);
 
     // The pickup itself, before anything is claimed: an orb spawning on the board
     // is the first moment these three programs are needed.
@@ -75,7 +79,7 @@ export function warmUpElementalSkins(renderer, camera) {
   const scene = new THREE.Scene();
   const geo = new THREE.PlaneGeometry(0.1, 0.1);
   for (const material of materials) {
-    if (material) scene.add(new THREE.Mesh(geo, material));
+    if (material) scene.add(material.userData.elementalPoints ? new THREE.Points(geo, material) : new THREE.Mesh(geo, material));
   }
 
   renderer.compile(scene, camera);

@@ -325,6 +325,12 @@ describe('elemental offering', () => {
     expect(sim.elementalSpawnTimer).toBeGreaterThanOrEqual(ELEMENTAL_CLAIM_COOLDOWN - 1e-6);
     expect(ELEMENTAL_CLAIM_COOLDOWN).toBeGreaterThan(ELEMENTAL_SPAWN_INTERVAL);
 
+    // The camera reveal freezes the spawn clock too. Account for its duration
+    // explicitly rather than assuming the old 1.8-second focus beat.
+    const cooldownAtClaim = sim.elementalSpawnTimer;
+    run(sim, ctx, sim.elementalFocusT);
+    expect(sim.elementalSpawnTimer).toBeGreaterThanOrEqual(cooldownAtClaim - 0.05);
+
     // Run out most of the cooldown: still nothing on the board.
     run(sim, ctx, ELEMENTAL_CLAIM_COOLDOWN - 2);
     expect(sim.specials.filter(s => isElementalType(s.type))).toHaveLength(0);

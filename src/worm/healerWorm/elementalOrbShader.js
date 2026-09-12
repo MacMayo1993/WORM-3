@@ -95,41 +95,39 @@ const coreFragment = /* glsl */ `
     float alpha;
 
     if (uMode == 0) {
-      // ── Water: drifting caustic net over a deep body, brightening at the rim.
-      float caustic = pow(max(0.0, sin(p.x * 2.3 + f) * sin(p.z * 2.5 - f)), 3.0);
-      col = mix(uColor * 0.30, uColor, 0.5 + 0.5 * sin(f));
-      col += uAccent * caustic * 0.95;
-      col = mix(col, uAccent, fres * 0.4);
-      alpha = 0.46 + fres * 0.34 + caustic * 0.22;
+      // A moving tide and concentric ripples inside the glassy orb.
+      float wave = sin(p.x * 3.0 + t * 1.3) * 0.16 + sin(p.z * 2.5 - t) * 0.12;
+      float waterline = 1.0 - smoothstep(-0.1, 0.1, p.y - wave);
+      float rings = pow(0.5 + 0.5 * sin(length(p.xz) * 12.0 - t * 2.0), 10.0);
+      col = mix(uColor * 0.25, uColor, waterline * 0.7 + fres * 0.3);
+      col += uAccent * rings * waterline * 0.55;
+      col += uAccent * exp(-abs(p.y - wave) * 15.0) * 0.5;
+      alpha = 0.3 + waterline * 0.4 + fres * 0.25;
     } else if (uMode == 1) {
-      // ── Fire: dark crust plates broken by white-hot veins, flickering.
-      float crust = smoothstep(0.25, 1.40, abs(f));
-      float vein = 1.0 - smoothstep(0.0, 0.38, abs(f));
-      float flicker = 0.84 + 0.16 * sin(t * 6.5 + p.x * 3.0 - p.y * 2.2);
-      col = mix(uColor * 1.10, vec3(0.10, 0.025, 0.015), crust * 0.82);
-      col += uAccent * vein * flicker * 1.15;
-      col += uColor * fres * 0.45;
-      alpha = 0.74 + fres * 0.26;
+      // Flame tongues rise through the orb, rather than molten rock.
+      float flame = sin(p.x * 6.0 + sin(p.y * 3.0 - t * 2.0)) + sin(p.z * 5.0 - t);
+      float tongues = smoothstep(-0.7, 0.7, flame - p.y * 0.6);
+      float heat = exp(-abs(p.y + 0.6) * 1.4);
+      col = mix(vec3(0.15, 0.025, 0.01), uColor, tongues);
+      col = mix(col, uAccent, heat * tongues * 0.8);
+      alpha = 0.45 + tongues * 0.45;
     } else if (uMode == 2) {
-      // ── Nature: mottled canopy with fine blade striations over it. The bands
-      // are *summed*, not multiplied — a product of sines sits near zero almost
-      // everywhere and flattens the whole sphere to one shade of green.
-      float canopy = 0.5 * sin(p.x * 2.2 + t * 0.50) + 0.5 * sin(p.y * 1.9 - t * 0.40) + 0.5 * sin(p.z * 2.4 + t * 0.45);
-      float blade = sin(p.y * 7.5 + canopy * 2.2);
-      float vein = smoothstep(0.55, 0.99, abs(blade));
-      col = mix(uColor * 0.26, uColor * 1.08, 0.5 + 0.5 * sin(canopy * 1.4));
-      col += uAccent * vein * 0.6;
-      col = mix(col, uAccent, fres * 0.28);
-      alpha = 0.64 + fres * 0.32;
+      // A branching stem and paired leaf veins preview the growing canopy.
+      float stem = exp(-abs(p.x + 0.14 * sin(p.y * 2.0 + t * 0.4)) * 15.0);
+      float leaves = pow(0.5 + 0.5 * cos(p.y * 9.0 - abs(p.x) * 5.0), 10.0) * exp(-abs(p.x) * 1.7);
+      col = mix(uColor * 0.2, uColor, 0.5 + 0.3 * sin(f));
+      col += uAccent * max(stem, leaves) * 0.7;
+      col = mix(col, uAccent, fres * 0.3);
+      alpha = 0.6 + fres * 0.3;
     } else if (uMode == 3) {
-      // ── Ice: frozen facets shot through with cracks, glassy at the edge. Same
-      // summed-band reasoning as nature above.
-      float facet = 0.5 + 0.5 * sin(0.9 * sin(p.x * 2.4) + 0.9 * sin(p.y * 2.7) + 0.9 * sin(p.z * 2.2));
-      float seam = sin(p.x * 2.1 + p.z * 2.5 + sin(p.y * 1.8) * 1.6);
-      float crack = smoothstep(0.80, 1.0, abs(seam));
-      col = mix(uColor * 0.50, vec3(0.92, 0.98, 1.0), facet * 0.55 + fres * 0.45);
-      col += vec3(1.0) * crack * 0.65;
-      alpha = 0.52 + fres * 0.40;
+      // Stable six-armed crystal with slowly traveling glints.
+      float radius = length(p.xy);
+      float arms = abs(sin(atan(p.y, p.x + 0.00001) * 3.0)) * radius;
+      float crystal = exp(-arms * 18.0);
+      float facets = 0.5 + 0.5 * sin(p.z * 4.0 + p.x * 3.0);
+      col = mix(uColor * 0.35, uAccent, facets * 0.45 + fres * 0.35);
+      col += uAccent * crystal * (0.35 + 0.35 * pow(0.5 + 0.5 * sin(radius * 8.0 - t), 8.0));
+      alpha = 0.48 + fres * 0.4;
     } else {
       // ── Lightning: a dark conductive body with white-hot filaments running
       // through it, discharging in bursts rather than pulsing evenly. The core is

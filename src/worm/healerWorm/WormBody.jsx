@@ -1,3 +1,4 @@
+import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, PICKUP_PULSE_DURATION } from './pickupPulse.js';
 import { wormBodyTaper } from '../wormCharacterFinish.js';
 // src/worm/healerWorm/WormBody.jsx
@@ -211,6 +212,7 @@ export function WormBody({ worm, size }) {
     if (!inchStateRef.current) inchStateRef.current = makeInchGaitState();
     const characterTimeRef = useRef(0);
     const pickupRef = useRef({ seq: useGameStore.getState().wormOrbFlash?.seq, age: Infinity, active: false });
+    const elementalBodyRef = useRef({ active: false, color: new THREE.Color() });
     const pickupColor = useMemo(() => new THREE.Color(), []);
     const reducedPickupMotion = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
     // Tracks the inputs that affect per-segment color so the instanced color buffer
@@ -399,7 +401,13 @@ export function WormBody({ worm, size }) {
         const prevCS = prevColorStateRef.current;
         // Prism cycles its hue continuously, so its color buffer must be rewritten every
         // frame; all other characters only recolor when an input actually changes.
-        const colorDirty = pickup.active || wasPickupActive || prevCS.mesh !== mesh || _transitCull || _isPrism || colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
+        const element = useGameStore.getState().wormElementalTheme;
+        const experience = ELEMENTAL_EXPERIENCE[element];
+        const previousElementActive = elementalBodyRef.current.active;
+        elementalBodyRef.current.active = !!experience;
+        const elementStrength = experience ? Math.min(1, (worm.elementalT?.current ?? 0) / experience.fadeOut) : 0;
+        if (experience) elementalBodyRef.current.color.set(experience.body);
+        const colorDirty = !!experience || previousElementActive || pickup.active || wasPickupActive || prevCS.mesh !== mesh || _transitCull || _isPrism || colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
             baseColor !== prevCS.baseColor || bellyCol !== prevCS.bellyCol || _isGlow !== prevCS.isGlow || _isInch !== prevCS.isInch;
         if (colorDirty) {
             prevCS.mesh = mesh;
@@ -651,6 +659,10 @@ export function WormBody({ worm, size }) {
                     _bodyColor.set(writeIdx % 2 === 0 ? baseColor : bellyCol);
                 } else {
                     _bodyColor.set(baseColor);
+                }
+                if (experience) {
+                    const shimmer = elementalBodyWave(element, characterTimeRef.current, i, tLen);
+                    _bodyColor.lerp(elementalBodyRef.current.color, elementStrength * (0.12 + 0.38 * shimmer));
                 }
                 _bodyColor.lerp(pickupColor, pickupWave * 0.85);
                 // Keep every glass exterior clear; carried parity colors live inside it.

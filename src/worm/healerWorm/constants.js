@@ -254,10 +254,8 @@ export const ELEMENTAL_CLAIM_COOLDOWN = 30;
 // over the cube instead of crawling past it. The wash's own clock is held for the
 // beat too, so this is not taken out of ELEMENTAL_DURATION.
 //
-// This is only the FREEZE, not the camera move: the close over-the-worm ride runs
-// off elementalT and lasts the whole wash (see WormChaseCamera). What this duration
-// controls is how long the worm is held still while that ride eases in.
-export const ELEMENTAL_FOCUS_DURATION = 1.8;
+// One full camera orbit and return, at the captured gameplay distance and FOV.
+export const ELEMENTAL_FOCUS_DURATION = 4.0;
 // Ceiling on queued attraction streaks. A sweep can only reach a dozen or so orbs,
 // but the cap keeps a pathological case from spawning unbounded geometry and React
 // state in a single frame.

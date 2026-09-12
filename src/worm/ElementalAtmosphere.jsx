@@ -13,7 +13,7 @@
 // version tinted the whole backdrop, which read as "the background changed" rather
 // than "the cube is in the element". The visible element now lives on the cube.
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -22,6 +22,7 @@ import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
 import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { wormBuffs } from './wormBuffs.js';
+import { getElementalParticleMaterial } from './healerWorm/elementalParticleMaterial.js';
 import ElementalCubeSkin from './ElementalCubeSkin.jsx';
 import ElementalStrikes from './ElementalStrikes.jsx';
 
@@ -47,9 +48,11 @@ const PARTICLE_KINDS = {
 // frame, which is exactly the kind of work a phone cannot spare.
 function ElementalParticles({ element, kind, color, extent, count }) {
   const pointsRef = useRef();
-  const materialRef = useRef();
+
   const elapsedRef = useRef(0);
   const cfg = PARTICLE_KINDS[kind] ?? PARTICLE_KINDS.bubbles;
+  const material = useMemo(() => getElementalParticleMaterial(kind, color, cfg.size * 1.8), [kind, color, cfg.size]);
+  useEffect(() => { material.uniforms.uOpacity.value = 0; }, [material]);
 
   // Seeds: each particle gets a random start position, a per-particle sway phase
   // and a slight speed jitter so the field never looks like a marching grid.
@@ -76,9 +79,10 @@ function ElementalParticles({ element, kind, color, extent, count }) {
   useFrame((state, delta) => {
     const pts = pointsRef.current;
     if (!pts) return;
+    if (useGameStore.getState().wormPaused) return;
     const dt = Math.min(delta, 0.05);
     const arr = pts.geometry.attributes.position.array;
-    const t = state.clock.elapsedTime;
+    const t = elapsedRef.current;
     for (let i = 0; i < count; i++) {
       const yi = i * 3 + 1;
       arr[yi] += cfg.vy * seeds[i * 2 + 1] * dt;
@@ -94,29 +98,23 @@ function ElementalParticles({ element, kind, color, extent, count }) {
       arr[i * 3 + 2] = origins[i * 2 + 1] + Math.cos(t * 0.7 + phase) * cfg.sway;
     }
     pts.geometry.attributes.position.needsUpdate = true;
-    if (materialRef.current) {
+    if (material) {
       // Same envelope the skin and the fill light run on, so the field can no
       // longer arrive before the element it belongs to or outlive it. It used to
       // read elementalT and divide by its own copy of the fade constant.
-      elapsedRef.current += delta;
-      const env = elementalEnvelope({ elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
-      materialRef.current.opacity = cfg.opacity * env.intensity;
+      elapsedRef.current += dt;
+      const env = elementalEnvelope({ element, elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
+      material.uniforms.uOpacity.value = cfg.opacity * env.intensity;
+      material.uniforms.uTime.value = t;
+      material.uniforms.uScale.value = state.size.height * state.gl.getPixelRatio() / (2 * Math.tan(state.camera.fov * Math.PI / 360));
     }
   });
 
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
   return (
     <points ref={pointsRef} geometry={geometry} frustumCulled={false} raycast={() => null}>
-      <pointsMaterial
-        ref={materialRef}
-        color={color}
-        size={cfg.size}
-        sizeAttenuation
-        transparent
-        opacity={cfg.opacity}
-        blending={cfg.blend}
-        depthWrite={false}
-        toneMapped={false}
-      />
+      <primitive object={material} attach="material" />
     </points>
   );
 }
@@ -156,13 +154,13 @@ export default function ElementalAtmosphere({ size = 3 }) {
 
 
   useFrame((_, delta) => {
-    if (!def) return;
-    elapsedRef.current += delta;
+    if (!def || useGameStore.getState().wormPaused) return;
+    elapsedRef.current += Math.min(delta, 0.1);
     // The shared envelope — the same one the cube skin scales itself by — so the
     // light can no longer be at full strength while the layer is still welling up,
     // or still lit after it has dissolved. wormBuffs mirrors the sim clock, so this
     // freezes on pause and during tunnel transit.
-    const env = elementalEnvelope({ elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
+    const env = elementalEnvelope({ element, elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
     if (lightRef.current) lightRef.current.intensity = 0.55 * env.intensity;
   });
 
@@ -216,7 +214,7 @@ export default function ElementalAtmosphere({ size = 3 }) {
         <ElementalParticles
           element={element}
           kind={def.particle}
-          color={def.accent}
+          color={element === 'fire' ? def.color : def.accent}
           extent={extent}
           count={quality.particleCount}
         />

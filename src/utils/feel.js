@@ -111,6 +111,22 @@ const COMBO_SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 131
 
 // ── SFX vocabulary ────────────────────────────────────────────────────────────
 const SFX = {
+  elementFire() {
+    noise({ dur: 0.5, type: 'bandpass', freq: 850, q: 0.8, gain: 0.25 });
+    tone({ freq: 180, freqTo: 420, dur: 0.3, type: 'triangle', gain: 0.16 });
+  },
+  elementWater() {
+    noise({ dur: 0.45, type: 'lowpass', freq: 650, gain: 0.16 });
+    tone({ freq: 520, freqTo: 980, dur: 0.22, type: 'sine', gain: 0.2 });
+    tone({ freq: 780, freqTo: 1170, dur: 0.2, type: 'sine', gain: 0.12, when: 0.13 });
+  },
+  elementIce() {
+    for (let i = 0; i < 3; i++) tone({ freq: 1200 * [1, 1.5, 2][i], dur: 0.45, type: 'sine', gain: 0.1, when: i * 0.09 });
+  },
+  elementNature() {
+    noise({ dur: 0.35, type: 'lowpass', freq: 1800, gain: 0.08 });
+    for (let i = 0; i < 3; i++) tone({ freq: [392, 494, 587][i], dur: 0.3, type: 'triangle', gain: 0.1, when: i * 0.12 });
+  },
   orb(combo = 0) {
     const f = COMBO_SCALE[Math.min(combo, COMBO_SCALE.length - 1)];
     tone({ freq: f, freqTo: f * 1.5, dur: 0.1, type: 'triangle', gain: 0.42 });
@@ -286,6 +302,10 @@ const SFX = {
 // Distinct patterns (ms, or [gap, buzz, gap, buzz…]) so events are identifiable by
 // feel alone. Orb rises with the combo to mirror the pitch climb.
 const HAPTICS = {
+  elementFire: [12, 20, 8],
+  elementWater: [8, 35, 8],
+  elementIce: [5, 25, 5, 25, 5],
+  elementNature: 12,
   orb: (combo = 0) => 8 + Math.min(combo, 6) * 3, // 8 → 26ms
   jump: 14,
   boost: [0, 25, 30, 25],

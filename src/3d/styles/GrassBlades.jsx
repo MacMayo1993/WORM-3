@@ -57,6 +57,12 @@ const grassVertexShader = `
     // Secondary cross-sway
     float windY = cos(time * 1.6 + phase * 0.6) * 0.10;
 
+    vec3 worldRoot = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xyz;
+    float meadow = sin(dot(worldRoot, vec3(0.7, 0.25, 0.6)) - time * 1.25);
+    windX = mix(windX, meadow * 0.38 + sin(time * 2.0 + phase) * 0.06, elemental);
+    windY = mix(windY, meadow * 0.16, elemental);
+    // Curl tapers to zero at the root, so the leaf remains attached to its tile.
+    localPos.z -= elemental * bladeH * hf * (0.08 + 0.06 * sin(time * 0.8 + phase));
     localPos.x += windX * hf * bladeH;
     localPos.y += windY * hf * bladeH;
 
@@ -91,7 +97,8 @@ const grassFragmentShader = `
     color *= 0.6 + 0.4 * smoothstep(0.0, 0.12, vUv.y);
 
     float vein = 1.0 - smoothstep(0.025, 0.13, across);
-    color += vec3(0.12, 0.20, 0.055) * vein * vUv.y * elemental;
+    float veins = pow(0.5 + 0.5 * cos(vUv.y * 34.0 - across * 9.0), 12.0) * (1.0 - across);
+    color += vec3(0.12, 0.20, 0.055) * max(vein, veins * 0.5) * vUv.y * elemental;
     float flower = step(0.965, vBladeTint) * smoothstep(0.78, 1.0, vUv.y) * elemental;
     color = mix(color, vec3(1.0, 0.82, 0.42), flower * 0.85);
     gl_FragColor = vec4(color, 1.0);
