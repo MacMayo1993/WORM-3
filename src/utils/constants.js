@@ -2,12 +2,12 @@
 // Core game constants and color mappings
 
 export const COLORS = {
-  red: '#ef4444',
-  blue: '#3b82f6',
-  yellow: '#FFD500',
-  white: '#ffffff',
-  orange: '#f97316',
-  green: '#22c55e',
+  red: '#DC3154',
+  blue: '#3973E8',
+  yellow: '#FFE600',
+  white: '#FFFFFF',
+  orange: '#E98D06',
+  green: '#38C875',
   black: '#121212',
   wormhole: '#dda15e'
 };
