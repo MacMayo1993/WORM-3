@@ -1,3 +1,4 @@
+import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 // src/worm/healerWorm/wormSim.js
 //
 // Pure(-ish) worm simulation core, extracted from useWormCrawler.js (2026-07).
@@ -466,7 +467,7 @@ export function startElemental(sim, ctx, type) {
     // camera pulls out to the opening-overview framing for a moment to show the
     // cube transform, then eases back to the chase (WormChaseCamera reads this).
     sim.elementalFocusT = ELEMENTAL_FOCUS_DURATION;
-    ctx.feel('orb');
+    ctx.feel(ELEMENTAL_EXPERIENCE[type]?.sound ?? 'orb');
     ctx.onElementalTheme(type, ELEMENTAL_DURATION);
 }
 

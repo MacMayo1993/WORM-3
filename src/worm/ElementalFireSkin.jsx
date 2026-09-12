@@ -218,7 +218,7 @@ const vertexShader = /* glsl */`
       float r2 = h2(aSeed, aIndex);
       float r3 = h1(aSeed * 1.7 + 3.0, aIndex * 2.3 + 1.0);
       float phase = (r1 + r2) * 6.2831853;
-      float rate = 6.5 + r2 * 7.0;
+      float rate = 2.8 + r2 * 3.0;
       // Length spread: a few taller leaders over a bed of short stubs layers the
       // fire. Spread tightened so the tallest leaders stay close to the pack rather
       // than shooting off the top edge as lone spikes.
@@ -228,14 +228,14 @@ const vertexShader = /* glsl */`
       float flick = 0.70 + 0.42 * sin(T * rate + phase) + 0.18 * sin(T * rate * 1.93 + phase * 1.7);
       // The gust rides ON the per-tongue flicker rather than replacing it: the
       // tongue keeps its own life, the band decides how far it gets to throw.
-      float band = (0.70 + 0.52 * gust) * tall * arrive;
-      vHeat = clamp(0.28 + 0.55 * gust + 0.32 * (aCell.y * 0.5 + upFacing * 0.5), 0.0, 1.0);
+      float band = (0.70 + 0.52 * gust) * tall * arrive * (1.0 - smoothstep(0.0, 0.75, uEnv.z));
+      vHeat = clamp(0.28 + 0.22 * sin(arrive * 3.141593) + 0.55 * gust + 0.32 * (aCell.y * 0.5 + upFacing * 0.5), 0.0, 1.0);
 
       vec2 size = vec2(${FLAME_W} * scl * (0.85 + 0.25 * flick),
                        ${FLAME_H} * scl * (0.78 + 0.48 * flick) * band);
 
       // Root the tongue somewhere inside the tile, in the tile's own plane.
-      vec3 anchor = (cellMatrix * vec4((r1 - 0.5) * 0.62, (r3 - 0.5) * 0.62, 0.02, 1.0)).xyz;
+      vec3 anchor = (cellMatrix * vec4(cos(phase) * (0.24 + 0.16 * r1), sin(phase) * (0.24 + 0.16 * r1), 0.02, 1.0)).xyz;
 
       // Splay: each tongue leaves along its own axis, tilted a little off the face
       // normal. Still outward — the axis never falls below the surface — but the

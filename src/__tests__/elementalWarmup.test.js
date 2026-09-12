@@ -26,11 +26,11 @@ import { ELEMENTAL_DEFS } from '../worm/healerWorm/elementalDefs.js';
 const fakeRenderer = () => ({ compile: vi.fn() });
 const fakeCamera = {};
 
-// Three materials per orb (core / shell / inner), plus the skin:
+// Three orb materials, one ambient particle material, plus the skin:
 //   surface → 1, flames → 2 (both detail tiers), blades → 1
 const SKIN_MATERIALS = { surface: 1, flames: 2, blades: 1 };
 const expectedCount = Object.values(ELEMENTAL_DEFS).reduce(
-  (n, def) => n + 3 + (SKIN_MATERIALS[def.renderer] ?? 0),
+  (n, def) => n + 4 + (SKIN_MATERIALS[def.renderer] ?? 0),
   0
 );
 
