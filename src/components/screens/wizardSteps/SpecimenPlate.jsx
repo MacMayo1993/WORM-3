@@ -86,6 +86,7 @@ export default function SpecimenPlate({
   hint = null,
   sticky = false,
   flush = false,
+  wideArt = false,
   children
 }) {
   const isMobile = useIsMobile();
@@ -169,15 +170,15 @@ export default function SpecimenPlate({
           }} />
 
           {onPrev
-            ? <button onClick={onPrev} aria-label={`Previous ${caption?.toLowerCase() || 'option'}`} style={plateArrow}>‹</button>
+            ? <button onClick={onPrev} aria-label={`Previous ${caption?.toLowerCase() || 'option'}`} style={{ ...plateArrow, ...(wideArt ? { position: 'absolute', left: 0 } : {}) }}>‹</button>
             : <span style={{ width: TOUCH_TARGET, flexShrink: 0 }} />}
 
-          <div style={{ zIndex: 1, display: 'flex', justifyContent: 'center', flex: 1, minWidth: 0 }}>
+          <div style={{ zIndex: 1, display: 'flex', justifyContent: 'center', flex: 1, minWidth: 0, ...(wideArt ? { pointerEvents: 'none' } : {}) }}>
             {art}
           </div>
 
           {onNext
-            ? <button onClick={onNext} aria-label={`Next ${caption?.toLowerCase() || 'option'}`} style={plateArrow}>›</button>
+            ? <button onClick={onNext} aria-label={`Next ${caption?.toLowerCase() || 'option'}`} style={{ ...plateArrow, ...(wideArt ? { position: 'absolute', right: 0 } : {}) }}>›</button>
             : <span style={{ width: TOUCH_TARGET, flexShrink: 0 }} />}
         </div>
 

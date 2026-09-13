@@ -217,17 +217,25 @@ function _initScene() {
     scene.add(shadow); return shadow;
   });
 
-  // A quiet floor gives the selector specimen contact and scale, without bloom.
+  // A miniature tile surface gives the selector the same visual vocabulary
+  // as the cube. Built once, reused by every character, hidden in thumbnails.
   characterStage = new THREE.Group();
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(0.50, 64),
-    new THREE.MeshBasicMaterial({ color: '#536755', toneMapped: false }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.scale.y = 0.62;
-  floor.position.set(-0.30, -0.115, 0);
-  const stageRim = new THREE.Mesh(new THREE.RingGeometry(0.50, 0.506, 64),
-    new THREE.MeshBasicMaterial({ color: '#a6ba94', toneMapped: false, side: THREE.DoubleSide }));
-  stageRim.rotation.copy(floor.rotation); stageRim.scale.copy(floor.scale); stageRim.position.copy(floor.position);
-  characterStage.add(floor, stageRim); characterStage.visible = false; scene.add(characterStage);
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.07, 0.66),
+    new THREE.MeshStandardMaterial({ color: '#23372e', roughness: 0.85 }));
+  plinth.position.set(-0.30, -0.16, 0);
+  characterStage.add(plinth);
+  const tileGeo = new THREE.BoxGeometry(0.198, 0.025, 0.198);
+  const tileMats = ['#729487', '#a8b79b', '#557970', '#b5a281'].map(color =>
+    new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.08 }));
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 5; col++) {
+      const tile = new THREE.Mesh(tileGeo, tileMats[(col + row * 2) % tileMats.length]);
+      tile.position.set(-0.30 + (col - 2) * 0.212, -0.112, (row - 1) * 0.212);
+      characterStage.add(tile);
+    }
+  }
+  characterStage.visible = false;
+  scene.add(characterStage);
 
   // Warm key + cool fill, enough to show the clearcoat highlight rolling over
   // the beads without an environment map.

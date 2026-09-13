@@ -3,7 +3,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { useIsMobile } from '../../hooks/index.js';
 import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
-import { NIGHT_TEXT, NIGHT_TEXT_MUTED, UI_CREAM, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
+import { UI_CREAM, TEXT_XS } from '../../utils/uiTheme.js';
 import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_SURFACE, WIZ_CARD_SHADOW, WIZ_SURFACE_RAISED, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import { WORM_DIFFICULTIES } from '../../worm/wormDifficulty.js';
@@ -11,7 +11,7 @@ import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, SizeStep, styleCategory,
   SpecimenPlate, LockPip, PickerHeading, SIZE_TIERS,
-  sceneLabel, paletteLabel, sizeLabel
+  sceneLabel, paletteLabel, sizeLabel, bgOptionFor
 } from './wizardSteps/index.jsx';
 
 const ACCENT = '#6A2C91';
@@ -63,12 +63,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     const prevChar = () => setWormCharacter(WORM_CHARACTERS[(charIndex - 1 + WORM_CHARACTERS.length) % WORM_CHARACTERS.length].id);
     const nextChar = () => setWormCharacter(WORM_CHARACTERS[(charIndex + 1) % WORM_CHARACTERS.length].id);
 
-    // "Steady Crawler — reliable healing on every cube size" → named trait plus
-    // its explanation, so the trait itself can be set apart from the prose.
-    const [rawTrait, ...traitRest] = activeCharacter.special.split('—');
-    const traitName = rawTrait.trim();
-    const traitDetail = traitRest.join('—').trim();
-
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {/* ── Character plate ── */}
@@ -76,6 +70,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         <SpecimenPlate
           flush={isMobile}
           caption="Character"
+          wideArt
+          backdrop={bgOptionFor(settings.backgroundTheme)}
           index={charIndex + 1}
           total={WORM_CHARACTERS.length}
           title={activeCharacter.label}
@@ -83,46 +79,26 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           onPrev={prevChar}
           onNext={nextChar}
           art={
-            <WormPreviewCanvas
-              characterId={wormCharacterId}
-              skinId={wormSkinId}
-              hatId={wormHatId}
-              size={isMobile ? 256 : 300}
-              framing="character"
-              style={{ width: '100%', maxWidth: 300, height: 'auto', aspectRatio: '1' }}
-              animated
-            />
-          }
-          subtitle={
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px',
-              background: `${activeSkin.glow}28`, border: `1px solid ${activeSkin.glow}55`,
-              color: activeSkin.glow, fontSize: TEXT_MICRO, fontWeight: 800,
-              letterSpacing: '0.16em', textTransform: 'uppercase', padding: '3px 11px', borderRadius: '999px',
-              transition: 'all 0.4s ease'
-            }}>
-              {activeCharacter.type}
-              <span style={{ opacity: 0.5 }}>·</span>
-              <span style={{ letterSpacing: '0.06em', textTransform: 'none', fontWeight: 600, opacity: 0.85 }}>
-                {activeCharacter.subtitle}
-              </span>
+            <div style={{ width: '100%', maxWidth: 360, aspectRatio: '4 / 3', maxHeight: '30svh',
+              position: 'relative', overflow: 'hidden' }}>
+              <WormPreviewCanvas
+                characterId={wormCharacterId}
+                skinId={wormSkinId}
+                hatId={wormHatId}
+                size={isMobile ? 288 : 320}
+                framing="character"
+                style={{ width: '100%', height: 'auto', aspectRatio: '1',
+                  position: 'absolute', top: '50%', transform: 'translateY(-50%)' }}
+                animated
+              />
             </div>
           }
         >
-          {/* Signature trait */}
-          <div style={{ alignSelf: 'stretch', display: 'flex', gap: '9px', alignItems: 'flex-start', paddingLeft: '2px', zIndex: 1 }}>
-            <span style={{ color: activeSkin.glow, fontSize: '10px', lineHeight: 1.6, flexShrink: 0 }}>◆</span>
-            <span style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED, lineHeight: 1.5 }}>
-              <span style={{ color: NIGHT_TEXT, fontWeight: 700 }}>{traitName}</span>
-              {traitDetail ? ` — ${traitDetail}` : ''}
-            </span>
-          </div>
-
           {/* Page dots: the marker stays small, the touch area does not. */}
-          <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', alignItems: 'center', zIndex: 1 }}>
+          <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', zIndex: 1 }}>
             {WORM_CHARACTERS.map(c => (
               <button key={c.id} type="button" onClick={() => setWormCharacter(c.id)} aria-label={c.label} aria-pressed={c.id === wormCharacterId} style={{
-                width: 48, height: 48, borderRadius: 12, display: 'grid', placeItems: 'center',
+                width: 44, height: 44, borderRadius: 12, display: 'grid', placeItems: 'center',
                 background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
               }}>
@@ -238,8 +214,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       key: 'character',
       icon: 'character',
       label: 'Character',
-      title: 'Pick Worm Type',
-      subtitle: 'Select your character, then customize skin & hat',
+      title: 'Choose your worm',
+      primaryLabel: 'Continue',
       summary: `${activeCharacter.label} · ${activeSkin.label}`,
       hero: renderCharacter('hero'),
       content: renderCharacter('body')
