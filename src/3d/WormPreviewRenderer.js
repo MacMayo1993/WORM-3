@@ -1,3 +1,4 @@
+import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormPreviewMotion.js';
 // WormPreviewRenderer.js
 // Renders worm thumbnails — the character picker's plate, the store's skin and
 // hat cards — using the *same* geometry and materials as the worm you steer in
@@ -178,7 +179,7 @@ function _buildRig() {
 // all, and wrong at hero size — a halo or a wizard's point sits well above the
 // crown and was being cut off by the top of the frame.
 const FRAMING = {
-  character: { pos: [-0.15, 1.0, 1.82], look: [-0.30, 0.06, 0], yaw: -0.12 },
+  character: { pos: [0.12, 1.0, 1.82], look: [-0.30, 0.06, 0], yaw: 0 },
   // Level runway: travel along X projects horizontally onto the menu's floor.
   runway: { pos: [-0.36, 0.62, 1.68], look: [-0.36, 0.02, 0], yaw: 0 },
   body: { pos: [0.34, 0.66, 0.97], look: [-0.30, 0.05, -0.12], yaw: -0.38 },
@@ -299,7 +300,7 @@ function _bufferFor(size, ctx) {
 // Where segment `i` sits, in the worm's local space. Each character moves
 // differently in game, so each one stands differently here: the inch worm
 // arches, the wiggle worm snakes, everything else trails in a lazy S.
-function _segmentOffset(i, character, time, out, crawling = false) {
+function _segmentOffset(i, character, time, out, crawling = false, roaming = false) {
   const inch = character === 'inch';
   const wiggle = character === 'wiggle';
   const book = character === 'book';
@@ -327,12 +328,15 @@ function _segmentOffset(i, character, time, out, crawling = false) {
     y = crawling ? 0 : Math.sin(time * 1.4 + d * 3) * 0.004;
   }
   out.set(-d, y, z);
+  if (roaming) previewPathPoint(time * PREVIEW_CRAWL_SPEED - d, out, z * 0.3);
   return out;
 }
 
 const _off = new THREE.Vector3();
 const _anchor = new THREE.Vector3();
 const _menuForward = new THREE.Vector3();
+const _roamForward = new THREE.Vector3();
+const _roamAhead = new THREE.Vector3();
 const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, null], mouth: null, hat: null };
 
 // Book Worm page-flip scratch (preview only — see the isBook block in _poseWorm).
@@ -350,6 +354,12 @@ const _pbZAxisUnit = new THREE.Vector3(0, 0, 1);
 function _poseWorm(opts, time) {
   const { characterId, skinId, hatId } = opts;
   const headOnly = opts.framing === 'head';
+  const roaming = opts.framing === 'character';
+  if (roaming) {
+    previewPathPoint(time * PREVIEW_CRAWL_SPEED, _roamForward);
+    previewPathPoint(time * PREVIEW_CRAWL_SPEED + 0.002, _roamAhead);
+    _roamForward.subVectors(_roamAhead, _roamForward).normalize();
+  }
   const skin = getSkin(skinId);
   const isInch = characterId === 'inch';
   const isGlow = characterId === 'glow';
@@ -379,7 +389,7 @@ function _poseWorm(opts, time) {
 
   for (let i = 0; i < SEGMENTS; i++) {
     if (opts.companion) menuWormSegment(opts.companion, i, _off);
-    else _segmentOffset(i, characterId, time, _off, (opts.framing === 'runway' || opts.framing === 'character'));
+    else _segmentOffset(i, characterId, time, _off, (opts.framing === 'runway' || opts.framing === 'character'), opts.framing === 'character');
     contactShadows[i].visible = !!opts.companion || opts.framing === 'character';
     if (opts.framing === 'character') {
       contactShadows[i].position.copy(_off).applyAxisAngle(UP, FRAMING.character.yaw);
@@ -441,7 +451,12 @@ function _poseWorm(opts, time) {
     if (mobiTail.group.visible) {
       mobiTail.group.position.copy(_off);
       mobiTail.group.scale.setScalar(MOBI_SEGMENT_RADIUS);
-      orientMobi(mobiTail.group, FWD, UP);
+      if (roaming) {
+        previewPathPoint(time * PREVIEW_CRAWL_SPEED - i * SPACING, _menuForward);
+        previewPathPoint(time * PREVIEW_CRAWL_SPEED - i * SPACING + 0.002, _roamAhead);
+        _menuForward.subVectors(_roamAhead, _menuForward).setY(0).normalize();
+      }
+      orientMobi(mobiTail.group, roaming ? _menuForward : FWD, UP);
       mobiTail.core.material.color.copy(_color);
       mobiTail.core.rotation.y = time * 0.48;
     }
@@ -452,7 +467,7 @@ function _poseWorm(opts, time) {
     // sway — so the preview shows the actual resting shape instead of a
     // moment frozen mid-turn.
     if (pagesShown) {
-      _segmentOffset(i - 1, characterId, time, _pbPrevOff, (opts.framing === 'runway' || opts.framing === 'character'));
+      _segmentOffset(i - 1, characterId, time, _pbPrevOff, (opts.framing === 'runway' || opts.framing === 'character'), opts.framing === 'character');
       _pbPrevOff.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y; // same constant raise _off already has — a uniform lift shouldn't skew the segment-to-segment direction
       _pbZ.subVectors(_off, _pbPrevOff).normalize(); // backward = away from the segment ahead
       if (_pbZ.lengthSq() < 1e-8) _pbZ.set(0, 0, 1);
@@ -529,12 +544,13 @@ function _poseWorm(opts, time) {
   rig.glowLight.intensity = isGlow ? 0.5 + Math.sin(time * 2.4) * 0.15 : 0;
   if (isGlow) {
     rig.glowLight.color.set(skin.glow);
-    rig.glowLight.position.set(0, 0.14, 0);
+    rig.glowLight.position.copy(rig.beads[0].position);
+    rig.glowLight.position.y += 0.14;
   }
 
   // Face — same layout the played worm uses.
   if (opts.companion) menuWormSegment(opts.companion, 0, _anchor);
-  else _segmentOffset(0, characterId, time, _anchor, (opts.framing === 'runway' || opts.framing === 'character'));
+  else _segmentOffset(0, characterId, time, _anchor, (opts.framing === 'runway' || opts.framing === 'character'), opts.framing === 'character');
   rig.glasses.forEach(g => { g.visible = isBook; });
   _faceParts.eyes[0] = rig.eyes[0];
   _faceParts.eyes[1] = rig.eyes[1];
@@ -548,7 +564,7 @@ function _poseWorm(opts, time) {
   // Its head rides at the book body's height, matching WormFace in gameplay.
   if (isBook) _anchor.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y;
   if (opts.companion) _menuForward.set(Math.cos(opts.companion.heading), 0, Math.sin(opts.companion.heading));
-  layoutWormFace(_anchor, opts.companion ? _menuForward : FWD, UP, HEAD_SCALE, _faceParts);
+  layoutWormFace(_anchor, opts.companion ? _menuForward : (roaming ? _roamForward : FWD), UP, HEAD_SCALE, _faceParts);
 
   // An occasional blink, squashing the eye and its pupil together.
   const blink = Math.sin(time * 0.9) > 0.985 ? 0.2 : 1;
@@ -562,7 +578,7 @@ function _poseWorm(opts, time) {
   rig.mouth.visible = !isMobi;
   if (isMobi) {
     rig.mobi.group.position.copy(_anchor);
-    orientMobi(rig.mobi.group, FWD, UP);
+    orientMobi(rig.mobi.group, roaming ? _roamForward : FWD, UP);
     animateMobi(rig.mobi, time);
     rig.hatGroup.position.copy(_anchor).addScaledVector(UP, MOBI_RADIUS * 1.1);
     rig.hatGroup.quaternion.copy(rig.mobi.group.quaternion);
@@ -671,26 +687,30 @@ const registry = new Map();
 export function hasActiveWormPreviews() { return registry.size > 0; }
 
 /** Driven by TilePreviewHost's useFrame when using the shared renderer. */
-// Animated previews cost a full size² pixel readback per drawn frame, so they
-// run at ANIMATED_FPS rather than the main loop's rate — idle worm motion is
-// slow enough that nobody can tell, and the store's static cards cost nothing
-// after their first render.
-const ANIMATED_FPS = 20;
-const ANIMATED_STEP = 1 / ANIMATED_FPS;
+// Only the large character stage runs at 60 Hz. Static swatches are rendered
+// two at a time so opening/changing a character does not draw every hat at once.
+const ANIMATED_STEP = 1 / 20;
+const CHARACTER_STEP = 1 / 60;
 
 export function tickWormPreviews(delta) {
-  simTime += delta;
+  simTime += Math.min(0.05, Math.max(0, delta));
+  let staticBudget = 2;
   for (const info of registry.values()) {
     if (info.animated && info.opts.companion) stepMenuWorm(info.opts.companion, delta);
+    const characterStage = info.opts.framing === 'character';
+    const step = characterStage ? CHARACTER_STEP : ANIMATED_STEP;
+    if (info.animated && !prefersReducedMotion()) info.age += Math.min(0.05, Math.max(0, delta));
+    const poseTime = characterStage ? info.age : simTime;
     if (info.dirty) {
-      renderToCanvas(info.opts, simTime, info.canvas);
+      if (!info.animated && staticBudget-- <= 0) continue;
+      renderToCanvas(info.opts, poseTime, info.canvas);
       info.dirty = false;
-      info.nextFrame = simTime + ANIMATED_STEP;
+      info.nextFrame = simTime + step;
       continue;
     }
-    if (!info.animated || simTime < (info.nextFrame ?? 0)) continue;
-    renderToCanvas(info.opts, simTime, info.canvas);
-    info.nextFrame = simTime + ANIMATED_STEP;
+    if (!info.animated || prefersReducedMotion() || simTime + 1e-6 < (info.nextFrame ?? 0)) continue;
+    renderToCanvas(info.opts, poseTime, info.canvas);
+    info.nextFrame = nextPreviewFrame(info.nextFrame, simTime + 1e-6, step);
   }
 }
 
@@ -734,7 +754,7 @@ function maybeStopLoop() {
  */
 export function registerWormPreview(canvas, opts) {
   const id = ++idCounter;
-  registry.set(id, { canvas, opts: { ...opts }, animated: !!opts.animated, dirty: true });
+  registry.set(id, { canvas, opts: { ...opts }, animated: !!opts.animated, dirty: true, age: 0 });
   maybeStartLoop();
   return id;
 }
@@ -742,6 +762,7 @@ export function registerWormPreview(canvas, opts) {
 export function updateWormPreview(id, opts) {
   const info = registry.get(id);
   if (!info) return;
+  if (info.opts.characterId !== opts.characterId || info.opts.framing !== opts.framing) info.age = 0;
   info.opts = { ...opts };
   info.animated = !!opts.animated;
   info.dirty = true;

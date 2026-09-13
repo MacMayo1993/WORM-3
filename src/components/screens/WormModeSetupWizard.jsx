@@ -85,7 +85,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 characterId={wormCharacterId}
                 skinId={wormSkinId}
                 hatId={wormHatId}
-                size={isMobile ? 288 : 320}
+                size={240}
+                maxPixelRatio={1}
                 framing="character"
                 style={{ width: '100%', height: 'auto', aspectRatio: '1',
                   position: 'absolute', top: '50%', transform: 'translateY(-50%)' }}
