@@ -1,3 +1,4 @@
+import { boundedWormZoom } from './healerWorm/zoomLimit.js';
 import React, { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -374,14 +375,12 @@ export default function WormChaseCamera({ worm, size }) {
             zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 3.0);
         }
 
-        // Permanent zoom scales with orbs collected so the longer worm always fits in frame.
-        // Each orb adds 0.18 units of pull-back; cap is size-relative.
-        // Stop the mega-worm pull-back 20% sooner so its heading remains readable.
-        const MAX_PERM_ZOOM = size * 2.6 * 0.8;
+        // Growth and pickup bursts share one ceiling. The furthest backward
+        // distance is 20% closer, including the base/portrait offset in that ratio.
         const orbCount = Math.max(0, Math.floor((tailLen - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
-        const permZoom = Math.min(orbCount * 0.18, MAX_PERM_ZOOM);
         const aspectZoomBoost = THREE.MathUtils.lerp(0, 0.4, portraitFactor);
-        const extraZoom = permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
+        const extraZoom = boundedWormZoom(size, CAM_BACK_BASE + aspectZoomBoost * 0.9,
+            orbCount, Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM));
         const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
         const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
 
