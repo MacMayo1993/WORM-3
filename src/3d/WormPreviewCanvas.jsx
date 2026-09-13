@@ -24,7 +24,7 @@ const renderScale = (maxPixelRatio) => Math.min(maxPixelRatio, typeof window ===
  * @param size         CSS size in px (square)
  * @param maxPixelRatio  cap readback resolution for groups of animated previews
  * @param animated     idle motion — true for hero previews, false for chips
- * @param framing      'body' for the whole worm, 'head' for a hat portrait
+ * @param framing      'body' for thumbnails, 'character' for the selector stage, 'head' for hats
  */
 export default function WormPreviewCanvas({
   characterId = 'classic',

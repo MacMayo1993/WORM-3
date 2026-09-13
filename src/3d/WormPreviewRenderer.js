@@ -16,6 +16,7 @@
 //   • UI components call registerWormPreview / updateWormPreview /
 //     unregisterWormPreview (see WormPreviewCanvas.jsx).
 
+import { prefersReducedMotion } from '../utils/device.js';
 import { finishWormEyes, wormBodyTaper } from '../worm/wormCharacterFinish.js';
 import * as THREE from 'three';
 import { stepMenuWorm, menuWormSegment } from './menuWormMotion.js';
@@ -63,6 +64,7 @@ const _targets = new Map();   // size → WebGLRenderTarget
 const _buffers = new Map();   // size → { pixels: Uint8Array, image: ImageData }
 
 let scene = null;
+let characterStage = null;
 let camera = null;
 let companionCamera = null;
 let contactShadows = [];
@@ -176,6 +178,7 @@ function _buildRig() {
 // all, and wrong at hero size — a halo or a wizard's point sits well above the
 // crown and was being cut off by the top of the frame.
 const FRAMING = {
+  character: { pos: [-0.15, 1.0, 1.82], look: [-0.30, 0.06, 0], yaw: -0.12 },
   // Level runway: travel along X projects horizontally onto the menu's floor.
   runway: { pos: [-0.36, 0.62, 1.68], look: [-0.36, 0.02, 0], yaw: 0 },
   body: { pos: [0.34, 0.66, 0.97], look: [-0.30, 0.05, -0.12], yaw: -0.38 },
@@ -213,6 +216,18 @@ function _initScene() {
     shadow.rotation.x = -Math.PI / 2; shadow.scale.setScalar(0.3); shadow.visible = false;
     scene.add(shadow); return shadow;
   });
+
+  // A quiet floor gives the selector specimen contact and scale, without bloom.
+  characterStage = new THREE.Group();
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(0.50, 64),
+    new THREE.MeshBasicMaterial({ color: '#536755', toneMapped: false }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.scale.y = 0.62;
+  floor.position.set(-0.30, -0.115, 0);
+  const stageRim = new THREE.Mesh(new THREE.RingGeometry(0.50, 0.506, 64),
+    new THREE.MeshBasicMaterial({ color: '#a6ba94', toneMapped: false, side: THREE.DoubleSide }));
+  stageRim.rotation.copy(floor.rotation); stageRim.scale.copy(floor.scale); stageRim.position.copy(floor.position);
+  characterStage.add(floor, stageRim); characterStage.visible = false; scene.add(characterStage);
 
   // Warm key + cool fill, enough to show the clearcoat highlight rolling over
   // the beads without an environment map.
@@ -356,8 +371,12 @@ function _poseWorm(opts, time) {
 
   for (let i = 0; i < SEGMENTS; i++) {
     if (opts.companion) menuWormSegment(opts.companion, i, _off);
-    else _segmentOffset(i, characterId, time, _off, opts.framing === 'runway');
-    contactShadows[i].visible = !!opts.companion;
+    else _segmentOffset(i, characterId, time, _off, (opts.framing === 'runway' || opts.framing === 'character'));
+    contactShadows[i].visible = !!opts.companion || opts.framing === 'character';
+    if (opts.framing === 'character') {
+      contactShadows[i].position.copy(_off).applyAxisAngle(UP, FRAMING.character.yaw);
+      contactShadows[i].position.y = -0.11;
+    }
     if (opts.companion) contactShadows[i].position.set(_off.x, 0.001, _off.z);
     const bead = rig.beads[i];
     const box = rig.boxes[i];
@@ -425,7 +444,7 @@ function _poseWorm(opts, time) {
     // sway — so the preview shows the actual resting shape instead of a
     // moment frozen mid-turn.
     if (pagesShown) {
-      _segmentOffset(i - 1, characterId, time, _pbPrevOff, opts.framing === 'runway');
+      _segmentOffset(i - 1, characterId, time, _pbPrevOff, (opts.framing === 'runway' || opts.framing === 'character'));
       _pbPrevOff.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y; // same constant raise _off already has — a uniform lift shouldn't skew the segment-to-segment direction
       _pbZ.subVectors(_off, _pbPrevOff).normalize(); // backward = away from the segment ahead
       if (_pbZ.lengthSq() < 1e-8) _pbZ.set(0, 0, 1);
@@ -507,7 +526,7 @@ function _poseWorm(opts, time) {
 
   // Face — same layout the played worm uses.
   if (opts.companion) menuWormSegment(opts.companion, 0, _anchor);
-  else _segmentOffset(0, characterId, time, _anchor, opts.framing === 'runway');
+  else _segmentOffset(0, characterId, time, _anchor, (opts.framing === 'runway' || opts.framing === 'character'));
   rig.glasses.forEach(g => { g.visible = isBook; });
   _faceParts.eyes[0] = rig.eyes[0];
   _faceParts.eyes[1] = rig.eyes[1];
@@ -590,7 +609,8 @@ function renderToCanvas(opts, time, targetCanvas) {
   const size = targetCanvas.width;
   if (!size) return;
   _frameCamera(opts.framing);
-  _poseWorm(opts, time);
+  characterStage.visible = opts.framing === 'character';
+  _poseWorm(opts, prefersReducedMotion() ? 0 : time);
   const renderCamera = opts.companion ? companionCamera : camera;
 
   const ctx = targetCanvas.getContext('2d');

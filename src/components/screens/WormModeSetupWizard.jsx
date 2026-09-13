@@ -75,7 +75,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         {slot !== 'body' && (
         <SpecimenPlate
           flush={isMobile}
-          caption="Specimen"
+          caption="Character"
           index={charIndex + 1}
           total={WORM_CHARACTERS.length}
           title={activeCharacter.label}
@@ -87,7 +87,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               characterId={wormCharacterId}
               skinId={wormSkinId}
               hatId={wormHatId}
-              size={isMobile ? 168 : 200}
+              size={isMobile ? 256 : 300}
+              framing="character"
+              style={{ width: '100%', maxWidth: 300, height: 'auto', aspectRatio: '1' }}
               animated
             />
           }
