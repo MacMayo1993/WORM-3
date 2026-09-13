@@ -9,6 +9,7 @@ import { createParityMobiusGeometry } from './parityGeometry.js';
 import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { fxBudget } from './healerWorm/fxBudget.js';
+import { useGameStore } from '../hooks/useGameStore.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 
@@ -619,7 +620,7 @@ const _collectSphere = new THREE.SphereGeometry(0.08, 8, 8);
 const _collectDummy  = new THREE.Object3D();
 const COLLECT_PARTICLE_COUNT = 12;
 
-export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
+export function OrbCollectEffect({ position, color = '#ffd700', onDone, pickup = false, reducedMotion = false }) {
   const meshRef  = useRef();
   const bloomRef = useRef();
   const timeRef  = useRef(0);
@@ -635,6 +636,7 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
   );
 
   useFrame((_state, delta) => {
+    if (pickup && useGameStore.getState().wormPaused) return;
     timeRef.current += delta;
     const t = timeRef.current;
 
@@ -654,8 +656,8 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
 
     if (bloomRef.current) {
       const bloomT = Math.min(1, t / 0.6);
-      bloomRef.current.scale.setScalar(0.3 + bloomT * 3.2);
-      bloomRef.current.material.opacity = Math.max(0, 0.85 * (1 - bloomT));
+      bloomRef.current.scale.setScalar(reducedMotion ? 0.45 : 0.3 + bloomT * 3.2);
+      bloomRef.current.material.opacity = Math.max(0, (reducedMotion ? 0.35 : 0.85) * (1 - bloomT));
     }
 
     if (t >= 0.65 && !calledDoneRef.current) {
@@ -666,7 +668,7 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
 
   return (
     <group position={position}>
-      <instancedMesh ref={meshRef} args={[_collectSphere, null, COLLECT_PARTICLE_COUNT]}>
+      <instancedMesh ref={meshRef} visible={!reducedMotion} args={[_collectSphere, null, COLLECT_PARTICLE_COUNT]}>
         <meshBasicMaterial
           color={color}
           transparent
