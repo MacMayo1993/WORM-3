@@ -723,18 +723,10 @@ const DRIFT_NOD_RATE = 0.043; // rad/s — and tips, on a period that does not
 const DRIFT_NOD_AMP = 0.60; //   divide the yaw's, so the pose never quite repeats
 
 // ─── Menu cube scale ─────────────────────────────────────────────────────────
-// The idle menu cube renders 20% smaller than it used to: at full size it
-// crowded the wordmark above it and ran under the START pill below, leaving no
-// air anywhere in the frame. Dollying the camera back would have done the same
-// job optically — the backdrop is a panorama at infinity, so pulling back only
-// shrinks the cube — but the mode carousel borrows this same camera, and its
-// cube is presenting a face and wants the frame. Scaling the group instead
-// keeps that one untouched.
-//
-// The three idle poses stay in proportion to each other; only their common
-// factor moved. Carousel and dive scales are deliberately not derived from
-// these.
-const MENU_CUBE_ZOOM = 0.8;
+// Grow both menu presentations by 5%, keeping each pose's existing proportions.
+const MENU_CUBE_GROWTH = 1.05;
+const MENU_BUTTON_LIFT_PX = 24;
+const MENU_CUBE_ZOOM = 0.8 * MENU_CUBE_GROWTH;
 const MENU_REST_SCALE = 1.022 * MENU_CUBE_ZOOM;
 const MENU_PRESS_SCALE = 0.968 * MENU_CUBE_ZOOM; // finger down on the cube
 const MENU_SHAKE_SCALE = 0.950 * MENU_CUBE_ZOOM; // the shake that precedes play
@@ -904,7 +896,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       // On portrait (phone) the presented mode cube sits higher with a large empty
       // gap below it, so drop it down into that space and size it up ~10%.
       let presentY = portrait ? 1.75 : 1.2;
-      let presentScale = portrait ? 0.79 : 1.0;
+      let presentScale = (portrait ? 0.79 : 1.0) * MENU_CUBE_GROWTH;
 
       // Grow into whatever height the DOM stage actually claimed. The overlay
       // measures itself and posts { height, baseline } (see menuCarouselState);
@@ -1486,7 +1478,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         minHeight: '100%', boxSizing: 'border-box',
         paddingTop: 'max(20px, env(safe-area-inset-top, 20px))',
-        paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+        paddingBottom: `calc(max(20px, env(safe-area-inset-bottom, 20px)) + ${MENU_BUTTON_LIFT_PX}px)`,
         paddingLeft: '12px', paddingRight: '12px',
         opacity: diving ? 0 : 1,
         transition: 'opacity 420ms ease',
@@ -1672,8 +1664,7 @@ const MenuCubeGlyph = () => (
 );
 
 const MenuStartButton = ({ visible, onClick, onDemo }) => {
-  // On phones the cluster sat ~120px off the bottom, leaving a big dead gap.
-  // Drop it near the bottom in portrait; keep the roomier desktop spacing.
+  // Lift the action cluster while retaining portrait/desktop and safe-area spacing.
   const [portrait, setPortrait] = React.useState(
     typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false
   );
@@ -1692,7 +1683,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
   return (
   <div style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingBottom: padBottom,
+    paddingBottom: `calc(${padBottom} + ${MENU_BUTTON_LIFT_PX}px)`,
     display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
     gap: '11px',
     zIndex: 4,
