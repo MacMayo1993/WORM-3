@@ -47,6 +47,7 @@ const _mobiCoreMatrix = new THREE.Matrix4();
 const _mobiSpinMatrix = new THREE.Matrix4();
 // Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
 const _bodyColor = new THREE.Color();
+const _pickupHighlight = new THREE.Color('#fff4c9');
 const _fireTail = new THREE.Vector3();
 const _fireInner = new THREE.Vector3();
 const _fireDirection = new THREE.Vector3();
@@ -230,7 +231,7 @@ export function WormBody({ worm, size }) {
             pickup.seq = flash?.seq;
             pickup.age = flash?.color ? 0 : Infinity;
             if (flash?.color) enqueuePickupPulse(pickup.pulses,
-                new THREE.Color(flash.color), worm.tailLength.current, pickup.count);
+                new THREE.Color(flash.color).lerp(_pickupHighlight, 0.28), worm.tailLength.current, pickup.count);
             else pickup.pulses.length = 0;
             pickup.count = worm.tailLength.current;
         }
@@ -685,7 +686,7 @@ export function WormBody({ worm, size }) {
                     const shimmer = elementalBodyWave(element, characterTimeRef.current, i, tLen);
                     _bodyColor.lerp(elementalBodyRef.current.color, elementStrength * (0.12 + 0.38 * shimmer));
                 }
-                _bodyColor.lerp(pickupColor, pickupWave * 0.85);
+                _bodyColor.lerp(pickupColor, pickupWave * 0.95);
                 // Keep every glass exterior clear; carried parity colors live inside it.
                 if (isMobi) mobiCoreRef.current?.setColorAt(writeIdx, _bodyColor);
                 else mesh.setColorAt(writeIdx, _bodyColor);

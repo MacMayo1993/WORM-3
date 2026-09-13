@@ -440,8 +440,7 @@ export function MagnetFX({ worm }) {
     );
 }
 
-// Burst played where a special was claimed — fires for every character (unlike the
-// glow worm's orb bloom below), since claiming one is a rare, deliberate moment.
+// Burst played where a special was claimed — fires for every character.
 //
 // Elements get their own, much bigger burst: claiming one re-skins the entire cube
 // and pulls the camera out to the overview, and the generic orb pop was far too
@@ -470,20 +469,27 @@ export function SpecialFlashSystem({ worm }) {
     );
 }
 
-// Watches for orb pickups by the glow worm and renders a color bloom at the collect point.
+// Every worm gets a color burst at its rendered head, including during rocket flight.
 // Follows the same pendingRef + useFrame polling pattern as HealBurstSystem.
 export function OrbFlashSystem({ worm }) {
-    const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
     const [flashes, setFlashes] = useState([]);
+    const seq = useRef(0);
+    const reduced = useRef(prefersReducedMotion());
 
     useFrame(() => {
-        if (!worm.pendingOrbFlashRef.current) return;
-        const { color, pos } = worm.pendingOrbFlashRef.current;
+        if (!useGameStore.getState().wormAlive) {
+            worm.pendingOrbFlashRef.current = null;
+            if (flashes.length) setFlashes([]);
+            return;
+        }
+        if (useGameStore.getState().wormPaused || !worm.pendingOrbFlashRef.current) return;
+        const { color, pos: fallback } = worm.pendingOrbFlashRef.current;
         worm.pendingOrbFlashRef.current = null;
-        // Only the glow worm gets the color bloom
-        if (wormCharacterId !== 'glow') return;
-        const id = Date.now() + Math.random();
-        setFlashes(prev => [...prev, { id, pos, color }]);
+        const pos = wormSegments.count
+            ? Array.from(wormSegments.positions.subarray(0, 3)) : fallback;
+        const id = ++seq.current;
+        // Magnet sweeps coalesce per frame; bound overlapping bursts as well.
+        setFlashes(prev => [...prev.slice(-3), { id, pos, color }]);
     });
 
     if (flashes.length === 0) return null;
@@ -494,6 +500,8 @@ export function OrbFlashSystem({ worm }) {
                     key={f.id}
                     position={f.pos}
                     color={f.color}
+                    pickup
+                    reducedMotion={reduced.current}
                     onDone={() => setFlashes(prev => prev.filter(x => x.id !== f.id))}
                 />
             ))}
