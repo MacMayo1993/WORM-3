@@ -18,11 +18,11 @@ describe('fx budget', () => {
     }
   });
 
-  it('puts Mega on the reduced budget', () => {
+  it('keeps full Mega orbs while retaining other big-board budgets', () => {
     const b = fxBudget(MEGA_SIZE);
     expect(isBigBoard(MEGA_SIZE)).toBe(true);
     expect(b.warning).toBe('lite');
-    expect(b.orbDetail).toBe('reduced');
+    expect(b.orbDetail).toBe('full');
     expect(b.trailHz).toBeLessThan(60);
     expect(b.trailDaubCap).toBeLessThan(fxBudget(3).trailDaubCap);
     expect(b.trailGlowCap).toBeLessThanOrEqual(fxBudget(3).trailGlowCap);

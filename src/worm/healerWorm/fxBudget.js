@@ -57,11 +57,9 @@ const BIG = {
   // actually turning, where a 33ms lag would show as the paint sliding off the
   // tiles it belongs to.
   trailHz: 30,
-  // Mega scales its orb population by area — 225/49 ≈ 4.6× — so the default 16
-  // becomes ~73 pickups on screen, each of which is ten-odd separately rendered
-  // pieces at full detail. This reverses "Show full-detail parity orbs on 15×15
-  // mega mode" (93ecdd9) deliberately: it is one word here to put back.
-  orbDetail: 'reduced'
+  // Keep the complete parity silhouette on Mega too. Save work through
+  // visibility culling; the current population scales by edge length, not area.
+  orbDetail: 'full'
 };
 
 /** What this board is allowed to spend. */

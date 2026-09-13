@@ -1,3 +1,5 @@
+import { getOrbMaterials } from './orbMaterials.js';
+import { createOrbVisibility } from './orbVisibility.js';
 // src/worm/ParityOrb.jsx
 // Collectible parity orbs — crystal-core visual design with inner plasma,
 // dual-layer aura, electron halos, and type-system foundation for power-ups.
@@ -36,68 +38,6 @@ export const ORB_TYPES = {
   shield: { electronColor: '#88ccff', electronEmissive: '#4499ee', glowBoost: 0.8 },
   magnet: { electronColor: '#ffdd88', electronEmissive: '#ffaa00', glowBoost: 1.5 },
 };
-
-// ── Shared module-level materials ───────────────────────────────────────────
-// Declared as JSX intrinsics these belong to R3F, which disposes them when an orb
-// is collected — and disposing the last material using a program makes three
-// destroy it, so the next orb to spawn relinks the lot. The gem shell is a
-// MeshPhysicalMaterial with clearcoat AND iridescence, the most expensive shader
-// three compiles; relinking it mid-crawl is a visible stall. There is one set per
-// (gem, band, target) combination — at most a dozen for a whole session — and they
-// are never disposed.
-//
-// Sharing is safe because every property the animator writes is either per-mesh
-// (scale, rotation, position) or uniform across orbs of the same colour (the glow
-// worm's rainbow hue and the target ring's pulse are both pure functions of time).
-const _orbMatCache = new Map();
-function getOrbMaterials(gemColor, bandColor, isTarget) {
-  const key = `${gemColor}_${bandColor}_${isTarget ? 't' : 'n'}`;
-  const hit = _orbMatCache.get(key);
-  if (hit) return hit;
-  const basic = (color, opacity, extra) =>
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false, ...extra });
-  const set = {
-    shell: new THREE.MeshPhysicalMaterial({
-      color: gemColor, emissive: gemColor, emissiveIntensity: isTarget ? 0.85 : 0.6,
-      metalness: 0, roughness: 0.06, iridescence: 1, iridescenceIOR: 1.4,
-      clearcoat: 1, clearcoatRoughness: 0.08,
-      transparent: true, opacity: 0.78, depthWrite: false, toneMapped: false
-    }),
-    innerCore: new THREE.MeshStandardMaterial({
-      color: gemColor, emissive: gemColor, emissiveIntensity: isTarget ? 2.6 : 2.0,
-      metalness: 0, roughness: 0.1, toneMapped: false
-    }),
-    innerGlow: basic(gemColor, 0.18, { blending: THREE.AdditiveBlending, side: THREE.BackSide }),
-    // Great-circle parity halo — a smooth glowing ring in place of the old
-    // wireframe octahedron. Additive so it reads as light, not a hard frame.
-    cage: basic('#e8fbff', isTarget ? 0.55 : 0.42, { blending: THREE.AdditiveBlending }),
-    // Second, cross-tilted halo so the antipodal signature reads from any angle
-    // without any straight edges.
-    cage2: basic('#dff8ff', isTarget ? 0.38 : 0.28, { blending: THREE.AdditiveBlending }),
-    // Luminous axis connecting the antipodal poles — soft additive glow rod,
-    // no longer a flat opaque cylinder.
-    axis: basic('#ffffff', 0.5, { blending: THREE.AdditiveBlending }),
-    nodeGem: new THREE.MeshBasicMaterial({ color: gemColor, toneMapped: false }),
-    nodeBand: new THREE.MeshBasicMaterial({ color: bandColor, toneMapped: false }),
-    band: new THREE.MeshStandardMaterial({
-      color: bandColor, emissive: bandColor, emissiveIntensity: isTarget ? 1.8 : 1.2,
-      metalness: 0.15, roughness: 0.06
-    }),
-    ringA: new THREE.MeshBasicMaterial({ color: gemColor, transparent: true, opacity: 0.42, depthWrite: false }),
-    ringB: new THREE.MeshBasicMaterial({ color: bandColor, transparent: true, opacity: 0.34, depthWrite: false }),
-    ringC: new THREE.MeshBasicMaterial({ color: gemColor, transparent: true, opacity: 0.28, depthWrite: false }),
-    lockRing: new THREE.MeshBasicMaterial({
-      color: '#ffffff', transparent: true, opacity: 0.30,
-      blending: THREE.AdditiveBlending, depthWrite: false
-    }),
-    reduced: new THREE.MeshStandardMaterial({
-      color: gemColor, emissive: gemColor, emissiveIntensity: 1.4,
-      roughness: 0.18, metalness: 0.05, toneMapped: false
-    })
-  };
-  _orbMatCache.set(key, set);
-  return set;
-}
 
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
 // Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
@@ -160,7 +100,7 @@ function SingleOrbImpl({
     () => (styleKey && styleKey !== 'solid' ? getTileStyleMaterial(styleKey, bandColor, false, null, gemColor) : null),
     [styleKey, bandColor, gemColor]
   );
-  const mat = useMemo(() => getOrbMaterials(gemColor, bandColor, isTarget), [gemColor, bandColor, isTarget]);
+  const mat = useMemo(() => getOrbMaterials(gemColor, bandColor, isTarget, elevated, isGlowWorm), [gemColor, bandColor, isTarget, elevated, isGlowWorm]);
   const orbGroupRef    = useRef();
   const coreRef        = useRef();
   const innerCoreRef   = useRef();
@@ -189,6 +129,7 @@ function SingleOrbImpl({
   const gridZRef      = useRef(gridZ);      gridZRef.current      = gridZ;
   const isGlowWormRef = useRef(isGlowWorm); isGlowWormRef.current = isGlowWorm;
   const typeRef       = useRef(type);       typeRef.current       = type;
+  const styledBandRef = useRef(false); styledBandRef.current = !!bandMaterial;
 
   useEffect(() => {
     registerAnim(orbKey, {
@@ -216,6 +157,7 @@ function SingleOrbImpl({
       get gridZ()         { return gridZRef.current; },
       get isGlowWorm()    { return isGlowWormRef.current; },
       get type()          { return typeRef.current; },
+      get styledBand()    { return styledBandRef.current; },
       timeOffset,
     });
     return () => unregisterAnim(orbKey);
@@ -225,11 +167,8 @@ function SingleOrbImpl({
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Very large boards can carry more than a hundred pickups. Rendering the full
-  // gem, halos, Möbius strip, and orbital system for every one turns those
-  // pickups into hundreds of draw calls, so past the 15×15 mega tier a single
-  // emissive gem keeps them readable while preserving movement and pickup. Mega
-  // (15×15) itself now renders the full orb; the fallback only kicks in above it.
+  // Optional fallback for future budgets. Every currently supported size,
+  // including Mega, selects the complete parity orb below.
   if (reducedDetail) {
     return (
       <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
@@ -362,11 +301,16 @@ export default function ParityOrbs({
   const isTunnelMode = mode === 'tunnel';
 
   const animMapRef = useRef(new Map());
+  const orbRootRef = useRef();
+  const visibility = useMemo(() => createOrbVisibility(), []);
   const registerAnim   = useCallback((key, refs) => { animMapRef.current.set(key, refs); }, []);
   const unregisterAnim = useCallback((key) => { animMapRef.current.delete(key); }, []);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
+    // PiP renders a second camera: main-camera culling must not hide its orbs.
+    const cull = !useGameStore.getState().showAntipodalPiP;
+    if (cull) visibility.begin(state.camera, orbRootRef.current);
 
     for (const refs of animMapRef.current.values()) {
       const {
@@ -402,6 +346,12 @@ export default function ParityOrbs({
         );
       }
 
+      // Keep placement current even when hidden so turning slices and camera
+      // moves bring the complete orb back immediately. Off-screen parts skip
+      // their individual animation and render-list traversal.
+      group.visible = !cull || visibility.contains(group.position, isTarget ? 1.1 : 0.85);
+      if (!group.visible) continue;
+
       // ── Crystal core spin ──────────────────────────────────────────────────
       if (core) {
         core.rotation.y = time * (isTarget ? 1.7 : 1.0);
@@ -429,7 +379,7 @@ export default function ParityOrbs({
 
       // ── Inner glow — pulses offset from outer glow ─────────────────────────
       if (innerGlow) {
-        innerGlow.material.opacity = (isTarget ? 0.28 : 0.18) + Math.sin(time * 3.8 + 1.2) * 0.07;
+        innerGlow.material.opacity = (isTarget ? 0.28 : 0.18) + Math.sin(t * 3.8 + 1.2) * 0.07;
         innerGlow.scale.setScalar(1 + Math.sin(time * 3.2) * 0.05);
       }
 
@@ -484,13 +434,13 @@ export default function ParityOrbs({
       const { isGlowWorm } = refs;
       if (isGlowWorm && !elevated) {
         if (shell && shell.material) shell.material.emissiveIntensity = (isTarget ? 3.4 : 2.6) + Math.sin(t * 4.0) * 0.9;
-        if (core && core.material) core.material.emissiveIntensity = (isTarget ? 2.4 : 1.8) + Math.sin(t * 4.0) * 0.6;
+        if (core && core.material?.emissive && !refs.styledBand) core.material.emissiveIntensity = (isTarget ? 2.4 : 1.8) + Math.sin(t * 4.0) * 0.6;
         if (glow) glow.material.opacity = (isTarget ? 0.65 : 0.50) + Math.sin(t * 4.0) * 0.22;
       }
 
       // ── Rainbow cycle for elevated (flipped-tile) orbs ────────────────────
       if (elevated) {
-        const hue = (time * 0.3) % 1;
+        const hue = (t * 0.3) % 1;
         _rainbowColor.setHSL(hue, 1.0, 0.62);
         if (shell && shell.material) {
           shell.material.color.copy(_rainbowColor);
@@ -502,11 +452,12 @@ export default function ParityOrbs({
         // render loop, for any elevated orb on a patterned face. That is a hard
         // freeze, not a glitch. The pattern is the information; leave it alone and
         // let the gem carry the rainbow.
-        if (core && core.material?.emissive) {
+        if (core && core.material?.emissive && !refs.styledBand) {
           _rainbowColor.setHSL((hue + 0.5) % 1, 1.0, 0.62);
           core.material.color.copy(_rainbowColor);
           core.material.emissive.copy(_rainbowColor);
         }
+        _rainbowColor.setHSL((hue + 0.5) % 1, 1.0, 0.62);
         if (innerCore && innerCore.material) innerCore.material.color.copy(_rainbowColor);
         if (innerGlow && innerGlow.material) {
           _rainbowColor.setHSL((hue + 0.15) % 1, 1.0, 0.70);
@@ -543,7 +494,7 @@ export default function ParityOrbs({
       if (targetGlow && isTarget) {
         targetGlow.rotation.z = time * 0.9;
         targetGlow.scale.setScalar(1 + Math.sin(time * 6.5) * 0.2);
-        targetGlow.material.opacity = 0.22 + Math.sin(time * 6.2) * 0.08;
+        targetGlow.material.opacity = 0.22 + Math.sin(t * 6.2) * 0.08;
       }
     }
   });
@@ -589,7 +540,7 @@ export default function ParityOrbs({
   }, [orbs, size, explosionFactor, isTunnelMode, targetTunnelId]);
 
   return (
-    <group>
+    <group ref={orbRootRef}>
       {orbData.map((data) => (
         <SingleOrb
           key={data.key}
