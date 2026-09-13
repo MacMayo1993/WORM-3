@@ -10,7 +10,7 @@ for (let i = 1; i <= STEPS; i++) {
   lengths.push(lengths[i - 1] + Math.hypot(RX * (Math.cos(b) - Math.cos(a)), RZ * (Math.sin(b) - Math.sin(a))));
 }
 export const PREVIEW_PATH_LENGTH = lengths[STEPS];
-export const PREVIEW_CRAWL_SPEED = 0.16;
+export const PREVIEW_CRAWL_SPEED = 0.36;
 
 export function previewPathPoint(distance, out, lateral = 0) {
   const d = ((distance % PREVIEW_PATH_LENGTH) + PREVIEW_PATH_LENGTH) % PREVIEW_PATH_LENGTH;

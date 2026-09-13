@@ -23,6 +23,7 @@ const renderScale = (maxPixelRatio) => Math.min(maxPixelRatio, typeof window ===
  * @param hatId        worm hat id ('none' for bare-headed)
  * @param size         CSS size in px (square)
  * @param maxPixelRatio  cap readback resolution for groups of animated previews
+ * @param maxRenderPixels  backing-buffer limit; large character art can opt into sharper rendering
  * @param animated     idle motion — true for hero previews, false for chips
  * @param framing      'body' for thumbnails, 'character' for the selector stage, 'head' for hats
  */
@@ -33,6 +34,7 @@ export default function WormPreviewCanvas({
   size = 64,
   animated = false,
   maxPixelRatio = 2,
+  maxRenderPixels = MAX_RENDER_PX,
   framing = 'body',
   companion,
   style,
@@ -43,7 +45,7 @@ export default function WormPreviewCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const px = Math.min(MAX_RENDER_PX, Math.round(size * renderScale(maxPixelRatio)));
+    const px = Math.min(maxRenderPixels, Math.round(size * renderScale(maxPixelRatio)));
     canvas.width = px;
     canvas.height = px;
     idRef.current = registerWormPreview(canvas, { characterId, skinId, hatId, animated, framing, companion });
@@ -53,7 +55,7 @@ export default function WormPreviewCanvas({
     };
     // Size changes remount the preview; the option effect below handles the rest.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size, maxPixelRatio]);
+  }, [size, maxPixelRatio, maxRenderPixels]);
 
   useEffect(() => {
     if (idRef.current !== null) updateWormPreview(idRef.current, { characterId, skinId, hatId, animated, framing, companion });
