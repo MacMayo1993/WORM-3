@@ -1,3 +1,5 @@
+import { ORB_GULP_DURATION } from './pickupPulse.js';
+import { wormSegments } from '../wormSegments.js';
 // src/worm/healerWorm/orbSystems.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split).
 import { memo, useState, useMemo, useRef } from 'react';
@@ -306,6 +308,9 @@ const _mfxGeos = {
     field: new THREE.TorusGeometry(0.62, 0.018, 8, 40),
 };
 const _mfxHead = new THREE.Vector3();
+const _mfxDirection = new THREE.Vector3();
+const _mfxNormal = new THREE.Vector3();
+const _mfxAxis = new THREE.Vector3(0, 0, 1);
 
 export function MagnetFX({ worm }) {
     const beadRefs = useRef([]);
@@ -322,6 +327,8 @@ export function MagnetFX({ worm }) {
     const pulseRef = useRef(0);
 
     useFrame((state, delta) => {
+        const store = useGameStore.getState();
+        const dt = store.wormPaused || !store.wormAlive ? 0 : delta;
         const queue = worm.pendingOrbAttractionsRef?.current;
         // Drain newly collected orbs into free slots.
         while (queue && queue.length > 0) {
@@ -334,6 +341,7 @@ export function MagnetFX({ worm }) {
             const slot = slots.current[slotIndex];
             slot.active = true;
             slot.t = 0;
+            slot.gulp = !!next.gulp;
             slot.from.fromArray(next.from);
             // Lift the origin to where the gem actually floated — orbs on flipped tiles
             // hover much higher. Lift along the tile's FACE normal (the same axis-aligned
@@ -342,8 +350,9 @@ export function MagnetFX({ worm }) {
             // diverge, and normalising slot.from would shove the streak's start sideways
             // off the gem — worst near corners, where the large elevated lift magnifies it.
             // Baked in once here so the per-frame flight loop stays allocation-free.
-            const faceNormal = FACE_NORMALS[next.dirKey] ?? FACE_NORMALS.PZ;
-            slot.from.addScaledVector(faceNormal, next.elevated ? ORB_ELEVATED_HOVER_HEIGHT : ORB_HOVER_HEIGHT);
+            _mfxNormal.copy(FACE_NORMALS[next.dirKey] ?? FACE_NORMALS.PZ);
+            if (next.x !== undefined) readLiveTile(next, slot.from, _mfxNormal);
+            slot.from.addScaledVector(_mfxNormal, next.elevated ? ORB_ELEVATED_HOVER_HEIGHT : ORB_HOVER_HEIGHT);
             const mesh = beadRefs.current[slotIndex];
             if (mesh) {
                 mesh.visible = true;
@@ -352,7 +361,10 @@ export function MagnetFX({ worm }) {
             pulseRef.current = 1;
         }
 
-        _mfxHead.copy(worm.headInterpPos.current);
+        // Body publishes the rendered head after jump, rocket and slice transforms.
+        // Use the same anchor through tunnels instead of chasing simulation tiles.
+        if (wormSegments.count) _mfxHead.fromArray(wormSegments.positions);
+        else _mfxHead.copy(worm.headInterpPos.current);
 
         for (let i = 0; i < slots.current.length; i++) {
             const slot = slots.current[i];
@@ -360,7 +372,7 @@ export function MagnetFX({ worm }) {
             if (!mesh) continue;
             if (!slot.active) { mesh.visible = false; continue; }
 
-            slot.t += delta / ORB_ATTRACTION_FX_DURATION;
+            slot.t += dt / (slot.gulp ? ORB_GULP_DURATION : ORB_ATTRACTION_FX_DURATION);
             if (slot.t >= 1) {
                 slot.active = false;
                 mesh.visible = false;
@@ -375,7 +387,11 @@ export function MagnetFX({ worm }) {
             // Hold full brightness through most of the flight, then fade as the worm
             // swallows it — the streak stays legible the whole way in.
             mesh.material.opacity = Math.min(1, 2.4 * (1 - t));
-            mesh.scale.setScalar(1 - 0.5 * t);
+            const shrink = slot.gulp ? Math.max(0.02, 1 - t * t) : 1 - 0.5 * t;
+            const stretch = reducedRef.current ? 0 : Math.sin(Math.PI * t);
+            mesh.scale.set(shrink * (1 - 0.3 * stretch), shrink * (1 - 0.3 * stretch), shrink * (1 + 1.5 * stretch));
+            _mfxDirection.subVectors(_mfxHead, slot.from);
+            if (_mfxDirection.lengthSq() > 1e-8) mesh.quaternion.setFromUnitVectors(_mfxAxis, _mfxDirection.normalize());
         }
 
         // Field ring around the head while the magnet is up, pulsing on each catch.
@@ -384,7 +400,7 @@ export function MagnetFX({ worm }) {
             const on = magnetT > 0;
             ringRef.current.visible = on;
             if (on) {
-                pulseRef.current = Math.max(0, pulseRef.current - delta * 3);
+                pulseRef.current = Math.max(0, pulseRef.current - dt * 3);
                 ringRef.current.position.copy(_mfxHead);
                 if (!reducedRef.current) {
                     ringRef.current.rotation.x = state.clock.elapsedTime * 0.6;
