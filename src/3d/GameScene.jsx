@@ -6,7 +6,7 @@
  */
 
 import React, { Suspense, useEffect, useMemo } from 'react';
-import { Html } from '@react-three/drei';
+import ErrorBoundary3D from './ErrorBoundary3D.jsx';
 import { useThree } from '@react-three/fiber';
 import { FogExp2 } from 'three';
 import SafeEnvironment from './SafeEnvironment.jsx';
@@ -54,39 +54,7 @@ function SceneFog({ enabled }) {
   return null;
 }
 
-class ErrorBoundary3D extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error('3D Component Error:', error);
-    console.error('Component Stack:', errorInfo.componentStack);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <group>
-          <mesh>
-            <boxGeometry args={[10, 10, 10]} />
-            <meshBasicMaterial color="red" wireframe />
-          </mesh>
-          <Html position={[0, 0, -2]}>
-            <div style={{ color: 'red', background: 'rgba(0,0,0,0.8)', padding: '10px' }}>
-              Error Loading Background
-              <br />
-              {this.state.error?.message}
-            </div>
-          </Html>
-        </group>
-      );
-    }
-    return this.props.children;
-  }
-}
+
 
 /**
  * GameScene renders all in-game 3D content.
@@ -134,6 +102,7 @@ export default function GameScene({
     size,
     cubies,
     wormHealerMode,
+    wormRunId,
     wormPhase,
     wormPaused,
     holonomyMode,
@@ -152,6 +121,7 @@ export default function GameScene({
     size: s.size,
     cubies: s.cubies,
     wormHealerMode: s.wormHealerMode,
+    wormRunId: s.wormRunId,
     wormPhase: s.wormPhase,
     wormPaused: s.wormPaused ?? false,
     holonomyMode: s.holonomyMode,
@@ -332,7 +302,7 @@ export default function GameScene({
         <AntipodalPairHighlight />
 
         {wormHealerMode && (
-          <ErrorBoundary3D>
+          <ErrorBoundary3D resetKey={wormRunId} label="Worm scene interrupted. Try again to restart.">
             <Suspense fallback={null}>
               <HealerWormMode3DWrapper
                 cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal} onAnimatedShuffle={onAnimatedShuffle}
