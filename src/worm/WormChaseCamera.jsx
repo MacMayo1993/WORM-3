@@ -374,14 +374,14 @@ export default function WormChaseCamera({ worm, size }) {
             zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 3.0);
         }
 
-        // Permanent zoom scales with orbs collected so the longer worm always fits in frame.
-        // Each orb adds 0.18 units of pull-back; cap is size-relative.
-        // Stop the mega-worm pull-back 20% sooner so its heading remains readable.
-        const MAX_PERM_ZOOM = size * 2.6 * 0.8;
+        // Keep the head and nearby hazards readable as the tail grows. Large
+        // cubes must not multiply this into a distant overview; pickup bursts
+        // share the same total allowance instead of pushing past the limit.
+        const maxGrowthZoom = Math.min(size * 0.65, 3.0);
         const orbCount = Math.max(0, Math.floor((tailLen - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
-        const permZoom = Math.min(orbCount * 0.18, MAX_PERM_ZOOM);
+        const permZoom = Math.min(orbCount * 0.10, maxGrowthZoom);
         const aspectZoomBoost = THREE.MathUtils.lerp(0, 0.4, portraitFactor);
-        const extraZoom = permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
+        const extraZoom = Math.min(maxGrowthZoom, permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM));
         const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
         const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
 
