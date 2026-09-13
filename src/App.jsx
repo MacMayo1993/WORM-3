@@ -917,7 +917,7 @@ export default function WORM3() {
 
     const wormParams = {
       wormSpeed: wizardSettings.wormSpeed ?? 2.0,
-      wormOrbCount: scaledWormOrbCount(wizardSettings.wormOrbCount ?? 40, targetSize),
+      wormOrbCount: scaledWormOrbCount(wizardSettings.wormOrbCount ?? 10, targetSize),
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
