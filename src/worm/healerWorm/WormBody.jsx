@@ -1,5 +1,5 @@
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
-import { pickupPulse, PICKUP_PULSE_DURATION } from './pickupPulse.js';
+import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
 import { wormBodyTaper } from '../wormCharacterFinish.js';
 // src/worm/healerWorm/WormBody.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
@@ -211,7 +211,7 @@ export function WormBody({ worm, size }) {
     const inchStateRef = useRef(null);
     if (!inchStateRef.current) inchStateRef.current = makeInchGaitState();
     const characterTimeRef = useRef(0);
-    const pickupRef = useRef({ seq: useGameStore.getState().wormOrbFlash?.seq, age: Infinity, active: false });
+    const pickupRef = useRef({ seq: useGameStore.getState().wormOrbFlash?.seq, age: Infinity, active: false, pulses: [], count: worm.tailLength.current });
     const elementalBodyRef = useRef({ active: false, color: new THREE.Color() });
     const pickupColor = useMemo(() => new THREE.Color(), []);
     const reducedPickupMotion = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
@@ -229,11 +229,18 @@ export function WormBody({ worm, size }) {
         if (flash?.seq !== pickup.seq) {
             pickup.seq = flash?.seq;
             pickup.age = flash?.color ? 0 : Infinity;
-            if (flash?.color) pickupColor.set(flash.color).lerp(new THREE.Color('#fff4c9'), 0.35);
+            if (flash?.color) enqueuePickupPulse(pickup.pulses,
+                new THREE.Color(flash.color), worm.tailLength.current, pickup.count);
+            else pickup.pulses.length = 0;
+            pickup.count = worm.tailLength.current;
         }
         const wasPickupActive = pickup.active;
         pickup.age += animationDelta;
-        pickup.active = pickup.age < PICKUP_PULSE_DURATION;
+        advancePickupPulses(pickup.pulses, animationDelta);
+        pickup.active = pickup.pulses.length > 0;
+        pickup.count = Math.min(pickup.count, worm.tailLength.current);
+        // Render-only scale shared with face accessories, never the collision body.
+        worm.pickupHeadScale = reducedPickupMotion ? 1 : pickupGulpScale(pickup.age);
         updateBodySurface(surface, size, liveRotation);
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
         _bodyHeadPos.copy(worm.headInterpPos.current);
@@ -297,10 +304,13 @@ export function WormBody({ worm, size }) {
                 _bookHeadDummy.position.copy(_bodyHeadPos)
                     .addScaledVector(_bodyNormal, BOOK_HEAD_LIFT);
                 _bookHeadDummy.quaternion.identity();
-                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS);
+                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * worm.pickupHeadScale);
                 _bookHeadDummy.updateMatrix();
                 headMesh.setMatrixAt(0, _bookHeadDummy.matrix);
                 _bookPageColor.set(wormColorRef.current);
+                for (const pulse of pickup.pulses) {
+                    _bookPageColor.lerp(pulse.color, pickupPulse(pulse.age, 0, pulse.count) * 0.85);
+                }
                 headMesh.setColorAt(0, _bookPageColor);
                 headMesh.count = 1;
                 headMesh.instanceMatrix.needsUpdate = true;
@@ -570,11 +580,22 @@ export function WormBody({ worm, size }) {
                 }
             }
 
-            const pickupWave = pickupPulse(pickup.age, i, tLen);
+            let pickupWave = 0;
+            let tailPop = 0;
+            // Strongest local wave wins, preserving each pickup's actual colour
+            // instead of mixing several colours into a muddy flash.
+            for (const pulse of pickup.pulses) {
+                const wave = pickupPulse(pulse.age, i, pulse.count);
+                if (i >= pulse.count) continue;
+                if (wave > pickupWave) {
+                    pickupWave = wave;
+                    pickupColor.copy(pulse.color);
+                }
+                if (i >= pulse.growthStart) tailPop = Math.max(tailPop, wave);
+            }
             if (!reducedPickupMotion) {
-                _wormDummy.scale.x *= 1 + 0.12 * pickupWave;
-                _wormDummy.scale.y *= 1 + 0.12 * pickupWave;
-                _wormDummy.scale.z *= 1 - 0.16 * pickupWave;
+                if (i === 0) _wormDummy.scale.multiplyScalar(worm.pickupHeadScale);
+                else _wormDummy.scale.multiplyScalar(1 + 0.12 * pickupWave + 0.22 * tailPop);
             }
             _wormDummy.scale.multiplyScalar(wormBodyTaper(i, tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);

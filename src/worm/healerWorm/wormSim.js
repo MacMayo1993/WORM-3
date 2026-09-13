@@ -728,22 +728,20 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
         sim.lastOrbTime = sim.timeAlive;
         applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId);
         sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray() };
-        // An orb collected off the head tile was dragged in by the magnet. Queue the
-        // data the renderer needs to draw it streaking to the worm — without this a
-        // magnet sweep reads as several orbs blinking out of existence at once. The
-        // gameplay reward is already applied above; only the visual is deferred.
-        if (puKey !== headKey) {
-            if (sim.pendingOrbAttractions.length < MAX_ORB_ATTRACTION_FX) {
-                const from = getStickerWorldPos(pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey, size, 0);
-                sim.pendingOrbAttractions.push({
-                    id: `att-${sim.attractionSeq++}`,
-                    from,
-                    to: sim.curWorldPos.toArray(),
-                    color: pickedColor,
-                    elevated: tileIsFlipped,
-                    dirKey: pickedUp.dirKey,
-                });
-            }
+        // Reward is immediate. The renderer consumes a short gulp on the head
+        // tile or a longer attraction for a remote magnet catch.
+        if (sim.pendingOrbAttractions.length < MAX_ORB_ATTRACTION_FX) {
+            const from = getStickerWorldPos(pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey, size, 0);
+            sim.pendingOrbAttractions.push({
+                id: `att-${sim.attractionSeq++}`,
+                from,
+                to: sim.curWorldPos.toArray(),
+                color: pickedColor,
+                gulp: puKey === headKey,
+                x: pickedUp.x, y: pickedUp.y, z: pickedUp.z,
+                elevated: tileIsFlipped,
+                dirKey: pickedUp.dirKey,
+            });
         }
         ctx.feel('orb', { combo: sim.orbCombo });
         sim.powerups[puIdx] = { ...respawnTile(size, [...sim.powerups, sim.pos]), type: 'apple' };

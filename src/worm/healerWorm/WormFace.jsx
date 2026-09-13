@@ -155,6 +155,7 @@ export function WormFace({ worm, size }) {
             }
             orientMobi(mobi.group, _faceForward, normal);
             animateMobi(mobi, mobiTime.current, { pulse: mobiPulse.current, transit: !!inTransit });
+            mobi.group.scale.setScalar(MOBI_RADIUS * (worm.pickupHeadScale ?? 1));
             if (hatGroupRef.current) {
                 hatGroupRef.current.position.copy(mobi.group.position).addScaledVector(normal, MOBI_RADIUS * 1.1);
                 hatGroupRef.current.quaternion.copy(mobi.group.quaternion);
@@ -176,7 +177,7 @@ export function WormFace({ worm, size }) {
         // takes the shared sphere layout too — it only needs the small lift that
         // keeps its head level with its floating book body.
         if (isBook) _faceHeadPos.addScaledVector(normal, BOOK_HEAD_LIFT);
-        layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS, _faceParts);
+        layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1), _faceParts);
 
         if (hatGroupRef.current) {
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);

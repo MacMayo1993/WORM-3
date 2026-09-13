@@ -621,15 +621,16 @@ describe('magnet attraction FX queue', () => {
     expect(att.from).toHaveLength(3);
   });
 
-  it('does not queue a streak for an orb taken on the head tile', () => {
+  it('queues a short gulp for an orb taken on the head tile', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.powerups = [apple(2, 3, 4, 'PZ')]; // the tile the worm lands on
     sim.magnetT = 5;
     stepUntilCommit(sim, ctx);
-    // Collected (it grew), but a head-tile pickup isn't "dragged" — nothing flies.
+    // Ordinary pickups bank immediately while their gulp is still queued.
     expect(sim.tailLength).toBeGreaterThan(BASE_TAIL_LENGTH);
-    expect(sim.pendingOrbAttractions).toHaveLength(0);
+    expect(sim.pendingOrbAttractions).toHaveLength(1);
+    expect(sim.pendingOrbAttractions[0].gulp).toBe(true);
   });
 
   it('never queues past the cap, and the pickup still lands when it is full', () => {
@@ -924,13 +925,14 @@ describe('magnet attraction effects', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('emits nothing for an orb collected by ordinary contact', () => {
+  it('emits a gulp for ordinary contact without a magnet', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.powerups = [apple(2, 3, 4, 'PZ')]; // directly on the worm's path
     stepUntilCommit(sim, ctx);
     expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
-    expect(sim.pendingOrbAttractions).toHaveLength(0);
+    expect(sim.pendingOrbAttractions).toHaveLength(1);
+    expect(sim.pendingOrbAttractions[0].gulp).toBe(true);
   });
 
   it('records a cross-face pull with both endpoints', () => {
