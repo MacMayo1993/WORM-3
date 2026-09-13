@@ -1,3 +1,4 @@
+import { createWorldTransformTracker } from './worldTransformTracker.js';
 // StickerInstances.jsx
 // Batches simple (solid-colour) sticker planes into a single THREE.InstancedMesh,
 // collapsing up to 150 individual draw calls (5×5 cube) to one.
@@ -109,7 +110,10 @@ export function StickerInstanceProvider({ children }) {
   // Per-slot cached RGB — 3 floats per slot.  Compared before each setColorAt
   // call; skipped when unchanged to avoid redundant GPU uploads every frame.
   // Initialised to NaN so the first upload always fires (NaN !== anything).
-  const lastColorsRef = useRef(new Float32Array(MAX_INSTANCES * 3).fill(NaN));
+  // THREE.Color channels are doubles: Float32 rounded them and made unchanged
+  // colors compare unequal, uploading the whole color buffer again each frame.
+  const lastColorsRef = useRef(new Float64Array(MAX_INSTANCES * 3).fill(NaN));
+  const transformTracker = useMemo(() => createWorldTransformTracker(), []);
   // Per-slot cached world matrix — 16 floats per slot.  Compared before each
   // setMatrixAt; the matrix write (and the whole-buffer instanceMatrix GPU
   // re-upload it triggers) is skipped when a sticker's transform is unchanged
@@ -208,13 +212,15 @@ export function StickerInstanceProvider({ children }) {
   useFrame(() => {
     if (registryRef.current.size === 0) return;
 
+    transformTracker.begin();
     let matDirty = false;
     let colDirty = false;
 
     // Iterate values(), not entries(): a for-of over the Map itself materialises a
     // fresh [key, value] pair array for every registered sticker on every frame —
     // 1,350 throwaway arrays a frame in 15×15 Mega Mode. The key is unused here.
-    for (const { groupRef, colorRef, isInstancedRef, slot } of registryRef.current.values()) {
+    for (const entry of registryRef.current.values()) {
+      const { groupRef, colorRef, isInstancedRef, slot } = entry;
       if (!isInstancedRef.current || !groupRef.current) {
         // Sticker is handled by its own mesh — blank the slot once so no
         // ghost instance lingers.  Skip if already zeroed to avoid uploading
@@ -236,24 +242,14 @@ export function StickerInstanceProvider({ children }) {
       // non-instanced transition will write _zeroMatrix exactly once again.
       zeroedSlotsRef.current.delete(slot);
 
-      // updateWorldMatrix(updateParents=true) walks up the scene graph to
-      // incorporate GSAP-driven cubie rotations and TrackballControls camera
-      // rotation that occurred this frame before our callback.
-      groupRef.current.updateWorldMatrix(true, false);
-      // Upload the world matrix only when it has actually changed since last frame.
-      // At rest (no drag / GSAP turn / flip-squish) the recomputed matrix is
-      // bit-identical, so this skips both the setMatrixAt buffer copy and the
-      // whole-buffer instanceMatrix GPU re-upload that needsUpdate forces.
-      const me = groupRef.current.matrixWorld.elements;
+      const worldVersion = transformTracker.update(groupRef.current);
       const mbase = slot * 16;
       const lm = lastMatricesRef.current;
-      let mChanged = false;
-      for (let k = 0; k < 16; k++) {
-        if (lm[mbase + k] !== me[k]) { mChanged = true; break; }
-      }
-      if (mChanged) {
+      if (entry.worldVersion !== worldVersion || Number.isNaN(lm[mbase])) {
+        const me = groupRef.current.matrixWorld.elements;
         instanceMesh.setMatrixAt(slot, groupRef.current.matrixWorld);
         lm.set(me, mbase);
+        entry.worldVersion = worldVersion;
         matDirty = true;
       }
 

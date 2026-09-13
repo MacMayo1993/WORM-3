@@ -89,6 +89,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 maxPixelRatio={2}
                 maxRenderPixels={640}
                 framing="character"
+                direct
                 style={{ width: '100%', height: 'auto', aspectRatio: '1',
                   position: 'absolute', top: '50%', transform: 'translateY(-50%)' }}
                 animated

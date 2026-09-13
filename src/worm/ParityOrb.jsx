@@ -1,3 +1,4 @@
+import { createOrbBatches } from './orbBatches.js';
 import { getOrbMaterials } from './orbMaterials.js';
 import { createOrbVisibility } from './orbVisibility.js';
 // src/worm/ParityOrb.jsx
@@ -116,6 +117,7 @@ function SingleOrbImpl({
   const electronGlowRefs = useRef([]); // target only
   const outlineRef     = useRef();
   const parityMarkRef  = useRef();
+  const poleRefs = useRef([]);
 
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
 
@@ -157,6 +159,7 @@ function SingleOrbImpl({
       get gridZ()         { return gridZRef.current; },
       get isGlowWorm()    { return isGlowWormRef.current; },
       get type()          { return typeRef.current; },
+      get poles()         { return poleRefs.current; },
       get styledBand()    { return styledBandRef.current; },
       timeOffset,
     });
@@ -188,7 +191,7 @@ function SingleOrbImpl({
 
       {/* Inner energy core — a small, bright, counter-spinning faceted gem that glows
           through the glassy shell, giving the orb visible depth and a molten centre. */}
-      <mesh ref={innerCoreRef} geometry={g.innerCore} material={mat.innerCore} />
+      <mesh ref={innerCoreRef} visible={false} geometry={g.innerCore} material={mat.innerCore} />
 
       {/* Inner additive halo — soft bloom around the core, pulsed by the animator. */}
       <mesh ref={innerGlowRef} geometry={g.innerGlow} material={mat.innerGlow} />
@@ -201,8 +204,8 @@ function SingleOrbImpl({
         <mesh geometry={g.parityCage} material={mat.cage} rotation={[Math.PI / 2, 0, 0]} />
         <mesh geometry={g.parityCage2} material={mat.cage2} rotation={[Math.PI / 2, Math.PI / 3, 0]} />
         <mesh geometry={g.parityAxis} material={mat.axis} />
-        <mesh geometry={g.parityNode} material={mat.nodeGem} position={[0, isTarget ? 0.34 : 0.27, 0]} />
-        <mesh geometry={g.parityNode} material={mat.nodeBand} position={[0, isTarget ? -0.34 : -0.27, 0]} />
+        <mesh ref={el => { poleRefs.current[0] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeGem} position={[0, isTarget ? 0.34 : 0.27, 0]} />
+        <mesh ref={el => { poleRefs.current[1] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeBand} position={[0, isTarget ? -0.34 : -0.27, 0]} />
       </group>
 
       {/* Möbius strip — the orb's own face, in that face's colour AND its tile
@@ -303,6 +306,8 @@ export default function ParityOrbs({
   const animMapRef = useRef(new Map());
   const orbRootRef = useRef();
   const visibility = useMemo(() => createOrbVisibility(), []);
+  const batches = useMemo(() => createOrbBatches(), []);
+  useEffect(() => () => batches.dispose(), [batches]);
   const registerAnim   = useCallback((key, refs) => { animMapRef.current.set(key, refs); }, []);
   const unregisterAnim = useCallback((key) => { animMapRef.current.delete(key); }, []);
 
@@ -311,6 +316,7 @@ export default function ParityOrbs({
     // PiP renders a second camera: main-camera culling must not hide its orbs.
     const cull = !useGameStore.getState().showAntipodalPiP;
     if (cull) visibility.begin(state.camera, orbRootRef.current);
+    batches.begin(orbRootRef.current);
 
     for (const refs of animMapRef.current.values()) {
       const {
@@ -496,7 +502,13 @@ export default function ParityOrbs({
         targetGlow.scale.setScalar(1 + Math.sin(time * 6.5) * 0.2);
         targetGlow.material.opacity = 0.22 + Math.sin(t * 6.2) * 0.08;
       }
+      // Hidden proxy meshes retain the exact animated transforms. Only these
+      // three opaque parts enter the shared draws; all other parts stay intact.
+      group.updateWorldMatrix(false, true);
+      batches.add(innerCore);
+      for (const pole of refs.poles) batches.add(pole);
     }
+    batches.end();
   });
 
   const orbData = useMemo(() => {
@@ -541,6 +553,7 @@ export default function ParityOrbs({
 
   return (
     <group ref={orbRootRef}>
+      <primitive object={batches.group} />
       {orbData.map((data) => (
         <SingleOrb
           key={data.key}

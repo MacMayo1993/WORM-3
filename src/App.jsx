@@ -1,3 +1,5 @@
+import { getDirectWormPreview, subscribeDirectWormPreview } from './3d/directWormPreview.js';
+import DirectWormPreviewHost from './3d/DirectWormPreviewHost.jsx';
 import { scaledWormOrbCount } from './worm/wormDifficulty.js';
 // src/App.jsx
 /**
@@ -7,7 +9,7 @@ import { scaledWormOrbCount } from './worm/wormDifficulty.js';
  * Original 2343 lines reduced to ~700 lines with modular architecture.
  */
 
-import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useSyncExternalStore, Suspense } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import SafeEnvironment from './3d/SafeEnvironment.jsx';
@@ -203,6 +205,7 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
 function MenuScene({ onCubeClick, background }) {
+  const directPreview = useSyncExternalStore(subscribeDirectWormPreview, getDirectWormPreview, () => null);
   return (
     <>
       {/* Each app launch chooses one photo panorama from MENU_BACKGROUNDS. The
@@ -228,7 +231,7 @@ function MenuScene({ onCubeClick, background }) {
         <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
       {!isMobile && (
-        <EffectComposer>
+        <EffectComposer enabled={!directPreview}>
           {/* Enamel highlights stay crisp; menu glow comes only from local effects. */}
           <Vignette offset={0.46} darkness={0.23} />
         </EffectComposer>
@@ -1456,6 +1459,7 @@ export default function WORM3() {
           <ClockContinuity paused={pageHidden} />
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
           <TilePreviewHost />
+          <DirectWormPreviewHost />
           {showWelcome ? (
             <IntroBranch
               time={introTime}

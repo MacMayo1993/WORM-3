@@ -672,6 +672,39 @@ function renderToCanvas(opts, time, targetCanvas) {
   }
 }
 
+// Direct hero rendering: no render target, pixel readback or 2D canvas copy.
+const _directSize = new THREE.Vector2();
+const _directViewport = new THREE.Vector4();
+const _directScissor = new THREE.Vector4();
+const _directClear = new THREE.Color();
+export function drawDirectWormPreview(gl, opts, time) {
+  if (!scene) setWormSharedRenderer(gl);
+  _frameCamera(opts.framing);
+  characterStage.visible = opts.framing === 'character';
+  _poseWorm(opts, prefersReducedMotion() ? 0 : time);
+  const target = gl.getRenderTarget();
+  const autoClear = gl.autoClear;
+  const scissorTest = gl.getScissorTest();
+  const alpha = gl.getClearAlpha();
+  gl.getViewport(_directViewport); gl.getScissor(_directScissor); gl.getClearColor(_directClear);
+  gl.getSize(_directSize);
+  camera.aspect = _directSize.x / _directSize.y;
+  camera.updateProjectionMatrix();
+  try {
+    gl.setRenderTarget(null);
+    gl.setScissorTest(false);
+    gl.setViewport(0, 0, _directSize.x, _directSize.y);
+    gl.setClearColor(0x000000, 0);
+    gl.autoClear = true;
+    gl.render(scene, camera);
+  } finally {
+    gl.setRenderTarget(target);
+    gl.setViewport(_directViewport); gl.setScissor(_directScissor); gl.setScissorTest(scissorTest);
+    gl.setClearColor(_directClear, alpha); gl.autoClear = autoClear;
+    camera.aspect = 1; camera.updateProjectionMatrix();
+  }
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
 let idCounter = 0;
