@@ -657,7 +657,7 @@ export function WizardShell({
             onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.08)'; }}
             onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
           >
-            {last ? finishLabel : `Confirm ${cat.label} & Continue`}
+            {last ? finishLabel : (cat.primaryLabel || `Confirm ${cat.label} & Continue`)}
           </button>
 
           {secondary && (
