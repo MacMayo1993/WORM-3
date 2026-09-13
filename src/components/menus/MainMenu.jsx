@@ -1652,10 +1652,22 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 // ─── Start button ─────────────────────────────────────────────────────────────
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScYKKOXc6c3vdqpmWWv0J3lMd90-GOfp0TxxxHelxjIjMdrvw/viewform';
 
+// Three visible faces, each with nine stickers and dark plastic seams.
 const MenuCubeGlyph = () => (
-  <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-    <path d="M16 3 28 10v13l-12 7-12-7V10Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-    <path d="m4 10 12 7 12-7M16 17v13M10 6.5l12 7M10 13.5v13" stroke="currentColor" strokeWidth="1.5" />
+  <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
+    <path d="M16 2 29 9.5v13L16 30 3 22.5v-13Z" fill="#182328" stroke="#182328" strokeWidth="1.2" strokeLinejoin="round" />
+    {[
+      { transform: 'matrix(1.444 .833 -1.444 .833 16 2)', color: '#fff5d8' },
+      { transform: 'matrix(1.444 .833 0 1.444 3 9.5)', color: '#f05249' },
+      { transform: 'matrix(1.444 -.833 0 1.444 16 17)', color: '#46b6ed' },
+    ].map(face => (
+      <g key={face.color} transform={face.transform} fill={face.color}>
+        {Array.from({ length: 9 }, (_, i) => (
+          <rect key={i} x={(i % 3) * 3 + 0.23} y={Math.floor(i / 3) * 3 + 0.23}
+            width="2.54" height="2.54" rx="0.16" />
+        ))}
+      </g>
+    ))}
   </svg>
 );
 
