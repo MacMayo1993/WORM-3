@@ -337,6 +337,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // auto-rotate clock must not keep charging behind the camera move.
         if ((worm.elementalFocusT?.current ?? 0) > 0) { rotationClock.held = true; return; }
 
+        // The first tunnel is a steering lesson; hazards begin in real runs.
+        if (useGameStore.getState().demoMode && useGameStore.getState().demoStep === 'worm-traversal') {
+            rotationClock.held = true;
+            return;
+        }
+
         // ── Bomb hazard: spawn → fuse → disarm-by-encircle → detonation ────────
         {
             // Clamp the timestep so a render stall (tab switch, GC pause) can't burn a

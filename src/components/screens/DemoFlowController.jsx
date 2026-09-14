@@ -1,3 +1,5 @@
+import DemoDialog from './DemoDialog.jsx';
+import { useDemoTarget } from './useDemoTarget.js';
 import React from 'react';
 import { UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
@@ -58,7 +60,7 @@ const ensureDemoShellStyle = () => {
       border: 1px solid rgba(89, 109, 74, 0.24);
       box-shadow: 0 8px 24px rgba(43, 53, 35, 0.16);
       color: #27351f;
-      backdrop-filter: blur(14px) saturate(1.08);
+      backdrop-filter: var(--paper-blur, none);
       font-family: ${UI_FONT};
       pointer-events: none;
     }
@@ -100,7 +102,7 @@ const ensureDemoShellStyle = () => {
       align-items: flex-start;
       padding: max(62px, calc(env(safe-area-inset-top, 0px) + 52px)) 18px 24px;
       background: linear-gradient(180deg, rgba(246, 241, 226, 0.50), rgba(246, 241, 226, 0.08) 38%, rgba(24, 31, 18, 0.10));
-      backdrop-filter: blur(4px) saturate(0.98);
+      backdrop-filter: var(--paper-blur, none);
       font-family: ${UI_FONT};
       text-align: center;
     }
@@ -181,7 +183,7 @@ const ensureDemoShellStyle = () => {
       position: absolute;
       /* Point at the Views tile: 4th of 5 space-around slots in a bar capped
          at 420px wide, so its center sits ~20% of the bar width right of center. */
-      left: calc(50% + min(19vw, 76px));
+      left: var(--tour-pointer, 50%);
       bottom: -8px;
       transform: translateX(-50%) rotate(45deg);
       width: 16px;
@@ -193,7 +195,7 @@ const ensureDemoShellStyle = () => {
 
     /* Flip tile is the middle (3rd of 5) slot, so its pointer sits dead centre. */
     .demo-spotlight-hint--flip::after {
-      left: 50%;
+      left: var(--tour-pointer, 50%);
     }
 
     /* Control tour: same card, but the pointer is aimed per beat at whichever
@@ -316,7 +318,7 @@ const ensureDemoShellStyle = () => {
       pointer-events: auto;
       cursor: pointer;
       background: radial-gradient(ellipse at center, rgba(24, 31, 18, 0.34), rgba(24, 31, 18, 0.62));
-      backdrop-filter: blur(9px) saturate(1.03);
+      backdrop-filter: var(--paper-blur, none);
     }
 
     .demo-complete-stamp--hold {
@@ -396,7 +398,7 @@ const ensureDemoShellStyle = () => {
         padding-top: max(88px, calc(env(safe-area-inset-top, 0px) + 84px));
         align-items: flex-start;
         background: linear-gradient(180deg, rgba(246, 241, 226, 0.38), rgba(246, 241, 226, 0.04) 46%, transparent 72%);
-        backdrop-filter: blur(2px) saturate(0.95);
+        backdrop-filter: var(--paper-blur, none);
       }
 
       .demo-intro-card {
@@ -595,15 +597,16 @@ const DemoProgressBar = ({ currentStep }) => {
   // Worm mode's glance strip owns the top edge — dock the pill at the bottom there.
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const idx = DEMO_STEPS.findIndex(s => s.id === currentStep);
-  const optional = idx >= 4 && currentStep !== 'end';
+  const exploring = useGameStore(s => s.demoExploring);
+  const optional = currentStep === 'end' ? exploring : idx >= 4;
   const total = optional ? 7 : 4;
-  const current = currentStep === 'end' ? 4 : optional ? idx - 3 : idx + 1;
+  const current = currentStep === 'end' ? total : optional ? idx - 3 : idx + 1;
   const progress = current / total;
 
   return (
     <div className={`demo-progress-pill${wormHealerMode ? ' demo-progress-pill--bottom' : ''}`}>
       <span className="demo-progress-label">{optional ? 'EXPLORE' : 'DEMO'}</span>
-      <div className="demo-progress-track">
+      <div className="demo-progress-track" role="progressbar" aria-label={optional ? "Explore progress" : "Demo progress"} aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
         <div className="demo-progress-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <span className="demo-progress-count">
@@ -625,10 +628,10 @@ const DemoStepIntro = ({ step, onContinue, onSkip }) => {
     <MobiIntroScreen
       key={step}
       lines={lines}
-      modeName={`Step ${info.num} · ${info.label}`}
+      modeName={`${info.num <= 4 ? 'Demo' : 'Explore'} ${info.num <= 4 ? info.num : info.num - 4} · ${info.label}`}
       primaryLabel="Let’s try it"
       onComplete={onContinue}
-      skipLabel="Skip Step ▶"
+      skipLabel="Skip lesson"
       onSkip={onSkip}
       // The in-game top bar is up during the demo — keep the dialogue under it.
       topInset="var(--topbar-h)"
@@ -752,14 +755,14 @@ const DEMO_LEVEL_CONFIGS = {
 // theory, and keep it to one breath — this pill has to read at a glance while
 // the player's thumb is already on the cube.
 const TRY_COPY = {
-  'baby-cube': 'Drag a row or column to twist it. Drag outside the cube to change your view. <strong>Reset</strong> restores the cube.',
+  'baby-cube': 'Drag a row or column to twist it. Drag outside the cube to change your view. Find <strong>Reset</strong> in More.',
   'learn-to-solve': 'Follow the <strong>gold ring</strong> — drag the glowing layer the way the light sweeps. It always knows the way home.',
   'twin-paradox': 'With Flip on, tap a tile. Its opposite twin moves with it.',
   'flip-gateway': 'Tap nine different pairs to send them across. Then tap the moved tiles to bring them back.',
   'make-it-yours': 'Try the <strong>Colors</strong>, <strong>Tiles</strong> and <strong>Scene</strong> tabs. Close Settings when you like what you see.',
   'worm-traversal': 'Steer left or right. Collect orbs and enter tunnels to heal the cube.',
   'chaos-forecast': 'Watch which color pair survives. Will it be your pick?',
-  'random-showcase': 'Watch the rules and look change. Tap Next step when you’re ready.',
+  'random-showcase': 'Watch the rules and look change. Tap Skip lesson when you’re ready.',
 };
 
 // Coach: the guidance already played inside the step-intro dialogue and the hint
@@ -771,7 +774,7 @@ const TRY_COPY = {
 const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => {
   ensureDemoShellStyle();
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
-  if (!copyOverride && !TRY_COPY[step]) return null;
+  if (step === 'worm-traversal' || (!copyOverride && !TRY_COPY[step])) return null;
 
   if (copyOverride) {
     const info = DEMO_STEPS.find(s => s.id === step);
@@ -792,7 +795,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
   return (
     <div className={`demo-coach-pill${wormHealerMode ? ' demo-coach-pill--bottom' : ''}`}>
       <button type="button" onClick={onNext} className="demo-coach-pill-btn">
-        Next step →
+        Skip lesson →
       </button>
     </div>
   );
@@ -837,30 +840,30 @@ const CONTROL_TOUR_SEQUENCE = [
     key: 'reset',
     slot: 1,
     title: 'Reset',
-    copy: 'Tap Reset to restore the cube.',
+    copy: 'Tap Reset to restore the cube. You can find it in More after this tour.',
   },
   {
     key: 'shuffle',
-    slot: 2,
+    slot: 1,
     title: 'Shuffle',
-    copy: 'Tap Shuffle to mix up the cube.',
+    copy: 'Tap Shuffle to mix up the cube. It also lives in More.',
   },
   {
     key: 'flip',
-    slot: 3,
+    slot: 2,
     title: 'Flip',
     copy: 'Turn on Flip. Taps will move paired tiles through the cube.',
   },
   {
     key: 'views',
-    slot: 4,
+    slot: 3,
     sheetBeat: true,
     title: 'Views',
     copy: 'Open Views to explore how the cube is shown. Close the panel to continue.',
   },
   {
     key: 'more',
-    slot: 5,
+    slot: 4,
     sheetBeat: true,
     title: 'More',
     copy: 'Open More to find extra tools, including Solve and Teach. Close it to continue.',
@@ -874,19 +877,15 @@ const CONTROL_TOUR_KEYS = CONTROL_TOUR_SEQUENCE.map((b) => b.key);
 const DemoControlTour = ({ index, onSkip }) => {
   ensureDemoShellStyle();
   const beat = CONTROL_TOUR_SEQUENCE[index];
+  const targetRef = useDemoTarget(beat?.key);
   if (!beat) return null;
-  // Slots are evenly spaced around the middle tile (slot 3), one unit apart.
-  const offset = beat.slot - 3;
-  const pointer = offset === 0
-    ? '50%'
-    : `calc(50% ${offset < 0 ? '-' : '+'} ${Math.abs(offset)} * min(19vw, 76px))`;
 
   return (
     <div
       className={`demo-spotlight-hint demo-tour-card${beat.sheetBeat ? ' demo-tour-card--top' : ''}`}
       role="status"
       aria-live="polite"
-      style={{ '--tour-pointer': pointer }}
+      ref={targetRef}
     >
       <p className="demo-intro-step" style={{ marginBottom: 2 }}>
         {index + 1} / {CONTROL_TOUR_SEQUENCE.length}
@@ -899,11 +898,11 @@ const DemoControlTour = ({ index, onSkip }) => {
         <button
           type="button"
           onClick={onSkip}
-          aria-label="Skip Step"
+          aria-label="Skip lesson"
           className="demo-intro-button"
           style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
         >
-          Skip Step ▶
+          Skip lesson
         </button>
       )}
     </div>
@@ -1058,24 +1057,12 @@ const DemoStepComplete = ({ step, onDismiss }) => {
   if (!info) return null;
   const handleDismiss = () => onDismiss?.();
   return (
-    <div
-      className="demo-beat-root demo-beat-root--hold"
-      aria-live="assertive"
-      role="button"
-      tabIndex={0}
-      aria-label={`Step ${info.num} complete — tap to continue`}
-      onClick={handleDismiss}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleDismiss();
-        }
-      }}
-    >
+    <DemoDialog className="demo-beat-root demo-beat-root--hold" onClose={handleDismiss}
+      aria-label={`${info.label} complete`} onClick={handleDismiss}>
       <div className="demo-beat-flash" />
       <div className="demo-complete-stamp demo-complete-stamp--hold">
         <p className="demo-complete-check">✓</p>
-        <p className="demo-beat-sub">Step {info.num} Complete</p>
+        <p className="demo-beat-sub">{info.num <= 4 ? 'Demo' : 'Explore'} {info.num <= 4 ? info.num : info.num - 4} Complete</p>
         <h2 className="demo-beat-title">{info.label}</h2>
         {STEP_COMPLETE_NOTE[step] && (
           <p className="demo-complete-note">{STEP_COMPLETE_NOTE[step]}</p>
@@ -1088,11 +1075,11 @@ const DemoStepComplete = ({ step, onDismiss }) => {
             handleDismiss();
           }}
         >
-          Next Step ▶
+          Continue →
         </button>
         <p className="demo-complete-hint">Tap anywhere to continue</p>
       </div>
-    </div>
+    </DemoDialog>
   );
 };
 
@@ -1133,8 +1120,9 @@ const DemoRewardStamp = ({ amount, correct }) => {
 // that kicks off the first view.
 const DemoViewSpotlightHint = ({ onSkip }) => {
   ensureDemoShellStyle();
+  const targetRef = useDemoTarget('views');
   return (
-    <div className="demo-spotlight-hint" role="status" aria-live="polite">
+    <div ref={targetRef} className="demo-spotlight-hint" role="status" aria-live="polite">
       <p className="demo-intro-copy" style={{ marginBottom: 8 }}>
         Tap the glowing <strong>Views</strong> button below to open the first view mode.
       </p>
@@ -1142,11 +1130,11 @@ const DemoViewSpotlightHint = ({ onSkip }) => {
         <button
           type="button"
           onClick={onSkip}
-          aria-label="Skip Step"
+          aria-label="Skip lesson"
           className="demo-intro-button"
           style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
         >
-          Skip Step ▶
+          Skip lesson
         </button>
       )}
     </div>
@@ -1160,8 +1148,9 @@ const DemoViewSpotlightHint = ({ onSkip }) => {
 // did something" and "I can do that again".
 const DemoFlipSpotlightHint = ({ onSkip }) => {
   ensureDemoShellStyle();
+  const targetRef = useDemoTarget('flip');
   return (
-    <div className="demo-spotlight-hint demo-spotlight-hint--flip" role="status" aria-live="polite">
+    <div ref={targetRef} className="demo-spotlight-hint demo-spotlight-hint--flip" role="status" aria-live="polite">
       <p className="demo-intro-copy" style={{ marginBottom: 8 }}>
         Tap the glowing <strong>Flip</strong> button to turn on tile flips.
       </p>
@@ -1194,13 +1183,26 @@ const DemoWormControlHint = ({ onRetry, onSkip }) => {
     : !orbs ? 'Nice! Steer toward a glowing orb to collect it.'
     : !tunnels ? 'Now steer onto a glowing tunnel tile. The worm will travel through automatically.'
     : 'Through the middle—and out the opposite side!';
-  return <div className="demo-worm-hint" role="status" aria-live="polite" style={{ pointerEvents: alive === false ? 'auto' : 'none', ...(alive === false ? { bottom: 'max(100px, 20dvh)', maxHeight: '60dvh', overflowY: 'auto' } : {}) }}>
-    {alive === false ? <>
-      <p style={{ margin: '0 0 8px' }}>That run ended. {details?.cause === 'self' ? 'Leave room for your tail when you turn.' : 'Try a wider turn and aim for a glowing tunnel tile.'}</p>
-      <button className="demo-intro-button" onClick={onRetry}>Try again</button>
-      <button className="demo-intro-button" onClick={onSkip}>Skip step</button>
-    </> : text}
-  </div>;
+  const cause = details?.cause || details?.reason;
+  const advice = cause === 'bomb' ? 'A bomb blast hit you. Keep clear of the marked blast tiles.'
+    : (cause === 'self' || cause === 'self-collision') ? 'You turned into your tail. Leave a little more room when turning.'
+    : cause === 'rotation' ? 'A turning layer caught you. Move clear of the highlighted layer.'
+    : 'Your run ended. Try steering toward a glowing tunnel tile.';
+  if (alive === false) return <DemoDialog className="demo-retry-dialog" aria-label="Try the tunnel lesson again" onClose={onSkip}>
+    <section className="demo-retry-card">
+      <h2>Try that again?</h2><p>{advice}</p>
+      <div className="demo-retry-actions">
+        <button className="demo-intro-button" onClick={onRetry}>Try again</button>
+        <button className="demo-intro-button demo-secondary" onClick={onSkip}>Skip lesson</button>
+      </div>
+    </section>
+  </DemoDialog>;
+  return <section className="demo-worm-dock" aria-label="Tunnel lesson">
+    <div className="demo-worm-dock-row"><DemoProgressBar currentStep="worm-traversal" />
+      <button className="demo-coach-pill-btn demo-secondary" onClick={onSkip}>Skip lesson</button>
+    </div>
+    <p role="status" aria-live="polite">{text}</p>
+  </section>;
 };
 
 // Flip-gateway progress: a bounded count of how many tile pairs have been sent
@@ -1276,11 +1278,11 @@ const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
             <button
               type="button"
               onClick={onSkip}
-              aria-label="Skip Step"
+              aria-label="Skip lesson"
               className="demo-intro-button"
               style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
             >
-              Skip Step ▶
+              Skip lesson
             </button>
           )}
         </div>

@@ -15,7 +15,7 @@ const ICONS = {
 function InstrumentKey({ label, onClick, active, primary, disabled, spotlight }) {
   return <button type="button"
     className={`cube-tile-btn instrument-key${primary ? ' instrument-key-primary' : ''}${spotlight ? ' instrument-key-spotlight' : ''}`}
-    disabled={disabled} aria-label={label} aria-pressed={active}
+    data-demo-control={label.toLowerCase()} disabled={disabled} aria-label={label} aria-pressed={active}
     onClick={() => { vibrate(12); onClick?.(); }}>
     <svg className="cube-tile-face" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[label]}</svg>
     <span className="cube-tile-label">{label}</span>

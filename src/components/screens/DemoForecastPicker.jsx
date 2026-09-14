@@ -1,3 +1,4 @@
+import DemoDialog from './DemoDialog.jsx';
 import React, { useState } from 'react';
 import {
   UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT, UI_ACTION_SHADOW,
@@ -15,12 +16,12 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
   const [selected, setSelected] = useState(null);
 
   return (
-    <div style={{
+    <DemoDialog onClose={onSkip} aria-label="Choose a color pair" style={{
       position: 'fixed', inset: 0, zIndex: 11500,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'safe center', overflowY: 'auto', boxSizing: 'border-box',
       background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
-      backdropFilter: 'blur(9px) saturate(1.03)',
+      backdropFilter: 'var(--paper-blur, none)',
       fontFamily: UI_FONT, textAlign: 'center', padding: 24,
     }}>
       <p style={{
@@ -107,9 +108,9 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
             cursor: 'pointer', letterSpacing: '0.04em',
           }}
         >
-          Skip Step ▶
+          Skip lesson
         </button>
       )}
-    </div>
+    </DemoDialog>
   );
 }

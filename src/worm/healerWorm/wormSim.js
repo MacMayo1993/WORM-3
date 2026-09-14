@@ -1877,8 +1877,8 @@ export function stepWormSim(sim, delta, size, ctx) {
     // ── Special orbs: ambient spawn clock + lifetime ageing. Both run only while
     // crawling, so a special can't appear (or expire unseen) during a tunnel transit.
     if (sim.phase === 'crawling') {
-        sim.specialTimer -= delta;
-        if (sim.specialTimer <= 0) {
+        if (!ctx.isDemoLesson?.()) sim.specialTimer -= delta;
+        if (!ctx.isDemoLesson?.() && sim.specialTimer <= 0) {
             // spawnSpecial resets the timer on success. A failure means either the
             // board is at its cap or the neighbourhood had no acceptable tile — both
             // are transient, so retry soon rather than skipping a whole interval.
@@ -1886,8 +1886,8 @@ export function stepWormSim(sim, delta, size, ctx) {
         }
         // Elemental offering runs on its own faster clock (spawnElementalOffering
         // resets the timer itself, to the interval on success or a short retry).
-        sim.elementalSpawnTimer -= delta;
-        if (sim.elementalSpawnTimer <= 0) {
+        if (!ctx.isDemoLesson?.()) sim.elementalSpawnTimer -= delta;
+        if (!ctx.isDemoLesson?.() && sim.elementalSpawnTimer <= 0) {
             spawnElementalOffering(sim, size, ctx);
         }
         if (sim.specials.length > 0) {

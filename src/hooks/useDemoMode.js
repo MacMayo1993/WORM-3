@@ -1,3 +1,4 @@
+import { demoTimer } from '../utils/demoTimer.js';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from './useGameStore.js';
@@ -28,9 +29,9 @@ const PRE_DEMO_SETTINGS_KEY = 'worm3_predemo_settings';
 // the step either way.
 const FLIP_SPOTLIGHT_FALLBACK_MS = 12000;
 
-// Same idea for each beat of the control tour: it waits for the player to press
-// the lit button, but a demo left running unattended has to keep moving.
-const TOUR_BEAT_FALLBACK_MS = 15000;
+// Lesson delays pause with the player; the control tour itself waits for input.
+const scheduleDemoTimer = (callback, delay) => demoTimer(callback, delay,
+  () => !!useGameStore.getState().wormPauseMenuOpen);
 
 // How long each kind of step waits before offering the "Next ▶" coach pill.
 //
@@ -125,7 +126,7 @@ export function useDemoMode({
   const preDemoWormSkinRef = useRef(null);
 
   const clearDemoWatchTimers = useCallback(() => {
-    demoWatchTimers.current.forEach(clearTimeout);
+    demoWatchTimers.current.forEach(timer => timer.cancel());
     demoWatchTimers.current = [];
   }, []);
 
@@ -402,7 +403,7 @@ export function useDemoMode({
       source: { x: tile.x, y: tile.y, z: tile.z, dir: tile.dirKey, faceId: sticker.curr },
       antipodal: { x: anti.x, y: anti.y, z: anti.z, dir: anti.dirKey, faceId: antiSticker?.curr },
     });
-    demoWatchTimers.current.push(setTimeout(fire, 1100));
+    demoWatchTimers.current.push(scheduleDemoTimer(fire, 1100));
   }, []);
 
   // The hands-on half of a cube step: play the WATCH beat, then put up the hint
@@ -413,15 +414,15 @@ export function useDemoMode({
     if (!config) return;
     const watch = config.watch;
     if (watch?.type === 'rotate') {
-      demoWatchTimers.current.push(setTimeout(() => {
+      demoWatchTimers.current.push(scheduleDemoTimer(() => {
         startAnimatedShuffle(watch.moves, () => {});
       }, 700));
     } else if (watch?.type === 'flip') {
-      demoWatchTimers.current.push(setTimeout(() => playTwinWatchFlip(watch.tile), 900));
+      demoWatchTimers.current.push(scheduleDemoTimer(() => playTwinWatchFlip(watch.tile), 900));
     }
     setDemoHintStep(step);
     const coachDelay = watch ? 2800 : 800;
-    demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), coachDelay));
+    demoWatchTimers.current.push(scheduleDemoTimer(() => setDemoTryVisible(true), coachDelay));
   }, [startAnimatedShuffle, playTwinWatchFlip]);
 
   // Escape hatches for the Flip prompt: the hint's "Do It For Me" button and the
@@ -450,20 +451,11 @@ export function useDemoMode({
   // for them to close it again.
   const tourSheetOpenedRef = useRef(false);
 
-  // Move to a beat and arm its "nobody is home" fallback, so an unattended
-  // demo still finishes the tour.
+  // Reading time belongs to the player. Skip remains available on every beat.
   const enterTourBeat = useCallback((index) => {
     tourSheetOpenedRef.current = false;
     setDemoTourIndex(index);
-    demoWatchTimers.current.push(setTimeout(() => {
-      // Re-read rather than close over the index: the player may have advanced
-      // it themselves by now, in which case this timer has nothing to do.
-      setDemoTourIndex((cur) => {
-        if (cur !== index) return cur;
-        advanceTourRef.current?.(index);
-        return cur;
-      });
-    }, TOUR_BEAT_FALLBACK_MS));
+
   }, []);
 
   const advanceTour = useCallback((fromIndex) => {
@@ -519,6 +511,7 @@ export function useDemoMode({
     preDemoSettingsRef.current = { ...store.settings };
     try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { /* private mode */ }
     store.startDemo();
+    useGameStore.setState({ demoExploreComplete: false, demoExploring: false });
     applyDemoSettings();
     // Pre-stage the first step's cube so Mobi's cold-open blurs the right scene
     // (otherwise the menu's 3×3 lingers behind the dialogue until Start).
@@ -590,12 +583,13 @@ export function useDemoMode({
     const idx = DEMO_STEP_IDS.indexOf(fromStep);
     const nextStep = fromStep === 'worm-traversal' ? 'end' : DEMO_STEP_IDS[idx + 1] || 'end';
     store.setDemoStep(nextStep);
+    if (fromStep === 'cosmetic-reward') useGameStore.setState({ demoExploreComplete: true });
     // Pre-stage plain cube steps so the intro dialogue blurs the upcoming
     // scene. Other types (worm/chaos/showcase/random) start on Continue —
     // pre-staging them would kick off gameplay or overlays behind the blur.
     if (DEMO_LEVEL_CONFIGS[nextStep]?.type === 'cube') applyDemoStepConfig(nextStep);
     if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers, restoreStagedLook, cancelDisparityRun, restoreWormCharacter, applyDemoStepConfig]);
+  }, [clearDemoWatchTimers, restoreStagedLook, cancelDisparityRun, restoreWormCharacter, applyDemoStepConfig, closeNavSheet]);
   advanceDemoStepRef.current = advanceDemoStep;
 
   const handleDemoStepContinue = useCallback(() => {
@@ -635,7 +629,7 @@ export function useDemoMode({
     }
     // Control tour: start the first beat once the launch stamp has cleared.
     if (config && config.type === 'tour') {
-      demoWatchTimers.current.push(setTimeout(() => {
+      demoWatchTimers.current.push(scheduleDemoTimer(() => {
         if (useGameStore.getState().demoStep === step) enterTourBeat(0);
       }, 1500));
     }
@@ -647,8 +641,8 @@ export function useDemoMode({
         // Hand the step over to the player: spotlight Flip on the nav bar once
         // the launch stamp has cleared, and keep a fallback so an unanswered
         // prompt can never stall the demo.
-        demoWatchTimers.current.push(setTimeout(() => setDemoFlipSpotlight(true), 1500));
-        demoWatchTimers.current.push(setTimeout(() => {
+        demoWatchTimers.current.push(scheduleDemoTimer(() => setDemoFlipSpotlight(true), 1500));
+        demoWatchTimers.current.push(scheduleDemoTimer(() => {
           if (useGameStore.getState().demoStep === step && !useGameStore.getState().flipMode) {
             armFlipAndContinue();
           }
@@ -660,7 +654,7 @@ export function useDemoMode({
 
     // Settings step: let the launch stamp read, then open the real menu.
     if (config && config.type === 'settings') {
-      demoWatchTimers.current.push(setTimeout(() => {
+      demoWatchTimers.current.push(scheduleDemoTimer(() => {
         if (useGameStore.getState().demoStep === step) useGameStore.getState().setShowSettings(true);
       }, 1600));
     }
@@ -672,7 +666,7 @@ export function useDemoMode({
       setDemoHintStep(step);
       const delay = COACH_DELAY_MS[config.type];
       if (delay != null) {
-        demoWatchTimers.current.push(setTimeout(() => {
+        demoWatchTimers.current.push(scheduleDemoTimer(() => {
           // The settings step opens a full modal over the scene, and the coach
           // pill is suppressed while one is open (demoChromeQuiet). Arming it
           // anyway means the escape hatch is already there the moment they
@@ -681,7 +675,7 @@ export function useDemoMode({
         }, delay));
       }
     }
-  }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, armSceneGate, armFlipAndContinue, beginCubeTryPhase]);
+  }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, armSceneGate, armFlipAndContinue, beginCubeTryPhase, enterTourBeat]);
 
   const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();
@@ -727,12 +721,13 @@ export function useDemoMode({
       store.clearDisparityGame();
       cancelDisparityRun();
     }
-  }, [clearDemoWatchTimers, cancelDisparityRun, restoreWormCharacter, restoreStagedLook]);
+  }, [clearDemoWatchTimers, cancelDisparityRun, restoreWormCharacter, restoreStagedLook, closeNavSheet]);
 
   const handleDemoReplay = useCallback(() => {
     const store = useGameStore.getState();
     cleanupAllDemoState(store);
     store.startDemo();
+    useGameStore.setState({ demoExploreComplete: false, demoExploring: false });
     applyDemoSettings();
     applyDemoStepConfig('baby-cube');
     setDemoColdOpenVisible(true);
@@ -874,7 +869,7 @@ export function useDemoMode({
     store.setChaosLevel(0);
     cancelDisparityRun();
     demoForecastPickRef.current = null;
-    demoWatchTimers.current.push(setTimeout(() => {
+    demoWatchTimers.current.push(scheduleDemoTimer(() => {
       setDemoRewardStamp(null);
       demoRewardPendingRef.current = false;
       advanceDemoStepRef.current?.('chaos-forecast');
@@ -1073,6 +1068,7 @@ export function useDemoMode({
   }, [demoMode, demoStep, wormAlive, clearDemoWatchTimers]);
 
   const handleDemoExplore = useCallback(() => {
+    useGameStore.setState({ demoExploring: true });
     useGameStore.getState().setDemoStep('learn-to-solve');
     applyDemoStepConfig('learn-to-solve');
     setDemoStepIntroVisible(true);

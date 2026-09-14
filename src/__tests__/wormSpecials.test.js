@@ -1117,3 +1117,20 @@ describe('rocket launch, refresh and touchdown continuity', () => {
     expect(sim.landingGraceT).toBe(0);
   });
 });
+
+
+describe('first tunnel lesson', () => {
+  it('freezes both advanced pickup clocks while keeping the worm moving', () => {
+    const sim = makeSim();
+    const ctx = makeCtx({ isDemoLesson: () => true });
+    const initial = {special: sim.specialTimer, element: sim.elementalSpawnTimer};
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.specialTimer).toBe(initial.special);
+    expect(sim.elementalSpawnTimer).toBe(initial.element);
+    expect(sim.specials).toHaveLength(0);
+    ctx.isDemoLesson = () => false;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.specialTimer).toBeLessThan(initial.special);
+    expect(sim.elementalSpawnTimer).toBeLessThan(initial.element);
+  });
+});

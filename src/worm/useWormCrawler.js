@@ -147,6 +147,7 @@ export function useWormCrawler(size, cubies) {
             // ── reads ───────────────────────────────────────────────────────────
             getCubies: () => useGameStore.getState().cubies,
             getGamePhase: () => useGameStore.getState().wormGamePhase,
+            isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
             isPaused: () => useGameStore.getState().wormPaused ?? false,
             getSpeed: () => useGameStore.getState().wormSpeed ?? 2.0,
             getControlMode: () => useGameStore.getState().wormControlMode ?? 'non-oriented',
