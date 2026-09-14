@@ -21,7 +21,6 @@ export const createDisparitySlice = (set, get) => ({
   showDisparityWinner: false,
   // Face elimination events: array of faceNum (1-6) values in order they were eliminated
   disparityEliminatedFaces: [],
-  holonomyMode: false,
 
   // Configurable flip cap for Disparity Mode (overrides FLIP_CAP constant).
   // Default matches the setup wizard's "Standard / Balanced carnage" tier — 13
@@ -117,7 +116,6 @@ export const createDisparitySlice = (set, get) => ({
     if (!faces?.length) return state;
     return { disparityEliminatedFaces: [...state.disparityEliminatedFaces, ...faces] };
   }),
-  setHolonomyMode: (v) => set({ holonomyMode: v }),
 
   // ── Economy ──────────────────────────────────────────────────────────────
   parityPoints: persistedState.parityPoints,

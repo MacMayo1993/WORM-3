@@ -17,7 +17,7 @@ export const MAX_UNDO_HISTORY = 10;
 // This is the ONE list of what a Disparity session leaves behind. resetGame used
 // to re-enumerate most of it by hand and the two copies had drifted apart: the
 // inline list forgot disparityParityScore (so a new game inherited the previous
-// session's un-cashed winnings) and holonomyMode, while the factory forgot
+// session's un-cashed winnings), while the factory forgot
 // tunnelDeaths. Both spread this now — add new session fields here only.
 export const makeDisparityRuntimeDefaults = () => ({
   disparityDeaths: [],
@@ -27,7 +27,6 @@ export const makeDisparityRuntimeDefaults = () => ({
   disparityEliminatedFaces: [],
   disparityParityScore: 0,
   cascades: [],
-  holonomyMode: false,
   // Transient FX maps — animations from a previous session are irrelevant.
   cubiePops: {},
   tunnelBirths: {},

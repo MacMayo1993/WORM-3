@@ -22,7 +22,6 @@ Live demo: https://macmayo1993.github.io/WORM-3/
 - [Controls](#controls)
   - [Mouse / Touch](#mouse--touch)
   - [Keyboard Shortcuts](#keyboard-shortcuts)
-  - [Hands Mode Keymap](#hands-mode-keymap)
   - [WORM Healer Control Styles](#worm-healer-control-styles)
 - [Visual + World Systems](#visual--world-systems)
 - [Tile Styles & Depth Illusions](#tile-styles--depth-illusions)
@@ -79,8 +78,7 @@ Because opposite points are identified and each sticker has its own flip parity,
 
 - **Wormholes & traversal (the WORM modes).** If a face and its antipode are the same place, you can travel *through* the cube from one to the other. That identification is literally a tunnel — so the same cube state powers real-time crawling, tunnel routing, and chase-cam action, not just puzzle-solving.
 - **Elimination & survival (Disparity / Chaos).** Flip parity accumulates. Push a sticker past its **flip cap** and it is eliminated; flips propagate in cascades, faces can be wiped out, and the last surviving antipodal pair wins. A second state axis turns a solve puzzle into a battle-royale of tiles.
-- **Path-dependent orientation (Holonomy).** On an RP²-flavored surface, transport around a loop can come back flipped. Moving a worm or tracing a path is order-sensitive in a way a sphere-topology cube never is.
-- **Identity that travels with parity (Biome / Merge).** Because a flip swaps a tile *across* the seam, higher-level identity can ride on it: in Biome/City mode a flip swaps a tile's city to the antipodal face's city; Merge mode grows connected regions across that same identified surface.
+- **Identity that travels with parity (Biome).** Because a flip swaps a tile *across* the seam, higher-level identity can ride on it: in Biome/City mode a flip swaps a tile's city to the antipodal face's city.
 - **New win conditions.** Classic color restoration, Sudokube constraints, and Ultimate all reinterpret "solved" over the identified surface rather than six independent faces.
 - **A visible topology.** Parity indicators, the Antipodal Integrity overlay, the tunnel network, and the depth-illusion tile styles all exist to make the identification legible while you play.
 
@@ -132,6 +130,8 @@ Level metadata supports: cube size, chaos level, game mode, win condition, backg
 
 ## Modes and Variants
 
+Hands, Holonomy, Merge, and Co-op are excluded from this release. Their source, tests, and restoration notes are preserved in [Scrapped modes](archive/scrapped-modes/README.md).
+
 ### Primary Modes
 
 - **Classic Puzzle** (default solve flow)
@@ -152,10 +152,6 @@ These layer on top of core play:
   - Cascade bolt visuals between propagating stickers.
   - Winner cinematic when the final antipodal pair survives.
   - Computation runs entirely in a dedicated **Web Worker** (off the main thread).
-- **Hands Mode**
-  - Speedcube-style keyboard mapping (WCA notation).
-  - Move-history notation display.
-  - Turns-per-second telemetry and combo detection.
 - **Solve Mode** — focused step-highlight assistance for the current puzzle state.
 - **Teach Mode** — guided instructional flow targeting the 3×3 layer-by-layer method; includes an integrated solver and algorithm reference.
 - **Antipodal Integrity Mode (I(T))** — topology/integrity exploration overlay showing the quotient structure in real time.
@@ -175,15 +171,9 @@ WORM transforms cube state into real-time movement gameplay:
   - Collision/death management.
   - Run lifecycle controls (retry / new game).
   - Orb and powerup-driven flow with inventory HUD.
-- **Co-op Platformer WORM** — platforming and cube interaction blend; dedicated setup wizard and HUD components.
 
 ### Experimental / Specialty Modes
 
-- **Holonomy Mode** — path-dependent orientation/transport exploration across the manifold.
-- **Merge Mode**
-  - Connected-region detection across the cube surface.
-  - Three tile evolution tiers (base → mid → final) with tier-based rendering overlays.
-  - Six theme packs: **Pokémon**, **D&D**, **Digimon**, **Marvel**, **Harry Potter**, **Disney**.
 - **Biome / City Mode**
   - Per-face 3D city theming using GLB asset clusters (colosseum, volcano, etc.).
   - City identity follows flip parity across the manifold: flipping a tile swaps its city to the antipodal face's city.
@@ -212,9 +202,8 @@ General shortcuts:
 - `X` — toggle explode view
 - `V` — cycle visual mode
 - `C` — toggle disparity/chaos mode
-- `P` — toggle hands mode
 - `N` — toggle net (unfolded) view
-- `Esc` — close menus / hide cursor / exit hands mode
+- `Esc` — close menus / hide cursor
 - `Z` — undo
 
 Keyboard cursor + cube interaction:
@@ -224,19 +213,6 @@ Keyboard cursor + cube interaction:
 - `A` / `D` — rotate selected column left/right
 - `Q` / `E` — rotate selected face CCW/CW
 - `F` — flip selected tile
-
-### Hands Mode Keymap
-
-- `I` / `K` → U / U′
-- `O` → U2
-- `J` / `L` → R / R′
-- `F` / `D` → L / L′
-- `H` / `G` → F / F′
-- `W` / `E` → B / B′
-- `S` / `;` → D / D′
-- `,` / `M` → M′ / M
-- `.` → M2
-- `U` / `N` → E′ / E
 
 ### WORM Healer Control Styles
 
@@ -301,7 +277,6 @@ Tile-style thumbnails are rendered through a shared preview renderer (no second 
 - Top menu bar with runtime stats (moves, time, level name).
 - Bottom navigation with grouped secondary-mode sheet.
 - Specialized overlays:
-  - Hands HUD (notation, TPS meter).
   - Disparity HUD (death log, alive count, face elimination banners).
   - Antipodal HUDs (parity indicator, integrity overlay).
   - Healer Worm HUD (orb inventory, health).
@@ -351,7 +326,7 @@ src/
 │   ├── winDetection.js     #   Classic, Sudokube, Ultimate win checks
 │   ├── manifoldLogic.js    #   Manifold grid mapping, antipodal lookup
 │   ├── antipodalMode.js    #   Antipodal sticker mechanics
-│   └── ...                 #   Parity, verification, hands input, mirror blocks
+│   └── ...                 #   Parity, verification, move notation, mirror blocks
 │
 ├── hooks/                  # Custom React hooks — Zustand store + domain logic
 │   ├── useGameStore.js     #   Central Zustand store (cube state, settings, disparity, levels)
@@ -359,7 +334,7 @@ src/
 │   ├── useChaosMode.js     #   Chaos cascade auto-rotate system
 │   ├── useChaosWorker.js   #   Web Worker bridge for off-thread chaos computation
 │   ├── useLevelSystem.js   #   Level selection and progression
-│   └── ...                 #   Animation, cursor, settings, undo, hands, tiling
+│   └── ...                 #   Animation, cursor, settings, undo, tiling
 │
 ├── workers/
 │   └── chaosWorker.js      # Web Worker — chaos/disparity tick computation (off main thread)
@@ -377,7 +352,7 @@ src/
 │   ├── menus/              #   MainMenu, TopMenuBar, SettingsMenu, MobileControls, HelpMenu, ...
 │   ├── screens/            #   WelcomeScreen, LevelSelect, VictoryScreen, setup wizards,
 │   │                       #   DisparityWinnerScreen, Level10Cutscene, ...
-│   ├── overlays/           #   CursorHighlight, DisparityHUD, HandsOverlay, AntipodalHUDs, ...
+│   ├── overlays/           #   CursorHighlight, DisparityHUD, AntipodalHUDs, ...
 │   └── intro/              #   Intro animation sequence components
 │
 ├── teach/                  # Teaching mode
@@ -385,9 +360,8 @@ src/
 │   ├── solver3x3.js        #   3×3 layer-by-layer solver
 │   └── algorithms.js       #   Common algorithm library (OLL, PLL, etc.)
 │
-├── worm/                   # WORM family modes (surface crawl, tunnel, healer, co-op)
+├── worm/                   # WORM family modes (surface crawl, tunnel, healer)
 │   ├── HealerWormMode.jsx  #   Real-time chase-cam action mode
-│   ├── PlatformerWormMode.jsx #  Co-op platformer variant
 │   ├── wormLogic.js        #   Core worm physics and pathfinding
 │   └── ...                 #   HUD, touch controls, physics, live rotation
 │
@@ -405,8 +379,7 @@ src/
 │   └── ...                 #   Particles, chaos waves, manifold grid, intro tunnel
 │
 ├── modes/                  # Specialty mode domains
-│   ├── CityBiomeMode.js    #   City/biome environment resolver
-│   └── merge/              #   Merge Mode — region detection, tile tiers, theme picker
+│   └── CityBiomeMode.js    #   City/biome environment resolver
 │
 └── utils/                  # Constants, helpers, audio
     ├── constants.js        #   COLORS, ANTIPODAL_COLOR, FLIP_CAP, face IDs, DIR_VECTORS
@@ -514,8 +487,7 @@ Runs lint → test → build in sequence.
 
 ## Known Notes
 
-- Merge mode includes code-level support for themed region tiers and overlays; final art asset completeness may vary by theme pack at runtime.
-- The project intentionally blends puzzle precision with experimental manifold mechanics (chaos/disparity, worm traversal, holonomy), so some modes are more "sandbox research" than fixed competitive rulesets.
+- The project intentionally blends puzzle precision with experimental manifold mechanics (chaos/disparity, worm traversal), so some modes are more "sandbox research" than fixed competitive rulesets.
 - Disparity Mode computation is isolated in a Web Worker; the main thread receives batched flip updates and applies them with lazy copy-on-write to avoid GC pressure during heavy cascade ticks.
 
 ---

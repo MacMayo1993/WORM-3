@@ -164,10 +164,8 @@ export const AXIS = {
 // Game mode identifiers — returned by getActiveMode() selector
 export const MODES = {
   FREEPLAY:    'freeplay',    // Default, no special mode active
-  WORM_HEALER: 'worm-healer', // Co-op platformer / worm healer
+  WORM_HEALER: 'worm-healer', // Worm healer
   TEACH:       'teach',       // Teaching / algorithm mode
-  HOLONOMY:    'holonomy',    // Holonomy loop mode
-  MERGE:       'merge',       // Merge Blocks mode
   HOLLOW:      'hollow',      // Hollow Void Cube
   MIRROR:      'mirror',      // Mirror Blocks mode
   CHAOS:       'chaos',       // Chaos / Disparity mode (chaosLevel > 0)

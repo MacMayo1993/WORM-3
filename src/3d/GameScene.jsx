@@ -27,7 +27,6 @@ import InteractivePhotoBackground from './InteractivePhotoBackground.jsx';
 const HealerWormMode3DWrapper = React.lazy(() =>
   import('../worm/HealerWormMode.jsx').then((mod) => ({ default: mod.HealerWormMode3DWrapper }))
 );
-const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
 
 const PHOTO_PRESETS = new Set([
   'sunset', 'forest', 'city', 'dawn', 'night',
@@ -105,7 +104,6 @@ export default function GameScene({
     wormRunId,
     wormPhase,
     wormPaused,
-    holonomyMode,
     wormHealedCount,
     perfReducedFX,
   } = useGameStore(useShallow((s) => ({
@@ -124,7 +122,6 @@ export default function GameScene({
     wormRunId: s.wormRunId,
     wormPhase: s.wormPhase,
     wormPaused: s.wormPaused ?? false,
-    holonomyMode: s.holonomyMode,
     wormHealedCount: s.wormHealedCount ?? 0,
     perfReducedFX: s.perfReducedFX ?? false,
   })));
@@ -311,11 +308,6 @@ export default function GameScene({
           </ErrorBoundary3D>
         )}
 
-        {holonomyMode && (
-          <Suspense fallback={null}>
-            <HolonomyWrapper size={size} />
-          </Suspense>
-        )}
 
       </Suspense>
 

@@ -13,7 +13,7 @@
 // because par is a count of entries: a `U2` left as a single numTurns:2 entry
 // would score par 1 for a move that costs the player two.
 
-import { namedMoveToRotation } from '../game/handsInput.js';
+import { namedMoveToRotation } from '../game/moveNotation.js';
 
 /** Invert a single notation token: R → R', R' → R, R2 → R2. */
 export function invertToken(token) {

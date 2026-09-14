@@ -40,7 +40,6 @@ const SecondaryModesSheet = ({
   teachModeActive, onToggleTeach,
   solverLocked,
   // Advanced
-  handsMode, onToggleHands,
   // Leaderboard
   showLeaderboard, onToggleLeaderboard,
   // Level
@@ -160,14 +159,6 @@ const SecondaryModesSheet = ({
               <div className="sheet-grid">
                 <SheetItem label="Solve" active={solveModeActive} onClick={onToggleSolve} color="#0051A2" locked={solverLocked} />
                 <SheetItem label="Teach" active={teachModeActive} onClick={onToggleTeach} color="#FFD500" locked={solverLocked} />
-              </div>
-            </div>
-
-            {/* Advanced */}
-            <div className="sheet-group">
-              <div className="sheet-group-title">Advanced</div>
-              <div className="sheet-grid">
-                <SheetItem label="Hands" active={handsMode} onClick={onToggleHands} color="#ff6b35" />
               </div>
             </div>
 

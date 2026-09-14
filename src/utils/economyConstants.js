@@ -11,7 +11,7 @@ export const EARN_DISPARITY_TILE_RESTORE = 5;  // per tile restored from dispari
 
 // ── Earning outside Worm and Chaos ────────────────────────────────────────────
 // Parity Points used to come from exactly two modes. Everything else — the three
-// campaigns, Freeplay, Random, Teach, Holonomy — paid nothing, so a player could
+// campaigns, Freeplay, Random, Teach — paid nothing, so a player could
 // finish every authored level in the game and still be able to afford nothing in
 // the store beyond the one-off starting bankroll. These route the rest of the
 // game into the same wallet.
@@ -24,8 +24,6 @@ export const EARN_LEVEL_FIRST_CLEAR = 15;    // any authored level, first comple
 export const EARN_LEVEL_STAR = 10;           // per NEW star, so ≤30 more per level
 export const EARN_FREEPLAY_FIRST_SOLVE = 25; // first Freeplay/Random solve at each cube size
 export const EARN_TEACH_ALGORITHM = 20;      // per algorithm executed to the end, once
-export const EARN_HOLONOMY_LOOP = 30;        // first closed holonomy loop
-export const EARN_HOLONOMY_MOBIUS = 60;      // first orientation-reversing loop — the RP² payoff
 
 // ── Disparity game lengths (shuffle counts) ───────────────────────────────────
 export const DISPARITY_GAME_LENGTHS = {

@@ -91,7 +91,6 @@ const CubeAssembly = React.memo(({
     showCursor,
     flipMode,
     flipWaveOrigins,
-    handsMode,
     wormHealerMode,
     wormTunnelActive,
     isBiomeMode,
@@ -108,7 +107,6 @@ const CubeAssembly = React.memo(({
       showCursor: s.showCursor,
       flipMode: s.flipMode,
       flipWaveOrigins: s.flipWaveOrigins,
-      handsMode: s.handsMode,
       wormHealerMode: s.wormHealerMode,
       // Keep puzzle controls disabled through the tunnel ride. Exterior visibility
       // is handled per frame from the lens position below.
@@ -234,8 +232,6 @@ const CubeAssembly = React.memo(({
   onFaceRotationModeRef.current = onFaceRotationMode;
   const onClearTileSelectionRef = useRef(onClearTileSelection);
   onClearTileSelectionRef.current = onClearTileSelection;
-  const handsModeRef = useRef(handsMode);
-  handsModeRef.current = handsMode;
 
   const onPointerDown = useCallback(({ pos, worldPos, event }) => {
     if (animStateRef.current) return;
@@ -618,20 +614,6 @@ const CubeAssembly = React.memo(({
     };
   }, []); // Run once - use refs for all state
 
-  // Lock camera to Home Grip POV when hands mode is enabled
-  useEffect(() => {
-    if (handsMode && !wormHealerMode) {
-      camera.position.set(0, 1.2, 10);
-      camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
-      // Reset TrackballControls target so it doesn't fight the lock
-      if (controlsRef.current) {
-        controlsRef.current.target.set(0, 0, 0);
-        controlsRef.current.reset();
-      }
-    }
-  }, [handsMode, wormHealerMode, camera]);
-
   // PuzzleOrbitControls unmounts while chase mode owns the camera. Pointer
   // cleanup must never be able to reactivate a dormant orbit controller.
 
@@ -642,12 +624,12 @@ const CubeAssembly = React.memo(({
   useEffect(() => {
     if (cameraOrbitRequest === prevCameraOrbitRequestRef.current) return;
     prevCameraOrbitRequestRef.current = cameraOrbitRequest;
-    if (!cameraOrbitDir || handsMode || wormHealerMode) return;
+    if (!cameraOrbitDir || wormHealerMode) return;
     const angle = cameraOrbitDir === 'cw' ? -Math.PI / 4 : Math.PI / 4;
     camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     camera.lookAt(0, 0, 0);
     if (controlsRef.current) controlsRef.current.update();
-  }, [cameraOrbitRequest, cameraOrbitDir, handsMode, wormHealerMode, camera]);
+  }, [cameraOrbitRequest, cameraOrbitDir, wormHealerMode, camera]);
 
   // Store refs for values accessed in useFrame to avoid stale closures
   const onAnimCompleteRef = useRef(onAnimComplete);
@@ -780,14 +762,13 @@ const CubeAssembly = React.memo(({
     initializedMoveRef.current = animState;
 
     // Use GSAP to animate the progress value with snappy easing
-    // Hands mode and shuffle moves use faster, crisper animations
-    const isHands = handsModeRef.current;
+    // Shuffle moves use faster, crisper animations
     const isShuffle = !!animState?.isShuffle;
     const isWormScramble = !!animState?.wormScramble;
-    // The worm-mode opening scramble now plays fast (like hands/shuffle): 20 parallel
+    // The worm-mode opening scramble now plays fast (like shuffle): 20 parallel
     // pair-moves would drag if each ran at full in-game turn length, so they snap
     // through crisply to get the player into the game sooner.
-    const isFast = isHands || isShuffle;
+    const isFast = isShuffle;
     // Worm-mode hazard rotations (the auto inverse-turns that grind through the worm)
     // run far slower than a normal turn so the planes menacingly creep through instead
     // of snapping — the slow execution itself is the "looming danger" payoff after the
@@ -1275,11 +1256,11 @@ const CubeAssembly = React.memo(({
             chaseActive={wormHealerMode}
             controlsRef={controlsRef}
             noPan={true}
-            noZoom={handsMode && explosionFactor === 0}
-            noRotate={handsMode ? true : false}
+            noZoom={false}
+            noRotate={false}
             minDistance={5}
             maxDistance={MAX_DISTANCE_BY_SIZE[size] || 28}
-            enabled={!wormHealerMode && (!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
+            enabled={!wormHealerMode && !animState && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
             staticMoving={false}
             dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
             rotateSpeed={isTouchDevice ? 0.8 : 1.2}

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   levelPayout, MAX_LEVEL_PAYOUT, milestonePayout, awardMilestone,
-  freeplaySolveKey, teachAlgorithmKey, HOLONOMY_LOOP_KEY, HOLONOMY_MOBIUS_KEY,
+  freeplaySolveKey, teachAlgorithmKey,
 } from '../levels/rewards.js';
 import { recordLevelCompletion, recordFreeplaySolve } from '../levels/completion.js';
 import { ProgressManager } from '../levels/ProgressManager.js';
@@ -9,7 +9,7 @@ import { DAILY_LEVEL_ID } from '../levels/dailyChallenge.js';
 import { OFFICIAL_PACKS } from '../levels/packs/index.js';
 import {
   EARN_LEVEL_FIRST_CLEAR, EARN_LEVEL_STAR, EARN_FREEPLAY_FIRST_SOLVE,
-  EARN_TEACH_ALGORITHM, EARN_HOLONOMY_LOOP, EARN_HOLONOMY_MOBIUS,
+  EARN_TEACH_ALGORITHM,
 } from '../utils/economyConstants.js';
 
 const wallet = () => {
@@ -61,12 +61,11 @@ describe('milestonePayout', () => {
   it('prices each milestone family', () => {
     expect(milestonePayout(freeplaySolveKey(3))).toBe(EARN_FREEPLAY_FIRST_SOLVE);
     expect(milestonePayout(teachAlgorithmKey('white-cross', 0))).toBe(EARN_TEACH_ALGORITHM);
-    expect(milestonePayout(HOLONOMY_LOOP_KEY)).toBe(EARN_HOLONOMY_LOOP);
-    expect(milestonePayout(HOLONOMY_MOBIUS_KEY)).toBe(EARN_HOLONOMY_MOBIUS);
   });
 
-  it('values the Möbius loop above a plain one — it is the mode’s actual point', () => {
-    expect(milestonePayout(HOLONOMY_MOBIUS_KEY)).toBeGreaterThan(milestonePayout(HOLONOMY_LOOP_KEY));
+  it('does not pay for retired Holonomy milestones', () => {
+    expect(milestonePayout('holonomy:loop')).toBe(0);
+    expect(milestonePayout('holonomy:mobius')).toBe(0);
   });
 
   it('pays nothing for an unknown or malformed key instead of throwing', () => {
@@ -105,7 +104,7 @@ describe('awardMilestone', () => {
   });
 
   it('claims before paying, so a throwing payer cannot leave it repeatable', () => {
-    const key = HOLONOMY_MOBIUS_KEY;
+    const key = teachAlgorithmKey('white-cross', 0);
     expect(() => awardMilestone(key, { progress: pm, earn: () => { throw new Error('boom'); } })).toThrow();
     expect(pm.hasMilestone(key)).toBe(true);
     expect(awardMilestone(key, { progress: pm, earn: w.earn })).toBe(0);

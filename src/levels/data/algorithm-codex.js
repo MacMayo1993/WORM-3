@@ -179,7 +179,7 @@ export const ALGORITHM_CODEX_LEVELS = [
     mobiLines: [
       'This one is worth more than the moves in it.',
       'Niklas is a commutator — two operations that almost cancel, leaving a small clean change behind.',
-      'Trace a closed loop and return changed. You have met that idea here before, under the name holonomy.',
+      'Trace a closed loop and return changed. The order of your turns matters.',
     ],
     winMessage: 'Commutators unlocked. You can derive algorithms now, not just recall them. 🔁',
   }),

@@ -88,7 +88,7 @@ const HelpMenu = ({ onClose }) => (
           <Row label="Worm" desc="Steer a worm across the cube to heal it. Eat orbs, earn points" />
           <Row label="Chaos" desc="Tiles flip on their own. Stake points on how long you last" />
           <Row label="Random" desc="The cube redecorates itself mid-solve" />
-          <Row label="More Modes" desc="Merge, Biome, Crawler, Holonomy — the odd corners" />
+          <Row label="More Modes" desc="Biome and Möbius Cubelet — more ways to explore" />
         </Section>
 
         <Section title="Special Features">
@@ -120,19 +120,6 @@ const HelpMenu = ({ onClose }) => (
           <KeyRow keys="F" desc="Send the selected tile through to its twin" />
         </Section>
 
-        <Section title="Hands Mode (P) — Speedcuber">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            <KeyRow keys="I / K" desc="U / U'" />
-            <KeyRow keys="O" desc="U2" />
-            <KeyRow keys="J / L" desc="R / R'" />
-            <KeyRow keys="F / D" desc="L / L'" />
-            <KeyRow keys="H / G" desc="F / F'" />
-            <KeyRow keys="W / E" desc="B / B'" />
-            <KeyRow keys="S / ;" desc="D / D'" />
-            <KeyRow keys=", / M" desc="M' / M" />
-          </div>
-        </Section>
-
         <Section title="Quick Shortcuts">
           <KeyRow keys="H / ?" desc="Open / close this help menu" />
           <KeyRow keys="Space" desc="Shuffle the cube" />
@@ -142,8 +129,7 @@ const HelpMenu = ({ onClose }) => (
           <KeyRow keys="X" desc="Toggle explosion view" />
           <KeyRow keys="V" desc="Cycle view mode" />
           <KeyRow keys="C" desc="Toggle Chaos Mode" />
-          <KeyRow keys="P" desc="Toggle Hands Mode" />
-          <KeyRow keys="Esc" desc="Close menus / exit Hands Mode" />
+          <KeyRow keys="Esc" desc="Close menus / hide cursor" />
         </Section>
 
         {/* Footnote — the one place this screen earns an accent, so it reads as

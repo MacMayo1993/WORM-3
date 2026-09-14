@@ -19,15 +19,6 @@ const ACCENT = '#1565C0';
 // cards stay read-only. Anything without it gets a Play button.
 const MODES = [
   {
-    id: 'merge',
-    label: 'Merge Mode',
-    accent: '#6a1b9a',
-    description:
-      'Match neighbouring tiles to evolve them. Every tile you line up levels the whole patch up a tier — think 2048, except the board is a Rubik\'s Cube and it rotates under you.',
-    tags: ['Puzzle', 'Chill', 'Pick a theme'],
-    playLabel: 'Start merging',
-  },
-  {
     id: 'biome',
     label: 'Biome Mode',
     accent: '#2e7d32',
@@ -35,24 +26,6 @@ const MODES = [
       'Six faces, six living ecosystems — grass, ice, sand, water, wood, stone. Same cube rules, but the surface breathes while you solve it. The prettiest way to play.',
     tags: ['Sandbox', 'No pressure', 'Living tiles'],
     playLabel: 'Grow a cube',
-  },
-  {
-    id: 'coop',
-    label: 'Crawler',
-    accent: '#c2410c',
-    description:
-      'Drop off the cube entirely and platform along its surface as the worm. Run the seams, fall through a face, come out the antipodal side — the topology becomes the level.',
-    tags: ['Platformer', 'Action', 'Worm'],
-    playLabel: 'Take the leap',
-  },
-  {
-    id: 'holonomy',
-    label: 'Holonomy',
-    accent: '#1565C0',
-    description:
-      'Drag an arrow around a closed loop on the cube and watch it come back pointing somewhere else. No score, no timer — just the strangest fact about this shape, made playable.',
-    tags: ['Math toy', 'Topology', 'Experimental'],
-    playLabel: 'Trace a loop',
   },
   {
     id: 'mobius',
@@ -237,17 +210,14 @@ const ModeCard = ({ item, isSelected, onClick, onPlay }) => {
   );
 };
 
-export default function ComingSoonScreen({ onBack, onHolonomy, onBiome, onMerge, onCoop, onMobiusCubelet }) {
+export default function ComingSoonScreen({ onBack, onBiome, onMobiusCubelet }) {
   const [visible, setVisible] = useState(false);
   // Open on the first card so the screen never reads as a wall of closed rows —
   // the player lands on something they can immediately play.
   const [selectedId, setSelectedId] = useState(MODES[0].id);
 
   const launchers = {
-    holonomy: onHolonomy,
     biome: onBiome,
-    merge: onMerge,
-    coop: onCoop,
     mobius: onMobiusCubelet,
   };
 
@@ -372,7 +342,7 @@ export default function ComingSoonScreen({ onBack, onHolonomy, onBiome, onMerge,
               lineHeight: 1.5,
             }}
           >
-            The odd corners of the cube. Most of these are playable right now — tap one to read it and jump straight in.
+            Explore living surfaces and a different view of the cube.
           </p>
         </div>
 

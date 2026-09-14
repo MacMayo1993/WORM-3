@@ -16,7 +16,6 @@ import { feel } from '../utils/feel.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isInRefractory, markFlipped, clearRefractory } from '../game/refractoryMap.js';
-import { computeMergeRegions } from '../modes/merge/index.js';
 import { pruneExpiredFx } from '../utils/transientFx.js';
 
 /**
@@ -35,14 +34,6 @@ import { pruneExpiredFx } from '../utils/transientFx.js';
  */
 export function shouldInterceptFirstFlip(hasFlippedOnce, alreadyIntercepted, hasPair) {
   return !hasFlippedOnce && !alreadyIntercepted && hasPair;
-}
-
-// Recompute merge region tiers from the current store state and persist them.
-// Called imperatively after every rotation/shuffle when merge mode is active.
-function updateMergeTiers() {
-  const { mergeMode, cubies, size, setMergeRegionTiers } = useGameStore.getState();
-  if (!mergeMode) return;
-  setMergeRegionTiers(computeMergeRegions(cubies, size));
 }
 
 /**
@@ -138,7 +129,6 @@ export function useCubeState() {
       moves: state.moves + 1,
       moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-MAX_UNDO_HISTORY),
     }));
-    updateMergeTiers();
   }, [size]);
 
   // Pending first-flip highlight timer — when the player's very first flip is
@@ -367,7 +357,6 @@ export function useCubeState() {
     clearHistory();
     clearRefractory();
     setHasShuffled(true);
-    updateMergeTiers();
   }, [size, setRotatedCubies, resetGame, clearHistory, setHasShuffled]);
 
   // Reset to solved state
