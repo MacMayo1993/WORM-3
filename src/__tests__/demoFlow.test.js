@@ -111,8 +111,8 @@ describe('control tour', () => {
     expect(new Set(CONTROL_TOUR_KEYS).size).toBe(CONTROL_TOUR_KEYS.length);
   });
 
-  it('numbers the tile slots 1..5 so each caption points at the right tile', () => {
-    expect(CONTROL_TOUR_SEQUENCE.map((b) => b.slot)).toEqual([1, 2, 3, 4, 5]);
+  it('maps Reset and Shuffle to the same first slot in the four-button dock', () => {
+    expect(CONTROL_TOUR_SEQUENCE.map((b) => b.slot)).toEqual([1, 1, 2, 3, 4]);
   });
 
   it('gives every beat a title and copy that asks for the press', () => {

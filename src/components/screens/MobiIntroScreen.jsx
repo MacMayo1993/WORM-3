@@ -1,3 +1,4 @@
+import DemoDialog from './DemoDialog.jsx';
 // src/components/screens/MobiIntroScreen.jsx
 /**
  * MobiIntroScreen — Civ 6-style dialogue: full-width panel at bottom,
@@ -195,12 +196,7 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
   const dismissed = useRef(false);
   const primaryRef = useRef(null);
   useEffect(() => {
-    const previous = document.activeElement;
-    primaryRef.current?.focus();
-    return () => {
-      clearTimeout(dismissTimer.current);
-      if (previous?.isConnected) previous.focus();
-    };
+    return () => clearTimeout(dismissTimer.current);
   }, []);
   useEffect(() => {
     if (!lines.length && !dismissed.current) {
@@ -231,22 +227,7 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
     else setIndex(i => i + 1);
   }, [isDismissing, isLast, dismiss]);
 
-  useEffect(() => {
-    const onKey = (e) => {
-      // Focused controls own Enter/Space; otherwise Skip incorrectly advances.
-      if (e.key !== 'Escape' && e.target?.closest?.('button, a, input, select, textarea, [contenteditable]')) return;
-      if (e.repeat) return;
-      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        advance();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        skip();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [advance, skip]);
+
 
   if (!lines.length) return null;
 
@@ -268,8 +249,9 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
     : 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards';
 
   return (
-    <div
-      role="region"
+    <DemoDialog
+      onClose={skip}
+      className="demo-mobi-dialog"
       aria-label={`${modeName || 'Game'} · Mobi’s instructions`}
       style={{
         position: 'fixed',
@@ -479,6 +461,7 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
             <button
               type="button"
               ref={primaryRef}
+              data-demo-autofocus
               disabled={isDismissing}
               onClick={(e) => { e.stopPropagation(); advance(); }}
               style={{
@@ -506,7 +489,7 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
           </div>
         </div>
       </div>
-    </div>
+    </DemoDialog>
   );
 };
 

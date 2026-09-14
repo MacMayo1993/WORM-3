@@ -631,7 +631,8 @@ export default function WORM3() {
   }, [advanceDemoStep]);
 
   // The demo's floating pills stand down while a full modal owns the screen.
-  const demoChromeQuiet = showStore || showSettings || showHelp;
+  const wormPauseMenuOpen = useGameStore(s => s.wormPauseMenuOpen);
+  const demoChromeQuiet = showStore || showSettings || showHelp || wormPauseMenuOpen;
   // …except on the Settings step, where the demo opened Settings itself. There
   // an open panel is the expected state, not an interruption, so suppressing
   // the coach pill would leave that step as the only one in the demo with no
@@ -639,7 +640,7 @@ export default function WORM3() {
   // on it. Closing Settings still completes the step; this is the escape hatch
   // for a player who does not want to.
   const demoCoachQuiet = demoStep === 'make-it-yours'
-    ? (showStore || showHelp)
+    ? (showStore || showHelp || wormPauseMenuOpen)
     : demoChromeQuiet;
 
   // Home during the demo is a real exit, not just a screen change: without this
@@ -1673,7 +1674,7 @@ export default function WORM3() {
           `demoChromeQuiet` is the one gate every floating demo pill respects: a
           full modal (Settings, Help, Store) owns the screen while it is open,
           and the demo opens Settings itself during the "Make It Yours" step. */}
-      {demoMode && !demoColdOpenVisible && !demoChromeQuiet && <DemoProgressBar currentStep={demoStep} />}
+      {demoMode && demoStep !== 'worm-traversal' && !demoColdOpenVisible && !demoChromeQuiet && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
       {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
@@ -1741,7 +1742,7 @@ export default function WORM3() {
       <ScreenTransition show={!!(demoMode && demoFlipSpotlight && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
         <DemoFlipSpotlightHint onSkip={handleDemoFlipSpotlightSkip} />
       </ScreenTransition>
-      <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoShowcaseSubStep >= 0 && !demoStepIntroVisible)} freezeOnExit>
+      <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoShowcaseSubStep >= 0 && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
         <DemoViewShowcase
           subStep={demoShowcaseSubStep}
           onNext={handleDemoShowcaseNext}

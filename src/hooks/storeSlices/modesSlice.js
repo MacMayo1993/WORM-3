@@ -97,6 +97,9 @@ export const createModesSlice = (set, _get) => ({
   // ========================================================================
   demoMode: false,
   demoStep: null,
+  wormPauseMenuOpen: false,
+  demoExploring: false,
+  demoExploreComplete: false,
 
   startDemo: () => set({
     demoMode: true,

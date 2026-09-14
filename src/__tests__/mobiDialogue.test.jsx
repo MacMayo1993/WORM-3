@@ -53,7 +53,7 @@ describe('Mobi dialogue interaction', () => {
   });
   it('ignores background taps so reading is not accidentally skipped', () => {
     show();
-    act(() => host.querySelector('[role="region"]').click());
+    act(() => host.querySelector('[role="dialog"]').click());
     expect(host.textContent).toContain('First instruction.');
   });
   it('handles an empty dialogue without completing during render', () => {

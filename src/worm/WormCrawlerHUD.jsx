@@ -4,7 +4,7 @@ import { elementalFeedback } from './healerWorm/elementalFeedback.js';
 // Three-zone layout: Glance Strip (top, info-only) · Game Scene · Thumb Tray (bottom, all controls).
 // Neutral instruments keep face colours on the cube and inventory samples.
 
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useLayoutEffect, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -612,8 +612,8 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
 // Pause lives in the status bar, not the thumb tray: it is a rare, deliberate
 // action and it was the odd third button sitting between the movement keys.
 const PAUSE_BTN_STYLE = {
-    width: 34,
-    height: 34,
+    width: 48,
+    height: 48,
     borderRadius: 11,
     background: HUD_SURFACE_SOFT,
     border: '1px solid rgba(255,245,220,0.16)',
@@ -1410,6 +1410,23 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const [isPaused, setIsPaused] = useState(false);
 
     ensureHudStyle();
+    const runId = useGameStore(s => s.wormRunId);
+    const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
+    const trayRef = useRef(null);
+    useLayoutEffect(() => {
+        useGameStore.setState({ wormPauseMenuOpen: isPaused });
+        return () => useGameStore.setState({ wormPauseMenuOpen: false });
+    }, [isPaused]);
+    useEffect(() => { setIsPaused(false); }, [runId]);
+    useLayoutEffect(() => {
+        const tray = trayRef.current;
+        if (!tray || !demoLesson) return;
+        const measure = () => document.documentElement.style.setProperty('--demo-tray-clearance', `${Math.max(0, window.innerHeight - tray.getBoundingClientRect().top) + 10}px`);
+        measure();
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+        observer?.observe(tray); window.addEventListener('resize', measure);
+        return () => { observer?.disconnect(); window.removeEventListener('resize', measure); document.documentElement.style.removeProperty('--demo-tray-clearance'); };
+    }, [demoLesson]);
 
     useEffect(() => {
         if (showDeathMenu) setIsMinimized(false);
@@ -1541,7 +1558,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
 
                 {/* Reserve row — the coins that used to float in a second panel */}
-                {wormAlive && (
+                {wormAlive && !demoLesson && (
                     <div className="worm-hud-reserve" style={RESERVE_ROW_STYLE}>
                         <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
                     </div>
@@ -1555,7 +1572,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {wormAlive && <SpecialNotice />}
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
-            <div style={THUMB_TRAY_STYLE}>
+            <div ref={trayRef} style={THUMB_TRAY_STYLE}>
                 <SteerKey side="left" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
 
                 {/* Middle: Jump + Boost, with the contextual portal hint above them */}

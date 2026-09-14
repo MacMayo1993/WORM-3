@@ -27,6 +27,14 @@ describe('short demo and retry', () => {
       wormTunnelCount: 0, wormPhase: 'crawling', wormGamePhase: 'playing', wormHealerMode: false });
   });
   afterEach(() => { useGameStore.setState({ demoMode: false }); vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
+  it('does not finish a control-tour beat merely because reading took 20 seconds', () => {
+    useGameStore.setState({ demoStep: 'control-tour', wormPauseMenuOpen: false });
+    const { result, unmount } = renderHook(() => useDemoMode(callbacks));
+    act(() => result.current.handleDemoStepContinue());
+    act(() => vi.advanceTimersByTime(20000));
+    expect(result.current.demoTourIndex).toBe(0);
+    unmount();
+  });
   it('stays on a failed attempt and lets retry start a new run', () => {
     const { result, unmount } = renderHook(() => useDemoMode(callbacks));
     act(() => useGameStore.setState({ wormAlive: false }));

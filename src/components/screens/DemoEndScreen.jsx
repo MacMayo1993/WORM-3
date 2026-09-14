@@ -1,3 +1,5 @@
+import DemoDialog from './DemoDialog.jsx';
+import { useGameStore } from '../../hooks/useGameStore.js';
 import React, { useState } from 'react';
 import {
   UI_FONT, DISPLAY_FONT,
@@ -24,15 +26,16 @@ const MODES = [
 ];
 
 const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit, onExplore }) => {
+  const explored = useGameStore(s => s.demoExploreComplete);
   const [expanded, setExpanded] = useState(false);
   const handlers = { worm: onWorm, story: onStory, freeplay: onFreeplay, chaos: onChaos, random: onRandom, store: onStore };
 
   return (
-    <div style={{
+    <DemoDialog onClose={onExit} aria-label={explored ? "Explore complete" : "Demo complete"} style={{
       position: 'fixed', inset: 0, zIndex: Z.DEMO,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
-      backdropFilter: 'blur(9px) saturate(1.03)',
+      backdropFilter: 'var(--paper-blur, none)',
       fontFamily: UI_FONT,
       padding: 16,
       overflowY: 'auto',
@@ -52,7 +55,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           color: '#7b6f45', fontSize: 11, fontWeight: 800,
           letterSpacing: '0.18em', textTransform: 'uppercase', margin: '0 0 6px',
         }}>
-          Demo Complete
+          {explored ? 'Explore Complete' : 'Demo Complete'}
         </p>
         <h1 style={{
           fontFamily: DISPLAY_FONT,
@@ -67,9 +70,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           color: '#43513a', fontSize: 13.5, lineHeight: 1.5,
           margin: '0 auto 22px', maxWidth: 360,
         }}>
-          You have the whole idea already: the tile dead opposite any other one is
-          its twin, and a tap sends a tile straight through the middle to it. Every
-          mode below is built on that.
+          Twist, flip, and travel through. Your first run is ready.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -99,16 +100,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
                   color: mode.primary ? UI_CREAM : '#26331f', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em',
                 }}>
                   {mode.primary ? 'Play WORM' : mode.name}
-                  {mode.primary && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
-                      padding: '2px 7px', borderRadius: 999,
-                      background: 'rgba(255,255,255,0.22)', color: '#fffdf5',
-                      textTransform: 'uppercase',
-                    }}>
-                      Start here
-                    </span>
-                  )}
+
                 </span>
                 <span style={{
                   display: 'block', marginTop: 2,
@@ -132,22 +124,10 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           style={{ minHeight: 48, marginTop: 12, background: 'transparent', border: 0, color: '#43513a', font: 'inherit' }}>
           {expanded ? 'Fewer choices' : 'Explore other modes'}
         </button>
-        <button type="button" onClick={onExplore}
+        {!explored && <button type="button" onClick={onExplore}
           style={{ display: 'block', width: '100%', minHeight: 48, background: 'transparent', border: '1px solid #cec8be', borderRadius: 12, color: '#43513a', font: 'inherit' }}>
-          Continue the optional tour
-        </button>
-        {/* The solver and the step-by-step teacher live behind the nav bar's
-            More button — the demo never opens that sheet, so name it here
-            rather than leave two of the game's biggest helps undiscovered. */}
-        <p style={{
-          color: '#657156', fontSize: 12, lineHeight: 1.45,
-          margin: '16px auto 0', maxWidth: 340,
-        }}>
-          While playing a cube puzzle, the <strong style={{ color: '#43513a' }}>More</strong> button on the
-          bottom bar has <strong style={{ color: '#43513a' }}>Solve</strong> (watch it solve itself)
-          and <strong style={{ color: '#43513a' }}>Teach</strong> (learn to do it yourself).
-        </p>
-
+          Explore more
+        </button>}
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button
             type="button"
@@ -181,7 +161,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           </button>
         </div>
       </div>
-    </div>
+    </DemoDialog>
   );
 };
 
