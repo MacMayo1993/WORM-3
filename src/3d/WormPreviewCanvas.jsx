@@ -1,10 +1,11 @@
+import { registerDirectWormPreview, updateDirectWormPreview, unregisterDirectWormPreview } from './directWormPreview.js';
 // WormPreviewCanvas.jsx
 // Drop-in <canvas> that shows the real 3D worm — same body, face, and hat you
 // see in Healer mode — drawn by the shared preview renderer. Use it anywhere a
 // worm needs to appear outside the game: the character plate, the store's skin
 // and hat cards, the cosmetic pickers.
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useLayoutEffect } from 'react';
 import {
   registerWormPreview,
   updateWormPreview,
@@ -33,6 +34,7 @@ export default function WormPreviewCanvas({
   hatId = 'none',
   size = 64,
   animated = false,
+  direct = false,
   maxPixelRatio = 2,
   maxRenderPixels = MAX_RENDER_PX,
   framing = 'body',
@@ -42,9 +44,14 @@ export default function WormPreviewCanvas({
   const canvasRef = useRef(null);
   const idRef = useRef(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (direct) {
+      const entry = registerDirectWormPreview(canvas, { characterId, skinId, hatId, animated, framing, companion });
+      idRef.current = entry;
+      return () => { unregisterDirectWormPreview(entry); idRef.current = null; };
+    }
     const px = Math.min(maxRenderPixels, Math.round(size * renderScale(maxPixelRatio)));
     canvas.width = px;
     canvas.height = px;
@@ -55,14 +62,15 @@ export default function WormPreviewCanvas({
     };
     // Size changes remount the preview; the option effect below handles the rest.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size, maxPixelRatio, maxRenderPixels]);
+  }, [size, maxPixelRatio, maxRenderPixels, direct]);
 
   useEffect(() => {
-    if (idRef.current !== null) updateWormPreview(idRef.current, { characterId, skinId, hatId, animated, framing, companion });
-  }, [characterId, skinId, hatId, animated, framing, companion]);
+    if (idRef.current !== null) (direct ? updateDirectWormPreview : updateWormPreview)(idRef.current, { characterId, skinId, hatId, animated, framing, companion });
+  }, [characterId, skinId, hatId, animated, framing, companion, direct]);
 
+  const Surface = direct ? 'div' : 'canvas';
   return (
-    <canvas
+    <Surface
       ref={canvasRef}
       style={{ display: 'block', width: `${size}px`, height: `${size}px`, ...style }}
     />
