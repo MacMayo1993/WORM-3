@@ -214,6 +214,8 @@ export function useWormCrawler(size, cubies) {
                 });
             },
             onCrawlResume: () => {
+                const resumed = useGameStore.getState();
+                if (resumed.wormPhase === 'windout') resumed.recordWormMission('tunnels', resumed.wormTunnelCount, null, resumed.wormRunId);
                 useGameStore.setState({
                     wormPhase: 'crawling',
                     wormOnFlippedTile: false,
@@ -250,6 +252,8 @@ export function useWormCrawler(size, cubies) {
                 }));
             },
             onOrbPickup: (faceId, orbCount, color, combo) => {
+                const pickup = useGameStore.getState();
+                pickup.recordWormMission('orbs', (pickup.wormSessionOrbs ?? 0) + 1, faceId, pickup.wormRunId);
                 useGameStore.setState((state) => ({
                     wormBodyTiles: orbCount,
                     wormSessionOrbs: (state.wormSessionOrbs ?? 0) + 1,
@@ -337,6 +341,7 @@ export function useWormCrawler(size, cubies) {
                 for (const key of healedProgressKeys) if (key) delete newProgress[key];
                 st.setWormHealingProgress(newProgress);
                 st.setWormHealedCount(healedCount);
+                st.recordWormMission('healed', healedCount, null, st.wormRunId);
                 useGameStore.getState().earnCoins(EARN_WORM_HEALED_FACE);
             },
         };

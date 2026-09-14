@@ -1,3 +1,4 @@
+import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
 import { elementalFeedback } from './healerWorm/elementalFeedback.js';
 // src/worm/WormCrawlerHUD.jsx
 // Mobile-first "Antipodal HUD" for WORM Chase-Cam Mode.
@@ -916,8 +917,9 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                     </div>
                 ))}
             </div>
+            <WormMissionCard summary />
             <div style={WINNER_BTN_ROW_STYLE}>
-                <button onClick={onRetry} style={WINNER_PLAY_AGAIN_STYLE}>Play Again</button>
+                <button onClick={onRetry} style={WINNER_PLAY_AGAIN_STYLE}><WormReplayLabel /></button>
                 <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New Game</button>
             </div>
         </div>
@@ -1294,6 +1296,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
             <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className="worm-pause-card" role="dialog" aria-modal="true" aria-label="Game paused" style={overlayCardStyle(green, { width: 420 })} onClick={e => e.stopPropagation()}>
                 <Eyebrow accent={green}>Paused</Eyebrow>
                 <ParityWallet dark neutral />
+                <WormMissionCard summary />
                 <OverlayTitle size="clamp(26px, min(9vw, 8vh), 44px)" outline="#14310f" glow={`${green}55`}>
                     TAKE A BREATHER
                 </OverlayTitle>
@@ -1420,12 +1423,16 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     useEffect(() => { setIsPaused(false); }, [runId]);
     useLayoutEffect(() => {
         const tray = trayRef.current;
-        if (!tray || !demoLesson) return;
-        const measure = () => document.documentElement.style.setProperty('--demo-tray-clearance', `${Math.max(0, window.innerHeight - tray.getBoundingClientRect().top) + 10}px`);
+        if (!tray) return;
+        const measure = () => {
+            const clearance = `${Math.max(0, window.innerHeight - tray.getBoundingClientRect().top) + 10}px`;
+            document.documentElement.style.setProperty('--worm-tray-clearance', clearance);
+            if (demoLesson) document.documentElement.style.setProperty('--demo-tray-clearance', clearance);
+        };
         measure();
         const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
         observer?.observe(tray); window.addEventListener('resize', measure);
-        return () => { observer?.disconnect(); window.removeEventListener('resize', measure); document.documentElement.style.removeProperty('--demo-tray-clearance'); };
+        return () => { observer?.disconnect(); window.removeEventListener('resize', measure); document.documentElement.style.removeProperty('--demo-tray-clearance'); document.documentElement.style.removeProperty('--worm-tray-clearance'); };
     }, [demoLesson]);
 
     useEffect(() => {
@@ -1564,6 +1571,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     </div>
                 )}
             </div>
+
+            <WormMissionCard />
 
             {/* ── Active buff pills (rocket / magnet) ── */}
             {wormAlive && <BuffStrip />}

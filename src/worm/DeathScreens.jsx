@@ -1,3 +1,4 @@
+import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
 // src/worm/DeathScreens.jsx
 // Full-screen death takeovers for Worm Healer mode — a distinct themed
 // experience per death cause instead of one generic "you died" card.
@@ -136,6 +137,7 @@ export default function DeathScreen({
                     >{config.title}</OverlayTitle>
                     <OverlayBlurb>{config.blurb}</OverlayBlurb>
 
+                    <WormMissionCard summary />
                     <HeroStat accent={config.accent} value={wormBodyTiles} label="Final length" />
                     <StatTiles stats={[
                         ['Time', formatTime(wormTimeAlive)],
@@ -151,7 +153,7 @@ export default function DeathScreen({
                         <button
                             onPointerDown={onRetry}
                             style={primaryBtnStyle(config.btnFrom ?? config.accent, config.btnTo ?? config.deep)}
-                        >Retry</button>
+                        ><WormReplayLabel /></button>
                         <button onPointerDown={onNewGame} style={SECONDARY_BTN_STYLE}>New Game</button>
                     </div>
                     {canExamine && (

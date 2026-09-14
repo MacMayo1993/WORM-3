@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
 
 const EXPECTED_KEYS = [
+  'wormMission', 'wormMissionsCompleted', 'recordWormMission',
   'wormPauseMenuOpen', 'demoExploring', 'demoExploreComplete',
   'achievedWins', 'activeBet', 'activePackId', 'addDisparityDeath',
   'addDisparityDeathsBulk', 'addDisparityEliminatedFace', 'addDisparityEliminatedFacesBulk', 'addDisparityParityScore',

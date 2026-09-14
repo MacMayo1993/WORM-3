@@ -1,3 +1,4 @@
+import { WORM_MISSION_STORAGE_KEY } from '../worm/missions.js';
 /**
  * useGameStore - Zustand State Management
  *
@@ -122,3 +123,6 @@ useGameStore.subscribe((state) => state.parityPoints, persist(PARITY_POINTS_KEY)
 useGameStore.subscribe((state) => state.ownedItems, persist(OWNED_ITEMS_KEY, JSON.stringify));
 useGameStore.subscribe((state) => state.betStreak, persist(BET_STREAK_KEY));
 useGameStore.subscribe((state) => state.modePlays, persist(MODE_PLAYS_KEY, JSON.stringify));
+
+useGameStore.subscribe(state => state.wormMissionsCompleted,
+  completed => persist(WORM_MISSION_STORAGE_KEY, JSON.stringify)({ completed }));

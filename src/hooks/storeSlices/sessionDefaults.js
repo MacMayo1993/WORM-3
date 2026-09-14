@@ -73,5 +73,6 @@ export const makeWormSessionDefaults = () => ({
   wormGamePhase: 'scrambling',
   wormCountdownStep: null,
   wormSessionOrbs: 0,
+  wormMission: null,
   wormActiveTunnelColors: null,
 });
