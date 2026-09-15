@@ -36,7 +36,7 @@ import RotationPreview from './overlays/RotationPreview.jsx';
 import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
-import HealerWormHUD from './overlays/HealerWormHUD.jsx';
+const HealerWormHUD = React.lazy(() => import('./overlays/HealerWormHUD.jsx'));
 import TunnelTransitOverlay from '../worm/TunnelTransitOverlay.jsx';
 import { isMobile } from '../utils/device.js';
 
@@ -289,7 +289,7 @@ export default function UILayer({
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <DisparityHUD />}
 
         {/* Healer Worm HUD Overlay */}
-        <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} />
+        {wormHealerMode && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} /></Suspense>}
         {/* Held for the whole traversal so the ride stays legible as one continuous
             event across the three camera regimes it cuts between. */}
         <TunnelTransitOverlay />

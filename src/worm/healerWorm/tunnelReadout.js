@@ -28,7 +28,7 @@ export function tunnelAt(sim, ctx, pos, distance = 0) {
     ...healingNeed({ deposited, inventory: ctx.getOrbInventory(), faceId: sticker.curr, tailLength: sim.tailLength, isPrism, refractCharges: sim.signature.character === 'prism' && sim.signature.active > 0 ? sim.signature.charges : 0 }) };
 }
 export function tunnelReadout(sim, size, ctx) {
-  if (!sim.alive || ctx.isDemoLesson?.() || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || liveRotation.active || sim.restRead) return null;
+  if (!sim.alive || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || liveRotation.active || sim.restRead) return null;
   if (sim.phase !== 'crawling') {
     const need = sim.activeTunnel && tunnelAt(sim, ctx, sim.activeTunnel.entry);
     return need ? { ...need, inTransit: true } : null;

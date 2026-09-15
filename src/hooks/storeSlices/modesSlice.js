@@ -1,3 +1,4 @@
+import { WORM_DEMO_LESSON_COUNT, newWormDemo, wormDemoActive } from '../../game/wormDemoState.js';
 /**
  * modesSlice.js — Campaign state, solver/teach overlays, and the guided demo.
  *
@@ -72,6 +73,7 @@ export const createModesSlice = (set, _get) => ({
   // ========================================================================
   // DEMO MODE
   // ========================================================================
+  ...newWormDemo(),
   demoMode: false,
   demoStep: null,
   wormPauseMenuOpen: false,
@@ -84,8 +86,15 @@ export const createModesSlice = (set, _get) => ({
     demoStep: 'baby-cube',
     showMainMenu: false,
   }),
-  setDemoStep: (demoStep) => set({ demoStep }),
+  setDemoStep: (demoStep) => set({ demoStep, ...(demoStep === 'worm-traversal' ? newWormDemo() : { demoWormTarget: null }) }),
+  startWormDemoLesson: () => set(s => wormDemoActive(s) && s.demoWormPrepared && ['active', 'finalHealing'].includes(s.wormGamePhase) && !s.demoWormComplete && !s.demoWormFinished && s.wormAlive && !s.wormPauseMenuOpen ? { demoWormStarted: true, wormPaused: false } : {}),
+  restartWormDemoLesson: () => set(s => !wormDemoActive(s) ? {} : ({ demoWormAttempt: s.demoWormAttempt + 1, demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true, showWormDeathMenu: false })),
+  nextWormDemoLesson: () => set(s => !wormDemoActive(s) ? {} : s.demoWormLessonIndex + 1 >= WORM_DEMO_LESSON_COUNT
+    ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null }
+    : { demoWormLessonIndex: s.demoWormLessonIndex + 1, demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true }),
+  finishWormDemo: () => set(s => wormDemoActive(s) ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null } : {}),
   exitDemo: () => set({
+    ...newWormDemo(),
     demoMode: false,
     demoStep: null,
     showMainMenu: true,

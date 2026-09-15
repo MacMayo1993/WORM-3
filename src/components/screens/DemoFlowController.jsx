@@ -1,4 +1,5 @@
 import DemoDialog from './DemoDialog.jsx';
+import { WORM_DEMO_LESSON_COUNT } from '../../game/wormDemoState.js';
 import { useDemoTarget } from './useDemoTarget.js';
 import React from 'react';
 import { UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../../utils/uiTheme.js';
@@ -17,7 +18,7 @@ const DEMO_STEPS = [
   { id: 'baby-cube', label: 'First Twist', num: 1 },
   { id: 'twin-paradox', label: 'Meet the Twins', num: 2 },
   { id: 'flip-gateway', label: 'Through the Middle', num: 3 },
-  { id: 'worm-traversal', label: 'First Tunnel', num: 4 },
+  { id: 'worm-traversal', label: 'WORM Practice', num: 4 },
   { id: 'learn-to-solve', label: 'Learn to Solve', num: 5 },
   { id: 'control-tour', label: 'Your Controls', num: 6 },
   { id: 'view-showcase', label: 'Every Look', num: 7 },
@@ -721,10 +722,10 @@ const DEMO_LEVEL_CONFIGS = {
   },
   'worm-traversal': {
     type: 'worm',
-    cubeSize: 6,
-    wormSpeed: 1.5,
-    wormOrbCount: 25,
-    wormholeInterval: 4,
+    cubeSize: 5,
+    wormSpeed: 1,
+    wormOrbCount: 2,
+    wormholeInterval: 30,
     wormColor: '#33ff66',
     wormCharacter: 'glow',
     wormSkin: 'lava',
@@ -1053,6 +1054,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
 // Next Step button, so the win registers before the next stage arrives.
 const DemoStepComplete = ({ step, onDismiss }) => {
   ensureDemoShellStyle();
+  const completedExercises = useGameStore(s => s.demoWormCompleted.length);
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
   const handleDismiss = () => onDismiss?.();
@@ -1064,6 +1066,7 @@ const DemoStepComplete = ({ step, onDismiss }) => {
         <p className="demo-complete-check">✓</p>
         <p className="demo-beat-sub">{info.num <= 4 ? 'Demo' : 'Explore'} {info.num <= 4 ? info.num : info.num - 4} Complete</p>
         <h2 className="demo-beat-title">{info.label}</h2>
+        {step === 'worm-traversal' && <p className="demo-complete-note">{completedExercises} of {WORM_DEMO_LESSON_COUNT} exercises completed. Replay practice whenever you like.</p>}
         {STEP_COMPLETE_NOTE[step] && (
           <p className="demo-complete-note">{STEP_COMPLETE_NOTE[step]}</p>
         )}
@@ -1169,42 +1172,6 @@ const DemoFlipSpotlightHint = ({ onSkip }) => {
   );
 };
 
-// Worm-step control hint: the healer worm crawls on its own and shows no
-// controls of its own, so the demo names the steer gesture while the player
-// plays. Non-interactive; the parent unmounts it once the worm makes progress.
-const DemoWormControlHint = ({ onRetry, onSkip }) => {
-  ensureDemoShellStyle();
-  const alive = useGameStore(s => s.wormAlive);
-  const steered = useGameStore(s => s.demoWormSteered);
-  const orbs = useGameStore(s => s.wormSessionOrbs);
-  const tunnels = useGameStore(s => s.wormTunnelCount);
-  const details = useGameStore(s => s.wormDeathDetails);
-  const text = !steered ? 'First, swipe left or right to steer. You can also use the turn buttons.'
-    : !orbs ? 'Nice! Steer toward a glowing orb to collect it.'
-    : !tunnels ? 'Now steer onto a glowing tunnel tile. The worm will travel through automatically.'
-    : 'Through the middle—and out the opposite side!';
-  const cause = details?.cause || details?.reason;
-  const advice = cause === 'bomb' ? 'A bomb blast hit you. Keep clear of the marked blast tiles.'
-    : (cause === 'self' || cause === 'self-collision') ? 'You turned into your tail. Leave a little more room when turning.'
-    : cause === 'rotation' ? 'A turning layer caught you. Move clear of the highlighted layer.'
-    : 'Your run ended. Try steering toward a glowing tunnel tile.';
-  if (alive === false) return <DemoDialog className="demo-retry-dialog" aria-label="Try the tunnel lesson again" onClose={onSkip}>
-    <section className="demo-retry-card">
-      <h2>Try that again?</h2><p>{advice}</p>
-      <div className="demo-retry-actions">
-        <button className="demo-intro-button" onClick={onRetry}>Try again</button>
-        <button className="demo-intro-button demo-secondary" onClick={onSkip}>Skip lesson</button>
-      </div>
-    </section>
-  </DemoDialog>;
-  return <section className="demo-worm-dock" aria-label="Tunnel lesson">
-    <div className="demo-worm-dock-row"><DemoProgressBar currentStep="worm-traversal" />
-      <button className="demo-coach-pill-btn demo-secondary" onClick={onSkip}>Skip lesson</button>
-    </div>
-    <p role="status" aria-live="polite">{text}</p>
-  </section>;
-};
-
 // Flip-gateway progress: a bounded count of how many tile pairs have been sent
 // through ("flip-all") or brought home ("unflip-all"), so the tap loop reads as
 // a short task with a finish line rather than an open-ended chore.
@@ -1302,7 +1269,6 @@ export {
   DemoViewShowcase,
   DemoViewSpotlightHint,
   DemoFlipSpotlightHint,
-  DemoWormControlHint,
   DemoFlipProgress,
   DemoStepComplete,
   DemoStepLaunch,

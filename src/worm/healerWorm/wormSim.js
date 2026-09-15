@@ -1901,7 +1901,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             // per-step heal scan on large boards. The timer resets regardless, so the first
             // interval after a heal refills the slot.
             const atCap = (ctx.getActiveTunnels?.() ?? []).length >= activeTunnelCap(size);
-            if (!noMoreSpawns && !atCap) {
+            if (!noMoreSpawns && !atCap && !ctx.isDemoLesson?.()) {
                 const tile = randomUnflippedTile(ctx.getCubies(), size, [sim.pos]);
                 if (tile) ctx.spawnWormholePair(tile);
             }

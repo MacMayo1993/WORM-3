@@ -24,7 +24,7 @@ describe('short demo and retry', () => {
     vi.useFakeTimers();
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     useGameStore.setState({ demoMode: true, demoStep: 'worm-traversal', wormAlive: true,
-      wormTunnelCount: 0, wormPhase: 'crawling', wormGamePhase: 'playing', wormHealerMode: false });
+      wormTunnelCount: 0, wormPhase: 'crawling', wormGamePhase: 'playing', wormHealerMode: false, demoWormFinished: false });
   });
   afterEach(() => { useGameStore.setState({ demoMode: false }); vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
   it('does not finish a control-tour beat merely because reading took 20 seconds', () => {
@@ -46,11 +46,13 @@ describe('short demo and retry', () => {
     expect(useGameStore.getState().wormAlive).toBe(true);
     unmount();
   });
-  it('waits for emergence, then completes the core tour and offers optional lessons', () => {
+  it('keeps practicing after emergence and offers optional lessons only when practice ends', () => {
     const { result, unmount } = renderHook(() => useDemoMode(callbacks));
     act(() => useGameStore.setState({ wormTunnelCount: 1, wormPhase: 'windup' }));
     expect(result.current.demoCelebrationStep).toBeNull();
     act(() => useGameStore.setState({ wormPhase: 'crawling' }));
+    expect(result.current.demoCelebrationStep).toBeNull();
+    act(() => useGameStore.getState().finishWormDemo());
     expect(result.current.demoCelebrationStep).toBe('worm-traversal');
     act(() => result.current.dismissDemoCelebration());
     expect(useGameStore.getState().demoStep).toBe('end');
