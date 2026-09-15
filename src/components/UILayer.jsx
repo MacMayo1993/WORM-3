@@ -35,7 +35,7 @@ import StoryObjectiveHUD from './overlays/StoryObjectiveHUD.jsx';
 import RotationPreview from './overlays/RotationPreview.jsx';
 import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
-import DisparityHUD from './overlays/DisparityHUD.jsx';
+const DisparityHUD = React.lazy(() => import('./overlays/DisparityHUD.jsx'));
 const HealerWormHUD = React.lazy(() => import('./overlays/HealerWormHUD.jsx'));
 import TunnelTransitOverlay from '../worm/TunnelTransitOverlay.jsx';
 import { isMobile } from '../utils/device.js';
@@ -115,7 +115,7 @@ export default function UILayer({
     onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet,
     onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
     onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
-    onBetPlaced, onBetSkipped, speedThresholdSec,
+    onBetPlaced, onBetSkipped, speedThresholdSec, chaosPreview, onBetBack, onChaosReplay,
     onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame, onVictoryMainMenu,
@@ -286,7 +286,7 @@ export default function UILayer({
         {!wormHealerMode && <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />}
 
         {/* Disparity HUD — RIP death log + winner announcement */}
-        {(!wormHealerMode && (chaosMode || disparityWinner)) && <DisparityHUD />}
+        {(!wormHealerMode && (chaosMode || disparityWinner)) && <Suspense fallback={null}><DisparityHUD /></Suspense>}
 
         {/* Healer Worm HUD Overlay */}
         {wormHealerMode && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} /></Suspense>}
@@ -324,7 +324,7 @@ export default function UILayer({
         {/* Disparity Betting Screen — intercepts before chaos starts */}
         <ScreenTransition show={showDisparityBetting}>
           <Suspense fallback={<ScreenFallback label="Loading" />}>
-            <DisparityBettingScreen onBetPlaced={onBetPlaced} onSkip={onBetSkipped} speedThresholdSec={speedThresholdSec} />
+            <DisparityBettingScreen onBetPlaced={onBetPlaced} onSkip={onBetSkipped} speedThresholdSec={speedThresholdSec} settings={chaosPreview} onBack={onBetBack} />
           </Suspense>
         </ScreenTransition>
 
@@ -336,16 +336,17 @@ export default function UILayer({
               // to the next demo step.
               <DisparityWinnerScreen onDismiss={onDemoDisparityDismiss} primaryLabel="Continue →" />
             ) : (
-              // Normal play: Play Again re-opens the setup wizard; Main Menu
-              // leaves chaos entirely.
+              // Replay returns to predictions with the same setup; changing
+              // settings and leaving the mode remain separate choices.
               <DisparityWinnerScreen
-                onDismiss={() => {
+                onDismiss={onChaosReplay}
+                onConfigure={() => {
                   useGameStore.getState().clearDisparityGame();
                   useGameStore.getState().clearLastBetResult();
                   useGameStore.getState().setChaosLevel(0);
                   setShowDisparityWizard(true);
                 }}
-                primaryLabel="Play Again"
+                primaryLabel="Next round · same setup"
                 secondaryLabel="Main Menu"
                 onSecondary={() => {
                   useGameStore.getState().clearDisparityGame();

@@ -20,6 +20,8 @@ export const MAX_UNDO_HISTORY = 10;
 // session's un-cashed winnings), while the factory forgot
 // tunnelDeaths. Both spread this now — add new session fields here only.
 export const makeDisparityRuntimeDefaults = () => ({
+  chaosExperience: null,
+  chaosFocusFaces: [],
   disparityDeaths: [],
   disparityDeathByGridId: {},
   disparityWinner: null,

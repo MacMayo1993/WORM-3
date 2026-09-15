@@ -32,6 +32,7 @@ export function useDisparityGame({
   const [showDisparityBetting, setShowDisparityBetting] = useState(false);
   // SPEED bet benchmark (median seconds) for the wizard settings being bet on.
   const [speedThresholdSec, setSpeedThresholdSec] = useState(null);
+  const [chaosPreview, setChaosPreview] = useState(null);
   // null | 3 | 2 | 1 | 'GO!'
   const [disparityCountdown, setDisparityCountdown] = useState(null);
 
@@ -41,63 +42,70 @@ export function useDisparityGame({
   const disparitySolveQueueRef = useRef([]);
   const disparitySolveActiveRef = useRef(false);
   const disparitySolveIntervalRef = useRef(null);
+  const launchTimerRef = useRef(null);
+  const launchGenerationRef = useRef(0);
 
-  // Resolve active bet when the winner screen appears
+  // Settle at the authoritative winner, before the visible reveal. Leaving the
+  // reveal must not refund an already-known losing prediction.
   useEffect(() => {
     return useGameStore.subscribe(
-      (s) => s.showDisparityWinner,
-      (show) => {
-        if (!show) return;
-        const s = useGameStore.getState();
-        // Round over — convert healed-tile parity score into wallet PP
-        // (idempotent: the action zeroes the score it cashes).
-        useGameStore.getState().cashOutParityScore();
-        const activeBet = s.activeBet;
-        if (!activeBet) return;
-        // A bet may only resolve against the round it was stamped for. A stale
-        // bet (its round was abandoned; this winner is from a later chaos
-        // session) is refunded rather than resolved against a random outcome.
-        if (activeBet.roundId !== s.disparityRoundId) {
-          useGameStore.getState().refundActiveBet();
-          return;
-        }
-        const result = resolveBet(activeBet, {
-          disparityDeaths: s.disparityDeaths,
-          disparityWinner: s.disparityWinner,
-          disparityEliminatedFaces: s.disparityEliminatedFaces,
-          // SPEED's fast/slow threshold is the measured median for these settings.
-          chaosLevel: s.chaosLevel,
-          disparityFlipCap: s.disparityFlipCap,
-        });
-        if (!result) return;
-        const streak = s.betStreak || 0;
-        if (result.push) {
-          // No meaningful outcome for this bet (e.g. SPEED with too few
-          // eliminations) — return the wager and leave the streak untouched.
-          useGameStore.getState().setLastBetResult({
-            won: false, push: true, payout: 0, net: 0, loss: 0,
-            description: result.description, wager: activeBet.wager,
+      (s) => s.disparityWinner,
+      (winner) => {
+        if (!winner) return;
+        try {
+          const s = useGameStore.getState();
+          // Round over — convert healed-tile parity score into wallet PP
+          // (idempotent: the action zeroes the score it cashes).
+          useGameStore.getState().cashOutParityScore();
+          const activeBet = s.activeBet;
+          if (!activeBet) return;
+          // A bet may only resolve against the round it was stamped for. A stale
+          // bet (its round was abandoned; this winner is from a later chaos
+          // session) is refunded rather than resolved against a random outcome.
+          if (activeBet.roundId !== s.disparityRoundId) {
+            useGameStore.getState().refundActiveBet();
+            return;
+          }
+          const result = resolveBet(activeBet, {
+            disparityDeaths: s.disparityDeaths,
+            disparityWinner: s.disparityWinner,
+            disparityEliminatedFaces: s.disparityEliminatedFaces,
+            // SPEED's fast/slow threshold is the measured median for these settings.
+            chaosLevel: s.chaosLevel,
+            disparityFlipCap: s.disparityFlipCap,
           });
-          useGameStore.getState().refundActiveBet();
-          return;
+          if (!result) return;
+          const streak = s.betStreak || 0;
+          if (result.push) {
+            // No meaningful outcome for this bet (e.g. SPEED with too few
+            // eliminations) — return the wager and leave the streak untouched.
+            useGameStore.getState().setLastBetResult({
+              won: false, push: true, payout: 0, net: 0, loss: 0,
+              description: result.description, wager: activeBet.wager,
+            });
+            useGameStore.getState().refundActiveBet();
+            return;
+          }
+          if (result.won) {
+            const payout = calcPayout(activeBet.wager, activeBet.odds, streak);
+            useGameStore.getState().earnCoins(payout);
+            useGameStore.getState().setBetStreak(streak + 1);
+            useGameStore.getState().setLastBetResult({
+              won: true, payout, net: payout - activeBet.wager, loss: 0,
+              description: result.description, wager: activeBet.wager,
+            });
+          } else {
+            // Wager was already deducted at bet time — just record the result.
+            useGameStore.getState().setBetStreak(0);
+            useGameStore.getState().setLastBetResult({
+              won: false, payout: 0, loss: activeBet.wager,
+              description: result.description, wager: activeBet.wager,
+            });
+          }
+          useGameStore.getState().clearActiveBet();
+        } finally {
+          useGameStore.getState().finishChaosExperience();
         }
-        if (result.won) {
-          const payout = calcPayout(activeBet.wager, activeBet.odds, streak);
-          useGameStore.getState().earnCoins(payout);
-          useGameStore.getState().setBetStreak(streak + 1);
-          useGameStore.getState().setLastBetResult({
-            won: true, payout, net: payout - activeBet.wager, loss: 0,
-            description: result.description, wager: activeBet.wager,
-          });
-        } else {
-          // Wager was already deducted at bet time — just record the result.
-          useGameStore.getState().setBetStreak(0);
-          useGameStore.getState().setLastBetResult({
-            won: false, payout: 0, loss: activeBet.wager,
-            description: result.description, wager: activeBet.wager,
-          });
-        }
-        useGameStore.getState().clearActiveBet();
       }
     );
   }, []);
@@ -192,6 +200,7 @@ export function useDisparityGame({
   // Applies wizard settings, scrambles the cube N times, then starts the
   // 3-2-1-GO countdown before the cube unshuffles itself.
   const startDisparityGame = useCallback((wizardSettings) => {
+    useGameStore.getState().clearLastBetResult();
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
     // Stamp the freshly-placed bet (if any) with this round's id so the
@@ -228,7 +237,11 @@ export function useDisparityGame({
 
     // Generate forward scramble moves, then compute the exact reverse sequence.
     // Use getState().size so we read the freshly-set size after changeSize().
-    setTimeout(() => {
+    const launchGeneration = ++launchGenerationRef.current;
+    if (launchTimerRef.current) clearTimeout(launchTimerRef.current);
+    launchTimerRef.current = setTimeout(() => {
+      launchTimerRef.current = null;
+      if (launchGeneration !== launchGenerationRef.current) return;
       const freshSize = useGameStore.getState().size;
       const numMoves = DISPARITY_GAME_LENGTHS[wizardSettings.gameLength] ?? DISPARITY_GAME_LENGTHS.medium;
       const axes = ['row', 'col', 'depth'];
@@ -244,7 +257,7 @@ export function useDisparityGame({
       useGameStore.getState().setRotatedCubies(makeCubies(freshSize));
       startAnimatedShuffle(forwardMoves, () => {
         // Scramble finished — start 3-2-1-GO countdown
-        setDisparityCountdown(3);
+        if (launchGeneration === launchGenerationRef.current) setDisparityCountdown(3);
       });
     }, 50);
   }, [size, settings, setSettings, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset, cancelShuffle, startAnimatedShuffle]);
@@ -252,6 +265,7 @@ export function useDisparityGame({
   const handleDisparitySetupComplete = useCallback((wizardSettings) => {
     setShowDisparityWizard(false);
     pendingWizardSettingsRef.current = wizardSettings;
+    setChaosPreview(wizardSettings);
     // Any bet still active here belongs to a round that never resolved
     // (the player quit mid-round) — return the wager before taking a new bet.
     useGameStore.getState().refundActiveBet();
@@ -282,9 +296,26 @@ export function useDisparityGame({
     launchRound();
   }, [launchRound]);
 
+  const handleBetBack = useCallback(() => {
+    setShowDisparityBetting(false);
+    setShowDisparityWizard(true);
+  }, []);
+
+  const handleChaosReplay = useCallback(() => {
+    useGameStore.getState().setChaosLevel(0);
+    useGameStore.getState().clearDisparityGame();
+    useGameStore.getState().clearLastBetResult();
+    if (pendingWizardSettingsRef.current) {
+      handleDisparitySetupComplete(pendingWizardSettingsRef.current);
+    } else setShowDisparityWizard(true);
+  }, [handleDisparitySetupComplete]);
+
   // Cancels an in-flight countdown/solve sequence. Called by App's reset
   // wrapper and by mode switches (e.g. starting Worm mode mid-countdown).
   const cancelDisparityRun = useCallback(() => {
+    launchGenerationRef.current++;
+    if (launchTimerRef.current) clearTimeout(launchTimerRef.current);
+    launchTimerRef.current = null;
     setDisparityCountdown(null);
     disparitySolveActiveRef.current = false;
     if (disparitySolveIntervalRef.current) {
@@ -293,11 +324,19 @@ export function useDisparityGame({
     }
   }, []);
 
+  useEffect(() => () => {
+    launchGenerationRef.current++;
+    clearTimeout(launchTimerRef.current);
+    clearTimeout(disparitySolveIntervalRef.current);
+    disparitySolveActiveRef.current = false;
+  }, []);
+
   return {
     showDisparityWizard,
     setShowDisparityWizard,
     showDisparityBetting,
     speedThresholdSec,
+    chaosPreview, handleBetBack, handleChaosReplay,
     disparityCountdown,
     handleDisparitySetupComplete,
     handleBetPlaced,

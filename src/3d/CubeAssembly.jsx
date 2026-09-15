@@ -26,6 +26,8 @@ const _liveLayers = [];
 const _liveAngles = [];
 import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
 import { liveCubies } from '../worm/liveCubies.js';
+import { getManifoldGridId } from '../game/gridIds.js';
+import { recordChaosHealing } from '../game/chaosExperience.js';
 import { collectHealWave, healTilePair, isHealable } from '../game/chaosHeal.js';
 import { buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
@@ -534,6 +536,9 @@ const CubeAssembly = React.memo(({
           // Wave 0 = tapped tile (fires immediately), wave N = tiles N steps away
           // on the same face. Each wave heals + pops its cubies outward.
           if (store.chaosLevel > 0) {
+            if (store.disparityWinner) return;
+            const healRoundId = store.disparityRoundId;
+            const healExperience = store.chaosExperience;
             const liveCubs = store.cubies;
             const flipCap = selectEffectiveFlipCap(store);
             const tapped = liveCubs[x]?.[y]?.[z]?.stickers[dirKey];
@@ -550,10 +555,12 @@ const CubeAssembly = React.memo(({
                 const fire = () => {
                   const now = performance.now();
                   const live = useGameStore.getState();
+                  if (live.chaosLevel <= 0 || live.disparityWinner || live.disparityRoundId !== healRoundId || live.chaosExperience?.startedAt !== healExperience?.startedAt) return;
                   const cap = selectEffectiveFlipCap(live);
                   let updated = live.cubies;
                   const pops = {};
                   let healed = 0;
+                  const healedIds = [];
                   for (const t of tiles) {
                     // Re-check against the CURRENT cube, not the tap-time snapshot:
                     // later waves fire up to a second after the tap, and a tile the
@@ -569,6 +576,8 @@ const CubeAssembly = React.memo(({
                     // here; that read as a white tile slapped over the sticker and
                     // broke immersion.
                     for (const h of step.healed) {
+                      const sticker = updated[h.x][h.y][h.z].stickers[h.dirKey];
+                      healedIds.push(getManifoldGridId(sticker, size));
                       pops[`${h.x},${h.y},${h.z}`] = { startMs: now, durationMs: 500 };
                     }
                     healed++;
@@ -578,6 +587,7 @@ const CubeAssembly = React.memo(({
                     cubies: updated,
                     cubiePops: { ...pruneExpiredFx(s.cubiePops, now), ...pops },
                     disparityParityScore: s.disparityParityScore + healed * EARN_DISPARITY_TILE_RESTORE,
+                    chaosExperience: recordChaosHealing(s.chaosExperience, healedIds, healed * EARN_DISPARITY_TILE_RESTORE),
                   }));
                   // The chaos worker simulates on its own private copy of the cube.
                   // Push this edit to it, or it keeps spreading damage the player

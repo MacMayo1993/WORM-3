@@ -918,6 +918,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // only the sticker whose primitive return value actually changed triggers a re-render.
   // 54 stickers dying → 54×54 re-renders becomes 1 re-render per death event.
   const deadRankRaw = useGameStore((s) => s.disparityDeathByGridId?.[stickerGridIdRef.current]?.rank ?? null);
+  const isChaosFocused = useGameStore(s => !presentation && s.chaosLevel > 0 && !s.wormHealerMode && s.chaosFocusFaces.includes(meta?.orig));
   const isWinnerTile = useGameStore((s) => s.chaosLevel > 0 && !!(s.disparityWinner?.pair?.includes(stickerGridIdRef.current)));
   // Live ref to current texture so useFrame closures can access it without stale captures.
   const currTextureRef = useRef(null);
@@ -2370,6 +2371,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </Text>
       )}
 
+      {!isDead && !presentation && chaosLevel > 0 && !wormHealerMode && (isChaosFocused || isWinnerTile) && (
+        <mesh position={[0, 0, 0.018]}>
+          <ringGeometry args={[0.36, isWinnerTile ? 0.41 : 0.385, 4]} />
+          <meshBasicMaterial color={isWinnerTile ? '#ffe9ad' : '#fffdf2'} transparent opacity={0.9} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
       {/* Per-tile health bar — Disparity Mode always; standard mode once a tile has flips (approaching FLIP_CAP death) */}
       {!isDead && (meta?.flips ?? 0) > 0 && (
         <DisparityHealthBar flips={meta?.flips ?? 0} flipCap={effectiveFlipCap} />

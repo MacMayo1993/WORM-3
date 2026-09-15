@@ -5,9 +5,38 @@
  * Part of the useGameStore assembly (see src/hooks/useGameStore.js).
  */
 
+import { chaosBoard, newChaosExperience, recordChaosTick, chaosRecap, readChaosRecord, predictionFaces } from '../../game/chaosExperience.js';
 import { persistedState } from './persistedState.js';
 
 export const createDisparitySlice = (set, get) => ({
+  chaosExperience: null,
+  chaosFocusFaces: [],
+  chaosRecord: readChaosRecord(),
+  setChaosFocusFaces: faces => set({ chaosFocusFaces: faces }),
+  startChaosExperience: () => set(state => ({
+    chaosExperience: state.wormHealerMode ? null : newChaosExperience(state),
+    chaosFocusFaces: state.wormHealerMode ? [] : predictionFaces(state.activeBet),
+  })),
+  recordChaosTick: payload => set(state => {
+    if (!state.chaosExperience || state.chaosLevel <= 0) return {};
+    const board = chaosBoard(state.cubies, state.size, state.disparityFlipCap);
+    return { chaosExperience: recordChaosTick(state.chaosExperience, payload, board) };
+  }),
+  finishChaosExperience: () => set(state => {
+    const run = state.chaosExperience;
+    if (!run || run.completed || !state.disparityWinner || run.roundId !== state.disparityRoundId) return {};
+    const recap = chaosRecap(run, state);
+    if (state.demoMode || state.currentLevel || state.wormHealerMode) return { chaosExperience: recap };
+    const rec = state.chaosRecord;
+    const prediction = recap.predictionResult;
+    return { chaosExperience: recap, chaosRecord: {
+      rounds: rec.rounds + 1,
+      predictions: rec.predictions + (prediction && !prediction.push ? 1 : 0),
+      correct: rec.correct + (prediction?.won ? 1 : 0),
+      bestStreak: Math.max(rec.bestStreak, state.betStreak || 0),
+      healedPoints: rec.healedPoints + run.healPoints,
+    } };
+  }),
   // ========================================================================
   // DISPARITY GAME STATE
   // ========================================================================

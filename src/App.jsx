@@ -62,7 +62,8 @@ import { setCubeSharedRenderer, tickCubePreviews, hasActiveCubePreviews } from '
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
-import Tutorial from './components/screens/Tutorial.jsx';
+// The help tutorial is optional; keep its copy off the initial download.
+const Tutorial = React.lazy(() => import('./components/screens/Tutorial.jsx'));
 import MobiIntroScreen, {
   MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
   MOBI_LINES_TEACH,
@@ -578,7 +579,7 @@ export default function WORM3() {
   // Disparity Mode — wizard, betting, countdown, solve sequence, bet resolution.
   const {
     showDisparityWizard, setShowDisparityWizard,
-    showDisparityBetting, speedThresholdSec, disparityCountdown,
+    showDisparityBetting, speedThresholdSec, disparityCountdown, chaosPreview, handleBetBack, handleChaosReplay,
     handleDisparitySetupComplete, handleBetPlaced, handleBetSkipped,
     cancelDisparityRun, startDisparityGame,
   } = useDisparityGame({
@@ -1334,7 +1335,7 @@ export default function WORM3() {
           background decodes. Self-dismisses when nothing is loading. */}
       <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} eager={sceneGateEager} minVisibleMs={sceneGateHold} style={{ zIndex: sceneGateZ }} />
       <ScreenTransition show={showTutorial && !showWelcome}>
-        <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />
+        <Suspense fallback={<LoadingScreen message="Loading guide" />}><Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} /></Suspense>
       </ScreenTransition>
       {showModeSelect && (
         <Suspense fallback={null}>
@@ -1560,7 +1561,7 @@ export default function WORM3() {
               onDisparitySetupComplete: handleDisparitySetupComplete,
               onBetPlaced: handleBetPlaced,
               onBetSkipped: handleBetSkipped,
-              speedThresholdSec,
+              speedThresholdSec, chaosPreview, onBetBack: handleBetBack, onChaosReplay: handleChaosReplay,
               onWormSetupComplete: handleWormSetupComplete,
               onMobiIntroComplete: handleMobiIntroComplete,
               onWormWizardCancel: handleWormWizardCancel,

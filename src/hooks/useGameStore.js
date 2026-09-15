@@ -1,3 +1,4 @@
+import { CHAOS_RECORD_KEY } from '../game/chaosExperience.js';
 import { savePlayerState } from '../progression/model.js';
 import { WORM_MISSION_STORAGE_KEY } from '../worm/missions.js';
 /**
@@ -122,6 +123,7 @@ useGameStore.subscribe(
 
 useGameStore.subscribe((state) => state.parityPoints, persist(PARITY_POINTS_KEY));
 useGameStore.subscribe((state) => state.ownedItems, persist(OWNED_ITEMS_KEY, JSON.stringify));
+useGameStore.subscribe(state => state.chaosRecord, persist(CHAOS_RECORD_KEY, JSON.stringify));
 useGameStore.subscribe((state) => state.betStreak, persist(BET_STREAK_KEY));
 useGameStore.subscribe((state) => state.modePlays, persist(MODE_PLAYS_KEY, JSON.stringify));
 
@@ -138,6 +140,6 @@ useGameStore.subscribe(
 useGameStore.subscribe(state => state.chaosLevel, (level, previous) => {
   if (level > 0 && previous === 0) useGameStore.getState().beginChaosXp();
 });
-useGameStore.subscribe(state => state.showDisparityWinner, show => {
-  if (show) useGameStore.getState().finishChaosXp();
+useGameStore.subscribe(state => state.disparityWinner, winner => {
+  if (winner) useGameStore.getState().finishChaosXp();
 });
