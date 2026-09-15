@@ -104,14 +104,15 @@ it('reduces puzzle feat XP on replays and remembers paid daily feats through sav
   puzzle('daily', 'story-campaign'); expect(state().xpRun.xp).toBe(0); expect(ids()).toEqual([]);
 });
 it('keeps Chaos achievements independent of the forecast and pays discovery bonuses once', () => {
-  for (const pair of [[1, 4], [2, 5], [3, 6]]) {
+  for (const pair of [['M1-001', 'M4-001'], ['M2-007', 'M5-007'], ['M3-015', 'M6-015']]) {
     set({ chaosLevel: 0, disparityWinner: null, showDisparityWinner: false });
     state().beginDisparityRound(); state().setChaosLevel(.5);
     state().finishChaosXp(); expect(state().xpRun.achievements).toEqual([]);
     set({ disparityWinner: { pair } }); state().finishChaosXp();
   }
   expect(ids()).toContain('chaos-colors');
-  expect(state().playerProgress.chaosColors).toHaveLength(6);
+  expect(state().playerProgress.chaosColors).toEqual([1, 4, 2, 5, 3, 6]);
+  expect(readPlayerSave().progress.chaosColors).toEqual([1, 4, 2, 5, 3, 6]);
   expect(state().playerProgress.achievements['chaos-round'].count).toBe(3);
   expect(state().xpRun.achievements.find(a => a.id === 'chaos-round').xpEarned).toBe(0);
 });

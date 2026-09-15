@@ -124,6 +124,7 @@ export function useTeachMode() {
   const enterTeachMode = useCallback(() => {
     if (size !== 3) return;
     setActive(true);
+    useGameStore.getState().setTeachModeActive(true);
     const result = analyzeState(cubies);
     setAnalysis(result);
     setSolveHighlights(result.highlights || []);
@@ -142,6 +143,7 @@ export function useTeachMode() {
 
   const exitTeachMode = useCallback(() => {
     setActive(false);
+    useGameStore.getState().setTeachModeActive(false);
     setAnalysis(null);
     setSelectedAlgo(null);
     setAlgoMoves([]);

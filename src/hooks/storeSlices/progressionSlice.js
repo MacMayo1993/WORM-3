@@ -4,6 +4,7 @@ import { createXpRun, difficultyMultiplier, puzzleFingerprint, puzzleMode, count
 import { xpChanges, wormXpChanges, puzzleXpChanges, achievementChanges } from '../../progression/awards.js';
 import { availableRewards, rewardChoices } from '../../progression/rewards.js';
 import { getLevelPar } from '../../levels/scoring.js';
+import { getWinnerFaces } from '../../utils/disparityBetting.js';
 
 export const createProgressionSlice = (set, get) => ({
   playerProgress: persistedState.playerProgress,
@@ -46,7 +47,7 @@ export const createProgressionSlice = (set, get) => ({
     const run = state.xpRun;
     if (state.demoMode || state.currentLevel || !run || run.mode !== 'chaos' || run.completed || run.id !== state.disparityRoundId || !state.disparityWinner) return {};
     // Independent of wager, luck, odds, board size and total elimination count.
-    const colors = [...new Set([...(state.playerProgress.chaosColors || []), ...(state.disparityWinner.pair || [])])].filter(n => Number.isInteger(n) && n >= 1 && n <= 6);
+    const colors = [...new Set([...(state.playerProgress.chaosColors || []), ...getWinnerFaces(state.disparityWinner.pair)])].filter(n => Number.isInteger(n) && n >= 1 && n <= 6);
     const progress = { ...state.playerProgress, chaosColors: colors };
     const paid = { ...state, ...xpChanges(state, 50, 'chaos', 'Round completed', { ...run, completed: true }, progress) };
     return achievementChanges(paid, colors.length === 6 ? ['chaos-round', 'chaos-colors'] : ['chaos-round'], { discoveriesOnly: true });
