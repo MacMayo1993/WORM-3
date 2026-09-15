@@ -1,5 +1,6 @@
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
+import { createCharacterGeometry, applyCharacterFinish, prismColor } from '../wormCharacterVisuals.js';
 import { wormBodyTaper } from '../wormCharacterFinish.js';
 // src/worm/healerWorm/WormBody.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
@@ -26,7 +27,7 @@ import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../wormSkinMaterial.js';
 import {
     PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-    BOOK_HEAD_RADIUS, BOOK_HEAD_LIFT, BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, TURN_SIGNAL_GAIN,
+    BOOK_HEAD_RADIUS, BOOK_HEAD_LIFT, BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, createBookPaperMaterial, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
 import {
@@ -172,6 +173,10 @@ export function WormBody({ worm, size }) {
     useEffect(() => () => { if (mobiAssets) disposeMobiSegmentAssets(mobiAssets); }, [mobiAssets]);
     const mobiCoreRef = useRef();
     const mobiFrameRef = useRef();
+    const characterGeometry = useMemo(() => createCharacterGeometry(wormCharacterId), [wormCharacterId]);
+    const paperMaterial = useMemo(() => createBookPaperMaterial(), []);
+    useEffect(() => () => characterGeometry.dispose(), [characterGeometry]);
+    useEffect(() => () => paperMaterial.dispose(), [paperMaterial]);
     const skin = getSkin(wormSkinId);
     const wormColor = skin.body;
     const bellyColor = skin.belly;
@@ -184,7 +189,8 @@ export function WormBody({ worm, size }) {
         applySkinMaterialProfile(skinMaterial, getSkinFX(wormSkinId), 0);
         // After the profile, which resets emissiveIntensity from the skin.
         applyBioluminescence(skinMaterial, skin.glow, isGlow);
-    }, [skinMaterial, wormSkinId, skin.glow, isGlow]);
+        applyCharacterFinish(skinMaterial, wormCharacterId);
+    }, [skinMaterial, wormSkinId, skin.glow, isGlow, wormCharacterId]);
     useEffect(() => () => skinMaterial.dispose(), [skinMaterial]);
     // Refs so useFrame always reads latest values without closure staleness
     const wormColorRef = useRef(wormColor);
@@ -431,7 +437,7 @@ export function WormBody({ worm, size }) {
         }
 
         // Book Worm page bank — one value per frame, shared by every segment below.
-        const _pageHinge = _isBook ? pageHingeAngles(bookTurnRef.current) : _NO_HINGE;
+        const _pageHinge = _isBook ? pageHingeAngles(bookTurnRef.current, reducedPickupMotion ? 0 : time) : _NO_HINGE;
 
         beginWormSegments();
         for (let i = 0; i < visibleCount; i++) {
@@ -549,7 +555,7 @@ export function WormBody({ worm, size }) {
                 // (tunnel/wind own their path).
                 if (orbitT > 0 && !segmentTransit) rocketOrbitInto(_bodyClonePos, size, orbitT);
                 _wormDummy.position.copy(_bodyClonePos);
-                if (_isBook || isMobi) {
+                if (_isBook || isMobi || _isInch || _isPrism) {
                     // Orient the cover to face the direction of travel, using the same
                     // lookAt convention CrawlerCharacter.jsx uses (local -Z = forward),
                     // so the page-flap hinge math below (wormBookFX.js) matches exactly.
@@ -655,7 +661,7 @@ export function WormBody({ worm, size }) {
                 const hasOrbColor = orbPickupIndex >= 0 && orbPickupIndex < orbColors.length;
                 if (_isPrism) {
                     // Spectrum: a rainbow that flows down the body and scrolls over time.
-                    _bodyColor.setHSL(((i * 0.022) + time * 0.12) % 1, 0.85, 0.6);
+                    prismColor(_bodyColor, i, reducedPickupMotion ? 0 : time);
                 } else if (i === 0 && _isGlow) {
                     // Glow head — use base worm color; GlowWormAura point light IS the
                     // bioluminescence. There was also an additive sphere at 1.4x the
@@ -678,7 +684,8 @@ export function WormBody({ worm, size }) {
                     // Alternating body/belly bands for visible ring pattern. Uses writeIdx
                     // (not i) so bands keep alternating once LOD thinning makes consecutive
                     // drawn segments an even number of real segments apart.
-                    _bodyColor.set(writeIdx % 2 === 0 ? baseColor : bellyCol);
+                    _bodyColor.set(baseColor);
+                    if (writeIdx % 2 !== 0) _bodyColor.lerp(_bookPageColor.set(bellyCol), 0.28);
                 } else {
                     _bodyColor.set(baseColor);
                 }
@@ -806,11 +813,11 @@ export function WormBody({ worm, size }) {
             </instancedMesh>
             <instancedMesh ref={leftPageRef} args={[undefined, undefined, MAX_TAIL * PAGE_LAYER_COUNT]} frustumCulled={false}>
                 <primitive object={bookPages[0]} attach="geometry" />
-                <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
+                <primitive object={paperMaterial} attach="material" />
             </instancedMesh>
             <instancedMesh ref={rightPageRef} args={[undefined, undefined, MAX_TAIL * PAGE_LAYER_COUNT]} frustumCulled={false}>
                 <primitive object={bookPages[1]} attach="geometry" />
-                <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
+                <primitive object={paperMaterial} attach="material" />
             </instancedMesh>
             {/* Round head orb — the same sphere the other worms wear, so the
                 Book Worm reads as a worm carrying books rather than as a
@@ -830,7 +837,7 @@ export function WormBody({ worm, size }) {
            so any non-white material color taints every orb pickup color. */
         <>
             <instancedMesh key={isMobi ? 'mobi' : 'worm'} ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false} renderOrder={isMobi ? 2 : 0}>
-                {isMobi ? <primitive object={mobiAssets.shellGeometry} attach="geometry" /> : <sphereGeometry args={[1, 16, 16]} />}
+                {isMobi ? <primitive object={mobiAssets.shellGeometry} attach="geometry" /> : <primitive object={characterGeometry} attach="geometry" />}
                 {/* Wet-slime clearcoat is just the "slime" skin's starting point now —
                     the skin's own FX profile (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + body-surface displacement) drives this

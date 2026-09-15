@@ -18,20 +18,20 @@ import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormP
 //     unregisterWormPreview (see WormPreviewCanvas.jsx).
 
 import { prefersReducedMotion } from '../utils/device.js';
+import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents } from '../worm/wormCharacterVisuals.js';
 import { finishWormEyes, wormBodyTaper } from '../worm/wormCharacterFinish.js';
 import * as THREE from 'three';
 import { stepMenuWorm, menuWormSegment } from './menuWormMotion.js';
 import { createMobiSegmentAssets, createMobiSegment, MOBI_SEGMENT_RADIUS } from '../worm/mobiSegments.js';
 import { createMobiModel, animateMobi, orientMobi, MOBI_RADIUS } from '../worm/mobiModel.js';
 import { getSkin } from '../worm/wormCosmeticsData.js';
-import { getHatParts } from '../worm/wormHatParts.js';
 import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../worm/wormSkinMaterial.js';
 import { makeWormHaloSprite, HALO_SCALE } from '../worm/wormGlowHalo.js';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, pageHingeAngles,
+  BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, createBookPaperMaterial, pageHingeAngles,
 } from '../worm/wormBookFX.js';
 
 import { inchGaitInto, inchLoopShape, INCH_BALL_SPACING } from '../worm/healerWorm/inchGait.js';
@@ -70,8 +70,22 @@ let camera = null;
 let companionCamera = null;
 let contactShadows = [];
 let rig = null;             // built lazily, reconfigured per render
+let getHatParts = null;
+let hatPartsLoad = null;
+
+function requestHatParts() {
+  if (!hatPartsLoad) {
+    hatPartsLoad = import('../worm/wormHatParts.js').then(module => {
+      getHatParts = module.getHatParts;
+      for (const info of registry.values()) info.dirty = true;
+    }).catch(error => {
+      console.error('Unable to load worm hat preview', error);
+    });
+  }
+}
 
 const _color = new THREE.Color();
+const _accentColor = new THREE.Color();
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
@@ -81,6 +95,9 @@ function _buildRig() {
   // Body beads. Material colour carries the segment colour directly (the game
   // uses white + per-instance colour because it draws one instanced mesh).
   const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
+  const characterGeometries = { inch: createCharacterGeometry('inch'), prism: createCharacterGeometry('prism'), default: sphereGeo };
+  const accents = Object.fromEntries(['book', 'inch', 'prism'].map(id => [id, createCharacterAccents(id)]));
+  Object.values(accents).forEach(a => group.add(a.group));
   // Thin spine/binding — the pages (below) are the visible body now, not a
   // flat square slab the pages ride on top of.
   const boxGeo = new THREE.BoxGeometry(...SPINE_GEO_ARGS);
@@ -125,9 +142,8 @@ function _buildRig() {
     const leftLayers = [];
     const rightLayers = [];
     for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
-      const paperColor = PAGE_COLORS[layer % PAGE_COLORS.length];
-      const leftPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ color: paperColor, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
-      const rightPage = new THREE.Mesh(rightPageGeo, new THREE.MeshStandardMaterial({ color: paperColor, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
+      const leftPage = new THREE.Mesh(pageGeo, createBookPaperMaterial());
+      const rightPage = new THREE.Mesh(rightPageGeo, createBookPaperMaterial());
       group.add(leftPage, rightPage);
       leftLayers.push(leftPage); rightLayers.push(rightPage);
     }
@@ -144,7 +160,7 @@ function _buildRig() {
   const eyes = [0, 1].map(() => new THREE.Mesh(eyeGeo, new THREE.MeshPhysicalMaterial({ color: 0xf1f3e9, roughness: 0.22, clearcoat: 1 })));
   const pupils = [0, 1].map(() => new THREE.Mesh(pupilGeo, new THREE.MeshBasicMaterial({ color: 0x12131a })));
   const mouth = new THREE.Mesh(mouthGeo, new THREE.MeshBasicMaterial({ color: 0x12131a }));
-  finishWormEyes(eyes, pupils);
+  const disposeEyes = finishWormEyes(eyes, pupils);
   eyes.forEach(m => group.add(m));
   pupils.forEach(m => group.add(m));
   group.add(mouth);
@@ -152,17 +168,18 @@ function _buildRig() {
   // Book worm glasses.
   const glassGeo = new THREE.TorusGeometry(1, FACE_LAYOUT.glassTube / FACE_LAYOUT.glassRadius, 8, 18);
   const glasses = [0, 1].map(() => new THREE.Mesh(glassGeo, new THREE.MeshStandardMaterial({
-    color: 0x1a1a1a, metalness: 0.9, roughness: 0.1,
+    color: 0xb98739, metalness: 0.65, roughness: 0.3,
   })));
   glasses.forEach(m => group.add(m));
 
   const hatGroup = new THREE.Group();
+  hatGroup.name = 'worm-hat';
   group.add(hatGroup);
 
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, mobi, mobiTails, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, skinKey: null };
+  return { group, disposeEyes, characterGeometries, accents, mobi, mobiTails, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -378,10 +395,14 @@ function _poseWorm(opts, time) {
   // skin change, which left a worm lit like whichever character was picked before.
   const fxKey = `${skinId}|${characterId}`;
   if (rig.skinKey !== fxKey) {
+    rig.disposeEyes();
+    rig.disposeEyes = finishWormEyes(rig.eyes, rig.pupils, characterId);
     const fx = getSkinFX(skinId);
     for (let i = 0; i < SEGMENTS; i++) {
       applySkinMaterialProfile(rig.beads[i].material, fx, i);
       applyBioluminescence(rig.beads[i].material, skin.glow, isGlow);
+      applyCharacterFinish(rig.beads[i].material, characterId);
+      rig.beads[i].geometry = rig.characterGeometries[characterId] || rig.characterGeometries.default;
     }
     rig.skinKey = fxKey;
   }
@@ -390,6 +411,7 @@ function _poseWorm(opts, time) {
   for (let i = 0; i < SEGMENTS; i++) {
     if (opts.companion) menuWormSegment(opts.companion, i, _off);
     else _segmentOffset(i, characterId, time, _off, (opts.framing === 'runway' || opts.framing === 'character'), opts.framing === 'character');
+    const inchArch = previewGait.arch;
     contactShadows[i].visible = !!opts.companion || opts.framing === 'character';
     if (opts.framing === 'character') {
       contactShadows[i].position.copy(_off).applyAxisAngle(UP, FRAMING.character.yaw);
@@ -419,12 +441,21 @@ function _poseWorm(opts, time) {
     if (isBook) _off.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y;
 
     body.position.copy(_off);
+    body.quaternion.identity();
+    if ((isInch || isPrism) && i > 0) {
+      _segmentOffset(i - 1, characterId, time, _pbPrevOff, opts.framing === 'runway' || roaming, roaming);
+      _pbZ.subVectors(_off, _pbPrevOff).normalize();
+      _pbX.crossVectors(UP, _pbZ).normalize();
+      _pbY.crossVectors(_pbZ, _pbX);
+      _pbBasisMat.makeBasis(_pbX, _pbY, _pbZ);
+      body.quaternion.setFromRotationMatrix(_pbBasisMat);
+    }
     if (i === 0) {
       body.scale.setScalar(HEAD_SCALE);
     } else if (isBook) {
       body.scale.set(BOOK_BODY_SCALE[0], BOOK_BODY_SCALE[1], BOOK_BODY_SCALE[2]);
     } else if (isInch) {
-      body.scale.setScalar(INCH_BODY_SCALE);
+      body.scale.setScalar(INCH_BODY_SCALE + inchArch * 0.03);
     } else if (isGlow) {
       body.scale.setScalar(0.088 + Math.sin(time * 3.5 + i * 1.6) * 0.01);
     } else {
@@ -436,12 +467,11 @@ function _poseWorm(opts, time) {
     // Segment colour, following WormBody: prism cycles the spectrum, the inch
     // worm bands body/belly, everything else is the skin's body colour.
     if (isPrism) {
-      // In game the rainbow spans a long tail; over nine preview beads the same
-      // per-segment step would read as a single gradient, so the spectrum is
-      // spread across the beads that are actually on screen.
-      _color.setHSL(((i / SEGMENTS) * 0.85 + time * 0.12) % 1, 0.85, 0.6);
+      // Identical spectrum spacing and speed in gameplay and the picker.
+      prismColor(_color, i, time);
     } else if (isInch) {
-      _color.set(i % 2 === 0 ? skin.body : skin.belly);
+      _color.set(skin.body);
+      if (i % 2 !== 0) _color.lerp(_accentColor.set(skin.belly), 0.28);
     } else {
       _color.set(skin.body);
     }
@@ -463,9 +493,7 @@ function _poseWorm(opts, time) {
 
     // Book Worm: orient the cover to face the direction of travel (derived
     // from consecutive segment offsets, since the preview has no real turn
-    // signal to read). Pages stay at their flat rest pose here — no idle
-    // sway — so the preview shows the actual resting shape instead of a
-    // moment frozen mid-turn.
+    // signal to read). A subtle shared flutter keeps the paper alive.
     if (pagesShown) {
       _segmentOffset(i - 1, characterId, time, _pbPrevOff, (opts.framing === 'runway' || opts.framing === 'character'), opts.framing === 'character');
       _pbPrevOff.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y; // same constant raise _off already has — a uniform lift shouldn't skew the segment-to-segment direction
@@ -477,7 +505,7 @@ function _poseWorm(opts, time) {
       _pbQuat.setFromRotationMatrix(_pbBasisMat);
       body.quaternion.copy(_pbQuat);
 
-      const { left, right } = pageHingeAngles(0);
+      const { left, right } = pageHingeAngles(0, time);
       const pageScale = body.scale.x * BOOK_PAGE_SCALE;
 
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, left);
@@ -566,6 +594,11 @@ function _poseWorm(opts, time) {
   if (opts.companion) _menuForward.set(Math.cos(opts.companion.heading), 0, Math.sin(opts.companion.heading));
   layoutWormFace(_anchor, opts.companion ? _menuForward : (roaming ? _roamForward : FWD), UP, HEAD_SCALE, _faceParts);
 
+  for (const [id, accent] of Object.entries(rig.accents)) {
+    accent.group.visible = id === characterId;
+    if (accent.group.visible) poseCharacterAccents(accent.group, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD, UP, HEAD_SCALE);
+  }
+
   // An occasional blink, squashing the eye and its pupil together.
   const blink = Math.sin(time * 0.9) > 0.985 ? 0.2 : 1;
   if (blink !== 1) {
@@ -586,8 +619,13 @@ function _poseWorm(opts, time) {
 
   // Hat — rebuilt only when the hat changes, then parked above the head.
   if (rig.hatKey !== hatId) {
+    rig.hatGroup.children.forEach(part => { part.geometry.dispose(); part.material.dispose(); });
     rig.hatGroup.clear();
-    for (const part of getHatParts(hatId, HAT_SCALE)) {
+    if (hatId && hatId !== 'none' && !getHatParts) {
+      requestHatParts();
+      return;
+    }
+    for (const part of getHatParts ? getHatParts(hatId, HAT_SCALE) : []) {
       const [geoName, args] = part.geo;
       const geo = _geometry(geoName, args);
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
