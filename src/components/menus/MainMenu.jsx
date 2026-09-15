@@ -1790,9 +1790,9 @@ const MenuBackdrop = ({ visible }) => (
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
-  onPlay: _onPlay, onLevels: _onLevels, onFreeplay: _onFreeplay, onRandom: _onRandom, onCoop: _onCoop, onTeach: _onTeach,
+  onPlay: _onPlay, onLevels: _onLevels, onFreeplay: _onFreeplay, onRandom: _onRandom, onTeach: _onTeach,
   onSettings: _onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
-  onWormHealer: _onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
+  onWormHealer: _onWormHealer,
   onStore: _onStore, onComingSoon: _onComingSoon, onMobiusCubelet: _onMobiusCubelet, onOpenModeSelect,
   onDemo,
 }) => {

@@ -35,7 +35,6 @@ import StoryObjectiveHUD from './overlays/StoryObjectiveHUD.jsx';
 import RotationPreview from './overlays/RotationPreview.jsx';
 import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
-import HandsOverlay from './overlays/HandsOverlay.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
 import HealerWormHUD from './overlays/HealerWormHUD.jsx';
 import MobiusHUD from '../worm/MobiusHUD.jsx';
@@ -57,7 +56,6 @@ const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectSc
 const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
 import MobiIntroScreen from './screens/MobiIntroScreen.jsx';
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
-const MergeThemePicker = React.lazy(() => import('../modes/merge/index.js').then((m) => ({ default: m.MergeThemePicker })));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
 const DisparityBettingScreen = React.lazy(() => import('./screens/DisparityBettingScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
@@ -81,9 +79,6 @@ export default function UILayer({
   moveHistory,
   undo,
   canUndo,
-  handsMode,
-  handsMoveHistory,
-  handsTps,
   victory,
   moves,
   gameTime,
@@ -118,14 +113,13 @@ export default function UILayer({
     onTapFlip, onBackToMainMenu, onLevelSelect, onSelectPack, onBackToPackSelect, onCutsceneComplete,
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
-    onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuRandomMode, onMenuCoop, onMenuTeach,
-    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet,
-    showMergeThemePicker, onMergeStart, onMergeCancel,
+    onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuRandomMode, onMenuTeach,
+    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet,
     onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
     onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped, speedThresholdSec,
     onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
-    onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
+    onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame, onVictoryMainMenu,
     onDemo,
     onDemoDisparityDismiss,
@@ -226,7 +220,7 @@ export default function UILayer({
 
   const hasFullScreenOverlay = showFreeplayWizard || showRandomWizard || showWormModeWizard
     || showModeSelect || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect || showPackSelect
-    || showComingSoon || showMobiusCubelet || showMobiIntro || victory || showMergeThemePicker
+    || showComingSoon || showMobiusCubelet || showMobiIntro || victory
     // Mobi's level briefing and the finale cutscene are blocking beats — clear
     // the game chrome (top bar, bottom nav, sheet) so nothing crowds him.
     || showLevelTutorial || showCutscene;
@@ -460,8 +454,6 @@ export default function UILayer({
         size={size}
         onChangeSize={(n) => { if (!currentLevelData) onChangeSize(n); }}
         sizeLocked={!!currentLevelData}
-        handsMode={handsMode}
-        onToggleHands={onToggleHandsMode}
         showLeaderboard={showLeaderboard}
         onToggleLeaderboard={toggleLeaderboard}
         currentLevelData={currentLevelData}
@@ -488,14 +480,11 @@ export default function UILayer({
           onLevels={onMenuLevels}
           onFreeplay={onMenuFreeplay}
           onRandom={onMenuRandomMode}
-          onCoop={onMenuCoop}
           onTeach={onMenuTeach}
           onSettings={onMenuSettings}
           onBiome={onMenuBiome}
           onDisparity={onMenuDisparity}
           onWormHealer={onMenuWormHealer}
-          onHolonomy={onMenuHolonomy}
-          onMerge={onMenuMerge}
           onStore={onMenuStore}
           onComingSoon={onMenuComingSoon}
           onMobiusCubelet={onMenuMobiusCubelet}
@@ -509,10 +498,7 @@ export default function UILayer({
               mounted over the mode it just started. */}
           <ComingSoonScreen
             onBack={onCloseComingSoon}
-            onHolonomy={() => { onCloseComingSoon(); onMenuHolonomy?.(); }}
             onBiome={() => { onCloseComingSoon(); onMenuBiome?.(); }}
-            onMerge={() => { onCloseComingSoon(); onMenuMerge?.(); }}
-            onCoop={() => { onCloseComingSoon(); onMenuCoop?.(); }}
             onMobiusCubelet={() => { onCloseComingSoon(); onMenuMobiusCubelet?.(); }}
           />
         </Suspense>
@@ -587,12 +573,6 @@ export default function UILayer({
           onComplete={onMobiIntroComplete}
         />
       )}
-
-      <ScreenTransition show={showMergeThemePicker}>
-        <Suspense fallback={<ScreenFallback label="Loading themes" />}>
-          <MergeThemePicker onStart={onMergeStart} onBack={onMergeCancel} />
-        </Suspense>
-      </ScreenTransition>
 
       <ScreenTransition show={showDisparityWizard}>
         <Suspense fallback={<ScreenFallback label="Loading setup" />}>
@@ -756,13 +736,6 @@ export default function UILayer({
         />
       )}
 
-      {handsMode && !wormHealerMode && (
-        <HandsOverlay
-          recentMoves={handsMoveHistory}
-          lastMove={handsMoveHistory.length > 0 ? handsMoveHistory[handsMoveHistory.length - 1] : null}
-          tps={handsTps}
-        />
-      )}
 
 
       <ScreenTransition show={showDevConsole} freezeOnExit>

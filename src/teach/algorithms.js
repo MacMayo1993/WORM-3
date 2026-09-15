@@ -4,7 +4,7 @@
 // Notation reference (Home Grip orientation):
 //   F=PZ(Red)  B=NZ(Orange)  R=PX(Blue)  L=NX(Green)  U=PY(White)  D=NY(Yellow)
 
-import { namedMoveToRotation } from '../game/handsInput.js';
+import { namedMoveToRotation } from '../game/moveNotation.js';
 
 // ---------------------------------------------------------------------------
 // Parse a notation string like "R U R' U'" into engine moves

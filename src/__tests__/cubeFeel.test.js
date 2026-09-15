@@ -89,7 +89,6 @@ describe('no dead sound paths remain', () => {
     'src/hooks/useGameSession.js',
     'src/3d/StickerPlane.jsx',
     'src/components/intro/IntroScene.jsx',
-    'src/worm/PlatformerWormMode.jsx',
     'src/coming-soon/worm/shared/useGameEvents.js',
   ];
 

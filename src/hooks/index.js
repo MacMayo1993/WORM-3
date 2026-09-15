@@ -16,7 +16,6 @@
  *   - useLevelSystem: Level selection and progression
  *   - useSettings: User settings and color schemes
  *   - useKeyboardControls: Keyboard shortcuts
- *   - useHandsMode: Speedcuber-style controls
  *   - useUndo: Undo functionality
  */
 
@@ -33,7 +32,6 @@ export { useCursor } from './useCursor.js';
 export { useLevelSystem } from './useLevelSystem.js';
 export { useSettings } from './useSettings.js';
 export { useKeyboardControls } from './useKeyboardControls.js';
-export { useHandsMode } from './useHandsMode.js';
 export { useUndo } from './useUndo.js';
 export { useAntipodalEngine } from './useAntipodalEngine.js';
 export { useParityDecay } from './useParityDecay.js';

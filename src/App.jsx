@@ -42,7 +42,6 @@ import {
   useCursor,
   useLevelSystem,
   useSettings,
-  useHandsMode,
   useUndo,
   useParityDecay,
   useKeyboardControls,
@@ -65,8 +64,8 @@ import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
 import MobiIntroScreen, {
   MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
-  MOBI_LINES_TEACH, MOBI_LINES_HOLONOMY, MOBI_LINES_COOP,
-  MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
+  MOBI_LINES_TEACH,
+  MOBI_LINES_BIOME, MOBI_LINES_CHAOS,
   MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
 import { UI_FONT, TEXT_MICRO } from './utils/uiTheme.js';
@@ -90,7 +89,6 @@ import { useTeachMode } from './teach/useTeachMode.js';
 import { isMobile } from './utils/device.js';
 import { preloadAppAssets } from './utils/preloadAssets.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
-const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
@@ -381,11 +379,6 @@ export default function WORM3() {
     setFeelEnabled({ sfx: settings?.sfx ?? true, haptics: settings?.haptics ?? true });
   }, [settings?.sfx, settings?.haptics]);
 
-  const {
-    handsMode, handsMoveHistory, handsTps, executeHandsMove,
-    setHandsMode, setHandsMoveHistory, setHandsMoveQueue, setHandsTps
-  } = useHandsMode();
-  const handsMoveTimestamps = useRef([]);
 
   const { moveHistory, undo, canUndo } = useUndo(startAnimation);
 
@@ -448,8 +441,6 @@ export default function WORM3() {
   // Keep the chosen panorama stable when returning from Settings or the store.
   const [menuBackground] = useState(() => MENU_BACKGROUNDS[Math.floor(Math.random() * MENU_BACKGROUNDS.length)]);
 
-  // Co-op Crawler mode
-  const [coopMode, setCoopMode] = useState(false);
 
   // Mode-transition cover: bump this token when a mode is revealed to arm the
   // SceneLoadingGate, which covers the scene with the loading cube while its
@@ -563,8 +554,6 @@ export default function WORM3() {
     setShowMobiIntro(true);
   }, []);
 
-  // Merge Mode theme picker
-  const [showMergeThemePicker, setShowMergeThemePicker] = useState(false);
 
   // Parity Store — hides main menu and freezes canvas while open
   const [showStore, setShowStore] = useState(false);
@@ -858,15 +847,6 @@ export default function WORM3() {
     useGameStore.getState().setShowMainMenu(true);
   }, []);
 
-  const handleMenuCoop = useCallback(() => {
-    useGameStore.getState().setShowMainMenu(false);
-    useGameStore.getState().clearLevel();
-    shuffle();
-    launchWithMobi(MOBI_LINES_COOP, 'CO-OP MODE', () => {
-      setCoopMode(true);
-    });
-  }, [shuffle, launchWithMobi]);
-
   const handleMenuTeach = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     useGameStore.getState().clearLevel();
@@ -985,17 +965,6 @@ export default function WORM3() {
     setShowMobiusCubelet(true);
   }, []);
 
-  const handleMenuHolonomy = useCallback(() => {
-    useGameStore.getState().setShowMainMenu(false);
-    useGameStore.getState().clearLevel();
-    useGameStore.getState().clearDisparityGame();
-    useGameStore.getState().setHolonomyMode(true);
-    setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
-    if (size !== 3) changeSize(3);
-    reset();
-    launchWithMobi(MOBI_LINES_HOLONOMY, 'HOLONOMY', () => {});
-  }, [settings, setSettings, size, changeSize, reset, launchWithMobi]);
-
   const handleMenuBiome = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     setSettings({
@@ -1009,28 +978,6 @@ export default function WORM3() {
     useGameStore.getState().setHasShuffled(true);
     launchWithMobi(MOBI_LINES_BIOME, 'BIOME MODE', () => {});
   }, [settings, setSettings, launchWithMobi]);
-
-  const handleMenuMerge = useCallback(() => {
-    useGameStore.getState().setShowMainMenu(false);
-    setShowMergeThemePicker(true);
-  }, []);
-
-  const handleMergeStart = useCallback((themeId) => {
-    setShowMergeThemePicker(false);
-    useGameStore.getState().setMergeTheme(themeId);
-    useGameStore.getState().clearLevel();
-    useGameStore.getState().resetGame();
-    useGameStore.getState().setHasShuffled(true);
-    shuffle();
-    launchWithMobi(MOBI_LINES_MERGE, 'MERGE MODE', () => {
-      useGameStore.getState().setMergeMode(true);
-    });
-  }, [shuffle, launchWithMobi]);
-
-  const handleMergeCancel = useCallback(() => {
-    setShowMergeThemePicker(false);
-    useGameStore.getState().setShowMainMenu(true);
-  }, []);
 
   const closeTutorial = useCallback(() => {
     setShowTutorial(false);
@@ -1326,16 +1273,6 @@ export default function WORM3() {
   // ========================================================================
   // KEYBOARD HANDLER — consolidated via useKeyboardControls hook
   // ========================================================================
-  const handleToggleHandsMode = useCallback(() => {
-    setHandsMode(!handsMode);
-    if (!handsMode) {
-      setHandsMoveHistory([]);
-      setHandsMoveQueue([]);
-      setHandsTps(0);
-      handsMoveTimestamps.current = [];
-    }
-  }, [handsMode, setHandsMode, setHandsMoveHistory, setHandsMoveQueue, setHandsTps]);
-
   // Wraps reset() to also cancel any in-flight disparity countdown and clear the
   // first-flip gate.  Without this, resetting mid-countdown lets the timeout fire
   // after ~3 s and silently restart chaos on the freshly-solved cube.
@@ -1349,12 +1286,9 @@ export default function WORM3() {
   }, [reset, cancelDisparityRun, currentLevelData]);
 
   // Surfaces that own the screen but live in App's local state rather than the
-  // store, so selectCubeInputBlocked cannot see them. Co-op is here too: the
-  // crawler reads WASD/arrows itself, and App early-returns into it below —
-  // which unmounts nothing, since this hook has already attached its listener.
-  const keyboardDisabled = coopMode
-    || showStore || showModeSelect || showCubeModeSelect || showComingSoon
-    || showMobiusCubelet || showMobiIntro || showMergeThemePicker
+  // store, so selectCubeInputBlocked cannot see them.
+  const keyboardDisabled = showStore || showModeSelect || showCubeModeSelect || showComingSoon
+    || showMobiusCubelet || showMobiIntro
     || showFreeplayWizard || showRandomWizard || showWormModeWizard
     || showDisparityWizard || showDisparityBetting;
 
@@ -1367,8 +1301,6 @@ export default function WORM3() {
     onSaveState: handleSaveState,
     onLoadState: handleLoadState,
     onLevelJump: handleLevelSelect,
-    onExecuteHandsMove: executeHandsMove,
-    onToggleHandsMode: handleToggleHandsMode,
     disabled: keyboardDisabled,
   });
 
@@ -1386,29 +1318,6 @@ export default function WORM3() {
   const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const introPerformanceMode = isMobile || prefersReducedMotion;
 
-
-  if (coopMode) {
-    return (
-      <>
-        <Suspense fallback={<LoadingScreen label="Waking the Co-op Crawler" />}>
-          <PlatformerWormMode
-            cubies={cubies}
-            size={size}
-            faceColors={resolvedColors}
-            onQuit={() => {
-              setCoopMode(false);
-              useGameStore.getState().setShowMainMenu(true);
-            }}
-          />
-        </Suspense>
-        {/* The main-return gate never mounts on the co-op path (this early return),
-            and the Mobi intro finished before coopMode flipped — so PlatformerWormMode's
-            own city/sunset env maps would pop in uncovered. Cover them here. The probe
-            runs long because those maps only begin loading after the lazy chunk mounts. */}
-        <SceneLoadingGate armToken={sceneGateToken} label="Co-op Crawler" probeMs={6000} style={{ zIndex: 9996 }} />
-      </>
-    );
-  }
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
@@ -1555,9 +1464,6 @@ export default function WORM3() {
             moveHistory={moveHistory}
             undo={undo}
             canUndo={canUndo}
-            handsMode={handsMode}
-            handsMoveHistory={handsMoveHistory}
-            handsTps={handsTps}
             victory={victory}
             moves={moves}
             gameTime={gameTime}
@@ -1618,14 +1524,11 @@ export default function WORM3() {
               onMenuLevels: handleMenuCube,
               onMenuFreeplay: handleMenuFreeplay,
               onMenuRandomMode: handleMenuRandomMode,
-              onMenuCoop: handleMenuCoop,
               onMenuTeach: handleMenuTeach,
               onMenuSettings: handleMenuSettings,
               onMenuBiome: handleMenuBiome,
               onMenuDisparity: handleMenuDisparity,
               onMenuWormHealer: handleMenuWormHealer,
-              onMenuHolonomy: handleMenuHolonomy,
-              onMenuMerge: handleMenuMerge,
               onMenuStore: handleOpenStore,
               onMenuComingSoon: handleMenuComingSoon,
               onMenuMobiusCubelet: handleMenuMobiusCubelet,
@@ -1639,9 +1542,6 @@ export default function WORM3() {
                 ? CONTROL_TOUR_SEQUENCE[demoTourIndex]?.key
                 : (demoFlipSpotlight ? 'flip' : (demoViewSpotlight ? 'views' : null)),
               onDemoNavTap: demoMode ? handleDemoNavTap : undefined,
-              showMergeThemePicker,
-              onMergeStart: handleMergeStart,
-              onMergeCancel: handleMergeCancel,
               onWizardComplete: handleWizardComplete,
               onWizardCancel: handleWizardCancel,
               onRandomWizardComplete: handleRandomWizardComplete,
@@ -1658,7 +1558,6 @@ export default function WORM3() {
               onWormWizardCancel: handleWormWizardCancel,
               onWormRetry: handleWormRetry,
               onWormNewGame: handleWormNewGame,
-              onToggleHandsMode: handleToggleHandsMode,
               onFaceRotate: handleFaceRotate,
               onTileRotation: handleTileRotation,
               onTileFaceRotation: handleTileFaceRotation,

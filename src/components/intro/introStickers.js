@@ -19,7 +19,7 @@ export const INTRO_STICKERS = [original, flipped, restored].map(cubies => TILES.
 }));
 export const INTRO_PRESENTATION = { config: {
   settings: { ...applyDemoOverrides(DEFAULT_SETTINGS), colorScheme: 'standard', biomeMode: { enabled: false } },
-  biomeEnabled: false, chaosLevel: 0, disparityFlipCap: 3, faceTextures: {}, mergeMode: false,
-  mergeTheme: null, wormHealerMode: true, perfReducedFX: true
+  biomeEnabled: false, chaosLevel: 0, disparityFlipCap: 3, faceTextures: {},
+  wormHealerMode: true, perfReducedFX: true
 } };
 export const introStickerStage = (time, reducedMotion = false) => reducedMotion || time < FULL_FLIP_START ? 0 : time < IMPLODE_START ? 1 : 2;

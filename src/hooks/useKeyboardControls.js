@@ -1,37 +1,12 @@
 /**
- * useKeyboardControls Hook
- *
- * The app's single global keyboard handler.
- *
- * Two things used to be wrong here and both were invisible from the call site:
- *
- *  1. The hook destructured only `onMove` and `onFlip` while App passed eleven
- *     props. Undo, reset, shuffle, save/load, level jump and both hands-mode
- *     callbacks were silently dropped — every shortcut the help menu documents
- *     (Space, R, P, Esc, the hands-mode letters) did nothing. So was `disabled`,
- *     which App sets during co-op so WASD drives the crawler instead of turning
- *     the cube; both handlers ran at once.
- *
- *  2. The listener guarded only three cases (worm paused, editable target, level
- *     tutorial), so cube keys stayed live under every menu, wizard and modal —
- *     a player pressing keys in the main menu was scrambling their next game,
- *     and the unconditional arrow-key preventDefault stole scrolling from the
- *     settings panel and the store.
- *
- * Input is now split into two tiers: a small set of shortcuts that work anywhere
- * (help, escape, dev console) and everything that touches the puzzle, which is
- * gated on `selectCubeInputBlocked` plus the caller's own `disabled` flag.
- *
- * State is read through `useGameStore.getState()` inside the handler rather than
- * mirrored into a ref on every render — the listener still attaches exactly once
- * and always sees current state, without ~60 lines of hand-maintained syncing.
+ * Global cube keyboard controls. Menus own input while open; ordinary puzzle
+ * shortcuts remain available during play. Retired mode bindings live in the archive.
  */
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { selectCubeInputBlocked, selectTopSurface } from './uiSurfaces.js';
 import { useCursor } from './useCursor.js';
-import { keyToMove } from '../game/handsInput.js';
 
 /**
  * Hook for keyboard controls.
@@ -47,9 +22,7 @@ import { keyToMove } from '../game/handsInput.js';
  * @param {Function} options.onSaveState         dev: save cube state    (Ctrl+S)
  * @param {Function} options.onLoadState         dev: restore cube state (Ctrl+O)
  * @param {Function} options.onLevelJump         dev: jump to level N    (Ctrl+1‥9)
- * @param {Function} options.onExecuteHandsMove  named speedcuber move while in Hands Mode
- * @param {Function} options.onToggleHandsMode   toggle Hands Mode   (P)
- * @param {boolean}  options.disabled            caller owns the keyboard (e.g. co-op crawler)
+ * @param {boolean}  options.disabled            caller owns the keyboard
  */
 export function useKeyboardControls({
   onMove,
@@ -60,8 +33,6 @@ export function useKeyboardControls({
   onSaveState,
   onLoadState,
   onLevelJump,
-  onExecuteHandsMove,
-  onToggleHandsMode,
   disabled = false,
 }) {
   const { cursor, moveCursor, getRotationParams, cursorToCubePos } = useCursor();
@@ -91,7 +62,7 @@ export function useKeyboardControls({
   const handlersRef = useRef(null);
   handlersRef.current = {
     onUndo, onReset, onShuffle, onSaveState, onLoadState, onLevelJump,
-    onExecuteHandsMove, onToggleHandsMode, disabled,
+    disabled,
     moveCursor, performCursorRotation, performCursorFlip,
   };
 
@@ -123,14 +94,13 @@ export function useKeyboardControls({
           top.close(state);
           return;
         }
-        if (state.handsMode) { state.toggleHandsMode(); return; }
         state.setShowCursor(false);
         return;
       }
 
       if (key === 'h' || key === '?') {
-        // 'h' is also a Hands Mode move (F); Hands Mode wins while it is active.
-        if (!state.handsMode) { state.toggleHelp(); return; }
+        state.toggleHelp();
+        return;
       }
 
       if (key === '`' && import.meta.env.DEV) {
@@ -141,7 +111,7 @@ export function useKeyboardControls({
 
       // ── Gate: everything below touches the puzzle ─────────────────────────
 
-      // The caller owns the keyboard (co-op crawler reads WASD/arrows itself).
+      // The caller owns the keyboard while its local overlay is open.
       if (h.disabled) return;
       // Worm mode is paused — the cube is frozen behind the pause overlay.
       if (state.wormHealerMode && (state.wormPaused ?? false)) return;
@@ -167,18 +137,7 @@ export function useKeyboardControls({
         return; // leave every other browser shortcut alone
       }
 
-      // ── Tier 3: Hands Mode owns the letter keys while active ──────────────
-
-      if (state.handsMode) {
-        const move = keyToMove(e);
-        if (move) {
-          e.preventDefault();
-          h.onExecuteHandsMove?.(move);
-          return;
-        }
-      }
-
-      // ── Tier 4: cursor + cube controls ────────────────────────────────────
+      // ── Tier 3: cursor + cube controls ────────────────────────────────────
 
       const CURSOR_KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
       if (CURSOR_KEYS[e.key]) {
@@ -216,7 +175,6 @@ export function useKeyboardControls({
       switch (key) {
         case 'u': h.onUndo?.(); break;
         case 'r': h.onReset?.(); break;
-        case 'p': h.onToggleHandsMode?.(); break;
         case 'g': if (allows('flips')) state.toggleFlipMode(); break;
         case 't': if (allows('tunnels')) state.toggleTunnels(); break;
         case 'x': if (allows('explode')) state.toggleExploded(); break;

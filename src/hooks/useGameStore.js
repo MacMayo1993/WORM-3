@@ -73,7 +73,7 @@ export const selectEffectiveFlipCap = (state) =>
  * Returns the single active game mode identifier.
  *
  * Priority order matches the original design: worm-healer overrides teach,
- * teach overrides holonomy, etc. Use with `useGameStore(getActiveMode)`.
+ * teach overrides puzzle overlays, etc. Use with `useGameStore(getActiveMode)`.
  *
  * Note this resolves conflicts rather than preventing them — the underlying mode
  * flags are independent booleans, so two really can be set at once and the
@@ -86,8 +86,6 @@ export const selectEffectiveFlipCap = (state) =>
 export const getActiveMode = (state) => {
   if (state.wormHealerMode)         return MODES.WORM_HEALER;
   if (state.teachModeActive)        return MODES.TEACH;
-  if (state.holonomyMode)           return MODES.HOLONOMY;
-  if (state.mergeMode)              return MODES.MERGE;
   if (state.hollowMode)             return MODES.HOLLOW;
   if (state.mirrorMode)             return MODES.MIRROR;
   if (state.chaosLevel > 0)         return MODES.CHAOS;

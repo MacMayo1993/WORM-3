@@ -1,7 +1,7 @@
 // rewards.js — what the rest of the game pays into the Parity Point wallet.
 //
 // Parity Points used to be earned in exactly two places: Worm mode and Chaos
-// betting. The three campaigns, Freeplay, Random, Teach and Holonomy paid
+// betting. The three campaigns, Freeplay, Random and Teach paid
 // nothing, which made the store — the game's only meta-progression — unreachable
 // from most of the game. A player could finish all 28 authored levels, learn
 // every algorithm and never afford a single skin.
@@ -15,7 +15,7 @@
 //     stars however many times it is replayed.
 //
 //   · MILESTONES are single events with no natural counter — a first Freeplay
-//     solve at a given cube size, an algorithm run to the end, a Möbius loop.
+//     solve at a given cube size, an algorithm run to the end.
 //     Each is claimed once against a persisted key (ProgressManager's milestone
 //     ledger), so re-running them is free but pays nothing.
 //
@@ -26,8 +26,6 @@ import {
   EARN_LEVEL_STAR,
   EARN_FREEPLAY_FIRST_SOLVE,
   EARN_TEACH_ALGORITHM,
-  EARN_HOLONOMY_LOOP,
-  EARN_HOLONOMY_MOBIUS,
 } from '../utils/economyConstants.js';
 
 // ─── Levels ──────────────────────────────────────────────────────────────────
@@ -63,9 +61,6 @@ export const freeplaySolveKey = (size) => `solve:${size}`;
 /** First time an algorithm is executed to its last move. */
 export const teachAlgorithmKey = (stageId, algoIndex) => `teach:${stageId}:${algoIndex}`;
 
-/** First closed holonomy loop, and first orientation-reversing one. */
-export const HOLONOMY_LOOP_KEY = 'holonomy:loop';
-export const HOLONOMY_MOBIUS_KEY = 'holonomy:mobius';
 
 /**
  * What a milestone key is worth. Unknown keys pay nothing rather than throwing —
@@ -75,8 +70,6 @@ export function milestonePayout(key) {
   if (typeof key !== 'string') return 0;
   if (key.startsWith('solve:')) return EARN_FREEPLAY_FIRST_SOLVE;
   if (key.startsWith('teach:')) return EARN_TEACH_ALGORITHM;
-  if (key === HOLONOMY_MOBIUS_KEY) return EARN_HOLONOMY_MOBIUS;
-  if (key === HOLONOMY_LOOP_KEY) return EARN_HOLONOMY_LOOP;
   return 0;
 }
 

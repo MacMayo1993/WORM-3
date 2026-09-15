@@ -38,7 +38,6 @@ import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
-import { MergeTileOverlay } from '../modes/merge/index.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -707,14 +706,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       disparityFlipCap: s.disparityFlipCap,
       settings: s.settings,
       faceTextures: s.faceTextures,
-      mergeMode: s.mergeMode,
-      mergeTheme: s.mergeTheme,
       wormHealerMode: s.wormHealerMode ?? false,
       perfReducedFX: s.perfReducedFX ?? false,
     }))
   );
   // Cinematics render real stickers with local styling, never changing saved settings.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
+  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
     [settings]
@@ -935,10 +932,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // 54 stickers dying → 54×54 re-renders becomes 1 re-render per death event.
   const deadRankRaw = useGameStore((s) => s.disparityDeathByGridId?.[stickerGridIdRef.current]?.rank ?? null);
   const isWinnerTile = useGameStore((s) => s.chaosLevel > 0 && !!(s.disparityWinner?.pair?.includes(stickerGridIdRef.current)));
-  // Stable home key for Merge Mode tier lookup — same format as computeMergeRegions output.
-  const mergeHomeKey = meta?.origPos
-    ? `${meta.origPos.x}-${meta.origPos.y}-${meta.origPos.z}-${meta.origDir}`
-    : null;
   // Live ref to current texture so useFrame closures can access it without stale captures.
   const currTextureRef = useRef(null);
 
@@ -2409,9 +2402,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <DisparityHealthBar flips={meta?.flips ?? 0} flipCap={effectiveFlipCap} />
       )}
 
-      {mergeMode && mergeHomeKey && (
-        <MergeTileOverlay homeKey={mergeHomeKey} themeId={mergeTheme} colorIndex={meta.curr} />
-      )}
     </group>
   );
 };

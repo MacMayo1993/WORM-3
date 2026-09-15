@@ -49,14 +49,14 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,woff2,woff,svg}', 'Mobi.webp'],
-        globIgnores: ['environments/**', 'models/**', 'images/**', 'merge-mode/**'],
+        globIgnores: ['environments/**', 'models/**', 'images/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: `${BASE}index.html`,
         runtimeCaching: [
           {
             // Big media: cache-first after first use, capped so the quota
             // never balloons past a few environment maps + models.
-            urlPattern: new RegExp(`${escapeRe(BASE)}(environments|models|images|merge-mode)/`),
+            urlPattern: new RegExp(`${escapeRe(BASE)}(environments|models|images)/`),
             handler: 'CacheFirst',
             options: {
               cacheName: 'worm3-media',

@@ -92,8 +92,6 @@ export {
   MAX_LEVEL_PAYOUT,
   freeplaySolveKey,
   teachAlgorithmKey,
-  HOLONOMY_LOOP_KEY,
-  HOLONOMY_MOBIUS_KEY,
   milestonePayout,
   awardMilestone
 } from './rewards.js';
