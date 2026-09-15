@@ -77,7 +77,7 @@ export function pressTile(gridId, amount) {
   if (entry) {
     if (a > entry.target) entry.target = a;
   } else {
-    tiles.set(gridId, { p: 0, v: 0, target: a });
+    tiles.set(gridId, { p: 0, v: 0, target: a, contact: 0 });
   }
 }
 
@@ -92,6 +92,7 @@ export function pressTile(gridId, amount) {
 export function tickWormPress(delta) {
   const dt = delta > MAX_DT ? MAX_DT : delta;
   for (const [key, e] of tiles) {
+    e.contact = e.target;
     e.v += ((e.target - e.p) * K - e.v * DAMP) * dt;
     e.p += e.v * dt;
     if (e.target === 0 && Math.abs(e.p) < REST_EPS && Math.abs(e.v) < REST_V_EPS) {
@@ -108,6 +109,10 @@ export function tickWormPress(delta) {
 /** Current press of a tile: 1 = fully under the worm, 0 = flat, <0 = rebounding proud. */
 export function getWormPress(gridId) {
   return gridId ? (tiles.get(gridId)?.p ?? 0) : 0;
+}
+
+export function getWormContact(gridId) {
+  return gridId ? (tiles.get(gridId)?.contact ?? 0) : 0;
 }
 
 /** Move every live spring through the same surface-key transform as the worm trail. */

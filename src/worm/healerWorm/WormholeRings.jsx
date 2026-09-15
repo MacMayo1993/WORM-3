@@ -7,7 +7,8 @@ import { getWormTunnelSnapshot } from '../tunnelSnapshot.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { FACE_COLORS } from '../../utils/constants.js';
-import { portalSparkPose } from './portalSparks.js';
+import { portalSparkPose, PORTAL_SPARKS, DANGER_SPARKS, sparkVertexShader, sparkFragmentShader } from './portalSparks.js';
+import { isMobile, prefersReducedMotion } from '../../utils/device.js';
 import { WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
 // ─── Wormhole portal rings — spinning neon rings at every flipped tile ────────
@@ -31,6 +32,7 @@ const _moteColor = new THREE.Color();
 // a missing palette entry degrades to the previous look rather than to black.
 const _faceColorFallback = new THREE.Color('#ff44ff');
 const _sparkWarmWhite = new THREE.Color('#fff5bd');
+const _sparkAmber = new THREE.Color('#ff9e28');
 const _sparkWhiteHot = new THREE.Color('#fffbe8');
 
 // Void swamp palette — sickly, stagnant, antipodality-gone-wrong
@@ -66,19 +68,8 @@ const SPARKS_PER_CRITICAL = 7;
 const POLES_PER_TILE = 4;
 const TAPES_PER_TILE = 4;
 const FRAME_SEGMENTS_PER_VOID = 4;
-// Capacity for the strongest fountain; ordinary portals use five slots per burst.
-const MOTES_PER_LIVE = 7; // five safe sparks, seven dangerous sparks
-
-// ── DEMO FLAG ────────────────────────────────────────────────────────────────
-// Puts the caution poles + tape on EVERY flipped tile, not just the ones that
-// will kill you. On by request, to demo how strongly the tape reads as a marker.
-//
-// Set back to false before shipping. The tape is the only thing in the mode that
-// means "entering this is fatal" (void kills on contact, critical kills when you
-// step off the exit); painting it on every portal spends that alarm on the most
-// common object in the game and leaves nothing to distinguish the deadly ones.
-// Flat caution borders and the spark fountains mark ordinary flipped tiles.
-const DEMO_TAPE_ON_ALL_PORTALS = false;
+// Fixed capacity; reduced FX uses half the particles without new draw calls.
+const MOTES_PER_LIVE = DANGER_SPARKS;
 
 // The caution tape strip. Constant for the life of the page, so it is drawn and
 // uploaded once rather than per mount — a restart used to redraw a 512×64 canvas
@@ -97,10 +88,19 @@ function getCautionTexture() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('CAUTION', 256, 36);
+    // Diagonal end stripes stay recognizable when the lettering is too distant.
+    for (const start of [0, 420]) {
+        for (let x = start - 30; x < start + 92; x += 32) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0); ctx.lineTo(x + 16, 0);
+            ctx.lineTo(x + 60, 64); ctx.lineTo(x + 44, 64);
+            ctx.fill();
+        }
+    }
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(3, 1);
+    tex.repeat.set(1, 1);
     tex.colorSpace = THREE.SRGBColorSpace;
     _cautionTexture = tex;
     return tex;
@@ -152,6 +152,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     // a Color. Subscribing to `settings` alone (not the whole store) keeps this from
     // re-rendering on every cubie tick.
     const settings = useGameStore((s) => s.settings);
+    const reducedFX = useGameStore(s => s.perfReducedFX);
+    const reducedMotion = prefersReducedMotion();
     const faceColorObjs = React.useMemo(() => {
         const hexes = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
         const out = new Map();
@@ -185,7 +187,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         const inTunnelPhase = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
         // Hidden, the rings are off-camera inside the cube: keep them ticking slowly
         // so they are never more than a fifth of a second stale, at ~1/12th the CPU.
-        const targetStep = hidden ? (1 / 5) : (inTunnelPhase ? (1 / 60) : (1 / 20));
+        const targetStep = hidden ? (1 / 5) : (inTunnelPhase || !isMobile ? (1 / 60) : (1 / 30));
 
         if (lastPhaseRef.current !== phase) {
             // Prevent carrying large accumulated delta across phase changes.
@@ -335,14 +337,19 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             const dangerous = isVoid || isCritical;
             const burstSeed = ((wp[0] * 0.173 + wp[1] * 0.317 + wp[2] * 0.571
                 + n.x * 0.113 + n.y * 0.257 + n.z * 0.419) % 1 + 1) % 1;
-            for (let m = 0; m < (dangerous ? 7 : 5) && moteIdx < MAX_MOTES; m++) {
+            const sparkCount = reducedMotion ? 0 : Math.ceil((dangerous ? DANGER_SPARKS : PORTAL_SPARKS) * (reducedFX ? 0.5 : 1));
+            for (let m = 0; m < sparkCount && moteIdx < MAX_MOTES; m++) {
                 if (!portalSparkPose(_moteDummy, wp, n, t, burstSeed, m, dangerous)) continue;
                 motes.setMatrixAt(moteIdx, _moteDummy.matrix);
-                _moteColor.copy(dangerous ? _sparkWhiteHot : _sparkWarmWhite).multiplyScalar(2.0);
+                _moteColor.copy(dangerous ? _sparkWhiteHot : _sparkWarmWhite).lerp(_sparkAmber, _moteDummy.userData.life).multiplyScalar(1.8);
                 motes.setColorAt(moteIdx++, _moteColor);
             }
 
-            if (isVoid || isCritical || DEMO_TAPE_ON_ALL_PORTALS) {
+            { // Every tunnel gets a raised perimeter; lethal mouths retain their void frame.
+                const poleHeight = dangerous ? 0.88 : 0.68;
+                const tapeWidth = dangerous ? 0.14 : 0.12;
+                const poleCenter = poleHeight / 2 + 0.01;
+                const tapeLift = poleHeight - tapeWidth / 2 - 0.025;
                 _tapeRight.crossVectors(n, _voidArcAxisY);
                 if (_tapeRight.lengthSq() < 1e-4) _tapeRight.set(1, 0, 0);
                 _tapeRight.normalize();
@@ -354,20 +361,15 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                     const cx = corners[c][0];
                     const cy = corners[c][1];
                     _cautionDummy.position.set(
-                        wp[0] + _tapeRight.x * cx + _tapeForward.x * cy + n.x * 0.2,
-                        wp[1] + _tapeRight.y * cx + _tapeForward.y * cy + n.y * 0.2,
-                        wp[2] + _tapeRight.z * cx + _tapeForward.z * cy + n.z * 0.2
+                        wp[0] + _tapeRight.x * cx + _tapeForward.x * cy + n.x * poleCenter,
+                        wp[1] + _tapeRight.y * cx + _tapeForward.y * cy + n.y * poleCenter,
+                        wp[2] + _tapeRight.z * cx + _tapeForward.z * cy + n.z * poleCenter
                     );
                     _cautionDummy.quaternion.setFromUnitVectors(_voidArcAxisY, n);
-                    _cautionDummy.scale.set(1, 1, 1);
+                    _cautionDummy.scale.set(1, poleHeight, 1);
                     _cautionDummy.updateMatrix();
                     poles.setMatrixAt(poleIdx++, _cautionDummy.matrix);
                 }
-                
-                const poleHeight = 0.4;
-                const tapeWidth = 0.07;
-                // Place tapes near the top of the poles, slightly below the tip
-                const tapeLift = 0.2 + (poleHeight / 2) - (tapeWidth / 2) - 0.02;
                 
                 const loopT = t * 0.8 + i * 2.3;
 
@@ -405,7 +407,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
 
                     // The OUTWARD normal of the tape is 'outwardDir'
                     // We add flutter to it so the tape blows in the wind
-                    const flutter = Math.sin(loopT * 15 + e * 2.1) * 0.08;
+                    const flutter = reducedMotion ? 0 : Math.sin(loopT * 3 + e * 2.1) * 0.045;
                     _tapeNormal.copy(_tapeOutwardDir).addScaledVector(n, flutter).normalize();
 
                     // Re-derive the exact edge direction that is perpendicular to both UP and NORMAL
@@ -418,6 +420,9 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                         _tapeNormal.negate(); // Flip normal too to keep right-handed coordinate system
                     }
 
+                    // Rebuild Y too: a tilted normal with the old Y sheared the tape.
+                    _tapeUp.crossVectors(_tapeNormal, _tapeCrossRight).normalize();
+
                     // X = _tapeCrossRight (along edge), Y = _tapeUp (height), Z = _tapeNormal (outward)
                     _tapeMat4.makeBasis(_tapeCrossRight, _tapeUp, _tapeNormal);
                     
@@ -425,7 +430,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                     const tapeLength = 0.9;
                     
                     // Add slight downward sag in the middle of the tape
-                    const sag = Math.sin(loopT * 2 + e + bubbleSeeds[si + 2] * Math.PI * 2) * 0.015 - 0.015;
+                    const sag = reducedMotion ? -0.015 : Math.sin(loopT * 2 + e + bubbleSeeds[si + 2] * Math.PI * 2) * 0.015 - 0.015;
                     _cautionDummy.position.set(
                         wp[0] + _tapeRight.x * mx + _tapeForward.x * my + n.x * (tapeLift + sag),
                         wp[1] + _tapeRight.y * mx + _tapeForward.y * my + n.y * (tapeLift + sag),
@@ -542,20 +547,20 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
 
             {/* Caution poles */}
             <instancedMesh ref={poleRef} args={[undefined, undefined, MAX_POLES]} frustumCulled={false}>
-                <cylinderGeometry args={[0.015, 0.015, 0.4, 8]} />
+                <cylinderGeometry args={[0.018, 0.018, 1, 6]} />
                 <meshBasicMaterial color="#111111" transparent opacity={0.98} depthWrite={false} />
             </instancedMesh>
 
             {/* Caution tape strips */}
             <instancedMesh ref={tapeRef} args={[undefined, undefined, MAX_TAPES]} frustumCulled={false}>
                 <planeGeometry args={[1, 1]} />
-                <meshBasicMaterial map={cautionTexture} color="#ffffff" side={THREE.DoubleSide} transparent opacity={0.98} depthWrite={false} />
+                <meshBasicMaterial map={cautionTexture} color="#ffffff" side={THREE.DoubleSide} toneMapped={false} />
             </instancedMesh>
 
             {/* Staggered surface-normal spark fountains on every flipped tile. */}
-            <instancedMesh ref={moteRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
-                <cylinderGeometry args={[0.35, 1, 1, 4]} />
-                <meshBasicMaterial color="#ffffff" transparent opacity={1} blending={THREE.AdditiveBlending} depthTest={true} depthWrite={false} toneMapped={false} />
+            <instancedMesh ref={moteRef} count={0} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
+                <cylinderGeometry args={[0.48, 0.04, 1, 5]} />
+                <shaderMaterial vertexShader={sparkVertexShader} fragmentShader={sparkFragmentShader} transparent blending={THREE.AdditiveBlending} depthTest depthWrite={false} toneMapped={false} />
             </instancedMesh>
 
             {/* Void tile frame booster — brighter than neighbor tile frames */}

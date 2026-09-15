@@ -1158,7 +1158,7 @@ const CubeAssembly = React.memo(({
               onPointerDown={onMegaChassisPointerDown}
             >
               {/* The sticker face begins 0.51 units from its cubie centre and its
-                  footprint can sink 0.0285 units (tile + perimeter offset). Keep
+                  footprint can sink 0.03584 units at maximum spring overshoot. Keep
                   the chassis face at 0.46 so depressed tiles remain in front of
                   its depth buffer instead of vanishing at the start of a run. */}
               <boxGeometry args={[megaChassis.full, megaChassis.full, megaChassis.full]} />
