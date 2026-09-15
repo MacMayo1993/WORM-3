@@ -1,3 +1,5 @@
+import { useGameStore } from '../../hooks/useGameStore.js';
+import NatureClaimLeaves from './NatureClaimLeaves.jsx';
 // src/worm/healerWorm/ElementalOrb.jsx
 //
 // The elemental offering as it sits on the board: a real orb, not a floating decal.
@@ -464,8 +466,9 @@ export function ElementalClaimBurst({ position, type, onDone }) {
   useEffect(() => () => spray.geometry.dispose(), [spray]);
 
   useFrame((state, delta) => {
+    if (useGameStore.getState().wormPaused) return;
     tRef.current += delta;
-    const t = Math.min(1, tRef.current / BURST_TIME);
+    const t = Math.min(1, tRef.current / (type === 'grass' ? 1.1 : BURST_TIME));
     // Ease-out: everything leaves fast and coasts, which reads as an impact.
     const e = 1 - (1 - t) * (1 - t) * (1 - t);
 
@@ -545,7 +548,7 @@ export function ElementalClaimBurst({ position, type, onDone }) {
           />
         </mesh>
       )}
-      <points ref={sparksRef} geometry={spray.geometry} frustumCulled={false} renderOrder={23} raycast={() => null}>
+      {type === 'grass' ? <NatureClaimLeaves progressRef={tRef} /> : <points ref={sparksRef} geometry={spray.geometry} frustumCulled={false} renderOrder={23} raycast={() => null}>
         <pointsMaterial
           map={glowTex}
           color={def.accent}
@@ -558,7 +561,7 @@ export function ElementalClaimBurst({ position, type, onDone }) {
           depthTest={false}
           toneMapped={false}
         />
-      </points>
+      </points>}
     </group>
   );
 }

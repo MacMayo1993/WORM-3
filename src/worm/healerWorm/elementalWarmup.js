@@ -21,7 +21,8 @@ import { getElementalParticleMaterial } from './elementalParticleMaterial.js';
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
 import { getElementalSurfaceMaterial } from '../ElementalSurface.jsx';
 import { getFlameMaterial } from '../ElementalFireSkin.jsx';
-import { getGrassBladeMaterial } from '../../3d/styles/GrassBlades.jsx';
+import { getMeadowMaterial } from '../ElementalGrassSkin.jsx';
+import { getNatureLeafMaterial } from './NatureClaimLeaves.jsx';
 import { getElementalOrbMaterials } from './elementalOrbShader.js';
 
 /**
@@ -54,7 +55,7 @@ function collectElementalMaterials() {
         materials.push(getFlameMaterial(true), getFlameMaterial(false));
         break;
       case 'blades':
-        materials.push(getGrassBladeMaterial(def.color, true));
+        materials.push(getMeadowMaterial(), getNatureLeafMaterial());
         break;
       default:
         break;
@@ -79,7 +80,7 @@ export function warmUpElementalSkins(renderer, camera) {
   const scene = new THREE.Scene();
   const geo = new THREE.PlaneGeometry(0.1, 0.1);
   for (const material of materials) {
-    if (material) scene.add(material.userData.elementalPoints ? new THREE.Points(geo, material) : new THREE.Mesh(geo, material));
+    if (material) scene.add(material.userData.elementalPoints ? new THREE.Points(geo, material) : material.userData.elementalInstanced ? new THREE.InstancedMesh(geo, material, 1) : new THREE.Mesh(geo, material));
   }
 
   renderer.compile(scene, camera);
