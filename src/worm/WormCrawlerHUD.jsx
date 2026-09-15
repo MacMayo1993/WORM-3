@@ -1,3 +1,5 @@
+import { CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
+import { combatBridge } from './combat/portalCombat.js';
 import WormDemoLessonCard from '../components/screens/WormDemoLessonCard.jsx';
 import { wormDemoLesson } from '../game/wormDemoLessons.js';
 import './wormHudLayout.css';
@@ -1366,6 +1368,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const [isPaused, setIsPaused] = useState(false);
 
     ensureHudStyle();
+    const combatMode = useGameStore(s => s.wormCombatMode);
     const runId = useGameStore(s => s.wormRunId);
     const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
     const lessonIndex = useGameStore(s => s.demoWormLessonIndex);
@@ -1449,8 +1452,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     }, [canPause, setWormPaused]);
     const handleResume = useCallback(() => {
         setIsPaused(false);
-        setWormPaused(demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete));
-    }, [setWormPaused, demoLesson]);
+        setWormPaused((demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
+    }, [setWormPaused, demoLesson, combatMode]);
 
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', faceId: 2 };
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
@@ -1477,7 +1480,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     };
 
     return (
-        <div className="worm-instrument" data-lesson={demoLesson ? lesson.id : undefined} style={ROOT_STYLE}>
+        <div className="worm-instrument" data-combat={combatMode || undefined} data-lesson={demoLesson ? lesson.id : undefined} style={ROOT_STYLE}>
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <OrbPickupFlash />}
@@ -1527,21 +1530,21 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                             <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
                         </div>
                     )}
-                    {(!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
+                    {!combatMode && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
                 </div>
 
                 {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} />}
             </div>
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
-            {(phase === 'crawling' || demoLesson) && <div className="worm-hud-bottom" ref={trayRef}>
-                {demoLesson ? <WormDemoLessonCard /> : <WormMissionCard />}
+            {(phase === 'crawling' || demoLesson || combatMode) && <div className="worm-hud-bottom" ref={trayRef}>
+                {combatMode ? <CombatCard onRetry={onRetry} onHome={onHome} /> : demoLesson ? <WormDemoLessonCard /> : <WormMissionCard />}
                 {phase === 'crawling' && <div style={THUMB_TRAY_STYLE}>
                     <SteerKey side="left" wormAlive={controlsEnabled} wormColor={wormColor} vars={steerVars} />
 
                     {/* Middle: signature and primary actions share the measured dock */}
                     <div className="worm-action-center" style={ACTION_CLUSTER_STYLE}>
-                        {(!demoLesson || lesson.id === 'signature') && <SignatureButton />}
+                        {combatMode ? <CombatFireButton /> : (!demoLesson || lesson.id === 'signature') && <SignatureButton />}
                         <div className="worm-primary-actions">
                             <button
                                 onPointerDown={handleJumpAction}
@@ -1587,7 +1590,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             )}
 
             {/* ── Examine mode minimized bar ── */}
-            {showDeathMenu && isMinimized && (
+            {!combatMode && showDeathMenu && isMinimized && (
                 <div style={EXAMINE_MINIMIZED_OUTER_STYLE}>
                     <div style={EXAMINE_BAR_STYLE}>
                         <div style={EXAMINE_DOT_STYLE} />
@@ -1620,7 +1623,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             )}
 
             {/* ── Death screen ── */}
-            {showDeathMenu && !isMinimized && (
+            {!combatMode && showDeathMenu && !isMinimized && (
                 <DeathScreen
                     deathDetails={deathDetails}
                     wormTimeAlive={wormTimeAlive}

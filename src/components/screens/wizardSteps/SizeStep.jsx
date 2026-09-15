@@ -9,7 +9,7 @@ import CubePlate from './CubePlate.jsx';
 import CubeSizeSlider from './CubeSizeSlider.jsx';
 import { SIZE_TIERS, sizeTier, bgOptionFor, paletteLabel, styleLabel } from './shared.jsx';
 
-export default function SizeStep({ cos, tiers = SIZE_TIERS, slot, compact = false }) {
+export default function SizeStep({ cos, tiers = SIZE_TIERS, slot, compact = false, locked = false }) {
   const { settings, cubeSize, setCubeSize, colors, accent, accentShadow } = cos;
 
   const tier = sizeTier(cubeSize, tiers);
@@ -26,8 +26,8 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS, slot, compact = fals
         total={compact ? undefined : tiers.length}
         title={tier.name}
         subtitle={compact ? undefined : `${paletteLabel(settings)} · ${styleLabel(settings)}`}
-        onPrev={() => setCubeSize(adjacentSize(-1))}
-        onNext={() => setCubeSize(adjacentSize(1))}
+        onPrev={locked ? undefined : () => setCubeSize(adjacentSize(-1))}
+        onNext={locked ? undefined : () => setCubeSize(adjacentSize(1))}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}
         glow={colors[1]}
         backdrop={bgOptionFor(settings.backgroundTheme)}

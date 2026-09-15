@@ -1901,7 +1901,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             // per-step heal scan on large boards. The timer resets regardless, so the first
             // interval after a heal refills the slot.
             const atCap = (ctx.getActiveTunnels?.() ?? []).length >= activeTunnelCap(size);
-            if (!noMoreSpawns && !atCap && !ctx.isDemoLesson?.()) {
+            if (!noMoreSpawns && !atCap && !ctx.isDemoLesson?.() && !ctx.isCombatMode?.()) {
                 const tile = randomUnflippedTile(ctx.getCubies(), size, [sim.pos]);
                 if (tile) ctx.spawnWormholePair(tile);
             }
@@ -1913,8 +1913,8 @@ export function stepWormSim(sim, delta, size, ctx) {
     // ── Special orbs: ambient spawn clock + lifetime ageing. Both run only while
     // crawling, so a special can't appear (or expire unseen) during a tunnel transit.
     if (sim.phase === 'crawling') {
-        if (!ctx.isDemoLesson?.()) sim.specialTimer -= delta;
-        if (!ctx.isDemoLesson?.() && sim.specialTimer <= 0) {
+        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.()) sim.specialTimer -= delta;
+        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && sim.specialTimer <= 0) {
             // spawnSpecial resets the timer on success. A failure means either the
             // board is at its cap or the neighbourhood had no acceptable tile — both
             // are transient, so retry soon rather than skipping a whole interval.
@@ -1922,8 +1922,8 @@ export function stepWormSim(sim, delta, size, ctx) {
         }
         // Elemental offering runs on its own faster clock (spawnElementalOffering
         // resets the timer itself, to the interval on success or a short retry).
-        if (!ctx.isDemoLesson?.()) sim.elementalSpawnTimer -= delta;
-        if (!ctx.isDemoLesson?.() && sim.elementalSpawnTimer <= 0) {
+        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.()) sim.elementalSpawnTimer -= delta;
+        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && sim.elementalSpawnTimer <= 0) {
             spawnElementalOffering(sim, size, ctx);
         }
         if (sim.specials.length > 0) {
