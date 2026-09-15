@@ -1,3 +1,5 @@
+import { createXpRun, wormMultiplier } from '../../progression/model.js';
+import { wormXpChanges } from '../../progression/awards.js';
 import { startMission, advanceMission, readMissionCount } from '../../worm/missions.js';
 import { MAX_WORM_ORBS } from '../../worm/wormDifficulty.js';
 /**
@@ -28,9 +30,10 @@ export const createWormSlice = (set, _get) => ({
     if (next === mission) return state;
     // Progress, reward and the next assignment commit together. No UI effect
     // or claim button can pay twice after a remount or a repeated event.
-    return { wormMission: next, ...(next.completed ? {
+    const xp = next.completed ? wormXpChanges({ ...state, wormMission: next }, 'mission', 1, next.id, runId) : {};
+    return { wormMission: next, ...xp, ...(next.completed ? {
       wormMissionsCompleted: state.wormMissionsCompleted + 1,
-      parityPoints: Math.max(0, (state.parityPoints || 0) + next.reward),
+      parityPoints: Math.max(0, (xp.parityPoints ?? state.parityPoints ?? 0) + next.reward),
     } : {}) };
   }),
   wormSpeed: 2.0,
@@ -116,6 +119,7 @@ export const createWormSlice = (set, _get) => ({
   // Tears down BOTH a disparity round and a worm run — the two share the same
   // runtime fields. Lives in the worm slice because initWormMode is its mirror.
   clearDisparityGame: () => set({
+    xpRun: null,
     ...makeDisparityRuntimeDefaults(),
     ...makeWormSessionDefaults(),
     wormHealerMode: false,
@@ -124,6 +128,9 @@ export const createWormSlice = (set, _get) => ({
     ...makeDisparityRuntimeDefaults(),
     ...makeWormSessionDefaults(),
     wormHealerMode: true,
+    xpRun: state.demoMode ? null : createXpRun('worm', (state.wormRunId ?? 0) + 1, state.playerProgress.xp, {
+      multiplier: wormMultiplier(speed ?? state.wormSpeed, interval ?? state.wormholeInterval),
+    }),
     wormMission: state.demoMode ? null : startMission(state.wormMissionsCompleted, (state.wormRunId ?? 0) + 1),
     disparityFlipCap: flipCap,
     chaosLevel: 0,

@@ -1,3 +1,4 @@
+import { LevelUpCue } from './progression/ProgressWidgets.jsx';
 import { getDirectWormPreview, subscribeDirectWormPreview } from './3d/directWormPreview.js';
 import DirectWormPreviewHost from './3d/DirectWormPreviewHost.jsx';
 import { scaledWormOrbCount } from './worm/wormDifficulty.js';
@@ -76,6 +77,7 @@ import LoadingScreen from './components/screens/LoadingScreen.jsx';
 // Covers a mode transition with the loading cube while the scene's env map /
 // textures decode. Reads drei's useProgress, so it must stay outside <Canvas>.
 import SceneLoadingGate from './components/screens/SceneLoadingGate.jsx';
+const PlayerProgressScreen = React.lazy(() => import('./progression/PlayerProgressScreen.jsx'));
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -289,6 +291,7 @@ export default function WORM3() {
   const {
     showWelcome, setShowWelcome,
     showMainMenu,
+    showPlayerProgress,
     showSettings,
     showTutorial, setShowTutorial,
     setShowSettings,
@@ -298,6 +301,7 @@ export default function WORM3() {
     showWelcome: s.showWelcome,
     setShowWelcome: s.setShowWelcome,
     showMainMenu: s.showMainMenu,
+    showPlayerProgress: s.showPlayerProgress,
     showSettings: s.showSettings,
     showTutorial: s.showTutorial,
     setShowTutorial: s.setShowTutorial,
@@ -975,7 +979,7 @@ export default function WORM3() {
     });
     useGameStore.getState().clearLevel();
     useGameStore.getState().resetGame();
-    useGameStore.getState().setHasShuffled(true);
+    useGameStore.getState().setHasShuffled(true, 0);
     launchWithMobi(MOBI_LINES_BIOME, 'BIOME MODE', () => {});
   }, [settings, setSettings, launchWithMobi]);
 
@@ -1195,7 +1199,8 @@ export default function WORM3() {
     setRotatedCubies(state);
     useGameStore.getState().setMoves(moveCount);
     useGameStore.getState().clearHistory();
-    useGameStore.getState().setHasShuffled(true);
+    useGameStore.getState().setHasShuffled(true, moveCount);
+    useGameStore.getState().markXpAssisted();
   }, [size, setRotatedCubies]);
 
   const handleInstantChaos = useCallback((targetDisparity) => {
@@ -1242,7 +1247,8 @@ export default function WORM3() {
     }
 
     setCubies(state);
-    useGameStore.getState().setHasShuffled(true);
+    useGameStore.getState().setHasShuffled(true, count);
+    useGameStore.getState().markXpAssisted();
   }, [cubies, size, setCubies]);
 
   const handleSaveState = useCallback(() => {
@@ -1265,6 +1271,7 @@ export default function WORM3() {
       alert(`Saved state is for ${savedCubeState.size}×${savedCubeState.size} cube.`);
       return;
     }
+    useGameStore.getState().markXpAssisted();
     setRotatedCubies(savedCubeState.cubies);
     useGameStore.getState().setMoves(savedCubeState.moves);
     useGameStore.getState().clearHistory();
@@ -1663,6 +1670,9 @@ export default function WORM3() {
           />
         </Suspense>
       )}
+
+      <LevelUpCue />
+      {showPlayerProgress && <Suspense fallback={<LoadingScreen label="Loading rewards" />}><PlayerProgressScreen /></Suspense>}
 
       {/* Parity Store — mounted at app root so it's above every overlay. The
           z-index lives on the fading wrapper: its will-change traps the store's

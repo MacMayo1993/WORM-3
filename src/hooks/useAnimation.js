@@ -171,6 +171,7 @@ export function useAnimation() {
           pendingMove: null,
         };
       });
+      if (pm.lessonXpKey) useGameStore.getState().recordLessonXp('teach', pm.lessonXpKey);
     } else {
       // No pending move — clear animation state as a safety net.
       clearAnimation();

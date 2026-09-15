@@ -1,3 +1,4 @@
+import { newProgress } from '../progression/model.js';
 import { it, expect } from 'vitest';
 import { scaledWormOrbCount } from '../worm/wormDifficulty.js';
 import { createWormSlice } from '../hooks/storeSlices/wormSlice.js';
@@ -14,7 +15,7 @@ it('leaves free tiles on tiny boards and bounds oversized inputs', () => {
 it('retains scaled counts and caps oversized settings', () => {
   let state;
   const set = update => { state = { ...state, ...(typeof update === 'function' ? update(state) : update) }; };
-  state = createWormSlice(set, () => state);
+  state = { ...createWormSlice(set, () => state), playerProgress: newProgress() };
   state.initWormMode(9999, 0, 3.5, scaledWormOrbCount(8, 15), 5);
   expect(state.wormOrbCount).toBe(40);
   state.setWormOrbCount(196);

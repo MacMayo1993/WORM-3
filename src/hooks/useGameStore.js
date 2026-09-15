@@ -1,3 +1,4 @@
+import { savePlayerState } from '../progression/model.js';
 import { WORM_MISSION_STORAGE_KEY } from '../worm/missions.js';
 /**
  * useGameStore - Zustand State Management
@@ -17,6 +18,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { MODES, FLIP_CAP } from '../utils/constants.js';
 import {
+  createProgressionSlice,
   createCubeSlice,
   createSessionSlice,
   createVisualSlice,
@@ -48,6 +50,7 @@ export const useGameStore = create(
     ...createUiSlice(set, get),
     ...createModesSlice(set, get),
     ...createSettingsSlice(set, get),
+    ...createProgressionSlice(set, get),
   }))
 );
 
@@ -124,3 +127,17 @@ useGameStore.subscribe((state) => state.modePlays, persist(MODE_PLAYS_KEY, JSON.
 
 useGameStore.subscribe(state => state.wormMissionsCompleted,
   completed => persist(WORM_MISSION_STORAGE_KEY, JSON.stringify)({ completed }));
+
+// Persist an atomic XP/wallet/ownership snapshot only when one of those changes.
+useGameStore.subscribe(
+  state => [state.playerProgress, state.parityPoints, state.ownedItems],
+  () => savePlayerState(useGameStore.getState()),
+  { equalityFn: (a, b) => a.every((value, i) => value === b[i]) }
+);
+
+useGameStore.subscribe(state => state.chaosLevel, (level, previous) => {
+  if (level > 0 && previous === 0) useGameStore.getState().beginChaosXp();
+});
+useGameStore.subscribe(state => state.showDisparityWinner, show => {
+  if (show) useGameStore.getState().finishChaosXp();
+});

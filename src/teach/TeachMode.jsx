@@ -1,3 +1,4 @@
+import { XpReceipt } from '../progression/ProgressWidgets.jsx';
 // src/teach/TeachMode.jsx
 // Teach Mode UI — Instructor panel with sub-modes: Guided, Demo, Quiz
 
@@ -957,6 +958,7 @@ const TeachMode = ({
         </div>
       </div>
 
+      <XpReceipt mode="teach" />
       {/* Sub-mode tabs */}
       <SubModeTabs subMode={subMode} onSwitch={onSwitchSubMode} />
 

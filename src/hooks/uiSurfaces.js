@@ -24,6 +24,7 @@
  * `flag` is the store key; `close` names the store action that dismisses it.
  */
 export const MODAL_SURFACES = [
+  { id: 'playerProgress', flag: 'showPlayerProgress', close: (s) => s.setShowPlayerProgress(false) },
   { id: 'devConsole',        flag: 'showDevConsole',        close: (s) => s.setShowDevConsole(false) },
   { id: 'help',              flag: 'showHelp',              close: (s) => s.setShowHelp(false) },
   { id: 'settings',          flag: 'showSettings',          close: (s) => s.setShowSettings(false) },

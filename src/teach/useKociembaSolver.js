@@ -121,6 +121,7 @@ export function useKociembaSolver(cubies, size) {
     // (solved → empty, or any residual the maneuver didn't clear).
     if (!isFinal) selfMovePendingRef.current = true;
     setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0, numTurns });
+    useGameStore.getState().markXpAssisted();
     setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, numTurns });
     pendingNextRef.current = true;
     moveIndexRef.current = next;

@@ -175,6 +175,8 @@ export function useWormCrawler(size, cubies) {
             // ── effects ─────────────────────────────────────────────────────────
             feel,
             onDeath: (details, timeAlive) => {
+                const ending = useGameStore.getState();
+                ending.finishWormXp(false, ending.wormRunId);
                 // A run ending mid-buff must not leave a pill stranded on the death
                 // screen — clear both the live readout and the store transitions.
                 resetWormBuffs();
@@ -201,6 +203,7 @@ export function useWormCrawler(size, cubies) {
             },
             onTunnelEnter: (tunnel) => {
                 const prevState = useGameStore.getState();
+                prevState.recordWormXp('entry', 0, [tunnel.entryColor, tunnel.exitColor].sort().join(':'), prevState.wormRunId);
                 const fc = resolveColors(prevState.settings, prevState.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
                 useGameStore.setState({
                     wormPhase: 'windup',
@@ -215,7 +218,10 @@ export function useWormCrawler(size, cubies) {
             },
             onCrawlResume: () => {
                 const resumed = useGameStore.getState();
-                if (resumed.wormPhase === 'windout') resumed.recordWormMission('tunnels', resumed.wormTunnelCount, null, resumed.wormRunId);
+                if (resumed.wormPhase === 'windout') {
+                    resumed.recordWormXp('tunnels', resumed.wormTunnelCount, null, resumed.wormRunId);
+                    resumed.recordWormMission('tunnels', resumed.wormTunnelCount, null, resumed.wormRunId);
+                }
                 useGameStore.setState({
                     wormPhase: 'crawling',
                     wormOnFlippedTile: false,
@@ -253,6 +259,7 @@ export function useWormCrawler(size, cubies) {
             },
             onOrbPickup: (faceId, orbCount, color, combo) => {
                 const pickup = useGameStore.getState();
+                pickup.recordWormXp('orbs', (pickup.wormSessionOrbs ?? 0) + 1, null, pickup.wormRunId);
                 pickup.recordWormMission('orbs', (pickup.wormSessionOrbs ?? 0) + 1, faceId, pickup.wormRunId);
                 useGameStore.setState((state) => ({
                     wormBodyTiles: orbCount,
@@ -341,6 +348,7 @@ export function useWormCrawler(size, cubies) {
                 for (const key of healedProgressKeys) if (key) delete newProgress[key];
                 st.setWormHealingProgress(newProgress);
                 st.setWormHealedCount(healedCount);
+                st.recordWormXp('healed', healedCount, null, st.wormRunId);
                 st.recordWormMission('healed', healedCount, null, st.wormRunId);
                 useGameStore.getState().earnCoins(EARN_WORM_HEALED_FACE);
             },

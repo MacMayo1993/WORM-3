@@ -6,7 +6,7 @@
 
 import { makeDisparityRuntimeDefaults, MAX_UNDO_HISTORY } from './sessionDefaults.js';
 
-export const createSessionSlice = (set, _get) => ({
+export const createSessionSlice = (set, get) => ({
   // ========================================================================
   // GAME SESSION STATE
   // ========================================================================
@@ -24,14 +24,21 @@ export const createSessionSlice = (set, _get) => ({
     : { moves }),
   setGameTime: (gameTime) => set({ gameTime }),
   setGameStartTime: (gameStartTime) => set({ gameStartTime }),
-  setHasShuffled: (hasShuffled) => set({ hasShuffled }),
-  setVictory: (victory) => set({ victory }),
+  setHasShuffled: (hasShuffled, scrambleMoves = 15) => {
+    set({ hasShuffled });
+    if (hasShuffled) get().beginPuzzleXp?.(scrambleMoves);
+  },
+  setVictory: (victory) => {
+    set({ victory });
+    if (victory) get().completePuzzleXp?.();
+  },
   setAchievedWins: (achievedWins) => set(typeof achievedWins === 'function'
     ? (state) => ({ achievedWins: achievedWins(state.achievedWins) })
     : { achievedWins }),
 
   incrementMoves: () => set((state) => ({ moves: state.moves + 1 })),
   resetGame: () => set({
+    xpRun: null,
     moves: 0,
     gameTime: 0,
     gameStartTime: Date.now(),

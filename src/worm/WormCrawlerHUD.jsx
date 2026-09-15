@@ -1,3 +1,4 @@
+import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
 import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
 import { elementalFeedback } from './healerWorm/elementalFeedback.js';
 // src/worm/WormCrawlerHUD.jsx
@@ -918,6 +919,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                 ))}
             </div>
             <WormMissionCard summary />
+            <XpRunSummary mode="worm" />
             <div style={WINNER_BTN_ROW_STYLE}>
                 <button onClick={onRetry} style={WINNER_PLAY_AGAIN_STYLE}><WormReplayLabel /></button>
                 <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New Game</button>
@@ -1297,6 +1299,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                 <Eyebrow accent={green}>Paused</Eyebrow>
                 <ParityWallet dark neutral />
                 <WormMissionCard summary />
+            <XpRunSummary mode="worm" />
                 <OverlayTitle size="clamp(26px, min(9vw, 8vh), 44px)" outline="#14310f" glow={`${green}55`}>
                     TAKE A BREATHER
                 </OverlayTitle>

@@ -310,6 +310,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 );
                 if (remaining.length === 0) {
                     gameModePhaseRef.current = 'solved';
+                    liveState.finishWormXp(true, liveState.wormRunId);
                     const bodyOrbs = useGameStore.getState().wormBodyTiles ?? 0;
                     // 2× multiplier: reward for clearing all tunnels before the clock ran out
                     if (bodyOrbs > 0) useGameStore.getState().earnCoins(bodyOrbs * EARN_ORB_COLLECT * 2);

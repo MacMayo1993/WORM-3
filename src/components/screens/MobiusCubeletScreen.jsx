@@ -5,6 +5,8 @@
 // antipodal face pair — demonstrating how RP² identification works:
 // travelling through a face returns you to the opposite face with a half-twist.
 
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { XpReceipt } from '../../progression/ProgressWidgets.jsx';
 import React, { useState, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -19,10 +21,12 @@ const LEGEND = [
   { colorA: '#f0f0f0', colorB: '#FFD500', label: 'Top  ↔  Bottom', sub: 'White  /  Yellow · Y-axis' },
 ];
 
-function LegendRow({ colorA, colorB, label, sub }) {
+function LegendRow({ colorA, colorB, label, sub, selected, visited, onClick }) {
   return (
-    <div
+    <button type="button" onClick={onClick} aria-pressed={selected}
       style={{
+        minHeight: 52, cursor: 'pointer', textAlign: 'left', color: 'inherit',
+        outline: selected ? `2px solid ${UI_GOLD}` : undefined,
         display: 'flex',
         alignItems: 'center',
         gap: '10px',
@@ -46,7 +50,7 @@ function LegendRow({ colorA, colorB, label, sub }) {
             fontFamily: UI_FONT,
           }}
         >
-          {label}
+          {label}{visited ? ' ✓' : ''}
         </div>
         <div
           style={{
@@ -59,13 +63,21 @@ function LegendRow({ colorA, colorB, label, sub }) {
           {sub}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
 export default function MobiusCubeletScreen({ onBack }) {
   const [visible, setVisible] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
+  const [selectedPair, setSelectedPair] = useState(null);
+  const [visited, setVisited] = useState([]);
+  const viewPair = axis => {
+    setSelectedPair(axis);
+    const next = [...new Set([...visited, axis])];
+    setVisited(next);
+    if (next.length === 3) useGameStore.getState().recordDiscoveryXp('cubelet');
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 30);
@@ -200,7 +212,7 @@ export default function MobiusCubeletScreen({ onBack }) {
           <Suspense fallback={null}>
             <SafeEnvironment preset="city" />
           </Suspense>
-          <MobiusCubelet autoRotate={autoRotate} />
+          <MobiusCubelet autoRotate={autoRotate} selectedPair={selectedPair} />
           {!autoRotate && <OrbitControls enablePan={false} minDistance={3} maxDistance={10} />}
         </Canvas>
 
@@ -245,13 +257,15 @@ export default function MobiusCubeletScreen({ onBack }) {
             marginBottom: '4px',
           }}
         >
-          Antipodal Pairs · Möbius Bands
+          Explore each pair · {visited.length}/3
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
-          {LEGEND.map(row => (
-            <LegendRow key={row.sub} {...row} />
-          ))}
+          {LEGEND.map((row, index) => {
+            const axis = ['Z', 'X', 'Y'][index];
+            return <LegendRow key={axis} {...row} selected={selectedPair === axis} visited={visited.includes(axis)} onClick={() => viewPair(axis)} />;
+          })}
         </div>
+        <XpReceipt mode="explore" />
       </div>
     </div>
   );

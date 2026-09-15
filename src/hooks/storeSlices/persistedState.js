@@ -1,3 +1,4 @@
+import { readPlayerSave, newProgress } from '../../progression/model.js';
 /**
  * persistedState.js — the one read of localStorage at module load.
  *
@@ -45,6 +46,7 @@ const migrateSettings = (rawSettings, version) => {
 
 // Load persisted state from localStorage
 const loadPersistedState = () => {
+  const playerSave = readPlayerSave();
   try {
     const settings = localStorage.getItem(SETTINGS_STORAGE_KEY);
     const settingsVersionRaw = localStorage.getItem(SETTINGS_VERSION_KEY);
@@ -84,13 +86,14 @@ const loadPersistedState = () => {
     // betting feature is reachable on day one. (An existing "0" stays 0 — the
     // player spent it; the grant is one-time by construction since every
     // earn/spend persists the key.)
-    const rawParityPoints = localStorage.getItem(PARITY_POINTS_KEY);
+    const rawParityPoints = playerSave?.points ?? localStorage.getItem(PARITY_POINTS_KEY);
     const parityPoints = rawParityPoints == null ? STARTING_BANKROLL : (parseInt(rawParityPoints, 10) || 0);
     let storedOwned = [];
     try {
       const rawOwned = JSON.parse(localStorage.getItem(OWNED_ITEMS_KEY) ?? '[]');
       if (Array.isArray(rawOwned)) storedOwned = rawOwned;
     } catch { /* corrupted owned-items entry — fall back to defaults */ }
+    if (playerSave) storedOwned = playerSave.ownedItems;
     const ownedItems = DEV_FREE_ECONOMY
       ? [...ALL_ITEMS_OWNED]
       : [...new Set([...DEFAULT_OWNED, ...storedOwned])];
@@ -118,6 +121,7 @@ const loadPersistedState = () => {
     }
 
     return {
+      playerProgress: playerSave?.progress ?? newProgress(),
       settings: migratedSettings,
       introSeen,
       tutorialDone,
@@ -136,6 +140,7 @@ const loadPersistedState = () => {
     };
   } catch {
     return {
+      playerProgress: playerSave?.progress ?? newProgress(),
       settings: { ...DEFAULT_SETTINGS },
       introSeen: false,
       tutorialDone: false,
@@ -147,9 +152,9 @@ const loadPersistedState = () => {
       wormCharacter: 'classic',
       wormShowTrail: true,
       wormCameraHorizon: 'face',
-      parityPoints: STARTING_BANKROLL, // storage unavailable — new-player experience
+      parityPoints: playerSave?.points ?? STARTING_BANKROLL, // storage unavailable — new-player experience
       modePlays: {},
-      ownedItems: [...DEFAULT_OWNED],
+      ownedItems: playerSave?.ownedItems ?? [...DEFAULT_OWNED],
       betStreak: 0,
     };
   }
