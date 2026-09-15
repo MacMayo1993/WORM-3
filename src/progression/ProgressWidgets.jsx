@@ -66,18 +66,24 @@ export function AchievementCue() {
   return message && !hidden ? <div className="xp-feat-toast" role="status">✦ {message}</div> : null;
 }
 export function LevelUpCue() {
-  const level = useGameStore(s => levelProgress(s.playerProgress.xp).level);
+  const { level, hidden } = useGameStore(useShallow(s => ({
+    level: levelProgress(s.playerProgress.xp).level,
+    // CHAOS settles XP before its survivor reveal. Keep that celebration in
+    // the recap, including the interval before showDisparityWinner turns on.
+    hidden: s.demoMode || s.showMainMenu || s.showPlayerProgress || !!s.victory
+      || s.showDisparityWinner || !!s.disparityWinner || s.chaosLevel > 0
+      || s.xpRun?.mode === 'chaos',
+  })));
   const previous = useRef(level);
   const [show, setShow] = useState(null);
   useEffect(() => {
     const gained = level - previous.current;
     previous.current = level;
-    const s = useGameStore.getState();
     setShow(null);
-    if (gained <= 0 || s.demoMode || s.showMainMenu || s.showPlayerProgress || s.victory || s.showDisparityWinner) return;
+    if (gained <= 0 || hidden) return;
     setShow({ level, points: gained * 25 });
     const timer = setTimeout(() => setShow(null), 1600);
     return () => clearTimeout(timer);
-  }, [level]);
-  return show ? <div className="xp-level-toast" role="status"><span className="xp-flip-cube" aria-hidden="true">✦</span><div><small>LEVEL UP</small><strong>Level {show.level}</strong><small>+{show.points} Parity Points</small></div></div> : null;
+  }, [level, hidden]);
+  return show && !hidden ? <div className="xp-level-toast" role="status"><span className="xp-flip-cube" aria-hidden="true">✦</span><div><small>LEVEL UP</small><strong>Level {show.level}</strong><small>+{show.points} Parity Points</small></div></div> : null;
 }

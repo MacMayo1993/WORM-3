@@ -75,6 +75,7 @@ import {
   consumeModeDive,
   setCarouselStage,
   getCarouselStage,
+  presentMenuCube,
 } from './menuCarouselState.js';
 
 // ─── Carousel-active flag ─────────────────────────────────────────────────────
@@ -859,6 +860,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   // ModeFacePlates is always mounted; this loop owns its visibility so the
   // plates and the cube's pose can never disagree.
   const platesRef = useRef();
+  const shufflingRef = useRef();
   // The contact shadow is a sibling of the cube group, not a child: it must stay
   // flat on the floor while the cube above it tumbles.
   const shadowRef = useRef();
@@ -874,7 +876,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     // One read per frame, shared by the pose below and the plates: the mode
     // plates are only ever on in a frame that also presents a mode face.
     const carouselActive = isCarouselActive();
-    if (platesRef.current) platesRef.current.visible = carouselActive;
+    presentMenuCube(shufflingRef.current, platesRef.current, carouselActive);
 
     if (carouselActive) {
       updateSharedTime(t);
@@ -1063,7 +1065,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         onPointerUp={handleCubeUp}
         onPointerLeave={handleCubeUp}
       >
-        <ShufflingCube onFlip={onFlip} />
+        <group ref={shufflingRef}>
+          <ShufflingCube onFlip={onFlip} />
+        </group>
         {/* Always mounted (no mount-timing flash); the frame loop above shows
             the plates only on frames where it presents a mode face. */}
         <ModeFacePlates ref={platesRef} />

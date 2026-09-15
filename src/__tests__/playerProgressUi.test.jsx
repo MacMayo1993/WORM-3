@@ -16,7 +16,7 @@ const click=el=>act(()=>el.click());
 beforeEach(()=>{
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
   host=document.createElement('div');document.body.append(host);root=createRoot(host);
-  useGameStore.setState({playerProgress:newProgress(),xpRun:null,xpNotice:null,xpActivityRuns:{},ownedItems:['skin_slime','hat_none'],parityPoints:100,demoMode:false,teachModeActive:false,showMainMenu:true,showPlayerProgress:false,victory:null,showDisparityWinner:false});
+  useGameStore.setState({playerProgress:newProgress(),xpRun:null,xpNotice:null,chaosLevel:0,disparityWinner:null,xpActivityRuns:{},ownedItems:['skin_slime','hat_none'],parityPoints:100,demoMode:false,teachModeActive:false,showMainMenu:true,showPlayerProgress:false,victory:null,showDisparityWinner:false});
 });
 afterEach(()=>{act(()=>root.unmount());host.remove();delete globalThis.IS_REACT_ACT_ENVIRONMENT;vi.useRealTimers();});
 it('opens the full level track from the menu badge with accessible progress',()=>{
@@ -113,4 +113,24 @@ it('enters and exits real Teach quiz sessions with synchronized eligibility and 
   act(() => teach.enterTeachMode());
   expect(teach.active).toBe(false);
   expect(state().teachModeActive).toBe(false);
+});
+
+it('keeps CHAOS level-ups in the recap and clears an existing toast on mode entry', () => {
+  vi.useFakeTimers();
+  act(() => { useGameStore.setState({ showMainMenu: false }); root.render(<LevelUpCue />); });
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), xp: xpForLevel(2) } }));
+  expect(host.querySelector('.xp-level-toast')).not.toBeNull();
+  act(() => useGameStore.setState({ chaosLevel: 3, xpRun: { mode: 'chaos', startXp: xpForLevel(2), xp: 0, breakdown: {}, achievements: [] } }));
+  expect(host.querySelector('.xp-level-toast')).toBeNull();
+  act(() => useGameStore.setState({
+    playerProgress: { ...newProgress(), xp: xpForLevel(4) },
+    disparityWinner: { pair: ['M1-001', 'M4-009'] }, showDisparityWinner: false,
+    xpRun: { ...state().xpRun, xp: xpForLevel(4) - xpForLevel(2), breakdown: { Completion: 100 } },
+  }));
+  expect(host.querySelector('.xp-level-toast')).toBeNull();
+  act(() => root.render(<><LevelUpCue /><XpRunSummary mode="chaos" /></>));
+  expect(host.textContent).toContain('LEVEL UP · 4');
+  expect(host.querySelector('.xp-level-toast')).toBeNull();
+  act(() => useGameStore.setState({ chaosLevel: 0, disparityWinner: null, xpRun: null }));
+  expect(host.querySelector('.xp-level-toast')).toBeNull();
 });

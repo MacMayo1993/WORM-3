@@ -283,7 +283,7 @@ export default function UILayer({
         )}
 
         {/* Floating HUD — auto-fade parity/chaos notifications */}
-        {!wormHealerMode && <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />}
+        {!wormHealerMode && !chaosMode && !disparityWinner && <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />}
 
         {/* Disparity HUD — RIP death log + winner announcement */}
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <Suspense fallback={null}><DisparityHUD /></Suspense>}
