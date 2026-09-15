@@ -1,6 +1,7 @@
 import { useTeachMode } from '../teach/useTeachMode.js';
 import { useAnimation } from '../hooks/useAnimation.js';
 import { makeCubies } from '../game/cubeState.js';
+import { rotateSliceCubies } from '../game/cubeRotation.js';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -15,7 +16,7 @@ const click=el=>act(()=>el.click());
 beforeEach(()=>{
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
   host=document.createElement('div');document.body.append(host);root=createRoot(host);
-  useGameStore.setState({playerProgress:newProgress(),xpRun:null,xpNotice:null,xpActivityRuns:{},ownedItems:['skin_slime','hat_none'],parityPoints:100,demoMode:false,showMainMenu:true,showPlayerProgress:false,victory:null,showDisparityWinner:false});
+  useGameStore.setState({playerProgress:newProgress(),xpRun:null,xpNotice:null,xpActivityRuns:{},ownedItems:['skin_slime','hat_none'],parityPoints:100,demoMode:false,teachModeActive:false,showMainMenu:true,showPlayerProgress:false,victory:null,showDisparityWinner:false});
 });
 afterEach(()=>{act(()=>root.unmount());host.remove();delete globalThis.IS_REACT_ACT_ENVIRONMENT;vi.useRealTimers();});
 it('opens the full level track from the menu badge with accessible progress',()=>{
@@ -59,7 +60,9 @@ it('awards an algorithm only after the last turn commits, never for notation pla
     React.useLayoutEffect(()=>{teach=teachApi;animation=animationApi;});
     return null;
   }
-  act(()=>{useGameStore.setState({size:3,cubies:makeCubies(3),animState:null,pendingMove:null,teachModeActive:true});root.render(<Harness/>);});
+  act(()=>{useGameStore.setState({size:3,cubies:makeCubies(3),animState:null,pendingMove:null,teachModeActive:false});root.render(<Harness/>);});
+  act(()=>teach.enterTeachMode());
+  expect(state().teachModeActive).toBe(true);
   act(()=>teach.selectAlgorithm(0,0));
   const length=teach.algoMoves.length;expect(length).toBeGreaterThan(0);
   for(let i=0;i<length;i++){
@@ -71,4 +74,43 @@ it('awards an algorithm only after the last turn commits, never for notation pla
   act(()=>animation.handleAnimComplete());expect(state().playerProgress.xp).toBe(60);
   act(()=>teach.playNotation('R'));act(()=>animation.handleAnimComplete());
   expect(state().playerProgress.xp).toBe(60);
+});
+
+it('enters and exits real Teach quiz sessions with synchronized eligibility and fresh receipts', () => {
+  let teach;
+  function Harness() {
+    const api = useTeachMode();
+    React.useLayoutEffect(() => { teach = api; });
+    return null;
+  }
+  act(() => {
+    useGameStore.setState({ size: 3, cubies: rotateSliceCubies(makeCubies(3), 3, 'row', 2, 1), animState: null });
+    root.render(<Harness />);
+  });
+  act(() => teach.enterTeachMode());
+  expect(teach.active).toBe(true);
+  expect(state().teachModeActive).toBe(true);
+  act(() => teach.switchSubMode('quiz'));
+  const correct = teach.quizOptions.findIndex(option => option.isCorrect);
+  expect(correct).toBeGreaterThanOrEqual(0);
+  act(() => teach.answerQuiz(correct));
+  expect(state().xpActivityRuns.teach.achievements.map(a => a.id)).toContain('teach-quiz');
+  const xp = state().playerProgress.xp;
+  const receipt = state().xpActivityRuns.teach;
+  act(() => teach.enterTeachMode());
+  expect(state().xpActivityRuns.teach).toBe(receipt);
+  act(() => teach.exitTeachMode());
+  expect(teach.active).toBe(false);
+  expect(state().teachModeActive).toBe(false);
+  act(() => state().recordLessonXp('quiz', 'after-exit:0'));
+  expect(state().playerProgress.xp).toBe(xp);
+  act(() => teach.enterTeachMode());
+  expect(state().teachModeActive).toBe(true);
+  expect(state().xpActivityRuns.teach).toBeNull();
+  expect(state().playerProgress.xp).toBe(xp);
+  act(() => teach.exitTeachMode());
+  act(() => useGameStore.setState({ size: 4, cubies: makeCubies(4) }));
+  act(() => teach.enterTeachMode());
+  expect(teach.active).toBe(false);
+  expect(state().teachModeActive).toBe(false);
 });
