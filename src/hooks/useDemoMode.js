@@ -1038,26 +1038,13 @@ export function useDemoMode({
     clearDemoWatchTimers();
   }, [clearDemoWatchTimers]);
 
-  // Celebrate the worm step when the traversal completes (solved phase).
-  const wormGamePhase = useGameStore((s) => s.wormGamePhase);
+  // The WORM chapter finishes only after the practice sequence or explicit exit.
+  const demoWormFinished = useGameStore(s => s.demoWormFinished);
   useEffect(() => {
-    if (!demoMode || demoStep !== 'worm-traversal') return;
-    if (wormGamePhase !== 'solved') return;
-    const timer = setTimeout(() => {
-      useGameStore.getState().clearDisparityGame();
-      celebrateStep('worm-traversal');
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [demoMode, demoStep, wormGamePhase, celebrateStep]);
-
-  // Finish only after the worm has emerged, not when it enters the tunnel.
-  const wormTunnelCount = useGameStore((s) => s.wormTunnelCount);
-  const wormPhase = useGameStore((s) => s.wormPhase);
-  useEffect(() => {
-    if (!demoMode || demoStep !== 'worm-traversal' || wormTunnelCount < 1 || wormPhase !== 'crawling') return;
+    if (!demoMode || demoStep !== 'worm-traversal' || !demoWormFinished) return;
     useGameStore.getState().setWormPaused(true);
     celebrateStep('worm-traversal');
-  }, [demoMode, demoStep, wormTunnelCount, wormPhase, celebrateStep]);
+  }, [demoMode, demoStep, demoWormFinished, celebrateStep]);
 
   // A failed attempt stays in the lesson. The hint supplies retry and skip.
   const wormAlive = useGameStore((s) => s.wormAlive);

@@ -1,3 +1,5 @@
+import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
+import DemoPracticeTargets from './healerWorm/DemoPracticeTargets.jsx';
 import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
 import { isHotTile } from './healerWorm/elementalGameplay.js';
 import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
@@ -134,6 +136,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Bumped whenever the live bomb set gains or loses a member, so <HealerBombs>
     // can notice the change without serialising the id list every frame.
     const bombMembershipRef = useRef(0);
+    const demoHazardAttemptRef = useRef(null);
 
     useEffect(() => {
         setWormTurnCallback(worm.queueTurn);
@@ -314,7 +317,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     liveState.finishWormXp(true, liveState.wormRunId);
                     const bodyOrbs = useGameStore.getState().wormBodyTiles ?? 0;
                     // 2× multiplier: reward for clearing all tunnels before the clock ran out
-                    if (bodyOrbs > 0) useGameStore.getState().earnCoins(bodyOrbs * EARN_ORB_COLLECT * 2);
+                    if (!liveState.demoMode && bodyOrbs > 0) liveState.earnCoins(bodyOrbs * EARN_ORB_COLLECT * 2);
                     // Freeze the worm — game is over; publish final time for WinnerScreen
                     useGameStore.setState({ wormGamePhase: 'solved', wormPaused: true, wormTimeAlive: Math.floor(worm.timeAliveRef.current) });
                 }
@@ -339,10 +342,22 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // auto-rotate clock must not keep charging behind the camera move.
         if ((worm.elementalFocusT?.current ?? 0) > 0) { rotationClock.held = true; return; }
 
-        // The first tunnel is a steering lesson; hazards begin in real runs.
-        if (useGameStore.getState().demoMode && useGameStore.getState().demoStep === 'worm-traversal') {
-            rotationClock.held = true;
-            return;
+        const demo = wormDemoActive(store);
+        const practiceLesson = wormDemoLesson(store).id;
+        if (demo) {
+            const attempt = `${store.wormRunId}:${store.demoWormLessonIndex}:${store.demoWormAttempt}`;
+            if (demoHazardAttemptRef.current !== attempt) {
+                demoHazardAttemptRef.current = attempt;
+                bombsRef.current = []; bombMembershipRef.current++;
+                autoTimerRef.current = 0; pendingRotRef.current = null; warningProgressRef.current = 0;
+                resetRotationClock();
+                if (practiceLesson === 'bomb' && store.demoWormTarget) {
+                    bombsRef.current.push({ id: bombSeqRef.current++, tile: store.demoWormTarget, fuse: 25, maxFuse: 25 });
+                    bombMembershipRef.current++;
+                }
+                if (practiceLesson === 'rotation') inverseQueueRef.current = [{ axis: 'col', sliceIndex: 0, dir: 1 }];
+            }
+            if (!['bomb', 'rotation'].includes(practiceLesson)) { rotationClock.held = true; return; }
         }
 
         // ── Bomb hazard: spawn → fuse → disarm-by-encircle → detonation ────────
@@ -369,8 +384,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // board, which is the worst possible moment to drop a five-second fuse
             // on them. The clock is reset to a full interval on the skip, so the
             // wash ending does not immediately hand over a bomb either.
-            bombTimerRef.current -= bdelta;
-            if (bombTimerRef.current <= 0) {
+            if (!demo) bombTimerRef.current -= bdelta;
+            if (!demo && bombTimerRef.current <= 0) {
                 bombTimerRef.current = BOMB_SPAWN_INTERVAL;
                 if (wormBuffs.elementalT > 0) {
                     // suspended for the wash — fall through to the fuse loop below
@@ -406,7 +421,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     const bomb = bombs[read];
                     // Disarm: body fully encircles the bomb — reward and remove it.
                     if (isBombDisarmed(bomb, occupied, size)) {
-                        useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);
+                        if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
+                        else useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);
                         feel('heal');
                         continue;
                     }
@@ -460,8 +476,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             }
         }
 
+        if (demo && (practiceLesson !== 'rotation' || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
         rotationClock.held = false;
-        autoTimerRef.current += delta;
+        autoTimerRef.current += Math.min(delta, 0.1);
         const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
 
         // Arm with the NEXT inverse move the moment the cycle starts (peek, don't
@@ -593,6 +610,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     return (
         <>
             <WormChaseCamera worm={worm} size={size} />
+            <DemoPracticeTargets size={size} />
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             {/* Elemental orb wash — bathes the whole cube in the claimed element. */}
             <ElementalAtmosphere size={size} />

@@ -51,7 +51,7 @@ export function signatureAvailability(sim, size, ctx, launching = false) {
   const sig = sim.signature;
   let reason = '';
   if (!SIGNATURES[character]) reason = 'No signature';
-  else if (!sim.alive || ctx.isPaused() || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || ctx.isDemoLesson?.()) reason = 'Not available now';
+  else if (!sim.alive || ctx.isPaused() || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || (ctx.isDemoLesson?.() && !ctx.allowDemoSignature?.())) reason = 'Not available now';
   else if (sim.phase !== 'crawling' || sim.rocketActive || sim.restRead || liveRotation.active) reason = 'Wait for a clear surface';
   else if (sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0) reason = 'Wait a moment';
   else if (!launching && !(character === 'book' && sig.active > 0) && (sig.cooldown > 0 || sig.active > 0 || sig.charge > 0)) reason = 'Recharging';

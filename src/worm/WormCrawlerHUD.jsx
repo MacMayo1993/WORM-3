@@ -1,3 +1,5 @@
+import WormDemoLessonCard from '../components/screens/WormDemoLessonCard.jsx';
+import { wormDemoLesson } from '../game/wormDemoLessons.js';
 import './wormHudLayout.css';
 import RotationCountdownHUD from './RotationCountdownHUD.jsx';
 import TunnelNeedsCard from './TunnelNeedsCard.jsx';
@@ -1366,6 +1368,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     ensureHudStyle();
     const runId = useGameStore(s => s.wormRunId);
     const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
+    const lessonIndex = useGameStore(s => s.demoWormLessonIndex);
+    const practiceRunning = useGameStore(s => s.demoWormStarted && !s.demoWormComplete);
+    const controlsEnabled = wormAlive && (!demoLesson || practiceRunning);
+    const lesson = wormDemoLesson({ demoWormLessonIndex: lessonIndex });
     const trayRef = useRef(null);
     useLayoutEffect(() => {
         useGameStore.setState({ wormPauseMenuOpen: isPaused });
@@ -1443,8 +1449,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     }, [canPause, setWormPaused]);
     const handleResume = useCallback(() => {
         setIsPaused(false);
-        setWormPaused(false);
-    }, [setWormPaused]);
+        setWormPaused(demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete));
+    }, [setWormPaused, demoLesson]);
 
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', faceId: 2 };
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
@@ -1471,7 +1477,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     };
 
     return (
-        <div className="worm-instrument" style={ROOT_STYLE}>
+        <div className="worm-instrument" data-lesson={demoLesson ? lesson.id : undefined} style={ROOT_STYLE}>
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <OrbPickupFlash />}
@@ -1516,26 +1522,26 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     </div>
 
                     {/* Reserve row — the coins that used to float in a second panel */}
-                    {wormAlive && phase === 'crawling' && !demoLesson && (
+                    {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal'].includes(lesson.id)) && (
                         <div className="worm-hud-reserve" style={RESERVE_ROW_STYLE}>
                             <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
                         </div>
                     )}
-                    {!demoLesson && <RotationCountdownHUD />}
+                    {(!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
                 </div>
 
-                {wormAlive && <HudContext surface={phase === 'crawling'} demo={demoLesson} />}
+                {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} />}
             </div>
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
-            {phase === 'crawling' && <div className="worm-hud-bottom" ref={trayRef}>
-                <WormMissionCard />
-                <div style={THUMB_TRAY_STYLE}>
-                    <SteerKey side="left" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
+            {(phase === 'crawling' || demoLesson) && <div className="worm-hud-bottom" ref={trayRef}>
+                {demoLesson ? <WormDemoLessonCard /> : <WormMissionCard />}
+                {phase === 'crawling' && <div style={THUMB_TRAY_STYLE}>
+                    <SteerKey side="left" wormAlive={controlsEnabled} wormColor={wormColor} vars={steerVars} />
 
                     {/* Middle: signature and primary actions share the measured dock */}
                     <div className="worm-action-center" style={ACTION_CLUSTER_STYLE}>
-                        {!demoLesson && <SignatureButton />}
+                        {(!demoLesson || lesson.id === 'signature') && <SignatureButton />}
                         <div className="worm-primary-actions">
                             <button
                                 onPointerDown={handleJumpAction}
@@ -1544,17 +1550,17 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                                 className={`worm-hud-key worm-action worm-jump${isPortalReady ? ' worm-jump-ready' : ''}`}
                                 style={isPortalReady ? jumpReadyStyle : jumpIdleStyle}
                                 aria-label={isPortalReady ? "Dive through wormhole" : "Jump over body or vault an edge"}
-                                disabled={!wormAlive}
+                                disabled={!controlsEnabled}
                             >
                                 <JumpIcon size={19} />
                                 {isPortalReady ? 'DIVE' : 'JUMP'}
                             </button>
-                            <BoostButton wormAlive={wormAlive} />
+                            <BoostButton wormAlive={controlsEnabled} />
                         </div>
                     </div>
 
-                    <SteerKey side="right" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
-                </div>
+                    <SteerKey side="right" wormAlive={controlsEnabled} wormColor={wormColor} vars={steerVars} />
+                </div>}
 
             </div>}
 

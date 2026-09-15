@@ -1,10 +1,11 @@
+import DemoWormControlHint from '../components/screens/WormDemoLessonCard.jsx';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import DemoDialog from '../components/screens/DemoDialog.jsx';
 import DemoEndScreen from '../components/screens/DemoEndScreen.jsx';
-import { DemoControlTour, DemoProgressBar, DemoWormControlHint } from '../components/screens/DemoFlowController.jsx';
+import { DemoControlTour, DemoProgressBar } from '../components/screens/DemoFlowController.jsx';
 import BottomNavBar from '../components/menus/BottomNavBar.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { demoTimer } from '../utils/demoTimer.js';
@@ -12,7 +13,7 @@ let host, root;
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-  useGameStore.setState({ wormAlive: true, wormHealerMode: false, demoExploring: false, demoExploreComplete: false });
+  useGameStore.setState({ wormAlive: true, wormGamePhase: 'active', demoWormLessonIndex: 0, demoWormComplete: false, demoWormFinished: false, wormPauseMenuOpen: false, wormHealerMode: false, demoExploring: false, demoExploreComplete: false });
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
 const render = node => act(() => root.render(node));
@@ -52,9 +53,9 @@ it('traps focus in the dialog and gives Escape one close action', () => {
 });
 it('groups the worm instruction, progress and skip into a single dock', () => {
   const skip = vi.fn(); render(<DemoWormControlHint onSkip={skip} />);
-  expect(host.querySelectorAll('.demo-worm-dock')).toHaveLength(1);
-  expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('4');
-  act(() => host.querySelector('button').click()); expect(skip).toHaveBeenCalledTimes(1);
+  expect(host.querySelectorAll('.worm-demo-card')).toHaveLength(1);
+  expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('0');
+  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'End practice').click()); expect(skip).toHaveBeenCalledTimes(1);
 });
 it('explains a bomb death and makes Retry the first focused action', () => {
   useGameStore.setState({wormAlive:false, wormDeathDetails:{cause:'bomb'}});
@@ -70,7 +71,7 @@ it('finishes Explore as 7/7 and removes its already-completed invitation', () =>
 });
 
 it('publishes pause-menu ownership and provides a 48px pause target', () => {
-  useGameStore.setState({demoMode:true, demoStep:'worm-traversal', wormGamePhase:'active', wormPaused:false});
+  useGameStore.setState({demoMode:true, demoStep:'worm-traversal', demoWormStarted:true, wormGamePhase:'active', wormPaused:false});
   render(<WormCrawlerHUD phase="crawling" wormAlive />);
   const pause = host.querySelector('[aria-label="Pause"]');
   expect(pause.style.width).toBe('48px'); expect(pause.style.height).toBe('48px');

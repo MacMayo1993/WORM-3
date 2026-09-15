@@ -97,7 +97,7 @@ const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoFor
 import {
   DemoProgressBar, DemoStepIntro, DemoCoach, DemoStepHint, DemoViewShowcase,
   DemoViewSpotlightHint, DemoFlipSpotlightHint, DemoControlTour, CONTROL_TOUR_SEQUENCE,
-  DemoWormControlHint, DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp,
+  DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp,
   DemoTeachCameo
 } from './components/screens/DemoFlowController.jsx';
 
@@ -1618,11 +1618,6 @@ export default function WORM3() {
       {demoMode && demoHintStep && demoHintStep === demoStep && !demoChromeQuiet && !demoColdOpenVisible &&
         !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && !demoViewSpotlight && !demoFlipSpotlight && (
         <DemoStepHint step={demoHintStep} />
-      )}
-      {/* Worm-step steer hint — shows during active play, before the skip pill. */}
-      {demoMode && demoStep === 'worm-traversal' && !demoColdOpenVisible && !demoChromeQuiet &&
-        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
-        <DemoWormControlHint onRetry={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       )}
       {/* Flip-gateway progress — bounded front-face flip/restore counter. */}
       {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible && !demoChromeQuiet &&

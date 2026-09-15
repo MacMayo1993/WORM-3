@@ -1,3 +1,5 @@
+import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
+import { stageWormPractice, readWormPractice } from './healerWorm/demoPractice.js';
 import { tunnelReadout } from './healerWorm/tunnelReadout.js';
 import { signatureReadout } from './healerWorm/signatures.js';
 import { liveRotation } from './liveRotation.js';
@@ -127,6 +129,7 @@ export function useWormCrawler(size, cubies) {
     if (simRef.current === null) simRef.current = makeWormSim(size);
 
     const deathMenuTimer = useRef(null);
+    const demoPracticeRef = useRef(null);
 
     // Simulation and portal visuals share one exact snapshot of committed cubies.
     // Rotation commits refresh this synchronously below; flips refresh in this effect.
@@ -150,6 +153,7 @@ export function useWormCrawler(size, cubies) {
             getCubies: () => useGameStore.getState().cubies,
             getGamePhase: () => useGameStore.getState().wormGamePhase,
             isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
+            allowDemoSignature: () => wormDemoLesson(useGameStore.getState()).id === 'signature',
             isPaused: () => useGameStore.getState().wormPaused ?? false,
             getSpeed: () => useGameStore.getState().wormSpeed ?? 2.0,
             getControlMode: () => useGameStore.getState().wormControlMode ?? 'non-oriented',
@@ -240,7 +244,7 @@ export function useWormCrawler(size, cubies) {
                 }
             },
             onBoostState: (state) => useGameStore.getState().setWormBoostState(state),
-            onSurvivalTick: () => useGameStore.getState().earnCoins(EARN_WORM_SURVIVAL_TICK),
+            onSurvivalTick: () => { const s = useGameStore.getState(); if (!s.demoMode) s.earnCoins(EARN_WORM_SURVIVAL_TICK); },
             spawnWormholePair: (tile) => {
                 useGameStore.setState((state) => {
                     const mm = getManifoldMap(state.cubies, sizeRef.current, state.rotationEpoch);
@@ -356,7 +360,7 @@ export function useWormCrawler(size, cubies) {
                 st.setWormHealedCount(healedCount);
                 st.recordWormXp('healed', healedCount, null, st.wormRunId);
                 st.recordWormMission('healed', healedCount, null, st.wormRunId);
-                useGameStore.getState().earnCoins(EARN_WORM_HEALED_FACE);
+                if (!st.demoMode) st.earnCoins(EARN_WORM_HEALED_FACE);
             },
         };
     }
@@ -364,7 +368,33 @@ export function useWormCrawler(size, cubies) {
     // ── Per-frame drive ──────────────────────────────────────────────────────────
     const tick = useCallback((delta) => {
         const sim = simRef.current;
+        const state = useGameStore.getState();
+        const demo = wormDemoActive(state) && !state.demoWormFinished;
+        const lesson = wormDemoLesson(state);
+        const attempt = `${state.wormRunId}:${state.demoWormLessonIndex}:${state.demoWormAttempt}`;
+        if (demo && ['active', 'finalHealing'].includes(state.wormGamePhase) && !state.wormPauseMenuOpen && !liveRotation.active && demoPracticeRef.current?.attempt !== attempt) {
+            if (deathMenuTimer.current) { clearTimeout(deathMenuTimer.current); deathMenuTimer.current = null; }
+            const practice = stageWormPractice(sim, sizeRef.current, lesson);
+            demoPracticeRef.current = { ...practice, attempt, rotationEpoch: state.rotationEpoch };
+            resetWormBuffs(); resetWormSegments(); resetWormPress();
+            useGameStore.setState({ cubies: practice.cubies, wormPowerups: sim.powerups, wormSpecials: sim.specials,
+                wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
+                wormSessionOrbs: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
+                wormPhase: 'crawling', wormAlive: true, wormPaused: true, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
+                wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormSpecialNotice: null,
+                wormBoostState: 'ready', wormOrbFlash: null, demoWormSteered: false, demoWormTarget: practice.target,
+                demoWormProgress: '', demoWormHazardCleared: null });
+            return; // Let the shared tunnel snapshot observe the staged board first.
+        }
         stepWormSim(sim, delta, sizeRef.current, ctxRef.current);
+        if (demo && state.demoWormStarted && demoPracticeRef.current?.attempt === attempt && !state.wormPaused && sim.alive && !state.demoWormComplete) {
+            const result = readWormPractice(sim, demoPracticeRef.current, lesson, useGameStore.getState(), sizeRef.current, delta);
+            if (result.done || result.progress !== state.demoWormProgress) {
+                useGameStore.setState({ demoWormProgress: result.progress,
+                    ...(result.done ? { demoWormComplete: true, wormPaused: true,
+                        demoWormCompleted: [...new Set([...state.demoWormCompleted, lesson.id])] } : {}) });
+            }
+        }
         // Publish the wormhole countdown through the plain bridge (pause menu snapshot).
         wormClock.countdown = sim.wormholeCountdown;
         // Mirror the authoritative buff clocks for the HUD. Plain field writes, so a
@@ -401,6 +431,7 @@ export function useWormCrawler(size, cubies) {
     // ── Run reset (retry / new setup / size change) ─────────────────────────────
     useEffect(() => {
         const sim = simRef.current;
+        demoPracticeRef.current = null;
         resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
         resetWormBuffs();
         resetWormSegments();
