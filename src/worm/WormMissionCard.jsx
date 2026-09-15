@@ -3,14 +3,14 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../hooks/useGameStore.js';
 import './wormMissions.css';
 
-function ActiveAchievement({ mission, xp, number }) {
+function ActiveAchievement({ mission, xp, number, compact = false }) {
   return <>
-    <div className="worm-mission-heading">
+    {!compact && <div className="worm-mission-heading">
       <span className="worm-mission-label">CHALLENGE {number}</span>
       <span className="worm-mission-reward">+{mission.reward} PP · +{xp} XP</span>
-    </div>
+    </div>}
     <div className="worm-mission-current" key={mission.sequence}>
-      <div className="worm-mission-objective"><strong>{mission.title}</strong><span>{mission.progress}/{mission.target}</span></div>
+      <div className="worm-mission-objective"><strong title={mission.title}>{mission.title}</strong><span>{mission.progress}/{mission.target}</span></div>
       <div className="worm-mission-track" role="progressbar" aria-label={mission.title} aria-valuemin={0} aria-valuemax={mission.target} aria-valuenow={mission.progress}>
         <div style={{ transform: `scaleX(${mission.progress / mission.target})` }} />
       </div>
@@ -27,7 +27,7 @@ export default function WormMissionCard({ summary = false }) {
   })));
   const finished = !alive || phase === 'solved' || ended;
   if (demo || (!summary && (!mission || finished || paused))) return null;
-  const active = mission ? <ActiveAchievement mission={mission} xp={Math.round((mission.xp || 50) * multiplier)} number={earned.length + 1} /> : <p>All available challenges completed this run.</p>;
+  const active = mission ? <ActiveAchievement mission={mission} xp={Math.round((mission.xp || 50) * multiplier)} number={earned.length + 1} compact={!summary} /> : <p>All available challenges completed this run.</p>;
   if (!summary) return <section className="worm-mission worm-mission-live" aria-label="Current achievement">
     {active}
     <span className="worm-mission-announcement" role="status" aria-live="polite" aria-atomic="true">

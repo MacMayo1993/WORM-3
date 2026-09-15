@@ -1,0 +1,42 @@
+/* Only the two docks are anchored. Their children reserve their own space,
+   including timer updates, healing readouts and signature feedback. */
+.worm-hud-top, .worm-hud-bottom {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 600px;
+  left: calc(env(safe-area-inset-left, 0px) + 12px);
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  margin-inline: auto;
+  pointer-events: none;
+}
+.worm-hud-top { top: calc(env(safe-area-inset-top, 0px) + 6px); }
+.worm-hud-bottom { bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); }
+.worm-hud-bar { box-sizing: border-box; min-width: 0; }
+.worm-hud-context { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.worm-hud-context:empty { display: none; }
+.worm-instrument .orb-reserve { gap: 4px; }
+.worm-instrument .orb-slot { padding: 5px 4px; gap: 4px; grid-template-columns: 12px minmax(0, 1fr); }
+.worm-instrument .orb-sample { width: 12px; height: 12px; }
+.worm-instrument .orb-slot-face { display: none; }
+.worm-instrument .orb-slot-count { font-size: 12px; }
+.worm-action-center { flex-direction: column; }
+.worm-primary-actions { display: flex; justify-content: center; gap: 8px; }
+.worm-instrument .worm-jump { flex: 1; }
+.worm-instrument .worm-action { min-height: 48px; }
+.worm-signature-control button > svg { flex-shrink: 0; }
+
+@media (max-height: 520px) and (min-width: 600px) {
+  .worm-hud-top, .worm-hud-bottom { gap: 6px; }
+  .worm-instrument .worm-hud-bar { flex-flow: row wrap; align-items: center; gap: 5px 12px; }
+  .worm-instrument .worm-hud-row { flex: 1 1 205px; }
+  .worm-instrument .worm-hud-reserve { flex: 1 1 280px; border-top: 0 !important; padding-top: 0; }
+  .worm-rotation-clock { flex: 1 1 100%; }
+  .worm-action-center { flex-direction: row; align-items: flex-end; }
+  .worm-signature-control { flex: 1; }
+  .worm-primary-actions { flex: 1; }
+  .worm-instrument .worm-action { height: 48px; }
+  .worm-instrument .worm-steer { height: 56px; }
+}

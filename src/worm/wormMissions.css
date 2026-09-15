@@ -1,5 +1,6 @@
 .worm-mission { box-sizing: border-box; font-family: var(--ui-font, sans-serif); color: #fff9e9; background: #252c25f5; border: 1px solid #a8bb9470; border-radius: 13px; padding: 9px 12px; text-align: left; }
-.worm-mission-live { position: absolute; bottom: var(--worm-tray-clearance, calc(env(safe-area-inset-bottom, 0px) + 124px)); left: 50%; transform: translateX(-50%); width: min(360px, calc(100% - 28px)); pointer-events: none; }
+.worm-mission-live { width: 100%; min-width: 0; pointer-events: none; padding: 7px 10px; }
+.worm-mission-live .worm-mission-objective strong { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .worm-mission-heading, .worm-mission-objective { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .worm-mission-heading { margin-bottom: 4px; }
 .worm-mission-label { font-size: 10px; font-weight: 800; letter-spacing: .07em; color: #c7d4bb; }
@@ -11,7 +12,7 @@
 .worm-mission-summary { margin: 12px 0; width: 100%; }
 .worm-mission-summary p { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: #d4dccb; }
 @media (max-height: 520px) and (orientation: landscape) {
-  .worm-mission-live { width: min(320px, 44vw); padding: 6px 10px; }
+  .worm-mission-live { padding: 6px 10px; }
   .worm-mission-heading { margin-bottom: 2px; }
 }
 @media (prefers-reduced-motion: reduce) { .worm-mission-track > div { transition: none; } }
