@@ -1,232 +1,17 @@
-import '../../chaos/chaos.css';
-import { useDialogBehavior } from '../ui/Panel.jsx';
 import React, { useState, useMemo, useRef } from 'react';
+import { useDialogBehavior } from '../ui/Panel.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import {
-  BET_TYPES, FACE_INFO, ANTIPODAL_PAIRS, calcPayout, streakMultiplier, formatSpeedThreshold,
-} from '../../utils/disparityBetting.js';
+import { BET_TYPES, FACE_INFO, ANTIPODAL_PAIRS, calcPayout, streakMultiplier, formatSpeedThreshold } from '../../utils/disparityBetting.js';
 import { BET_MIN, BET_MAX } from '../../utils/economyConstants.js';
-import {
-  UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_SHEET_RAISED,
-  PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
- Z, TEXT_MICRO } from '../../utils/uiTheme.js';
+import { Z } from '../../utils/uiTheme.js';
+import { ChaosGlyph, ChaosEmblem } from '../../chaos/ChaosArt.jsx';
+import '../../chaos/chaos.css';
 
-const ACCENT = '#C44B00';
-const ACCENT_SHADOW = '#7a2e00';
 const WAGER_PRESETS = [10, 25, 50, 100, 250, 500];
+const StepLabel = ({ n, done, label }) => <div className="chaos-step-label">
+  <span data-done={done}>{done ? '✓' : `0${n}`}</span><h3>{label}</h3>
+</div>;
 
-const S = {
-  overlay: {
-    position: 'fixed', inset: 0, zIndex: Z.FULLSCREEN,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: PAPER_BACKDROP, backdropFilter: PAPER_BACKDROP_BLUR, WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
-    padding: '12px',
-    fontFamily: UI_FONT,
-    animation: 'modalBackdropIn 0.22s ease',
-    pointerEvents: 'auto',
-  },
-  sheet: {
-    background: PAPER_SHEET, borderRadius: '20px', width: 'min(600px, 100%)',
-    maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    boxShadow: PAPER_SHADOW,
-    border: `1px solid ${PAPER_BORDER}`, animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
-  },
-  header: { padding: '20px 0 16px', flexShrink: 0 },
-  body: {
-    padding: '0 28px', overflowY: 'auto', flex: 1,
-    scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent`,
-  },
-  footer: {
-    padding: '16px 28px 22px', display: 'flex', flexDirection: 'column', gap: '10px',
-    flexShrink: 0, borderTop: `1px solid ${PAPER_BORDER_SOFT}`, background: PAPER_FOOTER_BG,
-  },
-  badge: {
-    display: 'inline-flex', alignItems: 'center', gap: '6px',
-    background: ACCENT, borderRadius: '6px', padding: '4px 12px',
-    marginBottom: '14px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
-  },
-  wallet: {
-    padding: '10px 14px', borderRadius: '12px',
-    background: PAPER_SHEET_RAISED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
-    boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
-    textAlign: 'right', flexShrink: 0,
-  },
-  betCard: (selected) => ({
-    flex: '1 1 130px', minWidth: '120px', maxWidth: '200px',
-    padding: '14px 12px 12px',
-    background: selected ? `${ACCENT}14` : PAPER_SHEET_RAISED,
-    border: selected ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
-    borderRadius: '12px', cursor: 'pointer', textAlign: 'left',
-    boxShadow: selected ? `inset 0 2px 4px rgba(0,0,0,0.06)` : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 10px rgba(0,0,0,0.06)`,
-    transform: selected ? 'translateY(1px)' : 'none',
-    transition: 'all 0.15s ease', position: 'relative',
-    fontFamily: 'inherit',
-    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-  }),
-  stepDot: (done, active) => ({
-    width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0,
-    background: done ? ACCENT : active ? `${ACCENT}20` : '#e8e2da',
-    border: done ? 'none' : active ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '10px', fontWeight: 800,
-    color: done ? '#fff' : active ? ACCENT : '#a09890',
-    transition: 'all 0.2s ease',
-    boxShadow: done ? `0 2px 0 ${ACCENT_SHADOW}` : 'none',
-  }),
-  sectionLabel: {
-    fontSize: '10px', fontWeight: 800, letterSpacing: '0.20em',
-    textTransform: 'uppercase', color: '#a09890',
-  },
-  hint: {
-    fontSize: '12px', color: PAPER_TEXT_FAINT,
-    fontFamily: UI_FONT,
-    textAlign: 'center',
-  },
-  primaryBtn: (enabled) => ({
-    flex: 1, padding: '14px 20px', borderRadius: '10px',
-    cursor: enabled ? 'pointer' : 'not-allowed',
-    background: enabled ? ACCENT : PAPER_BORDER_SOFT,
-    border: 'none', fontFamily: 'inherit', fontSize: '14px', fontWeight: 800,
-    color: enabled ? '#fff' : '#a09890',
-    transition: 'all 0.12s ease',
-    boxShadow: enabled ? `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44` : `0 3px 0 ${PAPER_CARD_SHADOW}`,
-    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-  }),
-  skipBtn: {
-    padding: '14px 18px', borderRadius: '10px', cursor: 'pointer',
-    background: 'none', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
-    fontFamily: 'inherit', fontSize: '14px', fontWeight: 600,
-    color: PAPER_TEXT_MUTED, whiteSpace: 'nowrap',
-    boxShadow: 'none',
-    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-  },
-};
-
-// ── Step label ────────────────────────────────────────────────────────────────
-const StepLabel = ({ n, done, active, label }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-    <div style={S.stepDot(done, active)}>
-      {done ? (
-        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-          <path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ) : n}
-    </div>
-    <span style={{ ...S.sectionLabel, color: done ? ACCENT : active ? '#3d2b1a' : '#a09890', transition: 'color 0.2s ease' }}>{label}</span>
-  </div>
-);
-
-// ── Bet type card ─────────────────────────────────────────────────────────────
-const BetTypeCard = ({ betType, selected, onSelect }) => (
-  <button aria-pressed={selected} onClick={onSelect} style={S.betCard(selected)}>
-    <div style={{
-      position: 'absolute', top: '8px', right: '8px',
-      background: selected ? ACCENT : '#e8e2da',
-      border: selected ? 'none' : `1.5px solid ${PAPER_BORDER_SOFT}`,
-      borderRadius: '6px', padding: '2px 7px',
-      fontSize: '11px', fontWeight: 900,
-      color: selected ? '#fff' : PAPER_TEXT_FAINT,
-      boxShadow: selected ? `0 2px 0 ${ACCENT_SHADOW}` : 'none',
-      fontFamily: 'inherit',
-    }}>{betType.odds}×</div>
-    <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '-0.02em', color: selected ? ACCENT : PAPER_TEXT, fontFamily: 'inherit', marginBottom: '4px', paddingRight: '36px' }}>
-      {betType.label}
-    </div>
-    <div style={{ fontSize: '11px', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: 'inherit' }}>
-      {betType.tagline}
-    </div>
-  </button>
-);
-
-// ── Face picker ───────────────────────────────────────────────────────────────
-const FacePicker = ({ value, onChange }) => (
-  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-    {Object.entries(FACE_INFO).map(([id, info]) => {
-      const faceId = parseInt(id, 10);
-      const selected = value === faceId;
-      return (
-        <button key={id} aria-pressed={selected} onClick={() => onChange(faceId)} style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          padding: '7px 13px', borderRadius: '100px', cursor: 'pointer',
-          border: selected ? `2px solid ${info.hex}` : `2px solid ${PAPER_BORDER_SOFT}`,
-          background: selected ? `${info.hex}20` : PAPER_SHEET_RAISED,
-          fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-          color: selected ? info.hex : PAPER_TEXT_MUTED,
-          boxShadow: selected ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-          transform: selected ? 'translateY(1px)' : 'none',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}>
-          <div style={{ width: '9px', height: '9px', borderRadius: '3px', background: info.hex, flexShrink: 0 }} />
-          {info.name}
-        </button>
-      );
-    })}
-  </div>
-);
-
-// ── Pair picker ───────────────────────────────────────────────────────────────
-const PairPicker = ({ value, onChange }) => (
-  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-    {ANTIPODAL_PAIRS.map(pair => {
-      const selected = value === pair.id;
-      const f1 = FACE_INFO[pair.faces[0]];
-      const f2 = FACE_INFO[pair.faces[1]];
-      return (
-        <button key={pair.id} aria-pressed={selected} onClick={() => onChange(pair.id)} style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          padding: '8px 14px', borderRadius: '100px', cursor: 'pointer',
-          border: selected ? `2px solid ${pair.color}` : `2px solid ${PAPER_BORDER_SOFT}`,
-          background: selected ? `${pair.color}20` : PAPER_SHEET_RAISED,
-          fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-          color: selected ? pair.color : PAPER_TEXT_MUTED,
-          boxShadow: selected ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-          transform: selected ? 'translateY(1px)' : 'none',
-          transition: 'all 0.15s ease',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '3px', background: f1.hex, flexShrink: 0 }} />
-          <span style={{ opacity: 0.45 }}>↔</span>
-          <div style={{ width: '8px', height: '8px', borderRadius: '3px', background: f2.hex, flexShrink: 0 }} />
-          {pair.label}
-        </button>
-      );
-    })}
-  </div>
-);
-
-// ── Speed picker ──────────────────────────────────────────────────────────────
-// thresholdSec is the measured median collapse time for the chosen settings —
-// FAST/SLOW is judged against it, so the sub-labels must show the real number.
-const SpeedPicker = ({ value, onChange, thresholdSec }) => (
-  <div style={{ display: 'flex', gap: '10px' }}>
-    {[
-      { id: 'FAST', label: 'Fast', sub: thresholdSec ? `< ${formatSpeedThreshold(thresholdSec)}` : 'beats the typical pace', color: '#c45000' },
-      { id: 'SLOW', label: 'Slow', sub: thresholdSec ? `≥ ${formatSpeedThreshold(thresholdSec)}` : 'outlasts the typical pace', color: '#1565C0' },
-    ].map(opt => {
-      const selected = value === opt.id;
-      return (
-        <button key={opt.id} aria-pressed={selected} onClick={() => onChange(opt.id)} style={{
-          flex: 1, padding: '14px', borderRadius: '12px', cursor: 'pointer',
-          border: selected ? `2px solid ${opt.color}` : `2px solid ${PAPER_BORDER_SOFT}`,
-          background: selected ? `${opt.color}14` : PAPER_SHEET_RAISED,
-          textAlign: 'center',
-          boxShadow: selected ? 'none' : `0 3px 0 ${PAPER_CARD_SHADOW}`,
-          transform: selected ? 'translateY(1px)' : 'none',
-          transition: 'all 0.15s ease',
-          fontFamily: 'inherit',
-          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: 800, color: selected ? opt.color : PAPER_TEXT }}>{opt.label}</div>
-          <div style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, marginTop: '2px' }}>{opt.sub}</div>
-        </button>
-      );
-    })}
-  </div>
-);
-
-// ── Main component ────────────────────────────────────────────────────────────
 const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null, settings, onBack }) => {
   const dialogRef = useRef(null);
   const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
@@ -253,7 +38,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
 
   const canPlace = !!(selectedType && pick !== null && wager >= BET_MIN && wager <= maxWager);
 
-  // Guards against a fast double-tap firing pointerdown twice before the
+  // Guards against a fast double-tap firing clicks twice before the
   // screen unmounts, which would deduct the wager twice.
   const placedRef = useRef(false);
   const handlePlace = () => {
@@ -269,158 +54,85 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
     : wager > maxWager ? `You only have ${parityPoints} PP`
     : null;
 
+  const size = settings?.cubeSize || 3;
+  const selectedPair = ANTIPODAL_PAIRS.find(p => p.id === pick);
   return (
-    <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui" style={S.overlay} role="dialog" aria-modal="true" aria-label="Choose a Chaos prediction">
-      <div style={S.sheet}>
-
-        {/* ── Scrollable body ─────────────────────────────────────────────── */}
-        <div style={S.body}>
-          <div style={{ paddingBottom: '24px' }}>
-
-            {/* Header */}
-            <div style={S.header}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={S.badge}>
-                    <span style={{ fontSize: '13px' }}>🎲</span>
-                    <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>CHAOS · Forecast</span>
-                  </div>
-                  <h2 style={{ margin: 0, fontSize: 'clamp(20px,5vw,26px)', fontWeight: 900, color: PAPER_TEXT, letterSpacing: '-0.04em', lineHeight: 1.1 }}>
-                    Call the survivors
-                  </h2>
-                  <p style={{ margin: '6px 0 0', fontSize: '13px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>
-                    Choose a color pair, follow its tiles, and heal the storm. Predictions use Parity Points.
-                  </p>
-                </div>
-
-                {/* Wallet */}
-                <div style={S.wallet}>
-                  <div style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#a09890' }}>Balance</div>
-                  <div style={{ fontSize: '18px', fontWeight: 900, color: PAPER_TEXT }}>{parityPoints} <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontWeight: 600 }}>PP</span></div>
-                  {betStreak > 0 && (
-                    <div style={{ fontSize: '10px', color: ACCENT, fontWeight: 700, marginTop: '2px' }}>
-                      {betStreak}× streak · {mult.toFixed(1)}× bonus
-                    </div>
-                  )}
-                </div>
+    <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-overlay" style={{ zIndex: Z.FULLSCREEN }} role="dialog" aria-modal="true" aria-label="Choose a Chaos prediction">
+      <div className="chaos-forecast-sheet">
+        <div className="chaos-forecast-scroll">
+          <header className="chaos-hero">
+            <div className="chaos-topline"><span className="chaos-kicker"><i className="chaos-status-dot" /> Survival forecast</span>
+              <div className="chaos-wallet"><span>Balance</span><strong>{parityPoints.toLocaleString()} <small>PP</small></strong></div>
+            </div>
+            <div className="chaos-hero-content">
+              <div><h1>CHAOS<span>Call the survivors.</span></h1>
+                <p>Six colors. One final pair.<br />Make your call. Heal the storm.</p></div>
+              <ChaosEmblem />
+            </div>
+            <div className="chaos-setup-strip">
+              <span><strong>{size}×{size}</strong> Cube</span>
+              <span><strong>{settings?.disparityLevel || 3}<small>/5</small></strong> Intensity</span>
+              <span><strong>{settings?.flipCap || 8}</strong> Flip limit</span>
+              <span><strong>{6 * size * size}</strong> Tiles</span>
+            </div>
+          </header>
+          <div className="chaos-forecast-body">
+            <section className="chaos-step">
+              <StepLabel n={1} done={!!selectedType} label="Choose a Bet Type" />
+              <div className="chaos-bet-types">{Object.values(BET_TYPES).map(bt =>
+                <button key={bt.id} className="chaos-bet-type" aria-pressed={selectedType === bt.id} onClick={() => handleSelectType(bt.id)}>
+                  <span className="chaos-bet-type-top"><ChaosGlyph kind={bt.id} /><span className="chaos-odds">{bt.odds}×</span></span>
+                  <strong>{bt.label}</strong><small>{bt.tagline}</small>
+                </button>
+              )}</div>
+            </section>
+            <section className="chaos-step">
+              <StepLabel n={2} done={pick !== null} label="Make Your Pick" />
+              <p className="chaos-step-description">{betDef.desc}</p>
+              {selectedType === 'PAIR' && <div className="chaos-pick-pairs">{ANTIPODAL_PAIRS.map(pair =>
+                <button key={pair.id} className="chaos-pick-pair" style={{ '--pair-a': FACE_INFO[pair.faces[0]].hex, '--pair-b': FACE_INFO[pair.faces[1]].hex }} aria-pressed={pick === pair.id} onClick={() => setPick(pair.id)}>
+                  <span className="chaos-pair-art" aria-hidden="true"><i /><i /></span>
+                  <strong>{pair.label}</strong><small>{2 * size * size} tiles · one color family</small>
+                  <span className="chaos-selection-mark" aria-hidden="true">{pick === pair.id ? '✓' : '+'}</span>
+                </button>
+              )}</div>}
+              {['SURVIVOR', 'FIRST_OUT'].includes(selectedType) && <div className="chaos-face-picker">{Object.entries(FACE_INFO).map(([id, info]) =>
+                <button key={id} className="chaos-face-choice" aria-pressed={pick === Number(id)} onClick={() => setPick(Number(id))}>
+                  <i style={{ background: info.hex }} /><strong>{info.name}</strong><span aria-hidden="true">{pick === Number(id) ? '✓' : '+'}</span>
+                </button>
+              )}</div>}
+              {selectedType === 'SPEED' && <div className="chaos-speed-picker">{[
+                { id: 'FAST', label: 'Fast', sub: speedThresholdSec ? `< ${formatSpeedThreshold(speedThresholdSec)}` : 'Beats the typical pace' },
+                { id: 'SLOW', label: 'Slow', sub: speedThresholdSec ? `≥ ${formatSpeedThreshold(speedThresholdSec)}` : 'Outlasts the typical pace' },
+              ].map(opt => <button key={opt.id} aria-pressed={pick === opt.id} onClick={() => setPick(opt.id)}>
+                <ChaosGlyph kind="SPEED" /><strong>{opt.label}</strong><small>{opt.sub}</small>
+              </button>)}</div>}
+              <div className="chaos-field-note"><ChaosGlyph kind="heal" /><p>
+                {selectedType === 'PAIR' && selectedPair && <strong>{size ** 2} tiles per color. </strong>}
+                Opposite tiles share their fate. Tap damaged living tiles to heal a wave. Healing can change your prediction’s outcome.
+              </p></div>
+            </section>
+            <section className="chaos-step">
+              <StepLabel n={3} done={canPlace} label="Set Your Wager" />
+              <div className="chaos-wager-presets">{WAGER_PRESETS.map(preset =>
+                <button key={preset} disabled={preset > maxWager} aria-pressed={wager === preset} onClick={() => setWager(preset)}>{preset}<small> PP</small></button>
+              )}{maxWager >= BET_MIN && <button aria-pressed={wager === maxWager} onClick={() => setWager(maxWager)}>All-in ({maxWager} PP)</button>}</div>
+              <div className="chaos-payoff" data-ready={canPlace}>
+                <div><span className="chaos-kicker">Potential profit</span><strong>+{profit}<small> PP</small></strong><small>{effectiveOdds}× odds{mult > 1 ? ` · ${mult.toFixed(1)}× streak bonus` : ' · profit after stake'}</small></div>
+                <div><span className="chaos-kicker">If you lose</span><strong>−{wager}<small> PP</small></strong><small>Parity Points wagered</small></div>
               </div>
-            </div>
-
-            <div className="chaos-inspect">
-              <strong>{settings?.cubeSize || 3}×{settings?.cubeSize || 3} · Intensity {settings?.disparityLevel || 3} · {settings?.flipCap || 8} flips to elimination</strong>
-              <p>Opposite tiles share their fate. Tap a damaged living tile during the round to heal a wave; healing can change your prediction’s outcome.</p>
-              <p>{record.predictions ? `${record.correct} / ${record.predictions} correct calls · Best streak ${record.bestStreak}` : 'Make your first call, or play without a wager.'}</p>
-            </div>
-            {/* Step 1 — Bet type */}
-            <div style={{ marginBottom: '20px' }}>
-              <StepLabel n={1} done={!!selectedType} active={!selectedType} label="Choose a Bet Type" />
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {Object.values(BET_TYPES).map(bt => (
-                  <BetTypeCard key={bt.id} betType={bt} selected={selectedType === bt.id} onSelect={() => handleSelectType(bt.id)} />
-                ))}
-              </div>
-            </div>
-
-            {/* Step 2 — Pick (always shown, dimmed until type is selected) */}
-            <div style={{ marginBottom: '20px', opacity: betDef ? 1 : 0.38, transition: 'opacity 0.2s ease', pointerEvents: betDef ? 'auto' : 'none' }}>
-              <StepLabel n={2} done={pick !== null} active={!!betDef && pick === null} label="Make Your Pick" />
-              {betDef ? (
-                <>
-                  <p style={{ margin: '0 0 10px', fontSize: '12px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>{betDef.desc}</p>
-                  {(selectedType === 'SURVIVOR' || selectedType === 'FIRST_OUT') && <FacePicker value={pick} onChange={setPick} />}
-                  {selectedType === 'PAIR' && <PairPicker value={pick} onChange={setPick} />}
-                  {selectedType === 'PAIR' && pick && <div className="chaos-inspect">
-                    <strong>Your color pair</strong>
-                    <div className="chaos-inspect-pair">{ANTIPODAL_PAIRS.find(p => p.id === pick).faces.map(f =>
-                      <div key={f} className="chaos-inspect-face" style={{ background: FACE_INFO[f].hex }}>{FACE_INFO[f].name}<br /><small>{(settings?.cubeSize || 3) ** 2} tiles</small></div>
-                    )}</div>
-                    <p>You are backing this color family. Any surviving antipodal tile pair in these colors wins your call.</p>
-                  </div>}
-                  {selectedType === 'SPEED' && <SpeedPicker value={pick} onChange={setPick} thresholdSec={speedThresholdSec} />}
-                </>
-              ) : (
-                <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#a09890', lineHeight: 1.5 }}>Select a bet type above first.</p>
-              )}
-            </div>
-
-            {/* Step 3 — Wager (always shown, dimmed until pick done) */}
-            <div style={{ marginBottom: '8px', opacity: pick !== null ? 1 : 0.38, transition: 'opacity 0.2s ease', pointerEvents: pick !== null ? 'auto' : 'none' }}>
-              <StepLabel n={3} done={wager >= BET_MIN && wager <= maxWager && pick !== null} active={pick !== null} label="Set Your Wager" />
-
-              {/* Preset chips */}
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                {WAGER_PRESETS.map(preset => {
-                  const disabled = preset > maxWager;
-                  const active = wager === preset;
-                  return (
-                    <button key={preset} disabled={disabled} aria-pressed={active} onClick={() => !disabled && setWager(preset)} style={{
-                      padding: '6px 14px', borderRadius: '100px',
-                      cursor: disabled ? 'not-allowed' : 'pointer',
-                      border: active ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                      background: active ? `${ACCENT}14` : PAPER_SHEET_RAISED,
-                      fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-                      color: active ? ACCENT : disabled ? PAPER_CARD_SHADOW : PAPER_TEXT_MUTED,
-                      boxShadow: active ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-                      transform: active ? 'translateY(1px)' : 'none',
-                      opacity: disabled ? 0.4 : 1,
-                      transition: 'all 0.13s ease',
-                      touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                    }}>{preset} PP</button>
-                  );
-                })}
-                {maxWager >= BET_MIN && !WAGER_PRESETS.includes(maxWager) && (
-                  <button onClick={() => setWager(maxWager)} style={{
-                    padding: '6px 14px', borderRadius: '100px', cursor: 'pointer',
-                    border: wager === maxWager ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                    background: wager === maxWager ? `${ACCENT}14` : PAPER_SHEET_RAISED,
-                    fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-                    color: wager === maxWager ? ACCENT : PAPER_TEXT_MUTED,
-                    boxShadow: wager === maxWager ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-                    transform: wager === maxWager ? 'translateY(1px)' : 'none',
-                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-                  }}>All-in ({maxWager} PP)</button>
-                )}
-              </div>
-
-              {/* Payout row */}
-              {canPlace && (
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '14px 16px', borderRadius: '12px',
-                  background: `${ACCENT}0e`, border: `2px solid ${ACCENT}40`,
-                }}>
-                  <div>
-                    <div style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a09890' }}>Potential win</div>
-                    <div style={{ fontSize: '22px', fontWeight: 900, color: ACCENT, letterSpacing: '-0.03em' }}>+{profit} PP</div>
-                    <div style={{ fontSize: '10px', color: PAPER_TEXT_FAINT, marginTop: '1px' }}>{effectiveOdds}× odds{mult > 1 ? ` · ${mult.toFixed(1)}× streak` : ''}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a09890' }}>If you lose</div>
-                    <div style={{ fontSize: '22px', fontWeight: 900, color: '#b91c1c', letterSpacing: '-0.03em' }}>−{wager} PP</div>
-                  </div>
-                </div>
-              )}
-            </div>
+            </section>
+            <div className="chaos-career-line"><ChaosGlyph kind="trophy" /><span>{record.predictions ? `${record.correct} / ${record.predictions} correct calls · Best streak ${record.bestStreak}` : 'Your first forecast starts here. Playing without a wager is always an option.'}</span></div>
           </div>
         </div>
-
-        {/* ── Sticky footer ─────────────────────────────────────────────── */}
-        <div style={S.footer}>
-          {hint && <div style={S.hint}>{hint}</div>}
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={handlePlace}
-              disabled={!canPlace}
-              style={S.primaryBtn(canPlace)}
-            >
-              {canPlace ? `Bet ${wager} PP & Start` : 'Place Bet & Start'}
-            </button>
-            <button onClick={() => { if (!placedRef.current) { placedRef.current = true; onSkip(); } }} style={S.skipBtn}>
-              Skip & Start
-            </button>
+        <footer className="chaos-forecast-footer">
+          {hint && <p className="chaos-footer-hint" role="status">{hint}</p>}
+          <div className="chaos-forecast-buttons">
+            <button className="chaos-button chaos-button-primary" onClick={handlePlace} disabled={!canPlace}>{canPlace ? `Bet ${wager} PP & Start` : 'Place Bet & Start'}<span aria-hidden="true">↗</span></button>
+            <button className="chaos-button" onClick={() => { if (!placedRef.current) { placedRef.current = true; onSkip(); } }}>Skip & Start</button>
           </div>
-          {onBack && <button onClick={onBack} style={{ ...S.skipBtn, padding: 8 }}>Back to setup</button>}
-        </div>
+          {onBack && <button className="chaos-back" onClick={onBack}>← Back to setup</button>}
+        </footer>
       </div>
     </div>
   );
