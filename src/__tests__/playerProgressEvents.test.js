@@ -54,7 +54,7 @@ describe('Worm XP at real run boundaries',()=>{
     expect(store().parityPoints).toBe(145); // 20 mission + 25 level
     expect(readPlayerSave()).toMatchObject({points:145,progress:{xp:130}});
     store().recordWormMission('orbs',8,1,id);expect(store().parityPoints).toBe(145);
-    expect(store().xpRun.breakdown.Mission).toBe(50);
+    expect(store().xpRun.breakdown.Achievements).toBe(50);
   });
   it('limits healing and only pays the completed cube once',()=>{
     const id=worm();store().recordWormXp('healed',100,null,id);
