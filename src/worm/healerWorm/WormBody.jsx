@@ -1,3 +1,4 @@
+import { SPRING_CHARGE } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
 import { createCharacterGeometry, applyCharacterFinish, prismColor } from '../wormCharacterVisuals.js';
@@ -603,6 +604,11 @@ export function WormBody({ worm, size }) {
             if (!reducedPickupMotion) {
                 if (i === 0) _wormDummy.scale.multiplyScalar(worm.pickupHeadScale);
                 else _wormDummy.scale.multiplyScalar(1 + 0.12 * pickupWave + 0.22 * tailPop);
+            }
+            if (_isInch && worm.signature.current.charge > 0) {
+                const compression = Math.sin((1 - worm.signature.current.charge / SPRING_CHARGE) * Math.PI * 0.5);
+                _wormDummy.scale.multiplyScalar(1 + compression * 0.2);
+                _wormDummy.position.addScaledVector(i === 0 ? _bodyNormal : _bodyCloneNormal, -compression * 0.025);
             }
             _wormDummy.scale.multiplyScalar(wormBodyTaper(i, tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);

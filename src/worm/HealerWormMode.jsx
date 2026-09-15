@@ -1,3 +1,4 @@
+import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
 import { isHotTile } from './healerWorm/elementalGameplay.js';
 import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
 // src/worm/HealerWormMode.jsx
@@ -603,6 +604,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormAlive && <ElementalPatches worm={worm} size={size} />}
             {wormAlive && <WormBody worm={worm} size={size} />}
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
+            {wormAlive && <SignatureEffects worm={worm} size={size} />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
             {wormAlive && <WormFace worm={worm} size={size} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}

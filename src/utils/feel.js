@@ -111,17 +111,27 @@ const COMBO_SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 131
 
 // ── SFX vocabulary ────────────────────────────────────────────────────────────
 const SFX = {
+  springCharge() {
+    tone({ freq: 220, freqTo: 110, dur: 0.23, type: 'triangle', gain: 0.2 });
+  },
+  beacon() {
+    for (let i = 0; i < 3; i++) tone({ freq: 660 + i * 220, dur: 0.3, gain: 0.14, when: i * 0.12 });
+  },
+  parityLock() {
+    tone({ freq: 180, freqTo: 90, dur: 0.16, type: 'triangle', gain: 0.22 });
+    tone({ freq: 880, dur: 0.18, gain: 0.12, when: 0.13 });
+  },
   elementFire() {
     noise({ dur: 0.5, type: 'bandpass', freq: 850, q: 0.8, gain: 0.25 });
     tone({ freq: 180, freqTo: 420, dur: 0.3, type: 'triangle', gain: 0.16 });
   },
   elementWater() {
     noise({ dur: 0.45, type: 'lowpass', freq: 650, gain: 0.16 });
-    tone({ freq: 520, freqTo: 980, dur: 0.22, type: 'sine', gain: 0.2 });
-    tone({ freq: 780, freqTo: 1170, dur: 0.2, type: 'sine', gain: 0.12, when: 0.13 });
+    tone({ freq: 520, freqTo: 980, dur: 0.22, gain: 0.2 });
+    tone({ freq: 780, freqTo: 1170, dur: 0.2, gain: 0.12, when: 0.13 });
   },
   elementIce() {
-    for (let i = 0; i < 3; i++) tone({ freq: 1200 * [1, 1.5, 2][i], dur: 0.45, type: 'sine', gain: 0.1, when: i * 0.09 });
+    for (let i = 0; i < 3; i++) tone({ freq: 1200 * [1, 1.5, 2][i], dur: 0.45, gain: 0.1, when: i * 0.09 });
   },
   elementNature() {
     noise({ dur: 0.35, type: 'lowpass', freq: 1800, gain: 0.08 });
@@ -130,24 +140,24 @@ const SFX = {
   orb(combo = 0) {
     const f = COMBO_SCALE[Math.min(combo, COMBO_SCALE.length - 1)];
     tone({ freq: f, freqTo: f * 1.5, dur: 0.1, type: 'triangle', gain: 0.42 });
-    tone({ freq: f * 2, freqTo: f * 2, dur: 0.14, type: 'sine', gain: 0.12 });
+    tone({ freq: f * 2, freqTo: f * 2, dur: 0.14, gain: 0.12 });
   },
   jump() {
-    tone({ freq: 300, freqTo: 640, dur: 0.09, type: 'sine', gain: 0.35 });
+    tone({ freq: 300, freqTo: 640, dur: 0.09, gain: 0.35 });
   },
   boost() {
     noise({ dur: 0.22, type: 'bandpass', freq: 900, q: 0.7, gain: 0.32 });
     tone({ freq: 220, freqTo: 660, dur: 0.22, type: 'sawtooth', gain: 0.22 });
   },
   dive() {
-    tone({ freq: 700, freqTo: 120, dur: 0.34, type: 'sine', gain: 0.4 });
+    tone({ freq: 700, freqTo: 120, dur: 0.34, gain: 0.4 });
     noise({ dur: 0.34, type: 'lowpass', freq: 700, gain: 0.18 });
   },
   exit() {
     tone({ freq: 200, freqTo: 900, dur: 0.18, type: 'triangle', gain: 0.4 });
   },
   heal() {
-    chord([523.25, 659.25, 783.99, 1046.5], { dur: 0.5, type: 'sine', gain: 0.3 });
+    chord([523.25, 659.25, 783.99, 1046.5], { dur: 0.5, gain: 0.3 });
   },
   cut() {
     noise({ dur: 0.12, type: 'highpass', freq: 2600, gain: 0.5 });
@@ -164,7 +174,7 @@ const SFX = {
   // A special orb appearing: a soft two-note chime, quiet enough not to compete
   // with a pickup, distinct enough to look up for.
   specialSpawn() {
-    chord([880, 1318.51], { dur: 0.22, type: 'sine', gain: 0.16 });
+    chord([880, 1318.51], { dur: 0.22, gain: 0.16 });
   },
   // Launch: thrust noise under a rising sweep.
   rocket() {
@@ -174,17 +184,17 @@ const SFX = {
   // Touchdown at the end of the flight — a short, dry thud.
   rocketLand() {
     noise({ dur: 0.1, type: 'lowpass', freq: 420, gain: 0.32 });
-    tone({ freq: 150, freqTo: 70, dur: 0.12, type: 'sine', gain: 0.24 });
+    tone({ freq: 150, freqTo: 70, dur: 0.12, gain: 0.24 });
   },
   // A special timed out untouched. Deliberately soft and downward — informative,
   // not punitive; missing one is a small shrug, not a failure state.
   specialExpire() {
-    tone({ freq: 520, freqTo: 300, dur: 0.2, type: 'sine', gain: 0.14 });
+    tone({ freq: 520, freqTo: 300, dur: 0.2, gain: 0.14 });
   },
   // Magnet engaging: a humming fifth that reads as a field switching on.
   magnet() {
     chord([392, 587.33], { dur: 0.36, type: 'triangle', gain: 0.24 });
-    tone({ freq: 96, freqTo: 196, dur: 0.36, type: 'sine', gain: 0.2 });
+    tone({ freq: 96, freqTo: 196, dur: 0.36, gain: 0.2 });
   },
   countdownGo() {
     chord([523.25, 659.25, 783.99, 1046.5, 1318.51], { dur: 0.42, type: 'triangle', gain: 0.33 });
@@ -196,7 +206,7 @@ const SFX = {
   // a rising sweep that resolves into an open fifth.
   tunnelBirth() {
     tone({ freq: 180, freqTo: 720, dur: 0.26, type: 'triangle', gain: 0.34 });
-    chord([523.25, 783.99], { dur: 0.38, type: 'sine', gain: 0.22, when: 0.18 });
+    chord([523.25, 783.99], { dur: 0.38, gain: 0.22, when: 0.18 });
   },
 
   // Subsequent flips on an existing pair. Pitch climbs the pentatonic scale with
@@ -268,7 +278,7 @@ const SFX = {
     const f = COMBO_SCALE[Math.min(Math.max(0, flips), COMBO_SCALE.length - 1)];
 
     noise({ dur: 0.03, type: 'highpass', freq: 3200, gain: 0.13 });
-    tone({ freq: 520, freqTo: 190, dur: 0.16, type: 'sine', gain: 0.20, when: 0.25 });
+    tone({ freq: 520, freqTo: 190, dur: 0.16, gain: 0.20, when: 0.25 });
     // Gain leans on danger so a nearly spent tile snaps back harder, matching
     // the haptic's growing kick rather than fighting it.
     tone({ freq: f, freqTo: f * 1.5, dur: 0.14, type: 'triangle', gain: 0.26 + danger * 0.12, when: 0.41 });
@@ -285,9 +295,9 @@ const SFX = {
   // The solve. The largest sound in the game, and the only one that resolves all
   // the way up the pentatonic — everything else stops short of the octave.
   cubeSolved() {
-    chord([523.25, 659.25, 783.99, 1046.5], { dur: 0.85, type: 'sine', gain: 0.26 });
+    chord([523.25, 659.25, 783.99, 1046.5], { dur: 0.85, gain: 0.26 });
     tone({ freq: 261.63, freqTo: 1046.5, dur: 0.5, type: 'triangle', gain: 0.2 });
-    chord([783.99, 1046.5, 1318.51], { dur: 0.7, type: 'sine', gain: 0.18, when: 0.34 });
+    chord([783.99, 1046.5, 1318.51], { dur: 0.7, gain: 0.18, when: 0.34 });
   },
 
   // Reset / shuffle — the cube being taken back. A downward sweep under a wash
@@ -302,6 +312,9 @@ const SFX = {
 // Distinct patterns (ms, or [gap, buzz, gap, buzz…]) so events are identifiable by
 // feel alone. Orb rises with the combo to mirror the pitch climb.
 const HAPTICS = {
+  springCharge: [10, 45, 18],
+  beacon: [8, 65, 8, 65, 8],
+  parityLock: [22, 35, 12],
   elementFire: [12, 20, 8],
   elementWater: [8, 35, 8],
   elementIce: [5, 25, 5, 25, 5],

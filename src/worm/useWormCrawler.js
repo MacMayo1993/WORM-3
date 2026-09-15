@@ -1,3 +1,4 @@
+import { signatureReadout } from './healerWorm/signatures.js';
 import { liveRotation } from './liveRotation.js';
 // src/worm/useWormCrawler.js
 //
@@ -152,6 +153,7 @@ export function useWormCrawler(size, cubies) {
             getSpeed: () => useGameStore.getState().wormSpeed ?? 2.0,
             getControlMode: () => useGameStore.getState().wormControlMode ?? 'non-oriented',
             getWormholeInterval: () => useGameStore.getState().wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL,
+            getCharacter: () => useGameStore.getState().wormCharacter ?? 'classic',
             isPrismCharacter: () => (useGameStore.getState().wormCharacter ?? 'classic') === 'prism',
             getOrbInventory: () => useGameStore.getState().wormOrbInventory,
             getHealingProgress: () => useGameStore.getState().wormHealingProgress ?? {},
@@ -365,6 +367,7 @@ export function useWormCrawler(size, cubies) {
         wormClock.countdown = sim.wormholeCountdown;
         // Mirror the authoritative buff clocks for the HUD. Plain field writes, so a
         // per-frame refresh costs nothing and freezes whenever the sim does.
+        wormBuffs.signature = sim.alive ? signatureReadout(sim, sizeRef.current, ctxRef.current) : null;
         wormBuffs.waterMomentum = sim.waterMomentum;
         const tile = sim.pos;
         wormBuffs.springReady = !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead
@@ -490,6 +493,7 @@ export function useWormCrawler(size, cubies) {
             set current(v) { simRef.current[key] = v; },
         });
         apiRef.current = {
+            signature: f('signature'),
             elementalPatches: f('elementalPatches'),
             pos: f('pos'),
             moveDir: f('moveDir'),

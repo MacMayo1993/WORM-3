@@ -1,3 +1,4 @@
+import { makeSignature, activateSignature, tickSignature, isParityLocked } from './signatures.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 // src/worm/healerWorm/wormSim.js
@@ -209,6 +210,8 @@ export function makeWormSim(size) {
         jumpHeight: SURFACE_JUMP_HEIGHT,
 
         // ── Boost ──────────────────────────────────────────────────────────────
+        signature: makeSignature(),
+        signatureRequested: false,
         boostActiveT: 0,
         boostCooldownT: 0,
 
@@ -326,6 +329,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.pendingTurns = [];
     sim.lastTurnDir = null;
     sim.tilesSinceTurn = 1;
+    sim.signature = makeSignature();
+    sim.signatureRequested = false;
     sim.boostActiveT = 0;
     sim.boostCooldownT = 0;
     sim.prevStepSec = null;
@@ -413,14 +418,14 @@ export const jumpLiftOf = (sim) => sim.isJumping
     : 0;
 
 export function startJump(sim, ctx, size) {
-    if (sim.phase !== 'crawling') return;
+    if (sim.phase !== 'crawling' || (sim.signature.character === 'inch' && sim.signature.active > 0)) return;
     const grounded = !sim.isJumping;
     // A deliberate dive reads only settled tile contents. Never resolve the
     // outgoing sticker while a layer is moving or a destination is rest-read.
     if (size && !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead) {
         const { x, y, z, dirKey } = sim.pos;
         const sticker = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
-        if (sticker && sticker.curr !== sticker.orig && ctx.resolveTunnel(x, y, z, dirKey)) {
+        if (sticker && sticker.curr !== sticker.orig && !isParityLocked(sim, sim.pos) && ctx.resolveTunnel(x, y, z, dirKey)) {
             beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
             return;
         }
@@ -537,6 +542,7 @@ export const isReversal = (current, next) =>
     turnWorm(turnWorm(current, 'left'), 'left') === next;
 
 export function queueTurn(sim, dir) {
+    if (dir === 'signature') { sim.signatureRequested = true; return; }
     const q = sim.pendingTurns;
     if (q.length >= 3) q.shift();
     if (q[q.length - 1] !== dir) q.push(dir);
@@ -546,11 +552,14 @@ export function killWormSim(sim, ctx, details = null) {
     if (!sim.alive) return;
     sim.alive = false;
     sim.phase = 'dead';
+    sim.signature = makeSignature();
+    sim.signatureRequested = false;
     ctx.feel('death');
     ctx.onDeath(details, Math.floor(sim.timeAlive));
 }
 
 function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
+    if (isParityLocked(sim, { x, y, z, dirKey })) return;
     const resolved = ctx.resolveTunnel(x, y, z, dirKey);
     if (!resolved) return;
 
@@ -697,9 +706,10 @@ const _magnetReach = new Set();
 // otherwise need a jump.
 function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
     if (sim.powerups.length === 0) return;
-    const magnetActive = sim.magnetT > 0;
+    const beaconActive = sim.signature.character === 'glow' && sim.signature.active > 0;
+    const magnetActive = sim.magnetT > 0 || beaconActive;
     const reach = magnetActive
-        ? collectManifoldRing(x, y, z, dirKey, size, MAGNET_RADIUS, _magnetReach)
+        ? collectManifoldRing(x, y, z, dirKey, size, sim.magnetT > 0 ? MAGNET_RADIUS : 1, _magnetReach)
         : null;
     const headKey = `${x},${y},${z},${dirKey}`;
     let collectedAny = false;
@@ -1309,7 +1319,7 @@ const PHASE_HANDLERS = {
                 // Landing grace also holds off an instant wormhole dive: a rocket that
                 // happens to touch down on a mouth shouldn't swallow the player before
                 // they can react to where they landed.
-                if (sim.rocketActive || sim.landingGraceT > 0) {
+                if (sim.rocketActive || sim.landingGraceT > 0 || isParityLocked(sim, { x, y, z, dirKey })) {
                     sim.pendingTunnelTrigger = null;
                 } else if (sim.interpT >= TUNNEL_TRIGGER_PROGRESS && !sim.isJumping) {
                     beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
@@ -1522,7 +1532,7 @@ const PHASE_HANDLERS = {
                 const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                 const resolved = isFlipped ? ctx.resolveTunnel(x, y, z, dirKey) : null;
                 const isVoidZone = !!(resolved && sim.voidTunnelKeys.has(resolved.tunnelKey));
-                sim.onFlippedTile = isFlipped && !isVoidZone;
+                sim.onFlippedTile = isFlipped && !isVoidZone && !isParityLocked(sim, sim.pos);
 
                 // Flipped tiles are instant wormholes unless the player is currently
                 // jumping over them.
@@ -1531,7 +1541,7 @@ const PHASE_HANDLERS = {
                     ctx.onFlippedTile(sim.onFlippedTile);
                 }
 
-                if (isFlipped && !sim.rocketActive && sim.landingGraceT <= 0) {
+                if (isFlipped && !isParityLocked(sim, sim.pos) && !sim.rocketActive && sim.landingGraceT <= 0) {
                     sim.pendingTunnelTrigger = { x, y, z, dirKey };
                     // Swept-entry guard: if the step accumulator remainder indicates the worm
                     // has already spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on
@@ -1702,14 +1712,14 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (!sim.alive) return;
     const paused = ctx.isPaused();
     if (sim.phase === 'crawling' &&
-        (paused || sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0)) {
+        (paused || sim.signature.charge > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0)) {
         // The render bridge applies the slice's ABSOLUTE angle after each tick.
         // A frozen tick must still restore the unrotated surface pose, otherwise
         // corner riding rotates yesterday's output again on every display frame.
         // Re-evaluate the fixed interpolation point without advancing gameplay.
         sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
     }
-    if (paused) return;
+    if (paused) { sim.signatureRequested = false; return; }
 
     // Heal pause: freeze the whole crawl for a beat after a ring heal so the tile pops out
     // and heals in view. The pop/particle FX are store- and clock-driven, so they play on
@@ -1754,6 +1764,15 @@ export function stepWormSim(sim, delta, size, ctx) {
     // clock in this tick (jump, wormhole spawn, boost, movement) reads this value, so
     // they all pause together through a stall and resume cleanly instead of lurching.
     if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
+    if (sim.signatureRequested) {
+        sim.signatureRequested = false;
+        activateSignature(sim, size, ctx);
+    }
+    if (tickSignature(sim, delta, size, ctx)) {
+        sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
+        return;
+    }
+
 
     // ── Speed boost: drain the active window, then run the cooldown, publishing
     // each state transition so the HUD button reflects ready/active/cooldown.
@@ -2168,6 +2187,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         const r = rotateByOwnLayer(_parseTile);
         return r === _parseTile ? key : `${r.x},${r.y},${r.z},${r.dirKey}`;
     };
+    if (sim.signature.target) sim.signature.target = rotateByOwnLayer(sim.signature.target);
     ttMapInPlace(sim.tileTrail, _remapTileKey);
     ttMapInPlace(sim.pathHistory, _remapTileKey);
     // Pressure uses the same positional keys as the trail, so its displacement
@@ -2187,12 +2207,12 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
         const landed = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         const landedFlipped = !!(landed && landed.curr !== landed.orig);
-        sim.onFlippedTile = landedFlipped;
-        if (landedFlipped !== sim.lastFlipped) {
-            sim.lastFlipped = landedFlipped;
-            ctx.onFlippedTile(landedFlipped);
+        sim.onFlippedTile = landedFlipped && !isParityLocked(sim, sim.pos);
+        if (sim.onFlippedTile !== sim.lastFlipped) {
+            sim.lastFlipped = sim.onFlippedTile;
+            ctx.onFlippedTile(sim.onFlippedTile);
         }
-        if (landedFlipped && !sim.rocketActive && sim.landingGraceT <= 0) sim.pendingTunnelTrigger = { x, y, z, dirKey };
+        if (landedFlipped && !isParityLocked(sim, sim.pos) && !sim.rocketActive && sim.landingGraceT <= 0) sim.pendingTunnelTrigger = { x, y, z, dirKey };
         // The trail and head now share the committed coordinate frame with the
         // refreshed tunnel lookup, so the ring check skipped during traversal is safe.
         tryWormholeRingHeal(sim, size, ctx);
