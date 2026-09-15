@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
-import { makeWormSim, resetWormSim, stepWormSim, queueTurn, killWormSim, applyRotationToSim, startJump } from '../worm/healerWorm/wormSim.js';
+import { makeWormSim, resetWormSim, stepWormSim, queueTurn, killWormSim, applyRotationToSim, startJump, tryShedSkin, tileKey } from '../worm/healerWorm/wormSim.js';
 import { signatureAvailability, signatureReadout, isParityLocked, SIGNATURES } from '../worm/healerWorm/signatures.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
-import { ttPush } from '../worm/circularBuffers.js';
+import { ttPush, shAt } from '../worm/circularBuffers.js';
 import { rotateTilePosition } from '../worm/wormHelpers.js';
 
 function makeCtx(overrides = {}) {
@@ -68,7 +68,7 @@ function tunnelWorld() {
 beforeEach(() => resetLiveRotation());
 
 describe('signature input and lifecycle', () => {
-  it.each(['classic', 'book', 'prism', 'wiggle'])('leaves %s boost intact without granting a signature', character => {
+  it.each(['unknown'])('leaves %s boost intact without granting a signature', character => {
     const { sim, ctx } = world(character);
     activate(sim, ctx);
     expect(sim.signature.active).toBe(0);
@@ -233,5 +233,100 @@ describe('MOBI: Parity Lock', () => {
     expect(sim.signature.target).toMatchObject(rotateTilePosition(entry, 'row', 3, -1, SIZE));
     expect(isParityLocked(sim, entry)).toBe(false);
     expect(isParityLocked(sim, sim.signature.target)).toBe(true);
+  });
+});
+
+
+describe('remaining signatures', () => {
+  it('defines all seven characters', () => expect(Object.keys(SIGNATURES).sort()).toEqual(['book', 'classic', 'glow', 'inch', 'mobi', 'prism', 'wiggle']));
+  it('arms Shed Skin only when the tail can pay and consumes it once', () => {
+    const { sim, ctx } = world('classic'); activate(sim, ctx);
+    expect(sim.signature.active).toBe(0);
+    sim.tailLength = 16; ctx.getOrbInventory = () => ({ 1: 12 });
+    sim.orbPickupFaceIds = [1, 1, 1, 1]; sim.orbPickupColors = ['a', 'b', 'c', 'd'];
+    const shed = []; ctx.onTailShed = (...args) => shed.push(args);
+    activate(sim, ctx); expect(sim.signature.active).toBeGreaterThan(0);
+    expect(tryShedSkin(sim, ctx, 'body')).toBe(true);
+    expect(sim.tailLength).toBeLessThanOrEqual(13);
+    expect(shed).toHaveLength(1);
+    expect(Object.values(shed[0][0]).reduce((a,b) => a+b, 0)).toBeLessThanOrEqual(sim.tailLength - 4);
+    expect(tryShedSkin(sim, ctx, 'body')).toBe(false);
+    expect(sim.alive).toBe(true);
+  });
+  it('consumes Shed Skin through the real pending-collision gameplay path', () => {
+    const { sim, ctx } = world('classic'); sim.tailLength = 30;
+    const body = '2,1,4,PZ'; ttPush(sim.tileTrail, body); ttPush(sim.tileTrail, tileKey(sim.pos));
+    sim.pendingSelfCollision = { key: body };
+    activate(sim, ctx);
+    expect(sim.alive).toBe(true); expect(sim.signature.active).toBe(0);
+    expect(sim.pendingSelfCollision).toBeNull(); expect(sim.tailLength).toBeLessThan(30);
+  });
+  it('does not protect Shed Skin from non-body deaths', () => {
+    const { sim, ctx } = world('classic'); sim.tailLength = 10; activate(sim, ctx);
+    killWormSim(sim, ctx, { reason: 'bomb' }); expect(sim.alive).toBe(false);
+  });
+  it('returns Book to its mark without restoring its spent inventory or progress', () => {
+    const { sim, ctx } = world('book'); const mark = { ...sim.pos };
+    activate(sim, ctx); run(sim, ctx, 1.1);
+    expect(sim.pos).not.toEqual(mark);
+    sim.tailLength = 4; const inventory = { 1: 1 }; ctx.getOrbInventory = () => inventory;
+    const deposited = { tunnel: { deposited: 3 } }; ctx.getHealingProgress = () => deposited;
+    activate(sim, ctx);
+    expect(sim.pos).toEqual(mark); expect(sim.signature.active).toBe(0);
+    expect(sim.signature.cooldown).toBeGreaterThan(28);
+    expect(ctx.getOrbInventory()).toBe(inventory); expect(ctx.getHealingProgress()).toBe(deposited);
+    expect(sim.tailLength).toBe(4); expect(eventsOf(ctx, 'pickup')).toHaveLength(0);
+    for (let i = 0; i < sim.stepHistory.count; i++) {
+      const sample = shAt(sim.stepHistory, i);
+      expect([sample.tx, sample.ty, sample.tz]).toEqual([mark.x, mark.y, mark.z]);
+    }
+  });
+  it('refuses a blocked Bookmark return while retaining the remaining return window', () => {
+    const { sim, ctx, cubies } = world('book'); activate(sim, ctx); run(sim, ctx, 1.1);
+    const target = sim.signature.target; cubies[target.x][target.y][target.z].stickers[target.dirKey].curr = 4;
+    const pos = { ...sim.pos }; activate(sim, ctx);
+    expect(sim.pos).toEqual(pos); expect(sim.signature.active).toBeGreaterThan(0);
+    expect(sim.signature.notice).toContain('wormhole');
+    run(sim, ctx, 3); expect(sim.signature.active).toBe(0);
+  });
+  it('rotates the Bookmark heading with its own cube slice', () => {
+    const { sim, ctx } = world('book'); activate(sim, ctx);
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', dir: 1, sliceIndex: 4 }, { inOpeningScramble: false, paused: false });
+    expect(sim.signature.target.dirKey).toBe('PZ');
+    expect(sim.signature.heading).not.toBe('up');
+    expect(sim.signature.heading).toBe(sim.moveDir);
+  });
+  it('Wiggle dodges a tile toward the last steering side and resumes forward', () => {
+    const { sim, ctx } = world('wiggle');
+    queueTurn(sim, 'turnLeft'); // remembered even while the dodge consumes the queued steering
+    activate(sim, ctx);
+    expect(sim.pos).toEqual({ x: 1, y: 2, z: 4, dirKey: 'PZ' });
+    expect(sim.signature.dashing).toBe(true); expect(sim.interpT).toBeGreaterThan(0); expect(sim.interpT).toBeLessThan(1);
+    run(sim, ctx, 0.15); expect(sim.signature.dashing).toBe(false);
+    expect(sim.moveDir).toBe('up'); expect(sim.alive).toBe(true);
+    run(sim, ctx, 0.1); expect(sim.pos.y).toBe(3);
+  });
+  it('refuses a Wiggle landing on a mouth, body or another face without charging', () => {
+    const { sim, ctx, cubies } = world('wiggle');
+    cubies[3][2][4].stickers.PZ.curr = 4; activate(sim, ctx);
+    expect(sim.signature.cooldown).toBe(0);
+    cubies[3][2][4].stickers.PZ.curr = cubies[3][2][4].stickers.PZ.orig;
+    ttPush(sim.tileTrail, '3,2,4,PZ'); ttPush(sim.tileTrail, tileKey(sim.pos)); sim.tailLength = 100;
+    activate(sim, ctx); expect(sim.signature.cooldown).toBe(0);
+    sim.pos.x = 4; activate(sim, ctx); expect(sim.signature.notice).toContain('Face edge');
+  });
+  it('Prism converts only three actual pickups, adding one segment each', () => {
+    const { sim, ctx, cubies } = world('prism');
+    const entry = { x: 0, y: 0, z: 4, dirKey: 'PZ' }; cubies[0][0][4].stickers.PZ.curr = 4;
+    ctx.getActiveTunnels = () => [{ entry }]; ctx.resolveTunnel = () => ({ tunnelKey: 'test' });
+    activate(sim, ctx); expect(sim.signature.charges).toBe(3);
+    sim.powerups = Array.from({ length: 4 }, () => ({ x: 2, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }));
+    run(sim, ctx, 1.05);
+    const pickups = eventsOf(ctx, 'pickup');
+    expect(pickups).toHaveLength(4);
+    expect(pickups.map(p => p.args[0])).toEqual([4, 4, 4, 1]);
+    expect(pickups.map(p => p.args[4])).toEqual([4, 4, 4, 3]);
+    expect(sim.signature.charges).toBe(0); expect(sim.signature.active).toBe(0);
+    expect(sim.tailLength).toBe(19);
   });
 });

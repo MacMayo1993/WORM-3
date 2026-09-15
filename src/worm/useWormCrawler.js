@@ -1,3 +1,4 @@
+import { tunnelReadout } from './healerWorm/tunnelReadout.js';
 import { signatureReadout } from './healerWorm/signatures.js';
 import { liveRotation } from './liveRotation.js';
 // src/worm/useWormCrawler.js
@@ -259,7 +260,8 @@ export function useWormCrawler(size, cubies) {
                     },
                 }));
             },
-            onOrbPickup: (faceId, orbCount, color, combo) => {
+            onTailShed: (inventory, orbCount) => useGameStore.setState({ wormOrbInventory: inventory, wormBodyTiles: orbCount }),
+            onOrbPickup: (faceId, orbCount, color, combo, segments = ORB_SEGMENT_GROWTH) => {
                 const pickup = useGameStore.getState();
                 pickup.recordWormXp('orbs', (pickup.wormSessionOrbs ?? 0) + 1, faceId, pickup.wormRunId);
                 pickup.recordWormMission('orbs', (pickup.wormSessionOrbs ?? 0) + 1, faceId, pickup.wormRunId);
@@ -277,7 +279,7 @@ export function useWormCrawler(size, cubies) {
                     ...(faceId ? {
                         wormOrbInventory: {
                             ...(state.wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }),
-                            [faceId]: (state.wormOrbInventory?.[faceId] ?? 0) + ORB_SEGMENT_GROWTH,
+                            [faceId]: (state.wormOrbInventory?.[faceId] ?? 0) + segments,
                         },
                     } : {}),
                 }));
@@ -367,6 +369,7 @@ export function useWormCrawler(size, cubies) {
         wormClock.countdown = sim.wormholeCountdown;
         // Mirror the authoritative buff clocks for the HUD. Plain field writes, so a
         // per-frame refresh costs nothing and freezes whenever the sim does.
+        wormBuffs.tunnelNeeds = tunnelReadout(sim, sizeRef.current, ctxRef.current);
         wormBuffs.signature = sim.alive ? signatureReadout(sim, sizeRef.current, ctxRef.current) : null;
         wormBuffs.waterMomentum = sim.waterMomentum;
         const tile = sim.pos;

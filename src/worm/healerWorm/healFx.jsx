@@ -1,18 +1,13 @@
+import { wormBuffs } from '../wormBuffs.js';
 // src/worm/healerWorm/healFx.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import { useRef, useState, useMemo, useEffect } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
-import { buildManifoldGridMap } from '../../game/manifoldLogic.js';
-import { findStickerByStableKey } from '../wormLogic.js';
-import { resolveColors } from '../../utils/colorSchemes.js';
 import { readLiveTile } from '../wormHelpers.js';
-import { updateHealBadgePose } from './healBadgePose.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
 import { liveCubies } from '../liveCubies.js';
-import { FACE_NORMALS, HEAL_COST } from './constants.js';
+import { FACE_NORMALS } from './constants.js';
 
 // 3D heal burst — an expanding shockwave + flash on the tile the worm emerges from, so the
 // wormhole exit reads as a pop of healing energy instead of the worm just sliding through a
@@ -129,86 +124,29 @@ export function HealBurstSystem({ worm, size }) {
     );
 }
 
-// A real depth-tested scene badge: HTML overlays cannot be hidden by the cube's
-// depth buffer. Facing/inside gates also cover the translucent Worm chassis.
-function HealProgressBadge({ entry, color, size, worm }) {
-    const sprite = useRef();
-    const scratch = useMemo(() => ({ position: new THREE.Vector3(), normal: new THREE.Vector3() }), []);
-    const texture = useMemo(() => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 160;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#101525';
-        ctx.beginPath();
-        ctx.roundRect(4, 4, 504, 152, 36);
-        ctx.fill();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 5;
-        ctx.stroke();
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = `bold 38px ${UI_FONT}`;
-        ctx.fillText(`${entry.remaining} ${entry.remaining === 1 ? 'ORB' : 'ORBS'} TO HEAL`, 256, 56);
-        for (let i = 0; i < HEAL_COST; i++) {
-            ctx.beginPath();
-            ctx.arc(196 + i * 40, 115, 11, 0, Math.PI * 2);
-            ctx.fillStyle = i < HEAL_COST - entry.remaining ? color : '#30384b';
-            ctx.fill();
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
-        const map = new THREE.CanvasTexture(canvas);
-        map.colorSpace = THREE.SRGBColorSpace;
-        return map;
-    }, [entry.remaining, color]);
-    useEffect(() => () => texture.dispose(), [texture]);
-
-    useFrame(({ camera }) => {
-        const mesh = sprite.current;
-        if (!mesh) return;
-        const { position, normal } = scratch;
-        if (!readLiveTile(entry.pos, position, normal)) {
-            position.fromArray(entry.wp);
-            normal.copy(FACE_NORMALS[entry.pos.dirKey]);
-        }
-        updateHealBadgePose(mesh, position, normal, camera.position, size, worm?.phase?.current);
-    });
-
-    return (
-        <sprite ref={sprite} visible={false} raycast={() => null}>
-            <spriteMaterial map={texture} transparent depthTest depthWrite={false} toneMapped={false} />
-        </sprite>
-    );
-}
-
+// One surface ring links the contextual HUD card to its entrance. No scene text
+// can overlap other tunnel signs or show through the cube.
 export function TunnelHealProgress({ size, worm }) {
-    const healingProgress = useGameStore((s) => s.wormHealingProgress);
-    // Use committed positions, not the lagging debounce snapshot, so a turn cannot
-    // leave a badge stranded on the old face. readLiveTile handles the tween.
-    const cubies = useGameStore((s) => s.cubies);
-    const settings = useGameStore((s) => s.settings);
-    const faceColors = useMemo(
-        () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
-        [settings]
-    );
-    const entries = useMemo(() => {
-        const partial = Object.entries(healingProgress ?? {}).filter(([, p]) => p.deposited >= 0 && p.deposited < HEAL_COST);
-        if (partial.length === 0) return [];
-        const mm = buildManifoldGridMap(cubies, size);
-        return partial.map(([key, p]) => {
-            const pos = findStickerByStableKey(cubies, size, key, mm);
-            if (!pos) return null;
-            const sticker = cubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[pos.dirKey];
-            if (!sticker || sticker.curr === sticker.orig) return null;
-            const wp = getStickerWorldPos(pos.x, pos.y, pos.z, pos.dirKey, size, 0);
-            return wp ? { key, pos, wp, remaining: HEAL_COST - p.deposited, faceId: p.faceId } : null;
-        }).filter(Boolean);
-    }, [healingProgress, cubies, size]);
-
-    return entries.map(entry => (
-        <HealProgressBadge key={entry.key} entry={entry} color={faceColors[entry.faceId] ?? '#ffffff'} size={size} worm={worm} />
-    ));
+    const ring = useRef();
+    const scratch = useMemo(() => ({ position: new THREE.Vector3(), normal: new THREE.Vector3(), view: new THREE.Vector3() }), []);
+    useFrame(({ camera }) => {
+        const mesh = ring.current, need = wormBuffs.tunnelNeeds;
+        if (!mesh) return;
+        mesh.visible = false;
+        if (!need || need.inTransit || worm.phase.current !== 'crawling') return;
+        const { position, normal, view } = scratch;
+        if (!readLiveTile(need.pos, position, normal)) {
+            position.fromArray(getStickerWorldPos(need.pos.x, need.pos.y, need.pos.z, need.pos.dirKey, size, 0));
+            normal.copy(FACE_NORMALS[need.pos.dirKey]);
+        }
+        if (view.copy(camera.position).sub(position).normalize().dot(normal) <= 0.18) return;
+        mesh.visible = true;
+        mesh.position.copy(position).addScaledVector(normal, 0.07);
+        mesh.quaternion.setFromUnitVectors(_healRingZ, normal);
+        mesh.material.color.set(need.ready ? '#a6eb9b' : need.color);
+    });
+    return <mesh ref={ring} visible={false} raycast={() => null}>
+        <ringGeometry args={[0.4, 0.44, 40]} />
+        <meshBasicMaterial transparent opacity={0.9} depthTest depthWrite={false} toneMapped={false} side={THREE.DoubleSide} />
+    </mesh>;
 }

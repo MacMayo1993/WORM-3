@@ -1,3 +1,7 @@
+import TunnelNeedsCard from '../worm/TunnelNeedsCard.jsx';
+import { flipStickerPair } from '../game/manifoldLogic.js';
+import { getManifoldMap } from '../game/manifoldMapStore.js';
+import { getStableKey } from '../worm/wormLogic.js';
 import React, { act, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -16,7 +20,7 @@ function Harness() {
   const cubies = useGameStore(s => s.cubies);
   const api = useWormCrawler(5, cubies);
   useEffect(() => { worm = api; setWormTurnCallback(api.queueTurn); return () => setWormTurnCallback(null); }, [api]);
-  return <><SignatureButton /><WormSwipeControls onTurn={api.queueTurn} worm={api} /></>;
+  return <><SignatureButton /><TunnelNeedsCard /><WormSwipeControls onTurn={api.queueTurn} worm={api} /></>;
 }
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -67,4 +71,30 @@ it('clears the HUD bridge when gameplay unmounts', () => {
   act(() => root.render(null));
   expect(wormBuffs.signature).toBeNull();
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it('Book can press Return while its cooldown is running', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'book' })); frame();
+  const mark = { ...worm.pos.current };
+  act(() => host.querySelector('button').click()); frame();
+  for (let i = 0; i < 24; i++) frame();
+  const button = host.querySelector('button');
+  expect(button.textContent).toContain('Return'); expect(button.disabled).toBe(false);
+  act(() => button.click()); frame();
+  expect(worm.pos.current).toEqual(mark); expect(button.disabled).toBe(true);
+});
+it('shows correct pickup requirements through the real tunnel lookup and store', () => {
+  const state = useGameStore.getState();
+  const cubies = flipStickerPair(state.cubies, 5, 2, 3, 4, 'PZ', getManifoldMap(state.cubies, 5, state.rotationEpoch));
+  act(() => useGameStore.setState({ cubies })); frame();
+  expect(host.textContent).toContain('COLLECT 2 MORE ORBS');
+  const face = cubies[2][3][4].stickers.PZ.curr;
+  act(() => { worm.tailLength.current = 7; useGameStore.setState({ wormOrbInventory: { [face]: 3 } }); }); frame();
+  expect(host.textContent).toContain('COLLECT 1 MORE ORB');
+  const key = getStableKey(2, 3, 4, 'PZ', cubies);
+  act(() => useGameStore.setState({ wormHealingProgress: { [key]: { deposited: 1, faceId: face } } })); frame();
+  expect(host.textContent).toContain('READY TO HEAL');
+  expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('25');
+  act(() => useGameStore.setState({ wormGamePhase: 'solved' }));
+  expect(host.querySelector('[aria-label="Tunnel healing requirements"]')).toBeNull();
 });
