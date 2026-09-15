@@ -61,6 +61,7 @@ export const makeWormSessionDefaults = () => ({
   // { color, combo, seq } for the most recent orb pickup — drives the HUD's
   // screen-edge confirmation flash.
   wormOrbFlash: null,
+  wormCombatMode: false,
   wormAlive: true,
   showWormDeathMenu: false,
   wormDeathDetails: null,

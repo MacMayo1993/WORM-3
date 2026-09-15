@@ -925,7 +925,8 @@ export default function WORM3() {
         wormParams.wormSpeed,
         wormParams.wormOrbCount,
         wormParams.wormholeInterval,
-        wormParams.wormColor
+        wormParams.wormColor,
+        !!wizardSettings.wormCombatMode
       );
     });
   }, [settings, setSettings, reset, size, changeSize, cancelDisparityRun, launchWithMobi, applyEffectiveDpr]);
@@ -948,7 +949,7 @@ export default function WORM3() {
 
   const handleWormRetry = useCallback(() => {
     useGameStore.getState().clearLevel();
-    useGameStore.getState().initWormMode();
+    useGameStore.getState().initWormMode(undefined, undefined, null, null, null, null, useGameStore.getState().wormCombatMode);
     reset();
   }, [reset]);
 

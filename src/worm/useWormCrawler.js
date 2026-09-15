@@ -1,3 +1,4 @@
+import { makeCombat, stepCombat, combatBridge } from './combat/portalCombat.js';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import { stageWormPractice, readWormPractice } from './healerWorm/demoPractice.js';
 import { tunnelReadout } from './healerWorm/tunnelReadout.js';
@@ -130,6 +131,8 @@ export function useWormCrawler(size, cubies) {
 
     const deathMenuTimer = useRef(null);
     const demoPracticeRef = useRef(null);
+    const combatRunRef = useRef(null);
+    useEffect(() => () => { combatBridge.current = null; }, []);
 
     // Simulation and portal visuals share one exact snapshot of committed cubies.
     // Rotation commits refresh this synchronously below; flips refresh in this effect.
@@ -153,6 +156,7 @@ export function useWormCrawler(size, cubies) {
             getCubies: () => useGameStore.getState().cubies,
             getGamePhase: () => useGameStore.getState().wormGamePhase,
             isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
+            isCombatMode: () => useGameStore.getState().wormCombatMode,
             allowDemoSignature: () => wormDemoLesson(useGameStore.getState()).id === 'signature',
             isPaused: () => useGameStore.getState().wormPaused ?? false,
             getSpeed: () => useGameStore.getState().wormSpeed ?? 2.0,
@@ -244,7 +248,7 @@ export function useWormCrawler(size, cubies) {
                 }
             },
             onBoostState: (state) => useGameStore.getState().setWormBoostState(state),
-            onSurvivalTick: () => { const s = useGameStore.getState(); if (!s.demoMode) s.earnCoins(EARN_WORM_SURVIVAL_TICK); },
+            onSurvivalTick: () => { const s = useGameStore.getState(); if (!s.demoMode && !s.wormCombatMode) s.earnCoins(EARN_WORM_SURVIVAL_TICK); },
             spawnWormholePair: (tile) => {
                 useGameStore.setState((state) => {
                     const mm = getManifoldMap(state.cubies, sizeRef.current, state.rotationEpoch);
@@ -360,7 +364,7 @@ export function useWormCrawler(size, cubies) {
                 st.setWormHealedCount(healedCount);
                 st.recordWormXp('healed', healedCount, null, st.wormRunId);
                 st.recordWormMission('healed', healedCount, null, st.wormRunId);
-                if (!st.demoMode) st.earnCoins(EARN_WORM_HEALED_FACE);
+                if (!st.demoMode && !st.wormCombatMode) st.earnCoins(EARN_WORM_HEALED_FACE);
             },
         };
     }
@@ -386,7 +390,38 @@ export function useWormCrawler(size, cubies) {
                 demoWormProgress: '', demoWormHazardCleared: null });
             return; // Let the shared tunnel snapshot observe the staged board first.
         }
+        if (state.wormCombatMode && state.wormGamePhase === 'active' && combatRunRef.current !== state.wormRunId) {
+            const practice = stageWormPractice(sim, sizeRef.current, { id: 'heal' });
+            sim.moveDir = 'right';
+            sim.combat = makeCombat(sizeRef.current, practice.target);
+            combatBridge.current = sim.combat;
+            combatRunRef.current = state.wormRunId;
+            resetWormBuffs(); resetWormSegments(); resetWormPress();
+            useGameStore.setState({ cubies: practice.cubies, wormOrbInventory: practice.inventory,
+                wormBodyTiles: 2, wormPowerups: [], wormSpecials: [], wormPhase: 'crawling',
+                wormPaused: true, wormHealedCount: 0, wormHealingProgress: {}, wormOnFlippedTile: false });
+            return;
+        }
+        const combatHeld = state.wormPaused || !sim.alive || sim.phase !== 'crawling' ||
+            sim.tunnelPassages.length > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 ||
+            sim.elementalFocusT > 0 || sim.signature.charge > 0 || liveRotation.active ||
+            state.wormGamePhase !== 'active';
         stepWormSim(sim, delta, sizeRef.current, ctxRef.current);
+        if (state.wormCombatMode && sim.combat) {
+            const c = sim.combat;
+            c.held = combatHeld || sim.phase !== 'crawling' || sim.tunnelPassages.length > 0 || !sim.alive;
+            const previousKills = c.kills, previousShots = c.shotsFired, previousDrops = c.dropsCollected;
+            stepCombat(c, delta, {
+                head: sim.pos, heading: sim.moveDir, position: sim.headInterpPos.toArray(),
+                blocked: c.held, protected: sim.isJumping || sim.rocketActive || sim.landingGraceT > 0,
+                portalOpen: sim.healed === 0, canFinish: sim.phase === 'crawling' && sim.tunnelPassages.length === 0,
+            }, health => { feel('cut'); if (health <= 0) killWormSim(sim, ctxRef.current, { reason: 'portal-crawler' }); });
+            if (c.shotsFired > previousShots) feel('boost');
+            if (c.kills > previousKills) feel('heal');
+            if (c.dropsCollected > previousDrops) feel('orb');
+            if (c.won && !state.wormPaused) useGameStore.setState({ wormPaused: true, wormTimeAlive: Math.floor(sim.timeAlive) });
+        }
+
         if (demo && state.demoWormStarted && demoPracticeRef.current?.attempt === attempt && !state.wormPaused && sim.alive && !state.demoWormComplete) {
             const result = readWormPractice(sim, demoPracticeRef.current, lesson, useGameStore.getState(), sizeRef.current, delta);
             if (result.done || result.progress !== state.demoWormProgress) {
@@ -420,7 +455,21 @@ export function useWormCrawler(size, cubies) {
         publishTilePress(sim, sizeRef.current, ctxRef.current, delta);
     }, []);
 
-    const queueTurn = useCallback((dir) => queueTurnSim(simRef.current, dir), []);
+    const queueTurn = useCallback((dir) => {
+        const sim = simRef.current, state = useGameStore.getState(), c = sim.combat;
+        if (state.wormCombatMode && dir === 'combat-start') {
+            if (c && !c.started && state.wormGamePhase === 'active' && !state.wormPauseMenuOpen) {
+                c.started = true; useGameStore.setState({ wormPaused: false });
+            }
+            return;
+        }
+        if (dir === 'fire') {
+            if (state.wormCombatMode && c?.started && !c.won && sim.alive && !state.wormPaused && !c.held && sim.phase === 'crawling') c.fireRequested = true;
+            return;
+        }
+        if (state.wormCombatMode && (!c?.started || c.won || state.wormPaused)) return;
+        queueTurnSim(sim, dir);
+    }, []);
 
     const killWorm = useCallback((details = null) => {
         killWormSim(simRef.current, ctxRef.current, details);
@@ -432,6 +481,7 @@ export function useWormCrawler(size, cubies) {
     useEffect(() => {
         const sim = simRef.current;
         demoPracticeRef.current = null;
+        combatRunRef.current = null; sim.combat = null; combatBridge.current = null;
         resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
         resetWormBuffs();
         resetWormSegments();

@@ -17,7 +17,7 @@ const EXPECTED_KEYS = [
   'beginPuzzleXp', 'markXpAssisted', 'completePuzzleXp', 'recordWormXp', 'finishWormXp',
   'beginChaosXp', 'finishChaosXp', 'recordLessonXp', 'recordDiscoveryXp', 'claimLevelReward',
   'wormMission', 'wormMissionsCompleted', 'recordWormMission', 'wormMissionCounters', 'wormRunAchievements',
-  'wormPauseMenuOpen', 'demoExploring', 'demoExploreComplete',
+  'wormCombatMode', 'wormPauseMenuOpen', 'demoExploring', 'demoExploreComplete',
   'demoWormLessonIndex', 'demoWormStarted', 'demoWormPrepared', 'demoWormAttempt',
   'demoWormComplete', 'demoWormFinished', 'demoWormCompleted', 'demoWormProgress',
   'demoWormTarget', 'demoWormHazardCleared',

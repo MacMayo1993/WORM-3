@@ -1,3 +1,4 @@
+import CombatScene from './combat/CombatScene.jsx';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import DemoPracticeTargets from './healerWorm/DemoPracticeTargets.jsx';
 import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
@@ -97,6 +98,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const finalHealCheckTimer = useRef(0);  // throttle: scan for active tunnels every 0.5s
 
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
+    const combatMode = useGameStore(s => s.wormCombatMode);
     const wormGamePhase = useGameStore(s => s.wormGamePhase ?? 'scrambling');
     const wormPhaseReactive = useGameStore(s => s.wormPhase ?? 'crawling');
 
@@ -295,6 +297,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             }
             return;
         }
+
+        // The combat arena owns its ending; ordinary bombs and solving turns stay off.
+        if (store.wormCombatMode) { resetRotationClock(); return; }
 
         // ── Phase: solved ──────────────────────────────────────────────────────
         if (gameModePhaseRef.current === 'solved') return;
@@ -611,6 +616,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         <>
             <WormChaseCamera worm={worm} size={size} />
             <DemoPracticeTargets size={size} />
+            {combatMode && <CombatScene />}
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             {/* Elemental orb wash — bathes the whole cube in the claimed element. */}
             <ElementalAtmosphere size={size} />

@@ -1,0 +1,18 @@
+.worm-combat-card { box-sizing: border-box; padding: 10px 12px; background: #20272bf5; color: #fff5de; border: 1px solid #c994ff80; border-radius: 16px; pointer-events: auto; }
+.worm-combat-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
+.worm-combat-heading span { color: #dac4f5; font-variant-numeric: tabular-nums; }
+.worm-combat-card p { font-size: 12px; line-height: 1.4; margin: 5px 0; }
+.worm-combat-card button { min-height: 44px; border: 1px solid #c994ff; border-radius: 10px; background: #57367a; color: #fff5de; padding: 6px 14px; font: inherit; font-size: 12px; cursor: pointer; }
+.worm-combat-results { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.worm-combat-fire { min-width: 0; min-height: 48px; width: 100%; border: 1px solid #ca9fff; border-radius: 16px; background: #5b3385; color: #fff5de; font: inherit; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; touch-action: manipulation; }
+.worm-combat-fire small { font-size: 10px; opacity: .65; }
+.worm-combat-ammo { display: flex; gap: 5px; }
+.worm-combat-ammo i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #d6bbff; background: #251334; }
+.worm-combat-ammo .ready { background: #cffbf2; box-shadow: 0 0 5px #9affec70; }
+.worm-combat-fire:disabled { opacity: .5; cursor: default; }
+.worm-combat-fire:focus-visible, .worm-combat-card button:focus-visible { outline: 3px solid #cffbf2; outline-offset: 2px; }
+@media (max-height: 520px) and (min-width: 600px) {
+  .worm-combat-card { padding: 6px 10px; }
+  .worm-combat-card p { font-size: 11px; margin: 3px 0; }
+  .worm-instrument[data-combat="true"] .worm-action-center { flex-direction: column; gap: 4px; }
+}
