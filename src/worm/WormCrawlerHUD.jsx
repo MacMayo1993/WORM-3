@@ -1,3 +1,4 @@
+import SignatureButton from './SignatureButton.jsx';
 import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
 import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
 import { elementalFeedback } from './healerWorm/elementalFeedback.js';
@@ -1589,6 +1590,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                 {/* Middle: Jump + Boost, with the contextual portal hint above them */}
                 <div style={ACTION_CLUSTER_STYLE}>
+                    {!demoLesson && <SignatureButton portalReady={isPortalReady} />}
                     {isPortalReady && (
                         <div style={{ ...PORTAL_HINT_STYLE, color: phaseColor }}>
                             <JumpIcon size={13} />

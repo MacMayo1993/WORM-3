@@ -11,6 +11,6 @@ export const setWormTurnCallback = (fn) => { _cb = fn; };
 
 /**
  * Called by WormCrawlerHUD's thumb tray: 'turnLeft' / 'turnRight' from the two
- * steering keys, plus 'jump' and 'boost'. Safe to call when unmounted (_cb is null).
+ * steering keys, plus 'jump', 'boost' and 'signature'. Safe to call when unmounted (_cb is null).
  */
 export const callWormTurn = (dir) => _cb?.(dir);
