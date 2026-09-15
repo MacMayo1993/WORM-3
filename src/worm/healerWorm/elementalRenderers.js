@@ -34,8 +34,8 @@ export const ELEMENTAL_RENDERERS = {
   surface: { key: 'surface', mode: 'instanced', uniformScale: false },
   // Camera-facing flame tongues over an ember bed, billboarded on the GPU (fire).
   flames: { key: 'flames', mode: 'instanced', uniformScale: true },
-  // The Living style's instanced blade mesh, one per cover cell (nature).
-  blades: { key: 'blades', mode: 'perCell', uniformScale: false }
+  // Curved meadow geometry, one instance per cover cell in one draw (nature).
+  blades: { key: 'blades', mode: 'instanced', uniformScale: false }
 };
 
 /**

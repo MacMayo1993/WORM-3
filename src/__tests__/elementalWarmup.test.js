@@ -27,8 +27,8 @@ const fakeRenderer = () => ({ compile: vi.fn() });
 const fakeCamera = {};
 
 // Three orb materials, one ambient particle material, plus the skin:
-//   surface → 1, flames → 2 (both detail tiers), blades → 1
-const SKIN_MATERIALS = { surface: 1, flames: 2, blades: 1 };
+//   surface → 1, flames → 2 (both detail tiers), blades → 2 (meadow and pickup leaves)
+const SKIN_MATERIALS = { surface: 1, flames: 2, blades: 2 };
 const expectedCount = Object.values(ELEMENTAL_DEFS).reduce(
   (n, def) => n + 4 + (SKIN_MATERIALS[def.renderer] ?? 0),
   0

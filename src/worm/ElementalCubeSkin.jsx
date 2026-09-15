@@ -8,10 +8,10 @@
 //
 // Each element brings its own layer, all of them rendered in a cell's local +Z
 // frame (the outward face normal, the tile roughly filling local XY): water and
-// ice are a continuous animated surface (ElementalSurface), nature keeps the
-// Living style's GrassBlades, and fire burns with the bombs' own flame sprites
-// (ElementalFireSkin). All are translucent or additive, so the tile style stays
-// readable underneath.
+// ice are a continuous animated surface (ElementalSurface), nature grows a
+// folded meadow (ElementalGrassSkin), and fire burns with the bombs' own flame sprites
+// (ElementalFireSkin). Surface washes remain translucent; the meadow uses short,
+// opaque leaves with space between them to preserve tile and hazard readability.
 //
 // ── What this file owns ──────────────────────────────────────────────────────
 // One thing: driving every cover cell's transform, once per frame, for whichever
@@ -61,7 +61,8 @@ import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
 import { cellEdgeMask, cellSeed, cellSweepDelay, resolveSweepOrigin } from './healerWorm/elementalSeeds.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
-import GrassBlades from '../3d/styles/GrassBlades.jsx';
+import ElementalGrassSkin from './ElementalGrassSkin.jsx';
+import { wormSegments } from './wormSegments.js';
 import ElementalFireSkin from './ElementalFireSkin.jsx';
 import { ElementalSurfaceSkin } from './ElementalSurface.jsx';
 
@@ -196,17 +197,14 @@ export default function ElementalCubeSkin({ size = 3 }) {
     return { cell, sweep: new Float32Array(cells.length) };
   }, [cells]);
 
-  // Instanced renderers write through instanceMatrix; the per-cell fallback writes
-  // group transforms. Only one of the two is ever populated.
+  // Every skin writes one matrix per cover cell into its single instanced mesh.
   const instRef = useRef(null);
-  const groupRefs = useRef([]);
   const elapsedRef = useRef(0);
   const lastElementRef = useRef(null);
   const lastOriginRef = useRef(undefined);
   if (lastElementRef.current !== element) {
     lastElementRef.current = element;
     elapsedRef.current = 0;
-    groupRefs.current = [];
     instRef.current = null;
     lastOriginRef.current = undefined;
   }
@@ -240,7 +238,7 @@ export default function ElementalCubeSkin({ size = 3 }) {
     // mesh, so match on capacity before writing into it — a stale one is skipped
     // for a frame rather than throwing out of range mid-loop.
     const inst = instRef.current?.count === cells.length ? instRef.current : null;
-    const groups = groupRefs.current;
+    if (!inst) return;
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i];
       // Follow the live cubie transform (rides a turning slice); fall back to the
@@ -254,23 +252,12 @@ export default function ElementalCubeSkin({ size = 3 }) {
       // Billboarded renderers take their on-screen size from world scale, so the
       // surface layers' squashed (cell, cell, grow) scale would distort them; they
       // get a uniform scale that still carries both cell size and the ramp.
-      const arrival = renderer.key === 'blades'
-        ? THREE.MathUtils.smoothstep(env.claim, cellData.sweep[i], cellData.sweep[i] + 0.3) : 1;
-      const cellGrow = g * arrival;
+      const cellGrow = g; // Instanced shaders own the per-cell sprouting/sweep.
       if (renderer.uniformScale) _scale.setScalar(c.cell * Math.max(0.001, cellGrow));
       else _scale.set(c.cell * g, c.cell * g, Math.max(0.001, cellGrow));
 
-      if (inst) {
-        _matrix.compose(_livePos, _quat, _scale);
-        inst.setMatrixAt(i, _matrix);
-      } else {
-        const grp = groups[i];
-        if (!grp) continue;
-        grp.visible = arrival > 0.001;
-        grp.position.copy(_livePos);
-        grp.quaternion.copy(_quat);
-        grp.scale.copy(_scale);
-      }
+      _matrix.compose(_livePos, _quat, _scale);
+      inst.setMatrixAt(i, _matrix);
     }
     if (inst) {
       inst.instanceMatrix.needsUpdate = true;
@@ -279,6 +266,13 @@ export default function ElementalCubeSkin({ size = 3 }) {
       // needed for either.
       const u = inst.material?.uniforms?.uEnv;
       if (u) u.value.set(env.intensity, env.claim, env.release, quality.animate ? 1 : 0);
+      if (renderer.key === 'blades' && inst.material.uniforms?.uWorm) {
+        const uniforms = inst.material.uniforms;
+        uniforms.uTime.value = quality.animate ? elapsedRef.current : 0;
+        const p = wormSegments.positions;
+        // Use the rendered head, including face transitions and slice rides.
+        uniforms.uWorm.value.set(p[0], p[1], p[2], wormSegments.count > 0 && quality.animate ? 1 : 0);
+      }
     }
   });
 
@@ -316,23 +310,13 @@ export default function ElementalCubeSkin({ size = 3 }) {
     );
   }
 
-  // Per-cell fallback: nature's blade mesh still owns a real child per cell.
   return (
-    <group>
-      {cells.map((c, i) => (
-        // Transform (position/quaternion/scale) is set entirely in the frame loop;
-        // the rest values here just avoid a one-frame flash at the origin.
-        <group
-          key={c.key}
-          ref={(el) => { groupRefs.current[i] = el; }}
-          position={c.restPos}
-          quaternion={c.restQuat}
-          scale={[c.cell * 0.01, c.cell * 0.01, 0.01]}
-        >
-          <GrassBlades faceColor={def.color} elemental animate={quality.animate}
-            count={quality.accents ? 110 : 64} seed={cellData.cell[i * 4 + 3]} />
-        </group>
-      ))}
-    </group>
+    <ElementalGrassSkin
+      key={`grass-${cells.length}-${quality.accents ? 88 : 56}`}
+      meshRef={instRef}
+      count={cells.length}
+      bladesPerCell={quality.accents ? 88 : 56}
+      cellData={cellData}
+    />
   );
 }
