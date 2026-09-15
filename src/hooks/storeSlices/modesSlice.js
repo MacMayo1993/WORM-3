@@ -6,6 +6,7 @@ import { WORM_DEMO_LESSON_COUNT, newWormDemo, wormDemoActive } from '../../game/
  */
 
 import { persistedState } from './persistedState.js';
+import { newSolverSession } from '../../teach/solverSession.js';
 
 export const createModesSlice = (set, _get) => ({
   // ========================================================================
@@ -51,12 +52,11 @@ export const createModesSlice = (set, _get) => ({
   // ========================================================================
   // SOLVE MODE STATE
   // ========================================================================
-  solveModeActive: false,
-  solveFocusedStep: null,
-  solveHighlights: [],
-  kociembaLayerHighlight: null,
+  ...newSolverSession(),
 
-  setSolveModeActive: (solveModeActive) => set({ solveModeActive }),
+  setSolveModeActive: (solveModeActive) => set(solveModeActive
+    ? { solveModeActive: true }
+    : newSolverSession()),
   setSolveFocusedStep: (solveFocusedStep) => set({ solveFocusedStep }),
   setSolveHighlights: (solveHighlights) => set({ solveHighlights }),
   setKociembaLayerHighlight: (kociembaLayerHighlight) => set({ kociembaLayerHighlight }),
@@ -81,6 +81,7 @@ export const createModesSlice = (set, _get) => ({
   demoExploreComplete: false,
 
   startDemo: () => set({
+    ...newSolverSession(),
     xpActivityRuns: {},
     demoMode: true,
     demoStep: 'baby-cube',
@@ -94,6 +95,7 @@ export const createModesSlice = (set, _get) => ({
     : { demoWormLessonIndex: s.demoWormLessonIndex + 1, demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true }),
   finishWormDemo: () => set(s => wormDemoActive(s) ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null } : {}),
   exitDemo: () => set({
+    ...newSolverSession(),
     ...newWormDemo(),
     demoMode: false,
     demoStep: null,

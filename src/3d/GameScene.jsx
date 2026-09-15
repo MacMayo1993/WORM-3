@@ -12,6 +12,7 @@ import { FogExp2 } from 'three';
 import SafeEnvironment from './SafeEnvironment.jsx';
 import { EffectComposer, N8AO } from '@react-three/postprocessing';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { selectSolveModeVisible } from '../teach/solverSession.js';
 import { useShallow } from 'zustand/react/shallow';
 import { isMobile } from '../utils/device.js';
 import CubeAssembly from './CubeAssembly.jsx';
@@ -112,10 +113,10 @@ export default function GameScene({
     currentLevelData: s.currentLevelData,
     blackHolePulse: s.blackHolePulse,
     settings: s.settings,
-    solveModeActive: s.solveModeActive,
+    solveModeActive: selectSolveModeVisible(s),
     solveHighlights: s.solveHighlights,
     kociembaLayerHighlight: s.kociembaLayerHighlight,
-    demoLearnGuide: s.demoMode && s.demoStep === 'learn-to-solve',
+    demoLearnGuide: !s.showMainMenu && s.demoMode && s.demoStep === 'learn-to-solve',
     size: s.size,
     cubies: s.cubies,
     wormHealerMode: s.wormHealerMode,

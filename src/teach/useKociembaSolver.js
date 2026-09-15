@@ -79,6 +79,7 @@ export function useKociembaSolver(cubies, size) {
   const movesRef = useRef([]);
   const moveIndexRef = useRef(0);
   const solveIdRef = useRef(0);
+  const resetTimerRef = useRef(null);
   // Last rotationEpoch this hook has already accounted for. Guards the
   // follow-along match below: `lastRotation` lingers after its turn, so without
   // an epoch check a later non-rotation cube change (a sticker flip) would
@@ -277,6 +278,8 @@ export function useKociembaSolver(cubies, size) {
   }, [animState, executeCurrentMove]);
 
   const reset = useCallback(() => {
+    ++solveIdRef.current;
+    clearTimeout(resetTimerRef.current);
     isPlayingRef.current = false;
     pendingNextRef.current = false;
     selfMovePendingRef.current = false;
@@ -289,12 +292,21 @@ export function useKociembaSolver(cubies, size) {
     setError(null);
     setKociembaLayerHighlight(null);
     // Immediately re-solve so state stays fresh
-    setTimeout(() => solve(), 0);
+    resetTimerRef.current = setTimeout(() => solve(), 0);
   }, [setKociembaLayerHighlight, solve]);
 
-  // Cleanup layer highlight when unmounted
+  // Invalidate pending WASM results before clearing the preview. Otherwise a
+  // solve that resolves after exit can put its highlight into the next screen.
   useEffect(() => {
-    return () => setKociembaLayerHighlight(null);
+    const generation = solveIdRef;
+    return () => {
+      ++generation.current;
+      isPlayingRef.current = false;
+      pendingNextRef.current = false;
+      selfMovePendingRef.current = false;
+      clearTimeout(resetTimerRef.current);
+      setKociembaLayerHighlight(null);
+    };
   }, [setKociembaLayerHighlight]);
 
   return { status, solutionStr, moves, moveIndex, error, solve, play, pause, stepForward, reset };

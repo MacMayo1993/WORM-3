@@ -15,6 +15,7 @@ import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { MONO_FONT, UI_FONT, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, TEXT_SM, RADIUS_PILL, Z } from '../utils/uiTheme.js';
 import { TOUCH_TARGET, ScreenFallback } from './ui/index.js';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { selectSolveModeVisible } from '../teach/solverSession.js';
 import { useShallow } from 'zustand/react/shallow';
 import ScreenTransition from './ScreenTransition.jsx';
 
@@ -162,7 +163,7 @@ export default function UILayer({
     showLeaderboard: s.showLeaderboard,
     showMobileTouchHint: s.showMobileTouchHint,
     showDevConsole: s.showDevConsole,
-    solveModeActive: s.solveModeActive,
+    solveModeActive: selectSolveModeVisible(s),
     showDisparityWinner: s.showDisparityWinner,
     wormHealerMode: s.wormHealerMode,
     demoMode: s.demoMode,
@@ -592,7 +593,8 @@ export default function UILayer({
         />
       </ScreenTransition>
 
-      <ScreenTransition show={solveModeActive} freezeOnExit>
+      {/* Unmount immediately on exit: frozen children keep solver timers alive. */}
+      {solveModeActive && <ScreenTransition show>
         <Suspense fallback={null}>
           <SolveMode
             cubies={cubies} size={size}
@@ -601,7 +603,7 @@ export default function UILayer({
             focusedStep={solveFocusedStep} onFocusStep={setSolveFocusedStep}
           />
         </Suspense>
-      </ScreenTransition>
+      </ScreenTransition>}
 
       <ScreenTransition show={teachMode.active} freezeOnExit>
         <Suspense fallback={null}>

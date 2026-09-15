@@ -10,6 +10,7 @@
 
 import { isMobile } from '../../utils/device.js';
 import { persistedState } from './persistedState.js';
+import { newSolverSession } from '../../teach/solverSession.js';
 
 export const createUiSlice = (set, _get) => ({
   // ========================================================================
@@ -60,7 +61,10 @@ export const createUiSlice = (set, _get) => ({
     ? (state) => ({ showHelp: showHelp(state.showHelp) })
     : { showHelp }),
   setShowSettings: (showSettings) => set({ showSettings }),
-  setShowMainMenu: (showMainMenu) => set({ showMainMenu }),
+  setShowMainMenu: (showMainMenu) => set({
+    showMainMenu,
+    ...(showMainMenu ? newSolverSession() : {}),
+  }),
   setShowLevelSelect: (showLevelSelect) => set({ showLevelSelect }),
   setShowPackSelect: (showPackSelect) => set({ showPackSelect }),
   setActivePackId: (activePackId) => set({ activePackId }),
