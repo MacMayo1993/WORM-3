@@ -19,3 +19,12 @@
 .worm-combat-readout { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #d4e6c8; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .worm-combat-fire > span:first-child { display: flex; flex-direction: column; align-items: center; font-size: 13px; }
 .worm-combat-fire small { font-size: 8px; }
+.worm-ambient-controls { width: 100%; min-width: 0; }
+.worm-ambient-actions { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 6px; align-items: start; }
+.worm-ambient-actions .worm-combat-fire { min-height: 58px; gap: 3px; flex-direction: column; }
+.worm-ambient-actions .worm-combat-fire > span:first-child { font-size: 11px; }
+.worm-ambient-actions .worm-combat-ammo i { width: 6px; height: 6px; }
+.worm-ambient-actions .worm-signature-compact button { flex-direction: column; min-height: 58px !important; gap: 2px !important; }
+.worm-ambient-actions .worm-signature-compact button > svg { display: none; }
+.worm-ambient-actions .worm-signature-compact button > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.worm-ambient-notice { color: #fff5de; text-shadow: 0 1px 3px #000; font-size: 10px; line-height: 1.25; text-align: center; margin-top: 4px; }

@@ -3,6 +3,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { callWormTurn } from '../wormTurnBridge.js';
 import { combatBridge, COMBAT } from './portalCombat.js';
 import { ELEMENTS, WAVES } from './combatDefs.js';
+import SignatureButton from '../SignatureButton.jsx';
 import './combat.css';
 
 function useCombatReadout() {
@@ -31,6 +32,16 @@ export function CombatCard({ onRetry, onHome }) {
     {(c.won || !alive) && <div className="worm-combat-results"><span>{c.wavesCleared}/3 waves · {c.shotsHit}/{c.shotsFired} shots hit · best ×{c.bestCombo}</span><button onClick={onRetry}>Try again</button><button onClick={onHome}>Main menu</button></div>}
   </section>;
 }
+export function AmbientCombatActions() {
+  const c = useCombatReadout();
+  const alive = useGameStore(s => s.wormAlive);
+  const encounter = c?.ambient && c.encounter && alive;
+  if (!encounter) return <div className="worm-ambient-controls"><SignatureButton />{alive && c?.noticeT > 0 && <div className="worm-ambient-notice" role="status">{c.notice}</div>}</div>;
+  return <div className="worm-ambient-controls">
+    <div className="worm-ambient-actions"><SignatureButton compact /><CombatFireButton /></div>
+    <div className="worm-ambient-notice" role="status">{c.warning > 0 ? `Portal stirring · ${Math.ceil(c.warning)}s` : 'Steer to aim · hold Fire'} · {c.health}/3 shields</div>
+  </div>;
+}
 export function CombatFireButton() {
   const c = useCombatReadout();
   const active = useGameStore(s => s.wormAlive && !s.wormPaused && s.wormPhase === 'crawling');
@@ -40,9 +51,9 @@ export function CombatFireButton() {
   const element = ELEMENTS[c?.element];
   return <button className="worm-combat-fire worm-hud-key" aria-label={`Fire parity shot, ${c?.ammo ?? 0} of 3 ready`}
     style={{borderColor:element?.color}}
-    disabled={!active || !c?.started || c.won || c.held}
+    disabled={!active || !c?.started || c.won || c.held || (c.ambient && !c.encounter)}
     onPointerDown={start} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}
     onClick={e => { if (e.detail === 0) callWormTurn('fire'); }}>
-    <span>✦ {c?.ammo === 0 ? 'CHARGING' : 'FIRE'} <small>HOLD / F</small></span><span className="worm-combat-ammo" aria-hidden="true">{[0,1,2].map(i => <i key={i} className={i < (c?.ammo ?? 0) ? 'ready' : ''} />)}</span>
+    <span>✦ {c?.aimHeld ? 'TURNING' : c?.ammo === 0 ? 'CHARGING' : 'FIRE'} <small>HOLD / F</small></span><span className="worm-combat-ammo" aria-hidden="true">{[0,1,2].map(i => <i key={i} className={i < (c?.ammo ?? 0) ? 'ready' : ''} />)}</span>
   </button>;
 }

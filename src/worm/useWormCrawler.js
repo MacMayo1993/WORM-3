@@ -1,3 +1,4 @@
+import { cancelAmbientEncounter, makeAmbientCombat, stepAmbientCombat } from './combat/ambientCombat.js';
 import { makeCombat, stepCombat, combatBridge } from './combat/portalCombat.js';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import { stageWormPractice, readWormPractice } from './healerWorm/demoPractice.js';
@@ -370,7 +371,7 @@ export function useWormCrawler(size, cubies) {
     }
 
     // ── Per-frame drive ──────────────────────────────────────────────────────────
-    const tick = useCallback((delta) => {
+    const tick = useCallback((delta, hazards = {}) => {
         const sim = simRef.current;
         const state = useGameStore.getState();
         const demo = wormDemoActive(state) && !state.demoWormFinished;
@@ -402,20 +403,39 @@ export function useWormCrawler(size, cubies) {
                 wormPaused: true, wormHealedCount: 0, wormHealingProgress: {}, wormOnFlippedTile: false });
             return;
         }
+        if (!state.wormCombatMode && !state.demoMode && state.wormHealerMode &&
+            state.wormGamePhase === 'active' && !sim.combat) {
+            sim.combat = makeAmbientCombat(sizeRef.current);
+            combatBridge.current = sim.combat;
+        }
         const combatHeld = state.wormPaused || !sim.alive || sim.phase !== 'crawling' ||
             sim.tunnelPassages.length > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 ||
-            sim.elementalFocusT > 0 || sim.signature.charge > 0 || liveRotation.active ||
+            sim.elementalFocusT > 0 || sim.signature.charge > 0 || sim.rocketActive || liveRotation.active ||
             state.wormGamePhase !== 'active';
         stepWormSim(sim, delta, sizeRef.current, ctxRef.current);
-        if (state.wormCombatMode && sim.combat) {
+        if (sim.combat) {
             const c = sim.combat;
             c.held = combatHeld || sim.phase !== 'crawling' || sim.tunnelPassages.length > 0 || !sim.alive;
             const previousKills = c.kills, previousShots = c.shotsFired, previousDrops = c.dropsCollected;
-            stepCombat(c, delta, {
+            const combatPlayer = {
                 head: sim.pos, heading: sim.moveDir, position: sim.headInterpPos.toArray(),
+                // The destination tile is committed before the visible head finishes
+                // crossing. Read this AFTER stepWormSim, including the entry frame.
+                aimBlocked: sim.interpT < 1 && (sim.crossingCorner ||
+                    !!(sim.prevTile && sim.prevTile.dirKey !== sim.pos.dirKey)),
                 blocked: c.held, protected: sim.isJumping || sim.rocketActive || sim.landingGraceT > 0,
                 portalOpen: sim.healed === 0, canFinish: sim.phase === 'crawling' && sim.tunnelPassages.length === 0,
-            }, health => { feel('cut'); if (health <= 0) killWormSim(sim, ctxRef.current, { reason: 'portal-crawler' }); });
+                phase: state.wormGamePhase, alive: sim.alive, healed: sim.healed,
+                rotating: liveRotation.active, hazardBusy: !!hazards.busy,
+                element: sim.elementalType, elementT: sim.elementalT,
+                lockedTile: sim.signature.character === 'mobi' && sim.signature.active > 0 ? sim.signature.target : null,
+            };
+            const onContact = health => { feel('cut'); if (health <= 0) killWormSim(sim, ctxRef.current, { reason: 'portal-crawler' }); };
+            if (c.ambient) {
+                const current = useGameStore.getState();
+                const tunnels = getWormTunnelSnapshot(current.cubies,sizeRef.current,current.rotationEpoch).tunnels;
+                stepAmbientCombat(c,delta,combatPlayer,tunnels.filter(hit => !sim.voidTunnelKeys.has(hit.tunnelKey)),onContact);
+            } else stepCombat(c,delta,combatPlayer,onContact);
             if (c.shotsFired > previousShots) feel('boost');
             if (c.kills > previousKills) feel('heal');
             if (c.dropsCollected > previousDrops) feel('orb');
@@ -465,7 +485,7 @@ export function useWormCrawler(size, cubies) {
         }
         if (dir === 'fire-stop') { if (c) c.fireHeld = false; return; }
         if (dir === 'fire' || dir === 'fire-start') {
-            if (state.wormCombatMode && c?.started && !c.won && sim.alive && !state.wormPaused && !c.held && sim.phase === 'crawling') { c.fireRequested = true; if (dir === 'fire-start') c.fireHeld = true; }
+            if (c?.started && (!c.ambient || c.encounter) && !c.won && sim.alive && !state.wormPaused && !c.held && sim.phase === 'crawling') { c.fireRequested = true; if (dir === 'fire-start') c.fireHeld = true; }
             return;
         }
         if (state.wormCombatMode && (!c?.started || c.won || state.wormPaused)) return;
@@ -540,6 +560,7 @@ export function useWormCrawler(size, cubies) {
                 const rot = st.lastRotation;
                 if (!rot || rot === lastCommittedRotation) return;
                 lastCommittedRotation = rot;
+                cancelAmbientEncounter(simRef.current.combat);
                 // Keep coordinate readers synchronous with the committed cubies.
                 // applyRotationToSim may immediately re-check a rest-read ring; waiting
                 // for the React effect below would expose the pre-commit tunnel mouths.

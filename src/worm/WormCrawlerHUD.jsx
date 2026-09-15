@@ -1,4 +1,4 @@
-import { CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
+import { AmbientCombatActions, CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
 import { combatBridge } from './combat/portalCombat.js';
 import WormDemoLessonCard from '../components/screens/WormDemoLessonCard.jsx';
 import { wormDemoLesson } from '../game/wormDemoLessons.js';
@@ -1544,7 +1544,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                     {/* Middle: signature and primary actions share the measured dock */}
                     <div className="worm-action-center" style={ACTION_CLUSTER_STYLE}>
-                        {combatMode ? <CombatFireButton /> : (!demoLesson || lesson.id === 'signature') && <SignatureButton />}
+                        {combatMode ? <CombatFireButton /> : demoLesson ? lesson.id === 'signature' && <SignatureButton /> : <AmbientCombatActions />}
                         <div className="worm-primary-actions">
                             <button
                                 onPointerDown={handleJumpAction}

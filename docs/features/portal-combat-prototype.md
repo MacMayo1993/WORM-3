@@ -1,4 +1,37 @@
-# Portal Combat prototype
+# Portal enemies and Combat arena
+
+## Normal WORM: occasional encounters
+
+Portal enemies are enabled in normal WORM, including Mega. The guided demo stays
+separate. The first encounter cannot begin before **45 seconds of active surface
+play**, and every encounter is followed by **at least 30 quiet seconds**. There
+is a hard limit of **one enemy**, regardless of cube size or how many portals are
+open. A live portal must be on the current face, two to six tiles from the head.
+
+The mouth warns for four seconds, then the enemy emerges. Approaching the mouth
+or leaving its face during the warning cancels the spawn. The first encounters
+use crawlers; dashers become eligible after 90 active seconds and occasional
+armored crawlers after 150. An enemy retreats after 20 active seconds. Pauses,
+tunnel travel, rockets and focus animations hold the encounter clocks.
+
+Encounters wait for existing bombs and rotation warnings to clear. While one is
+active, scheduled bombs and layer turns wait, so the hazards do not pile up.
+Manual live or committed rotations retire the enemy and start the quiet period.
+The final-healing phase has no enemies. Sealing the source portal also ends the
+encounter, without ending the normal run; MOBI's temporary lock blocks it too.
+
+Normal runs start with three enemy shields. A contact removes one shield and the
+enemy retreats immediately; jumping avoids contact. Losing the last shield ends
+the run with a dedicated explanation. Healing a tunnel restores one shield, up
+to three. The existing self-collision, bomb and tunnel rules still apply.
+
+Fire appears beside the character ability only during an encounter. Jump, boost,
+missions and normal XP stay available. The same elemental pickups used by normal
+WORM infuse shots while their buff lasts. Enemies do not create an extra pickup
+stream or award additional permanent currency/XP. Shield changes have a brief
+message in the existing action dock. Retry resets the encounter and grace period.
+
+## Optional three-wave arena
 
 Open **WORM → Play → Portal Combat · Prototype**, then **Start Playing**.
 The 5×5 arena waits for **Start combat**. Worm speed is 1.25 tiles/second.
@@ -35,6 +68,11 @@ world units away. It prefers the closest alignment, then distance. A dotted aim
 line and four-part target reticle preview the next shot. Enemies crossing onto
 another face cannot be locked.
 
+Aiming and new shots pause throughout cube-edge crossings, until the visible head
+reaches the destination face. The reticle disappears and Fire reads **Turning**;
+held fire resumes on arrival, while released/tapped requests do not queue shots.
+Enemies, encounter timers and already-fired shots continue normally.
+
 Shots fly straight along the previewed direction at eight units/second, without
 homing or reacquiring targets. They stop at the current face boundary. With no
 eligible target they fire directly forward. Lightning can still chain around an
@@ -70,11 +108,11 @@ waves cleared, shots hit/fired and best combo. A chain hit counts as **one** sho
 hit even when it defeats multiple enemies. Prototype score is local to the run;
 it grants no permanent XP, mission rewards or currency.
 
-Retry resets waves, held input, effects, score, inventory and ammo. Normal WORM
-and the guided demo keep their own rules. The arena suppresses bombs, layer-turn
+Retry resets waves, held input, effects, score, inventory and ammo. Normal WORM uses the sparse director above; the guided demo keeps its own rules. The arena suppresses bombs, layer-turn
 hazards, additional portals and normal special/elemental offerings. The opening
 scramble still plays. Transporting enemies through live rotating layers remains
-outside this prototype; unexpected live rotations defensively hold combat.
+outside the arena prototype; unexpected live rotations defensively hold arena combat.
+Normal encounters instead retreat when a rotation starts or commits.
 
 ## Implementation and verification
 
@@ -90,3 +128,9 @@ Tests cover all 150 tiles, outside-corner interpolation, forward aiming in all
 24 face/heading combinations, cone limits, fixed trajectories, corner chaining, actual
 three-wave completion, enemy behaviors, all elemental effects, bounded lightning
 range, combos, intermissions, held fire, pause/retry and real tunnel healing.
+
+`ambientCombat.js` owns the sparse director. Integration tests exercise the real
+normal-WORM hook, gun input, mission/XP preservation, portal closure and demo
+exclusion. A ten-minute director simulation checks the one-enemy cap and minimum
+quiet time. Additional cases cover hazard deferral, shield repair/contact, expiry,
+MOBI locks, elemental shots and live/committed rotation cancellation.

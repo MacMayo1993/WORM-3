@@ -4,7 +4,7 @@ import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
 // Full-screen death takeovers for Worm Healer mode — a distinct themed
 // experience per death cause instead of one generic "you died" card.
 //
-// The four causes stay four identities, but they are one shell driven by a
+// The causes keep distinct identities, but they are one shell driven by a
 // config table rather than four hand-copied screens that had drifted apart in
 // spacing, button order and which stats they showed. The shell itself is shared
 // with the pause menu (./wormOverlayUI.jsx), so both screens that stop the game
@@ -40,6 +40,7 @@ function classifyDeath(reason) {
     if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted') return 'event-horizon';
     if (reason === 'slice-rotation') return 'sliced';
     if (reason === 'bomb') return 'blasted';
+    if (reason === 'portal-crawler') return 'overrun';
     return 'tail-bite'; // self-collision, plus any legacy/unknown reason
 }
 
@@ -50,6 +51,13 @@ function classifyDeath(reason) {
 //   SLICED is steel-white and filling a button with it left white label text on
 //   a near-white field. That screen borrows the red from the slice hazard.
 const DEATHS = {
+    overrun: {
+        eyebrow: 'Portal encounter',
+        title: 'SHIELDS DOWN',
+        blurb: 'Portal enemies broke your last shield. Jump to dodge; healing a tunnel restores one.',
+        accent: '#d5b4ff', accentSoft: 'rgba(181,145,235,0.45)', deep: '#492468',
+        titleSize: 'clamp(27px, min(9vw, 8vh), 64px)',
+    },
     'tail-bite': {
         eyebrow: 'Worm collision',
         title: 'TAIL BITE',

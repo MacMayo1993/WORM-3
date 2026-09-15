@@ -66,7 +66,7 @@ export function makeCombat(size, portal) {
     killsByType: { crawler: 0, scout: 0, brute: 0 }, damageTaken: 0, fireHeld: false,
     kills: 0, shotsFired: 0, shotsHit: 0, dropsCollected: 0, seq: 0,
     enemies: [], shots: [], bursts: [], drops: [], arcs: [], spawnTimer: COMBAT.warning,
-    portalOpen: true, lockedId: null, aim: null, fireRequested: false, held: false };
+    portalOpen: true, lockedId: null, aim: null, aimHeld: false, fireRequested: false, held: false };
 }
 // Aim and projectiles share a face plane. No route-finding or homing can turn a
 // forward shot into a hit behind the worm or on a hidden face.
@@ -135,6 +135,7 @@ function damageEnemy(c, enemy, amount) {
   c.lastKill = c.time; c.bestCombo = Math.max(c.bestCombo,c.combo);
   c.score += ENEMIES[type].points * c.combo;
   burst(c,enemy.tile,'kill');
+  if (c.ambient) return;
   const element = c.kills % 2 === 1 ? ELEMENT_ORDER[Math.floor(c.kills/2) % ELEMENT_ORDER.length] : null;
   c.drops.push({ id: ++c.seq, tile: { ...enemy.tile }, life: 20, element });
   if (c.drops.length > 6) c.drops.shift();
@@ -178,7 +179,7 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
   const dt = Math.max(0, Math.min(0.05, delta));
   c.held = false; c.time += dt;
   c.portalOpen = player.portalOpen;
-  if (!c.portalOpen && player.canFinish) {
+  if (!c.ambient && !c.portalOpen && player.canFinish) {
     finishCombat(c,'sealed'); return;
   }
   c.elementT = Math.max(0,c.elementT-dt);
@@ -197,12 +198,13 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
     c.recharge += dt;
     if (c.recharge >= COMBAT.recharge) { c.ammo++; c.recharge -= COMBAT.recharge; }
   } else c.recharge = 0;
-  c.aim = aimShot(c,player);
+  c.aimHeld = !!player.aimBlocked;
+  c.aim = c.aimHeld ? null : aimShot(c,player);
   c.lockedId = c.aim?.targetId ?? null;
   if (c.fireRequested || c.fireHeld) fire(c);
   c.fireRequested = false;
   const wave = WAVES[c.wave];
-  if (c.portalOpen && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap) {
+  if (!c.ambient && c.portalOpen && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap) {
     c.spawnTimer -= dt;
     if (c.spawnTimer <= 0) {
       c.enemies.push(makeEnemy(c,wave.enemies[c.waveSpawned++]));
@@ -269,7 +271,7 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
   c.arcs = c.arcs.filter(arc => arc.life > 0);
   for (const b of c.bursts) b.life -= dt;
   c.bursts = c.bursts.filter(b => b.life > 0);
-  if (c.health > 0 && c.intermission === 0 && c.waveSpawned === wave.enemies.length && c.enemies.length === 0) {
+  if (!c.ambient && c.health > 0 && c.intermission === 0 && c.waveSpawned === wave.enemies.length && c.enemies.length === 0) {
     c.wavesCleared++;
     if (c.wave === WAVES.length-1) finishCombat(c,'waves');
     else c.intermission = 4;

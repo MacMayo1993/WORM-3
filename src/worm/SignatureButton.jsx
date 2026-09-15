@@ -5,7 +5,7 @@ import { callWormTurn } from './wormTurnBridge.js';
 import { SIGNATURES } from './healerWorm/signatures.js';
 import { GAME_HUD } from '../utils/uiTheme.js';
 
-export default function SignatureButton() {
+export default function SignatureButton({ compact = false }) {
   const character = useGameStore(s => s.wormCharacter);
   const paused = useGameStore(s => s.wormPaused);
   const alive = useGameStore(s => s.wormAlive);
@@ -26,7 +26,7 @@ export default function SignatureButton() {
     const state = useGameStore.getState();
     if (!disabled && state.wormAlive && !state.wormPaused) callWormTurn('signature');
   };
-  return <div className="worm-signature-control" style={{ width: '100%', minWidth: 0, textAlign: 'center' }}>
+  return <div className={`worm-signature-control${compact ? ' worm-signature-compact' : ''}`} style={{ width: '100%', minWidth: 0, textAlign: 'center' }}>
     <button type="button" disabled={disabled} onPointerDown={activate}
       onClick={e => { if (e.detail === 0) activate(); }}
       aria-label={`${current?.returnReady ? 'Return to bookmark' : def.name}${current?.returnReady ? `, ${current.activeSeconds} seconds to return` : current?.seconds > 0 ? `, ${current.seconds} seconds remaining` : ''}`}
