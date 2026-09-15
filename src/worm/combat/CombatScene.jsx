@@ -201,10 +201,10 @@ function PortalBeacon() {
     const c = combatBridge.current;
     if (!ref.current) return;
     ref.current.visible = !!c && c.portalOpen && !c.won;
-    if (!c) return;
+    if (!ref.current.visible || !c.portal) return;
     place(ref.current,{tile:c.portal},c.size,0.12);
     const wave = WAVES[c.wave];
-    const warning = c.started && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap && c.spawnTimer <= COMBAT.warning;
+    const warning = c.ambient ? c.warning > 0 : c.started && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap && c.spawnTimer <= COMBAT.warning;
     ring.current.material.color.set(warning ? '#ffab76' : '#c29aff');
     ring.current.scale.setScalar(1+(warning?0.1*Math.sin(c.time*10):0));
     ref.current.children[1].position.z = 0.6+Math.sin(c.time*3)*0.08;
@@ -214,8 +214,8 @@ function PortalBeacon() {
     <mesh><octahedronGeometry args={[0.13]} /><meshBasicMaterial color="#c29aff" toneMapped={false} /></mesh>
   </group>;
 }
-export default function CombatScene() {
-  return <group><PortalBeacon /><AimGuide />{Array.from({length:COMBAT.maxEnemies},(_,i)=><Crawler key={i} slot={i} />)}
+export default function CombatScene({ maxEnemies = COMBAT.maxEnemies }) {
+  return <group><PortalBeacon /><AimGuide />{Array.from({length:maxEnemies},(_,i)=><Crawler key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Shot key={i} slot={i} />)}
     {Array.from({length:6},(_,i)=><Drop key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Burst key={i} slot={i} />)}

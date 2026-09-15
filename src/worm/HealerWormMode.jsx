@@ -1,3 +1,4 @@
+import { combatBridge } from './combat/portalCombat.js';
 import CombatScene from './combat/CombatScene.jsx';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import DemoPracticeTargets from './healerWorm/DemoPracticeTargets.jsx';
@@ -98,6 +99,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const finalHealCheckTimer = useRef(0);  // throttle: scan for active tunnels every 0.5s
 
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
+    const demoMode = useGameStore(s => s.demoMode);
     const combatMode = useGameStore(s => s.wormCombatMode);
     const wormGamePhase = useGameStore(s => s.wormGamePhase ?? 'scrambling');
     const wormPhaseReactive = useGameStore(s => s.wormPhase ?? 'crawling');
@@ -193,7 +195,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     }, [size, onAnimatedShuffle]);
 
     useFrame((_, delta) => {
-        worm.tick(delta);
+        worm.tick(delta, { busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
+            autoTimerRef.current >= ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING - 0.2 });
 
         // While a slice the worm sits on is mid-rotation during live play, ride it so the
         // worm visually turns with the cube rather than snapping into place only when the
@@ -332,6 +335,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
+        if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
 
         // Pause the rotation hazard until the whole worm clears its wormhole: freeze the
         // clock and warning beam while even the trailing segments are still inside.
@@ -616,7 +620,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         <>
             <WormChaseCamera worm={worm} size={size} />
             <DemoPracticeTargets size={size} />
-            {combatMode && <CombatScene />}
+            {!demoMode && <CombatScene maxEnemies={combatMode ? 4 : 1} />}
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             {/* Elemental orb wash — bathes the whole cube in the claimed element. */}
             <ElementalAtmosphere size={size} />

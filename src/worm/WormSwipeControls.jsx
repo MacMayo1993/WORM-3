@@ -86,7 +86,7 @@ export default function WormSwipeControls({ onTurn, worm }) {
         const onKey = (e) => {
             if (e.repeat && e.key !== ' ') return;
             if (e.target?.closest?.('input, textarea, select, [contenteditable=true]')) return;
-            if (e.key.toLowerCase() === 'f' && useGameStore.getState().wormCombatMode) { e.preventDefault(); e.stopPropagation(); onTurn('fire-start'); return; }
+            if (e.key.toLowerCase() === 'f' && useGameStore.getState().wormHealerMode && !useGameStore.getState().demoMode) { e.preventDefault(); e.stopPropagation(); onTurn('fire-start'); return; }
             if (e.key.toLowerCase() === 'q') { e.preventDefault(); e.stopPropagation(); onTurn('signature'); return; }
             if (e.key === 'ArrowLeft') { e.preventDefault(); emitDirection('left'); }
             if (e.key === 'ArrowRight') { e.preventDefault(); emitDirection('right'); }

@@ -6,6 +6,7 @@ import { useWormCrawler } from '../worm/useWormCrawler.js';
 import { makeCubies } from '../game/cubeState.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 import { combatBridge } from '../worm/combat/portalCombat.js';
+import { getWormTunnelSnapshot } from '../worm/tunnelSnapshot.js';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
 vi.mock('../utils/feel.js',()=>({feel:vi.fn()}));
@@ -27,7 +28,7 @@ beforeEach(()=>{
   host=document.createElement('div');document.body.append(host);root=createRoot(host);
   act(()=>root.render(<Harness/>));frame();frame();
 });
-afterEach(()=>{act(()=>root.unmount());host.remove();state().clearDisparityGame();delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
+afterEach(()=>{act(()=>root.unmount());host.remove();state().clearDisparityGame();vi.useRealTimers();delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
 it('starts explicitly, keeps the three-shot gun separate from healing inventory, and resets on retry',()=>{
   expect(state().wormPaused).toBe(true);expect(state().xpRun).toBeNull();expect(state().wormMission).toBeNull();
   const inventory={...state().wormOrbInventory};expect(Object.values(inventory).reduce((a,b)=>a+b,0)).toBe(6);
@@ -65,4 +66,66 @@ it('holds fire through recharge, releases it, and clears a held request on pause
   for(let i=0;i<20;i++)frame();expect(combatBridge.current.shotsFired).toBe(count);
   act(()=>worm.queueTurn('fire-start'));frame();act(()=>state().setWormPaused(true));frame();
   expect(combatBridge.current.fireHeld).toBe(false);
+});
+
+it('integrates sparse encounters into normal WORM without replacing missions or signatures',()=>{
+  vi.useFakeTimers();
+  act(()=>state().initWormMode());
+  act(()=>useGameStore.setState({wormGamePhase:'active',wormPaused:false}));
+  frame();const c=combatBridge.current;
+  expect(c.ambient).toBe(true);expect(c.quiet).toBeGreaterThan(44);expect(c.enemies).toHaveLength(0);
+  const xp=state().xpRun,mission=state().wormMission,inventory={...state().wormOrbInventory};
+  expect(xp).not.toBeNull();expect(mission).not.toBeNull();
+  act(()=>{worm.pos.current={x:0,y:0,z:4,dirKey:'PZ'};worm.moveDir.current='right';c.quiet=0;});
+  frame();expect(c.encounter).toBe(true);expect(c.warning).toBe(4);
+  act(()=>vi.advanceTimersByTime(100));
+  expect(host.querySelector('.worm-ambient-actions')).not.toBeNull();
+  expect(host.querySelector('.worm-signature-control')).not.toBeNull();
+  expect(host.querySelector('[aria-label^="Fire parity shot"]')).not.toBeNull();
+  expect(host.querySelector('.worm-combat-card')).toBeNull();
+  act(()=>worm.queueTurn('fire-start'));frame();
+  expect(c.shotsFired).toBe(1);expect(c.fireHeld).toBe(true);expect(state().wormOrbInventory).toEqual(inventory);
+  act(()=>worm.queueTurn('fire-stop'));expect(c.fireHeld).toBe(false);
+  expect(state().xpRun.runId).toBe(xp.runId);expect(state().wormMission).toEqual(mission);
+  act(()=>useGameStore.setState({cubies:makeCubies(5)}));frame();
+  expect(c.encounter).toBe(false);expect(c.won).toBe(false);expect(state().wormPaused).toBe(false);
+  act(()=>vi.advanceTimersByTime(100));expect(host.querySelector('.worm-ambient-actions')).toBeNull();
+});
+it('defers normal encounters to existing hazards and never creates them in the demo',()=>{
+  act(()=>state().initWormMode());act(()=>useGameStore.setState({wormGamePhase:'active',wormPaused:false}));frame();
+  const c=combatBridge.current;c.quiet=0;worm.pos.current={x:0,y:0,z:4,dirKey:'PZ'};
+  act(()=>worm.tick(.05,{busy:true}));expect(c.encounter).toBe(false);
+  act(()=>useGameStore.setState({demoMode:true,demoStep:'welcome'}));
+  act(()=>state().initWormMode());act(()=>useGameStore.setState({wormGamePhase:'active'}));frame();
+  expect(combatBridge.current).toBeNull();
+});
+it.each(['arena','normal'])('holds aim and new shots throughout an actual edge crossing in %s WORM',mode=>{
+  if(mode==='arena') act(()=>worm.queueTurn('combat-start'));
+  else {
+    act(()=>state().initWormMode());
+    act(()=>useGameStore.setState({wormGamePhase:'active',wormPaused:false}));
+    frame();
+    const hit=getWormTunnelSnapshot(state().cubies,5,state().rotationEpoch).tunnels[0];
+    Object.assign(combatBridge.current,{encounter:true,sourceId:hit.tunnel.pairId,portal:hit.tunnel.entry,warning:999});
+    worm.moveDir.current='right';
+  }
+  const c=combatBridge.current;c.spawnTimer=999;
+  until(()=>worm.pos.current.dirKey==='PZ'&&worm.pos.current.x===4&&worm.interpT.current>.8);
+  act(()=>worm.queueTurn('fire-start'));
+  let before;
+  // Catch the exact tick on which stepWormSim switches the logical face.
+  do {before=c.shotsFired;c.cooldown=0;c.ammo=3;frame();} while(worm.pos.current.dirKey==='PZ');
+  expect(worm.crossingCorner.current).toBe(true);
+  expect(worm.interpT.current).toBeLessThan(.5);
+  expect(c.shotsFired).toBe(before);expect(c.aim).toBeNull();expect(c.lockedId).toBeNull();
+  const crossingShots=c.shotsFired,time=c.time;let sawSecondHalf=false;
+  for(let i=0;i<100;i++) {
+    c.cooldown=0;c.ammo=3;frame();
+    if(!worm.crossingCorner.current||worm.interpT.current>=1)break;
+    sawSecondHalf ||= worm.interpT.current>.5;
+    expect(c.shotsFired).toBe(crossingShots);expect(c.aim).toBeNull();expect(c.aimHeld).toBe(true);
+  }
+  expect(sawSecondHalf).toBe(true);expect(c.time).toBeGreaterThan(time);
+  expect(c.fireHeld).toBe(true);expect(c.aimHeld).toBe(false);
+  expect(c.aim.face).toBe(worm.pos.current.dirKey);expect(c.shotsFired).toBeGreaterThan(crossingShots);
 });

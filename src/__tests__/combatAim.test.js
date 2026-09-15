@@ -57,6 +57,19 @@ describe('forward aim assist',()=>{
 });
 
 describe('fixed shot trajectories',()=>{
+  it('keeps existing shots moving through a crossing and discards tapped fire requests',()=>{
+    const c=arena(),p=player(tile(0,0));c.fireHeld=true;stepCombat(c,.05,p);
+    const shot=c.shots[0],x=shot.position[0],time=c.time;
+    const head={x:4,y:0,z:4,dirKey:'PX'};
+    const crossing={...player(head),position:[2.3,-2,2.72],aimBlocked:true};
+    c.cooldown=0;stepCombat(c,.05,crossing);
+    expect(c.aim).toBeNull();expect(c.lockedId).toBeNull();expect(c.shotsFired).toBe(1);
+    expect(shot.position[0]).toBeGreaterThan(x);expect(c.time).toBeGreaterThan(time);
+    c.fireHeld=false;c.fireRequested=true;stepCombat(c,.05,crossing);
+    expect(c.fireRequested).toBe(false);
+    stepCombat(c,.05,player(head));
+    expect(c.shotsFired).toBe(1);expect(c.aim.face).toBe('PX');
+  });
   it('fires a straight assisted diagonal and hits without taking a grid detour',()=>{
     const c=arena(),p=player(tile(0,1));add(c,tile(4,2));c.fireRequested=true;
     stepCombat(c,.05,p);
