@@ -1,4 +1,4 @@
-import { LevelUpCue } from './progression/ProgressWidgets.jsx';
+import { LevelUpCue, AchievementCue } from './progression/ProgressWidgets.jsx';
 import { getDirectWormPreview, subscribeDirectWormPreview } from './3d/directWormPreview.js';
 import DirectWormPreviewHost from './3d/DirectWormPreviewHost.jsx';
 import { scaledWormOrbCount } from './worm/wormDifficulty.js';
@@ -1671,7 +1671,7 @@ export default function WORM3() {
         </Suspense>
       )}
 
-      <LevelUpCue />
+      <LevelUpCue /><AchievementCue />
       {showPlayerProgress && <Suspense fallback={<LoadingScreen label="Loading rewards" />}><PlayerProgressScreen /></Suspense>}
 
       {/* Parity Store — mounted at app root so it's above every overlay. The

@@ -2,22 +2,30 @@
 
 Normal Worm and Mega runs show one active achievement at a time. Completing it
 immediately removes it from live play and assigns the next objective. Every
-completion is kept in the current run's earned list. The guided demo has no
-achievements or achievement payouts.
+completion is kept in the current run's earned list. The guided demo has no Worm challenges or Worm payouts; its introduction
+completion has a separate one-time feat.
 
 ## Track
 
 | Objective | Parity Points | Base XP |
 | --- | ---: | ---: |
-| Collect 8 orbs | 20 | 50 |
-| Complete 1 tunnel trip | 25 | 50 |
+| Collect 8 orbs | 20 | 25 |
+| Complete 1 tunnel trip | 25 | 25 |
 | Collect 3 distinct face colors | 30 | 50 |
 | Heal 1 tunnel | 40 | 50 |
 | Collect 20 orbs | 35 | 50 |
 | Complete 3 tunnel trips | 45 | 50 |
+| Collect a dozen orbs | 25 | 25 |
+| Collect 4 face colors | 35 | 50 |
+| Complete 2 tunnel trips | 30 | 25 |
+| Collect 35 orbs | 50 | 100 |
+| Collect 5 face colors | 45 | 50 |
+| Collect all 6 face colors | 60 | 100 |
 
-The six objectives repeat, including within the same run. Each completion has a
-separate receipt, even when the same objective is earned again. Targets are fixed
+The twelve objectives never repeat within a run. Recently completed goals are
+deprioritized using the last six completions in the player snapshot. When every
+eligible goal is complete, the live card disappears; background feats continue.
+Final-healing assignments skip healing goals. Targets are fixed
 across cube sizes. XP uses the run's existing difficulty multiplier: Easy ×1,
 Medium ×1.2, Hard ×1.4. Level-up PP is separate from achievement reward totals.
 
@@ -40,8 +48,8 @@ Medium ×1.2, Hard ×1.4. Level-up PP is separate from achievement reward totals
 ## Run lifecycle
 
 Earned receipts remain available on both death and victory screens. Starting a new
-run clears the run list, counters and partial progress. The saved track resumes
-with the unfinished objective; already earned PP and XP remain in the player's
+run clears the run list, counters and partial progress. The next run selects a fresh eligible goal from the saved track, avoiding recent
+completions; already earned PP and XP remain in the player's
 wallet and profile. Exiting clears run-only data while retaining lifetime progress.
 
 Lifetime completion count continues to use `worm3_missions_v1`. XP and wallet use
@@ -57,15 +65,15 @@ cards do not linger over the cube or move the camera.
 
 Pause shows achievements earned so far, their reward totals, and the active
 objective separately. End-of-run results list every earned achievement in order,
-including repeated objectives, with the actual PP and XP earned. The unfinished
-objective is labeled for the next run and is never included as earned. Runs with
+with the actual PP and XP earned. Unfinished objectives are never included as
+earned. The separate XP summary lists background feats and a run highlight. Runs with
 no completions show an explicit empty state. Existing scrollable result screens
 keep long achievement lists and the Play again button reachable.
 
 ## Verification
 
 The mission tests cover immediate replacement, new-objective baselines, batched
-and duplicate events, distinct colors, repeated tracks, per-achievement XP/PP,
+and duplicate events, distinct colors, pool exhaustion without repeats, per-achievement XP/PP,
 level rewards, persistence, death/retry/exit, pause/demo exclusions, live-card
 replacement, full win/death results and results reopening without another payout.
 Store surface and XP event tests also cover the new state and cumulative rewards.

@@ -80,6 +80,7 @@ export default function MobiusCubeletScreen({ onBack }) {
   };
 
   useEffect(() => {
+    useGameStore.getState().beginAchievementActivity('explore');
     const t = setTimeout(() => setVisible(true), 30);
     return () => clearTimeout(t);
   }, []);
