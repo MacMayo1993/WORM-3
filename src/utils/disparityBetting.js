@@ -35,7 +35,7 @@ export const BET_TYPES = {
   },
   PAIR: {
     id: 'PAIR',
-    label: 'Exact Pair',
+    label: 'Color Pair',
     tagline: 'Name the winning antipodal pair',
     desc: 'Call the antipodal pairing that outlasts all others: Red-Orange, Green-Blue, or White-Yellow. 1-in-3 shot.',
     odds: 2.7,

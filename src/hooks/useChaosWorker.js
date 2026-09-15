@@ -141,6 +141,7 @@ export function useChaosWorker({
     worker.onmessageerror = failRound;
 
     worker.onmessage = (e) => {
+      if (e.data.payload?.gen != null && e.data.payload.gen !== genRef.current) return;
       if (e.data.type === 'METRICS') {
         // Initial snapshot posted on START so HUDs have data before the first tick.
         useGameStore.getState().setChaosStats(e.data.payload.metrics);
@@ -157,6 +158,7 @@ export function useChaosWorker({
         return;
       }
       if (e.data.type !== 'TICK') return;
+      if (useGameStore.getState().chaosLevel <= 0 || useGameStore.getState().disparityWinner) return;
       // Drop flip batches from a superseded run — the cube was reset/shuffled/resized
       // after the worker computed this TICK, so applying it would dirty the new board.
       if (e.data.payload?.gen != null && e.data.payload.gen !== genRef.current) return;
@@ -220,31 +222,32 @@ export function useChaosWorker({
         addDisparityEliminatedFacesBulk(eliminatedFaces);
       }
 
+      // Reconcile the rendered board before recording the final burst.
+      if (finalState && winner?.length) setCubies(finalState);
+      useGameStore.getState().recordChaosTick(e.data.payload);
+
       if (winner?.length) {
-        // Make the visible cube match the worker's authoritative terminal
-        // state before opening the result screen. Normal TICK operations are
-        // applied incrementally above for animation, but React can defer those
-        // commits under load; replacing with this final snapshot prevents the
-        // game from announcing one antipodal pair while stale live tiles are
-        // still rendered.
-        if (finalState) setCubies(finalState);
         // Flush any lingering bolt visuals when the winner pair is finalized.
         setCascades([]);
         const finalWinner = winner;
+        useGameStore.getState().setDisparityWinner({ pair: finalWinner });
+        const winnerState = useGameStore.getState().disparityWinner;
+        const winnerGeneration = genRef.current;
         const announce = () => {
-          useGameStore.getState().setDisparityWinner({ pair: finalWinner });
-          useGameStore.getState().setShowDisparityWinner(true);
+          const live = useGameStore.getState();
+          if (live.chaosLevel > 0 && live.disparityWinner === winnerState && genRef.current === winnerGeneration) {
+            live.setShowDisparityWinner(true);
+          }
         };
-        // Always delay: the final deaths may have arrived in a prior TICK whose
-        // 500ms animation is still playing. The unconditional 700ms window lets
-        // all in-flight death animations finish before the winner screen appears.
+        // Let death animations finish, then hold the marked final pair briefly
+        // before opening results. The winner is already frozen above.
         // Track the timer so exiting chaos mode inside the window cancels it —
         // otherwise the winner screen pops over whatever mode the player is in.
         if (winnerTimeoutRef.current) clearTimeout(winnerTimeoutRef.current);
         winnerTimeoutRef.current = setTimeout(() => {
           winnerTimeoutRef.current = null;
           announce();
-        }, 700);
+        }, 1800);
       }
 
       if (metrics) {
@@ -282,6 +285,7 @@ export function useChaosWorker({
     if (chaosMode) {
       manifoldMapRef.current = buildManifoldGridMap(cubies, size);
       useGameStore.getState().clearDisparityGame();
+      useGameStore.getState().startChaosExperience();
       genRef.current += 1;
       worker.postMessage({
         type: 'START',

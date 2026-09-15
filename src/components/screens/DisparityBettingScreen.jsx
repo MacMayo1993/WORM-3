@@ -1,3 +1,5 @@
+import '../../chaos/chaos.css';
+import { useDialogBehavior } from '../ui/Panel.jsx';
 import React, { useState, useMemo, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import {
@@ -30,7 +32,7 @@ const S = {
     boxShadow: PAPER_SHADOW,
     border: `1px solid ${PAPER_BORDER}`, animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
-  header: { padding: '24px 28px 16px', flexShrink: 0 },
+  header: { padding: '20px 0 16px', flexShrink: 0 },
   body: {
     padding: '0 28px', overflowY: 'auto', flex: 1,
     scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent`,
@@ -117,7 +119,7 @@ const StepLabel = ({ n, done, active, label }) => (
 
 // ── Bet type card ─────────────────────────────────────────────────────────────
 const BetTypeCard = ({ betType, selected, onSelect }) => (
-  <button onPointerDown={onSelect} style={S.betCard(selected)}>
+  <button aria-pressed={selected} onClick={onSelect} style={S.betCard(selected)}>
     <div style={{
       position: 'absolute', top: '8px', right: '8px',
       background: selected ? ACCENT : '#e8e2da',
@@ -144,7 +146,7 @@ const FacePicker = ({ value, onChange }) => (
       const faceId = parseInt(id, 10);
       const selected = value === faceId;
       return (
-        <button key={id} onPointerDown={() => onChange(faceId)} style={{
+        <button key={id} aria-pressed={selected} onClick={() => onChange(faceId)} style={{
           display: 'flex', alignItems: 'center', gap: '6px',
           padding: '7px 13px', borderRadius: '100px', cursor: 'pointer',
           border: selected ? `2px solid ${info.hex}` : `2px solid ${PAPER_BORDER_SOFT}`,
@@ -172,7 +174,7 @@ const PairPicker = ({ value, onChange }) => (
       const f1 = FACE_INFO[pair.faces[0]];
       const f2 = FACE_INFO[pair.faces[1]];
       return (
-        <button key={pair.id} onPointerDown={() => onChange(pair.id)} style={{
+        <button key={pair.id} aria-pressed={selected} onClick={() => onChange(pair.id)} style={{
           display: 'flex', alignItems: 'center', gap: '6px',
           padding: '8px 14px', borderRadius: '100px', cursor: 'pointer',
           border: selected ? `2px solid ${pair.color}` : `2px solid ${PAPER_BORDER_SOFT}`,
@@ -201,11 +203,11 @@ const SpeedPicker = ({ value, onChange, thresholdSec }) => (
   <div style={{ display: 'flex', gap: '10px' }}>
     {[
       { id: 'FAST', label: 'Fast', sub: thresholdSec ? `< ${formatSpeedThreshold(thresholdSec)}` : 'beats the typical pace', color: '#c45000' },
-      { id: 'SLOW', label: 'Slow', sub: thresholdSec ? `> ${formatSpeedThreshold(thresholdSec)}` : 'outlasts the typical pace', color: '#1565C0' },
+      { id: 'SLOW', label: 'Slow', sub: thresholdSec ? `≥ ${formatSpeedThreshold(thresholdSec)}` : 'outlasts the typical pace', color: '#1565C0' },
     ].map(opt => {
       const selected = value === opt.id;
       return (
-        <button key={opt.id} onPointerDown={() => onChange(opt.id)} style={{
+        <button key={opt.id} aria-pressed={selected} onClick={() => onChange(opt.id)} style={{
           flex: 1, padding: '14px', borderRadius: '12px', cursor: 'pointer',
           border: selected ? `2px solid ${opt.color}` : `2px solid ${PAPER_BORDER_SOFT}`,
           background: selected ? `${opt.color}14` : PAPER_SHEET_RAISED,
@@ -225,11 +227,14 @@ const SpeedPicker = ({ value, onChange, thresholdSec }) => (
 );
 
 // ── Main component ────────────────────────────────────────────────────────────
-const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null }) => {
+const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null, settings, onBack }) => {
+  const dialogRef = useRef(null);
+  const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
   const parityPoints = useGameStore(s => s.parityPoints);
   const betStreak = useGameStore(s => s.betStreak);
+  const record = useGameStore(s => s.chaosRecord);
 
-  const [selectedType, setSelectedType] = useState(null);
+  const [selectedType, setSelectedType] = useState('PAIR');
   const [pick, setPick] = useState(null);
   const [wager, setWager] = useState(25);
 
@@ -265,7 +270,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
     : null;
 
   return (
-    <div style={S.overlay}>
+    <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui" style={S.overlay} role="dialog" aria-modal="true" aria-label="Choose a Chaos prediction">
       <div style={S.sheet}>
 
         {/* ── Scrollable body ─────────────────────────────────────────────── */}
@@ -278,13 +283,13 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
                 <div>
                   <div style={S.badge}>
                     <span style={{ fontSize: '13px' }}>🎲</span>
-                    <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>Parity Roulette</span>
+                    <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>CHAOS · Forecast</span>
                   </div>
                   <h2 style={{ margin: 0, fontSize: 'clamp(20px,5vw,26px)', fontWeight: 900, color: PAPER_TEXT, letterSpacing: '-0.04em', lineHeight: 1.1 }}>
-                    Place Your Bet
+                    Call the survivors
                   </h2>
                   <p style={{ margin: '6px 0 0', fontSize: '13px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>
-                    Pick a wager before the round starts — wins are paid in PP.
+                    Choose a color pair, follow its tiles, and heal the storm. Predictions use Parity Points.
                   </p>
                 </div>
 
@@ -301,6 +306,11 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
               </div>
             </div>
 
+            <div className="chaos-inspect">
+              <strong>{settings?.cubeSize || 3}×{settings?.cubeSize || 3} · Intensity {settings?.disparityLevel || 3} · {settings?.flipCap || 8} flips to elimination</strong>
+              <p>Opposite tiles share their fate. Tap a damaged living tile during the round to heal a wave; healing can change your prediction’s outcome.</p>
+              <p>{record.predictions ? `${record.correct} / ${record.predictions} correct calls · Best streak ${record.bestStreak}` : 'Make your first call, or play without a wager.'}</p>
+            </div>
             {/* Step 1 — Bet type */}
             <div style={{ marginBottom: '20px' }}>
               <StepLabel n={1} done={!!selectedType} active={!selectedType} label="Choose a Bet Type" />
@@ -319,6 +329,13 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
                   <p style={{ margin: '0 0 10px', fontSize: '12px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>{betDef.desc}</p>
                   {(selectedType === 'SURVIVOR' || selectedType === 'FIRST_OUT') && <FacePicker value={pick} onChange={setPick} />}
                   {selectedType === 'PAIR' && <PairPicker value={pick} onChange={setPick} />}
+                  {selectedType === 'PAIR' && pick && <div className="chaos-inspect">
+                    <strong>Your color pair</strong>
+                    <div className="chaos-inspect-pair">{ANTIPODAL_PAIRS.find(p => p.id === pick).faces.map(f =>
+                      <div key={f} className="chaos-inspect-face" style={{ background: FACE_INFO[f].hex }}>{FACE_INFO[f].name}<br /><small>{(settings?.cubeSize || 3) ** 2} tiles</small></div>
+                    )}</div>
+                    <p>You are backing this color family. Any surviving antipodal tile pair in these colors wins your call.</p>
+                  </div>}
                   {selectedType === 'SPEED' && <SpeedPicker value={pick} onChange={setPick} thresholdSec={speedThresholdSec} />}
                 </>
               ) : (
@@ -336,7 +353,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
                   const disabled = preset > maxWager;
                   const active = wager === preset;
                   return (
-                    <button key={preset} onPointerDown={() => !disabled && setWager(preset)} style={{
+                    <button key={preset} disabled={disabled} aria-pressed={active} onClick={() => !disabled && setWager(preset)} style={{
                       padding: '6px 14px', borderRadius: '100px',
                       cursor: disabled ? 'not-allowed' : 'pointer',
                       border: active ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
@@ -352,7 +369,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
                   );
                 })}
                 {maxWager >= BET_MIN && !WAGER_PRESETS.includes(maxWager) && (
-                  <button onPointerDown={() => setWager(maxWager)} style={{
+                  <button onClick={() => setWager(maxWager)} style={{
                     padding: '6px 14px', borderRadius: '100px', cursor: 'pointer',
                     border: wager === maxWager ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
                     background: wager === maxWager ? `${ACCENT}14` : PAPER_SHEET_RAISED,
@@ -390,18 +407,19 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null 
         {/* ── Sticky footer ─────────────────────────────────────────────── */}
         <div style={S.footer}>
           {hint && <div style={S.hint}>{hint}</div>}
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
-              onPointerDown={handlePlace}
+              onClick={handlePlace}
               disabled={!canPlace}
               style={S.primaryBtn(canPlace)}
             >
               {canPlace ? `Bet ${wager} PP & Start` : 'Place Bet & Start'}
             </button>
-            <button onPointerDown={onSkip} style={S.skipBtn}>
+            <button onClick={() => { if (!placedRef.current) { placedRef.current = true; onSkip(); } }} style={S.skipBtn}>
               Skip & Start
             </button>
           </div>
+          {onBack && <button onClick={onBack} style={{ ...S.skipBtn, padding: 8 }}>Back to setup</button>}
         </div>
       </div>
     </div>

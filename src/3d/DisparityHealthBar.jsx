@@ -9,7 +9,7 @@ const DisparityHealthBar = React.memo(function DisparityHealthBar({ flips, flipC
     if (pct <= 0) return null;
 
     const barColor = pct < 0.33 ? '#22c55e' : pct < 0.66 ? '#f97316' : '#ef4444';
-    const isFlashing = pct >= 0.9;
+    const isFlashing = flipCap - flips <= 1;
     const barWidth = pct * 0.82;
 
     return (
@@ -19,6 +19,10 @@ const DisparityHealthBar = React.memo(function DisparityHealthBar({ flips, flipC
                 <planeGeometry args={[0.82, 0.05]} />
                 <meshBasicMaterial color="#111111" transparent opacity={0.5} depthWrite={false} />
             </mesh>
+            {isFlashing && <mesh position={[0.37, 0.08, 0.002]}>
+                <planeGeometry args={[0.07, 0.07]} />
+                <meshBasicMaterial color="#fffdf2" depthWrite={false} toneMapped={false} />
+            </mesh>}
             {/* Fill bar — left-aligned so it shrinks from right */}
             <mesh position={[-(0.82 - barWidth) / 2, 0, 0.001]}>
                 <planeGeometry args={[barWidth, 0.05]} />

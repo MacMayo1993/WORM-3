@@ -31,7 +31,7 @@ const schedule = () => {
     // Pass accumulated real ms so chain cooldowns run in wall-clock time.
     const payload = sim.chainTick(tickAcc);
     if (payload && payload.didWork) {
-      postTick(payload);
+      postTick({ ...payload, source: 'chain' });
     }
     if (sim.isFinished()) running = false;
     tickAcc = 0;
@@ -45,6 +45,7 @@ const schedule = () => {
     if (conwayPayload) {
       postTick({
         ...conwayPayload,
+        source: 'conway',
         // Winner detection stays with the chain tick, which re-evaluates the
         // alive count every cycle — at most one chain period behind a Conway kill.
         winner: null,
@@ -87,7 +88,7 @@ self.onmessage = (e) => {
       running = true;
       // Immediate metrics snapshot so HUDs have data before the first
       // productive tick (replaces main-thread polling scans).
-      self.postMessage({ type: 'METRICS', payload: { metrics: sim.getMetrics() } });
+      self.postMessage({ type: 'METRICS', payload: { metrics: sim.getMetrics(), gen: workerGen } });
       if (timerId) clearTimeout(timerId);
       schedule();
       break;
