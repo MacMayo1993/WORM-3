@@ -15,7 +15,8 @@ import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
-import { getWormPress, wormPress } from '../worm/tilePressBridge.js';
+import { getWormPress, getWormContact, wormPress } from '../worm/tilePressBridge.js';
+import { updateTilePressVisual } from '../worm/tilePressVisual.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
 import WaterVolume from './styles/WaterVolume.jsx';
@@ -50,20 +51,6 @@ const _wormApertureGeo = new THREE.PlaneGeometry(0.76, 0.76);
 // Neon worm-border plane — sits in the grid-line channel just outside the sticker so the
 // glowing square outline traces the tile's own perimeter (like the neon view mode).
 const _neonBorderGeo = new THREE.PlaneGeometry(0.94, 0.94);
-// How far into the cube a tile sinks under the worm, in world units.
-//
-// The ceiling here is not taste, it is clearance: a sticker sits at 0.51 on a
-// cubie body that is 0.98 across (face at 0.49), so it floats 0.02 proud of the
-// piece it is stuck to. Sink it past that and the body's own face — which writes
-// depth even in worm mode, where it is only partly transparent — swallows it, and
-// the tile does not read as pressed, it reads as gone.
-const PRESS_DEPTH = 0.019;
-// …and how much it narrows at full press, opening the grid channel around it.
-// This is the cue that survives being looked at head-on, where two hundredths of
-// depth is a couple of pixels; it reads as the tile dropping into its socket.
-// 14% is intentional: depth alone is almost invisible from the chase camera, while
-// this exposes a broad socket around the pressed face without making it look detached.
-const PRESS_SHRINK = 0.14;
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
 // avoids depth-sorting issues and is unaffected by the biome-mode code that explicitly
@@ -961,9 +948,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (!key) return undefined;
     const tickSticker = (state, delta) => tickImplRef.current?.(state, delta);
     registerSticker(key, tickSticker);
-    if ((meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig) activateSticker(key);
+    // A reused slot needs one tick to clear old contact or resume a moved spring.
+    activateSticker(key);
     return () => unregisterSticker(key, tickSticker);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- meta read only at (re)register time
   }, [stickerGridId]);
 
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
@@ -1057,7 +1044,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     prevRawP.current = 0;
     blinkBounceRef.current = 0;
     innerShockZ.current = 0;
-    innerPressZ.current = 0;
+    innerPressZ.current = updateTilePressVisual(
+      innerGroupRef.current, footprintGroupRef.current, footprintUniforms, 0, 0, wormPress.color
+    );
     applyInnerZ();
     if (eyelidOverlayRef.current) eyelidOverlayRef.current.visible = false;
     if (spinRevealRef.current) spinRevealRef.current.visible = false;
@@ -1267,31 +1256,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Sits ahead of the idle gate, and feeds it: a tile whose only activity is
     // being stood on has to run, and — just as important — has to get one last
     // frame at press 0 to put itself back flat before it goes to sleep.
-    let pressBusy = false;
-    if (wormHealerMode) {
-      const press = getWormPress(surfaceTileKey);
-      pressBusy = press !== 0 || innerPressZ.current !== 0;
-      if (pressBusy) {
-        innerPressZ.current = -press * PRESS_DEPTH;
-        applyInnerZ();
-        if (innerGroupRef.current) {
-          const shrink = 1 - Math.max(0, press) * PRESS_SHRINK;
-          innerGroupRef.current.scale.set(shrink, shrink, 1);
-        }
-        const fpGroup = footprintGroupRef.current;
-        if (fpGroup) {
-          const lit = press > 0.01;
-          fpGroup.visible = lit;
-          if (lit) {
-            // Half the tile's own sink: the lit square lives in the channel wall
-            // between this tile and its neighbours, not on the tile's face.
-            fpGroup.position.z = -press * PRESS_DEPTH * 0.5;
-            footprintUniforms.uPress.value = press;
-            footprintUniforms.uColor.value.set(wormPress.color);
-          }
-        }
-      }
-    }
+    const press = wormHealerMode ? getWormPress(surfaceTileKey) : 0;
+    const pressBusy = press !== 0 || innerPressZ.current !== 0;
+    // Always clear presentation before the idle gate, including after identity
+    // changes, restart, mode exit and spring remapping through a slice turn.
+    innerPressZ.current = updateTilePressVisual(
+      innerGroupRef.current, footprintGroupRef.current, footprintUniforms,
+      press, wormHealerMode ? getWormContact(surfaceTileKey) : 0, wormPress.color
+    );
+    applyInnerZ();
 
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).

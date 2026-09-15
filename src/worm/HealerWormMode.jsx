@@ -621,7 +621,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 hidden={wormInTunnel}
             />
             <HealerBombs bombsRef={bombsRef} membershipRef={bombMembershipRef} blastApiRef={blastApiRef} size={size} hidden={wormInTunnel} />
-            <TunnelHealProgress size={size} />
+            <TunnelHealProgress size={size} worm={worm} />
             <HealBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
             <SpecialFlashSystem worm={worm} />

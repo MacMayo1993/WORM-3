@@ -488,7 +488,7 @@ const Cubie = React.forwardRef(function Cubie({
           <boxGeometry args={[0.98, 0.98, 0.98]} />
         </mesh>
       ) : (
-        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
+        <RoundedBox args={wormMode ? [0.92, 0.92, 0.92] : [0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
           <meshStandardMaterial {...bodyMatProps} />
         </RoundedBox>
       )}

@@ -1,15 +1,15 @@
 // src/worm/healerWorm/healFx.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { findStickerByStableKey } from '../wormLogic.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
-import { isMobile } from '../../utils/device.js';
+import { readLiveTile } from '../wormHelpers.js';
+import { updateHealBadgePose } from './healBadgePose.js';
 import { UI_FONT } from '../../utils/uiTheme.js';
 import { liveCubies } from '../liveCubies.js';
 import { FACE_NORMALS, HEAL_COST } from './constants.js';
@@ -129,66 +129,86 @@ export function HealBurstSystem({ worm, size }) {
     );
 }
 
-export function TunnelHealProgress({ size }) {
-    const healingProgress = useGameStore((s) => s.wormHealingProgress ?? {});
-    const cubies = useGameStore((s) => s.debouncedCubies ?? s.cubies);
+// A real depth-tested scene badge: HTML overlays cannot be hidden by the cube's
+// depth buffer. Facing/inside gates also cover the translucent Worm chassis.
+function HealProgressBadge({ entry, color, size, worm }) {
+    const sprite = useRef();
+    const scratch = useMemo(() => ({ position: new THREE.Vector3(), normal: new THREE.Vector3() }), []);
+    const texture = useMemo(() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 160;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#101525';
+        ctx.beginPath();
+        ctx.roundRect(4, 4, 504, 152, 36);
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `bold 38px ${UI_FONT}`;
+        ctx.fillText(`${entry.remaining} ${entry.remaining === 1 ? 'ORB' : 'ORBS'} TO HEAL`, 256, 56);
+        for (let i = 0; i < HEAL_COST; i++) {
+            ctx.beginPath();
+            ctx.arc(196 + i * 40, 115, 11, 0, Math.PI * 2);
+            ctx.fillStyle = i < HEAL_COST - entry.remaining ? color : '#30384b';
+            ctx.fill();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        const map = new THREE.CanvasTexture(canvas);
+        map.colorSpace = THREE.SRGBColorSpace;
+        return map;
+    }, [entry.remaining, color]);
+    useEffect(() => () => texture.dispose(), [texture]);
+
+    useFrame(({ camera }) => {
+        const mesh = sprite.current;
+        if (!mesh) return;
+        const { position, normal } = scratch;
+        if (!readLiveTile(entry.pos, position, normal)) {
+            position.fromArray(entry.wp);
+            normal.copy(FACE_NORMALS[entry.pos.dirKey]);
+        }
+        updateHealBadgePose(mesh, position, normal, camera.position, size, worm?.phase?.current);
+    });
+
+    return (
+        <sprite ref={sprite} visible={false} raycast={() => null}>
+            <spriteMaterial map={texture} transparent depthTest depthWrite={false} toneMapped={false} />
+        </sprite>
+    );
+}
+
+export function TunnelHealProgress({ size, worm }) {
+    const healingProgress = useGameStore((s) => s.wormHealingProgress);
+    // Use committed positions, not the lagging debounce snapshot, so a turn cannot
+    // leave a badge stranded on the old face. readLiveTile handles the tween.
+    const cubies = useGameStore((s) => s.cubies);
     const settings = useGameStore((s) => s.settings);
     const faceColors = useMemo(
         () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
         [settings]
     );
-
     const entries = useMemo(() => {
-        const partial = Object.entries(healingProgress).filter(([, p]) => p.deposited > 0 && p.deposited < HEAL_COST);
+        const partial = Object.entries(healingProgress ?? {}).filter(([, p]) => p.deposited >= 0 && p.deposited < HEAL_COST);
         if (partial.length === 0) return [];
-        // Build the manifold map once and share it across all findStickerByStableKey calls.
-        // Without this, each call rebuilt an O(size³×6) map — 3 tunnels = 3× the work.
-        // NOTE: this operates on the *debounced* cubies snapshot, not the live epoch's, so it
-        // intentionally bypasses the shared manifoldMapStore owner (which is keyed on the live
-        // rotationEpoch) and builds against this lagged snapshot directly.
         const mm = buildManifoldGridMap(cubies, size);
-        return partial
-            .map(([key, p]) => {
-                const pos = findStickerByStableKey(cubies, size, key, mm);
-                if (!pos) return null;
-                const wp = getStickerWorldPos(pos.x, pos.y, pos.z, pos.dirKey, size, 0);
-                if (!wp) return null;
-                return { key, wp, remaining: HEAL_COST - p.deposited, faceId: p.faceId };
-            })
-            .filter(Boolean);
+        return partial.map(([key, p]) => {
+            const pos = findStickerByStableKey(cubies, size, key, mm);
+            if (!pos) return null;
+            const sticker = cubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[pos.dirKey];
+            if (!sticker || sticker.curr === sticker.orig) return null;
+            const wp = getStickerWorldPos(pos.x, pos.y, pos.z, pos.dirKey, size, 0);
+            return wp ? { key, pos, wp, remaining: HEAL_COST - p.deposited, faceId: p.faceId } : null;
+        }).filter(Boolean);
     }, [healingProgress, cubies, size]);
 
-    if (entries.length === 0) return null;
-
-    return (
-        <>
-            {entries.map(({ key, wp, remaining, faceId }) => {
-                const color = faceColors[faceId] ?? '#ffffff';
-                return (
-                    <Html key={key} position={[wp[0], wp[1], wp[2]]} center>
-                        <div style={{
-                            background: color,
-                            color: '#ffffff',
-                            width: isMobile ? '32px' : '26px',
-                            height: isMobile ? '32px' : '26px',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: isMobile ? '15px' : '13px',
-                            fontWeight: 900,
-                            fontFamily: UI_FONT,
-                            border: '2.5px solid #ffffff',
-                            boxShadow: `0 0 10px ${color}, 0 2px 6px rgba(0,0,0,0.5)`,
-                            lineHeight: 1,
-                            pointerEvents: 'none',
-                            userSelect: 'none',
-                        }}>
-                            {remaining}
-                        </div>
-                    </Html>
-                );
-            })}
-        </>
-    );
+    return entries.map(entry => (
+        <HealProgressBadge key={entry.key} entry={entry} color={faceColors[entry.faceId] ?? '#ffffff'} size={size} worm={worm} />
+    ));
 }
