@@ -1,11 +1,12 @@
 import { ENEMIES, WAVES, ELEMENTS, ELEMENT_ORDER, ELEMENT_DURATION } from './combatDefs.js';
+import { DIR_FORWARD } from '../healerWorm/constants.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
 import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 
 export const COMBAT = Object.freeze({ magazine: 3, recharge: 1.4, fireInterval: 0.32,
   health: 3, maxEnemies: 4, warning: 2.5, spawnInterval: 6, enemySpeed: 0.85,
-  shotSpeed: 8, range: 7, invulnerability: 1.6 });
+  shotSpeed: 8, range: 7, aimCos: Math.cos(Math.PI / 9), invulnerability: 1.6 });
 export const combatBridge = { current: null };
 export const combatKey = p => `${p.x},${p.y},${p.z},${p.dirKey}`;
 const normals = { PX: [1,0,0], NX: [-1,0,0], PY: [0,1,0], NY: [0,-1,0], PZ: [0,0,1], NZ: [0,0,-1] };
@@ -65,25 +66,52 @@ export function makeCombat(size, portal) {
     killsByType: { crawler: 0, scout: 0, brute: 0 }, damageTaken: 0, fireHeld: false,
     kills: 0, shotsFired: 0, shotsHit: 0, dropsCollected: 0, seq: 0,
     enemies: [], shots: [], bursts: [], drops: [], arcs: [], spawnTimer: COMBAT.warning,
-    portalOpen: true, lockedId: null, fireRequested: false, held: false };
+    portalOpen: true, lockedId: null, aim: null, fireRequested: false, held: false };
 }
-export function acquireTarget(c, head) {
-  let best = null, distance = Infinity;
+// Aim and projectiles share a face plane. No route-finding or homing can turn a
+// forward shot into a hit behind the worm or on a hidden face.
+function shotOrigin(c, head, position) {
+  const center = surfacePose(head,head,0,c.size,0.2).position;
+  return center.map((v,i) => normals[head.dirKey][i] ? v
+    : Math.max(-c.size/2,Math.min(c.size/2,position?.[i] ?? v)));
+}
+export function acquireTarget(c, head, heading, position) {
+  const forward = DIR_FORWARD[head.dirKey]?.[heading];
+  if (!forward) return null;
+  const origin = shotOrigin(c,head,position);
+  let best = null, alignment = COMBAT.aimCos, distance = Infinity;
   for (const enemy of c.enemies) {
-    if (enemy.emerging > 0) continue;
-    const route = surfaceRoute(head,enemy.tile,c.size,COMBAT.range);
-    if (route && route.length < distance) { best = enemy; distance = route.length; }
+    if (enemy.emerging > 0 || enemy.tile.dirKey !== head.dirKey ||
+      (enemy.next && enemy.next.dirKey !== head.dirKey)) continue;
+    const offset = pose(enemy,c,0.2).map((v,i) => normals[head.dirKey][i] ? 0 : v-origin[i]);
+    const length = Math.hypot(...offset);
+    if (length < 0.001 || length > COMBAT.range) continue;
+    const dot = offset.reduce((sum,v,i) => sum+v*forward[i],0)/length;
+    if (dot >= COMBAT.aimCos && (dot > alignment+1e-6 || (Math.abs(dot-alignment) <= 1e-6 && length < distance))) {
+      best = enemy; alignment = dot; distance = length;
+    }
   }
   return best;
 }
-function fire(c, player) {
-  if (c.ammo <= 0 || c.cooldown > 0 || c.shots.length >= 8) return;
-  const target = acquireTarget(c, player.head);
-  const next = target ? surfaceRoute(player.head, target.tile, c.size)?.[0]
-    : getNextSurfacePosition(player.head, player.heading, c.size);
+function aimShot(c, player) {
+  const origin = shotOrigin(c,player.head,player.position);
+  const target = acquireTarget(c,player.head,player.heading,player.position);
+  const forward = DIR_FORWARD[player.head.dirKey]?.[player.heading];
+  if (!forward) return null;
+  const offset = target ? pose(target,c,0.2).map((v,i) => normals[player.head.dirKey][i] ? 0 : v-origin[i]) : forward;
+  const length = Math.hypot(...offset), direction = offset.map(v => v/length);
+  let range = COMBAT.range;
+  for (let i=0;i<3;i++) if (Math.abs(direction[i]) > 1e-6) {
+    range = Math.min(range,(Math.sign(direction[i])*c.size/2-origin[i])/direction[i]);
+  }
+  return { origin, direction, range: Math.max(0,range), targetId: target?.id ?? null, face: player.head.dirKey };
+}
+function fire(c) {
+  if (!c.aim || c.ammo <= 0 || c.cooldown > 0 || c.shots.length >= 8) return;
+  const aim = c.aim;
   c.ammo--; c.cooldown = COMBAT.fireInterval; c.shotsFired++;
-  c.shots.push({ id: ++c.seq, tile: { ...player.head }, next: next || null, t: 0,
-    heading: next?.moveDir || player.heading, targetId: target?.id, life: 2,
+  c.shots.push({ id: ++c.seq, position: [...aim.origin], direction: [...aim.direction],
+    face: aim.face, remaining: aim.range, life: COMBAT.range/COMBAT.shotSpeed,
     element: c.element, color: ELEMENTS[c.element]?.color || (c.shotsFired % 2 ? '#c38bff' : '#8af7ee') });
 }
 function burst(c, tile, kind) {
@@ -141,12 +169,12 @@ function hitEnemy(c, shot, enemy, player) {
 }
 function finishCombat(c, reason) {
   c.won = true; c.endReason = reason; c.enemies = []; c.shots = [];
-  c.fireRequested = false; c.fireHeld = false;
+  c.fireRequested = false; c.fireHeld = false; c.lockedId = null; c.aim = null;
 }
 // No wall-clock timers: pause, tunnel travel, claim beats and rotations hold all
 // combat clocks together. Requests made while held are discarded, never buffered.
 export function stepCombat(c, delta, player, onHit = () => {}) {
-  if (!c || !c.started || c.won || c.health <= 0 || player.blocked) { if (c) { c.fireRequested = false; c.fireHeld = false; } return; }
+  if (!c || !c.started || c.won || c.health <= 0 || player.blocked) { if (c) { c.fireRequested = false; c.fireHeld = false; c.lockedId = null; c.aim = null; } return; }
   const dt = Math.max(0, Math.min(0.05, delta));
   c.held = false; c.time += dt;
   c.portalOpen = player.portalOpen;
@@ -169,8 +197,9 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
     c.recharge += dt;
     if (c.recharge >= COMBAT.recharge) { c.ammo++; c.recharge -= COMBAT.recharge; }
   } else c.recharge = 0;
-  c.lockedId = acquireTarget(c, player.head)?.id ?? null;
-  if (c.fireRequested || c.fireHeld) fire(c, player);
+  c.aim = aimShot(c,player);
+  c.lockedId = c.aim?.targetId ?? null;
+  if (c.fireRequested || c.fireHeld) fire(c);
   c.fireRequested = false;
   const wave = WAVES[c.wave];
   if (c.portalOpen && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap) {
@@ -210,18 +239,12 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
   for (const shot of c.shots) {
     for (let remaining = dt; remaining > 0 && shot.life > 0;) {
       const step = Math.min(remaining, 0.02); remaining -= step; shot.life -= step;
-      if (!shot.next) {
-        const target = c.enemies.find(e => e.id === shot.targetId);
-        shot.next = target ? surfaceRoute(shot.tile, target.tile, c.size)?.[0]
-          : getNextSurfacePosition(shot.tile, shot.heading, c.size);
-        if (shot.next) shot.heading = shot.next.moveDir;
-      }
-      if (shot.next) {
-        shot.t += step * COMBAT.shotSpeed;
-        if (shot.t >= 1) { shot.tile = shot.next; shot.next = null; shot.t = 0; }
-      }
-      const position = pose(shot,c,0.2);
-      const hit = c.enemies.find(e => e.emerging <= 0 && distanceSq(position,pose(e,c,0.2)) < 0.42 ** 2);
+      const travel = Math.min(step*COMBAT.shotSpeed,shot.remaining);
+      for (let i=0;i<3;i++) shot.position[i] += shot.direction[i]*travel;
+      shot.remaining -= travel;
+      const hit = c.enemies.find(e => e.emerging <= 0 && e.tile.dirKey === shot.face &&
+        (!e.next || e.next.dirKey === shot.face) && distanceSq(shot.position,pose(e,c,0.2)) < 0.42 ** 2);
+      if (shot.remaining <= 0) shot.life = 0;
       if (hit) hitEnemy(c,shot,hit,player);
     }
   }
