@@ -5,8 +5,8 @@ import { missionDefinition } from './missions.js';
 import './wormMissions.css';
 
 export default function WormMissionCard({ summary = false }) {
-  const { mission, demo, completed, alive, paused, phase } = useGameStore(useShallow(s => ({
-    mission: s.wormMission, demo: s.demoMode, completed: s.wormMissionsCompleted,
+  const { mission, demo, completed, alive, paused, phase, multiplier } = useGameStore(useShallow(s => ({
+    mission: s.wormMission, demo: s.demoMode, completed: s.wormMissionsCompleted, multiplier: s.xpRun?.mode === 'worm' ? s.xpRun.multiplier : 1,
     alive: s.wormAlive, paused: s.wormPauseMenuOpen, phase: s.wormGamePhase,
   })));
   if (!mission || demo || (!summary && (!alive || paused || phase === 'solved'))) return null;
@@ -14,7 +14,7 @@ export default function WormMissionCard({ summary = false }) {
     <div className="worm-mission-heading">
       <span className="worm-mission-label">{mission.completed ? 'MISSION COMPLETE' : 'RUN MISSION'}</span>
       <span className="worm-mission-reward" role={mission.completed ? 'status' : undefined}>
-        {mission.completed ? `+${mission.reward} PP earned` : `+${mission.reward} PP`}
+        +{mission.reward} PP · +{Math.round(50 * multiplier)} XP
       </span>
     </div>
     <div className="worm-mission-objective"><strong>{mission.title}</strong><span>{mission.progress}/{mission.target}</span></div>

@@ -1,3 +1,4 @@
+import { XpReceipt } from '../../progression/ProgressWidgets.jsx';
 import DemoDialog from './DemoDialog.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import React, { useState } from 'react';
@@ -57,6 +58,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
         }}>
           {explored ? 'Explore Complete' : 'Demo Complete'}
         </p>
+        <XpReceipt mode="demo" />
         <h1 style={{
           fontFamily: DISPLAY_FONT,
           fontSize: 26,

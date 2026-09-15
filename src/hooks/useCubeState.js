@@ -356,7 +356,7 @@ export function useCubeState() {
     resetGame();
     clearHistory();
     clearRefractory();
-    setHasShuffled(true);
+    setHasShuffled(true, 25);
   }, [size, setRotatedCubies, resetGame, clearHistory, setHasShuffled]);
 
   // Reset to solved state

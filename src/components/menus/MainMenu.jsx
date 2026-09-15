@@ -1,3 +1,4 @@
+import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
 import { MENU_FLIP_PAIRS, flipMenuCenters } from './menuCenterPortals.js';
 import { carouselPlateGeometry } from './carouselPlateGeometry.js';
 import CubeGlowWorm from './CubeGlowWorm.jsx';
@@ -1693,6 +1694,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
     pointerEvents: visible ? 'auto' : 'none',
   }} inert={visible ? undefined : ''}>
     <div className="worm-menu-actions">
+    <PlayerLevelBadge />
     <button
       type="button"
       className="worm-tactile-btn"

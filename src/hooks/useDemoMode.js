@@ -582,6 +582,7 @@ export function useDemoMode({
     }
     const idx = DEMO_STEP_IDS.indexOf(fromStep);
     const nextStep = fromStep === 'worm-traversal' ? 'end' : DEMO_STEP_IDS[idx + 1] || 'end';
+    if (nextStep === 'end') store.recordDiscoveryXp('introduction');
     store.setDemoStep(nextStep);
     if (fromStep === 'cosmetic-reward') useGameStore.setState({ demoExploreComplete: true });
     // Pre-stage plain cube steps so the intro dialogue blurs the upcoming

@@ -1,3 +1,4 @@
+import { newProgress } from '../progression/model.js';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
@@ -7,7 +8,7 @@ import WormMissionCard, { WormReplayLabel } from '../worm/WormMissionCard.jsx';
 
 beforeEach(() => {
   localStorage.removeItem(WORM_MISSION_STORAGE_KEY);
-  useGameStore.setState({ demoMode:false, wormMissionsCompleted:0, parityPoints:100, wormHealerMode:false, wormPauseMenuOpen:false });
+  useGameStore.setState({ playerProgress:newProgress(), demoMode:false, wormMissionsCompleted:0, parityPoints:100, wormHealerMode:false, wormPauseMenuOpen:false });
 });
 function start(completed = 0) {
   useGameStore.setState({wormMissionsCompleted:completed});
@@ -85,7 +86,7 @@ describe('mission UI', () => {
     expect(host.textContent).toContain('Retry mission');
     act(()=>record('orbs',8,1));
     expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('8');
-    expect(host.textContent).toContain('+20 PP earned');
+    expect(host.textContent).toContain('+20 PP · +50 XP');
     expect(host.textContent).toContain('Next run: Complete 1 tunnel trip');
     expect(host.textContent).toContain('Next mission');
   });

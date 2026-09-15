@@ -222,7 +222,7 @@ function CenterCubelet() {
  *   autoRotate {boolean}  — slowly spin the whole assembly (default true)
  *   rotateSpeed {number}  — radians per second (default 0.35)
  */
-export default function MobiusCubelet({ autoRotate = true, rotateSpeed = 0.35 }) {
+export default function MobiusCubelet({ autoRotate = true, rotateSpeed = 0.35, selectedPair = null }) {
   const groupRef = useRef();
 
   useFrame((_state, delta) => {
@@ -236,10 +236,10 @@ export default function MobiusCubelet({ autoRotate = true, rotateSpeed = 0.35 })
     <group ref={groupRef}>
       <CenterCubelet />
       {ANTIPODAL_PAIRS.map(({ colorA, colorB, axis }) => (
-        <React.Fragment key={axis}>
+        <group key={axis} visible={selectedPair === null || selectedPair === axis}>
           <MobiusBand colorA={colorA} colorB={colorB} axis={axis} />
           <MobiusBoundary colorA={colorA} colorB={colorB} axis={axis} />
-        </React.Fragment>
+        </group>
       ))}
     </group>
   );

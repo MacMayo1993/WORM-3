@@ -1,3 +1,4 @@
+import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { VICTORY } from '../../utils/constants.js';
 import {
@@ -353,6 +354,8 @@ const VictoryScreen = ({
             Every chapter is available to replay for more stars.
           </p>
         )}
+
+        <XpRunSummary mode="puzzle" />
 
         {/* Stats */}
         <div style={{

@@ -1,3 +1,4 @@
+import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
 import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
 // src/worm/DeathScreens.jsx
 // Full-screen death takeovers for Worm Healer mode — a distinct themed
@@ -138,6 +139,7 @@ export default function DeathScreen({
                     <OverlayBlurb>{config.blurb}</OverlayBlurb>
 
                     <WormMissionCard summary />
+            <XpRunSummary mode="worm" />
                     <HeroStat accent={config.accent} value={wormBodyTiles} label="Final length" />
                     <StatTiles stats={[
                         ['Time', formatTime(wormTimeAlive)],

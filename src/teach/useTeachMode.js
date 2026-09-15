@@ -229,7 +229,11 @@ export function useTeachMode() {
     // quarter turns on the cube. Without it the demo teaches the wrong move.
     const numTurns = move.numTurns ?? 1;
     setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0, numTurns });
-    setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, numTurns });
+    useGameStore.getState().markXpAssisted();
+    const stage = BEGINNER_METHOD_3x3.stages[selectedAlgo?.stageIndex];
+    const lessonXpKey = currentStep + 1 === algoMoves.length && stage && selectedAlgo
+      ? `${stage.id}:${selectedAlgo.algoIndex}` : undefined;
+    setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, numTurns, lessonXpKey });
     pendingNextRef.current = true;
 
     const nextStep = currentStep + 1;
@@ -309,6 +313,7 @@ export function useTeachMode() {
     setNotationToken(token);
     setLayerHighlight({ axis: move.axis, sliceIndex: move.sliceIndex, dir: move.dir });
     setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0, numTurns });
+    useGameStore.getState().markXpAssisted();
     setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, numTurns });
   }, [animState, setAnimState, setPendingMove]);
 
@@ -320,11 +325,13 @@ export function useTeachMode() {
     if (!opt) return;
     if (opt.isCorrect) {
       setQuizAnswered('correct');
+      const stage = BEGINNER_METHOD_3x3.stages[analysis?.stageIndex];
+      if (stage) useGameStore.getState().recordLessonXp('quiz', `${stage.id}:0`);
     } else {
       setQuizAnswered('wrong');
       setQuizHintShown(true);
     }
-  }, [quizOptions]);
+  }, [quizOptions, analysis]);
 
   const retryQuiz = useCallback(() => {
     setQuizAnswered(null);

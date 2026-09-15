@@ -1,3 +1,4 @@
+import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 // src/components/screens/DisparityWinnerScreen.jsx
 // Results screen for Disparity Mode — the last antipodal pair standing.
 // Deliberately restrained: a calm dark results card, flat color swatches, one
@@ -236,6 +237,8 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
             })}
           </div>
         )}
+
+        <XpRunSummary mode="chaos" />
 
         {/* Primary action (Play Again / Continue) */}
         <button
