@@ -25,7 +25,7 @@ export function CombatCard({ onRetry, onHome }) {
     : element ? `${element.effect}. Collect colored drops to change your shots.` : 'Hold Fire to auto-aim. Jump to dodge. Colored drops infuse your shots.';
   return <section className="worm-combat-card" aria-label="Portal Combat">
     <div className="worm-combat-heading"><strong>{c.won ? c.endReason === 'waves' ? 'ARENA CLEARED' : 'PORTAL SEALED' : `WAVE ${c.wave+1}/${WAVES.length}`}</strong><span>Shield {c.health}/{COMBAT.health} · {c.kills} defeated</span></div>
-    {c.started && <div className="worm-combat-readout"><span>{c.score.toLocaleString()} pts {c.combo > 1 ? `· ×${c.combo}` : ''}</span><span style={{color:element?.color}}>{element ? `${element.label} · ${Math.ceil(c.elementT)}s` : `${Math.max(0,wave.enemies.length-c.waveSpawned)+c.enemies.length} remaining`}</span></div>}
+    {c.started && <div className="worm-combat-readout"><span>{c.score.toLocaleString()} pts {c.combo > 1 ? `· ×${c.combo}` : ''}</span>{alive && !c.won && <span style={{color:element?.color}}>{element ? `${element.label} · ${Math.ceil(c.elementT)}s` : `${Math.max(0,wave.enemies.length-c.waveSpawned)+c.enemies.length} remaining`}</span>}</div>}
     <p role="status">{message}</p>
     {!c.started && alive && <button onClick={() => callWormTurn('combat-start')}>Start combat</button>}
     {(c.won || !alive) && <div className="worm-combat-results"><span>{c.wavesCleared}/3 waves · {c.shotsHit}/{c.shotsFired} shots hit · best ×{c.bestCombo}</span><button onClick={onRetry}>Try again</button><button onClick={onHome}>Main menu</button></div>}
