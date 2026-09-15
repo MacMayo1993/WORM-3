@@ -1,6 +1,6 @@
-// One objective per run. Failed attempts retry the same objective; completion
-// advances the saved track. Targets are fixed so changing cube size cannot
-// change what a mission means or make a failed attempt harder.
+// One active objective at a time. Completion immediately advances the saved
+// track; the run keeps every earned achievement for its results. Targets stay
+// fixed across cube sizes, and each assignment starts from fresh progress.
 export const WORM_MISSION_STORAGE_KEY = 'worm3_missions_v1';
 export const WORM_MISSIONS = [
   { id: 'orb-starter', kind: 'orbs', target: 8, title: 'Collect 8 orbs', reward: 20 },
@@ -20,21 +20,24 @@ export function readMissionCount() {
 export function missionDefinition(completed) {
   return WORM_MISSIONS[missionCount(completed) % WORM_MISSIONS.length];
 }
-export function startMission(completed, runId) {
-  return { ...missionDefinition(completed), runId, progress: 0, colors: [], completed: false };
+export function startMission(completed, runId, counters = {}) {
+  const definition = missionDefinition(completed);
+  const counter = definition.kind === 'colors' ? 'orbs' : definition.kind;
+  const startTotal = missionCount(counters[counter]);
+  return { ...definition, sequence: missionCount(completed), runId, startTotal, lastTotal: startTotal, progress: 0, colors: [], completed: false };
 }
-// Counters are absolute run totals, so repeated notifications cannot advance
-// the mission twice. Colors remember pickups even after the orbs are deposited.
+// Absolute totals are measured from assignment time. A repeated/older event
+// cannot advance even a new color, and depositing orbs never erases progress.
 export function advanceMission(mission, kind, total, faceId) {
-  if (!mission || mission.completed) return mission;
+  if (!mission || mission.completed || !Number.isSafeInteger(total) || total <= mission.lastTotal) return mission;
   let progress = mission.progress, colors = mission.colors;
   if (mission.kind === 'colors' && kind === 'orbs') {
-    if (!Number.isInteger(faceId) || faceId < 1 || faceId > 6 || colors.includes(faceId)) return mission;
-    colors = [...colors, faceId]; progress = colors.length;
-  } else if (mission.kind === kind && Number.isFinite(total)) {
-    progress = Math.max(progress, Math.floor(total));
+    if (!Number.isInteger(faceId) || faceId < 1 || faceId > 6) return mission;
+    if (!colors.includes(faceId)) colors = [...colors, faceId];
+    progress = colors.length;
+  } else if (mission.kind === kind) {
+    progress = Math.max(progress, total - mission.startTotal);
   } else return mission;
   progress = Math.min(mission.target, progress);
-  if (progress === mission.progress) return mission;
-  return { ...mission, colors, progress, completed: progress >= mission.target };
+  return { ...mission, colors, lastTotal: total, progress, completed: progress >= mission.target };
 }

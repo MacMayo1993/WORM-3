@@ -8,7 +8,6 @@
 .worm-mission-objective span { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .worm-mission-track { margin-top: 7px; height: 4px; border-radius: 4px; background: #ffffff24; overflow: hidden; }
 .worm-mission-track > div { height: 100%; background: #c4df91; transform-origin: left; transition: transform .2s ease; }
-.worm-mission-complete { border-color: #e7c978; }
 .worm-mission-summary { margin: 12px 0; width: 100%; }
 .worm-mission-summary p { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: #d4dccb; }
 @media (max-height: 520px) and (orientation: landscape) {
@@ -16,3 +15,21 @@
   .worm-mission-heading { margin-bottom: 2px; }
 }
 @media (prefers-reduced-motion: reduce) { .worm-mission-track > div { transition: none; } }
+.worm-mission-heading { flex-wrap: wrap; }
+.worm-mission-label { margin: 0; }
+.worm-mission-current { animation: worm-objective-in .22s ease-out; }
+.worm-mission-announcement { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.worm-achievement-count { display: inline-grid; place-items: center; min-width: 24px; min-height: 24px; border-radius: 8px; padding: 0 5px; color: #ffe297; background: #ffffff12; font-size: 12px; font-weight: 800; }
+.worm-achievements-list { margin: 8px 0; padding: 0; list-style: none; }
+.worm-achievements-list li { display: flex; align-items: flex-start; gap: 9px; padding: 10px 0; border-bottom: 1px solid #ffffff17; }
+.worm-achievements-list li > div { flex: 1; min-width: 0; }
+.worm-achievements-list strong { display: block; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.worm-achievements-list li > div > span { display: block; margin-top: 3px; font-size: 11px; color: #ffe297; line-height: 1.4; }
+.worm-achievement-check { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: #c4df9122; color: #c4df91; font-weight: 800; }
+.worm-achievement-order { flex-shrink: 0; font-size: 11px; color: #bbc8af; font-variant-numeric: tabular-nums; }
+.worm-achievement-total { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px 10px; padding: 6px 0; font-size: 11px; line-height: 1.5; }
+.worm-achievement-total > strong { color: #ffe297; font-variant-numeric: tabular-nums; }
+.worm-achievement-active { border-top: 1px solid #ffffff24; margin-top: 10px; padding-top: 12px; }
+.worm-mission-summary .worm-achievement-next { padding-top: 8px; border-top: 1px solid #ffffff17; }
+@keyframes worm-objective-in { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .worm-mission-current { animation: none; } }

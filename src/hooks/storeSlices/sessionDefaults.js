@@ -73,5 +73,7 @@ export const makeWormSessionDefaults = () => ({
   wormCountdownStep: null,
   wormSessionOrbs: 0,
   wormMission: null,
+  wormMissionCounters: { orbs: 0, tunnels: 0, healed: 0 },
+  wormRunAchievements: [],
   wormActiveTunnelColors: null,
 });

@@ -43,7 +43,7 @@ Cosmic; RP² Geodesics remains available in the style selector.
 | Worm: pickups 21–80 | 1 per pair | No further pickup XP above 80 in a run |
 | Worm: heal a tunnel pair | 15 | First 6 heals per run |
 | Worm: complete a new tunnel route | 8 | Unique entrance/exit color pair; at most 6 per run; pays on crawl resume, not entry |
-| Worm: finish the run mission | 50 | One mission per run, in addition to its existing PP reward |
+| Worm: finish an achievement | 50 each | Replaces the objective immediately; each completion also earns its listed PP reward |
 | Worm: heal the whole cube | 100 | Once per completed run |
 | Story, Cube, Algorithm Codex: solve | `20 + 5 × min(par, 20)` | Par uses the authored moves and flips; fallback 15 if unavailable |
 | Freeplay, Random, Biome: solve | `20 + 5 × min(scramble moves, 20)` | Fresh non-solved scramble of at least 8 turns/changes |

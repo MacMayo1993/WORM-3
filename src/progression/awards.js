@@ -42,9 +42,10 @@ export function wormXpChanges(state, kind, total, pair, runId) {
     base = 8; label = 'New tunnel routes';
     next = { ...run, pendingPair: null, seen: [...run.seen, key] };
   } else if (kind === 'mission') {
-    if (old || !state.wormMission?.completed) return {};
-    base = 50; label = 'Mission';
-    next = { ...run, counters: { ...run.counters, mission: 1 } };
+    if (!state.wormMission?.completed || !Number.isSafeInteger(total) || total !== old + 1 ||
+        state.wormRunAchievements.length !== old) return {};
+    base = 50; label = 'Achievements';
+    next = { ...run, counters: { ...run.counters, mission: total } };
   } else return {};
   // Round each cumulative category, not each orb: fractional difficulty cannot
   // pay differently when the same pickups arrive individually or in a batch.

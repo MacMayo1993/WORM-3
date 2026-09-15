@@ -23,18 +23,33 @@ export const createWormSlice = (set, _get) => ({
   wormMissionsCompleted: readMissionCount(),
   recordWormMission: (kind, total, faceId, runId) => set(state => {
     const mission = state.wormMission;
-    if (!state.wormHealerMode || state.demoMode || !state.wormAlive || !mission ||
-        mission.runId !== state.wormRunId || runId !== state.wormRunId ||
-        !['active', 'finalHealing'].includes(state.wormGamePhase)) return state;
+    if (!state.wormHealerMode || state.demoMode || !state.wormAlive || state.wormPaused || !mission || mission.completed ||
+        state.xpRun?.completed || mission.runId !== state.wormRunId || runId !== state.wormRunId ||
+        !['active', 'finalHealing'].includes(state.wormGamePhase) ||
+        !['orbs', 'tunnels', 'healed'].includes(kind) || !Number.isSafeInteger(total) ||
+        total <= state.wormMissionCounters[kind]) return state;
+    // Track every real event, even while a different objective is active. The
+    // next assignment takes its baseline after this event, so old pickups and
+    // completed trips cannot cascade into free achievements on the same tick.
+    const counters = { ...state.wormMissionCounters, [kind]: total };
     const next = advanceMission(mission, kind, total, faceId);
-    if (next === mission) return state;
-    // Progress, reward and the next assignment commit together. No UI effect
-    // or claim button can pay twice after a remount or a repeated event.
-    const xp = next.completed ? wormXpChanges({ ...state, wormMission: next }, 'mission', 1, next.id, runId) : {};
-    return { wormMission: next, ...xp, ...(next.completed ? {
-      wormMissionsCompleted: state.wormMissionsCompleted + 1,
+    if (!next.completed) return { wormMissionCounters: counters, wormMission: next };
+    const completed = state.wormMissionsCompleted + 1;
+    const xp = wormXpChanges({ ...state, wormMission: next }, 'mission', state.wormRunAchievements.length + 1, next.id, runId);
+    const achievement = {
+      ...next,
+      xpEarned: (xp.xpRun?.xp ?? state.xpRun?.xp ?? 0) - (state.xpRun?.xp ?? 0),
+    };
+    // Rewards, the earned list and the replacement objective commit together.
+    // Results only display these receipts; opening them never pays a second time.
+    return {
+      ...xp,
+      wormMissionCounters: counters,
+      wormRunAchievements: [...state.wormRunAchievements, achievement],
+      wormMission: startMission(completed, runId, counters),
+      wormMissionsCompleted: completed,
       parityPoints: Math.max(0, (xp.parityPoints ?? state.parityPoints ?? 0) + next.reward),
-    } : {}) };
+    };
   }),
   wormSpeed: 2.0,
   setWormSpeed: (v) => set({ wormSpeed: v }),
