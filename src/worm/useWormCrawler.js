@@ -463,8 +463,9 @@ export function useWormCrawler(size, cubies) {
             }
             return;
         }
-        if (dir === 'fire') {
-            if (state.wormCombatMode && c?.started && !c.won && sim.alive && !state.wormPaused && !c.held && sim.phase === 'crawling') c.fireRequested = true;
+        if (dir === 'fire-stop') { if (c) c.fireHeld = false; return; }
+        if (dir === 'fire' || dir === 'fire-start') {
+            if (state.wormCombatMode && c?.started && !c.won && sim.alive && !state.wormPaused && !c.held && sim.phase === 'crawling') { c.fireRequested = true; if (dir === 'fire-start') c.fireHeld = true; }
             return;
         }
         if (state.wormCombatMode && (!c?.started || c.won || state.wormPaused)) return;

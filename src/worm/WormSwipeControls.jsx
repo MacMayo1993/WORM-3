@@ -86,7 +86,7 @@ export default function WormSwipeControls({ onTurn, worm }) {
         const onKey = (e) => {
             if (e.repeat && e.key !== ' ') return;
             if (e.target?.closest?.('input, textarea, select, [contenteditable=true]')) return;
-            if (e.key.toLowerCase() === 'f' && useGameStore.getState().wormCombatMode) { e.preventDefault(); e.stopPropagation(); onTurn('fire'); return; }
+            if (e.key.toLowerCase() === 'f' && useGameStore.getState().wormCombatMode) { e.preventDefault(); e.stopPropagation(); onTurn('fire-start'); return; }
             if (e.key.toLowerCase() === 'q') { e.preventDefault(); e.stopPropagation(); onTurn('signature'); return; }
             if (e.key === 'ArrowLeft') { e.preventDefault(); emitDirection('left'); }
             if (e.key === 'ArrowRight') { e.preventDefault(); emitDirection('right'); }
@@ -98,10 +98,17 @@ export default function WormSwipeControls({ onTurn, worm }) {
                 onTurn('jump');
             }
         };
+        const stopFire = () => onTurn('fire-stop');
+        const onKeyUp = e => { if (e.key.toLowerCase() === 'f') stopFire(); };
+        window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('blur', stopFire);
         window.addEventListener('touchstart', onTouchStart, { passive: true });
         window.addEventListener('touchend', onTouchEnd, { passive: true });
         window.addEventListener('keydown', onKey, { capture: true });
         return () => {
+            stopFire();
+            window.removeEventListener('keyup', onKeyUp);
+            window.removeEventListener('blur', stopFire);
             window.removeEventListener('touchstart', onTouchStart);
             window.removeEventListener('touchend', onTouchEnd);
             window.removeEventListener('keydown', onKey, { capture: true });

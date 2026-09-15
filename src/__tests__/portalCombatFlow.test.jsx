@@ -58,3 +58,11 @@ it('returns to normal WORM and clears the combat bridge on unmount',()=>{
   act(()=>state().initWormMode());expect(state().wormCombatMode).toBe(false);expect(state().xpRun).not.toBeNull();
   expect(combatBridge.current).toBeNull();
 });
+it('holds fire through recharge, releases it, and clears a held request on pause',()=>{
+  act(()=>worm.queueTurn('combat-start'));frame();act(()=>worm.queueTurn('fire-start'));
+  until(()=>combatBridge.current.shotsFired>=4);
+  act(()=>worm.queueTurn('fire-stop'));const count=combatBridge.current.shotsFired;
+  for(let i=0;i<20;i++)frame();expect(combatBridge.current.shotsFired).toBe(count);
+  act(()=>worm.queueTurn('fire-start'));frame();act(()=>state().setWormPaused(true));frame();
+  expect(combatBridge.current.fireHeld).toBe(false);
+});
