@@ -2,11 +2,11 @@ import * as THREE from 'three';
 
 // Shared anatomical finish, installed once per head (never per body segment).
 // Features are children of the existing eyes/pupils and inherit face orientation.
-export function finishWormEyes(eyes, pupils) {
+export function finishWormEyes(eyes, pupils, character = 'classic') {
   const irisGeo = new THREE.TorusGeometry(0.90, 0.24, 6, 24);
   const lidGeo = new THREE.TorusGeometry(0.96, 0.075, 6, 24, Math.PI);
   const glintGeo = new THREE.SphereGeometry(1, 8, 6);
-  const irisMat = new THREE.MeshPhysicalMaterial({ color: '#459a87', roughness: 0.24, clearcoat: 1, metalness: 0.15 });
+  const irisMat = new THREE.MeshPhysicalMaterial({ color: ({ book: '#b98739', prism: '#8563d9', inch: '#779438' })[character] || '#459a87', roughness: 0.24, clearcoat: 1, metalness: 0.15 });
   const lidMat = new THREE.MeshStandardMaterial({ color: '#34433f', roughness: 0.48 });
   const glintMat = new THREE.MeshBasicMaterial({ color: '#fffdf2', toneMapped: false });
   const attachments = [];

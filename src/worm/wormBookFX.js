@@ -11,7 +11,7 @@ import * as THREE from 'three';
 // gently curved leaves (including the coloured cover) read as a bound book.
 export const PAGE_GEO_ARGS = [0.95, 0.018, 1.02];
 export const PAGE_LAYER_COUNT = 4;
-export const PAGE_LAYER_GAP = 0.035;
+export const PAGE_LAYER_GAP = 0.030;
 export const PAGE_COLORS = ['#fff8df', '#eadfbd'];
 export const PAGE_HINGE_X = 0.08;
 export const SPINE_X_SCALE = 0.16;
@@ -19,6 +19,29 @@ export const SPINE_GEO_ARGS = [SPINE_X_SCALE, 0.16, 1.06];
 export const PAGE_HINGE_Y = 0.06;
 export const BOOK_SEGMENT_STRIDE = 2;
 export const BOOK_PAGE_SCALE = 1.35;
+
+// Ink and a gilded margin follow the curved paper without textures or extra
+// meshes. The instance colour still supplies parchment/skin-coloured covers.
+export function createBookPaperMaterial() {
+  const material = new THREE.MeshStandardMaterial({ color: 'white', roughness: 0.8, side: THREE.DoubleSide });
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 bookPoint; varying float bookTop;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nbookPoint = position; bookTop = step(0.5, normal.y);');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 bookPoint; varying float bookTop;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec2 p = abs(bookPoint.xz);
+        float margin = step(0.385, p.x) * step(p.x, 0.405) * step(p.y, 0.42);
+        float line = step(0.78, fract((bookPoint.z + 0.4) * 8.0));
+        float ink = line * step(p.x, 0.30) * step(p.y, 0.33) * bookTop;
+        diffuseColor.rgb *= 1.0 - 0.57 * ink;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.65, 0.36, 0.09), margin * bookTop * 0.65);
+      `);
+  };
+  material.customProgramCacheKey = () => 'bound-paper-1';
+  return material;
+}
 
 /** Low-poly curved leaf shared by gameplay and previews, including platformer.
  * Mirror the camber so both halves rise from the gutter towards the fore-edge.
@@ -28,7 +51,7 @@ export function createBookPageGeometry(side = 1) {
   const positions = geometry.attributes.position;
   for (let i = 0; i < positions.count; i++) {
     const u = side * positions.getX(i) / PAGE_GEO_ARGS[0] + 0.5;
-    positions.setY(i, positions.getY(i) + 0.055 * Math.sin(Math.PI * u) + 0.035 * u * u);
+    positions.setY(i, positions.getY(i) + 0.055 * Math.sin(Math.PI * u) + 0.055 * u * u * u);
     // Chamfer the fore-edge corners without adding another geometry layer.
     positions.setZ(i, positions.getZ(i) * (1 - 0.06 * Math.pow(u, 6)));
   }
@@ -90,10 +113,11 @@ export function smoothTurn(current, target, delta, rate = TURN_SMOOTH_RATE) {
  * spread tips like a seesaw toward whichever side the worm turns into,
  * rather than each page reacting independently.
  */
-export function pageHingeAngles(turn) {
+export function pageHingeAngles(turn, time = 0) {
   const bank = Math.max(-1, Math.min(1, turn)) * PAGE_SWING_GAIN;
+  const flutter = Math.sin(time * 2.2) * 0.012;
   return {
-    left: PAGE_REST_ANGLE + bank,
-    right: -PAGE_REST_ANGLE + bank,
+    left: PAGE_REST_ANGLE + bank + flutter,
+    right: -PAGE_REST_ANGLE + bank - flutter,
   };
 }

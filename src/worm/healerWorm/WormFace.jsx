@@ -1,5 +1,6 @@
 // src/worm/healerWorm/WormFace.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
+import { createCharacterAccents, poseCharacterAccents } from '../wormCharacterVisuals.js';
 import { finishWormEyes } from '../wormCharacterFinish.js';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -41,14 +42,16 @@ export function WormFace({ worm, size }) {
     const faceOpacityRef = useRef(1);
     const wormHatId = useGameStore(s => s.wormHat ?? 'none');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
+    const accents = useMemo(() => createCharacterAccents(wormCharacterId), [wormCharacterId]);
+    useEffect(() => () => accents.dispose(), [accents]);
     const isBook = wormCharacterId === 'book';
     const isMobi = wormCharacterId === 'mobi';
     const mobi = useMemo(() => isMobi ? createMobiModel() : null, [isMobi]);
     useEffect(() => () => { if (mobi) disposeMobi(mobi); }, [mobi]);
     useEffect(() => {
         if (isMobi) return;
-        return finishWormEyes([leftEyeRef.current, rightEyeRef.current], [leftPupilRef.current, rightPupilRef.current]);
-    }, [isMobi]);
+        return finishWormEyes([leftEyeRef.current, rightEyeRef.current], [leftPupilRef.current, rightPupilRef.current], wormCharacterId);
+    }, [isMobi, wormCharacterId]);
     const mobiTime = useRef(0);
     const mobiPulse = useRef(0);
     const previousOrbs = useRef(0);
@@ -179,6 +182,8 @@ export function WormFace({ worm, size }) {
         if (isBook) _faceHeadPos.addScaledVector(normal, BOOK_HEAD_LIFT);
         layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1), _faceParts);
 
+        poseCharacterAccents(accents.group, _faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1));
+
         if (hatGroupRef.current) {
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);
             hatGroupRef.current.quaternion.copy(_hatAlignQuat);
@@ -197,6 +202,7 @@ export function WormFace({ worm, size }) {
 
     return (
         <>
+            <primitive object={accents.group} dispose={null} />
             <mesh ref={leftEyeRef}>
                 <sphereGeometry args={[1, 12, 12]} />
                 <meshPhysicalMaterial color="#f1f3e9" roughness={0.22} clearcoat={1} />
@@ -231,11 +237,11 @@ export function WormFace({ worm, size }) {
                 <>
                     <mesh ref={glassLeftRef}>
                         <torusGeometry args={[1, FACE_LAYOUT.glassTube / FACE_LAYOUT.glassRadius, 8, 18]} />
-                        <meshStandardMaterial color="#1a1a1a" metalness={0.9} roughness={0.1} />
+                        <meshStandardMaterial color="#b98739" metalness={0.65} roughness={0.3} />
                     </mesh>
                     <mesh ref={glassRightRef}>
                         <torusGeometry args={[1, FACE_LAYOUT.glassTube / FACE_LAYOUT.glassRadius, 8, 18]} />
-                        <meshStandardMaterial color="#1a1a1a" metalness={0.9} roughness={0.1} />
+                        <meshStandardMaterial color="#b98739" metalness={0.65} roughness={0.3} />
                     </mesh>
                 </>
             )}
