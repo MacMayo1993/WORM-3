@@ -1,61 +1,79 @@
 # Portal Combat prototype
 
 Open **WORM → Play → Portal Combat · Prototype**, then **Start Playing**.
-The staged arena waits for **Start combat** before releasing the worm.
+The 5×5 arena waits for **Start combat**. Worm speed is 1.25 tiles/second.
 
-This is an optional 5×5 encounter at 1.25 tiles/second. Ordinary WORM runs and
-the guided demo retain their own rules. The prototype disables random bombs,
-layer-turn hazards, extra portals and special/elemental offerings to isolate
-shooting and pursuit. The opening scramble still plays before the arena is set.
+## Fight or seal
 
-## Controls and objective
+Survive three waves (3, 5 and 7 enemies), or seal the marked portal early with the
+six supplied matching healing charges. Real tunnel deposits and tail clearance
+still determine when sealing finishes. The two outcomes have distinct results:
+**Arena cleared** versus **Portal sealed**. Ordinary body-collision rules apply.
 
-- Steer, jump and boost with the existing controls. Jumping avoids crawler contact.
-- Tap **Fire**, or press **F**. The gun aims at the nearest emerged crawler within
-  seven surface steps. With no target, it fires along the current heading.
-- The three-shot magazine regenerates one shot every 1.4 seconds. Shots have a
-  0.32-second minimum interval and do not consume healing charges or Parity Points.
-- Follow the lavender beacon to the spawning portal. Its ring turns amber during
-  the 2.5-second warning. At most two crawlers can be active; their movement speed
-  is 0.85 tiles/second. They emerge for 0.8 seconds before they can attack.
-- A shot defeats a crawler and releases a mint-colored pickup. Collect it to
-  restore one shot. Uncollected drops expire after 14 active seconds.
-- The player has three shield hits against crawlers, with 1.6 seconds of protection
-  after contact. Normal body-collision rules still apply.
-- Six matching healing charges are supplied. Enter the marked mouth and let the
-  tail clear the exit to seal the portal and end the encounter. The opposite
-  mouth may require the other face color, as in ordinary WORM healing.
+| Enemy | Health | Behavior |
+| --- | --- | --- |
+| Pink crawler | 1 | Steady pursuit at 0.85 tiles/second |
+| Amber dasher | 1 | Pauses 0.45s to telegraph, lunges for 0.5s, repeats every 3s |
+| Violet armored crawler | 3 | Slow pursuit at 0.62 tiles/second; visible armor plates disappear with damage |
 
-The end card reports defeated enemies, shots hit/fired and collected drops.
-Retry rebuilds the arena, inventory, shield and ammunition. Main menu clears
-combat mode. Starting a normal run also clears it. Prototype play grants no
-permanent XP, mission awards or currency.
+Waves cap live enemies at 2, 3 and 4 respectively. Four-second breaks between
+waves refill the magazine and repair **one** shield, up to three. The worm keeps
+moving during these breaks. The first emergence has a 2.5-second warning; enemies
+spend another 0.8 seconds emerging before attacking or becoming targetable.
 
-## Simulation and rendering
+## Shooting and elements
 
-`src/worm/combat/portalCombat.js` is the bounded combat simulation. Routes use
-`getNextSurfacePosition`, the same face-edge topology as the worm. Targeting
-uses surface distance; it cannot lock through the cube to the opposite face.
-Projectile movement is substepped for collision checks. Face transitions render
-through the outside corner, avoiding a straight chord through a cubelet.
+Hold **Fire** or **F** to keep shooting. Release to stop. Losing pointer capture,
+canceling a touch, blurring the window, pausing, entering a tunnel, death or victory
+cancels held fire. Resuming requires a new press. Keyboard activation via Enter
+still fires a single shot. Holding works through an empty magazine's recharge.
 
-The combat clock advances with the worm's clamped timestep. Pause, death,
-tunnel travel and tail clearance, healing focus, elemental focus, signature
-charge and live rotations hold combat. Input while held is discarded. Rotations
-are held defensively; transporting combat actors through rotating layers is not
-part of this prototype and is not enabled in its arena.
+The magazine holds three shots, recharges one every 1.4 seconds and has a
+0.32-second firing interval. Auto-aim selects emerged enemies within seven surface
+steps; shots follow cube edges instead of cutting through the cube. With no target,
+shots follow the worm's heading. Shooting never consumes healing charges or PP.
 
-`CombatScene.jsx` uses fixed pools of two crawlers, eight shots, six drops and
-eight impact effects. Scene geometry uses depth testing. Only the active combat
-arena mounts these renderers. HUD readouts sample the shared simulation bridge;
-frame-by-frame enemy positions do not create Zustand updates. Fire occupies the
-signature slot, and the encounter card occupies the mission slot in the measured
-bottom dock.
+Defeated enemies drop ammo. Every other kill also produces a larger colored
+pickup, cycling through all five elements. Pickups attract from one surface step
+away while grounded and expire after 20 active seconds. An elemental pickup
+replaces the current infusion and gives **14 active seconds** of enhanced shots.
+Shots retain the element they had when fired.
 
-## Verification
+| Infusion | Effect in addition to one impact damage |
+| --- | --- |
+| Fire | Burns for 0.75 damage/second for 3 seconds |
+| Ice | Freezes movement and contact attacks for 2.2 seconds |
+| Water | Pushes a surviving enemy one surface step away, followed by a short stun |
+| Nature | Roots movement for 3 seconds; contact remains dangerous |
+| Lightning | Deals one damage to up to two other emerged enemies within two surface steps |
 
-The combat tests cover all 150 surface tiles, directed cube-edge interpolation,
-range limits, spawn warnings/caps, auto-aim and corner hits, ammunition, damage
-and jump protection, pause, drops, healing and run lifecycle. The hook-level
-integration uses the actual worm simulation and store for tunnel deposits,
-tail clearance, reward isolation and retry behavior.
+The shot colors, status rings, armor flashes and chain arcs show these effects.
+All scene markers and lightning paths respect the cube surface and depth testing.
+
+## Score and results
+
+Base scores are 100/150/300 for crawler/dasher/armor. Kills within five seconds
+build a multiplier up to ×5; contact damage breaks it. The HUD shows wave, shield,
+score, active infusion and enemy count when no infusion is active. Results show
+waves cleared, shots hit/fired and best combo. A chain hit counts as **one** shot
+hit even when it defeats multiple enemies. Prototype score is local to the run;
+it grants no permanent XP, mission rewards or currency.
+
+Retry resets waves, held input, effects, score, inventory and ammo. Normal WORM
+and the guided demo keep their own rules. The arena suppresses bombs, layer-turn
+hazards, additional portals and normal special/elemental offerings. The opening
+scramble still plays. Transporting enemies through live rotating layers remains
+outside this prototype; unexpected live rotations defensively hold combat.
+
+## Implementation and verification
+
+`portalCombat.js` advances a clamped simulation with bounded pools. `combatDefs.js`
+owns wave composition, enemy stats and infusion definitions. Surface routing uses
+the production `getNextSurfacePosition`. The renderer interpolates through outside
+corners, and shots use small collision substeps. Fixed pools support four enemies,
+eight shots, six drops, eight impact effects and six lightning arcs. HUD readouts
+sample a shared bridge rather than publishing frame-by-frame positions to Zustand.
+
+Tests cover all 150 tiles, outside-corner interpolation, targeting, actual
+three-wave completion, enemy behaviors, all elemental effects, bounded lightning
+range, combos, intermissions, held fire, pause/retry and real tunnel healing.

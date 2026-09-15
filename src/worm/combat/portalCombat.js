@@ -1,9 +1,10 @@
+import { ENEMIES, WAVES, ELEMENTS, ELEMENT_ORDER, ELEMENT_DURATION } from './combatDefs.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
 import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 
 export const COMBAT = Object.freeze({ magazine: 3, recharge: 1.4, fireInterval: 0.32,
-  health: 3, maxEnemies: 2, warning: 2.5, spawnInterval: 6, enemySpeed: 0.85,
+  health: 3, maxEnemies: 4, warning: 2.5, spawnInterval: 6, enemySpeed: 0.85,
   shotSpeed: 8, range: 7, invulnerability: 1.6 });
 export const combatBridge = { current: null };
 export const combatKey = p => `${p.x},${p.y},${p.z},${p.dirKey}`;
@@ -59,15 +60,18 @@ const pose = (actor,c,lift) => surfacePose(actor.tile, actor.next || actor.tile,
 export function makeCombat(size, portal) {
   return { size, portal, started: false, won: false, time: 0, ammo: COMBAT.magazine,
     health: COMBAT.health, recharge: 0, cooldown: 0, invulnerable: 0,
+    wave: 0, waveSpawned: 0, wavesCleared: 0, intermission: 0, endReason: null,
+    element: null, elementT: 0, score: 0, combo: 0, bestCombo: 0, lastKill: -Infinity,
+    killsByType: { crawler: 0, scout: 0, brute: 0 }, damageTaken: 0, fireHeld: false,
     kills: 0, shotsFired: 0, shotsHit: 0, dropsCollected: 0, seq: 0,
-    enemies: [], shots: [], bursts: [], drops: [], spawnTimer: COMBAT.warning,
+    enemies: [], shots: [], bursts: [], drops: [], arcs: [], spawnTimer: COMBAT.warning,
     portalOpen: true, lockedId: null, fireRequested: false, held: false };
 }
 export function acquireTarget(c, head) {
   let best = null, distance = Infinity;
   for (const enemy of c.enemies) {
     if (enemy.emerging > 0) continue;
-    const route = surfaceRoute(head, enemy.tile, c.size, COMBAT.range);
+    const route = surfaceRoute(head,enemy.tile,c.size,COMBAT.range);
     if (route && route.length < distance) { best = enemy; distance = route.length; }
   }
   return best;
@@ -80,28 +84,84 @@ function fire(c, player) {
   c.ammo--; c.cooldown = COMBAT.fireInterval; c.shotsFired++;
   c.shots.push({ id: ++c.seq, tile: { ...player.head }, next: next || null, t: 0,
     heading: next?.moveDir || player.heading, targetId: target?.id, life: 2,
-    color: c.shotsFired % 2 ? '#c38bff' : '#8af7ee' });
+    element: c.element, color: ELEMENTS[c.element]?.color || (c.shotsFired % 2 ? '#c38bff' : '#8af7ee') });
 }
 function burst(c, tile, kind) {
   c.bursts.push({ id: ++c.seq, tile: { ...tile }, life: 0.55, kind });
   if (c.bursts.length > 8) c.bursts.shift();
 }
-function hitEnemy(c, shot, enemy) {
+export function makeEnemy(c, type = 'crawler') {
+  const def = ENEMIES[type];
+  return { id: ++c.seq, type, hp: def.hp, tile: { ...c.portal }, next: null, t: 0,
+    emerging: 0.8, stun: 0, freeze: 0, root: 0, burn: 0, dashClock: 0, hitFlash: 0 };
+}
+function damageEnemy(c, enemy, amount) {
   if (!c.enemies.includes(enemy)) return;
-  c.enemies.splice(c.enemies.indexOf(enemy), 1); shot.life = 0;
-  c.kills++; c.shotsHit++; burst(c, enemy.tile, 'kill');
-  c.drops.push({ id: ++c.seq, tile: { ...enemy.tile }, life: 14 });
+  enemy.hp = (enemy.hp ?? 1) - amount;
+  if (amount >= 1) enemy.hitFlash = 0.15;
+  if (enemy.hp > 0) return;
+  c.enemies.splice(c.enemies.indexOf(enemy), 1);
+  const type = enemy.type || 'crawler';
+  c.kills++; c.killsByType[type]++;
+  c.combo = c.time-c.lastKill <= 5 ? Math.min(5,c.combo+1) : 1;
+  c.lastKill = c.time; c.bestCombo = Math.max(c.bestCombo,c.combo);
+  c.score += ENEMIES[type].points * c.combo;
+  burst(c,enemy.tile,'kill');
+  const element = c.kills % 2 === 1 ? ELEMENT_ORDER[Math.floor(c.kills/2) % ELEMENT_ORDER.length] : null;
+  c.drops.push({ id: ++c.seq, tile: { ...enemy.tile }, life: 20, element });
   if (c.drops.length > 6) c.drops.shift();
+}
+function hitEnemy(c, shot, enemy, player) {
+  if (!c.enemies.includes(enemy)) return;
+  shot.life = 0; c.shotsHit++;
+  burst(c,enemy.tile,'impact');
+  // Keep the impact tile for chaining even if the first target dies.
+  const impact = { ...enemy.tile };
+  if (shot.element === 'fire') enemy.burn = 3;
+  if (shot.element === 'ice') enemy.freeze = 2.2;
+  if (shot.element === 'grass') enemy.root = 3;
+  if (shot.element === 'water') {
+    let best = enemy.tile, distance = -1;
+    for (const next of graph(c.size).get(combatKey(enemy.tile)) || []) {
+      const route = surfaceRoute(next,player.head,c.size);
+      if (route && route.length > distance) { best = next; distance = route.length; }
+    }
+    // A short surface step makes the push visible without crossing the cube.
+    enemy.next = best; enemy.t = 0; enemy.knockback = true; enemy.stun = 0.35;
+  }
+  damageEnemy(c,enemy,1);
+  if (shot.element === 'lightning') {
+    const chained = c.enemies.filter(e => e !== enemy && e.emerging <= 0 && surfaceRoute(impact,e.tile,c.size,2));
+    for (const other of chained.slice(0,2)) {
+      c.arcs.push({ id: ++c.seq, tiles: [impact, ...surfaceRoute(impact,other.tile,c.size,2)], life: 0.3 });
+      if (c.arcs.length > 6) c.arcs.shift();
+      burst(c,other.tile,'lightning'); damageEnemy(c,other,1);
+    }
+  }
+}
+function finishCombat(c, reason) {
+  c.won = true; c.endReason = reason; c.enemies = []; c.shots = [];
+  c.fireRequested = false; c.fireHeld = false;
 }
 // No wall-clock timers: pause, tunnel travel, claim beats and rotations hold all
 // combat clocks together. Requests made while held are discarded, never buffered.
 export function stepCombat(c, delta, player, onHit = () => {}) {
-  if (!c || !c.started || c.won || player.blocked) { if (c) c.fireRequested = false; return; }
+  if (!c || !c.started || c.won || c.health <= 0 || player.blocked) { if (c) { c.fireRequested = false; c.fireHeld = false; } return; }
   const dt = Math.max(0, Math.min(0.05, delta));
   c.held = false; c.time += dt;
   c.portalOpen = player.portalOpen;
   if (!c.portalOpen && player.canFinish) {
-    c.won = true; c.enemies = []; c.shots = []; c.fireRequested = false; return;
+    finishCombat(c,'sealed'); return;
+  }
+  c.elementT = Math.max(0,c.elementT-dt);
+  if (c.elementT === 0) c.element = null;
+  if (c.time-c.lastKill > 5) c.combo = 0;
+  if (c.intermission > 0) {
+    c.intermission = Math.max(0,c.intermission-dt);
+    if (c.intermission === 0) {
+      c.wave++; c.waveSpawned = 0; c.spawnTimer = COMBAT.warning;
+      c.health = Math.min(COMBAT.health,c.health+1); c.ammo = COMBAT.magazine; c.recharge = 0;
+    }
   }
   c.cooldown = Math.max(0, c.cooldown - dt);
   c.invulnerable = Math.max(0, c.invulnerable - dt);
@@ -110,21 +170,39 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
     if (c.recharge >= COMBAT.recharge) { c.ammo++; c.recharge -= COMBAT.recharge; }
   } else c.recharge = 0;
   c.lockedId = acquireTarget(c, player.head)?.id ?? null;
-  if (c.fireRequested) fire(c, player);
+  if (c.fireRequested || c.fireHeld) fire(c, player);
   c.fireRequested = false;
-  if (c.portalOpen && c.enemies.length < COMBAT.maxEnemies) {
+  const wave = WAVES[c.wave];
+  if (c.portalOpen && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap) {
     c.spawnTimer -= dt;
     if (c.spawnTimer <= 0) {
-      c.enemies.push({ id: ++c.seq, tile: { ...c.portal }, next: null, t: 0, emerging: 0.8, stun: 0 });
-      c.spawnTimer = COMBAT.spawnInterval;
+      c.enemies.push(makeEnemy(c,wave.enemies[c.waveSpawned++]));
+      c.spawnTimer = wave.interval;
     }
   }
-  for (const enemy of c.enemies) {
+  for (const enemy of [...c.enemies]) {
+    if (enemy.burn > 0) {
+      const burnTime = Math.min(dt,enemy.burn); enemy.burn -= burnTime;
+      damageEnemy(c,enemy,burnTime*0.75);
+      if (!c.enemies.includes(enemy)) continue;
+    }
+    enemy.hitFlash = Math.max(0,(enemy.hitFlash || 0)-dt);
     if (enemy.emerging > 0) { enemy.emerging = Math.max(0, enemy.emerging-dt); continue; }
-    if (enemy.stun > 0) { enemy.stun -= dt; continue; }
+    if (enemy.knockback) {
+      enemy.t += dt*6;
+      if (enemy.t >= 1) { enemy.tile = enemy.next; enemy.next = null; enemy.t = 0; enemy.knockback = false; }
+      continue;
+    }
+    enemy.dashClock = ((enemy.dashClock || 0)+dt)%3;
+    if (enemy.freeze > 0 || enemy.root > 0 || enemy.stun > 0) {
+      enemy.freeze = Math.max(0,(enemy.freeze || 0)-dt);
+      enemy.root = Math.max(0,(enemy.root || 0)-dt);
+      enemy.stun = Math.max(0,enemy.stun-dt); continue;
+    }
     if (!enemy.next) enemy.next = surfaceRoute(enemy.tile, player.head, c.size)?.[0] || null;
     if (enemy.next) {
-      enemy.t += dt * COMBAT.enemySpeed;
+      const dash = enemy.type === 'scout' ? (enemy.dashClock < 0.45 ? 0 : enemy.dashClock < 0.95 ? 2.4 : 1) : 1;
+      enemy.t += dt * (ENEMIES[enemy.type]?.speed ?? COMBAT.enemySpeed) * dash;
       if (enemy.t >= 1) { enemy.tile = enemy.next; enemy.next = null; enemy.t = 0; }
     }
   }
@@ -144,25 +222,33 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
       }
       const position = pose(shot,c,0.2);
       const hit = c.enemies.find(e => e.emerging <= 0 && distanceSq(position,pose(e,c,0.2)) < 0.42 ** 2);
-      if (hit) hitEnemy(c,shot,hit);
+      if (hit) hitEnemy(c,shot,hit,player);
     }
   }
   c.shots = c.shots.filter(s => s.life > 0);
   if (!player.protected && c.invulnerable <= 0) {
-    const enemy = c.enemies.find(e => e.emerging <= 0 && e.stun <= 0 && distanceSq(player.position,pose(e,c,0.18)) < 0.48 ** 2);
+    const enemy = c.enemies.find(e => e.emerging <= 0 && e.stun <= 0 && !(e.freeze > 0) && !e.knockback && distanceSq(player.position,pose(e,c,0.18)) < 0.48 ** 2);
     if (enemy) {
-      c.health--; c.invulnerable = COMBAT.invulnerability; enemy.stun = 1;
+      c.health = Math.max(0,c.health-1); c.damageTaken++; c.combo = 0; c.lastKill = -Infinity; c.invulnerable = COMBAT.invulnerability; enemy.stun = 1;
       burst(c,player.head,'hit'); onHit(c.health);
     }
   }
   for (const drop of c.drops) {
     drop.life -= dt;
-    if (combatKey(drop.tile) === combatKey(player.head) && !player.protected) {
+    if (surfaceRoute(player.head,drop.tile,c.size,1) && !player.protected) {
       c.ammo = Math.min(COMBAT.magazine,c.ammo+1); c.dropsCollected++; drop.life = 0;
+      if (drop.element) { c.element = drop.element; c.elementT = ELEMENT_DURATION; }
       burst(c,drop.tile,'pickup');
     }
   }
   c.drops = c.drops.filter(d => d.life > 0);
+  for (const arc of c.arcs) arc.life -= dt;
+  c.arcs = c.arcs.filter(arc => arc.life > 0);
   for (const b of c.bursts) b.life -= dt;
   c.bursts = c.bursts.filter(b => b.life > 0);
+  if (c.health > 0 && c.intermission === 0 && c.waveSpawned === wave.enemies.length && c.enemies.length === 0) {
+    c.wavesCleared++;
+    if (c.wave === WAVES.length-1) finishCombat(c,'waves');
+    else c.intermission = 4;
+  }
 }

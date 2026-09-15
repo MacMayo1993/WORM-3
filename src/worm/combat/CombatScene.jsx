@@ -1,4 +1,5 @@
-import React, { useRef } from 'react';
+import { ENEMIES, ELEMENTS, WAVES } from './combatDefs.js';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Vector3 } from 'three';
 import { combatBridge, COMBAT, surfacePose } from './portalCombat.js';
@@ -10,7 +11,7 @@ function place(group, actor, size, lift = 0.18) {
   group.quaternion.setFromUnitVectors(up, normal.fromArray(p.normal));
 }
 function Crawler({ slot }) {
-  const ref = useRef(), body = useRef(), target = useRef();
+  const ref = useRef(), body = useRef(), target = useRef(), shell = useRef(), stripe = useRef(), armor = useRef(), status = useRef();
   useFrame(() => {
     const c = combatBridge.current, e = c?.enemies[slot];
     if (!ref.current) return;
@@ -18,7 +19,15 @@ function Crawler({ slot }) {
     if (!e) return;
     place(ref.current,e,c.size);
     const emerge = 1-Math.max(0,e.emerging)/0.8;
-    ref.current.scale.setScalar(Math.max(0.05,emerge));
+    const def = ENEMIES[e.type] || ENEMIES.crawler;
+    ref.current.scale.setScalar(Math.max(0.05,emerge)*def.scale);
+    shell.current.material.emissive.set(e.hitFlash > 0 ? '#ffffff' : e.freeze > 0 ? '#58b9ff' : e.burn > 0 ? '#ff6633' : def.color);
+    shell.current.material.emissiveIntensity = e.hitFlash > 0 ? 1.5 : 0.45;
+    stripe.current.material.color.set(def.color);
+    armor.current.visible = e.type === 'brute';
+    armor.current.children.forEach((mesh,i) => { mesh.visible = i < Math.ceil(e.hp); });
+    status.current.visible = e.freeze > 0 || e.root > 0 || (e.type === 'scout' && e.dashClock < 0.45);
+    status.current.material.color.set(e.freeze > 0 ? '#a0e7ff' : e.root > 0 ? '#b6ed80' : '#ffca70');
     body.current.rotation.z = Math.sin(c.time * 9 + e.id) * 0.14;
     body.current.position.z = 0.06 + Math.sin(c.time*12+e.id)*0.025;
     target.current.visible = c.lockedId === e.id;
@@ -26,13 +35,15 @@ function Crawler({ slot }) {
   });
   return <group ref={ref} visible={false}>
     <group ref={body}>
-      <mesh scale={[0.28,0.35,0.17]}><icosahedronGeometry args={[1,1]} /><meshStandardMaterial color="#261738" emissive="#862552" emissiveIntensity={0.7} metalness={0.5} roughness={0.3} /></mesh>
-      <mesh position={[0,0,0.16]} scale={[0.06,0.28,0.025]}><boxGeometry /><meshBasicMaterial color="#ff8bc4" toneMapped={false} /></mesh>
+      <mesh ref={shell} scale={[0.28,0.35,0.17]}><icosahedronGeometry args={[1,1]} /><meshStandardMaterial color="#261738" emissive="#862552" emissiveIntensity={0.7} metalness={0.5} roughness={0.3} /></mesh>
+      <mesh ref={stripe} position={[0,0,0.16]} scale={[0.06,0.28,0.025]}><boxGeometry /><meshBasicMaterial color="#ff8bc4" toneMapped={false} /></mesh>
       {[-1,1].map(side => <group key={side}>
         <mesh position={[side*0.11,0.21,0.12]}><sphereGeometry args={[0.045,8,6]} /><meshBasicMaterial color="#ffdf85" toneMapped={false} /></mesh>
         {[-1,0,1].map(i => <mesh key={i} position={[side*0.28,i*0.19,0]} rotation={[0,side*0.3,side*(0.35+i*0.2)]} scale={[0.2,0.035,0.035]}><boxGeometry /><meshStandardMaterial color="#a7528b" metalness={0.6} roughness={0.3} /></mesh>)}
       </group>)}
     </group>
+    <group ref={armor}>{[0,1,2].map(i=><mesh key={i} position={[0,(i-1)*0.15,0.24]} scale={[0.34,0.06,0.055]}><boxGeometry /><meshStandardMaterial color="#d4c5ff" metalness={0.75} roughness={0.25} /></mesh>)}</group>
+    <mesh ref={status} position={[0,0,0.05]}><ringGeometry args={[0.34,0.42,6]} /><meshBasicMaterial transparent opacity={0.75} depthWrite={false} toneMapped={false} /></mesh>
     <mesh ref={target} position={[0,0,0.02]}><ringGeometry args={[0.44,0.47,24,1,0,Math.PI*1.6]} /><meshBasicMaterial color="#d4fff1" transparent opacity={0.85} depthWrite={false} toneMapped={false} /></mesh>
   </group>;
 }
@@ -44,6 +55,7 @@ function Shot({ slot }) {
     ref.current.visible = !!shot;
     if (!shot) return;
     place(ref.current,shot,c.size,0.2); orbit.current.rotation.z = c.time*18;
+    orbit.current.children.forEach(mesh => mesh.material.color.set(shot.color));
   });
   return <group ref={ref} visible={false}>
     <mesh><sphereGeometry args={[0.075,10,8]} /><meshBasicMaterial color="#fff8e0" toneMapped={false} /></mesh>
@@ -62,6 +74,9 @@ function Drop({ slot }) {
     if (!d) return;
     place(ref.current,d,c.size,0.35+Math.sin(c.time*3)*0.08);
     ref.current.rotateZ(c.time*1.5);
+    const color = ELEMENTS[d.element]?.color || '#84ffdd';
+    ref.current.children[0].material.color.set(color);
+    ref.current.scale.setScalar(d.element ? 1.5 : 1);
   });
   return <group ref={ref} visible={false}><mesh><octahedronGeometry args={[0.16]} /><meshBasicMaterial color="#84ffdd" toneMapped={false} /></mesh><mesh><torusGeometry args={[0.23,0.012,5,16]} /><meshBasicMaterial color="#c9adff" /></mesh></group>;
 }
@@ -75,12 +90,35 @@ function Burst({ slot }) {
     place(ref.current,b,c.size,0.28);
     const t = 1-b.life/0.55;
     ref.current.scale.setScalar(0.2+t*1.2);
-    for (const child of ref.current.children) { child.material.opacity = 1-t; child.material.color.set(b.kind === 'hit' ? '#ff7759' : '#bdfce3'); }
+    for (const child of ref.current.children) { child.material.opacity = 1-t; child.material.color.set(b.kind === 'hit' ? '#ff7759' : b.kind === 'lightning' ? '#d39bff' : b.kind === 'impact' ? '#fff4cd' : '#bdfce3'); }
   });
   return <group ref={ref} visible={false}>
     <mesh><ringGeometry args={[0.7,0.76,24]} /><meshBasicMaterial transparent depthWrite={false} toneMapped={false} /></mesh>
     {Array.from({length:8},(_,i) => <mesh key={i} position={[Math.cos(i*Math.PI/4)*0.6,Math.sin(i*Math.PI/4)*0.6,0.1]}><octahedronGeometry args={[0.09]} /><meshBasicMaterial transparent depthWrite={false} toneMapped={false} /></mesh>)}
   </group>;
+}
+function ChainArc({ slot }) {
+  const ref = useRef();
+  const positions = useMemo(() => new Float32Array(27*3), []);
+  useFrame(() => {
+    const c = combatBridge.current, arc = c?.arcs[slot], line = ref.current;
+    if (!line) return;
+    line.visible = !!arc;
+    if (!arc) return;
+    let count = 0;
+    const tiles = arc.tiles.length === 1 ? [arc.tiles[0],arc.tiles[0]] : arc.tiles;
+    for (let i=1;i<tiles.length;i++) for (let j=0;j<=8;j++) {
+      const p = surfacePose(tiles[i-1],tiles[i],j/8,c.size,0.32);
+      // Jitter lifts the spark off the surface; it never cuts through the shell.
+      const jitter = j%2 ? 0.08*(1+Math.sin(c.time*40+j*3)) : 0;
+      for (let axis=0;axis<3;axis++) positions[count*3+axis] = p.position[axis]+p.normal[axis]*jitter;
+      count++;
+    }
+    line.geometry.attributes.position.needsUpdate = true;
+    line.geometry.setDrawRange(0,count);
+    line.material.opacity = Math.min(1,arc.life/0.15);
+  });
+  return <line ref={ref} visible={false} frustumCulled={false}><bufferGeometry><bufferAttribute attach="attributes-position" args={[positions,3]} /></bufferGeometry><lineBasicMaterial color="#e2baff" transparent depthWrite={false} toneMapped={false} /></line>;
 }
 function PortalBeacon() {
   const ref = useRef(), ring = useRef();
@@ -90,7 +128,8 @@ function PortalBeacon() {
     ref.current.visible = !!c && c.portalOpen && !c.won;
     if (!c) return;
     place(ref.current,{tile:c.portal},c.size,0.12);
-    const warning = c.started && c.enemies.length < COMBAT.maxEnemies && c.spawnTimer <= COMBAT.warning;
+    const wave = WAVES[c.wave];
+    const warning = c.started && c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap && c.spawnTimer <= COMBAT.warning;
     ring.current.material.color.set(warning ? '#ffab76' : '#c29aff');
     ring.current.scale.setScalar(1+(warning?0.1*Math.sin(c.time*10):0));
     ref.current.children[1].position.z = 0.6+Math.sin(c.time*3)*0.08;
@@ -101,9 +140,10 @@ function PortalBeacon() {
   </group>;
 }
 export default function CombatScene() {
-  return <group><PortalBeacon />{[0,1].map(i=><Crawler key={i} slot={i} />)}
+  return <group><PortalBeacon />{Array.from({length:COMBAT.maxEnemies},(_,i)=><Crawler key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Shot key={i} slot={i} />)}
     {Array.from({length:6},(_,i)=><Drop key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Burst key={i} slot={i} />)}
+    {Array.from({length:6},(_,i)=><ChainArc key={i} slot={i} />)}
   </group>;
 }

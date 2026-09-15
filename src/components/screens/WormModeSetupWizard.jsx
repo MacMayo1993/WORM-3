@@ -196,7 +196,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <div style={{ display: 'grid', gap: 18 }}>
       <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 48, color: WIZ_TEXT, cursor: 'pointer' }}>
         <input type="checkbox" checked={!!settings.wormCombatMode} onChange={e => cos.setSettings(current => ({ ...current, wormCombatMode: e.target.checked }))} style={{ width: 22, height: 22, flexShrink: 0 }} />
-        <span><strong>Portal Combat · Prototype</strong><br /><small>Shoot portal crawlers. 5×5 arena, three-shot recharge, no bombs or layer turns.</small></span>
+        <span><strong>Portal Combat · Prototype</strong><br /><small>Three waves, armored enemies and elemental shots. 5×5 arena; no layer turns.</small></span>
       </label>
       {!settings.wormCombatMode && <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="body" compact />}
       {!settings.wormCombatMode && <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
