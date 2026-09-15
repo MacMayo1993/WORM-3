@@ -15,7 +15,7 @@ const click=el=>act(()=>el.click());
 beforeEach(()=>{
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
   host=document.createElement('div');document.body.append(host);root=createRoot(host);
-  useGameStore.setState({playerProgress:newProgress(),xpRun:null,xpNotice:null,ownedItems:['skin_slime','hat_none'],parityPoints:100,demoMode:false,showMainMenu:true,showPlayerProgress:false,victory:null,showDisparityWinner:false});
+  useGameStore.setState({playerProgress:newProgress(),xpRun:null,xpNotice:null,xpActivityRuns:{},ownedItems:['skin_slime','hat_none'],parityPoints:100,demoMode:false,showMainMenu:true,showPlayerProgress:false,victory:null,showDisparityWinner:false});
 });
 afterEach(()=>{act(()=>root.unmount());host.remove();delete globalThis.IS_REACT_ACT_ENVIRONMENT;vi.useRealTimers();});
 it('opens the full level track from the menu badge with accessible progress',()=>{
@@ -67,8 +67,8 @@ it('awards an algorithm only after the last turn commits, never for notation pla
     expect(state().playerProgress.xp).toBe(0);
     act(()=>animation.handleAnimComplete());
   }
-  expect(state().playerProgress.xp).toBe(25);
-  act(()=>animation.handleAnimComplete());expect(state().playerProgress.xp).toBe(25);
+  expect(state().playerProgress.xp).toBe(60);
+  act(()=>animation.handleAnimComplete());expect(state().playerProgress.xp).toBe(60);
   act(()=>teach.playNotation('R'));act(()=>animation.handleAnimComplete());
-  expect(state().playerProgress.xp).toBe(25);
+  expect(state().playerProgress.xp).toBe(60);
 });

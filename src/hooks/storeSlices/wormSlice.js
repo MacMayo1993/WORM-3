@@ -46,7 +46,11 @@ export const createWormSlice = (set, _get) => ({
       ...xp,
       wormMissionCounters: counters,
       wormRunAchievements: [...state.wormRunAchievements, achievement],
-      wormMission: startMission(completed, runId, counters),
+      wormMission: startMission(completed, runId, counters, {
+        earned: [...state.wormRunAchievements.map(a => a.id), next.id],
+        recent: state.playerProgress.recentGoals || [], phase: state.wormGamePhase,
+      }),
+      playerProgress: { ...(xp.playerProgress || state.playerProgress), recentGoals: [...(state.playerProgress.recentGoals || []), next.id].slice(-6) },
       wormMissionsCompleted: completed,
       parityPoints: Math.max(0, (xp.parityPoints ?? state.parityPoints ?? 0) + next.reward),
     };
@@ -146,7 +150,7 @@ export const createWormSlice = (set, _get) => ({
     xpRun: state.demoMode ? null : createXpRun('worm', (state.wormRunId ?? 0) + 1, state.playerProgress.xp, {
       multiplier: wormMultiplier(speed ?? state.wormSpeed, interval ?? state.wormholeInterval),
     }),
-    wormMission: state.demoMode ? null : startMission(state.wormMissionsCompleted, (state.wormRunId ?? 0) + 1),
+    wormMission: state.demoMode ? null : startMission(state.wormMissionsCompleted, (state.wormRunId ?? 0) + 1, {}, { recent: state.playerProgress.recentGoals || [] }),
     disparityFlipCap: flipCap,
     chaosLevel: 0,
     wormRunId: (state.wormRunId ?? 0) + 1,

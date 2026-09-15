@@ -6,7 +6,7 @@ import './wormMissions.css';
 function ActiveAchievement({ mission, xp, number }) {
   return <>
     <div className="worm-mission-heading">
-      <span className="worm-mission-label">ACHIEVEMENT {number}</span>
+      <span className="worm-mission-label">CHALLENGE {number}</span>
       <span className="worm-mission-reward">+{mission.reward} PP · +{xp} XP</span>
     </div>
     <div className="worm-mission-current" key={mission.sequence}>
@@ -26,8 +26,8 @@ export default function WormMissionCard({ summary = false }) {
     ended: s.xpRun?.completed,
   })));
   const finished = !alive || phase === 'solved' || ended;
-  if (!mission || demo || (!summary && (finished || paused))) return null;
-  const active = <ActiveAchievement mission={mission} xp={Math.round(50 * multiplier)} number={earned.length + 1} />;
+  if (demo || (!summary && (!mission || finished || paused))) return null;
+  const active = mission ? <ActiveAchievement mission={mission} xp={Math.round((mission.xp || 50) * multiplier)} number={earned.length + 1} /> : <p>All available challenges completed this run.</p>;
   if (!summary) return <section className="worm-mission worm-mission-live" aria-label="Current achievement">
     {active}
     <span className="worm-mission-announcement" role="status" aria-live="polite" aria-atomic="true">
@@ -38,7 +38,7 @@ export default function WormMissionCard({ summary = false }) {
   const xp = earned.reduce((sum, achievement) => sum + achievement.xpEarned, 0);
   return <section className="worm-mission worm-mission-summary" aria-label={finished ? 'Achievements earned this run' : 'Achievements this run'}>
     <div className="worm-mission-heading">
-      <h3 className="worm-mission-label">{finished ? 'ACHIEVEMENTS EARNED' : 'ACHIEVEMENTS SO FAR'}</h3>
+      <h3 className="worm-mission-label">{finished ? 'CHALLENGES COMPLETED' : 'CHALLENGES SO FAR'}</h3>
       <span className="worm-achievement-count" aria-label={`${earned.length} earned`}>{earned.length}</span>
     </div>
     {earned.length > 0 ? <>
@@ -51,7 +51,7 @@ export default function WormMissionCard({ summary = false }) {
       </ol>
       <div className="worm-achievement-total"><span>Achievement rewards</span><strong>+{points} PP · +{xp} XP</strong></div>
     </> : <p>No achievements earned yet.</p>}
-    {finished ? <p className="worm-achievement-next">Next run: {mission.title}.</p> : <div className="worm-achievement-active">{active}</div>}
+    {finished ? <p className="worm-achievement-next">New run, fresh challenges.</p> : <div className="worm-achievement-active">{active}</div>}
   </section>;
 }
 

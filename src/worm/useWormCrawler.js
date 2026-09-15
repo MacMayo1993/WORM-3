@@ -259,7 +259,7 @@ export function useWormCrawler(size, cubies) {
             },
             onOrbPickup: (faceId, orbCount, color, combo) => {
                 const pickup = useGameStore.getState();
-                pickup.recordWormXp('orbs', (pickup.wormSessionOrbs ?? 0) + 1, null, pickup.wormRunId);
+                pickup.recordWormXp('orbs', (pickup.wormSessionOrbs ?? 0) + 1, faceId, pickup.wormRunId);
                 pickup.recordWormMission('orbs', (pickup.wormSessionOrbs ?? 0) + 1, faceId, pickup.wormRunId);
                 useGameStore.setState((state) => ({
                     wormBodyTiles: orbCount,
@@ -310,6 +310,8 @@ export function useWormCrawler(size, cubies) {
             // show a pill. The remaining seconds ride the wormBuffs bridge like the
             // magnet's, so the countdown freezes with the simulation.
             onElementalTheme: (type, maxSeconds) => {
+                const state = useGameStore.getState();
+                state.recordWormXp('element', 0, type ?? null, state.wormRunId);
                 wormBuffs.elementalT = type ? (maxSeconds ?? 0) : 0;
                 wormBuffs.elementalMaxT = type ? (maxSeconds ?? 0) : 0;
                 if (useGameStore.getState().wormElementalTheme !== (type ?? null)) {

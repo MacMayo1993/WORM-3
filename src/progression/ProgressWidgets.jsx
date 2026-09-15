@@ -1,3 +1,4 @@
+import AchievementList from './AchievementList.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -31,14 +32,38 @@ export function XpRunSummary({ mode }) {
   return <section className="xp-run-summary" aria-label="XP earned">
     <div className="xp-summary-heading"><strong>+{run.xp} XP</strong><span>{gainedLevels > 0 ? `LEVEL UP · ${level}` : `LEVEL ${level}`}</span></div>
     <XpMeter xp={progress.xp} animate />
+    <AchievementList achievements={run.achievements} />
     {Object.keys(run.breakdown).length > 0 && <details><summary>XP breakdown</summary><dl>{Object.entries(run.breakdown).map(([label, amount]) => <div key={label}><dt>{label}</dt><dd>+{amount}</dd></div>)}</dl></details>}
     <button type="button" className="xp-text-button" onClick={() => open(true)}>View rewards →</button>
   </section>;
 }
 export function XpReceipt({ mode }) {
-  const notice = useGameStore(s => s.xpNotice);
-  if (!notice || notice.mode !== mode) return null;
+  const { notice, run } = useGameStore(useShallow(s => ({ notice: s.xpNotice, run: s.xpActivityRuns?.[mode] })));
+  if (run?.xp) return <section className="xp-run-summary" aria-label="Activity rewards"><strong>+{run.xp} XP this session</strong><AchievementList achievements={run.achievements} /></section>;
+  if (run || !notice || notice.mode !== mode) return null;
   return <p className="xp-receipt" role="status" key={notice.id}>+{notice.amount} XP · {notice.label}</p>;
+}
+
+export function AchievementCue() {
+  const { run, hidden } = useGameStore(useShallow(s => ({ run: s.xpRun,
+    hidden: s.demoMode || s.showMainMenu || s.showPlayerProgress || s.wormPaused || !s.wormAlive || s.wormGamePhase === 'solved',
+  })));
+  const previous = useRef({ id: null, count: 0 });
+  const [message, setMessage] = useState(null);
+  const id = run?.mode === 'worm' ? run.id : null;
+  const earned = run?.achievements;
+  useEffect(() => {
+    const count = earned?.length || 0;
+    const old = previous.current;
+    previous.current = { id, count };
+    setMessage(null);
+    if (!id || hidden || old.id !== id || count <= old.count) return;
+    const added = earned.slice(old.count);
+    setMessage(added.length > 1 ? `${added.length} feats earned · ${added.at(-1).title}` : added[0].title);
+    const timer = setTimeout(() => setMessage(null), 2200);
+    return () => clearTimeout(timer);
+  }, [id, earned, hidden]);
+  return message && !hidden ? <div className="xp-feat-toast" role="status">✦ {message}</div> : null;
 }
 export function LevelUpCue() {
   const level = useGameStore(s => levelProgress(s.playerProgress.xp).level);

@@ -32,3 +32,18 @@
 @media (max-height: 620px) { .xp-menu-badge { min-height: 52px; padding: 6px 12px; } .xp-badge-body .xp-meter-copy { display: none; } .xp-screen-header { min-height: 58px; } .xp-level-toast { top: calc(env(safe-area-inset-top, 0px) + 65px); } }
 
 @media (prefers-reduced-motion: reduce) { .xp-meter > span { transition: none; } .xp-meter-animate, .xp-level-toast, .xp-flip-cube { animation: none; } }
+
+.xp-feats { margin-top: 12px; }
+.xp-feat-standout { padding: 10px 12px; border-left: 3px solid #d4b963; background: #ffffff09; border-radius: 4px 9px 9px 4px; }
+.xp-feat-standout small, .xp-feat-standout strong { display: block; }
+.xp-feat-standout small { font-size: 9px; letter-spacing: .1em; color: #e1ca89; }
+.xp-feat-standout strong { font: 13px/1.5 'Bungee', sans-serif; }
+.xp-feats ol { list-style: none; padding: 0; margin: 8px 0; }
+.xp-feats li { display: flex; align-items: flex-start; gap: 8px; padding: 9px 0; border-bottom: 1px solid #ffffff20; font-size: 12px; }
+.xp-feats li > span { color: #e1ca89; }
+.xp-feats li > div { flex: 1; min-width: 0; }
+.xp-feats li strong, .xp-feats li div > span, .xp-feats li small { display: block; }
+.xp-feats li div > span { font-size: 11px; line-height: 1.45; opacity: .85; margin-top: 3px; }
+.xp-feats li small { color: #e1ca89; font-size: 9px; margin-top: 4px; }
+.xp-feats li > b { white-space: nowrap; font-size: 11px; color: #e1ca89; }
+.xp-feat-toast { position: fixed; z-index: 949; top: calc(env(safe-area-inset-top, 0px) + 195px); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 40px); box-sizing: border-box; padding: 10px 14px; border-radius: 12px; border: 1px solid #d4b963; background: #253121; color: #fff9e9; font: 700 12px/1.4 system-ui, sans-serif; pointer-events: none; }

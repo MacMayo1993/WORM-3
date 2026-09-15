@@ -1,3 +1,4 @@
+import { ACHIEVEMENT_BY_ID } from './achievements.js';
 // Permanent XP is independent of the spendable wallet and of any one run.
 export const PLAYER_SAVE_KEY = 'worm3_player_progress_v1';
 export const MAX_PLAYER_LEVEL = 50;
@@ -28,12 +29,18 @@ export function playerRank(level) {
   if (level >= 10) return 'Inside Out';
   return 'Explorer';
 }
-export const newProgress = () => ({ xp: 0, modeXp: {}, milestones: {}, bests: {}, challenges: [], claimedRewards: {} });
+export const newProgress = () => ({ xp: 0, modeXp: {}, milestones: {}, bests: {}, challenges: [], claimedRewards: {}, achievements: {}, recentGoals: [], chaosColors: [] });
 const record = value => value && typeof value === 'object' && !Array.isArray(value);
 export function sanitizeProgress(raw) {
   const p = newProgress();
   if (!record(raw)) return p;
   p.xp = Math.min(count(raw.xp), 1e9);
+  for (const id of Object.keys(ACHIEVEMENT_BY_ID)) {
+    const value = raw.achievements?.[id];
+    if (record(value) && count(value.count)) p.achievements[id] = { count: Math.min(count(value.count), 1e6) };
+  }
+  p.recentGoals = (Array.isArray(raw.recentGoals) ? raw.recentGoals : []).filter(id => typeof id === 'string' && /^[a-z-]{1,40}$/.test(id)).slice(-6);
+  p.chaosColors = [...new Set((Array.isArray(raw.chaosColors) ? raw.chaosColors : []).filter(n => Number.isInteger(n) && n >= 1 && n <= 6))];
   for (const key of Object.keys(XP_MODES)) if (count(raw.modeXp?.[key])) p.modeXp[key] = Math.min(count(raw.modeXp[key]), p.xp);
   // Only bounded, internally-issued keys are accepted. Historical records never
   // turn into actions or revive archived modes.
@@ -74,7 +81,7 @@ export function addXp(progress, amount, mode) {
   return { progress: next, points: POINTS_PER_LEVEL * (levelProgress(next.xp).level - levelProgress(progress.xp).level), amount: grant };
 }
 export function createXpRun(mode, id, xp, details = {}) {
-  return { mode, id, startXp: xp, xp: 0, breakdown: {}, counters: {}, seen: [], completed: false, assisted: false, ...details };
+  return { mode, id, startXp: xp, xp: 0, breakdown: {}, counters: {}, seen: [], achievements: [], featStats: {}, completed: false, assisted: false, ...details };
 }
 export function wormOrbXp(total) {
   const n = count(total);

@@ -1,3 +1,4 @@
+import { ACHIEVEMENTS } from './achievements.js';
 import './PlayerProgressScreen.css';
 import React, { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -12,6 +13,9 @@ import RewardPreview from './RewardPreview.jsx';
 export default function PlayerProgressScreen() {
   const { progress, owned, close, claim } = useGameStore(useShallow(s => ({ progress: s.playerProgress, owned: s.ownedItems, close: s.setShowPlayerProgress, claim: s.claimLevelReward })));
   const level = levelProgress(progress.xp).level;
+  const [achievementMode, setAchievementMode] = useState('worm');
+  const modeFeats = ACHIEVEMENTS.filter(a => a.mode === achievementMode);
+  const discoveries = Object.keys(progress.achievements || {}).length;
   const pending = availableRewards(progress);
   const [selectedLevel, selectLevel] = useState(() => pending[0] || REWARD_LEVELS.find(n => n > level) || MAX_PLAYER_LEVEL);
   const [choiceId, selectChoice] = useState(null);
@@ -61,6 +65,18 @@ export default function PlayerProgressScreen() {
           <button type="button" className="xp-primary" disabled={!canClaim} onClick={claimSelected}>{canClaim ? `Claim ${selected?.label}` : `Unlock at level ${selectedLevel}`}</button></>}
           {!isMilestone && <p className="xp-rule">{levelDescription(selectedLevel)}</p>}
         </>}
+      </section>
+      <section className="xp-collection" aria-labelledby="xp-collection-title">
+        <h2 id="xp-collection-title">Achievement collection</h2>
+        <p>{discoveries} / {ACHIEVEMENTS.length} discovered · First discovery in each feat family earns +10 XP.</p>
+        <div className="xp-achievement-filters" role="group" aria-label="Achievement mode">
+          {Object.entries(XP_MODES).map(([mode, label]) => <button key={mode} type="button" aria-pressed={achievementMode === mode} onClick={() => setAchievementMode(mode)}>{label}</button>)}
+        </div>
+        <ul className="xp-collection-list">{modeFeats.map(a => {
+          const count = progress.achievements?.[a.id]?.count || 0;
+          return <li key={a.id} className={count ? 'is-earned' : ''}><span aria-hidden="true">{count ? '✦' : '◇'}</span><div><strong>{a.title}</strong><p>{a.description}</p><small>{count ? `Earned ${count} time${count === 1 ? '' : 's'}` : 'Undiscovered'} · {a.xp} base XP</small></div></li>;
+        })}</ul>
+        <p>Related tiers award only the XP increase. Puzzle replays earn reduced XP; learning, exploration and Chaos feat bonuses pay on first discovery.</p>
       </section>
       <section className="xp-track-section"><h2>Level track</h2><div className="xp-level-track" aria-label="All 50 levels">{Array.from({ length: MAX_PLAYER_LEVEL }, (_, i) => i + 1).map(n => <button type="button" key={n} onClick={() => chooseLevel(n)} aria-pressed={selectedLevel === n} aria-label={`Level ${n}${n % 5 === 0 ? ', reward choice' : ''}${n <= level ? ', reached' : ''}`} className={`${n <= level ? 'is-reached' : ''} ${n % 5 === 0 ? 'is-milestone' : ''}`}><strong>{n}</strong>{n % 5 === 0 && <span aria-hidden="true">✦</span>}</button>)}</div></section>
       {Object.keys(progress.modeXp).length > 0 && <section className="xp-mode-section"><h2>XP across your modes</h2><dl>{Object.entries(progress.modeXp).map(([mode, xp]) => <div key={mode}><dt>{XP_MODES[mode]}</dt><dd>{xp.toLocaleString()} XP</dd></div>)}</dl></section>}

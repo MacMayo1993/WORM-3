@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { advanceMission, startMission, readMissionCount, missionDefinition, WORM_MISSION_STORAGE_KEY } from '../worm/missions.js';
+import { advanceMission, startMission, readMissionCount, missionDefinition, WORM_MISSIONS, WORM_MISSION_STORAGE_KEY } from '../worm/missions.js';
 import WormMissionCard, { WormReplayLabel } from '../worm/WormMissionCard.jsx';
 
 const state = () => useGameStore.getState();
@@ -41,16 +41,16 @@ describe('rolling run achievements', () => {
     start(); record('orbs', 8, 1);
     expect(state().wormMission).toMatchObject({ kind: 'tunnels', progress: 0, completed: false });
     expect(state().wormRunAchievements).toHaveLength(1);
-    expect(state().wormRunAchievements[0]).toMatchObject({ title: 'Collect 8 orbs', reward: 20, xpEarned: 50, completed: true });
+    expect(state().wormRunAchievements[0]).toMatchObject({ title: 'Collect 8 orbs', reward: 20, xpEarned: 25, completed: true });
     record('orbs', 8, 1); record('orbs', 20, 2);
     expect(state().parityPoints).toBe(120);
-    expect(state().playerProgress.xp).toBe(50);
+    expect(state().playerProgress.xp).toBe(25);
     expect(readMissionCount()).toBe(1);
     record('tunnels', 1);
     expect(state().wormRunAchievements).toHaveLength(2);
     expect(state().wormMission.kind).toBe('colors');
-    expect(state().xpRun.breakdown.Achievements).toBe(100);
-    expect(readPlayerSave()).toMatchObject({ points: 170, progress: { xp: 100 } }); // includes level 2's 25 PP
+    expect(state().xpRun.breakdown.Achievements).toBe(50);
+    expect(readPlayerSave()).toMatchObject({ points: 145, progress: { xp: 50 } });
   });
   it('does not backfill new objectives from earlier or batched run totals', () => {
     start(); record('tunnels', 12); record('healed', 3); record('orbs', 80, 1);
@@ -79,16 +79,17 @@ describe('rolling run achievements', () => {
     expect(state().wormMission).toMatchObject({ kind: 'healed', progress: 0 });
     expect(state().parityPoints).toBe(130);
   });
-  it('keeps every completion when the six-objective track repeats within a run', () => {
-    start(); for (let i = 0; i < 7; i++) finishCurrent();
+  it('exhausts a varied pool without repeating a goal or granting again', () => {
+    start(); for (let i = 0; i < WORM_MISSIONS.length; i++) finishCurrent();
     const earned = state().wormRunAchievements;
-    expect(earned).toHaveLength(7);
-    expect(earned[0].id).toBe(earned[6].id);
-    expect(new Set(earned.map(a => a.sequence)).size).toBe(7);
-    expect(state().wormMission).toMatchObject({ kind: 'tunnels', startTotal: 4, progress: 0 });
-    expect(state().playerProgress.xp).toBe(350);
-    expect(state().parityPoints).toBe(365); // 215 achievement PP + 50 level PP
-    expect(readMissionCount()).toBe(7);
+    expect(earned).toHaveLength(WORM_MISSIONS.length);
+    expect(new Set(earned.map(a => a.id)).size).toBe(earned.length);
+    expect(state().wormMission).toBeNull();
+    const xp = state().playerProgress.xp;
+    record('orbs', 9999, 1); expect(state().playerProgress.xp).toBe(xp);
+    expect(readMissionCount()).toBe(WORM_MISSIONS.length);
+    const recent = state().playerProgress.recentGoals;
+    start(); expect(recent).not.toContain(state().wormMission.id);
   });
   it('keeps earned receipts on death and clears them only for a new run', () => {
     const oldId = start(); finishCurrent(); finishCurrent(); record('orbs', 9, 1);
@@ -96,7 +97,7 @@ describe('rolling run achievements', () => {
     state().finishWormXp(false, oldId); set({ wormAlive: false });
     record('orbs', 10, 2);
     expect(state().wormRunAchievements).toBe(earned);
-    expect(state().playerProgress.xp).toBe(100);
+    expect(state().playerProgress.xp).toBe(50);
     start();
     expect(state().wormRunAchievements).toEqual([]);
     expect(state().wormMission).toMatchObject({ kind: 'colors', progress: 0, colors: [] });
@@ -130,7 +131,7 @@ describe('rolling run achievements', () => {
     const m = advanceMission(startMission(0, 1), 'orbs', 4, 1);
     for (const value of [3, NaN, Infinity, 8.5, '8', -1]) expect(advanceMission(m, 'orbs', value, 1)).toBe(m);
     expect(advanceMission(m, 'tunnels', 100, 1)).toBe(m);
-    expect(missionDefinition(6).id).toBe(missionDefinition(0).id);
+    expect(missionDefinition(WORM_MISSIONS.length).id).toBe(missionDefinition(0).id);
     start(); for (const value of [NaN, Infinity, 8.5, '8', -1]) record('orbs', value, 1);
     expect(state().wormRunAchievements).toEqual([]);
   });
@@ -158,17 +159,17 @@ describe('achievement UI', () => {
     expect(host.querySelector('[role="status"]').textContent).toContain('Achievement earned');
     expect(host.querySelector('ol')).toBeNull();
   });
-  it.each(['death', 'win'])('lists all seven earned achievements, including repeats, after a %s', ending => {
+  it.each(['death', 'win'])('lists all seven distinct earned challenges, after a %s', ending => {
     start(); for (let i = 0; i < 7; i++) finishCurrent();
     set(ending === 'death' ? { wormAlive: false } : { wormGamePhase: 'solved' });
     const points = state().parityPoints, xp = state().playerProgress.xp;
     act(() => root.render(<><WormMissionCard summary /><WormReplayLabel /></>));
     expect(host.querySelectorAll('ol li')).toHaveLength(7);
     expect(host.querySelectorAll('ol li')[0].textContent).toContain('Collect 8 orbs');
-    expect(host.querySelectorAll('ol li')[6].textContent).toContain('Collect 8 orbs');
-    expect(host.textContent).toContain('ACHIEVEMENTS EARNED');
-    expect(host.textContent).toContain('+215 PP · +350 XP');
-    expect(host.textContent).toContain('Next run: Complete 1 tunnel trip.');
+    expect(host.querySelectorAll('ol li')[6].textContent).toContain('Collect a dozen orbs');
+    expect(host.textContent).toContain('CHALLENGES COMPLETED');
+    expect(host.textContent).toContain('+220 PP · +275 XP');
+    expect(host.textContent).toContain('New run, fresh challenges.');
     expect(host.querySelector('[role="progressbar"]')).toBeNull();
     expect(host.textContent).toContain('Play again');
     act(() => root.render(<WormMissionCard summary key="reopen" />));
@@ -177,7 +178,7 @@ describe('achievement UI', () => {
   it('keeps the active objective separate from the earned list when paused', () => {
     start(); finishCurrent(); set({ wormPauseMenuOpen: true, wormPaused: true });
     act(() => root.render(<WormMissionCard summary />));
-    expect(host.textContent).toContain('ACHIEVEMENTS SO FAR');
+    expect(host.textContent).toContain('CHALLENGES SO FAR');
     expect(host.querySelectorAll('ol li')).toHaveLength(1);
     expect(host.querySelector('ol').textContent).not.toContain('Complete 1 tunnel trip');
     expect(host.querySelector('[role="progressbar"]').getAttribute('aria-label')).toBe('Complete 1 tunnel trip');
@@ -185,11 +186,11 @@ describe('achievement UI', () => {
   it('shows an honest empty result when no achievement was earned', () => {
     start(); set({ wormAlive: false }); act(() => root.render(<WormMissionCard summary />));
     expect(host.textContent).toContain('No achievements earned yet.');
-    expect(host.textContent).toContain('Next run: Collect 8 orbs.');
+    expect(host.textContent).toContain('New run, fresh challenges.');
     expect(host.querySelector('ol')).toBeNull();
   });
   it('hides live achievements on pause, death and victory, and every achievement surface in the demo', () => {
-    start(); act(() => root.render(<WormMissionCard />)); expect(host.textContent).toContain('ACHIEVEMENT 1');
+    start(); act(() => root.render(<WormMissionCard />)); expect(host.textContent).toContain('CHALLENGE 1');
     act(() => set({ wormPauseMenuOpen: true })); expect(host.textContent).toBe('');
     act(() => set({ wormPauseMenuOpen: false, wormAlive: false })); expect(host.textContent).toBe('');
     act(() => set({ wormAlive: true, wormGamePhase: 'solved' })); expect(host.textContent).toBe('');

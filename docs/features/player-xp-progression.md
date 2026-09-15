@@ -43,7 +43,7 @@ Cosmic; RP² Geodesics remains available in the style selector.
 | Worm: pickups 21–80 | 1 per pair | No further pickup XP above 80 in a run |
 | Worm: heal a tunnel pair | 15 | First 6 heals per run |
 | Worm: complete a new tunnel route | 8 | Unique entrance/exit color pair; at most 6 per run; pays on crawl resume, not entry |
-| Worm: finish an achievement | 50 each | Replaces the objective immediately; each completion also earns its listed PP reward |
+| Worm: finish a challenge | 25 / 50 / 100 | Replaces the objective immediately from a pool of 12; no same-run repeats; also pays its listed PP reward |
 | Worm: heal the whole cube | 100 | Once per completed run |
 | Story, Cube, Algorithm Codex: solve | `20 + 5 × min(par, 20)` | Par uses the authored moves and flips; fallback 15 if unavailable |
 | Freeplay, Random, Biome: solve | `20 + 5 × min(scramble moves, 20)` | Fresh non-solved scramble of at least 8 turns/changes |
@@ -105,3 +105,51 @@ Puzzle awards validate the original level/size and an actually solved cube with 
 pending animation. Rewards commit from gameplay events, never from mounting a
 result screen. Repeat claims are rejected at the store action, not only disabled
 in the UI. Reward previews do not grant ownership.
+
+## Mode achievements
+
+33 named feats cover all twelve release progression categories. The catalogue
+and exact conditions live in `src/progression/achievements.js`. These supplement
+the active Worm challenge: they observe the entire run, including events that do
+not advance the current challenge. A feat is earned at most once per run.
+
+| Mode | Feats |
+| --- | --- |
+| Worm / Mega | Color Curious, Full Spectrum, Orb Gatherer, Living Rainbow, Front Is Back, Thread the Cube, First Aid, Cube Surgeon, Green Thumb, Element Hopper, Whole Again, Mega Medic |
+| Story | Chapter Written, Perfect Chapter, Rewrite History |
+| Cube Academy | Cube Graduate, Under Budget |
+| Algorithm Codex | Code Cracker, Elegant Algorithm |
+| Freeplay | Your Own Way, Big Thinking |
+| Random | Order from Chaos, Short Circuit |
+| Biome | City Planner, Urban Renewal |
+| Daily Descent | Descent Complete, Precision Landing |
+| Chaos | Eye of the Storm, Every Color Has Its Day |
+| Teach | Muscle Memory, Read the Cube, Study Session |
+| Cubelet exploration | Opposites Attract |
+| Introduction | Welcome to the Other Side |
+
+Feats award 25, 50 or 100 base XP. Related tiers pay only the increase, and the
+first discovery within an entire feat family adds 10 XP once. Worm feat bases
+use the run's difficulty multiplier. Puzzle feat bases use the existing replay
+reduction, and assisted solves earn no feats. Daily feats pay once per date;
+a later independent par improvement can still earn Precision Landing.
+
+Chaos, Teach, exploration and introduction feat bonuses pay only on their first
+discovery. Chaos color discovery observes all six colors in winning pairs across
+completed rounds, independent of forecasts and stakes. The normal 50 XP Chaos
+completion remains unchanged. Teach sessions count distinct completed algorithms,
+including ones learned before this update; their original completion XP still
+pays only once. Teach/exploration receipts use separate activity records so they
+cannot replace a pending puzzle run. Starting a new activity clears its receipt.
+
+The collection is saved in the existing atomic player snapshot with lifetime
+counts and filters for every mode. Old saves start with an empty collection while
+retaining their XP, wallet, purchases and milestones. New feats remain discoverable
+on previously completed lessons and exploration activities. Run receipts remain
+transient; achievements and XP already earned survive reloads and deaths.
+
+The XP results section displays all run feats, actual XP paid, first discoveries
+and a standout feat. Worm challenges retain their separate PP/XP receipts. Brief
+Worm feat announcements do not block controls or move the camera. There are no
+new per-frame scans or timers for earning XP. The 50-level curve and cosmetic
+reward choices are unchanged in this iteration.

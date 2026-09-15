@@ -65,7 +65,9 @@ export const createModesSlice = (set, _get) => ({
   // ========================================================================
   teachModeActive: false,
 
-  setTeachModeActive: (teachModeActive) => set({ teachModeActive }),
+  setTeachModeActive: (teachModeActive) => set(state => ({ teachModeActive,
+    ...(teachModeActive && !state.teachModeActive ? { xpActivityRuns: { ...state.xpActivityRuns, teach: null }, xpNotice: state.xpNotice?.mode === 'teach' ? null : state.xpNotice } : {}),
+  })),
 
   // ========================================================================
   // DEMO MODE
@@ -77,6 +79,7 @@ export const createModesSlice = (set, _get) => ({
   demoExploreComplete: false,
 
   startDemo: () => set({
+    xpActivityRuns: {},
     demoMode: true,
     demoStep: 'baby-cube',
     showMainMenu: false,
