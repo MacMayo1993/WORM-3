@@ -5,7 +5,7 @@ import { callWormTurn } from './wormTurnBridge.js';
 import { SIGNATURES } from './healerWorm/signatures.js';
 import { GAME_HUD } from '../utils/uiTheme.js';
 
-export default function SignatureButton({ portalReady = false }) {
+export default function SignatureButton() {
   const character = useGameStore(s => s.wormCharacter);
   const paused = useGameStore(s => s.wormPaused);
   const alive = useGameStore(s => s.wormAlive);
@@ -21,12 +21,12 @@ export default function SignatureButton({ portalReady = false }) {
   const current = readout?.character === character ? readout : null;
   const disabled = !alive || paused || !['active', 'finalHealing'].includes(phase) || !current || (!current.returnReady && (current.seconds > 0 || current.active));
   const label = current?.returnReady ? `${current.activeSeconds}s` : current?.charges > 0 ? `${current.charges} LEFT` : current?.active ? 'ACTIVE' : current?.seconds > 0 ? `${current.seconds}s` : 'Q';
-  const status = current?.notice || (current?.ready ? def.hint : current?.reason || 'Ready at start');
+  const status = current?.notice || '';
   const activate = () => {
     const state = useGameStore.getState();
     if (!disabled && state.wormAlive && !state.wormPaused) callWormTurn('signature');
   };
-  return <div style={{ position: 'absolute', bottom: `calc(100% + ${portalReady ? 52 : 12}px)`, left: '50%', transform: 'translateX(-50%)', width: 'min(180px, 48vw)', textAlign: 'center' }}>
+  return <div className="worm-signature-control" style={{ width: '100%', minWidth: 0, textAlign: 'center' }}>
     <button type="button" disabled={disabled} onPointerDown={activate}
       onClick={e => { if (e.detail === 0) activate(); }}
       aria-label={`${current?.returnReady ? 'Return to bookmark' : def.name}${current?.returnReady ? `, ${current.activeSeconds} seconds to return` : current?.seconds > 0 ? `, ${current.seconds} seconds remaining` : ''}`}
@@ -51,6 +51,6 @@ export default function SignatureButton({ portalReady = false }) {
       <span style={{ fontWeight: 800, fontSize: 12 }}>{current?.returnReady ? 'Return' : def.short}</span>
       <span style={{ fontSize: 10, minWidth: 30 }}>{label}</span>
     </button>
-    <div role={current?.notice ? 'status' : undefined} style={{ marginTop: 4, fontSize: 10, lineHeight: 1.25, color: '#fff8e7', textShadow: '0 1px 3px #000', pointerEvents: 'none' }}>{status}</div>
+    {status && <div role={current?.notice ? 'status' : undefined} style={{ marginTop: 4, fontSize: 10, lineHeight: 1.25, color: '#fff8e7', textShadow: '0 1px 3px #000', pointerEvents: 'none' }}>{status}</div>}
   </div>;
 }

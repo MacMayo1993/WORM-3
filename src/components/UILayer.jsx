@@ -37,8 +37,6 @@ import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
 import HealerWormHUD from './overlays/HealerWormHUD.jsx';
-import MobiusHUD from '../worm/MobiusHUD.jsx';
-import RotationCountdownHUD from '../worm/RotationCountdownHUD.jsx';
 import TunnelTransitOverlay from '../worm/TunnelTransitOverlay.jsx';
 import { isMobile } from '../utils/device.js';
 
@@ -292,10 +290,6 @@ export default function UILayer({
 
         {/* Healer Worm HUD Overlay */}
         <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} />
-        {/* Rotation hazard clock — how long until the lit layer turns */}
-        <RotationCountdownHUD />
-        {/* Möbius Band HUD — shows topology of active wormhole during tunnel traversal */}
-        <MobiusHUD />
         {/* Held for the whole traversal so the ride stays legible as one continuous
             event across the three camera regimes it cuts between. */}
         <TunnelTransitOverlay />

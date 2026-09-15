@@ -1,3 +1,5 @@
+import './wormHudLayout.css';
+import RotationCountdownHUD from './RotationCountdownHUD.jsx';
 import TunnelNeedsCard from './TunnelNeedsCard.jsx';
 import SignatureButton from './SignatureButton.jsx';
 import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
@@ -252,19 +254,7 @@ const ensureHudStyle = () => {
            actually win — a landscape phone has ~390px of height to spend and the
            portrait ramp eats half of it. */
         .worm-hud-bar {
-            position: absolute;
-            top: calc(env(safe-area-inset-top, 0px) + 6px);
-            left: 8px; right: 8px;
             flex-direction: column; padding: 9px 10px 8px; gap: 7px;
-        }
-        /* On a wide screen a full-bleed bar leaves a dead gap in the middle; cap it
-           and centre it so it reads as one panel rather than a stretched strip. */
-        @media (min-width: 900px) {
-            .worm-hud-bar {
-                left: 50%; right: auto;
-                width: min(600px, calc(100% - 32px));
-                transform: translateX(-50%);
-            }
         }
         .worm-hud-row { min-width: 0; }
         .worm-hud-reserve { padding-top: 7px; }
@@ -275,12 +265,6 @@ const ensureHudStyle = () => {
         @media (max-width: 380px) {
             .worm-hud-phase { padding: 3px 8px; font-size: 10px; letter-spacing: 0.4px; }
             .worm-hud-stats { gap: 8px; }
-        }
-        /* Landscape: fold the reserve onto the same line — height is the scarce axis. */
-        @media (max-height: 520px) and (min-width: 600px) {
-            .worm-hud-bar { flex-direction: row; align-items: center; gap: 12px; }
-            .worm-hud-row { flex: 1 1 auto; }
-            .worm-hud-reserve { order: -1; flex: 1 1 340px; min-width: 0; border-top: none; padding-top: 0; }
         }
         /* Compact corner keys leave the lower scene visible while keeping
            comfortable touch targets. */
@@ -494,10 +478,6 @@ const RESERVE_ROW_STYLE = {
 // Bottom offset clears the Pixel's gesture bar: the safe-area inset plus a margin,
 // so the keys sit above the swipe strip rather than fighting it for the same pixels.
 const THUMB_TRAY_STYLE = {
-    position: 'absolute',
-    bottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)',
-    left: 'calc(env(safe-area-inset-left, 0px) + 12px)',
-    right: 'calc(env(safe-area-inset-right, 0px) + 12px)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
@@ -513,10 +493,9 @@ const ACTION_CLUSTER_STYLE = {
     // pair stays on the screen's midline whatever the steering keys measure.
     flex: '1 1 auto',
     display: 'flex',
-    alignItems: 'flex-end',
+    alignItems: 'stretch',
     justifyContent: 'center',
-    gap: 10,
-    paddingBottom: 6,
+    gap: 6,
     pointerEvents: 'auto',
     minWidth: 0,
 };
@@ -634,25 +613,8 @@ const PAUSE_BTN_STYLE = {
 // ─── Portal hint, Examine, Countdown ─────────────────────────────────────────
 
 // ─── Active buff strip (rocket / magnet) ─────────────────────────────────────
-// Sits just under the status bar so it never collides with the thumb tray or the
-// portal hint. Only rendered while something is actually active.
-// The status bar is now a single two-row object roughly 84px tall (chips row +
-// orb reserve row), so the pills clear it at 92px and the spawn notice stacks
-// below them. Measured against the real layout, not guessed — an earlier version
-// of this offset put the pills straight on top of the orb tracker.
-const BUFF_STRIP_TOP = 92;
-const SPECIAL_NOTICE_TOP = BUFF_STRIP_TOP + 36;
-
-const BUFF_STRIP_STYLE = {
-    position: 'absolute',
-    top: `calc(env(safe-area-inset-top, 0px) + ${BUFF_STRIP_TOP}px)`,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    display: 'flex',
-    gap: 4,
-    maxWidth: 'calc(100vw - 16px)',
-    pointerEvents: 'none',
-};
+// The context stack owns placement for active buffs and brief pickup notices.
+const BUFF_STRIP_STYLE = { display: 'flex', gap: 4, maxWidth: '100%', pointerEvents: 'none' };
 
 const BUFF_PILL_STYLE = {
     position: 'relative',
@@ -685,10 +647,6 @@ const ELEM_RING_CIRC = 2 * Math.PI * ELEM_RING_R;
 // Spawn/expiry notice — sits just under the buff strip, above the play area and
 // clear of the thumb tray and the mobile safe-area insets.
 const SPECIAL_NOTICE_STYLE = {
-    position: 'absolute',
-    top: `calc(env(safe-area-inset-top, 0px) + ${SPECIAL_NOTICE_TOP}px)`,
-    left: '50%',
-    transform: 'translateX(-50%)',
     display: 'flex',
     alignItems: 'center',
     gap: 6,
@@ -700,29 +658,8 @@ const SPECIAL_NOTICE_STYLE = {
     letterSpacing: 1.0,
     boxShadow: SHADOW,
     pointerEvents: 'none',
-    whiteSpace: 'nowrap',
-};
-
-// Anchored above the JUMP key it is telling the player to press, inside the left
-// cluster. Centred on the screen it ran straight under the d-pad.
-const PORTAL_HINT_STYLE = {
-    position: 'absolute',
-    bottom: '100%',
-    left: 0,
-    marginBottom: 8,
-    pointerEvents: 'none',
-    fontSize: 11, letterSpacing: 1.2, fontWeight: 800,
-    background: HUD_SURFACE,
-    backdropFilter: HUD_BLUR,
-    WebkitBackdropFilter: HUD_BLUR,
-    border: `1px solid ${BORDER}`,
-    boxShadow: SHADOW,
-    borderRadius: 999,
-    padding: '7px 14px',
-    whiteSpace: 'nowrap',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 7,
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
 };
 
 const EXAMINE_MINIMIZED_OUTER_STYLE = {
@@ -1069,7 +1006,7 @@ function BuffStrip() {
     const elemDef = elementalTheme ? getElementalDef(elementalTheme) : null;
 
     return (
-        <div style={{ ...BUFF_STRIP_STYLE, flexWrap: 'wrap', justifyContent: 'center', width: 'min(420px, calc(100vw - 16px))' }} role="status" aria-live="polite">
+        <div style={{ ...BUFF_STRIP_STYLE, flexWrap: 'wrap', justifyContent: 'center', width: '100%' }} role="status" aria-live="polite">
             {rocketActive && (
                 <div
                     style={{
@@ -1178,7 +1115,6 @@ function BuffStrip() {
 const NOTICE_MS = 2200;
 
 function SpecialNotice() {
-    const elementalActive = useGameStore(s => !!s.wormElementalTheme);
     const notice = useGameStore(s => s.wormSpecialNotice);
     const [shown, setShown] = useState(null);
     const timer = useRef(null);
@@ -1200,7 +1136,6 @@ function SpecialNotice() {
             key={shown.seq}
             style={{
                 ...SPECIAL_NOTICE_STYLE,
-                top: `calc(env(safe-area-inset-top, 0px) + ${SPECIAL_NOTICE_TOP + (elementalActive ? 58 : 0)}px)`,
                 color: expired ? 'rgba(255,255,255,0.72)' : def.color,
                 border: `1px solid ${expired ? 'rgba(255,255,255,0.22)' : def.color}`,
                 opacity: expired ? 0.75 : 1,
@@ -1411,6 +1346,17 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
     );
 }
 
+function HudContext({ surface, demo }) {
+    const [hasTunnel, setHasTunnel] = useState(!!wormBuffs.tunnelNeeds);
+    useEffect(() => {
+        const id = setInterval(() => setHasTunnel(!!wormBuffs.tunnelNeeds), 100);
+        return () => clearInterval(id);
+    }, []);
+    if (hasTunnel && !demo) return <TunnelNeedsCard />;
+    if (!surface) return null;
+    return <div className="worm-hud-context"><BuffStrip /><SpecialNotice /></div>;
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
@@ -1438,7 +1384,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
         observer?.observe(tray); window.addEventListener('resize', measure);
         return () => { observer?.disconnect(); window.removeEventListener('resize', measure); document.documentElement.style.removeProperty('--demo-tray-clearance'); document.documentElement.style.removeProperty('--worm-tray-clearance'); };
-    }, [demoLesson]);
+    }, [demoLesson, phase]);
 
     useEffect(() => {
         if (showDeathMenu) setIsMinimized(false);
@@ -1501,7 +1447,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     }, [setWormPaused]);
 
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', faceId: 2 };
-    const phaseColor = fc[phaseMeta.faceId] || FACE_FALLBACKS[phaseMeta.faceId];
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
     const jumpReadyStyle = {
@@ -1532,90 +1477,86 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {wormAlive && <OrbPickupFlash />}
 
             {/* ── Zone 1: Status bar — glance info + pause, one object ── */}
-            <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
-                <div className="worm-hud-row" style={HUD_ROW_STYLE}>
-                    {/* Phase label */}
-                    <div className="worm-hud-phase" style={{
-                        ...GLANCE_CHIP_STYLE,
-                        background: HUD_SURFACE_SOFT,
-                        border: `1px solid ${BORDER}`,
-                        color: TEXT,
-                    }}>
-                        <div style={{
-                            width: 6, height: 6, borderRadius: '50%',
-                            background: HUD_ACCENT,
-                            boxShadow: 'none',
-                        }} />
-                        {phaseMeta.label}
-                    </div>
-
-                    {/* Stat group — length, orbs, PP, pause */}
-                    <div className="worm-hud-stats" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <span style={GLANCE_LABEL_STYLE}>Length</span>
-                            <span style={{ ...GLANCE_VALUE_STYLE, color: TEXT }}>{wormBodyTiles}</span>
+            <div className="worm-hud-top">
+                <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
+                    <div className="worm-hud-row" style={HUD_ROW_STYLE}>
+                        {/* Phase label */}
+                        <div className="worm-hud-phase" style={{
+                            ...GLANCE_CHIP_STYLE,
+                            background: HUD_SURFACE_SOFT,
+                            border: `1px solid ${BORDER}`,
+                            color: TEXT,
+                        }}>
+                            <div style={{
+                                width: 6, height: 6, borderRadius: '50%',
+                                background: HUD_ACCENT,
+                                boxShadow: 'none',
+                            }} />
+                            {phaseMeta.label}
                         </div>
 
-                        <button
-                            onPointerDown={handlePause}
-                            onClick={e => { if (e.detail === 0) handlePause(); }}
-                            disabled={!canPause}
-                            className="worm-hud-key"
-                            style={PAUSE_BTN_STYLE}
-                            aria-label="Pause"
-                        >
-                            <PauseIcon />
-                        </button>
+                        {/* Stat group — length, orbs, PP, pause */}
+                        <div className="worm-hud-stats" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <span style={GLANCE_LABEL_STYLE}>Length</span>
+                                <span style={{ ...GLANCE_VALUE_STYLE, color: TEXT }}>{wormBodyTiles}</span>
+                            </div>
+
+                            <button
+                                onPointerDown={handlePause}
+                                onClick={e => { if (e.detail === 0) handlePause(); }}
+                                disabled={!canPause}
+                                className="worm-hud-key"
+                                style={PAUSE_BTN_STYLE}
+                                aria-label="Pause"
+                            >
+                                <PauseIcon />
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                {/* Reserve row — the coins that used to float in a second panel */}
-                {wormAlive && !demoLesson && (
-                    <div className="worm-hud-reserve" style={RESERVE_ROW_STYLE}>
-                        <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
-                    </div>
-                )}
-            </div>
-
-            <WormMissionCard />
-
-            {/* ── Active buff pills (rocket / magnet) ── */}
-            {wormAlive && <BuffStrip />}
-
-            {/* ── Special spawned / expired notice ── */}
-            {wormAlive && <SpecialNotice />}
-            {!demoLesson && <TunnelNeedsCard />}
-
-            {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
-            <div ref={trayRef} style={THUMB_TRAY_STYLE}>
-                <SteerKey side="left" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
-
-                {/* Middle: Jump + Boost, with the contextual portal hint above them */}
-                <div style={ACTION_CLUSTER_STYLE}>
-                    {!demoLesson && <SignatureButton portalReady={isPortalReady} />}
-                    {isPortalReady && (
-                        <div style={{ ...PORTAL_HINT_STYLE, color: phaseColor }}>
-                            <JumpIcon size={13} />
-                            TAP TO DIVE
+                    {/* Reserve row — the coins that used to float in a second panel */}
+                    {wormAlive && phase === 'crawling' && !demoLesson && (
+                        <div className="worm-hud-reserve" style={RESERVE_ROW_STYLE}>
+                            <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
                         </div>
                     )}
-                    <button
-                        onPointerDown={handleJumpAction}
-                        onClick={e => { if (e.detail === 0) handleJumpAction(); }}
-
-                        className={`worm-hud-key worm-action worm-jump${isPortalReady ? ' worm-jump-ready' : ''}`}
-                        style={isPortalReady ? jumpReadyStyle : jumpIdleStyle}
-                        aria-label={isPortalReady ? "Dive through wormhole" : "Jump over body or vault an edge"}
-                        disabled={!wormAlive}
-                    >
-                        <JumpIcon size={19} />
-                        {isPortalReady ? 'DIVE' : 'JUMP'}
-                    </button>
-                    <BoostButton wormAlive={wormAlive} />
+                    {!demoLesson && <RotationCountdownHUD />}
                 </div>
 
-                <SteerKey side="right" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
+                {wormAlive && <HudContext surface={phase === 'crawling'} demo={demoLesson} />}
             </div>
+
+            {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
+            {phase === 'crawling' && <div className="worm-hud-bottom" ref={trayRef}>
+                <WormMissionCard />
+                <div style={THUMB_TRAY_STYLE}>
+                    <SteerKey side="left" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
+
+                    {/* Middle: signature and primary actions share the measured dock */}
+                    <div className="worm-action-center" style={ACTION_CLUSTER_STYLE}>
+                        {!demoLesson && <SignatureButton />}
+                        <div className="worm-primary-actions">
+                            <button
+                                onPointerDown={handleJumpAction}
+                                onClick={e => { if (e.detail === 0) handleJumpAction(); }}
+
+                                className={`worm-hud-key worm-action worm-jump${isPortalReady ? ' worm-jump-ready' : ''}`}
+                                style={isPortalReady ? jumpReadyStyle : jumpIdleStyle}
+                                aria-label={isPortalReady ? "Dive through wormhole" : "Jump over body or vault an edge"}
+                                disabled={!wormAlive}
+                            >
+                                <JumpIcon size={19} />
+                                {isPortalReady ? 'DIVE' : 'JUMP'}
+                            </button>
+                            <BoostButton wormAlive={wormAlive} />
+                        </div>
+                    </div>
+
+                    <SteerKey side="right" wormAlive={wormAlive} wormColor={wormColor} vars={steerVars} />
+                </div>
+
+            </div>}
 
             {/* ── Pause Menu Overlay ── */}
             {isPaused && (

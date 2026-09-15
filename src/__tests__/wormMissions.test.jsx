@@ -190,7 +190,7 @@ describe('achievement UI', () => {
     expect(host.querySelector('ol')).toBeNull();
   });
   it('hides live achievements on pause, death and victory, and every achievement surface in the demo', () => {
-    start(); act(() => root.render(<WormMissionCard />)); expect(host.textContent).toContain('CHALLENGE 1');
+    start(); act(() => root.render(<WormMissionCard />)); expect(host.textContent).toContain(state().wormMission.title);
     act(() => set({ wormPauseMenuOpen: true })); expect(host.textContent).toBe('');
     act(() => set({ wormPauseMenuOpen: false, wormAlive: false })); expect(host.textContent).toBe('');
     act(() => set({ wormAlive: true, wormGamePhase: 'solved' })); expect(host.textContent).toBe('');

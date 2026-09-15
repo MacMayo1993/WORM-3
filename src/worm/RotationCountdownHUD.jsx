@@ -15,7 +15,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { UI_FONT, MONO_FONT, NIGHT_TEXT_MUTED, Z } from '../utils/uiTheme.js';
+import { UI_FONT, MONO_FONT, NIGHT_TEXT_MUTED } from '../utils/uiTheme.js';
 import { rotationClock } from './healerWorm/rotationClockBridge.js';
 
 const BAR_W = 132;
@@ -26,16 +26,17 @@ const HOT = '#ffb648';
 const CRITICAL = '#ff5b4a';
 
 export default function RotationCountdownHUD() {
-  const { wormHealerMode, wormGamePhase, wormAlive, wormPaused } = useGameStore(
+  const { wormHealerMode, wormGamePhase, wormAlive, wormPaused, wormPhase } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode ?? false,
       wormGamePhase: s.wormGamePhase ?? 'active',
       wormAlive: s.wormAlive ?? true,
+      wormPhase: s.wormPhase ?? 'crawling',
       wormPaused: s.wormPaused ?? false
     }))
   );
 
-  const running = wormHealerMode && wormAlive && !wormPaused
+  const running = wormHealerMode && wormAlive && !wormPaused && wormPhase === 'crawling'
     && (wormGamePhase === 'active' || wormGamePhase === 'finalHealing');
 
   const rootRef = useRef(null);
@@ -47,7 +48,6 @@ export default function RotationCountdownHUD() {
   useEffect(() => {
     if (!running) {
       cancelAnimationFrame(rafRef.current);
-      if (rootRef.current) rootRef.current.style.opacity = '0';
       return undefined;
     }
     const paint = () => {
@@ -56,7 +56,7 @@ export default function RotationCountdownHUD() {
       if (!root) return;
 
       if (!rotationClock.armed) {
-        root.style.opacity = '0';
+        root.style.display = 'none';
         return;
       }
       const total = rotationClock.total || 1;
@@ -64,7 +64,7 @@ export default function RotationCountdownHUD() {
       const warn = rotationClock.warning;
       const held = rotationClock.held;
 
-      root.style.opacity = '1';
+      root.style.display = 'flex';
       // The bar drains rather than fills: a shortening bar and a falling number
       // say the same thing, and two cues that agree are read faster than one.
       const remaining = Math.max(0, Math.min(1, left / total));
@@ -90,20 +90,14 @@ export default function RotationCountdownHUD() {
     return () => cancelAnimationFrame(rafRef.current);
   }, [running]);
 
-  if (!wormHealerMode) return null;
+  if (!running) return null;
 
   return (
     <div
-      ref={rootRef}
+      className="worm-rotation-clock" ref={rootRef}
       aria-hidden="true"
       style={{
-        position: 'fixed',
-        // Clears the two-row status bar above it; the Möbius band readout sits
-        // below this one so the two never share a line.
-        top: 'calc(env(safe-area-inset-top, 0px) + 104px)',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
+        display: 'none',
         alignItems: 'center',
         gap: 9,
         padding: '5px 12px 5px 11px',
@@ -114,9 +108,6 @@ export default function RotationCountdownHUD() {
         border: '1px solid rgba(255,245,220,0.16)',
         boxShadow: '0 4px 16px rgba(10,14,8,0.5)',
         pointerEvents: 'none',
-        zIndex: Z.NAV,
-        opacity: 0,
-        transition: 'opacity 0.25s ease',
         fontFamily: UI_FONT
       }}
     >
@@ -134,7 +125,7 @@ export default function RotationCountdownHUD() {
         LAYER TURNS IN
       </span>
 
-      <div style={{ width: BAR_W, height: 5, borderRadius: 999, background: 'rgba(255,245,220,0.14)', overflow: 'hidden' }}>
+      <div style={{ width: BAR_W, flex: '1 1 auto', minWidth: 0, height: 5, borderRadius: 999, background: 'rgba(255,245,220,0.14)', overflow: 'hidden' }}>
         <div ref={fillRef} style={{ width: '100%', height: '100%', borderRadius: 999, background: CALM }} />
       </div>
 
