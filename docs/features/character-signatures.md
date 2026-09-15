@@ -1,44 +1,70 @@
 # Character signature moves
 
-The first playable set adds one signature button above Jump and Boost for Inch,
-Glow and MOBI. Q activates the same action from the keyboard. Other characters
-continue to use their existing controls.
+Each character has a signature button above Jump and Boost. Q activates the same
+action. Invalid attempts spend no cooldown. Signature clocks advance with crawling
+simulation time and freeze during pause, transit and cinematic gameplay freezes.
+Death, retry and leaving Worm mode clear the effects.
 
 | Character | Move | Effect | Cooldown |
 | --- | --- | --- | --- |
+| Classic | Shed Skin | Four-second window to survive one body collision by shedding tail, costing at least one orb's worth of growth | 30 seconds |
+| Book | Bookmark | Mark a tile and heading; tap Return within four seconds to fold back to it if clear | 30 seconds from marking |
+| Prism | Refract | Next three pickups become useful tunnel colors and provide one extra healing segment each | 26 seconds |
+| Wiggle | Sidewinder | 0.18-second sideways dodge toward the last left/right steering input; defaults right | 12 seconds |
 | Inch | Spring Loaded | 0.24-second wind-up, then a 2.2-tile jump with increased height | 24 seconds from launch |
-| Glow | Pulse Beacon | Reveals nearby color orbs and flipped entrances for 5 seconds; collects color orbs from adjacent manifold tiles | 22 seconds from activation |
-| MOBI | Parity Lock | Seals the current or nearest valid entrance up to 3 tiles ahead for 6 seconds | 28 seconds from activation |
+| Glow | Pulse Beacon | Five seconds of nearby color-orb/entrance reveals and adjacent-tile color-orb pickup reach | 22 seconds |
+| MOBI | Parity Lock | Seal the current or nearest valid entrance up to three tiles ahead for six seconds | 28 seconds |
 
-Cooldowns include the active window, advance with crawling simulation time, and
-freeze during pause, tunnel transit and cinematic gameplay freezes. Death, retry
-and leaving Worm mode clear the effect. Invalid activations spend no cooldown.
-Signatures are unavailable during the lesson, countdown, cube turns and rocket
-flight. Boost retains its own independent timer.
+Cooldowns include active windows. Refract stays armed until three eligible pickups
+are consumed; it cannot be stacked while active. Its bonus adds body/inventory
+energy, while each collection still produces exactly one pickup/XP event. Prism's
+existing wildcard payment remains available. Color selection favors underfunded
+live entrances and excludes voided or fully paid entrances.
 
-Spring previews the projected landing and checks for a flipped tile or occupied
-body trail both on activation and after wind-up. Subsequent steering and hazards
-still affect the jump; it does not grant blanket invulnerability. The existing
-jump marker tracks its landing during flight.
+Shed Skin is consumed only by a confirmed body collision. It cuts enough tail to
+remove the collision, reconciles inventory against remaining physical growth,
+and provides brief disengagement grace. Bombs, slice hazards and collapsed tunnels
+retain their existing rules.
 
-Beacon highlights are the only signature markers visible through the cube. They
-use a three-step manifold neighborhood, with at most 32 markers per category.
-The collection radius is one step, and an existing magnet keeps its larger radius.
-Highlights clear on expiry, death and tunnel entry. Landing and seal markers obey
-depth testing. No additional scene lights are allocated.
+Bookmark's marked tile and heading follow their own cube slice, including opposite
+paired turns. Return rechecks the current sticker and body occupancy. It preserves
+current inventory, growth, deposits, scores and clocks; spatial body history folds
+closed and rebuilds at the destination. Return is blocked during jumps, face/tunnel
+crossings and unsettled rotations. Expiry spends the original cooldown.
 
-Parity Lock seals one entrance, not both ends of a tunnel. It follows that sticker
-through cube rotations, including paired turns in opposite directions. It does
-not change stickers, deposit inventory, consume tunnel uses, award healing XP or
-protect against other hazards. An expired seal restores normal entry under the
-worm after any in-progress cube turn settles.
+Sidewinder previews the adjacent landing and travels there using the existing
+surface interpolation/body history. It rejects flipped or occupied landings and
+cross-face destinations, then resumes the original forward heading. Cube rotation
+and hazard rules still apply during the dodge. Boost keeps its independent timer.
 
-Implementation: `healerWorm/signatures.js` owns rules and balance constants;
-`wormSim.js` applies input, movement and entrance suppression; `useWormCrawler`
-reads the real selected character and mirrors the readout through `wormBuffs`.
-The DOM button and keyboard use the existing turn bridge. `SignatureEffects`
-owns bounded reusable meshes and disposes their resources on unmount.
+Spring previews and rechecks its projected landing after wind-up. Subsequent
+steering and hazards can still change its outcome. Beacon alone reveals through
+the cube; landing and seal markers obey depth testing. Effects use bounded reusable
+meshes with explicit disposal. Parity Lock seals one entrance, follows its sticker,
+and restores entry after expiry once any moving cube layer settles. It neither
+heals nor deposits orbs.
 
-Validation covers deterministic gameplay, the real hook/store/button/keyboard
-path, pause and retry, effect visibility and disposal, and rotating seals. Mobile
-WebGL appearance and subjective cooldown balance still need device playtesting.
+## Tunnel healing readout
+
+One contextual HUD card replaces the per-entrance floating text signs. A small
+depth-tested surface ring identifies the relevant entrance. The card follows the
+nearest entrance on the current/next three route tiles, including around corners,
+and reports the active tunnel during transit. It clears when no relevant entrance
+exists, after death/solve, on mode exit, and during unsettled cube rotations.
+
+Amounts are **additional collected orbs**, not body segments. Each ordinary pickup
+provides three segments, while a fresh tunnel needs four. The display uses:
+
+    payable = min(matching reserve, remaining cost, physical tail reserve)
+    missing = remaining cost - payable
+    additional pickups = ceil(missing / pickup contribution)
+
+Prism can pay with any color; armed Refract increases its next contribution to
+four. Saved deposits and carried contribution appear separately in the progress
+bar. Ready, healing-on-exit, sealed and traversal-limit states explain what happens
+next without changing the underlying economy.
+
+Validation covers deterministic gameplay, real hook/store/button/keyboard/tunnel
+lookup integration, pause/retry, inventory reconciliation, effect disposal and
+paired cube rotations. Mobile WebGL appearance and subjective balance still need
+device playtesting.

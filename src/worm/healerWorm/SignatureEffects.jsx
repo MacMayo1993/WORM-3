@@ -31,16 +31,18 @@ export function SignatureEffects({ worm, size }) {
         orbs: instances(new THREE.RingGeometry(0.14, 0.18, 20), '#8eefff', LIMIT, true),
         mouths: instances(new THREE.RingGeometry(0.34, 0.38, 4), '#ffd080', LIMIT, true),
         lock: instances(new THREE.RingGeometry(0.32, 0.39, 4), '#ceacff', 3),
+        pages: instances(new THREE.PlaneGeometry(0.46, 0.65), '#ffda91', 3),
+        shell: instances(new THREE.SphereGeometry(0.19, 12, 8), '#a6eb9b', 4),
         pose: new THREE.Object3D(), normal: new THREE.Vector3(), axis: new THREE.Vector3(),
         reach: new Set(), orbTiles: [], mouthTiles: [], scanAt: -1, seq: -1, epoch: -1,
     }), []);
     useEffect(() => () => {
-        for (const mesh of [r.target, r.pulse, r.orbs, r.mouths, r.lock]) {
+        for (const mesh of [r.target, r.pulse, r.orbs, r.mouths, r.lock, r.pages, r.shell]) {
             mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose();
         }
     }, [r]);
     useFrame(() => {
-        for (const mesh of [r.target, r.pulse, r.orbs, r.mouths, r.lock]) mesh.count = 0;
+        for (const mesh of [r.target, r.pulse, r.orbs, r.mouths, r.lock, r.pages, r.shell]) mesh.count = 0;
         const sig = worm.signature.current;
         const state = useGameStore.getState();
         if (!state.wormAlive || worm.phase.current !== 'crawling'
@@ -61,7 +63,27 @@ export function SignatureEffects({ worm, size }) {
             mesh.setMatrixAt(mesh.count++, pose.matrix);
             mesh.instanceMatrix.needsUpdate = true;
         };
-        if (sig.character === 'inch') {
+        if (sig.character === 'book' && (sig.active > 0 || sig.fxT > 0)) {
+            r.pages.material.opacity = sig.active > 0 ? 0.8 : sig.fxT;
+            const tile = sig.active > 0 ? sig.target : sig.fxTile;
+            for (let i = 0; i < 3; i++) place(r.pages, tile, 0.85, 0.18 + i * 0.07, (i - 1) * 0.2);
+        } else if (sig.character === 'classic' && (sig.active > 0 || sig.fxT > 0)) {
+            const breaking = sig.active <= 0;
+            const age = breaking ? 1 - sig.fxT / 0.7 : 0;
+            r.shell.material.opacity = breaking ? sig.fxT * 0.55 : 0.25;
+            for (let i = 0; i < 4; i++) place(r.shell, breaking ? sig.fxTile : worm.pos.current,
+                1 + (reduced ? 0 : age) + i * 0.12, 0.13 + i * 0.12);
+        } else if (sig.character === 'prism' && sig.active > 0) {
+            r.pulse.material.color.set('#ffd2fb'); r.pulse.material.opacity = 0.5;
+            for (let i = 0; i < sig.charges; i++) place(r.pulse, worm.pos.current, 0.45 + i * 0.3, 0.12 + i * 0.1);
+        } else if (sig.character === 'wiggle') {
+            r.target.material.color.set(sig.reason ? '#ffbb72' : '#ffb5d7');
+            if (!liveRotation.active && !worm.restRead.current) place(r.target, sig.dashing ? sig.target : sig.preview);
+            if (sig.fxT > 0) {
+                r.pulse.material.color.set('#ffb5d7'); r.pulse.material.opacity = sig.fxT * 0.55;
+                for (let i = 0; i < 3; i++) place(r.pulse, sig.fxTile, 0.4 + i * 0.3 + (reduced ? 0 : 0.7 - sig.fxT), 0.08);
+            }
+        } else if (sig.character === 'inch') {
             const tile = sig.charge > 0 ? sig.target : sig.preview;
             if (!liveRotation.active && !worm.restRead.current && !worm.isJumping.current) {
                 r.target.material.color.set(sig.reason ? '#ffbb72' : '#c6ec86');
@@ -102,10 +124,10 @@ export function SignatureEffects({ worm, size }) {
             r.mouths.material.opacity = 0.6 * fade;
             for (const tile of r.orbTiles) place(r.orbs, tile, 1, 0.23);
             for (const tile of r.mouthTiles) place(r.mouths, tile, 1, 0.15, Math.PI / 4);
-            r.pulse.material.opacity = 0.24 * fade;
+            r.pulse.material.color.set('#8eefff'); r.pulse.material.opacity = 0.24 * fade;
             for (let i = 0; i < 3; i++) place(r.pulse, worm.pos.current,
                 reduced ? 1.4 + i * 0.8 : 0.7 + ((age * 1.8 + i) % 3), 0.12 + i * 0.02);
         }
     });
-    return <>{[r.target, r.pulse, r.orbs, r.mouths, r.lock].map((mesh, i) => <primitive key={i} object={mesh} />)}</>;
+    return <>{[r.target, r.pulse, r.orbs, r.mouths, r.lock, r.pages, r.shell].map((mesh, i) => <primitive key={i} object={mesh} />)}</>;
 }

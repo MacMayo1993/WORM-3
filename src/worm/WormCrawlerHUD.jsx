@@ -1,3 +1,4 @@
+import TunnelNeedsCard from './TunnelNeedsCard.jsx';
 import SignatureButton from './SignatureButton.jsx';
 import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
 import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
@@ -1583,6 +1584,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Special spawned / expired notice ── */}
             {wormAlive && <SpecialNotice />}
+            {!demoLesson && <TunnelNeedsCard />}
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
             <div ref={trayRef} style={THUMB_TRAY_STYLE}>

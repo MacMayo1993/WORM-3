@@ -51,7 +51,7 @@ export function classifyTraversal(nextTraversals, maxTraversals = WORMHOLE_MAX_T
  * spills into the remaining faces.
  *
  * @param {Object} args
- * @param {Object} args.inventory   - faceId → orb count (never mutated)
+ * @param {Object} args.inventory   - faceId → stored orb segments (never mutated)
  * @param {number} args.deposited   - segments already deposited into this tunnel
  * @param {number} args.entryFaceId - face color of the tunnel entry sticker
  * @param {number} args.tailLength  - current tail length in visual balls
