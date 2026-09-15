@@ -44,20 +44,20 @@ describe('portal combat encounters',()=>{
     ticks(c,p,3);expect(c.enemies).toHaveLength(1);expect(c.enemies[0].emerging).toBeGreaterThan(0);
     ticks(c,p,500);expect(c.enemies).toHaveLength(2);
   });
-  it('auto-aims, defeats a crawler and leaves a collectible drop',()=>{
+  it('assists a forward shot, defeats a crawler and leaves a collectible drop',()=>{
     const c=arena();enemy(c);const p=player();p.protected=true;
-    expect(acquireTarget(c,p.head)).toBe(c.enemies[0]);
+    expect(acquireTarget(c,p.head,p.heading,p.position)).toBe(c.enemies[0]);
     c.fireRequested=true;ticks(c,p,20);
     expect(c.kills).toBe(1);expect(c.shotsHit).toBe(1);expect(c.enemies).toHaveLength(0);expect(c.drops).toHaveLength(1);
     expect(c.ammo).toBe(2);
   });
-  it('hits an enemy around a face edge using a surface route',()=>{
+  it('stops a forward shot at the face edge instead of seeking around the corner',()=>{
     const c=arena(), head=tile(4,2), target=getNextSurfacePosition(head,'right',5);
     enemy(c,target);const p=player(head);p.protected=true;c.fireRequested=true;ticks(c,p,25);
-    expect(c.kills).toBe(1);
+    expect(c.kills).toBe(0);expect(c.shots).toHaveLength(0);
   });
   it('does not lock on to an out-of-range enemy through the cube',()=>{
-    const c=arena();enemy(c,tile(2,2,'NZ',0));expect(acquireTarget(c,tile())).toBeNull();
+    const c=arena();enemy(c,tile(2,2,'NZ',0));expect(acquireTarget(c,tile(),'right')).toBeNull();
   });
   it('limits fire rate and recharges only the three-shot magazine',()=>{
     const c=arena(),p=player();

@@ -18,11 +18,11 @@ export function CombatCard({ onRetry, onHome }) {
   const charging = c.intermission === 0 && c.waveSpawned < wave.enemies.length && c.enemies.length < wave.cap && c.spawnTimer <= COMBAT.warning;
   const message = c.won ? c.endReason === 'waves' ? 'All three waves defeated. Arena cleared!' : 'Portal sealed. You escaped the remaining waves.'
     : !alive ? 'Run ended. Try jumping over dashers or freezing armored crawlers.'
-    : !c.started ? 'Survive 3 waves, or seal the portal with your six healing charges. Hold Fire; colored drops add elemental shots.'
+    : !c.started ? 'Survive 3 waves, or seal the portal with your six healing charges. Steer to aim. Hold Fire; colored drops infuse shots.'
     : c.intermission > 0 ? `Wave clear! Next wave in ${Math.ceil(c.intermission)}s — ammo refill and +1 shield.`
     : c.held ? 'Combat held while you clear the tunnel or return to the surface.'
     : charging ? 'Portal charging — watch for the next enemy.'
-    : element ? `${element.effect}. Collect colored drops to change your shots.` : 'Hold Fire to auto-aim. Jump to dodge. Colored drops infuse your shots.';
+    : element ? `${element.effect}. Collect colored drops to change your shots.` : 'Steer to line up the reticle. Hold Fire to shoot forward. Jump to dodge.';
   return <section className="worm-combat-card" aria-label="Portal Combat">
     <div className="worm-combat-heading"><strong>{c.won ? c.endReason === 'waves' ? 'ARENA CLEARED' : 'PORTAL SEALED' : `WAVE ${c.wave+1}/${WAVES.length}`}</strong><span>Shield {c.health}/{COMBAT.health} · {c.kills} defeated</span></div>
     {c.started && <div className="worm-combat-readout"><span>{c.score.toLocaleString()} pts {c.combo > 1 ? `· ×${c.combo}` : ''}</span>{alive && !c.won && <span style={{color:element?.color}}>{element ? `${element.label} · ${Math.ceil(c.elementT)}s` : `${Math.max(0,wave.enemies.length-c.waveSpawned)+c.enemies.length} remaining`}</span>}</div>}

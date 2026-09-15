@@ -29,9 +29,16 @@ cancels held fire. Resuming requires a new press. Keyboard activation via Enter
 still fires a single shot. Holding works through an empty magazine's recharge.
 
 The magazine holds three shots, recharges one every 1.4 seconds and has a
-0.32-second firing interval. Auto-aim selects emerged enemies within seven surface
-steps; shots follow cube edges instead of cutting through the cube. With no target,
-shots follow the worm's heading. Shooting never consumes healing charges or PP.
+0.32-second firing interval. Steer to aim: assistance selects an emerged enemy
+within 20° of the worm's forward heading, on the same face and at most seven
+world units away. It prefers the closest alignment, then distance. A dotted aim
+line and four-part target reticle preview the next shot. Enemies crossing onto
+another face cannot be locked.
+
+Shots fly straight along the previewed direction at eight units/second, without
+homing or reacquiring targets. They stop at the current face boundary. With no
+eligible target they fire directly forward. Lightning can still chain around an
+edge after a direct hit. Shooting never consumes healing charges or PP.
 
 Defeated enemies drop ammo. Every other kill also produces a larger colored
 pickup, cycling through all five elements. Pickups attract from one surface step
@@ -47,7 +54,11 @@ Shots retain the element they had when fired.
 | Nature | Roots movement for 3 seconds; contact remains dangerous |
 | Lightning | Deals one damage to up to two other emerged enemies within two surface steps |
 
-The shot colors, status rings, armor flashes and chain arcs show these effects.
+Enemies have split carapaces, emissive eye slits, mandibles and six articulated
+legs that follow their surface heading. Dashers have narrow bodies and swept
+fins; they crouch and project a forward warning before lunging. Armored crawlers
+carry three overlapping plates that disappear with damage. Frost cages, root
+rings, impact flashes, shot colors and chain arcs show elemental effects.
 All scene markers and lightning paths respect the cube surface and depth testing.
 
 ## Score and results
@@ -69,11 +80,13 @@ outside this prototype; unexpected live rotations defensively hold combat.
 
 `portalCombat.js` advances a clamped simulation with bounded pools. `combatDefs.js`
 owns wave composition, enemy stats and infusion definitions. Surface routing uses
-the production `getNextSurfacePosition`. The renderer interpolates through outside
-corners, and shots use small collision substeps. Fixed pools support four enemies,
+the production `getNextSurfacePosition` for enemies and lightning. The renderer
+interpolates enemies through outside corners; straight shots use small collision
+substeps and never enter the cube. Fixed pools support four enemies,
 eight shots, six drops, eight impact effects and six lightning arcs. HUD readouts
 sample a shared bridge rather than publishing frame-by-frame positions to Zustand.
 
-Tests cover all 150 tiles, outside-corner interpolation, targeting, actual
+Tests cover all 150 tiles, outside-corner interpolation, forward aiming in all
+24 face/heading combinations, cone limits, fixed trajectories, corner chaining, actual
 three-wave completion, enemy behaviors, all elemental effects, bounded lightning
 range, combos, intermissions, held fire, pause/retry and real tunnel healing.
