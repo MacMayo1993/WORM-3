@@ -9,13 +9,14 @@ prediction rules, odds, healing payouts, and completion XP remain unchanged.
   limit. Color Pair is the default prediction type; its preview explains that
   any surviving tile pair in that color family wins. Players can skip a wager
   or go back to setup.
-- The match panel pins the prediction and reports living tiles directly from
-  the rendered board. Three color-family buttons mark original identities on
+- The compact match panel pins the prediction and reports living tiles directly
+  from the rendered board. Inspect match reveals standings, healing objectives,
+  and event notices inside a bounded scroll area. Three color-family buttons mark original identities on
   the cube, including after rotations or flips. The backed family starts marked.
 - Damage bars fill toward the configured limit. A pale notch marks a tile with
   one flip remaining. Match details list danger counts and the last six tiles'
   identities and remaining flips. Standings describe survival, not probabilities.
-- Short notices announce elimination bursts and entire color eliminations.
+- Inside Inspect match, short notices announce elimination bursts and entire color eliminations.
   The live stage advances from Opening storm through The squeeze and Final six.
   Existing cascade bolts remain bounded to four concurrent effects. Stage
   sounds/haptics use the existing feel dispatcher and player settings.
@@ -33,7 +34,7 @@ prediction rules, odds, healing payouts, and completion XP remain unchanged.
   and Main Menu remain available.
 
 The CHAOS match panel and optional help tutorial load on demand. The initial
-route is 2,294.3 KB raw / 605.5 KB Brotli, below the existing 2,300 / 640 KB
+route is 2,294.4 KB raw / 605.4 KB Brotli, below the existing 2,300 / 640 KB
 budgets (baseline: 2,299.5 / 606.3 KB).
 
 ## Visual design
@@ -45,7 +46,9 @@ Local vector glyphs and a CSS tile emblem add character without image downloads.
 
 The forecast separates prediction type, color selection, and wager into numbered
 sections. Its action footer stays visible while the body scrolls. The HUD uses
-color-family survival segments and a distinct healing progress track. Results
+color-family survival segments; its healing progress track and extended statistics
+are collapsed by default so they do not obstruct the cube. Generic parity popups
+are disabled during CHAOS, and level-up celebrations stay in the results recap. Results
 lead with the survivors, then the prediction outcome, contribution, XP, and feats.
 Shared XP widgets receive palette overrides scoped only to CHAOS.
 

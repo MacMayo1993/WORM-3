@@ -132,3 +132,12 @@
 .chaos-ui .xp-summary-heading > strong { color: var(--chaos-accent); }
 .chaos-ui .xp-meter { background: #ffffff14; }
 .chaos-ui .xp-meter > span { background: linear-gradient(90deg, #82bd9a, #d6ff63); }
+
+/* Live play defaults to a short readout. Extra information opens deliberately
+   inside one bounded, scrollable panel rather than growing over the cube. */
+.chaos-compact-call { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 11px; line-height: 1.5; color: var(--chaos-muted); }
+.chaos-compact-call strong { flex-shrink: 0; color: var(--chaos-accent); font-size: 11px; }
+.chaos-expanded { max-height: 30dvh; overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; padding: 10px 2px 2px; border-top: 1px solid var(--chaos-line); scrollbar-width: thin; }
+.chaos-expanded .chaos-detail { max-height: none; overflow: visible; }
+.chaos-expanded .chaos-live-event { margin-bottom: 10px; }
+@media (max-height: 550px) and (orientation: landscape) { .chaos-expanded { max-height: 24dvh; } }

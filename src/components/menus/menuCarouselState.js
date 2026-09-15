@@ -58,3 +58,11 @@ export const consumeModeDive = () => {
 let _stage = null; // { height, baseline } in CSS px
 export const setCarouselStage = (stage) => { _stage = stage; };
 export const getCarouselStage = () => _stage;
+
+// Switch whole scene branches together. A middle slice can be paused at any
+// angle when the selector opens; hiding just its stickers leaves the rotating
+// black cubie bodies protruding through the mode plates.
+export function presentMenuCube(shufflingCube, modePlates, carouselActive) {
+  if (shufflingCube) shufflingCube.visible = !carouselActive;
+  if (modePlates) modePlates.visible = carouselActive;
+}
