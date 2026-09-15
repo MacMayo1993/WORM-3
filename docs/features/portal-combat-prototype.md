@@ -2,8 +2,11 @@
 
 ## Normal WORM: occasional encounters
 
-Portal enemies are enabled in normal WORM, including Mega. The guided demo stays
-separate. The first encounter cannot begin before **45 seconds of active surface
+Choose **WORM → Play → Portal Enemies** to turn normal encounters on or off,
+including Mega. The default is **On**. The menu remembers the selection, and retry
+keeps it. Off removes enemy encounters and their Fire control; healing, signature
+moves, hazards, missions and XP continue normally. The separate Combat arena
+always includes its waves, regardless of this toggle. The guided demo stays separate. The first encounter cannot begin before **45 seconds of active surface
 play**, and every encounter is followed by **at least 30 quiet seconds**. There
 is a hard limit of **one enemy**, regardless of cube size or how many portals are
 open. A live portal must be on the current face, two to six tiles from the head.

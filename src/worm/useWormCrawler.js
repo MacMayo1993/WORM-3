@@ -403,7 +403,7 @@ export function useWormCrawler(size, cubies) {
                 wormPaused: true, wormHealedCount: 0, wormHealingProgress: {}, wormOnFlippedTile: false });
             return;
         }
-        if (!state.wormCombatMode && !state.demoMode && state.wormHealerMode &&
+        if (state.wormEnemiesEnabled && !state.wormCombatMode && !state.demoMode && state.wormHealerMode &&
             state.wormGamePhase === 'active' && !sim.combat) {
             sim.combat = makeAmbientCombat(sizeRef.current);
             combatBridge.current = sim.combat;

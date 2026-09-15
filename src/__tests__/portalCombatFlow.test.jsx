@@ -129,3 +129,35 @@ it.each(['arena','normal'])('holds aim and new shots throughout an actual edge c
   expect(c.fireHeld).toBe(true);expect(c.aimHeld).toBe(false);
   expect(c.aim.face).toBe(worm.pos.current.dirKey);expect(c.shotsFired).toBeGreaterThan(crossingShots);
 });
+
+it('disables normal enemies and Fire, preserves the choice on retry, and can enable encounters again', () => {
+  const start = enemies => {
+    act(() => state().initWormMode(undefined, undefined, null, null, null, null, false, enemies));
+    act(() => useGameStore.setState({ wormGamePhase: 'active', wormPaused: false }));
+    frame();
+  };
+  start(false);
+  expect(state().wormEnemiesEnabled).toBe(false);
+  expect(state().xpRun).not.toBeNull();expect(state().wormMission).not.toBeNull();
+  expect(host.querySelector('.worm-signature-control')).not.toBeNull();
+  expect(host.querySelector('[aria-label^="Fire parity shot"]')).toBeNull();
+  act(() => worm.queueTurn('fire-start'));
+  for (let i = 0; i < 1000; i++) frame();
+  expect(combatBridge.current).toBeNull();
+  // Retry passes the current run's selection, just like App's retry handler.
+  start(state().wormEnemiesEnabled);
+  expect(combatBridge.current).toBeNull();expect(state().wormEnemiesEnabled).toBe(false);
+  start(true);
+  expect(combatBridge.current.ambient).toBe(true);
+  expect(combatBridge.current.quiet).toBeGreaterThan(44);
+});
+
+it('keeps the optional combat arena playable when normal portal enemies are off', () => {
+  act(() => state().initWormMode(undefined, undefined, null, null, null, null, true, false));
+  act(() => useGameStore.setState({ wormGamePhase: 'active' }));frame();
+  expect(state().wormEnemiesEnabled).toBe(false);
+  expect(combatBridge.current.ambient).not.toBe(true);
+  act(() => worm.queueTurn('combat-start'));frame();
+  act(() => worm.queueTurn('fire'));frame();
+  expect(combatBridge.current.started).toBe(true);expect(combatBridge.current.shotsFired).toBe(1);
+});

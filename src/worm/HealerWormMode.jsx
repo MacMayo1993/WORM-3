@@ -101,6 +101,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
     const demoMode = useGameStore(s => s.demoMode);
     const combatMode = useGameStore(s => s.wormCombatMode);
+    const enemiesEnabled = useGameStore(s => s.wormEnemiesEnabled);
     const wormGamePhase = useGameStore(s => s.wormGamePhase ?? 'scrambling');
     const wormPhaseReactive = useGameStore(s => s.wormPhase ?? 'crawling');
 
@@ -620,7 +621,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         <>
             <WormChaseCamera worm={worm} size={size} />
             <DemoPracticeTargets size={size} />
-            {!demoMode && <CombatScene maxEnemies={combatMode ? 4 : 1} />}
+            {!demoMode && (combatMode || enemiesEnabled) && <CombatScene maxEnemies={combatMode ? 4 : 1} />}
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             {/* Elemental orb wash — bathes the whole cube in the claimed element. */}
             <ElementalAtmosphere size={size} />

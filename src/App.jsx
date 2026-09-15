@@ -880,6 +880,7 @@ export default function WORM3() {
       backgroundTheme: wizardSettings.backgroundTheme,
       manifoldStyles,
       biomeMode: { enabled: false, faceAssignment: null },
+      wormEnemiesEnabled: wizardSettings.wormEnemiesEnabled !== false,
     };
     if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
     setSettings(newSettings);
@@ -927,7 +928,8 @@ export default function WORM3() {
         wormParams.wormOrbCount,
         wormParams.wormholeInterval,
         wormParams.wormColor,
-        !!wizardSettings.wormCombatMode
+        !!wizardSettings.wormCombatMode,
+        wizardSettings.wormEnemiesEnabled !== false
       );
     });
   }, [settings, setSettings, reset, size, changeSize, cancelDisparityRun, launchWithMobi, applyEffectiveDpr]);
@@ -950,7 +952,8 @@ export default function WORM3() {
 
   const handleWormRetry = useCallback(() => {
     useGameStore.getState().clearLevel();
-    useGameStore.getState().initWormMode(undefined, undefined, null, null, null, null, useGameStore.getState().wormCombatMode);
+    const wormState = useGameStore.getState();
+    wormState.initWormMode(undefined, undefined, null, null, null, null, wormState.wormCombatMode, wormState.wormEnemiesEnabled);
     reset();
   }, [reset]);
 

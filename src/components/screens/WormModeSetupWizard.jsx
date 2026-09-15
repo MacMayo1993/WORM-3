@@ -32,7 +32,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     accentShadow: ACCENT_SHADOW,
     extra: {
       ...WORM_DIFFICULTIES[1].settings,
-      wormColor: '#33ff66', wormCombatMode: false
+      wormColor: '#33ff66', wormCombatMode: false,
+      wormEnemiesEnabled: initialSettings?.wormEnemiesEnabled !== false
     }
   });
   const { settings, ownedItems } = cos;
@@ -198,7 +199,18 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         <input type="checkbox" checked={!!settings.wormCombatMode} onChange={e => cos.setSettings(current => ({ ...current, wormCombatMode: e.target.checked }))} style={{ width: 22, height: 22, flexShrink: 0 }} />
         <span><strong>Portal Combat · Prototype</strong><br /><small>Three waves, armored enemies and elemental shots. 5×5 arena; no layer turns.</small></span>
       </label>
-      {!settings.wormCombatMode && <p style={{ margin: 0, fontSize: 12, color: WIZ_TEXT }}>Occasional portal enemies, one at a time. Steer to aim and hold Fire. Healing restores a shield.</p>}
+      {!settings.wormCombatMode && <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 64, padding: 14, borderRadius: 12, border: `1px solid ${WIZ_BORDER_SOFT}`, background: WIZ_SURFACE_RAISED, color: WIZ_TEXT, cursor: 'pointer' }}>
+        <input type="checkbox" role="switch" aria-label="Portal enemies" aria-describedby="worm-enemies-description"
+          checked={settings.wormEnemiesEnabled}
+          onChange={e => cos.setSettings(current => ({ ...current, wormEnemiesEnabled: e.target.checked }))}
+          style={{ width: 24, height: 24, flexShrink: 0, accentColor: ACCENT }} />
+        <span style={{ flex: 1 }}><strong>Portal Enemies</strong><br />
+          <small id="worm-enemies-description">{settings.wormEnemiesEnabled
+            ? 'Occasional enemies, one at a time. Steer to aim and hold Fire.'
+            : 'Explore and heal tunnels without enemy encounters.'}</small>
+        </span>
+        <strong style={{ color: ACCENT }}>{settings.wormEnemiesEnabled ? 'On' : 'Off'}</strong>
+      </label>}
       {!settings.wormCombatMode && <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="body" compact />}
       {!settings.wormCombatMode && <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <legend style={{ fontSize: 13, fontWeight: 700, color: WIZ_TEXT, marginBottom: 10 }}>Difficulty</legend>

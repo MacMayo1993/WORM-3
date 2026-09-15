@@ -34,3 +34,26 @@ it.each([
       wormSpeed: speed, wormOrbCount: orbs, wormholeInterval: interval }));
   } finally { act(() => root.unmount()); host.remove(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; }
 });
+
+it.each([true, false])('loads the saved enemy choice %s and submits changes independently of arena and difficulty', saved => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'); document.body.appendChild(host);
+  const root = createRoot(host); const onComplete = vi.fn();
+  const click = name => act(() => [...host.querySelectorAll('button')].find(b => b.textContent === name).click());
+  try {
+    act(() => root.render(<WormModeSetupWizard onComplete={onComplete} initialSettings={{ wormEnemiesEnabled: saved }} />));
+    click('Play');
+    const toggle = () => host.querySelector('[role="switch"][aria-label="Portal enemies"]');
+    expect(toggle().checked).toBe(saved);
+    act(() => toggle().click());
+    expect(toggle().checked).toBe(!saved);
+    click('Hard');
+    const arena = host.querySelector('input[type="checkbox"]:not([role="switch"])');
+    act(() => arena.click());
+    expect(toggle()).toBeNull();
+    act(() => arena.click());
+    expect(toggle().checked).toBe(!saved);
+    click('Continue');
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ wormEnemiesEnabled: !saved, wormCombatMode: false, wormSpeed: 3.5 }));
+  } finally { act(() => root.unmount()); host.remove(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; }
+});
