@@ -33,8 +33,27 @@ prediction rules, odds, healing payouts, and completion XP remain unchanged.
   and Main Menu remain available.
 
 The CHAOS match panel and optional help tutorial load on demand. The initial
-route is 2,294.3 KB raw / 605.3 KB Brotli, below the existing 2,300 / 640 KB
+route is 2,294.3 KB raw / 605.5 KB Brotli, below the existing 2,300 / 640 KB
 budgets (baseline: 2,299.5 / 606.3 KB).
+
+## Visual design
+
+CHAOS uses a dedicated dark teal and electric lime palette across its forecast,
+live HUD, winner reveal, and recap. Cube colors stay recognizable in raised
+color-pair cards, survival meters, and the two survivor tiles on the podium.
+Local vector glyphs and a CSS tile emblem add character without image downloads.
+
+The forecast separates prediction type, color selection, and wager into numbered
+sections. Its action footer stays visible while the body scrolls. The HUD uses
+color-family survival segments and a distinct healing progress track. Results
+lead with the survivors, then the prediction outcome, contribution, XP, and feats.
+Shared XP widgets receive palette overrides scoped only to CHAOS.
+
+Narrow screens use a two-column prediction grid, compact pair artwork, and
+stacked match statistics. Short landscape screens omit the decorative live
+objective row while preserving selectable standings and scrollable match details.
+Controls have visible keyboard focus, labels alongside color signals, and
+reduced-motion support. No continuous decorative animation runs during play.
 
 ## Records and lifecycle
 

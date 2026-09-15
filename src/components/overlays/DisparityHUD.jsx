@@ -6,6 +6,7 @@ import { FACE_INFO, speedThresholdFor } from '../../utils/disparityBetting.js';
 import { feel } from '../../utils/feel.js';
 import { Z, UI_FONT } from '../../utils/uiTheme.js';
 import '../../chaos/chaos.css';
+import { ChaosGlyph } from '../../chaos/ChaosArt.jsx';
 
 export default function DisparityHUD() {
   const s = useGameStore(useShallow(state => ({ cubies: state.cubies, size: state.size,
@@ -49,21 +50,21 @@ export default function DisparityHUD() {
   if (s.showWinner) return null;
   return <div className="chaos-ui" style={{ fontFamily: UI_FONT }}>
     {s.winner && <div className="chaos-finale" style={{ zIndex: Z.HUD_RAISED }} role="status">
-      <div className="chaos-kicker">The storm has settled</div>
+      <ChaosGlyph kind="trophy" /><div className="chaos-kicker">The storm has settled</div>
       <h2>Last pair standing</h2>
       <p>{s.winner.pair?.join(' ↔ ')}</p>
     </div>}
     <section className="chaos-hud" style={{ zIndex: Z.HUD_RAISED }} aria-label="Chaos match">
       {(faceNotice != null || notice) && !s.winner && <div className="chaos-live-event" key={faceNotice ?? notice?.at}>
-        {faceNotice != null ? `${FACE_INFO[faceNotice]?.name} eliminated — every tile has fallen` : `${notice.tiles.length} tiles fell · ${notice.source === 'conway' ? 'Surface surge' : 'Chain spread'}`}
+        <ChaosGlyph />{faceNotice != null ? `${FACE_INFO[faceNotice]?.name} eliminated — every tile has fallen` : `${notice.tiles.length} tiles fell · ${notice.source === 'conway' ? 'Surface surge' : 'Chain spread'}`}
       </div>}
       <div className="chaos-match" data-finale={board.alive <= 6}>
         <div className="chaos-scoreline">
-          <div><div className="chaos-kicker">CHAOS · {s.cap} flip limit</div><h2 aria-live="polite">{stage}</h2></div>
+          <div><div className="chaos-kicker"><i className="chaos-status-dot" /> CHAOS · {s.cap} flip limit</div><h2 aria-live="polite">{stage}</h2></div>
           <div className="chaos-count">{board.alive}<small> / {board.total} tiles</small></div>
         </div>
         <div className="chaos-survival" role="progressbar" aria-label="Surviving tiles" aria-valuenow={board.alive} aria-valuemin={0} aria-valuemax={board.total}>
-          <span style={{ width: `${board.total ? 100 * board.alive / board.total : 0}%` }} />
+          {board.pairs.map(pair => <span key={pair.id} style={{ width: `${board.total ? 100 * pair.alive / board.total : 0}%`, background: `linear-gradient(90deg, ${FACE_INFO[pair.faces[0]].hex}, ${FACE_INFO[pair.faces[1]].hex})` }} />)}
         </div>
         <div className="chaos-prediction">
           <div><div className="chaos-kicker">{bet ? 'Your prediction' : 'Your objective'}</div>
@@ -84,11 +85,15 @@ export default function DisparityHUD() {
             onClick={() => focusPair(pair)}>
             <span className="chaos-swatches">{pair.faces.map(f => <i key={f} style={{ background: FACE_INFO[f].hex }} />)}</span>
             <strong>{pair.alive}</strong><small>{pair.id === 'RO' ? 'Red / Orange' : pair.id === 'GB' ? 'Green / Blue' : 'White / Yellow'}</small>
+            <span className="chaos-pair-meter" aria-hidden="true" style={{ width: `${100 * pair.alive / (2 * s.size * s.size)}%`, background: `linear-gradient(90deg, ${FACE_INFO[pair.faces[0]].hex}, ${FACE_INFO[pair.faces[1]].hex})` }} />
           </button>)}
         </div>
-        <p className="chaos-note">{objective.label}{objective.value != null ? ` · ${objective.value}/${objective.target}` : ''}</p>
+        <div className="chaos-objective"><ChaosGlyph kind="heal" /><div style={{ flex: 1 }}>
+          <p className="chaos-note">{objective.label}{objective.value != null ? ` · ${objective.value}/${objective.target}` : ''}</p>
+          {objective.value != null && <div className="chaos-objective-track" aria-hidden="true"><span style={{ width: `${Math.min(100, 100 * objective.value / objective.target)}%` }} /></div>}
+        </div></div>
         <button className="chaos-detail-button" onClick={() => setDetails(v => !v)} aria-expanded={details}>
-          {details ? 'Hide match details' : 'Inspect match'} {details ? '−' : '+'}
+          {details ? 'Hide match details' : 'Inspect match'} <span aria-hidden="true">{details ? '−' : '+'}</span>
         </button>
         {details && <div className="chaos-detail">
           <p className="chaos-note">Tap a color pair above to mark its living tiles on the cube. Marks follow original identity through every flip and turn.</p>
