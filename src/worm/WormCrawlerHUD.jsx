@@ -1369,6 +1369,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
     ensureHudStyle();
     const combatMode = useGameStore(s => s.wormCombatMode);
+    const enemiesEnabled = useGameStore(s => s.wormEnemiesEnabled);
     const runId = useGameStore(s => s.wormRunId);
     const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
     const lessonIndex = useGameStore(s => s.demoWormLessonIndex);
@@ -1544,7 +1545,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                     {/* Middle: signature and primary actions share the measured dock */}
                     <div className="worm-action-center" style={ACTION_CLUSTER_STYLE}>
-                        {combatMode ? <CombatFireButton /> : demoLesson ? lesson.id === 'signature' && <SignatureButton /> : <AmbientCombatActions />}
+                        {combatMode ? <CombatFireButton /> : demoLesson ? lesson.id === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
                         <div className="worm-primary-actions">
                             <button
                                 onPointerDown={handleJumpAction}

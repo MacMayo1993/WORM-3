@@ -143,11 +143,12 @@ export const createWormSlice = (set, _get) => ({
     ...makeWormSessionDefaults(),
     wormHealerMode: false,
   }),
-  initWormMode: (flipCap = 9999, _chaosLevel = 0, speed = null, orbCount = null, interval = null, color = null, combat = false) => set((state) => ({
+  initWormMode: (flipCap = 9999, _chaosLevel = 0, speed = null, orbCount = null, interval = null, color = null, combat = false, enemies = true) => set((state) => ({
     ...makeDisparityRuntimeDefaults(),
     ...makeWormSessionDefaults(),
     wormHealerMode: true,
     wormCombatMode: combat === true && !state.demoMode,
+    wormEnemiesEnabled: enemies !== false,
     xpRun: state.demoMode || combat ? null : createXpRun('worm', (state.wormRunId ?? 0) + 1, state.playerProgress.xp, {
       multiplier: wormMultiplier(speed ?? state.wormSpeed, interval ?? state.wormholeInterval),
     }),

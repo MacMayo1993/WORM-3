@@ -64,6 +64,7 @@ export const makeWormSessionDefaults = () => ({
   // screen-edge confirmation flash.
   wormOrbFlash: null,
   wormCombatMode: false,
+  wormEnemiesEnabled: true,
   wormAlive: true,
   showWormDeathMenu: false,
   wormDeathDetails: null,
