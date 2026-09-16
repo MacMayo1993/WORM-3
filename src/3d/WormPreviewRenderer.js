@@ -19,13 +19,14 @@ import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormP
 
 import { prefersReducedMotion } from '../utils/device.js';
 import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents } from '../worm/wormCharacterVisuals.js';
+import { animateWormFace } from '../worm/wormFaceExpression.js';
 import { finishWormEyes, wormBodyTaper } from '../worm/wormCharacterFinish.js';
 import * as THREE from 'three';
 import { stepMenuWorm, menuWormSegment } from './menuWormMotion.js';
 import { createMobiSegmentAssets, createMobiSegment, MOBI_SEGMENT_RADIUS } from '../worm/mobiSegments.js';
 import { createMobiModel, animateMobi, orientMobi, MOBI_RADIUS } from '../worm/mobiModel.js';
 import { getSkin } from '../worm/wormCosmeticsData.js';
-import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
+import { layoutWormFace, FACE_LAYOUT } from '../worm/wormFaceLayout.js';
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../worm/wormSkinMaterial.js';
 import { makeWormHaloSprite, HALO_SCALE } from '../worm/wormGlowHalo.js';
@@ -156,11 +157,11 @@ function _buildRig() {
   // Face — eyes with pupils and a curved smile, as in WormFace.
   const eyeGeo = new THREE.SphereGeometry(1, 14, 14);
   const pupilGeo = new THREE.SphereGeometry(1, 10, 10);
-  const mouthGeo = new THREE.TorusGeometry(1, FACE_LAYOUT.mouthTube / FACE_LAYOUT.mouthRadius, 8, 22, MOUTH_ARC);
+  const mouthGeo = new THREE.BufferGeometry();
   const eyes = [0, 1].map(() => new THREE.Mesh(eyeGeo, new THREE.MeshPhysicalMaterial({ color: 0xf1f3e9, roughness: 0.22, clearcoat: 1 })));
   const pupils = [0, 1].map(() => new THREE.Mesh(pupilGeo, new THREE.MeshBasicMaterial({ color: 0x12131a })));
   const mouth = new THREE.Mesh(mouthGeo, new THREE.MeshBasicMaterial({ color: 0x12131a }));
-  const disposeEyes = finishWormEyes(eyes, pupils);
+  const disposeEyes = finishWormEyes(eyes, pupils, 'classic', mouth);
   eyes.forEach(m => group.add(m));
   pupils.forEach(m => group.add(m));
   group.add(mouth);
@@ -204,10 +205,12 @@ const FRAMING = {
   portrait: { pos: [0.34, 0.52, 0.68], look: [0.0, 0.10, -0.02], yaw: -0.55 },
 };
 
-function _frameCamera(framing) {
+function _frameCamera(framing, characterId) {
   const f = FRAMING[framing] || FRAMING.body;
   camera.position.set(f.pos[0], f.pos[1], f.pos[2]);
   camera.lookAt(f.look[0], f.look[1], f.look[2]);
+  camera.zoom = characterId === 'mobi' && (framing === 'head' || framing === 'portrait') ? 0.68 : 1;
+  camera.updateProjectionMatrix();
   // Yaw the worm rather than orbit the camera: the face reads best turned a
   // little towards the lens, and turning the worm keeps the shallow elevation
   // that stops a hat brim from cutting across the eyes.
@@ -396,7 +399,7 @@ function _poseWorm(opts, time) {
   const fxKey = `${skinId}|${characterId}`;
   if (rig.skinKey !== fxKey) {
     rig.disposeEyes();
-    rig.disposeEyes = finishWormEyes(rig.eyes, rig.pupils, characterId);
+    rig.disposeEyes = finishWormEyes(rig.eyes, rig.pupils, characterId, rig.mouth);
     const fx = getSkinFX(skinId);
     for (let i = 0; i < SEGMENTS; i++) {
       applySkinMaterialProfile(rig.beads[i].material, fx, i);
@@ -599,12 +602,7 @@ function _poseWorm(opts, time) {
     if (accent.group.visible) poseCharacterAccents(accent.group, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD, UP, HEAD_SCALE);
   }
 
-  // An occasional blink, squashing the eye and its pupil together.
-  const blink = Math.sin(time * 0.9) > 0.985 ? 0.2 : 1;
-  if (blink !== 1) {
-    rig.eyes.forEach(eye => { eye.scale.y *= blink; });
-    rig.pupils.forEach(pupil => { pupil.scale.y *= blink; });
-  }
+  animateWormFace(_faceParts, characterId, time, { reducedMotion: prefersReducedMotion() });
 
   rig.eyes.forEach(eye => { eye.visible = !isMobi; });
   rig.pupils.forEach(eye => { eye.visible = !isMobi; });
@@ -674,7 +672,7 @@ function renderToCanvas(opts, time, targetCanvas) {
 
   const size = targetCanvas.width;
   if (!size) return;
-  _frameCamera(opts.framing);
+  _frameCamera(opts.framing, opts.characterId);
   characterStage.visible = opts.framing === 'character';
   _poseWorm(opts, prefersReducedMotion() ? 0 : time);
   const renderCamera = opts.companion ? companionCamera : camera;
@@ -721,7 +719,7 @@ const _directScissor = new THREE.Vector4();
 const _directClear = new THREE.Color();
 export function drawDirectWormPreview(gl, opts, time) {
   if (!scene) setWormSharedRenderer(gl);
-  _frameCamera(opts.framing);
+  _frameCamera(opts.framing, opts.characterId);
   characterStage.visible = opts.framing === 'character';
   _poseWorm(opts, prefersReducedMotion() ? 0 : time);
   const target = gl.getRenderTarget();

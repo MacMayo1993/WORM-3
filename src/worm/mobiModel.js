@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createMobiGasMaterial } from './mobiEnergyMaterials.js';
 import { prefersReducedMotion } from '../utils/device.js';
+import { wormBlink } from './wormFaceExpression.js';
 import { createParityMobiusGeometry } from './parityGeometry.js';
 
 export const MOBI_RADIUS = 0.12;
@@ -99,39 +100,45 @@ export function createMobiModel({ face = true } = {}) {
     return { group, core, gem, gas, band, eyes: [], primary, secondary, ownedBandMaterial, shellMaterial, lastTime: null, transitRoll: 0 };
   }
 
-  // The guide's tiny Rubik's-cube eyes, kept above the core's sight line.
-  const eyes = [];
-  const eyeGeo = new RoundedBoxGeometry(0.52, 0.52, 0.52, 2, 0.055);
-  const tileGeo = new THREE.PlaneGeometry(0.145, 0.145);
+  // Cube eyes keep the guide's identity, with readable digital lenses.
+  const eyes = [], pupils = [], brows = [];
+  const eyeGeo = new RoundedBoxGeometry(0.62, 0.55, 0.36, 2, 0.07);
+  const lensGeo = new RoundedBoxGeometry(0.48, 0.40, 0.04, 2, 0.06);
+  const pupilGeo = new RoundedBoxGeometry(0.23, 0.27, 0.045, 2, 0.045);
+  const tileGeo = new THREE.BoxGeometry(0.18, 0.025, 0.12);
   const tileMaterials = ['#ecfbff', '#63d7ef', '#b4a3f5'].map(light);
+  const browGeo = new RoundedBoxGeometry(0.50, 0.055, 0.05, 1, 0.018);
   for (const sign of [-1, 1]) {
     const eye = new THREE.Group();
-    eye.position.set(sign * 0.45, 0.58, -1.02);
+    eye.position.set(sign * 0.43, 0.48, -1.04);
+    // Tip the lenses towards the gameplay camera, clear of the hat seat.
+    eye.rotation.x = 0.24;
     eye.add(new THREE.Mesh(eyeGeo, dark));
-    for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
-      const front = new THREE.Mesh(tileGeo, row === 1 && col === 1 ? dark : tileMaterials[(row + col) % 3]);
-      front.position.set((col - 1) * 0.164, (row - 1) * 0.164, -0.265);
-      front.rotation.y = Math.PI;
-      eye.add(front);
-      const top = new THREE.Mesh(tileGeo, tileMaterials[col % 3]);
-      top.position.set((col - 1) * 0.164, 0.265, (row - 1) * 0.164);
-      top.rotation.x = -Math.PI / 2;
-      eye.add(top);
+    const lens = new THREE.Mesh(lensGeo, cyan);
+    lens.position.z = -0.20; eye.add(lens);
+    const pupil = new THREE.Mesh(pupilGeo, dark);
+    pupil.position.set(0, 0, -0.24); eye.add(pupil); pupils.push(pupil);
+    const glint = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.065, 0.02), tileMaterials[0]);
+    glint.position.set(0.045, 0.065, -0.035); pupil.add(glint);
+    for (const x of [-1, 1]) for (const z of [-1, 1]) {
+      const tile = new THREE.Mesh(tileGeo, tileMaterials[x === z ? 1 : 2]);
+      tile.position.set(x * 0.13, 0.283, z * 0.095); eye.add(tile);
     }
-    eyes.push(eye);
-    group.add(eye);
+    const brow = new THREE.Mesh(browGeo, violet);
+    brow.position.set(0, 0.35, -0.10); eye.add(brow); brows.push(brow);
+    eyes.push(eye); group.add(eye);
     const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.035, 0.35, 8), violet);
     antenna.position.set(sign * 0.65, 1.1, 0.1);
     antenna.rotation.z = -sign * 0.22;
     group.add(antenna);
   }
-  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.017, 6, 24, Math.PI), cyan);
-  smile.position.set(0, -0.46, -1.015);
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.038, 6, 24, Math.PI), cyan);
+  smile.position.set(0, -0.39, -1.07);
   smile.rotation.z = Math.PI;
-  smile.scale.y = 0.45;
+  smile.scale.y = 0.62;
   group.add(smile);
   group.scale.setScalar(MOBI_RADIUS);
-  return { group, core, gem, gas, band, eyes, primary, secondary, ownedBandMaterial, shellMaterial, lastTime: null, transitRoll: 0 };
+  return { group, core, gem, gas, band, eyes, pupils, brows, smile, primary, secondary, ownedBandMaterial, shellMaterial, lastTime: null, transitRoll: 0 };
 }
 
 /** Time is supplied by the caller's pause-aware clock; no independent timers. */
@@ -145,8 +152,13 @@ export function animateMobi(rig, time, { pulse = 0, transit = false } = {}) {
   rig.core.rotation.set(Math.PI / 4 + time * 0.32, time * 0.48, Math.PI / 4 + rig.transitRoll);
   rig.band.rotation.y = -time * 0.6;
   rig.gem.scale.setScalar(1 + Math.sin(time * 3) * 0.08 + Math.max(0, Math.min(1, pulse)) * 0.35);
-  const blink = Math.sin(time * 0.9) > 0.985 ? 0.18 : 1;
-  rig.eyes.forEach(eye => { eye.scale.y = blink; });
+  const blink = wormBlink(time, 4.4);
+  rig.eyes.forEach((eye, i) => {
+    eye.scale.y = blink * (1 + pulse * 0.12);
+    rig.pupils[i].position.x = Math.sin(time * 0.65) * 0.035;
+    rig.brows[i].rotation.z = (i ? -1 : 1) * (0.09 + pulse * 0.22);
+  });
+  if (rig.smile) rig.smile.scale.y = 0.62 + pulse * 0.35;
 }
 
 export function disposeMobi(rig) {

@@ -1,30 +1,54 @@
 import * as THREE from 'three';
+import { WORM_FACE_PROFILES } from './wormFaceExpression.js';
 
-// Shared anatomical finish, installed once per head (never per body segment).
-// Features are children of the existing eyes/pupils and inherit face orientation.
-export function finishWormEyes(eyes, pupils, character = 'classic') {
-  const irisGeo = new THREE.TorusGeometry(0.90, 0.24, 6, 24);
-  const lidGeo = new THREE.TorusGeometry(0.96, 0.075, 6, 24, Math.PI);
+// Shared by gameplay and previews. Children inherit the face's surface basis.
+export function finishWormEyes(eyes, pupils, character = 'classic', mouth = null) {
+  const profile = WORM_FACE_PROFILES[character] || WORM_FACE_PROFILES.classic;
+  const irisGeo = new THREE.TorusGeometry(0.82, 0.26, 8, character === 'prism' ? 4 : 24);
+  const lidGeo = new THREE.TorusGeometry(1.02, 0.115, 6, 20, Math.PI);
   const glintGeo = new THREE.SphereGeometry(1, 8, 6);
-  const irisMat = new THREE.MeshPhysicalMaterial({ color: ({ book: '#b98739', prism: '#8563d9', inch: '#779438' })[character] || '#459a87', roughness: 0.24, clearcoat: 1, metalness: 0.15 });
-  const lidMat = new THREE.MeshStandardMaterial({ color: '#34433f', roughness: 0.48 });
+  const irisMat = new THREE.MeshStandardMaterial({ color: profile.iris, emissive: profile.iris,
+    emissiveIntensity: character === 'glow' ? 0.65 : 0.22, roughness: 0.25, metalness: 0.12, toneMapped: false });
+  const lidMat = new THREE.MeshBasicMaterial({ color: profile.lid });
   const glintMat = new THREE.MeshBasicMaterial({ color: '#fffdf2', toneMapped: false });
   const attachments = [];
   for (let i = 0; i < 2; i++) {
     if (!eyes[i] || !pupils[i]) continue;
     const lid = new THREE.Mesh(lidGeo, lidMat);
-    lid.position.z = 0.56;
+    lid.position.set(0, 0.12, 0.62);
+    lid.scale.y = 0.88;
+    eyes[i].userData.wormBrow = lid;
     eyes[i].add(lid); attachments.push(lid);
     const iris = new THREE.Mesh(irisGeo, irisMat);
-    iris.position.z = 0.15;
+    iris.position.z = 0.64;
     pupils[i].add(iris); attachments.push(iris);
     const glint = new THREE.Mesh(glintGeo, glintMat);
-    glint.position.set(-0.30, 0.32, 1.03); glint.scale.set(0.18, 0.18, 0.10);
+    glint.position.set(-0.32, 0.35, 1.15); glint.scale.set(0.23, 0.23, 0.12);
     pupils[i].add(glint); attachments.push(glint);
+
+  }
+  // A sculpted opening with an inset tooth line reads better than a thin arc.
+  const originalMouth = mouth?.geometry;
+  let smileGeometry, teethGeometry;
+  if (mouth) {
+    const smile = new THREE.Shape();
+    smile.moveTo(-1, 0); smile.quadraticCurveTo(0, 0.20, 1, 0);
+    smile.quadraticCurveTo(0.8, 1.10, 0, 1.10); smile.quadraticCurveTo(-0.8, 1.10, -1, 0);
+    smileGeometry = new THREE.ShapeGeometry(smile, 16);
+    mouth.geometry = smileGeometry;
+    const tooth = new THREE.Shape();
+    tooth.moveTo(-0.77, 0.16); tooth.quadraticCurveTo(0, 0.32, 0.77, 0.16);
+    tooth.lineTo(0.59, 0.47); tooth.quadraticCurveTo(0, 0.58, -0.59, 0.47); tooth.closePath();
+    teethGeometry = new THREE.ShapeGeometry(tooth, 12);
+    const teeth = new THREE.Mesh(teethGeometry, glintMat);
+    teeth.position.z = 0.04;
+    mouth.add(teeth); attachments.push(teeth);
   }
   return () => {
     attachments.forEach(part => part.removeFromParent());
-    [irisGeo, lidGeo, glintGeo, irisMat, lidMat, glintMat].forEach(resource => resource.dispose());
+    eyes.forEach(eye => { if (eye) delete eye.userData.wormBrow; });
+    if (mouth) mouth.geometry = originalMouth;
+    [irisGeo, lidGeo, glintGeo, irisMat, lidMat, glintMat, smileGeometry, teethGeometry].forEach(resource => resource?.dispose());
   };
 }
 
