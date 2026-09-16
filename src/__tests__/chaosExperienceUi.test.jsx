@@ -1,3 +1,4 @@
+import { bettingPalette } from '../utils/disparityBetting.js';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -104,4 +105,30 @@ it('keeps a losing wager settled when leaving during the winner reveal', () => {
   act(() => { state().refundActiveBet(); state().clearDisparityGame(); });
   expect(state().parityPoints).toBe(975);
   expect(state().chaosRecord).toMatchObject({ rounds: 1, predictions: 1, correct: 0 });
+});
+
+it('uses the chosen palette for picks and preserves pair identity when placing a bet', () => {
+  const onBet = vi.fn();
+  const settings = { colorScheme: 'neon', cubeSize: 5 };
+  const { faces, pairs } = bettingPalette(settings);
+  act(() => root.render(<DisparityBettingScreen settings={settings} onBetPlaced={onBet} onSkip={vi.fn()} />));
+  const choices = [...host.querySelectorAll('.chaos-pick-pair')];
+  expect(choices[0].textContent).toContain(pairs[0].label);
+  expect(choices[0].style.getPropertyValue('--pair-a')).toBe(faces[1].hex);
+  expect(choices[0].style.getPropertyValue('--pair-b')).toBe(faces[4].hex);
+  expect(host.textContent).not.toContain('Red-Orange, Green-Blue');
+  act(() => choices[0].click());
+  click('Bet 25 PP');
+  expect(onBet.mock.calls[0][0]).toMatchObject({ pick: 'RO', type: 'PAIR', paletteSettings: settings });
+});
+it('updates single-color picks when the setup palette changes', () => {
+  const renderPalette = settings => act(() => root.render(<DisparityBettingScreen settings={settings} onBetPlaced={vi.fn()} onSkip={vi.fn()} />));
+  renderPalette({ colorScheme: 'neon' });
+  click('Last Color');
+  const custom = { colorScheme: 'custom', customColors: { 1: '#123456', 4: '#ff55cc' } };
+  renderPalette(custom);
+  const { faces } = bettingPalette(custom);
+  const choice = host.querySelector('.chaos-face-choice');
+  expect(choice.textContent).toContain(faces[1].name);
+  expect(choice.querySelector('i').style.background).toBe('rgb(18, 52, 86)');
 });

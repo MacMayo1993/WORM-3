@@ -67,6 +67,7 @@ export function useDisparityGame({
             return;
           }
           const result = resolveBet(activeBet, {
+            settings: s.settings,
             disparityDeaths: s.disparityDeaths,
             disparityWinner: s.disparityWinner,
             disparityEliminatedFaces: s.disparityEliminatedFaces,

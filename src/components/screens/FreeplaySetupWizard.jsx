@@ -1,3 +1,4 @@
+import { MODE_THEMES } from '../../utils/modeThemes.js';
 import React, { useState, useMemo } from 'react';
 import { useIsMobile } from '../../hooks/index.js';
 import { wizardLayout, WizardShell } from './WizardChrome.jsx';
@@ -7,8 +8,8 @@ import {
   sceneLabel, paletteLabel, sizeLabel
 } from './wizardSteps/index.jsx';
 
-const ACCENT = '#1565C0';
-const ACCENT_SHADOW = '#0a3872';
+const ACCENT = MODE_THEMES.cube.accent;
+const ACCENT_SHADOW = MODE_THEMES.cube.shadow;
 
 const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   // Which category the pane is showing. The rail sets it directly; Back and

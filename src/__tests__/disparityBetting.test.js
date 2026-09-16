@@ -260,3 +260,15 @@ describe('BET_TYPES odds', () => {
     }
   });
 });
+
+
+describe('palette-aware predictions', () => {
+  it('settles by face identity and describes the selected palette', () => {
+    const state = { disparityWinner: { pair: ['M1-001', 'M4-009'] }, settings: { colorScheme: 'neon' } };
+    const result = resolveBet({ type: 'PAIR', pick: 'RO' }, state);
+    expect(result.won).toBe(true);
+    expect(result.description).toContain('Pink – Cyan');
+    const saved = resolveBet({ type: 'PAIR', pick: 'RO', paletteSettings: { colorScheme: 'standard' } }, state);
+    expect(saved.description).toContain('Red – Orange');
+  });
+});

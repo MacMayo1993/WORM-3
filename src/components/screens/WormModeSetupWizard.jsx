@@ -1,3 +1,4 @@
+import { MODE_THEMES } from '../../utils/modeThemes.js';
 import React, { useState, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useIsMobile } from '../../hooks/index.js';
@@ -14,8 +15,8 @@ import {
   sceneLabel, paletteLabel, sizeLabel, bgOptionFor
 } from './wizardSteps/index.jsx';
 
-const ACCENT = '#6A2C91';
-const ACCENT_SHADOW = '#3d1854';
+const ACCENT = MODE_THEMES.worm.accent;
+const ACCENT_SHADOW = MODE_THEMES.worm.shadow;
 const MEGA_CUBE_SIZE = 15;
 const WORM_SIZE_TIERS = [
   ...SIZE_TIERS.map(tier => tier.n === 6 ? { ...tier, tag: 'Giant' } : tier),
@@ -221,7 +222,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             style={{ minHeight: 48, padding: '12px 6px', borderRadius: 10,
               border: `2px solid ${difficulty.id === option.id ? ACCENT : WIZ_BORDER_SOFT}`,
               background: difficulty.id === option.id ? ACCENT : WIZ_SURFACE_RAISED,
-              color: difficulty.id === option.id ? '#fff' : WIZ_TEXT,
+              color: difficulty.id === option.id ? '#111d20' : WIZ_TEXT,
               cursor: 'pointer', font: 'inherit', fontSize: 14, fontWeight: 700 }}
           >{option.label}</button>)}
         </div>

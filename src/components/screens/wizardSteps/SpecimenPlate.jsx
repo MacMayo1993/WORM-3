@@ -21,7 +21,7 @@ import { TOUCH_TARGET } from '../../ui/Button.jsx';
 // NIGHT_SHEET's colour taken opaque — the plate sits on paper rather than over
 // the 3D scene — lit from behind by whatever the specimen is wearing.
 export const plateSurface = glow => ({
-  backgroundColor: '#1c2316',
+  backgroundColor: 'var(--wiz-base, #1c2316)',
   backgroundImage: [
     `radial-gradient(ellipse at 50% 46%, ${glow}30 0%, transparent 64%)`,
     'linear-gradient(165deg, rgba(255,245,220,0.07), rgba(12,16,9,0.55))'

@@ -1,3 +1,4 @@
+import { MODE_THEMES } from '../../utils/modeThemes.js';
 import React, { useState, useMemo } from 'react';
 import { TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
 import { useIsMobile } from '../../hooks/index.js';
@@ -8,11 +9,11 @@ import {
   cardStyle, sceneLabel, paletteLabel, sizeLabel
 } from './wizardSteps/index.jsx';
 
-const ACCENT = '#C44B00';
-const ACCENT_SHADOW = '#7a2e00';
+const ACCENT = MODE_THEMES.chaos.accent;
+const ACCENT_SHADOW = MODE_THEMES.chaos.shadow;
 
 const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
-const LEVEL_ACCENT = { 1: '#2d7a3a', 2: '#b58a00', 3: '#c45000', 4: '#c0392b', 5: '#7b2d8b' };
+const LEVEL_ACCENT = { 1: '#88e59a', 2: '#f4d35e', 3: '#ffad70', 4: '#ff9090', 5: '#d6a0ff' };
 
 const FLIP_CAP_PRESETS = [
   { label: 'Fragile', value: 3, sub: 'Fast massacre' },
@@ -209,7 +210,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   return (
     <WizardShell
       styles={S}
-      mode="DISPARITY MODE"
+      mode="CHAOS MODE"
       accent={ACCENT}
       categories={categories}
       active={step}

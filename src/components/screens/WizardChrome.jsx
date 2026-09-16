@@ -1,33 +1,10 @@
-// WizardChrome.jsx — shared visual chrome and layout for every mode setup wizard.
-//
-// All four setup wizards (Freeplay/cube, Worm, Disparity, Random) share one look
-// and, since the stack below, one shell: they hand <WizardShell> their categories
-// and their accent and it draws the whole sheet. They used to hand-copy the
-// overlay/sheet/header/body/footer JSX four times, which is how they drifted
-// apart on phones — one full-bleed at 92vh, one floating at 88vh with desktop
-// padding.
-//
-// ── The layout ────────────────────────────────────────────────────────────────
-// Everything stacks, full width, in the order you make the decisions in:
-//
-//     mode bar          ← back, and which mode you are configuring
-//     specimen          ← the live cube (or worm), edge to edge
-//     family chips      ← horizontally scrolling, only where a category has them
-//     category bar      ← Character · Scene · Colors · Style · Size · Play
-//     the choices       ← the scrolling grid
-//     one wide action   ← confirm and go on
-//
-// This replaced a vertical rail down the left edge. The rail kept every category
-// in view — which is the thing worth keeping, and the category bar still does it
-// — but it did so by taking a quarter of a phone's width off the pane for its
-// whole height, so the cube sat in a column narrower than the grid beneath it and
-// the bottom half of the rail was empty paper. A phone has width to spend and
-// height to hoard; this spends the width.
-//
-// Setup uses shared warm paper; live specimens retain their selected scenes.
+// Shared forecast-style setup shell for CUBE, WORM, CHAOS and RANDOM.
+// Scoped CSS variables keep paper styling for notebook and store consumers.
 
 import React from 'react';
-import { UI_FONT, UI_MOSS, UI_ACTION_SHADOW, PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BG_MUTED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_SHADOW, PAPER_CARD_SHADOW, PAPER_BACKDROP, PAPER_FOOTER_BG, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
+import { UI_FONT, PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BG_MUTED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_SHADOW, PAPER_CARD_SHADOW, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
+import { modeTheme } from '../../utils/modeThemes.js';
+import './modeWizard.css';
 import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
 
@@ -64,24 +41,24 @@ export const WIZARD_FOOTER_BG = 'rgba(245, 238, 222, 0.82)';
 export const PENCIL_LEAD = '#35404a';
 
 // Shared paper surfaces keep every mode in the same field-guide family.
-export const WIZ_BASE = PAPER_SHEET;
-export const WIZ_SURFACE = PAPER_BG_MUTED;
-export const WIZ_SURFACE_RAISED = PAPER_SHEET_RAISED;
-export const WIZ_BORDER = PAPER_BORDER;
-export const WIZ_BORDER_SOFT = PAPER_BORDER_SOFT;
-export const WIZ_TEXT = PAPER_TEXT;
-export const WIZ_TEXT_MUTED = PAPER_TEXT_MUTED;
+export const WIZ_BASE = `var(--wiz-base, ${PAPER_SHEET})`;
+export const WIZ_SURFACE = `var(--wiz-surface, ${PAPER_BG_MUTED})`;
+export const WIZ_SURFACE_RAISED = `var(--wiz-surface-raised, ${PAPER_SHEET_RAISED})`;
+export const WIZ_BORDER = `var(--wiz-border, ${PAPER_BORDER})`;
+export const WIZ_BORDER_SOFT = `var(--wiz-border-soft, ${PAPER_BORDER_SOFT})`;
+export const WIZ_TEXT = `var(--wiz-text, ${PAPER_TEXT})`;
+export const WIZ_TEXT_MUTED = `var(--wiz-text-muted, ${PAPER_TEXT_MUTED})`;
 // Small interactive labels need the stronger secondary ink on cream.
-export const WIZ_TEXT_FAINT = PAPER_TEXT_MUTED;
+export const WIZ_TEXT_FAINT = `var(--wiz-text-faint, ${PAPER_TEXT_MUTED})`;
 export const WIZ_SHADOW = PAPER_SHADOW;
-export const WIZ_CARD_SHADOW = PAPER_CARD_SHADOW;
+export const WIZ_CARD_SHADOW = `var(--wiz-card-shadow, ${PAPER_CARD_SHADOW})`;
 
 /** Unruled paper with a restrained wash of the mode's accent. */
 export const wizardBackground = accent => ({
   backgroundColor: WIZ_BASE,
   backgroundImage: [
     `radial-gradient(ellipse at 100% 0%, ${accent}0c, transparent 55%)`,
-    'radial-gradient(ellipse at 0% 0%, rgba(255,255,255,0.7), transparent 65%)'
+    'linear-gradient(120deg, #1b2c30, #121e22)'
   ].join(',')
 });
 
@@ -109,7 +86,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: PAPER_BACKDROP,
+      background: `radial-gradient(ellipse at 20% 0%, ${accent}18, transparent 55%), #060e12ed`,
       backdropFilter: PAPER_BACKDROP_BLUR,
       WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
       zIndex: Z.MODAL,
@@ -117,23 +94,22 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       // dvh tracks the collapsing mobile URL bar; browsers without it fall back
       // to the inset:0 box, which is what this used to rely on entirely.
       height: '100dvh',
-      padding: 0,
+      padding: mobile ? 'max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left))' : 18,
       boxSizing: 'border-box',
       animation: 'modalBackdropIn 0.22s ease'
     },
 
     sheet: {
       ...wizardBackground(accent),
-      borderRadius: mobile ? 0 : '20px',
+      borderRadius: mobile ? 20 : 24,
       width: mobile ? '100%' : 'min(720px, 96vw)',
-      height: mobile ? '100%' : 'auto',
-      maxHeight: mobile ? '100%' : '92vh',
+      height: '100%',
+      maxHeight: mobile ? '100%' : '94dvh',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      boxShadow: mobile ? 'none' : WIZ_SHADOW,
-      border: mobile ? 'none' : `1px solid ${WIZ_BORDER}`,
-      borderTop: `3px solid ${accent}`,
+      boxShadow: '0 30px 100px #0008',
+      border: `1px solid ${WIZ_BORDER}`,
       color: WIZ_TEXT,
       animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)'
     },
@@ -258,7 +234,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       padding: `0 ${Math.max(GUTTER - 8, 6)}px`,
       borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
       borderBottom: `1px solid ${WIZ_BORDER_SOFT}`,
-      background: PAPER_BG_MUTED,
+      background: WIZ_SURFACE,
       overflowX: 'auto',
       overscrollBehaviorX: 'contain',
       WebkitOverflowScrolling: 'touch',
@@ -307,20 +283,20 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       gap: 8,
       flexShrink: 0,
       borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
-      background: PAPER_FOOTER_BG
+      background: '#0d181c'
     },
 
     // One wide action. A wizard has exactly one thing to do next, and on a phone
     // it belongs across the thumb rather than in a corner.
     btnPrimary: {
       width: '100%',
-      background: UI_MOSS,
-      border: `1px solid ${UI_MOSS}`,
+      background: accent,
+      border: `1px solid ${accent}`,
       fontSize: TEXT_SM,
       fontWeight: '800',
       letterSpacing: '0.10em',
       textTransform: 'uppercase',
-      color: '#fff',
+      color: '#111d20',
       cursor: 'pointer',
       minHeight: TOUCH_TARGET + 4,
       padding: '13px 20px',
@@ -328,7 +304,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       transition: 'all 0.12s ease',
       fontFamily: 'inherit',
       WebkitTapHighlightColor: 'transparent',
-      boxShadow: UI_ACTION_SHADOW
+      boxShadow: `0 3px 0 ${_accentShadow}`
     },
 
     btnSecondary: {
@@ -367,7 +343,7 @@ export function WizardSectionHeading({ children, style }) {
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
         color: WIZ_TEXT_FAINT,
-        background: `linear-gradient(${WIZ_BASE} 70%, rgba(245,240,232,0))`,
+        background: WIZ_BASE,
         ...style
       }}
     >
@@ -594,6 +570,9 @@ export function WizardShell({
   mobile = isMobile,
   children
 }) {
+  const scrollRef = React.useRef(null);
+  React.useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
+  const theme = modeTheme(mode);
   const cat = categories[active];
   const last = active === categories.length - 1;
   // Keep the cube above the setup selector and its style-family controls.
@@ -618,10 +597,10 @@ export function WizardShell({
   );
 
   return (
-    <div style={styles.overlay}>
+    <div className="mode-wizard" style={{ ...styles.overlay, '--mode-accent': accent }}>
       {children}
 
-      <div style={styles.sheet}>
+      <div className="mode-wizard-sheet" style={styles.sheet}>
         <div style={styles.modeBar}>
           <button type="button" onClick={onBack} className="ui-focusable" style={styles.backBtn} aria-label="Back">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -629,9 +608,15 @@ export function WizardShell({
             </svg>
             {!mobile && (active === 0 ? 'Cancel' : 'Back')}
           </button>
-          <span style={styles.modeName}>{mode}</span>
+          <span className="mode-wizard-kicker">Configure your run</span>
+          <span className="mode-wizard-count">{String(active + 1).padStart(2, '0')} / {String(categories.length).padStart(2, '0')}</span>
         </div>
 
+        <div className="mode-wizard-scroll" ref={scrollRef}>
+        <header className="mode-wizard-heading">
+          <h1>{theme.name}</h1>
+          <p>{theme.tagline}</p>
+        </header>
         {specimen}
         {isStyle && categoryBar}
 
@@ -645,11 +630,13 @@ export function WizardShell({
 
         {!isStyle && categoryBar}
 
-        <div style={styles.body} id={WIZARD_PANEL_ID} role="region" aria-label={cat.label}>
+        <div style={{ ...styles.body, overflowY: 'visible', maskImage: 'none', WebkitMaskImage: 'none' }} id={WIZARD_PANEL_ID} role="region" aria-label={cat.label}>
           <div style={{ paddingBottom: '24px' }}>{cat.content}</div>
         </div>
 
+        </div>
         <div style={styles.footer}>
+          <div className="mode-wizard-footer-note">{cat.label} · {cat.summary}</div>
           <button
             type="button"
             style={styles.btnPrimary}

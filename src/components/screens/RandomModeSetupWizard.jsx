@@ -1,10 +1,11 @@
+import { MODE_THEMES } from '../../utils/modeThemes.js';
 import React, { useState, useMemo } from 'react';
 import { useIsMobile } from '../../hooks/index.js';
 import { wizardLayout, WizardShell } from './WizardChrome.jsx';
 import { useWizardCosmetics, SceneStep, SizeStep, sceneLabel, sizeLabel } from './wizardSteps/index.jsx';
 
-const ACCENT = '#C44B00';
-const ACCENT_SHADOW = '#7a2e00';
+const ACCENT = MODE_THEMES.random.accent;
+const ACCENT_SHADOW = MODE_THEMES.random.shadow;
 
 const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
