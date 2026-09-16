@@ -1,6 +1,6 @@
 .opening-edge {
   position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(16,30,22,.3), transparent 24%, transparent 54%, rgba(16,30,22,.88));
+  background: linear-gradient(180deg, rgba(10,16,18,.12), transparent 24%, transparent 54%, rgba(10,16,18,.72));
 }
 .opening-brand {
   position: absolute; top: max(22px, env(safe-area-inset-top)); left: max(22px, env(safe-area-inset-left));

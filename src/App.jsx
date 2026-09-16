@@ -53,7 +53,7 @@ import {
 
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
-import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
+import IntroBackdrop from './components/intro/IntroBackdrop.jsx';
 import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
@@ -115,20 +115,13 @@ const DEFAULT_CAMERA_FOV = 40;
 function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode = false }) {
   return (
     <>
-      <color attach="background" args={['#17291f']} />
+      <color attach="background" args={['#111b1e']} />
       <ambientLight intensity={1.0} />
       <pointLight position={[10, 10, 10]} intensity={2.2} />
       <pointLight position={[-10, -10, -10]} intensity={1.6} />
       <pointLight position={[-6, 2, 8]} intensity={1.4} color="#4a7ccc" />
       <pointLight position={[5, -4, -6]} intensity={0.8} color="#2a4a8a" />
-      {/* Slow atmospheric backdrop; static when reduced motion is requested. */}
-      <NebulaEnvironment
-        variant="intro"
-        speed={reducedMotion ? 0 : 0.18}
-        density={performanceMode ? 0.35 : 0.5}
-        structure={0.9}
-        performanceMode={performanceMode}
-      />
+      <IntroBackdrop time={time} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <SafeEnvironment preset="city" />
       {!performanceMode && (
