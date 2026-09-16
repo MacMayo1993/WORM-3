@@ -1,5 +1,5 @@
 import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelSwim.js';
-import { createMobiOrbPalette } from '../mobiOrbAppearance.js';
+import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
 import { SPRING_CHARGE } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
@@ -172,13 +172,14 @@ export function WormBody({ worm, size }) {
     const isWiggle = wormCharacter.id === 'wiggle';
     const isPrism = wormCharacter.id === 'prism';
     const isMobi = wormCharacter.id === 'mobi';
-    const mobiAssets = useMemo(() => isMobi ? createMobiSegmentAssets() : null, [isMobi]);
+    const mobiAssets = useMemo(() => isMobi ? createMobiSegmentAssets(MAX_TAIL) : null, [isMobi]);
     useEffect(() => () => { if (mobiAssets) disposeMobiSegmentAssets(mobiAssets); }, [mobiAssets]);
     const settings = useGameStore(s => s.settings);
     const mobiPalette = useMemo(() => isMobi ? createMobiOrbPalette(settings) : null, [isMobi, settings]);
     const mobiBandsRef = useRef([]);
     const mobiBandCounts = useRef(new Uint16Array(7));
     const mobiCoreRef = useRef();
+    const mobiGasRef = useRef();
     const mobiFrameRef = useRef();
     const characterGeometry = useMemo(() => createCharacterGeometry(wormCharacterId), [wormCharacterId]);
     const paperMaterial = useMemo(() => createBookPaperMaterial(), []);
@@ -339,7 +340,11 @@ export function WormBody({ worm, size }) {
         const tLen = worm.tailLength.current;
         const steps = worm.stepHistory.current;
         const time = characterTimeRef.current;
-        if (isMobi) _mobiSpinMatrix.makeRotationY(time * 0.48);
+        if (isMobi) {
+            _mobiSpinMatrix.makeRotationY(reducedPickupMotion ? 0 : time * 0.48);
+            mobiAssets.gasMaterial.uniforms.uTime.value = reducedPickupMotion ? 0 : time;
+            mobiAssets.gasMaterial.uniforms.uMotion.value = reducedPickupMotion ? 0 : 1;
+        }
         updateWormSkinMaterialTime(skinMaterial, time);
 
         // ── Inch Worm gait driver ──────────────────────────────────────────────
@@ -668,14 +673,19 @@ export function WormBody({ worm, size }) {
             mesh.setMatrixAt(writeIdx, _wormDummy.matrix);
             if (isMobi) {
                 mobiFrameRef.current?.setMatrixAt(writeIdx, _wormDummy.matrix);
-                const pickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
-                const face = worm.orbPickupFaceIdsRef.current[pickupIndex];
-                // The starter box is empty; each grown capsule carries its collected orb.
-                // Read surviving pickup history, so healing/cuts remove the right cores.
-                if (pickupIndex >= 0 && pickupIndex < orbColors.length && mobiPalette[face]) {
+                const face = mobiCarriedFace(i, orbColors.length, worm.orbPickupFaceIdsRef.current);
+                const appearance = mobiPalette[face];
+                // Every capsule has gas. Only surviving collected capsules contain an orb.
+                mobiGasRef.current?.setMatrixAt(writeIdx, _wormDummy.matrix);
+                mobiGasRef.current?.setColorAt(writeIdx, appearance.gasGem);
+                mobiAssets.gasGeometry.attributes.mobiBandColor.setXYZ(writeIdx, appearance.gasBand.r, appearance.gasBand.g, appearance.gasBand.b);
+                mobiAssets.gasGeometry.attributes.mobiPhase.setX(writeIdx, i * 0.73);
+                if (face) {
                     _mobiCoreMatrix.copy(_wormDummy.matrix).multiply(_mobiSpinMatrix);
                     mobiCoreRef.current?.setMatrixAt(mobiCoreCount, _mobiCoreMatrix);
-                    mobiCoreRef.current?.setColorAt(mobiCoreCount++, _bodyColor.set(mobiPalette[face].gemColor));
+                    mobiCoreRef.current?.setColorAt(mobiCoreCount, appearance.gasGem);
+                    mobiAssets.coreGeometry.attributes.mobiBandColor.setXYZ(mobiCoreCount, appearance.gasBand.r, appearance.gasBand.g, appearance.gasBand.b);
+                    mobiCoreCount++;
                     const band = mobiBandsRef.current[face];
                     band?.setMatrixAt(mobiBandCounts.current[face]++, _mobiCoreMatrix);
                 }
@@ -799,12 +809,17 @@ export function WormBody({ worm, size }) {
         }
 
         if (isMobi) {
-            for (const part of [mobiCoreRef.current, mobiFrameRef.current]) {
+            for (const part of [mobiCoreRef.current, mobiFrameRef.current, mobiGasRef.current]) {
                 if (!part) continue;
                 part.count = part === mobiCoreRef.current ? mobiCoreCount : writeIdx;
                 part.instanceMatrix.needsUpdate = true;
                 if (part.instanceColor) part.instanceColor.needsUpdate = true;
             }
+        }
+        if (isMobi) {
+            mobiAssets.gasGeometry.attributes.mobiBandColor.needsUpdate = true;
+            mobiAssets.gasGeometry.attributes.mobiPhase.needsUpdate = true;
+            mobiAssets.coreGeometry.attributes.mobiBandColor.needsUpdate = true;
         }
         if (isMobi) mobiBandsRef.current.forEach((band, face) => {
             if (!band) return;
@@ -896,6 +911,8 @@ export function WormBody({ worm, size }) {
                     : <primitive object={skinMaterial} attach="material" />}
             </instancedMesh>
             {isMobi && <>
+                <instancedMesh ref={mobiGasRef} args={[mobiAssets.gasGeometry, mobiAssets.gasMaterial, MAX_TAIL]}
+                    frustumCulled={false} renderOrder={1} dispose={null} />
                 <instancedMesh ref={mobiFrameRef} args={[mobiAssets.frameGeometry, mobiAssets.frameMaterial, MAX_TAIL]} frustumCulled={false} dispose={null} />
                 <instancedMesh ref={mobiCoreRef} args={[mobiAssets.coreGeometry, mobiAssets.coreMaterial, MAX_TAIL]} frustumCulled={false} dispose={null} />
                 {mobiPalette.map((appearance, face) => face > 0 && <instancedMesh key={face}
