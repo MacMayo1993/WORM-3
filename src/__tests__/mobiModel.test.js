@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi } from '../worm/mobiModel.js';
 import { WORM_CHARACTERS, getWormCharacter } from '../worm/wormCharacterData.js';
@@ -101,4 +101,55 @@ it('preserves actual antipodal pickup colors and patterned bands without recolor
   palette[1].bandMaterial.addEventListener('dispose', () => { disposed = true; });
   disposeMobi(rig); disposeMobi(other);
   expect(disposed).toBe(false);
+});
+
+it('fills starter capsules with bounded gas and keeps instance colors independent', async () => {
+  const assets = createMobiSegmentAssets(1200);
+  assets.gasGeometry.computeBoundingBox();
+  assets.shellGeometry.computeBoundingBox();
+  expect(assets.shellGeometry.boundingBox.containsBox(assets.gasGeometry.boundingBox)).toBe(true);
+  expect(assets.gasGeometry.attributes.mobiBandColor.count).toBe(1200);
+  expect(assets.coreGeometry.attributes.mobiBandColor.count).toBe(1200);
+  expect(assets.gasMaterial.depthWrite).toBe(false);
+  expect(assets.gasMaterial.uniforms.uTime.value).toBe(0);
+  assets.gasGeometry.attributes.mobiBandColor.setXYZ(0, 1, 0, 0);
+  assets.gasGeometry.attributes.mobiBandColor.setXYZ(1, 0, 1, 0);
+  expect(assets.gasGeometry.attributes.mobiBandColor.getX(0)).toBe(1);
+  expect(assets.gasGeometry.attributes.mobiBandColor.getX(1)).toBe(0);
+  disposeMobiSegmentAssets(assets);
+});
+
+it('uses the surviving pickup history and selected antipodal palette for carried capsules', async () => {
+  const { mobiCarriedFace, createMobiOrbPalette } = await import('../worm/mobiOrbAppearance.js');
+  const { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } = await import('../worm/healerWorm/constants.js');
+  const ids = [2, 5, 1];
+  expect(mobiCarriedFace(BASE_TAIL_LENGTH - 1, 3, ids)).toBe(0);
+  for (let j = 0; j < ORB_SEGMENT_GROWTH; j++) {
+    expect(mobiCarriedFace(BASE_TAIL_LENGTH + j, 3, ids)).toBe(2);
+    expect(mobiCarriedFace(BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH + j, 3, ids)).toBe(5);
+  }
+  expect(mobiCarriedFace(BASE_TAIL_LENGTH + 2 * ORB_SEGMENT_GROWTH, 2, ids)).toBe(0);
+  expect(mobiCarriedFace(BASE_TAIL_LENGTH, 1, [99])).toBe(0);
+  const palette = createMobiOrbPalette({ colorScheme: 'neon' });
+  expect(palette[2].gasGem.equals(palette[5].gasBand)).toBe(true);
+  expect(palette[2].gasBand.equals(palette[5].gasGem)).toBe(true);
+  expect(palette[0].gasBand.equals(palette[1].gasBand)).toBe(true);
+});
+
+
+it('freezes gas when paused and suppresses sparks with reduced motion', () => {
+  const rig = createMobiModel();
+  animateMobi(rig, 3.2);
+  animateMobi(rig, 3.2);
+  expect(rig.gas.material.uniforms.uTime.value).toBe(3.2);
+  const previous = window.matchMedia;
+  window.matchMedia = vi.fn(() => ({ matches: true }));
+  try {
+    animateMobi(rig, 10, { transit: true });
+    expect(rig.gas.material.uniforms.uTime.value).toBe(0);
+    expect(rig.gas.material.uniforms.uMotion.value).toBe(0);
+  } finally {
+    window.matchMedia = previous;
+    disposeMobi(rig);
+  }
 });

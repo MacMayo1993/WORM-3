@@ -613,6 +613,10 @@ function _poseWorm(opts, time) {
     rig.mobi.group.position.copy(_anchor);
     orientMobi(rig.mobi.group, roaming ? _roamForward : FWD, UP);
     animateMobi(rig.mobi, time);
+    for (const tail of rig.mobiTails) {
+      tail.gas.material.uniforms.uTime.value = rig.mobi.gas.material.uniforms.uTime.value;
+      tail.gas.material.uniforms.uMotion.value = rig.mobi.gas.material.uniforms.uMotion.value;
+    }
     rig.hatGroup.position.copy(_anchor).addScaledVector(UP, MOBI_RADIUS * 1.1);
     rig.hatGroup.quaternion.copy(rig.mobi.group.quaternion);
   }
