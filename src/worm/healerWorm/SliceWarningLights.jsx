@@ -14,8 +14,8 @@
 // arms the next move the moment the previous one commits (see HealerWormMode), so
 // the player can see which slice is coming while there is still time to leave it.
 // What changes over the cycle is how hard it burns — a steady low glow while the
-// turn is far off, then a ramp through the telegraph window ending in a pulse on
-// the beat. That ramp is driven straight into the shader's alpha from a ref, so a
+// turn is far off, then a ramp through the telegraph window and a clear flash
+// during the final three seconds. This drives the shader's alpha from a ref, so a
 // warning that runs for ten seconds still costs the one render it always did.
 import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -25,6 +25,7 @@ import { getSkin } from '../wormCosmeticsData.js';
 import { fxBudget } from './fxBudget.js';
 import { chooseSafeLane } from './safeLane.js';
 import { SAFE_LANE_MAX_SIZE } from './constants.js';
+import { rotationClock } from './rotationClockBridge.js';
 
 // Which tier this board's warning runs at is the fx budget's call, not this
 // file's — see fxBudget.js for why Mega gives the spectacle up.
@@ -78,7 +79,7 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
     // The safe lane's own alpha — same ramp, lower range, no pulse.
     const safeAlphaRef = useRef(SAFE_IDLE_ALPHA);
 
-    useFrame((state) => {
+    useFrame(() => {
         const p = pendingRotRef.current;
         // The mode arms this ref with one stable move object per warning (and nulls
         // it on reset), so identity is an exact change test. It used to build a
@@ -89,12 +90,18 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
             setPending(p ? { axis: p.axis, sliceIndex: p.sliceIndex, sliceIndices: p.sliceIndices, sliceDirs: p.sliceDirs, dir: p.dir } : null);
         }
 
-        // Ease into the telegraph rather than stepping into it, and beat once a
-        // second through the last stretch so the layer reads as counting down.
+        // Keep the early preview steady, then flash twice per second from 3.0s.
+        // Use remaining simulation time so pausing freezes the flash as well as
+        // the countdown. A held turn stays steady, and the dim beat still marks
+        // the threatened layer instead of making the preview disappear.
         const w = warningProgressRef?.current ?? 0;
         const ramp = w * w;
-        const pulse = w > 0 ? 0.18 * w * Math.sin(state.clock.elapsedTime * 9.0) : 0;
-        alphaRef.current = IDLE_ALPHA + (PEAK_ALPHA - IDLE_ALPHA) * ramp + pulse;
+        const left = rotationClock.secondsLeft;
+        const flashing = p && rotationClock.armed && !rotationClock.held && left > 0 && left <= 3;
+        const flash = flashing
+            ? 0.55 + 1.05 * (0.5 + 0.5 * Math.cos((3 - left) * Math.PI * 4))
+            : 1;
+        alphaRef.current = (IDLE_ALPHA + (PEAK_ALPHA - IDLE_ALPHA) * ramp) * flash;
         safeAlphaRef.current = SAFE_IDLE_ALPHA + (SAFE_PEAK_ALPHA - SAFE_IDLE_ALPHA) * ramp;
     });
 
