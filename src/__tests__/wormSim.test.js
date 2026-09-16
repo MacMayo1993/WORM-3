@@ -436,6 +436,28 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(sim.pos.dirKey).toBe('NZ');
   });
 
+  it('gives the interior ride time to read while keeping surface flourishes short', () => {
+    const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    const sim = makeSim();
+    const ctx = makeCtx({
+      getCubies: () => cubies,
+      resolveTunnel: () => ({ tunnel, tunnelKey }),
+    });
+    expect(runUntil(sim, ctx, () => sim.phase === 'windup')).toBe(true);
+    const elapsed = {};
+    for (let frame = 0; frame < 1200 && sim.phase !== 'crawling'; frame++) {
+      elapsed[sim.phase] = (elapsed[sim.phase] ?? 0) + 1 / 60;
+      stepWormSim(sim, 1 / 60, SIZE, ctx);
+    }
+    expect(sim.phase).toBe('crawling');
+    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(5.5);
+    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(6.1);
+    expect(elapsed.tunnel).toBeGreaterThan(2.5);
+    expect(elapsed.windup).toBeLessThan(0.9);
+    expect(elapsed.windout).toBeLessThan(0.9);
+    expect(sim.pos.dirKey).toBe('NZ');
+  });
+
   it('resumes crawling with a long tail inside and heals only after it clears', () => {
     const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
     const sim = makeSim();

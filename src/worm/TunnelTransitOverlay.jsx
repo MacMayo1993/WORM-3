@@ -78,7 +78,7 @@ export default function TunnelTransitOverlay() {
         const mid = Math.sin(Math.PI * Math.min(1, Math.max(0, t)));
 
         if (vignetteRef.current) {
-          vignetteRef.current.style.opacity = String(amp * (reduced ? 0.35 : 0.45 + mid * 0.18));
+          vignetteRef.current.style.opacity = String(amp * (reduced ? 0.18 : 0.20 + mid * 0.08));
         }
         if (fringeRef.current) {
           fringeRef.current.style.opacity = String(amp * (reduced ? 0.15 : 0.22 + mid * 0.20));
