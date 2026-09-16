@@ -54,6 +54,6 @@ export function CombatFireButton() {
     disabled={!active || !c?.started || c.won || c.held || (c.ambient && !c.encounter)}
     onPointerDown={start} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}
     onClick={e => { if (e.detail === 0) callWormTurn('fire'); }}>
-    <span>✦ {c?.aimHeld ? 'TURNING' : c?.ammo === 0 ? 'CHARGING' : 'FIRE'} <small>HOLD / F</small></span><span className="worm-combat-ammo" aria-hidden="true">{[0,1,2].map(i => <i key={i} className={i < (c?.ammo ?? 0) ? 'ready' : ''} />)}</span>
+    <span key={c?.shotsFired ?? 0} className={c?.shotsFired > 0 ? 'worm-shot-confirm' : ''}>✦ {c?.aimHeld ? 'TURNING' : c?.ammo === 0 ? 'CHARGING' : 'FIRE'} <small>HOLD / F</small></span><span className="worm-combat-ammo" aria-hidden="true">{[0,1,2].map(i => <i key={i} className={i < (c?.ammo ?? 0) ? 'ready' : ''} />)}</span>
   </button>;
 }

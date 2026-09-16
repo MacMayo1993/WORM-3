@@ -46,8 +46,8 @@ describe('overlapping pickup presentation', () => {
     });
     it('squeezes, rebounds and restores head and face to their original size', () => {
         expect(pickupGulpScale(0)).toBe(1);
-        expect(pickupGulpScale(0.06)).toBeCloseTo(0.87);
-        expect(pickupGulpScale(0.22)).toBeCloseTo(1.1);
+        expect(pickupGulpScale(0.06)).toBeCloseTo(0.83);
+        expect(pickupGulpScale(0.22)).toBeCloseTo(1.13);
         expect(pickupGulpScale(0.32)).toBe(1);
         expect(pickupGulpScale(Infinity)).toBe(1);
     });

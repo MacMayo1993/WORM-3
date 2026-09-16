@@ -10,7 +10,7 @@ function retreat(c, keepBurst = false) {
   c.encounter = false; c.sourceId = null; c.portalOpen = false; c.portal = null;
   c.quiet = c.enemies.length === 0 && c.warning > 0 ? AMBIENT.retry : AMBIENT.cooldown;
   c.warning = 0; c.remaining = 0;
-  c.enemies = []; c.shots = []; c.drops = []; c.arcs = [];
+  c.enemies = []; c.shots = []; c.drops = []; c.arcs = []; c.muzzle = null;
   if (!keepBurst) c.bursts = [];
   c.fireHeld = false; c.fireRequested = false; c.lockedId = null; c.aim = null;
 }

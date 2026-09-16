@@ -8,8 +8,9 @@ import { resetLiveRotation } from '../worm/liveRotation.js';
 import { combatBridge } from '../worm/combat/portalCombat.js';
 import { getWormTunnelSnapshot } from '../worm/tunnelSnapshot.js';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
+import { feel, stopFeel } from '../utils/feel.js';
 import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
-vi.mock('../utils/feel.js',()=>({feel:vi.fn()}));
+vi.mock('../utils/feel.js', async original => ({ ...(await original()), feel: vi.fn(), stopFeel: vi.fn(), resumeFeel: vi.fn(), setFeelEnabled: vi.fn() }));
 let root,host,worm;
 const state=()=>useGameStore.getState();
 function Harness(){
@@ -160,4 +161,17 @@ it('keeps the optional combat arena playable when normal portal enemies are off'
   act(() => worm.queueTurn('combat-start'));frame();
   act(() => worm.queueTurn('fire'));frame();
   expect(combatBridge.current.started).toBe(true);expect(combatBridge.current.shotsFired).toBe(1);
+});
+
+
+it('confirms successful shots and cancels feedback immediately when the pause menu takes ownership', () => {
+  act(() => worm.queueTurn('combat-start')); frame();
+  vi.mocked(feel).mockClear(); vi.mocked(stopFeel).mockClear();
+  act(() => worm.queueTurn('fire')); frame();
+  expect(feel).toHaveBeenCalledWith('shot', expect.any(Object), expect.any(Object));
+  act(() => useGameStore.setState({ wormPaused: true }));
+  expect(stopFeel).toHaveBeenCalled();
+  vi.mocked(feel).mockClear();
+  for (let i = 0; i < 20; i++) frame();
+  expect(feel).not.toHaveBeenCalled();
 });

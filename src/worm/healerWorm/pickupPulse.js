@@ -23,7 +23,7 @@ export function enqueuePickupPulse(pulses, color, count, growthStart) {
 // A quick squeeze, then a smaller rebound; returns exactly to rest.
 export function pickupGulpScale(age) {
     if (age < 0 || age >= 0.32) return 1;
-    if (age < 0.12) return 1 - 0.13 * Math.sin(Math.PI * age / 0.12);
-    return 1 + 0.10 * Math.sin(Math.PI * (age - 0.12) / 0.20);
+    if (age < 0.12) return 1 - 0.17 * Math.sin(Math.PI * age / 0.12);
+    return 1 + 0.13 * Math.sin(Math.PI * (age - 0.12) / 0.20);
 }
 export const ORB_GULP_DURATION = 0.24;
