@@ -1,3 +1,4 @@
+import { createMobiOrbPalette } from '../mobiOrbAppearance.js';
 import { SPRING_CHARGE } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
@@ -172,6 +173,10 @@ export function WormBody({ worm, size }) {
     const isMobi = wormCharacter.id === 'mobi';
     const mobiAssets = useMemo(() => isMobi ? createMobiSegmentAssets() : null, [isMobi]);
     useEffect(() => () => { if (mobiAssets) disposeMobiSegmentAssets(mobiAssets); }, [mobiAssets]);
+    const settings = useGameStore(s => s.settings);
+    const mobiPalette = useMemo(() => isMobi ? createMobiOrbPalette(settings) : null, [isMobi, settings]);
+    const mobiBandsRef = useRef([]);
+    const mobiBandCounts = useRef(new Uint16Array(7));
     const mobiCoreRef = useRef();
     const mobiFrameRef = useRef();
     const characterGeometry = useMemo(() => createCharacterGeometry(wormCharacterId), [wormCharacterId]);
@@ -391,6 +396,7 @@ export function WormBody({ worm, size }) {
             mesh.count = 0;
             if (mobiCoreRef.current) mobiCoreRef.current.count = 0;
             if (mobiFrameRef.current) mobiFrameRef.current.count = 0;
+            for (const band of mobiBandsRef.current) if (band) band.count = 0;
             if (haloRef.current) haloRef.current.count = 0;
             if (leftPageRef.current) leftPageRef.current.count = 0;
             if (rightPageRef.current) rightPageRef.current.count = 0;
@@ -404,6 +410,8 @@ export function WormBody({ worm, size }) {
         resetStepPathCursor(_pathCursor, steps, _headPathPoint);
         let cumulativeDist = 0;
         let writeIdx = 0; // compacted instance slot — advances only for segments actually drawn
+        let mobiCoreCount = 0;
+        mobiBandCounts.current.fill(0);
         let haloIdx = 0;  // compacted slot into the glow-halo overlay
         let pageWriteIdx = 0; // book worm only — compacted slot into the page-flap overlays (body segments only, no head entry)
 
@@ -442,6 +450,10 @@ export function WormBody({ worm, size }) {
 
         beginWormSegments();
         for (let i = 0; i < visibleCount; i++) {
+            // A collected orb grows three simulation segments. MOBI renders one
+            // larger capsule at their center, preventing overlapping glass boxes
+            // from washing out the orb inside. Length/collision history is unchanged.
+            if (isMobi && (i < BASE_TAIL_LENGTH ? i !== 2 : (i - BASE_TAIL_LENGTH) % ORB_SEGMENT_GROWTH !== 1)) continue;
             // Distance LOD: segments far behind the head are visually indistinguishable at
             // gameplay camera distance, so thin them out — every segment near the head,
             // every 2nd beyond 200, every 4th beyond 600. Skipped segments never run the
@@ -539,7 +551,7 @@ export function WormBody({ worm, size }) {
                 }
 
                 if (!segmentTransit && foundPosition) {
-                    clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : 0.10, surface);
+                    clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : isMobi ? 0.15 : 0.10, surface);
                 }
                 if (_isBook && !segmentTransit) {
                     // Book worm rides on top of the surface, lifted by its own
@@ -638,8 +650,17 @@ export function WormBody({ worm, size }) {
             mesh.setMatrixAt(writeIdx, _wormDummy.matrix);
             if (isMobi) {
                 mobiFrameRef.current?.setMatrixAt(writeIdx, _wormDummy.matrix);
-                _mobiCoreMatrix.copy(_wormDummy.matrix).multiply(_mobiSpinMatrix);
-                mobiCoreRef.current?.setMatrixAt(writeIdx, _mobiCoreMatrix);
+                const pickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
+                const face = worm.orbPickupFaceIdsRef.current[pickupIndex];
+                // The starter box is empty; each grown capsule carries its collected orb.
+                // Read surviving pickup history, so healing/cuts remove the right cores.
+                if (pickupIndex >= 0 && pickupIndex < orbColors.length && mobiPalette[face]) {
+                    _mobiCoreMatrix.copy(_wormDummy.matrix).multiply(_mobiSpinMatrix);
+                    mobiCoreRef.current?.setMatrixAt(mobiCoreCount, _mobiCoreMatrix);
+                    mobiCoreRef.current?.setColorAt(mobiCoreCount++, _bodyColor.set(mobiPalette[face].gemColor));
+                    const band = mobiBandsRef.current[face];
+                    band?.setMatrixAt(mobiBandCounts.current[face]++, _mobiCoreMatrix);
+                }
             }
             // Publish where this segment actually ended up, for effects that need to
             // aim at the body (the lightning theme's strikes). Recorded here rather
@@ -701,8 +722,7 @@ export function WormBody({ worm, size }) {
                 }
                 _bodyColor.lerp(pickupColor, pickupWave * 0.95);
                 // Keep every glass exterior clear; carried parity colors live inside it.
-                if (isMobi) mobiCoreRef.current?.setColorAt(writeIdx, _bodyColor);
-                else mesh.setColorAt(writeIdx, _bodyColor);
+                if (!isMobi) mesh.setColorAt(writeIdx, _bodyColor);
             }
 
             // Book Worm: a stack of thin page layers hinged along the cover's
@@ -763,11 +783,16 @@ export function WormBody({ worm, size }) {
         if (isMobi) {
             for (const part of [mobiCoreRef.current, mobiFrameRef.current]) {
                 if (!part) continue;
-                part.count = writeIdx;
+                part.count = part === mobiCoreRef.current ? mobiCoreCount : writeIdx;
                 part.instanceMatrix.needsUpdate = true;
-                if (part.instanceColor && colorDirty) part.instanceColor.needsUpdate = true;
+                if (part.instanceColor) part.instanceColor.needsUpdate = true;
             }
         }
+        if (isMobi) mobiBandsRef.current.forEach((band, face) => {
+            if (!band) return;
+            band.count = mobiBandCounts.current[face];
+            band.instanceMatrix.needsUpdate = true;
+        });
         mesh.count = writeIdx;
         mesh.instanceMatrix.needsUpdate = true;
         endWormSegments();
@@ -855,6 +880,10 @@ export function WormBody({ worm, size }) {
             {isMobi && <>
                 <instancedMesh ref={mobiFrameRef} args={[mobiAssets.frameGeometry, mobiAssets.frameMaterial, MAX_TAIL]} frustumCulled={false} dispose={null} />
                 <instancedMesh ref={mobiCoreRef} args={[mobiAssets.coreGeometry, mobiAssets.coreMaterial, MAX_TAIL]} frustumCulled={false} dispose={null} />
+                {mobiPalette.map((appearance, face) => face > 0 && <instancedMesh key={face}
+                    ref={mesh => { mobiBandsRef.current[face] = mesh; }}
+                    args={[mobiAssets.bandGeometry, appearance.bandMaterial, MAX_TAIL]}
+                    frustumCulled={false} dispose={null} />)}
             </>}
             {isGlow && (
                 <instancedMesh

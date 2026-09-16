@@ -2,9 +2,9 @@
 // Shells never receive skin/pickup colors; those belong inside the glass.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { createMobiModel, disposeMobi } from './mobiModel.js';
+import { createMobiModel, disposeMobi, createMobiFrameGeometry } from './mobiModel.js';
 
-export const MOBI_SEGMENT_RADIUS = 0.055;
+export const MOBI_SEGMENT_RADIUS = 0.11;
 
 export function createMobiSegmentAssets() {
   const model = createMobiModel({ face: false });
@@ -13,11 +13,11 @@ export function createMobiSegmentAssets() {
   model.group.updateMatrixWorld(true);
   const pieces = [];
   model.core.traverse(object => {
-    if (!object.isMesh) return;
+    if (!object.isMesh || object === model.band) return;
     const geometry = object.geometry.index ? object.geometry.toNonIndexed() : object.geometry.clone();
     geometry.applyMatrix4(object.matrixWorld);
     geometry.deleteAttribute('uv');
-    const color = object.material.color;
+    const color = new THREE.Color(1, 1, 1);
     const colors = new Float32Array(geometry.attributes.position.count * 3);
     for (let i = 0; i < colors.length; i += 3) color.toArray(colors, i);
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -27,25 +27,15 @@ export function createMobiSegmentAssets() {
   pieces.forEach(g => g.dispose());
   const shellGeometry = model.group.getObjectByName('transparent-body').geometry.clone();
   const shellMaterial = model.shellMaterial.clone();
+  const bandGeometry = model.band.geometry.clone();
+  bandGeometry.applyMatrix4(model.band.matrixWorld);
   disposeMobi(model);
 
-  // Mesh edges can be instanced together, unlike one LineSegments per bead.
-  const edges = [];
-  for (let axis = 0; axis < 3; axis++) for (const a of [-1, 1]) for (const b of [-1, 1]) {
-    const dims = [0.026, 0.026, 0.026];
-    dims[axis] = 1.92;
-    const edge = new THREE.BoxGeometry(...dims);
-    const pos = [0, 0, 0];
-    pos[(axis + 1) % 3] = a * 0.96;
-    pos[(axis + 2) % 3] = b * 0.96;
-    edge.translate(...pos);
-    edges.push(edge);
-  }
-  const frameGeometry = mergeGeometries(edges);
-  edges.forEach(g => g.dispose());
+  const frameGeometry = createMobiFrameGeometry();
   return {
-    shellGeometry, shellMaterial, frameGeometry, coreGeometry,
-    frameMaterial: new THREE.MeshBasicMaterial({ color: '#8cd9f4', toneMapped: false }),
+    shellGeometry, shellMaterial, frameGeometry, coreGeometry, bandGeometry,
+    bandMaterial: new THREE.MeshBasicMaterial({ color: '#bd92ff', toneMapped: false }),
+    frameMaterial: new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
     coreMaterial: new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
   };
 }
@@ -56,8 +46,10 @@ export function createMobiSegment(assets) {
   shell.renderOrder = 2;
   const frame = new THREE.Mesh(assets.frameGeometry, assets.frameMaterial);
   const core = new THREE.Mesh(assets.coreGeometry, assets.coreMaterial.clone());
+  const band = new THREE.Mesh(assets.bandGeometry, assets.bandMaterial);
+  core.add(band);
   group.add(shell, frame, core);
-  return { group, core };
+  return { group, core, band };
 }
 
 export function disposeMobiSegmentAssets(assets) {

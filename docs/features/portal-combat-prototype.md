@@ -6,13 +6,14 @@ Choose **WORM → Play → Portal Enemies** to turn normal encounters on or off,
 including Mega. The default is **On**. The menu remembers the selection, and retry
 keeps it. Off removes enemy encounters and their Fire control; healing, signature
 moves, hazards, missions and XP continue normally. The separate Combat arena
-always includes its waves, regardless of this toggle. The guided demo stays separate. The first encounter cannot begin before **45 seconds of active surface
-play**, and every encounter is followed by **at least 30 quiet seconds**. There
+always includes its waves, regardless of this toggle. The guided demo stays separate. The first encounter cannot begin before **12 seconds of active surface
+play**, and every encounter is followed by **at least 24 quiet seconds**. There
 is a hard limit of **one enemy**, regardless of cube size or how many portals are
 open. A live portal must be on the current face, two to six tiles from the head.
 
-The mouth warns for four seconds, then the enemy emerges. Approaching the mouth
-or leaving its face during the warning cancels the spawn. The first encounters
+The mouth warns for 1.5 seconds, then the enemy emerges over another 0.8 seconds. Approaching the mouth
+or leaving its face during the warning cancels the spawn. An interrupted warning
+retries after three quiet seconds instead of charging the full encounter cooldown. The first encounters
 use crawlers; dashers become eligible after 90 active seconds and occasional
 armored crawlers after 150. An enemy retreats after 20 active seconds. Pauses,
 tunnel travel, rockets and focus animations hold the encounter clocks.
