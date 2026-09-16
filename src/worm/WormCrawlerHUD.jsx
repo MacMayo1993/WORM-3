@@ -552,8 +552,8 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
 // Pause lives in the status bar, not the thumb tray: it is a rare, deliberate
 // action and it was the odd third button sitting between the movement keys.
 const PAUSE_BTN_STYLE = {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 11,
     background: HUD_SURFACE_SOFT,
     border: '1px solid rgba(255,245,220,0.16)',
