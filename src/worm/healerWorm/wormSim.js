@@ -72,6 +72,7 @@ import { isElementalType, ELEMENTAL_TYPES } from './specialDefs.js';
 import {
     WORM_LIFT,
     TUNNEL_SPEED_SCALE,
+    TUNNEL_INTERIOR_SPEED_SCALE,
     FACE_NORMALS,
     INITIAL_DIR,
     INITIAL_POS,
@@ -1597,7 +1598,7 @@ const PHASE_HANDLERS = {
             ctx.onPhase('entering');
         },
         update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (1.2 * TUNNEL_SPEED_SCALE);
+            const nextProgress = sim.tunnelProgress + delta * (1.2 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
             advanceTunnelHead(sim, 'entering', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
@@ -1614,7 +1615,7 @@ const PHASE_HANDLERS = {
             ctx.onPhase('tunnel');
         },
         update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (0.65 * TUNNEL_SPEED_SCALE);
+            const nextProgress = sim.tunnelProgress + delta * (0.65 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
             advanceTunnelHead(sim, 'tunnel', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
@@ -1638,7 +1639,7 @@ const PHASE_HANDLERS = {
             }
         },
         update(sim, size, ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (1.0 * TUNNEL_SPEED_SCALE);
+            const nextProgress = sim.tunnelProgress + delta * (1.0 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
             advanceTunnelHead(sim, 'exiting', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {

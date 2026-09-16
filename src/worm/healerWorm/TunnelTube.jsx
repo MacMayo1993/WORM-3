@@ -35,7 +35,7 @@ const VERT_COUNT = (RINGS + 1) * (SIDES + 1);
 // The radius profile lives in utils/tunnelPath.js, alongside the centerline it is
 // swept around and the camera offset it has to clear — see tunnelBoreRadiusAt.
 // The corner where the two arms meet sits in the narrow part of that profile, and
-// the fragment shader fades the wall out across it entirely.
+// the fragment shader softens the wall across it while retaining illumination.
 
 // Opacity targets by phase. 'entering' starts at the faint value — a foreshadow
 // of the shaft while the camera is still hanging outside — and is driven up to
@@ -70,17 +70,9 @@ const vertexShader = `
 
 // vUv.y runs 0 (entry mouth) → 1 (exit mouth); vUv.x wraps the circumference.
 //
-// ── Why this is built out of noise and darks ─────────────────────────────────
-// The first version was `base * intensity`: one face colour, multiplied by a
-// scalar that floored at 0.50 and summed to well over 2. Every pixel of the bore
-// therefore sat in the top of the range of a single hue, and a trip down an
-// orange tunnel was a flat orange screen — no darks for the energy to read
-// against, no chroma anywhere, and the rings washing out into the wall they were
-// supposed to be racing across.
-//
-// It now composes the way the elemental surfaces do: a dark body, energy laid on
-// top in a hotter colour than the wall, and the detail coming from a real 3D
-// noise field rather than from a single sine.
+// Keep a luminous wall under the detail: alpha blending a dark shader over the
+// black interior backing otherwise erases both the color and the sense of depth.
+// Output conversion is explicit because ShaderMaterial does not add it for us.
 const fragmentShader = `
   uniform vec3 uColorA;
   uniform vec3 uColorB;
@@ -115,34 +107,34 @@ const fragmentShader = `
     // Retain both palette identities through the half-twist. Opposing lanes
     // trade places while the body stays dark enough to see the ribbon and worm.
     vec3 base = mix(uColorA, uColorB, smoothstep(0.42, 0.58, y));
-    base = mix(base, vec3(0.35, 0.40, 0.48), 0.08);
+    base = mix(base, vec3(0.62, 0.68, 0.78), 0.22);
     vec3 laneColor = mix(uColorA, uColorB, 0.5 + 0.5 * sin(twist));
     vec3 hot = mix(base, vec3(1.0, 0.97, 0.88), 0.3);
     vec2 circle = vec2(cos(angle), sin(angle));
-    float cloud = noise3(vec3(circle * 2.0, y * 10.0 - uTime * 0.65));
-    float filaments = pow(1.0 - abs(noise3(vec3(circle * 5.0, y * 5.0 - uTime * 1.8)) * 2.0 - 1.0), 14.0);
+    float cloud = noise3(vec3(circle * 2.0, y * 10.0 - uTime * 0.30));
+    float filaments = pow(1.0 - abs(noise3(vec3(circle * 5.0, y * 5.0 - uTime * 0.75)) * 2.0 - 1.0), 14.0);
 
     // Broken hoops read as depth stations, leaving open windows between them.
     // Derivative smoothing keeps the distant lines stable on phone displays.
-    float hoopDistance = abs(fract(y * 18.0 - uTime * 0.38) - 0.5);
-    float aa = max(fwidth(y) * 18.0, 0.012);
-    float hoop = 1.0 - smoothstep(0.025, 0.025 + aa, hoopDistance);
+    float hoopDistance = abs(fract(y * 14.0 - uTime * 0.16) - 0.5);
+    float aa = max(fwidth(y) * 14.0, 0.012);
+    float hoop = 1.0 - smoothstep(0.05, 0.05 + aa, hoopDistance);
     float segments = smoothstep(-0.5, -0.1, cos(angle * 8.0 + y * 6.2831853));
     hoop *= segments;
     float helix = pow(0.5 + 0.5 * cos(twist * 2.0), 42.0);
-    float packets = pow(0.5 + 0.5 * cos(y * 40.0 - uTime * 4.0), 10.0);
+    float packets = pow(0.5 + 0.5 * cos(y * 40.0 - uTime * 1.8), 10.0);
 
     float nearHead = exp(-pow((y - uHead) / 0.19, 2.0));
     float wake = step(y, uHead) * exp(-abs(uHead - y) * 6.0);
     float arrival = exp(-pow((y - uHead - 0.06) / 0.045, 2.0));
     // Sparse glints are shader detail, not a particle emitter or extra draw call.
-    vec2 cell = vec2(vUv.x * 32.0, y * 45.0 - uTime * 1.1);
+    vec2 cell = vec2(vUv.x * 32.0, y * 45.0 - uTime * 0.45);
     vec2 local = fract(cell) - 0.5;
     float seed = hash13(vec3(floor(cell), 7.0));
     float glint = (1.0 - smoothstep(0.02, 0.13, length(local * vec2(1.0, 0.42)))) * step(0.91, seed);
 
-    vec3 col = base * (0.055 + cloud * 0.17 + nearHead * 0.10);
-    col += hot * hoop * (0.28 + nearHead * 0.30);
+    vec3 col = base * (0.32 + cloud * 0.24 + nearHead * 0.16);
+    col += hot * hoop * (0.50 + nearHead * 0.30);
     col += laneColor * helix * (0.55 + packets * 0.5 + wake * 0.25);
     col += hot * filaments * (0.26 + nearHead * 0.20);
     col += hot * arrival * hoop * 0.65;
@@ -152,10 +144,11 @@ const fragmentShader = `
     // angular gaps preserve the core silhouette during the orientation change.
     float seam = (1.0 - smoothstep(0.0, 0.13, coreDistance));
     float braid = pow(0.5 + 0.5 * cos(twist * 2.0 - y * 20.0), 8.0);
-    col = col * coreFade + laneColor * seam * (0.16 + braid * 0.8);
-    float wall = (0.12 + cloud * 0.06 + hoop * 0.32 + helix * 0.36 + filaments * 0.14 + glint * 0.18) * coreFade;
+    col = col * mix(0.65, 1.0, coreFade) + mix(laneColor, hot, 0.25) * seam * (0.22 + braid * 0.65);
+    float wall = (0.52 + cloud * 0.10 + hoop * 0.18 + helix * 0.14 + filaments * 0.08 + glint * 0.10) * mix(0.8, 1.0, coreFade);
     float bridge = seam * (0.10 + braid * 0.30);
-    gl_FragColor = vec4(col, min(0.82, (wall + bridge) * mouth * uOpacity));
+    gl_FragColor = vec4(col, min(0.86, (wall + bridge) * mouth * uOpacity));
+    #include <colorspace_fragment>
   }
 `;
 
@@ -307,6 +300,7 @@ export function TunnelTube({ worm, size }) {
       <shaderMaterial
         uniforms={uniforms}
         extensions={{ derivatives: true }}
+        toneMapped={false}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
         // This sweep's winding makes the INNER surface front-facing, which is why
