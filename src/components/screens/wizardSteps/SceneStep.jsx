@@ -6,6 +6,7 @@
 // wizard chrome wants.
 
 import React from 'react';
+import { WIZ_SURFACE_RAISED } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
 import { BG_OPTIONS, Checkmark, sizeTier, styleLabel } from './shared.jsx';
 
@@ -42,7 +43,7 @@ export default function SceneStep({ cos, slot }) {
               key={opt.value}
               onClick={() => select('backgroundTheme', opt.value)}
               style={{
-                borderRadius: '10px', overflow: 'hidden',
+                borderRadius: '10px', overflow: 'hidden', background: WIZ_SURFACE_RAISED,
                 border: selected ? `3px solid ${accent}` : '3px solid transparent',
                 boxShadow: selected ? `0 0 0 1px ${accent}44` : '0 2px 6px rgba(0,0,0,0.10)',
                 cursor: 'pointer', transition: 'all 0.18s ease',

@@ -1,3 +1,4 @@
+import { resolveColors } from './colorSchemes.js';
 // src/utils/disparityBetting.js
 // Disparity Parity Roulette — bet types, resolution logic, and payout math.
 
@@ -18,6 +19,38 @@ export const ANTIPODAL_PAIRS = [
   { id: 'WY', faces: [3, 6], label: 'White – Yellow', color: '#FFD500' },
 ];
 
+// UI colors follow the chosen palette while all bets retain stable face/pair IDs.
+function colorName(hex) {
+  const value = String(hex).replace('#', '');
+  const full = value.length === 3 ? [...value].map(c => c + c).join('') : value;
+  const rgb = [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16) / 255);
+  if (rgb.some(n => !Number.isFinite(n))) return 'Color';
+  const [r, g, b] = rgb, max = Math.max(...rgb), min = Math.min(...rgb), d = max - min;
+  const light = (max + min) / 2;
+  if (d < 0.09) return light > 0.87 ? 'White' : light < 0.16 ? 'Black' : 'Gray';
+  if (light > 0.82 && r > b && g > b) return 'Cream';
+  const rawHue = max === r ? (g - b) / d : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  const hue = (rawHue * 60 + 360) % 360;
+  return hue < 12 || hue >= 350 ? 'Red' : hue < 42 ? 'Orange' : hue < 68 ? 'Yellow'
+    : hue < 155 ? 'Green' : hue < 180 ? 'Teal' : hue < 200 ? 'Cyan'
+    : hue < 255 ? 'Blue' : hue < 290 ? 'Purple' : 'Pink';
+}
+
+export function bettingPalette(settings = {}) {
+  const colors = resolveColors(settings, settings.biomeMode?.faceAssignment);
+  const standard = !settings.colorScheme || settings.colorScheme === 'standard';
+  const names = Object.fromEntries(Object.keys(FACE_INFO).map(id => [id, standard ? FACE_INFO[id].name : colorName(colors[id])]));
+  const faces = Object.fromEntries(Object.entries(FACE_INFO).map(([id, face]) => [id, {
+    ...face, hex: colors[id],
+    // Similar colors are legal in custom palettes; keep their identities distinguishable.
+    name: Object.values(names).filter(name => name === names[id]).length > 1 ? `${names[id]} ${id}` : names[id],
+  }]));
+  const pairs = ANTIPODAL_PAIRS.map(pair => ({ ...pair,
+    label: pair.faces.map(id => faces[id].name).join(' – '), color: faces[pair.faces[0]].hex,
+  }));
+  return { faces, pairs };
+}
+
 // ── Bet type definitions ──────────────────────────────────────────────────────
 // Odds are total payout multipliers on the wager (stake is deducted at bet
 // time). The final winning pair is always one of the three antipodal pairs, so
@@ -37,7 +70,7 @@ export const BET_TYPES = {
     id: 'PAIR',
     label: 'Color Pair',
     tagline: 'Name the winning antipodal pair',
-    desc: 'Call the antipodal pairing that outlasts all others: Red-Orange, Green-Blue, or White-Yellow. 1-in-3 shot.',
+    desc: 'Pick the opposite color pair from your palette that outlasts all others. 1-in-3 shot.',
     odds: 2.7,
     icon: 'P',
   },
@@ -110,16 +143,17 @@ export function getWinnerFaces(pair) {
 // Returns { won: bool, description: string } — or { won: false, push: true,
 // description } when the round produced no meaningful outcome for the bet
 // (the wager should be returned, not lost).
-export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEliminatedFaces, chaosLevel, disparityFlipCap }) {
+export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEliminatedFaces, chaosLevel, disparityFlipCap, settings }) {
   if (!bet || !disparityWinner?.pair?.length) return null;
 
   const { type, pick } = bet;
+  const { faces: faceInfo, pairs } = bettingPalette(bet.paletteSettings || settings);
 
   if (type === 'SURVIVOR') {
     const winnerFaces = getWinnerFaces(disparityWinner.pair);
     const won = winnerFaces.includes(pick);
-    const faceName = FACE_INFO[pick]?.name ?? pick;
-    const actual = winnerFaces.map(f => FACE_INFO[f]?.name ?? f).join(' & ');
+    const faceName = faceInfo[pick]?.name ?? pick;
+    const actual = winnerFaces.map(f => faceInfo[f]?.name ?? f).join(' & ');
     return {
       won,
       description: won
@@ -130,10 +164,10 @@ export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEli
 
   if (type === 'PAIR') {
     const winnerFaces = new Set(getWinnerFaces(disparityWinner.pair));
-    const pairDef = ANTIPODAL_PAIRS.find(p => p.id === pick);
+    const pairDef = pairs.find(p => p.id === pick);
     const won = pairDef ? pairDef.faces.every(f => winnerFaces.has(f)) : false;
     const actualFaces = getWinnerFaces(disparityWinner.pair);
-    const actualPair = ANTIPODAL_PAIRS.find(p => p.faces.every(f => actualFaces.includes(f)));
+    const actualPair = pairs.find(p => p.faces.every(f => actualFaces.includes(f)));
     return {
       won,
       description: won
@@ -145,8 +179,8 @@ export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEli
   if (type === 'FIRST_OUT') {
     const firstElim = disparityEliminatedFaces?.[0];
     const won = firstElim === pick;
-    const faceName = FACE_INFO[pick]?.name ?? pick;
-    const actualName = FACE_INFO[firstElim]?.name ?? firstElim;
+    const faceName = faceInfo[pick]?.name ?? pick;
+    const actualName = faceInfo[firstElim]?.name ?? firstElim;
     return {
       won,
       description: won

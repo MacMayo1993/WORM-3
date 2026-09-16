@@ -1,5 +1,5 @@
 import { getManifoldGridId } from './gridIds.js';
-import { ANTIPODAL_PAIRS, FACE_INFO, getFaceFromGridId, resolveBet } from '../utils/disparityBetting.js';
+import { ANTIPODAL_PAIRS, FACE_INFO, bettingPalette, getFaceFromGridId, resolveBet } from '../utils/disparityBetting.js';
 
 export const CHAOS_RECORD_KEY = 'worm3_chaos_record';
 export const emptyChaosRecord = () => ({ rounds: 0, predictions: 0, correct: 0, bestStreak: 0, healedPoints: 0 });
@@ -17,7 +17,7 @@ export function readChaosRecord() {
 
 // Read identity and damage from the rendered board, never infer health from the
 // historical ledger. Rotation changes position; flips change curr, not orig.
-export function chaosBoard(cubies, size, cap) {
+export function chaosBoard(cubies, size, cap, settings) {
   const faces = Object.fromEntries(Object.keys(FACE_INFO).map(id => [id, { alive: 0, danger: 0, total: 0, pressure: 0 }]));
   const survivors = [];
   for (const layer of cubies || []) for (const row of layer) for (const cubie of row) {
@@ -35,7 +35,7 @@ export function chaosBoard(cubies, size, cap) {
   }
   const alive = survivors.length;
   const total = Object.values(faces).reduce((n, f) => n + f.total, 0);
-  const pairs = ANTIPODAL_PAIRS.map(pair => ({ ...pair,
+  const pairs = bettingPalette(settings).pairs.map(pair => ({ ...pair,
     alive: pair.faces.reduce((n, f) => n + faces[f].alive, 0),
     danger: pair.faces.reduce((n, f) => n + faces[f].danger, 0),
     total: pair.faces.reduce((n, f) => n + faces[f].total, 0),
@@ -50,11 +50,12 @@ export function chaosStage(alive, total) {
   return 'Opening storm';
 }
 
-export function predictionLabel(bet) {
+export function predictionLabel(bet, settings) {
   if (!bet) return 'Open round';
-  if (bet.type === 'PAIR') return ANTIPODAL_PAIRS.find(p => p.id === bet.pick)?.label || 'Color pair';
+  const { faces, pairs } = bettingPalette(bet.paletteSettings || settings);
+  if (bet.type === 'PAIR') return pairs.find(p => p.id === bet.pick)?.label || 'Color pair';
   if (bet.type === 'SPEED') return bet.pick === 'FAST' ? 'Fast collapse' : 'Slow collapse';
-  return `${FACE_INFO[bet.pick]?.name || 'Color'} ${bet.type === 'FIRST_OUT' ? 'falls first' : 'survives'}`;
+  return `${faces[bet.pick]?.name || 'Color'} ${bet.type === 'FIRST_OUT' ? 'falls first' : 'survives'}`;
 }
 
 export function predictionFaces(bet) {
@@ -65,6 +66,7 @@ export function predictionFaces(bet) {
 export function newChaosExperience(state, now = Date.now()) {
   return { roundId: state.disparityRoundId, startedAt: now, endedAt: null,
     prediction: state.activeBet?.roundId === state.disparityRoundId ? { ...state.activeBet } : null,
+    paletteSettings: state.settings,
     size: state.size, cap: state.disparityFlipCap, level: state.chaosLevel,
     events: [], peakBurst: 0, cascadeCount: 0, healPoints: 0, healedIds: [], milestones: [], completed: false };
 }
@@ -87,7 +89,7 @@ export function recordChaosTick(run, payload, board, now = Date.now()) {
 export function chaosRecap(run, state) {
   const prediction = run.prediction ? resolveBet(run.prediction, state) : null;
   const winningFaces = new Set((state.disparityWinner?.pair || []).map(getFaceFromGridId));
-  const pair = ANTIPODAL_PAIRS.find(p => p.faces.every(f => winningFaces.has(f)));
+  const pair = bettingPalette(run.paletteSettings || state.settings).pairs.find(p => p.faces.every(f => winningFaces.has(f)));
   const medals = ['Storm witnessed'];
   if (run.healPoints > 0) medals.push('Helping hand');
   if ((run.healedIds?.length || 0) >= 6) medals.push('Six restored');

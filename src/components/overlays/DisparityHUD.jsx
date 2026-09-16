@@ -2,14 +2,14 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import { chaosBoard, chaosStage, predictionLabel, predictionFaces, chaosObjective } from '../../game/chaosExperience.js';
-import { FACE_INFO, speedThresholdFor } from '../../utils/disparityBetting.js';
+import { bettingPalette, speedThresholdFor } from '../../utils/disparityBetting.js';
 import { feel } from '../../utils/feel.js';
 import { Z, UI_FONT } from '../../utils/uiTheme.js';
 import '../../chaos/chaos.css';
 import { ChaosGlyph } from '../../chaos/ChaosArt.jsx';
 
 export default function DisparityHUD() {
-  const s = useGameStore(useShallow(state => ({ cubies: state.cubies, size: state.size,
+  const s = useGameStore(useShallow(state => ({ cubies: state.cubies, size: state.size, settings: state.settings,
     cap: selectEffectiveFlipCap(state), run: state.chaosExperience, winner: state.disparityWinner,
     showWinner: state.showDisparityWinner, focus: state.chaosFocusFaces,
     activeBet: state.activeBet, score: state.disparityParityScore, eliminated: state.disparityEliminatedFaces })));
@@ -17,7 +17,8 @@ export default function DisparityHUD() {
   useEffect(() => { setDetails(false); }, [s.run?.startedAt]);
   const [notice, setNotice] = useState(null);
   const [faceNotice, setFaceNotice] = useState(null);
-  const board = useMemo(() => chaosBoard(s.cubies, s.size, s.cap), [s.cubies, s.size, s.cap]);
+  const board = useMemo(() => chaosBoard(s.cubies, s.size, s.cap, s.settings), [s.cubies, s.size, s.cap, s.settings]);
+  const { faces: faceInfo } = useMemo(() => bettingPalette(s.settings), [s.settings]);
   const latest = s.run?.events.at(-1);
   useEffect(() => {
     if (!latest) { setNotice(null); return; }
@@ -62,19 +63,19 @@ export default function DisparityHUD() {
           <div className="chaos-count">{board.alive}<small> / {board.total} tiles</small></div>
         </div>
         <div className="chaos-survival" role="progressbar" aria-label="Surviving tiles" aria-valuenow={board.alive} aria-valuemin={0} aria-valuemax={board.total}>
-          {board.pairs.map(pair => <span key={pair.id} style={{ width: `${board.total ? 100 * pair.alive / board.total : 0}%`, background: `linear-gradient(90deg, ${FACE_INFO[pair.faces[0]].hex}, ${FACE_INFO[pair.faces[1]].hex})` }} />)}
+          {board.pairs.map(pair => <span key={pair.id} style={{ width: `${board.total ? 100 * pair.alive / board.total : 0}%`, background: `linear-gradient(90deg, ${faceInfo[pair.faces[0]].hex}, ${faceInfo[pair.faces[1]].hex})` }} />)}
         </div>
-        <div className="chaos-compact-call"><span>{bet ? predictionLabel(bet) : 'Tap damaged tiles to heal'}</span><strong>+{s.score} PP</strong></div>
+        <div className="chaos-compact-call"><span>{bet ? predictionLabel(bet, s.settings) : 'Tap damaged tiles to heal'}</span><strong>+{s.score} PP</strong></div>
         <button className="chaos-detail-button" onClick={() => setDetails(v => !v)} aria-expanded={details} aria-controls="chaos-match-details">
           {details ? 'Hide match details' : 'Inspect match'} <span aria-hidden="true">{details ? '−' : '+'}</span>
         </button>
         {details && <div className="chaos-expanded" id="chaos-match-details">
           {(faceNotice != null || notice) && !s.winner && <div className="chaos-live-event" key={faceNotice ?? notice?.at}>
-            <ChaosGlyph />{faceNotice != null ? `${FACE_INFO[faceNotice]?.name} eliminated — every tile has fallen` : `${notice.tiles.length} tiles fell · ${notice.source === 'conway' ? 'Surface surge' : 'Chain spread'}`}
+            <ChaosGlyph />{faceNotice != null ? `${faceInfo[faceNotice]?.name} eliminated — every tile has fallen` : `${notice.tiles.length} tiles fell · ${notice.source === 'conway' ? 'Surface surge' : 'Chain spread'}`}
           </div>}
           <div className="chaos-prediction">
             <div><div className="chaos-kicker">{bet ? 'Your prediction' : 'Your objective'}</div>
-              <strong>{bet ? predictionLabel(bet) : 'Heal the storm'}</strong>
+              <strong>{bet ? predictionLabel(bet, s.settings) : 'Heal the storm'}</strong>
               <small>{bet ? `${bet.wager} PP committed` : 'Tap a damaged living tile to start a healing wave.'}</small>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -89,9 +90,9 @@ export default function DisparityHUD() {
               aria-label={`Highlight ${pair.label}: ${pair.alive} living tiles`}
               aria-pressed={pair.faces.every(f => s.focus.includes(f))} data-out={pair.alive === 0}
               onClick={() => focusPair(pair)}>
-              <span className="chaos-swatches">{pair.faces.map(f => <i key={f} style={{ background: FACE_INFO[f].hex }} />)}</span>
-              <strong>{pair.alive}</strong><small>{pair.id === 'RO' ? 'Red / Orange' : pair.id === 'GB' ? 'Green / Blue' : 'White / Yellow'}</small>
-              <span className="chaos-pair-meter" aria-hidden="true" style={{ width: `${100 * pair.alive / (2 * s.size * s.size)}%`, background: `linear-gradient(90deg, ${FACE_INFO[pair.faces[0]].hex}, ${FACE_INFO[pair.faces[1]].hex})` }} />
+              <span className="chaos-swatches">{pair.faces.map(f => <i key={f} style={{ background: faceInfo[f].hex }} />)}</span>
+              <strong>{pair.alive}</strong><small>{pair.label}</small>
+              <span className="chaos-pair-meter" aria-hidden="true" style={{ width: `${100 * pair.alive / (2 * s.size * s.size)}%`, background: `linear-gradient(90deg, ${faceInfo[pair.faces[0]].hex}, ${faceInfo[pair.faces[1]].hex})` }} />
             </button>)}
           </div>
           <div className="chaos-objective"><ChaosGlyph kind="heal" /><div style={{ flex: 1 }}>

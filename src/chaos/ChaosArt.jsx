@@ -14,10 +14,10 @@ export function ChaosGlyph({ kind = 'storm', className = '' }) {
   return <svg className={`chaos-glyph ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[kind] || paths.storm} /></svg>;
 }
 
-export function ChaosEmblem() {
+export function ChaosEmblem({ colors } = {}) {
   return <div className="chaos-emblem" aria-hidden="true">
     <div className="chaos-orbit" /><div className="chaos-orbit chaos-orbit-inner" />
-    <div className="chaos-shards">{Array.from({ length: 9 }, (_, i) => <i key={i} />)}</div>
+    <div className="chaos-shards">{Array.from({ length: 9 }, (_, i) => <i key={i} style={colors ? { background: colors[(i % 6) + 1].hex } : undefined} />)}</div>
     <span className="chaos-emblem-cross">+</span><span className="chaos-emblem-coord">06 / 02</span>
   </div>;
 }

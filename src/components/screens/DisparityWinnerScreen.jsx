@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { FACE_INFO, getFaceFromGridId } from '../../utils/disparityBetting.js';
+import { bettingPalette, getFaceFromGridId } from '../../utils/disparityBetting.js';
 import { predictionLabel } from '../../game/chaosExperience.js';
 import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 import { Z, UI_FONT, DISPLAY_FONT, MONO_FONT } from '../../utils/uiTheme.js';
@@ -11,10 +11,12 @@ import { useDialogBehavior } from '../ui/Panel.jsx';
 
 const sourceName = source => source === 'conway' ? 'Surface surge' : source === 'chain' ? 'Chain spread' : 'Chaos';
 export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play Again', onSecondary, secondaryLabel, onConfigure }) {
-  const { winner, deaths, result, run, record } = useGameStore(useShallow(s => ({
+  const { winner, deaths, result, run, record, settings } = useGameStore(useShallow(s => ({
     winner: s.disparityWinner, deaths: s.disparityDeaths, result: s.lastBetResult,
-    run: s.chaosExperience, record: s.chaosRecord,
+    run: s.chaosExperience, record: s.chaosRecord, settings: s.settings,
   })));
+  const paletteSettings = run?.paletteSettings || settings;
+  const { faces: faceInfo } = bettingPalette(paletteSettings);
   const [ready, setReady] = useState(false);
   const dialogRef = useRef(null);
   const onDialogKeyDown = useDialogBehavior(dialogRef, ready ? onSecondary : undefined);
@@ -39,8 +41,8 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
         <div className="chaos-winners">
           {pair.map((id, i) => <React.Fragment key={id}>
             {i > 0 && <span className="chaos-winner-link" aria-hidden="true">↔</span>}
-            <div className="chaos-winner-tile" style={{ background: FACE_INFO[getFaceFromGridId(id)]?.hex || '#ddd' }}>
-              <small>{FACE_INFO[getFaceFromGridId(id)]?.name}</small>
+            <div className="chaos-winner-tile" style={{ background: faceInfo[getFaceFromGridId(id)]?.hex || '#ddd' }}>
+              <small>{faceInfo[getFaceFromGridId(id)]?.name}</small>
               <strong style={{ fontFamily: MONO_FONT }}>{id}</strong>
             </div>
           </React.Fragment>)}
@@ -51,7 +53,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
           <ChaosGlyph kind={result?.won ? 'trophy' : 'storm'} />
           <div>
             <strong>{outcome}</strong>
-            {run?.prediction && <p>Your call: {predictionLabel(run.prediction)}.</p>}
+            {run?.prediction && <p>Your call: {predictionLabel(run.prediction, paletteSettings)}.</p>}
             {result && <p>{result.description}</p>}
             {!result && <p>The final survivors outlasted {deaths.length} fallen tiles.</p>}
             {lastBackedEvent && <p>Latest elimination in your color group: {sourceName(lastBackedEvent.source).toLowerCase()} at {Math.max(0, Math.round((lastBackedEvent.at - run.startedAt) / 1000))}s, with {lastBackedEvent.alive} tiles left on the cube.</p>}
