@@ -1,7 +1,9 @@
 import { createMobiOrbPalette } from '../mobiOrbAppearance.js';
 // src/worm/healerWorm/WormFace.jsx
-// Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
+// Shared character expressions follow the head across surfaces and tunnels.
 import { createCharacterAccents, poseCharacterAccents } from '../wormCharacterVisuals.js';
+import { animateWormFace } from '../wormFaceExpression.js';
+import { prefersReducedMotion } from '../../utils/device.js';
 import { finishWormEyes } from '../wormCharacterFinish.js';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -10,7 +12,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { getTunnelWorldPosInto, getWindWorldPosInto } from '../wormLogic.js';
 import WormHat3D from '../wormCosmetics.jsx';
-import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../wormFaceLayout.js';
+import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp } from '../wormCosmeticsData.js';
 import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD, } from './constants.js';
@@ -53,10 +55,11 @@ export function WormFace({ worm, size }) {
     useEffect(() => () => { if (mobi) disposeMobi(mobi); }, [mobi]);
     useEffect(() => {
         if (isMobi) return;
-        return finishWormEyes([leftEyeRef.current, rightEyeRef.current], [leftPupilRef.current, rightPupilRef.current], wormCharacterId);
+        return finishWormEyes([leftEyeRef.current, rightEyeRef.current], [leftPupilRef.current, rightPupilRef.current], wormCharacterId, mouthRef.current);
     }, [isMobi, wormCharacterId]);
-    const mobiTime = useRef(0);
-    const mobiPulse = useRef(0);
+    const faceTime = useRef(0);
+    const reducedMotion = useMemo(() => prefersReducedMotion(), []);
+    const facePulse = useRef(0);
     const previousOrbs = useRef(0);
 
     useFrame((_, delta) => {
@@ -133,15 +136,16 @@ export function WormFace({ worm, size }) {
             rocketOrbitInto(_faceHeadPos, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
         }
 
+        const state = useGameStore.getState();
+        const dt = state.wormPaused || !state.wormAlive ? 0 : Math.min(delta, 0.05);
+        faceTime.current += dt;
+        const count = worm.orbPickupColorsRef.current.length;
+        if (count > previousOrbs.current) facePulse.current = 1;
+        previousOrbs.current = count;
+        facePulse.current = Math.max(0, facePulse.current - dt * 2);
+
         if (mobi) {
-            // Use the same interpolated anchor/current normal as WormBody so MOBI
-            // rides live slices and corner arcs with his tail.
-            const dt = useGameStore.getState().wormPaused ? 0 : delta;
-            mobiTime.current += dt;
-            const count = worm.orbPickupColorsRef.current.length;
-            if (count > previousOrbs.current) mobiPulse.current = 1;
-            previousOrbs.current = count;
-            mobiPulse.current = Math.max(0, mobiPulse.current - dt * 2);
+            // Use the same interpolated anchor/current normal as the body.
             const bodyTransit = phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout';
             normal = worm.currentNormal.current;
             mobi.group.position.copy(worm.headInterpPos.current);
@@ -163,7 +167,7 @@ export function WormFace({ worm, size }) {
             const faces = worm.orbPickupFaceIdsRef.current;
             setMobiOrbAppearance(mobi, mobiPalette[faces[faces.length - 1]] || mobiPalette[0]);
             if (!bodyTransit) mobi.group.position.addScaledVector(normal, 0.035);
-            animateMobi(mobi, mobiTime.current, { pulse: mobiPulse.current, transit: !!inTransit });
+            animateMobi(mobi, faceTime.current, { pulse: facePulse.current, transit: !!inTransit });
             mobi.group.scale.setScalar(MOBI_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
             if (hatGroupRef.current) {
                 hatGroupRef.current.position.copy(mobi.group.position).addScaledVector(normal, MOBI_RADIUS * 1.1);
@@ -187,6 +191,10 @@ export function WormFace({ worm, size }) {
         // keeps its head level with its floating book body.
         if (isBook) _faceHeadPos.addScaledVector(normal, BOOK_HEAD_LIFT);
         layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), _faceParts);
+
+        animateWormFace(_faceParts, wormCharacterId, faceTime.current, {
+            pulse: facePulse.current, transit: !!inTransit, reducedMotion,
+        });
 
         poseCharacterAccents(accents.group, _faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
 
@@ -227,10 +235,9 @@ export function WormFace({ worm, size }) {
                 <sphereGeometry args={[1, 10, 10]} />
                 <meshBasicMaterial color="#12131a" />
             </mesh>
-            {/* Smile — one curved mouth. Three dots in a row disappeared at any
-                size a phone actually renders the worm at. */}
+            {/* The shared face finish supplies the sculpted mouth geometry. */}
             <mesh ref={mouthRef}>
-                <torusGeometry args={[1, FACE_LAYOUT.mouthTube / FACE_LAYOUT.mouthRadius, 8, 20, MOUTH_ARC]} />
+                <bufferGeometry />
                 <meshBasicMaterial color="#12131a" />
             </mesh>
             {wormHatId !== 'none' && (

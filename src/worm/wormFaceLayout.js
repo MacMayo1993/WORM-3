@@ -22,13 +22,12 @@ export const FACE_LAYOUT = {
 
   eyeSide: 0.36,     // sideways offset of each eye
   eyeUp: 0.20,       // offset up the face
-  eyeRadius: 0.25,
-  pupilRadius: 0.115,
-  pupilOut: 0.12,    // how far the pupil stands off the eye
+  eyeRadius: 0.29,
+  pupilRadius: 0.14,
+  pupilOut: 0.16,    // how far the pupil stands off the eye
 
   mouthDown: 0.26,   // offset down the face
-  mouthRadius: 0.24, // the smile's arc radius
-  mouthTube: 0.025,
+  mouthRadius: 0.29, // the smile's arc radius
 
   glassRadius: 0.33, // book worm lenses, drawn around the eyes
   glassTube: 0.035,
@@ -39,11 +38,6 @@ export const FACE_LAYOUT = {
   hatSeat: 0.62,
   hatScale: 0.78     // hat "head radius" argument, relative to the real one
 };
-
-// The smile is a half-torus: a real curved mouth instead of the three dots that
-// vanished at thumbnail size. Its arc is the top half of the ring, so the basis
-// below flips it to open upward.
-export const MOUTH_ARC = Math.PI;
 
 const _faceDir = new THREE.Vector3();
 const _right = new THREE.Vector3();
@@ -132,12 +126,12 @@ export function layoutWormFace(center, forward, up, radius, parts) {
   }
 
   if (parts.mouth) {
-    // Flip the arc so its drawn half curves downward — a smile, not a frown.
+    // Local positive Y follows the lower lip; local Z faces out of the head.
     _basisY.copy(_faceUp).negate();
     _basisZ.crossVectors(_right, _basisY);
     _matrix.makeBasis(_right, _basisY, _basisZ);
     _quat.setFromRotationMatrix(_matrix);
-    parts.mouth.position.copy(place(0, -radius * L.mouthDown, radius * L.mouthRadius));
+    parts.mouth.position.copy(place(0, -radius * L.mouthDown));
     parts.mouth.quaternion.copy(_quat);
     parts.mouth.scale.set(radius * L.mouthRadius, radius * L.mouthRadius * 0.45, radius * L.mouthRadius);
   }

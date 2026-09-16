@@ -1,3 +1,5 @@
+import { animateWormFace } from '../../worm/wormFaceExpression.js';
+import { prefersReducedMotion } from '../../utils/device.js';
 import { finishWormEyes } from '../../worm/wormCharacterFinish.js';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -5,7 +7,7 @@ import * as THREE from 'three';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import { createWormSkinMaterial, applyBioluminescence, updateWormSkinMaterialTime } from '../../worm/wormSkinMaterial.js';
 import { makeWormHaloSprite, HALO_SCALE } from '../../worm/wormGlowHalo.js';
-import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../../worm/wormFaceLayout.js';
+import { layoutWormFace } from '../../worm/wormFaceLayout.js';
 import { isCarouselActive } from './menuCarouselState.js';
 import { sampleWigglingCubeWorm } from './cubeWormPath.js';
 
@@ -49,9 +51,9 @@ function GlowWorm({ distance, antipodal = false }) {
     const black = new THREE.MeshBasicMaterial({ color: '#12131a' });
     const eyes = [0, 1].map(() => new THREE.Mesh(geometry, white));
     const pupils = [0, 1].map(() => new THREE.Mesh(geometry, black));
-    const disposeEyes = finishWormEyes(eyes, pupils);
-    const mouthGeo = new THREE.TorusGeometry(1, FACE_LAYOUT.mouthTube / FACE_LAYOUT.mouthRadius, 8, 22, MOUTH_ARC);
+    const mouthGeo = new THREE.BufferGeometry();
     const mouth = new THREE.Mesh(mouthGeo, black);
+    const disposeEyes = finishWormEyes(eyes, pupils, 'glow', mouth);
     group.add(...eyes, ...pupils, mouth);
     return { group, beads, halos, rings, material, face: { eyes, pupils, mouth, glasses: [null, null], hat: null },
       position: new THREE.Vector3(), normal: new THREE.Vector3(), forward: new THREE.Vector3(), axis: new THREE.Vector3(0, 0, 1),
@@ -80,7 +82,10 @@ function GlowWorm({ distance, antipodal = false }) {
         ring.scale.setScalar(radius * bulge);
       }
       model.halos[i].position.copy(model.position);
-      if (i === 0) layoutWormFace(model.position, model.forward, model.normal, 0.17, model.face);
+      if (i === 0) {
+        layoutWormFace(model.position, model.forward, model.normal, 0.17, model.face);
+        animateWormFace(model.face, 'glow', time, { reducedMotion: prefersReducedMotion() });
+      }
     });
   });
   return <primitive object={model.group} dispose={null} />;

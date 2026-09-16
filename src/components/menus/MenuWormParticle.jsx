@@ -1,9 +1,11 @@
+import { animateWormFace } from '../../worm/wormFaceExpression.js';
+import { prefersReducedMotion } from '../../utils/device.js';
 import { finishWormEyes, wormBodyTaper } from '../../worm/wormCharacterFinish.js';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createWormSkinMaterial, updateWormSkinMaterialTime } from '../../worm/wormSkinMaterial.js';
-import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../../worm/wormFaceLayout.js';
+import { layoutWormFace } from '../../worm/wormFaceLayout.js';
 import { isCarouselActive } from './menuCarouselState.js';
 import { makeMenuTunnelWormPath, sampleMenuTunnelWorm, MENU_WORM_RADIUS, MENU_WORM_SEGMENTS, MENU_WORM_SPACING, MENU_WORM_SPEED } from './menuTunnelWormPath.js';
 
@@ -28,9 +30,9 @@ export default function MenuWormParticle({ start, color1, elapsed, arcPhase = 0,
     const black = new THREE.MeshBasicMaterial({ color: '#12131a' });
     const eyes = [0, 1].map(() => new THREE.Mesh(geometry, white));
     const pupils = [0, 1].map(() => new THREE.Mesh(geometry, black));
-    const disposeEyes = finishWormEyes(eyes, pupils);
-    const mouthGeo = new THREE.TorusGeometry(1, FACE_LAYOUT.mouthTube / FACE_LAYOUT.mouthRadius, 8, 22, MOUTH_ARC);
+    const mouthGeo = new THREE.BufferGeometry();
     const mouth = new THREE.Mesh(mouthGeo, black);
+    const disposeEyes = finishWormEyes(eyes, pupils, 'glow', mouth);
     group.add(...eyes, ...pupils, mouth);
     return { group, beads, material, face: { eyes, pupils, mouth, glasses: [null, null], hat: null },
       position: new THREE.Vector3(), normal: new THREE.Vector3(), forward: new THREE.Vector3(),
@@ -49,6 +51,7 @@ export default function MenuWormParticle({ start, color1, elapsed, arcPhase = 0,
       bead.position.copy(model.position);
       if (i === 0) {
         layoutWormFace(model.position, model.forward, model.normal, MENU_WORM_RADIUS, model.face);
+        animateWormFace(model.face, 'glow', time, { reducedMotion: prefersReducedMotion() });
         [...model.face.eyes, ...model.face.pupils, model.face.mouth].forEach(part => { part.visible = bead.visible; });
       }
     });
