@@ -39,10 +39,10 @@ describe('playable MOBI', () => {
     for (let t = 0; t < 20; t += 0.5) {
       animateMobi(rig, t, { pulse: 1, transit: true });
       rig.group.updateMatrixWorld(true);
-      const bounds = new THREE.Box3().setFromObject(rig.core);
+      const bounds = new THREE.Box3().setFromObject(rig.core, true);
       for (const axis of ['x', 'y', 'z']) {
-        expect(bounds.min[axis]).toBeGreaterThan(-0.55);
-        expect(bounds.max[axis]).toBeLessThan(0.55);
+        expect(bounds.min[axis]).toBeGreaterThan(-0.98);
+        expect(bounds.max[axis]).toBeLessThan(0.98);
       }
       const a = rig.core.getObjectByName('positive-pole').getWorldPosition(new THREE.Vector3());
       const b = rig.core.getObjectByName('negative-pole').getWorldPosition(new THREE.Vector3());
@@ -79,4 +79,26 @@ describe('playable MOBI', () => {
     expect(rig.core.quaternion.equals(rotation)).toBe(true);
     disposeMobi(rig);
   });
+});
+
+it('preserves actual antipodal pickup colors and patterned bands without recoloring the glass or eyes', async () => {
+  const { createMobiOrbPalette } = await import('../worm/mobiOrbAppearance.js');
+  const { setMobiOrbAppearance } = await import('../worm/mobiModel.js');
+  const { getTileStyleMaterial } = await import('../3d/styles/TileStyleMaterials.jsx');
+  const settings = { colorScheme: 'custom', customColors: { 1: '#ee4455', 2: '#44dd88', 3: '#eeeeee', 4: '#ff9900', 5: '#4477ff', 6: '#ffdd22' }, manifoldStyles: { 1: 'checkerboard' } };
+  const palette = createMobiOrbPalette(settings);
+  const rig = createMobiModel(), other = createMobiModel();
+  const shell = rig.shellMaterial.color.clone(), eyes = rig.eyes[0].children[0].material.color.clone();
+  setMobiOrbAppearance(rig, palette[1]);
+  expect(rig.primary.color.getHexString()).toBe(palette[1].gemColor.slice(1));
+  expect(rig.band.material).toBe(getTileStyleMaterial('checkerboard', palette[1].bandColor, false, null, palette[1].gemColor));
+  setMobiOrbAppearance(other, palette[2]);
+  expect(rig.primary.color.equals(other.primary.color)).toBe(false);
+  expect(rig.band.material).not.toBe(other.band.material);
+  expect(rig.shellMaterial.color.equals(shell)).toBe(true);
+  expect(rig.eyes[0].children[0].material.color.equals(eyes)).toBe(true);
+  let disposed = false;
+  palette[1].bandMaterial.addEventListener('dispose', () => { disposed = true; });
+  disposeMobi(rig); disposeMobi(other);
+  expect(disposed).toBe(false);
 });

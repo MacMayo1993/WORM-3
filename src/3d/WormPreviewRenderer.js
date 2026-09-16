@@ -477,7 +477,7 @@ function _poseWorm(opts, time) {
     }
     body.material.color.copy(_color);
     const mobiTail = rig.mobiTails[i];
-    mobiTail.group.visible = isMobi && shown && i !== 0;
+    mobiTail.group.visible = isMobi && shown && (i === 2 || (i >= 4 && (i - 4) % 3 === 1));
     if (mobiTail.group.visible) {
       mobiTail.group.position.copy(_off);
       mobiTail.group.scale.setScalar(MOBI_SEGMENT_RADIUS);

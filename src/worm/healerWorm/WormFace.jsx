@@ -1,3 +1,4 @@
+import { createMobiOrbPalette } from '../mobiOrbAppearance.js';
 // src/worm/healerWorm/WormFace.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import { createCharacterAccents, poseCharacterAccents } from '../wormCharacterVisuals.js';
@@ -13,7 +14,7 @@ import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp } from '../wormCosmeticsData.js';
 import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD, } from './constants.js';
-import { createMobiModel, animateMobi, orientMobi, disposeMobi, MOBI_RADIUS } from '../mobiModel.js';
+import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, MOBI_RADIUS } from '../mobiModel.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
@@ -46,6 +47,8 @@ export function WormFace({ worm, size }) {
     useEffect(() => () => accents.dispose(), [accents]);
     const isBook = wormCharacterId === 'book';
     const isMobi = wormCharacterId === 'mobi';
+    const settings = useGameStore(s => s.settings);
+    const mobiPalette = useMemo(() => isMobi ? createMobiOrbPalette(settings) : null, [isMobi, settings]);
     const mobi = useMemo(() => isMobi ? createMobiModel() : null, [isMobi]);
     useEffect(() => () => { if (mobi) disposeMobi(mobi); }, [mobi]);
     useEffect(() => {
@@ -157,6 +160,9 @@ export function WormFace({ worm, size }) {
                 }
             }
             orientMobi(mobi.group, _faceForward, normal);
+            const faces = worm.orbPickupFaceIdsRef.current;
+            setMobiOrbAppearance(mobi, mobiPalette[faces[faces.length - 1]] || mobiPalette[0]);
+            if (!bodyTransit) mobi.group.position.addScaledVector(normal, 0.035);
             animateMobi(mobi, mobiTime.current, { pulse: mobiPulse.current, transit: !!inTransit });
             mobi.group.scale.setScalar(MOBI_RADIUS * (worm.pickupHeadScale ?? 1));
             if (hatGroupRef.current) {

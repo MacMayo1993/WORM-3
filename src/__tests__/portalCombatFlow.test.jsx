@@ -73,11 +73,11 @@ it('integrates sparse encounters into normal WORM without replacing missions or 
   act(()=>state().initWormMode());
   act(()=>useGameStore.setState({wormGamePhase:'active',wormPaused:false}));
   frame();const c=combatBridge.current;
-  expect(c.ambient).toBe(true);expect(c.quiet).toBeGreaterThan(44);expect(c.enemies).toHaveLength(0);
+  expect(c.ambient).toBe(true);expect(c.quiet).toBeGreaterThan(11);expect(c.enemies).toHaveLength(0);
   const xp=state().xpRun,mission=state().wormMission,inventory={...state().wormOrbInventory};
   expect(xp).not.toBeNull();expect(mission).not.toBeNull();
   act(()=>{worm.pos.current={x:0,y:0,z:4,dirKey:'PZ'};worm.moveDir.current='right';c.quiet=0;});
-  frame();expect(c.encounter).toBe(true);expect(c.warning).toBe(4);
+  frame();expect(c.encounter).toBe(true);expect(c.warning).toBe(1.5);
   act(()=>vi.advanceTimersByTime(100));
   expect(host.querySelector('.worm-ambient-actions')).not.toBeNull();
   expect(host.querySelector('.worm-signature-control')).not.toBeNull();
@@ -149,7 +149,7 @@ it('disables normal enemies and Fire, preserves the choice on retry, and can ena
   expect(combatBridge.current).toBeNull();expect(state().wormEnemiesEnabled).toBe(false);
   start(true);
   expect(combatBridge.current.ambient).toBe(true);
-  expect(combatBridge.current.quiet).toBeGreaterThan(44);
+  expect(combatBridge.current.quiet).toBeGreaterThan(11);
 });
 
 it('keeps the optional combat arena playable when normal portal enemies are off', () => {

@@ -1,9 +1,10 @@
 // Shared playable MOBI geometry: gameplay and every picker use this same rig.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createParityMobiusGeometry } from './parityGeometry.js';
 
-export const MOBI_RADIUS = 0.092;
+export const MOBI_RADIUS = 0.12;
 const _x = new THREE.Vector3();
 const _y = new THREE.Vector3();
 const _z = new THREE.Vector3();
@@ -32,8 +33,8 @@ export function createMobiModel({ face = true } = {}) {
   const violet = light('#bd92ff');
   const dark = light('#183249');
   const shellMaterial = new THREE.MeshPhysicalMaterial({
-    color: '#b9e8ff', roughness: 0.12, metalness: 0.08,
-    clearcoat: 1, iridescence: 1, transparent: true, opacity: 0.16,
+    color: '#b9b0f4', emissive: '#44316e', emissiveIntensity: 0.25, roughness: 0.22, metalness: 0.08,
+    clearcoat: 1, iridescence: 1, transparent: true, opacity: 0.14,
     depthWrite: false, side: THREE.FrontSide,
   });
   const shellGeometry = new RoundedBoxGeometry(2, 2, 2, 2, 0.12);
@@ -41,28 +42,28 @@ export function createMobiModel({ face = true } = {}) {
   shell.name = 'transparent-body';
   shell.renderOrder = 2;
   group.add(shell);
-  const frameBox = new THREE.BoxGeometry(1.92, 1.92, 1.92);
-  const frame = new THREE.LineSegments(new THREE.EdgesGeometry(frameBox),
-    new THREE.LineBasicMaterial({ color: '#8cd9f4', transparent: true, opacity: 0.8 }));
-  frameBox.dispose();
+  const frame = new THREE.Mesh(createMobiFrameGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
+  frame.name = 'body-frame';
   group.add(frame);
 
   // Miniature of the collectible's crossed halos, antipodal axis and Möbius band.
-  // The complete core spans 0.8 units inside the 2-unit body (40%).
+  // Enlarged carried orb, still enclosed throughout its full rotation.
   const core = new THREE.Group();
   core.name = 'parity-core';
-  const gem = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), cyan);
+  const primary = light('#80e8ff');
+  const secondary = light('#bd92ff');
+  const gem = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), primary);
   core.add(gem);
   const haloGeo = new THREE.TorusGeometry(0.34, 0.013, 6, 40);
-  const halo = new THREE.Mesh(haloGeo, cyan);
+  const halo = new THREE.Mesh(haloGeo, primary);
   halo.rotation.x = Math.PI / 2;
-  const crossed = new THREE.Mesh(haloGeo, violet);
+  const crossed = new THREE.Mesh(haloGeo, secondary);
   crossed.rotation.set(Math.PI / 2, Math.PI / 3, 0);
   core.add(halo, crossed);
-  core.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.66, 8), cyan));
+  core.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.66, 8), primary));
   const nodeGeo = new THREE.SphereGeometry(0.047, 12, 8);
   for (const sign of [-1, 1]) {
-    const node = new THREE.Mesh(nodeGeo, sign === 1 ? cyan : violet);
+    const node = new THREE.Mesh(nodeGeo, sign === 1 ? primary : secondary);
     node.name = sign === 1 ? 'positive-pole' : 'negative-pole';
     node.position.y = sign * 0.33;
     core.add(node);
@@ -70,12 +71,14 @@ export function createMobiModel({ face = true } = {}) {
   const band = new THREE.Mesh(createParityMobiusGeometry(0.30, 0.065),
     new THREE.MeshStandardMaterial({ color: '#bd92ff', emissive: '#805ec8', emissiveIntensity: 0.7, roughness: 0.24 }));
   core.add(band);
+  core.scale.setScalar(1.7);
+  const ownedBandMaterial = band.material;
   group.add(core);
 
   if (!face) {
-    dark.dispose();
+    dark.dispose(); cyan.dispose(); violet.dispose();
     group.scale.setScalar(MOBI_RADIUS);
-    return { group, core, gem, band, eyes: [], shellMaterial, lastTime: null, transitRoll: 0 };
+    return { group, core, gem, band, eyes: [], primary, secondary, ownedBandMaterial, shellMaterial, lastTime: null, transitRoll: 0 };
   }
 
   // The guide's tiny Rubik's-cube eyes, kept above the core's sight line.
@@ -110,7 +113,7 @@ export function createMobiModel({ face = true } = {}) {
   smile.scale.y = 0.45;
   group.add(smile);
   group.scale.setScalar(MOBI_RADIUS);
-  return { group, core, gem, band, eyes, shellMaterial, lastTime: null, transitRoll: 0 };
+  return { group, core, gem, band, eyes, primary, secondary, ownedBandMaterial, shellMaterial, lastTime: null, transitRoll: 0 };
 }
 
 /** Time is supplied by the caller's pause-aware clock; no independent timers. */
@@ -126,6 +129,8 @@ export function animateMobi(rig, time, { pulse = 0, transit = false } = {}) {
 }
 
 export function disposeMobi(rig) {
+  // Styled bands borrow the same cached material as the world pickups.
+  rig.band.material = rig.ownedBandMaterial;
   const geometries = new Set();
   const materials = new Set();
   rig.group.traverse(object => {
@@ -134,4 +139,34 @@ export function disposeMobi(rig) {
   });
   geometries.forEach(g => g.dispose());
   materials.forEach(m => m.dispose());
+}
+
+// Solid rails stay readable on bright and patterned tiles.
+export function createMobiFrameGeometry() {
+  const pieces = [];
+  for (let axis = 0; axis < 3; axis++) for (const a of [-1, 1]) for (const b of [-1, 1]) {
+    const dims = [0.085, 0.085, 0.085]; dims[axis] = 1.96;
+    const edge = new THREE.BoxGeometry(...dims);
+    const pos = [0, 0, 0]; pos[(axis + 1) % 3] = a * 0.94; pos[(axis + 2) % 3] = b * 0.94;
+    edge.translate(...pos); pieces.push(edge);
+  }
+  const railCount = pieces.length;
+  for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+    pieces.push(new THREE.BoxGeometry(.20, .20, .20).translate(x * .94, y * .94, z * .94));
+  }
+  pieces.forEach((piece, i) => {
+    const color = new THREE.Color(i < railCount ? '#503080' : '#ddc4ff');
+    const colors = new Float32Array(piece.attributes.position.count * 3);
+    for (let j = 0; j < colors.length; j += 3) color.toArray(colors, j);
+    piece.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  });
+  const geometry = mergeGeometries(pieces);
+  pieces.forEach(p => p.dispose());
+  return geometry;
+}
+
+export function setMobiOrbAppearance(rig, appearance) {
+  rig.primary.color.set(appearance.gemColor);
+  rig.secondary.color.set(appearance.bandColor);
+  rig.band.material = appearance.bandMaterial;
 }

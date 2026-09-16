@@ -1,6 +1,6 @@
 import { COMBAT, combatKey, makeCombat, makeEnemy, stepCombat } from './portalCombat.js';
 
-export const AMBIENT = Object.freeze({ grace: 45, cooldown: 30, warning: 4, lifetime: 20 });
+export const AMBIENT = Object.freeze({ grace: 12, cooldown: 24, retry: 3, warning: 1.5, lifetime: 20 });
 export function makeAmbientCombat(size) {
   return Object.assign(makeCombat(size,null), { ambient: true, started: true,
     portalOpen: false, encounter: false, sourceId: null, age: 0,
@@ -8,7 +8,8 @@ export function makeAmbientCombat(size) {
 }
 function retreat(c, keepBurst = false) {
   c.encounter = false; c.sourceId = null; c.portalOpen = false; c.portal = null;
-  c.warning = 0; c.remaining = 0; c.quiet = AMBIENT.cooldown;
+  c.quiet = c.enemies.length === 0 && c.warning > 0 ? AMBIENT.retry : AMBIENT.cooldown;
+  c.warning = 0; c.remaining = 0;
   c.enemies = []; c.shots = []; c.drops = []; c.arcs = [];
   if (!keepBurst) c.bursts = [];
   c.fireHeld = false; c.fireRequested = false; c.lockedId = null; c.aim = null;
@@ -65,7 +66,7 @@ export function stepAmbientCombat(c, delta, player, tunnels, onHit) {
   if (c.warning > 0) {
     c.warning = Math.max(0,c.warning-dt);
     if (c.warning === 0) {
-      if (!safeMouth(c.portal,player)) { retreat(c); return; }
+      if (!safeMouth(c.portal,player)) { retreat(c); c.quiet = AMBIENT.retry; return; }
       const type = c.age < 90 ? 'crawler' : c.age < 150 || c.encounters%3 !== 2 ? 'scout' : 'brute';
       c.enemies = [makeEnemy(c,type)]; c.encounters++; c.remaining = AMBIENT.lifetime;
     }
