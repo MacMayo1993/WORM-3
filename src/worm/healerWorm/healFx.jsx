@@ -143,7 +143,7 @@ export function TunnelHealProgress({ size, worm }) {
         mesh.visible = true;
         mesh.position.copy(position).addScaledVector(normal, 0.07);
         mesh.quaternion.setFromUnitVectors(_healRingZ, normal);
-        mesh.material.color.set(need.ready ? '#a6eb9b' : need.color);
+        mesh.material.color.set(need.ready && !need.voided ? '#8ee5a6' : '#f08d91');
     });
     return <mesh ref={ring} visible={false} raycast={() => null}>
         <ringGeometry args={[0.4, 0.44, 40]} />
