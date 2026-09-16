@@ -21,25 +21,27 @@
 import React, { useEffect, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
+import { prefersReducedMotion } from '../utils/device.js';
 import { tunnelState } from './tunnelProgressBridge.js';
 
 // Intensity ramps in fast on entry and releases slower on exit, so the release
 // reads as the ride ending rather than the effect being switched off.
-const FADE_IN = 0.16;
-const FADE_OUT = 0.05;
+const FADE_IN = 10;
+const FADE_OUT = 4;
 
 export default function TunnelTransitOverlay() {
-  const { wormHealerMode, wormPhase, tunnelColors } = useGameStore(
+  const { wormHealerMode, wormPhase, tunnelColors, wormAlive } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode ?? false,
       wormPhase: s.wormPhase ?? 'crawling',
+      wormAlive: s.wormAlive ?? true,
       tunnelColors: s.wormActiveTunnelColors,
     }))
   );
 
   // Held for the full arc including the wind-up spiral and the exit flourish —
   // deliberately wider than the phases that render the tunnel interior.
-  const isActive = wormHealerMode && (
+  const isActive = wormHealerMode && wormAlive && (
     wormPhase === 'windup' || wormPhase === 'entering' ||
     wormPhase === 'tunnel' || wormPhase === 'exiting' || wormPhase === 'windout'
   );
@@ -51,9 +53,17 @@ export default function TunnelTransitOverlay() {
   const rafRef = useRef(null);
 
   useEffect(() => {
-    const animate = () => {
+    let lastFrame = null;
+    const animate = now => {
+      const dt = lastFrame == null ? 1 / 60 : Math.min(0.05, (now - lastFrame) / 1000);
+      lastFrame = now;
+      if (isActive && useGameStore.getState().wormPaused) {
+        rafRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      const reduced = prefersReducedMotion();
       const target = isActive ? 1 : 0;
-      ampRef.current += (target - ampRef.current) * (target > ampRef.current ? FADE_IN : FADE_OUT);
+      ampRef.current += (target - ampRef.current) * (1 - Math.exp(-dt * (target > ampRef.current ? FADE_IN : FADE_OUT)));
       const amp = ampRef.current;
 
       if (amp < 0.004) {
@@ -68,10 +78,10 @@ export default function TunnelTransitOverlay() {
         const mid = Math.sin(Math.PI * Math.min(1, Math.max(0, t)));
 
         if (vignetteRef.current) {
-          vignetteRef.current.style.opacity = String(amp * (0.55 + mid * 0.35));
+          vignetteRef.current.style.opacity = String(amp * (reduced ? 0.35 : 0.45 + mid * 0.18));
         }
         if (fringeRef.current) {
-          fringeRef.current.style.opacity = String(amp * (0.22 + mid * 0.4));
+          fringeRef.current.style.opacity = String(amp * (reduced ? 0.15 : 0.22 + mid * 0.20));
         }
         if (seamRef.current) {
           // A brief bloom exactly at ½π — the identification moment.
@@ -81,7 +91,7 @@ export default function TunnelTransitOverlay() {
           // beat this overlay exists to sell, and until the camera actually did it
           // there was nothing at this point in the ride to mark.
           const punch = Math.max(0, 1 - Math.abs(t - 0.33) / 0.045);
-          seamRef.current.style.opacity = String(amp * Math.max(seam, punch * punch * 0.85) * 0.5);
+          seamRef.current.style.opacity = String(reduced ? 0 : amp * Math.max(seam, punch * punch * 0.65) * 0.32);
         }
       }
       rafRef.current = requestAnimationFrame(animate);
@@ -129,12 +139,12 @@ export default function TunnelTransitOverlay() {
           mixBlendMode: 'screen',
         }}
       />
-      {/* ½π bloom. */}
+      {/* Color separation around the crossing; the centre stays unobstructed. */}
       <div
         ref={seamRef}
         style={{
           ...base,
-          background: 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 58%)',
+          background: `radial-gradient(ellipse at 50% 50%, transparent 25%, ${entryColor}00 38%, ${entryColor}88 51%, ${exitColor}66 57%, transparent 72%)`,
           mixBlendMode: 'screen',
         }}
       />

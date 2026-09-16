@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
+import { prefersReducedMotion } from '../../utils/device.js';
 import { FACE_NORMALS } from './constants.js';
 
 // Pre-allocated scratch vector for PortalGlow
@@ -95,22 +96,21 @@ const holeFragmentShader = `
 
     float d = r / max(uOpen, 0.0001);     // 0 at the centre of the hole, 1 at the cut edge
 
-    // Looking down a shaft: near-black deep in, picking up the tunnel's colour
-    // toward the mouth. This is what makes it read as depth rather than a
-    // black sticker.
-    vec3 col = mix(vec3(0.012, 0.012, 0.022), uColor * 0.5, pow(d, 2.6));
-
-    // The cut edge catches light — the single strongest "this is a hole" cue.
-    float rim = smoothstep(0.86, 1.0, d);
-    col += uColor * rim * (1.3 + uCharge * 1.8);
-
-    // A few rings receding down the throat, drifting inward. Deliberately faint:
-    // these replace four spinning torus rings that used to sit on the surface.
-    float rings = smoothstep(0.87, 1.0, fract(d * 3.0 - uTime * 0.5)) * 0.16 * (1.0 - d);
-    col += uColor * rings;
-
-    // Glow from something arriving.
-    col += mix(uColor, vec3(1.0, 0.96, 0.78), 0.6) * uCharge * 0.75 * (1.0 - d);
+    float angle = atan(p.y, p.x);
+    float depth = -log(max(d, 0.06));
+    vec3 hot = mix(uColor, vec3(1.0, 0.97, 0.86), 0.35);
+    // Spiral arms wind INTO the aperture. The centre remains a dark opening.
+    float arms = pow(0.5 + 0.5 * cos(angle * 3.0 + depth * 5.0 + uTime * 1.7), 12.0);
+    float throat = smoothstep(0.10, 0.42, d) * (1.0 - smoothstep(0.86, 1.0, d));
+    float ripples = pow(0.5 + 0.5 * cos(depth * 15.0 - uTime * 2.2), 18.0);
+    float iris = pow(0.5 + 0.5 * cos(angle * 12.0 - uTime * 0.7), 8.0);
+    float rim = smoothstep(0.86, 0.98, d);
+    float fineEdge = smoothstep(0.965, 0.995, d);
+    vec3 col = vec3(0.007, 0.012, 0.02) + uColor * pow(d, 3.0) * 0.12;
+    col += uColor * arms * throat * (0.38 + uCharge * 0.35);
+    col += hot * ripples * throat * 0.18;
+    col += uColor * rim * (0.5 + iris * 0.6 + uCharge * 0.3);
+    col += hot * fineEdge * 0.7;
 
     gl_FragColor = vec4(col, 1.0);
   }
@@ -153,8 +153,10 @@ export function TunnelPortalFX({ worm, size }) {
         const tunnel = occupied ?? lastTunnelRef.current;
         const prog = worm.tunnelProgress.current;
 
-        entryUniforms.uTime.value += delta;
-        exitUniforms.uTime.value += delta;
+        const reduced = prefersReducedMotion();
+        const flowDelta = reduced ? 0 : Math.min(delta, 0.05);
+        entryUniforms.uTime.value += flowDelta;
+        exitUniforms.uTime.value += flowDelta;
         entryUniforms.uColor.value.set(entryColor);
         exitUniforms.uColor.value.set(exitColor);
 
@@ -219,7 +221,8 @@ export function TunnelPortalFX({ worm, size }) {
                 burstRef.current.quaternion.copy(_fxQuat);
             }
             if (burstFlashRef.current) {
-                burstFlashRef.current.position.copy(_fxPos).addScaledVector(_fxNormal, 0.12);
+                burstFlashRef.current.position.copy(_fxPos).addScaledVector(_fxNormal, 0.14);
+                burstFlashRef.current.quaternion.copy(_fxQuat);
             }
         }
         if (phase === 'crawling') firedRef.current = false; // re-arm for the next tunnel
@@ -230,13 +233,14 @@ export function TunnelPortalFX({ worm, size }) {
             const ease = 1 - (1 - bt) * (1 - bt); // ease-out expansion
             if (burstRef.current) {
                 burstRef.current.visible = bt < 1;
-                burstRef.current.scale.setScalar(0.15 + ease * 2.0);
-                if (burstRef.current.material) burstRef.current.material.opacity = (1 - bt) * 0.85;
+                burstRef.current.scale.setScalar(reduced ? 1 : 0.65 + ease * 1.6);
+                if (burstRef.current.material) burstRef.current.material.opacity = (1 - bt) * (reduced ? 0.22 : 0.72);
             }
             if (burstFlashRef.current) {
-                burstFlashRef.current.visible = bt < 0.6;
-                burstFlashRef.current.scale.setScalar(0.25 + ease * 0.7);
-                if (burstFlashRef.current.material) burstFlashRef.current.material.opacity = Math.max(0, 0.6 - bt) * 1.4;
+                burstFlashRef.current.visible = bt < 1 && !reduced;
+                burstFlashRef.current.scale.setScalar(0.4 + ease * 1.35);
+                if (!reduced) burstFlashRef.current.rotateZ(-Math.min(delta, 0.05) * 1.2);
+                if (burstFlashRef.current.material) burstFlashRef.current.material.opacity = Math.max(0, 1 - bt) * 0.48;
             }
             if (bt >= 1) burstTRef.current = -1;
         } else {
@@ -275,10 +279,10 @@ export function TunnelPortalFX({ worm, size }) {
                 <meshBasicMaterial color={exitColor} transparent opacity={0} side={THREE.DoubleSide}
                     blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
             </mesh>
-            {/* Exit flash pop */}
+            {/* Thin counter-rotated echo arcs leave the emerging worm visible. */}
             <mesh ref={burstFlashRef} visible={false}>
-                <sphereGeometry args={[0.5, 16, 16]} />
-                <meshBasicMaterial color={exitColor} transparent opacity={0}
+                <ringGeometry args={[0.39, 0.415, 48, 1, 0, Math.PI * 1.5]} />
+                <meshBasicMaterial color={exitColor} transparent opacity={0} side={THREE.DoubleSide}
                     blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
             </mesh>
         </>
