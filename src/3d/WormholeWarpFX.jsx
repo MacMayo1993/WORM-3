@@ -1,9 +1,13 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { prefersReducedMotion } from '../utils/device.js';
 
 const PHASE_BOOST = {
   crawling: 0.0,
+  windup: 0.45,
+  windout: 0.35,
   entering: 1.0,
   tunnel: 1.0,
   exiting: 0.8,
@@ -20,7 +24,7 @@ const PHASE_BOOST = {
 export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true, healMoment = 0 }) {
   const meshRef = useRef(null);
   const prevEnabledRef = useRef(false);
-  const prevHealMomentRef = useRef(0);
+  const prevHealMomentRef = useRef(healMoment);
   const healFlashRef = useRef(0); // 1→0, drives reverse pressure flash
   const { size } = useThree();
 
@@ -31,6 +35,8 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
       new THREE.ShaderMaterial({
         uniforms: {
           uTime: { value: 0 },
+          uColorA: { value: new THREE.Color('#00bbff') },
+          uColorB: { value: new THREE.Color('#ff7700') },
           uBoost: { value: 0 },
           uAspect: { value: 1 },
           uOpacity: { value: 0 },
@@ -50,6 +56,8 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
         fragmentShader: `
           varying vec2 vUv;
           uniform float uTime;
+          uniform vec3 uColorA;
+          uniform vec3 uColorB;
           uniform float uBoost;
           uniform float uAspect;
           uniform float uOpacity;
@@ -60,24 +68,15 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
             float r = length(p);
             float angle = atan(p.y, p.x);
 
-            // Rings scrolling inward (= forward tunnel motion).
-            float speed = mix(0.5, 3.2, uBoost);
-            float rings = sin(r * 10.0 - uTime * speed) * 0.5 + 0.5;
-
-            // Gentle spiral twist.
-            float twist = angle + uTime * mix(0.1, 0.7, uBoost) + r * 3.0;
-            float spiral = sin(twist * 6.0) * 0.5 + 0.5;
-
-            // Cyan ↔ purple colour blend.
-            vec3 colA = vec3(0.0, 0.75, 1.0);
-            vec3 colB = vec3(0.55, 0.05, 1.0);
-            vec3 col = mix(colA, colB, spiral) * (rings * 0.75 + 0.35);
-
-            // EDGE-ONLY vignette — transparent in the centre so ribbon geometry
-            // is always visible; only a thin border glow at the screen perimeter.
-            float edgeMask = smoothstep(0.72, 1.3, r);  // narrower edge band than before
-            float alpha = edgeMask * (rings * 0.20 + 0.06) * uOpacity;
-            alpha = clamp(alpha, 0.0, 0.16);
+            // Long, sparse edge streaks suggest forward travel without painting
+            // over the worm. Their color is the actual entry/exit palette pair.
+            float lane = pow(0.5 + 0.5 * sin(angle * 28.0 + sin(angle * 7.0)), 24.0);
+            float run = pow(0.5 + 0.5 * sin(r * 18.0 - uTime * (2.0 + uBoost * 3.0)), 5.0);
+            float sweep = 0.5 + 0.5 * sin(angle - 0.35);
+            vec3 col = mix(uColorA, uColorB, sweep);
+            col = mix(col, vec3(1.0), lane * run * 0.28);
+            float edgeMask = smoothstep(0.72, 1.35, r);
+            float alpha = min(0.12, edgeMask * (0.045 + lane * run * 0.28) * uOpacity);
 
             if (alpha < 0.001) discard;
             gl_FragColor = vec4(col, alpha);
@@ -87,41 +86,34 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
     []
   );
 
+  useEffect(() => () => { geometry.dispose(); material.dispose(); }, [geometry, material]);
+
   useFrame((_state, delta) => {
-    if (!meshRef.current) return;
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const state = useGameStore.getState();
+    const active = enabled && state.wormAlive;
+    const reduced = prefersReducedMotion();
+    const dt = Math.min(delta, 0.05);
+    const uniforms = material.uniforms;
+    if (active && state.wormPaused) return;
 
-    const boost = enabled ? (PHASE_BOOST[wormPhase] ?? 0) : 0;
-
-    // Heal moment: spike to full opacity then fast-fade — "pressure release" as the
-    // portal seals. Only fires if the warp was active (enabled) so it doesn't ghost.
     if (healMoment !== prevHealMomentRef.current) {
       prevHealMomentRef.current = healMoment;
-      healFlashRef.current = 1.0;
+      if ((active || prevEnabledRef.current) && !reduced) healFlashRef.current = 0.45;
     }
-    if (healFlashRef.current > 0) {
-      healFlashRef.current = Math.max(0, healFlashRef.current - delta * 11.0);
-      material.uniforms.uOpacity.value = Math.max(
-        material.uniforms.uOpacity.value,
-        healFlashRef.current
-      );
+    healFlashRef.current = Math.max(0, healFlashRef.current - dt * 2.5);
+    const target = Math.max(active ? (reduced ? 0.18 : 0.65) : 0, healFlashRef.current);
+    uniforms.uOpacity.value += (target - uniforms.uOpacity.value) * (1 - Math.exp(-dt * (active ? 8 : 6)));
+    uniforms.uBoost.value = active ? (PHASE_BOOST[wormPhase] ?? 0) : 0;
+    uniforms.uAspect.value = size.width / Math.max(1, size.height);
+    if (state.wormActiveTunnelColors) {
+      uniforms.uColorA.value.set(state.wormActiveTunnelColors.entryColor);
+      uniforms.uColorB.value.set(state.wormActiveTunnelColors.exitColor);
     }
-
-    if (enabled && !prevEnabledRef.current) {
-      // Subtle edge glow only — FPS ribbon camera provides the immersion.
-      material.uniforms.uOpacity.value = 0.22;
-    } else if (!enabled && healFlashRef.current <= 0) {
-      // Slow fade-out so the exit feels natural (skip while heal flash is decaying).
-      material.uniforms.uOpacity.value = THREE.MathUtils.lerp(
-        material.uniforms.uOpacity.value,
-        0.0,
-        delta * 4.0
-      );
-    }
-    prevEnabledRef.current = enabled;
-
-    material.uniforms.uTime.value += delta;
-    material.uniforms.uBoost.value = boost;
-    material.uniforms.uAspect.value = size.width / size.height;
+    if (active && !reduced) uniforms.uTime.value += dt;
+    mesh.visible = uniforms.uOpacity.value > 0.004;
+    prevEnabledRef.current = active;
   });
 
   return (

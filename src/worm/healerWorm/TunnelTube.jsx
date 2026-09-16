@@ -24,6 +24,7 @@ import { getTunnelWorldPosInto } from '../wormLogic.js';
 import { diveProgress } from '../tunnelCameraRails.js';
 import { tunnelBoreRadiusAt } from '../../utils/tunnelPath.js';
 import { FACE_COLORS } from '../../utils/constants.js';
+import { prefersReducedMotion } from '../../utils/device.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 
 const RINGS = 64;            // samples along the tunnel
@@ -81,140 +82,80 @@ const vertexShader = `
 // top in a hotter colour than the wall, and the detail coming from a real 3D
 // noise field rather than from a single sine.
 const fragmentShader = `
-  uniform vec3  uColorA;
-  uniform vec3  uColorB;
+  uniform vec3 uColorA;
+  uniform vec3 uColorB;
   uniform float uTime;
   uniform float uOpacity;
-  uniform float uHead;      // 0→1 position of the worm along the tunnel
-
+  uniform float uHead;
   varying vec2 vUv;
   varying vec3 vViewPos;
 
-  float hash13(vec3 p3) {
-    p3 = fract(p3 * 0.1031);
-    p3 += dot(p3, p3.zyx + 31.32);
-    return fract((p3.x + p3.y) * p3.z);
+  float hash13(vec3 p) {
+    p = fract(p * 0.1031);
+    p += dot(p, p.zyx + 31.32);
+    return fract((p.x + p.y) * p.z);
   }
-  float vnoise(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = fract(p);
+  float noise3(vec3 p) {
+    vec3 i = floor(p), f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
     return mix(
-      mix(mix(hash13(i + vec3(0.0, 0.0, 0.0)), hash13(i + vec3(1.0, 0.0, 0.0)), f.x),
-          mix(hash13(i + vec3(0.0, 1.0, 0.0)), hash13(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
-      mix(mix(hash13(i + vec3(0.0, 0.0, 1.0)), hash13(i + vec3(1.0, 0.0, 1.0)), f.x),
-          mix(hash13(i + vec3(0.0, 1.0, 1.0)), hash13(i + vec3(1.0, 1.0, 1.0)), f.x), f.y),
-      f.z);
+      mix(mix(hash13(i), hash13(i + vec3(1,0,0)), f.x),
+          mix(hash13(i + vec3(0,1,0)), hash13(i + vec3(1,1,0)), f.x), f.y),
+      mix(mix(hash13(i + vec3(0,0,1)), hash13(i + vec3(1,0,1)), f.x),
+          mix(hash13(i + vec3(0,1,1)), hash13(i + vec3(1,1,1)), f.x), f.y), f.z);
   }
-
   void main() {
-    float t = uTime;
+    float y = vUv.y;
+    float angle = vUv.x * 6.2831853;
+    float twist = angle - y * 3.14159265;
+    float coreDistance = abs(y - 0.5);
+    float coreFade = smoothstep(0.045, 0.14, coreDistance);
+    float mouth = smoothstep(0.0, 0.1, y) * (1.0 - smoothstep(0.90, 1.0, y));
 
-    // Each half carries its own tile's colour — the same language the ribbon
-    // uses, so tube and ribbon read as one object. The two do not cross-fade
-    // directly into each other (two saturated tile colours average into mud);
-    // they drive through a hot fused colour at the midpoint instead, which is
-    // also where the band's half-twist happens.
-    vec3 fused = mix(mix(uColorA, uColorB, 0.5), vec3(1.0), 0.55);
-    vec3 base = mix(uColorA, uColorB, smoothstep(0.30, 0.70, vUv.y));
-    // Small lift only: face colours can be very dark (deep reds especially) and a
-    // shaft lit purely by its own tile colour goes black. The brightness comes
-    // from the energy layers below, not from bleaching the wall.
-    base = mix(base, vec3(1.0), 0.06);
-    float mid = 1.0 - smoothstep(0.0, 0.22, abs(vUv.y - 0.5));
-    base = mix(base, fused, mid * 0.8);
+    // Retain both palette identities through the half-twist. Opposing lanes
+    // trade places while the body stays dark enough to see the ribbon and worm.
+    vec3 base = mix(uColorA, uColorB, smoothstep(0.42, 0.58, y));
+    base = mix(base, vec3(0.35, 0.40, 0.48), 0.08);
+    vec3 laneColor = mix(uColorA, uColorB, 0.5 + 0.5 * sin(twist));
+    vec3 hot = mix(base, vec3(1.0, 0.97, 0.88), 0.3);
+    vec2 circle = vec2(cos(angle), sin(angle));
+    float cloud = noise3(vec3(circle * 2.0, y * 10.0 - uTime * 0.65));
+    float filaments = pow(1.0 - abs(noise3(vec3(circle * 5.0, y * 5.0 - uTime * 1.8)) * 2.0 - 1.0), 14.0);
 
-    // Sampling the noise on a CIRCLE of the bore (cos/sin of the wrapped
-    // coordinate) rather than on vUv.x directly is what keeps it seamless: vUv.x
-    // jumps 1→0 at the seam, and any field sampled on it tears in a visible line
-    // straight down the tunnel.
-    float ang = vUv.x * 6.2831853;
-    vec2  ring2 = vec2(cos(ang), sin(ang));
+    // Broken hoops read as depth stations, leaving open windows between them.
+    // Derivative smoothing keeps the distant lines stable on phone displays.
+    float hoopDistance = abs(fract(y * 18.0 - uTime * 0.38) - 0.5);
+    float aa = max(fwidth(y) * 18.0, 0.012);
+    float hoop = 1.0 - smoothstep(0.025, 0.025 + aa, hoopDistance);
+    float segments = smoothstep(-0.5, -0.1, cos(angle * 8.0 + y * 6.2831853));
+    hoop *= segments;
+    float helix = pow(0.5 + 0.5 * cos(twist * 2.0), 42.0);
+    float packets = pow(0.5 + 0.5 * cos(y * 40.0 - uTime * 4.0), 10.0);
 
-    // Plasma crawling down the bore — the wall's own texture, so it is not a
-    // flat sheet of colour between rings.
-    vec3 np = vec3(ring2 * 1.6, vUv.y * 9.0 - t * 1.6);
-    float plasma = vnoise(np) * 0.6 + vnoise(np * 2.3 + 5.0) * 0.4;
+    float nearHead = exp(-pow((y - uHead) / 0.19, 2.0));
+    float wake = step(y, uHead) * exp(-abs(uHead - y) * 6.0);
+    float arrival = exp(-pow((y - uHead - 0.06) / 0.045, 2.0));
+    // Sparse glints are shader detail, not a particle emitter or extra draw call.
+    vec2 cell = vec2(vUv.x * 32.0, y * 45.0 - uTime * 1.1);
+    vec2 local = fract(cell) - 0.5;
+    float seed = hash13(vec3(floor(cell), 7.0));
+    float glint = (1.0 - smoothstep(0.02, 0.13, length(local * vec2(1.0, 0.42)))) * step(0.91, seed);
 
-    // Warp streaks: ridged noise stretched along the bore leaves thin filaments
-    // running toward the camera. This is the real speed cue — far stronger than
-    // the rings, because the filaments are long enough to track.
-    // Frequency and exponent both matter here: too few filaments, or too soft a
-    // ridge, and they stop being streaks and become fat beams that wash the whole
-    // bore out. Many thin ones read as speed; a handful of wide ones read as fog.
-    vec3 sp = vec3(ring2 * 7.0, vUv.y * 4.0 - t * 3.2);
-    float streak = pow(1.0 - abs(vnoise(sp) * 2.0 - 1.0), 10.0);
+    vec3 col = base * (0.055 + cloud * 0.17 + nearHead * 0.10);
+    col += hot * hoop * (0.28 + nearHead * 0.30);
+    col += laneColor * helix * (0.55 + packets * 0.5 + wake * 0.25);
+    col += hot * filaments * (0.26 + nearHead * 0.20);
+    col += hot * arrival * hoop * 0.65;
+    col += mix(base, vec3(1.0), 0.7) * glint * 0.75;
 
-    // Rings racing past, kept as the regular beat under the streaks' irregular one.
-    float rings = smoothstep(0.86, 1.0, fract(vUv.y * 26.0 - t * 2.4));
-
-    // Longitudinal ribs give the bore a readable cross-section so it reads as a
-    // round shaft rather than a flat backdrop.
-    float ribs = pow(abs(sin(vUv.x * 3.14159265 * 8.0)), 6.0);
-
-    // The half-twist point — where the band's orientation inverts. The HUD marks
-    // it as ½π; this is the same moment in the world. Widened to span the stretch
-    // where the wall is faded out, so the crossing reads as a burst of light
-    // between two shafts rather than as a hole.
-    float dMid = abs(vUv.y - 0.5);
-    float seam = 1.0 - smoothstep(0.0, 0.15, dMid);
-    seam *= 0.9 + 0.1 * sin(t * 8.0);
-
-    // Never draw the wall across the corner where the two arms meet — no frame
-    // can carry a cross-section smoothly through a sharp bend, and the result
-    // reads as two barrels that do not line up.
-    float coreFade = smoothstep(0.05, 0.15, dMid);
-
-    // Light pooled around the worm, falling off ahead and behind, so the shaft
-    // has depth instead of being uniformly lit end to end. The falloff has to be
-    // wide: anchoring tunnels on their tiles made each arm ~5x longer, so a tight
-    // pool leaves almost the whole shaft unlit.
-    float headGlow = exp(-pow((vUv.y - uHead) / 0.22, 2.0));
-    float travelPulse = exp(-pow((vUv.y - uHead) / 0.035, 2.0));
-    float wake = step(vUv.y, uHead) * exp(-(uHead - vUv.y) * 5.0);
-    // One luminous seam visibly carries the half-twist through the shaft.
-    float twistStripe = pow(max(0.0, cos(vUv.x * 6.2831853 - vUv.y * 3.14159265)), 36.0);
-
-    // Both mouths open out to nothing so the tube never ends in a hard disc, and
-    // so the ends do not read as geometry hanging outside the cube.
-    float mouth = smoothstep(0.0, 0.16, vUv.y) * smoothstep(1.0, 0.84, vUv.y);
-
-    // Grazing incidence brightening: walls far down the bore catch more light,
-    // which is what sells a cylinder when you are standing inside it.
-    vec3  V = normalize(-vViewPos);
-    float graze = pow(clamp(1.0 - abs(V.z), 0.0, 1.0), 2.0);
-
-    // Dark body first, so there is somewhere for the energy to sit against.
-    vec3 col = base * (0.10 + 0.35 * plasma + 0.30 * headGlow + 0.25 * graze);
-    // Energy laid over it in a HOTTER colour than the wall rather than as a
-    // brighter version of the same hue — that difference is what reads as light
-    // in the tunnel instead of as a lighter patch of tunnel.
-    //
-    // Only part-way to white, though. Taking the accent most of the way there
-    // bleached the streaks out and the tunnel came back reading white-blue with
-    // the tile colour barely present — the opposite of the complaint. The hue is
-    // carried by the accent; the white is added back only on the brightest cores
-    // of the streaks, where a blown-out centre is what makes them look hot.
-    vec3 accent = mix(base, vec3(1.0), 0.55);
-    col += accent * streak * 0.80;
-    col += vec3(1.0) * pow(streak, 3.0) * 0.22;
-    col += accent * rings  * 0.32;
-    col += mix(accent, vec3(1.0, 0.96, 0.78), 0.5) * travelPulse * 0.85;
-    col += base   * ribs   * 0.30;
-    col += accent * twistStripe * (0.18 + 0.4 * wake);
-    col += vec3(1.0) * seam * 1.10;
-
-    // Wall and seam are summed separately: the seam peaks exactly where coreFade
-    // removes the wall, so the shaft hands off to light and back without a gap.
-    // Translucent on purpose: the Möbius ribbon runs down the middle of this
-    // shaft and the cube's interior sits beyond it, and both have to stay
-    // readable through the wall rather than being sealed off by it.
-    // The plasma contributes to colour far more than it should to coverage: at a
-    // higher weight here it filled the gaps between the streaks with milk and the
-    // whole bore fogged over, which is what the flat original did too.
-    float wall = (0.16 + rings * 0.28 + streak * 0.30 + plasma * 0.09 + headGlow * 0.22) * coreFade;
-    float glow = seam * 0.60;
-    gl_FragColor = vec4(col, clamp((wall + glow) * mouth * uOpacity, 0.0, 1.0));
+    // A braided color bridge replaces the broad white midpoint wash. Its
+    // angular gaps preserve the core silhouette during the orientation change.
+    float seam = (1.0 - smoothstep(0.0, 0.13, coreDistance));
+    float braid = pow(0.5 + 0.5 * cos(twist * 2.0 - y * 20.0), 8.0);
+    col = col * coreFade + laneColor * seam * (0.16 + braid * 0.8);
+    float wall = (0.12 + cloud * 0.06 + hoop * 0.32 + helix * 0.36 + filaments * 0.14 + glint * 0.18) * coreFade;
+    float bridge = seam * (0.10 + braid * 0.30);
+    gl_FragColor = vec4(col, min(0.82, (wall + bridge) * mouth * uOpacity));
   }
 `;
 
@@ -330,7 +271,7 @@ export function TunnelTube({ worm, size }) {
     opacityRef.current += (target - opacityRef.current) * Math.min(1, delta * lerp);
 
     const st = useGameStore.getState();
-    if (!st.wormPaused && st.wormAlive) uniforms.uTime.value += delta;
+    if (!st.wormPaused && st.wormAlive && !prefersReducedMotion()) uniforms.uTime.value += Math.min(delta, 0.05);
     uniforms.uOpacity.value = opacityRef.current;
 
     if (!meshRef.current) return;
@@ -365,6 +306,7 @@ export function TunnelTube({ worm, size }) {
     <mesh ref={meshRef} geometry={geo} frustumCulled={false} renderOrder={2}>
       <shaderMaterial
         uniforms={uniforms}
+        extensions={{ derivatives: true }}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
         // This sweep's winding makes the INNER surface front-facing, which is why
