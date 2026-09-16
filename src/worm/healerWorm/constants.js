@@ -21,11 +21,12 @@ export const TUNNEL_SURF_BACK = 0.264;     // camera behind worm along tunnel ax
 export const TUNNEL_SURF_UP = 0.132;       // raise camera above ribbon surface; nonzero value causes Möbius orbit (camera rolls 180° over tunnel) — intentional RP² effect
 export const TUNNEL_LOOK_AHEAD = 1.8;      // 1 arm-length ahead; keeps exit in view without shooting past the cube
 export const TUNNEL_SURF_SWAY = 0.22;
-// Multiplies every phase of the tunnel trip (windup, dive, ride, exit, windout — all
-// five tunnelProgress increments in wormSim scale off this), so it is the single lever
-// on how long a trip takes. 0.264 was 35% slower than original; 0.50 was snappy; 0.60
-// was 20% faster still. 0.90 cuts the trip duration by a further 33% (0.60 / 0.67).
+// Base rate shared by all five traversal phases. The interior has its own
+// multiplier below so its readability does not depend on surface flourish time.
 export const TUNNEL_SPEED_SCALE = 0.90;
+// Slow only the dive, interior and exit: ~5.8s to read the route instead of ~3.7s.
+// Keep the short surface flourishes and normal crawl speed unchanged.
+export const TUNNEL_INTERIOR_SPEED_SCALE = 0.65;
 
 // Face outward normals.
 export const FACE_NORMALS = {
