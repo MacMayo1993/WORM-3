@@ -84,7 +84,7 @@ export default function RotationCountdownHUD() {
       // The wording stays put and the colour escalates: a label that rewrites
       // itself next to a number that is already moving is one moving thing too
       // many at the moment the player most needs to read it.
-      if (label) label.textContent = held ? 'TURN HELD' : 'LAYER TURNS IN';
+      if (label) label.textContent = held ? 'TURN HELD' : 'TURN IN';
     };
     rafRef.current = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(rafRef.current);
@@ -100,13 +100,11 @@ export default function RotationCountdownHUD() {
         display: 'none',
         alignItems: 'center',
         gap: 9,
-        padding: '5px 12px 5px 11px',
+        padding: '1px 3px 3px',
         borderRadius: 999,
-        background: 'rgba(18,24,14,0.62)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,245,220,0.16)',
-        boxShadow: '0 4px 16px rgba(10,14,8,0.5)',
+        background: 'transparent',
+        border: 0,
+        boxShadow: 'none',
         pointerEvents: 'none',
         fontFamily: UI_FONT
       }}
@@ -122,7 +120,7 @@ export default function RotationCountdownHUD() {
           whiteSpace: 'nowrap'
         }}
       >
-        LAYER TURNS IN
+        TURN IN
       </span>
 
       <div style={{ width: BAR_W, flex: '1 1 auto', minWidth: 0, height: 5, borderRadius: 999, background: 'rgba(255,245,220,0.14)', overflow: 'hidden' }}>

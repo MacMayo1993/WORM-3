@@ -184,13 +184,6 @@ const WormCountdownOverlay = ({ step }) => {
     );
 };
 
-const PHASE_META = {
-    crawling: { label: 'CRAWLING', faceId: 2 },
-    entering: { label: 'ENTERING', faceId: 5 },
-    tunnel: { label: 'IN TUNNEL', faceId: 5 },
-    exiting: { label: 'EXITING', faceId: 4 },
-};
-
 // The standard scheme, straight from constants.js — this was a verbatim
 // copy of FACE_COLORS and would have silently disagreed if that ever moved.
 const FACE_FALLBACKS = FACE_COLORS;
@@ -257,19 +250,6 @@ const ensureHudStyle = () => {
         /* Sizes live here rather than inline so the short-viewport rules below can
            actually win — a landscape phone has ~390px of height to spend and the
            portrait ramp eats half of it. */
-        .worm-hud-bar {
-            flex-direction: column; padding: 9px 10px 8px; gap: 7px;
-        }
-        .worm-hud-row { min-width: 0; }
-        .worm-hud-reserve { padding-top: 7px; }
-        .worm-hud-phase { padding: 4px 10px; font-size: 11px; letter-spacing: 0.9px; }
-        .worm-hud-stats { gap: 10px; }
-        /* Narrow phones: the phase chip gives up its generous tracking before the
-           numbers give up any room. */
-        @media (max-width: 380px) {
-            .worm-hud-phase { padding: 3px 8px; font-size: 10px; letter-spacing: 0.4px; }
-            .worm-hud-stats { gap: 8px; }
-        }
         /* Compact corner keys leave the lower scene visible while keeping
            comfortable touch targets. */
         .worm-steer {
@@ -284,8 +264,6 @@ const ensureHudStyle = () => {
            and the steering keys shrink hardest, since a landscape grip has the
            whole side of the screen to reach into. */
         @media (max-height: 520px) {
-            .worm-hud-bar { padding: 6px 10px; gap: 4px; }
-            .worm-hud-reserve { padding-top: 5px; }
             /* Landscape keys retain a 56px minimum width. */
             .worm-steer { --steer: clamp(56px, 17vh, 76px); height: clamp(64px, 19vh, 80px); }
             .worm-action { --action: clamp(44px, 13vh, 54px); }
@@ -407,10 +385,7 @@ const JumpIcon = ({ size = 20 }) => (
 );
 
 // ─── Zone 1: Status bar ──────────────────────────────────────────────────────
-// One bar, two rows. The old layout stacked a second free-floating panel under
-// the strip that repeated the orb total already shown above it; the reserve
-// coins are now the second row of the same object.
-
+// Inventory, length and pause share one row above the slim rotation clock.
 // NOTE: placement, padding and gap come from the .worm-hud-bar rule, not from
 // here, so the short- and wide-viewport media queries can compact/centre them.
 const HUD_BAR_STYLE = {
@@ -432,25 +407,10 @@ const HUD_ROW_STYLE = {
     gap: 8,
 };
 
-// The phase chip is the one thing allowed to give up width on a 360px phone —
-// everything to its right is a number the player is actually reading.
-// Padding/size/tracking live in .worm-hud-phase so the narrow-phone rule applies.
-const GLANCE_CHIP_STYLE = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 5,
-    borderRadius: 999,
-    fontWeight: 800,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    minWidth: 0,
-    flexShrink: 1,
-};
-
 const GLANCE_LABEL_STYLE = {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: 700,
-    letterSpacing: 1.1,
+    letterSpacing: 0.4,
     color: TEXT_MUTED,
     textTransform: 'uppercase',
     lineHeight: 1,
@@ -462,13 +422,6 @@ const GLANCE_VALUE_STYLE = {
     fontWeight: 800,
     lineHeight: 1,
     fontVariantNumeric: 'tabular-nums',
-};
-
-const RESERVE_ROW_STYLE = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    borderTop: '1px solid rgba(255,245,220,0.12)',
 };
 
 // ─── Zone 3: Thumb Tray ──────────────────────────────────────────────────────
@@ -599,8 +552,8 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
 // Pause lives in the status bar, not the thumb tray: it is a rare, deliberate
 // action and it was the odd third button sitting between the movement keys.
 const PAUSE_BTN_STYLE = {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 11,
     background: HUD_SURFACE_SOFT,
     border: '1px solid rgba(255,245,220,0.16)',
@@ -1456,7 +1409,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         setWormPaused((demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
     }, [setWormPaused, demoLesson, combatMode]);
 
-    const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', faceId: 2 };
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
     const jumpReadyStyle = {
@@ -1490,22 +1442,13 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             <div className="worm-hud-top">
                 <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
-                        {/* Phase label */}
-                        <div className="worm-hud-phase" style={{
-                            ...GLANCE_CHIP_STYLE,
-                            background: HUD_SURFACE_SOFT,
-                            border: `1px solid ${BORDER}`,
-                            color: TEXT,
-                        }}>
-                            <div style={{
-                                width: 6, height: 6, borderRadius: '50%',
-                                background: HUD_ACCENT,
-                                boxShadow: 'none',
-                            }} />
-                            {phaseMeta.label}
-                        </div>
+                        {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal'].includes(lesson.id)) && (
+                            <div className="worm-hud-reserve">
+                                <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
+                            </div>
+                        )}
 
-                        {/* Stat group — length, orbs, PP, pause */}
+                        {/* Length and pause stay visible throughout transit. */}
                         <div className="worm-hud-stats" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                 <span style={GLANCE_LABEL_STYLE}>Length</span>
@@ -1525,12 +1468,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         </div>
                     </div>
 
-                    {/* Reserve row — the coins that used to float in a second panel */}
-                    {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal'].includes(lesson.id)) && (
-                        <div className="worm-hud-reserve" style={RESERVE_ROW_STYLE}>
-                            <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} tileStyles={settings?.manifoldStyles} mobile={isMobile} />
-                        </div>
-                    )}
                     {!combatMode && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
                 </div>
 

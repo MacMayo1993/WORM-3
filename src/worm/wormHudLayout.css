@@ -14,14 +14,30 @@
 }
 .worm-hud-top { top: calc(env(safe-area-inset-top, 0px) + 6px); }
 .worm-hud-bottom { bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); }
-.worm-hud-bar { box-sizing: border-box; min-width: 0; }
+.worm-instrument .worm-hud-bar {
+  box-sizing: border-box; min-width: 0; flex-direction: column;
+  padding: 4px 6px; gap: 0;
+}
+.worm-hud-row { min-width: 0; }
+.worm-hud-reserve { flex: 1; min-width: 0; }
+.worm-hud-stats { gap: 6px; margin-left: auto; }
 .worm-hud-context { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .worm-hud-context:empty { display: none; }
-.worm-instrument .orb-reserve { gap: 4px; }
-.worm-instrument .orb-slot { padding: 5px 4px; gap: 4px; grid-template-columns: 12px minmax(0, 1fr); }
+.worm-instrument .orb-reserve { gap: 3px; }
+.worm-instrument .orb-slot {
+  padding: 3px 0; gap: 3px; grid-template-columns: 12px auto;
+  justify-content: center; background: transparent; border: 0; border-radius: 5px;
+}
+.worm-instrument .orb-slot-pickup { background: var(--hud-active); }
 .worm-instrument .orb-sample { width: 12px; height: 12px; }
 .worm-instrument .orb-slot-face { display: none; }
 .worm-instrument .orb-slot-count { font-size: 12px; }
+@media (max-width: 360px) {
+  .worm-instrument .orb-reserve { gap: 0; }
+  .worm-instrument .orb-slot { gap: 2px; grid-template-columns: 10px auto; }
+  .worm-instrument .orb-sample { width: 10px; height: 10px; }
+  .worm-instrument .orb-slot-count { font-size: 11px; }
+}
 .worm-action-center { flex-direction: column; }
 .worm-primary-actions { display: flex; justify-content: center; gap: 8px; }
 .worm-instrument .worm-jump { flex: 1; }
@@ -30,10 +46,6 @@
 
 @media (max-height: 520px) and (min-width: 600px) {
   .worm-hud-top, .worm-hud-bottom { gap: 6px; }
-  .worm-instrument .worm-hud-bar { flex-flow: row wrap; align-items: center; gap: 5px 12px; }
-  .worm-instrument .worm-hud-row { flex: 1 1 205px; }
-  .worm-instrument .worm-hud-reserve { flex: 1 1 280px; border-top: 0 !important; padding-top: 0; }
-  .worm-rotation-clock { flex: 1 1 100%; }
   .worm-action-center { flex-direction: row; align-items: flex-end; }
   .worm-signature-control { flex: 1; }
   .worm-primary-actions { flex: 1; }
