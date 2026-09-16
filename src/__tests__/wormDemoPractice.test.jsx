@@ -10,7 +10,7 @@ import { makeCubies } from '../game/cubeState.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
-vi.mock('../utils/feel.js', () => ({ feel: vi.fn() }));
+vi.mock('../utils/feel.js', async original => ({ ...(await original()), feel: vi.fn(), stopFeel: vi.fn(), resumeFeel: vi.fn(), setFeelEnabled: vi.fn() }));
 let root, host, worm;
 const state = () => useGameStore.getState();
 function Harness() {

@@ -66,7 +66,7 @@ export function makeCombat(size, portal) {
     killsByType: { crawler: 0, scout: 0, brute: 0 }, damageTaken: 0, fireHeld: false,
     kills: 0, shotsFired: 0, shotsHit: 0, dropsCollected: 0, seq: 0,
     enemies: [], shots: [], bursts: [], drops: [], arcs: [], spawnTimer: COMBAT.warning,
-    portalOpen: true, lockedId: null, aim: null, aimHeld: false, fireRequested: false, held: false };
+    muzzle: null, portalOpen: true, lockedId: null, aim: null, aimHeld: false, fireRequested: false, held: false };
 }
 // Aim and projectiles share a face plane. No route-finding or homing can turn a
 // forward shot into a hit behind the worm or on a hidden face.
@@ -110,6 +110,8 @@ function fire(c) {
   if (!c.aim || c.ammo <= 0 || c.cooldown > 0 || c.shots.length >= 8) return;
   const aim = c.aim;
   c.ammo--; c.cooldown = COMBAT.fireInterval; c.shotsFired++;
+  c.muzzle = { origin: [...aim.origin], direction: [...aim.direction], life: 0.12,
+    color: ELEMENTS[c.element]?.color || '#d8c5ff' };
   c.shots.push({ id: ++c.seq, position: [...aim.origin], direction: [...aim.direction],
     face: aim.face, remaining: aim.range, life: COMBAT.range/COMBAT.shotSpeed,
     element: c.element, color: ELEMENTS[c.element]?.color || (c.shotsFired % 2 ? '#c38bff' : '#8af7ee') });
@@ -169,7 +171,7 @@ function hitEnemy(c, shot, enemy, player) {
   }
 }
 function finishCombat(c, reason) {
-  c.won = true; c.endReason = reason; c.enemies = []; c.shots = [];
+  c.won = true; c.endReason = reason; c.enemies = []; c.shots = []; c.muzzle = null;
   c.fireRequested = false; c.fireHeld = false; c.lockedId = null; c.aim = null;
 }
 // No wall-clock timers: pause, tunnel travel, claim beats and rotations hold all
@@ -178,6 +180,7 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
   if (!c || !c.started || c.won || c.health <= 0 || player.blocked) { if (c) { c.fireRequested = false; c.fireHeld = false; c.lockedId = null; c.aim = null; } return; }
   const dt = Math.max(0, Math.min(0.05, delta));
   c.held = false; c.time += dt;
+  if (c.muzzle) { c.muzzle.life -= dt; if (c.muzzle.life <= 0) c.muzzle = null; }
   c.portalOpen = player.portalOpen;
   if (!c.ambient && !c.portalOpen && player.canFinish) {
     finishCombat(c,'sealed'); return;

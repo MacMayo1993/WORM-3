@@ -14,7 +14,7 @@ import { wormBuffs } from '../worm/wormBuffs.js';
 import { makeCubies } from '../game/cubeState.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 vi.mock('@react-three/fiber', () => ({ useThree: () => ({ camera: {} }) }));
-vi.mock('../utils/feel.js', () => ({ feel: vi.fn() }));
+vi.mock('../utils/feel.js', async original => ({ ...(await original()), feel: vi.fn(), stopFeel: vi.fn(), resumeFeel: vi.fn(), setFeelEnabled: vi.fn() }));
 let host, root, worm;
 function Harness() {
   const cubies = useGameStore(s => s.cubies);

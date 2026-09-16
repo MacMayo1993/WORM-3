@@ -93,3 +93,19 @@ describe('portal combat encounters',()=>{
     const c=arena();stepCombat(c,10,player());expect(c.time).toBe(.05);
   });
 });
+
+
+it('shows a muzzle pulse only for an accepted shot and freezes/expires it with combat time', () => {
+  const c = arena(), p = player();
+  c.fireRequested = true; stepCombat(c, .05, { ...p, aimBlocked: true });
+  expect(c.muzzle).toBeNull();
+  c.fireRequested = true; stepCombat(c, .05, p);
+  expect(c.muzzle.origin).toEqual(c.aim.origin);
+  expect(c.muzzle.direction).toEqual(c.aim.direction);
+  const flash = { ...c.muzzle };
+  stepCombat(c, 1, { ...p, blocked: true });
+  expect(c.muzzle).toEqual(flash);
+  ticks(c, p, 3); expect(c.muzzle).toBeNull();
+  c.ammo = 0; c.cooldown = 0; c.fireRequested = true;
+  stepCombat(c, .05, p); expect(c.muzzle).toBeNull();
+});

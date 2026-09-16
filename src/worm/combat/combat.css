@@ -28,3 +28,13 @@
 .worm-ambient-actions .worm-signature-compact button > svg { display: none; }
 .worm-ambient-actions .worm-signature-compact button > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .worm-ambient-notice { color: #fff5de; text-shadow: 0 1px 3px #000; font-size: 10px; line-height: 1.25; text-align: center; margin-top: 4px; }
+
+@keyframes worm-shot-confirm {
+  0% { transform: scale(0.88); color: #ffffff; }
+  45% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+.worm-shot-confirm { animation: worm-shot-confirm 160ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .worm-shot-confirm { animation: none; }
+}

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 // The synth writes to Web Audio, which jsdom has none of — feel() swallows that
 // internally, so these assert the CONTRACT (every event resolves, nothing throws,
 // haptics respect the setting) rather than the waveform.
-import { feel, setFeelEnabled } from '../utils/feel.js';
+import { feel, setFeelEnabled, stopFeel } from '../utils/feel.js';
 import { coalescePopup } from '../components/overlays/ParityWallet.jsx';
 
 const CUBE_EVENTS = ['cubeTurn', 'cubeShuffleTurn', 'cubeFlip', 'cubeRefuse', 'cubeSolved', 'cubeReset'];
@@ -12,6 +12,7 @@ const CUBE_EVENTS = ['cubeTurn', 'cubeShuffleTurn', 'cubeFlip', 'cubeRefuse', 'c
 describe('the cube has a voice', () => {
   let vibrated;
   beforeEach(() => {
+    stopFeel();
     vibrated = [];
     vi.stubGlobal('navigator', { vibrate: (p) => { vibrated.push(p); return true; } });
     setFeelEnabled({ sfx: true, haptics: true });

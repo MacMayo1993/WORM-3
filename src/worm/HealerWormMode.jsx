@@ -433,7 +433,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     if (isBombDisarmed(bomb, occupied, size)) {
                         if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
                         else useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);
-                        feel('heal');
+                        worm.feel('heal');
                         continue;
                     }
                     bomb.fuse -= bdelta * (isHotTile(worm.elementalPatches.current, bomb.tile) ? 3 : 1);
@@ -456,7 +456,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     pushFlame(center, 0);
                     for (const arm of arms) arm.forEach((t, idx) => pushFlame(t, (idx + 1) * 0.05));
                     blastApiRef.current?.spawn(flames);
-                    feel('cut');
+                    worm.feel('cut');
 
                     // The hot route is a firebreak, not blanket blast immunity.
                     for (const key of keys) {
@@ -585,7 +585,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex: hit.sliceIndex ?? sliceIndex });
                 } else {
                     cutWormTail(worm, hit.cutTrailIdx);
-                    feel('cut');
+                    worm.feel('cut');
                     // Cue the chase camera to swing out to the impact for the WORM'D
                     // beat, then ease back to the chase (see WormChaseCamera).
                     worm.cutFocusT.current = CUT_FOCUS_DURATION;

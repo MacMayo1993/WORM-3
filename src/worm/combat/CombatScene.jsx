@@ -140,6 +140,25 @@ function Shot({ slot }) {
     </group>
   </group>;
 }
+// One local firing flash, fixed to the actual shot origin. No camera impulse.
+function MuzzleFlash() {
+  const ref = useRef();
+  const reduced = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
+  useFrame(() => {
+    const c = combatBridge.current, flash = c?.muzzle, group = ref.current;
+    group.visible = !!flash && !c.held && !c.won;
+    if (!group.visible) return;
+    group.position.fromArray(flash.origin);
+    group.quaternion.setFromUnitVectors(up, tangent.fromArray(flash.direction));
+    const remaining = flash.life / 0.12;
+    group.scale.setScalar(reduced ? 0.6 : 0.7 + (1 - remaining) * 0.8);
+    group.children.forEach(mesh => { mesh.material.color.set(flash.color); mesh.material.opacity = remaining * (reduced ? 0.35 : 0.8); });
+  });
+  return <group ref={ref} visible={false}>
+    <mesh position={[0,0,0.16]}><ringGeometry args={[0.055,0.085,16]} /><meshBasicMaterial transparent depthWrite={false} toneMapped={false} side={2} /></mesh>
+    <mesh position={[0,0,0.1]} scale={[0.045,0.045,0.17]}><octahedronGeometry /><meshBasicMaterial transparent depthWrite={false} toneMapped={false} /></mesh>
+  </group>;
+}
 function Drop({ slot }) {
   const ref = useRef();
   useFrame(() => {
@@ -215,7 +234,7 @@ function PortalBeacon() {
   </group>;
 }
 export default function CombatScene({ maxEnemies = COMBAT.maxEnemies }) {
-  return <group><PortalBeacon /><AimGuide />{Array.from({length:maxEnemies},(_,i)=><Crawler key={i} slot={i} />)}
+  return <group><PortalBeacon /><AimGuide /><MuzzleFlash />{Array.from({length:maxEnemies},(_,i)=><Crawler key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Shot key={i} slot={i} />)}
     {Array.from({length:6},(_,i)=><Drop key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Burst key={i} slot={i} />)}

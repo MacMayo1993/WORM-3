@@ -30,7 +30,8 @@ import { FACE_COLORS } from '../utils/constants.js';
 import { EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE } from '../utils/economyConstants.js';
 import { pruneExpiredFx } from '../utils/transientFx.js';
 import { activateSticker } from '../3d/StickerAnimationManager.js';
-import { feel } from '../utils/feel.js';
+import { createWormFeedback } from './wormFeedback.js';
+import { setFeelEnabled, resumeFeel } from '../utils/feel.js';
 import {
     ORB_SEGMENT_GROWTH,
     DEFAULT_POWERUP_COUNT,
@@ -130,6 +131,21 @@ export function useWormCrawler(size, cubies) {
     const simRef = useRef(null);
     if (simRef.current === null) simRef.current = makeWormSim(size);
 
+    const feedbackRef = useRef(null);
+    if (!feedbackRef.current) feedbackRef.current = createWormFeedback();
+    useEffect(() => {
+        const sync = () => {
+            const state = useGameStore.getState();
+            setFeelEnabled({ sfx: state.settings?.sfx ?? true, haptics: state.settings?.haptics ?? true });
+            feedbackRef.current.hold(!!state.wormPaused || document.hidden);
+        };
+        sync();
+        resumeFeel();
+        const unsubscribe = useGameStore.subscribe(sync);
+        document.addEventListener('visibilitychange', sync);
+        return () => { unsubscribe(); document.removeEventListener('visibilitychange', sync); feedbackRef.current.reset(); };
+    }, []);
+
     const deathMenuTimer = useRef(null);
     const demoPracticeRef = useRef(null);
     const combatRunRef = useRef(null);
@@ -185,7 +201,7 @@ export function useWormCrawler(size, cubies) {
             },
 
             // ── effects ─────────────────────────────────────────────────────────
-            feel,
+            feel: (event, opts) => feedbackRef.current.emit(event, opts),
             onDeath: (details, timeAlive) => {
                 const ending = useGameStore.getState();
                 ending.finishWormXp(false, ending.wormRunId);
@@ -374,6 +390,7 @@ export function useWormCrawler(size, cubies) {
     const tick = useCallback((delta, hazards = {}) => {
         const sim = simRef.current;
         const state = useGameStore.getState();
+        feedbackRef.current.advance(delta);
         const demo = wormDemoActive(state) && !state.demoWormFinished;
         const lesson = wormDemoLesson(state);
         const attempt = `${state.wormRunId}:${state.demoWormLessonIndex}:${state.demoWormAttempt}`;
@@ -413,10 +430,12 @@ export function useWormCrawler(size, cubies) {
             sim.elementalFocusT > 0 || sim.signature.charge > 0 || sim.rocketActive || liveRotation.active ||
             state.wormGamePhase !== 'active';
         stepWormSim(sim, delta, sizeRef.current, ctxRef.current);
+        feedbackRef.current.tunnel(sim.phase, sim.tunnelProgress, sim.alive);
         if (sim.combat) {
             const c = sim.combat;
             c.held = combatHeld || sim.phase !== 'crawling' || sim.tunnelPassages.length > 0 || !sim.alive;
             const previousKills = c.kills, previousShots = c.shotsFired, previousDrops = c.dropsCollected;
+            const previousHits = c.shotsHit, previousAmmo = c.ammo;
             const combatPlayer = {
                 head: sim.pos, heading: sim.moveDir, position: sim.headInterpPos.toArray(),
                 // The destination tile is committed before the visible head finishes
@@ -430,15 +449,22 @@ export function useWormCrawler(size, cubies) {
                 element: sim.elementalType, elementT: sim.elementalT,
                 lockedTile: sim.signature.character === 'mobi' && sim.signature.active > 0 ? sim.signature.target : null,
             };
-            const onContact = health => { feel('cut'); if (health <= 0) killWormSim(sim, ctxRef.current, { reason: 'portal-crawler' }); };
+            const onContact = health => {
+                if (health <= 0) killWormSim(sim, ctxRef.current, { reason: 'portal-crawler' });
+                else ctxRef.current.feel('shieldHit');
+            };
             if (c.ambient) {
                 const current = useGameStore.getState();
                 const tunnels = getWormTunnelSnapshot(current.cubies,sizeRef.current,current.rotationEpoch).tunnels;
                 stepAmbientCombat(c,delta,combatPlayer,tunnels.filter(hit => !sim.voidTunnelKeys.has(hit.tunnelKey)),onContact);
             } else stepCombat(c,delta,combatPlayer,onContact);
-            if (c.shotsFired > previousShots) feel('boost');
-            if (c.kills > previousKills) feel('heal');
-            if (c.dropsCollected > previousDrops) feel('orb');
+            if (sim.alive) {
+                if (c.shotsFired > previousShots) ctxRef.current.feel('shot');
+                if (c.kills > previousKills) ctxRef.current.feel('enemyDown');
+                else if (c.shotsHit > previousHits) ctxRef.current.feel('shotHit');
+                if (c.dropsCollected > previousDrops) ctxRef.current.feel('orb');
+                else if (previousAmmo === 0 && c.ammo > 0) ctxRef.current.feel('recharge');
+            }
             if (c.won && !state.wormPaused) useGameStore.setState({ wormPaused: true, wormTimeAlive: Math.floor(sim.timeAlive) });
         }
 
@@ -503,6 +529,7 @@ export function useWormCrawler(size, cubies) {
         const sim = simRef.current;
         demoPracticeRef.current = null;
         combatRunRef.current = null; sim.combat = null; combatBridge.current = null;
+        feedbackRef.current.reset();
         resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
         resetWormBuffs();
         resetWormSegments();
@@ -649,6 +676,7 @@ export function useWormCrawler(size, cubies) {
             tileTrail: f('tileTrail'),
             pathHistory: f('pathHistory'),
             timeAliveRef: f('timeAlive'),
+            feel: ctxRef.current.feel,
             jumpLift,
             tick,
             queueTurn,
