@@ -13,6 +13,8 @@ let _master = null;
 let _enabledSfx = true;
 let _enabledHaptics = true;
 let _unlockAttached = false;
+let _resume = null, audioEpoch = 0;
+const pendingSounds = new Set();
 const voices = new Set();
 let hapticEnd = 0, hapticPriority = 0;
 
@@ -26,7 +28,10 @@ function finishVoice(source, nodes, start, end) {
 
 /** Cancel live/scheduled voices and the motor when leaving or pausing play. */
 export function stopFeel({ audio = true, haptics = true } = {}) {
-  if (audio) for (const source of voices) { try { source.stop(); } catch (_) {} source.onended(); }
+  if (audio) {
+    audioEpoch++; pendingSounds.clear();
+    for (const source of voices) { try { source.stop(); } catch (_) {} source.onended(); }
+  }
   if (haptics) {
     if (hapticEnd > Date.now()) vibrate(0);
     hapticEnd = 0;
@@ -57,12 +62,7 @@ function ctx() {
 function attachUnlock() {
   if (_unlockAttached || typeof window === 'undefined') return;
   _unlockAttached = true;
-  const unlock = () => {
-    if (!_enabledSfx) return;
-    const c = ctx();
-    if (c && c.state === 'suspended') c.resume().catch(() => {});
-  };
-  ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => window.addEventListener(ev, unlock, { passive: true }));
+  ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => window.addEventListener(ev, resumeFeel, { passive: true }));
 }
 
 /** Enable/disable the two feedback channels (synced from settings). */
@@ -78,7 +78,29 @@ export function resumeFeel() {
   attachUnlock();
   if (!_enabledSfx) return;
   const c = ctx();
-  if (c && c.state === 'suspended') c.resume().catch(() => {});
+  if (c && c.state === 'suspended') {
+    const resume = _resume = c.resume().catch(() => {});
+    for (const sound of pendingSounds) sound(resume);
+    pendingSounds.clear();
+    // Only effects from this input task may join this unlock attempt.
+    setTimeout(() => { if (_resume === resume) _resume = null; }, 0);
+  }
+}
+
+function playSound(fn, opts) {
+  const play = () => { try { fn(opts.combo, opts); } catch (_) {} };
+  if (ctx()?.state !== 'suspended') { play(); return; }
+  const epoch = audioEpoch, deadline = Date.now() + 200;
+  const sound = resume => resume.then(() => {
+    if (audioEpoch === epoch && Date.now() <= deadline && _ctx.state === 'running') play();
+  });
+  if (_resume) sound(_resume);
+  else {
+    // A target handler runs before the window's bubbling unlock listener.
+    // Keep this effect through that event, but never until a later gesture.
+    pendingSounds.add(sound);
+    setTimeout(() => pendingSounds.delete(sound), 0);
+  }
 }
 
 // ── Low-level synth voices ────────────────────────────────────────────────────
@@ -133,9 +155,18 @@ function sweep(freq, freqTo, dur, gain, type = 'sine', when = 0) {
   tone({ freq, freqTo, dur, gain, type, when });
 }
 
+// Compact internal noise presets; the public voice API keeps named options.
+function burst(dur, gain, type, freq, q = 1) {
+  noise({ dur, gain, type, freq, q });
+}
+
+function flipDanger(flips, { cap }) {
+  return Math.min(1, Math.max(0, flips / (cap > 0 ? cap : 6)));
+}
+
 function cubeClick(depth, quiet) {
   const step = 1 + Math.min(Math.max(0, depth), 6) * 0.055;
-  noise({ dur: quiet ? 0.03 : 0.035, type: 'bandpass', freq: 1800 * step, q: 1.6, gain: quiet ? 0.09 : 0.16 });
+  burst(quiet ? 0.03 : 0.035, quiet ? 0.09 : 0.16, 'bandpass', 1800 * step, 1.6);
   sweep(150 * step, 110 * step, quiet ? 0.06 : 0.07, quiet ? 0.07 : 0.12, 'triangle');
 }
 
@@ -156,11 +187,11 @@ const SFX = {
     tone({ freq: 880, dur: 0.18, gain: 0.12, when: 0.13 });
   },
   elementFire() {
-    noise({ dur: 0.5, type: 'bandpass', freq: 850, q: 0.8, gain: 0.25 });
+    burst(0.5, 0.25, 'bandpass', 850, 0.8);
     sweep(180, 420, 0.3, 0.16, 'triangle');
   },
   elementWater() {
-    noise({ dur: 0.45, type: 'lowpass', freq: 650, gain: 0.16 });
+    burst(0.45, 0.16, 'lowpass', 650);
     sweep(520, 980, 0.22, 0.2);
     sweep(780, 1170, 0.2, 0.12, 'sine', 0.13);
   },
@@ -168,7 +199,7 @@ const SFX = {
     for (let i = 0; i < 3; i++) tone({ freq: 1200 * [1, 1.5, 2][i], dur: 0.45, gain: 0.1, when: i * 0.09 });
   },
   elementNature() {
-    noise({ dur: 0.35, type: 'lowpass', freq: 1800, gain: 0.08 });
+    burst(0.35, 0.08, 'lowpass', 1800);
     for (let i = 0; i < 3; i++) tone({ freq: [392, 494, 587][i], dur: 0.3, type: 'triangle', gain: 0.1, when: i * 0.12 });
   },
   orb(combo = 0) {
@@ -180,12 +211,12 @@ const SFX = {
     sweep(300, 640, 0.09, 0.35);
   },
   boost() {
-    noise({ dur: 0.22, type: 'bandpass', freq: 900, q: 0.7, gain: 0.32 });
+    burst(0.22, 0.32, 'bandpass', 900, 0.7);
     sweep(220, 660, 0.22, 0.22, 'sawtooth');
   },
   dive() {
     sweep(700, 120, 0.34, 0.4);
-    noise({ dur: 0.34, type: 'lowpass', freq: 700, gain: 0.18 });
+    burst(0.34, 0.18, 'lowpass', 700);
   },
   exit() {
     sweep(200, 900, 0.18, 0.4, 'triangle');
@@ -194,7 +225,7 @@ const SFX = {
     chord([523.25, 659.25, 783.99, 1046.5], { dur: 0.5, gain: 0.3 });
   },
   cut() {
-    noise({ dur: 0.12, type: 'highpass', freq: 2600, gain: 0.5 });
+    burst(0.12, 0.5, 'highpass', 2600);
     sweep(420, 170, 0.12, 0.18, 'square');
   },
   death() {
@@ -212,12 +243,12 @@ const SFX = {
   },
   // Launch: thrust noise under a rising sweep.
   rocket() {
-    noise({ dur: 0.42, type: 'lowpass', freq: 1400, gain: 0.34 });
+    burst(0.42, 0.34, 'lowpass', 1400);
     sweep(180, 1200, 0.42, 0.26, 'sawtooth');
   },
   // Touchdown at the end of the flight — a short, dry thud.
   rocketLand() {
-    noise({ dur: 0.1, type: 'lowpass', freq: 420, gain: 0.32 });
+    burst(0.1, 0.32, 'lowpass', 420);
     sweep(150, 70, 0.12, 0.24);
   },
   // A special timed out untouched. Deliberately soft and downward — informative,
@@ -254,14 +285,14 @@ const SFX = {
   // The pair hit FLIP_CAP and severed. Deliberately the ugliest sound here —
   // a snapped cable, not a reward.
   tunnelSnap() {
-    noise({ dur: 0.18, type: 'highpass', freq: 3000, gain: 0.5 });
+    burst(0.18, 0.5, 'highpass', 3000);
     sweep(320, 48, 0.42, 0.34, 'sawtooth');
   },
   // The touch tray's keys. Dry and short — the sound of a switch bottoming out,
   // not an event in the game. It fires on every press, so it has to sit under the
   // game's own vocabulary rather than compete with it.
   uiKey() {
-    noise({ dur: 0.025, type: 'highpass', freq: 2600, gain: 0.16 });
+    burst(0.025, 0.16, 'highpass', 2600);
     sweep(190, 130, 0.045, 0.09, 'square');
   },
 
@@ -299,11 +330,10 @@ const SFX = {
   // The climb is the same COMBO_SCALE the orb and tunnel pulses use, so a player
   // already reads rising pitch as "escalating" by the time they meet it here.
   cubeFlip(flips = 0, opts = {}) {
-    const cap = opts.cap > 0 ? opts.cap : 6;
-    const danger = Math.min(1, Math.max(0, flips / cap));
+    const danger = flipDanger(flips, opts);
     const f = COMBO_SCALE[Math.min(Math.max(0, flips), COMBO_SCALE.length - 1)];
 
-    noise({ dur: 0.03, type: 'highpass', freq: 3200, gain: 0.13 });
+    burst(0.03, 0.13, 'highpass', 3200);
     sweep(520, 190, 0.16, 0.20, 'sine', 0.25);
     // Gain leans on danger so a nearly spent tile snaps back harder, matching
     // the haptic's growing kick rather than fighting it.
@@ -314,7 +344,7 @@ const SFX = {
   // which reads as an unresponsive control rather than a spent tile — this is a
   // dull, closed thud that says "heard you, and no".
   cubeRefuse() {
-    noise({ dur: 0.06, type: 'lowpass', freq: 300, gain: 0.22 });
+    burst(0.06, 0.22, 'lowpass', 300);
     sweep(110, 82, 0.09, 0.10, 'square');
   },
 
@@ -329,7 +359,7 @@ const SFX = {
   // Reset / shuffle — the cube being taken back. A downward sweep under a wash
   // of noise: the opposite shape to the solve, deliberately.
   cubeReset() {
-    noise({ dur: 0.3, type: 'bandpass', freq: 900, q: 0.6, gain: 0.2 });
+    burst(0.3, 0.2, 'bandpass', 900, 0.6);
     sweep(480, 130, 0.3, 0.16, 'triangle');
   },
 };
@@ -385,8 +415,7 @@ const HAPTICS = {
   // last flip's pattern wins rather than stacking — which reads as one settling
   // buzz instead of a smear.
   cubeFlip: (flips = 0, opts = {}) => {
-    const cap = opts.cap > 0 ? opts.cap : 6;
-    const danger = Math.min(1, Math.max(0, flips / cap));
+    const danger = flipDanger(flips, opts);
     return [8, 235, Math.round(14 + danger * 10), 150, Math.round(26 + danger * 24)];
   },
 
@@ -411,11 +440,7 @@ export function feel(event, opts = {}, vocabulary = {}) {
   attachUnlock();
   if (_enabledSfx) {
     const fn = vocabulary.sfx?.[event] ?? SFX[event];
-    if (fn) {
-      try {
-        fn(opts.combo, opts);
-      } catch (_) {}
-    }
+    if (fn) playSound(fn, opts);
   }
   if (_enabledHaptics && opts.haptics !== false) {
     const h = vocabulary.haptics?.[event] ?? HAPTICS[event];
