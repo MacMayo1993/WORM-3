@@ -1,3 +1,4 @@
+import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelSwim.js';
 import { createMobiOrbPalette } from '../mobiOrbAppearance.js';
 import { SPRING_CHARGE } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
@@ -224,6 +225,7 @@ export function WormBody({ worm, size }) {
     const inchStateRef = useRef(null);
     if (!inchStateRef.current) inchStateRef.current = makeInchGaitState();
     const characterTimeRef = useRef(0);
+    const tunnelStroke = useRef({ side: 0, lift: 0, scale: 1, bank: 0 });
     const pickupRef = useRef({ seq: useGameStore.getState().wormOrbFlash?.seq, age: Infinity, active: false, pulses: [], count: worm.tailLength.current });
     const elementalBodyRef = useRef({ active: false, color: new THREE.Color() });
     const pickupColor = useMemo(() => new THREE.Color(), []);
@@ -254,6 +256,7 @@ export function WormBody({ worm, size }) {
         pickup.count = Math.min(pickup.count, worm.tailLength.current);
         // Render-only scale shared with face accessories, never the collision body.
         worm.pickupHeadScale = reducedPickupMotion ? 1 : pickupGulpScale(pickup.age);
+        worm.tunnelHeadScale = tunnelHeadPulse(worm.phase.current, worm.tunnelProgress.current, characterTimeRef.current, reducedPickupMotion);
         updateBodySurface(surface, size, liveRotation);
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
         _bodyHeadPos.copy(worm.headInterpPos.current);
@@ -317,7 +320,7 @@ export function WormBody({ worm, size }) {
                 _bookHeadDummy.position.copy(_bodyHeadPos)
                     .addScaledVector(_bodyNormal, BOOK_HEAD_LIFT);
                 _bookHeadDummy.quaternion.identity();
-                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * worm.pickupHeadScale);
+                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * worm.pickupHeadScale * worm.tunnelHeadScale);
                 _bookHeadDummy.updateMatrix();
                 headMesh.setMatrixAt(0, _bookHeadDummy.matrix);
                 _bookPageColor.set(wormColorRef.current);
@@ -464,6 +467,7 @@ export function WormBody({ worm, size }) {
             if (i !== 0 && i % lodStep !== 0) continue;
 
             const fade = 1 - i / tLen;
+            let swimWeight = 0;
 
             if (i === 0) {
                 // Head — reset quaternion every frame: body segments (below) rotate this
@@ -509,6 +513,7 @@ export function WormBody({ worm, size }) {
                         // Found the bracket on the curve! Interpolate exact point.
                         segmentTransit = !!(ptA.transit || ptB.transit);
                         const t = distToNext > 0 ? (targetDist - cumulativeDist) / distToNext : 0;
+                        swimWeight = (ptA.transit ? 1 - t : 0) + (ptB.transit ? t : 0);
                         // Use scratch vectors instead of .clone() to avoid GC pressure
                         _bodyClonePos.lerpVectors(aPos, bPos, t);
                         blendBodyNormalInto(_bodyCloneNormal, ptA.normal, ptB.normal, t, _bodyRideAxis,
@@ -550,6 +555,9 @@ export function WormBody({ worm, size }) {
                     _bodySegForward.set(0, 0, 0);
                 }
 
+                const stroke = tunnelSwimInto(tunnelStroke.current, i, tLen, time, swimWeight, reducedPickupMotion);
+                if (swimWeight > 0) offsetTunnelSwimInto(_bodyClonePos, _bodySegForward, _bodyCloneNormal, stroke);
+
                 if (!segmentTransit && foundPosition) {
                     clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : isMobi ? 0.15 : 0.10, surface);
                 }
@@ -582,6 +590,13 @@ export function WormBody({ worm, size }) {
                     _bookBasisMat.makeBasis(_bookX, _bookY, _bookZ);
                     _bookQuat.setFromRotationMatrix(_bookBasisMat);
                     _wormDummy.quaternion.copy(_bookQuat);
+                    if (swimWeight > 0) {
+                        _wormDummy.rotateZ(stroke.bank);
+                        // Page hinges share the banked cover frame.
+                        _bookQuat.copy(_wormDummy.quaternion);
+                        _bookX.set(1, 0, 0).applyQuaternion(_bookQuat);
+                        _bookY.set(0, 1, 0).applyQuaternion(_bookQuat);
+                    }
                 }
                 if (_isInch) {
                     // Segments fatten at each hump's peak, thin elsewhere — only while moving.
@@ -599,6 +614,9 @@ export function WormBody({ worm, size }) {
                     _wormDummy.scale.setScalar(0.09);
                 }
             }
+
+            if (i === 0) _wormDummy.scale.multiplyScalar(worm.tunnelHeadScale);
+            else if (swimWeight > 0) _wormDummy.scale.multiplyScalar(tunnelStroke.current.scale);
 
             let pickupWave = 0;
             let tailPop = 0;

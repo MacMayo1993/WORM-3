@@ -164,7 +164,7 @@ export function WormFace({ worm, size }) {
             setMobiOrbAppearance(mobi, mobiPalette[faces[faces.length - 1]] || mobiPalette[0]);
             if (!bodyTransit) mobi.group.position.addScaledVector(normal, 0.035);
             animateMobi(mobi, mobiTime.current, { pulse: mobiPulse.current, transit: !!inTransit });
-            mobi.group.scale.setScalar(MOBI_RADIUS * (worm.pickupHeadScale ?? 1));
+            mobi.group.scale.setScalar(MOBI_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
             if (hatGroupRef.current) {
                 hatGroupRef.current.position.copy(mobi.group.position).addScaledVector(normal, MOBI_RADIUS * 1.1);
                 hatGroupRef.current.quaternion.copy(mobi.group.quaternion);
@@ -186,9 +186,9 @@ export function WormFace({ worm, size }) {
         // takes the shared sphere layout too — it only needs the small lift that
         // keeps its head level with its floating book body.
         if (isBook) _faceHeadPos.addScaledVector(normal, BOOK_HEAD_LIFT);
-        layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1), _faceParts);
+        layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), _faceParts);
 
-        poseCharacterAccents(accents.group, _faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1));
+        poseCharacterAccents(accents.group, _faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
 
         if (hatGroupRef.current) {
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);
