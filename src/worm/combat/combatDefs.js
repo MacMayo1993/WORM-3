@@ -1,7 +1,7 @@
 export const ENEMIES = Object.freeze({
-  crawler: { label: 'Crawler', hp: 1, speed: 0.85, points: 100, color: '#ff8bc4', scale: 1 },
-  scout: { label: 'Dasher', hp: 1, speed: 1.05, points: 150, color: '#ffca70', scale: 0.8 },
-  brute: { label: 'Armored crawler', hp: 3, speed: 0.62, points: 300, color: '#b79bff', scale: 1.2 },
+  crawler: { label: 'Crawler', hp: 1, speed: 0.425, points: 100, color: '#ff8bc4', scale: 1 },
+  scout: { label: 'Dasher', hp: 1, speed: 0.525, points: 150, color: '#ffca70', scale: 0.8 },
+  brute: { label: 'Armored crawler', hp: 3, speed: 0.31, points: 300, color: '#b79bff', scale: 1.2 },
 });
 export const WAVES = [
   { enemies: ['crawler','crawler','scout'], cap: 2, interval: 4 },

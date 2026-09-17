@@ -41,7 +41,7 @@ describe('waves and enemy behavior',()=>{
   it('telegraphs a dash before moving faster',()=>{
     const c=arena(),p=player(tile(4,2)),e=add(c,'scout',tile(0,2));
     advance(c,p,8);expect(e.t).toBe(0);
-    advance(c,p,6);expect(e.t).toBeGreaterThan(.5);
+    advance(c,p,6);expect(e.t).toBeGreaterThan(.25);
   });
   it('keeps firing after an empty magazine recharges, then stops on release',()=>{
     const c=arena(),p=player();c.fireHeld=true;advance(c,p,100);expect(c.shotsFired).toBeGreaterThan(3);

@@ -37,6 +37,15 @@ describe('portal combat surface routing',()=>{
   });
 });
 describe('portal combat encounters',()=>{
+  it.each([
+    ['crawler', 0.85, 1], ['scout', 1.05, 1], ['brute', 0.62, 1],
+    ['scout', 1.05, 2.4], [undefined, 0.85, 1],
+  ])('moves %s at half its original speed (dash multiplier %s / %s)',(type,originalSpeed,dash)=>{
+    const c=arena(), e=enemy(c,tile(4,4));
+    Object.assign(e,{type,dashClock:dash>1 ? 0.5 : 1});
+    ticks(c,{...player(tile(0,0)),protected:true},4);
+    expect(e.t).toBeCloseTo(0.2*originalSpeed*0.5*dash);
+  });
   it('warns before emergence and caps the active crawlers at two',()=>{
     const c=makeCombat(5,tile());c.started=true;
     const p=player(tile(0,0));p.protected=true;
