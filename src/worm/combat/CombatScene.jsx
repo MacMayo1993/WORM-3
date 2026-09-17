@@ -1,7 +1,7 @@
 import { ENEMIES, ELEMENTS, WAVES } from './combatDefs.js';
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useLayoutEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Quaternion, Vector3 } from 'three';
+import { BackSide, Quaternion, Vector3 } from 'three';
 import { combatBridge, COMBAT, surfacePose } from './portalCombat.js';
 
 const up = new Vector3(0,0,1), normal = new Vector3(), tangent = new Vector3(), inverse = new Quaternion();
@@ -9,6 +9,20 @@ function place(group, actor, size, lift = 0.18) {
   const p = surfacePose(actor.tile, actor.next || actor.tile, actor.t || 0, size, lift);
   group.position.fromArray(p.position);
   group.quaternion.setFromUnitVectors(up, normal.fromArray(p.normal));
+}
+// Two inverted shells share the body's geometry: a clear red edge and a wider
+// faint halo. Depth testing keeps enemies behind the cube hidden; no bloom or
+// lights are required, so the outline also works on low graphics settings.
+function EnemyOutline() {
+  const ref = useRef();
+  useLayoutEffect(() => {
+    const group = ref.current;
+    for (const mesh of group.children) mesh.geometry = group.parent.geometry;
+  }, []);
+  return <group ref={ref}>
+    <mesh scale={1.24}><meshBasicMaterial color="#ff1828" side={BackSide} transparent opacity={0.2} depthWrite={false} toneMapped={false} /></mesh>
+    <mesh scale={1.1}><meshBasicMaterial color="#ff3038" side={BackSide} transparent opacity={0.95} depthWrite={false} toneMapped={false} /></mesh>
+  </group>;
 }
 // Four pooled rigs; shells and joints animate in place without React state.
 function Crawler({ slot }) {
@@ -38,7 +52,7 @@ function Crawler({ slot }) {
     const charging = e.type === 'scout' && e.dashClock < 0.45 && !frozen && !rooted && e.emerging <= 0;
     const dashing = e.type === 'scout' && e.dashClock >= 0.45 && e.dashClock < 0.95;
     const moving = e.next && !frozen && !rooted && !(e.stun > 0) && !charging && e.emerging <= 0;
-    const gait = c.time*(dashing ? 30 : e.type === 'brute' ? 8 : 15)+e.id;
+    const gait = c.time*(dashing ? 15 : e.type === 'brute' ? 4 : 7.5)+e.id;
     body.current.position.z = 0.08+(moving ? Math.sin(gait*2)*0.016 : 0);
     body.current.rotation.x = charging ? -0.14 : dashing ? 0.09 : 0;
     shell.current.scale.set(e.type === 'scout' ? 0.7 : 1,e.type === 'scout' ? 1.15 : 1,1);
@@ -73,24 +87,24 @@ function Crawler({ slot }) {
   return <group ref={ref} visible={false}>
     <group ref={rig}>
       <group ref={legs}>{[-1,1].flatMap(side => [-1,0,1].map(row => <group key={`${side}:${row}`} position={[side*0.18,row*0.19,0.02]}>
-        <mesh position={[side*0.1,0,0.015]} scale={[0.25,0.055,0.055]}><boxGeometry /><meshStandardMaterial color="#9e91aa" metalness={0.65} roughness={0.38} /></mesh>
+        <mesh position={[side*0.1,0,0.015]} scale={[0.25,0.055,0.055]}><boxGeometry /><meshStandardMaterial color="#9e91aa" emissive="#ff2038" emissiveIntensity={0.5} metalness={0.65} roughness={0.38} /></mesh>
         <group position={[side*0.21,0,0]}>
-          <mesh position={[side*0.075,0,0]} scale={[0.2,0.035,0.045]}><boxGeometry /><meshStandardMaterial color="#312538" metalness={0.65} roughness={0.35} /></mesh>
+          <mesh position={[side*0.075,0,0]} scale={[0.2,0.035,0.045]}><boxGeometry /><meshStandardMaterial color="#312538" emissive="#ff2038" emissiveIntensity={0.45} metalness={0.65} roughness={0.35} /></mesh>
           <mesh position={[side*0.15,0,0]}><icosahedronGeometry args={[0.048,0]} /><meshStandardMaterial color="#e1b7cb" metalness={0.45} roughness={0.4} /></mesh>
         </group>
       </group>))}</group>
       <group ref={body}>
-        <mesh position={[0,-0.07,0.03]} scale={[0.23,0.32,0.1]}><icosahedronGeometry args={[1,1]} /><meshStandardMaterial color="#201d32" metalness={0.45} roughness={0.45} /></mesh>
-        <group ref={shell}>{[-1,1].map(side => <mesh key={side} position={[side*0.125,-0.035,0.12]} rotation={[0,side*0.18,side*0.06]} scale={[0.155,0.32,0.18]}><icosahedronGeometry args={[1,1]} /><meshStandardMaterial metalness={0.65} roughness={0.3} /></mesh>)}</group>
-        <mesh position={[0,0.28,0.09]} scale={[0.205,0.14,0.12]}><icosahedronGeometry args={[1,0]} /><meshStandardMaterial color="#302739" metalness={0.65} roughness={0.28} /></mesh>
+        <mesh position={[0,-0.07,0.03]} scale={[0.23,0.32,0.1]}><icosahedronGeometry args={[1,1]} /><meshStandardMaterial color="#201d32" metalness={0.45} roughness={0.45} /><EnemyOutline /></mesh>
+        <group ref={shell}>{[-1,1].map(side => <mesh key={side} position={[side*0.125,-0.035,0.12]} rotation={[0,side*0.18,side*0.06]} scale={[0.155,0.32,0.18]}><icosahedronGeometry args={[1,1]} /><meshStandardMaterial metalness={0.65} roughness={0.3} /><EnemyOutline /></mesh>)}</group>
+        <mesh position={[0,0.28,0.09]} scale={[0.205,0.14,0.12]}><icosahedronGeometry args={[1,0]} /><meshStandardMaterial color="#302739" metalness={0.65} roughness={0.28} /><EnemyOutline /></mesh>
         <group ref={accents}>
           {[-1,1].map(side => <mesh key={side} position={[side*0.094,0.365,0.14]} rotation={[0,0,side*0.16]} scale={[0.12,0.03,0.027]}><boxGeometry /><meshBasicMaterial toneMapped={false} /></mesh>)}
           {[-1,0,1].map(i => <mesh key={i+3} position={[0,i*0.16-0.055,0.265]} scale={[0.045,0.075,0.03]}><octahedronGeometry /><meshBasicMaterial toneMapped={false} /></mesh>)}
         </group>
         {[-1,1].map(side => <mesh key={side} position={[side*0.14,0.425,0.065]} rotation={[0,0,-side*0.35]}><coneGeometry args={[0.055,0.18,4]} /><meshStandardMaterial color="#e2c6d9" metalness={0.5} roughness={0.32} /></mesh>)}
-        <group ref={fins}>{[-1,1].map(side => <mesh key={side} position={[side*0.21,-0.27,0.16]} rotation={[0.15,side*0.3,side*0.5]} scale={[0.07,0.3,0.11]}><octahedronGeometry /><meshStandardMaterial color="#e9bc6f" emissive="#ff8b35" emissiveIntensity={0.25} metalness={0.65} roughness={0.3} /></mesh>)}</group>
+        <group ref={fins}>{[-1,1].map(side => <mesh key={side} position={[side*0.21,-0.27,0.16]} rotation={[0.15,side*0.3,side*0.5]} scale={[0.07,0.3,0.11]}><octahedronGeometry /><meshStandardMaterial color="#e9bc6f" emissive="#ff8b35" emissiveIntensity={0.25} metalness={0.65} roughness={0.3} /><EnemyOutline /></mesh>)}</group>
         <group ref={armor}>{[0,1,2].map(i => <group key={i} position={[0,(i-1)*0.185,0.26]}>
-          <mesh scale={[0.34,0.135,0.1]}><icosahedronGeometry args={[1,0]} /><meshStandardMaterial color="#b8accb" emissive="#b79bff" metalness={0.7} roughness={0.3} /></mesh>
+          <mesh scale={[0.34,0.135,0.1]}><icosahedronGeometry args={[1,0]} /><meshStandardMaterial color="#b8accb" emissive="#b79bff" metalness={0.7} roughness={0.3} /><EnemyOutline /></mesh>
           <mesh position={[0,0,0.085]} scale={[0.13,0.024,0.025]}><boxGeometry /><meshBasicMaterial color="#ddc8ff" toneMapped={false} /></mesh>
         </group>)}</group>
       </group>

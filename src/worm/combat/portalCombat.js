@@ -5,7 +5,7 @@ import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 
 export const COMBAT = Object.freeze({ magazine: 3, recharge: 1.4, fireInterval: 0.32,
-  health: 3, maxEnemies: 4, warning: 2.5, spawnInterval: 6, enemySpeed: 0.85,
+  health: 3, maxEnemies: 4, warning: 2.5, spawnInterval: 6, enemySpeed: 0.425,
   shotSpeed: 8, range: 7, aimCos: Math.cos(Math.PI / 9), invulnerability: 1.6 });
 export const combatBridge = { current: null };
 export const combatKey = p => `${p.x},${p.y},${p.z},${p.dirKey}`;
