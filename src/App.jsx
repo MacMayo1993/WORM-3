@@ -1,3 +1,4 @@
+import { storyLevel, storyUnlocked } from './worm/story/levels.js';
 import { LevelUpCue, AchievementCue } from './progression/ProgressWidgets.jsx';
 import { getDirectWormPreview, subscribeDirectWormPreview } from './3d/directWormPreview.js';
 import DirectWormPreviewHost from './3d/DirectWormPreviewHost.jsx';
@@ -524,6 +525,7 @@ export default function WORM3() {
   const [showFreeplayWizard, setShowFreeplayWizard] = useState(false);
   const [showRandomWizard, setShowRandomWizard] = useState(false);
   const [showWormModeWizard, setShowWormModeWizard] = useState(false);
+  const [wormEntryPage, setWormEntryPage] = useState('choice');
 
   // Mobi intro — shown before any game mode goes live
   const [showMobiIntro, setShowMobiIntro] = useState(false);
@@ -842,11 +844,14 @@ export default function WORM3() {
   }, [size, changeSize, shuffle, teachMode, launchWithMobi]);
 
   const handleMenuWormHealer = useCallback(() => {
+    setWormEntryPage('choice');
     useGameStore.getState().setShowMainMenu(false);
     setShowWormModeWizard(true);
   }, []);
 
   const handleWormSetupComplete = useCallback((wizardSettings) => {
+    const chapterLevel = storyLevel(wizardSettings.storyLevel);
+    if (wizardSettings.storyLevel && !storyUnlocked(useGameStore.getState().playerProgress, wizardSettings.storyLevel)) return;
     setShowWormModeWizard(false);
 
     // Apply visual settings immediately so the game scene shows the user's
@@ -859,7 +864,7 @@ export default function WORM3() {
       backgroundTheme: wizardSettings.backgroundTheme,
       manifoldStyles,
       biomeMode: { enabled: false, faceAssignment: null },
-      wormEnemiesEnabled: wizardSettings.wormEnemiesEnabled !== false,
+      wormEnemiesEnabled: chapterLevel ? settings.wormEnemiesEnabled : wizardSettings.wormEnemiesEnabled !== false,
     };
     if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
     setSettings(newSettings);
@@ -890,7 +895,7 @@ export default function WORM3() {
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
-    launchWithMobi(MOBI_LINES_WORM, 'WORM MODE', () => {
+    launchWithMobi(chapterLevel ? [chapterLevel.subtitle, chapterLevel.goal] : MOBI_LINES_WORM, chapterLevel ? `STORY · ${chapterLevel.title}` : 'WORM FREE PLAY', () => {
       vibrate([50, 30, 100]);
       cancelDisparityRun();
       useGameStore.getState().clearLevel();
@@ -908,7 +913,8 @@ export default function WORM3() {
         wormParams.wormholeInterval,
         wormParams.wormColor,
         !!wizardSettings.wormCombatMode,
-        wizardSettings.wormEnemiesEnabled !== false
+        wizardSettings.wormEnemiesEnabled !== false,
+        chapterLevel?.id ?? null
       );
     });
   }, [settings, setSettings, reset, size, changeSize, cancelDisparityRun, launchWithMobi, applyEffectiveDpr]);
@@ -932,16 +938,26 @@ export default function WORM3() {
   const handleWormRetry = useCallback(() => {
     useGameStore.getState().clearLevel();
     const wormState = useGameStore.getState();
-    wormState.initWormMode(undefined, undefined, null, null, null, null, wormState.wormCombatMode, wormState.wormEnemiesEnabled);
+    wormState.initWormMode(undefined, undefined, null, null, null, null, wormState.wormCombatMode, wormState.wormEnemiesEnabled, wormState.wormStoryLevel);
     reset();
   }, [reset]);
 
   const handleWormNewGame = useCallback(() => {
+    setWormEntryPage(useGameStore.getState().wormStoryLevel ? 'story' : 'choice');
     clearMegaReducedFXOverride();
     useGameStore.getState().clearDisparityGame();
     useGameStore.getState().setShowMainMenu(false);
     setShowWormModeWizard(true);
   }, [clearMegaReducedFXOverride]);
+
+  const handleWormStoryNext = useCallback(() => {
+    const s = useGameStore.getState();
+    const id = (s.wormStoryResult?.levelId ?? 0) + 1;
+    if (!s.wormStoryResult || !storyUnlocked(s.playerProgress, id)) return;
+    handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles,
+      storyLevel: id, cubeSize: 5, megaMode: false, wormSpeed: 1.4, wormOrbCount: 1,
+      wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
+  }, [handleWormSetupComplete]);
 
   const handleMenuComingSoon = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -1468,7 +1484,7 @@ export default function WORM3() {
             performCursorRotation={performCursorRotation}
             ui={{
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-              showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+              showFreeplayWizard, showRandomWizard, showWormModeWizard, wormEntryPage, showCubeModeSelect,
               showModeSelect,
               showMobiIntro, mobiLines, mobiModeName,
               showDisparityWizard, setShowDisparityWizard,
@@ -1552,6 +1568,7 @@ export default function WORM3() {
               onWormWizardCancel: handleWormWizardCancel,
               onWormRetry: handleWormRetry,
               onWormNewGame: handleWormNewGame,
+              onWormStoryNext: handleWormStoryNext,
               onFaceRotate: handleFaceRotate,
               onTileRotation: handleTileRotation,
               onTileFaceRotation: handleTileFaceRotation,

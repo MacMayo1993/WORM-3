@@ -51,7 +51,7 @@ const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
 const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
 const RandomModeSetupWizard = React.lazy(() => import('./screens/RandomModeSetupWizard.jsx'));
 const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectScreen.jsx'));
-const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
+const WormEntryScreen = React.lazy(() => import('./screens/WormEntryScreen.jsx'));
 import MobiIntroScreen from './screens/MobiIntroScreen.jsx';
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
@@ -92,7 +92,7 @@ export default function UILayer({
 }) {
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-    showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+    showFreeplayWizard, showRandomWizard, showWormModeWizard, wormEntryPage, showCubeModeSelect,
     showModeSelect,
     showMobiIntro, mobiLines, mobiModeName,
     showDisparityWizard, setShowDisparityWizard,
@@ -116,7 +116,7 @@ export default function UILayer({
     onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
     onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped, speedThresholdSec, chaosPreview, onBetBack, onChaosReplay,
-    onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
+    onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame, onWormStoryNext,
     onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame, onVictoryMainMenu,
     onDemo,
@@ -289,7 +289,7 @@ export default function UILayer({
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <Suspense fallback={null}><DisparityHUD /></Suspense>}
 
         {/* Healer Worm HUD Overlay */}
-        {wormHealerMode && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} /></Suspense>}
+        {wormHealerMode && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} onStoryNext={onWormStoryNext} /></Suspense>}
         {/* Held for the whole traversal so the ride stays legible as one continuous
             event across the three camera regimes it cuts between. */}
         <TunnelTransitOverlay />
@@ -557,7 +557,7 @@ export default function UILayer({
 
       <ScreenTransition show={showWormModeWizard}>
         <Suspense fallback={<ScreenFallback label="Loading setup" />}>
-          <WormModeSetupWizard onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
+          <WormEntryScreen initialPage={wormEntryPage} onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
         </Suspense>
       </ScreenTransition>
 

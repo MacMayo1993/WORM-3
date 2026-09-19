@@ -1,3 +1,4 @@
+import { storyLevel } from './story/levels.js';
 import { combatBridge } from './combat/portalCombat.js';
 import CombatScene from './combat/CombatScene.jsx';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
@@ -156,10 +157,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Build a fresh scramble whenever a new run starts (or on first mount).
     useEffect(() => {
         const generateScramble = () => {
-            const seq = buildWormScramble(size, SCRAMBLE_STEPS);
+            const story = storyLevel(useGameStore.getState().wormStoryLevel);
+            const seq = story ? [] : buildWormScramble(size, SCRAMBLE_STEPS);
             scrambleSeqRef.current  = seq;
             // Reverse the sequence and every turn so the timed hazard solves the board.
-            inverseQueueRef.current = invertWormScramble(seq);
+            inverseQueueRef.current = story ? (story.kind === 'rotation' ? [{ axis: 'col', sliceIndex: 0, dir: 1 }] : []) : invertWormScramble(seq);
 
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
@@ -180,11 +182,18 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // fast 0.12s power2.out animations (no back-easing overshoot → no black layers),
             // properly sequenced, not counted as player moves.
             // When done, go to 'spawning' so the worm can emerge before the countdown.
-            onAnimatedShuffle(seq, () => {
+            const afterShuffle = () => {
                 gameModePhaseRef.current = 'spawning';
                 spawnTimerRef.current    = 0;
                 useGameStore.setState({ wormGamePhase: 'spawning', wormCountdownStep: null });
-            });
+            };
+            if (story) {
+                // The authored board is staged by the next crawler tick. Its ready
+                // card starts play, without a second countdown on every short retry.
+                gameModePhaseRef.current = 'active';
+                useGameStore.setState({ wormGamePhase: 'active', wormPaused: true, wormCountdownStep: null });
+            }
+            else onAnimatedShuffle(seq, afterShuffle);
         };
 
         // Run immediately so the first game (where initWormMode fires before this
@@ -306,6 +315,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             return;
         }
 
+        // Story objectives own their ending; only Moving Ground uses the slice queue.
+        if (store.wormStoryLevel && (storyLevel(store.wormStoryLevel)?.kind !== 'rotation' || store.wormStoryResult)) { resetRotationClock(); return; }
+
         // The combat arena owns its ending; ordinary bombs and solving turns stay off.
         if (store.wormCombatMode) { resetRotationClock(); return; }
 
@@ -314,6 +326,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         // ── Phase: finalHealing — all rotations done, heal remaining tunnels ───
         if (gameModePhaseRef.current === 'finalHealing') {
+            if (store.wormStoryLevel) return;
             if (!store.wormAlive) return;
             // Throttle the expensive tunnel scan to once every 0.5 s
             finalHealCheckTimer.current += delta;
@@ -401,8 +414,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // board, which is the worst possible moment to drop a five-second fuse
             // on them. The clock is reset to a full interval on the skip, so the
             // wash ending does not immediately hand over a bomb either.
-            if (!demo) bombTimerRef.current -= bdelta;
-            if (!demo && bombTimerRef.current <= 0) {
+            if (!demo && !store.wormStoryLevel) bombTimerRef.current -= bdelta;
+            if (!demo && !store.wormStoryLevel && bombTimerRef.current <= 0) {
                 bombTimerRef.current = BOMB_SPAWN_INTERVAL;
                 if (wormBuffs.elementalT > 0) {
                     // suspended for the wash — fall through to the fuse loop below

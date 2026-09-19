@@ -1,3 +1,5 @@
+import { storyUnlocked } from '../../worm/story/levels.js';
+import { completeStoryChanges, claimStoryChanges } from '../../worm/story/rewards.js';
 import { createXpRun, wormMultiplier } from '../../progression/model.js';
 import { wormMissionChanges } from '../../worm/wormEventChanges.js';
 import { startMission, readMissionCount } from '../../worm/missions.js';
@@ -16,6 +18,9 @@ const WORM_CHARACTER_KEY = 'worm3_character';
 export const createWormSlice = (set, _get) => ({
   // ── Mode flag ─────────────────────────────────────────────────────────────
   wormHealerMode: false,
+  startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen ? { wormStoryStarted: true, wormPaused: false } : s),
+  completeWormStory: (runId, metrics) => set(s => completeStoryChanges(s, runId, metrics)),
+  claimWormStoryReward: (id, choice) => set(s => claimStoryChanges(s, id, choice)),
   setWormHealerMode: (v) => set({ wormHealerMode: v }),
 
   // ── Config (persists across sessions or set by wizard) ────────────────────
@@ -23,7 +28,7 @@ export const createWormSlice = (set, _get) => ({
   wormMissionsCompleted: readMissionCount(),
   recordWormMission: (kind, total, faceId, runId) => set(state => wormMissionChanges(state, kind, total, faceId, runId) ?? state),
   wormSpeed: 2.0,
-  setWormSpeed: (v) => set({ wormSpeed: v }),
+  setWormSpeed: (v) => set(s => s.wormStoryLevel ? s : { wormSpeed: v }),
   wormBoostState: 'ready',
   setWormBoostState: (v) => set({ wormBoostState: v }),
   wormOrbCount: 5,
@@ -110,21 +115,22 @@ export const createWormSlice = (set, _get) => ({
     ...makeWormSessionDefaults(),
     wormHealerMode: false,
   }),
-  initWormMode: (flipCap = 9999, _chaosLevel = 0, speed = null, orbCount = null, interval = null, color = null, combat = false, enemies = true) => set((state) => ({
+  initWormMode: (flipCap = 9999, _chaosLevel = 0, speed = null, orbCount = null, interval = null, color = null, combat = false, enemies = true, storyId = null) => set((state) => storyId !== null && !storyUnlocked(state.playerProgress, storyId) ? state : ({
     ...makeDisparityRuntimeDefaults(),
     ...makeWormSessionDefaults(),
     wormHealerMode: true,
-    wormCombatMode: combat === true && !state.demoMode,
-    wormEnemiesEnabled: enemies !== false,
-    xpRun: state.demoMode || combat ? null : createXpRun('worm', (state.wormRunId ?? 0) + 1, state.playerProgress.xp, {
+    wormStoryLevel: storyId,
+    wormCombatMode: combat === true && !state.demoMode && !storyId,
+    wormEnemiesEnabled: enemies !== false && !storyId,
+    xpRun: state.demoMode || combat || storyId ? null : createXpRun('worm', (state.wormRunId ?? 0) + 1, state.playerProgress.xp, {
       multiplier: wormMultiplier(speed ?? state.wormSpeed, interval ?? state.wormholeInterval),
     }),
-    wormMission: state.demoMode || combat ? null : startMission(state.wormMissionsCompleted, (state.wormRunId ?? 0) + 1, {}, { recent: state.playerProgress.recentGoals || [] }),
+    wormMission: state.demoMode || combat || storyId ? null : startMission(state.wormMissionsCompleted, (state.wormRunId ?? 0) + 1, {}, { recent: state.playerProgress.recentGoals || [] }),
     disparityFlipCap: flipCap,
     chaosLevel: 0,
     wormRunId: (state.wormRunId ?? 0) + 1,
     wormPaused: true,
-    wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.5, speed)) : state.wormSpeed,
+    wormSpeed: storyId ? 1.4 : speed !== null ? Math.max(0.5, Math.min(3.5, speed)) : state.wormSpeed,
     wormOrbCount: orbCount !== null ? Math.max(1, Math.min(MAX_WORM_ORBS, Math.round(orbCount))) : state.wormOrbCount,
     wormholeInterval: interval !== null ? Math.max(2, Math.min(30, Number(interval))) : state.wormholeInterval,
     wormColor: color !== null ? (color || '#33ff66') : state.wormColor,

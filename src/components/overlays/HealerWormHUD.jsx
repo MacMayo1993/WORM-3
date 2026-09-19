@@ -6,7 +6,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import WormCrawlerHUD from '../../worm/WormCrawlerHUD.jsx';
 
-export default function HealerWormHUD({ onHome, onSettings, onToggleAntipodal, antipodalActive, onRetry, onNewGame }) {
+export default function HealerWormHUD({ onHome, onSettings, onToggleAntipodal, antipodalActive, onRetry, onNewGame, onStoryNext }) {
     const { wormHealerMode, wormPhase, wormOnFlippedTile, size, wormAlive, showWormDeathMenu, wormDeathDetails } = useGameStore(
         useShallow(s => ({
             wormHealerMode: s.wormHealerMode,
@@ -35,6 +35,7 @@ export default function HealerWormHUD({ onHome, onSettings, onToggleAntipodal, a
             deathDetails={wormDeathDetails}
             onRetry={onRetry}
             onNewGame={onNewGame}
+            onStoryNext={onStoryNext}
         />
     );
 }

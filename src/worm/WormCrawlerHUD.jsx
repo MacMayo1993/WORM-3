@@ -1,3 +1,4 @@
+import { StoryObjectiveCard, StoryResult } from './story/StoryCards.jsx';
 import { AmbientCombatActions, CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
 import { combatBridge } from './combat/portalCombat.js';
 import WormDemoLessonCard from '../components/screens/WormDemoLessonCard.jsx';
@@ -1171,6 +1172,7 @@ function BoostButton({ wormAlive }) {
 // ─── Pause Menu Overlay ──────────────────────────────────────────────────────
 
 function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc: _fc }) {
+    const storyId = useGameStore(s => s.wormStoryLevel);
     const green = UI_MOSS_LIGHT;
     const blue = UI_MOSS_LIGHT;
     const dialogRef = useRef(null);
@@ -1203,20 +1205,20 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     ['Time', formatTime(wormTimeAlive)],
                     ['Healed', wormHealedCount],
                     ['Collected', wormSessionOrbs],
-                    ['Next hole', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
+                    storyId ? ['Story level', `${storyId} / 6`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
                 {/* Named speed presets — keep the underlying multipliers out of the UI. */}
                 <div style={{ ...SETTING_ROW_STYLE, marginTop: 'clamp(10px, 2vh, 16px)' }}>
-                    <span style={SETTING_LABEL_STYLE}>Speed</span>
+                    <span style={SETTING_LABEL_STYLE}>{storyId ? 'Level speed' : 'Speed'}</span>
                     <div style={{ display: 'flex', gap: 5, flex: 1 }}>
-                        {WORM_SPEED_OPTIONS.map(option => (
+                        {storyId ? <span style={{ ...SETTING_LABEL_STYLE, padding: '10px 0' }}>Story pace · fixed for this level</span> : WORM_SPEED_OPTIONS.map(option => (
                             <button
                                 key={option.label}
                                 type="button"
-                                disabled={!wormAlive}
+                                disabled={!wormAlive || !!storyId}
                                 onClick={() => wormAlive && setWormSpeed(option.value)}
-                                style={segmentStyle(wormSpeed === option.value, blue, wormAlive)}
+                                style={segmentStyle(wormSpeed === option.value, blue, wormAlive && !storyId)}
                             >
                                 {option.label}
                             </button>
@@ -1317,7 +1319,7 @@ function HudContext({ surface, demo }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame, onStoryNext }) {
     const [isMinimized, setIsMinimized] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
 
@@ -1329,7 +1331,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
     const lessonIndex = useGameStore(s => s.demoWormLessonIndex);
     const practiceRunning = useGameStore(s => s.demoWormStarted && !s.demoWormComplete);
-    const controlsEnabled = wormAlive && (!demoLesson || practiceRunning);
+    const storyId = useGameStore(s => s.wormStoryLevel);
+    const storyStarted = useGameStore(s => s.wormStoryStarted);
+    const controlsEnabled = wormAlive && (!demoLesson || practiceRunning) && (!storyId || storyStarted);
     const lesson = wormDemoLesson({ demoWormLessonIndex: lessonIndex });
     const trayRef = useRef(null);
     useLayoutEffect(() => {
@@ -1408,8 +1412,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     }, [canPause, setWormPaused]);
     const handleResume = useCallback(() => {
         setIsPaused(false);
-        setWormPaused((demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
-    }, [setWormPaused, demoLesson, combatMode]);
+        setWormPaused((storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
+    }, [setWormPaused, demoLesson, combatMode, storyId]);
 
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
@@ -1470,7 +1474,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         </div>
                     </div>
 
-                    {!combatMode && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
+                    {!combatMode && (!storyId || storyId === 4) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
                 </div>
 
                 {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} />}
@@ -1478,7 +1482,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
             {(phase === 'crawling' || demoLesson || combatMode) && <div className="worm-hud-bottom" ref={trayRef}>
-                {combatMode ? <CombatCard onRetry={onRetry} onHome={onHome} /> : demoLesson ? <WormDemoLessonCard /> : <WormMissionCard />}
+                {combatMode ? <CombatCard onRetry={onRetry} onHome={onHome} /> : demoLesson ? <WormDemoLessonCard /> : storyId ? <StoryObjectiveCard /> : <WormMissionCard />}
                 {phase === 'crawling' && <div style={THUMB_TRAY_STYLE}>
                     <SteerKey side="left" wormAlive={controlsEnabled && !jumpRescue} wormColor={wormColor} vars={steerVars} />
 
@@ -1551,7 +1555,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             )}
 
             {/* ── Winner screen ── */}
-            {wormGamePhase === 'solved' && (
+            {wormGamePhase === 'solved' && !storyId && (
                 <WinnerScreen
                     wormBodyTiles={wormBodyTiles}
                     wormSessionOrbs={wormSessionOrbs}
@@ -1564,6 +1568,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     onNewGame={onNewGame}
                 />
             )}
+
+            {wormGamePhase === 'solved' && storyId && <StoryResult onNext={onStoryNext} onRetry={onRetry} onLevels={onNewGame} />}
 
             {/* ── Death screen ── */}
             {!combatMode && showDeathMenu && !isMinimized && (
