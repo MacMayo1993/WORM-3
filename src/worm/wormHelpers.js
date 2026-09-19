@@ -16,6 +16,7 @@ import {
 } from './healerWorm/constants.js';
 import { orbsCarried } from './healerWorm/economy.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
+import { findSlicePathHit, clipSliceHistory } from './healerWorm/sliceBodyPath.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
@@ -192,8 +193,18 @@ export function tileKeyCoordAt(key, idx) {
 //
 // Rocket overdrive makes the entire worm impenetrable. Landing grace only clears the
 // head, while still allowing the normal tail-cut behavior.
-export function checkWormHitBySlice(worm, axis, sliceIndex) {
+export function checkWormHitBySlice(worm, axis, sliceIndex, size) {
     if (worm.rocketActive?.current) return null;
+    if (size && worm.stepHistory?.current) {
+        const hit = findSlicePathHit(worm, axis, sliceIndex, size);
+        if (!hit) return null;
+        const coordIdx = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
+        const trail = worm.tileTrail.current;
+        let cutTrailIdx = 1;
+        while (cutTrailIdx < trail.count &&
+            (tileKeyCoordAt(ttAt(trail, cutTrailIdx), coordIdx) === sliceIndex) === hit.headOnLayer) cutTrailIdx++;
+        return { ...hit, cutTrailIdx };
+    }
     // pos is the traversal destination, chosen before the head reaches it.
     // Damage must classify the occupied half of the step, not that future tile.
     const previous = worm.prevTile?.current;
@@ -241,17 +252,17 @@ export function checkWormHitBySlice(worm, axis, sliceIndex) {
  *
  * @returns {null|{type:'death'|'cut', cutTrailIdx?:number, sliceIndex:number}}
  */
-export function resolveSliceHits(worm, axis, layers) {
+export function resolveSliceHits(worm, axis, layers, size) {
     let death = null;
     let cut = null;
     for (const layer of layers) {
-        const hit = checkWormHitBySlice(worm, axis, layer);
+        const hit = checkWormHitBySlice(worm, axis, layer, size);
         if (!hit) continue;
         if (hit.type === 'death') {
-            if (!death) death = { ...hit, sliceIndex: layer };
+            if (!death || (hit.cutDistance ?? Infinity) < (death.cutDistance ?? Infinity)) death = { ...hit, sliceIndex: layer };
             continue;
         }
-        if (!cut || hit.cutTrailIdx < cut.cutTrailIdx) cut = { ...hit, sliceIndex: layer };
+        if (!cut || (hit.cutDistance ?? hit.cutTrailIdx) < (cut.cutDistance ?? cut.cutTrailIdx)) cut = { ...hit, sliceIndex: layer };
     }
     return death ?? cut;
 }
@@ -272,11 +283,17 @@ export function reconcileOrbInventoryAfterCut(inventory, removedFaceIds, segment
     return nextInventory;
 }
 
-export function cutWormTail(worm, cutTrailIdx) {
+export function cutWormTail(worm, cut) {
+    const physical = typeof cut === 'object' && Number.isFinite(cut.cutDistance);
+    const cutTrailIdx = typeof cut === 'object' ? cut.cutTrailIdx : cut;
     ttTrimTo(worm.tileTrail.current, cutTrailIdx);
-    const histLen = cutTrailIdx * STEPS_PER_TILE;
-    shTrimTo(worm.stepHistory.current, histLen);
-    worm.tailLength.current = Math.max(BASE_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING));
+    if (physical) {
+        clipSliceHistory(worm, cut);
+        worm.tailLength.current = Math.min(worm.tailLength.current, cut.keepCount);
+    } else {
+        shTrimTo(worm.stepHistory.current, cutTrailIdx * STEPS_PER_TILE);
+        worm.tailLength.current = Math.min(worm.tailLength.current, Math.max(BASE_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING)));
+    }
     const orbsLeft = orbsCarried(worm.tailLength.current);
     const removedFaceIds = worm.orbPickupFaceIdsRef?.current?.slice(orbsLeft) ?? [];
     const droppedVisualOrbs = worm.orbPickupColorsRef.current.length > orbsLeft;

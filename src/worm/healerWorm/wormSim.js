@@ -1,6 +1,7 @@
 import { makeSignature, activateSignature, tickSignature, isParityLocked, refractPickup } from './signatures.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
+import { makeInchGaitState, advanceInchGaitState } from './inchGait.js';
 // src/worm/healerWorm/wormSim.js
 //
 // Pure(-ish) worm simulation core, extracted from useWormCrawler.js (2026-07).
@@ -267,6 +268,7 @@ export function makeWormSim(size) {
 
         // ── Collision ──────────────────────────────────────────────────────────
         pendingSelfCollision: null,
+        bodyGait: makeInchGaitState(),
         jumpRescueT: 0,
         jumpRescueCollision: null,
         jumpRescueRequested: false,
@@ -381,6 +383,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.landingGraceT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
+    sim.bodyGait = makeInchGaitState();
     sim.jumpRescueT = 0;
     sim.jumpRescueCollision = null;
     sim.jumpRescueRequested = false;
@@ -2056,6 +2059,12 @@ export function stepWormSim(sim, delta, size, ctx) {
         sim.prevPhase = currentPhase;
     }
     PHASE_HANDLERS[currentPhase].update(sim, size, ctx, delta, STEP_SEC);
+    // Damage and rendering share the same contracted body layout, including
+    // frames when the renderer skips work. Slice rides never advance this gait.
+    sim.bodyGait.enabled = ctx.getCharacter?.() === 'inch';
+    if (sim.bodyGait.enabled && sim.alive) {
+        advanceInchGaitState(sim.bodyGait, sim.crawlDistance, sim.tailLength, delta);
+    }
     // A phase handler can kill the worm. Death is terminal for this tick too:
     // queued tail clearance must not heal tiles or spawn rewards afterward.
     if (!sim.alive) return;

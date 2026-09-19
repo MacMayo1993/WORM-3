@@ -113,3 +113,16 @@ it('holds bombs and the rotation countdown through a rescue and its release fram
   tick();
   expect(bomb.fuse).toBeCloseTo(0.2);
 });
+
+it('severs a fatal slice hit and stops the turn before it can drag the dead body apart', () => {
+  resolveSliceHits.mockReturnValueOnce({ type: 'death', sliceIndex: 1,
+    cutTrailIdx: 1, cutDistance: 0.2, keepCount: 2, historyIndex: 0, historyT: 0.5,
+    cutPosition: sim.headInterpPos.toArray() });
+  tick(110);
+  expect(useGameStore.getState().wormAlive).toBe(false);
+  expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'slice-rotation', sliceIndex: 1 });
+  expect(sim.tailLength).toBe(2);
+  expect(sim.stepHistory.count).toBe(1);
+  expect(rotate).not.toHaveBeenCalled();
+  expect(worm.feel.mock.calls.filter(([event]) => event === 'death')).toHaveLength(1);
+});

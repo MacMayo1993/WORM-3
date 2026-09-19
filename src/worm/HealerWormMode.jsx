@@ -571,23 +571,16 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // in: a tail cut on plane 0 masked a death on plane 2 and the worm walked
             // away from a turn that had it trapped. See resolveSliceHits.
             //
-            // TIMING (unchanged, and deliberately so): this is evaluated once, on the
-            // frame the turn is dequeued and the animation starts. The helper uses
-            // the occupied half of the current step, rather than the future tile
-            // stored in `worm.pos`. Making this continuous would
+            // Evaluate once, before the turn starts, against the occupied body
+            // centre-line, including the live head's partial step. Making this continuous would
             // need a rule for what a crossing worm is allowed to do — it would otherwise
             // re-damage the same body every frame of the tween and punish exactly the
             // crossings rest-read protection exists to allow — so it stays a single
             // decision at the start of the turn until that rule is designed.
             const layers = sliceIndices?.length ? sliceIndices : [sliceIndex];
-            const hit = resolveSliceHits(worm, axis, layers);
+            const hit = resolveSliceHits(worm, axis, layers, size);
             if (hit) {
-                const histEntry = hit.type === 'cut'
-                    ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)
-                    : null;
-                const hitPos = histEntry
-                    ? histEntry.pos.toArray()
-                    : worm.headInterpPos.current.toArray();
+                const hitPos = hit.cutPosition ?? worm.headInterpPos.current.toArray();
                 const cutColors = worm.orbPickupColorsRef.current.slice(0, 5);
                 thunkRef.current = {
                     active: true,
@@ -595,10 +588,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     colors: cutColors.length ? cutColors : ['#ffdd44', '#ff8800'],
                 };
                 if (hit.type === 'death') {
+                    if (Number.isFinite(hit.cutDistance)) cutWormTail(worm, hit);
                     // The plane that actually caught the worm, not the anchor.
                     worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex: hit.sliceIndex ?? sliceIndex });
+                    // Death freezes the severed body; don't keep rotating its
+                    // history under a stationary head during the death overlay.
+                    return;
                 } else {
-                    cutWormTail(worm, hit.cutTrailIdx);
+                    cutWormTail(worm, hit);
                     worm.feel('cut');
                     // Cue the chase camera to swing out to the impact for the WORM'D
                     // beat, then ease back to the chase (see WormChaseCamera).
