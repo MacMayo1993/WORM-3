@@ -9,7 +9,10 @@ import { resolveColors } from '../../utils/colorSchemes.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { portalSparkPose, PORTAL_SPARKS, DANGER_SPARKS, sparkVertexShader, sparkFragmentShader } from './portalSparks.js';
 import { isMobile, prefersReducedMotion } from '../../utils/device.js';
-import { WORMHOLE_MAX_TRAVERSALS } from './constants.js';
+import { healingNeed } from './tunnelReadout.js';
+import { getStableKey } from '../wormLogic.js';
+import { isParityLocked } from './signatures.js';
+import { BASE_TAIL_LENGTH, WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
 // ─── Wormhole portal rings — spinning neon rings at every flipped tile ────────
 // Gives players a clear visual cue for all wormhole locations on the cube surface.
@@ -31,9 +34,10 @@ const _moteColor = new THREE.Color();
 // Fallback when a face id has no resolved colour — the old uniform neon pink, so
 // a missing palette entry degrades to the previous look rather than to black.
 const _faceColorFallback = new THREE.Color('#ff44ff');
-const _sparkWarmWhite = new THREE.Color('#fff5bd');
-const _sparkAmber = new THREE.Color('#ff9e28');
-const _sparkWhiteHot = new THREE.Color('#fffbe8');
+const _sparkGreen = new THREE.Color('#35ff68');
+const _sparkGold = new THREE.Color('#ffd43b');
+const _sparkRed = new THREE.Color('#ff2038');
+const _sparkBlack = new THREE.Color('#080308');
 
 // Void swamp palette — sickly, stagnant, antipodality-gone-wrong
 const VOID_OUTER_COLOR = '#b8b1ff';   // inverted-feel rim over dark tiles
@@ -116,7 +120,7 @@ function getCautionTexture() {
  */
 export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef, hidden = false }) {
     const liveRef = useRef();       // live wormhole rings (tinted to the face they charge)
-    const moteRef = useRef();       // white-yellow flare sparks on all flipped tiles
+    const moteRef = useRef();       // affordability sparks on all flipped tiles
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
@@ -222,6 +226,10 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         const voidKeys = voidTunnelKeysRef?.current ?? _EMPTY_SET;
         const useCounts = tunnelUseCountsRef?.current ?? _EMPTY_MAP;
 
+        const state = useGameStore.getState();
+        const tailLength = worm?.tailLength?.current ?? BASE_TAIL_LENGTH;
+        const signature = worm?.signature?.current;
+
         let liveIdx = 0;
         let voidIdx = 0;
         let bubbleIdx = 0;
@@ -232,11 +240,18 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         let moteIdx = 0;
 
         for (let i = 0; i < allPositions.length; i++) {
-            const { tunnelKey, wp, normal: n, faceId } = allPositions[i];
+            const tile = allPositions[i];
+            const { tunnelKey, wp, normal: n, faceId } = tile;
             const isVoid = !!(tunnelKey && voidKeys.has(tunnelKey));
             const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
             const isCritical = !isVoid && traversals >= WORMHOLE_MAX_TRAVERSALS;
             const faceColor = faceColorObjs.get(faceId) ?? _faceColorFallback;
+            const stableKey = getStableKey(tile.x, tile.y, tile.z, tile.dirKey, cubies);
+            const ready = !isVoid && !!tunnelKey && !isParityLocked({ signature }, tile) && healingNeed({
+                deposited: state.wormHealingProgress?.[stableKey]?.deposited ?? 0,
+                inventory: state.wormOrbInventory ?? {}, faceId, tailLength,
+                isPrism: state.wormCharacter === 'prism',
+            }).ready;
 
             _ringDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.08);
             _ringUp.set(0, 1, 0);
@@ -327,12 +342,15 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                         _sparkDummy.scale.set(thickness, height, thickness);
                         _sparkDummy.updateMatrix();
                         sparks.setMatrixAt(sparkIdx, _sparkDummy.matrix);
+                        sparks.setColorAt(sparkIdx, ready
+                            ? (sp % 2 === 0 ? _sparkGreen : _sparkGold)
+                            : (sp % 2 === 0 ? _sparkRed : _sparkBlack));
                         sparkIdx++;
                     }
                 }
             }
 
-            // Amber bursts rise far enough to peek past nearby cube edges.
+            // Paired colors remain distinct: green/gold if payable, red/black otherwise.
             // Reuse the old plume's instanced draw instead of adding another effect.
             const dangerous = isVoid || isCritical;
             const burstSeed = ((wp[0] * 0.173 + wp[1] * 0.317 + wp[2] * 0.571
@@ -341,7 +359,9 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             for (let m = 0; m < sparkCount && moteIdx < MAX_MOTES; m++) {
                 if (!portalSparkPose(_moteDummy, wp, n, t, burstSeed, m, dangerous)) continue;
                 motes.setMatrixAt(moteIdx, _moteDummy.matrix);
-                _moteColor.copy(dangerous ? _sparkWhiteHot : _sparkWarmWhite).lerp(_sparkAmber, _moteDummy.userData.life).multiplyScalar(1.8);
+                _moteColor.copy(ready
+                    ? (m % 2 === 0 ? _sparkGreen : _sparkGold)
+                    : (m % 2 === 0 ? _sparkRed : _sparkBlack));
                 motes.setColorAt(moteIdx++, _moteColor);
             }
 
@@ -501,7 +521,10 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             voidInner.instanceMatrix.needsUpdate = true;
         }
         if (bubbleIdx > 0) bubbles.instanceMatrix.needsUpdate = true;
-        if (sparkIdx > 0) sparks.instanceMatrix.needsUpdate = true;
+        if (sparkIdx > 0) {
+            sparks.instanceMatrix.needsUpdate = true;
+            if (sparks.instanceColor) sparks.instanceColor.needsUpdate = true;
+        }
         if (poleIdx > 0) poles.instanceMatrix.needsUpdate = true;
         if (tapeIdx > 0) tapes.instanceMatrix.needsUpdate = true;
         if (frameIdx > 0) voidFrames.instanceMatrix.needsUpdate = true;
@@ -542,7 +565,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             {/* Critical escape arcs — electricity venting from near-void portals */}
             <instancedMesh ref={sparkRef} args={[undefined, undefined, MAX_SPARKS]} frustumCulled={false}>
                 <cylinderGeometry args={[1, 1, 1, 5]} />
-                <meshBasicMaterial color={CRITICAL_ARC_COLOR} transparent opacity={0.88} blending={THREE.AdditiveBlending} depthWrite={false} />
+                <meshBasicMaterial color="#ffffff" vertexColors transparent opacity={0.95} depthWrite={false} toneMapped={false} />
             </instancedMesh>
 
             {/* Caution poles */}
@@ -560,7 +583,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             {/* Staggered surface-normal spark fountains on every flipped tile. */}
             <instancedMesh ref={moteRef} count={0} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
                 <cylinderGeometry args={[0.48, 0.04, 1, 5]} />
-                <shaderMaterial vertexShader={sparkVertexShader} fragmentShader={sparkFragmentShader} transparent blending={THREE.AdditiveBlending} depthTest depthWrite={false} toneMapped={false} />
+                <shaderMaterial vertexShader={sparkVertexShader} fragmentShader={sparkFragmentShader} transparent blending={THREE.NormalBlending} depthTest depthWrite={false} toneMapped={false} />
             </instancedMesh>
 
             {/* Void tile frame booster — brighter than neighbor tile frames */}

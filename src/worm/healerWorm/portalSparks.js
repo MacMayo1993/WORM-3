@@ -65,7 +65,8 @@ export const sparkFragmentShader = `
     void main() {
         float head = smoothstep(0.3, 0.95, vY);
         float fade = smoothstep(0.0, 0.3, vY);
-        vec3 color = mix(vTint * 0.65, vec3(3.4, 3.1, 2.5), head);
+        // Preserve the status hue through the bright tip, including black fragments.
+        vec3 color = vTint * mix(0.75, 1.8, head);
         gl_FragColor = vec4(color, fade);
     }
 `;

@@ -18,10 +18,8 @@ import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
 import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
-// Each orb carries the face it represents — matching the tracker/inventory HUD —
-// and follows that tile through cube rotations. The face colour rides the Möbius
-// band while the gem shows the antipodal partner, so the pickup never disappears
-// into the same-coloured tile it hovers over. See the note in the memo below.
+// The gem shows the face credited to the reserve; the opposite-colored band
+// separates it from the tile underneath. Face identity follows live rotations.
 //
 // Memoised on `size`, its only prop. Everything else it needs comes from its own
 // store subscription, so it still re-renders the instant an orb tile changes —
@@ -61,14 +59,9 @@ function PowerupOrbsImpl({ size }) {
             const faceId = sticker?.curr ?? 0;
             // Orbs on flipped tiles hover above the surface — worm must jump to collect
             const elevated = !!(sticker && sticker.curr !== sticker.orig);
-            // `color` is the face the orb belongs to (the tracker/HUD colour) and
-            // `antipodalColor` its manifold partner. ParityOrb renders the GEM in the
-            // antipodal colour and the Möbius band in `color` — an orb hovers over a
-            // tile of its own face colour, so a gem in that same colour vanished into
-            // the tile. The band also wears that face's tile style, so a patterned
-            // board still reads off the pickup.
             return {
                 ...p,
+                matchReserveColor: true,
                 color: getOrbColor(faceId, faceColors),
                 antipodalColor: getAntipodalOrbColor(faceId, faceColors),
                 styleKey: manifoldStyles?.[faceId] || 'solid',

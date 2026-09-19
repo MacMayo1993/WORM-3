@@ -80,20 +80,15 @@ const _orbGeos = {
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
 function SingleOrbImpl({
   position, color = '#ffd700', antipodalColor = '#ffd700', styleKey = 'solid',
-  collected = false, isTarget = false, elevated = false,
+  collected = false, isTarget = false, elevated = false, matchReserveColor = false,
   dirKey = 'PY', orbKey, type = 'parity',
   registerAnim, unregisterAnim,
   gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false, reducedDetail = false,
 }) {
-  // The gem wears the ANTIPODAL colour and the Möbius band the orb's own face
-  // colour — the inverse of how this used to read. An orb hovers over a tile of
-  // its own face colour, so colouring the gem to match made it disappear into
-  // the tile exactly when the player needed to spot it. The face colour is not
-  // lost: it moves to the band, which also carries that face's tile style, so a
-  // patterned board still reads off the pickup instead of flattening to a
-  // coloured ball. `color` and `antipodalColor` keep meaning what they say.
-  const gemColor = antipodalColor;
-  const bandColor = color;
+  // WORM pickups advertise the color credited to the reserve in their main gem.
+  // The opposite-colored band keeps them distinct from the supporting tile.
+  const gemColor = matchReserveColor ? color : antipodalColor;
+  const bandColor = matchReserveColor ? antipodalColor : color;
   // The stickers' own material — same shader, same defines, so it shares their
   // already-compiled program and never links a new one mid-run. 'solid' has no
   // pattern worth carrying, so it keeps the emissive band below instead.
@@ -269,6 +264,7 @@ const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
   a.orbKey === b.orbKey &&
   a.color === b.color &&
   a.antipodalColor === b.antipodalColor &&
+  a.matchReserveColor === b.matchReserveColor &&
   a.styleKey === b.styleKey &&
   a.dirKey === b.dirKey &&
   a.type === b.type &&
@@ -538,6 +534,7 @@ export default function ParityOrbs({
         position,
         color:          orb.color          || '#ffd700',
         antipodalColor: orb.antipodalColor || orb.color || '#ffd700',
+        matchReserveColor: !!orb.matchReserveColor,
         styleKey:       orb.styleKey       || 'solid',
         dirKey:         orb.dirKey         || 'PY',
         type:           orb.type           || 'parity',
@@ -561,6 +558,7 @@ export default function ParityOrbs({
           position={data.position}
           color={data.color}
           antipodalColor={data.antipodalColor}
+          matchReserveColor={data.matchReserveColor}
           styleKey={data.styleKey}
           dirKey={data.dirKey}
           type={data.type}
