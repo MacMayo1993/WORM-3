@@ -34,7 +34,8 @@ import { makeCubies } from '../game/cubeState.js';
 import * as THREE from 'three';
 import { liveRotation } from '../worm/liveRotation.js';
 import { inchCrawlAdvance } from '../worm/healerWorm/inchGait.js';
-import { shPush, shReset, ttAt } from '../worm/circularBuffers.js';
+import { shPush, shAt, shReset, ttAt } from '../worm/circularBuffers.js';
+import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 
 const SIZE = 3;
 
@@ -478,8 +479,8 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(5.5);
     expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(6.1);
     expect(elapsed.tunnel).toBeGreaterThan(2.5);
-    expect(elapsed.windup).toBeLessThan(0.9);
-    expect(elapsed.windout).toBeLessThan(0.9);
+    expect(elapsed.windup).toBeLessThan(0.21);
+    expect(elapsed.windout).toBeLessThan(0.21);
     expect(sim.pos.dirKey).toBe('NZ');
   });
 
@@ -500,11 +501,16 @@ describe('flipped tiles and tunnel traversal', () => {
 
     // The head regains control while the body keeps following the tunnel history.
     expect(runUntil(sim, ctx, () => sim.phase === 'crawling')).toBe(true);
-    ctx.resolveTunnel = () => null; // do not start another trip in this stub world
+    // Remove flipped navigation tiles from the stub so a full body's worth of
+    // crawling can continue without arming an unresolvable second entry.
+    ctx.getCubies = () => null;
+    ctx.resolveTunnel = () => null;
     expect(sim.tunnelPassages).toHaveLength(1);
     expect(eventsOf(ctx, 'heal')).toHaveLength(0);
     const passage = sim.tunnelPassages[0];
-    expect(runUntil(sim, ctx, () => passage.clearFrame)).toBe(true);
+    const cleared = runUntil(sim, ctx, () => passage.clearFrame);
+    expect(cleared, JSON.stringify({ phase: sim.phase, pos: sim.pos, distance: sim.stepHistory.distance - passage.exitDistance,
+      deaths: eventsOf(ctx, 'death') })).toBe(true);
     expect(eventsOf(ctx, 'heal')).toHaveLength(0);
     stepWormSim(sim, 0.05, SIZE, ctx);
 
@@ -514,6 +520,75 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(sim.pendingHealBurst).toEqual({ exitTile: tunnel.exit, entryTile: tunnel.entry });
     // Healed tunnel's traversal bookkeeping is dropped
     expect(sim.tunnelUseCounts.has(tunnelKey)).toBe(false);
+  });
+
+  it.each([4, 40, 100])('feeds a %i-segment tail out by distance and holds it during pause', count => {
+    const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    const sim = makeSim();
+    sim.tailLength = count;
+    let paused = false;
+    const ctx = makeCtx({ getCubies: () => cubies, resolveTunnel: () => ({ tunnel, tunnelKey }), isPaused: () => paused });
+    expect(runUntil(sim, ctx, () => sim.phase === 'windout')).toBe(true);
+    const passage = sim.tunnelPassages[0];
+    expect(runUntil(sim, ctx, () => sim.phase === 'crawling')).toBe(true);
+    expect(sim.stepHistory.distance - passage.exitDistance).toBeCloseTo(0.1, 6);
+    expect(sim.tunnelPassages).toContain(passage);
+    const distance = sim.stepHistory.distance;
+    const recorded = sim.stepHistory.count;
+    paused = true;
+    run(sim, ctx, 3);
+    expect(sim.stepHistory.distance).toBe(distance);
+    expect(sim.stepHistory.count).toBe(recorded);
+    expect(sim.tunnelPassages).toContain(passage);
+    paused = false;
+    ctx.getCubies = () => null;
+    for (let i = 0; i < 1200 && sim.tunnelPassages.includes(passage); i++) {
+      stepWormSim(sim, 1 / 60, SIZE, ctx);
+      if (sim.stepHistory.distance - passage.exitDistance < tunnelTailReach(count)) {
+        expect(sim.tunnelPassages).toContain(passage);
+      }
+    }
+    expect(sim.alive).toBe(true);
+    expect(sim.tunnelPassages).not.toContain(passage);
+    expect(sim.stepHistory.distance - passage.exitDistance).toBeGreaterThanOrEqual(tunnelTailReach(count));
+  });
+
+  it('re-enters an occupied pair in reverse without discarding the outgoing body or healing around it', () => {
+    const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    const reverse = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
+    const sim = makeSim();
+    sim.tailLength = 200;
+    const ctx = makeCtx({
+      getCubies: () => cubies,
+      resolveTunnel: (_x, _y, _z, dirKey) => ({ tunnel: dirKey === tunnel.exit.dirKey ? reverse : tunnel, tunnelKey }),
+      getHealingProgress: () => ({ 'PZ-1-2-2': { deposited: 4, faceId: 4 }, 'NZ-1-0-0': { deposited: 4, faceId: 1 } }),
+    });
+    expect(runUntil(sim, ctx, () => sim.phase === 'crawling' && sim.tunnelPassages.length > 0)).toBe(true);
+    const firstPassage = sim.tunnelPassages[0];
+    const firstCount = sim.stepHistory.count;
+    const oldInterior = Array.from({ length: firstCount }, (_, i) => shAt(sim.stepHistory, i))
+      .filter(point => point.transit && Math.abs(point.pos.z) < 1.3)
+      .map(point => ({ point, position: point.pos.clone() }));
+    expect(oldInterior.length).toBeGreaterThan(10);
+    // Jump on a settled flipped mouth is the existing deliberate-dive action.
+    queueTurn(sim, 'jump');
+    stepWormSim(sim, 1 / 60, SIZE, ctx);
+    expect(sim.activeTunnel).toBe(reverse);
+    expect(sim.tunnelUseCounts.get(tunnelKey)).toBe(2);
+    expect(runUntil(sim, ctx, () => sim.phase === 'tunnel' && sim.tunnelProgress > 0.5)).toBe(true);
+    expect(sim.tunnelPassages).toContain(firstPassage);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    for (const { point, position } of oldInterior) expect(point.pos.distanceTo(position)).toBe(0);
+    expect(sim.stepHistory.count).toBeGreaterThan(firstCount);
+    // The new trip traverses the same physical interior occupied by the older
+    // outgoing stream. Both visits remain in the history used by the body renderer.
+    const recent = Array.from({ length: sim.stepHistory.count - firstCount }, (_, i) => shAt(sim.stepHistory, i));
+    expect(recent.some(point => point.transit && oldInterior.some(old => old.position.distanceTo(point.pos) < 0.02))).toBe(true);
+    expect(runUntil(sim, ctx, () => sim.phase === 'crawling')).toBe(true);
+    expect(sim.tunnelPassages).toHaveLength(2);
+    expect(sim.tunnelPassages.filter(p => p.heal)).toHaveLength(1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    expect(sim.alive).toBe(true);
   });
 
   it('collapses the tunnel into a void kill past the traversal cap', () => {

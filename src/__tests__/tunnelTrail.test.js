@@ -48,6 +48,33 @@ function bodyPoint(sim, distance) {
 }
 
 describe('continuous worm tunnel trail', () => {
+    it('moves only through the aperture at entry and exit, without an above-mouth orbit', () => {
+        for (const side of ['entry', 'exit']) {
+            const mouth = getWindWorldPosInto(new THREE.Vector3(), tunnel, side, 1, 3);
+            const surface = getWindWorldPosInto(new THREE.Vector3(), tunnel, side, 0, 3);
+            let previous = surface.clone(), distance = 0;
+            for (let i = 1; i <= 1000; i++) {
+                const point = getWindWorldPosInto(new THREE.Vector3(), tunnel, side, i / 1000, 3);
+                distance += previous.distanceTo(point);
+                expect(point.x).toBeCloseTo(mouth.x, 10);
+                expect(point.y).toBeCloseTo(mouth.y, 10);
+                previous = point;
+            }
+            expect(distance).toBeCloseTo(surface.distanceTo(mouth), 8);
+            expect(distance).toBeLessThan(0.11);
+        }
+    });
+
+    it('keeps even a starter tail inside at the end of the exit handoff', () => {
+        const sim = makeSim();
+        for (const name of phases.slice(0, 3)) phase(sim, name);
+        const passage = { exitDistance: sim.stepHistory.distance };
+        phase(sim, 'windout');
+        expect(sim.stepHistory.distance - passage.exitDistance).toBeLessThan(0.11);
+        expect(tunnelTailCleared(passage, sim.stepHistory, 4)).toBe(false);
+        expect(bodyPoint(sim, 3 * 0.09).z).toBeGreaterThan(-1.5);
+    });
+
     it('retains the same-face exit route for the trailing body on all six faces', () => {
         for (const size of [2, 3, 5, 15]) {
             const middle = Math.floor(size / 2);

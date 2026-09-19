@@ -32,6 +32,7 @@ import {
     ORB_SEGMENT_GROWTH,
     HEAL_PAUSE_DURATION,
     CUT_FOCUS_DURATION,
+    TUNNEL_HANDOFF_SECONDS,
 } from './healerWorm/constants.js';
 import { makeElementalRevealOrbit, sampleElementalRevealOrbit } from './elementalRevealOrbit.js';
 
@@ -647,7 +648,10 @@ export default function WormChaseCamera({ worm, size }) {
                 _rails.look.copy(_entryTileCenter);
                 // A face-tangent up remains valid when looking down ±Y.
                 _rails.up.set(Math.abs(entN.y) > 0.9 ? 1 : 0, Math.abs(entN.y) > 0.9 ? 0 : 1, 0);
-                blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails, diveEase(tp));
+                // The head's short aperture handoff must not compress the
+                // entire camera move into 180 ms. Entering continues this blend.
+                blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails,
+                    diveEase(tp * TUNNEL_HANDOFF_SECONDS / 0.7));
             } else {
                 tunnelEntryPoseInto(transitionPose.current, tunnel, tp, size, phaseStartPose.current);
             }
@@ -678,8 +682,10 @@ export default function WormChaseCamera({ worm, size }) {
                 .multiplyScalar(1 - CAM_CENTER_BIAS);
             _rails.up.copy(horizonMode === 'face' ? extN : _WORLD_UP);
             if (horizonMode !== 'face' && extN.y < -0.8) _rails.up.negate();
-            // Start at the actual last exit pose and land in the chase framing.
-            blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails, diveEase(tp));
+            // Start at the actual exit pose; the existing post-tunnel crawl
+            // easing completes the camera move after control has returned.
+            blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails,
+                diveEase(tp * TUNNEL_HANDOFF_SECONDS / 0.7));
             applyTunnelPose(transitionPose.current);
         }
 

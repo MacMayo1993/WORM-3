@@ -73,6 +73,7 @@ import {
     WORM_LIFT,
     TUNNEL_SPEED_SCALE,
     TUNNEL_INTERIOR_SPEED_SCALE,
+    TUNNEL_HANDOFF_SECONDS,
     FACE_NORMALS,
     INITIAL_DIR,
     INITIAL_POS,
@@ -650,7 +651,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
     const exitTileKey = tileKey(tunnel.exit);
     ttFilterInPlace(sim.tileTrail, k => k !== exitTileKey);
     sim.tunnelProgress = 0;
-    // Start with the wind-up flourish (spiral circle above the entry hole) before the dive.
+    // Align with the aperture before the axial dive. Keep the existing history.
     sim.phase = 'windup';
     ctx.feel('dive');
     sim.onFlippedTile = false;
@@ -1577,12 +1578,11 @@ const PHASE_HANDLERS = {
         },
     },
 
-    // Wind-up: the worm orbits in a shrinking circle above the entry hole, then is
-    // pulled into it — a flourish that plays before the dive. beginTunnelTransition
+    // Wind-up: align at crawl height, then enter the mouth. beginTunnelTransition
     // publishes wormPhase:'windup' via ctx.onTunnelEnter, so no enter() here.
     windup: {
         update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (1.5 * TUNNEL_SPEED_SCALE);
+            const nextProgress = sim.tunnelProgress + delta / TUNNEL_HANDOFF_SECONDS;
             advanceTunnelHead(sim, 'windup', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
@@ -1680,24 +1680,22 @@ const PHASE_HANDLERS = {
                 });
                 sim.pendingTunnelHeal = null;
 
-                // Tunnel travel complete — windout spiral plays before resuming crawl.
-                // sim.activeTunnel stays alive so windout can animate the exit spiral.
+                // Only the head has reached the mouth. A short axial handoff
+                // restores crawl height; the retained history feeds the body out.
                 sim.phase = 'windout';
             }
             return false;
         },
     },
 
-    // Wind-out: mirrors windup — the worm spirals UP from the exit hole and settles on
-    // the surface, giving the "riding the Möbius strip back up and out" visual.
-    // s runs 1→0: start at exit hole (s=1, env=0), rise to peak orbit (s=0.5, env=1),
-    // settle on surface tile (s=0, env=0).
+    // Wind-out: lift the head just past the aperture, then return control while
+    // every trailing segment continues along its own position in the history.
     windout: {
         enter(_sim, _size, ctx) {
             ctx.onPhase('windout');
         },
-        update(sim, size, ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (1.5 * TUNNEL_SPEED_SCALE);
+        update(sim, size, ctx, delta, STEP_SEC) {
+            const nextProgress = sim.tunnelProgress + delta / TUNNEL_HANDOFF_SECONDS;
             advanceTunnelHead(sim, 'windout', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
@@ -1708,7 +1706,9 @@ const PHASE_HANDLERS = {
                 sim.crossingCorner = false;
                 sim.restRead = null;
                 sim.interpT = 1;
-                sim.stepAcc = 0;
+                // Let the next crawling tick choose the departure immediately,
+                // rather than holding the head on the mouth for a full tile beat.
+                sim.stepAcc = STEP_SEC;
                 sim.lastRecordedT = 1 + 1 / STEPS_PER_TILE;
                 sim.tunnelProgress = 0;
                 sim.activeTunnel = null;

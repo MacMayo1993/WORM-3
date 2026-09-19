@@ -16,7 +16,7 @@
 // (entry arm → exit arm), and a naive frame flips there, which would twist the
 // whole tube in one frame.
 
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -26,6 +26,7 @@ import { tunnelBoreRadiusAt } from '../../utils/tunnelPath.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
+import { makeTunnelTubePool, syncTunnelTubePool, tunnelTubeHeadProgress } from './tunnelTubePool.js';
 
 const RINGS = 64;            // samples along the tunnel
 const SIDES = 24;            // samples around the circumference — below ~20 the bore
@@ -170,10 +171,20 @@ function createTubeGeometry() {
 }
 
 export function TunnelTube({ worm, size }) {
+  const pool = useMemo(() => makeTunnelTubePool(), []);
+  const [slots, setSlots] = useState([]);
+  useFrame(() => {
+    const occupied = syncTunnelTubePool(pool, worm.activeTunnel.current, worm.tunnelPassages?.current ?? []);
+    // Mount only when capacity grows. Occupancy and reverse visits update refs;
+    // completed slots fade and can be reused without rebuilding the React tree.
+    if (occupied.length !== slots.length) setSlots(occupied.slice());
+  });
+  return slots.map(slot => <TunnelTubeSlot key={slot.id} slot={slot} worm={worm} size={size} />);
+}
+
+function TunnelTubeSlot({ slot, worm, size }) {
   const meshRef = useRef();
-  const opacityRef = useRef(0);
   const builtForRef = useRef(null);
-  const lastTunnelRef = useRef(null);
 
   const geo = useMemo(() => createTubeGeometry(), []);
   const uniforms = useMemo(() => ({
@@ -246,11 +257,8 @@ export function TunnelTube({ worm, size }) {
   };
 
   useFrame((_state, delta) => {
-    const phase = worm.phase.current;
-    const tailPassage = worm.tunnelPassages?.current?.at(-1);
-    const occupyingTunnel = worm.activeTunnel.current ?? tailPassage?.tunnel;
-    if (occupyingTunnel) lastTunnelRef.current = occupyingTunnel;
-    const tunnel = occupyingTunnel ?? lastTunnelRef.current;
+    const phase = slot.activeTunnel ? worm.phase.current : 'crawling';
+    const tunnel = slot.tunnel;
     const riding = phase === 'tunnel' || phase === 'exiting';
     const entering = phase === 'entering';
 
@@ -258,17 +266,17 @@ export function TunnelTube({ worm, size }) {
     // approach speed are the same curve.
     const enterP = Math.min(1, Math.max(0, worm.tunnelProgress.current ?? 0));
     const dive = diveProgress(enterP);
-    const target = entering ? OP_ENTER + (OP_RIDE - OP_ENTER) * dive : (riding || tailPassage) ? OP_RIDE
+    const target = slot.tailOccupied ? OP_RIDE : entering ? OP_ENTER + (OP_RIDE - OP_ENTER) * dive : riding ? OP_RIDE
       : phase === 'windout' ? OP_ENTER : 0;
-    const lerp = target > opacityRef.current ? OP_LERP_IN : OP_LERP_OUT;
-    opacityRef.current += (target - opacityRef.current) * Math.min(1, delta * lerp);
+    const lerp = target > slot.opacity ? OP_LERP_IN : OP_LERP_OUT;
+    slot.opacity += (target - slot.opacity) * Math.min(1, delta * lerp);
 
     const st = useGameStore.getState();
     if (!st.wormPaused && st.wormAlive && !prefersReducedMotion()) uniforms.uTime.value += Math.min(delta, 0.05);
-    uniforms.uOpacity.value = opacityRef.current;
+    uniforms.uOpacity.value = slot.opacity;
 
     if (!meshRef.current) return;
-    if (!tunnel || opacityRef.current < 0.01) {
+    if (!tunnel || slot.opacity < 0.01) {
       meshRef.current.visible = false;
       builtForRef.current = null;
       return;
@@ -288,9 +296,10 @@ export function TunnelTube({ worm, size }) {
     // Head position along the full traversal, matching WormChaseCamera's mapping
     // of per-phase progress onto the 0→1 tunnel parameter.
     const tp = worm.tunnelProgress.current ?? 0;
-    uniforms.uHead.value = phase === 'tunnel' ? 0.33 + tp * 0.34
+    const headProgress = phase === 'tunnel' ? 0.33 + tp * 0.34
       : phase === 'exiting' ? 0.67 + tp * 0.33
         : phase === 'entering' ? tp * 0.33 : 1;
+    uniforms.uHead.value = tunnelTubeHeadProgress(slot, headProgress);
   });
 
   return (
