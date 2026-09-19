@@ -3,29 +3,35 @@ import * as THREE from 'three';
 import { makeStepHistory, shPush, shAt } from '../worm/circularBuffers.js';
 import { advanceTunnelHead, tunnelTailCleared, tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 import { getTunnelWorldPosInto, getWindWorldPosInto } from '../worm/wormLogic.js';
+import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
+import { BORE_MOUTH } from '../utils/tunnelPath.js';
 
 const tunnel = {
     entry: { x: 1, y: 1, z: 2, dirKey: 'PZ' },
     exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' },
 };
 const phases = ['entering', 'tunnel', 'exiting', 'windout'];
-function makeSim() {
+function makeSim(route = tunnel, size = 3) {
     const sim = {
-        activeTunnel: tunnel, tunnelProgress: 0,
+        activeTunnel: route, tunnelProgress: 0, size,
         headInterpPos: new THREE.Vector3(), currentNormal: new THREE.Vector3(0, 0, 1),
         stepHistory: makeStepHistory(20000),
     };
     // A long approach leading toward the entrance. Long tails must retain it,
     // rather than vanish when the head exits the much shorter tunnel.
-    for (let z = 115; z >= 1.5; z -= 0.02) shPush(sim.stepHistory, new THREE.Vector3(0, 0, z), sim.currentNormal, -1, -1, -1);
-    getTunnelWorldPosInto(sim.headInterpPos, tunnel, 0, 3);
+    sim.currentNormal.copy(FACE_NORMALS[route.entry.dirKey]);
+    getTunnelWorldPosInto(sim.headInterpPos, route, 0, size);
+    for (let distance = 113.5; distance >= 0; distance -= 0.02) {
+        const point = sim.headInterpPos.clone().addScaledVector(sim.currentNormal, distance);
+        shPush(sim.stepHistory, point, sim.currentNormal, -1, -1, -1);
+    }
     return sim;
 }
 function phase(sim, name, end = 1, frames = 60) {
     sim.tunnelProgress = 0;
     for (let i = 1; i <= Math.ceil(end * frames); i++) {
         const p = Math.min(end, i / frames);
-        advanceTunnelHead(sim, name, p, 3);
+        advanceTunnelHead(sim, name, p, sim.size);
         sim.tunnelProgress = p;
     }
 }
@@ -42,6 +48,45 @@ function bodyPoint(sim, distance) {
 }
 
 describe('continuous worm tunnel trail', () => {
+    it('retains the same-face exit route for the trailing body on all six faces', () => {
+        for (const size of [2, 3, 5, 15]) {
+            const middle = Math.floor(size / 2);
+            for (const [dirKey, normal] of Object.entries(FACE_NORMALS)) {
+                const axis = normal.x ? 'x' : normal.y ? 'y' : 'z';
+                const lateral = axis === 'x' ? 'z' : 'x';
+                const entry = { x: middle, y: middle, z: middle, dirKey };
+                entry[axis] = normal[axis] > 0 ? size - 1 : 0;
+                entry[lateral] = 0;
+                const route = { entry, exit: { ...entry, [lateral]: size - 1 } };
+                const simulations = [30, 60, 120].map(frames => {
+                    const sim = makeSim(route, size);
+                    for (const name of phases) phase(sim, name, 1, frames);
+                    return sim;
+                });
+                const mouth = getTunnelWorldPosInto(new THREE.Vector3(), route, 1, size);
+                const entryMouth = getTunnelWorldPosInto(new THREE.Vector3(), route, 0, size);
+                for (let i = 0; i < 1200; i++) {
+                    const point = bodyPoint(simulations[0], i * 0.09);
+                    for (const sim of simulations.slice(1)) {
+                        expect(bodyPoint(sim, i * 0.09).distanceTo(point)).toBeLessThan(1e-6);
+                    }
+                    // A centreline crossing either face aperture stays on its
+                    // axis. The deep core and lifted flourish are unrestricted.
+                    const height = point.clone().sub(mouth).dot(normal);
+                    if (height > -0.2 && height < 0.02) {
+                        const exitOffset = point.clone().sub(mouth).projectOnPlane(normal).length();
+                        const entryOffset = point.clone().sub(entryMouth).projectOnPlane(normal).length();
+                        expect(Math.min(exitOffset, entryOffset)).toBeLessThan(BORE_MOUTH - 0.15);
+                    }
+                }
+                // Transit provenance must survive head exit: no surface-clearance
+                // projection may eject the remaining interior body onto the cube.
+                expect(Array.from({ length: simulations[0].stepHistory.count }, (_, i) =>
+                    shAt(simulations[0].stepHistory, i)).some(p => p.transit && p.pos.clone().sub(mouth).dot(normal) < -0.2)).toBe(true);
+            }
+        }
+    });
+
     it('keeps trailing segments inside as the head starts its exit flourish', () => {
         const sim = makeSim();
         for (const name of phases.slice(0, 3)) phase(sim, name);

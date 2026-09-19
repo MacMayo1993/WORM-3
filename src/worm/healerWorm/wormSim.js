@@ -1972,6 +1972,9 @@ export function stepWormSim(sim, delta, size, ctx) {
         sim.prevPhase = currentPhase;
     }
     PHASE_HANDLERS[currentPhase].update(sim, size, ctx, delta, STEP_SEC);
+    // A phase handler can kill the worm. Death is terminal for this tick too:
+    // queued tail clearance must not heal tiles or spawn rewards afterward.
+    if (!sim.alive) return;
     for (let i = sim.tunnelPassages.length - 1; i >= 0; i--) {
         const passage = sim.tunnelPassages[i];
         // Re-entering a still-occupied pair must not close it around the new
