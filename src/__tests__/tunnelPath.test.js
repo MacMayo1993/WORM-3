@@ -40,6 +40,26 @@ const buildTop = (size, gx, gz, exitAnchor = null, exitNormal = null) => {
 const lateralFromEntryAxis = (p, anchor) => Math.hypot(p.x - anchor.x, p.z - anchor.z);
 
 describe('buildTunnelPathInto', () => {
+  it('gives same-face mouths distinct docks and a reversible, moving core crossing', () => {
+    for (const normal of [V(1, 0, 0), V(-1, 0, 0), V(0, 1, 0), V(0, -1, 0), V(0, 0, 1), V(0, 0, -1)]) {
+      const lateral = new THREE.Vector3().crossVectors(normal, Math.abs(normal.y) < 0.9 ? V(0, 1, 0) : V(1, 0, 0));
+      for (const size of [2, 3, 5, 15]) {
+        const a = normal.clone().multiplyScalar(size / 2).addScaledVector(lateral, -(size - 1) / 2);
+        const b = normal.clone().multiplyScalar(size / 2).addScaledVector(lateral, (size - 1) / 2);
+        const path = buildTunnelPathInto(makeTunnelPath(), a, normal, b, normal);
+        const reverse = buildTunnelPathInto(makeTunnelPath(), b, normal, a, normal);
+        expect(path.legLen.every(length => length > 0)).toBe(true);
+        expect(tunnelPathTToArc(path, 0.55)).toBeGreaterThan(tunnelPathTToArc(path, 0.45));
+        for (let i = 0; i <= 100; i++) {
+          const p = tunnelPathPointInto(new THREE.Vector3(), path, i / 100);
+          const q = tunnelPathPointInto(new THREE.Vector3(), reverse, 1 - i / 100);
+          expect(p.distanceTo(q)).toBeLessThan(1e-9);
+          expect(p.dot(normal)).toBeLessThanOrEqual(size / 2 + 1e-9);
+        }
+      }
+    }
+  });
+
   it('opens each mouth with a straight run along that tile\'s own normal', () => {
     for (const size of [2, 3, 4, 5]) {
       const path = buildTop(size, 0, 0); // corner tile — worst case

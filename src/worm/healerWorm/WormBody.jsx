@@ -42,7 +42,7 @@ import {
     MAX_TAIL,
 } from './constants.js';
 import { inchGaitInto, makeInchGaitState, advanceInchGaitState, INCH_BALL_SPACING } from './inchGait.js';
-import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto } from './bodySurface.js';
+import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
@@ -585,14 +585,7 @@ export function WormBody({ worm, size }) {
                     // Orient the cover to face the direction of travel, using the same
                     // lookAt convention CrawlerCharacter.jsx uses (local -Z = forward),
                     // so the page-flap hinge math below (wormBookFX.js) matches exactly.
-                    _bookZ.copy(_bodySegForward).negate();
-                    if (_bookZ.lengthSq() < 1e-8) _bookZ.set(0, 0, 1);
-                    _bookZ.normalize();
-                    _bookX.crossVectors(_bodyCloneNormal, _bookZ);
-                    if (_bookX.lengthSq() < 1e-8) { _bookZ.x += 1e-4; _bookZ.normalize(); _bookX.crossVectors(_bodyCloneNormal, _bookZ); }
-                    _bookX.normalize();
-                    _bookY.crossVectors(_bookZ, _bookX);
-                    _bookBasisMat.makeBasis(_bookX, _bookY, _bookZ);
+                    bodyFrameInto(_bookBasisMat, _bodySegForward, _bodyCloneNormal, _bookX, _bookY, _bookZ);
                     _bookQuat.setFromRotationMatrix(_bookBasisMat);
                     _wormDummy.quaternion.copy(_bookQuat);
                     if (swimWeight > 0) {

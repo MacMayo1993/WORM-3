@@ -102,6 +102,31 @@ function runUntil(sim, ctx, predicate, maxSeconds = 30, dt = 0.05) {
 
 const eventsOf = (ctx, type) => ctx.events.filter(e => e.type === type);
 
+describe('terminal death ordering', () => {
+  it('does not heal or reward a cleared tunnel after a death in the same tick', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const tunnel = { entry: { ...sim.pos }, exit: { ...sim.pos, x: 0 } };
+    sim.pendingVoidKill = { tunnelKey: 'fatal', exitTileKey: tileKey(tunnel.exit), armed: true };
+    sim.stepHistory.distance = 100;
+    sim.tunnelPassages.push({
+      tunnel, tunnelKey: 'healing', exitDistance: 0, clearFrame: true,
+      heal: { tunnel, tunnelKey: 'healing', stableKey: 'stable' },
+    });
+    stepWormSim(sim, 0.01, SIZE, ctx);
+    expect(sim.phase).toBe('dead');
+    expect(eventsOf(ctx, 'death')).toHaveLength(1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    expect(eventsOf(ctx, 'specialSpawned')).toHaveLength(0);
+    expect(sim.healed).toBe(0);
+    const eventCount = ctx.events.length;
+    killWormSim(sim, ctx, { reason: 'slice-rotation' });
+    run(sim, ctx, 1);
+    expect(ctx.events).toHaveLength(eventCount);
+    expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('voided');
+  });
+});
+
 beforeEach(() => {
   liveRotation.active = false;
 });

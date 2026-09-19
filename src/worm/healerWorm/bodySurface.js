@@ -92,3 +92,21 @@ export function blendBodyNormalInto(out, a, b, t, axis, angleA, angleB, scratchA
   if (out.lengthSq() < 1e-8) out.copy(t < 0.5 ? scratchA : scratchB);
   return out.normalize();
 }
+
+/** Body's local -Z follows travel; all scratch vectors are caller-owned. */
+export function bodyFrameInto(matrix, forward, normal, x, y, z) {
+  z.copy(forward).negate();
+  if (z.lengthSq() < 1e-8) z.set(0, 0, 1);
+  z.normalize();
+  x.crossVectors(normal, z);
+  if (x.lengthSq() < 1e-8) {
+    // The normal is parallel to travel inside an axial throat. Perturbing z.x
+    // leaves an X-axis tangent parallel and produces a singular matrix. Pick
+    // a perpendicular reference without changing the actual travel direction.
+    y.set(Math.abs(z.y) < 0.9 ? 0 : 1, Math.abs(z.y) < 0.9 ? 1 : 0, 0);
+    x.crossVectors(y, z);
+  }
+  x.normalize();
+  y.crossVectors(z, x);
+  return matrix.makeBasis(x, y, z);
+}

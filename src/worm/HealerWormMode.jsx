@@ -337,6 +337,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
         if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
+        // Do not replace an uncommitted move or classify damage in its
+        // intermediate geometry. Resume the queued hazard after that commit.
+        if (store.animState) { rotationClock.held = true; return; }
 
         // Pause the rotation hazard until the whole worm clears its wormhole: freeze the
         // clock and warning beam while even the trailing segments are still inside.
@@ -429,6 +432,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 let kept = 0;
                 for (let read = 0; read < bombs.length; read++) {
                     const bomb = bombs[read];
+                    // onDeath synchronously updates the store. Preserve remaining
+                    // bombs without disarms, damage or rewards after a fatal hit.
+                    if (!useGameStore.getState().wormAlive) { bombs[kept++] = bomb; continue; }
                     // Disarm: body fully encircles the bomb — reward and remove it.
                     if (isBombDisarmed(bomb, occupied, size)) {
                         if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
@@ -485,6 +491,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 }
             }
         }
+
+        // The store snapshot above predates bomb damage. A lethal explosion must
+        // not dequeue a slice or overwrite its death cue in the same frame.
+        if (!useGameStore.getState().wormAlive) return;
 
         if (demo && (practiceLesson !== 'rotation' || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
         rotationClock.held = false;
@@ -558,9 +568,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // away from a turn that had it trapped. See resolveSliceHits.
             //
             // TIMING (unchanged, and deliberately so): this is evaluated once, on the
-            // frame the turn is dequeued and the animation starts. `worm.pos` is the
-            // destination of the step in flight, not where the head is on screen, so a
-            // worm mid-step is judged by where it is going. Making this continuous would
+            // frame the turn is dequeued and the animation starts. The helper uses
+            // the occupied half of the current step, rather than the future tile
+            // stored in `worm.pos`. Making this continuous would
             // need a rule for what a crossing worm is allowed to do — it would otherwise
             // re-damage the same body every frame of the tween and punish exactly the
             // crossings rest-read protection exists to allow — so it stays a single

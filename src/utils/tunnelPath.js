@@ -95,6 +95,7 @@ export function tunnelBoreRadiusAt(t) {
 
 const LEG_COUNT = 5;
 const _axial = new THREE.Vector3();
+const _dockSide = new THREE.Vector3();
 
 /** Allocate a reusable path object. Fill it with buildTunnelPathInto. */
 export const makeTunnelPath = () => {
@@ -162,6 +163,18 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockN1 = n1, doc
   path.nEnd.copy(n2).normalize();
   path.midA.copy(dockN1).multiplyScalar(TUNNEL_MINI_FACE_R);
   path.midB.copy(dockN2).multiplyScalar(TUNNEL_MINI_FACE_R);
+  // Slice turns can put both mouths on the same physical face. Sharing its
+  // centre dock collapses the entire core leg (20% of traversal time) to a
+  // point. Separate the docks along the mouths' in-face separation instead.
+  // Swapping entry/exit reverses this vector, preserving the same physical path.
+  if (path.midA.distanceToSquared(path.midB) < 1e-10) {
+    _dockSide.subVectors(vEnd, vStart).projectOnPlane(path.nStart);
+    if (_dockSide.lengthSq() > 1e-10) {
+      _dockSide.normalize().multiplyScalar(TUNNEL_MINI_FACE_R);
+      path.midA.sub(_dockSide);
+      path.midB.add(_dockSide);
+    }
+  }
   path.throatA.copy(vStart).addScaledVector(n1, -throatDepth(vStart, n1, path.midA));
   path.throatB.copy(vEnd).addScaledVector(n2, -throatDepth(vEnd, n2, path.midB));
 

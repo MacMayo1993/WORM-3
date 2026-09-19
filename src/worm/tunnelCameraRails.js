@@ -161,7 +161,8 @@ function routeUpInto(out, path, arc, tangent, roll) {
   out.set(Math.abs(_framePrev.y) > 0.9 ? 1 : 0, Math.abs(_framePrev.y) > 0.9 ? 0 : 1, 0);
   out.addScaledVector(_framePrev, -out.dot(_framePrev)).normalize();
   for (let i = 0; i < path.legLen.length; i++) {
-    if (path.legArc0[i] >= arc || path.legLen[i] < 1e-8) break;
+    if (path.legArc0[i] >= arc) break;
+    if (path.legLen[i] < 1e-8) continue;
     _frameNext.subVectors(path.legB[i], path.legA[i]).normalize();
     if (path.legArc0[i] + path.legLen[i] >= arc) break;
     out.applyQuaternion(_frameTurn.setFromUnitVectors(_framePrev, _frameNext));
