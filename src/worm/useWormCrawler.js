@@ -1,3 +1,5 @@
+import { wormEventChanges } from './wormEventChanges.js';
+import { withPersistenceBatch } from '../utils/persistenceBatch.js';
 import { cancelAmbientEncounter, makeAmbientCombat, stepAmbientCombat } from './combat/ambientCombat.js';
 import { makeCombat, stepCombat, combatBridge } from './combat/portalCombat.js';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
@@ -299,10 +301,8 @@ export function useWormCrawler(size, cubies) {
             },
             onTailShed: (inventory, orbCount) => useGameStore.setState({ wormOrbInventory: inventory, wormBodyTiles: orbCount }),
             onOrbPickup: (faceId, orbCount, color, combo, segments = ORB_SEGMENT_GROWTH) => {
-                const pickup = useGameStore.getState();
-                pickup.recordWormXp('orbs', (pickup.wormSessionOrbs ?? 0) + 1, faceId, pickup.wormRunId);
-                pickup.recordWormMission('orbs', (pickup.wormSessionOrbs ?? 0) + 1, faceId, pickup.wormRunId);
                 useGameStore.setState((state) => ({
+                    ...wormEventChanges(state, 'orbs', (state.wormSessionOrbs ?? 0) + 1, faceId, state.wormRunId),
                     wormBodyTiles: orbCount,
                     wormSessionOrbs: (state.wormSessionOrbs ?? 0) + 1,
                     // Drives the HUD's screen-edge confirmation flash. `seq` is what the
@@ -377,23 +377,23 @@ export function useWormCrawler(size, cubies) {
                     [`${entry.x},${entry.y},${entry.z}`]: { startMs: now, durationMs: 500 },
                     [`${exitTile.x},${exitTile.y},${exitTile.z}`]: { startMs: now, durationMs: 500 },
                 };
-                useGameStore.setState((state) => ({
-                    cubies: healed,
-                    cubiePops: { ...pruneExpiredFx(state.cubiePops, now), ...pops },
-                }));
-                // A worm heal during a chaos round edits the cube behind the chaos
-                // worker's back — push it across, or the worker keeps spreading the
-                // damage that was just cleared and its death ledger drifts away from
-                // the tiles on screen.
-                if (st.chaosLevel > 0) useGameStore.getState().requestChaosResync();
                 const newProgress = { ...(st.wormHealingProgress ?? {}) };
                 const healedProgressKeys = Array.isArray(stableKey) ? stableKey : [stableKey];
                 for (const key of healedProgressKeys) if (key) delete newProgress[key];
-                st.setWormHealingProgress(newProgress);
-                st.setWormHealedCount(healedCount);
-                st.recordWormXp('healed', healedCount, null, st.wormRunId);
-                st.recordWormMission('healed', healedCount, null, st.wormRunId);
-                if (!st.demoMode && !st.wormCombatMode) st.earnCoins(EARN_WORM_HEALED_FACE);
+                useGameStore.setState(state => {
+                    const event = wormEventChanges(state, 'healed', healedCount, null, state.wormRunId);
+                    return {
+                        ...event,
+                        cubies: healed,
+                        cubiePops: { ...pruneExpiredFx(state.cubiePops, now), ...pops },
+                        wormHealingProgress: newProgress,
+                        wormHealedCount: healedCount,
+                        parityPoints: Math.max(0, (event.parityPoints ?? state.parityPoints ?? 0) +
+                            (!state.demoMode && !state.wormCombatMode ? Math.round(EARN_WORM_HEALED_FACE) : 0)),
+                    };
+                });
+                // Publish the entire heal before the worker resync reads it.
+                if (st.chaosLevel > 0) useGameStore.getState().requestChaosResync();
             },
         };
     }
@@ -442,7 +442,7 @@ export function useWormCrawler(size, cubies) {
             sim.tunnelPassages.length > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 ||
             sim.elementalFocusT > 0 || sim.signature.charge > 0 || sim.rocketActive || liveRotation.active ||
             state.wormGamePhase !== 'active';
-        stepWormSim(sim, delta, sizeRef.current, ctxRef.current);
+        withPersistenceBatch(() => stepWormSim(sim, delta, sizeRef.current, ctxRef.current));
         feedbackRef.current.tunnel(sim.phase, sim.tunnelProgress, sim.alive);
         if (sim.combat) {
             const c = sim.combat;

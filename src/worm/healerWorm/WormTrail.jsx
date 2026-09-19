@@ -25,6 +25,7 @@ import { getSkin, getTrail } from '../wormCosmeticsData.js';
 import { liveRotation } from '../liveRotation.js';
 import { FACE_NORMALS, BODY_BALL_SPACING } from './constants.js';
 import { fxBudget } from './fxBudget.js';
+import { writeTrailMatrix, uploadTrailRange } from './trailUpdates.js';
 
 /** Whether the painted route is drawn at all. See the note at the top. */
 export const TRAIL_PAINTING_ENABLED = false;
@@ -124,6 +125,9 @@ export function WormTrail({ worm, size }) {
     // cannot see the difference. While a slice is actually turning it goes back to
     // every frame — there the paint has to stay glued to tiles that are moving.
     const sinceRepaint = useRef(0);
+    const lastPaint = useRef(null);
+    const previousCounts = useRef({ body: 0, glow: 0 });
+    const matrixRanges = useRef({ body: { start: Infinity, end: 0 }, glow: { start: Infinity, end: 0 } });
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormShowTrail = useGameStore(s => s.wormShowTrail ?? true);
     const skin = getSkin(wormSkinId);
@@ -163,16 +167,33 @@ export function WormTrail({ worm, size }) {
         if (!mesh) return;
         const glowMesh = glowRef.current;
 
-        if (!wormShowTrail) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+        if (!wormShowTrail) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
         // Hide the surface trail whenever the worm is not crawling on the surface — during
         // wormhole entry/tunnel/exit and the wind spirals the camera is inside the cube, and
         // the surface daubs would otherwise shine through. Only the cube interior should show.
-        if (worm.phase.current !== 'crawling') { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+        if (worm.phase.current !== 'crawling') { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
         const trail = worm.pathHistory.current;
         const count = trail.count;
-        if (count < 2) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+        if (count < 2) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+
+        const state = useGameStore.getState();
+        const previous = lastPaint.current;
+        const bodyTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
+        const colors = trailColorsRef.current;
+        const now = performance.now();
+        const popping = Object.values(state.cubiePops || {}).some(pop => now < pop.startMs + pop.durationMs);
+        const moving = liveRotation.active || popping;
+        const recolor = !previous || previous.bodyHex !== colors.bodyHex || previous.glowHex !== colors.glowHex;
+        // Paint has no wall-clock animation: a settled frame between path edits
+        // reuses its complete instance buffers, even on a long retained route.
+        if (previous && !moving && !previous.moving && !recolor &&
+            previous.trail === trail && previous.head === trail.head && previous.count === count &&
+            previous.seq === trail.nextSeq && previous.key === ttAt(trail, 0) &&
+            previous.bodyTiles === bodyTiles && previous.character === wormCharacterId &&
+            previous.cubies === state.cubies && previous.epoch === state.rotationEpoch &&
+            previous.size === liveCubies.size && previous.refs === liveCubies.refs) return;
 
         // Repaint budget. Deliberately after the three guards above: hiding the
         // trail has to happen on the frame it is asked for (the camera is about to
@@ -182,6 +203,12 @@ export function WormTrail({ worm, size }) {
         if (!liveRotation.active && sinceRepaint.current < 1 / budget.trailHz) return;
         sinceRepaint.current = 0;
 
+        lastPaint.current = { trail, head: trail.head, count, seq: trail.nextSeq, key: ttAt(trail, 0),
+            bodyTiles, character: wormCharacterId, cubies: state.cubies, epoch: state.rotationEpoch,
+            size: liveCubies.size, refs: liveCubies.refs, moving, bodyHex: colors.bodyHex, glowHex: colors.glowHex };
+        const ranges = matrixRanges.current;
+        ranges.body.start = ranges.glow.start = Infinity;
+        ranges.body.end = ranges.glow.end = 0;
         const lSize = liveCubies.size;
         const capCount = count; // render the full retained route, not a fixed window
         const trailColors = trailColorsRef.current;
@@ -192,11 +219,10 @@ export function WormTrail({ worm, size }) {
         // seeding one tile short of that end makes the freshest daubs overlap the last orb (no
         // gap) and then stream backward. Seeding exactly at the body end left a visible gap;
         // seeding near index 1 painted under the whole body near the head.
-        const bodyTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
         let aIdx = Math.max(1, bodyTiles - 1);
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
-        if (!haveA) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+        if (!haveA) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
         let seqA = trail.seq[(trail.head + aIdx) % trail.capacity];
 
         let visible = 0;
@@ -213,6 +239,7 @@ export function WormTrail({ worm, size }) {
             const lodStep = age < 60 ? 1 : age < 180 ? 2 : age < 500 ? 4 : 8;
             const subStep = age < 60 ? TRAIL_SUB_STEP : age < 180 ? 0.22 : age < 500 ? 0.45 : 0.9;
             const nextI = i + lodStep;
+            if (nextI >= capCount) break; // never bridge into stale ring-buffer slots
             // Skip unavailable tiles; the segment simply bridges A → next valid tile.
             if (!resolveTrailTile(trail, nextI, lSize, _trailCB, _trailNB)) { i = nextI; continue; }
             const seqB = trail.seq[(trail.head + nextI) % trail.capacity];
@@ -261,20 +288,20 @@ export function WormTrail({ worm, size }) {
                         _trailDummy.scale.setScalar((fs * 0.16 + 0.03) * 0.6);
                     }
                     _trailDummy.updateMatrix();
-                    mesh.setMatrixAt(visible, _trailDummy.matrix);
+                    writeTrailMatrix(mesh, visible, _trailDummy.matrix, ranges.body);
 
                     // Encode fade as color brightness
                     _trailColor.copy(trailColors.body).multiplyScalar(0.20 + fs * 0.80);
-                    mesh.setColorAt(visible, _trailColor);
+                    if (recolor || visible >= previousCounts.current.body) mesh.setColorAt(visible, _trailColor);
 
                     // Recent daubs also get a soft additive glow halo in the skin's glow colour,
                     // scaled up from the same daub transform. Purely local geometry — no bloom pass.
                     if (glowMesh && visible < glowCap) {
                         _trailDummy.scale.multiplyScalar(TRAIL_GLOW_SCALE);
                         _trailDummy.updateMatrix();
-                        glowMesh.setMatrixAt(visible, _trailDummy.matrix);
+                        writeTrailMatrix(glowMesh, visible, _trailDummy.matrix, ranges.glow);
                         _trailGlowColor.copy(trailColors.glow).multiplyScalar(0.14 + fs * 0.36);
-                        glowMesh.setColorAt(visible, _trailGlowColor);
+                        if (recolor || visible >= previousCounts.current.glow) glowMesh.setColorAt(visible, _trailGlowColor);
                         glowCount = visible + 1;
                     }
                     visible++;
@@ -291,13 +318,15 @@ export function WormTrail({ worm, size }) {
         }
 
         mesh.count = visible;
-        mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        uploadTrailRange(mesh.instanceMatrix, ranges.body.start, ranges.body.end);
+        uploadTrailRange(mesh.instanceColor, recolor ? 0 : previousCounts.current.body * 3, visible * 3);
+        previousCounts.current.body = visible;
 
         if (glowMesh) {
             glowMesh.count = glowCount;
-            glowMesh.instanceMatrix.needsUpdate = true;
-            if (glowMesh.instanceColor) glowMesh.instanceColor.needsUpdate = true;
+            uploadTrailRange(glowMesh.instanceMatrix, ranges.glow.start, ranges.glow.end);
+            uploadTrailRange(glowMesh.instanceColor, recolor ? 0 : previousCounts.current.glow * 3, glowCount * 3);
+            previousCounts.current.glow = glowCount;
         }
     });
 

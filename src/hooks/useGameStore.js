@@ -1,4 +1,5 @@
 import { CHAOS_RECORD_KEY } from '../game/chaosExperience.js';
+import { persistLatest } from '../utils/persistenceBatch.js';
 import { savePlayerState } from '../progression/model.js';
 import { WORM_MISSION_STORAGE_KEY } from '../worm/missions.js';
 /**
@@ -105,11 +106,11 @@ export const getActiveMode = (state) => {
 // refund), so any future writer of parityPoints that forgot the line would lose
 // the player's money on reload. Settings already had the right pattern; the
 // wallet, purchases and streak now use it too.
-const persist = (key, serialise = String) => (value) => {
+const persist = (key, serialise = String) => (value) => persistLatest(key, () => {
   try {
     localStorage.setItem(key, serialise(value));
   } catch { /* storage unavailable (private mode, quota) — state stays in memory */ }
-};
+});
 
 useGameStore.subscribe(
   (state) => state.settings,
@@ -133,7 +134,7 @@ useGameStore.subscribe(state => state.wormMissionsCompleted,
 // Persist an atomic XP/wallet/ownership snapshot only when one of those changes.
 useGameStore.subscribe(
   state => [state.playerProgress, state.parityPoints, state.ownedItems],
-  () => savePlayerState(useGameStore.getState()),
+  () => persistLatest('player-snapshot', () => savePlayerState(useGameStore.getState())),
   { equalityFn: (a, b) => a.every((value, i) => value === b[i]) }
 );
 

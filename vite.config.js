@@ -84,6 +84,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Shared CJS helpers must not live in the optional solver chunk.
+          if (id.includes('commonjsHelpers')) return 'vendor-react';
           if (!id.includes('node_modules')) return;
           // React and the state layer ride in their own chunk rather than with the
           // r3f/drei stack. Together they were one 740 KB asset — over the size
@@ -93,9 +95,13 @@ export default defineConfig({
           if (id.includes('/node_modules/react/')) return 'vendor-react';
           if (id.includes('/node_modules/react-dom/')) return 'vendor-react';
           if (id.includes('/node_modules/scheduler/')) return 'vendor-react';
+          // Shared loaders/controls belong to the base 3D stack, not optional AO.
+          if (id.includes('/node_modules/three-stdlib/')) return 'vendor-react3d';
+          if (/\/node_modules\/(buffer|base64-js|ieee754)\//.test(id)) return 'vendor-react3d';
+          if (id.includes('/node_modules/n8ao/')) return 'vendor-postprocessing';
           if (id.includes('/node_modules/@react-three/fiber/')) return 'vendor-react3d';
           if (id.includes('/node_modules/@react-three/drei/')) return 'vendor-react3d';
-          if (id.includes('/node_modules/@react-three/postprocessing/')) return 'vendor-react3d';
+          if (id.includes('/node_modules/@react-three/postprocessing/')) return 'vendor-postprocessing';
           if (id.includes('/node_modules/postprocessing/')) return 'vendor-postprocessing';
           if (id.includes('/node_modules/three/examples/')) {
             const examplesPath = id.split('/node_modules/three/examples/')[1] || '';

@@ -39,7 +39,7 @@ export function useKeyboardControls({
 
   // Perform rotation based on cursor position
   const performCursorRotation = useCallback((rotationType) => {
-    if (useGameStore.getState().animState) return;
+    if (useGameStore.getState().wormHealerMode || useGameStore.getState().animState) return;
 
     const { axis, dir, pos } = getRotationParams(rotationType);
     if (axis && dir !== undefined && onMove) {
@@ -113,8 +113,8 @@ export function useKeyboardControls({
 
       // The caller owns the keyboard while its local overlay is open.
       if (h.disabled) return;
-      // Worm mode is paused — the cube is frozen behind the pause overlay.
-      if (state.wormHealerMode && (state.wormPaused || state.wormJumpRescueActive)) return;
+      // WORM owns movement/jump bindings separately. Puzzle turns never run here.
+      if (state.wormHealerMode) return;
 
       // Space/Enter dismisses the level briefing before any other binding, so
       // Space does not shuffle the cube out from under an unread tutorial.

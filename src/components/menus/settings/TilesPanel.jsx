@@ -6,6 +6,7 @@ import {
   registerTilePreview,
   updateTilePreview,
   unregisterTilePreview,
+  setTilePreviewActive,
 } from '../../../3d/TilePreviewRenderer.js';
 
 /**
@@ -13,7 +14,7 @@ import {
  * `colorHex` defaults to a neutral mid-blue so style-card previews look good
  * without needing a specific face color.
  */
-function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, className = '' }) {
+function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, className = '', active = false }) {
   const canvasRef = useRef(null);
   const idRef = useRef(null);
 
@@ -32,6 +33,10 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, classNam
   useEffect(() => {
     if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, colorHex);
   }, [styleKey, colorHex]);
+
+  useEffect(() => {
+    if (idRef.current !== null) setTilePreviewActive(idRef.current, active);
+  }, [active]);
 
   return (
     <canvas
@@ -60,7 +65,7 @@ function StyleGrid({ keys, label, globalStyle, onApply, tileOwned }) {
               style={!owned ? { opacity: 0.4, cursor: 'not-allowed', position: 'relative' } : { position: 'relative' }}
               title={!owned ? `Locked — buy in Parity Store` : `Apply ${style.label} to all faces`}
             >
-              <TilePreviewCanvas styleKey={key} size={56} className="style-card-preview" />
+              <TilePreviewCanvas active={globalStyle === key} styleKey={key} size={56} className="style-card-preview" />
               <span className="style-card-label">{style.label}{!owned ? ' 🔒' : ''}</span>
             </button>
           );

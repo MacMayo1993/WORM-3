@@ -15,11 +15,13 @@ import {
   updateTilePreview,
   unregisterTilePreview,
   setTilePreviewVisible,
+  setTilePreviewActive,
   tickPreviews,
   isAnimatedPreviewStyle
 } from '../3d/TilePreviewRenderer.js';
 
 let putCount = 0;
+let readCount = 0;
 
 function fakeCanvas(size = 56) {
   const canvas = { width: size, height: size };
@@ -41,6 +43,7 @@ const fakeGl = {
   // A horizontal ramp: every column of the 64² target has a distinct red value,
   // which is what makes a mis-copied row visible in the test below.
   readRenderTargetPixels: (_rt, _x, _y, w, h, buf) => {
+    readCount++;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
@@ -71,7 +74,7 @@ describe('tile preview redraw budget', () => {
   });
 
   it('redraws an animated preview on its own budget, not every frame', () => {
-    const id = registerTilePreview(fakeCanvas(), 'lava', '#ff0000');
+    const id = registerTilePreview(fakeCanvas(), 'lava', '#ff0000', true);
     const drawn = run(1);
     unregisterTilePreview(id);
     // 20fps plus the mount's immediate first frame — nowhere near the 60 a
@@ -107,7 +110,7 @@ describe('tile preview redraw budget', () => {
   });
 
   it('stops redrawing an off-screen preview', () => {
-    const id = registerTilePreview(fakeCanvas(), 'lava', '#ff0000');
+    const id = registerTilePreview(fakeCanvas(), 'lava', '#ff0000', true);
     setTilePreviewVisible(id, false);
     const hidden = run(1);
     expect(hidden).toBe(0); // hidden mounts wait until visible
@@ -119,7 +122,7 @@ describe('tile preview redraw budget', () => {
   });
 
   it('defers an off-screen style change until it becomes visible', () => {
-    const id = registerTilePreview(fakeCanvas(), 'lava', '#ff0000');
+    const id = registerTilePreview(fakeCanvas(), 'lava', '#ff0000', true);
     setTilePreviewVisible(id, false);
     run(0.5);
     putCount = 0;
@@ -132,7 +135,7 @@ describe('tile preview redraw budget', () => {
   });
 
   it('spreads the redraws of a grid mounted on one frame across the interval', () => {
-    const ids = Array.from({ length: 10 }, () => registerTilePreview(fakeCanvas(), 'lava', '#ff0000'));
+    const ids = Array.from({ length: 10 }, () => registerTilePreview(fakeCanvas(), 'lava', '#ff0000', true));
     run(0.1); // clear the shared mount frame
     // Count how many distinct frames carry a draw over the next second: with a
     // single phase every tile would land on the same 20 frames.
@@ -165,4 +168,37 @@ it('holds animated thumbnails still when reduced motion is requested', () => {
   window.matchMedia = () => ({ matches: true });
   const id = registerTilePreview(fakeCanvas(), 'lava', '#abcdef');
   try { expect(run(1)).toBe(1); } finally { unregisterTilePreview(id); window.matchMedia = previous; }
+});
+
+
+it('caches static snapshots across mounts and only animates the focused selection', () => {
+  const before = readCount;
+  const first = registerTilePreview(fakeCanvas(), 'lava', '#112233');
+  run(1);
+  expect(readCount - before).toBe(1);
+  unregisterTilePreview(first);
+  const second = registerTilePreview(fakeCanvas(), 'lava', '#112233');
+  run(1);
+  expect(readCount - before).toBe(1); // remount copies pixels; no GPU readback
+  setTilePreviewActive(second, true);
+  run(1);
+  expect(readCount - before).toBeGreaterThan(15);
+  setTilePreviewActive(second, false);
+  const stopped = readCount;
+  run(1);
+  expect(readCount).toBe(stopped);
+  updateTilePreview(second, 'lava', '#112234');
+  run(1);
+  expect(readCount).toBe(stopped + 1);
+  unregisterTilePreview(second);
+});
+
+it('finishes a static animated-style grid with no recurring GPU readbacks', () => {
+  const before = readCount;
+  const ids = Array.from({ length: 30 }, (_, i) => registerTilePreview(fakeCanvas(), 'galaxy', `#2233${i.toString(16).padStart(2, '0')}`));
+  run(1);
+  expect(readCount - before).toBe(30);
+  run(2);
+  expect(readCount - before).toBe(30);
+  ids.forEach(unregisterTilePreview);
 });

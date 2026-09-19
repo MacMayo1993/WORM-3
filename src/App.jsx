@@ -14,7 +14,7 @@ import React, { useState, useRef, useEffect, useCallback, useSyncExternalStore, 
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import SafeEnvironment from './3d/SafeEnvironment.jsx';
-import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
+const SceneEffects = React.lazy(() => import('./3d/SceneEffects.jsx'));
 import './App.css';
 
 // Utils
@@ -125,18 +125,7 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <SafeEnvironment preset="city" />
       {!performanceMode && (
-        <EffectComposer>
-          <Bloom
-            intensity={0.35}
-            luminanceThreshold={0.85}
-            luminanceSmoothing={0.85}
-            mipmapBlur
-          />
-          <Vignette
-            offset={0.35}
-            darkness={0.35}
-          />
-        </EffectComposer>
+        <Suspense fallback={null}><SceneEffects kind="intro" /></Suspense>
       )}
     </>
   );
@@ -225,10 +214,7 @@ function MenuScene({ onCubeClick, background }) {
         <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
       {!isMobile && (
-        <EffectComposer enabled={!directPreview}>
-          {/* Enamel highlights stay crisp; menu glow comes only from local effects. */}
-          <Vignette offset={0.46} darkness={0.23} />
-        </EffectComposer>
+        <Suspense fallback={null}><SceneEffects kind="menu" enabled={!directPreview} /></Suspense>
       )}
     </>
   );
@@ -1013,6 +999,7 @@ export default function WORM3() {
   }, [setFaceRotationTarget]);
 
   const handleFaceRotate = useCallback((direction) => {
+    if (useGameStore.getState().wormHealerMode) return;
     if (!faceRotationTarget) return;
     const { pos, dirKey } = faceRotationTarget;
     const dir = direction === 'cw' ? -1 : 1;
@@ -1036,6 +1023,7 @@ export default function WORM3() {
 
   // Tile rotation handlers
   const handleTileRotation = useCallback((direction) => {
+    if (useGameStore.getState().wormHealerMode) return;
     if (!selectedTileForRotation) return;
     const { cursor: cur } = selectedTileForRotation;
     const { face } = cur;
@@ -1056,6 +1044,7 @@ export default function WORM3() {
   }, [selectedTileForRotation, cursorToCubePos, onMove, setSelectedTileForRotation]);
 
   const handleTileFaceRotation = useCallback((direction) => {
+    if (useGameStore.getState().wormHealerMode) return;
     if (!selectedTileForRotation) return;
     const { cursor: cur } = selectedTileForRotation;
     const { face } = cur;
