@@ -4,10 +4,11 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeWormSim, resetWormSim } from '../worm/healerWorm/wormSim.js';
-import { shPush, shReset } from '../worm/circularBuffers.js';
+import { shPush, shReset, ttPush, ttReset } from '../worm/circularBuffers.js';
+import { checkWormHitBySlice, cutWormTail } from '../worm/wormHelpers.js';
 import { advanceTunnelHead } from '../worm/healerWorm/tunnelTrail.js';
 import { WORM_LIFT } from '../worm/healerWorm/constants.js';
-import { liveRotation } from '../worm/liveRotation.js';
+import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 
 let frame, tree;
 vi.mock('@react-three/fiber', () => ({ useFrame: callback => { frame = callback; } }));
@@ -36,6 +37,7 @@ beforeEach(() => {
   element.ref.current = mesh;
 });
 afterEach(() => {
+  resetLiveRotation();
   act(() => root.unmount()); host.remove();
   mesh.geometry.dispose(); mesh.material.dispose();
   vi.unstubAllGlobals(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
@@ -90,4 +92,33 @@ it('uses route distance even when dense samples exceed the old sample-count cap'
   expect(points).toHaveLength(40);
   expect(points.at(-1).y).toBeCloseTo(-39 * 0.09, 5);
   for (let i = 1; i < points.length; i++) expect(points[i].distanceTo(points[i - 1])).toBeCloseTo(0.09, 5);
+});
+
+it('removes every bead beyond a slice seam without stretching the remaining tail into the moving layer', () => {
+  sim.phase = 'crawling'; sim.tailLength = 20;
+  sim.pos = { x: 0, y: 1, z: 2, dirKey: 'PZ' };
+  sim.interpT = 1;
+  sim.headInterpPos.set(-1, 0, 1.52); sim.currentNormal.set(0, 0, 1);
+  shReset(sim.stepHistory);
+  for (let i = 200; i >= 0; i--) {
+    const x = -1 + i / 100;
+    shPush(sim.stepHistory, new THREE.Vector3(x, 0, 1.6), sim.currentNormal, Math.round(x + 1), 1, 2);
+  }
+  ttReset(sim.tileTrail, '2,1,2,PZ'); ttPush(sim.tileTrail, '1,1,2,PZ'); ttPush(sim.tileTrail, '0,1,2,PZ');
+  const before = renderPoints();
+  expect(before).toHaveLength(20);
+  const hit = checkWormHitBySlice(worm, 'col', 1, 3);
+  expect(hit.cutPosition[0]).toBeCloseTo(-0.5);
+  cutWormTail(worm, hit);
+  expect(sim.tailLength).toBe(5);
+  for (const angle of [0, 0.3, 1, Math.PI / 2]) {
+    setLiveRotation('col', [1], [angle], 1, angle);
+    const points = renderPoints();
+    expect(points).toHaveLength(5);
+    for (let i = 0; i < points.length; i++) {
+      expect(points[i].x).toBeCloseTo(before[i].x, 6);
+      expect(points[i].x).toBeLessThan(-0.59);
+      if (i) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.15);
+    }
+  }
 });

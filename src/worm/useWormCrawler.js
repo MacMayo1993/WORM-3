@@ -673,6 +673,7 @@ export function useWormCrawler(size, cubies) {
             headInterpPos: f('headInterpPos'),
             currentNormal: f('currentNormal'),
             tailLength: f('tailLength'),
+            bodyGait: f('bodyGait'),
             stepHistory: f('stepHistory'),
             orbPickupColorsRef: f('orbPickupColors'),
             orbPickupFaceIdsRef: f('orbPickupFaceIds'),

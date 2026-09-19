@@ -44,6 +44,7 @@ import {
 import { inchGaitInto, makeInchGaitState, advanceInchGaitState } from './inchGait.js';
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
+import { bodyPathHeadInto } from './sliceBodyPath.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
@@ -260,10 +261,8 @@ export function WormBody({ worm, size }) {
         worm.tunnelHeadScale = tunnelHeadPulse(worm.phase.current, worm.tunnelProgress.current, characterTimeRef.current, reducedPickupMotion);
         updateBodySurface(surface, size, liveRotation);
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
-        _bodyHeadPos.copy(worm.headInterpPos.current);
         _bodyNormal.copy(worm.currentNormal.current);
 
-        const currentJumpVal = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
         // Rocket flight: the whole worm cruises above the surface for the burn. Added to the
         // rendered head and every body segment below (not to the path-walk anchor), so the
         // worm rises level and flies rather than rearing up from a lifted head.
@@ -276,7 +275,7 @@ export function WormBody({ worm, size }) {
         // windout uses getWindWorldPosInto which supplies its own lift, so WORM_LIFT must not
         // be added again here (face is already placed at headInterpPos + 0.09, consistent).
         const _bodyTransit = worm.phase.current === 'windup' || worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
-        _bodyHeadPos.addScaledVector(_bodyNormal, _bodyTransit ? 0 : WORM_LIFT + currentJumpVal);
+        bodyPathHeadInto(_bodyHeadPos, worm, _bodyTransit);
         _headPathPoint.transit = _bodyTransit;
         // Only the in-tunnel shots put the lens on the body's own line — the surface
         // chase camera sits well above and behind it, so nothing there needs culling
@@ -350,8 +349,10 @@ export function WormBody({ worm, size }) {
         // ── Inch Worm gait driver ──────────────────────────────────────────────
         // Consume the simulation's accumulated surface travel, including tile commits.
         // Slice rides and spawn bounces never advance this counter.
-        const gait = inchStateRef.current;
-        if (_isInch) advanceInchGaitState(gait, worm.crawlDistance.current, Math.min(MAX_TAIL, tLen), delta, frozen);
+        const gait = worm.bodyGait?.current?.enabled ? worm.bodyGait.current : inchStateRef.current;
+        if (_isInch && !worm.bodyGait?.current?.enabled) {
+            advanceInchGaitState(gait, worm.crawlDistance.current, Math.min(MAX_TAIL, tLen), delta, frozen);
+        }
         const _gaitMove = gait.move;
         const _gaitPhase = gait.phase;
         const _inchShape = _isInch ? gait.shape : null;
