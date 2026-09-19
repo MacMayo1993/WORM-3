@@ -15,7 +15,7 @@ import { getTileStyleMaterial } from './styles/TileStyleMaterials.jsx';
 
 const PREVIEW_SIZE = 64;
 
-// Styles that need continuous per-frame animation
+// Styles that animate while selected, hovered or focused
 const ANIMATED_STYLE_SET = new Set([
   ...LIVING_SURFACE_KEYS,
   'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
@@ -168,6 +168,7 @@ function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
   if (savedTime !== null) {
     mat.uniforms.time.value = savedTime;
   }
+  return _usingShared ? _imgDataCache.get(targetCanvas) : null;
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────
@@ -181,6 +182,26 @@ let lastTimestamp = null;
 
 // Map<id, { canvas, styleKey, colorHex, animated, dirty, visible, nextFrame }>
 const registry = new Map();
+let previewEntries = [];
+// CPU snapshots survive grid unmounts. Bounded by both count and bytes, so
+// unusual canvas sizes cannot turn the cache into an unbounded image store.
+const snapshots = new Map();
+let snapshotBytes = 0;
+const SNAPSHOT_BYTES = 4 * 1024 * 1024;
+function snapshotKey(info) {
+  return `${info.styleKey}|${info.colorHex}|${info.canvas.width}|${info.canvas.height}`;
+}
+function rememberSnapshot(key, frame) {
+  if (!frame || frame.data.byteLength > SNAPSHOT_BYTES) return;
+  const copy = { width: frame.width, height: frame.height, data: frame.data.slice() };
+  snapshots.set(key, copy);
+  snapshotBytes += copy.data.byteLength;
+  while (snapshots.size > 128 || snapshotBytes > SNAPSHOT_BYTES) {
+    const oldest = snapshots.keys().next().value;
+    snapshotBytes -= snapshots.get(oldest).data.byteLength;
+    snapshots.delete(oldest);
+  }
+}
 
 /** Returns true when there are previews that need rendering. */
 export function hasActivePreviews() { return registry.size > 0; }
@@ -200,7 +221,19 @@ const ANIMATED_STEP = 1 / ANIMATED_FPS;
 const PHASE_SLOTS = 5;
 
 function drawPreview(info) {
-  renderToCanvas(info.styleKey, info.colorHex, simTime, info.canvas);
+  const animate = info.animated && (info.active || info.hovered || info.focused) && !prefersReducedMotion();
+  const key = snapshotKey(info);
+  const cached = !animate && snapshots.get(key);
+  if (cached) {
+    const ctx = info.canvas.getContext('2d');
+    const frame = imageDataFor(ctx, info.canvas, cached.width, cached.height);
+    frame.data.set(cached.data);
+    ctx.putImageData(frame, 0, 0);
+    snapshots.delete(key); snapshots.set(key, cached);
+  } else {
+    const frame = renderToCanvas(info.styleKey, info.colorHex, animate ? simTime : 0, info.canvas);
+    if (!animate) rememberSnapshot(key, frame);
+  }
   info.dirty = false;
   // A grid mounts every one of its tiles on the same frame, so the first redraw
   // is where they get pulled apart; after that the interval keeps them apart.
@@ -213,14 +246,14 @@ function tick(delta) {
   if (registry.size === 0) return;
   const reduced = prefersReducedMotion();
   if (!reduced) simTime += Math.min(delta, 0.1);
-  const entries = [...registry.values()];
+  const entries = previewEntries;
   const start = previewCursor % entries.length;
   let budget = isMobile ? 2 : 4;
   for (let offset = 0; offset < entries.length; offset++) {
     const index = (start + offset) % entries.length;
     const info = entries[index];
     if (!info.visible) continue;
-    if (!info.dirty && (reduced || !info.animated || simTime < info.nextFrame)) continue;
+    if (!info.dirty && (reduced || !info.animated || !(info.active || info.hovered || info.focused) || simTime < info.nextFrame)) continue;
     drawPreview(info);
     previewCursor = (index + 1) % entries.length;
     if (--budget === 0) break;
@@ -259,21 +292,45 @@ function maybeStopLoop() {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function registerTilePreview(canvas, styleKey, colorHex) {
+export function registerTilePreview(canvas, styleKey, colorHex, active = false) {
   const id = ++idCounter;
   registry.set(id, {
     canvas,
     styleKey,
     colorHex,
+    active, hovered: false, focused: false,
     animated: isAnimatedPreviewStyle(styleKey),
     dirty: true,
-    // Previews start visible: a caller that never reports visibility (the
-    // per-face plates, the store) keeps the old always-animating behaviour.
+    // Without IntersectionObserver, still images render once and active
+    // previews use the normal animation budget.
     visible: true,
     nextFrame: 0,
     phase: (id % PHASE_SLOTS) * (ANIMATED_STEP / PHASE_SLOTS),
     phased: false,
   });
+  previewEntries = [...registry.values()];
+  const info = registry.get(id);
+  // Listen on the owning card, including its label, and support keyboard focus.
+  const target = canvas.closest?.('button') || canvas;
+  const listeners = [
+    ['pointerenter', () => { info.hovered = true; info.nextFrame = simTime; }],
+    ['pointerleave', () => { info.hovered = false; info.dirty = true; }],
+    ['focusin', () => { info.focused = true; info.nextFrame = simTime; }],
+    ['focusout', () => { info.focused = false; info.dirty = true; }],
+  ];
+  for (const [event, handler] of listeners) target.addEventListener?.(event, handler);
+  let observer;
+  if (typeof IntersectionObserver === 'function') {
+    info.visible = false;
+    observer = new IntersectionObserver(entries => {
+      for (const entry of entries) setTilePreviewVisible(id, entry.isIntersecting);
+    }, { rootMargin: '120px' });
+    observer.observe(canvas);
+  }
+  info.cleanup = () => {
+    observer?.disconnect();
+    for (const [event, handler] of listeners) target.removeEventListener?.(event, handler);
+  };
   maybeStartLoop();
   return id;
 }
@@ -281,6 +338,7 @@ export function registerTilePreview(canvas, styleKey, colorHex) {
 export function updateTilePreview(id, styleKey, colorHex) {
   const info = registry.get(id);
   if (!info) return;
+  if (info.styleKey === styleKey && info.colorHex === colorHex) return;
   info.styleKey = styleKey;
   info.colorHex = colorHex;
   info.animated = isAnimatedPreviewStyle(styleKey);
@@ -300,8 +358,18 @@ export function setTilePreviewVisible(id, visible) {
   if (visible) info.nextFrame = simTime;
 }
 
+export function setTilePreviewActive(id, active) {
+  const info = registry.get(id);
+  if (!info || info.active === active) return;
+  info.active = active;
+  info.dirty = true;
+  info.nextFrame = simTime;
+}
+
 export function unregisterTilePreview(id) {
+  registry.get(id)?.cleanup();
   registry.delete(id);
+  previewEntries = [...registry.values()];
   maybeStopLoop();
 }
 

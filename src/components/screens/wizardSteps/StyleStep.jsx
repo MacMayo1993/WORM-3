@@ -164,7 +164,7 @@ export default function StyleStep({ cos, family, slot }) {
                     transition: 'all 0.15s ease', fontFamily: 'inherit', overflow: 'hidden'
                   }}
                 >
-                  <TilePreviewCanvas styleKey={key} colorHex={swatchColor} size={56} canvasStyle={{ width: '100%', height: 'auto', borderRadius: 0 }} />
+                  <TilePreviewCanvas active={sel} styleKey={key} colorHex={swatchColor} size={56} canvasStyle={{ width: '100%', height: 'auto', borderRadius: 0 }} />
                   <span style={{
                     position: isMobile ? 'relative' : 'absolute', display: 'block', bottom: 0, left: 0, right: 0, textAlign: 'center',
                     overflowWrap: 'anywhere', minHeight: isMobile ? '24px' : undefined,

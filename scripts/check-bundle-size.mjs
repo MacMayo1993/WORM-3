@@ -85,6 +85,10 @@ if (entryKeys(manifest).length === 0) {
 }
 
 const { chunkKeys: routeChunkKeys, files: routeFiles } = collectRoute(manifest);
+// These packages belong behind feature gates, including their shared helpers.
+for (const key of routeChunkKeys) {
+  if (/vendor-(kociemba|postprocessing)/.test(key)) fail(`optional dependency entered startup: ${key}`);
+}
 
 const sizeOf = (file) => {
   const path = join(DIST_DIR, file);

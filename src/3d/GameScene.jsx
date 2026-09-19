@@ -10,7 +10,7 @@ import ErrorBoundary3D from './ErrorBoundary3D.jsx';
 import { useThree } from '@react-three/fiber';
 import { FogExp2 } from 'three';
 import SafeEnvironment from './SafeEnvironment.jsx';
-import { EffectComposer, N8AO } from '@react-three/postprocessing';
+const SceneEffects = React.lazy(() => import('./SceneEffects.jsx'));
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { isMobile } from '../utils/device.js';
@@ -103,7 +103,6 @@ export default function GameScene({
     wormHealerMode,
     wormRunId,
     wormPhase,
-    wormPaused,
     wormHealedCount,
     perfReducedFX,
   } = useGameStore(useShallow((s) => ({
@@ -121,7 +120,6 @@ export default function GameScene({
     wormHealerMode: s.wormHealerMode,
     wormRunId: s.wormRunId,
     wormPhase: s.wormPhase,
-    wormPaused: s.wormPaused ?? false,
     wormHealedCount: s.wormHealedCount ?? 0,
     perfReducedFX: s.perfReducedFX ?? false,
   })));
@@ -263,7 +261,7 @@ export default function GameScene({
         <CubeAssembly
           size={size}
           cubies={cubies}
-          onMove={wormHealerMode && wormPaused ? null : onMove}
+          onMove={wormHealerMode ? null : onMove}
           onTapFlip={onTapFlip}
           animState={animState}
           onAnimComplete={onAnimComplete}
@@ -321,9 +319,7 @@ export default function GameScene({
           mutually exclusive — toggling the PiP on gracefully drops AO for that view.
           Gated off on mobile / low-FPS / wireframe / glass via aoEnabled. */}
       {aoEnabled && !shouldShowAntipodalPiP && (
-        <EffectComposer multisampling={4}>
-          <N8AO aoRadius={0.55} distanceFalloff={1} intensity={2.2} quality="medium" halfRes />
-        </EffectComposer>
+        <Suspense fallback={null}><SceneEffects kind="game" /></Suspense>
       )}
     </>
   );

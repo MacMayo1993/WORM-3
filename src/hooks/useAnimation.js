@@ -188,6 +188,8 @@ export function useAnimation() {
   // all land in the same render, preventing any intermediate state from
   // triggering win detection or a stale animation frame.
   const onMove = useCallback((axis, dir, sel, numTurns = 1) => {
+    // Only the WORM scheduler may turn layers; startAnimation remains its port.
+    if (useGameStore.getState().wormHealerMode) return;
     const sliceIndex = axis === 'col' ? sel.x : axis === 'row' ? sel.y : sel.z;
     if (numTurns <= 1) {
       startAnimation(axis, dir, sliceIndex);

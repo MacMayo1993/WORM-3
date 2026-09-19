@@ -8,7 +8,7 @@ import React, { useRef } from 'react';
 import { COLOR_SCHEMES, SCHEME_LABELS, TILE_STYLES } from '../../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../../utils/backgrounds.js';
 import { BG_PREVIEWS } from '../../../utils/bgPreviews.js';
-import { registerTilePreview, updateTilePreview, unregisterTilePreview, setTilePreviewVisible } from '../../../3d/TilePreviewRenderer.js';
+import { registerTilePreview, updateTilePreview, unregisterTilePreview, setTilePreviewActive } from '../../../3d/TilePreviewRenderer.js';
 import { TEXT_XS } from '../../../utils/uiTheme.js';
 import { WIZ_SURFACE, WIZ_SURFACE_RAISED, WIZ_BORDER, WIZ_BORDER_SOFT, WIZ_TEXT, WIZ_TEXT_MUTED, WIZ_TEXT_FAINT, WIZ_CARD_SHADOW } from '../WizardChrome.jsx';
 
@@ -187,7 +187,7 @@ export function PickerHeading({ label, hint, locked = 0, children }) {
  * A single tile drawn with its real shader — the chip used in the style rail and
  * the palette cards. The hero cube is CubePreviewCanvas; this is the cheap one.
  */
-export function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasStyle }) {
+export function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasStyle, active = false }) {
   const canvasRef = useRef(null);
   const idRef = useRef(null);
 
@@ -199,24 +199,7 @@ export function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, c
     const id = registerTilePreview(canvas, styleKey, colorHex);
     idRef.current = id;
 
-    // A style family is a scrolling grid of dozens of these, and every animated
-    // one costs a GPU readback per drawn frame. Only the tiles actually in the
-    // scroller's viewport need to keep moving; the rest hold their last frame
-    // until they come back into view. No IntersectionObserver (jsdom, old
-    // WebViews) just means everything animates, as before.
-    let observer = null;
-    if (typeof IntersectionObserver === 'function') {
-      setTilePreviewVisible(id, false);
-      observer = new IntersectionObserver(
-        entries => { for (const entry of entries) setTilePreviewVisible(id, entry.isIntersecting); },
-        // A little margin so a tile is already moving by the time it is read.
-        { rootMargin: '120px' }
-      );
-      observer.observe(canvas);
-    }
-
     return () => {
-      observer?.disconnect();
       unregisterTilePreview(id);
       idRef.current = null;
     };
@@ -225,6 +208,10 @@ export function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, c
   React.useEffect(() => {
     if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, colorHex);
   }, [styleKey, colorHex]);
+
+  React.useEffect(() => {
+    if (idRef.current !== null) setTilePreviewActive(idRef.current, active);
+  }, [active]);
 
   return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '6px', ...canvasStyle }} />;
 }

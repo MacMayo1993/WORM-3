@@ -243,7 +243,7 @@ const CubeAssembly = React.memo(({
   onClearTileSelectionRef.current = onClearTileSelection;
 
   const onPointerDown = useCallback(({ pos, worldPos, event }) => {
-    if (jumpRescueActive()) return;
+    if (useGameStore.getState().wormHealerMode || jumpRescueActive()) return;
     if (animStateRef.current) return;
     if (gsapAnimRef.current) return;
 
@@ -347,7 +347,7 @@ const CubeAssembly = React.memo(({
     };
 
     const move = e => {
-      if (jumpRescueActive()) return;
+      if (useGameStore.getState().wormHealerMode || jumpRescueActive()) return;
       const ds = dragStartRef.current;
       if (!ds) return;
       e.preventDefault();
