@@ -1,3 +1,4 @@
+import { sanitizeStoryProgress } from '../worm/story/levels.js';
 import { ACHIEVEMENT_BY_ID } from './achievements.js';
 // Permanent XP is independent of the spendable wallet and of any one run.
 export const PLAYER_SAVE_KEY = 'worm3_player_progress_v1';
@@ -29,12 +30,13 @@ export function playerRank(level) {
   if (level >= 10) return 'Inside Out';
   return 'Explorer';
 }
-export const newProgress = () => ({ xp: 0, modeXp: {}, milestones: {}, bests: {}, challenges: [], claimedRewards: {}, achievements: {}, recentGoals: [], chaosColors: [] });
+export const newProgress = () => ({ xp: 0, modeXp: {}, milestones: {}, bests: {}, challenges: [], claimedRewards: {}, achievements: {}, recentGoals: [], chaosColors: [], wormStory: { stars: {}, claimed: {} } });
 const record = value => value && typeof value === 'object' && !Array.isArray(value);
 export function sanitizeProgress(raw) {
   const p = newProgress();
   if (!record(raw)) return p;
   p.xp = Math.min(count(raw.xp), 1e9);
+  p.wormStory = sanitizeStoryProgress(raw.wormStory);
   for (const id of Object.keys(ACHIEVEMENT_BY_ID)) {
     const value = raw.achievements?.[id];
     if (record(value) && count(value.count)) p.achievements[id] = { count: Math.min(count(value.count), 1e6) };

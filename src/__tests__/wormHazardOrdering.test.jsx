@@ -50,7 +50,7 @@ beforeEach(() => {
   }, details);
   const cubies = makeCubies(3);
   useGameStore.setState({ cubies, size: 3, wormAlive: true, wormPaused: false, wormJumpRescueActive: false, animState: null,
-    demoMode: false, wormCombatMode: false, wormEnemiesEnabled: false, wormPhase: 'crawling' });
+    demoMode: false, wormStoryLevel: null, wormStoryResult: null, wormCombatMode: false, wormEnemiesEnabled: false, wormPhase: 'crawling' });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   rotate = vi.fn();
   act(() => root.render(<Harness cubies={cubies} size={3} onRotate={rotate} onAnimatedShuffle={(_moves, done) => done()} />));
@@ -125,4 +125,31 @@ it('severs a fatal slice hit and stops the turn before it can drag the dead body
   expect(sim.stepHistory.count).toBe(1);
   expect(rotate).not.toHaveBeenCalled();
   expect(worm.feel.mock.calls.filter(([event]) => event === 'death')).toHaveLength(1);
+});
+
+it.each([1, 2, 3, 5, 6])('keeps story level %i free of ambient bombs, rotations and ordinary solve rewards', id => {
+  act(() => {
+    useGameStore.setState({ playerProgress: { ...useGameStore.getState().playerProgress, wormStory: { stars: {1:1,2:1,3:1,4:1,5:1}, claimed: {} } } });
+    useGameStore.getState().initWormMode(undefined, undefined, 1.4, 1, 30, null, false, false, id);
+  });
+  expect(useGameStore.getState().wormGamePhase).toBe('active');
+  act(() => useGameStore.setState({ wormPaused: false, wormStoryStarted: true }));
+  tick(500);
+  expect(rotate).not.toHaveBeenCalled();
+  expect(useGameStore.getState().wormGamePhase).toBe('active');
+  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  expect(props.bombsRef.current).toHaveLength(0);
+});
+
+it('schedules just one warned turn for Moving Ground and leaves completion to its objective', () => {
+  act(() => {
+    useGameStore.setState({ playerProgress: { ...useGameStore.getState().playerProgress, wormStory: { stars: {1:1,2:1,3:1}, claimed: {} } } });
+    useGameStore.getState().initWormMode(undefined, undefined, 1.4, 1, 30, null, false, false, 4);
+  });
+  tick(150); expect(rotate).not.toHaveBeenCalled(); // ready card holds the hazard
+  act(() => useGameStore.setState({ wormPaused: false, wormStoryStarted: true }));
+  tick(50); expect(rotate).not.toHaveBeenCalled(); expect(rotationClock.held).toBe(false);
+  tick(500); expect(rotate).toHaveBeenCalledTimes(1);
+  expect(useGameStore.getState().wormGamePhase).toBe('finalHealing');
+  expect(useGameStore.getState().wormStoryResult).toBeNull();
 });

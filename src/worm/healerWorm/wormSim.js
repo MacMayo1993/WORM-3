@@ -840,7 +840,8 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
             });
         }
         ctx.feel('orb', { combo: sim.orbCombo });
-        sim.powerups[puIdx] = { ...respawnTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
+        if (ctx.isStoryMode?.()) sim.powerups.splice(puIdx--, 1);
+        else sim.powerups[puIdx] = { ...respawnTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
         collectedAny = true;
     }
 
@@ -899,7 +900,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
     // for surrounding it, and the only way it reads on a mega board where the tile is tiny.
     sim.healPauseT = HEAL_PAUSE_DURATION;
     sim.healFocusTile = hit.mouth; // the tile the camera pushes in on during the pause
-    spawnSpecial(sim, size, ctx, hit.mouth);
+    if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, hit.mouth);
     if (tunnelKey) {
         sim.tunnelUseCounts.delete(tunnelKey);
         sim.voidTunnelKeys.delete(tunnelKey);
@@ -1989,7 +1990,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             // per-step heal scan on large boards. The timer resets regardless, so the first
             // interval after a heal refills the slot.
             const atCap = (ctx.getActiveTunnels?.() ?? []).length >= activeTunnelCap(size);
-            if (!noMoreSpawns && !atCap && !ctx.isDemoLesson?.() && !ctx.isCombatMode?.()) {
+            if (!noMoreSpawns && !atCap && !ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && !ctx.isStoryMode?.()) {
                 const tile = randomUnflippedTile(ctx.getCubies(), size, [sim.pos]);
                 if (tile) ctx.spawnWormholePair(tile);
             }
@@ -2001,8 +2002,8 @@ export function stepWormSim(sim, delta, size, ctx) {
     // ── Special orbs: ambient spawn clock + lifetime ageing. Both run only while
     // crawling, so a special can't appear (or expire unseen) during a tunnel transit.
     if (sim.phase === 'crawling') {
-        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.()) sim.specialTimer -= delta;
-        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && sim.specialTimer <= 0) {
+        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && !ctx.isStoryMode?.()) sim.specialTimer -= delta;
+        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && !ctx.isStoryMode?.() && sim.specialTimer <= 0) {
             // spawnSpecial resets the timer on success. A failure means either the
             // board is at its cap or the neighbourhood had no acceptable tile — both
             // are transient, so retry soon rather than skipping a whole interval.
@@ -2010,8 +2011,8 @@ export function stepWormSim(sim, delta, size, ctx) {
         }
         // Elemental offering runs on its own faster clock (spawnElementalOffering
         // resets the timer itself, to the interval on success or a short retry).
-        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.()) sim.elementalSpawnTimer -= delta;
-        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && sim.elementalSpawnTimer <= 0) {
+        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && !ctx.isStoryMode?.()) sim.elementalSpawnTimer -= delta;
+        if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && !ctx.isStoryMode?.() && sim.elementalSpawnTimer <= 0) {
             spawnElementalOffering(sim, size, ctx);
         }
         if (sim.specials.length > 0) {
@@ -2088,7 +2089,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.healed += 1;
             ctx.applyHeal(tunnel.entry, tunnel.exit, stableKey, sim.healed);
             sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
-            spawnSpecial(sim, size, ctx, tunnel.exit);
+            if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, tunnel.exit);
             if (tunnelKey) {
                 sim.tunnelUseCounts.delete(tunnelKey);
                 sim.voidTunnelKeys.delete(tunnelKey);
