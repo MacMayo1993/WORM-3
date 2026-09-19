@@ -7,7 +7,7 @@ import { GAME_HUD } from '../utils/uiTheme.js';
 
 export default function SignatureButton({ compact = false }) {
   const character = useGameStore(s => s.wormCharacter);
-  const paused = useGameStore(s => s.wormPaused);
+  const paused = useGameStore(s => s.wormPaused || s.wormJumpRescueActive);
   const alive = useGameStore(s => s.wormAlive);
   const phase = useGameStore(s => s.wormGamePhase);
   const [readout, setReadout] = useState(wormBuffs.signature);

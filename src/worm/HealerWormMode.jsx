@@ -208,6 +208,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         }
 
         const store = useGameStore.getState();
+        if (store.wormJumpRescueActive || worm.jumpRescueHeld?.current) {
+            rotationClock.held = true;
+            return;
+        }
 
         // ── Phase: scrambling ──────────────────────────────────────────────────
         // Moves are sequenced by startAnimatedShuffle (called from generateScramble).

@@ -9,7 +9,7 @@ import DirectWormPreviewHost from '../3d/DirectWormPreviewHost.jsx';
 import { registerDirectWormPreview, unregisterDirectWormPreview } from '../3d/directWormPreview.js';
 import { drawDirectWormPreview } from '../3d/WormPreviewRenderer.js';
 
-it('restores canvas ownership and size through strict mount, adaptive resize and exit', () => {
+it('restores canvas ownership and size through strict mount, adaptive resize and exit', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   const original = document.createElement('div'), hero = document.createElement('div');
@@ -21,7 +21,8 @@ it('restores canvas ownership and size through strict mount, adaptive resize and
   state.three = { gl, get: () => ({ size: { width: 900, height: 700 }, viewport: { dpr: 1 }, invalidate: vi.fn() }) };
   const root = createRoot(document.createElement('div'));
   const entry = registerDirectWormPreview(hero, { framing: 'character' });
-  act(() => root.render(<React.StrictMode><DirectWormPreviewHost /></React.StrictMode>));
+  await act(async () => root.render(<React.StrictMode><DirectWormPreviewHost /></React.StrictMode>));
+  await act(async () => { await import('../3d/ActiveWormPreview.jsx'); });
   expect(canvas.parentNode).toBe(hero); expect(size.x).toBe(360);
   size.set(900, 700); ratio = 0.5;
   act(() => state.frame({}, 1 / 60));

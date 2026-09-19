@@ -49,7 +49,7 @@ beforeEach(() => {
     onDeath: death => useGameStore.setState({ wormAlive: false, wormDeathDetails: death }),
   }, details);
   const cubies = makeCubies(3);
-  useGameStore.setState({ cubies, size: 3, wormAlive: true, wormPaused: false, animState: null,
+  useGameStore.setState({ cubies, size: 3, wormAlive: true, wormPaused: false, wormJumpRescueActive: false, animState: null,
     demoMode: false, wormCombatMode: false, wormEnemiesEnabled: false, wormPhase: 'crawling' });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   rotate = vi.fn();
@@ -92,4 +92,24 @@ it('stops damage and slice dispatch after a fatal bomb on the rotation frame', (
   expect(resolveSliceHits).not.toHaveBeenCalled();
   tick(20);
   expect(worm.feel.mock.calls.filter(([event]) => event === 'death')).toHaveLength(1);
+});
+
+it('holds bombs and the rotation countdown through a rescue and its release frame', () => {
+  tick(95);
+  const bombProps = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  const bomb = { id: 3, tile: { ...sim.pos }, fuse: 0.3, maxFuse: 5 };
+  bombProps.bombsRef.current.push(bomb);
+  act(() => useGameStore.setState({ wormJumpRescueActive: true }));
+  tick(10);
+  expect(bomb.fuse).toBe(0.3);
+  expect(checkBlastHitWorm).not.toHaveBeenCalled();
+  expect(rotate).not.toHaveBeenCalled();
+  expect(rotationClock.held).toBe(true);
+  act(() => useGameStore.setState({ wormJumpRescueActive: false }));
+  sim.jumpRescueHeld = true;
+  tick();
+  expect(bomb.fuse).toBe(0.3);
+  sim.jumpRescueHeld = false;
+  tick();
+  expect(bomb.fuse).toBeCloseTo(0.2);
 });

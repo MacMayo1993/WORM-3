@@ -114,7 +114,7 @@ export function useKeyboardControls({
       // The caller owns the keyboard while its local overlay is open.
       if (h.disabled) return;
       // Worm mode is paused — the cube is frozen behind the pause overlay.
-      if (state.wormHealerMode && (state.wormPaused ?? false)) return;
+      if (state.wormHealerMode && (state.wormPaused || state.wormJumpRescueActive)) return;
 
       // Space/Enter dismisses the level briefing before any other binding, so
       // Space does not shuffle the cube out from under an unread tutorial.

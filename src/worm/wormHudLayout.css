@@ -40,6 +40,21 @@
 }
 .worm-action-center { flex-direction: column; }
 .worm-primary-actions { display: flex; justify-content: center; gap: 8px; }
+.worm-jump-slot { position: relative; display: flex; }
+.worm-instrument .worm-jump-rescue {
+  outline: 3px solid #ffe58a;
+  outline-offset: 3px;
+  box-shadow: 0 0 24px 5px rgba(255, 229, 138, 0.5);
+}
+.worm-jump-rescue-cue {
+  position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 190px; padding: 8px 12px;
+  border: 1px solid #ffe58a; border-radius: 9px; background: var(--hud-surface, #20251e);
+  color: #ffe58a; font-size: 13px; font-weight: 800; line-height: 1.3;
+  pointer-events: none; z-index: 3;
+}
+.worm-jump-rescue-meter { display: block; height: 3px; margin-top: 6px; background: rgba(255, 229, 138, 0.2); }
+.worm-jump-rescue-meter > span { display: block; height: 100%; background: #ffe58a; transform-origin: left; }
 .worm-instrument .worm-jump { flex: 1; }
 .worm-instrument .worm-action { min-height: 48px; }
 .worm-signature-control button > svg { flex-shrink: 0; }
