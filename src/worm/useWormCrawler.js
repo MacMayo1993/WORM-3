@@ -132,18 +132,25 @@ export function useWormCrawler(size, cubies) {
     if (simRef.current === null) simRef.current = makeWormSim(size);
 
     const feedbackRef = useRef(null);
+    const resumeFrameRef = useRef(false);
     if (!feedbackRef.current) feedbackRef.current = createWormFeedback();
     useEffect(() => {
         const sync = () => {
             const state = useGameStore.getState();
             setFeelEnabled({ sfx: state.settings?.sfx ?? true, haptics: state.settings?.haptics ?? true });
-            feedbackRef.current.hold(!!state.wormPaused || document.hidden);
+            feedbackRef.current.hold(!!state.wormPaused || !!state.wormJumpRescueActive || document.hidden);
         };
         sync();
         resumeFeel();
         const unsubscribe = useGameStore.subscribe(sync);
-        document.addEventListener('visibilitychange', sync);
-        return () => { unsubscribe(); document.removeEventListener('visibilitychange', sync); feedbackRef.current.reset(); };
+        const visibility = () => {
+            // RAF can stop entirely in the background. Discard its catch-up delta
+            // on return so a hidden tab cannot spend the rescue reaction window.
+            if (document.hidden) resumeFrameRef.current = true;
+            sync();
+        };
+        document.addEventListener('visibilitychange', visibility);
+        return () => { unsubscribe(); document.removeEventListener('visibilitychange', visibility); feedbackRef.current.reset(); };
     }, []);
 
     const deathMenuTimer = useRef(null);
@@ -175,7 +182,11 @@ export function useWormCrawler(size, cubies) {
             isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
             isCombatMode: () => useGameStore.getState().wormCombatMode,
             allowDemoSignature: () => wormDemoLesson(useGameStore.getState()).id === 'signature',
-            isPaused: () => useGameStore.getState().wormPaused ?? false,
+            isPaused: () => !!useGameStore.getState().wormPaused || document.hidden,
+            isJumpRescueEnabled: () => {
+                const s = useGameStore.getState();
+                return !s.demoMode && ['active', 'finalHealing'].includes(s.wormGamePhase);
+            },
             getSpeed: () => useGameStore.getState().wormSpeed ?? 2.0,
             getControlMode: () => useGameStore.getState().wormControlMode ?? 'non-oriented',
             getWormholeInterval: () => useGameStore.getState().wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL,
@@ -202,6 +213,7 @@ export function useWormCrawler(size, cubies) {
 
             // ── effects ─────────────────────────────────────────────────────────
             feel: (event, opts) => feedbackRef.current.emit(event, opts),
+            onJumpRescue: active => useGameStore.setState({ wormJumpRescueActive: active }),
             onDeath: (details, timeAlive) => {
                 const ending = useGameStore.getState();
                 ending.finishWormXp(false, ending.wormRunId);
@@ -388,6 +400,7 @@ export function useWormCrawler(size, cubies) {
 
     // ── Per-frame drive ──────────────────────────────────────────────────────────
     const tick = useCallback((delta, hazards = {}) => {
+        if (resumeFrameRef.current && !document.hidden) { delta = 0; resumeFrameRef.current = false; }
         const sim = simRef.current;
         const state = useGameStore.getState();
         feedbackRef.current.advance(delta);
@@ -425,7 +438,7 @@ export function useWormCrawler(size, cubies) {
             sim.combat = makeAmbientCombat(sizeRef.current);
             combatBridge.current = sim.combat;
         }
-        const combatHeld = state.wormPaused || !sim.alive || sim.phase !== 'crawling' ||
+        const combatHeld = state.wormPaused || document.hidden || sim.jumpRescueT > 0 || !sim.alive || sim.phase !== 'crawling' ||
             sim.tunnelPassages.length > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 ||
             sim.elementalFocusT > 0 || sim.signature.charge > 0 || sim.rocketActive || liveRotation.active ||
             state.wormGamePhase !== 'active';
@@ -433,7 +446,7 @@ export function useWormCrawler(size, cubies) {
         feedbackRef.current.tunnel(sim.phase, sim.tunnelProgress, sim.alive);
         if (sim.combat) {
             const c = sim.combat;
-            c.held = combatHeld || sim.phase !== 'crawling' || sim.tunnelPassages.length > 0 || !sim.alive;
+            c.held = combatHeld || sim.jumpRescueHeld || sim.phase !== 'crawling' || sim.tunnelPassages.length > 0 || !sim.alive;
             const previousKills = c.kills, previousShots = c.shotsFired, previousDrops = c.dropsCollected;
             const previousHits = c.shotsHit, previousAmmo = c.ammo;
             const combatPlayer = {
@@ -478,6 +491,7 @@ export function useWormCrawler(size, cubies) {
         }
         // Publish the wormhole countdown through the plain bridge (pause menu snapshot).
         wormClock.countdown = sim.wormholeCountdown;
+        wormBuffs.jumpRescueT = sim.jumpRescueT;
         // Mirror the authoritative buff clocks for the HUD. Plain field writes, so a
         // per-frame refresh costs nothing and freezes whenever the sim does.
         wormBuffs.tunnelNeeds = tunnelReadout(sim, sizeRef.current, ctxRef.current);
@@ -510,6 +524,8 @@ export function useWormCrawler(size, cubies) {
             return;
         }
         if (dir === 'fire-stop') { if (c) c.fireHeld = false; return; }
+        if (state.wormPaused || !sim.alive) return;
+        if (sim.jumpRescueT > 0) { queueTurnSim(sim, dir); return; }
         if (dir === 'fire' || dir === 'fire-start') {
             if (c?.started && (!c.ambient || c.encounter) && !c.won && sim.alive && !state.wormPaused && !c.held && sim.phase === 'crawling') { c.fireRequested = true; if (dir === 'fire-start') c.fireHeld = true; }
             return;
@@ -549,6 +565,7 @@ export function useWormCrawler(size, cubies) {
             wormHealingProgress: {},
             wormHealedCount: 0,
             wormAlive: true,
+            wormJumpRescueActive: false,
             showWormDeathMenu: false,
             wormDeathDetails: null,
             wormPhase: 'crawling',
@@ -573,7 +590,7 @@ export function useWormCrawler(size, cubies) {
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
-        useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null });
+        useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false });
     }, []);
 
     // When a cube rotation commits, transform the whole sim (worm, powerups, trails,
@@ -668,6 +685,7 @@ export function useWormCrawler(size, cubies) {
             healPauseT: f('healPauseT'),
             healFocusTile: f('healFocusTile'),
             cutFocusT: f('cutFocusT'),
+            jumpRescueHeld: f('jumpRescueHeld'),
             cutFocusPos: f('cutFocusPos'),
             elementalFocusT: f('elementalFocusT'),
             elementalT: f('elementalT'),

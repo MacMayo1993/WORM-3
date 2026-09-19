@@ -34,7 +34,8 @@ import { makeCubies } from '../game/cubeState.js';
 import * as THREE from 'three';
 import { liveRotation } from '../worm/liveRotation.js';
 import { inchCrawlAdvance } from '../worm/healerWorm/inchGait.js';
-import { shPush, shAt, shReset, ttAt } from '../worm/circularBuffers.js';
+import { shPush, shAt, shReset, ttAt, ttReset, ttPush } from '../worm/circularBuffers.js';
+import { getNextSurfacePosition } from '../worm/wormLogic.js';
 import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 
 const SIZE = 3;
@@ -102,6 +103,120 @@ function runUntil(sim, ctx, predicate, maxSeconds = 30, dt = 0.05) {
 }
 
 const eventsOf = (ctx, type) => ctx.events.filter(e => e.type === type);
+
+describe('jump rescue window', () => {
+  function setup(overrides = {}, size = 5) {
+    const sim = makeWormSim(size);
+    resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
+    const ctx = makeCtx({ isJumpRescueEnabled: () => true, ...overrides });
+    ctx.onJumpRescue = active => ctx.events.push({ type: 'rescue', active });
+    stepWormSim(sim, 0, size, ctx);
+    sim.moveDir = 'right';
+    const key = tileKey(getNextSurfacePosition(sim.pos, sim.moveDir, size));
+    sim.tailLength = 100;
+    ttReset(sim.tileTrail, key);
+    ttPush(sim.tileTrail, '0,0,4,PZ');
+    ttPush(sim.tileTrail, tileKey(sim.pos));
+    sim.stepAcc = 100; // start the next step now, then restore its accumulator
+    stepWormSim(sim, 0, size, ctx);
+    sim.stepAcc = 0;
+    expect(sim.pendingSelfCollision?.key).toBe(key);
+    return { sim, ctx };
+  }
+
+  it('freezes all sim clocks and the body trail for exactly half a second', () => {
+    const { sim, ctx } = setup();
+    sim.boostActiveT = 1; sim.magnetT = 2; sim.elementalT = 3;
+    const snapshot = () => [sim.interpT, sim.stepAcc, sim.timeAlive, sim.survivalTick,
+      sim.wormholeTimer, sim.boostActiveT, sim.magnetT, sim.elementalT, sim.stepHistory.distance];
+    const before = snapshot();
+    stepWormSim(sim, 0.02, 5, ctx);
+    expect(sim.jumpRescueT).toBe(0.5);
+    expect(snapshot()).toEqual(before);
+    stepWormSim(sim, 0.49, 5, ctx);
+    expect(sim.jumpRescueT).toBeCloseTo(0.01);
+    expect(snapshot()).toEqual(before);
+    stepWormSim(sim, 0.01, 5, ctx);
+    expect(sim.jumpRescueT).toBe(0);
+    expect(snapshot()).toEqual(before);
+    for (let i = 0; i < 50 && sim.alive; i++) stepWormSim(sim, 0.02, 5, ctx);
+    expect(sim.alive).toBe(false);
+    expect(eventsOf(ctx, 'death')).toHaveLength(1);
+    expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('self-collision');
+    expect(eventsOf(ctx, 'rescue').map(e => e.active)).toEqual([true, false]);
+  });
+
+  it.each([
+    [5, 0.5, 60, false], [5, 1, 60, false], [5, 3.5, 60, false],
+    [2, 3.5, 30, true], [3, 3.5, 60, true], [15, 3.5, 120, true],
+  ])('clears the body on size %s, speed %s, %s Hz, boost %s', (size, speed, hz, boost) => {
+    const { sim, ctx } = setup({ getSpeed: () => speed }, size);
+    if (boost) sim.boostActiveT = 2;
+    const hitKey = sim.pendingSelfCollision.key;
+    stepWormSim(sim, 0.01, size, ctx);
+    stepWormSim(sim, 0.499, size, ctx);
+    queueTurn(sim, 'boost'); queueTurn(sim, 'signature'); queueTurn(sim, 'left');
+    expect(sim.pendingTurns).toEqual([]);
+    queueTurn(sim, 'jump');
+    stepWormSim(sim, 0.001, size, ctx);
+    expect(sim.isJumping).toBe(true);
+    expect(sim.jumpRescueT).toBe(0);
+    expect(sim.signatureRequested).toBe(false);
+    let crossed = false;
+    for (let i = 0; i < 400 && (sim.isJumping || !crossed) && sim.alive; i++) {
+      stepWormSim(sim, 1 / hz, size, ctx);
+      crossed ||= tileKey(sim.pos) !== hitKey;
+    }
+    expect(crossed).toBe(true);
+    expect(sim.alive).toBe(true);
+    expect(sim.isJumping).toBe(false);
+    expect(eventsOf(ctx, 'feel').filter(e => e.args[0] === 'jump')).toHaveLength(1);
+  });
+
+  it('holds the window during manual pause, then resumes its remaining time', () => {
+    let paused = false;
+    const { sim, ctx } = setup({ isPaused: () => paused });
+    stepWormSim(sim, 0.01, 5, ctx);
+    stepWormSim(sim, 0.2, 5, ctx);
+    paused = true;
+    stepWormSim(sim, 10, 5, ctx);
+    expect(sim.jumpRescueT).toBeCloseTo(0.3);
+    paused = false;
+    stepWormSim(sim, 0.3, 5, ctx);
+    expect(sim.jumpRescueT).toBe(0);
+  });
+
+  it('revalidates a cut body and cleans up on death and reset', () => {
+    const { sim, ctx } = setup();
+    stepWormSim(sim, 0.01, 5, ctx);
+    ttReset(sim.tileTrail, tileKey(sim.pos));
+    stepWormSim(sim, 0.01, 5, ctx);
+    expect(sim.jumpRescueT).toBe(0);
+    expect(sim.alive).toBe(true);
+    const next = setup();
+    stepWormSim(next.sim, 0.01, 5, next.ctx);
+    killWormSim(next.sim, next.ctx, { reason: 'slice-rotation' });
+    expect(next.sim.jumpRescueT).toBe(0);
+    expect(eventsOf(next.ctx, 'rescue').map(e => e.active)).toEqual([true, false]);
+    resetWormSim(next.sim, 5, { orbCount: 0, wormholeInterval: 9999 });
+    expect(next.sim.jumpRescueCollision).toBeNull();
+    expect(next.sim.jumpRescueRequested).toBe(false);
+  });
+
+  it.each(['queued', 'airborne', 'grace', 'tunnel', 'disabled', 'spent', 'shed'])('does not interrupt %s movement', kind => {
+    const { sim, ctx } = setup();
+    if (kind === 'queued') { queueTurn(sim, 'left'); queueTurn(sim, 'jump'); }
+    if (kind === 'airborne') startJump(sim, ctx, 5);
+    if (kind === 'grace') sim.selfCollisionGraceSteps = 3;
+    if (kind === 'tunnel') sim.pendingTunnelTrigger = { ...sim.pos };
+    if (kind === 'disabled') ctx.isJumpRescueEnabled = () => false;
+    if (kind === 'spent') sim.jumpCount = MAX_JUMPS;
+    if (kind === 'shed') { sim.signature.character = 'classic'; sim.signature.active = 1; }
+    stepWormSim(sim, 0.01, 5, ctx);
+    expect(sim.jumpRescueT).toBe(0);
+    if (kind === 'queued') expect(sim.isJumping).toBe(true);
+  });
+});
 
 describe('terminal death ordering', () => {
   it('does not heal or reward a cleared tunnel after a death in the same tick', () => {

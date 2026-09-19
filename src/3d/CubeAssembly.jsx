@@ -20,6 +20,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, setLiveRotation, resetLiveRotation, syncRotationFrame } from '../worm/liveRotation.js';
+const jumpRescueActive = () => useGameStore.getState().wormJumpRescueActive;
 // Scratch layer/angle lists handed to setLiveRotation every frame — it copies out
 // of them, so they are reused rather than reallocated per frame.
 const _liveLayers = [];
@@ -135,6 +136,12 @@ const CubeAssembly = React.memo(({
   const controlsEnabledRef = useRef(true); // Track controls state with ref for immediate updates
   const cubeGroupRef = useRef(null);
   const gsapAnimRef = useRef(null);
+  // Freeze an in-flight layer synchronously with the rescue transition. A React
+  // render alone can arrive after GSAP has advanced another gameplay frame.
+  useEffect(() => useGameStore.subscribe(
+    s => s.wormJumpRescueActive,
+    held => gsapAnimRef.current?.paused(held)
+  ), []);
   const initializedMoveRef = useRef(null);
   const animProgressRef = useRef({ value: 0 });
   const { camera, gl } = useThree();
@@ -236,6 +243,7 @@ const CubeAssembly = React.memo(({
   onClearTileSelectionRef.current = onClearTileSelection;
 
   const onPointerDown = useCallback(({ pos, worldPos, event }) => {
+    if (jumpRescueActive()) return;
     if (animStateRef.current) return;
     if (gsapAnimRef.current) return;
 
@@ -339,6 +347,7 @@ const CubeAssembly = React.memo(({
     };
 
     const move = e => {
+      if (jumpRescueActive()) return;
       const ds = dragStartRef.current;
       if (!ds) return;
       e.preventDefault();
@@ -436,6 +445,14 @@ const CubeAssembly = React.memo(({
       const ds = dragStartRef.current;
       if (!ds) return;
 
+      if (jumpRescueActive() && !liveDragRef.current) {
+        dragStartRef.current = null;
+        setDragStart(null);
+        controlsEnabledRef.current = true;
+        if (controlsRef.current) controlsRef.current.enabled = true;
+        return;
+      }
+
       // Handle live drag release
       if (liveDragRef.current) {
         const ld = liveDragRef.current;
@@ -464,6 +481,7 @@ const CubeAssembly = React.memo(({
           const remaining = Math.abs(targetAngle - currentAngle);
           const snapDuration = Math.max(0.06, (remaining / quarterTurn) * 0.15);
           gsapAnimRef.current = gsap.to(ld, {
+            paused: jumpRescueActive(),
             angle: targetAngle,
             duration: snapDuration,
             ease: 'power3.out',
@@ -506,6 +524,7 @@ const CubeAssembly = React.memo(({
           // Snap back to zero — proportional duration so a tiny overswing snaps back fast.
           const snapBackDuration = Math.max(0.06, (Math.abs(currentAngle) / quarterTurn) * 0.15);
           gsapAnimRef.current = gsap.to(ld, {
+            paused: jumpRescueActive(),
             angle: 0,
             duration: snapBackDuration,
             ease: 'power3.out',
@@ -788,6 +807,7 @@ const CubeAssembly = React.memo(({
     const baseDuration = isFast ? 0.12 : 0.35;
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
       value: 1,
+      paused: jumpRescueActive(),
       duration: isWormHazard ? baseDuration * 4.0 : baseDuration,
       ease: isWormHazard ? "power2.inOut" : isFast ? "power2.out" : "back.out(1.4)",
       onComplete: () => {

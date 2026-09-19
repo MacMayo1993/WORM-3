@@ -86,6 +86,7 @@ import {
     HEAL_PAUSE_DURATION,
     TUNNEL_TRIGGER_PROGRESS,
     SELF_COLLISION_TRIGGER_PROGRESS,
+    JUMP_RESCUE_SECONDS,
     SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
     selfCollisionGraceAfterRotation,
     SAFE_LANE_MAX_SIZE,
@@ -266,6 +267,10 @@ export function makeWormSim(size) {
 
         // ── Collision ──────────────────────────────────────────────────────────
         pendingSelfCollision: null,
+        jumpRescueT: 0,
+        jumpRescueCollision: null,
+        jumpRescueRequested: false,
+        jumpRescueHeld: false,
         selfCollisionGraceSteps: 0,
 
         // ── Body / trails ──────────────────────────────────────────────────────
@@ -376,6 +381,10 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.landingGraceT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
+    sim.jumpRescueT = 0;
+    sim.jumpRescueCollision = null;
+    sim.jumpRescueRequested = false;
+    sim.jumpRescueHeld = false;
     sim.selfCollisionGraceSteps = 0;
     sim.tailLength = BASE_TAIL_LENGTH;
     sim.orbPickupColors = [];
@@ -421,12 +430,12 @@ export const jumpLiftOf = (sim) => sim.isJumping
     ? Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight
     : 0;
 
-export function startJump(sim, ctx, size) {
+export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     if (sim.phase !== 'crawling' || (sim.signature.character === 'inch' && sim.signature.active > 0)) return;
     const grounded = !sim.isJumping;
     // A deliberate dive reads only settled tile contents. Never resolve the
     // outgoing sticker while a layer is moving or a destination is rest-read.
-    if (size && !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead) {
+    if (allowDive && size && !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead) {
         const { x, y, z, dirKey } = sim.pos;
         const sticker = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         if (sticker && sticker.curr !== sticker.orig && !isParityLocked(sim, sim.pos) && ctx.resolveTunnel(x, y, z, dirKey)) {
@@ -545,7 +554,73 @@ export function activateSpecial(sim, ctx, type) {
 export const isReversal = (current, next) =>
     turnWorm(turnWorm(current, 'left'), 'left') === next;
 
+function pendingBodyStillPresent(sim) {
+    const key = sim.pendingSelfCollision?.key;
+    if (!key) return false;
+    const limit = Math.min(Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)), sim.tileTrail.count);
+    for (let i = 1; i < limit; i++) if (ttAt(sim.tileTrail, i) === key) return true;
+    return false;
+}
+
+function clearJumpRescue(sim, ctx) {
+    const wasActive = sim.jumpRescueCollision !== null;
+    sim.jumpRescueT = 0;
+    sim.jumpRescueCollision = null;
+    sim.jumpRescueRequested = false;
+    if (wasActive) ctx.onJumpRescue?.(false);
+}
+
+// The countdown is presentation time; every gameplay clock remains frozen.
+// Offer at the start of the armed step so a normal jump has room to gain height
+// before the 40% contact plane. Never restart a window for the same candidate.
+function tickJumpRescue(sim, delta, size, ctx) {
+    const candidate = sim.pendingSelfCollision;
+    const eligible = sim.phase === 'crawling' && candidate && !sim.isJumping &&
+        !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 &&
+        !sim.pendingTunnelTrigger && !sim.pendingVoidKill?.armed && !sim.signature.dashing &&
+        !(sim.signature.character === 'classic' && sim.signature.active > 0 && sim.tailLength >= BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH) &&
+        !(sim.signature.character === 'inch' && sim.signature.active > 0) && sim.jumpCount < MAX_JUMPS;
+    if (sim.jumpRescueCollision) {
+        if (!eligible || candidate !== sim.jumpRescueCollision || !pendingBodyStillPresent(sim)) {
+            clearJumpRescue(sim, ctx);
+            return true;
+        }
+        if (sim.jumpRescueRequested) {
+            clearJumpRescue(sim, ctx);
+            // A rescue always hops; a changed sticker must not turn this into a dive.
+            startJump(sim, ctx, size, { allowDive: false });
+            // The prompt fires at the step's beginning. Carry the assisted hop
+            // beyond that occupied tile so it cannot land back on the same body.
+            sim.jumpSpan = Math.max(sim.jumpSpan, 1.25);
+            return true;
+        }
+        sim.jumpRescueT = Math.max(0, sim.jumpRescueT - Math.max(0, delta));
+        if (sim.jumpRescueT <= 1e-9) clearJumpRescue(sim, ctx);
+        return true;
+    }
+    if (!ctx.isJumpRescueEnabled?.() || !eligible || candidate.rescueOffered ||
+        sim.interpT > 0.1 || !pendingBodyStillPresent(sim)) return false;
+    const queuedJump = sim.pendingTurns.indexOf('jump');
+    if (queuedJump >= 0) {
+        // Reward proactive jumping without interrupting it or hiding it behind steering.
+        sim.pendingTurns.splice(queuedJump, 1);
+        sim.pendingTurns.unshift('jump');
+        return false;
+    }
+    candidate.rescueOffered = true;
+    sim.jumpRescueCollision = candidate;
+    sim.jumpRescueT = JUMP_RESCUE_SECONDS;
+    sim.pendingTurns.length = 0;
+    sim.signatureRequested = false;
+    ctx.onJumpRescue?.(true);
+    return true;
+}
+
 export function queueTurn(sim, dir) {
+    if (sim.jumpRescueT > 0) {
+        if (dir === 'jump') sim.jumpRescueRequested = true;
+        return;
+    }
     if (dir === 'turnLeft' || dir === 'left') sim.signatureSide = 'left';
     if (dir === 'turnRight' || dir === 'right') sim.signatureSide = 'right';
     if (dir === 'signature') { sim.signatureRequested = true; return; }
@@ -556,6 +631,7 @@ export function queueTurn(sim, dir) {
 
 export function killWormSim(sim, ctx, details = null) {
     if (!sim.alive) return;
+    clearJumpRescue(sim, ctx);
     sim.alive = false;
     sim.phase = 'dead';
     sim.signature = makeSignature();
@@ -1726,6 +1802,7 @@ const PHASE_HANDLERS = {
  * active phase handler (firing enter()/exit() exactly once per transition).
  */
 export function stepWormSim(sim, delta, size, ctx) {
+    sim.jumpRescueHeld = false;
     if (!sim.alive) return;
     const paused = ctx.isPaused();
     if (sim.phase === 'crawling' &&
@@ -1771,6 +1848,13 @@ export function stepWormSim(sim, delta, size, ctx) {
     // of crawling afterwards.
     if (sim.elementalFocusT > 0) {
         sim.elementalFocusT = Math.max(0, sim.elementalFocusT - Math.min(delta, MAX_TICK_DELTA));
+        return;
+    }
+
+    if (tickJumpRescue(sim, delta, size, ctx)) {
+        // Restore the rest pose before the render bridge applies a slice angle.
+        sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
+        sim.jumpRescueHeld = true;
         return;
     }
 
