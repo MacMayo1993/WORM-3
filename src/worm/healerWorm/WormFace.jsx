@@ -88,14 +88,12 @@ export function WormFace({ worm, size }) {
             normal = worm.currentNormal.current;
 
             if (phase === 'windout' || phase === 'windup') {
-                // Tangent from the exit spiral: look slightly ahead in s (s decreases as prog rises)
-                const prog = worm.tunnelProgress.current;
+                // Aim along the short mouth handoff. A fixed world-Z fallback
+                // would turn the face sideways on the other five face directions.
                 const exiting = phase === 'windout';
-                const sHead = exiting ? 1 - prog : prog;
-                const sAhead = Math.max(0, Math.min(1, sHead + (exiting ? -0.02 : 0.02)));
-                getWindWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, exiting ? 'exit' : 'entry', sAhead, size);
+                getWindWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, exiting ? 'exit' : 'entry', exiting ? 0 : 1, size);
                 _faceForward.copy(_faceTunnelAhead).sub(_faceHeadPos);
-                if (_faceForward.lengthSq() < 0.0001) _faceForward.set(0, 0, 1);
+                if (_faceForward.lengthSq() < 1e-12) _faceForward.copy(normal).multiplyScalar(exiting ? 1 : -1);
                 _faceForward.normalize();
             } else {
                 // Derive forward from the tunnel tangent at the current parametric position.

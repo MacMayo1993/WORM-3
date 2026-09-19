@@ -41,7 +41,7 @@ import {
     BASE_TAIL_LENGTH,
     MAX_TAIL,
 } from './constants.js';
-import { inchGaitInto, makeInchGaitState, advanceInchGaitState, INCH_BALL_SPACING } from './inchGait.js';
+import { inchGaitInto, makeInchGaitState, advanceInchGaitState } from './inchGait.js';
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
 import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
 
@@ -357,13 +357,10 @@ export function WormBody({ worm, size }) {
         const _inchShape = _isInch ? gait.shape : null;
         const _humpHeight = _inchShape ? _inchShape.height : 0;
 
-        // Walk the ring directly. Keep the existing reach cap, but avoid copying
-        // up to 10,900 history references before positioning a long worm each frame.
-        const _bodyReach = Math.min(MAX_TAIL, tLen) * (_isInch ? INCH_BALL_SPACING : BODY_BALL_SPACING);
-        // ×2 headroom covers corner arcs (which lengthen the path) + 2 spare tiles of margin,
-        // so the walk's last segment finds its bracket rather than freezing at the buffer end.
-        const _neededSteps = Math.ceil(_bodyReach * STEPS_PER_TILE * 2) + STEPS_PER_TILE * 2;
-        const _fillCount = Math.min(steps.count, _neededSteps);
+        // Samples have different densities at spawn, corners and portal handoffs.
+        // Stop the cursor at the last bead's actual distance, never at an estimated
+        // sample count that could clamp or eject a still-trailing tunnel segment.
+        const _fillCount = steps.count;
         const pathPointCount = _fillCount + 1;
 
         // Ride: while a slice is mid-rotation, body points sitting in that slice must turn

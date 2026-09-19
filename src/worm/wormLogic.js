@@ -493,56 +493,27 @@ const ZERO3 = [0, 0, 0];
 // mini-cube radius used to be duplicated here and in three manifold components, which
 // is how the anchor drifted onto the wrong side of the cubie in the first place.
 
-// ── Wind-up / wind-out spiral flourish above a tunnel mouth ───────────────────
-// The worm orbits in a shrinking circle above the hole and descends into it (wind-up),
-// or rises out of it and spirals open (wind-out, played in reverse). s ∈ [0,1]:
-//   s = 0 → far out on the circle, lifted high above the surface
-//   s = 1 → centered on the hole, settled at the face surface
-const WIND_RADIUS = 0.72; // circle radius in cube units at s = 0
-const WIND_LIFT   = 0.95; // height above the face surface at s = 0
-const WIND_TURNS  = 1.5;  // number of orbits over the full spiral
-const _windCenter = new THREE.Vector3();
-const _windNormal = new THREE.Vector3();
-const _windRef = new THREE.Vector3();
-const _windT1 = new THREE.Vector3();
-const _windT2 = new THREE.Vector3();
+// ── Surface / tunnel mouth handoff ───────────────────────────────────────────
+// s = 0 is the ordinary lifted crawl position; s = 1 is the aperture centre.
+// This short axial path is recorded as real travel. The former orbit added
+// 5.38 units of route at exit, pulling ~60 body beads out while the head stayed
+// over the hole. Only actual departure should draw the remaining tail through.
 
 /**
- * Write the worm's spiral-flourish world position into `out`.
+ * Write the axial handoff between the crawl surface and the aperture.
  * @param {THREE.Vector3} out
  * @param {Object} tunnel
  * @param {'entry'|'exit'} side - which mouth to orbit
- * @param {number} s - 0 = far/lifted, 1 = on the hole at the surface
+ * @param {number} s - 0 = lifted crawl position, 1 = aperture centre
  * @param {number} size - cube size
  */
 export const getWindWorldPosInto = (out, tunnel, side, s, size) => {
   const tile = side === 'exit' ? tunnel.exit : tunnel.entry;
   const n = TUNNEL_FACE_NORMALS[tile.dirKey] || ZERO3;
   const wp = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, 0);
-  _windCenter.set(wp[0], wp[1], wp[2]);
-  _windNormal.set(n[0], n[1], n[2]);
-  // In-face basis (t1, t2) ⟂ normal. Use a shuffled reference so it is never parallel to n.
-  _windRef.set(n[1], n[2], n[0]);
-  _windT1.crossVectors(_windRef, _windNormal);
-  if (_windT1.lengthSq() < 1e-4) _windT1.set(1, 0, 0).cross(_windNormal);
-  _windT1.normalize();
-  _windT2.crossVectors(_windNormal, _windT1).normalize();
-
   const cl = Math.max(0, Math.min(1, s));
-  // Radius + lift follow a smooth 0→1→0 bump so the worm starts AT the hole (no teleport),
-  // rises out and orbits at the peak, then is drawn back down into the hole.
-  const env = Math.sin(cl * Math.PI);
-  const radius = WIND_RADIUS * env;
-  const angle = cl * WIND_TURNS * Math.PI * 2;
-  const lift = WIND_LIFT * env + THREE.MathUtils.lerp(WORM_LIFT, TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, cl); // just above the surface at both ends
-  const cos = Math.cos(angle) * radius;
-  const sin = Math.sin(angle) * radius;
-  out.set(
-    _windCenter.x + _windT1.x * cos + _windT2.x * sin + n[0] * lift,
-    _windCenter.y + _windT1.y * cos + _windT2.y * sin + n[1] * lift,
-    _windCenter.z + _windT1.z * cos + _windT2.z * sin + n[2] * lift
-  );
-  return out;
+  const lift = THREE.MathUtils.lerp(WORM_LIFT, TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, cl);
+  return out.set(wp[0] + n[0] * lift, wp[1] + n[1] * lift, wp[2] + n[2] * lift);
 };
 // ============================================================================
 // SURFACE NAVIGATION - Grid stepping on the cube surface (used by the crawler)

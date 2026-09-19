@@ -31,9 +31,16 @@ export function advanceTunnelHead(sim, phase, nextProgress, size) {
     const sample = (p, record) => {
         if (wind) {
             const exiting = phase === 'windout';
-            getWindWorldPosInto(sim.headInterpPos, tunnel, exiting ? 'exit' : 'entry', exiting ? windoutHeadS(p) : p, size);
             if (!exiting && sim.tunnelApproach) {
-                sim.headInterpPos.lerp(sim.tunnelApproach, 1 - THREE.MathUtils.smoothstep(p, 0, 0.3));
+                // First reach the mouth's centre at crawl height, then descend
+                // axially. A diagonal dive from the still-approaching head can
+                // cross the solid tile beside the aperture.
+                const aligned = THREE.MathUtils.smoothstep(p, 0, 0.65);
+                const dive = THREE.MathUtils.smoothstep(p, 0.65, 1);
+                getWindWorldPosInto(sim.headInterpPos, tunnel, 'entry', dive, size);
+                sim.headInterpPos.lerp(sim.tunnelApproach, 1 - aligned);
+            } else {
+                getWindWorldPosInto(sim.headInterpPos, tunnel, exiting ? 'exit' : 'entry', exiting ? windoutHeadS(p) : p, size);
             }
             normal.copy(exiting ? exitN : entryN);
         } else {

@@ -126,8 +126,9 @@ export const activeTunnelCap = (size) =>
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
 export const MAX_TAIL = 1200;
 
-// The exit flourish follows the head only. The body uses its recorded world-space
-// trail, so a longer worm never accelerates the flourish or piles up at its end.
+// Short handoff at each aperture; body extrusion follows distance, not this timer.
+export const TUNNEL_HANDOFF_SECONDS = 0.18;
+// Preserve the phase parameter for camera/face consumers: surface=0, mouth=1.
 export const windoutHeadS = (progress) => 1 - Math.min(1, Math.max(0, progress));
 export const HEAL_COST = 4; // worm segments (balls) required to fully heal one tunnel
 // When a ring heal completes, hold the worm still for this long so the tile visibly pops

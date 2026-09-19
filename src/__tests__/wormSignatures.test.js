@@ -201,7 +201,8 @@ describe('MOBI: Parity Lock', () => {
     const { sim, ctx } = tunnelWorld(); activate(sim, ctx); run(sim, ctx, 1.15);
     sim.signature.active = 0.01;
     run(sim, ctx, 0.35);
-    expect(sim.phase).toBe('windup'); expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
+    // The 180 ms mouth alignment has finished by this observation time.
+    expect(sim.phase).toBe('entering'); expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
   });
   it('waits for a cube turn to settle before rearming an expired seal', () => {
     const { sim, ctx } = tunnelWorld(); activate(sim, ctx); run(sim, ctx, 1.15);
@@ -209,13 +210,13 @@ describe('MOBI: Parity Lock', () => {
     step(sim, ctx);
     expect(sim.pendingTunnelTrigger).toBeNull(); expect(sim.phase).toBe('crawling');
     resetLiveRotation(); run(sim, ctx, 0.35);
-    expect(sim.phase).toBe('windup');
+    expect(sim.phase).toBe('entering');
   });
   it('leaves other entrances dangerous', () => {
     const { sim, ctx, cubies } = tunnelWorld(); activate(sim, ctx);
     cubies[2][4][4].stickers.PZ.curr = 4;
     run(sim, ctx, 2.5);
-    expect(sim.phase).toBe('windup'); expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
+    expect(sim.phase).toBe('entering'); expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
   });
   it('does not spend the cooldown when no entrance is in front', () => {
     const { sim, ctx } = world('mobi'); activate(sim, ctx);
