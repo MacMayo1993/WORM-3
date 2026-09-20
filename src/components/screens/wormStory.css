@@ -80,3 +80,16 @@
 .worm-entry-choice .worm-path-free .worm-path-cta { background:#f4d35e; }
 .worm-entry-choice .worm-path-cta b { color:inherit; font-size:22px; }
 .worm-entry-choice .worm-entry-nav>span:last-child { display:inline; }
+
+.worm-story-checklist { list-style:none; padding:0; margin:7px 0 4px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 12px; }
+.worm-story-checklist li { display:flex; align-items:center; gap:6px; font-size:12px; line-height:1.35; min-width:0; }
+.worm-story-check { flex:none; color:#aab8b0; }
+.worm-story-task { flex:1; }
+.worm-story-checklist b { flex:none; font-variant-numeric:tabular-nums; font-size:11px; }
+.worm-story-checklist .is-complete { color:#88e59a; }
+.worm-story-checklist .is-complete .worm-story-check { color:inherit; }
+.worm-story-checklist .is-complete .worm-story-task { text-decoration:line-through; opacity:0.75; }
+.worm-story-clock { font-variant-numeric:tabular-nums; }
+.worm-hud-bottom .worm-story-start { pointer-events:auto; min-height:56px; margin:0; justify-content:space-between; font-size:17px; }
+.worm-story-start:disabled { opacity:0.5; cursor:wait; }
+@media(max-width:360px) { .worm-story-checklist { gap:4px 8px; } .worm-story-checklist li { font-size:11px; } }

@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStoreItem } from '../../utils/storeCatalog.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
-import { storyLevel, storyStars, WORM_STORY_LEVELS } from './levels.js';
+import { storyLevel, storyChecklist, storyStars, WORM_STORY_LEVELS } from './levels.js';
 import '../../components/screens/wormStory.css';
 
 export function StoryRewardChoices({ level }) {
@@ -22,15 +22,32 @@ export function StoryRewardChoices({ level }) {
 }
 
 export function StoryObjectiveCard() {
-  const state = useGameStore(useShallow(s => ({ id: s.wormStoryLevel, ready: s.wormStoryReady, started: s.wormStoryStarted, result: s.wormStoryResult, progress: s.wormStoryProgress, start: s.startWormStory, alive: s.wormAlive })));
+  const state = useGameStore(useShallow(s => ({ id: s.wormStoryLevel, started: s.wormStoryStarted,
+    result: s.wormStoryResult, checklist: s.wormStoryChecklist, runId: s.wormRunId, alive: s.wormAlive })));
   const level = storyLevel(state.id);
   if (!level || state.result || !state.alive) return null;
+  const live = state.started && state.checklist?.runId === state.runId && state.checklist.levelId === level.id ? state.checklist : null;
+  const goals = live?.goals ?? storyChecklist(level);
   return <section className="worm-story-card" aria-label="Story objective">
-    <small>STORY · LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><strong>{level.title}</strong><p>{state.started ? state.progress || level.goal : level.goal}</p>
-    {state.started && level.mechanics && <details><summary>Level goals</summary><p>{level.goal}</p></details>}
-    {!state.started && <p>Time limit: {level.limit}s{level.rotateEvery ? ` · Layer turns every ${level.rotateEvery}s on the surface` : ''}</p>}
-    {state.ready && !state.started && <button className="worm-story-primary" onClick={state.start}>Start level <span>→</span></button>}
+    <small>LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><strong>{level.title}</strong>
+    <ul className="worm-story-checklist" aria-label="Level tasks">{goals.map(goal => <li key={goal.key} className={goal.done ? 'is-complete' : ''}
+      aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
+      <span className="worm-story-check" aria-hidden="true">{goal.done ? '✓' : '○'}</span>
+      <span className="worm-story-task">{goal.label}</span><b aria-hidden="true">{goal.value}/{goal.target}</b>
+    </li>)}</ul>
+    <p className="worm-story-clock">{state.started ? `${live?.seconds ?? level.limit}s left` : `Time limit: ${level.limit}s`}
+      {!state.started && level.rotateEvery ? ` · Turn every ${level.rotateEvery}s` : ''}</p>
+    {live?.settling ? <p role="status">Clear your tail and land to finish.</p> : live?.hint ? <p className="worm-story-power-hint">{live.hint}</p> : null}
   </section>;
+}
+
+export function StoryStartButton() {
+  const s = useGameStore(useShallow(s => ({ level: s.wormStoryLevel, ready: s.wormStoryReady, started: s.wormStoryStarted,
+    alive: s.wormAlive, result: s.wormStoryResult, start: s.startWormStory })));
+  if (!s.level || !s.alive || s.result || s.started) return null;
+  return <button className="worm-story-primary worm-story-start" disabled={!s.ready} onClick={s.start}>
+    {s.ready ? 'Start level' : 'Preparing level…'}<span aria-hidden="true">→</span>
+  </button>;
 }
 
 export function StoryResult({ onNext, onRetry, onLevels }) {
