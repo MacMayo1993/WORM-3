@@ -69,7 +69,7 @@ const OrbSlot = ({ color, styleKey, count, faceId }) => {
     return () => { clearTimeout(timer); setPickedUp(false); };
   }, [count]);
   return <div className={`orb-slot${count === 0 ? ' orb-slot-empty' : ''}${pickedUp ? ' orb-slot-pickup' : ''}`}
-    role="listitem" aria-label={`${FACE_NAMES[faceId - 1]}: ${count} orbs`} title={FACE_NAMES[faceId - 1]}>
+    style={{ '--orb-color': color }} role="listitem" aria-label={`${FACE_NAMES[faceId - 1]}: ${count} orbs`} title={FACE_NAMES[faceId - 1]}>
     <span className="orb-sample" aria-hidden="true" style={{ backgroundColor: color, backgroundImage: pattern ? `url(${pattern})` : 'none' }} />
     <span className="orb-slot-count" aria-hidden="true">{count}</span>
     <span className="orb-slot-face" aria-hidden="true">{FACE_NAMES[faceId - 1]}</span>

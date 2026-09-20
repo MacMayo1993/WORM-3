@@ -20,23 +20,40 @@
 }
 .worm-hud-row { min-width: 0; }
 .worm-hud-reserve { flex: 1; min-width: 0; }
-.worm-hud-stats { gap: 6px; margin-left: auto; }
+/* Reserve almost the entire bar for the six orb families. */
+.worm-hud-stats { gap: 4px; margin-left: 0; flex-direction: column-reverse; width: 48px; }
+.worm-hud-stats > div { flex-direction: row !important; gap: 4px; }
+.worm-hud-stats > div > span:first-child { margin-bottom: 0 !important; font-size: 7px !important; }
+.worm-hud-stats > div > span:last-child { font-size: 13px !important; }
 .worm-hud-context { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .worm-hud-context:empty { display: none; }
-.worm-instrument .orb-reserve { gap: 3px; }
+.worm-instrument .orb-reserve { gap: 4px; }
 .worm-instrument .orb-slot {
-  padding: 3px 0; gap: 3px; grid-template-columns: 12px auto;
-  justify-content: center; background: transparent; border: 0; border-radius: 5px;
+  padding: 4px 0; gap: 2px; grid-template-columns: minmax(0, 1fr);
+  justify-items: center; background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 9px;
 }
-.worm-instrument .orb-slot-pickup { background: var(--hud-active); }
-.worm-instrument .orb-sample { width: 12px; height: 12px; }
+.worm-instrument .orb-sample {
+  position: relative; width: clamp(28px, 8vw, 40px); height: auto; aspect-ratio: 1;
+  max-width: calc(100% - 2px); border-radius: 50%;
+  box-shadow: inset -3px -4px 7px #0009, inset 2px 2px 4px #fff7, 0 0 8px var(--orb-color);
+}
+.worm-instrument .orb-sample::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: radial-gradient(circle at 30% 25%, #fffc 0%, #fff4 12%, transparent 40%);
+}
+.worm-instrument .orb-slot-empty .orb-sample { opacity: 0.55; box-shadow: inset -3px -4px 7px #0009, inset 2px 2px 4px #fff5; }
+.worm-instrument .orb-slot-pickup { background: var(--hud-active); border-color: var(--orb-color); }
+.worm-instrument .orb-slot-pickup .orb-sample { animation: worm-reserve-pop 360ms ease-out; }
 .worm-instrument .orb-slot-face { display: none; }
-.worm-instrument .orb-slot-count { font-size: 12px; }
+.worm-instrument .orb-slot-count { font-size: 17px; line-height: 1.1; font-weight: 800; min-width: 0; }
+@keyframes worm-reserve-pop { 35% { transform: scale(1.13); filter: brightness(1.35); } }
 @media (max-width: 360px) {
-  .worm-instrument .orb-reserve { gap: 0; }
-  .worm-instrument .orb-slot { gap: 2px; grid-template-columns: 10px auto; }
-  .worm-instrument .orb-sample { width: 10px; height: 10px; }
-  .worm-instrument .orb-slot-count { font-size: 11px; }
+  .worm-instrument .orb-reserve { gap: 2px; }
+  .worm-instrument .orb-slot-count { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .worm-instrument .orb-slot-pickup .orb-sample { animation: none; }
 }
 .worm-action-center { flex-direction: column; }
 .worm-primary-actions { display: flex; justify-content: center; gap: 8px; }
