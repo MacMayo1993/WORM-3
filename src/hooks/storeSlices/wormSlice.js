@@ -1,3 +1,4 @@
+import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { storyLevel, storyUnlocked } from '../../worm/story/levels.js';
 import { completeStoryChanges, claimStoryChanges } from '../../worm/story/rewards.js';
 import { createXpRun, wormMultiplier } from '../../progression/model.js';
@@ -15,7 +16,7 @@ import { persistedState } from './persistedState.js';
 
 const WORM_CHARACTER_KEY = 'worm3_character';
 
-export const createWormSlice = (set, _get) => ({
+export const createWormSlice = (set, get) => ({
   // ── Mode flag ─────────────────────────────────────────────────────────────
   wormHealerMode: false,
   startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen ? { wormStoryStarted: true, wormPaused: false } : s),
@@ -54,6 +55,7 @@ export const createWormSlice = (set, _get) => ({
   },
   wormCharacter: persistedState.wormCharacter ?? 'classic',
   setWormCharacter: (id) => {
+    if (!WORM_CHARACTERS.some(c => c.id === id) || (!get().ownedItems.includes(`character_${id}`) && !get().demoMode)) return false;
     try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
     set({ wormCharacter: id });
   },

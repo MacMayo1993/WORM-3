@@ -3,6 +3,7 @@
 // price: 0 = free / default-owned.
 
 import { SCHEME_LABELS, TILE_STYLES } from './colorSchemes.js';
+import { WORM_CHARACTERS } from '../worm/wormCharacterData.js';
 import { WORM_TRAILS } from '../worm/wormCosmeticsData.js';
 
 // ── Worm Skins ────────────────────────────────────────────────────────────────
@@ -148,7 +149,10 @@ export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({
 }));
 
 // ── Combined catalog ──────────────────────────────────────────────────────────
+export const STORE_CHARACTERS = WORM_CHARACTERS.map(c => ({ id: `character_${c.id}`, type: 'character', category: 'characters', characterId: c.id, label: c.label, price: c.id === 'classic' ? 0 : 1000 }));
+
 export const STORE_ITEMS = [
+  ...STORE_CHARACTERS,
   ...STORE_SKINS,
   ...STORE_HATS,
   ...STORE_TRAILS,

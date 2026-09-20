@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../hooks/useGameStore.js';
 import DemoDialog from '../components/screens/DemoDialog.jsx';
 import { STORE_ITEMS } from '../utils/storeCatalog.js';
-import { levelProgress, playerRank, XP_MODES, MAX_PLAYER_LEVEL, levelDescription } from './model.js';
+import { levelProgress, playerRank, XP_MODES, XP_SOURCES, MAX_PLAYER_LEVEL, levelDescription } from './model.js';
 import { rewardChoices, rewardTitle, availableRewards, REWARD_LEVELS } from './rewards.js';
 import { XpMeter } from './ProgressWidgets.jsx';
 import RewardPreview from './RewardPreview.jsx';
@@ -79,7 +79,7 @@ export default function PlayerProgressScreen() {
         <p>Related tiers award only the XP increase. Puzzle replays earn reduced XP; learning, exploration and Chaos feat bonuses pay on first discovery.</p>
       </section>
       <section className="xp-track-section"><h2>Level track</h2><div className="xp-level-track" aria-label="All 50 levels">{Array.from({ length: MAX_PLAYER_LEVEL }, (_, i) => i + 1).map(n => <button type="button" key={n} onClick={() => chooseLevel(n)} aria-pressed={selectedLevel === n} aria-label={`Level ${n}${n % 5 === 0 ? ', reward choice' : ''}${n <= level ? ', reached' : ''}`} className={`${n <= level ? 'is-reached' : ''} ${n % 5 === 0 ? 'is-milestone' : ''}`}><strong>{n}</strong>{n % 5 === 0 && <span aria-hidden="true">✦</span>}</button>)}</div></section>
-      {Object.keys(progress.modeXp).length > 0 && <section className="xp-mode-section"><h2>XP across your modes</h2><dl>{Object.entries(progress.modeXp).map(([mode, xp]) => <div key={mode}><dt>{XP_MODES[mode]}</dt><dd>{xp.toLocaleString()} XP</dd></div>)}</dl></section>}
+      {Object.keys(progress.modeXp).length > 0 && <section className="xp-mode-section"><h2>XP across your modes</h2><dl>{Object.entries(progress.modeXp).map(([mode, xp]) => <div key={mode}><dt>{XP_SOURCES[mode]}</dt><dd>{xp.toLocaleString()} XP</dd></div>)}</dl></section>}
     </main>
   </DemoDialog>;
 }
