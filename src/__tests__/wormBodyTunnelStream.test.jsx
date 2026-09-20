@@ -1,4 +1,4 @@
-import { makeWiggleSweep } from '../worm/healerWorm/wiggleSweep.js';
+import { makeWiggleSweep, wiggleOffset } from '../worm/healerWorm/wiggleSweep.js';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -130,9 +130,41 @@ it('renders a connected three-tile tail sweep with its head fixed', () => {
   const anchor = sim.headInterpPos.clone().addScaledVector(sim.currentNormal, WORM_LIFT);
   for (const offset of [-3, 3, -3, 3, 0]) {
     sim.signature.sweep.offset = offset;
+    sim.signature.sweep.elapsed = 1;
     const points = renderPoints();
     expect(points[0].distanceTo(anchor)).toBeLessThan(.01);
     expect(points.at(-1).x).toBeCloseTo(anchor.x + offset, 4);
     for (let i = 1; i < points.length; i++) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(.2);
+  }
+});
+
+it('keeps a three-face sweep connected and outside the cube through both reversals', () => {
+  const r = 1.5 + WORM_LIFT;
+  const route = [];
+  const addLeg = (a, b, normal) => {
+    for (let i = 0; i <= 100; i++) route.push({ pos: a.clone().lerp(b, i / 100), normal });
+  };
+  addLeg(new THREE.Vector3(0, 0, r), new THREE.Vector3(r, 0, r), new THREE.Vector3(0, 0, 1));
+  addLeg(new THREE.Vector3(r, 0, r), new THREE.Vector3(r, 0, -r), new THREE.Vector3(1, 0, 0));
+  addLeg(new THREE.Vector3(r, 0, -r), new THREE.Vector3(0, 0, -r), new THREE.Vector3(0, 0, -1));
+  shReset(sim.stepHistory);
+  for (const p of [...route].reverse()) shPush(sim.stepHistory, p.pos, p.normal, -1, -1, -1);
+  sim.headInterpPos.set(0, 0, 1.5); sim.currentNormal.set(0, 0, 1);
+  sim.tailLength = Math.floor(4 * r / 0.09) + 1;
+  sim.moveDir = 'up';
+  sim.signature.sweep = makeWiggleSweep(sim, 3);
+  let previous, count;
+  for (let t = 0.12; t <= 2.28; t += 0.02) {
+    sim.signature.sweep.elapsed = t; sim.signature.sweep.offset = wiggleOffset(t);
+    const points = renderPoints();
+    count ??= points.length;
+    expect(points).toHaveLength(count);
+    for (let i = 1; i < points.length; i++) {
+      const p = points[i];
+      expect(Math.max(Math.abs(p.x), Math.abs(p.y), Math.abs(p.z))).toBeGreaterThanOrEqual(1.5);
+      expect(p.distanceTo(points[i - 1])).toBeLessThan(0.2);
+      if (previous) expect(p.distanceTo(previous[i])).toBeLessThan(0.4);
+    }
+    previous = points;
   }
 });

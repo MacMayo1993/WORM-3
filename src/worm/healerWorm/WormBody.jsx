@@ -1,4 +1,4 @@
-import { wigglePointInto } from './wiggleSweep.js';
+import { wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelSwim.js';
 import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
 import { SPRING_CHARGE } from './signatures.js';
@@ -374,7 +374,7 @@ export function WormBody({ worm, size }) {
         let pageWriteIdx = 0; // book worm only — compacted slot into the page-flap overlays (body segments only, no head entry)
 
         const sweep = worm.signature.current.sweep;
-        const visibleCount = Math.min(MAX_TAIL, sweep ? Math.max(tLen, Math.ceil((sweep.length + Math.abs(sweep.offset) * 2) / BODY_BALL_SPACING) + 1) : tLen);
+        const visibleCount = Math.min(MAX_TAIL, sweep ? Math.max(tLen, Math.ceil((sweep.length + 8) / BODY_BALL_SPACING) + 1) : tLen);
 
         const orbColors = worm.orbPickupColorsRef.current;
         const baseColor = wormColorRef.current;
@@ -451,7 +451,7 @@ export function WormBody({ worm, size }) {
                     targetDist = THREE.MathUtils.lerp(_inchGait.dist, i * BODY_BALL_SPACING, flightBlend);
                     _inchArch = _inchGait.arch * (1 - flightBlend);
                 } else {
-                    targetDist = i * BODY_BALL_SPACING;
+                    targetDist = sweep ? i / (visibleCount - 1) * sweep.length : i * BODY_BALL_SPACING;
                 }
 
                 // Clones — parametrically walk backwards along the curve to exact target distance
@@ -487,7 +487,7 @@ export function WormBody({ worm, size }) {
                         // phase-step would alias the closely-spaced (0.09 apart) segments into
                         // a jagged scatter instead of a coherent S-curve.
                         const wiggleAmp = (_isInch || segmentTransit) ? 0.0 : (_isWiggle ? 0.26 : 0.08) * Math.sin(fade * Math.PI) * (1 - flightBlend);
-                        const wigglePhase = i * (_isWiggle ? 0.5 : 0.8) - time * (_isWiggle ? 8.0 : 6.0);
+                        const wigglePhase = targetDist * (_isWiggle ? 3 : 0.8 / BODY_BALL_SPACING) - time * (_isWiggle ? 8.0 : 6.0);
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         // Inch Worm: ride up off the surface along the normal wherever the
                         // wave has bunched the body, so each compression reads as a hump —
@@ -533,8 +533,10 @@ export function WormBody({ worm, size }) {
                     _bodyCloneNormal.addScaledVector(_bodySegForward, -_bodyCloneNormal.dot(_bodySegForward)).normalize();
                 }
                 if (sweep) {
-                    wigglePointInto(_bodyClonePos, sweep, i / (visibleCount - 1));
-                    _bodyCloneNormal.copy(sweep.normal);
+                    wigglePointInto(_bodyEffA, sweep, i / (visibleCount - 1));
+                    const edge = Math.min(sweep.elapsed / 0.12, (WIGGLE_DURATION - sweep.elapsed) / 0.12, 1);
+                    const blend = Math.max(0, edge);
+                    _bodyClonePos.lerp(_bodyEffA, blend * blend * (3 - 2 * blend));
                 }
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isBook || isMobi || _isInch || _isPrism) {

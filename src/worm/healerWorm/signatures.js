@@ -93,7 +93,7 @@ export function activateSignature(sim, size, ctx) {
     sig.mobiOpening = true;
   }
   if (sig.character === 'wiggle') {
-    sig.sweep = makeWiggleSweep(sim);
+    sig.sweep = makeWiggleSweep(sim, size);
     sig.heading = sim.moveDir;
     sim.pendingTurns.length = 0;
   }
