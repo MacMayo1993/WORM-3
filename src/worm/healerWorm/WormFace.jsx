@@ -18,7 +18,8 @@ import { _hatAlignQuat, _hatYUp } from '../wormCosmeticsData.js';
 import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD, } from './constants.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, MOBI_RADIUS } from '../mobiModel.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
-import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
+import { bodyPathHeadInto } from './sliceBodyPath.js';
+import { rocketOrbitT, rocketOrbitInto, rocketFrameInto } from './rocketOrbit.js';
 
 // Head radius, matching WormBody's head scale.
 const HEAD_RADIUS = 0.092;
@@ -29,6 +30,7 @@ const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, n
 // ─── Worm Face (eyes + pupils + smile) ────────────────────────────────────────
 const _faceRight = new THREE.Vector3();
 const _faceForward = new THREE.Vector3();
+const _rocketFaceNormal = new THREE.Vector3();
 const _faceHeadPos = new THREE.Vector3();
 const _faceTunnelAhead = new THREE.Vector3(); // scratch for tunnel tangent during enter/exit
 const _mobiRideAxis = new THREE.Vector3();
@@ -134,6 +136,15 @@ export function WormFace({ worm, size }) {
             rocketOrbitInto(_faceHeadPos, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
         }
 
+        if (!inTransit && worm.rocketActive.current) {
+            // One live anchor for the body, face, glasses and hat at corners.
+            bodyPathHeadInto(_faceHeadPos, worm);
+            const lift = rocketOrbitT(true, worm.rocketT.current, worm.rocketFlight?.current);
+            normal = _rocketFaceNormal.copy(worm.currentNormal.current);
+            rocketFrameInto(_faceForward, normal, _faceHeadPos, size, lift);
+            rocketOrbitInto(_faceHeadPos, size, lift);
+        }
+
         const state = useGameStore.getState();
         const dt = state.wormPaused || !state.wormAlive ? 0 : Math.min(delta, 0.05);
         faceTime.current += dt;
@@ -152,6 +163,10 @@ export function WormFace({ worm, size }) {
                 mobi.group.position.addScaledVector(normal, WORM_LIFT + jump);
             }
             rocketOrbitInto(mobi.group.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
+            if (!inTransit && worm.rocketActive.current) {
+                mobi.group.position.copy(_faceHeadPos);
+                normal = _rocketFaceNormal;
+            }
             if (!inTransit && liveRotation.active) {
                 const { x, y, z } = worm.pos.current;
                 const angle = liveLayerAngle(x, y, z);

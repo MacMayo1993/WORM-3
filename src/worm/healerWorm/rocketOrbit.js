@@ -36,7 +36,7 @@ export const ROCKET_ORBIT_CLEARANCE = 0.55;
 const _dir = new THREE.Vector3();
 
 /**
- * Flight arc, 0..1: rises to a single apex and then descends. Height and
+ * Flight altitude, 0..1: fast takeoff, steady cruise, controlled descent. Height and
  * orbit share the simulation phase, including during a fuel refresh.
  */
 export function rocketOrbitT(active, rocketT, flightPhase) {
@@ -100,4 +100,20 @@ export function rocketOrbitInto(out, size, t, height = ROCKET_FLIGHT_HEIGHT) {
     out.addScaledVector(_dir, (need - gap) * 1.75);
   }
   return out;
+}
+
+const _flightAhead = new THREE.Vector3();
+const _flightOrigin = new THREE.Vector3();
+
+/** Tangent and up of the airborne path, shared by the face and chase camera. */
+export function rocketFrameInto(forward, up, surfacePosition, size, lift) {
+  if (!(lift > 0)) return;
+  _flightOrigin.copy(surfacePosition);
+  _flightAhead.copy(surfacePosition).addScaledVector(forward, 0.04);
+  rocketOrbitInto(_flightOrigin, size, lift);
+  rocketOrbitInto(_flightAhead, size, lift);
+  forward.subVectors(_flightAhead, _flightOrigin).normalize();
+  cubeShellDirInto(_dir, surfacePosition, size);
+  up.lerp(_dir, lift).normalize();
+  up.addScaledVector(forward, -up.dot(forward)).normalize();
 }
