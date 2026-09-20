@@ -68,11 +68,21 @@ export function rollChest(mode, ownedItems, random = randomUnit) {
   let reward;
   if (tier === 0) reward = { kind: 'currency', points: 25, xp: 25 };
   else {
-    const unowned = chestPool(tier).filter(item => !ownedItems.includes(item.id));
-    // Sample without replacement: every remaining cosmetic has the same inclusion chance.
+    const pool = chestPool(tier);
+    const unowned = pool.filter(item => !ownedItems.includes(item.id));
+    const owned = pool.filter(item => ownedItems.includes(item.id));
     const itemIds = [];
-    while (unowned.length && itemIds.length < 3) {
-      itemIds.push(unowned.splice(Math.floor(sampleUnit(random) * unowned.length), 1)[0].id);
+    // Prefer new cosmetics, then fill the reveal with distinct owned items.
+    // A completed collection still gets three real options and a saved choice.
+    for (const candidates of [unowned, owned]) {
+      while (candidates.length && itemIds.length < 3) {
+        itemIds.push(candidates.splice(Math.floor(sampleUnit(random) * candidates.length), 1)[0].id);
+      }
+    }
+    // Mix new and owned options so neither is tied to a fixed card position.
+    for (let i = itemIds.length - 1; i > 0; i--) {
+      const j = Math.floor(sampleUnit(random) * (i + 1));
+      [itemIds[i], itemIds[j]] = [itemIds[j], itemIds[i]];
     }
     reward = itemIds.length ? { kind: 'choice', itemIds }
       : { kind: 'complete', gems: CHEST_TIERS[tier].compensation };

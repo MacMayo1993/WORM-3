@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import WormPreviewCanvas from '../3d/WormPreviewCanvas.jsx';
 import CubePreviewCanvas from '../3d/CubePreviewCanvas.jsx';
 import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
@@ -22,17 +22,26 @@ function RewardPreview({ item }) {
 
 export default function ChestRewardChoices({ receipt, ownedItems, onChoose }) {
   const tier = CHEST_TIERS[receipt.tier];
-  return <section className="chest-choices" aria-labelledby="chest-choice-title" style={{ '--choice-tier': tier.color }}>
-    <h2 id="chest-choice-title">CHOOSE YOUR REWARD</h2>
-    <p>Pick one to keep. {receipt.reward.itemIds.length < 3 ? 'These are the remaining unowned rewards from your roll.' : 'Three discoveries. One new favorite.'}</p>
-    <div className="chest-choice-grid">{receipt.reward.itemIds.map(id => {
+  const heading = useRef(null), panel = useRef(null);
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+    // The cards appear below the dice. Bring the reveal into view on short screens.
+    const bounds = panel.current?.getBoundingClientRect();
+    if (bounds && (bounds.top < 0 || bounds.bottom > window.innerHeight)) {
+      panel.current.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+    }
+  }, [receipt.id]);
+  return <section ref={panel} className="chest-choices" aria-labelledby="chest-choice-title" style={{ '--choice-tier': tier.color }}>
+    <h2 ref={heading} tabIndex={-1} id="chest-choice-title">CHOOSE ONE</h2>
+    <p>New items unlock. Owned items give gems.</p>
+    <div className="chest-choice-grid">{receipt.reward.itemIds.map((id, index) => {
       const item = getStoreItem(id), owned = ownedItems.includes(id);
-      return <button key={id} className="chest-choice-card" onClick={() => onChoose(id)} aria-label={`Choose ${item.label}`}>
+      return <button key={id} className="chest-choice-card" style={{ '--card-index': index }} onClick={() => onChoose(id)} aria-label={`Choose ${item.label}`}>
         <span className="chest-choice-art" aria-hidden="true"><RewardPreview item={item} /></span>
         <span className="chest-choice-copy"><strong>{item.label}</strong><small>{owned ? `Already owned · ${tier.compensation} gems instead` : tier.name}</small></span>
         <span className="chest-choice-cta">Choose →</span>
       </button>;
     })}</div>
-    <p className="chest-choice-note">Your choices are saved. You can come back to them anytime.</p>
+    <p className="chest-choice-note">Choices saved until you pick.</p>
   </section>;
 }
