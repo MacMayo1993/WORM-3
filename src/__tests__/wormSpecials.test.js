@@ -1134,3 +1134,14 @@ describe('first tunnel lesson', () => {
     expect(sim.elementalSpawnTimer).toBeLessThan(initial.element);
   });
 });
+
+it.each(['remote', 'head', 'beacon'])('credits Story magnet catches for remote magnetic pickups only: %s', kind => {
+  const sim = makeSim(), events = [];
+  const ctx = makeCtx({ isStoryMode: () => true, onStoryMechanic: key => events.push(key), getCharacter: () => kind === 'beacon' ? 'glow' : 'classic' });
+  sim.powerups = [apple(kind === 'head' ? 2 : 1, 3, 4, 'PZ')];
+  if (kind === 'beacon') Object.assign(sim.signature, { character: 'glow', active: 5 });
+  else sim.magnetT = 5;
+  stepUntilCommit(sim, ctx);
+  expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
+  expect(events).toEqual(kind === 'remote' ? ['magnetOrbs'] : []);
+});

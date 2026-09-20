@@ -1,4 +1,5 @@
-import { storyUnlocked } from '../../worm/story/levels.js';
+import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
+import { storyLevel, storyUnlocked } from '../../worm/story/levels.js';
 import { completeStoryChanges, claimStoryChanges } from '../../worm/story/rewards.js';
 import { createXpRun, wormMultiplier } from '../../progression/model.js';
 import { wormMissionChanges } from '../../worm/wormEventChanges.js';
@@ -15,7 +16,7 @@ import { persistedState } from './persistedState.js';
 
 const WORM_CHARACTER_KEY = 'worm3_character';
 
-export const createWormSlice = (set, _get) => ({
+export const createWormSlice = (set, get) => ({
   // ── Mode flag ─────────────────────────────────────────────────────────────
   wormHealerMode: false,
   startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen ? { wormStoryStarted: true, wormPaused: false } : s),
@@ -54,6 +55,7 @@ export const createWormSlice = (set, _get) => ({
   },
   wormCharacter: persistedState.wormCharacter ?? 'classic',
   setWormCharacter: (id) => {
+    if (!WORM_CHARACTERS.some(c => c.id === id) || (!get().ownedItems.includes(`character_${id}`) && !get().demoMode)) return false;
     try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
     set({ wormCharacter: id });
   },
@@ -121,7 +123,7 @@ export const createWormSlice = (set, _get) => ({
     wormHealerMode: true,
     wormStoryLevel: storyId,
     wormCombatMode: combat === true && !state.demoMode && !storyId,
-    wormEnemiesEnabled: enemies !== false && !storyId,
+    wormEnemiesEnabled: storyId ? !!storyLevel(storyId).mechanics?.kills : enemies !== false,
     xpRun: state.demoMode || combat || storyId ? null : createXpRun('worm', (state.wormRunId ?? 0) + 1, state.playerProgress.xp, {
       multiplier: wormMultiplier(speed ?? state.wormSpeed, interval ?? state.wormholeInterval),
     }),
@@ -130,7 +132,7 @@ export const createWormSlice = (set, _get) => ({
     chaosLevel: 0,
     wormRunId: (state.wormRunId ?? 0) + 1,
     wormPaused: true,
-    wormSpeed: storyId ? 1.4 : speed !== null ? Math.max(0.5, Math.min(3.5, speed)) : state.wormSpeed,
+    wormSpeed: storyId ? storyLevel(storyId).speed : speed !== null ? Math.max(0.5, Math.min(3.5, speed)) : state.wormSpeed,
     wormOrbCount: orbCount !== null ? Math.max(1, Math.min(MAX_WORM_ORBS, Math.round(orbCount))) : state.wormOrbCount,
     wormholeInterval: interval !== null ? Math.max(2, Math.min(30, Number(interval))) : state.wormholeInterval,
     wormColor: color !== null ? (color || '#33ff66') : state.wormColor,

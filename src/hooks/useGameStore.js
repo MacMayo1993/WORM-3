@@ -1,3 +1,4 @@
+import { createChestSlice } from './storeSlices/chestSlice.js';
 import { CHAOS_RECORD_KEY } from '../game/chaosExperience.js';
 import { persistLatest } from '../utils/persistenceBatch.js';
 import { savePlayerState } from '../progression/model.js';
@@ -53,6 +54,7 @@ export const useGameStore = create(
     ...createModesSlice(set, get),
     ...createSettingsSlice(set, get),
     ...createProgressionSlice(set, get),
+    ...createChestSlice(set, get),
   }))
 );
 
@@ -133,7 +135,7 @@ useGameStore.subscribe(state => state.wormMissionsCompleted,
 
 // Persist an atomic XP/wallet/ownership snapshot only when one of those changes.
 useGameStore.subscribe(
-  state => [state.playerProgress, state.parityPoints, state.ownedItems],
+  state => [state.playerProgress, state.parityPoints, state.ownedItems, state.chestWallet],
   () => persistLatest('player-snapshot', () => savePlayerState(useGameStore.getState())),
   { equalityFn: (a, b) => a.every((value, i) => value === b[i]) }
 );

@@ -1,0 +1,121 @@
+import { it, expect } from 'vitest';
+import { makeWormSim } from '../worm/healerWorm/wormSim.js';
+import { stageStory, storyMetrics } from '../worm/story/runtime.js';
+import { recordStoryMechanic, offerStoryPower, nextStoryPower } from '../worm/story/mastery.js';
+import { storyLevel, storyOutcome, nextStoryLevel, sanitizeStoryProgress } from '../worm/story/levels.js';
+import { getActiveTunnels } from '../worm/wormLogic.js';
+import { makeStoryCombat, stepStoryCombat } from '../worm/story/combat.js';
+import { surfacePose } from '../worm/combat/portalCombat.js';
+import { resetLiveRotation } from '../worm/liveRotation.js';
+
+function setup(id = 10) {
+  resetLiveRotation();
+  const sim = makeWormSim(5), level = storyLevel(id), p = stageStory(sim, 5, level);
+  p.rotationEpoch = 0;
+  const read = (delta = 0.05) => storyMetrics(sim, p, level, { wormSessionOrbs: 0, rotationEpoch: 0 }, [], delta);
+  return { sim, level, p, read };
+}
+it.each([7, 8, 9, 10])('authors level %i with enough matching orbs and real healing pairs', id => {
+  const { sim, p, level } = setup(id);
+  expect(getActiveTunnels(p.cubies, 5)).toHaveLength(level.target);
+  expect(sim.powerups.length).toBeGreaterThanOrEqual(level.orbs);
+  for (const color of [1,2,3,4,5,6]) expect(sim.powerups.filter(t => p.cubies[t.x][t.y][t.z].stickers[t.dirKey].curr === color).length).toBeGreaterThanOrEqual(4);
+  expect(sim.specials.length).toBeLessThanOrEqual(1);
+});
+it('requires every final-level mechanic, a safe landing, tail clearance and settled rotation', () => {
+  const level = storyLevel(10);
+  const won = { ...level.mechanics, alive: true, elapsed: 300, cuts: 0, orbs: 36, rotations: 8, healed: 6, remaining: 0, tailClear: true, landed: true, rotationSettled: true };
+  expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
+  for (const [key, target] of Object.entries(level.mechanics)) expect(storyOutcome(level, { ...won, [key]: target - 1 })).toBeNull();
+  for (const key of ['alive', 'tailClear', 'landed', 'rotationSettled']) expect(storyOutcome(level, { ...won, [key]: false })).toBeNull();
+  expect(storyOutcome(level, { ...won, elapsed: 541 })).toBeNull();
+});
+it('counts completed boosts, double-jump landings and rocket landings once per episode', () => {
+  const { sim, read } = setup(7);
+  sim.boostActiveT = 1; expect(read().boosts).toBeUndefined();
+  sim.boostActiveT = 0; expect(read().boosts).toBe(1); expect(read().boosts).toBe(1);
+  sim.isJumping = true; sim.jumpCount = 2;
+  expect(read().doubleJumps).toBeUndefined(); read();
+  sim.isJumping = false; sim.jumpCount = 0;
+  expect(read().doubleJumps).toBe(1); expect(read().doubleJumps).toBe(1);
+  sim.rocketActive = true; sim.isJumping = true; sim.jumpCount = 2; read();
+  sim.rocketActive = false; expect(read().rockets).toBeUndefined();
+  sim.isJumping = false; expect(read().rockets).toBe(1); expect(read().doubleJumps).toBe(1);
+});
+it('does not count fatal landings or an Inch signature that only charged', () => {
+  const { sim, read } = setup();
+  sim.signature.character = 'inch'; sim.signature.seq = 1; sim.signature.charge = 1;
+  expect(read().signatures).toBeUndefined();
+  sim.signature.charge = 0; expect(read().signatures).toBeUndefined();
+  sim.signature.seq = 2; sim.signature.active = 1; expect(read().signatures).toBe(1);
+  expect(read().signatures).toBe(1);
+  sim.isJumping = true; sim.jumpCount = 2; read();
+  sim.alive = false; sim.isJumping = false; expect(read().doubleJumps).toBeUndefined();
+});
+it('checks all five elemental effects and reoffers a missed or expired power', () => {
+  const { sim, p, level, read } = setup(8);
+  expect(sim.specials[0].type).toBe('water');
+  sim.specials = []; expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
+  expect(sim.specials[0].type).toBe('water');
+  for (const type of ['water', 'fire', 'grass', 'ice', 'lightning']) {
+    sim.specials = []; sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0;
+    sim.waterMomentum = 0;
+    for (let i = 0; i < 81; i++) read();
+    if (type === 'water') { expect(p.elements.has(type)).toBe(false); sim.waterMomentum = 0.9; read(); }
+    if (type === 'fire') { expect(p.elements.has(type)).toBe(false); sim.elementalPatches.set('test', { type: 'fire' }); read(); }
+    if (type === 'grass' || type === 'ice') {
+      expect(p.elements.has(type)).toBe(false);
+      sim.isJumping = true; sim.jumpHeight = type === 'grass' ? 3 : 1;
+      if (type === 'grass') { read(); expect(p.elements.has(type)).toBe(false); recordStoryMechanic(p, 'grassLaunch'); }
+      read();
+      expect(p.elements.has(type)).toBe(false);
+      sim.isJumping = false; read();
+    }
+    expect(p.elements.has(type)).toBe(true);
+    expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(false); // don't replace an active element
+  }
+  expect(read().elements).toBe(5); expect(nextStoryPower(p, level)).toBeNull();
+});
+it('deduplicates disarms and resets every mastery counter on retry', () => {
+  const { sim, p, level } = setup();
+  recordStoryMechanic(p, 'bombs', 0); recordStoryMechanic(p, 'bombs', 0); recordStoryMechanic(p, 'bombs');
+  recordStoryMechanic(p, 'ringHeals'); recordStoryMechanic(p, 'magnetOrbs');
+  expect(p.mechanics).toEqual({ bombs: 1, ringHeals: 1, magnetOrbs: 1 });
+  const retry = stageStory(sim, 5, level);
+  expect(retry.mechanics).toEqual({}); expect(retry.elements.size).toBe(0); expect(retry.bombIds.size).toBe(0);
+});
+it('keeps six-level saves and claims intact, resumes at seven, and ends at ten', () => {
+  const old = { stars: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [i+1, 3])), claimed: { 6: 'skin_royal' } };
+  expect(sanitizeStoryProgress(old)).toEqual(old);
+  expect(nextStoryLevel({ wormStory: old }).id).toBe(7);
+  const complete = { wormStory: { stars: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i+1, 3])) } };
+  expect(nextStoryLevel(complete).id).toBe(10);
+});
+
+const head = { x: 0, y: 0, z: 4, dirKey: 'PZ' };
+const player = () => ({ head, heading: 'up', position: surfacePose(head, head, 0, 5).position,
+  phase: 'active', alive: true, healed: 6, protected: true, elementT: 0 });
+function tickCombat(c, p, count, goal = 6) { for (let i = 0; i < count; i++) stepStoryCombat(c, .05, p, goal); }
+it('offers all enemy types after all tunnels close; only real kills count and no prototype win fires', () => {
+  const c = makeStoryCombat(5), p = player();
+  for (const type of ['crawler', 'scout', 'brute']) {
+    c.quiet = 0; tickCombat(c, p, 1); expect(c.warning).toBe(2.5);
+    tickCombat(c, p, 51); expect(c.enemies[0].type).toBe(type);
+    // The authored rift lies straight ahead. Real surface shots defeat the enemy.
+    c.enemies[0].freeze = 15; c.fireHeld = true;
+    tickCombat(c, p, 120);
+    expect(c.killsByType[type]).toBe(1); expect(c.encounter).toBe(false);
+  }
+  expect(c.kills).toBe(3); expect(c.won).toBe(false); expect(c.drops).toHaveLength(0);
+  c.quiet = 0; tickCombat(c, p, 100, 3); expect(c.encounter).toBe(false);
+});
+it('holds warnings in a pause, avoids other hazards, and cancels stale encounters on rotation or death', () => {
+  const c = makeStoryCombat(5), p = player(); c.quiet = 0;
+  tickCombat(c, { ...p, hazardBusy: true }, 100); expect(c.encounter).toBe(false);
+  tickCombat(c, p, 1); const warning = c.warning;
+  tickCombat(c, { ...p, blocked: true }, 100); expect(c.warning).toBe(warning);
+  tickCombat(c, { ...p, rotating: true, blocked: true }, 1); expect(c.encounter).toBe(false);
+  expect(c.enemies).toHaveLength(0); expect(c.kills).toBe(0);
+  c.quiet = 0; tickCombat(c, p, 1);
+  tickCombat(c, { ...p, alive: false }, 1); expect(c.encounter).toBe(false); expect(c.kills).toBe(0);
+});

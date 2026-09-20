@@ -62,8 +62,11 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     const lockedHats = WORM_HATS.filter(h => !ownedItems.includes(`hat_${h.id}`)).length;
 
     const charIndex = WORM_CHARACTERS.findIndex(c => c.id === wormCharacterId);
-    const prevChar = () => setWormCharacter(WORM_CHARACTERS[(charIndex - 1 + WORM_CHARACTERS.length) % WORM_CHARACTERS.length].id);
-    const nextChar = () => setWormCharacter(WORM_CHARACTERS[(charIndex + 1) % WORM_CHARACTERS.length].id);
+    const available = WORM_CHARACTERS.filter(c => ownedItems.includes(`character_${c.id}`));
+    const ownedIndex = Math.max(0, available.findIndex(c => c.id === wormCharacterId));
+    const stepCharacter = dir => { if (available.length) setWormCharacter(available[(ownedIndex + dir + available.length) % available.length].id); };
+    const prevChar = () => stepCharacter(-1);
+    const nextChar = () => stepCharacter(1);
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -102,7 +105,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           {/* Page dots: the marker stays small, the touch area does not. */}
           <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', zIndex: 1 }}>
             {WORM_CHARACTERS.map(c => (
-              <button key={c.id} type="button" onClick={() => setWormCharacter(c.id)} aria-label={c.label} aria-pressed={c.id === wormCharacterId} style={{
+              <button key={c.id} type="button" onClick={() => setWormCharacter(c.id)} disabled={!ownedItems.includes(`character_${c.id}`)} title={ownedItems.includes(`character_${c.id}`) ? c.label : `${c.label} · Unlock in the Parity Store or a mythic chest`} aria-label={ownedItems.includes(`character_${c.id}`) ? c.label : `${c.label} · Locked`} aria-pressed={c.id === wormCharacterId} style={{
                 width: 44, height: 44, borderRadius: 12, display: 'grid', placeItems: 'center',
                 background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
                 touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -112,6 +115,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               </button>
             ))}
           </div>
+          {available.length < WORM_CHARACTERS.length && <p style={{ fontSize: 12, textAlign: 'center' }}>Unlock more worms through mythic chests or direct purchases in the Parity Store.</p>}
         </SpecimenPlate>
         )}
 

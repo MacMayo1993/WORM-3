@@ -1,3 +1,4 @@
+import { storyLevel, WORM_STORY_LEVELS } from './story/levels.js';
 import { StoryObjectiveCard, StoryResult } from './story/StoryCards.jsx';
 import { AmbientCombatActions, CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
 import { combatBridge } from './combat/portalCombat.js';
@@ -1205,7 +1206,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     ['Time', formatTime(wormTimeAlive)],
                     ['Healed', wormHealedCount],
                     ['Collected', wormSessionOrbs],
-                    storyId ? ['Story level', `${storyId} / 6`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
+                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
                 {/* Named speed presets — keep the underlying multipliers out of the UI. */}
@@ -1474,7 +1475,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         </div>
                     </div>
 
-                    {!combatMode && (!storyId || storyId === 4) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
+                    {!combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
                 </div>
 
                 {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} />}

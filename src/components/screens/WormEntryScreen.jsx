@@ -44,19 +44,19 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   const level = WORM_STORY_LEVELS.find(item => item.id === selected);
   const totalStars = WORM_STORY_LEVELS.reduce((n, item) => n + storyStars(progress, item.id), 0);
   const launch = () => onComplete({ ...initialSettings, perFaceStyles: initialSettings?.manifoldStyles,
-    storyLevel: level.id, cubeSize: 5, megaMode: false, wormSpeed: 1.4, wormOrbCount: 1,
+    storyLevel: level.id, cubeSize: 5, megaMode: false, wormSpeed: level.speed, wormOrbCount: 1,
     wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
   return <div ref={root} className="mode-wizard worm-entry" role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
     style={{ '--mode-accent': MODE_THEMES.worm.accent, '--story-display': DISPLAY_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
     <div className="worm-entry-sheet">
       <nav className="worm-entry-nav"><button onClick={back} aria-label={page === 'choice' ? 'Back to modes' : 'Back to WORM choices'}>← Back</button><span className="mode-wizard-kicker">Choose your path</span><span>WORM³</span></nav>
       <div className="worm-entry-scroll">
-        <header className="worm-entry-heading"><p>{page === 'choice' ? 'A little worm. A whole world.' : 'CHAPTER 01 · FIND YOUR FEET'}</p><h1 id="worm-entry-title">{page === 'choice' ? 'HOW WILL YOU WORM?' : 'THE FIRST TURN'}</h1><span>{page === 'choice' ? 'Follow a story. Or follow your curiosity.' : 'Six small adventures. Something new around every corner.'}</span></header>
+        <header className="worm-entry-heading"><p>{page === 'choice' ? 'A little worm. A whole world.' : 'CHAPTER 01 · FIND YOUR FEET'}</p><h1 id="worm-entry-title">{page === 'choice' ? 'HOW WILL YOU WORM?' : 'THE FIRST TURN'}</h1><span>{page === 'choice' ? 'Follow a story. Or follow your curiosity.' : 'Ten timed challenges. One increasingly restless cube.'}</span></header>
         {page === 'choice' ? <>
           <div className="worm-path-split">
             <button className="worm-path-card worm-path-story" onClick={() => setPage('story')}>
               <span className="worm-path-kicker">A journey to grow into</span><PathArt story /><h2>STORY</h2><p>Learn the moves.<br />Earn your look.</p>
-              <span className="worm-path-tags">6 levels · Hats · Palettes · Skins</span><span className="worm-path-cta">{totalStars ? 'Continue story' : 'Begin your story'} <b>↗</b></span>
+              <span className="worm-path-tags">{WORM_STORY_LEVELS.length} levels · Hats · Palettes · Skins · Trails</span><span className="worm-path-cta">{totalStars ? 'Continue story' : 'Begin your story'} <b>↗</b></span>
             </button>
             <button className="worm-path-card worm-path-free" onClick={() => setPage('free')}>
               <span className="worm-path-kicker">Your cube. Your rules.</span><PathArt /><h2>FREE PLAY</h2><p>Set your challenge.<br />Find your flow.</p>
@@ -64,7 +64,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
             </button>
           </div><footer className="worm-entry-foot">One collection. Everything you earn travels with you.</footer>
         </> : <>
-          <div className="worm-chapter-progress"><span>CHAPTER PROGRESS</span><strong>{totalStars} / 18 ★</strong><progress value={totalStars} max="18" aria-label="Chapter stars" /></div>
+          <div className="worm-chapter-progress"><span>CHAPTER PROGRESS</span><strong>{totalStars} / {WORM_STORY_LEVELS.length * 3} ★</strong><progress value={totalStars} max={WORM_STORY_LEVELS.length * 3} aria-label="Chapter stars" /></div>
           <div className="worm-level-grid">{WORM_STORY_LEVELS.map(item => {
             const unlocked = storyUnlocked(progress, item.id), stars = storyStars(progress, item.id);
             return <button key={item.id} disabled={!unlocked} aria-pressed={selected === item.id} aria-label={`Level ${item.id}: ${item.title}${unlocked ? `, ${stars} stars` : ', locked'}`} onClick={() => setSelected(item.id)} className={selected === item.id ? 'selected' : ''}>
@@ -72,7 +72,8 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
             </button>;
           })}</div>
           <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">LEVEL {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><p>{level.subtitle}</p><strong>{level.goal}</strong>
-            <ul><li>★ Finish the objective</li><li>★ Finish within {level.par} seconds</li><li>★ Finish without a tail cut</li></ul>
+            <p className="worm-story-limit">Time limit: {level.limit} seconds{level.rotateEvery ? ` · Layer turns every ${level.rotateEvery}s while moving on the surface` : ''}</p>
+            <ul><li>★ Finish the objective before time runs out</li><li>★ Finish within {level.par} seconds</li><li>★ Finish without a tail cut</li></ul>
             <div className="worm-level-reward"><span>FIRST CLEAR</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>
             <StoryRewardChoices level={level} />
             <button className="worm-story-primary" onClick={launch}>{storyStars(progress, level.id) ? 'Replay level' : 'Play level'} <span>→</span></button>

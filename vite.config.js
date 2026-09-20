@@ -84,6 +84,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Stable wallet rules and catalog data can cache independently from the app.
+          if (id.endsWith('/src/economy/chests.js')) return 'economy';
           // Shared CJS helpers must not live in the optional solver chunk.
           if (id.includes('commonjsHelpers')) return 'vendor-react';
           if (!id.includes('node_modules')) return;

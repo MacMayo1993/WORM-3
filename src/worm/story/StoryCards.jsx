@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStoreItem } from '../../utils/storeCatalog.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
-import { storyLevel, storyStars } from './levels.js';
+import { storyLevel, storyStars, WORM_STORY_LEVELS } from './levels.js';
 import '../../components/screens/wormStory.css';
 
 export function StoryRewardChoices({ level }) {
@@ -26,7 +26,9 @@ export function StoryObjectiveCard() {
   const level = storyLevel(state.id);
   if (!level || state.result || !state.alive) return null;
   return <section className="worm-story-card" aria-label="Story objective">
-    <small>STORY · LEVEL {level.id} / 6</small><strong>{level.title}</strong><p>{state.started ? state.progress || level.goal : level.goal}</p>
+    <small>STORY · LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><strong>{level.title}</strong><p>{state.started ? state.progress || level.goal : level.goal}</p>
+    {state.started && level.mechanics && <details><summary>Level goals</summary><p>{level.goal}</p></details>}
+    {!state.started && <p>Time limit: {level.limit}s{level.rotateEvery ? ` · Layer turns every ${level.rotateEvery}s on the surface` : ''}</p>}
     {state.ready && !state.started && <button className="worm-story-primary" onClick={state.start}>Start level <span>→</span></button>}
   </section>;
 }
@@ -50,11 +52,11 @@ export function StoryResult({ onNext, onRetry, onLevels }) {
   const level = storyLevel(result?.levelId);
   if (!result || !level) return null;
   return <div ref={ref} className="worm-story-result" role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" style={{ zIndex: Z.MODAL, fontFamily: UI_FONT }}>
-    <div className="worm-story-result-sheet"><small>STORY · LEVEL {level.id} / 6</small><h2 id="worm-story-result-title">{level.id === 6 ? 'CHAPTER COMPLETE!' : 'LEVEL CLEAR!'}</h2>
+    <div className="worm-story-result-sheet"><small>STORY · LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><h2 id="worm-story-result-title">{level.id === WORM_STORY_LEVELS.at(-1).id ? 'CHAPTER COMPLETE!' : 'LEVEL CLEAR!'}</h2>
       <div className="worm-story-result-stars" aria-label={`${result.stars} out of 3 stars`}>{'★'.repeat(result.stars)}{'☆'.repeat(3-result.stars)}</div>
       <p>{level.title} · {result.seconds}s<br />+{result.xp} XP · +{result.points} Parity Points</p>
       <StoryRewardChoices level={level} />
-      <button className="worm-story-primary" onClick={level.id < 6 ? onNext : onLevels}>{level.id < 6 ? 'Next level' : 'Back to chapter'} <span>→</span></button>
+      <button className="worm-story-primary" onClick={level.id < WORM_STORY_LEVELS.at(-1).id ? onNext : onLevels}>{level.id < WORM_STORY_LEVELS.at(-1).id ? 'Next level' : 'Back to chapter'} <span>→</span></button>
       <button className="worm-story-secondary" onClick={onRetry}>Replay</button><button className="worm-story-secondary" onClick={onLevels}>Chapter map</button>
     </div>
   </div>;
