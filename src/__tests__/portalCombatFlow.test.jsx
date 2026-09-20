@@ -23,7 +23,7 @@ const frame=()=>act(()=>worm.tick(.05));
 const until=(fn,max=1000)=>{for(let i=0;i<max&&!fn();i++)frame();expect(fn()).toBeTruthy();};
 beforeEach(()=>{
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;resetLiveRotation();
-  useGameStore.setState({cubies:makeCubies(5),size:5,demoMode:false,wormPauseMenuOpen:false});
+  useGameStore.setState({cubies:makeCubies(5),size:5,demoMode:false,wormPauseMenuOpen:false,wormCharacter:'glow'});
   state().initWormMode(undefined,undefined,1.25,2,30,null,true);
   useGameStore.setState({wormGamePhase:'active'});
   host=document.createElement('div');document.body.append(host);root=createRoot(host);

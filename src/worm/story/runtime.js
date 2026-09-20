@@ -35,18 +35,16 @@ export function stageStory(sim, size, level, character) {
   for (const [x, y, z, dir] of MOUTHS.slice(0, pairCount)) {
     base.cubies = flipStickerPair(base.cubies, size, x, y, z, dir, buildManifoldGridMap(base.cubies, size));
   }
-  // The route trial has no healing inventory; its marked portals stay available
-  // for traversal. Other levels distribute finite pickups over all six faces.
+  // Every level includes matching healing resources on all six faces.
+  // Route-trial pairs can seal after traversal without losing their recorded credit.
   sim.powerups = [];
-  if (level.kind !== 'tunnel') {
-    const cells = level.kind === 'mastery' ? [[1,1],[3,1],[1,3],[3,3],[2,1],[2,3],[1,2],[3,2]] : level.kind === 'restore' ? [[1,1],[3,1],[1,3],[3,3],[2,1],[2,3]] : [[1,1],[3,1],[1,3],[3,3]];
-    for (const dirKey of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
-      for (const [a, b] of cells) {
-        const [x, y, z] = dirKey === 'PZ' || dirKey === 'NZ' ? [a, b, dirKey === 'PZ' ? 4 : 0]
-          : dirKey === 'PX' || dirKey === 'NX' ? [dirKey === 'PX' ? 4 : 0, a, b] : [a, dirKey === 'PY' ? 4 : 0, b];
-        const sticker = base.cubies[x][y][z].stickers[dirKey];
-        if (sticker.curr === sticker.orig) sim.powerups.push({ x, y, z, dirKey, type: 'apple' });
-      }
+  const cells = level.kind === 'mastery' ? [[1,1],[3,1],[1,3],[3,3],[2,1],[2,3],[1,2],[3,2]] : level.kind === 'restore' ? [[1,1],[3,1],[1,3],[3,3],[2,1],[2,3]] : [[1,1],[3,1],[1,3],[3,3]];
+  for (const dirKey of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
+    for (const [a, b] of cells) {
+      const [x, y, z] = dirKey === 'PZ' || dirKey === 'NZ' ? [a, b, dirKey === 'PZ' ? 4 : 0]
+        : dirKey === 'PX' || dirKey === 'NX' ? [dirKey === 'PX' ? 4 : 0, a, b] : [a, dirKey === 'PY' ? 4 : 0, b];
+      const sticker = base.cubies[x][y][z].stickers[dirKey];
+      if (sticker.curr === sticker.orig) sim.powerups.push({ x, y, z, dirKey, type: 'apple' });
     }
   }
   if (level.kind === 'jump') {

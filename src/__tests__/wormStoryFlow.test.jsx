@@ -89,7 +89,7 @@ it('counts a real body clearance only on landing and requires more than one hop'
   begin(3); until(() => !state().wormAlive); expect(state().wormStoryResult).toBeNull();
 });
 it('stages the increased healing network with enough ordinary matching pickups', () => {
-  for (const id of [5, 6]) {
+  for (const id of [2, 5, 6]) {
     begin(id); const tunnels = getActiveTunnels(state().cubies, 5);
     expect(tunnels).toHaveLength(storyLevel(id).target);
     expect(state().wormPowerups.length).toBeGreaterThanOrEqual(id === 6 ? 30 : 24);
@@ -163,7 +163,7 @@ function travelUntil(done) {
   expect(state().wormAlive, JSON.stringify(state().wormDeathDetails)).toBe(true);
   expect(done(), state().wormStoryProgress).toBeTruthy();
 }
-it.each([5, 6])('can collect the resources and heal every authored pair for level %i through real movement', id => {
+it.each([2, 5, 6])('can collect the resources and heal every authored pair for level %i through real movement', id => {
   begin(id);
   // Scheduler assertions live in wormHazardOrdering; this exercises the actual
   // routes, deposits, transit and finite supply without substituting heal calls.
@@ -180,6 +180,7 @@ it.each([5, 6])('can collect the resources and heal every authored pair for leve
     travelUntil(() => state().wormHealedCount >= pair + 1);
   }
   expect(getActiveTunnels(state().cubies, 5)).toHaveLength(0);
+  if (id === 2) expect(state().wormStoryResult).not.toBeNull();
   if (id === 6) expect(state().wormStoryResult).toBeNull(); // turns + 30 orbs still required
 });
 
@@ -229,7 +230,7 @@ it('keeps deposited tunnels open until the ring and signature objectives are met
 });
 
 it('Classic adds 50 percent more Story orbs without changing the authored tunnel objective', () => {
-  for (const level of [1, 6]) {
+  for (const level of [1, 2, 6]) {
     act(() => useGameStore.setState({ wormCharacter: 'glow' }));
     begin(level);
     const ordinaryOrbs = state().wormPowerups.length;

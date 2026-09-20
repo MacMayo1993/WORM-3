@@ -14,28 +14,28 @@ beforeEach(() => {
   resetLiveRotation(); frames.length = 0;
   const cubies = makeCubies(5); cubies[2][3][4].stickers.PZ.curr = 4;
   useGameStore.setState({ cubies, wormAlive: true, wormGamePhase: 'active', wormPowerups: [{ x: 2, y: 3, z: 4, dirKey: 'PZ' }] });
-  worm = { signature: { current: { ...makeSignature(), character: 'glow', active: 5, seq: 1 } },
+  worm = { signature: { current: { ...makeSignature(), character: 'glow', active: 3, seq: 1 } },
     pos: { current: { x: 2, y: 2, z: 4, dirKey: 'PZ' } }, phase: { current: 'crawling' } };
   meshes = SignatureEffects({ worm, size: 5 }).props.children.map(child => {
     const { object, ...props } = child.props; applyProps(object, props); return object;
   });
 });
 afterEach(() => { while (cleanups.length) cleanups.pop()(); resetLiveRotation(); });
-it('removes all reveal markers on expiry, death and tunnel entry', () => {
-  frames[0](); expect(meshes[2].count).toBe(1); expect(meshes[3].count).toBe(1);
-  expect(meshes[2].material.depthTest).toBe(false); // only the explicit reveal is see-through
+it('removes Glow pulses on expiry, death and tunnel entry', () => {
+  frames[0](); expect(meshes[1].count).toBe(3);
+  expect(meshes[1].material.depthTest).toBe(true);
   worm.signature.current.active = 0; frames[0](); expect(meshes.every(m => m.count === 0)).toBe(true);
   worm.signature.current.active = 4; worm.phase.current = 'tunnel'; frames[0](); expect(meshes.every(m => m.count === 0)).toBe(true);
   worm.phase.current = 'crawling'; useGameStore.setState({ wormAlive: false }); frames[0]();
   expect(meshes.every(m => m.count === 0)).toBe(true);
 });
-it('depth-tests the seal and follows its own rotating slice', () => {
-  worm.signature.current = { ...makeSignature(), character: 'mobi', active: 6, target: { x: 2, y: 3, z: 4, dirKey: 'PZ' } };
-  frames[0](); const initial = new Matrix4(); meshes[4].getMatrixAt(0, initial);
-  expect(meshes[4].material.depthTest).toBe(true);
+it('depth-tests the MOBI tunnel marker and follows its own rotating slice', () => {
+  worm.signature.current = { ...makeSignature(), character: 'mobi', mobiTunnel: { reentryT: 10 }, target: { x: 2, y: 3, z: 4, dirKey: 'PZ' } };
+  frames[0](); const initial = new Matrix4(); meshes[2].getMatrixAt(0, initial);
+  expect(meshes[2].material.depthTest).toBe(true);
   setLiveRotation('row', [1, 3], [0.6, -0.6], 1, 0.6); frames[0]();
-  const rotated = new Matrix4(); meshes[4].getMatrixAt(0, rotated);
-  expect(rotated.equals(initial)).toBe(false); expect(meshes[4].count).toBe(3);
+  const rotated = new Matrix4(); meshes[2].getMatrixAt(0, rotated);
+  expect(rotated.equals(initial)).toBe(false); expect(meshes[2].count).toBe(1);
 });
 it('disposes every mesh, geometry and material on retry/unmount', () => {
   const listeners = meshes.flatMap(mesh => [mesh, mesh.geometry, mesh.material]).map(resource => {
