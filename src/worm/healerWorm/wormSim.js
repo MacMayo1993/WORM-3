@@ -858,14 +858,13 @@ function tickWiggleSweep(sim, delta, size, ctx) {
     const samples = Math.max(1, Math.ceil((sweep.elapsed - oldTime) / 0.008));
     const bodySamples = Math.max(32, Math.ceil((sweep.length + 6) / 0.15));
     for (const orb of [...sim.powerups]) {
-        if (orb.dirKey !== sweep.dirKey) continue;
         _sweepOrb.fromArray(getStickerWorldPos(orb.x, orb.y, orb.z, orb.dirKey, size, 0))
-            .addScaledVector(sweep.normal, WORM_LIFT);
+            .addScaledVector(FACE_NORMALS[orb.dirKey], WORM_LIFT);
         let hit = false;
         for (let t = 0; t <= samples && !hit; t++) {
             const offset = wiggleOffset(oldTime + (sweep.elapsed - oldTime) * t / samples);
             for (let i = 0; i <= bodySamples; i++) {
-                wigglePointInto(_sweepPoint, sweep, i / bodySamples, offset);
+                wigglePointInto(_sweepPoint, sweep, i / bodySamples, offset, oldTime + (sweep.elapsed - oldTime) * t / samples);
                 if (_sweepPoint.distanceToSquared(_sweepOrb) < 0.25) { hit = true; break; }
             }
         }

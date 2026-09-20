@@ -238,7 +238,9 @@ describe('character abilities', () => {
     const sweep = sim.signature.sweep, tail = new Vector3(), origin = new Vector3();
     wigglePointInto(origin, sweep, 1, 0);
     wigglePointInto(tail, sweep, 1, -3);
-    expect(tail.distanceTo(origin)).toBeCloseTo(3);
+    // On a finite cube the three-tile offset wraps around the surface.
+    expect(tail.distanceTo(origin)).toBeGreaterThan(2.5);
+    expect(Math.max(Math.abs(tail.x), Math.abs(tail.y), Math.abs(tail.z))).toBeCloseTo(5 / 2 + 0.08);
     wigglePointInto(tail, sweep, 0, 3);
     expect(tail.distanceTo(sweep.points[0])).toBeCloseTo(0);
   });
