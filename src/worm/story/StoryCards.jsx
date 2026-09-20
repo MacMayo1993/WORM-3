@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStoreItem } from '../../utils/storeCatalog.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
 import { storyLevel, storyChecklist, storyStars, WORM_STORY_LEVELS } from './levels.js';
+import { feel, resumeFeel } from '../../utils/feel.js';
 import '../../components/screens/wormStory.css';
 
 export function StoryRewardChoices({ level }) {
@@ -21,13 +22,49 @@ export function StoryRewardChoices({ level }) {
   </div>;
 }
 
-export function StoryObjectiveCard() {
+export function StoryObjectiveCard({ compact = false, onInspect }) {
   const state = useGameStore(useShallow(s => ({ id: s.wormStoryLevel, started: s.wormStoryStarted,
-    result: s.wormStoryResult, checklist: s.wormStoryChecklist, runId: s.wormRunId, alive: s.wormAlive })));
+    result: s.wormStoryResult, checklist: s.wormStoryChecklist, runId: s.wormRunId, alive: s.wormAlive, paused: s.wormPaused })));
   const level = storyLevel(state.id);
+  const live = state.started && state.checklist?.runId === state.runId && state.checklist.levelId === level?.id ? state.checklist : null;
+  const goals = live?.goals ?? (level ? storyChecklist(level) : []);
+  const previous = useRef(null);
+  const [celebration, setCelebration] = useState(null);
+  const runKey = `${state.runId}:${state.id}`;
+  useEffect(() => {
+    if (!compact) return;
+    const done = new Set((live?.goals ?? []).filter(goal => goal.done).map(goal => goal.key));
+    const fresh = previous.current?.runKey === runKey
+      ? live?.goals.find(goal => goal.done && !previous.current.done.has(goal.key)) : null;
+    previous.current = { runKey, done };
+    if (fresh && state.started && state.alive && !state.result && !state.paused) {
+      feel('storyTask', { priority: 0 });
+      setCelebration({ runKey, label: fresh.label });
+    }
+  }, [compact, live, runKey, state.started, state.alive, state.result, state.paused]);
+  useEffect(() => {
+    if (!celebration) return;
+    const timer = setTimeout(() => setCelebration(null), 1400);
+    return () => clearTimeout(timer);
+  }, [celebration]);
   if (!level || state.result || !state.alive) return null;
-  const live = state.started && state.checklist?.runId === state.runId && state.checklist.levelId === level.id ? state.checklist : null;
-  const goals = live?.goals ?? storyChecklist(level);
+  const completed = goals.filter(goal => goal.done).length;
+  const seconds = live?.seconds ?? level.limit;
+  const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  const recent = celebration?.runKey === runKey ? celebration : null;
+  if (compact) return <button type="button" className={`worm-story-glance worm-hud-chip${recent ? ' worm-task-confirmed' : ''}`}
+    onClick={onInspect} aria-label={`Level ${level.id}: ${level.title}. ${completed} of ${goals.length} tasks complete. ${seconds} seconds left. Pause to view tasks.`}
+    aria-haspopup="dialog" title={level.title}>
+    <span className="worm-story-glance-level">L{level.id}</span>
+    <span className="worm-story-glance-progress">
+      <span>{recent ? `✓ ${recent.label}` : live?.settling ? 'Land + clear tail' : `Tasks ${completed}/${goals.length}`}</span>
+      <span className="worm-story-goal-bars" aria-hidden="true">{goals.map(goal => <i key={goal.key} data-done={goal.done}>
+        <i style={{ transform: `scaleX(${Math.max(0, Math.min(1, goal.value / goal.target))})` }} />
+      </i>)}</span>
+    </span>
+    <span className="worm-story-glance-clock" data-urgent={seconds <= 30}>{clock}</span>
+    <span className="worm-hud-sr" role="status">{recent ? `${recent.label} complete.` : ''}</span>
+  </button>;
   return <section className="worm-story-card" aria-label="Story objective">
     <small>LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><strong>{level.title}</strong>
     <ul className="worm-story-checklist" aria-label="Level tasks">{goals.map(goal => <li key={goal.key} className={goal.done ? 'is-complete' : ''}
@@ -45,7 +82,7 @@ export function StoryStartButton() {
   const s = useGameStore(useShallow(s => ({ level: s.wormStoryLevel, ready: s.wormStoryReady, started: s.wormStoryStarted,
     alive: s.wormAlive, result: s.wormStoryResult, start: s.startWormStory })));
   if (!s.level || !s.alive || s.result || s.started) return null;
-  return <button className="worm-story-primary worm-story-start" disabled={!s.ready} onClick={s.start}>
+  return <button className="worm-story-primary worm-story-start" disabled={!s.ready} onClick={() => { resumeFeel(); feel('uiKey'); s.start(); }}>
     {s.ready ? 'Start level' : 'Preparing level…'}<span aria-hidden="true">→</span>
   </button>;
 }

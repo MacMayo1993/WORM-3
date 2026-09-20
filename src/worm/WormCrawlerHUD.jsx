@@ -8,6 +8,7 @@ import './wormHudLayout.css';
 import RotationCountdownHUD from './RotationCountdownHUD.jsx';
 import TunnelNeedsCard from './TunnelNeedsCard.jsx';
 import SignatureButton from './SignatureButton.jsx';
+import { SIGNATURES } from './healerWorm/signatures.js';
 import JumpRescueCue from './JumpRescueCue.jsx';
 import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
 import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
@@ -29,7 +30,7 @@ import { wormBuffs } from './wormBuffs.js';
 import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { wormClock } from './wormClock.js';
-import { feel } from '../utils/feel.js';
+import { feel, resumeFeel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
@@ -574,28 +575,6 @@ const PAUSE_BTN_STYLE = {
 
 // ─── Active buff strip (rocket / magnet) ─────────────────────────────────────
 // The context stack owns placement for active buffs and brief pickup notices.
-const BUFF_STRIP_STYLE = { display: 'flex', gap: 4, maxWidth: '100%', pointerEvents: 'none' };
-
-const BUFF_PILL_STYLE = {
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: 999,
-    padding: '5px clamp(8px, 2.5vw, 12px)',
-    fontSize: 11,
-    fontWeight: 800,
-    letterSpacing: 1.0,
-    color: '#fff',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    boxShadow: SHADOW,
-};
-
-const BUFF_FILL_STYLE = {
-    position: 'absolute',
-    left: 0, top: 0, bottom: 0,
-    pointerEvents: 'none',
-};
 
 // Elemental chip: the active wash reads as a mini enamel medal (the same badge the
 // pickup wears) with a radial countdown ring, rather than a flat pill — it is a
@@ -910,7 +889,7 @@ function SpecialIcon({ type, size = 14 }) {
 // advances when the sim does, the readout freezes during a pause or a tunnel transit
 // instead of draining against a wall clock.
 
-function BuffStrip() {
+function BuffStrip({ detailed = false, onInspect }) {
     const rocketActive = useGameStore(s => s.wormRocketActive ?? false);
     const magnetActive = useGameStore(s => s.wormMagnetActive ?? false);
     const magnetSeq = useGameStore(s => s.wormMagnetSeq ?? 0);
@@ -957,7 +936,7 @@ function BuffStrip() {
         };
         paint();
         return () => cancelAnimationFrame(raf);
-    }, [elementalTheme]);
+    }, [elementalTheme, detailed]);
 
     if (!rocketActive && !magnetActive && !elementalTheme) return null;
 
@@ -965,107 +944,41 @@ function BuffStrip() {
     const magnetDef = getSpecialDef('magnet');
     const elemDef = elementalTheme ? getElementalDef(elementalTheme) : null;
 
-    return (
-        <div style={{ ...BUFF_STRIP_STYLE, flexWrap: 'wrap', justifyContent: 'center', width: '100%' }} role="status" aria-live="polite">
-            {rocketActive && (
-                <div
-                    style={{
-                        ...BUFF_PILL_STYLE,
-                        background: 'linear-gradient(135deg, #ff9d2e, #f4501e)',
-                        border: `1px solid ${rocketDef.accent}`,
-                        color: '#fff',
-                    }}
-                    aria-label="Rocket active"
-                >
-                    <SpecialIcon type="rocket" />
-                    <span>{rocketDef.label}</span>
-                </div>
-            )}
-            {magnetActive && (
-                <div
-                    style={{
-                        ...BUFF_PILL_STYLE,
-                        background: 'rgba(15, 23, 42, 0.78)',
-                        border: `1px solid ${magnetDef.color}`,
-                        color: '#fff',
-                    }}
-                    aria-label="Magnet active"
-                >
-                    <div ref={fillRef} aria-hidden="true" style={{ ...BUFF_FILL_STYLE, width: '100%', background: 'rgba(56, 224, 255, 0.38)' }} />
-                    <span style={{ position: 'relative', zIndex: 1, display: 'flex', color: magnetDef.color }}>
-                        <SpecialIcon type="magnet" />
-                    </span>
-                    <span style={{ position: 'relative', zIndex: 1 }}>{magnetDef.label}</span>
-                    {/* The visual timer updates every frame; hide it from the live
-                        region so assistive tech announces activation once, not 10×/s. */}
-                    <span ref={secondsRef} aria-hidden="true" style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 30, textAlign: 'right' }} />
-                </div>
-            )}
-            {elemDef && (
-                <div
-                    style={{
-                        ...BUFF_PILL_STYLE,
-                        overflow: 'visible',
-                        paddingLeft: 4,
-                        background: `linear-gradient(135deg, ${elemDef.color}2e, rgba(15, 23, 42, 0.82))`,
-                        border: `1px solid ${elemDef.color}`,
-                        boxShadow: `${SHADOW}, 0 0 14px ${elemDef.color}55, inset 0 0 10px ${elemDef.color}1f`,
-                        color: '#fff',
-                    }}
-                    aria-label={`${elemDef.label} element active`}
-                >
-                    {/* Enamel medal + radial countdown ring — the pickup badge, HUD-sized. */}
-                    <span style={{ position: 'relative', width: 22, height: 22, flexShrink: 0, display: 'block' }}>
-                        <svg
-                            width={22}
-                            height={22}
-                            viewBox="0 0 22 22"
-                            aria-hidden="true"
-                            style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}
-                        >
-                            <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
-                            <circle
-                                ref={elemFillRef}
-                                cx="11"
-                                cy="11"
-                                r={ELEM_RING_R}
-                                fill="none"
-                                stroke={elemDef.color}
-                                strokeWidth="2.4"
-                                strokeLinecap="round"
-                                strokeDasharray={ELEM_RING_CIRC}
-                                strokeDashoffset={0}
-                                style={{ filter: `drop-shadow(0 0 2px ${elemDef.color})` }}
-                            />
-                        </svg>
-                        <span
-                            style={{
-                                position: 'absolute',
-                                inset: 3,
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: `radial-gradient(circle at 34% 28%, ${elemDef.accent}, ${elemDef.color} 78%)`,
-                                boxShadow: `inset 0 -1px 3px rgba(0,0,0,0.4)`,
-                                color: '#ffffff',
-                            }}
-                        >
-                            <SpecialIcon type={elementalTheme} size={12} />
-                        </span>
-                    </span>
-                    <span style={{ position: 'relative', zIndex: 1 }}>{elemDef.label}</span>
-                    <span ref={elemSecondsRef} aria-hidden="true" style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 24, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} />
-                </div>
-            )}
-            {elemDef && <div style={{ flexBasis: '100%', textAlign: 'center', borderRadius: 8, background: 'rgba(12,23,24,.88)', padding: '5px 8px', fontSize: 11, lineHeight: 1.4, color: '#f6f3df' }} aria-label={elemDef.description}>
-                <span ref={feedbackRef} aria-hidden="true" />
-                {elementalTheme === 'water' && <div aria-hidden="true" style={{ height: 3, marginTop: 4, background: '#344b50', borderRadius: 3, overflow: 'hidden' }}>
-                    <div ref={momentumRef} style={{ height: '100%', background: '#8bebff', transformOrigin: 'left', transform: 'scaleX(0)' }} />
-                </div>}
-            </div>}
-        </div>
-    );
+    return <div className={`worm-buffs${detailed ? ' worm-buffs-detailed' : ''}`} aria-label="Active powers">
+        {rocketActive && <div className="worm-buff-item">
+            <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
+                style={{ '--power-color': rocketDef.color }} aria-label="Rocket active" aria-haspopup={detailed ? undefined : 'dialog'}>
+                <SpecialIcon type="rocket" /><span>Rocket</span>
+            </button>
+            {detailed && <p>{rocketDef.description}</p>}
+        </div>}
+        {magnetActive && <div className="worm-buff-item">
+            <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
+                style={{ '--power-color': magnetDef.color }} aria-label="Magnet active" aria-haspopup={detailed ? undefined : 'dialog'}>
+                <span ref={fillRef} className="worm-buff-meter" aria-hidden="true" style={{ width: '100%' }} />
+                <SpecialIcon type="magnet" /><span className="worm-buff-name">Magnet</span>
+                <span ref={secondsRef} aria-hidden="true" />
+            </button>
+            {detailed && <p>{magnetDef.description}</p>}
+        </div>}
+        {elemDef && <div className="worm-buff-item">
+            <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
+                style={{ '--power-color': elemDef.color }} aria-label={`${elemDef.label} element active`} aria-haspopup={detailed ? undefined : 'dialog'}>
+                <span className="worm-element-medal" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 22 22">
+                        <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="#ffffff25" strokeWidth="2" />
+                        <circle ref={elemFillRef} cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke={elemDef.color} strokeWidth="2.4"
+                            strokeLinecap="round" strokeDasharray={ELEM_RING_CIRC} strokeDashoffset={0} transform="rotate(-90 11 11)" />
+                    </svg>
+                    <SpecialIcon type={elementalTheme} size={12} />
+                </span>
+                <span className="worm-buff-name">{elemDef.label}</span>
+                <span ref={elemSecondsRef} aria-hidden="true" />
+                {elementalTheme === 'water' && <span className="worm-buff-meter worm-momentum-meter" ref={momentumRef} aria-hidden="true" />}
+            </button>
+            {detailed && <div className="worm-power-detail"><p>{elemDef.description}</p><p ref={feedbackRef} /></div>}
+        </div>}
+    </div>;
 }
 
 // ─── Special spawn / expiry notice ───────────────────────────────────────────
@@ -1074,7 +987,7 @@ function BuffStrip() {
 
 const NOTICE_MS = 2200;
 
-function SpecialNotice() {
+function SpecialNotice({ suppressed = false }) {
     const notice = useGameStore(s => s.wormSpecialNotice);
     const [shown, setShown] = useState(null);
     const timer = useRef(null);
@@ -1087,13 +1000,14 @@ function SpecialNotice() {
         return () => clearTimeout(timer.current);
     }, [notice]);
 
-    if (!shown) return null;
+    if (!shown || suppressed) return null;
     const def = getSpecialDef(shown.type);
     const expired = shown.kind === 'expire';
 
     return (
         <div
             key={shown.seq}
+            className="worm-special-notice"
             style={{
                 ...SPECIAL_NOTICE_STYLE,
                 color: expired ? 'rgba(255,255,255,0.72)' : def.color,
@@ -1172,6 +1086,12 @@ function BoostButton({ wormAlive }) {
 
 // ─── Pause Menu Overlay ──────────────────────────────────────────────────────
 
+function SignatureGuide() {
+    const character = useGameStore(s => s.wormCharacter);
+    const def = SIGNATURES[character];
+    return def && !def.passive ? <section className="worm-signature-guide"><strong>{def.name}</strong><p>{def.hint}</p></section> : null;
+}
+
 function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc: _fc }) {
     const storyId = useGameStore(s => s.wormStoryLevel);
     const green = UI_MOSS_LIGHT;
@@ -1195,6 +1115,11 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
         <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onClick={onResume}>
             <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className="worm-pause-card" role="dialog" aria-modal="true" aria-label="Game paused" style={overlayCardStyle(green, { width: 420 })} onClick={e => e.stopPropagation()}>
                 <Eyebrow accent={green}>Paused</Eyebrow>
+                <button type="button" className="worm-pause-resume worm-hud-chip" onClick={onResume}>RESUME</button>
+                {storyId && <StoryObjectiveCard />}
+                <BuffStrip detailed />
+                <TunnelNeedsCard />
+                <SignatureGuide />
                 <ParityWallet dark neutral />
                 <WormMissionCard summary />
             <XpRunSummary mode="worm" />
@@ -1298,24 +1223,25 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     )}
                 </div>
 
-                {/* Resume is the only primary — the reason the player opened this. */}
-                <div style={ACTION_ROW_STYLE}>
-                    <button onClick={onResume} style={primaryBtnStyle(green, blue)}>RESUME</button>
-                </div>
+
             </div>
         </div>
     );
 }
 
-function HudContext({ surface, demo }) {
+function HudContext({ surface, demo, onInspect }) {
+    const hasBuff = useGameStore(s => s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme);
     const [hasTunnel, setHasTunnel] = useState(!!wormBuffs.tunnelNeeds);
     useEffect(() => {
         const id = setInterval(() => setHasTunnel(!!wormBuffs.tunnelNeeds), 100);
         return () => clearInterval(id);
     }, []);
-    if (hasTunnel && !demo) return <TunnelNeedsCard />;
-    if (!surface) return null;
-    return <div className="worm-hud-context"><BuffStrip /><SpecialNotice /></div>;
+    const healing = hasTunnel && !demo;
+    return <div className="worm-hud-context">
+        {healing ? <TunnelNeedsCard compact onInspect={onInspect} /> : surface && hasBuff ? <BuffStrip onInspect={onInspect} /> : null}
+        {/* Keep the notice clock mounted while hidden so old spawns cannot replay. */}
+        <SpecialNotice suppressed={healing || hasBuff || !surface} />
+    </div>;
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -1408,10 +1334,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const canPause = wormAlive && (wormGamePhase === 'active' || wormGamePhase === 'finalHealing');
     const handlePause = useCallback(() => {
         if (!canPause) return;
+        resumeFeel(); feel('uiKey');
         setIsPaused(true);
         setWormPaused(true);
     }, [canPause, setWormPaused]);
     const handleResume = useCallback(() => {
+        resumeFeel(); feel('uiKey');
         setIsPaused(false);
         setWormPaused((storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
     }, [setWormPaused, demoLesson, combatMode, storyId]);
@@ -1446,7 +1374,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {wormAlive && <OrbPickupFlash />}
 
             {/* ── Zone 1: Status bar — glance info + pause, one object ── */}
-            <div className="worm-hud-top">
+            <div className="worm-hud-top" aria-hidden={isPaused || undefined} inert={isPaused ? '' : undefined}>
                 <div className="worm-hud-bar" style={HUD_BAR_STYLE}>
                     <div className="worm-hud-row" style={HUD_ROW_STYLE}>
                         {wormAlive && phase === 'crawling' && (!demoLesson || ['orbs', 'heal'].includes(lesson.id)) && (
@@ -1458,7 +1386,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         {/* Length and pause stay visible throughout transit. */}
                         <div className="worm-hud-stats" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <span style={GLANCE_LABEL_STYLE}>Length</span>
+                                <span style={GLANCE_LABEL_STYLE} aria-label="Length">LEN</span>
                                 <span style={{ ...GLANCE_VALUE_STYLE, color: TEXT }}>{wormBodyTiles}</span>
                             </div>
 
@@ -1478,14 +1406,19 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     {!combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
                 </div>
 
-                {!combatMode && !demoLesson && storyId && <StoryObjectiveCard />}
-                {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} />}
+                <div className="worm-hud-status-row">
+                    {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact onInspect={handlePause} />}
+                    {!combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
+                    {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} />}
+                </div>
             </div>
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
-            {(phase === 'crawling' || demoLesson || combatMode) && <div className="worm-hud-bottom" ref={trayRef}>
-                {!combatMode && !demoLesson && storyId && <StoryStartButton />}
-                {combatMode ? <CombatCard onRetry={onRetry} onHome={onHome} /> : demoLesson ? <WormDemoLessonCard /> : !storyId ? <WormMissionCard /> : null}
+            {(phase === 'crawling' || demoLesson || combatMode) && <div className="worm-hud-bottom" ref={trayRef} aria-hidden={isPaused || undefined} inert={isPaused ? '' : undefined}>
+                {!combatMode && !demoLesson && storyId && !storyStarted && <div className="worm-story-briefing">
+                    <StoryObjectiveCard /><StoryStartButton />
+                </div>}
+                {combatMode ? <CombatCard onRetry={onRetry} onHome={onHome} /> : demoLesson ? <WormDemoLessonCard /> : null}
                 {phase === 'crawling' && (!storyId || storyStarted) && <div style={THUMB_TRAY_STYLE}>
                     <SteerKey side="left" wormAlive={controlsEnabled && !jumpRescue} wormColor={wormColor} vars={steerVars} />
 
