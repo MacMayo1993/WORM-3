@@ -36,9 +36,13 @@ it('covers every purchasable catalog item once and guarantees an unowned item wi
     const rng = () => face;
     const owned = pool.slice(1).map(i => i.id);
     const result = rollChest('single', owned, rng);
-    expect(result.reward).toEqual({ kind: 'choice', itemIds: [pool[0].id] });
+    expect(result.reward.kind).toBe('choice');
+    expect(result.reward.itemIds).toHaveLength(3);
+    expect(result.reward.itemIds).toContain(pool[0].id);
     expect(chestItemTier(pool[0])).toBe(tier);
-    expect(rollChest('single', pool.map(i => i.id), rng).reward).toEqual({ kind: 'complete', gems: CHEST_TIERS[tier].compensation });
+    const completed = rollChest('single', pool.map(i => i.id), rng).reward;
+    expect(completed.kind).toBe('choice');
+    expect(new Set(completed.itemIds).size).toBe(3);
   }
 });
 it('commits the result before reveal, prevents double charges and reloads the same receipt', () => {
@@ -110,7 +114,7 @@ it('persists a mythic choice before granting the selected character exactly once
   expect(state().wormCharacter).toBe(character); expect(state().chestWallet.gems).toBe(10);
 });
 
-it.each([1, 2, 3, 4, 5])('offers three unique unowned cosmetics in tier %i, or only the remaining choices', tier => {
+it.each([1, 2, 3, 4, 5])('offers three unique unowned cosmetics in tier %i, filling any remaining slots with owned cosmetics', tier => {
   const pool = chestPool(tier);
   const face = CHEST_MODES.single.weights.slice(0, tier).reduce((a,b) => a+b,0) / 10000 + .00001;
   const roll = owned => rollChest('single', owned, () => face);
@@ -119,7 +123,9 @@ it.each([1, 2, 3, 4, 5])('offers three unique unowned cosmetics in tier %i, or o
   expect(new Set(offered).size).toBe(3);
   expect(offered).not.toContain(pool[0].id);
   offered.forEach(id => expect(pool.some(item => item.id === id)).toBe(true));
-  expect(new Set(roll(pool.slice(2).map(i => i.id)).reward.itemIds)).toEqual(new Set(pool.slice(0,2).map(i => i.id)));
+  const almostComplete = roll(pool.slice(2).map(i => i.id)).reward.itemIds;
+  expect(almostComplete).toHaveLength(3);
+  expect(almostComplete).toEqual(expect.arrayContaining(pool.slice(0,2).map(i => i.id)));
 });
 
 it('retains the exact pending options across reload and recovers from a failed claim save', () => {
@@ -164,4 +170,33 @@ it('validates saved choices and keeps old awarded receipts non-claimable', () =>
   useGameStore.setState({ chestWallet: sanitizeChestWallet({ ...wallet, history: [legacy] }) });
   expect(state().chestWallet.history[0]).toEqual(legacy);
   expect(state().chooseChestReward(1, ids[0]).error).toBeTruthy();
+});
+
+it.each([1, 2, 3, 4, 5])('keeps completed tier %i choices through reload and compensates exactly one pick', tier => {
+  const face = CHEST_MODES.single.weights.slice(0, tier).reduce((a,b) => a+b,0) / 10000 + .00001;
+  vi.spyOn(crypto, 'getRandomValues').mockImplementation(a => { a[0] = Math.floor(face * 4294967296); return a; });
+  const ownedItems = STORE_ITEMS.map(i => i.id);
+  useGameStore.setState({ ownedItems });
+  const { receipt } = state().rollCubieChest('single');
+  expect(receipt.reward.kind).toBe('choice');
+  expect(new Set(receipt.reward.itemIds).size).toBe(3);
+  expect(state().chestWallet.gems).toBe(10);
+  const saved = readPlayerSave();
+  useGameStore.setState({ chestWallet: saved.chestWallet, chestRolling: false });
+  expect(state().chestWallet.history.at(-1)).toEqual(receipt);
+  expect(state().rollCubieChest('single').error).toBeTruthy();
+  const pick = receipt.reward.itemIds[0];
+  expect(state().chooseChestReward(receipt.id, pick).receipt.reward).toEqual({ kind: 'complete', gems: CHEST_TIERS[tier].compensation });
+  expect(state().ownedItems).toEqual(ownedItems);
+  expect(state().chestWallet.gems).toBe(10 + CHEST_TIERS[tier].compensation);
+  expect(state().chooseChestReward(receipt.id, receipt.reward.itemIds[1]).error).toBeTruthy();
+  expect(readPlayerSave().chestWallet.gems).toBe(10 + CHEST_TIERS[tier].compensation);
+});
+
+it('randomizes completed-tier choices instead of always returning the same three', () => {
+  const owned = STORE_ITEMS.map(i => i.id);
+  const random = value => { let first = true; return () => { if (first) { first = false; return .995; } return value; }; };
+  const first = rollChest('single', owned, random(0)).reward.itemIds;
+  const second = rollChest('single', owned, random(.999)).reward.itemIds;
+  expect(new Set(first)).not.toEqual(new Set(second));
 });
