@@ -295,6 +295,9 @@ const SFX = {
     burst(0.025, 0.16, 'highpass', 2600);
     sweep(190, 130, 0.045, 0.09, 'square');
   },
+  storyTask() {
+    sweep(520, 780, 0.08, 0.09, 'sine');
+  },
 
   // ── The cube itself ─────────────────────────────────────────────────────────
   // Worm mode has had this whole layer since it shipped; the cube was still
@@ -397,6 +400,7 @@ const HAPTICS = {
   tunnelSnap: [0, 60, 35, 90],
   // Short enough to read as the key itself rather than as something happening.
   uiKey: 10,
+  storyTask: [10, 35, 15],
 
   // ── The cube itself ─────────────────────────────────────────────────────────
   // Light enough to sit under a fast sequence of turns without buzzing the hand.

@@ -30,7 +30,8 @@ export default function SignatureButton({ compact = false }) {
     <button type="button" disabled={disabled} onPointerDown={activate}
       onClick={e => { if (e.detail === 0) activate(); }}
       aria-label={`${current?.returnReady ? 'Return to bookmark' : def.name}${current?.returnReady ? `, ${current.activeSeconds} seconds to return` : current?.seconds > 0 ? `, ${current.seconds} seconds remaining` : ''}`}
-      title={`${def.hint} Keyboard: Q`} className="worm-hud-key"
+      title={`${def.hint} Keyboard: Q${status ? ` · ${status}` : ''}`} className="worm-hud-key"
+      data-ready={current?.ready && !disabled || undefined}
       style={{ width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 18,
         color: def.color, background: GAME_HUD.raised, border: `1px solid ${def.color}`, opacity: disabled && !current?.active ? 0.65 : 1,
         boxShadow: current?.ready ? `0 0 12px ${def.color}35` : 'none', fontFamily: 'inherit', cursor: disabled ? 'default' : 'pointer' }}>
@@ -49,8 +50,8 @@ export default function SignatureButton({ compact = false }) {
         </g>
       </svg>
       <span style={{ fontWeight: 800, fontSize: 12 }}>{current?.returnReady ? 'Return' : def.short}</span>
-      <span style={{ fontSize: 10, minWidth: 30 }}>{label}</span>
+      <span className={label === 'Q' ? 'worm-keyboard-hint' : undefined} style={{ fontSize: 10, minWidth: 30 }}>{label}</span>
     </button>
-    {status && <div role={current?.notice ? 'status' : undefined} style={{ marginTop: 4, fontSize: 10, lineHeight: 1.25, color: '#fff8e7', textShadow: '0 1px 3px #000', pointerEvents: 'none' }}>{status}</div>}
+    {status && <div className="worm-hud-sr" role={current?.notice ? 'status' : undefined}>{status}</div>}
   </div>;
 }

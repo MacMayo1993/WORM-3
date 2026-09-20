@@ -18,7 +18,7 @@ function ActiveAchievement({ mission, xp, number, compact = false }) {
   </>;
 }
 
-export default function WormMissionCard({ summary = false }) {
+export default function WormMissionCard({ summary = false, onInspect }) {
   const { mission, earned, demo, alive, paused, phase, multiplier, ended } = useGameStore(useShallow(s => ({
     mission: s.wormMission, earned: s.wormRunAchievements, demo: s.demoMode,
     multiplier: s.xpRun?.mode === 'worm' ? s.xpRun.multiplier : 1,
@@ -26,8 +26,12 @@ export default function WormMissionCard({ summary = false }) {
     ended: s.xpRun?.completed,
   })));
   const finished = !alive || phase === 'solved' || ended;
-  if (demo || (!summary && (!mission || finished || paused))) return null;
+  if (demo || (!summary && (!mission || finished || (paused && !onInspect)))) return null;
   const active = mission ? <ActiveAchievement mission={mission} xp={Math.round((mission.xp || 50) * multiplier)} number={earned.length + 1} compact={!summary} /> : <p>All available challenges completed this run.</p>;
+  if (!summary && onInspect) return <button type="button" className="worm-mission-live worm-mission-glance worm-hud-chip" onClick={onInspect}
+    aria-label={`${mission.title}: ${mission.progress} of ${mission.target}. Pause for details.`} aria-haspopup="dialog">
+    <span className="worm-mission-glance-title">{mission.title}</span><strong>{mission.progress}/{mission.target}</strong>
+  </button>;
   if (!summary) return <section className="worm-mission worm-mission-live" aria-label="Current achievement">
     {active}
     <span className="worm-mission-announcement" role="status" aria-live="polite" aria-atomic="true">

@@ -3,7 +3,7 @@ import { wormBuffs } from './wormBuffs.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { GAME_HUD } from '../utils/uiTheme.js';
 
-export default function TunnelNeedsCard() {
+export default function TunnelNeedsCard({ compact = false, onInspect }) {
   const [need, setNeed] = useState(wormBuffs.tunnelNeeds);
   const alive = useGameStore(s => s.wormAlive);
   const phase = useGameStore(s => s.wormGamePhase);
@@ -16,6 +16,11 @@ export default function TunnelNeedsCard() {
   const location = need.inTransit ? 'THIS TUNNEL' : need.distance === 0 ? 'TUNNEL HERE' : need.aroundCorner ? 'AROUND THE CORNER' : 'TUNNEL AHEAD';
   const caption = need.voided ? 'Choose another route' : need.locked ? `Re-entry in ${need.lockSeconds}s · heal before creating another` : need.uses >= 3 ? 'Danger · tunnel at traversal limit' : need.ready ? (need.inTransit ? 'Let your tail clear the exit' : 'Enter to spend your carried orbs') : need.isPrism ? 'Any color counts · carried orbs included' : need.saved > 0 ? 'Progress saved · match this color' : 'Match this color · carried orbs included';
   const funded = need.ready && !need.voided;
+  if (compact) return <button type="button" onClick={onInspect} className="worm-tunnel-needs worm-tunnel-glance worm-hud-chip"
+    data-heal-ready={funded} aria-label={`Tunnel healing requirements: ${title}. ${caption}. Pause for details.`} aria-haspopup="dialog">
+    <span className="worm-tunnel-orb" aria-hidden="true" style={{ background: need.color }}>{need.voided ? '×' : funded ? '✓' : need.pickupsNeeded}</span>
+    <span>{need.voided ? 'Collapsed' : need.locked ? `Locked ${need.lockSeconds}s` : need.uses >= 3 ? 'Last traversal' : funded ? (need.inTransit ? 'HEALING ON EXIT' : 'Heal ready') : `Need ${need.pickupsNeeded} orbs`}</span>
+  </button>;
   return <aside className="worm-tunnel-needs" data-heal-ready={funded} aria-label="Tunnel healing requirements" style={{ color: GAME_HUD.text, background: funded ? 'rgba(22,65,39,0.94)' : 'rgba(76,27,32,0.94)', border: `1px solid ${funded ? '#8ee5a6' : '#f08d91'}`, borderRadius: 16, padding: '8px 10px', width: '100%', boxSizing: 'border-box', pointerEvents: 'none', boxShadow: '0 6px 20px #0005' }}>
 
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
