@@ -1,6 +1,6 @@
 import { persistedState } from './persistedState.js';
 import { addXp, levelProgress, savePlayerState } from '../../progression/model.js';
-import { CHEST_MODES, GEM_EXCHANGE, GEM_LEVEL_REWARD, GEM_STORY_REWARD, newChestWallet, rollChest } from '../../economy/chests.js';
+import { CHEST_TIERS, CHEST_MODES, GEM_EXCHANGE, GEM_LEVEL_REWARD, GEM_STORY_REWARD, newChestWallet, rollChest } from '../../economy/chests.js';
 
 export function pendingGemRewards(state) {
   const wallet = state.chestWallet ?? newChestWallet();
@@ -9,11 +9,11 @@ export function pendingGemRewards(state) {
   return { level, story, amount: Math.max(0, level - wallet.claimedLevel) * GEM_LEVEL_REWARD + story.filter(id => !wallet.claimedStory.includes(id)).length * GEM_STORY_REWARD };
 }
 export const createChestSlice = (set, get) => {
-  // Persist cost, outcome and ownership together before starting the animation.
-  // Closing/reloading reveals the same receipt; there is no second claim action.
+  // Persist the cost and offered choices before animating. Claim commits ownership
+  // and replaces the pending receipt atomically, so reloads cannot reroll or double-claim.
   const commit = patch => {
     const next = { ...get(), ...patch };
-    if (!savePlayerState(next)) return { error: 'Could not save. No currency was spent. Please try again.' };
+    if (!savePlayerState(next)) return { error: 'Could not save. Nothing changed. Please try again.' };
     set(patch); return { ok: true };
   };
   return {
@@ -21,7 +21,7 @@ export const createChestSlice = (set, get) => {
     chestRolling: false,
     rollCubieChest: mode => {
       const s = get(), def = CHEST_MODES[mode];
-      if (!def || s.chestRolling || s.demoMode) return { error: 'Finish the current roll before rolling again.' };
+      if (!def || s.chestRolling || s.demoMode || s.chestWallet.history.at(-1)?.reward.kind === 'choice') return { error: 'Finish the current roll before rolling again.' };
       if (s.chestWallet.gems < def.cost) return { error: `Need ${def.cost - s.chestWallet.gems} more gems.` };
       let receipt;
       try { receipt = { ...rollChest(mode, s.ownedItems), id: s.chestWallet.rolls + 1 }; }
@@ -35,6 +35,20 @@ export const createChestSlice = (set, get) => {
         ownedItems: reward.kind === 'item' ? [...s.ownedItems, reward.itemId] : s.ownedItems };
       const result = commit(patch);
       return result.ok ? { receipt } : result;
+    },
+    chooseChestReward: (receiptId, itemId) => {
+      const s = get(), receipt = s.chestWallet.history.at(-1);
+      if (!receipt || s.demoMode || s.chestRolling || receipt.id !== receiptId || receipt.reward.kind !== 'choice' ||
+          !receipt.reward.itemIds.includes(itemId)) return { error: 'Choose one of the offered rewards after the roll lands.' };
+      // A player may acquire an offered item in the Store before returning to claim.
+      // Keep their saved options and compensate that choice instead of granting a duplicate.
+      const owned = s.ownedItems.includes(itemId);
+      const reward = owned ? { kind: 'complete', gems: CHEST_TIERS[receipt.tier].compensation } : { kind: 'item', itemId };
+      const claimed = { ...receipt, reward };
+      const result = commit({ chestWallet: { ...s.chestWallet,
+        gems: s.chestWallet.gems + (reward.gems ?? 0), history: [...s.chestWallet.history.slice(0, -1), claimed] },
+        ownedItems: owned ? s.ownedItems : [...s.ownedItems, itemId] });
+      return result.ok ? { receipt: claimed } : result;
     },
     finishChestRoll: id => { if (get().chestWallet.history.at(-1)?.id === id) set({ chestRolling: false }); },
     exchangeChestGems: () => {

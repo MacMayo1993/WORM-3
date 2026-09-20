@@ -37,7 +37,13 @@ it('displays two cubies and the matching-pair upgrade without charging twice on 
   expect(state().chestWallet.rolls).toBe(1); expect(state().chestWallet.gems).toBe(5);
   act(() => vi.advanceTimersByTime(2400));
   expect(host.querySelector('[role="status"]').textContent).toContain('Matching pair! Upgraded one tier.');
-  expect(state().ownedItems.length).toBe(2);
+  expect(state().ownedItems.length).toBe(1);
+  expect(host.querySelectorAll('.chest-choice-card')).toHaveLength(3);
+  const itemId = state().chestWallet.history.at(-1).reward.itemIds[1];
+  act(() => host.querySelectorAll('.chest-choice-card')[1].click());
+  expect(state().ownedItems).toContain(itemId);
+  expect(host.querySelector('.chest-choices')).toBeNull();
+  expect(state().chestWallet.gems).toBe(5);
 });
 it('retains a paid result and releases the animation lock when leaving early', () => {
   act(() => button('Roll one cubie').click());
@@ -115,4 +121,24 @@ it('renders only the selected tile family and switches its preview', () => {
   const first = host.querySelector('.catalogue-preview h3').textContent;
   act(() => host.querySelector('[aria-label="Next item"]').click());
   expect(host.querySelector('.catalogue-preview h3').textContent).not.toBe(first);
+});
+
+it('restores a paid cosmetic choice after leaving mid-roll, without another charge', () => {
+  act(() => button('Two cubies').click());
+  act(() => button('Roll two cubies').click());
+  expect(host.querySelector('.chest-choices')).toBeNull();
+  const offered = state().chestWallet.history.at(-1).reward.itemIds;
+  act(() => root.render(null));
+  const saved = readPlayerSave();
+  act(() => useGameStore.setState({ chestWallet: saved.chestWallet, ownedItems: saved.ownedItems, chestRolling: false }));
+  act(() => root.render(<ChestRoom onClose={close} onBack={back} />));
+  expect(host.querySelectorAll('.chest-die')).toHaveLength(2);
+  expect(host.querySelectorAll('.chest-choice-card')).toHaveLength(3);
+  expect(button('Choose your reward above').disabled).toBe(true);
+  expect(state().chestWallet.history.at(-1).reward.itemIds).toEqual(offered);
+  const cards = [...host.querySelectorAll('.chest-choice-card')];
+  act(() => { cards[0].click(); cards[1].click(); });
+  expect(state().ownedItems).toContain(offered[0]);
+  expect(state().ownedItems).not.toContain(offered[1]);
+  expect(state().chestWallet.gems).toBe(5);
 });
