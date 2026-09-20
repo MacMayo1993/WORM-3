@@ -1,3 +1,4 @@
+import { wigglePointInto } from './wiggleSweep.js';
 import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelSwim.js';
 import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
 import { SPRING_CHARGE } from './signatures.js';
@@ -372,7 +373,8 @@ export function WormBody({ worm, size }) {
         let haloIdx = 0;  // compacted slot into the glow-halo overlay
         let pageWriteIdx = 0; // book worm only — compacted slot into the page-flap overlays (body segments only, no head entry)
 
-        const visibleCount = Math.min(MAX_TAIL, tLen);
+        const sweep = worm.signature.current.sweep;
+        const visibleCount = Math.min(MAX_TAIL, sweep ? Math.max(tLen, Math.ceil((sweep.length + Math.abs(sweep.offset) * 2) / BODY_BALL_SPACING) + 1) : tLen);
 
         const orbColors = worm.orbPickupColorsRef.current;
         const baseColor = wormColorRef.current;
@@ -420,7 +422,7 @@ export function WormBody({ worm, size }) {
             const lodStep = i < 200 ? 1 : (i < 600 ? 2 : 4);
             if (i !== 0 && i % lodStep !== 0) continue;
 
-            const fade = 1 - i / tLen;
+            const fade = 1 - i / (sweep ? visibleCount : tLen);
             let swimWeight = 0;
 
             if (i === 0) {
@@ -530,6 +532,10 @@ export function WormBody({ worm, size }) {
                     cubeShellDirInto(_bodyCloneNormal, _bodyClonePos, size);
                     _bodyCloneNormal.addScaledVector(_bodySegForward, -_bodyCloneNormal.dot(_bodySegForward)).normalize();
                 }
+                if (sweep) {
+                    wigglePointInto(_bodyClonePos, sweep, i / (visibleCount - 1));
+                    _bodyCloneNormal.copy(sweep.normal);
+                }
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isBook || isMobi || _isInch || _isPrism) {
                     // Orient the cover to face the direction of travel, using the same
@@ -588,7 +594,7 @@ export function WormBody({ worm, size }) {
                 _wormDummy.scale.multiplyScalar(1 + compression * 0.2);
                 _wormDummy.position.addScaledVector(i === 0 ? _bodyNormal : _bodyCloneNormal, -compression * 0.025);
             }
-            _wormDummy.scale.multiplyScalar(wormBodyTaper(i, tLen, wormCharacterId));
+            _wormDummy.scale.multiplyScalar(wormBodyTaper(i, sweep ? visibleCount : tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
             // LOD removes distant instances to control cost, but must never make
             // the survivors larger: that produced an abrupt size jump at segment

@@ -113,7 +113,7 @@ function resolveTrailTile(trail, i, lSize, outPos, outNorm) {
 // smooth interpolation has caught up), so it is used only as a stretch target for
 // index 1's daub and is never rendered itself — this keeps the trail entirely behind
 // the head instead of flashing a disc out in front of it.
-export function WormTrail({ worm, size }) {
+export function WormTrail({ abilityTrail = false, worm, size }) {
     const meshRef = useRef();
     const glowRef = useRef(); // additive glow-halo overlay for the recent trail
     const budget = fxBudget(size);
@@ -167,7 +167,8 @@ export function WormTrail({ worm, size }) {
         if (!mesh) return;
         const glowMesh = glowRef.current;
 
-        if (!wormShowTrail) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+        const trailActive = worm.signature?.current?.character === 'glow' && worm.signature.current.active > 0;
+        if (abilityTrail ? !trailActive : !wormShowTrail) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
         // Hide the surface trail whenever the worm is not crawling on the surface — during
         // wormhole entry/tunnel/exit and the wind spirals the camera is inside the cube, and
@@ -175,7 +176,7 @@ export function WormTrail({ worm, size }) {
         if (worm.phase.current !== 'crawling') { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
         const trail = worm.pathHistory.current;
-        const count = trail.count;
+        const count = abilityTrail ? Math.min(trail.count, trail.nextSeq - worm.signature.current.trailStartSeq + 1) : trail.count;
         if (count < 2) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
         const state = useGameStore.getState();
@@ -219,7 +220,7 @@ export function WormTrail({ worm, size }) {
         // seeding one tile short of that end makes the freshest daubs overlap the last orb (no
         // gap) and then stream backward. Seeding exactly at the body end left a visible gap;
         // seeding near index 1 painted under the whole body near the head.
-        let aIdx = Math.max(1, bodyTiles - 1);
+        let aIdx = abilityTrail ? 0 : Math.max(1, bodyTiles - 1);
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
         if (!haveA) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }

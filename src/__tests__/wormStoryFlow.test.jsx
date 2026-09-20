@@ -33,7 +33,7 @@ function until(predicate, max = 2000) {
 }
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true; resetLiveRotation();
-  useGameStore.setState({ cubies: makeCubies(5), size: 5, demoMode: false, wormCharacter: 'classic', wormControlMode: 'oriented', animState: null,
+  useGameStore.setState({ cubies: makeCubies(5), size: 5, demoMode: false, wormCharacter: 'glow', wormControlMode: 'oriented', animState: null,
     playerProgress: { ...newProgress(), wormStory: { stars: {1:1,2:1,3:1,4:1,5:1}, claimed: {} } } });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   act(() => root.render(<Harness />));
@@ -139,4 +139,14 @@ it('can restore all three authored pairs using only the placed orbs and surface 
   until(() => !!state().wormStoryResult);
   expect(getActiveTunnels(state().cubies, 5)).toHaveLength(0);
   expect(state().wormStoryResult).toMatchObject({ levelId: 6 });
+});
+
+it('Classic adds 50 percent more Story orbs without changing the authored tunnel objective', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'classic' }));
+  begin(1); expect(state().wormPowerups).toHaveLength(6);
+  until(() => !!state().wormStoryResult);
+  expect(state().wormSessionOrbs).toBe(4);
+  expect(state().wormPowerups).toHaveLength(2);
+  begin(6); expect(state().wormPowerups).toHaveLength(36);
+  expect(getActiveTunnels(state().cubies, 5)).toHaveLength(3);
 });

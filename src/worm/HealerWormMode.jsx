@@ -1,3 +1,5 @@
+import { holdsRotationTimer } from './characterAbilities.js';
+import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { storyLevel } from './story/levels.js';
 import { combatBridge } from './combat/portalCombat.js';
 import CombatScene from './combat/CombatScene.jsx';
@@ -101,6 +103,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const finalHealCheckTimer = useRef(0);  // throttle: scan for active tunnels every 0.5s
 
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
+    const glowCharacter = useGameStore(s => s.wormCharacter === 'glow');
     const demoMode = useGameStore(s => s.demoMode);
     const combatMode = useGameStore(s => s.wormCombatMode);
     const enemiesEnabled = useGameStore(s => s.wormEnemiesEnabled);
@@ -367,7 +370,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // frozen for this beat (see stepWormSim), so hold the auto-rotate timer and warning
         // beam steady too — otherwise the clock keeps charging behind the camera swing and
         // the next turn can fire the instant the worm resumes.
-        if (worm.cutFocusT.current > 0) { rotationClock.held = true; return; }
+        if (worm.signature.current.sweep || worm.cutFocusT.current > 0) { rotationClock.held = true; return; }
 
         // Same for the elemental-claim beat — the sim is frozen for it, so the
         // auto-rotate clock must not keep charging behind the camera move.
@@ -515,6 +518,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         if (!useGameStore.getState().wormAlive) return;
 
         if (demo && (practiceLesson !== 'rotation' || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
+        if (holdsRotationTimer(worm.signature.current)) { rotationClock.held = true; return; }
         rotationClock.held = false;
         autoTimerRef.current += Math.min(delta, 0.1);
         const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
@@ -659,6 +663,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormAlive && <WormBody worm={worm} size={size} />}
             {wormAlive && <RocketExhaust worm={worm} />}
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
+            {wormAlive && glowCharacter && <WormTrail worm={worm} size={size} abilityTrail />}
             {wormAlive && <SignatureEffects worm={worm} size={size} />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
             {wormAlive && <WormFace worm={worm} size={size} />}

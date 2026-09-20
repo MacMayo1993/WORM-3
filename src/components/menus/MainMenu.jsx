@@ -370,6 +370,7 @@ const ShufflingCube = ({ onFlip }) => {
         <MenuFlipWave
           key={wave.id}
           origins={wave.origins}
+          characterCycle={wave.id}
           startTime={wave.startTime}
           onComplete={handleWormComplete}
         />

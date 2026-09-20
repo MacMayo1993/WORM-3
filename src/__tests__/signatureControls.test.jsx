@@ -39,14 +39,14 @@ afterEach(() => {
 const frame = () => act(() => { worm.tick(0.05); vi.advanceTimersByTime(100); });
 it('uses the real character store, button bridge, sim and cooldown mirror', () => {
   const button = host.querySelector('button');
-  expect(button.getAttribute('aria-label')).toBe('Pulse Beacon'); expect(button.disabled).toBe(false);
+  expect(button.getAttribute('aria-label')).toBe('Light Trail'); expect(button.disabled).toBe(false);
   act(() => {
     button.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
   });
   frame();
   expect(worm.signature.current.seq).toBe(1);
-  expect(worm.signature.current.active).toBeGreaterThan(4);
+  expect(worm.signature.current.active).toBeGreaterThan(2);
   expect(button.disabled).toBe(true); expect(button.textContent).toContain('ACTIVE');
   const seconds = wormBuffs.signature.seconds;
   act(() => useGameStore.setState({ wormPaused: true }));
@@ -73,15 +73,24 @@ it('clears the HUD bridge when gameplay unmounts', () => {
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it('Book can press Return while its cooldown is running', () => {
+it('Book pauses once, keeps moving and cannot reactivate through cooldown', () => {
   act(() => useGameStore.setState({ wormCharacter: 'book' })); frame();
   const mark = { ...worm.pos.current };
   act(() => host.querySelector('button').click()); frame();
   for (let i = 0; i < 24; i++) frame();
   const button = host.querySelector('button');
-  expect(button.textContent).toContain('Return'); expect(button.disabled).toBe(false);
-  act(() => button.click()); frame();
-  expect(worm.pos.current).toEqual(mark); expect(button.disabled).toBe(true);
+  expect(button.textContent).toContain('Pause'); expect(button.disabled).toBe(true);
+  expect(worm.pos.current).not.toEqual(mark);
+});
+it('MOBI creates a real tunnel and preserves its inventory during the opening dive', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'mobi', wormOrbInventory: { 4: 12 } })); frame();
+  worm.tailLength.current = 16;
+  const before = { ...useGameStore.getState().wormOrbInventory };
+  act(() => host.querySelector('button').click()); frame();
+  expect(worm.phase.current).toBe('windup');
+  expect(worm.signature.current.mobiTunnel?.stableKeys).toHaveLength(2);
+  expect(useGameStore.getState().wormOrbInventory).toEqual(before);
+  expect(worm.tailLength.current).toBe(16);
 });
 it('shows correct pickup requirements through the real tunnel lookup and store', () => {
   const state = useGameStore.getState();
@@ -101,4 +110,11 @@ it('shows correct pickup requirements through the real tunnel lookup and store',
   expect(host.querySelector('.worm-tunnel-needs').dataset.healReady).toBe('false');
   act(() => useGameStore.setState({ wormGamePhase: 'solved' }));
   expect(host.querySelector('[aria-label="Tunnel healing requirements"]')).toBeNull();
+});
+
+it('Classic receives extra orbs from the actual run reset', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'classic', wormOrbCount: 5, wormRunId: 103 })); frame();
+  expect(useGameStore.getState().wormPowerups).toHaveLength(8);
+  act(() => useGameStore.setState({ wormCharacter: 'glow', wormRunId: 104 })); frame();
+  expect(useGameStore.getState().wormPowerups).toHaveLength(5);
 });

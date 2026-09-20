@@ -1,3 +1,4 @@
+import { characterXpMultiplier } from '../../worm/characterAbilities.js';
 import { storyUnlocked } from '../../worm/story/levels.js';
 import { completeStoryChanges, claimStoryChanges } from '../../worm/story/rewards.js';
 import { createXpRun, wormMultiplier } from '../../progression/model.js';
@@ -123,7 +124,8 @@ export const createWormSlice = (set, _get) => ({
     wormCombatMode: combat === true && !state.demoMode && !storyId,
     wormEnemiesEnabled: enemies !== false && !storyId,
     xpRun: state.demoMode || combat || storyId ? null : createXpRun('worm', (state.wormRunId ?? 0) + 1, state.playerProgress.xp, {
-      multiplier: wormMultiplier(speed ?? state.wormSpeed, interval ?? state.wormholeInterval),
+      multiplier: wormMultiplier(speed ?? state.wormSpeed, interval ?? state.wormholeInterval) * characterXpMultiplier(state.wormCharacter),
+      character: state.wormCharacter,
     }),
     wormMission: state.demoMode || combat || storyId ? null : startMission(state.wormMissionsCompleted, (state.wormRunId ?? 0) + 1, {}, { recent: state.playerProgress.recentGoals || [] }),
     disparityFlipCap: flipCap,

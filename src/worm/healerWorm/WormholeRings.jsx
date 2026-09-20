@@ -247,7 +247,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             const isCritical = !isVoid && traversals >= WORMHOLE_MAX_TRAVERSALS;
             const faceColor = faceColorObjs.get(faceId) ?? _faceColorFallback;
             const stableKey = getStableKey(tile.x, tile.y, tile.z, tile.dirKey, cubies);
-            const ready = !isVoid && !!tunnelKey && !isParityLocked({ signature }, tile) && healingNeed({
+            const ready = !isVoid && !!tunnelKey && !isParityLocked({ signature }, tile, { getCubies: () => cubies }) && healingNeed({
                 deposited: state.wormHealingProgress?.[stableKey]?.deposited ?? 0,
                 inventory: state.wormOrbInventory ?? {}, faceId, tailLength,
                 isPrism: state.wormCharacter === 'prism',

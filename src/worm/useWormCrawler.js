@@ -1,3 +1,5 @@
+import { getStableKey } from './wormLogic.js';
+import { characterOrbCount } from './characterAbilities.js';
 import { storyLevel, storyOutcome } from './story/levels.js';
 import { stageStory, storyMetrics } from './story/runtime.js';
 import { wormEventChanges } from './wormEventChanges.js';
@@ -26,7 +28,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
-import { flipStickerPair } from '../game/manifoldLogic.js';
+import { canFlipStickerPair, flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker } from '../game/cubeState.js';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -292,6 +294,23 @@ export function useWormCrawler(size, cubies) {
                     };
                 });
             },
+            canCreateMobiTunnel: tile => {
+                const state = useGameStore.getState();
+                const sticker = state.cubies?.[tile.x]?.[tile.y]?.[tile.z]?.stickers?.[tile.dirKey];
+                return !!sticker && sticker.curr === sticker.orig && canFlipStickerPair(state.cubies, sizeRef.current,
+                    tile.x, tile.y, tile.z, tile.dirKey, getManifoldMap(state.cubies, sizeRef.current, state.rotationEpoch));
+            },
+            createMobiTunnel: tile => {
+                if (!ctxRef.current.canCreateMobiTunnel(tile)) return null;
+                ctxRef.current.spawnWormholePair(tile);
+                const state = useGameStore.getState();
+                const snapshot = getWormTunnelSnapshot(state.cubies, sizeRef.current, state.rotationEpoch);
+                tunnelLookupRef.current = snapshot.lookup;
+                activeTunnelsRef.current = snapshot.tunnels;
+                const resolved = ctxRef.current.resolveTunnel(tile.x, tile.y, tile.z, tile.dirKey);
+                return resolved ? { ...resolved, stableKeys: [resolved.tunnel.entry, resolved.tunnel.exit].map(p =>
+                    getStableKey(p.x, p.y, p.z, p.dirKey, state.cubies)) } : null;
+            },
             onFlippedTile: (v) => useGameStore.getState().setWormOnFlippedTile(v),
             applyDeposit: (deposit, stableKey, entryFaceId) => {
                 useGameStore.setState((state) => ({
@@ -410,7 +429,7 @@ export function useWormCrawler(size, cubies) {
         feedbackRef.current.advance(delta);
         const story = storyLevel(state.wormStoryLevel);
         if (story && state.wormGamePhase === 'active' && storyPracticeRef.current?.runId !== state.wormRunId && !liveRotation.active) {
-            const practice = stageStory(sim, sizeRef.current, story);
+            const practice = stageStory(sim, sizeRef.current, story, state.wormCharacter);
             storyPracticeRef.current = { ...practice, runId: state.wormRunId, rotationEpoch: state.rotationEpoch };
             resetWormBuffs(); resetWormSegments(); resetWormPress();
             useGameStore.setState({ cubies: practice.cubies, wormOrbInventory: practice.inventory,
@@ -454,7 +473,7 @@ export function useWormCrawler(size, cubies) {
         }
         const combatHeld = state.wormPaused || document.hidden || sim.jumpRescueT > 0 || !sim.alive || sim.phase !== 'crawling' ||
             sim.tunnelPassages.length > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 ||
-            sim.elementalFocusT > 0 || sim.signature.charge > 0 || sim.rocketActive || liveRotation.active ||
+            sim.elementalFocusT > 0 || sim.signature.charge > 0 || !!sim.signature.sweep || sim.rocketActive || liveRotation.active ||
             state.wormGamePhase !== 'active';
         withPersistenceBatch(() => stepWormSim(sim, delta, sizeRef.current, ctxRef.current));
         feedbackRef.current.tunnel(sim.phase, sim.tunnelProgress, sim.alive);
@@ -474,7 +493,7 @@ export function useWormCrawler(size, cubies) {
                 phase: state.wormGamePhase, alive: sim.alive, healed: sim.healed,
                 rotating: liveRotation.active, hazardBusy: !!hazards.busy,
                 element: sim.elementalType, elementT: sim.elementalT,
-                lockedTile: sim.signature.character === 'mobi' && sim.signature.active > 0 ? sim.signature.target : null,
+                lockedTile: null,
             };
             const onContact = health => {
                 if (health <= 0) killWormSim(sim, ctxRef.current, { reason: 'portal-crawler' });
@@ -571,7 +590,7 @@ export function useWormCrawler(size, cubies) {
         storyPracticeRef.current = null;
         combatRunRef.current = null; sim.combat = null; combatBridge.current = null;
         feedbackRef.current.reset();
-        resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
+        resetWormSim(sim, size, { orbCount: characterOrbCount(wormOrbCount, useGameStore.getState().wormCharacter), wormholeInterval });
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();

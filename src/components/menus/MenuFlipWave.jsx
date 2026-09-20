@@ -1,3 +1,4 @@
+import { menuCharacterPair } from './menuCharacterRig.js';
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -9,7 +10,7 @@ const portalGeometry = new THREE.RingGeometry(0.19, 0.23, 40);
 
 // One paused clock drives one antipodal pair, their portal pulses and tail completion.
 // There is deliberately no wall-clock timeout that can rotate a cube mid-worm.
-export default function MenuFlipWave({ origins, onComplete }) {
+export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }) {
   const phase = useMemo(() => Math.random() * Math.PI * 2, []);
   const elapsed = useRef(0);
   const root = useRef();
@@ -53,7 +54,7 @@ export default function MenuFlipWave({ origins, onComplete }) {
     </group>)}
     {[0, 1].map(i => <MenuWormParticle key={i}
       start={origins[0].position} antipodal={i === 1}
-      color1={origins[i].color} elapsed={elapsed} arcPhase={phase} onComplete={wormCompleted}
+      character={menuCharacterPair(characterCycle)[i]} elapsed={elapsed} arcPhase={phase} onComplete={wormCompleted}
     />)}
   </group>;
 }

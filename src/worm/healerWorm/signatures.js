@@ -1,47 +1,41 @@
-import { getNextSurfacePosition, turnWorm, getStableKey } from '../wormLogic.js';
-import { BODY_BALL_SPACING, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH, HEAL_COST } from './constants.js';
+import { BOOK_PAUSE_SECONDS, GLOW_TRAIL_SECONDS, MOBI_REENTRY_SECONDS } from '../characterAbilities.js';
+import { makeWiggleSweep, WIGGLE_DURATION } from './wiggleSweep.js';
+import { getStableKey } from '../wormLogic.js';
+import { BODY_BALL_SPACING } from './constants.js';
 import { ttAt } from '../circularBuffers.js';
 import { liveRotation } from '../liveRotation.js';
 import { jumpLandingTile } from './jumpLanding.js';
 
 export const SIGNATURES = {
-  classic: { name: 'Shed Skin', short: 'Shed', cooldown: 30, duration: 4, color: '#a6eb9b', hint: 'Survive one body hit by shedding tail. Costs at least one orb.' },
-  book: { name: 'Bookmark', short: 'Mark', cooldown: 30, duration: 4, color: '#ffda91', hint: 'Mark this tile. Tap again within four seconds to return.' },
-  prism: { name: 'Refract', short: 'Refract', cooldown: 26, duration: 1, color: '#ffd2fb', hint: 'Next three pickups: useful colors and +1 healing charge each.' },
-  wiggle: { name: 'Sidewinder', short: 'Dodge', cooldown: 12, duration: 1, color: '#ffb5d7', hint: 'Dodge toward your last steering side. Clear landing required.' },
+  classic: { name: 'Orb Abundance', short: 'Abundance', passive: true, cooldown: 0, duration: 0, color: '#a6eb9b', hint: '50% more orbs on the cube.' },
+  book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: 'Pause the rotation-layer timer for 5 seconds. Earn 25% more XP.' },
+  prism: { name: 'Spectrum', short: 'Spectrum', passive: true, cooldown: 0, duration: 0, color: '#ffd2fb', hint: 'Every orb color can heal every wormhole tunnel.' },
+  wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs. Steering locks until finished.' },
   inch: { name: 'Spring Loaded', short: 'Spring', cooldown: 24, duration: 0, color: '#c6ec86', hint: 'Long spring jump. Landing must be clear.' },
-  glow: { name: 'Pulse Beacon', short: 'Beacon', cooldown: 22, duration: 5, color: '#8eefff', hint: 'Reveal nearby orbs and entrances. Reach one tile farther.' },
-  mobi: { name: 'Parity Lock', short: 'Lock', cooldown: 28, duration: 6, color: '#ceacff', hint: 'Seal the nearest entrance ahead for six seconds.' },
+  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Leave a luminous trail for 3 seconds. Enemies always glow brighter.' },
+  mobi: { name: 'Create Wormhole', short: 'Tunnel', cooldown: 0, duration: 0, color: '#ceacff', hint: 'Open a tunnel beneath you without spending orbs. No re-entry for 10 seconds. Heal it before creating another.' },
 };
 export const SPRING_CHARGE = 0.24;
 export const SPRING_SPAN = 2.2;
 export const SPRING_HEIGHT = 1.8;
 export const signatureKey = p => p ? `${p.x},${p.y},${p.z},${p.dirKey}` : '';
-export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, relocate: null, dashing: false, fxT: 0, fxTile: null });
+export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, sweep: null, mobiTunnel: null, mobiOpening: false, trailStartSeq: 0, fxT: 0, fxTile: null });
 const stickerAt = (ctx, p) => ctx.getCubies()?.[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
 
-export function isParityLocked(sim, tile) {
-  return sim.signature?.character === 'mobi' && sim.signature.active > 0
-    && signatureKey(sim.signature.target) === signatureKey(tile);
+// The restriction follows sticker identity when either mouth rotates to another face.
+export function isParityLocked(sim, tile, ctx) {
+  const owned = sim.signature?.mobiTunnel;
+  return !!owned && owned.reentryT > 0 && !sim.signature.mobiOpening
+    && owned.stableKeys.includes(getStableKey(tile.x, tile.y, tile.z, tile.dirKey, ctx.getCubies()));
+}
+
+export function releaseMobiTunnel(sim, tunnel) {
+  if (sim.signature.mobiTunnel?.pairId === tunnel.pairId) sim.signature.mobiTunnel = null;
 }
 
 function targetFor(sim, size, ctx, character) {
   if (character === 'inch') return jumpLandingTile(sim.pos, sim.moveDir, size, sim.interpT, 0.001, SPRING_SPAN);
-  if (character === 'book' && sim.signature.active > 0) return sim.signature.target;
-  if (character === 'wiggle') return getNextSurfacePosition(sim.pos, turnWorm(sim.moveDir, sim.signatureSide ?? 'right'), size);
-  if (character !== 'mobi') return sim.pos;
-  let tile = sim.pos, direction = sim.moveDir;
-  for (let i = 0; i <= 3; i++) {
-    const sticker = stickerAt(ctx, tile);
-    if (sticker && sticker.curr !== sticker.orig) {
-      const tunnel = ctx.resolveTunnel(tile.x, tile.y, tile.z, tile.dirKey);
-      if (tunnel && !sim.voidTunnelKeys.has(tunnel.tunnelKey)) return tile;
-    }
-    const next = getNextSurfacePosition(tile, direction, size);
-    if (!next) break;
-    tile = next; direction = next.moveDir ?? direction;
-  }
-  return null;
+  return sim.pos;
 }
 
 // Preview and activation share eligibility. An invalid attempt never starts a
@@ -51,18 +45,18 @@ export function signatureAvailability(sim, size, ctx, launching = false) {
   const sig = sim.signature;
   let reason = '';
   if (!SIGNATURES[character]) reason = 'No signature';
+  else if (SIGNATURES[character].passive) reason = 'Always active';
   else if (!sim.alive || ctx.isPaused() || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || (ctx.isDemoLesson?.() && !ctx.allowDemoSignature?.())) reason = 'Not available now';
   else if (sim.phase !== 'crawling' || sim.rocketActive || sim.restRead || liveRotation.active) reason = 'Wait for a clear surface';
   else if (sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0) reason = 'Wait a moment';
-  else if (!launching && !(character === 'book' && sig.active > 0) && (sig.cooldown > 0 || sig.active > 0 || sig.charge > 0)) reason = 'Recharging';
-  else if (['inch', 'book', 'wiggle'].includes(character) && sim.isJumping) reason = 'Land first';
-  else if (['book', 'wiggle'].includes(character) && (sim.crossingCorner || sim.pendingVoidKill || sim.pendingTunnelHeal || sim.tunnelPassages.length)) reason = 'Finish the crossing first';
-  else if (character === 'classic' && sim.tailLength < BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH) reason = 'Collect an orb first';
-  else if (character === 'prism' && !neededPrismColor(sim, ctx)) reason = 'No tunnels need healing';
+  else if (!launching && (sig.cooldown > 0 || sig.active > 0 || sig.charge > 0)) reason = 'Recharging';
+  else if (['inch', 'wiggle', 'mobi'].includes(character) && sim.isJumping) reason = 'Land first';
+  else if (['wiggle', 'mobi'].includes(character) && (sim.crossingCorner || sim.pendingVoidKill || sim.pendingTunnelHeal || sim.tunnelPassages.length)) reason = 'Finish the crossing first';
+  else if (character === 'mobi' && sig.mobiTunnel) reason = 'Heal your previous wormhole first';
+  else if (character === 'mobi' && !ctx.canCreateMobiTunnel?.(sim.pos)) reason = 'Find an unflipped tile';
   const target = reason ? null : targetFor(sim, size, ctx, character);
   if (!reason && !target) reason = 'No entrance ahead';
-  if (!reason && character === 'wiggle' && target.dirKey !== sim.pos.dirKey) reason = 'Face edge — turn first';
-  if (!reason && (character === 'inch' || character === 'wiggle' || (character === 'book' && sig.active > 0))) {
+  if (!reason && character === 'inch') {
     const sticker = stickerAt(ctx, target);
     if (!sticker || sticker.curr !== sticker.orig) reason = 'Landing on a wormhole';
     const key = signatureKey(target);
@@ -82,10 +76,10 @@ export function activateSignature(sim, size, ctx) {
     return false;
   }
   const def = SIGNATURES[available.character];
-  if (available.character === 'book' && sig.active > 0) {
-    sig.relocate = { ...sig.target, moveDir: sig.heading, teleport: true };
-    sig.active = 0; sig.notice = 'Back to your bookmark'; sig.noticeT = 1.8; sig.fxT = 0.7;
-    ctx.feel('exit'); return true;
+  let created = null;
+  if (available.character === 'mobi') {
+    created = ctx.createMobiTunnel?.(available.target);
+    if (!created) { sig.notice = 'Cannot open a tunnel here'; sig.noticeT = 1.8; return false; }
   }
   sig.character = available.character;
   sig.target = { ...available.target };
@@ -93,15 +87,15 @@ export function activateSignature(sim, size, ctx) {
   sig.notice = def.name; sig.noticeT = 1.8;
   if (sig.character === 'inch') sig.charge = SPRING_CHARGE;
   else { sig.active = def.duration; sig.cooldown = def.cooldown; }
-  if (sig.character === 'book') sig.heading = sim.moveDir;
-  if (sig.character === 'prism') sig.charges = 3;
-  if (sig.character === 'wiggle') {
-    sig.relocate = { ...sig.target, moveDir: sim.moveDir, teleport: false };
-    sig.dashing = true;
+  if (sig.character === 'glow') sig.trailStartSeq = sim.pathHistory.nextSeq;
+  if (created) {
+    sig.mobiTunnel = { pairId: created.tunnel.pairId, stableKeys: created.stableKeys, reentryT: MOBI_REENTRY_SECONDS };
+    sig.mobiOpening = true;
   }
-  if (sig.character === 'mobi' && isParityLocked(sim, sim.pos)) {
-    sim.pendingTunnelTrigger = null;
-    sim.onFlippedTile = false; sim.lastFlipped = false; ctx.onFlippedTile(false);
+  if (sig.character === 'wiggle') {
+    sig.sweep = makeWiggleSweep(sim);
+    sig.heading = sim.moveDir;
+    sim.pendingTurns.length = 0;
   }
   ctx.feel(({ inch: 'springCharge', glow: 'beacon', mobi: 'parityLock', classic: 'magnet', book: 'specialSpawn', prism: 'heal', wiggle: 'jump' })[sig.character]);
   return true;
@@ -129,22 +123,11 @@ export function tickSignature(sim, delta, size, ctx) {
     ctx.feel('jump');
   }
   sig.cooldown = Math.max(0, sig.cooldown - delta);
+  if (sig.mobiTunnel) sig.mobiTunnel.reentryT = Math.max(0, sig.mobiTunnel.reentryT - delta);
   if (sig.character === 'inch') {
     if (sig.active && !sim.isJumping) { sig.active = 0; ctx.feel('rocketLand'); }
   } else if (sig.active > 0 && !['prism', 'wiggle'].includes(sig.character)) {
     sig.active = Math.max(0, sig.active - delta);
-  }
-  // Wait for settled coordinates before releasing an expired seal. A cube turn
-  // may still be moving the locked sticker away from the head's destination.
-  if (sig.character === 'mobi' && sig.active === 0 && sig.target && !liveRotation.active && !sim.restRead) {
-    if (signatureKey(sig.target) === signatureKey(sim.pos)) {
-      const sticker = stickerAt(ctx, sim.pos);
-      if (sticker && sticker.curr !== sticker.orig) {
-        sim.pendingTunnelTrigger = { ...sim.pos };
-        sim.onFlippedTile = true; sim.lastFlipped = true; ctx.onFlippedTile(true);
-      }
-    }
-    sig.target = null;
   }
   return false;
 }
@@ -155,40 +138,11 @@ export function signatureReadout(sim, size, ctx) {
   sig.preview = available.target;
   sig.reason = available.reason;
   return { character: available.character, ready: !available.reason, reason: available.reason,
-    returnReady: available.character === 'book' && sig.active > 0, activeSeconds: Math.ceil(sig.active), charges: sig.charges,
+    returnReady: false, activeSeconds: Math.ceil(sig.active), charges: sig.charges,
     active: sig.active > 0 || sig.charge > 0, seconds: Math.ceil(sig.cooldown),
-    fraction: def ? 1 - sig.cooldown / def.cooldown : 0,
-    notice: sig.noticeT > 0 ? sig.notice : '' };
+    fraction: def?.cooldown ? 1 - sig.cooldown / def.cooldown : 1,
+    notice: sig.noticeT > 0 ? sig.notice : sig.mobiTunnel ? `Heal your wormhole${sig.mobiTunnel.reentryT > 0 ? ` · re-entry in ${Math.ceil(sig.mobiTunnel.reentryT)}s` : ''}` : '' };
 }
 
-// Choose the most underfunded live entrance, with deterministic tie-breaking.
-// A pickup is still one pickup for XP; Refract adds one spendable body segment.
-export function neededPrismColor(sim, ctx) {
-  let best = null, deficit = -Infinity;
-  const inventory = ctx.getOrbInventory() ?? {}, progress = ctx.getHealingProgress() ?? {};
-  for (const tunnel of ctx.getActiveTunnels?.() ?? []) {
-    for (const pos of [tunnel.entry, tunnel.exit]) {
-      if (!pos) continue;
-      const sticker = stickerAt(ctx, pos);
-      if (!sticker || sticker.curr === sticker.orig) continue;
-      const resolved = ctx.resolveTunnel(pos.x, pos.y, pos.z, pos.dirKey);
-      if (resolved && sim.voidTunnelKeys.has(resolved.tunnelKey)) continue;
-      const key = getStableKey(pos.x, pos.y, pos.z, pos.dirKey, ctx.getCubies());
-      const remaining = HEAL_COST - (progress[key]?.deposited ?? 0);
-      if (remaining <= 0) continue;
-      const need = remaining - (inventory[sticker.curr] ?? 0);
-      if (need > deficit || (need === deficit && sticker.curr < best)) { best = sticker.curr; deficit = need; }
-    }
-  }
-  return best;
-}
-export function refractPickup(sim, ctx, faceId) {
-  const sig = sim.signature;
-  if (sig.character !== 'prism' || !sig.active || sig.charges <= 0) return { faceId, bonus: 0 };
-  const needed = neededPrismColor(sim, ctx);
-  if (!needed) return { faceId, bonus: 0 };
-  sig.charges--; if (sig.charges === 0) sig.active = 0;
-  sig.fxT = 0.7; sig.fxTile = { ...sim.pos };
-  sig.notice = `Refract · ${sig.charges} pickups left`; sig.noticeT = 1.8;
-  return { faceId: needed, bonus: 1 };
-}
+// Prism's wildcard is a permanent deposit rule, not a pickup conversion.
+export function refractPickup(_sim, _ctx, faceId) { return { faceId, bonus: 0 }; }

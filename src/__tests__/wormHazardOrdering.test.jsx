@@ -153,3 +153,16 @@ it('schedules just one warned turn for Moving Ground and leaves completion to it
   expect(useGameStore.getState().wormGamePhase).toBe('finalHealing');
   expect(useGameStore.getState().wormStoryResult).toBeNull();
 });
+
+it('Book freezes only the layer countdown and resumes the same pending turn', () => {
+  tick(80);
+  const remaining = rotationClock.remaining;
+  sim.signature.character = 'book'; sim.signature.active = 5;
+  tick(60);
+  expect(rotationClock.held).toBe(true);
+  expect(rotationClock.remaining).toBe(remaining);
+  expect(rotate).not.toHaveBeenCalled();
+  sim.signature.active = 0;
+  tick(21);
+  expect(rotate).toHaveBeenCalledTimes(1);
+});

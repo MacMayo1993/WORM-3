@@ -1,3 +1,5 @@
+import { characterOrbCount } from '../characterAbilities.js';
+import { randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import * as THREE from 'three';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
@@ -6,7 +8,7 @@ import { shReset, shPush, ttReset, ttPush, ttAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING, WORM_LIFT } from '../healerWorm/constants.js';
 import { tileKey } from '../healerWorm/wormSim.js';
 
-export function stageStory(sim, size, level) {
+export function stageStory(sim, size, level, character) {
   const base = stageWormPractice(sim, size, { id: level.kind === 'tunnel' ? 'tunnel' : 'steer' });
   const c = Math.floor(size / 2);
   const orb = (x, y, z = size - 1, dirKey = 'PZ') => ({ x, y, z, dirKey, type: 'apple' });
@@ -47,6 +49,12 @@ export function stageStory(sim, size, level) {
     }
     sim.tailLength = Math.floor(13 / BODY_BALL_SPACING);
     base.target = { x: 2, y: 2, z: 4, dirKey: 'PZ' };
+  }
+  const targetCount = characterOrbCount(sim.powerups.length, character);
+  while (sim.powerups.length < targetCount) {
+    const tile = randomUnflippedTile(base.cubies, size, [...sim.powerups, sim.pos]);
+    if (!tile) break;
+    sim.powerups.push({ ...tile, type: 'apple' });
   }
   sim.specials = [];
   return { ...base, elapsed: 0, cuts: 0, wasCut: false, crossedBody: false };

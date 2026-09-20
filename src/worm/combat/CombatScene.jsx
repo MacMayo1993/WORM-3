@@ -1,3 +1,4 @@
+import { useGameStore } from '../../hooks/useGameStore.js';
 import { ENEMIES, ELEMENTS, WAVES } from './combatDefs.js';
 import React, { useRef, useMemo, useLayoutEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -14,14 +15,15 @@ function place(group, actor, size, lift = 0.18) {
 // faint halo. Depth testing keeps enemies behind the cube hidden; no bloom or
 // lights are required, so the outline also works on low graphics settings.
 function EnemyOutline() {
+  const enhanced = useGameStore(s => s.wormCharacter === 'glow');
   const ref = useRef();
   useLayoutEffect(() => {
     const group = ref.current;
     for (const mesh of group.children) mesh.geometry = group.parent.geometry;
   }, []);
   return <group ref={ref}>
-    <mesh scale={1.24}><meshBasicMaterial color="#ff1828" side={BackSide} transparent opacity={0.2} depthWrite={false} toneMapped={false} /></mesh>
-    <mesh scale={1.1}><meshBasicMaterial color="#ff3038" side={BackSide} transparent opacity={0.95} depthWrite={false} toneMapped={false} /></mesh>
+    <mesh scale={enhanced ? 1.42 : 1.24}><meshBasicMaterial color="#ff1828" side={BackSide} transparent opacity={enhanced ? 0.5 : 0.2} depthWrite={false} toneMapped={false} /></mesh>
+    <mesh scale={enhanced ? 1.16 : 1.1}><meshBasicMaterial color="#ff3038" side={BackSide} transparent opacity={0.95} depthWrite={false} toneMapped={false} /></mesh>
   </group>;
 }
 // Four pooled rigs; shells and joints animate in place without React state.
@@ -59,7 +61,7 @@ function Crawler({ slot }) {
     for (const mesh of shell.current.children) {
       mesh.material.color.set(e.type === 'brute' ? '#55446f' : e.type === 'scout' ? '#8d512c' : '#813b61');
       mesh.material.emissive.set(e.hitFlash > 0 ? '#ffffff' : frozen ? '#58b9ff' : e.burn > 0 ? '#ff6633' : def.color);
-      mesh.material.emissiveIntensity = e.hitFlash > 0 ? 1.8 : e.burn > 0 ? 0.8 : 0.18;
+      mesh.material.emissiveIntensity = e.hitFlash > 0 ? 1.8 : e.burn > 0 ? 0.8 : useGameStore.getState().wormCharacter === 'glow' ? 0.75 : 0.18;
     }
     accents.current.children.forEach(mesh => mesh.material.color.set(frozen ? '#c9f4ff' : def.color));
     legs.current.children.forEach((joint,i) => {

@@ -67,3 +67,10 @@ it('requires physical outcomes, including tail clearance, landing, and committed
   expect(storyOutcome(storyLevel(6), { ...won, healed: 3, remaining: 1, tailClear: true })).toBeNull();
   expect(storyOutcome(storyLevel(6), { ...won, healed: 3, remaining: 0, tailClear: true })).toMatchObject({ stars: 3 });
 });
+
+it('Book receives its XP bonus on first Story clears', () => {
+  useGameStore.setState({ wormCharacter: 'book' }); start();
+  state().completeWormStory(state().wormRunId, { ...won, elapsed: 30, cuts: 1 });
+  expect(state().wormStoryResult.xp).toBe(63);
+  useGameStore.setState({ wormCharacter: 'classic' });
+});
