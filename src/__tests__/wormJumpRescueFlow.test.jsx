@@ -55,7 +55,7 @@ it.each(['touch', 'keyboard'])('highlights Jump and accepts %s input while holdi
   expect(button.classList.contains('worm-jump-rescue')).toBe(true);
   expect(host.querySelector('[role="alert"]').textContent).toContain('Body ahead');
   const snapshot = [worm.timeAliveRef.current, worm.interpT.current, combatBridge.current.time];
-  frame(0.3);
+  frame(0.8);
   expect([worm.timeAliveRef.current, worm.interpT.current, combatBridge.current.time]).toEqual(snapshot);
   expect(wormBuffs.jumpRescueT).toBeCloseTo(0.2);
   act(() => {
@@ -75,7 +75,7 @@ it('holds the remaining countdown in Pause and removes the prompt on retry', () 
   frame(0.1);
   act(() => host.querySelector('[aria-label="Pause"]').click());
   frame(1);
-  expect(wormBuffs.jumpRescueT).toBeCloseTo(0.4);
+  expect(wormBuffs.jumpRescueT).toBeCloseTo(0.9);
   expect(host.querySelector('.worm-jump-rescue')).toBeNull();
   act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'RESUME').click());
   expect(host.querySelector('.worm-jump-rescue')).not.toBeNull();
@@ -90,11 +90,11 @@ it('does not spend the reaction window on a background tab catch-up frame', () =
   vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
   act(() => document.dispatchEvent(new Event('visibilitychange')));
   frame(5);
-  expect(wormBuffs.jumpRescueT).toBe(0.5);
+  expect(wormBuffs.jumpRescueT).toBe(1);
   hidden = false;
   act(() => document.dispatchEvent(new Event('visibilitychange')));
   frame(5);
-  expect(wormBuffs.jumpRescueT).toBe(0.5);
+  expect(wormBuffs.jumpRescueT).toBe(1);
   frame(0.1);
-  expect(wormBuffs.jumpRescueT).toBeCloseTo(0.4);
+  expect(wormBuffs.jumpRescueT).toBeCloseTo(0.9);
 });

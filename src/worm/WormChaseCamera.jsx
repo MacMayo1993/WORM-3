@@ -1,4 +1,4 @@
-import { boundedWormZoom } from './healerWorm/zoomLimit.js';
+import { boundedWormZoom, wormSurfaceFov } from './healerWorm/zoomLimit.js';
 import React, { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -378,7 +378,7 @@ export default function WormChaseCamera({ worm, size }) {
             : phase === 'exiting' ? 1 - diveEase((_enterP - 0.5) / 0.5)
             : 0;
         const rocketLift = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
-        const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix) + rocketLift * 7;
+        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 16, tunnelMix) + rocketLift * 7;
         const fovAlpha = Math.min(1, delta * 6);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {

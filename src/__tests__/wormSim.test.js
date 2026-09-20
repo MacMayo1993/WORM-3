@@ -124,16 +124,16 @@ describe('jump rescue window', () => {
     return { sim, ctx };
   }
 
-  it('freezes all sim clocks and the body trail for exactly half a second', () => {
+  it('freezes all sim clocks and the body trail for exactly one second', () => {
     const { sim, ctx } = setup();
     sim.boostActiveT = 1; sim.magnetT = 2; sim.elementalT = 3;
     const snapshot = () => [sim.interpT, sim.stepAcc, sim.timeAlive, sim.survivalTick,
       sim.wormholeTimer, sim.boostActiveT, sim.magnetT, sim.elementalT, sim.stepHistory.distance];
     const before = snapshot();
     stepWormSim(sim, 0.02, 5, ctx);
-    expect(sim.jumpRescueT).toBe(0.5);
+    expect(sim.jumpRescueT).toBe(1);
     expect(snapshot()).toEqual(before);
-    stepWormSim(sim, 0.49, 5, ctx);
+    stepWormSim(sim, 0.99, 5, ctx);
     expect(sim.jumpRescueT).toBeCloseTo(0.01);
     expect(snapshot()).toEqual(before);
     stepWormSim(sim, 0.01, 5, ctx);
@@ -154,7 +154,7 @@ describe('jump rescue window', () => {
     if (boost) sim.boostActiveT = 2;
     const hitKey = sim.pendingSelfCollision.key;
     stepWormSim(sim, 0.01, size, ctx);
-    stepWormSim(sim, 0.499, size, ctx);
+    stepWormSim(sim, 0.999, size, ctx);
     queueTurn(sim, 'boost'); queueTurn(sim, 'signature'); queueTurn(sim, 'left');
     expect(sim.pendingTurns).toEqual([]);
     queueTurn(sim, 'jump');
@@ -180,9 +180,9 @@ describe('jump rescue window', () => {
     stepWormSim(sim, 0.2, 5, ctx);
     paused = true;
     stepWormSim(sim, 10, 5, ctx);
-    expect(sim.jumpRescueT).toBeCloseTo(0.3);
+    expect(sim.jumpRescueT).toBeCloseTo(0.8);
     paused = false;
-    stepWormSim(sim, 0.3, 5, ctx);
+    stepWormSim(sim, 0.8, 5, ctx);
     expect(sim.jumpRescueT).toBe(0);
   });
 
