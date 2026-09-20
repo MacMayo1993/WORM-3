@@ -1587,7 +1587,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
               {mode.desc}
             </p>
             <details key={mode.id} style={{ marginTop: 10 }}>
-              <summary className="ui-focusable" style={{ cursor: 'pointer', textAlign: 'center', fontFamily: UI_FONT, fontSize: 12, color: PAPER_TEXT_MUTED, padding: '10px 0', minHeight: 24 }}>How it works &amp; your progress</summary>
+              <summary className="ui-focusable" style={{ cursor: 'pointer', textAlign: 'center', fontFamily: UI_FONT, fontSize: 12, color: PAPER_TEXT_MUTED, padding: '10px 0', minHeight: 24 }}>Rules & progress</summary>
             {/* Rules and history remain available without competing with Play. */}
             <p style={{ margin: '6px 0 0', textAlign: 'center', fontSize: 'clamp(11.5px, 3vw, 12.5px)', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: UI_FONT, fontWeight: 500 }}>
               {mode.how}
@@ -1765,7 +1765,7 @@ export const MenuTitleCard = ({ visible }) => (
     {/* One line of eyebrow type, ruled on both sides. It fills the gap between
         the wordmark and the cube and answers the question a first-time player
         actually has: what is the cube in front of me doing? */}
-    <div className="worm-menu-tagline">Flip through the cube</div>
+    
   </div>
 );
 

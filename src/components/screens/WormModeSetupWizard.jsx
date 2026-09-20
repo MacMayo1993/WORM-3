@@ -115,7 +115,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               </button>
             ))}
           </div>
-          {available.length < WORM_CHARACTERS.length && <p style={{ fontSize: 12, textAlign: 'center' }}>Unlock more worms through mythic chests or direct purchases in the Parity Store.</p>}
+          {available.length < WORM_CHARACTERS.length && <p style={{ fontSize: 12, textAlign: 'center' }}>More worms in the Store.</p>}
         </SpecimenPlate>
         )}
 
@@ -202,7 +202,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <div style={{ display: 'grid', gap: 18 }}>
       <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 48, color: WIZ_TEXT, cursor: 'pointer' }}>
         <input type="checkbox" checked={!!settings.wormCombatMode} onChange={e => cos.setSettings(current => ({ ...current, wormCombatMode: e.target.checked }))} style={{ width: 22, height: 22, flexShrink: 0 }} />
-        <span><strong>Portal Combat · Prototype</strong><br /><small>Three waves, armored enemies and elemental shots. 5×5 arena; no layer turns.</small></span>
+        <span><strong>Portal Combat · Prototype</strong><br /><small>3 waves · 5×5 · No layer turns</small></span>
       </label>
       {!settings.wormCombatMode && <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 64, padding: 14, borderRadius: 12, border: `1px solid ${WIZ_BORDER_SOFT}`, background: WIZ_SURFACE_RAISED, color: WIZ_TEXT, cursor: 'pointer' }}>
         <input type="checkbox" role="switch" aria-label="Portal enemies" aria-describedby="worm-enemies-description"
@@ -211,8 +211,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           style={{ width: 24, height: 24, flexShrink: 0, accentColor: ACCENT }} />
         <span style={{ flex: 1 }}><strong>Portal Enemies</strong><br />
           <small id="worm-enemies-description">{settings.wormEnemiesEnabled
-            ? 'Occasional enemies, one at a time. Steer to aim and hold Fire.'
-            : 'Explore and heal tunnels without enemy encounters.'}</small>
+            ? 'Steer to aim. Hold Fire to shoot.'
+            : 'No enemies.'}</small>
         </span>
         <strong style={{ color: ACCENT }}>{settings.wormEnemiesEnabled ? 'On' : 'Off'}</strong>
       </label>}
@@ -250,7 +250,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       icon: 'scene',
       label: 'Scene',
       title: 'Background',
-      subtitle: 'Choose your play environment',
+      subtitle: '',
       summary: sceneLabel(settings),
       hero: <SceneStep cos={cos} slot="hero" />,
       content: <SceneStep cos={cos} slot="body" />
@@ -260,7 +260,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       icon: 'colors',
       label: 'Colors',
       title: 'Color Palette',
-      subtitle: 'Pick a palette — the cube wears it as you go',
+      subtitle: '',
       summary: paletteLabel(settings),
       hero: <PaletteStep cos={cos} slot="hero" />,
       content: <PaletteStep cos={cos} slot="body" />

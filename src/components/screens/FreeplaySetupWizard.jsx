@@ -30,7 +30,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       icon: 'scene',
       label: 'Scene',
       title: 'Pick Your Scene',
-      subtitle: 'Choose your play environment',
+      subtitle: '',
       summary: sceneLabel(cos.settings),
       hero: <SceneStep cos={cos} slot="hero" />,
       content: <SceneStep cos={cos} slot="body" />
@@ -40,7 +40,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       icon: 'colors',
       label: 'Colors',
       title: 'Color Palette',
-      subtitle: 'Pick a palette — the cube wears it as you go',
+      subtitle: '',
       summary: paletteLabel(cos.settings),
       hero: <PaletteStep cos={cos} slot="hero" />,
       content: <PaletteStep cos={cos} slot="body" />
@@ -51,7 +51,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       icon: 'size',
       label: 'Size',
       title: 'Cube Size',
-      subtitle: 'Slide to size — everything else is already decided',
+      subtitle: '',
       summary: sizeLabel(cos.cubeSize),
       hero: <SizeStep cos={cos} slot="hero" />,
       content: <SizeStep cos={cos} slot="body" />

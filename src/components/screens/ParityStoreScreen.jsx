@@ -474,7 +474,7 @@ const StoreCollection = ({ onClose, onChests }) => {
             onClick={() => { setTab(t.id); setFocusedId(null); resetScroll(); }}>
             <i aria-hidden="true" /><span><strong>{t.label}</strong><small>{tabOwned[t.id]} / {t.items.length} owned</small></span><b aria-hidden="true">›</b>
           </button>)}
-          <button className="catalogue-chests" onClick={onChests}><span aria-hidden="true">◇</span><strong>Cubie Chests</strong><small>Roll & discover →</small></button>
+          <button className="catalogue-chests" onClick={onChests}><span aria-hidden="true">◇</span><strong>Cubie Chests</strong><small>Open →</small></button>
         </nav>
         <section ref={selectorRef} className="catalogue-selector" id="catalogue-selector" aria-label={`${activeTab.label} selector`}>
           <div className="catalogue-section-heading"><div><span className="catalogue-kicker">MAKE IT YOURS</span><h2>{activeTab.label}</h2></div>
@@ -485,15 +485,15 @@ const StoreCollection = ({ onClose, onChests }) => {
           {focused ? <div className="catalogue-preview" style={{ '--item-accent': heroAccent }}>
             <div className="catalogue-preview-art">{heroArt()}</div>
             <div className="catalogue-preview-info"><span className="catalogue-kicker">{TYPE_LABEL[focused.type]} · {focusIndex + 1}/{items.length}</span>
-              <h3>{focused.label}</h3><p>{heroEquipped ? 'In your loadout' : heroOwned ? 'Ready to equip' : 'Add to your collection'}</p>
+              <h3>{focused.label}</h3>
               <button className="catalogue-action" disabled={heroEquipped || (!heroOwned && !canAfford)} onClick={() => {
                 if (heroOwned) { equip(focused); showToast(`${focused.label} applied`); } else buy(focused);
               }}>{heroEquipped ? '✓ Equipped' : heroOwned ? 'Equip' : `Unlock · ${focused.price} PP`}</button>
               {!heroOwned && !canAfford && <small>{focused.price - parityPoints} more PP needed</small>}
             </div>
             <div className="catalogue-preview-nav"><button aria-label="Previous item" onClick={() => stepFocus(-1)}>‹</button><button aria-label="Next item" onClick={() => stepFocus(1)}>›</button></div>
-          </div> : <div className="catalogue-empty"><h3>Your collection starts here</h3><p>No owned items in this category yet.</p><button onClick={() => setOwnedOnly(false)}>Browse all items</button></div>}
-          <div className="catalogue-grid-heading"><span>{tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).label : 'Explore the collection'}</span><small>{items.length} items</small></div>
+          </div> : <div className="catalogue-empty"><h3>No items yet</h3><p>No owned items in this category yet.</p><button onClick={() => setOwnedOnly(false)}>Browse all items</button></div>}
+          <div className="catalogue-grid-heading"><span>{tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).label : 'Items'}</span><small>{items.length} items</small></div>
           {renderItems(items)}
         </section>
       </div>

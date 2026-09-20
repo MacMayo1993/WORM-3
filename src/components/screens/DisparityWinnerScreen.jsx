@@ -37,7 +37,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
         <ChaosGlyph kind="trophy" />
         <div className="chaos-kicker">CHAOS · Last pair standing</div>
         <h1 id="chaos-result-title" style={{ fontFamily: DISPLAY_FONT }}>{run?.winningPair || 'Storm settled'}</h1>
-        <p className="chaos-result-subtitle">The storm is over. Meet your survivors.</p>
+        
         <div className="chaos-winners">
           {pair.map((id, i) => <React.Fragment key={id}>
             {i > 0 && <span className="chaos-winner-link" aria-hidden="true">↔</span>}
@@ -55,7 +55,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
             <strong>{outcome}</strong>
             {run?.prediction && <p>Your call: {predictionLabel(run.prediction, paletteSettings)}.</p>}
             {result && <p>{result.description}</p>}
-            {!result && <p>The final survivors outlasted {deaths.length} fallen tiles.</p>}
+            {!result && <p>{deaths.length} tiles eliminated.</p>}
             {lastBackedEvent && <p>Latest elimination in your color group: {sourceName(lastBackedEvent.source).toLowerCase()} at {Math.max(0, Math.round((lastBackedEvent.at - run.startedAt) / 1000))}s, with {lastBackedEvent.alive} tiles left on the cube.</p>}
           </div>
         </div>
@@ -81,7 +81,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
             <time>#{entry.rank}</time><div style={{ fontFamily: MONO_FONT }}>{entry.gridId}
               {entry.endGridId && entry.endGridId !== entry.gridId && <small>Final position: {entry.endGridId}</small>}</div>
           </li>)}</ol>
-          <p className="chaos-note">Numbers show elimination order, earliest first.</p>
+          <p className="chaos-note">Elimination order: earliest first.</p>
         </details>
         <p className="chaos-note">Your record: {record.rounds} rounds · {record.correct}/{record.predictions} correct predictions · best streak {record.bestStreak}.</p>
         <div className="chaos-actions">

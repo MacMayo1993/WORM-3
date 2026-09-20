@@ -582,7 +582,7 @@ export function WizardShell({
   ) : (
     <div style={styles.heroHeading}>
       <h2 style={styles.title}>{cat.title}</h2>
-      <p style={styles.subtitle}>{cat.subtitle}</p>
+      {cat.subtitle && <p style={styles.subtitle}>{cat.subtitle}</p>}
     </div>
   );
   const categoryBar = (
@@ -615,7 +615,7 @@ export function WizardShell({
         <div className="mode-wizard-scroll" ref={scrollRef}>
         <header className="mode-wizard-heading">
           <h1>{theme.name}</h1>
-          <p>{theme.tagline}</p>
+          
         </header>
         {specimen}
         {isStyle && categoryBar}
