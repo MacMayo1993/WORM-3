@@ -1,3 +1,4 @@
+import { cubeExpansionMultiplier, cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import PuzzleOrbitControls from './PuzzleOrbitControls.jsx';
@@ -735,7 +736,7 @@ const CubeAssembly = React.memo(({
     prevEfRef2.current = ef;
 
     if (!wormHealerMode && preExplodeDist.current > 0 && efAnimating) {
-      const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
+      const explosionMultiplier = cubeExpansionMultiplier(size);
       const zoomFactor = 1 + ef * explosionMultiplier * 0.55;
       const targetDist = preExplodeDist.current * zoomFactor;
       const currentDist = camera.position.length();
@@ -855,8 +856,7 @@ const CubeAssembly = React.memo(({
 
     // Snap if we just finished an animation OR if the logical state jumped (drag snap)
     if ((wasAnimating && !nowAnimating) || epochChanged) {
-      const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
-      const expansionFactor = 1 + explosionFactorRef.current * explosionMultiplier;
+      const expansionFactor = cubeExpansionScale(size, explosionFactorRef.current);
       for (let idx = 0; idx < positionCache.length; idx++) {
         const g = cubieRefs.current[idx];
         if (!g) continue;
@@ -931,8 +931,7 @@ const CubeAssembly = React.memo(({
         latchedSpinAxisRef.current =
           liveRotation.axis === 'row' ? 1 : liveRotation.axis === 'depth' ? 2 : 0;
         const kCenter = (size - 1) / 2;
-        const expMult = size >= 4 ? 1.53 : 1.8;
-        const exp = 1 + explosionFactorRef.current * expMult;
+        const exp = cubeExpansionScale(size, explosionFactorRef.current);
         latchedSpinSliceRef.current = (liveRotation.sliceIndex - kCenter) * exp;
       }
       updateSharedSpin(spinEnergyRef.current, latchedSpinAxisRef.current, latchedSpinSliceRef.current);
@@ -1095,8 +1094,7 @@ const CubeAssembly = React.memo(({
       sliceIndicesRef.current = null;
       sliceDirByIdxRef.current = null;
       // Reduce explosion distance by 15% for larger cubes (4x4, 5x5)
-      const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
-      const expansionFactor = 1 + explosionFactor * explosionMultiplier;
+      const expansionFactor = cubeExpansionScale(size, explosionFactor);
       items.forEach((it, idx) => {
         const g = cubieRefs.current[idx];
         if (g) {

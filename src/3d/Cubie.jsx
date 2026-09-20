@@ -1,3 +1,4 @@
+import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
@@ -206,13 +207,13 @@ const Cubie = React.forwardRef(function Cubie({
 
   const explodedPos = useMemo(() => {
     if (explosionFactor === 0) return position;
-    const expansionFactor = 1.8;
+    const expansionScale = cubeExpansionScale(size, explosionFactor);
     return [
-      position[0] * (1 + explosionFactor * expansionFactor),
-      position[1] * (1 + explosionFactor * expansionFactor),
-      position[2] * (1 + explosionFactor * expansionFactor)
+      position[0] * expansionScale,
+      position[1] * expansionScale,
+      position[2] * expansionScale
     ];
-  }, [position, explosionFactor]);
+  }, [position, explosionFactor, size]);
 
   const handleDown = (e) => {
     e.stopPropagation();

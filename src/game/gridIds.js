@@ -5,6 +5,7 @@
 // these formulas which had drifted for the NX/NY/NZ faces — giving the worker a
 // different antipodal pairing than the main thread and silently desyncing the
 // two copies of the cube. Every consumer must go through this module.
+import { cubieCenterInto } from './cubeWorldGeometry.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Get row/column position for a face direction
@@ -42,14 +43,7 @@ export const getManifoldGridId = (sticker, size) => {
 
 // Get sticker world position (with optional explosion factor)
 export const getStickerWorldPos = (x, y, z, dirKey, size, explosionFactor = 0) => {
-  const k = (size - 1) / 2;
-  const base = [x - k, y - k, z - k];
-
-  const exploded = [
-    base[0] * (1 + explosionFactor * 1.8),
-    base[1] * (1 + explosionFactor * 1.8),
-    base[2] * (1 + explosionFactor * 1.8)
-  ];
+  const exploded = cubieCenterInto([0, 0, 0], x, y, z, size, explosionFactor);
 
   switch (dirKey) {
     case 'PX': return [exploded[0] + SURFACE_OFFSET, exploded[1], exploded[2]];

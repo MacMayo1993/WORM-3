@@ -1,3 +1,4 @@
+import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 // src/worm/wormLogic.js
 // Core game logic for WORM mode: tunnel geometry/centerline math, the active-tunnel
 // scan + O(1) tile→tunnel lookup, and grid-based surface navigation.
@@ -381,7 +382,7 @@ export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0)
  */
 export const buildTunnelPathForTunnel = (path, tunnel, size, explosionFactor = 0) => {
   const k = (size - 1) / 2;
-  const scale = 1 + explosionFactor * 1.8;
+  const scale = cubeExpansionScale(size, explosionFactor);
 
   // Cube-cell centers of the entry/exit tiles (scaled out during the explosion anim).
   _tunnelEntry.set(
