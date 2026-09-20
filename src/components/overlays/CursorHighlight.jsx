@@ -1,3 +1,4 @@
+import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -34,9 +35,9 @@ const CursorHighlight = () => {
     }
 
     const exploded = [
-      x * (1 + explosionFactor * 1.8),
-      y * (1 + explosionFactor * 1.8),
-      z * (1 + explosionFactor * 1.8)
+      x * cubeExpansionScale(size, explosionFactor),
+      y * cubeExpansionScale(size, explosionFactor),
+      z * cubeExpansionScale(size, explosionFactor)
     ];
 
     const offset = 0.53;

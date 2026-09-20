@@ -1,6 +1,7 @@
 // src/components/overlays/SolveHighlight.jsx
 // Visual highlighting for solve mode pieces
 
+import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -24,9 +25,9 @@ const PieceHighlight = React.memo(({ x, y, z, dir, solved, type }) => {
     const baseZ = z - k;
 
     const exploded = [
-      baseX * (1 + explosionFactor * 1.8),
-      baseY * (1 + explosionFactor * 1.8),
-      baseZ * (1 + explosionFactor * 1.8)
+      baseX * cubeExpansionScale(size, explosionFactor),
+      baseY * cubeExpansionScale(size, explosionFactor),
+      baseZ * cubeExpansionScale(size, explosionFactor)
     ];
 
     const offset = 0.54;

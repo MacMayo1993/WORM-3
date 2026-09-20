@@ -1,3 +1,4 @@
+import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 // src/utils/smartRouting.js
 // Smart tunnel routing that avoids cube intersection
 import * as THREE from 'three';
@@ -30,8 +31,7 @@ export const calculateSmartControlPoint = (start, end, size, side = null, explos
   const dz = Math.abs(_delta.z);
 
   // Scale routing radius to match exploded cube size
-  const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
-  const cubeRadius = ((size - 1) / 2) * 1.4 * (1 + explosionFactor * explosionMultiplier);
+  const cubeRadius = ((size - 1) / 2) * 1.4 * cubeExpansionScale(size, explosionFactor);
 
   // Push perpendicular to the tunnel's main axis
   // If side is specified, use that; otherwise auto-detect based on midpoint

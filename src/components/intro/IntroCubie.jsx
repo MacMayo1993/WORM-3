@@ -1,3 +1,4 @@
+import { cubeGridIndex } from '../../game/cubeWorldGeometry.js';
 import React from 'react';
 import { RoundedBox } from '@react-three/drei';
 import IntroSticker from './IntroSticker.jsx';
@@ -40,12 +41,11 @@ const IntroCubie = React.forwardRef(({
   faceReveal = FULL_REVEAL,   // default = fully revealed, never black
   pulseFaces = {},
 }, ref) => {
-  const limit = (size - 1) / 2;
   // In IntroScene, cubies are wrapped in a parent <group position={...}> and this
   // component receives local position [0,0,0]. Use explicit gridPos when supplied.
-  const x = gridPos ? gridPos[0] : Math.round(position[0] / (1 + explosionFactor * 1.8) + limit);
-  const y = gridPos ? gridPos[1] : Math.round(position[1] / (1 + explosionFactor * 1.8) + limit);
-  const z = gridPos ? gridPos[2] : Math.round(position[2] / (1 + explosionFactor * 1.8) + limit);
+  const x = gridPos ? gridPos[0] : cubeGridIndex(position[0], size, explosionFactor);
+  const y = gridPos ? gridPos[1] : cubeGridIndex(position[1], size, explosionFactor);
+  const z = gridPos ? gridPos[2] : cubeGridIndex(position[2], size, explosionFactor);
 
   const exploded = explosionFactor > 0;
   const isOuterPZ = exploded || z === size - 1;
