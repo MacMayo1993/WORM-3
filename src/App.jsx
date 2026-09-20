@@ -955,7 +955,7 @@ export default function WORM3() {
     const id = (s.wormStoryResult?.levelId ?? 0) + 1;
     if (!s.wormStoryResult || !storyUnlocked(s.playerProgress, id)) return;
     handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles,
-      storyLevel: id, cubeSize: 5, megaMode: false, wormSpeed: 1.4, wormOrbCount: 1,
+      storyLevel: id, cubeSize: 5, megaMode: false, wormSpeed: storyLevel(id).speed, wormOrbCount: 1,
       wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
   }, [handleWormSetupComplete]);
 

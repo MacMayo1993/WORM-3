@@ -8,7 +8,8 @@ import { readPlayerSave, newProgress } from '../../progression/model.js';
  */
 
 import { DEFAULT_SETTINGS } from '../../utils/colorSchemes.js';
-import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../../utils/storeCatalog.js';
+import { newChestWallet } from '../../economy/chests.js';
+import { DEFAULT_OWNED, ALL_ITEMS_OWNED, STORE_CHARACTERS } from '../../utils/storeCatalog.js';
 import { UNLOCK_ALL } from '../../utils/testUnlock.js';
 import { STARTING_BANKROLL } from '../../utils/economyConstants.js';
 
@@ -94,6 +95,8 @@ const loadPersistedState = () => {
       if (Array.isArray(rawOwned)) storedOwned = rawOwned;
     } catch { /* corrupted owned-items entry — fall back to defaults */ }
     if (playerSave) storedOwned = playerSave.ownedItems;
+    // Characters were free before chests. Keep existing players' access.
+    if (playerSave?.legacyCharacters || (!playerSave && (settings || localStorage.getItem(OWNED_ITEMS_KEY)))) storedOwned = [...storedOwned, ...STORE_CHARACTERS.map(c => c.id)];
     const ownedItems = DEV_FREE_ECONOMY
       ? [...ALL_ITEMS_OWNED]
       : [...new Set([...DEFAULT_OWNED, ...storedOwned])];
@@ -122,6 +125,7 @@ const loadPersistedState = () => {
 
     return {
       playerProgress: playerSave?.progress ?? newProgress(),
+      chestWallet: playerSave?.chestWallet ?? newChestWallet(),
       settings: migratedSettings,
       introSeen,
       tutorialDone,
@@ -130,7 +134,7 @@ const loadPersistedState = () => {
       wormSkin: safeSkin,
       wormHat: safeHat,
       wormTrail: safeTrail,
-      wormCharacter,
+      wormCharacter: ownedItems.includes(`character_${wormCharacter}`) ? wormCharacter : 'classic',
       wormShowTrail,
       wormCameraHorizon,
       parityPoints: safeParityPoints,
@@ -141,6 +145,7 @@ const loadPersistedState = () => {
   } catch {
     return {
       playerProgress: playerSave?.progress ?? newProgress(),
+      chestWallet: playerSave?.chestWallet ?? newChestWallet(),
       settings: { ...DEFAULT_SETTINGS },
       introSeen: false,
       tutorialDone: false,
@@ -154,7 +159,7 @@ const loadPersistedState = () => {
       wormCameraHorizon: 'face',
       parityPoints: playerSave?.points ?? STARTING_BANKROLL, // storage unavailable — new-player experience
       modePlays: {},
-      ownedItems: playerSave?.ownedItems ?? [...DEFAULT_OWNED],
+      ownedItems: [...new Set([...DEFAULT_OWNED, ...(playerSave?.ownedItems ?? []), ...(playerSave?.legacyCharacters ? STORE_CHARACTERS.map(c => c.id) : [])])],
       betStreak: 0,
     };
   }

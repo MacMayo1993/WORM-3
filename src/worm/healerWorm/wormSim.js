@@ -464,6 +464,7 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     if (grounded && !sim.restRead && !liveRotation.active && consumeSpring(sim)) {
         sim.jumpSpan = 2.2;
         sim.jumpHeight = 2.1;
+        ctx.onStoryMechanic?.('grassLaunch');
     }
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
@@ -717,7 +718,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 
     // Determine whether this tunnel traversal will heal on exit (for portal ring pop fx).
     const postDepositProgress = ctx.getHealingProgress()?.[stableKey];
-    sim.willHeal = isHealReady(postDepositProgress?.deposited);
+    sim.willHeal = isHealReady(postDepositProgress?.deposited) && ctx.allowTunnelHeal?.() !== false;
 
     sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
     sim.headInterpPos.copy(sim.tunnelApproach);
@@ -821,6 +822,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
         sim.lastOrbTime = sim.timeAlive;
         applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId, ORB_SEGMENT_GROWTH + refracted.bonus);
+        if (sim.magnetT > 0 && puKey !== headKey) ctx.onStoryMechanic?.('magnetOrbs');
         sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray() };
         // Reward is immediate. The renderer consumes a short gulp on the head
         // tile or a longer attraction for a remote magnet catch.
@@ -884,6 +886,7 @@ const _ringOccupied = new Set();
 // cells around either mouth. Occupancy comes from the logical trail, not the
 // footprint spring, whose intentional rebound would otherwise count departed tiles.
 function tryWormholeRingHeal(sim, size, ctx) {
+    if (ctx.allowRingHeal?.() === false) return false;
     const tunnels = ctx.getActiveTunnels?.() ?? [];
     // Prune stale healed keys, but only when there are any — the common case is an
     // empty set, and materialising an active-key Set every crawl step just to iterate
@@ -923,6 +926,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
     // whole pair, so retire partial progress stored against both stable endpoints.
     ctx.applyHeal(tunnel.entry, tunnel.exit, [entryStableKey, exitStableKey].filter(Boolean), sim.healed);
     releaseMobiTunnel(sim, tunnel);
+    ctx.onStoryMechanic?.('ringHeals');
     sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
     // Hold the worm still for a beat so the tile visibly pops out and heals — the reward
     // for surrounding it, and the only way it reads on a mega board where the tile is tiny.
@@ -1755,7 +1759,7 @@ const PHASE_HANDLERS = {
                 // Arm the heal now, but leave both flipped tiles and the tunnel intact
                 // until the recorded route proves the final segment has cleared the exit.
                 const exitProgress = exitStableKey ? (ctx.getHealingProgress()?.[exitStableKey]) : null;
-                const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel;
+                const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel && ctx.allowTunnelHeal?.() !== false;
                 if (didHeal && !sim.tunnelPassages.some(p => p.heal?.tunnelKey === exitTunnelKey)) {
                     sim.pendingTunnelHeal = {
                         tunnel: exitedTunnel,

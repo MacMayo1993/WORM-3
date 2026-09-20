@@ -1,0 +1,60 @@
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { beforeEach, afterEach, it, expect, vi } from 'vitest';
+import ChestRoom from '../economy/ChestRoom.jsx';
+import ParityStoreScreen from '../components/screens/ParityStoreScreen.jsx';
+vi.mock('../3d/WormPreviewCanvas.jsx', () => ({ default: () => <div aria-label="Worm preview" /> }));
+vi.mock('../3d/CubePreviewCanvas.jsx', () => ({ default: () => <div aria-label="Cube preview" /> }));
+import { useGameStore } from '../hooks/useGameStore.js';
+import { newProgress, readPlayerSave } from '../progression/model.js';
+import { newChestWallet } from '../economy/chests.js';
+let root, host, close, back;
+const state = () => useGameStore.getState();
+const button = text => [...host.querySelectorAll('button')].find(b => b.textContent.includes(text));
+beforeEach(() => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true; vi.useFakeTimers();
+  vi.spyOn(crypto, 'getRandomValues').mockImplementation(a => { a[0] = 0; return a; });
+  useGameStore.setState({ playerProgress: newProgress(), chestWallet: newChestWallet(), chestRolling: false, ownedItems: ['character_classic'], parityPoints: 100, demoMode: false });
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host); close = vi.fn(); back = vi.fn();
+  act(() => root.render(<ChestRoom onClose={close} onBack={back} />));
+});
+afterEach(() => { act(() => root.unmount()); host.remove(); vi.useRealTimers(); vi.restoreAllMocks(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
+it('shows prices and exact final odds and resolves one paid roll before revealing it', () => {
+  expect(host.textContent).toContain('1.69%'); expect(host.textContent).toContain('15 gems');
+  act(() => button('Roll one cubie').click());
+  expect(state().chestWallet.gems).toBe(10); expect(state().parityPoints).toBe(125);
+  expect(host.querySelector('[role="status"]').textContent).toContain('Rolling');
+  expect(button('Rolling').disabled).toBe(true);
+  act(() => vi.advanceTimersByTime(1600));
+  expect(host.querySelector('[role="status"]').textContent).toContain('25 Parity Points + 25 XP');
+  expect(state().chestRolling).toBe(false);
+});
+it('displays two cubies and the matching-pair upgrade without charging twice on repeated taps', () => {
+  act(() => button('Two cubies').click());
+  expect(host.querySelectorAll('.chest-die')).toHaveLength(2);
+  act(() => { button('Roll two cubies').click(); button('Roll two cubies')?.click(); });
+  expect(state().chestWallet.rolls).toBe(1); expect(state().chestWallet.gems).toBe(5);
+  act(() => vi.advanceTimersByTime(1600));
+  expect(host.querySelector('[role="status"]').textContent).toContain('Matching pair! Upgraded one tier.');
+  expect(state().ownedItems.length).toBe(2);
+});
+it('retains a paid result and releases the animation lock when leaving early', () => {
+  act(() => button('Roll one cubie').click());
+  const saved = readPlayerSave(); act(() => root.render(null));
+  expect(state().chestRolling).toBe(false);
+  expect(readPlayerSave().chestWallet).toEqual(saved.chestWallet);
+  act(() => root.render(<ChestRoom onClose={close} onBack={back} />));
+  expect(host.querySelector('[role="status"]').textContent).toContain('25 Parity Points');
+  act(() => host.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(close).toHaveBeenCalledOnce();
+});
+
+it('opens chests from the actual store and returns to equip a newly owned worm', () => {
+  act(() => root.render(<ParityStoreScreen onClose={close} />));
+  act(() => button('Cubie Chests').click()); expect(host.querySelector('#chest-title').textContent).toBe('CUBIE CHESTS');
+  act(() => button('Collection').click());
+  act(() => useGameStore.setState({ ownedItems: [...state().ownedItems, 'character_mobi'] }));
+  act(() => button('Worms').click());
+  act(() => button('MOBI').click()); act(() => button('MOBI').click());
+  expect(state().wormCharacter).toBe('mobi');
+});

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
-import { getSkins, getHats, getSchemes, getTiles } from '../../utils/storeCatalog.js';
+import { getSkins, getHats, getSchemes, getTiles, getTrails, STORE_CHARACTERS } from '../../utils/storeCatalog.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import { TILE_STYLE_SECTIONS } from '../../utils/tileStyleCatalog.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
@@ -22,6 +22,7 @@ import { wizardPaperBackground, WIZARD_FOOTER_BG, PENCIL_LEAD } from './WizardCh
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import CubePreviewCanvas from '../../3d/CubePreviewCanvas.jsx';
 import { SpecimenPlate, resolveWizardColors, bgOptionFor } from './wizardSteps/index.jsx';
+import ChestRoom from '../../economy/ChestRoom.jsx';
 import './ParityStoreScreen.css';
 
 const ACCENT = UI_MOSS;
@@ -35,13 +36,15 @@ const SCHEMES = getSchemes();
 const TILES   = getTiles();
 
 const TABS = [
+  { id: 'characters', label: 'Worms', accent: '#bd4747', items: STORE_CHARACTERS },
+  { id: 'trails', label: 'Trails', accent: '#0D9488', items: getTrails() },
   { id: 'skins',   label: 'Skins',    accent: '#2D7A3A', items: SKINS },
   { id: 'hats',    label: 'Hats',     accent: '#6A2C91', items: HATS },
   { id: 'schemes', label: 'Palettes', accent: '#1565C0', items: SCHEMES },
   { id: 'tiles',   label: 'Tiles',    accent: '#C44B00', items: TILES },
 ];
 
-const ALL_ITEMS = [...SKINS, ...HATS, ...SCHEMES, ...TILES];
+const ALL_ITEMS = [...STORE_CHARACTERS, ...getTrails(), ...SKINS, ...HATS, ...SCHEMES, ...TILES];
 
 // The store is full-bleed, but the collection itself is a column: past ~1000px
 // the cards stop spreading so the masthead, tabs, grid, and footnote stay in one
@@ -49,6 +52,7 @@ const ALL_ITEMS = [...SKINS, ...HATS, ...SCHEMES, ...TILES];
 const COLUMN = { width: '100%', maxWidth: '1000px', margin: '0 auto', boxSizing: 'border-box' };
 
 const TYPE_LABEL = {
+  character: 'Worm Character',
   skin: 'Worm Skin',
   hat: 'Hat',
   trail: 'Trail',
@@ -154,6 +158,7 @@ const TrailPreview = ({ body, glow, size = 44 }) => (
 // flat shader tiles. The live, turning version of whatever you tapped is on the
 // plate above — one animated preview for the whole screen.
 const CardArt = ({ item, size, characterId, skinId, tileColor }) => {
+  if (item.type === 'character') return <WormPreviewCanvas characterId={item.characterId} skinId={skinId} size={size} />;
   if (item.type === 'skin') return (
     <WormPreviewCanvas characterId={characterId} skinId={item.skinId} size={size} />
   );
@@ -200,7 +205,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
   const locked = !owned;
 
   return (
-    <div
+    <button type="button"
       className={`store-card store-card-enter${equipped ? ' is-equipped' : ''}`}
       onClick={onTap}
       style={{
@@ -273,7 +278,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
           <span style={{ fontSize: '11px', fontWeight: 800, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>{item.price}</span>
         </div>
       )}
-    </div>
+    </button>
   );
 };
 
@@ -305,7 +310,7 @@ const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
 // catalogue order.
 const TILE_ORDER = TILE_SECTIONS.flatMap(s => s.items);
 
-const TAB_ITEMS = { skins: SKINS, hats: HATS, schemes: SCHEMES, tiles: TILE_ORDER };
+const TAB_ITEMS = { characters: STORE_CHARACTERS, trails: getTrails(), skins: SKINS, hats: HATS, schemes: SCHEMES, tiles: TILE_ORDER };
 
 // ── Viewport ──────────────────────────────────────────────────────────────────
 // The plate is sized from the screen rather than a fixed px so a phone spends
@@ -332,11 +337,12 @@ function useHeroSize() {
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-const ParityStoreScreen = ({ onClose }) => {
+const StoreCollection = ({ onClose, onChests }) => {
+  const gems = useGameStore(s => s.chestWallet.gems);
   const [tab, setTab] = useState('skins');
   const heroPx = useHeroSize();
 
-  const { parityPoints, ownedItems, wormSkin, wormHat, wormTrail, wormCharacter, buyItem, setWormSkin, setWormHat, setWormTrail } =
+  const { parityPoints, ownedItems, wormSkin, wormHat, wormTrail, wormCharacter, buyItem, setWormSkin, setWormHat, setWormTrail, setWormCharacter } =
     useGameStore(useShallow(s => ({
       parityPoints: s.parityPoints,
       ownedItems: s.ownedItems,
@@ -345,6 +351,7 @@ const ParityStoreScreen = ({ onClose }) => {
       wormTrail: s.wormTrail,
       wormCharacter: s.wormCharacter,
       buyItem: s.buyItem,
+      setWormCharacter: s.setWormCharacter,
       setWormSkin: s.setWormSkin,
       setWormHat: s.setWormHat,
       setWormTrail: s.setWormTrail,
@@ -364,6 +371,7 @@ const ParityStoreScreen = ({ onClose }) => {
   };
 
   const isEquipped = useCallback((item) => {
+    if (item.type === 'character') return wormCharacter === item.characterId;
     if (item.type === 'skin')   return wormSkin === item.skinId;
     if (item.type === 'hat')    return wormHat === item.hatId;
     if (item.type === 'trail')  return wormTrail === item.trailId;
@@ -373,7 +381,7 @@ const ParityStoreScreen = ({ onClose }) => {
       return [1, 2, 3, 4, 5, 6].every(id => (styles[id] || 'solid') === item.tileKey);
     }
     return false;
-  }, [wormSkin, wormHat, wormTrail, settings]);
+  }, [wormSkin, wormHat, wormTrail, wormCharacter, settings]);
 
   const items = TAB_ITEMS[tab];
 
@@ -390,7 +398,8 @@ const ParityStoreScreen = ({ onClose }) => {
   const stepFocus = delta => setFocusedId(items[(focusIndex + delta + items.length) % items.length].id);
 
   const equip = (item) => {
-    if (item.type === 'skin') setWormSkin(item.skinId);
+    if (item.type === 'character') setWormCharacter(item.characterId);
+    else if (item.type === 'skin') setWormSkin(item.skinId);
     else if (item.type === 'hat') setWormHat(item.hatId);
     else if (item.type === 'trail') setWormTrail(item.trailId);
     else if (item.type === 'scheme') setSettings({ ...settings, colorScheme: item.schemeKey });
@@ -461,6 +470,7 @@ const ParityStoreScreen = ({ onClose }) => {
   // exactly what you will be looking at afterwards.
   const heroArt = () => {
     if (!focused) return null;
+    if (focused.type === 'character') return <WormPreviewCanvas characterId={focused.characterId} skinId={wormSkin} hatId={wormHat} size={heroPx} animated />;
     if (focused.type === 'skin') {
       return <WormPreviewCanvas characterId={wormCharacter} skinId={focused.skinId} hatId={wormHat} size={heroPx} animated />;
     }
@@ -589,6 +599,8 @@ const ParityStoreScreen = ({ onClose }) => {
           </button>
         </div>
       </div>
+
+      <div style={{ ...COLUMN, padding: '12px 16px 0' }}><button className="store-tab" onClick={onChests} style={{ minHeight: 48, width: '100%', font: 'inherit', fontWeight: 800, borderRadius: 12, border: `1px solid ${ACCENT}`, color: ACCENT, background: '#e3efcf', cursor: 'pointer' }}>Cubie Chests · ◆ {gems} gems · Roll & earn rewards →</button></div>
 
       {/* Tabs */}
       <div style={{
@@ -749,4 +761,7 @@ const ParityStoreScreen = ({ onClose }) => {
   );
 };
 
-export default ParityStoreScreen;
+export default function ParityStoreScreen({ onClose }) {
+  const [chests, setChests] = useState(false);
+  return chests ? <ChestRoom onBack={() => setChests(false)} onClose={onClose} /> : <StoreCollection onClose={onClose} onChests={() => setChests(true)} />;
+}

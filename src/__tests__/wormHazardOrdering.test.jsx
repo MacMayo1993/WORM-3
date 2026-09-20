@@ -17,13 +17,13 @@ vi.mock('../worm/healerWorm/HealerBombs.jsx', () => ({ HealerBombs: () => null, 
 vi.mock('../utils/feel.js', async importOriginal => ({ ...await importOriginal(), feel: vi.fn(), setFeelEnabled: vi.fn() }));
 vi.mock('../worm/wormHelpers.js', async importOriginal => ({ ...await importOriginal(), resolveSliceHits: vi.fn(() => null) }));
 vi.mock('../worm/healerWorm/bombs.js', async importOriginal => ({
-  ...await importOriginal(), checkBlastHitWorm: vi.fn(() => ({ type: 'death' })), isBombDisarmed: () => false,
+  ...await importOriginal(), checkBlastHitWorm: vi.fn(() => ({ type: 'death' })), isBombDisarmed: vi.fn(() => false),
 }));
 
 import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 import { HealerBombs } from '../worm/healerWorm/HealerBombs.jsx';
 import { resolveSliceHits } from '../worm/wormHelpers.js';
-import { checkBlastHitWorm } from '../worm/healerWorm/bombs.js';
+import { isBombDisarmed, checkBlastHitWorm } from '../worm/healerWorm/bombs.js';
 
 // Run the real scheduler's hooks, retaining its child props without mounting
 // WebGL renderers. Only the simulation port and visual effects are substituted.
@@ -33,6 +33,7 @@ const tick = (count = 1, delta = 0.1) => act(() => { for (let i = 0; i < count; 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  isBombDisarmed.mockImplementation(() => false);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   sim = makeWormSim(3);
   resetWormSim(sim, 3, { orbCount: 0, wormholeInterval: 9999 });
@@ -127,7 +128,7 @@ it('severs a fatal slice hit and stops the turn before it can drag the dead body
   expect(worm.feel.mock.calls.filter(([event]) => event === 'death')).toHaveLength(1);
 });
 
-it.each([1, 2, 3, 5, 6])('keeps story level %i free of ambient bombs, rotations and ordinary solve rewards', id => {
+it.each([1, 2, 3])('keeps story level %i free of ambient bombs, rotations and ordinary solve rewards', id => {
   act(() => {
     useGameStore.setState({ playerProgress: { ...useGameStore.getState().playerProgress, wormStory: { stars: {1:1,2:1,3:1,4:1,5:1}, claimed: {} } } });
     useGameStore.getState().initWormMode(undefined, undefined, 1.4, 1, 30, null, false, false, id);
@@ -141,17 +142,46 @@ it.each([1, 2, 3, 5, 6])('keeps story level %i free of ambient bombs, rotations 
   expect(props.bombsRef.current).toHaveLength(0);
 });
 
-it('schedules just one warned turn for Moving Ground and leaves completion to its objective', () => {
+it.each([[4,10], [5,10], [6,8]])('repeats the full warned cycle for story level %i at %is intervals and holds it while paused', (id, interval) => {
   act(() => {
-    useGameStore.setState({ playerProgress: { ...useGameStore.getState().playerProgress, wormStory: { stars: {1:1,2:1,3:1}, claimed: {} } } });
-    useGameStore.getState().initWormMode(undefined, undefined, 1.4, 1, 30, null, false, false, 4);
+    useGameStore.setState({ playerProgress: { ...useGameStore.getState().playerProgress, wormStory: { stars: {1:1,2:1,3:1,4:1,5:1}, claimed: {} } } });
+    useGameStore.getState().initWormMode(undefined, undefined, 1.4, 1, 30, null, false, false, id);
   });
-  tick(150); expect(rotate).not.toHaveBeenCalled(); // ready card holds the hazard
+  tick(150); expect(rotate).not.toHaveBeenCalled();
   act(() => useGameStore.setState({ wormPaused: false, wormStoryStarted: true }));
-  tick(50); expect(rotate).not.toHaveBeenCalled(); expect(rotationClock.held).toBe(false);
-  tick(500); expect(rotate).toHaveBeenCalledTimes(1);
-  expect(useGameStore.getState().wormGamePhase).toBe('finalHealing');
+  tick(interval * 5); expect(rotate).not.toHaveBeenCalled(); expect(rotationClock.total).toBe(interval);
+  act(() => useGameStore.setState({ wormPaused: true }));
+  const left = rotationClock.secondsLeft;
+  tick(300); expect(rotationClock.secondsLeft).toBe(left); expect(rotate).not.toHaveBeenCalled();
+  act(() => useGameStore.setState({ wormPaused: false }));
+  tick(interval * 70);
+  expect(rotate.mock.calls.length).toBeGreaterThanOrEqual(7);
+  expect(useGameStore.getState().wormGamePhase).toBe('active');
   expect(useGameStore.getState().wormStoryResult).toBeNull();
+  expect(new Set(rotate.mock.calls.map(call => call[0])).size).toBe(3);
+  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  expect(props.bombsRef.current).toHaveLength(0);
+});
+
+it('spawns a Story bomb, credits only a full live ring, and suppresses ordinary disarm coins', async () => {
+  const { isBombDisarmed: actualDisarm, bombDisarmRing } = await vi.importActual('../worm/healerWorm/bombs.js');
+  const { ttReset, ttPush } = await import('../worm/circularBuffers.js');
+  isBombDisarmed.mockImplementation(actualDisarm);
+  sim.pos = { x: 0, y: 0, z: 2, dirKey: 'PZ' };
+  worm.storyBombsNeeded = () => true; worm.recordStoryBomb = vi.fn();
+  act(() => useGameStore.setState({ wormStoryLevel: 9, wormStoryStarted: true, wormStoryResult: null, wormPaused: false }));
+  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  for (let i = 0; i < 600 && props.bombsRef.current.length === 0; i++) tick();
+  expect(props.bombsRef.current).toHaveLength(1);
+  const bomb = props.bombsRef.current[0]; expect(bomb.maxFuse).toBe(25);
+  const ring = [...bombDisarmRing(bomb, 3)]; sim.tailLength = 120;
+  ttReset(sim.tileTrail, ring[0]); for (const key of ring.slice(1, -1)) ttPush(sim.tileTrail, key);
+  tick(); expect(worm.recordStoryBomb).not.toHaveBeenCalled();
+  const coins = useGameStore.getState().parityPoints;
+  ttPush(sim.tileTrail, ring.at(-1)); tick();
+  expect(worm.recordStoryBomb).toHaveBeenCalledExactlyOnceWith(bomb.id);
+  expect(props.bombsRef.current).toHaveLength(0);
+  expect(useGameStore.getState().parityPoints).toBe(coins);
 });
 
 it('Book freezes only the layer countdown and resumes the same pending turn', () => {

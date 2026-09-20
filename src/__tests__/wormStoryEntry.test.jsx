@@ -2,6 +2,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormEntryScreen from '../components/screens/WormEntryScreen.jsx';
+import DeathScreen from '../worm/DeathScreens.jsx';
 import { StoryResult } from '../worm/story/StoryCards.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress } from '../progression/model.js';
@@ -20,8 +21,8 @@ it('opens with Story on the left and Free Play on the right, without launching e
   show(); const cards = [...host.querySelector('.worm-path-split').children];
   expect(cards.map(b => b.querySelector('h2').textContent)).toEqual(['STORY', 'FREE PLAY']);
   expect(complete).not.toHaveBeenCalled();
-  click('STORY'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(5);
-  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 1.4, wormEnemiesEnabled: false, perFaceStyles: {1:'grass'} }));
+  click('STORY'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
+  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false, perFaceStyles: {1:'grass'} }));
   click('Back'); await act(async () => { click('FREE PLAY'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
   click('Launch free run'); expect(complete.mock.lastCall[0]).toEqual({ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 });
@@ -49,4 +50,24 @@ it('offers Next, Replay and chapter navigation from completion', () => {
   expect(host.querySelector('[aria-label="3 out of 3 stars"]')).not.toBeNull();
   click('Next level'); click('Replay'); click('Chapter map');
   expect(next).toHaveBeenCalledOnce(); expect(retry).toHaveBeenCalledOnce(); expect(levels).toHaveBeenCalledOnce();
+});
+
+it('explains the hard deadline before play and distinguishes timeout from a collision', () => {
+  show({ initialPage: 'story' }); expect(host.textContent).toContain('Time limit: 90 seconds');
+  act(() => root.render(<DeathScreen deathDetails={{ reason: 'story-timeout' }} wormTimeAlive={90}
+    wormBodyTiles={12} wormHealedCount={0} wormTunnelCount={0} formatTime={n => `${n}s`} />));
+  expect(host.textContent).toContain('TIME’S UP'); expect(host.textContent).toContain('The clock ran out');
+  expect(host.textContent).not.toContain('TAIL BITE');
+});
+
+it('continues level six into seven and reserves chapter completion for ten', () => {
+  const next = vi.fn(), levels = vi.fn();
+  for (const id of [6, 10]) {
+    act(() => useGameStore.setState({ wormStoryResult: { levelId: id, stars: 1, seconds: 200, xp: 50, points: 0 } }));
+    act(() => root.render(<StoryResult onNext={next} onLevels={levels} />));
+    expect(host.textContent).toContain(`LEVEL ${id} / 10`);
+    expect(host.textContent.includes('CHAPTER COMPLETE!')).toBe(id === 10);
+    click(id === 6 ? 'Next level' : 'Back to chapter');
+  }
+  expect(next).toHaveBeenCalledOnce(); expect(levels).toHaveBeenCalledOnce();
 });
