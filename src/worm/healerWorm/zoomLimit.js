@@ -9,3 +9,9 @@ export function boundedWormZoom(size, baseBack, orbCount, burst) {
     return Math.min(wormZoomLimit(size, baseBack),
         Math.max(0, orbCount) * 0.18 + Math.max(0, burst));
 }
+
+// Match a 10% closer view optically, preserving surface and tunnel clearance.
+// Perspective extent is distance * tan(FOV / 2); multiply that extent by 0.9.
+export function wormSurfaceFov(baseFov) {
+    return 2 * Math.atan(Math.tan(baseFov * Math.PI / 360) * 0.9) * 180 / Math.PI;
+}
