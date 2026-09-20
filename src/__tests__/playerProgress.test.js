@@ -85,7 +85,7 @@ describe('atomic player save', () => {
     const state={playerProgress:progress,parityPoints:7,ownedItems:['hat_party','skin_slime']};
     expect(savePlayerState(state,localStorage)).toBe(true);
     const save=readPlayerSave(localStorage);
-    expect(save).toEqual({progress,points:7,ownedItems:state.ownedItems});
+    expect(save).toMatchObject({progress,points:7,ownedItems:state.ownedItems,chestWallet:{gems:20,rolls:0},legacyCharacters:false});
     expect(addXp(save.progress,1,'worm').points).toBe(0);
     expect(availableRewards(save.progress)).toEqual([]);
   });

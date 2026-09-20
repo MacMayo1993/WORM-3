@@ -6,6 +6,7 @@
  */
 
 import { chaosBoard, newChaosExperience, recordChaosTick, chaosRecap, readChaosRecord, predictionFaces } from '../../game/chaosExperience.js';
+import { getStoreItem } from '../../utils/storeCatalog.js';
 import { persistedState } from './persistedState.js';
 
 export const createDisparitySlice = (set, get) => ({
@@ -148,10 +149,11 @@ export const createDisparitySlice = (set, get) => ({
 
   // ── Economy ──────────────────────────────────────────────────────────────
   parityPoints: persistedState.parityPoints,
-  earnCoins: (amount) => set((state) => ({
+  earnCoins: (amount) => set((state) => !Number.isFinite(amount) || amount <= 0 || !Number.isSafeInteger((state.parityPoints || 0) + Math.round(amount)) ? {} : ({
     parityPoints: Math.max(0, (state.parityPoints || 0) + Math.round(amount)),
   })),
   spendCoins: (amount) => {
+    if (!Number.isSafeInteger(amount) || amount <= 0) return false;
     const current = get().parityPoints || 0;
     if (current < amount) return false;
     set({ parityPoints: current - Math.round(amount) });
@@ -160,7 +162,10 @@ export const createDisparitySlice = (set, get) => ({
 
   // ── Store ownership ───────────────────────────────────────────────────────
   ownedItems: persistedState.ownedItems,
-  buyItem: (itemId, price) => {
+  buyItem: (itemId, _price) => {
+    const item = getStoreItem(itemId);
+    if (!item) return false;
+    const price = item.price;
     const state = get();
     if (state.ownedItems.includes(itemId)) return true; // already owned
     const current = state.parityPoints || 0;

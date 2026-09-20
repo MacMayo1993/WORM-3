@@ -1,3 +1,4 @@
+import { sanitizeChestWallet } from '../economy/chests.js';
 import { sanitizeStoryProgress } from '../worm/story/levels.js';
 import { ACHIEVEMENT_BY_ID } from './achievements.js';
 // Permanent XP is independent of the spendable wallet and of any one run.
@@ -9,6 +10,8 @@ export const XP_MODES = {
   freeplay: 'Freeplay', random: 'Random', biome: 'Biome', chaos: 'Chaos',
   daily: 'Daily Descent', teach: 'Teach', explore: 'Exploration', demo: 'Introduction',
 };
+// Chests grant XP, but are not a gameplay mode with run achievements.
+export const XP_SOURCES = { ...XP_MODES, chests: 'Cubie Chests' };
 export const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
 export const xpForLevel = level => {
   const n = Math.max(0, Math.min(MAX_PLAYER_LEVEL - 1, (Number.isFinite(level) ? Math.floor(level) : 1) - 1));
@@ -43,7 +46,7 @@ export function sanitizeProgress(raw) {
   }
   p.recentGoals = (Array.isArray(raw.recentGoals) ? raw.recentGoals : []).filter(id => typeof id === 'string' && /^[a-z-]{1,40}$/.test(id)).slice(-6);
   p.chaosColors = [...new Set((Array.isArray(raw.chaosColors) ? raw.chaosColors : []).filter(n => Number.isInteger(n) && n >= 1 && n <= 6))];
-  for (const key of Object.keys(XP_MODES)) if (count(raw.modeXp?.[key])) p.modeXp[key] = Math.min(count(raw.modeXp[key]), p.xp);
+  for (const key of Object.keys(XP_SOURCES)) if (count(raw.modeXp?.[key])) p.modeXp[key] = Math.min(count(raw.modeXp[key]), p.xp);
   // Only bounded, internally-issued keys are accepted. Historical records never
   // turn into actions or revive archived modes.
   for (const [key, value] of Object.entries(record(raw.milestones) ? raw.milestones : {}).slice(0, 2000)) {
@@ -64,7 +67,7 @@ export function readPlayerSave(storage) {
     storage ??= globalThis.localStorage;
     const raw = JSON.parse(storage.getItem(PLAYER_SAVE_KEY));
     if (raw?.version !== 1 || !record(raw.progress) || !Number.isSafeInteger(raw.points) || raw.points < 0 || !Array.isArray(raw.ownedItems)) return null;
-    return { progress: sanitizeProgress(raw.progress), points: raw.points, ownedItems: [...new Set(raw.ownedItems.filter(id => typeof id === 'string'))] };
+    return { progress: sanitizeProgress(raw.progress), points: raw.points, ownedItems: [...new Set(raw.ownedItems.filter(id => typeof id === 'string'))], chestWallet: sanitizeChestWallet(raw.chestWallet), legacyCharacters: raw.chestWallet == null };
   } catch { return null; }
 }
 export function savePlayerState(state, storage) {
@@ -72,13 +75,13 @@ export function savePlayerState(state, storage) {
     storage ??= globalThis.localStorage;
     // One storage write commits XP, level payouts and ownership together.
     // Legacy wallet keys remain mirrors; this snapshot is authoritative on load.
-    storage.setItem(PLAYER_SAVE_KEY, JSON.stringify({ version: 1, progress: state.playerProgress, points: state.parityPoints, ownedItems: state.ownedItems }));
+    storage.setItem(PLAYER_SAVE_KEY, JSON.stringify({ version: 1, progress: state.playerProgress, points: state.parityPoints, ownedItems: state.ownedItems, chestWallet: state.chestWallet ?? sanitizeChestWallet(null) }));
     return true;
   } catch { return false; }
 }
 export function addXp(progress, amount, mode) {
   const grant = Math.min(count(amount), Math.max(0, 1e9 - progress.xp));
-  if (!grant || !XP_MODES[mode]) return { progress, points: 0, amount: 0 };
+  if (!grant || !XP_SOURCES[mode]) return { progress, points: 0, amount: 0 };
   const next = { ...progress, xp: progress.xp + grant, modeXp: { ...progress.modeXp, [mode]: (progress.modeXp[mode] || 0) + grant } };
   return { progress: next, points: POINTS_PER_LEVEL * (levelProgress(next.xp).level - levelProgress(progress.xp).level), amount: grant };
 }
