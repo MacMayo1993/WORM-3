@@ -16,7 +16,7 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   useGameStore.setState({ demoMode: false, wormHealerMode: true, wormAlive: true,
-    wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
+    wormStoryLevel: null, wormStoryResult: null, wormCombatMode: false, wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
     wormMission: { title: 'Collect 3 face orbs', target: 3, progress: 0, reward: 30, xp: 60, sequence: 5 },
     wormRunAchievements: [] });
   wormBuffs.signature = { character: 'inch', ready: true, seconds: 0, fraction: 1 };
@@ -63,5 +63,18 @@ it('replaces secondary context with one healing readout and keeps pause usable d
   wormBuffs.tunnelNeeds = null;
   renderPhase('crawling'); act(() => vi.advanceTimersByTime(110));
   expect(host.querySelector('.worm-tunnel-needs')).toBeNull();
+  expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
+});
+
+it('places level seven objectives beneath the orb tracker and outside the control tray', () => {
+  useGameStore.setState({ wormStoryLevel: 7, wormStoryReady: true, wormStoryStarted: true,
+    wormStoryProgress: '1/6 goals · 0/2 boosts finished' });
+  renderPhase('crawling');
+  const top = host.querySelector('.worm-hud-top');
+  const card = top.querySelector('[aria-label="Story objective"]');
+  expect(card).not.toBeNull();
+  expect(card.textContent).toContain('Full Throttle');
+  expect(top.querySelector('.worm-hud-bar').compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(host.querySelector('.worm-hud-bottom [aria-label="Story objective"]')).toBeNull();
   expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
 });

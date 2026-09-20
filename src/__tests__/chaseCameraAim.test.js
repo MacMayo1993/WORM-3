@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { aimCamera } from '../worm/WormChaseCamera.jsx';
+import { aimCamera, frameSurfaceCamera } from '../worm/WormChaseCamera.jsx';
 
 const cam = () => new THREE.PerspectiveCamera(70, 1, 0.1, 100);
 const finite = q => [q.x, q.y, q.z, q.w].every(Number.isFinite);
@@ -79,4 +79,19 @@ describe('chase camera aim', () => {
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(c.quaternion);
     expect(up.dot(n)).toBeGreaterThan(0.7);
   });
+});
+
+it('holds the cube above screen center across all surface faces and changing camera rolls', () => {
+  const c = new THREE.PerspectiveCamera(82, 0.46, 0.1, 100);
+  for (let i = 0; i <= 180; i++) {
+    const a = i * Math.PI / 90;
+    c.position.set(9 * Math.sin(a), 6 * Math.cos(a), 8 * Math.cos(a / 2));
+    aimCamera(c, c.position, new THREE.Vector3(0, 4, 0), new THREE.Vector3(Math.sin(a), Math.cos(a), 0), 0.1);
+    frameSurfaceCamera(c, 1);
+    c.updateMatrixWorld(true);
+    const center = new THREE.Vector3().project(c);
+    expect(center.x).toBeCloseTo(0, 6);
+    expect(center.y).toBeCloseTo(0.12, 6);
+    expect(finite(c.quaternion)).toBe(true);
+  }
 });

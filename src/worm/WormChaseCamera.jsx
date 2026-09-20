@@ -145,6 +145,25 @@ const _cutCam = new THREE.Vector3();
 const _cutUp = new THREE.Vector3();
 const CUT_FOCUS_PEAK = 0.9; // how far toward the impact shot the swing goes (0..1)
 
+const frameForward = new THREE.Vector3();
+const frameDirection = new THREE.Vector3();
+const frameCorrection = new THREE.Quaternion();
+
+// Camera position and roll still ease around the worm, but their independent
+// lags must not drag the cube underneath the controls during a face crossing.
+export function frameSurfaceCamera(camera, portraitFactor) {
+    frameDirection.copy(camera.position).negate();
+    if (frameDirection.lengthSq() < 1e-8) return;
+    frameDirection.normalize();
+    frameForward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    frameCorrection.setFromUnitVectors(frameForward, frameDirection);
+    camera.quaternion.premultiply(frameCorrection);
+    // A fixed screen-space anchor survives every cube face and horizon roll.
+    const screenY = THREE.MathUtils.lerp(0.06, 0.12, portraitFactor);
+    camera.rotateX(-Math.atan(screenY * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))));
+    camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+}
+
 export default function WormChaseCamera({ worm, size }) {
     const { camera, size: viewportSize } = useThree();
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
@@ -645,6 +664,9 @@ export default function WormChaseCamera({ worm, size }) {
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
             aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, alpha);
+            if (!rocketLift && !(worm.healPauseT?.current > 0) && !(worm.cutFocusT?.current > 0)) {
+                frameSurfaceCamera(camera, portraitFactor);
+            }
             camUpRef.current.copy(camera.up);
         } else if (phase === 'windup' || phase === 'entering') {
             const tunnel = worm.activeTunnel.current;
