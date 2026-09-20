@@ -103,3 +103,19 @@ export function storyProgressText(level, metrics) {
   parts.push(`${Math.max(0, Math.ceil(level.limit - metrics.elapsed))}s left`);
   return parts.join(' · ');
 }
+
+// Shared objective data for the preflight checklist and live completion marks.
+export function storyChecklist(level, metrics = {}) {
+  const primary = { orbs: 'orbs', tunnel: 'uniqueTunnels', jump: 'bodyJumps', rotation: 'rotations' }[level.kind] ?? 'healed';
+  const targets = { ...level.mechanics, [primary]: level.target };
+  for (const key of ['orbs', 'colors', 'rotations']) if (level[key]) targets[key] = level[key];
+  const labels = { boosts: 'Finish boosts', doubleJumps: 'Land double jumps', rockets: 'Land a rocket flight',
+    magnetOrbs: 'Magnet catches', elements: 'Master all 5 elements', ringHeals: 'Surround a tunnel',
+    signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
+    orbs: 'Collect orbs', colors: 'Collect all 6 colors', uniqueTunnels: 'Cross different tunnel pairs',
+    bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };
+  return Object.entries(targets).map(([key, target]) => {
+    const value = Math.min(target, Math.max(0, metrics[key] ?? 0));
+    return { key, label: labels[key], value, target, done: value >= target };
+  });
+}

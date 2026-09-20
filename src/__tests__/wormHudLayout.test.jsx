@@ -16,7 +16,7 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   useGameStore.setState({ demoMode: false, wormHealerMode: true, wormAlive: true,
-    wormStoryLevel: null, wormStoryResult: null, wormCombatMode: false, wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
+    wormStoryLevel: null, wormStoryChecklist: null, wormStoryResult: null, wormCombatMode: false, wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
     wormMission: { title: 'Collect 3 face orbs', target: 3, progress: 0, reward: 30, xp: 60, sequence: 5 },
     wormRunAchievements: [] });
   wormBuffs.signature = { character: 'inch', ready: true, seconds: 0, fraction: 1 };
@@ -77,4 +77,24 @@ it('places level seven objectives beneath the orb tracker and outside the contro
   expect(top.querySelector('.worm-hud-bar').compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(host.querySelector('.worm-hud-bottom [aria-label="Story objective"]')).toBeNull();
   expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
+});
+
+it('puts Start level at the bottom, then shows controls and automatic checked tasks', () => {
+  const runId = useGameStore.getState().wormRunId;
+  useGameStore.setState({ wormStoryLevel: 7, wormStoryReady: true, wormStoryStarted: false, wormStoryChecklist: null, wormPauseMenuOpen: false });
+  renderPhase('crawling');
+  expect(host.querySelectorAll('.worm-story-checklist li')).toHaveLength(6);
+  expect(host.querySelector('.worm-hud-top .worm-story-start')).toBeNull();
+  expect(host.querySelector('.worm-primary-actions')).toBeNull();
+  const start = host.querySelector('.worm-hud-bottom .worm-story-start');
+  expect(start.textContent).toContain('Start level');
+  act(() => start.click());
+  expect(host.querySelector('.worm-story-start')).toBeNull();
+  expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
+  act(() => useGameStore.setState({ wormStoryChecklist: { runId, levelId: 7, seconds: 260,
+    goals: [{ key: 'boosts', label: 'Finish boosts', value: 2, target: 2, done: true }] } }));
+  expect(host.querySelector('.worm-story-checklist .is-complete').getAttribute('aria-label')).toContain('complete');
+  // A retry must not show marks from the previous attempt.
+  act(() => useGameStore.setState({ wormRunId: runId + 1 }));
+  expect(host.querySelector('.worm-story-checklist .is-complete')).toBeNull();
 });
