@@ -37,6 +37,7 @@ import {
 
 // ─── Death-cause classification ───────────────────────────────────────────────
 function classifyDeath(reason) {
+    if (reason === 'story-timeout') return 'time-up';
     if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted') return 'event-horizon';
     if (reason === 'slice-rotation') return 'sliced';
     if (reason === 'bomb') return 'blasted';
@@ -51,6 +52,12 @@ function classifyDeath(reason) {
 //   SLICED is steel-white and filling a button with it left white label text on
 //   a near-white field. That screen borrows the red from the slice hazard.
 const DEATHS = {
+    'time-up': {
+        eyebrow: 'Story challenge', title: "TIME’S UP",
+        blurb: 'The clock ran out. Plan a tighter route and try again.',
+        accent: '#f4d35e', accentSoft: 'rgba(244,211,94,0.45)', deep: '#705019',
+        titleSize: 'clamp(32px, min(11vw, 10vh), 76px)',
+    },
     overrun: {
         eyebrow: 'Portal encounter',
         title: 'SHIELDS DOWN',

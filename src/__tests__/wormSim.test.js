@@ -1093,3 +1093,16 @@ describe('elemental movement integration', () => {
     expect([...sim.elementalPatches.values()].some(p => p.type === 'fire')).toBe(true);
   });
 });
+
+it('reports a grass launch only after actually consuming the spring under the head', () => {
+  liveRotation.active = false;
+  const sim = makeSim(), launches = [];
+  const ctx = makeCtx({ onStoryMechanic: key => launches.push(key) });
+  startJump(sim, ctx, SIZE); expect(launches).toEqual([]);
+  sim.isJumping = false; sim.jumpCount = 0;
+  sim.elementalPatches.set(tileKey(sim.pos), { type: 'grass', ttl: 10 });
+  startJump(sim, ctx, SIZE);
+  expect(sim.elementalPatches.has(tileKey(sim.pos))).toBe(false);
+  expect(launches).toEqual(['grassLaunch']);
+  startJump(sim, ctx, SIZE); expect(launches).toEqual(['grassLaunch']);
+});

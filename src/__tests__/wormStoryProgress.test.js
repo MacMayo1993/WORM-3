@@ -4,7 +4,7 @@ import { newProgress, readPlayerSave, sanitizeProgress } from '../progression/mo
 import { storyLevel, storyOutcome, storyUnlocked } from '../worm/story/levels.js';
 import { getStoreItem } from '../utils/storeCatalog.js';
 const state = () => useGameStore.getState();
-const won = { alive: true, elapsed: 10, cuts: 0, orbs: 4 };
+const won = { alive: true, elapsed: 10, cuts: 0, orbs: 18, colors: 6 };
 function start(id = 1) {
   state().initWormMode(undefined, undefined, 3.5, 1, 30, null, true, true, id);
   useGameStore.setState({ wormStoryReady: true, wormGamePhase: 'active' });
@@ -17,8 +17,8 @@ beforeEach(() => {
 it('locks future levels, fixes story rules, and restores ordinary Free Play runs', () => {
   const id = state().wormRunId;
   start(2); expect(state().wormRunId).toBe(id);
-  start(); expect(state()).toMatchObject({ wormSpeed: 1.4, wormEnemiesEnabled: false, wormCombatMode: false, xpRun: null, wormMission: null });
-  state().setWormSpeed(3); expect(state().wormSpeed).toBe(1.4);
+  start(); expect(state()).toMatchObject({ wormSpeed: 2, wormEnemiesEnabled: false, wormCombatMode: false, xpRun: null, wormMission: null });
+  state().setWormSpeed(3); expect(state().wormSpeed).toBe(2);
   state().clearDisparityGame(); state().initWormMode(); state().setWormSpeed(2);
   expect(state()).toMatchObject({ wormStoryLevel: null, wormStoryReady: false, wormStoryResult: null, wormSpeed: 2 });
   expect(state().xpRun).not.toBeNull(); expect(state().wormMission).not.toBeNull();
@@ -30,7 +30,7 @@ it.each([{ wormPaused: true }, { wormAlive: false }, { wormStoryStarted: false }
 it('pays first clears and newly improved stars once, persists them, and rejects stale runs', () => {
   start(); state().completeWormStory(state().wormRunId - 1, won);
   expect(state().wormStoryResult).toBeNull();
-  state().completeWormStory(state().wormRunId, { ...won, elapsed: 30, cuts: 1 });
+  state().completeWormStory(state().wormRunId, { ...won, elapsed: 65, cuts: 1 });
   expect(state().wormStoryResult).toMatchObject({ stars: 1, points: 25, xp: 50 });
   expect(storyUnlocked(state().playerProgress, 2)).toBe(true);
   expect(storyUnlocked(state().playerProgress, 3)).toBe(false);
@@ -41,7 +41,7 @@ it('pays first clears and newly improved stars once, persists them, and rejects 
   expect(state().parityPoints).toBe(wallet); expect(state().playerProgress.xp).toBe(xp);
   expect(readPlayerSave()).toMatchObject({ progress: state().playerProgress, points: wallet });
 });
-it.each([3, 5, 6])('claims an existing cosmetic from level %i exactly once, including after leaving the run', id => {
+it.each([3, 5, 6, 7, 8, 9, 10])('claims an existing cosmetic from level %i exactly once, including after leaving the run', id => {
   const level = storyLevel(id); for (const item of level.reward) expect(getStoreItem(item)).toBeTruthy();
   state().claimWormStoryReward(id, level.reward[0]); expect(state().ownedItems).toEqual([]);
   useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({length:id}, (_, i) => [i+1, 1])), claimed: {} } } });
@@ -60,10 +60,19 @@ it('sanitizes old, malformed, and gapped saves without unlocking reward claims',
   expect(sanitizeProgress({}).wormStory).toEqual({ stars: {}, claimed: {} });
   expect(sanitizeProgress({ wormStory: { stars: { 1: 3, 2: 4, 3: 1 }, claimed: { 3: 'hat_party' } } }).wormStory).toEqual({ stars: { 1: 3 }, claimed: {} });
 });
-it('requires physical outcomes, including tail clearance, landing, and committed turns', () => {
-  expect(storyOutcome(storyLevel(2), { ...won, tunnels: 1, tailClear: false })).toBeNull();
-  expect(storyOutcome(storyLevel(3), { ...won, crossedBody: true, landed: false })).toBeNull();
-  expect(storyOutcome(storyLevel(4), { ...won, rotations: 1, rotationSettled: false })).toBeNull();
-  expect(storyOutcome(storyLevel(6), { ...won, healed: 3, remaining: 1, tailClear: true })).toBeNull();
-  expect(storyOutcome(storyLevel(6), { ...won, healed: 3, remaining: 0, tailClear: true })).toMatchObject({ stars: 3 });
+it('requires every physical objective and rejects expiration or old tutorial clears', () => {
+  const complete = { ...won, orbs: 30, colors: 6, uniqueTunnels: 4, bodyJumps: 4, landed: true,
+    rotations: 6, rotationSettled: true, healed: 6, remaining: 0, tailClear: true };
+  for (let id = 1; id <= 6; id++) {
+    expect(storyOutcome(storyLevel(id), complete)).toMatchObject({ stars: 3 });
+    expect(storyOutcome(storyLevel(id), { ...complete, elapsed: storyLevel(id).limit + 0.01 })).toBeNull();
+    expect(storyOutcome(storyLevel(id), { ...won, orbs: 4, tunnels: 1, crossedBody: true, landed: true, rotations: 1, healed: 3, remaining: 0, tailClear: true, rotationSettled: true })).toBeNull();
+  }
+  expect(storyOutcome(storyLevel(2), { ...complete, tailClear: false })).toBeNull();
+  expect(storyOutcome(storyLevel(3), { ...complete, landed: false })).toBeNull();
+  expect(storyOutcome(storyLevel(4), { ...complete, rotationSettled: false })).toBeNull();
+  expect(storyOutcome(storyLevel(5), { ...complete, colors: 5 })).toBeNull();
+  expect(storyOutcome(storyLevel(6), { ...complete, remaining: 1 })).toBeNull();
+  expect(storyOutcome(storyLevel(6), { ...complete, orbs: 29 })).toBeNull();
+  expect(storyOutcome(storyLevel(6), { ...complete, rotations: 5 })).toBeNull();
 });

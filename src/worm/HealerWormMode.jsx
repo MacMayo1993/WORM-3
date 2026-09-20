@@ -1,4 +1,5 @@
-import { storyLevel } from './story/levels.js';
+import { storySurfaceTile } from './story/mastery.js';
+import { storyLevel, storyRotationCycle } from './story/levels.js';
 import { combatBridge } from './combat/portalCombat.js';
 import CombatScene from './combat/CombatScene.jsx';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
@@ -161,7 +162,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const seq = story ? [] : buildWormScramble(size, SCRAMBLE_STEPS);
             scrambleSeqRef.current  = seq;
             // Reverse the sequence and every turn so the timed hazard solves the board.
-            inverseQueueRef.current = story ? (story.kind === 'rotation' ? [{ axis: 'col', sliceIndex: 0, dir: 1 }] : []) : invertWormScramble(seq);
+            inverseQueueRef.current = story ? (story.rotateEvery ? storyRotationCycle(size) : []) : invertWormScramble(seq);
 
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
@@ -205,8 +206,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     }, [size, onAnimatedShuffle]);
 
     useFrame((_, delta) => {
+        const story = storyLevel(useGameStore.getState().wormStoryLevel);
+        const rotationInterval = story?.rotateEvery || ACTIVE_ROTATE_INTERVAL;
         worm.tick(delta, { busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
-            autoTimerRef.current >= ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING - 0.2 });
+            autoTimerRef.current >= rotationInterval - AUTO_ROTATE_WARNING - 0.2 });
 
         // While a slice the worm sits on is mid-rotation during live play, ride it so the
         // worm visually turns with the cube rather than snapping into place only when the
@@ -315,8 +318,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             return;
         }
 
-        // Story objectives own their ending; only Moving Ground uses the slice queue.
-        if (store.wormStoryLevel && (storyLevel(store.wormStoryLevel)?.kind !== 'rotation' || store.wormStoryResult)) { resetRotationClock(); return; }
+        // Story objectives own their ending; later challenges repeat the warned slice cycle.
+        if (store.wormStoryLevel && (!story?.rotateEvery || store.wormStoryResult)) { resetRotationClock(); return; }
 
         // The combat arena owns its ending; ordinary bombs and solving turns stay off.
         if (store.wormCombatMode) { resetRotationClock(); return; }
@@ -407,6 +410,19 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             occupied.clear();
             for (let i = 0; i < occupiedCount; i++) occupied.add(ttAt(trail, i));
 
+            if (story?.mechanics?.bombs && worm.storyBombsNeeded?.() && bombsRef.current.length === 0 &&
+                wormBuffs.elementalT <= 0) {
+                bombTimerRef.current -= bdelta;
+                if (bombTimerRef.current <= 0 && warningProgressRef.current <= 0) {
+                    const tile = storySurfaceTile({ pos: worm.pos.current }, size, store.cubies, occupied);
+                    if (tile) {
+                        bombsRef.current.push({ id: bombSeqRef.current++, tile, fuse: 25, maxFuse: 25 });
+                        bombMembershipRef.current++;
+                        bombTimerRef.current = 10;
+                    }
+                }
+            }
+
             // Spawn clock — one attempt per interval, capped by board size.
             //
             // An active elemental wash suspends it entirely: the cube is re-skinned,
@@ -455,6 +471,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     // Disarm: body fully encircles the bomb — reward and remove it.
                     if (isBombDisarmed(bomb, occupied, size)) {
                         if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
+                        else if (store.wormStoryLevel) worm.recordStoryBomb?.(bomb.id);
                         else useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);
                         worm.feel('heal');
                         continue;
@@ -516,7 +533,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         if (demo && (practiceLesson !== 'rotation' || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
         rotationClock.held = false;
         autoTimerRef.current += Math.min(delta, 0.1);
-        const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
+        const warningStart = rotationInterval - AUTO_ROTATE_WARNING;
 
         // Arm with the NEXT inverse move the moment the cycle starts (peek, don't
         // dequeue yet). The layer stays lit for the whole ten seconds — softly at
@@ -549,8 +566,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // store state — this changes every frame and the readout paints itself
         // from a ref (see rotationClockBridge).
         rotationClock.armed = !!pendingRotRef.current;
-        rotationClock.secondsLeft = Math.max(0, ACTIVE_ROTATE_INTERVAL - autoTimerRef.current);
-        rotationClock.total = ACTIVE_ROTATE_INTERVAL;
+        rotationClock.secondsLeft = Math.max(0, rotationInterval - autoTimerRef.current);
+        rotationClock.total = rotationInterval;
         rotationClock.warning = warningProgressRef.current;
         rotationClock.axis = pendingRotRef.current?.axis ?? null;
         rotationClock.sliceIndex = pendingRotRef.current?.sliceIndex ?? null;
@@ -567,16 +584,17 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             for (let i = 0; i < _layers.length; i++) _si[i] = _layers[i];
         }
 
-        // Fire rotation at the fixed 10-second mark
-        if (autoTimerRef.current >= ACTIVE_ROTATE_INTERVAL && pendingRotRef.current) {
+        // Fire at the authored interval after the full warning.
+        if (autoTimerRef.current >= rotationInterval && pendingRotRef.current) {
             // Delay if mid-tunnel
             if (worm.phase.current !== 'crawling') {
-                autoTimerRef.current = ACTIVE_ROTATE_INTERVAL - 1.5;
+                autoTimerRef.current = rotationInterval - 1.5;
                 return;
             }
 
             const { axis, dir, sliceIndex, sliceIndices, sliceDirs } = pendingRotRef.current;
-            inverseQueueRef.current.shift(); // now dequeue
+            const dispatched = inverseQueueRef.current.shift();
+            if (story?.rotateEvery) inverseQueueRef.current.push(dispatched); // repeat until the objective clears
 
             // Hit detection — the worm can be caught by EITHER spinning plane, so both
             // are resolved before anything is applied. Taking the first plane that
