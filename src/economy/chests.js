@@ -69,7 +69,12 @@ export function rollChest(mode, ownedItems, random = randomUnit) {
   if (tier === 0) reward = { kind: 'currency', points: 25, xp: 25 };
   else {
     const unowned = chestPool(tier).filter(item => !ownedItems.includes(item.id));
-    reward = unowned.length ? { kind: 'item', itemId: unowned[Math.floor(sampleUnit(random) * unowned.length)].id }
+    // Sample without replacement: every remaining cosmetic has the same inclusion chance.
+    const itemIds = [];
+    while (unowned.length && itemIds.length < 3) {
+      itemIds.push(unowned.splice(Math.floor(sampleUnit(random) * unowned.length), 1)[0].id);
+    }
+    reward = itemIds.length ? { kind: 'choice', itemIds }
       : { kind: 'complete', gems: CHEST_TIERS[tier].compensation };
   }
   return { mode, faces, tier, reward, cost: def.cost };
@@ -83,11 +88,14 @@ export function sanitizeChestWallet(raw) {
     if (!r || !CHEST_MODES[r.mode] || !Array.isArray(r.faces) || r.faces.length !== CHEST_MODES[r.mode].dice ||
         !r.faces.every(validTier) || r.tier !== resolveChestFaces(r.faces) || !Number.isSafeInteger(r.id) || r.id <= 0 || r.id > wallet.rolls) continue;
     const reward = r.reward;
-    const valid = reward?.kind === 'item' ? chestItemTier(getStoreItem(reward.itemId)) === r.tier
+    const validChoice = reward?.kind === 'choice' && r.id === wallet.rolls && r.tier > 0 &&
+      Array.isArray(reward.itemIds) && reward.itemIds.length >= 1 && reward.itemIds.length <= 3 &&
+      new Set(reward.itemIds).size === reward.itemIds.length && reward.itemIds.every(id => chestItemTier(getStoreItem(id)) === r.tier);
+    const valid = reward?.kind === 'choice' ? validChoice : reward?.kind === 'item' ? chestItemTier(getStoreItem(reward.itemId)) === r.tier
       : reward?.kind === 'currency' ? r.tier === 0 && reward.points === 25 && reward.xp === 25
       : reward?.kind === 'complete' && r.tier > 0 && reward.gems === CHEST_TIERS[r.tier].compensation;
     if (!valid || wallet.history.some(old => old.id === r.id)) continue;
-    wallet.history.push({ id: r.id, mode: r.mode, faces: [...r.faces], tier: r.tier, reward: reward.kind === 'item' ? { kind: 'item', itemId: reward.itemId }
+    wallet.history.push({ id: r.id, mode: r.mode, faces: [...r.faces], tier: r.tier, reward: reward.kind === 'choice' ? { kind: 'choice', itemIds: [...reward.itemIds] } : reward.kind === 'item' ? { kind: 'item', itemId: reward.itemId }
       : reward.kind === 'currency' ? { kind: 'currency', points: 25, xp: 25 } : { kind: 'complete', gems: reward.gems }, cost: CHEST_MODES[r.mode].cost });
   }
   return wallet;

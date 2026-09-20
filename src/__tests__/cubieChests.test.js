@@ -36,7 +36,7 @@ it('covers every purchasable catalog item once and guarantees an unowned item wi
     const rng = () => face;
     const owned = pool.slice(1).map(i => i.id);
     const result = rollChest('single', owned, rng);
-    expect(result.reward).toEqual({ kind: 'item', itemId: pool[0].id });
+    expect(result.reward).toEqual({ kind: 'choice', itemIds: [pool[0].id] });
     expect(chestItemTier(pool[0])).toBe(tier);
     expect(rollChest('single', pool.map(i => i.id), rng).reward).toEqual({ kind: 'complete', gems: CHEST_TIERS[tier].compensation });
   }
@@ -90,11 +90,78 @@ it('uses catalog prices, rejects negative/non-finite money, and equips only owne
   useGameStore.setState({ ownedItems: [...state().ownedItems, 'character_mobi'] });
   state().setWormCharacter('mobi'); expect(state().wormCharacter).toBe('mobi');
 });
-it('persists a mythic character unlock and permits equipping it immediately', () => {
+it('persists a mythic choice before granting the selected character exactly once', () => {
   vi.spyOn(crypto, 'getRandomValues').mockImplementation(array => { array[0] = Math.floor(.995 * 4294967296); return array; });
   const { receipt } = state().rollCubieChest('single');
-  expect(receipt.tier).toBe(5); expect(receipt.reward.kind).toBe('item');
-  expect(readPlayerSave().ownedItems).toContain(receipt.reward.itemId);
-  const character = receipt.reward.itemId.replace('character_', ''); state().setWormCharacter(character);
+  expect(receipt.tier).toBe(5); expect(receipt.reward.kind).toBe('choice');
+  expect(receipt.reward.itemIds).toHaveLength(3);
+  const itemId = receipt.reward.itemIds[1];
+  expect(readPlayerSave().ownedItems).not.toContain(itemId);
+  expect(state().chooseChestReward(receipt.id, itemId).error).toBeTruthy();
+  state().finishChestRoll(receipt.id);
+  expect(state().rollCubieChest('single').error).toBeTruthy();
+  expect(state().chooseChestReward(receipt.id + 1, itemId).error).toBeTruthy();
+  expect(state().chooseChestReward(receipt.id, 'character_classic').error).toBeTruthy();
+  expect(state().chooseChestReward(receipt.id, itemId).receipt.reward).toEqual({ kind: 'item', itemId });
+  expect(readPlayerSave().ownedItems).toContain(itemId);
+  expect(state().chooseChestReward(receipt.id, receipt.reward.itemIds[0]).error).toBeTruthy();
+  expect(readPlayerSave().ownedItems).not.toContain(receipt.reward.itemIds[0]);
+  const character = itemId.replace('character_', ''); state().setWormCharacter(character);
   expect(state().wormCharacter).toBe(character); expect(state().chestWallet.gems).toBe(10);
+});
+
+it.each([1, 2, 3, 4, 5])('offers three unique unowned cosmetics in tier %i, or only the remaining choices', tier => {
+  const pool = chestPool(tier);
+  const face = CHEST_MODES.single.weights.slice(0, tier).reduce((a,b) => a+b,0) / 10000 + .00001;
+  const roll = owned => rollChest('single', owned, () => face);
+  const offered = roll([pool[0].id]).reward.itemIds;
+  expect(offered).toHaveLength(3);
+  expect(new Set(offered).size).toBe(3);
+  expect(offered).not.toContain(pool[0].id);
+  offered.forEach(id => expect(pool.some(item => item.id === id)).toBe(true));
+  expect(new Set(roll(pool.slice(2).map(i => i.id)).reward.itemIds)).toEqual(new Set(pool.slice(0,2).map(i => i.id)));
+});
+
+it('retains the exact pending options across reload and recovers from a failed claim save', () => {
+  vi.spyOn(crypto, 'getRandomValues').mockImplementation(array => { array[0] = Math.floor(.995 * 4294967296); return array; });
+  const { receipt } = state().rollCubieChest('single');
+  const saved = readPlayerSave();
+  useGameStore.setState({ chestWallet: saved.chestWallet, ownedItems: saved.ownedItems, chestRolling: false });
+  expect(state().chestWallet.history.at(-1)).toEqual(receipt);
+  expect(state().rollCubieChest('double').error).toBeTruthy();
+  const failSave = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+  const itemId = receipt.reward.itemIds[0];
+  expect(state().chooseChestReward(receipt.id, itemId).error).toContain('Could not save');
+  expect(state().ownedItems).not.toContain(itemId);
+  expect(state().chestWallet.history.at(-1)).toEqual(receipt);
+  failSave.mockRestore();
+  expect(state().chooseChestReward(receipt.id, itemId).receipt.reward.itemId).toBe(itemId);
+  expect(readPlayerSave().chestWallet.gems).toBe(10);
+});
+
+it('compensates an offered item acquired elsewhere without changing the other saved options', () => {
+  vi.spyOn(crypto, 'getRandomValues').mockImplementation(array => { array[0] = Math.floor(.995 * 4294967296); return array; });
+  const { receipt } = state().rollCubieChest('single'); state().finishChestRoll(receipt.id);
+  const itemId = receipt.reward.itemIds[0];
+  useGameStore.setState({ ownedItems: [...state().ownedItems, itemId] });
+  expect(state().chooseChestReward(receipt.id, itemId).receipt.reward).toEqual({ kind: 'complete', gems: 15 });
+  expect(state().chestWallet.gems).toBe(25);
+  expect(state().ownedItems.filter(id => id === itemId)).toHaveLength(1);
+  expect(state().chooseChestReward(receipt.id, itemId).error).toBeTruthy();
+  expect(state().chestWallet.gems).toBe(25);
+});
+
+it('validates saved choices and keeps old awarded receipts non-claimable', () => {
+  expect(state().chooseChestReward().error).toBeTruthy();
+  const ids = chestPool(5).slice(0,3).map(i => i.id);
+  const receipt = { id: 1, mode: 'single', faces: [5], tier: 5, cost: 10, reward: { kind: 'choice', itemIds: ids } };
+  const wallet = { ...newChestWallet(), rolls: 1, gems: 10, history: [receipt] };
+  expect(sanitizeChestWallet(wallet)).toEqual(wallet);
+  for (const badIds of [[], [ids[0], ids[0]], [...ids, chestPool(5)[3].id], ['missing'], [chestPool(1)[0].id]]) {
+    expect(sanitizeChestWallet({ ...wallet, history: [{ ...receipt, reward: { kind: 'choice', itemIds: badIds } }] }).history).toEqual([]);
+  }
+  const legacy = { ...receipt, reward: { kind: 'item', itemId: ids[0] } };
+  useGameStore.setState({ chestWallet: sanitizeChestWallet({ ...wallet, history: [legacy] }) });
+  expect(state().chestWallet.history[0]).toEqual(legacy);
+  expect(state().chooseChestReward(1, ids[0]).error).toBeTruthy();
 });

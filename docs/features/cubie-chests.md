@@ -33,7 +33,7 @@ For ascending tiers indexed 0–5 with face probabilities p_i, paired final prob
 
 ## Ownership and duplicate handling
 
-The rarity is rolled first. Then an unowned item is selected uniformly within that tier. Free catalog defaults are excluded from reward pools. Advanced styles are Living, Living Surfaces, Non-Euclidean, Impossible and Surreal; Classic and Antipodal styles are blue-tier rewards.
+The rarity is rolled first. Then up to three distinct unowned items are sampled uniformly without replacement within that tier. After the animation, the player chooses one cosmetic to keep. If N items remain, k = min(3, N) options appear and each item has inclusion probability k/N. One or two remaining items produce that many choices; no duplicate filler is shown. Free catalog defaults are excluded from reward pools. Advanced styles are Living, Living Surfaces, Non-Euclidean, Impossible and Surreal; Classic and Antipodal styles are blue-tier rewards.
 
 When the entire tier is owned, it compensates 2/4/6/10/15 gems for green/blue/yellow/orange/red. The pool and compensation are visible in the room. No tier reroll occurs.
 
@@ -43,7 +43,7 @@ Classic is free for new players. Other existing worm characters cost 1,000 PP di
 
 `chestWallet` extends the authoritative version-1 player snapshot with gems, roll count, claimed progress and bounded receipt history. Older snapshots migrate without removing XP, PP or owned items. Explicit zero balances remain zero; invalid receipt contents are discarded.
 
-A roll synchronously samples browser cryptographic randomness, resolves the reward and saves cost, reward, XP and ownership in one snapshot before the animation starts. Storage or entropy failure aborts the transaction. A busy guard prevents duplicate clicks during a reveal. Closing the room releases the animation lock but never refunds or rolls again; reloading displays the persisted receipt without granting it twice.
+A roll synchronously samples browser cryptographic randomness and saves its cost, tier and exact offered item IDs before the animation starts. Cosmetic receipts use a pending `choice` reward; no ownership is granted until selection. The claim action validates the receipt ID and offered item, then saves ownership and the resolved receipt together. Storage or entropy failure leaves the prior state intact. Another roll is blocked while animating or awaiting a choice. Closing releases the animation lock but never refunds or rerolls; reloading restores the same pending options. Repeated or stale claims cannot grant a second reward. If an offered item was acquired elsewhere before claiming, choosing it grants the displayed tier compensation instead. Legacy receipts remain already-awarded and cannot be reclaimed. Common PP/XP and completed-tier gems are still granted in the initial roll transaction.
 
 White XP participates in normal XP level payouts; the resulting PP bonus is included in the same transaction. Chests are an XP source rather than a new gameplay achievement mode. Purchase actions resolve prices from the catalog, and wallet actions reject negative, non-finite or unsafe amounts.
 
@@ -71,8 +71,7 @@ badge. Reduced motion reveals immediately. Closing still retains the committed
 reward and releases the animation lock. Changing roll mode displays the right
 number of preview cubies while retaining the clearly labeled last reward.
 Rarity labels omit redundant color names, and selecting a tier immediately
-shows its reward pool. Prices, odds, wallet migrations, and reward rules are
-unchanged.
+shows its reward pool. Prices and tier odds are unchanged. Cosmetic reward choice is described above.
 
 Validation: full CI passed with 184 files / 2,275 tests, lint, production build,
 and bundle budgets. Targeted UI checks also cover explicit equip, browsing
@@ -80,3 +79,23 @@ without spending, ownership filtering/empty states, tile-family switching,
 mode switching after a roll, reduced motion, and interrupted reveals. Phone
 visual playtesting remains outstanding; DOM tests do not verify CSS/WebGL
 appearance.
+
+## Choose-one reward cards
+
+The completed cosmetic roll reveals up to three cards with real cube/worm
+previews or a trail swatch. Selecting a card claims that item; the other options
+are discarded. All cards are keyboard-accessible and mobile cards stack into
+compact rows. Pending choices survive closing, reloading and storage failures.
+The original roll mode is restored when returning to the room. No additional
+gems are charged to select a reward. Common and completed-tier payouts retain
+their automatic behavior.
+
+Targeted coverage includes distinct same-tier choices, depleted pools,
+claim-before-reveal rejection, invalid/stale claims, reload continuity, storage
+failure/retry, items acquired elsewhere, legacy receipts and one-time ownership.
+Phone visual playtesting remains outstanding.
+
+Choice-flow validation: full CI passed with 187 test files / 2,295 tests, lint,
+production build and bundle budgets (7 initial files, 2,024.3 KiB raw /
+498.9 KiB Brotli). The final empty-receipt claim guard also passed the targeted
+53-test economy suite and lint.
