@@ -11,22 +11,20 @@ import {
   unregisterTilePreview,
 } from '../../3d/TilePreviewRenderer.js';
 import {
-  UI_FONT, DISPLAY_FONT, HAND_FONT,
-  PAPER_SHEET_RAISED, UI_MOSS, UI_ACTION_SHADOW,
+  UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, UI_MOSS,
   PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_CREAM,
-  NIGHT_TEXT_MUTED,
- Z, TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
-import { isMobile } from '../../utils/device.js';
-import { wizardPaperBackground, WIZARD_FOOTER_BG, PENCIL_LEAD } from './WizardChrome.jsx';
+  PAPER_CARD_SHADOW, PAPER_BG_MUTED, NIGHT_SHEET, NIGHT_TEXT, NIGHT_TEXT_MUTED,
+  Z, TEXT_MICRO, TEXT_XS
+} from '../../utils/uiTheme.js';
+import { wizardPaperBackground } from './WizardChrome.jsx';
+import { useDialogBehavior } from '../ui/Panel.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import CubePreviewCanvas from '../../3d/CubePreviewCanvas.jsx';
-import { SpecimenPlate, resolveWizardColors, bgOptionFor } from './wizardSteps/index.jsx';
+import { resolveWizardColors } from './wizardSteps/index.jsx';
 import ChestRoom from '../../economy/ChestRoom.jsx';
 import './ParityStoreScreen.css';
 
 const ACCENT = UI_MOSS;
-const ACCENT_SHADOW = '#405832';
 const FONT = UI_FONT;
 const TOUCH = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' };
 
@@ -36,20 +34,15 @@ const SCHEMES = getSchemes();
 const TILES   = getTiles();
 
 const TABS = [
-  { id: 'characters', label: 'Worms', accent: '#bd4747', items: STORE_CHARACTERS },
-  { id: 'trails', label: 'Trails', accent: '#0D9488', items: getTrails() },
-  { id: 'skins',   label: 'Skins',    accent: '#2D7A3A', items: SKINS },
-  { id: 'hats',    label: 'Hats',     accent: '#6A2C91', items: HATS },
-  { id: 'schemes', label: 'Palettes', accent: '#1565C0', items: SCHEMES },
-  { id: 'tiles',   label: 'Tiles',    accent: '#C44B00', items: TILES },
+  { id: 'characters', label: 'Worms', accent: '#ed5353', items: STORE_CHARACTERS },
+  { id: 'trails', label: 'Trails', accent: '#ed8a39', items: getTrails() },
+  { id: 'skins',   label: 'Skins',    accent: '#ed8a39', items: SKINS },
+  { id: 'hats',    label: 'Hats',     accent: '#ed8a39', items: HATS },
+  { id: 'schemes', label: 'Palettes', accent: '#53b968', items: SCHEMES },
+  { id: 'tiles',   label: 'Tiles',    accent: '#469dea', items: TILES },
 ];
 
 const ALL_ITEMS = [...STORE_CHARACTERS, ...getTrails(), ...SKINS, ...HATS, ...SCHEMES, ...TILES];
-
-// The store is full-bleed, but the collection itself is a column: past ~1000px
-// the cards stop spreading so the masthead, tabs, grid, and footnote stay in one
-// readable measure instead of drifting to opposite edges of a desktop screen.
-const COLUMN = { width: '100%', maxWidth: '1000px', margin: '0 auto', boxSizing: 'border-box' };
 
 const TYPE_LABEL = {
   character: 'Worm Character',
@@ -62,6 +55,7 @@ const TYPE_LABEL = {
 
 // Per-type accent for item cards
 const typeAccent = (item) => {
+  if (item.type === 'character') return '#bd4747';
   if (item.type === 'skin')   return item.glow || '#2D7A3A';
   if (item.type === 'hat')    return '#6A2C91';
   if (item.type === 'trail')  return item.glow || item.body || '#0D9488';
@@ -208,6 +202,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
     <button type="button"
       className={`store-card store-card-enter${equipped ? ' is-equipped' : ''}`}
       onClick={onTap}
+      aria-pressed={focused}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px',
         padding: '9px 8px 8px',
@@ -282,27 +277,9 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
   );
 };
 
-// ── Tile category section ─────────────────────────────────────────────────────
-const TileSection = ({ label, items, renderItems }) => items.length === 0 ? null : (
-  <div style={{ marginBottom: '22px' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-      <span style={{
-        fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
-        color: PAPER_TEXT_MUTED, fontFamily: FONT, whiteSpace: 'nowrap',
-      }}>{label}</span>
-      <div style={{ flex: 1, height: '1px', background: PAPER_BORDER_SOFT }} />
-    </div>
-    {renderItems(items)}
-  </div>
-);
-
-// Store sections mirror the tile catalog exactly, so a style is purchasable the
-// moment it is added to a section and it sits under the same heading here as in
-// the settings panel. These used to be inferred from tileType and price, and any
-// tile matching none of those buckets silently vanished from the store — a
-// 'procedural' tile priced over 100 could never be bought.
 const TILE_BY_KEY = new Map(TILES.map(t => [t.tileKey, t]));
 const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
+  key: section.key,
   label: section.label,
   items: section.keys.map(k => TILE_BY_KEY.get(k)).filter(Boolean),
 }));
@@ -312,35 +289,17 @@ const TILE_ORDER = TILE_SECTIONS.flatMap(s => s.items);
 
 const TAB_ITEMS = { characters: STORE_CHARACTERS, trails: getTrails(), skins: SKINS, hats: HATS, schemes: SCHEMES, tiles: TILE_ORDER };
 
-// ── Viewport ──────────────────────────────────────────────────────────────────
-// The plate is sized from the screen rather than a fixed px so a phone spends
-// most of its height on the thing being sold.
-function useHeroSize() {
-  const measure = () => {
-    if (typeof window === 'undefined') return 200;
-    const { innerWidth: w, innerHeight: h } = window;
-    return isMobile
-      ? Math.round(Math.max(150, Math.min(h * 0.34, w * 0.66)))
-      : Math.round(Math.max(180, Math.min(h * 0.30, 280)));
-  };
-  const [size, setSize] = useState(measure);
-  useEffect(() => {
-    const onResize = () => setSize(measure());
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
-    };
-  }, []);
-  return size;
-}
-
 // ── Main screen ───────────────────────────────────────────────────────────────
 const StoreCollection = ({ onClose, onChests }) => {
   const gems = useGameStore(s => s.chestWallet.gems);
-  const [tab, setTab] = useState('skins');
-  const heroPx = useHeroSize();
+  const [tab, setTab] = useState('characters');
+  const [tileFamily, setTileFamily] = useState('classic');
+  const [ownedOnly, setOwnedOnly] = useState(false);
+  const heroPx = 144;
+  const dialogRef = useRef(null);
+  const selectorRef = useRef(null);
+  const resetScroll = () => { if (selectorRef.current) selectorRef.current.scrollTop = 0; };
+  const onKeyDown = useDialogBehavior(dialogRef, onClose);
 
   const { parityPoints, ownedItems, wormSkin, wormHat, wormTrail, wormCharacter, buyItem, setWormSkin, setWormHat, setWormTrail, setWormCharacter } =
     useGameStore(useShallow(s => ({
@@ -383,7 +342,8 @@ const StoreCollection = ({ onClose, onChests }) => {
     return false;
   }, [wormSkin, wormHat, wormTrail, wormCharacter, settings]);
 
-  const items = TAB_ITEMS[tab];
+  const categoryItems = tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).items : TAB_ITEMS[tab];
+  const items = useMemo(() => ownedOnly ? categoryItems.filter(i => ownedItems.includes(i.id)) : categoryItems, [categoryItems, ownedOnly, ownedItems]);
 
   // Opening a tab lands on what you are already wearing, so the plate starts by
   // showing your cube rather than an arbitrary first item.
@@ -395,7 +355,7 @@ const StoreCollection = ({ onClose, onChests }) => {
   }, [items, focusedId, isEquipped]);
 
   const focused = items[focusIndex];
-  const stepFocus = delta => setFocusedId(items[(focusIndex + delta + items.length) % items.length].id);
+  const stepFocus = delta => { if (items.length) setFocusedId(items[(focusIndex + delta + items.length) % items.length].id); };
 
   const equip = (item) => {
     if (item.type === 'character') setWormCharacter(item.characterId);
@@ -417,14 +377,8 @@ const StoreCollection = ({ onClose, onChests }) => {
     showToast(`${item.label} unlocked!`);
   };
 
-  // Tap to bring an item to the plate; tap the one already on the plate to act
-  // on it. Keeps the one-tap equip for something you are going straight back to
-  // without making every stray tap change your cube.
-  const tapCard = (item) => {
-    if (item.id !== focused?.id) { setFocusedId(item.id); return; }
-    if (ownedItems.includes(item.id)) { equip(item); showToast(`${item.label} applied`); }
-    else buy(item);
-  };
+  // Cards only select a preview. Spending or changing the loadout requires the explicit action.
+  const tapCard = item => { setFocusedId(item.id); resetScroll(); };
 
   // Collection progress — the whole catalog, and per-tab for the tab chips.
   const ownedCount = useMemo(
@@ -442,11 +396,7 @@ const StoreCollection = ({ onClose, onChests }) => {
   const cardTileColor = currentColors[1] || '#e53935';
 
   const renderItems = (list) => (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: `repeat(auto-fill, minmax(${tab === 'tiles' ? '88px' : '96px'}, 1fr))`,
-      gap: '9px',
-    }}>
+    <div className="catalogue-grid">
       {list.map((item, i) => (
         <ItemCard
           key={item.id} item={item} index={i}
@@ -502,261 +452,53 @@ const StoreCollection = ({ onClose, onChests }) => {
   const heroAccent = focused ? typeAccent(focused) : ACCENT;
   const canAfford = focused ? parityPoints >= focused.price : false;
 
-  const heroActionStyle = {
-    ...TOUCH, minHeight: 48, padding: '12px 26px', borderRadius: '12px',
-    background: UI_MOSS, border: 'none',
-    color: '#fff', fontSize: '14px', fontWeight: 800, letterSpacing: '0.04em',
-    cursor: 'pointer', fontFamily: FONT,
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    boxShadow: UI_ACTION_SHADOW,
-  };
-
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: Z.TOAST,
-      display: 'flex', flexDirection: 'column',
-      ...wizardPaperBackground,
-      fontFamily: FONT,
-      pointerEvents: 'auto',
-    }}>
-
-      {/* Header — compact on a phone, where every row it gives up goes to the plate */}
-      <div style={{
-        ...COLUMN,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-        padding: isMobile ? 'calc(10px + env(safe-area-inset-top)) 16px 0' : '18px 20px 0',
-        flexShrink: 0,
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: ACCENT, borderRadius: '6px', padding: '4px 11px',
-            marginBottom: isMobile ? '6px' : '9px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
-          }}>
-            <PPCoin size={12} color={UI_CREAM} ink={ACCENT} />
-            <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#fff' }}>Parity Store</span>
-          </div>
-          <div style={{
-            fontFamily: DISPLAY_FONT,
-            fontSize: isMobile ? '17px' : 'clamp(19px, 5.4vw, 26px)',
-            color: PAPER_TEXT, letterSpacing: '0.01em', lineHeight: 1,
-            textShadow: '0 2px 0 rgba(255,255,255,0.7)',
-          }}>YOUR COLLECTION</div>
-
-          {/* Collection progress */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginTop: isMobile ? '6px' : '9px', maxWidth: '260px' }}>
-            <div style={{
-              flex: 1, height: '5px', borderRadius: '999px',
-              background: 'rgba(255,255,255,0.66)',
-              border: `1px solid ${PAPER_BORDER_SOFT}`, overflow: 'hidden',
-            }}>
-              <div style={{
-                width: `${collectedPct}%`, height: '100%',
-                background: `linear-gradient(90deg, ${ACCENT}, ${activeTabAccent})`,
-                borderRadius: '999px', transition: 'width 0.4s cubic-bezier(0.22,1,0.36,1), background 0.3s ease',
-              }} />
+    <div ref={dialogRef} onKeyDown={onKeyDown} className="store-catalogue" role="dialog" aria-modal="true" aria-labelledby="catalogue-title"
+      style={{ ...wizardPaperBackground, zIndex: Z.TOAST, fontFamily: FONT,
+        '--paper-ink': PAPER_TEXT, '--paper-muted': PAPER_TEXT_MUTED, '--paper-line': PAPER_BORDER_SOFT,
+        '--paper-soft': PAPER_BG_MUTED, '--moss': UI_MOSS, '--display-font': DISPLAY_FONT,
+        '--night': NIGHT_SHEET, '--night-ink': NIGHT_TEXT, '--night-muted': NIGHT_TEXT_MUTED, '--category': activeTabAccent }}>
+      <header className="catalogue-header">
+        <div><span className="catalogue-kicker">THE PARITY STORE</span><h1 id="catalogue-title">COLLECTION</h1>
+          <div className="catalogue-progress"><span style={{ width: `${collectedPct}%` }} /></div>
+          <small>{ownedCount}/{ALL_ITEMS.length} collected</small>
+        </div>
+        <div className="catalogue-wallet"><strong><PPCoin size={15} /> {parityPoints.toLocaleString()} PP</strong><span>◆ {gems.toLocaleString()} gems</span></div>
+        <button className="catalogue-close" onClick={onClose} aria-label="Close store">✕</button>
+      </header>
+      <div className="catalogue-layout">
+        <nav className="catalogue-sidebar" aria-label="Store categories">
+          <span className="catalogue-kicker">CATALOGUE</span>
+          {TABS.map(t => <button key={t.id} className="catalogue-category" aria-pressed={tab === t.id}
+            aria-controls="catalogue-selector" style={{ '--category': t.accent }}
+            onClick={() => { setTab(t.id); setFocusedId(null); resetScroll(); }}>
+            <i aria-hidden="true" /><span><strong>{t.label}</strong><small>{tabOwned[t.id]} / {t.items.length} owned</small></span><b aria-hidden="true">›</b>
+          </button>)}
+          <button className="catalogue-chests" onClick={onChests}><span aria-hidden="true">◇</span><strong>Cubie Chests</strong><small>Roll & discover →</small></button>
+        </nav>
+        <section ref={selectorRef} className="catalogue-selector" id="catalogue-selector" aria-label={`${activeTab.label} selector`}>
+          <div className="catalogue-section-heading"><div><span className="catalogue-kicker">MAKE IT YOURS</span><h2>{activeTab.label}</h2></div>
+            <button className="catalogue-owned" aria-pressed={ownedOnly} onClick={() => setOwnedOnly(v => !v)}>Owned only</button></div>
+          {tab === 'tiles' && <nav className="catalogue-families" aria-label="Tile families">{TILE_SECTIONS.map(section =>
+            <button key={section.key} aria-pressed={tileFamily === section.key} onClick={() => { setTileFamily(section.key); setFocusedId(null); resetScroll(); }}>{section.label}<small>{section.items.length}</small></button>
+          )}</nav>}
+          {focused ? <div className="catalogue-preview" style={{ '--item-accent': heroAccent }}>
+            <div className="catalogue-preview-art">{heroArt()}</div>
+            <div className="catalogue-preview-info"><span className="catalogue-kicker">{TYPE_LABEL[focused.type]} · {focusIndex + 1}/{items.length}</span>
+              <h3>{focused.label}</h3><p>{heroEquipped ? 'In your loadout' : heroOwned ? 'Ready to equip' : 'Add to your collection'}</p>
+              <button className="catalogue-action" disabled={heroEquipped || (!heroOwned && !canAfford)} onClick={() => {
+                if (heroOwned) { equip(focused); showToast(`${focused.label} applied`); } else buy(focused);
+              }}>{heroEquipped ? '✓ Equipped' : heroOwned ? 'Equip' : `Unlock · ${focused.price} PP`}</button>
+              {!heroOwned && !canAfford && <small>{focused.price - parityPoints} more PP needed</small>}
             </div>
-            <span style={{ fontSize: '10px', fontWeight: 700, color: PAPER_TEXT_MUTED, whiteSpace: 'nowrap' }}>
-              {ownedCount}/{ALL_ITEMS.length} collected
-            </span>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0 }}>
-          {/* PP balance */}
-          <div style={{
-            padding: isMobile ? '6px 11px' : '7px 13px', borderRadius: '12px',
-            background: 'rgba(255,255,255,0.82)', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
-            boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`,
-            textAlign: 'right',
-          }}>
-            <div style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>Balance</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-              <PPCoin size={14} />
-              <span style={{ fontSize: '19px', fontWeight: 900, color: ACCENT, letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {parityPoints}
-              </span>
-              <span style={{ fontSize: '10px', fontWeight: 800, color: PAPER_TEXT_FAINT }}>PP</span>
-            </div>
-          </div>
-
-          {/* Close */}
-          <button
-            className="store-icon-btn"
-            onClick={onClose}
-            aria-label="Close store"
-            style={{
-              ...TOUCH, width: 48, height: 48, borderRadius: '12px',
-              background: 'rgba(255,255,255,0.82)', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
-              color: PAPER_TEXT_MUTED, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`, fontFamily: FONT,
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+            <div className="catalogue-preview-nav"><button aria-label="Previous item" onClick={() => stepFocus(-1)}>‹</button><button aria-label="Next item" onClick={() => stepFocus(1)}>›</button></div>
+          </div> : <div className="catalogue-empty"><h3>Your collection starts here</h3><p>No owned items in this category yet.</p><button onClick={() => setOwnedOnly(false)}>Browse all items</button></div>}
+          <div className="catalogue-grid-heading"><span>{tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).label : 'Explore the collection'}</span><small>{items.length} items</small></div>
+          {renderItems(items)}
+        </section>
       </div>
-
-      <div style={{ ...COLUMN, padding: '12px 16px 0' }}><button className="store-tab" onClick={onChests} style={{ minHeight: 48, width: '100%', font: 'inherit', fontWeight: 800, borderRadius: 12, border: `1px solid ${ACCENT}`, color: ACCENT, background: '#e3efcf', cursor: 'pointer' }}>Cubie Chests · ◆ {gems} gems · Roll & earn rewards →</button></div>
-
-      {/* Tabs */}
-      <div style={{
-        ...COLUMN, display: 'flex', gap: '7px',
-        padding: isMobile ? '10px 16px 2px' : '16px 20px 2px',
-        flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none',
-      }}>
-        {TABS.map(t => {
-          const active = tab === t.id;
-          const total = t.items.length;
-          return (
-            <button
-              key={t.id}
-              aria-pressed={active}
-              className={`store-tab${active ? ' is-active' : ''}`}
-              onClick={() => { setTab(t.id); setFocusedId(null); }}
-              style={{
-                ...TOUCH, minHeight: 48,
-                display: 'flex', alignItems: 'center', gap: '7px',
-                padding: '8px 14px', borderRadius: '999px', cursor: 'pointer',
-                background: active ? UI_MOSS : 'rgba(255,255,255,0.72)',
-                border: active ? `2px solid ${UI_MOSS}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                color: active ? '#fff' : PAPER_TEXT_MUTED,
-                fontSize: '12px', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
-                fontFamily: FONT, whiteSpace: 'nowrap',
-                boxShadow: active ? UI_ACTION_SHADOW : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-              }}
-            >
-              {t.label}
-              <span style={{
-                fontSize: TEXT_XS, fontWeight: 800, letterSpacing: '0.02em',
-                padding: '2px 6px', borderRadius: '999px',
-                background: active ? 'rgba(255,255,255,0.24)' : PAPER_BG_MUTED,
-                color: active ? '#fff' : PAPER_TEXT_FAINT,
-              }}>{tabOwned[t.id]}/{total}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Content — the plate rides the top of the scroller, so whatever you scroll
-          down to is still landing on something you can see. */}
-      <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent` }}>
-        <div style={{ ...COLUMN, padding: isMobile ? '10px 16px 18px' : '16px 20px 18px' }}>
-          {focused && (
-            <SpecimenPlate
-              sticky
-              caption={TYPE_LABEL[focused.type]}
-              index={focusIndex + 1}
-              total={items.length}
-              title={focused.label}
-              glow={heroAccent}
-              // Your chosen scene follows you in here too, so a skin is judged
-              // against the environment you actually play it in.
-              backdrop={bgOptionFor(settings?.backgroundTheme)}
-              onPrev={() => stepFocus(-1)}
-              onNext={() => stepFocus(1)}
-              art={heroArt()}
-              hint={focused.type === 'scheme' || focused.type === 'tile' ? 'drag the cube to turn it' : null}
-              subtitle={
-                heroEquipped ? (
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    background: `${heroAccent}28`, border: `1px solid ${heroAccent}55`,
-                    color: heroAccent, fontSize: TEXT_MICRO, fontWeight: 800,
-                    letterSpacing: '0.14em', textTransform: 'uppercase',
-                    padding: '3px 11px', borderRadius: '999px',
-                  }}>
-                    <CheckIcon size={9} color={heroAccent} /> Equipped
-                  </div>
-                ) : null
-              }
-            >
-              {/* Action — the plate is the purchase counter now, so nothing has to
-                  open on top of the thing you are trying to look at. */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 1 }}>
-                {heroOwned ? (
-                  !heroEquipped && (
-                    <button style={heroActionStyle} onClick={() => { equip(focused); showToast(`${focused.label} applied`); }}>
-                      Equip
-                    </button>
-                  )
-                ) : canAfford ? (
-                  <button style={heroActionStyle} onClick={() => buy(focused)}>
-                    <PPCoin size={15} color={UI_CREAM} ink={heroAccent} /> Unlock for {focused.price}
-                  </button>
-                ) : (
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '7px',
-                    padding: '11px 20px', borderRadius: '12px',
-                    background: 'rgba(255,245,220,0.08)', border: '1.5px dashed rgba(255,245,220,0.28)',
-                    color: NIGHT_TEXT_MUTED, fontSize: '12px', fontWeight: 700,
-                  }}>
-                    <LockIcon size={12} color={NIGHT_TEXT_MUTED} />
-                    {focused.price - parityPoints} more PP to unlock
-                  </div>
-                )}
-                {!heroOwned && (
-                  <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
-                    You have {parityPoints} PP
-                  </span>
-                )}
-              </div>
-            </SpecimenPlate>
-          )}
-
-          {tab === 'tiles'
-            ? TILE_SECTIONS.map(section => (
-              <TileSection key={section.label} label={section.label} items={section.items} renderItems={renderItems} />
-            ))
-            : renderItems(items)}
-        </div>
-      </div>
-
-      {/* Footer — Mobi's note on where PP comes from, in the same pencil hand the
-          setup wizards use. */}
-      <div style={{
-        padding: isMobile ? '8px 16px calc(10px + env(safe-area-inset-bottom))' : '11px 20px 16px',
-        borderTop: `1px solid ${PAPER_BORDER_SOFT}`, flexShrink: 0,
-        background: WIZARD_FOOTER_BG,
-      }}>
-        <div style={{
-          ...COLUMN,
-          display: 'flex', gap: '11px', alignItems: 'center',
-          padding: '9px 13px', borderRadius: '10px',
-          borderLeft: `3px solid ${ACCENT}`,
-          background: 'rgba(255,255,255,0.5)',
-          boxShadow: 'inset 0 0 0 1px rgba(91,72,45,0.08)',
-        }}>
-          <span style={{
-            fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase',
-            color: ACCENT, opacity: 0.85, flexShrink: 0,
-          }}>Earning PP</span>
-          <span style={{ fontFamily: HAND_FONT, fontSize: '17px', lineHeight: 1.25, color: PENCIL_LEAD }}>
-            Collect orbs in Worm mode and win Chaos bets.
-          </span>
-        </div>
-      </div>
-
-      {/* Toast */}
-      {toast && (
-        <div className="store-toast" style={{
-          position: 'fixed', bottom: '92px', left: '50%',
-          display: 'flex', alignItems: 'center', gap: '8px',
-          background: toast.ok ? activeTabAccent : '#c44b00',
-          border: 'none',
-          borderRadius: '999px', padding: '11px 20px',
-          color: '#fff',
-          fontSize: '13px', fontWeight: 700, fontFamily: FONT,
-          boxShadow: '0 6px 22px rgba(0,0,0,0.24)',
-          pointerEvents: 'none', zIndex: 900,
-        }}>
-          {toast.ok ? <CheckIcon size={11} /> : <LockIcon size={12} color="#fff" />}
-          {toast.msg}
-        </div>
-      )}
+      <footer className="catalogue-footer">Collect orbs in WORM and win Chaos bets to earn PP.</footer>
+      {toast && <div className="store-toast catalogue-toast" role="status" style={{ background: toast.ok ? ACCENT : '#a34325' }}>{toast.msg}</div>}
     </div>
   );
 };
