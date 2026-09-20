@@ -145,6 +145,11 @@ export function WormFace({ worm, size }) {
             rocketOrbitInto(_faceHeadPos, size, lift);
         }
 
+        const traversalPose = worm.traversalPose?.current;
+        if (traversalPose) {
+            normal = _rocketFaceNormal;
+            traversalPose.sample(0, _faceHeadPos, normal, _faceForward);
+        }
         const state = useGameStore.getState();
         const dt = state.wormPaused || !state.wormAlive ? 0 : Math.min(delta, 0.05);
         faceTime.current += dt;
@@ -175,6 +180,10 @@ export function WormFace({ worm, size }) {
                     _mobiRideAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
                     _faceForward.applyAxisAngle(_mobiRideAxis, angle);
                 }
+            }
+            if (traversalPose) {
+                normal = _rocketFaceNormal;
+                mobi.group.position.copy(_faceHeadPos);
             }
             orientMobi(mobi.group, _faceForward, normal);
             const faces = worm.orbPickupFaceIdsRef.current;

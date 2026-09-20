@@ -224,6 +224,8 @@ export function WormBody({ worm, size }) {
         // be added again here (face is already placed at headInterpPos + 0.09, consistent).
         const _bodyTransit = worm.phase.current === 'windup' || worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
         bodyPathHeadInto(_bodyHeadPos, worm, _bodyTransit);
+        const traversalPose = worm.traversalPose?.current;
+        if (traversalPose) traversalPose.sample(0, _bodyHeadPos, _bodyNormal, _bodySegForward);
         _headPathPoint.transit = _bodyTransit;
         // Only the in-tunnel shots put the lens on the body's own line — the surface
         // chase camera sits well above and behind it, so nothing there needs culling
@@ -511,10 +513,15 @@ export function WormBody({ worm, size }) {
                     _bodySegForward.set(0, 0, 0);
                 }
 
+                if (traversalPose) {
+                    traversalPose.sample(i * BODY_BALL_SPACING, _bodyClonePos, _bodyCloneNormal, _bodySegForward);
+                    swimWeight = 0;
+                    _inchArch = 0;
+                }
                 const stroke = tunnelSwimInto(tunnelStroke.current, i, tLen, time, swimWeight, reducedPickupMotion);
                 if (swimWeight > 0) offsetTunnelSwimInto(_bodyClonePos, _bodySegForward, _bodyCloneNormal, stroke);
 
-                if (!segmentTransit && foundPosition && orbitT === 0) {
+                if (!traversalPose && !segmentTransit && foundPosition && orbitT === 0) {
                     clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : isMobi ? 0.15 : 0.10, surface);
                 }
                 if (_isBook && !segmentTransit) {

@@ -1,3 +1,4 @@
+import { AUDIT_FILE, developmentAuditFailures } from './development-module-audit.mjs';
 // Bundle budgets.
 //
 // Per-file ceilings alone cannot see a regression that arrives as five new
@@ -78,6 +79,11 @@ if (!existsSync(MANIFEST_PATH)) {
 }
 
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
+const auditPath = join(DIST_DIR, AUDIT_FILE);
+let developmentAudit;
+try { developmentAudit = JSON.parse(readFileSync(auditPath, 'utf8')); } catch { /* missing and malformed audits fail closed */ }
+for (const message of developmentAuditFailures(developmentAudit)) fail(message);
+
 
 if (entryKeys(manifest).length === 0) {
   console.error('Bundle size check failed: manifest declares no entry chunk.');

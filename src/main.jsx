@@ -113,6 +113,9 @@ window.addEventListener('vite:preloadError', async () => {
 // App survived 30s — chunks are consistent; allow future deploys to reload again.
 setTimeout(() => sessionStorage.removeItem(CHUNK_RELOAD_KEY), 30000);
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <App />,
-)
+const root = ReactDOM.createRoot(document.getElementById('root'))
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('gapLab')) {
+  import('./worm/dev/GapLab.jsx').then(({ default: GapLab }) => root.render(React.createElement(GapLab)))
+} else {
+  root.render(<App />)
+}
