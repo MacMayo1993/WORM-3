@@ -2,17 +2,17 @@ import { MODE_THEMES } from '../../utils/modeThemes.js';
 import React, { useState, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useIsMobile } from '../../hooks/index.js';
-import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
+import { WORM_SKINS } from '../../worm/wormCosmeticsData.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
-import { UI_CREAM, TEXT_XS } from '../../utils/uiTheme.js';
-import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_SURFACE, WIZ_CARD_SHADOW, WIZ_SURFACE_RAISED, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from './WizardChrome.jsx';
-import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
+import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_SURFACE_RAISED, WIZ_TEXT } from './WizardChrome.jsx';
+import WormProfile from './WormProfile.jsx';
+import { wormMenuFeedback } from './wormMenuFeedback.js';
 import { WORM_DIFFICULTIES } from '../../worm/wormDifficulty.js';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, SizeStep, styleCategory,
-  SpecimenPlate, LockPip, PickerHeading, SIZE_TIERS,
-  sceneLabel, paletteLabel, sizeLabel, bgOptionFor
+  SIZE_TIERS,
+  sceneLabel, paletteLabel, sizeLabel
 } from './wizardSteps/index.jsx';
 
 const ACCENT = MODE_THEMES.worm.accent;
@@ -37,166 +37,14 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       wormEnemiesEnabled: initialSettings?.wormEnemiesEnabled !== false
     }
   });
-  const { settings, ownedItems } = cos;
+  const { settings } = cos;
   const difficulty = WORM_DIFFICULTIES.find(option => option.settings.wormSpeed === settings.wormSpeed) || WORM_DIFFICULTIES[1];
 
   const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
-  const wormHatId = useGameStore(s => s.wormHat ?? 'none');
   const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
-  const setWormSkin = useGameStore(s => s.setWormSkin);
-  const setWormHat = useGameStore(s => s.setWormHat);
-  const setWormCharacter = useGameStore(s => s.setWormCharacter);
 
   const activeSkin = WORM_SKINS.find(s => s.id === wormSkinId) ?? WORM_SKINS[0];
   const activeCharacter = WORM_CHARACTERS.find(c => c.id === wormCharacterId) ?? WORM_CHARACTERS[0];
-
-  // ── Step 0: Character ───────────────────────────────────────────────────────
-
-  const renderCharacter = slot => {
-    const chipBase = {
-      border: 'none', cursor: 'pointer', borderRadius: '10px',
-      transition: 'all 0.18s ease', fontFamily: 'inherit'
-    };
-
-    const lockedSkins = WORM_SKINS.filter(s => !ownedItems.includes(`skin_${s.id}`)).length;
-    const lockedHats = WORM_HATS.filter(h => !ownedItems.includes(`hat_${h.id}`)).length;
-
-    const charIndex = WORM_CHARACTERS.findIndex(c => c.id === wormCharacterId);
-    const available = WORM_CHARACTERS.filter(c => ownedItems.includes(`character_${c.id}`));
-    const ownedIndex = Math.max(0, available.findIndex(c => c.id === wormCharacterId));
-    const stepCharacter = dir => { if (available.length) setWormCharacter(available[(ownedIndex + dir + available.length) % available.length].id); };
-    const prevChar = () => stepCharacter(-1);
-    const nextChar = () => stepCharacter(1);
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {/* ── Character plate ── */}
-        {slot !== 'body' && (
-        <SpecimenPlate
-          flush={isMobile}
-          caption="Character"
-          wideArt
-          backdrop={bgOptionFor(settings.backgroundTheme)}
-          index={charIndex + 1}
-          total={WORM_CHARACTERS.length}
-          title={activeCharacter.label}
-          glow={activeSkin.glow}
-          onPrev={prevChar}
-          onNext={nextChar}
-          art={
-            <div style={{ width: '100%', maxWidth: 360, aspectRatio: '4 / 3', maxHeight: '30svh',
-              position: 'relative', overflow: 'hidden' }}>
-              <WormPreviewCanvas
-                characterId={wormCharacterId}
-                skinId={wormSkinId}
-                hatId={wormHatId}
-                size={360}
-                maxPixelRatio={2}
-                maxRenderPixels={640}
-                framing="character"
-                direct
-                style={{ width: '100%', height: 'auto', aspectRatio: '1',
-                  position: 'absolute', top: '50%', transform: 'translateY(-50%)' }}
-                animated
-              />
-            </div>
-          }
-        >
-          {/* Page dots: the marker stays small, the touch area does not. */}
-          <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', zIndex: 1 }}>
-            {WORM_CHARACTERS.map(c => (
-              <button key={c.id} type="button" onClick={() => setWormCharacter(c.id)} disabled={!ownedItems.includes(`character_${c.id}`)} title={ownedItems.includes(`character_${c.id}`) ? c.label : `${c.label} · Unlock in the Parity Store or a mythic chest`} aria-label={ownedItems.includes(`character_${c.id}`) ? c.label : `${c.label} · Locked`} aria-pressed={c.id === wormCharacterId} style={{
-                width: 44, height: 44, borderRadius: 12, display: 'grid', placeItems: 'center',
-                background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
-                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
-              }}>
-                <span aria-hidden="true" style={{ width: c.id === wormCharacterId ? 22 : 7, height: 7, borderRadius: 4,
-                  background: c.id === wormCharacterId ? UI_CREAM : 'rgba(255,245,220,0.28)' }} />
-              </button>
-            ))}
-          </div>
-          {available.length < WORM_CHARACTERS.length && <p style={{ fontSize: 12, textAlign: 'center' }}>More worms in the Store.</p>}
-        </SpecimenPlate>
-        )}
-
-        {slot !== 'hero' && (
-        <>
-        {/* ── Skin picker ── */}
-        <div>
-          <PickerHeading label="Skin" locked={lockedSkins} />
-          <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {WORM_SKINS.map(skin => {
-              const owned = ownedItems.includes(`skin_${skin.id}`);
-              const selected = skin.id === wormSkinId;
-              return (
-                <button key={skin.id} onClick={() => owned && setWormSkin(skin.id)} style={{
-                  ...chipBase, flexShrink: 0,
-                  padding: '7px 9px 6px',
-                  background: selected ? `${activeSkin.body}22` : WIZ_SURFACE,
-                  border: selected ? `2px solid ${skin.body}` : `2px solid ${WIZ_BORDER_SOFT}`,
-                  boxShadow: selected ? `0 3px 0 ${skin.body}66, 0 5px 14px ${skin.glow}3d` : `0 2px 0 ${WIZ_CARD_SHADOW}`,
-                  transform: selected ? 'translateY(-1px)' : 'none',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                  opacity: owned ? 1 : 0.5,
-                  cursor: owned ? 'pointer' : 'not-allowed',
-                  position: 'relative',
-                  minWidth: '60px'
-                }}>
-                  {/* Locked skins keep their colour, the same as in the store —
-                      a grey worm tells you nothing about what you'd be buying. */}
-                  <div style={{ filter: owned ? 'none' : 'saturate(0.5)' }}>
-                    <WormPreviewCanvas characterId={wormCharacterId} skinId={skin.id} size={34} />
-                  </div>
-                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, color: selected ? WIZ_TEXT : WIZ_TEXT_FAINT, letterSpacing: '0.05em' }}>
-                    {skin.label}
-                  </span>
-                  {!owned && <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Hat picker ── */}
-        <div>
-          <PickerHeading label="Hat" locked={lockedHats} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(66px, 1fr))', gap: '7px' }}>
-            {WORM_HATS.map(hat => {
-              const owned = ownedItems.includes(`hat_${hat.id}`);
-              const selected = hat.id === wormHatId;
-              return (
-                <button key={hat.id} onClick={() => owned && setWormHat(hat.id)} style={{
-                  ...chipBase,
-                  padding: '8px 6px 6px',
-                  background: selected ? `${ACCENT}2e` : WIZ_SURFACE,
-                  border: selected ? `2px solid ${ACCENT}` : `2px solid ${WIZ_BORDER_SOFT}`,
-                  boxShadow: selected ? 'inset 0 2px 4px rgba(83,72,56,0.12)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
-                  transform: selected ? 'translateY(1px)' : 'none',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                  opacity: owned ? 1 : 0.5,
-                  cursor: owned ? 'pointer' : 'not-allowed',
-                  position: 'relative'
-                }}>
-                  <WormPreviewCanvas
-                    characterId={wormCharacterId} skinId={wormSkinId} hatId={hat.id}
-                    size={34} framing="head"
-                    style={{ filter: owned ? 'none' : 'saturate(0.5)' }}
-                  />
-                  <span style={{ fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.05em', color: selected ? ACCENT : WIZ_TEXT_MUTED, lineHeight: 1.2, textAlign: 'center' }}>
-                    {hat.label}
-                  </span>
-                  {!owned && <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        </>
-        )}
-      </div>
-    );
-  };
 
   const renderPlay = () => (
     <div style={{ display: 'grid', gap: 18 }}>
@@ -239,11 +87,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       key: 'character',
       icon: 'character',
       label: 'Character',
-      title: 'Choose your worm',
+      title: 'Your worm profile',
       primaryLabel: 'Continue',
       summary: `${activeCharacter.label} · ${activeSkin.label}`,
-      hero: renderCharacter('hero'),
-      content: renderCharacter('body')
+      content: <WormProfile defaultExpanded />
     },
     {
       key: 'scene',
@@ -279,15 +126,17 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
 
   const handleNext = () => {
+    wormMenuFeedback();
     if (step < categories.length - 1) setStep(step + 1);
     else onComplete({
       ...settings,
+      wormColor: activeSkin.body,
       cubeSize: settings.wormCombatMode ? 5 : cos.cubeSize,
       wormSpeed: settings.wormCombatMode ? 1.25 : settings.wormSpeed,
       megaMode: !settings.wormCombatMode && cos.cubeSize === MEGA_CUBE_SIZE
     });
   };
-  const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
+  const handleBack = () => { wormMenuFeedback(); if (step > 0) setStep(step - 1); else onCancel(); };
 
   return (
     <WizardShell
@@ -296,7 +145,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       accent={ACCENT}
       categories={categories}
       active={step}
-      onSelect={setStep}
+      onSelect={value => { wormMenuFeedback(); setStep(value); }}
       onBack={handleBack}
       onPrimary={handleNext}
       finishLabel="Start Playing"

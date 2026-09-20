@@ -1,0 +1,37 @@
+.worm-profile { flex-shrink:0; min-width:0; border:1px solid var(--wiz-border); border-radius:16px; background:var(--wiz-surface); color:var(--wiz-text); overflow:hidden; }
+.worm-profile-summary { display:grid; grid-template-columns:112px minmax(0,1fr) auto; gap:14px; align-items:center; padding:14px; background:radial-gradient(ellipse at 0 50%,color-mix(in srgb,var(--profile-color) 10%,transparent),transparent 65%); }
+.worm-profile-preview { min-width:0; border-radius:14px; background:var(--wiz-base); border-bottom:3px solid var(--profile-color); overflow:hidden; }
+.worm-profile-identity { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.worm-profile-identity h2 { margin:0; font-size:10px; letter-spacing:.14em; color:var(--mode-accent); }
+.worm-profile-identity>strong { font-size:clamp(18px,4vw,24px); line-height:1.15; }
+.worm-profile-identity>span { font-size:12px; line-height:1.4; }
+.worm-profile-identity>small { font-size:10px; color:var(--wiz-text-muted); }
+.worm-profile button { font:inherit; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; transition:transform .1s,box-shadow .1s,background .1s; }
+.worm-profile-edit { min-height:44px; border:1px solid var(--wiz-border); border-radius:10px; padding:10px 12px; background:var(--wiz-surface-raised); color:var(--wiz-text); font-size:12px!important; font-weight:750!important; box-shadow:0 4px 0 var(--wiz-card-shadow); }
+.worm-profile-edit span { margin-left:5px; color:var(--mode-accent); }
+.worm-profile-editor { border-top:1px solid var(--wiz-border-soft); padding:14px; }
+.worm-profile-categories { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:16px; }
+.worm-profile .worm-profile-categories button { min-height:44px; padding:10px 6px; border:1px solid var(--wiz-border); border-radius:10px; background:var(--wiz-base); color:var(--wiz-text); font-size:13px; font-weight:700; box-shadow:0 3px 0 var(--wiz-card-shadow); }
+.worm-profile-categories button[aria-pressed=true] { background:var(--mode-accent); color:var(--wiz-check-ink); border-color:var(--mode-accent); }
+.worm-profile-options { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:9px; }
+.worm-profile-option { display:flex; flex-direction:column; align-items:center; justify-content:space-between; gap:5px; min-width:0; padding:10px 6px; border:1px solid var(--wiz-border); border-radius:12px; color:var(--wiz-text); background:var(--wiz-surface-raised); box-shadow:0 4px 0 var(--wiz-card-shadow); }
+.worm-profile-option[aria-pressed=true] { border-color:var(--mode-accent); background:color-mix(in srgb,var(--mode-accent) 12%,var(--wiz-base)); }
+.worm-profile-option:disabled { opacity:.5; cursor:default; box-shadow:none; }
+.worm-profile-option-art { height:60px; display:grid; place-items:center; }
+.worm-profile-option strong { font-size:12px; line-height:1.3; overflow-wrap:anywhere; }
+.worm-profile-option small { font-size:10px; color:var(--wiz-text-muted); }
+.worm-profile-option[aria-pressed=true] small { color:var(--mode-accent); }
+.worm-profile-swatch { width:38px; height:38px; border:5px solid; border-radius:50%; box-shadow:inset 0 3px 0 #ffffff50,0 4px 0 #0004; }
+.worm-profile-ability,.worm-profile-note { color:var(--wiz-text-muted); font-size:12px; line-height:1.5; margin:14px 0 0; }
+.worm-profile-ability strong { color:var(--wiz-text); }
+.worm-profile-note { font-size:11px; }
+.worm-profile button:enabled:active { transform:translateY(3px); box-shadow:0 1px 0 var(--wiz-card-shadow),inset 0 2px 4px #0003; }
+.worm-profile button:focus-visible { outline:3px solid var(--mode-accent); outline-offset:2px; }
+@media(hover:hover) { .worm-profile button:enabled:hover { border-color:var(--mode-accent); } }
+@media(max-width:600px) {
+ .worm-profile-summary { grid-template-columns:82px minmax(0,1fr) auto; gap:10px; padding:12px; }
+ .worm-profile-edit { padding:10px 8px; }.worm-profile-edit span { display:none; }
+ .worm-profile-editor { padding:12px; }
+}
+@media(max-width:360px) { .worm-profile-summary { grid-template-columns:64px minmax(0,1fr); }.worm-profile-edit { grid-column:1/-1; } }
+@media(prefers-reduced-motion:reduce) { .worm-profile button { transition:none; }.worm-profile button:enabled:active { transform:none; } }
