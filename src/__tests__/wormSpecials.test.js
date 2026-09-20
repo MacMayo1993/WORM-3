@@ -1076,20 +1076,22 @@ describe('rocket launch, refresh and touchdown continuity', () => {
     run(sim, ctx, ROCKET_DURATION / 2 - 0.1);
     expect(sim.rocketFlight).toBeCloseTo(1, 5);
   });
-  it('climbs to one high apex and descends throughout the second half', () => {
+  it('launches quickly, sustains cruise, and eases down only before touchdown', () => {
     const sim = makeSim(), ctx = makeCtx();
     startRocket(sim, ctx);
-    const heights = [0];
-    for (let i = 0; i < 4; i++) {
-      run(sim, ctx, ROCKET_DURATION / 4);
-      heights.push(rocketFlightLift(sim.rocketActive, sim.rocketT, sim.rocketFlight));
-    }
-    expect(heights[1]).toBeGreaterThan(0);
-    expect(heights[2]).toBeGreaterThan(3);
-    expect(heights[2]).toBeGreaterThan(heights[1]);
-    expect(heights[3]).toBeLessThan(heights[2]);
-    expect(heights[3]).toBeGreaterThan(0);
-    expect(heights[4]).toBeCloseTo(0, 6);
+    run(sim, ctx, 0.15);
+    const rising = rocketFlightLift(true, sim.rocketT, sim.rocketFlight);
+    expect(rising).toBeGreaterThan(0);
+    expect(rising).toBeLessThan(ROCKET_FLIGHT_HEIGHT);
+    run(sim, ctx, 0.35);
+    expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeCloseTo(ROCKET_FLIGHT_HEIGHT);
+    run(sim, ctx, 1.8);
+    expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeCloseTo(ROCKET_FLIGHT_HEIGHT);
+    run(sim, ctx, 0.45);
+    expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeLessThan(ROCKET_FLIGHT_HEIGHT);
+    expect(sim.rocketActive).toBe(true);
+    run(sim, ctx, 0.3);
+    expect(rocketFlightLift(sim.rocketActive, sim.rocketT, sim.rocketFlight)).toBe(0);
   });
   it('refreshes fuel without resetting altitude, including during descent', () => {
     const sim = makeSim(), ctx = makeCtx();

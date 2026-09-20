@@ -22,6 +22,10 @@ const MAX_PUBLISHED = 96;
 export const wormSegments = {
   /** Segment world positions, packed xyz. Only the first `count * 3` are valid. */
   positions: new Float32Array(MAX_PUBLISHED * 3),
+  // Uncapped endpoints let rocket exhaust track the actual last rendered bead.
+  tail: new Float32Array(3),
+  beforeTail: new Float32Array(3),
+  tailCount: 0,
   /** How many segments are live this frame. */
   count: 0,
   /** Frame-ish counter, bumped on every publish — lets a reader spot a stale feed. */
@@ -32,6 +36,7 @@ export const wormSegments = {
 /** Start a frame's publication. Called by WormBody before it writes any segment. */
 export function beginWormSegments() {
   wormSegments.count = 0;
+  wormSegments.tailCount = 0;
 }
 
 /**
@@ -39,6 +44,9 @@ export function beginWormSegments() {
  * mega-worm has hundreds of segments and an effect does not need them all.
  */
 export function pushWormSegment(x, y, z) {
+  wormSegments.beforeTail.set(wormSegments.tail);
+  wormSegments.tail[0] = x; wormSegments.tail[1] = y; wormSegments.tail[2] = z;
+  wormSegments.tailCount++;
   const i = wormSegments.count;
   if (i >= MAX_PUBLISHED) return;
   wormSegments.positions[i * 3] = x;
@@ -55,5 +63,6 @@ export function endWormSegments() {
 /** Zero the feed — run reset, death and mode unmount all go through here. */
 export function resetWormSegments() {
   wormSegments.count = 0;
+  wormSegments.tailCount = 0;
   wormSegments.epoch = 0;
 }
