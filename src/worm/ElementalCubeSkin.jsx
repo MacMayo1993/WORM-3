@@ -217,9 +217,8 @@ export default function ElementalCubeSkin({ size = 3 }) {
     // One envelope, shared with the fill light and the particles. wormBuffs mirrors
     // the sim clock, so it freezes on pause and during tunnel transit.
     const env = elementalEnvelope({ element, elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
-    // Uniform grow drives BOTH coverage and thickness, so the layer visibly wells
-    // up from nothing and shrinks away — changing scale.z alone would leave the top
-    // plane at full size and full shader alpha the whole time, never fading.
+    // Water keeps full coverage throughout its fade; shrinking every patch in XY
+    // opens square holes. Its shader fades opacity while grow controls thickness.
     const g = env.grow;
 
     // The claim sweep's starting point. The sim snapshots the tile the orb was
@@ -254,6 +253,7 @@ export default function ElementalCubeSkin({ size = 3 }) {
       // get a uniform scale that still carries both cell size and the ramp.
       const cellGrow = g; // Instanced shaders own the per-cell sprouting/sweep.
       if (renderer.uniformScale) _scale.setScalar(c.cell * Math.max(0.001, cellGrow));
+      else if (element === 'water') _scale.set(c.cell, c.cell, Math.max(0.001, cellGrow));
       else _scale.set(c.cell * g, c.cell * g, Math.max(0.001, cellGrow));
 
       _matrix.compose(_livePos, _quat, _scale);

@@ -93,6 +93,7 @@ function makeCtx(overrides = {}) {
     onSpecialSpawned: log('specialSpawned'),
     onSpecialExpired: log('specialExpired'),
     onElementalTheme: log('elemental'),
+    onStoryMechanic: log('storyMechanic'),
     ...overrides,
   };
 }
@@ -307,6 +308,7 @@ describe('elemental offering', () => {
       special(0, 4, 4, 'PZ', 'ice'),
     ];
     stepUntilCommit(sim, ctx);
+    run(sim, ctx, 1, 0.01);
     expect(sim.elementalType).toBe('water'); // the one grabbed starts its wash
     expect(sim.specials).toHaveLength(0);    // the other three are wiped
   });
@@ -320,6 +322,7 @@ describe('elemental offering', () => {
     // next offering, and it may only ever push the clock back, never forward.
     sim.elementalSpawnTimer = ELEMENTAL_SPAWN_INTERVAL;
     stepUntilCommit(sim, ctx);
+    run(sim, ctx, 1, 0.01);
     expect(sim.elementalType).toBe('water');
     // The claim buys the cooldown, not the ordinary spawn interval.
     expect(sim.elementalSpawnTimer).toBeGreaterThanOrEqual(ELEMENTAL_CLAIM_COOLDOWN - 1e-6);
@@ -370,6 +373,63 @@ describe('elemental offering', () => {
 });
 
 describe('claiming a special', () => {
+  it.each([[3, 1 / 60], [3, 1 / 30], [3, 0.1], [3.5, 0.07]])('does not skip center contact at speed %s and frame time %s', (speed, dt) => {
+    const sim = makeSim(), ctx = makeCtx({ getSpeed: () => speed });
+    sim.specials = [special(2, 3, 4, 'PZ', 'water')];
+    for (let i = 0; i < 100 && !sim.elementalType; i++) stepWormSim(sim, dt, SIZE, ctx);
+    expect(sim.elementalType).toBe('water');
+    expect(sim.pos).toEqual({ x: 2, y: 3, z: 4, dirKey: 'PZ' });
+    expect(sim.headInterpPos.distanceTo(sim.curWorldPos)).toBeLessThan(1e-8);
+    expect(eventsOf(ctx, 'storyMechanic')).toHaveLength(1);
+  });
+
+  it.each(ELEMENTAL_TYPES)('claims %s once at the tile center, never on approach', type => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.specials = [special(2, 3, 4, 'PZ', type)];
+    stepUntilCommit(sim, ctx);
+    expect(sim.elementalType).toBeNull();
+    run(sim, ctx, 0.99, 0.01);
+    expect(sim.interpT).toBeCloseTo(0.99);
+    expect(sim.specials).toHaveLength(1);
+    expect(sim.elementalFocusT).toBe(0);
+    expect(eventsOf(ctx, 'elemental')).toHaveLength(0);
+    stepWormSim(sim, 0.01, SIZE, ctx);
+    expect(sim.interpT).toBe(1);
+    expect(sim.elementalType).toBe(type);
+    expect(sim.elementalFocusT).toBeGreaterThan(0);
+    expect(sim.pendingSpecialFlash.pos).toEqual(sim.headInterpPos.toArray());
+    expect(sim.headInterpPos.toArray()).toEqual(sim.curWorldPos.toArray());
+    expect(sim.specials).toHaveLength(0);
+    const progress = sim.interpT, accumulator = sim.stepAcc;
+    run(sim, ctx, 0.25);
+    expect(sim.interpT).toBe(progress);
+    expect(sim.stepAcc).toBe(accumulator);
+    expect(eventsOf(ctx, 'elemental')).toHaveLength(1);
+    expect(eventsOf(ctx, 'storyMechanic')).toEqual([{ type: 'storyMechanic', args: ['elementPickups'] }]);
+  });
+
+  it.each(['magnet', 'jump', 'both'])('leaves nearby elements alone with %s assistance', assist => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.specials = [special(1, 3, 4, 'PZ', 'water')];
+    if (assist !== 'jump') sim.magnetT = 5;
+    if (assist !== 'magnet') queueTurn(sim, 'jump');
+    stepUntilCommit(sim, ctx);
+    run(sim, ctx, 0.6);
+    expect(sim.specials).toHaveLength(1);
+    expect(sim.elementalType).toBeNull();
+    expect(eventsOf(ctx, 'storyMechanic')).toHaveLength(0);
+  });
+
+  it('still claims an element directly at the tile center with a magnet active', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.magnetT = 5;
+    sim.specials = [special(2, 3, 4, 'PZ', 'water')];
+    stepUntilCommit(sim, ctx);
+    expect(sim.specials).toHaveLength(1);
+    run(sim, ctx, 1, 0.01);
+    expect(sim.elementalType).toBe('water');
+  });
+
   it('is claimed by crawling onto it — contact is enough', () => {
     const sim = makeSim();
     const ctx = makeCtx();

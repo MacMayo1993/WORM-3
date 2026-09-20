@@ -65,6 +65,8 @@ function makeCtx(overrides = {}) {
     onMagnetState: log('magnetState'),
     onSpecialSpawned: log('specialSpawned'),
     onSpecialExpired: log('specialExpired'),
+    onElementalTheme: log('elemental'),
+    onStoryMechanic: log('storyMechanic'),
     ...overrides,
   };
 }
@@ -314,6 +316,34 @@ describe('applyRotationToSim — multi-layer commit', () => {
     applyRotationToSim(single, SIZE, makeCtx(), { axis: 'row', sliceIndex: 2, dir: -1 },
       { inOpeningScramble: false, paused: false });
     expect(sim.powerups[1]).toEqual(single.powerups[0]);
+  });
+
+  it.each([0.3, 0.7])('waits for the tile center after rotation commits at %s', progress => {
+    const sim = makeSim(), ctx = makeCtx();
+    const destination = { x: 0, y: 2, z: 2, dirKey: 'PZ' };
+    sim.pos = { ...destination };
+    sim.prevTile = { x: 0, y: 1, z: 2, dirKey: 'PZ' };
+    sim.prevWorldPos = new THREE.Vector3(-1, 0, 1.5);
+    sim.curWorldPos.set(-1, 1, 1.5);
+    sim.interpT = 0.3; sim.stepAcc = 0.3;
+    // This orb is carried INTO the destination, not the outgoing face there.
+    const source = rotateTilePosition(destination, 'row', 2, -1, SIZE);
+    sim.specials = [{ ...source, id: 'water', type: 'water', ttl: 20 }];
+    beginTurn('row', [2], [1]);
+    stepWormSim(sim, 0.01, SIZE, ctx);
+    if (progress > 0.5) for (let i = 0; i < 4; i++) stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(sim.restRead).not.toBeNull();
+    expect(sim.elementalType).toBeNull();
+    resetLiveRotation();
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'row', sliceIndex: 2, dir: 1 }, { inOpeningScramble: false, paused: false });
+    expect(sim.pos).toEqual(destination);
+    expect(sim.elementalType).toBeNull();
+    for (let i = 0; i < 10 && !sim.elementalType; i++) stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(sim.elementalType).toBe('water');
+    expect(sim.specials).toHaveLength(0);
+    stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(ctx.events.filter(e => e.type === 'elemental')).toHaveLength(1);
+    expect(ctx.events.filter(e => e.type === 'storyMechanic')).toEqual([{ type: 'storyMechanic', args: ['elementPickups'] }]);
   });
 
   it('resolves a deferred pickup once, against the committed cell', () => {

@@ -26,10 +26,10 @@ export const WORM_STORY_LEVELS = [
     kind: 'mastery', target: 2, orbs: 24, speed: 3, rotateEvery: 9, par: 170, limit: 280,
     mechanics: { boosts: 2, doubleJumps: 2, rockets: 1, magnetOrbs: 4 },
     reward: ['trail_comet', 'trail_circuit'], rewardLabel: 'Choose a trail', fallback: 200 },
-  { id: 8, title: 'Force of Nature', subtitle: 'Five elements. Five different ways to move.',
-    goal: 'Master water, fire, grass, ice and lightning. Collect 24 orbs and heal three pairs while layers turn. Follow the marked power and its instruction.',
+  { id: 8, title: 'Force of Nature', subtitle: 'Collect two elemental powers.',
+    goal: 'Pick up 2 elemental orbs. Collect 24 orbs and heal three pairs while layers turn. Steer onto each marked elemental orb to claim it.',
     kind: 'mastery', target: 3, orbs: 24, speed: 3, rotateEvery: 9, par: 220, limit: 350,
-    mechanics: { elements: 5 },
+    mechanics: { elementPickups: 2 },
     reward: ['scheme_aurora', 'scheme_cosmic'], rewardLabel: 'Choose a palette', fallback: 150 },
   { id: 9, title: 'Under Siege', subtitle: 'Fight. Encircle. Turn danger into a route.',
     goal: 'Surround a tunnel to heal it, use your character signature twice, disarm two bombs by encircling them, defeat four enemies, collect 24 orbs and restore four pairs. Tunnel deposits seal after the ring and signature goals.',
@@ -43,7 +43,7 @@ export const WORM_STORY_LEVELS = [
     reward: ['skin_gold', 'skin_galaxy'], rewardLabel: 'Choose a champion skin', fallback: 300 },
 ];
 export const STORY_MECHANIC_LABELS = { boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
-  magnetOrbs: 'remote magnet catches', elements: 'elements mastered', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated' };
+  magnetOrbs: 'remote magnet catches', elements: 'elements mastered', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated' };
 // A repeating authored cycle spans all axes and includes central layers. Retain
 // the normal warning and collision transaction; never steer hazards at the head.
 export const storyRotationCycle = size => [
@@ -110,7 +110,7 @@ export function storyChecklist(level, metrics = {}) {
   const targets = { ...level.mechanics, [primary]: level.target };
   for (const key of ['orbs', 'colors', 'rotations']) if (level[key]) targets[key] = level[key];
   const labels = { boosts: 'Finish boosts', doubleJumps: 'Land double jumps', rockets: 'Land a rocket flight',
-    magnetOrbs: 'Magnet catches', elements: 'Master all 5 elements', ringHeals: 'Surround a tunnel',
+    magnetOrbs: 'Magnet catches', elements: 'Master all 5 elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
     signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
     orbs: 'Collect orbs', colors: 'Collect all 6 colors', uniqueTunnels: 'Cross different tunnel pairs',
     bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };

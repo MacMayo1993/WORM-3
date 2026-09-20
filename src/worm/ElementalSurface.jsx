@@ -44,6 +44,9 @@ import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 // ice — it is a third branch of this shader rather than a fourth renderer, so the
 // charged cube costs exactly what a wet one does: one draw call.
 export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2 };
+// wfield sums four sine waves. The trough must remain above the sticker even
+// when all four and the broad swell reach their minimum together.
+export const WATER_HEIGHT = { base: 0.12, ripple: 0.018, swell: 0.035 };
 
 const _geoCache = { geo: null };
 export function getElementalSurfaceGeo() {
@@ -174,19 +177,19 @@ const vertexShader = /* glsl */`
     // a cube whose faces all point somewhere different.
     vFaceNormal = normalize((cellMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
 
-    // The claim sweep. Each cell holds off until the sweep reaches it, so the
-    // element travels outward from the tile the orb was taken on rather than
-    // appearing on all six faces at once. Once the sweep has passed, uEnv.y pins to
-    // 1 and this is a constant 1 for the rest of the wash.
-    vArrive = smoothstep(aSweep, aSweep + 0.35, uEnv.y);
+    // Water rises together on every manifold. Per-cell delays made neighboring
+    // patches disagree in height and opacity, exposing a blocky tile grid.
+    // Ice and lightning retain their outward claim sweep.
+    vArrive = uMode == 0 ? smoothstep(0.0, 1.0, uEnv.y)
+                        : smoothstep(aSweep, aSweep + 0.35, uEnv.y);
 
     vec3 pos = position;
     // Local +Z is the outward face normal for every cell, so displacement along
     // it lifts the surface off the sticker on all six faces.
     if (uMode == 0) {
-      // Ripple plus the broad swell, both gated by the sweep so a cell rises into
-      // the water rather than snapping to full displacement the moment it arrives.
-      pos.z += (w * 0.035 + vSwell * 0.065 + 0.11 * sin(vArrive * 3.141593)) * vArrive;
+      // Keep troughs above the sticker: a signed displacement alone submerged
+      // portions of the mesh, leaving hard-edged holes as the waves moved.
+      pos.z += (${WATER_HEIGHT.base} + w * ${WATER_HEIGHT.ripple} + vSwell * ${WATER_HEIGHT.swell}) * vArrive;
     } else if (uMode == 2) {
       // Lightning is a charge crawling ON the surface, not a body sitting on it —
       // it stays flat. Any displacement here would lift the veins off the tile and
