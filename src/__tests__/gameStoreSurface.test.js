@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
 
 const EXPECTED_KEYS = [
-  'wormStoryLevel', 'wormStoryStarted', 'wormStoryReady', 'wormStoryTarget', 'wormStoryProgress', 'wormStoryResult', 'startWormStory', 'completeWormStory', 'claimWormStoryReward',
+  'wormStoryLevel', 'wormStoryStarted', 'wormStoryReady', 'wormStoryTarget', 'wormStoryProgress', 'wormStoryChecklist', 'wormStoryResult', 'startWormStory', 'completeWormStory', 'claimWormStoryReward',
   'chaosExperience', 'chaosFocusFaces', 'chaosRecord', 'setChaosFocusFaces', 'startChaosExperience', 'recordChaosTick', 'finishChaosExperience',
   'xpActivityRuns', 'beginAchievementActivity',
   'playerProgress', 'xpRun', 'xpNotice', 'showPlayerProgress', 'setShowPlayerProgress',

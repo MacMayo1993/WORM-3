@@ -1,5 +1,5 @@
 import { storyLevel, WORM_STORY_LEVELS } from './story/levels.js';
-import { StoryObjectiveCard, StoryResult } from './story/StoryCards.jsx';
+import { StoryObjectiveCard, StoryStartButton, StoryResult } from './story/StoryCards.jsx';
 import { AmbientCombatActions, CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
 import { combatBridge } from './combat/portalCombat.js';
 import WormDemoLessonCard from '../components/screens/WormDemoLessonCard.jsx';
@@ -1484,8 +1484,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}
             {(phase === 'crawling' || demoLesson || combatMode) && <div className="worm-hud-bottom" ref={trayRef}>
+                {!combatMode && !demoLesson && storyId && <StoryStartButton />}
                 {combatMode ? <CombatCard onRetry={onRetry} onHome={onHome} /> : demoLesson ? <WormDemoLessonCard /> : !storyId ? <WormMissionCard /> : null}
-                {phase === 'crawling' && <div style={THUMB_TRAY_STYLE}>
+                {phase === 'crawling' && (!storyId || storyStarted) && <div style={THUMB_TRAY_STYLE}>
                     <SteerKey side="left" wormAlive={controlsEnabled && !jumpRescue} wormColor={wormColor} vars={steerVars} />
 
                     {/* Middle: signature and primary actions share the measured dock */}

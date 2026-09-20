@@ -1,7 +1,7 @@
 import { getStableKey } from './wormLogic.js';
 import { characterOrbCount } from './characterAbilities.js';
 import { orbsCarried } from './healerWorm/economy.js';
-import { storyLevel, storyOutcome, storyProgressText } from './story/levels.js';
+import { storyLevel, storyOutcome, storyProgressText, storyChecklist } from './story/levels.js';
 import { offerStoryPower, recordStoryMechanic } from './story/mastery.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
 import { stageStory, storyMetrics } from './story/runtime.js';
@@ -564,7 +564,12 @@ export function useWormCrawler(size, cubies) {
                 if (live.wormStoryTarget !== target) useGameStore.setState({ wormStoryTarget: target });
             }
             const progress = storyProgressText(story, metrics);
-            if (progress !== live.wormStoryProgress) useGameStore.setState({ wormStoryProgress: progress });
+            const checklist = { runId: state.wormRunId, levelId: story.id, goals: storyChecklist(story, metrics),
+                seconds: Math.max(0, Math.ceil(story.limit - metrics.elapsed)), hint: metrics.powerHint || '',
+                settling: !storyOutcome(story, metrics) && storyChecklist(story, metrics).every(goal => goal.done) };
+            if (progress !== live.wormStoryProgress || JSON.stringify(checklist) !== JSON.stringify(live.wormStoryChecklist)) {
+                useGameStore.setState({ wormStoryProgress: progress, wormStoryChecklist: checklist });
+            }
             if (story.kind === 'tunnel' && live.wormStoryTarget !== metrics.nextTarget) useGameStore.setState({ wormStoryTarget: metrics.nextTarget });
             if (story.kind === 'jump' && metrics.bodyJumps > 0 && live.wormStoryTarget) useGameStore.setState({ wormStoryTarget: null });
             if (!sim.jumpRescueHeld) {
