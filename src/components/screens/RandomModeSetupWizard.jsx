@@ -28,7 +28,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       icon: 'scene',
       label: 'Scene',
       title: 'Pick Your Scene',
-      subtitle: 'This stays fixed — color schemes, tile styles, and a per-cubelet mix of view styles will cycle automatically every 10 seconds.',
+      subtitle: 'Scene stays fixed. Cube visuals change every 10s.',
       summary: sceneLabel(cos.settings),
       hero: <SceneStep cos={cos} slot="hero" />,
       content: <SceneStep cos={cos} slot="body" />
@@ -38,7 +38,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       icon: 'size',
       label: 'Size',
       title: 'Cube Size',
-      subtitle: 'Slide to size — this stays fixed during play.',
+      subtitle: 'Size stays fixed.',
       summary: sizeLabel(cos.cubeSize),
       hero: <SizeStep cos={cos} slot="hero" />,
       content: <SizeStep cos={cos} slot="body" />

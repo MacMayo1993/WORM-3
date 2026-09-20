@@ -51,7 +51,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
     <div className="worm-entry-sheet">
       <nav className="worm-entry-nav"><button onClick={back} aria-label={page === 'choice' ? 'Back to modes' : 'Back to WORM choices'}>← Back</button>{page !== 'choice' && <span className="mode-wizard-kicker">Choose your path</span>}<span>WORM³</span></nav>
       <div className="worm-entry-scroll">
-        {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><p>CHAPTER 01 · FIND YOUR FEET</p><h1 id="worm-entry-title">THE FIRST TURN</h1><span>Ten timed challenges. One increasingly restless cube.</span></header>}
+        {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><h1 id="worm-entry-title">THE FIRST TURN</h1></header>}
         {page === 'choice' ? <>
           <div className="worm-path-split">
             <button className="worm-path-card worm-path-story" onClick={() => setPage('story')}>
@@ -69,13 +69,13 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
               <span className="worm-level-number">{String(item.id).padStart(2, '0')}</span><strong>{item.title}</strong><small>{unlocked ? `${'★'.repeat(stars)}${'☆'.repeat(3-stars)}` : 'Clear the previous level'}</small>
             </button>;
           })}</div>
-          <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">LEVEL {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><p>{level.subtitle}</p><strong>{level.goal}</strong>
+          <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">LEVEL {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><strong>{level.goal}</strong>
             <p className="worm-story-limit">Time limit: {level.limit} seconds{level.rotateEvery ? ` · Layer turns every ${level.rotateEvery}s while moving on the surface` : ''}</p>
-            <ul><li>★ Finish the objective before time runs out</li><li>★ Finish within {level.par} seconds</li><li>★ Finish without a tail cut</li></ul>
+            <details><summary>Stars & rewards</summary><ul><li>★ Finish before time runs out</li><li>★ Finish within {level.par}s</li><li>★ No tail cuts</li></ul><small>Rewards pay once. Extra stars earn bonuses.</small></details>
             <div className="worm-level-reward"><span>FIRST CLEAR</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>
             <StoryRewardChoices level={level} />
             <button className="worm-story-primary" onClick={launch}>{storyStars(progress, level.id) ? 'Replay level' : 'Play level'} <span>→</span></button>
-            <small>Extra stars never block the next level. Rewards pay once; new stars earn bonuses.</small>
+            
           </section>
         </>}
       </div>

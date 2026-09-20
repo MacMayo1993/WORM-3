@@ -70,7 +70,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
             </div>
             <div className="chaos-hero-content">
               <div><h1>CHAOS<span>Call the survivors.</span></h1>
-                <p>Six colors. One final pair.<br />Make your call. Heal the storm.</p></div>
+                </div>
               <ChaosEmblem colors={faceInfo} />
             </div>
             <div className="chaos-setup-strip">
@@ -113,7 +113,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
               </button>)}</div>}
               <div className="chaos-field-note"><ChaosGlyph kind="heal" /><p>
                 {selectedType === 'PAIR' && selectedPair && <strong>{size ** 2} tiles per color. </strong>}
-                Opposite tiles share their fate. Tap damaged living tiles to heal a wave. Healing can change your prediction’s outcome.
+                Opposite tiles share their fate. Tap damaged tiles to heal; this can change the outcome.
               </p></div>
             </section>
             <section className="chaos-step">

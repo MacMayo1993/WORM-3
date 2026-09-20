@@ -145,8 +145,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
             fontSize: 'clamp(26px, 7vw, 40px)', letterSpacing: '0.02em', lineHeight: 1,
           }}>Choose a campaign</h1>
           <p style={{ margin: 0, fontSize: '13px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>
-            Today&rsquo;s puzzle, then three campaigns — and they do not overtake each other, so your
-            progress in one is its own.
+            Progress is saved per campaign.
           </p>
         </div>
 

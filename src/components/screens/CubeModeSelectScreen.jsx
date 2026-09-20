@@ -62,10 +62,10 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
         Cube path
       </p>
       <h2 id="cube-mode-title" style={{ margin: 0, fontSize: 'clamp(2rem, 6vw, 3.4rem)', lineHeight: 0.95, letterSpacing: '-0.06em', color: PAPER_TEXT }}>
-        Choose your cube mode
+        Choose a mode
       </h2>
       <p style={{ margin: '14px 0 0', color: PAPER_TEXT_MUTED, fontSize: '16px', lineHeight: 1.55 }}>
-        Pick classic freeplay setup or the antipodal Disparity ruleset. The main CUBE tile now starts the progressive campaign.
+        Solve or survive.
       </p>
 
       <div style={optionGridStyle}>
@@ -94,7 +94,7 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
         >
           <span style={{ display: 'block', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.03em', color: '#1565C0' }}>Rubik's Mode</span>
           <span style={{ display: 'block', marginTop: '10px', color: PAPER_TEXT_MUTED, lineHeight: 1.45 }}>
-            Classic cube play with the freeplay setup wizard before shuffling into the board.
+            Solve a custom cube.
           </span>
         </button>
 
@@ -123,7 +123,7 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
         >
           <span style={{ display: 'block', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.03em', color: '#C44B00' }}>Disparity Mode</span>
           <span style={{ display: 'block', marginTop: '10px', color: PAPER_TEXT_MUTED, lineHeight: 1.45 }}>
-            Antipodal flip survival, betting, and chaos tuning through the disparity wizard.
+            Predict the surviving pair.
           </span>
         </button>
       </div>

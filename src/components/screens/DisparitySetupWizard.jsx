@@ -161,7 +161,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       icon: 'scene',
       label: 'Scene',
       title: 'Background',
-      subtitle: 'Choose your play environment',
+      subtitle: '',
       summary: sceneLabel(settings),
       hero: <SceneStep cos={cos} slot="hero" />,
       content: <SceneStep cos={cos} slot="body" />
@@ -171,7 +171,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       icon: 'colors',
       label: 'Colors',
       title: 'Color Palette',
-      subtitle: 'Pick a palette — the cube wears it as you go',
+      subtitle: '',
       summary: paletteLabel(settings),
       hero: <PaletteStep cos={cos} slot="hero" />,
       content: <PaletteStep cos={cos} slot="body" />
@@ -182,7 +182,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       icon: 'gameplay',
       label: 'Gameplay',
       title: 'Gameplay',
-      subtitle: 'Tune disparity intensity and survival rules',
+      subtitle: '',
       // The two settings that decide how long the cube lasts, which is what a
       // player checks this category for.
       summary: `${LEVEL_LABELS[settings.disparityLevel]} · ${FLIP_CAP_PRESETS.find(p => p.value === settings.flipCap)?.label || 'Custom'}`,
@@ -193,7 +193,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       icon: 'size',
       label: 'Size',
       title: 'Cube Size',
-      subtitle: 'Slide to size — this is the cube that has to survive',
+      subtitle: '',
       summary: sizeLabel(cos.cubeSize),
       hero: <SizeStep cos={cos} slot="hero" />,
       content: <SizeStep cos={cos} slot="body" />
