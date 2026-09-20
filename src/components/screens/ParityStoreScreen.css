@@ -102,3 +102,64 @@
     transform: none;
   }
 }
+
+/* Catalogue: the category rail stays visible while the selected collection scrolls. */
+.store-catalogue { position:fixed; inset:0; display:flex; flex-direction:column; color:var(--paper-ink); pointer-events:auto; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.store-catalogue * { box-sizing:border-box; }
+.store-catalogue button { font:inherit; cursor:pointer; touch-action:manipulation; }
+.store-catalogue button:focus-visible { outline:3px solid var(--moss); outline-offset:3px; }
+.store-catalogue button:disabled { cursor:default; opacity:.6; }
+.catalogue-header { display:flex; align-items:center; gap:20px; padding:18px 24px; width:100%; max-width:1180px; margin:auto; }
+.catalogue-header h1 { font-family:var(--display-font); font-size:clamp(20px,4vw,30px); margin:4px 0 8px; }
+.catalogue-kicker { font-size:10px; font-weight:800; letter-spacing:.15em; color:var(--paper-muted); }
+.catalogue-header small { font-size:11px; color:var(--paper-muted); }
+.catalogue-progress { height:4px; width:160px; background:var(--paper-line); border-radius:4px; overflow:hidden; margin-bottom:4px; }
+.catalogue-progress span { display:block; height:100%; background:var(--moss); }
+.catalogue-wallet { margin-left:auto; text-align:right; font-variant-numeric:tabular-nums; }
+.catalogue-wallet strong { display:flex; align-items:center; justify-content:flex-end; gap:5px; color:var(--moss); font-size:17px; }
+.catalogue-wallet span { display:block; font-size:12px; margin-top:5px; color:var(--paper-muted); }
+.catalogue-close { width:48px; height:48px; border:1px solid var(--paper-line); border-radius:14px; color:var(--paper-ink); background:#ffffff80; flex-shrink:0; }
+.catalogue-layout { display:grid; grid-template-columns:210px minmax(0,1fr); flex:1; min-height:0; width:100%; max-width:1180px; margin:auto; border-top:1px solid var(--paper-line); }
+.catalogue-sidebar { overflow-y:auto; overscroll-behavior:contain; padding:20px 12px 24px 24px; border-right:1px solid var(--paper-line); }
+.catalogue-sidebar>.catalogue-kicker { display:block; margin:0 0 14px 10px; }
+.catalogue-category { display:flex; align-items:center; gap:10px; width:100%; min-height:66px; padding:10px; border:1px solid transparent; border-bottom-color:var(--paper-line); background:transparent; text-align:left; color:var(--paper-ink); }
+.catalogue-category i { width:22px; height:22px; flex-shrink:0; background:var(--category); border:3px solid #302c24; border-radius:5px; box-shadow:inset 2px 2px 0 #ffffff60; }
+.catalogue-category strong { font-size:13px; }
+.catalogue-category small { display:block; font-size:10px; margin-top:5px; color:var(--paper-muted); font-variant-numeric:tabular-nums; }
+.catalogue-category b { margin-left:auto; font-size:20px; opacity:.5; }
+.catalogue-category[aria-pressed=true] { background:#fff9; border-color:var(--category); border-radius:10px; box-shadow:0 3px 0 #33261612; }
+.catalogue-chests { display:grid; gap:5px; width:100%; margin-top:22px; padding:16px 10px; border:1px solid #ffffff20; border-radius:14px; background:var(--night); color:var(--night-ink); text-align:left; }
+.catalogue-chests>span { font-size:28px; color:#b8dd92; }
+.catalogue-chests strong { font-size:13px; }.catalogue-chests small { font-size:10px; color:var(--night-muted); }
+.catalogue-selector { min-width:0; overflow-y:auto; overscroll-behavior:contain; padding:20px 24px 28px; }
+.catalogue-section-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:16px; }
+.catalogue-section-heading h2 { font-family:var(--display-font); font-size:23px; margin:3px 0 0; }
+.catalogue-owned,.catalogue-empty button { min-height:48px; border:1px solid var(--paper-line); border-radius:10px; background:#fff8; padding:8px 12px; font-size:12px!important; color:var(--paper-muted); }
+.catalogue-owned[aria-pressed=true] { background:var(--moss); color:white; }
+.catalogue-families { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+.catalogue-families button { min-height:48px; border:1px solid var(--paper-line); border-radius:8px; background:#fff7; color:var(--paper-muted); padding:8px 10px; font-size:12px; }
+.catalogue-families button[aria-pressed=true] { color:var(--paper-ink); background:white; border-color:var(--category); }
+.catalogue-families small { padding-left:7px; opacity:.7; }
+.catalogue-preview { position:relative; display:grid; grid-template-columns:160px minmax(0,1fr) 48px; align-items:center; gap:16px; min-height:180px; padding:16px; border:1px solid #ffffff25; border-radius:18px; background:radial-gradient(ellipse at 12% 40%,#ffffff18,transparent 65%),var(--night); color:var(--night-ink); box-shadow:0 5px 0 #24201718; }
+.catalogue-preview-art { display:grid; place-items:center; min-width:0; }
+.catalogue-preview-info { min-width:0; }.catalogue-preview-info .catalogue-kicker { color:var(--night-muted); }
+.catalogue-preview-info h3 { font-size:22px; margin:8px 0; overflow-wrap:anywhere; }
+.catalogue-preview-info p { font-size:12px; color:var(--night-muted); margin:0 0 12px; }
+.catalogue-preview-info>small { display:block; font-size:11px; margin-top:8px; }
+.catalogue-action { min-height:48px; padding:10px 16px; border:1px solid #b5d78e; background:#b5d78e; color:#24321b; border-radius:10px; font-weight:800!important; }
+.catalogue-preview-nav { display:grid; gap:8px; }.catalogue-preview-nav button { width:48px; height:48px; border:1px solid #ffffff30; border-radius:10px; background:#ffffff0c; color:var(--night-ink); font-size:26px; }
+.catalogue-grid-heading { display:flex; justify-content:space-between; gap:8px; align-items:center; margin:24px 0 14px; color:var(--paper-muted); font-size:12px; }
+.catalogue-grid-heading small { white-space:nowrap; }.catalogue-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; }
+.catalogue-empty { padding:20px; background:#fff7; border:1px dashed var(--paper-line); border-radius:12px; }.catalogue-empty p { font-size:13px; }
+.catalogue-footer { text-align:center; padding:10px 16px; border-top:1px solid var(--paper-line); font-size:11px; color:var(--paper-muted); }
+.catalogue-toast { position:fixed; bottom:80px; left:50%; color:white; border-radius:30px; padding:12px 20px; pointer-events:none; font-size:13px; }
+@media(max-width:650px) {
+  .catalogue-header { padding:12px; gap:10px; }.catalogue-header h1 { font-size:20px; }.catalogue-progress { width:130px; }.catalogue-wallet strong { font-size:13px; }
+  .catalogue-layout { grid-template-columns:112px minmax(0,1fr); }.catalogue-sidebar { padding:14px 6px 20px; }.catalogue-sidebar>.catalogue-kicker { margin-left:5px; font-size:9px; }
+  .catalogue-category { gap:7px; padding:10px 5px; }.catalogue-category i { width:16px; height:16px; border-width:2px; }.catalogue-category strong { font-size:11px; }.catalogue-category small { font-size:9px; }.catalogue-category b { display:none; }
+  .catalogue-selector { padding:14px 10px 24px; }.catalogue-section-heading { flex-wrap:wrap; }.catalogue-section-heading h2 { font-size:20px; }.catalogue-owned { padding:6px 9px; min-height:48px; }
+  .catalogue-preview { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; padding:10px; }.catalogue-preview-art { width:100%; height:132px; }.catalogue-preview-art>div { transform:scale(.88); }
+  .catalogue-preview-info { width:100%; text-align:center; }.catalogue-preview-info h3 { font-size:18px; margin:6px 0; }.catalogue-preview-info p { margin-bottom:8px; }.catalogue-preview-nav { display:flex; justify-content:space-between; width:100%; }.catalogue-preview-nav button { height:48px; }
+  .catalogue-action { width:100%; padding:10px 6px; font-size:13px!important; }.catalogue-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }.catalogue-grid .store-card { min-width:0; padding:8px 4px!important; }.catalogue-grid .store-card>span { overflow-wrap:anywhere; }
+  .catalogue-grid-heading { margin-top:18px; font-size:11px; }.catalogue-families { gap:4px; }.catalogue-families button { padding:6px 8px; font-size:11px; }.catalogue-footer { font-size:10px; padding:8px; }
+}

@@ -52,3 +52,31 @@ The client save is the existing device-local prototype economy. A future paid or
 ## Validation
 
 Tests cover all 36 face pairs, full probability sums, weighted sample boundaries, complete pool coverage, owned-item compensation, mythic unlock/equip, failed storage and entropy, repeated clicks, interrupted reveals, zero-balance reloads, production migrations, one-time earned gems and authoritative prices. Full CI passed: 184 test files / 2,271 tests, lint, production build and bundle budgets. The initial route is 7 files, 2,022.8 KiB raw / 498.5 KiB Brotli. Wallet rules and catalog data have their own cacheable economy chunk; the production chunk also initializes successfully in a standalone module check. Phone/WebGL visual verification and long-term reward-rate playtesting remain outstanding.
+
+## Catalogue and rolling-table presentation upgrade
+
+The Store now uses a persistent left category rail (Worms, Trails, Skins, Hats,
+Palettes, Tiles) with ownership counts and a direct Cubie Chests entry. The right
+pane contains a compact live preview, previous/next controls, an explicit
+Equip/Unlock action, and item cards. Cards select a preview without spending PP
+or changing equipment; selecting a category or card returns the pane to its
+preview. An Owned only filter includes a recoverable empty state. Tile families
+are selected individually, so their preview canvases are mounted one family at
+a time rather than across the entire tile catalogue.
+
+Chest Room shares the paper catalogue theme with a dark inset rolling table.
+The six-sided CSS cubies throw, tumble, bounce, and settle over 2.2 seconds; the
+saved reward is revealed at 2.3 seconds with a rarity ring and matching-pair
+badge. Reduced motion reveals immediately. Closing still retains the committed
+reward and releases the animation lock. Changing roll mode displays the right
+number of preview cubies while retaining the clearly labeled last reward.
+Rarity labels omit redundant color names, and selecting a tier immediately
+shows its reward pool. Prices, odds, wallet migrations, and reward rules are
+unchanged.
+
+Validation: full CI passed with 184 files / 2,275 tests, lint, production build,
+and bundle budgets. Targeted UI checks also cover explicit equip, browsing
+without spending, ownership filtering/empty states, tile-family switching,
+mode switching after a roll, reduced motion, and interrupted reveals. Phone
+visual playtesting remains outstanding; DOM tests do not verify CSS/WebGL
+appearance.

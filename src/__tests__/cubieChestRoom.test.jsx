@@ -4,6 +4,7 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import ChestRoom from '../economy/ChestRoom.jsx';
 import ParityStoreScreen from '../components/screens/ParityStoreScreen.jsx';
 vi.mock('../3d/WormPreviewCanvas.jsx', () => ({ default: () => <div aria-label="Worm preview" /> }));
+vi.mock('../3d/TilePreviewRenderer.js', () => ({ registerTilePreview: vi.fn(() => 1), updateTilePreview: vi.fn(), unregisterTilePreview: vi.fn() }));
 vi.mock('../3d/CubePreviewCanvas.jsx', () => ({ default: () => <div aria-label="Cube preview" /> }));
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress, readPlayerSave } from '../progression/model.js';
@@ -25,7 +26,7 @@ it('shows prices and exact final odds and resolves one paid roll before revealin
   expect(state().chestWallet.gems).toBe(10); expect(state().parityPoints).toBe(125);
   expect(host.querySelector('[role="status"]').textContent).toContain('Rolling');
   expect(button('Rolling').disabled).toBe(true);
-  act(() => vi.advanceTimersByTime(1600));
+  act(() => vi.advanceTimersByTime(2400));
   expect(host.querySelector('[role="status"]').textContent).toContain('25 Parity Points + 25 XP');
   expect(state().chestRolling).toBe(false);
 });
@@ -34,7 +35,7 @@ it('displays two cubies and the matching-pair upgrade without charging twice on 
   expect(host.querySelectorAll('.chest-die')).toHaveLength(2);
   act(() => { button('Roll two cubies').click(); button('Roll two cubies')?.click(); });
   expect(state().chestWallet.rolls).toBe(1); expect(state().chestWallet.gems).toBe(5);
-  act(() => vi.advanceTimersByTime(1600));
+  act(() => vi.advanceTimersByTime(2400));
   expect(host.querySelector('[role="status"]').textContent).toContain('Matching pair! Upgraded one tier.');
   expect(state().ownedItems.length).toBe(2);
 });
@@ -55,6 +56,63 @@ it('opens chests from the actual store and returns to equip a newly owned worm',
   act(() => button('Collection').click());
   act(() => useGameStore.setState({ ownedItems: [...state().ownedItems, 'character_mobi'] }));
   act(() => button('Worms').click());
-  act(() => button('MOBI').click()); act(() => button('MOBI').click());
+  act(() => button('MOBI').click()); act(() => button('Equip').click());
   expect(state().wormCharacter).toBe('mobi');
+});
+
+it('switches catalogue categories, filters ownership, and previews without spending', () => {
+  act(() => root.render(<ParityStoreScreen onClose={close} />));
+  const categories = host.querySelector('nav[aria-label="Store categories"]');
+  expect([...categories.querySelectorAll('.catalogue-category')].map(b => b.querySelector('strong').textContent))
+    .toEqual(['Worms', 'Trails', 'Skins', 'Hats', 'Palettes', 'Tiles']);
+  act(() => button('MOBI').click());
+  expect(host.querySelector('.catalogue-preview h3').textContent).toBe('MOBI');
+  act(() => button('MOBI').click());
+  expect(state().parityPoints).toBe(100);
+  act(() => button('Owned only').click());
+  expect(host.querySelectorAll('.store-card')).toHaveLength(1);
+  act(() => button('Hats').click());
+  expect(host.textContent).toContain('No owned items in this category yet.');
+  act(() => button('Browse all items').click());
+  expect(host.querySelectorAll('.store-card').length).toBeGreaterThan(1);
+  act(() => host.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(close).toHaveBeenCalledOnce();
+});
+
+it('uses the selected roll mode for the dice preview after a previous roll', () => {
+  act(() => button('Roll one cubie').click());
+  act(() => vi.advanceTimersByTime(2400));
+  act(() => button('Two cubies').click());
+  expect(host.querySelectorAll('.chest-die')).toHaveLength(2);
+  expect(state().chestWallet.rolls).toBe(1);
+  expect(host.querySelector('[role="status"]').textContent).toContain('25 Parity Points');
+  const tiers = [...host.querySelectorAll('.chest-tiers>button strong')].map(n => n.textContent);
+  expect(tiers).toEqual(['Mythic', 'Legendary', 'Very rare', 'Rare', 'Uncommon', 'Common']);
+  act(() => button('Common').click());
+  expect(host.querySelector('.chest-pool').textContent).toContain('25 PP and 25 XP');
+});
+
+it('reveals immediately with reduced motion while keeping the paid result', () => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+  try {
+    act(() => button('Roll one cubie').click());
+    act(() => vi.advanceTimersByTime(0));
+    expect(state().chestRolling).toBe(false);
+    expect(state().chestWallet.gems).toBe(10);
+    expect(host.querySelector('[role="status"]').textContent).toContain('25 Parity Points');
+  } finally { vi.unstubAllGlobals(); }
+});
+
+it('renders only the selected tile family and switches its preview', () => {
+  act(() => root.render(<ParityStoreScreen onClose={close} />));
+  act(() => button('Tiles').click());
+  expect(host.querySelectorAll('nav[aria-label="Tile families"] button')).toHaveLength(7);
+  const initial = host.querySelectorAll('.store-card').length;
+  act(() => button('Surreal').click());
+  expect(host.querySelectorAll('.store-card')).toHaveLength(6);
+  expect(initial).toBeGreaterThan(6);
+  expect(host.querySelector('.catalogue-grid-heading').textContent).toContain('Surreal');
+  const first = host.querySelector('.catalogue-preview h3').textContent;
+  act(() => host.querySelector('[aria-label="Next item"]').click());
+  expect(host.querySelector('.catalogue-preview h3').textContent).not.toBe(first);
 });
