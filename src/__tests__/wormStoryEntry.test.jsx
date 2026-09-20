@@ -19,7 +19,9 @@ afterEach(() => { act(() => root.unmount()); host.remove(); state().clearDispari
 const show = props => act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={cancel} initialSettings={{ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 }} {...props} />));
 it('opens with Story on the left and Free Play on the right, without launching either', async () => {
   show(); const cards = [...host.querySelector('.worm-path-split').children];
-  expect(cards.map(b => b.querySelector('h2').textContent)).toEqual(['STORY', 'FREE PLAY']);
+  expect(cards).toHaveLength(2);
+  expect(cards.every(card => card.tagName === 'BUTTON')).toBe(true);
+  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['STORY LEVELS', 'FREE PLAY']);
   expect(complete).not.toHaveBeenCalled();
   click('STORY'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false, perFaceStyles: {1:'grass'} }));
