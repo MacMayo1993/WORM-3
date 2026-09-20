@@ -199,12 +199,12 @@ export const SPECIAL_SPAWN_RETRY = 2;
 // and advertises the protected window with a flame at the tail.
 export const ROCKET_DURATION = 3;
 export const ROCKET_SPEED_MULT = 4;
-// Spend the full burn climbing and descending, with no flat cruising section.
-// Smoothstep on each half gives zero vertical velocity at launch, apex and landing.
+// Fast ignition, sustained cruise, then a short controlled landing.
+// Smoothstep keeps the launch and touchdown free of altitude snaps.
 // The shared flight phase also ramps thrust and preserves altitude on fuel refresh.
-export const ROCKET_FLIGHT_HEIGHT = 3.2;
-export const ROCKET_FLIGHT_TAKEOFF = ROCKET_DURATION / 2;
-export const ROCKET_FLIGHT_LANDING = ROCKET_DURATION / 2;
+export const ROCKET_FLIGHT_HEIGHT = 1.8;
+export const ROCKET_FLIGHT_TAKEOFF = 0.35;
+export const ROCKET_FLIGHT_LANDING = 0.55;
 export const rocketFlightLift = (active, rocketT, flightPhase) => {
   if (!active) return 0;
   const elapsed = ROCKET_DURATION - rocketT;

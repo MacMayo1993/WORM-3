@@ -8,7 +8,7 @@ export const WORM_CHARACTERS = [
     type: 'Intelligence Unit',
     subtitle: 'Multi Orientable Block Intelligence',
     stats: { speed: 55, healing: 60, agility: 65, glow: 45 },
-    special: 'Parity Core — a living parity core turns inside a transparent cube body',
+    special: 'Create Wormhole — escape through a new tunnel without spending orbs; re-entry locks for 10 seconds; heal it before creating another',
   },
   {
     id: 'classic',
@@ -16,7 +16,7 @@ export const WORM_CHARACTERS = [
     type: 'Ranger',
     subtitle: 'Original rounded crawler',
     stats: { speed: 55, healing: 60, agility: 65, glow: 10 },
-    special: 'Steady Crawler — reliable healing on every cube size, no weak spots',
+    special: 'Orb Abundance — 50% more orbs on the cube',
   },
   {
     id: 'inch',
@@ -32,7 +32,7 @@ export const WORM_CHARACTERS = [
     type: 'Scout',
     subtitle: 'Bioluminescent trail crawler',
     stats: { speed: 90, healing: 40, agility: 80, glow: 100 },
-    special: 'Bioluminescence — lights nearby tiles and adds a glow to surface orbs',
+    special: 'Light Trail — brighter enemy outlines; press the ability button to paint a luminous trail for 3 seconds',
   },
   {
     id: 'book',
@@ -40,7 +40,7 @@ export const WORM_CHARACTERS = [
     type: 'Sage',
     subtitle: 'Gilded pages and brass spectacles',
     stats: { speed: 40, healing: 75, agility: 50, glow: 15 },
-    special: "Page Turner — curved pages and a coloured binding bank gently into turns",
+    special: "Time Out — earn 25% more XP and pause the rotation timer for 5 seconds",
   },
   {
     id: 'wiggle',
@@ -48,7 +48,7 @@ export const WORM_CHARACTERS = [
     type: 'Dancer',
     subtitle: 'Hyper-flexible sidewinder',
     stats: { speed: 80, healing: 50, agility: 100, glow: 20 },
-    special: 'Sidewinder — a wide lateral wave follows the cube surface',
+    special: 'Tail Wipers — sweep three tiles left and right twice to collect orbs; steering locks during the sweep',
   },
   {
     id: 'prism',

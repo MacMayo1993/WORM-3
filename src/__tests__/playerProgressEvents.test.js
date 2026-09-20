@@ -139,3 +139,10 @@ describe('other release modes and claims',()=>{
     expect(store().claimLevelReward(50,'points')).toBe(false);
   });
 });
+
+it('Book earns 25 percent more Worm XP with cumulative rounding', () => {
+  set({ wormCharacter: 'book' }); worm(); pickup(8);
+  expect(store().xpRun.xp).toBe(20);
+  set({ wormCharacter: 'classic' }); worm(); pickup(8);
+  expect(store().xpRun.xp).toBe(16);
+});

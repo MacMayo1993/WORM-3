@@ -1,10 +1,13 @@
+import { Vector3 } from 'three';
+import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from '../worm/healerWorm/wiggleSweep.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
-import { makeWormSim, resetWormSim, stepWormSim, queueTurn, killWormSim, applyRotationToSim, startJump, tryShedSkin, tileKey } from '../worm/healerWorm/wormSim.js';
-import { signatureAvailability, signatureReadout, isParityLocked, SIGNATURES } from '../worm/healerWorm/signatures.js';
+import { makeWormSim, resetWormSim, stepWormSim, queueTurn, killWormSim, startJump } from '../worm/healerWorm/wormSim.js';
+import { signatureAvailability, signatureReadout, isParityLocked, releaseMobiTunnel, tickSignature, SIGNATURES } from '../worm/healerWorm/signatures.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
-import { ttPush, shAt } from '../worm/circularBuffers.js';
-import { rotateTilePosition } from '../worm/wormHelpers.js';
+import { ttPush } from '../worm/circularBuffers.js';
+import { characterOrbCount, characterXpMultiplier, holdsRotationTimer } from '../worm/characterAbilities.js';
+import { getStableKey } from '../worm/wormLogic.js';
 
 function makeCtx(overrides = {}) {
   const events = [];
@@ -56,15 +59,6 @@ const step = (sim, ctx, seconds = 0.05) => stepWormSim(sim, seconds, SIZE, ctx);
 function run(sim, ctx, seconds) { for (let t = 0; t < seconds - 0.001; t += 0.05) step(sim, ctx); }
 function activate(sim, ctx) { queueTurn(sim, 'signature'); step(sim, ctx); }
 const eventsOf = (ctx, type) => ctx.events.filter(e => e.type === type);
-function tunnelWorld() {
-  const w = world('mobi');
-  const entry = { x: 2, y: 3, z: 4, dirKey: 'PZ' };
-  const exit = { x: 2, y: 1, z: 0, dirKey: 'NZ' };
-  w.cubies[2][3][4].stickers.PZ.curr = 4;
-  const tunnel = { entry, exit, entryColor: 4, exitColor: 1 };
-  w.ctx.resolveTunnel = () => ({ tunnel, tunnelKey: 'lock-test' });
-  return { ...w, entry, tunnel };
-}
 beforeEach(() => resetLiveRotation());
 
 describe('signature input and lifecycle', () => {
@@ -155,179 +149,130 @@ describe('Inch: Spring Loaded', () => {
   });
 });
 
-describe('Glow: Pulse Beacon', () => {
-  it('collects an adjacent orb, leaves a distant one, and keeps boost available', () => {
-    const { sim, ctx } = world('glow');
-    sim.powerups = [{ x: 3, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }, { x: 0, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }];
-    activate(sim, ctx); run(sim, ctx, 1.05);
-    expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
-    expect(sim.powerups[1].x).toBe(0);
-    queueTurn(sim, 'boost'); step(sim, ctx); expect(sim.boostActiveT).toBeGreaterThan(0);
+describe('character abilities', () => {
+  it('Book pauses the layer clock without stopping movement or teleporting', () => {
+    const { sim, ctx } = world('book'); const origin = { ...sim.pos };
+    activate(sim, ctx); expect(holdsRotationTimer(sim.signature)).toBe(true);
+    run(sim, ctx, 1.1); expect(sim.pos).not.toEqual(origin);
+    const seq = sim.signature.seq; activate(sim, ctx); expect(sim.signature.seq).toBe(seq);
+    expect(signatureReadout(sim, SIZE, ctx).returnReady).toBe(false);
+    tickSignature(sim, 5, SIZE, ctx); expect(holdsRotationTimer(sim.signature)).toBe(false);
   });
-  it('removes the extra pickup reach after expiry', () => {
-    const { sim, ctx } = world('glow'); activate(sim, ctx);
-    sim.signature.active = 0.01;
-    sim.powerups = [{ x: 3, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }];
-    run(sim, ctx, 1.05);
-    expect(eventsOf(ctx, 'pickup')).toHaveLength(0);
-    expect(signatureReadout(sim, SIZE, ctx).ready).toBe(false);
-  });
-  it('does not shrink an existing magnet reach', () => {
-    const { sim, ctx } = world('glow');
-    sim.magnetT = sim.magnetMaxT = 10;
-    sim.powerups = [{ x: 4, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }];
-    activate(sim, ctx); run(sim, ctx, 1.05);
-    expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
-  });
-});
-
-describe('MOBI: Parity Lock', () => {
-  it('crosses the sealed entrance without entering, healing, depositing or using it', () => {
-    const { sim, ctx, entry, cubies } = tunnelWorld();
-    const before = JSON.stringify(cubies);
-    activate(sim, ctx); expect(isParityLocked(sim, entry)).toBe(true);
-    run(sim, ctx, 1.5);
-    expect(sim.phase).toBe('crawling'); expect(sim.onFlippedTile).toBe(false);
-    for (const type of ['tunnelEnter', 'heal', 'deposit']) expect(eventsOf(ctx, type)).toHaveLength(0);
-    expect(sim.tunnelUseCounts.size).toBe(0); expect(JSON.stringify(cubies)).toBe(before);
-  });
-  it('clears a stale pending trigger without stalling the crawl', () => {
-    const { sim, ctx, entry } = tunnelWorld(); activate(sim, ctx);
-    sim.pendingTunnelTrigger = entry;
-    const elapsed = sim.stepAcc; step(sim, ctx);
-    expect(sim.pendingTunnelTrigger).toBeNull(); expect(sim.stepAcc).toBeGreaterThan(elapsed);
-  });
-  it('restores normal entry when the seal expires under the worm', () => {
-    const { sim, ctx } = tunnelWorld(); activate(sim, ctx); run(sim, ctx, 1.15);
-    sim.signature.active = 0.01;
-    run(sim, ctx, 0.35);
-    // The 180 ms mouth alignment has finished by this observation time.
-    expect(sim.phase).toBe('entering'); expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
-  });
-  it('waits for a cube turn to settle before rearming an expired seal', () => {
-    const { sim, ctx } = tunnelWorld(); activate(sim, ctx); run(sim, ctx, 1.15);
-    liveRotation.active = true; sim.signature.active = 0.01;
-    step(sim, ctx);
-    expect(sim.pendingTunnelTrigger).toBeNull(); expect(sim.phase).toBe('crawling');
-    resetLiveRotation(); run(sim, ctx, 0.35);
-    expect(sim.phase).toBe('entering');
-  });
-  it('leaves other entrances dangerous', () => {
-    const { sim, ctx, cubies } = tunnelWorld(); activate(sim, ctx);
-    cubies[2][4][4].stickers.PZ.curr = 4;
-    run(sim, ctx, 2.5);
-    expect(sim.phase).toBe('entering'); expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
-  });
-  it('does not spend the cooldown when no entrance is in front', () => {
-    const { sim, ctx } = world('mobi'); activate(sim, ctx);
-    expect(sim.signature.cooldown).toBe(0);
-    expect(signatureReadout(sim, SIZE, ctx).reason).toBe('No entrance ahead');
-  });
-  it('refuses a voided entrance', () => {
-    const { sim, ctx } = tunnelWorld(); sim.voidTunnelKeys.add('lock-test'); activate(sim, ctx);
-    expect(sim.signature.cooldown).toBe(0);
-  });
-  it('carries the seal with its own layer in an opposite-direction paired turn', () => {
-    const { sim, ctx, entry } = tunnelWorld(); activate(sim, ctx);
-    const rotation = { axis: 'row', dir: 1, sliceIndex: 1, sliceIndices: [1, 3], sliceDirs: [1, -1] };
-    applyRotationToSim(sim, SIZE, ctx, rotation, { inOpeningScramble: false, paused: false });
-    expect(sim.signature.target).toMatchObject(rotateTilePosition(entry, 'row', 3, -1, SIZE));
-    expect(isParityLocked(sim, entry)).toBe(false);
-    expect(isParityLocked(sim, sim.signature.target)).toBe(true);
-  });
-});
-
-
-describe('remaining signatures', () => {
-  it('defines all seven characters', () => expect(Object.keys(SIGNATURES).sort()).toEqual(['book', 'classic', 'glow', 'inch', 'mobi', 'prism', 'wiggle']));
-  it('arms Shed Skin only when the tail can pay and consumes it once', () => {
-    const { sim, ctx } = world('classic'); activate(sim, ctx);
-    expect(sim.signature.active).toBe(0);
-    sim.tailLength = 16; ctx.getOrbInventory = () => ({ 1: 12 });
-    sim.orbPickupFaceIds = [1, 1, 1, 1]; sim.orbPickupColors = ['a', 'b', 'c', 'd'];
-    const shed = []; ctx.onTailShed = (...args) => shed.push(args);
-    activate(sim, ctx); expect(sim.signature.active).toBeGreaterThan(0);
-    expect(tryShedSkin(sim, ctx, 'body')).toBe(true);
-    expect(sim.tailLength).toBeLessThanOrEqual(13);
-    expect(shed).toHaveLength(1);
-    expect(Object.values(shed[0][0]).reduce((a,b) => a+b, 0)).toBeLessThanOrEqual(sim.tailLength - 4);
-    expect(tryShedSkin(sim, ctx, 'body')).toBe(false);
-    expect(sim.alive).toBe(true);
-  });
-  it('consumes Shed Skin through the real pending-collision gameplay path', () => {
-    const { sim, ctx } = world('classic'); sim.tailLength = 30;
-    const body = '2,1,4,PZ'; ttPush(sim.tileTrail, body); ttPush(sim.tileTrail, tileKey(sim.pos));
-    sim.pendingSelfCollision = { key: body };
-    activate(sim, ctx);
-    expect(sim.alive).toBe(true); expect(sim.signature.active).toBe(0);
-    expect(sim.pendingSelfCollision).toBeNull(); expect(sim.tailLength).toBeLessThan(30);
-  });
-  it('does not protect Shed Skin from non-body deaths', () => {
-    const { sim, ctx } = world('classic'); sim.tailLength = 10; activate(sim, ctx);
-    killWormSim(sim, ctx, { reason: 'bomb' }); expect(sim.alive).toBe(false);
-  });
-  it('returns Book to its mark without restoring its spent inventory or progress', () => {
-    const { sim, ctx } = world('book'); const mark = { ...sim.pos };
-    activate(sim, ctx); run(sim, ctx, 1.1);
-    expect(sim.pos).not.toEqual(mark);
-    sim.tailLength = 4; const inventory = { 1: 1 }; ctx.getOrbInventory = () => inventory;
-    const deposited = { tunnel: { deposited: 3 } }; ctx.getHealingProgress = () => deposited;
-    activate(sim, ctx);
-    expect(sim.pos).toEqual(mark); expect(sim.signature.active).toBe(0);
-    expect(sim.signature.cooldown).toBeGreaterThan(28);
-    expect(ctx.getOrbInventory()).toBe(inventory); expect(ctx.getHealingProgress()).toBe(deposited);
-    expect(sim.tailLength).toBe(4); expect(eventsOf(ctx, 'pickup')).toHaveLength(0);
-    for (let i = 0; i < sim.stepHistory.count; i++) {
-      const sample = shAt(sim.stepHistory, i);
-      expect([sample.tx, sample.ty, sample.tz]).toEqual([mark.x, mark.y, mark.z]);
+  it('Classic and Prism are always-on passives', () => {
+    for (const id of ['classic', 'prism']) {
+      const { sim, ctx } = world(id); activate(sim, ctx);
+      expect(sim.signature.active).toBe(0); expect(SIGNATURES[id].passive).toBe(true);
     }
+    expect(characterOrbCount(5, 'classic')).toBe(8);
+    expect(characterOrbCount(5, 'prism')).toBe(5);
+    expect(characterXpMultiplier('book')).toBe(1.25);
+    expect(characterXpMultiplier('glow')).toBe(1);
   });
-  it('refuses a blocked Bookmark return while retaining the remaining return window', () => {
-    const { sim, ctx, cubies } = world('book'); activate(sim, ctx); run(sim, ctx, 1.1);
-    const target = sim.signature.target; cubies[target.x][target.y][target.z].stickers[target.dirKey].curr = 4;
-    const pos = { ...sim.pos }; activate(sim, ctx);
-    expect(sim.pos).toEqual(pos); expect(sim.signature.active).toBeGreaterThan(0);
-    expect(sim.signature.notice).toContain('wormhole');
-    run(sim, ctx, 3); expect(sim.signature.active).toBe(0);
+  it('Glow paints for three seconds without granting the old magnet reach', () => {
+    const { sim, ctx } = world('glow');
+    const seq = sim.pathHistory.nextSeq;
+    sim.powerups = [{ x: 3, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }];
+    activate(sim, ctx); expect(sim.signature.trailStartSeq).toBe(seq);
+    expect(sim.signature.active).toBeCloseTo(2.95);
+    run(sim, ctx, 1.05); expect(eventsOf(ctx, 'pickup')).toHaveLength(0);
+    tickSignature(sim, 3, SIZE, ctx); expect(sim.signature.active).toBe(0);
   });
-  it('rotates the Bookmark heading with its own cube slice', () => {
-    const { sim, ctx } = world('book'); activate(sim, ctx);
-    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', dir: 1, sliceIndex: 4 }, { inOpeningScramble: false, paused: false });
-    expect(sim.signature.target.dirKey).toBe('PZ');
-    expect(sim.signature.heading).not.toBe('up');
-    expect(sim.signature.heading).toBe(sim.moveDir);
-  });
-  it('Wiggle dodges a tile toward the last steering side and resumes forward', () => {
-    const { sim, ctx } = world('wiggle');
-    queueTurn(sim, 'turnLeft'); // remembered even while the dodge consumes the queued steering
+  it('MOBI creates beneath its head, enters without a deposit, and must heal before creating again', () => {
+    const { sim, ctx, cubies } = world('mobi');
+    const entry = { ...sim.pos }, exit = { x: 2, y: 2, z: 0, dirKey: 'NZ' };
+    const tunnel = { entry, exit, entryColor: 4, exitColor: 1, pairId: 'personal' };
+    const stableKeys = [entry, exit].map(p => getStableKey(p.x,p.y,p.z,p.dirKey,cubies));
+    let created = false;
+    ctx.canCreateMobiTunnel = () => !created;
+    ctx.createMobiTunnel = p => {
+      expect(p).toEqual(entry); created = true;
+      cubies[2][2][4].stickers.PZ.curr = 4;
+      return { tunnel, stableKeys };
+    };
+    ctx.resolveTunnel = () => ({ tunnel, tunnelKey: 'personal' });
+    ctx.getOrbInventory = () => ({ 4: 30 }); sim.tailLength = 34;
     activate(sim, ctx);
-    expect(sim.pos).toEqual({ x: 1, y: 2, z: 4, dirKey: 'PZ' });
-    expect(sim.signature.dashing).toBe(true); expect(sim.interpT).toBeGreaterThan(0); expect(sim.interpT).toBeLessThan(1);
-    run(sim, ctx, 0.15); expect(sim.signature.dashing).toBe(false);
-    expect(sim.moveDir).toBe('up'); expect(sim.alive).toBe(true);
-    run(sim, ctx, 0.1); expect(sim.pos.y).toBe(3);
+    expect(sim.phase).toBe('windup'); expect(eventsOf(ctx, 'tunnelEnter')).toHaveLength(1);
+    expect(eventsOf(ctx, 'deposit')).toHaveLength(0); expect(sim.tailLength).toBe(34);
+    expect(isParityLocked(sim, entry, ctx)).toBe(true); expect(isParityLocked(sim, exit, ctx)).toBe(true);
+    expect(isParityLocked(sim, { ...entry, x: 1 }, ctx)).toBe(false);
+    sim.phase = 'crawling'; sim.tunnelPassages = [];
+    tickSignature(sim, 9.9, SIZE, ctx); expect(isParityLocked(sim, entry, ctx)).toBe(true);
+    tickSignature(sim, .11, SIZE, ctx); expect(isParityLocked(sim, entry, ctx)).toBe(false);
+    expect(signatureAvailability(sim, SIZE, ctx).reason).toContain('Heal your previous');
+    releaseMobiTunnel(sim, { pairId: 'other' }); expect(sim.signature.mobiTunnel).not.toBeNull();
+    releaseMobiTunnel(sim, tunnel); expect(sim.signature.mobiTunnel).toBeNull();
   });
-  it('refuses a Wiggle landing on a mouth, body or another face without charging', () => {
-    const { sim, ctx, cubies } = world('wiggle');
-    cubies[3][2][4].stickers.PZ.curr = 4; activate(sim, ctx);
-    expect(sim.signature.cooldown).toBe(0);
-    cubies[3][2][4].stickers.PZ.curr = cubies[3][2][4].stickers.PZ.orig;
-    ttPush(sim.tileTrail, '3,2,4,PZ'); ttPush(sim.tileTrail, tileKey(sim.pos)); sim.tailLength = 100;
-    activate(sim, ctx); expect(sim.signature.cooldown).toBe(0);
-    sim.pos.x = 4; activate(sim, ctx); expect(sim.signature.notice).toContain('Face edge');
+  it('MOBI lock follows a sticker identity rather than stale tile coordinates', () => {
+    const { sim, ctx, cubies } = world('mobi');
+    const p = { ...sim.pos }, moved = { ...p, x: 1 };
+    sim.signature.mobiTunnel = { pairId: 'personal', reentryT: 10,
+      stableKeys: [getStableKey(p.x,p.y,p.z,p.dirKey,cubies)] };
+    [cubies[p.x][p.y][p.z].stickers.PZ, cubies[moved.x][moved.y][moved.z].stickers.PZ] =
+      [cubies[moved.x][moved.y][moved.z].stickers.PZ, cubies[p.x][p.y][p.z].stickers.PZ];
+    expect(isParityLocked(sim, moved, ctx)).toBe(true); expect(isParityLocked(sim, p, ctx)).toBe(false);
   });
-  it('Prism converts only three actual pickups, adding one segment each', () => {
-    const { sim, ctx, cubies } = world('prism');
-    const entry = { x: 0, y: 0, z: 4, dirKey: 'PZ' }; cubies[0][0][4].stickers.PZ.curr = 4;
-    ctx.getActiveTunnels = () => [{ entry }]; ctx.resolveTunnel = () => ({ tunnelKey: 'test' });
-    activate(sim, ctx); expect(sim.signature.charges).toBe(3);
-    sim.powerups = Array.from({ length: 4 }, () => ({ x: 2, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }));
+  it('MOBI rejects unavailable terrain without creating a tunnel', () => {
+    const { sim, ctx } = world('mobi'); activate(sim, ctx);
+    expect(sim.signature.seq).toBe(0); expect(sim.signature.mobiTunnel).toBeNull();
+  });
+  it('holds the head and discards turns through both wiper cycles, then resumes', () => {
+    const { sim, ctx } = world('wiggle');
+    const origin = { ...sim.pos };
+    queueTurn(sim, 'turnLeft'); activate(sim, ctx);
+    expect(sim.pos).toEqual(origin);
+    expect(sim.signature.sweep).not.toBeNull();
+    for (let i = 0; i < 40; i++) {
+      queueTurn(sim, 'turnRight'); queueTurn(sim, 'jump'); step(sim, ctx);
+      expect(sim.pos).toEqual(origin); expect(sim.moveDir).toBe('up');
+      expect(sim.pendingTurns).toHaveLength(0); expect(sim.isJumping).toBe(false);
+    }
+    run(sim, ctx, 0.35);
+    expect(sim.signature.sweep).toBeNull(); expect(sim.signature.active).toBe(0);
+    expect(sim.pos).toEqual(origin);
+    run(sim, ctx, 1.05); expect(sim.pos.y).toBe(3); expect(sim.moveDir).toBe('up');
+  });
+  it('reaches three tiles on each side twice and returns exactly to center', () => {
+    expect([0, .3, .9, 1.5, 2.1, 2.4].map(wiggleOffset)).toEqual([0, -3, 3, -3, 3, 0]);
+    const { sim, ctx } = world('wiggle'); activate(sim, ctx);
+    const sweep = sim.signature.sweep, tail = new Vector3(), origin = new Vector3();
+    wigglePointInto(origin, sweep, 1, 0);
+    wigglePointInto(tail, sweep, 1, -3);
+    expect(tail.distanceTo(origin)).toBeCloseTo(3);
+    wigglePointInto(tail, sweep, 0, 3);
+    expect(tail.distanceTo(sweep.points[0])).toBeCloseTo(0);
+  });
+  it('collects crossed orbs once with normal growth, leaving off-path orbs', () => {
+    const { sim, ctx } = world('wiggle', { isStoryMode: () => true });
+    sim.powerups = [0, 4].map(x => ({ x, y: 2, z: 4, dirKey: 'PZ', type: 'apple' }));
+    sim.powerups.push({ x: 0, y: 4, z: 4, dirKey: 'PZ', type: 'apple' });
+    const length = sim.tailLength;
+    activate(sim, ctx); run(sim, ctx, WIGGLE_DURATION - .05);
+    expect(eventsOf(ctx, 'pickup')).toHaveLength(2);
+    expect(sim.tailLength).toBe(length + 6);
+    expect(sim.powerups).toHaveLength(1); expect(sim.powerups[0].y).toBe(4);
+  });
+  it('freezes during pause and clears on death without releasing queued steering', () => {
+    const { sim, ctx } = world('wiggle'); activate(sim, ctx);
+    const elapsed = sim.signature.sweep.elapsed;
+    ctx.isPaused = () => true; run(sim, ctx, 1);
+    expect(sim.signature.sweep.elapsed).toBe(elapsed);
+    ctx.isPaused = () => false; killWormSim(sim, ctx);
+    expect(sim.signature.sweep).toBeNull(); expect(sim.pendingTurns).toHaveLength(0);
+  });
+  it('Prism keeps pickup colors and quantity intact; wildcard applies on deposit', () => {
+    const { sim, ctx } = world('prism', { isStoryMode: () => true });
+    sim.powerups = [{ x: 2, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }];
     run(sim, ctx, 1.05);
-    const pickups = eventsOf(ctx, 'pickup');
-    expect(pickups).toHaveLength(4);
-    expect(pickups.map(p => p.args[0])).toEqual([4, 4, 4, 1]);
-    expect(pickups.map(p => p.args[4])).toEqual([4, 4, 4, 3]);
-    expect(sim.signature.charges).toBe(0); expect(sim.signature.active).toBe(0);
-    expect(sim.tailLength).toBe(19);
+    expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
+    expect(eventsOf(ctx, 'pickup')[0].args[4]).toBe(3);
+    expect(sim.tailLength).toBe(7);
   });
+});
+
+it('caps dense Classic orb layouts at distinct surface tiles', () => {
+  const sim = makeWormSim(3);
+  resetWormSim(sim, 3, { orbCount: characterOrbCount(100, 'classic'), wormholeInterval: 9999 });
+  expect(sim.powerups).toHaveLength(53);
+  expect(new Set(sim.powerups.map(p => `${p.x},${p.y},${p.z},${p.dirKey}`)).size).toBe(53);
 });

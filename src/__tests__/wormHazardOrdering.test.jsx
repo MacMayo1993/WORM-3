@@ -183,3 +183,16 @@ it('spawns a Story bomb, credits only a full live ring, and suppresses ordinary 
   expect(props.bombsRef.current).toHaveLength(0);
   expect(useGameStore.getState().parityPoints).toBe(coins);
 });
+
+it('Book freezes only the layer countdown and resumes the same pending turn', () => {
+  tick(80);
+  const remaining = rotationClock.remaining;
+  sim.signature.character = 'book'; sim.signature.active = 5;
+  tick(60);
+  expect(rotationClock.held).toBe(true);
+  expect(rotationClock.remaining).toBe(remaining);
+  expect(rotate).not.toHaveBeenCalled();
+  sim.signature.active = 0;
+  tick(21);
+  expect(rotate).toHaveBeenCalledTimes(1);
+});

@@ -16,7 +16,7 @@ export const WORM_DEMO_LESSONS = [
   { id: 'grass', title: 'Grow a spring pad', instruction: 'Collect the green leaf, jump and land to grow a pad. Jump again from a green pad for a bigger leap.', success: 'You used a spring pad. Nature turns your landings into new launch points.' },
   { id: 'ice', title: 'Break out of a slide', instruction: 'Collect the snowflake. Ice delays grounded turns until the next tile; JUMP to regain immediate steering.', success: 'Jumping gives you control while the surface is slippery.' },
   { id: 'lightning', title: 'Ride the storm', instruction: 'Collect the purple lightning orb and keep crawling as the cube lights up.', success: 'Lightning transforms the cube with electrical veins and strikes.' },
-  { id: 'signature', title: 'Your signature move', instruction: 'Press Beacon. Glow Worm reveals nearby pickups and reaches one tile farther. Every character has its own move.', success: 'Your signature has its own cooldown, separate from Boost.' },
+  { id: 'signature', title: 'Your signature move', instruction: 'Press Trail. Glow Worm paints a luminous trail for three seconds and makes enemies glow brighter. Each character has its own ability.', success: 'Your signature has its own cooldown, separate from Boost.' },
   { id: 'bomb', title: 'Disarm a bomb', instruction: 'Surround the bomb using the marked ring before its fuse runs out. Your practice worm is already long enough.', success: 'A complete ring disarms the bomb. In real runs, keep clear of its blast lanes.' },
   { id: 'rotation', title: 'Watch the turning layer', instruction: 'Watch the lit layer and countdown. Keep your head and tail clear until the layer finishes turning.', success: 'You cleared the turning layer. You have finished WORM practice.' },
 ];

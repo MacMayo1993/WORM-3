@@ -13,15 +13,15 @@ export default function SignatureButton({ compact = false }) {
   const [readout, setReadout] = useState(wormBuffs.signature);
   const def = SIGNATURES[character];
   useEffect(() => {
-    if (!def) return;
+    if (!def || def.passive) return;
     const id = setInterval(() => setReadout(wormBuffs.signature), 100);
     return () => clearInterval(id);
   }, [def]);
-  if (!def) return null;
+  if (!def || def.passive) return null;
   const current = readout?.character === character ? readout : null;
   const disabled = !alive || paused || !['active', 'finalHealing'].includes(phase) || !current || (!current.returnReady && (current.seconds > 0 || current.active));
   const label = current?.returnReady ? `${current.activeSeconds}s` : current?.charges > 0 ? `${current.charges} LEFT` : current?.active ? 'ACTIVE' : current?.seconds > 0 ? `${current.seconds}s` : 'Q';
-  const status = current?.notice || '';
+  const status = current?.notice || (!current?.ready && !current?.active && !current?.seconds ? current?.reason : '') || '';
   const activate = () => {
     const state = useGameStore.getState();
     if (!disabled && state.wormAlive && !state.wormPaused) callWormTurn('signature');

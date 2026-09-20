@@ -1,3 +1,4 @@
+import { wigglePointInto } from './wiggleSweep.js';
 import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelSwim.js';
 import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
 import { SPRING_CHARGE } from './signatures.js';
@@ -36,14 +37,13 @@ import {
 import {
     WORM_LIFT,
     ORB_SEGMENT_GROWTH,
-    STEPS_PER_TILE,
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
     MAX_TAIL,
 } from './constants.js';
 import { inchGaitInto, makeInchGaitState, advanceInchGaitState } from './inchGait.js';
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
-import { rocketOrbitT, rocketOrbitInto } from './rocketOrbit.js';
+import { rocketOrbitT, rocketOrbitInto, cubeShellDirInto } from './rocketOrbit.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
@@ -53,59 +53,6 @@ const _mobiSpinMatrix = new THREE.Matrix4();
 // Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
 const _bodyColor = new THREE.Color();
 const _pickupHighlight = new THREE.Color('#fff4c9');
-const _fireTail = new THREE.Vector3();
-const _fireInner = new THREE.Vector3();
-const _fireDirection = new THREE.Vector3();
-const _fireUp = new THREE.Vector3(0, 1, 0);
-
-/** Flame fixed to the final visible orb while rocket overdrive is active. */
-export function RocketTailFire({ worm, size }) {
-    const groupRef = useRef();
-    useFrame((state) => {
-        const group = groupRef.current;
-        if (!group) return;
-        const active = worm.rocketActive.current && worm.phase.current === 'crawling';
-        group.visible = active;
-        if (!active) return;
-
-        const history = worm.stepHistory.current;
-        if (history.count < 2) {
-            group.visible = false;
-            return;
-        }
-        const tailSteps = Math.min(history.count - 1, Math.max(0, Math.round(worm.tailLength.current * BODY_BALL_SPACING * STEPS_PER_TILE)));
-        const tail = shAt(history, tailSteps);
-        const inner = shAt(history, Math.max(0, tailSteps - 4));
-        if (!tail || !inner) return;
-        _fireTail.copy(tail.pos);
-        _fireInner.copy(inner.pos);
-        // Ride the orbit with the body so the flame stays glued to the risen tail.
-        const orbitT = rocketOrbitT(true, worm.rocketT.current, worm.rocketFlight?.current);
-        if (orbitT > 0) {
-            rocketOrbitInto(_fireTail, size, orbitT);
-            rocketOrbitInto(_fireInner, size, orbitT);
-        }
-        _fireDirection.subVectors(_fireTail, _fireInner).normalize();
-        group.position.copy(_fireTail).addScaledVector(_fireDirection, 0.12);
-        group.quaternion.setFromUnitVectors(_fireUp, _fireDirection);
-        const pulse = 0.9 + Math.sin(state.clock.elapsedTime * 24) * 0.16;
-        group.scale.set(pulse, pulse * 1.25, pulse);
-    });
-
-    return (
-        <group ref={groupRef} visible={false}>
-            <mesh position={[0, 0.16, 0]}>
-                <coneGeometry args={[0.18, 0.52, 12]} />
-                <meshBasicMaterial color="#ff5a16" transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-            </mesh>
-            <mesh position={[0, 0.11, 0]}>
-                <coneGeometry args={[0.1, 0.34, 10]} />
-                <meshBasicMaterial color="#ffe96a" blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-            </mesh>
-            <pointLight color="#ff7b24" intensity={1.8} distance={2.2} decay={2} />
-        </group>
-    );
-}
 // Book Worm page-flip scratch — see the isBook block in the segment loop below.
 const _NO_HINGE = { left: 0, right: 0 };
 const _pageDummy = new THREE.Object3D();
@@ -270,6 +217,7 @@ export function WormBody({ worm, size }) {
         // constant altitude that rounds every edge — rather than each part offsetting
         // itself along whichever face normal it happens to hold. See rocketOrbit.js.
         const orbitT = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
+        const flightBlend = Math.min(1, orbitT * 4);
         // During transit (entering/tunnel/exiting) and the windout spiral the body segments ride
         // the ribbon/spiral centerline exactly — no face-normal lift, or the head floats off.
         // windout uses getWindWorldPosInto which supplies its own lift, so WORM_LIFT must not
@@ -317,8 +265,9 @@ export function WormBody({ worm, size }) {
             // The body keeps its books; only the head is round now.
             const headMesh = bookHeadRef.current;
             if (headMesh) {
-                _bookHeadDummy.position.copy(_bodyHeadPos)
-                    .addScaledVector(_bodyNormal, BOOK_HEAD_LIFT);
+                _bookHeadDummy.position.copy(_bodyHeadPos);
+                if (orbitT > 0) rocketOrbitInto(_bookHeadDummy.position, size, orbitT);
+                _bookHeadDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT);
                 _bookHeadDummy.quaternion.identity();
                 _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * worm.pickupHeadScale * worm.tunnelHeadScale);
                 _bookHeadDummy.updateMatrix();
@@ -372,8 +321,7 @@ export function WormBody({ worm, size }) {
         const _ride = liveRotation.active;
         const _rAxis = liveRotation.axis;
         if (_ride) _bodyRideAxis.set(_rAxis === 'col' ? 1 : 0, _rAxis === 'row' ? 1 : 0, _rAxis === 'depth' ? 1 : 0);
-        // Returns the effective (possibly ridden) world position for a path point, writing into
-        // `out` only when a rotation is applied; otherwise returns the point's own vector.
+        // Resolve each path point into scratch without mutating simulation history.
         //
         // Each point rides ITS OWN plane at that plane's signed angle. Riding the anchor
         // plane's angle meant a body sample on the second plane of a two-plane turn sat
@@ -381,11 +329,15 @@ export function WormBody({ worm, size }) {
         // turn, whose planes spin opposite ways, half the body was doing that. Points
         // tagged tx < 0 were recorded in destination space (a crossing) and never ride.
         const effPos = (pt, out) => {
+            out.copy(pt.pos);
             if (_ride && pt.tx >= 0) {
                 const ang = liveLayerAngle(pt.tx, pt.ty, pt.tz);
-                if (ang !== null) return out.copy(pt.pos).applyAxisAngle(_bodyRideAxis, ang);
+                if (ang !== null) out.applyAxisAngle(_bodyRideAxis, ang);
             }
-            return pt.pos;
+            // Measure distances AFTER lifting the path. Projecting already-spaced
+            // beads stretches them apart at cube edges as the flight radius grows.
+            if (orbitT > 0 && !pt.transit) rocketOrbitInto(out, size, orbitT);
+            return out;
         };
 
         // Worm stays visible through the whole Möbius ride now (the tunnel camera rides inside on
@@ -421,7 +373,8 @@ export function WormBody({ worm, size }) {
         let haloIdx = 0;  // compacted slot into the glow-halo overlay
         let pageWriteIdx = 0; // book worm only — compacted slot into the page-flap overlays (body segments only, no head entry)
 
-        const visibleCount = Math.min(MAX_TAIL, tLen);
+        const sweep = worm.signature.current.sweep;
+        const visibleCount = Math.min(MAX_TAIL, sweep ? Math.max(tLen, Math.ceil((sweep.length + Math.abs(sweep.offset) * 2) / BODY_BALL_SPACING) + 1) : tLen);
 
         const orbColors = worm.orbPickupColorsRef.current;
         const baseColor = wormColorRef.current;
@@ -469,7 +422,7 @@ export function WormBody({ worm, size }) {
             const lodStep = i < 200 ? 1 : (i < 600 ? 2 : 4);
             if (i !== 0 && i % lodStep !== 0) continue;
 
-            const fade = 1 - i / tLen;
+            const fade = 1 - i / (sweep ? visibleCount : tLen);
             let swimWeight = 0;
 
             if (i === 0) {
@@ -495,8 +448,8 @@ export function WormBody({ worm, size }) {
                 let targetDist;
                 if (_isInch) {
                     inchGaitInto(_inchGait, i, visibleCount, _gaitPhase, _gaitMove, _inchShape);
-                    targetDist = _inchGait.dist;
-                    _inchArch = _inchGait.arch;
+                    targetDist = THREE.MathUtils.lerp(_inchGait.dist, i * BODY_BALL_SPACING, flightBlend);
+                    _inchArch = _inchGait.arch * (1 - flightBlend);
                 } else {
                     targetDist = i * BODY_BALL_SPACING;
                 }
@@ -533,7 +486,7 @@ export function WormBody({ worm, size }) {
                         // segments (small phase-step → long spatial wavelength); a large
                         // phase-step would alias the closely-spaced (0.09 apart) segments into
                         // a jagged scatter instead of a coherent S-curve.
-                        const wiggleAmp = (_isInch || segmentTransit) ? 0.0 : (_isWiggle ? 0.26 : 0.08) * Math.sin(fade * Math.PI);
+                        const wiggleAmp = (_isInch || segmentTransit) ? 0.0 : (_isWiggle ? 0.26 : 0.08) * Math.sin(fade * Math.PI) * (1 - flightBlend);
                         const wigglePhase = i * (_isWiggle ? 0.5 : 0.8) - time * (_isWiggle ? 8.0 : 6.0);
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         // Inch Worm: ride up off the surface along the normal wherever the
@@ -561,7 +514,7 @@ export function WormBody({ worm, size }) {
                 const stroke = tunnelSwimInto(tunnelStroke.current, i, tLen, time, swimWeight, reducedPickupMotion);
                 if (swimWeight > 0) offsetTunnelSwimInto(_bodyClonePos, _bodySegForward, _bodyCloneNormal, stroke);
 
-                if (!segmentTransit && foundPosition) {
+                if (!segmentTransit && foundPosition && orbitT === 0) {
                     clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : isMobi ? 0.15 : 0.10, surface);
                 }
                 if (_isBook && !segmentTransit) {
@@ -573,11 +526,16 @@ export function WormBody({ worm, size }) {
                     // _bodyClonePos directly, inherit the same lift.
                     _bodyClonePos.addScaledVector(_bodyCloneNormal, 0.088 * PAGE_HINGE_Y);
                 }
-                // Rocket flight puts every surface segment on the same orbit shell as the
-                // head, so the body flies level and rounds edges together instead of each
-                // segment swinging out along its own face's normal. Skipped in transit
-                // (tunnel/wind own their path).
-                if (orbitT > 0 && !segmentTransit) rocketOrbitInto(_bodyClonePos, size, orbitT);
+                // Follow the airborne tangent when orienting books and capsules.
+                // Position was already lifted before the path's distance was measured.
+                if (orbitT > 0 && !segmentTransit) {
+                    cubeShellDirInto(_bodyCloneNormal, _bodyClonePos, size);
+                    _bodyCloneNormal.addScaledVector(_bodySegForward, -_bodyCloneNormal.dot(_bodySegForward)).normalize();
+                }
+                if (sweep) {
+                    wigglePointInto(_bodyClonePos, sweep, i / (visibleCount - 1));
+                    _bodyCloneNormal.copy(sweep.normal);
+                }
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isBook || isMobi || _isInch || _isPrism) {
                     // Orient the cover to face the direction of travel, using the same
@@ -636,7 +594,7 @@ export function WormBody({ worm, size }) {
                 _wormDummy.scale.multiplyScalar(1 + compression * 0.2);
                 _wormDummy.position.addScaledVector(i === 0 ? _bodyNormal : _bodyCloneNormal, -compression * 0.025);
             }
-            _wormDummy.scale.multiplyScalar(wormBodyTaper(i, tLen, wormCharacterId));
+            _wormDummy.scale.multiplyScalar(wormBodyTaper(i, sweep ? visibleCount : tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
             // LOD removes distant instances to control cost, but must never make
             // the survivors larger: that produced an abrupt size jump at segment

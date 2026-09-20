@@ -1,4 +1,5 @@
-import { makeSignature, activateSignature, tickSignature, isParityLocked, refractPickup } from './signatures.js';
+import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
+import { makeSignature, activateSignature, tickSignature, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState } from './inchGait.js';
@@ -50,11 +51,11 @@ import {
     findCoveredWormholeRing,
 } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
-import { rotateTilePosition, parseTileKey, _parseTile, reconcileOrbInventoryAfterCut } from '../wormHelpers.js';
+import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
 import { remapWormPress } from '../tilePressBridge.js';
 import {
-    makeStepHistory, shPush, shAt, shReset, shTrimTo, shMarkRestRead, shReleaseRestRead,
-    makeTileTrail, ttPush, ttAt, ttReset, ttTrimTo, ttMapInPlace, ttFilterInPlace,
+    makeStepHistory, shPush, shAt, shReset, shMarkRestRead, shReleaseRestRead,
+    makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace,
 } from '../circularBuffers.js';
 import { isSurfaceTilePos, randomFreeTile, randomUnflippedTile } from './surfaceTiles.js';
 import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady } from './economy.js';
@@ -216,7 +217,6 @@ export function makeWormSim(size) {
         // ── Boost ──────────────────────────────────────────────────────────────
         signature: makeSignature(),
         signatureRequested: false,
-        signatureSide: 'right',
         boostActiveT: 0,
         boostCooldownT: 0,
 
@@ -325,7 +325,7 @@ const setCurWorldPosFromTile = (sim, size) => {
 export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     const startPos = INITIAL_POS(size);
     const initial = [];
-    for (let i = 0; i < orbCount; i++) {
+    for (let i = 0; i < Math.min(orbCount, 6 * size * size - 1); i++) {
         initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
     }
 
@@ -341,7 +341,6 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.tilesSinceTurn = 1;
     sim.signature = makeSignature();
     sim.signatureRequested = false;
-    sim.signatureSide = 'right';
     sim.boostActiveT = 0;
     sim.boostCooldownT = 0;
     sim.prevStepSec = null;
@@ -434,6 +433,7 @@ export const jumpLiftOf = (sim) => sim.isJumping
     : 0;
 
 export function startJump(sim, ctx, size, { allowDive = true } = {}) {
+    if (sim.signature.sweep) return;
     if (sim.phase !== 'crawling' || (sim.signature.character === 'inch' && sim.signature.active > 0)) return;
     const grounded = !sim.isJumping;
     // A deliberate dive reads only settled tile contents. Never resolve the
@@ -441,7 +441,7 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     if (allowDive && size && !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead) {
         const { x, y, z, dirKey } = sim.pos;
         const sticker = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
-        if (sticker && sticker.curr !== sticker.orig && !isParityLocked(sim, sim.pos) && ctx.resolveTunnel(x, y, z, dirKey)) {
+        if (sticker && sticker.curr !== sticker.orig && !isParityLocked(sim, sim.pos, ctx) && ctx.resolveTunnel(x, y, z, dirKey)) {
             beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
             return;
         }
@@ -581,7 +581,7 @@ function tickJumpRescue(sim, delta, size, ctx) {
     const candidate = sim.pendingSelfCollision;
     const eligible = sim.phase === 'crawling' && candidate && !sim.isJumping &&
         !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 &&
-        !sim.pendingTunnelTrigger && !sim.pendingVoidKill?.armed && !sim.signature.dashing &&
+        !sim.pendingTunnelTrigger && !sim.pendingVoidKill?.armed &&
         !(sim.signature.character === 'classic' && sim.signature.active > 0 && sim.tailLength >= BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH) &&
         !(sim.signature.character === 'inch' && sim.signature.active > 0) && sim.jumpCount < MAX_JUMPS;
     if (sim.jumpRescueCollision) {
@@ -621,12 +621,11 @@ function tickJumpRescue(sim, delta, size, ctx) {
 }
 
 export function queueTurn(sim, dir) {
+    if (sim.signature.sweep) return;
     if (sim.jumpRescueT > 0) {
         if (dir === 'jump') sim.jumpRescueRequested = true;
         return;
     }
-    if (dir === 'turnLeft' || dir === 'left') sim.signatureSide = 'left';
-    if (dir === 'turnRight' || dir === 'right') sim.signatureSide = 'right';
     if (dir === 'signature') { sim.signatureRequested = true; return; }
     const q = sim.pendingTurns;
     if (q.length >= 3) q.shift();
@@ -644,8 +643,8 @@ export function killWormSim(sim, ctx, details = null) {
     ctx.onDeath(details, Math.floor(sim.timeAlive));
 }
 
-function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
-    if (isParityLocked(sim, { x, y, z, dirKey })) return;
+function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = false) {
+    if (isParityLocked(sim, { x, y, z, dirKey }, ctx)) return;
     const resolved = ctx.resolveTunnel(x, y, z, dirKey);
     if (!resolved) return;
 
@@ -694,7 +693,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
     sim.currentTunnelStableKey = stableKey;
     sim.currentTunnelKey = tunnelKey;
 
-    if (stableKey && entryFaceId) {
+    if (!skipDeposit && stableKey && entryFaceId) {
         const healingProgress = ctx.getHealingProgress() ?? {};
         const progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
         // Deposit rules (caps + Prism Worm wildcard drain) are pure functions in
@@ -790,10 +789,9 @@ const _magnetReach = new Set();
 // active the reach widens to a MAGNET_RADIUS manifold ring, which wraps around face
 // edges — and the pull also plucks hovering orbs off flipped tiles that would
 // otherwise need a jump.
-function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
+function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = false) {
     if (sim.powerups.length === 0) return;
-    const beaconActive = sim.signature.character === 'glow' && sim.signature.active > 0;
-    const magnetActive = sim.magnetT > 0 || beaconActive;
+    const magnetActive = !sweepContact && sim.magnetT > 0;
     const reach = magnetActive
         ? collectManifoldRing(x, y, z, dirKey, size, sim.magnetT > 0 ? MAGNET_RADIUS : 1, _magnetReach)
         : null;
@@ -813,7 +811,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
         // Orbs on flipped tiles hover above the surface — worm must jump to reach them,
         // unless the magnet is dragging them down.
         const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
-        if (tileIsFlipped && !sim.isJumping && !magnetActive) continue; // out of reach
+        if (tileIsFlipped && !sim.isJumping && !magnetActive && !sweepContact) continue; // out of reach
         const refracted = refractPickup(sim, ctx, pickedSticker ? pickedSticker.curr : 0);
         const pickedFaceId = refracted.faceId;
         const pickedColor = ctx.getOrbColor(pickedFaceId);
@@ -848,6 +846,35 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
     }
 
     if (collectedAny) ctx.onPowerupsChanged(sim.powerups.slice());
+}
+
+// Sample both space and time so quick sweeps cannot skip an orb between frames.
+const _sweepPoint = new THREE.Vector3();
+const _sweepOrb = new THREE.Vector3();
+function tickWiggleSweep(sim, delta, size, ctx) {
+    const sweep = sim.signature.sweep;
+    const oldTime = sweep.elapsed;
+    sweep.elapsed = oldTime + delta >= WIGGLE_DURATION - 1e-9 ? WIGGLE_DURATION : oldTime + delta;
+    const samples = Math.max(1, Math.ceil((sweep.elapsed - oldTime) / 0.008));
+    const bodySamples = Math.max(32, Math.ceil((sweep.length + 6) / 0.15));
+    for (const orb of [...sim.powerups]) {
+        if (orb.dirKey !== sweep.dirKey) continue;
+        _sweepOrb.fromArray(getStickerWorldPos(orb.x, orb.y, orb.z, orb.dirKey, size, 0))
+            .addScaledVector(sweep.normal, WORM_LIFT);
+        let hit = false;
+        for (let t = 0; t <= samples && !hit; t++) {
+            const offset = wiggleOffset(oldTime + (sweep.elapsed - oldTime) * t / samples);
+            for (let i = 0; i <= bodySamples; i++) {
+                wigglePointInto(_sweepPoint, sweep, i / bodySamples, offset);
+                if (_sweepPoint.distanceToSquared(_sweepOrb) < 0.25) { hit = true; break; }
+            }
+        }
+        if (hit) tryPickupPowerupAt(sim, size, ctx, orb.x, orb.y, orb.z, orb.dirKey, true);
+    }
+    sweep.offset = wiggleOffset(sweep.elapsed);
+    sim.pendingTurns.length = 0;
+    sim.signature.active = Math.max(0, WIGGLE_DURATION - sweep.elapsed);
+    if (!sim.signature.active) sim.signature.sweep = null;
 }
 
 // Reusable scratch for the special-claim reach.
@@ -898,6 +925,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
     // Deposits can be keyed from either traversal direction. Ring healing seals the
     // whole pair, so retire partial progress stored against both stable endpoints.
     ctx.applyHeal(tunnel.entry, tunnel.exit, [entryStableKey, exitStableKey].filter(Boolean), sim.healed);
+    releaseMobiTunnel(sim, tunnel);
     ctx.onStoryMechanic?.('ringHeals');
     sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
     // Hold the worm still for a beat so the tile visibly pops out and heals — the reward
@@ -1315,7 +1343,7 @@ const PHASE_HANDLERS = {
                 const action = sim.pendingTurns.findIndex(t => t === 'jump' || t === 'boost');
                 if (action > 0) sim.pendingTurns.unshift(sim.pendingTurns.splice(action, 1)[0]);
             }
-            if (!sim.signature.dashing && sim.pendingTurns.length > 0 && (!iceHoldsTurn(sim, delta, STEP_SEC)
+            if (sim.pendingTurns.length > 0 && (!iceHoldsTurn(sim, delta, STEP_SEC)
                 || sim.pendingTurns[0] === 'jump' || sim.pendingTurns[0] === 'boost')) {
                 const t = sim.pendingTurns[0]; // peek — a held turn stays queued
                 // Two same-direction turns are a 180 relative to the original heading: fine
@@ -1410,7 +1438,7 @@ const PHASE_HANDLERS = {
                 // Landing grace also holds off an instant wormhole dive: a rocket that
                 // happens to touch down on a mouth shouldn't swallow the player before
                 // they can react to where they landed.
-                if (sim.rocketActive || sim.landingGraceT > 0 || isParityLocked(sim, { x, y, z, dirKey })) {
+                if (sim.rocketActive || sim.landingGraceT > 0 || isParityLocked(sim, { x, y, z, dirKey }, ctx)) {
                     sim.pendingTunnelTrigger = null;
                 } else if (sim.interpT >= TUNNEL_TRIGGER_PROGRESS && !sim.isJumping) {
                     beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
@@ -1450,7 +1478,7 @@ const PHASE_HANDLERS = {
                     for (let ti = 1; ti < trailLimitNow; ti++) {
                         if (ttAt(sim.tileTrail, ti) === collisionKey) { stillPresent = true; break; }
                     }
-                    if (!stillPresent || tryShedSkin(sim, ctx, collisionKey)) {
+                    if (!stillPresent) {
                         sim.pendingSelfCollision = null;
                     } else {
                         killWormSim(sim, ctx, {
@@ -1519,17 +1547,7 @@ const PHASE_HANDLERS = {
             // When navigating a corner, traversing double the distance means we should
             // theoretically give it more time so the speed looks constant, but the Bezier
             // arc covers it nicely.
-            if (sim.stepAcc >= STEP_SEC && sim.signature.dashing) {
-                sim.signature.dashing = false; sim.signature.active = 0;
-                if (!sim.restRead && !liveRotation.active) {
-                    const { x, y, z, dirKey } = sim.pos;
-                    const sticker = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
-                    if (sticker && sticker.curr !== sticker.orig) sim.pendingTunnelTrigger = { ...sim.pos };
-                    tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
-                    trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
-                }
-                return false;
-            }
+
             if (sim.stepAcc >= STEP_SEC) {
                 sim.stepAcc -= STEP_SEC;
                 sim.interpT = 0;
@@ -1634,7 +1652,7 @@ const PHASE_HANDLERS = {
                 const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                 const resolved = isFlipped ? ctx.resolveTunnel(x, y, z, dirKey) : null;
                 const isVoidZone = !!(resolved && sim.voidTunnelKeys.has(resolved.tunnelKey));
-                sim.onFlippedTile = isFlipped && !isVoidZone && !isParityLocked(sim, sim.pos);
+                sim.onFlippedTile = isFlipped && !isVoidZone && !isParityLocked(sim, sim.pos, ctx);
 
                 // Flipped tiles are instant wormholes unless the player is currently
                 // jumping over them.
@@ -1643,7 +1661,7 @@ const PHASE_HANDLERS = {
                     ctx.onFlippedTile(sim.onFlippedTile);
                 }
 
-                if (isFlipped && !isParityLocked(sim, sim.pos) && !sim.rocketActive && sim.landingGraceT <= 0) {
+                if (isFlipped && !isParityLocked(sim, sim.pos, ctx) && !sim.rocketActive && sim.landingGraceT <= 0) {
                     sim.pendingTunnelTrigger = { x, y, z, dirKey };
                     // Swept-entry guard: if the step accumulator remainder indicates the worm
                     // has already spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on
@@ -1877,7 +1895,19 @@ export function stepWormSim(sim, delta, size, ctx) {
         sim.signatureRequested = false;
         activateSignature(sim, size, ctx);
     }
-    if (sim.signature.relocate) relocateSignature(sim, size, ctx);
+    if (sim.signature.mobiOpening) {
+        const p = sim.pos;
+        beginTunnelTransition(sim, size, ctx, p.x, p.y, p.z, p.dirKey, true);
+        sim.signature.mobiOpening = false;
+        return;
+    }
+    if (sim.signature.sweep) {
+        tickSignature(sim, delta, size, ctx);
+        if (sim.signature.sweep) {
+            tickWiggleSweep(sim, delta, size, ctx);
+            return;
+        }
+    }
     if (tickSignature(sim, delta, size, ctx)) {
         sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
         return;
@@ -1959,7 +1989,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     const flight = sim.rocketFlight ?? 0;
     const throttle = flight * flight * (3 - 2 * flight);
     const speedMult = sim.rocketActive ? boostMult + (ROCKET_SPEED_MULT - boostMult) * throttle : boostMult * (1 + 0.25 * sim.waterMomentum);
-    const STEP_SEC = sim.signature.dashing ? 0.18 : 1.0 / (ctx.getSpeed() * speedMult);
+    const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step
     // accumulator so its fraction (== interpT) is preserved across the change. Without
@@ -2092,6 +2122,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.healFired = true;
             sim.healed += 1;
             ctx.applyHeal(tunnel.entry, tunnel.exit, stableKey, sim.healed);
+            releaseMobiTunnel(sim, tunnel);
             sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
             if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, tunnel.exit);
             if (tunnelKey) {
@@ -2312,7 +2343,6 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         let rotated = old;
         if (ownDir !== null) for (let n = 0; n < numTurns; n++) {
             const next = rotateTilePosition(rotated, axis, axis === 'col' ? old.x : axis === 'row' ? old.y : old.z, ownDir, size);
-            if (sim.signature.character === 'book') sim.signature.heading = rotateMoveDir(sim.signature.heading, rotated.dirKey, next.dirKey, axis, ownDir);
             rotated = next;
         }
         sim.signature.target = rotated;
@@ -2337,12 +2367,12 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
         const landed = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         const landedFlipped = !!(landed && landed.curr !== landed.orig);
-        sim.onFlippedTile = landedFlipped && !isParityLocked(sim, sim.pos);
+        sim.onFlippedTile = landedFlipped && !isParityLocked(sim, sim.pos, ctx);
         if (sim.onFlippedTile !== sim.lastFlipped) {
             sim.lastFlipped = sim.onFlippedTile;
             ctx.onFlippedTile(sim.onFlippedTile);
         }
-        if (landedFlipped && !isParityLocked(sim, sim.pos) && !sim.rocketActive && sim.landingGraceT <= 0) sim.pendingTunnelTrigger = { x, y, z, dirKey };
+        if (landedFlipped && !isParityLocked(sim, sim.pos, ctx) && !sim.rocketActive && sim.landingGraceT <= 0) sim.pendingTunnelTrigger = { x, y, z, dirKey };
         // The trail and head now share the committed coordinate frame with the
         // refreshed tunnel lookup, so the ring check skipped during traversal is safe.
         tryWormholeRingHeal(sim, size, ctx);
@@ -2473,51 +2503,4 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     // two-plane turn erase the protection belonging to the second.
     sim.restRead = null;
     restTiles.clear();
-}
-
-// Shed Skin is consumed by a confirmed body collision only. Its tail loss uses
-// the same inventory reconciliation as slice cuts, so it cannot create reserve.
-export function tryShedSkin(sim, ctx, collisionKey) {
-    const sig = sim.signature;
-    if (sig.character !== 'classic' || sig.active <= 0 || sim.tailLength < BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH) return false;
-    let cut = 1;
-    for (let i = 1; i < sim.tileTrail.count; i++) if (ttAt(sim.tileTrail, i) === collisionKey) { cut = i; break; }
-    sim.tailLength = Math.max(BASE_TAIL_LENGTH, Math.min(sim.tailLength - ORB_SEGMENT_GROWTH, Math.round(cut / BODY_BALL_SPACING)));
-    const remaining = orbsCarried(sim.tailLength), removed = sim.orbPickupFaceIds.slice(remaining);
-    const inventory = reconcileOrbInventoryAfterCut(ctx.getOrbInventory(), removed, sim.tailLength - BASE_TAIL_LENGTH);
-    sim.orbPickupColors.length = Math.min(sim.orbPickupColors.length, remaining);
-    sim.orbPickupFaceIds.length = Math.min(sim.orbPickupFaceIds.length, remaining);
-    sim.colorEpoch++;
-    ttTrimTo(sim.tileTrail, cut); shTrimTo(sim.stepHistory, cut * STEPS_PER_TILE);
-    sim.pendingSelfCollision = null; sim.selfCollisionGraceSteps = 1;
-    sig.active = 0; sig.fxT = 0.7; sig.fxTile = { ...sim.pos }; sig.notice = 'Skin shed · tail lost'; sig.noticeT = 1.8;
-    ctx.onTailShed?.(inventory, remaining); ctx.feel('cut');
-    return true;
-}
-
-function relocateSignature(sim, size, ctx) {
-    const move = sim.signature.relocate; sim.signature.relocate = null;
-    const old = { ...sim.pos };
-    sim._prevWP.copy(sim.headInterpPos);
-    sim.prevWorldPos = move.teleport ? null : sim._prevWP;
-    sim.prevTile = move.teleport ? null : old;
-    sim.prevDirKey = move.teleport ? null : old.dirKey;
-    sim.pos = { x: move.x, y: move.y, z: move.z, dirKey: move.dirKey };
-    sim.moveDir = move.moveDir;
-    setCurWorldPosFromTile(sim, size);
-    sim.interpT = move.teleport ? 1 : 0; sim.stepAcc = 0; sim.prevStepSec = null; sim.lastRecordedT = 0;
-    sim.crossingCorner = false; sim.cornerVault = false;
-    sim.pendingTurns.length = 0; sim.lastTurnDir = null; sim.tilesSinceTurn = 1;
-    sim.pendingSelfCollision = null; sim.pendingTunnelTrigger = null;
-    sim.onFlippedTile = sim.lastFlipped = false; ctx.onFlippedTile(false);
-    if (move.teleport) {
-        sim.headInterpPos.copy(sim.curWorldPos); sim.currentNormal.copy(FACE_NORMALS[move.dirKey]);
-        // The book folds closed for the return. Rebuild spatial history as it
-        // unfolds, preserving inventory, growth, deposits, score and run clocks.
-        shReset(sim.stepHistory); ttReset(sim.tileTrail, tileKey(sim.pos)); ttReset(sim.pathHistory, tileKey(sim.pos));
-        sim.restReadTiles.clear();
-        tryPickupPowerupAt(sim, size, ctx, move.x, move.y, move.z, move.dirKey);
-    } else {
-        ttPush(sim.tileTrail, tileKey(sim.pos)); ttPush(sim.pathHistory, tileKey(sim.pos));
-    }
 }

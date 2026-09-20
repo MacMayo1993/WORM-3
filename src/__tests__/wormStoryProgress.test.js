@@ -76,3 +76,10 @@ it('requires every physical objective and rejects expiration or old tutorial cle
   expect(storyOutcome(storyLevel(6), { ...complete, orbs: 29 })).toBeNull();
   expect(storyOutcome(storyLevel(6), { ...complete, rotations: 5 })).toBeNull();
 });
+
+it('Book receives its XP bonus on first Story clears', () => {
+  useGameStore.setState({ wormCharacter: 'book' }); start();
+  state().completeWormStory(state().wormRunId, { ...won, elapsed: 65, cuts: 1 });
+  expect(state().wormStoryResult.xp).toBe(63);
+  useGameStore.setState({ wormCharacter: 'classic' });
+});

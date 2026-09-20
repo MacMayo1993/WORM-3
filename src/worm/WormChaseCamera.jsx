@@ -4,7 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { rocketOrbitInto, rocketOrbitT } from './healerWorm/rocketOrbit.js';
+import { rocketOrbitInto, rocketOrbitT, rocketFrameInto } from './healerWorm/rocketOrbit.js';
 import { tunnelState } from './tunnelProgressBridge.js';
 import {
     makeTunnelCamPose,
@@ -358,7 +358,8 @@ export default function WormChaseCamera({ worm, size }) {
             : phase === 'entering' ? diveProgress(_enterP)
             : phase === 'exiting' ? 1 - diveEase((_enterP - 0.5) / 0.5)
             : 0;
-        const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix);
+        const rocketLift = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
+        const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix) + rocketLift * 7;
         const fovAlpha = Math.min(1, delta * 6);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -493,6 +494,10 @@ export default function WormChaseCamera({ worm, size }) {
                 _rawForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
             }
 
+            if (rocketLift > 0) {
+                rocketFrameInto(_rawForward, _rawNormal, worm.headInterpPos.current, size, rocketLift);
+            }
+
             if (prevPhaseRef.current !== 'crawling') {
                 prevDirKeyRef.current = dirKey;
                 faceTransT.current = 0;
@@ -519,18 +524,24 @@ export default function WormChaseCamera({ worm, size }) {
                 _camForward.copy(_rawForward);
             }
 
+            // Airborne turns follow the rounded flight path, rather than rolling
+            // the camera on a delayed 90-degree surface-face transition.
+            if (rocketLift > 0) {
+                _camNormal.lerp(_rawNormal, rocketLift).normalize();
+                _camForward.lerp(_rawForward, rocketLift).normalize();
+            }
             lastNormalRef.current.copy(_camNormal);
             lastForwardRef.current.copy(_camForward);
 
             // Camera: behind worm (opposite of forward) + above face (along normal),
             // pitched down by the portrait rake on narrow viewports.
             _camTargetCam.copy(_camWormWorld)
-                .addScaledVector(_camNormal, camHeight + rakeLift)
-                .addScaledVector(_camForward, -camBack * rakeTuck);
-            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead);
+                .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 - 0.24 * rocketLift))
+                .addScaledVector(_camForward, -camBack * rakeTuck - rocketLift * 0.6);
+            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead + rocketLift * 0.9);
             // Pull the look target partway toward the cube centre (origin) so the whole cube
             // stays framed rather than drifting off-screen as the camera tracks the worm.
-            _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
+            _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS * (1 - rocketLift));
 
             // Heal focus: while a ring heal freezes the worm (worm.healPauseT), push the
             // camera in on the surrounded tile with a slow circular track, then ease back to
@@ -627,7 +638,9 @@ export default function WormChaseCamera({ worm, size }) {
                 crawlK = THREE.MathUtils.lerp(3.0, CAM_LERP, 1 - postTunnelEaseRef.current / 0.7);
             }
 
-            const alpha = Math.min(1, crawlK * delta);
+            const alpha = rocketLift > 0
+                ? 1 - Math.exp(-crawlK * (1 + rocketLift * 0.6) * delta)
+                : Math.min(1, crawlK * delta);
             camPosRef.current.lerp(_camTargetCam, alpha);
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);

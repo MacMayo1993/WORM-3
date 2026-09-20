@@ -1,3 +1,4 @@
+import { characterXpMultiplier } from '../characterAbilities.js';
 import { addXp } from '../../progression/model.js';
 import { storyLevel, storyStars, storyUnlocked, storyOutcome } from './levels.js';
 
@@ -11,7 +12,7 @@ export function completeStoryChanges(state, runId, metrics) {
   const old = storyStars(state.playerProgress, level.id);
   const improved = Math.max(0, result.stars - Math.max(1, old));
   const points = (old ? 0 : level.points || 0) + improved * 10;
-  const xp = (old ? 0 : 50) + improved * 10;
+  const xp = Math.round(((old ? 0 : 50) + improved * 10) * characterXpMultiplier(state.wormCharacter));
   const progress = { ...state.playerProgress, wormStory: {
     ...state.playerProgress.wormStory,
     stars: { ...state.playerProgress.wormStory?.stars, [level.id]: Math.max(old, result.stars) },

@@ -8,11 +8,12 @@ import { liveCubies } from '../worm/liveCubies.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { makeTileTrail, ttPush, ttReset, ttMapInPlace } from '../worm/circularBuffers.js';
 import { uploadTrailRange } from '../worm/healerWorm/trailUpdates.js';
-let frame, tree, root, host, meshes, worm;
+let frame, tree, root, host, meshes, worm, abilityTrail = false;
 vi.mock('@react-three/fiber', () => ({ useFrame: callback => { frame = callback; } }));
-function Harness() { tree = WormTrail({ worm, size: 3 }); return null; }
+function Harness() { tree = WormTrail({ worm, size: 3, abilityTrail }); return null; }
 const tick = () => act(() => frame({}, 0.1));
 beforeEach(() => {
+  abilityTrail = false;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   resetLiveRotation();
   useGameStore.setState({ wormShowTrail: true, wormSkin: 'slime', wormTrail: 'classic', wormCharacter: 'classic', cubiePops: {}, rotationEpoch: 0 });
@@ -88,4 +89,16 @@ it('keeps pending off-camera upload ranges bounded without discarding earlier ed
   const attr = new THREE.InstancedBufferAttribute(new Float32Array(160), 16);
   for (let i = 0; i < 100; i++) uploadTrailRange(attr, i % 8, 16 + i % 8);
   expect(attr.updateRanges).toEqual([{ start: 0, count: 23 }]);
+});
+
+it('Glow paints only the new ability path and hides it when the three-second effect ends', () => {
+  abilityTrail = true;
+  worm.signature = { current: { character: 'glow', active: 3, trailStartSeq: worm.pathHistory.current.nextSeq } };
+  act(() => { useGameStore.setState({ wormShowTrail: false, wormCharacter: 'glow' }); root.render(<Harness />); });
+  tick(); expect(meshes[0].count).toBe(0);
+  ttPush(worm.pathHistory.current, '1,2,2,PZ');
+  ttPush(worm.pathHistory.current, '0,2,2,PZ');
+  tick(); expect(meshes[0].count).toBeGreaterThan(0);
+  worm.signature.current.active = 0;
+  tick(); expect(meshes[0].count).toBe(0); expect(meshes[1].count).toBe(0);
 });

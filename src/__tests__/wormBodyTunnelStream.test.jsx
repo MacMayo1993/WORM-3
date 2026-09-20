@@ -1,3 +1,4 @@
+import { makeWiggleSweep } from '../worm/healerWorm/wiggleSweep.js';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -120,5 +121,18 @@ it('removes every bead beyond a slice seam without stretching the remaining tail
       expect(points[i].x).toBeLessThan(-0.59);
       if (i) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.15);
     }
+  }
+});
+
+it('renders a connected three-tile tail sweep with its head fixed', () => {
+  sim.tailLength = 4;
+  sim.signature.sweep = makeWiggleSweep(sim);
+  const anchor = sim.headInterpPos.clone().addScaledVector(sim.currentNormal, WORM_LIFT);
+  for (const offset of [-3, 3, -3, 3, 0]) {
+    sim.signature.sweep.offset = offset;
+    const points = renderPoints();
+    expect(points[0].distanceTo(anchor)).toBeLessThan(.01);
+    expect(points.at(-1).x).toBeCloseTo(anchor.x + offset, 4);
+    for (let i = 1; i < points.length; i++) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(.2);
   }
 });

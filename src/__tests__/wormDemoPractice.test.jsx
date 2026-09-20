@@ -82,7 +82,7 @@ it('teaches ice jumping and a real nature spring consumption', () => {
 it('allows Beacon only in the signature lesson, through the real button bridge', () => {
   input('signature'); frames(3); expect(worm.signature.current.seq).toBe(0);
   lesson('signature'); frames(2);
-  act(() => host.querySelector('[aria-label="Pulse Beacon"]').click());
+  act(() => host.querySelector('[aria-label="Light Trail"]').click());
   until(() => state().demoWormComplete); expect(worm.signature.current.seq).toBe(1);
 });
 it('retries only the current exercise; skipping gives no completion credit and clears old buffs', () => {
