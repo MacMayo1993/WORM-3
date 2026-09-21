@@ -13,8 +13,11 @@
   max-width: 640px; margin-inline: auto;
 }
 .opening-copy-beat { display: flex; flex-direction: column; align-items: center; gap: 18px; }
-.opening-copy h1 { font-family: var(--display-font); font-weight: 400; font-size: var(--ui-heading-size); line-height: 1.4; margin: 0 auto; max-width: 100%; overflow-wrap: break-word; text-wrap: balance; }
-.opening-copy .opening-title { font-size: var(--ui-title-size); letter-spacing: .04em; color: #c3ed9f; }
+/* The script runs in the heading face, not Bungee: three sentences of prose in
+   a signage display face read as shouting, and it leaves Bungee to do the one
+   job it is for — the WORM³ title that lands on top of it. */
+.opening-copy h1 { font-family: var(--heading-font); font-weight: 500; font-size: var(--ui-heading-size); line-height: 1.4; margin: 0 auto; max-width: 100%; overflow-wrap: break-word; text-wrap: balance; }
+.opening-copy .opening-title { font-family: var(--display-font); font-weight: 400; font-size: var(--ui-title-size); letter-spacing: .04em; color: #c3ed9f; }
 .opening-title sup { font-size: .45em; vertical-align: baseline; position: relative; top: -.7em; line-height: 0; }
 .opening-tagline { font-family: var(--ui-font); font-size: var(--ui-body-size); line-height: 1.5; margin: 0; max-width: 28ch; }
 .opening-skip, .opening-enter {
@@ -38,7 +41,7 @@
 
 /* Reserve each word's space before revealing it, so the line never re-centers. */
 .opening-poem-word { display: inline-block; }
-.opening-copy .opening-poem-line { font-size: clamp(17px, 4.7vw, 30px); }
+.opening-copy .opening-poem-line { font-size: clamp(17px, 4.7vw, 30px); letter-spacing: .005em; text-shadow: 0 2px 18px rgba(10, 16, 18, .55); }
 @media (orientation: landscape) and (max-height: 500px) {
   .opening-copy .opening-poem-line { font-size: min(5vh, 26px); }
 }

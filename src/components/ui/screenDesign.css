@@ -1,6 +1,6 @@
 /* Interface titles speak quietly; the cube, character and rewards carry the color. */
 .screen-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:16px 0 20px; }
-.screen-heading h1 { margin:0; font:750 clamp(27px,5vw,42px)/1.08 var(--ui-font,system-ui); letter-spacing:-.045em; }
+.screen-heading h1 { margin:0; font:750 clamp(27px,5vw,42px)/1.08 var(--heading-font,system-ui); letter-spacing:-.045em; }
 .screen-heading p { margin:8px 0 0; font-size:14px; line-height:1.45; opacity:.75; }
 .mode-artwork { display:block; width:100%; height:auto; flex:none; }
 .screen-heading>.mode-artwork { width:86px; color:var(--mode-accent,currentColor); }
@@ -16,7 +16,7 @@
 .screen-stat-row span { display:block; margin-top:4px; font-size:12px; color:inherit; opacity:.7; }
 .mc-mode-copy { width:min(400px,94vw); margin-top:8px; }
 .mc-mode-copy article { padding:18px 20px 8px; border-radius:20px; background:var(--bg-primary,#f5f0e8); color:var(--text-primary,#1e1612); box-shadow:0 5px 0 #292a2624; border:1px solid var(--ui-border,#cec8be); }
-.mc-mode-copy h2 { font:750 26px/1.15 var(--ui-font,system-ui); letter-spacing:-.04em; margin:0; }
+.mc-mode-copy h2 { font:750 26px/1.15 var(--heading-font,system-ui); letter-spacing:-.04em; margin:0; }
 .mc-mode-copy p { margin:8px 0 0; font-size:14px; line-height:1.45; }
 .mc-mode-copy header { display:flex; align-items:center; justify-content:space-between; }
 .mc-mode-copy header>span { width:27px; height:27px; border-radius:8px; background:var(--mode-accent); box-shadow:inset 0 0 0 1px #0002,inset 0 2px 0 #fff6; transform:rotate(-9deg); }
@@ -29,7 +29,7 @@
 .mode-wizard button,.worm-entry button,.worm-story-result button,.worm-pause-card button,.run-result button { -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
 .mode-wizard button:enabled:active,.worm-story-result button:enabled:active,.run-result button:enabled:active { transform:translateY(2px); }
 .run-result { --mode-accent:#9fdb7a; }
-.run-result .run-result-heading { margin:0; font:750 clamp(30px,8vw,52px)/1.05 var(--ui-font,system-ui); letter-spacing:-.04em; }
+.run-result .run-result-heading { margin:0; font:750 clamp(30px,8vw,52px)/1.05 var(--heading-font,system-ui); letter-spacing:-.04em; }
 .run-result button { min-height:48px; }
 @keyframes screen-arrive { from { opacity:0; transform:translateY(8px) rotate(-6deg); } to { opacity:1; transform:none; } }
 @media(hover:hover) { button:hover>.mode-artwork { transform:translateY(-3px) rotate(-3deg); } }

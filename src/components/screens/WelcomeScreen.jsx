@@ -9,6 +9,7 @@
 import React, { useEffect } from 'react';
 import { TITLE_END } from '../intro/introTiming.js';
 import TextOverlay from '../intro/TextOverlay.jsx';
+import { INTRO_COPY_TEXT } from '../intro/introCopy.js';
 
 const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
   // Returning players have seen the cinematic — give them ENTER immediately
@@ -35,7 +36,10 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
       className="welcome-screen"
       style={{ background: 'transparent', pointerEvents: 'none' }}
     >
-      <p className="opening-accessible">WORM cubed. One day… Front left, and flipped right to Back.</p>
+      {/* The cinematic is aria-hidden, so this is the only place a screen reader
+          hears the opening. Read from INTRO_COPY so it cannot drift from the
+          script the way a hand-copied duplicate did. */}
+      <p className="opening-accessible">WORM cubed. {INTRO_COPY_TEXT}</p>
       <TextOverlay time={introTime} reducedMotion={reducedMotion} />
 
       <button

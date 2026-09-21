@@ -30,7 +30,15 @@ const KB = 1024;
 
 // Per-asset ceilings.
 const JS_MAX_BYTES = 680 * KB; // keeps Three.js bounded
-const CSS_MAX_BYTES = 80 * KB;
+// The bundled stylesheet carries every @font-face the game self-hosts, and the
+// four faces cost a fixed ~2.9 KB of declarations before a single rule of
+// layout. This ceiling was 80 KB against a 79.0 KB baseline — 1 KB of room,
+// which is close enough to the line that ordinary interface work trips it and
+// the check stops reading as a drift detector and starts reading as noise.
+// Raised to restore a few KB of genuine headroom, not to make space for a new
+// screen's worth of CSS: if this needs raising again, split the stylesheet by
+// route the way the JS already is.
+const CSS_MAX_BYTES = 86 * KB;
 
 // Initial route: what must land before first render. Headroom over the current
 // baseline is deliberate but small — the point is to notice drift, not to leave

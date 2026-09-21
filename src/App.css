@@ -41,8 +41,13 @@
   --shadow-lg: 0 18px 42px rgba(43, 53, 35, 0.25);
   --shadow-xl: 0 28px 72px rgba(43, 53, 35, 0.30);
 
-  /* Unified warm UI chrome — matches demo progress and setup cards. */
-  --ui-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  /* Unified warm UI chrome — matches demo progress and setup cards.
+     Fonts mirror UI_FONT / HEADING_FONT in src/utils/uiTheme.js; both faces are
+     self-hosted variable fonts imported in main.jsx. main.jsx also writes these
+     same values onto :root at boot, so the two can never silently diverge —
+     these literals are the pre-hydration fallback. */
+  --ui-font: 'Nunito Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  --heading-font: 'Outfit Variable', 'Nunito Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --ui-panel: rgba(250, 247, 238, 0.90);
   --ui-panel-strong: rgba(250, 247, 238, 0.96);
   --ui-ink: #1e1612;
@@ -87,6 +92,11 @@ body {
 body {
   background: #000000;
   font-family: var(--ui-font);
+  /* Nunito's rounded stems render heavy under subpixel AA on the game's dark
+     surfaces; greyscale AA keeps body copy the weight it was drawn at. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .full-screen {

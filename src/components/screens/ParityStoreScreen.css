@@ -164,7 +164,7 @@
   .catalogue-grid-heading { margin-top:18px; font-size:11px; }.catalogue-families { gap:4px; }.catalogue-families button { padding:6px 8px; font-size:11px; }.catalogue-footer { font-size:10px; padding:8px; }
 }
 
-.catalogue-header h1,.catalogue-section-heading h2,.catalogue-preview h3 { font-family:var(--ui-font,system-ui); font-weight:750; letter-spacing:-.04em; }
+.catalogue-header h1,.catalogue-section-heading h2,.catalogue-preview h3 { font-family:var(--heading-font,system-ui); font-weight:750; letter-spacing:-.04em; }
 .catalogue-header h1 { font-size:clamp(28px,5vw,40px); }
 .catalogue-category strong { font-weight:650; }
 .catalogue-category { position:relative; }
