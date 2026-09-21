@@ -1,3 +1,4 @@
+import { getHandmadeParts } from './handmadeParts.js';
 // Shared, head-relative models for gameplay and every worm preview.
 // +Y points out of the head. Keep to geometry supported by both renderers.
 export function getHatParts(type, s = 0.28) {
@@ -93,5 +94,5 @@ export function getHatParts(type, s = 0.28) {
     ball(0.08,[0.93,0.79,0.93],gold);
     around(7,a=>cylinder(0.017,0.026,0.31,[0.93+Math.cos(a)*0.07,0.62,0.93+Math.sin(a)*0.07],gold));
   }
-  return parts;
+  return parts.length ? parts : getHandmadeParts(type, s);
 }

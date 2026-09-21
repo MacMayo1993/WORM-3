@@ -103,3 +103,19 @@ it('emits one tactile cue per activation and wraps focus around the expanded sel
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true })));
   expect(document.activeElement).toBe(buttons.at(-1));
 });
+
+
+it('mixes a hat with body and tail pieces, then removes only the selected slot', () => {
+  act(() => useGameStore.setState({wormAccessories:{face:'none',neck:'none',body:'none',tail:'none'},
+    wormHat:'acorn',demoMode:false,ownedItems:['hat_acorn','accessory_seedSatchel','accessory_ribbonTail']}));
+  act(() => root.render(<WormProfile defaultExpanded />));
+  act(() => button('Body').click());
+  act(() => host.querySelector('button[aria-label="Seed Satchel"]').click());
+  act(() => button('Tail').click());
+  act(() => host.querySelector('button[aria-label="Ribbon Tail"]').click());
+  expect(state().wormAccessories).toMatchObject({body:'seedSatchel',tail:'ribbonTail'});
+  expect(host.querySelector('button[aria-label="Paintbrush Tail, locked"]').disabled).toBe(true);
+  act(() => host.querySelector('button[aria-label="None"]').click());
+  expect(state().wormAccessories).toMatchObject({body:'seedSatchel',tail:'none'});
+  expect(state().wormHat).toBe('acorn');
+});

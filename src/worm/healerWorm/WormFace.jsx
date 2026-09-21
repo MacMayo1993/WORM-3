@@ -1,3 +1,5 @@
+import { createAccessoryRig, poseHeadAccessories, poseHandmadeHat } from '../wormAccessories.js';
+import { EMPTY_ACCESSORIES } from '../handmadeAccessoriesData.js';
 import { createMobiOrbPalette } from '../mobiOrbAppearance.js';
 // src/worm/healerWorm/WormFace.jsx
 // Shared character expressions follow the head across surfaces and tunnels.
@@ -36,6 +38,9 @@ const _faceTunnelAhead = new THREE.Vector3(); // scratch for tunnel tangent duri
 const _mobiRideAxis = new THREE.Vector3();
 
 export function WormFace({ worm, size }) {
+    const equipment = useGameStore(s => s.wormAccessories ?? EMPTY_ACCESSORIES);
+    const accessories = useMemo(() => createAccessoryRig({face: equipment.face, neck: equipment.neck}), [equipment.face, equipment.neck]);
+    useEffect(() => () => accessories.dispose(), [accessories]);
     const leftEyeRef = useRef();
     const rightEyeRef = useRef();
     const leftPupilRef = useRef();
@@ -50,6 +55,7 @@ export function WormFace({ worm, size }) {
     const accents = useMemo(() => createCharacterAccents(wormCharacterId), [wormCharacterId]);
     useEffect(() => () => accents.dispose(), [accents]);
     const isBook = wormCharacterId === 'book';
+    const showBookGlasses = isBook && equipment.face === 'none';
     const isMobi = wormCharacterId === 'mobi';
     const settings = useGameStore(s => s.settings);
     const mobiPalette = useMemo(() => isMobi ? createMobiOrbPalette(settings) : null, [isMobi, settings]);
@@ -182,9 +188,12 @@ export function WormFace({ worm, size }) {
             if (!bodyTransit) mobi.group.position.addScaledVector(normal, 0.035);
             animateMobi(mobi, faceTime.current, { pulse: facePulse.current, transit: !!inTransit });
             mobi.group.scale.setScalar(MOBI_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
+            poseHeadAccessories(accessories, mobi.group.position, _faceForward, normal, MOBI_RADIUS,
+                reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
             if (hatGroupRef.current) {
                 hatGroupRef.current.position.copy(mobi.group.position).addScaledVector(normal, MOBI_RADIUS * 1.1);
                 hatGroupRef.current.quaternion.copy(mobi.group.quaternion);
+                poseHandmadeHat(hatGroupRef.current,wormHatId,_faceForward,normal,reducedMotion ? 0 : faceTime.current,!!inTransit);
             }
             return;
         }
@@ -196,8 +205,8 @@ export function WormFace({ worm, size }) {
         _faceParts.pupils[0] = leftPupilRef.current;
         _faceParts.pupils[1] = rightPupilRef.current;
         _faceParts.mouth = mouthRef.current;
-        _faceParts.glasses[0] = isBook ? glassLeftRef.current : null;
-        _faceParts.glasses[1] = isBook ? glassRightRef.current : null;
+        _faceParts.glasses[0] = showBookGlasses ? glassLeftRef.current : null;
+        _faceParts.glasses[1] = showBookGlasses ? glassRightRef.current : null;
         _faceParts.hat = hatGroupRef.current;
         // The Book Worm's head is a round orb like everyone else's now, so it
         // takes the shared sphere layout too — it only needs the small lift that
@@ -205,6 +214,8 @@ export function WormFace({ worm, size }) {
         if (isBook) _faceHeadPos.addScaledVector(normal, BOOK_HEAD_LIFT);
         layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), _faceParts);
 
+        poseHeadAccessories(accessories, _faceHeadPos, _faceForward, normal,
+            HEAD_RADIUS * (worm.pickupHeadScale ?? 1), reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
         animateWormFace(_faceParts, wormCharacterId, faceTime.current, {
             pulse: facePulse.current, transit: !!inTransit, reducedMotion,
         });
@@ -214,12 +225,14 @@ export function WormFace({ worm, size }) {
         if (hatGroupRef.current) {
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);
             hatGroupRef.current.quaternion.copy(_hatAlignQuat);
+            poseHandmadeHat(hatGroupRef.current,wormHatId,_faceForward,normal,reducedMotion ? 0 : faceTime.current,!!inTransit);
         }
 
     });
 
     if (mobi) return (
         <>
+            <primitive object={accessories.root} dispose={null} />
             <primitive object={mobi.group} dispose={null} />
             {wormHatId !== 'none' && <group ref={hatGroupRef}>
                 <WormHat3D type={wormHatId} scale={MOBI_RADIUS * FACE_LAYOUT.hatScale} />
@@ -229,6 +242,7 @@ export function WormFace({ worm, size }) {
 
     return (
         <>
+            <primitive object={accessories.root} dispose={null} />
             <primitive object={accents.group} dispose={null} />
             <mesh ref={leftEyeRef}>
                 <sphereGeometry args={[1, 12, 12]} />
@@ -259,7 +273,7 @@ export function WormFace({ worm, size }) {
                 </group>
             )}
             {/* Book worm glasses — two torus rings, only rendered for book character */}
-            {isBook && (
+            {showBookGlasses && (
                 <>
                     <mesh ref={glassLeftRef}>
                         <torusGeometry args={[1, FACE_LAYOUT.glassTube / FACE_LAYOUT.glassRadius, 8, 18]} />

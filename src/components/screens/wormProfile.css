@@ -10,7 +10,7 @@
 .worm-profile-edit { min-height:44px; border:1px solid var(--wiz-border); border-radius:10px; padding:10px 12px; background:var(--wiz-surface-raised); color:var(--wiz-text); font-size:12px!important; font-weight:750!important; box-shadow:0 4px 0 var(--wiz-card-shadow); }
 .worm-profile-edit span { margin-left:5px; color:var(--mode-accent); }
 .worm-profile-editor { border-top:1px solid var(--wiz-border-soft); padding:14px; }
-.worm-profile-categories { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:16px; }
+.worm-profile-categories { display:grid; grid-template-columns:repeat(auto-fit,minmax(76px,1fr)); gap:8px; margin-bottom:16px; }
 .worm-profile .worm-profile-categories button { min-height:44px; padding:10px 6px; border:1px solid var(--wiz-border); border-radius:10px; background:var(--wiz-base); color:var(--wiz-text); font-size:13px; font-weight:700; box-shadow:0 3px 0 var(--wiz-card-shadow); }
 .worm-profile-categories button[aria-pressed=true] { background:var(--mode-accent); color:var(--wiz-check-ink); border-color:var(--mode-accent); }
 .worm-profile-options { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:9px; }

@@ -71,7 +71,7 @@ it('switches catalogue categories, filters ownership, and previews without spend
   act(() => root.render(<ParityStoreScreen onClose={close} />));
   const categories = host.querySelector('nav[aria-label="Store categories"]');
   expect([...categories.querySelectorAll('.catalogue-category')].map(b => b.querySelector('strong').textContent))
-    .toEqual(['Worms', 'Trails', 'Skins', 'Hats', 'Palettes', 'Tiles']);
+    .toEqual(['Worms', 'Trails', 'Skins', 'Accessories', 'Hats', 'Palettes', 'Tiles']);
   act(() => button('MOBI').click());
   expect(host.querySelector('.catalogue-preview h3').textContent).toBe('MOBI');
   act(() => button('MOBI').click());
