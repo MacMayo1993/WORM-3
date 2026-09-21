@@ -163,3 +163,9 @@
   .catalogue-action { width:100%; padding:10px 6px; font-size:13px!important; }.catalogue-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }.catalogue-grid .store-card { min-width:0; padding:8px 4px!important; }.catalogue-grid .store-card>span { overflow-wrap:anywhere; }
   .catalogue-grid-heading { margin-top:18px; font-size:11px; }.catalogue-families { gap:4px; }.catalogue-families button { padding:6px 8px; font-size:11px; }.catalogue-footer { font-size:10px; padding:8px; }
 }
+
+.catalogue-header h1,.catalogue-section-heading h2,.catalogue-preview h3 { font-family:var(--ui-font,system-ui); font-weight:750; letter-spacing:-.04em; }
+.catalogue-header h1 { font-size:clamp(28px,5vw,40px); }
+.catalogue-category strong { font-weight:650; }
+.catalogue-category { position:relative; }
+.catalogue-category[aria-pressed="true"]::after { content:''; position:absolute; left:0; top:16%; bottom:16%; width:3px; background:var(--category); border-radius:2px; }

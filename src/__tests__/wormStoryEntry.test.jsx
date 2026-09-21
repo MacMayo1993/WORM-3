@@ -9,7 +9,7 @@ import { newProgress } from '../progression/model.js';
 vi.mock('../components/screens/WormModeSetupWizard.jsx', () => ({ default: ({ onComplete, onCancel, initialSettings }) => <div aria-label="Free Play setup"><button onClick={onCancel}>Cancel setup</button><button onClick={() => onComplete(initialSettings)}>Launch free run</button></div> }));
 let host, root, complete, cancel;
 const state = () => useGameStore.getState();
-const click = text => act(() => [...host.querySelectorAll('button')].find(b => b.textContent.includes(text)).click());
+const click = text => act(() => [...host.querySelectorAll('button')].find(b => (b.getAttribute('aria-label') || b.textContent).includes(text)).click());
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   useGameStore.setState({ playerProgress: newProgress(), ownedItems: [], parityPoints: 0 });
@@ -21,11 +21,11 @@ it('opens with Story on the left and Free Play on the right, without launching e
   show(); const cards = [...host.querySelector('.worm-path-split').children];
   expect(cards).toHaveLength(2);
   expect(cards.every(card => card.tagName === 'BUTTON')).toBe(true);
-  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['STORY LEVELS', 'FREE PLAY']);
+  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Story', 'Free play']);
   expect(complete).not.toHaveBeenCalled();
-  click('STORY'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
+  click('Story levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false, perFaceStyles: {1:'grass'} }));
-  click('Back'); await act(async () => { click('FREE PLAY'); await import('../components/screens/WormModeSetupWizard.jsx'); });
+  click('Back'); await act(async () => { click('Free play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
   click('Launch free run'); expect(complete.mock.lastCall[0]).toEqual({ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 });
   click('Cancel setup'); expect(host.querySelector('.worm-path-split')).not.toBeNull();
@@ -34,13 +34,13 @@ it('traps keyboard focus and handles Back/Escape within the mode boundary', () =
   show(); const buttons = host.querySelectorAll('button'); expect(document.activeElement).toBe(buttons[0]);
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true })));
   expect(document.activeElement).toBe(buttons[buttons.length-1]);
-  click('STORY'); act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  click('Story levels'); act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(host.querySelector('.worm-path-split')).not.toBeNull(); expect(cancel).not.toHaveBeenCalled();
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); expect(cancel).toHaveBeenCalledOnce();
 });
 it('resumes at the next unlocked level and lets a completed level claim its reward from the map', () => {
   useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: {1:3,2:2,3:1}, claimed: {} } } });
-  show({ initialPage: 'story' }); expect(host.querySelector('[aria-pressed="true"]').textContent).toContain('Moving Ground');
+  show({ initialPage: 'story' }); expect(host.querySelector('[aria-pressed="true"]').getAttribute('aria-label')).toContain('Moving Ground');
   click('Clear Your Tail'); const choices = host.querySelector('.worm-story-rewards');
   act(() => choices.querySelector('button').click());
   expect(state().ownedItems).toHaveLength(1); expect(host.querySelector('[role="status"]').textContent).toContain('unlocked');
@@ -55,11 +55,11 @@ it('offers Next, Replay and chapter navigation from completion', () => {
 });
 
 it('explains the hard deadline before play and distinguishes timeout from a collision', () => {
-  show({ initialPage: 'story' }); expect(host.textContent).toContain('Time limit: 90 seconds');
+  show({ initialPage: 'story' }); expect(host.textContent).toContain('1:30 to finish');
   act(() => root.render(<DeathScreen deathDetails={{ reason: 'story-timeout' }} wormTimeAlive={90}
     wormBodyTiles={12} wormHealedCount={0} wormTunnelCount={0} formatTime={n => `${n}s`} />));
-  expect(host.textContent).toContain('TIME’S UP'); expect(host.textContent).toContain('The clock ran out');
-  expect(host.textContent).not.toContain('TAIL BITE');
+  expect(host.textContent).toContain('Time’s up'); expect(host.textContent).toContain('Try a shorter route');
+  expect(host.textContent).not.toContain('Tail bite');
 });
 
 it('continues level six into seven and reserves chapter completion for ten', () => {
@@ -68,7 +68,7 @@ it('continues level six into seven and reserves chapter completion for ten', () 
     act(() => useGameStore.setState({ wormStoryResult: { levelId: id, stars: 1, seconds: 200, xp: 50, points: 0 } }));
     act(() => root.render(<StoryResult onNext={next} onLevels={levels} />));
     expect(host.textContent).toContain(`LEVEL ${id} / 10`);
-    expect(host.textContent.includes('CHAPTER COMPLETE!')).toBe(id === 10);
+    expect(host.textContent.includes('Chapter complete')).toBe(id === 10);
     click(id === 6 ? 'Next level' : 'Back to chapter');
   }
   expect(next).toHaveBeenCalledOnce(); expect(levels).toHaveBeenCalledOnce();

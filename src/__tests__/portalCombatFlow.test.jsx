@@ -42,7 +42,7 @@ it('starts explicitly, keeps the three-shot gun separate from healing inventory,
 });
 it('freezes combat when paused and does not resume a ready arena through the pause menu',()=>{
   act(()=>host.querySelector('[aria-label="Pause"]').click());
-  act(()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='RESUME').click());
+  act(()=>[...host.querySelectorAll('button')].find(b=>b.classList.contains('worm-pause-resume')).click());
   expect(state().wormPaused).toBe(true);
   act(()=>worm.queueTurn('combat-start'));until(()=>combatBridge.current.time>.1);
   const time=combatBridge.current.time;act(()=>state().setWormPaused(true));

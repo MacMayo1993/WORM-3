@@ -141,3 +141,11 @@
 .chaos-expanded .chaos-detail { max-height: none; overflow: visible; }
 .chaos-expanded .chaos-live-event { margin-bottom: 10px; }
 @media (max-height: 550px) and (orientation: landscape) { .chaos-expanded { max-height: 24dvh; } }
+
+/* The survivors are the hero. Titles and counters use the shared screen type. */
+.chaos-ui { --chaos-display:var(--ui-font,system-ui); }
+.chaos-hero h1 { font-weight:750; font-size:clamp(32px,7vw,52px); }
+.chaos-result-hero h1,.chaos-scoreline h2 { font-weight:750; }
+.chaos-kicker { letter-spacing:.04em; text-transform:none; font-size:12px; }
+.chaos-count { font-family:var(--ui-font,system-ui); font-weight:750; }
+.chaos-result-grid>div { background:transparent; border:0; }

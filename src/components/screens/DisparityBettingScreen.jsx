@@ -65,11 +65,11 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
       <div className="chaos-forecast-sheet">
         <div className="chaos-forecast-scroll">
           <header className="chaos-hero">
-            <div className="chaos-topline"><span className="chaos-kicker"><i className="chaos-status-dot" /> Survival forecast</span>
+            <div className="chaos-topline"><span className="chaos-kicker"><i className="chaos-status-dot" /> Chaos</span>
               <div className="chaos-wallet"><span>Balance</span><strong>{parityPoints.toLocaleString()} <small>PP</small></strong></div>
             </div>
             <div className="chaos-hero-content">
-              <div><h1>CHAOS<span>Call the survivors.</span></h1>
+              <div><h1>Who survives?</h1>
                 </div>
               <ChaosEmblem colors={faceInfo} />
             </div>

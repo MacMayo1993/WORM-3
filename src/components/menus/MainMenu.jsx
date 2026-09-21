@@ -1,3 +1,5 @@
+import { createModePlateArtwork } from '../../3d/modePlateArtwork.js';
+import '../ui/screenDesign.css';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
 import { MENU_FLIP_PAIRS, flipMenuCenters } from './menuCenterPortals.js';
 import { carouselPlateGeometry } from './carouselPlateGeometry.js';
@@ -778,11 +780,13 @@ function makeContactShadowTexture() {
 }
 
 // Renders a beveled, glossy solid-color tile on every cube face, with the
-// mode LABEL on all six faces so the words wrap the whole cube. Fully opaque,
+// illustrated mode scene and a small label on each face. Fully opaque,
 // depth-writing tiles occlude the faces behind them, so only the words on
 // visible faces read — hidden faces are naturally masked by the front tile.
 const ModeFacePlates = React.forwardRef((_props, rootRef) => {
   const enamelRefs = useRef({});
+  const decals = useMemo(() => Object.fromEntries(CAROUSEL_MODES.map(m => [m.id, createModePlateArtwork(m.id, m.textColor)])), []);
+  useEffect(() => () => Object.values(decals).forEach(texture => texture?.dispose()), [decals]);
   const faceColors = useMemo(() => Object.fromEntries(CAROUSEL_MODES.map(m => [m.face, new THREE.Color(m.tileColor)])), []);
   const targetColor = useMemo(() => new THREE.Color(), []);
   useFrame((_state, delta) => {
@@ -820,15 +824,19 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               <meshPhysicalMaterial ref={material => { enamelRefs.current[m.face] = material; }} color={m.tileColor} metalness={0.08} roughness={0.3}
                 clearcoat={1} clearcoatRoughness={0.2} envMapIntensity={0.3} />
             </mesh>
-            {/* Label on every face — the mode words wrap the whole cube */}
+            {decals[m.id] && <mesh position={[0, 0.25, 0.035]} renderOrder={33}>
+              <planeGeometry args={[2.35, 2.35]} />
+              <meshBasicMaterial map={decals[m.id]} transparent depthWrite={false} toneMapped={false} />
+            </mesh>}
+            {/* A scene first, with a small name along the edge of each face. */}
             <Text
-              position={[0, 0, 0.03]}
+              position={[0, -1.08, 0.04]}
               font={bungeeWoffUrl}
-              fontSize={m.label.length > 5 ? 0.58 : 0.74}
+              fontSize={0.32}
               color={m.textColor}
               anchorX="center"
               anchorY="middle"
-              outlineWidth={0.012}
+              outlineWidth={0.004}
               outlineColor={m.textColor === '#fffdf2' ? '#162035' : '#f4f1e8'}
               renderOrder={34}
             >
@@ -1127,14 +1135,14 @@ const withFaceColor = (mode) => {
 const CAROUSEL_MODES = [
   {
     id: 'worm', label: 'WORM', face: 'NX',
-    desc: 'Steer your worm through tunnels to heal the cube.',
+    desc: 'Jump your tail to keep the run alive.',
     how: 'Heal every flipped tile before the worm runs out of room.',
     chips: ['2×2 – Mega', 'Arcade'],
     cta: 'PLAY',
   },
   {
     id: 'freeplay', label: 'CUBE', face: 'NY',
-    desc: "Solve a cube your way, with no time limit.",
+    desc: 'Solve at your own pace.',
     how: 'Done when all six faces show a single colour.',
     chips: ['2×2 – 7×7', 'Relaxed'],
     cta: 'PLAY',
@@ -1144,28 +1152,28 @@ const CAROUSEL_MODES = [
     // No chapter count in the copy: it said "ten" while the campaign has had
     // twelve for some time. The chip carries the number now, derived from the
     // level data (see chipsFor) so it cannot drift again.
-    desc: 'Learn one new trick at a time, chapter by chapter.',
+    desc: 'Learn a new move each chapter.',
     how: 'Clear a chapter to unlock the next one.',
     chips: ['Campaign', 'Guided'],
     cta: 'PLAY',
   },
   {
     id: 'chaos', label: 'CHAOS', face: 'NZ',
-    desc: 'Predict the last surviving pair as the cube flips itself.',
+    desc: 'Pick a pair. Watch the cube fall apart.',
     how: 'Back the pair that outlasts the rest to win Parity Points.',
     chips: ['2×2 – 7×7', 'Wager'],
     cta: 'PLAY',
   },
   {
     id: 'random', label: 'RANDOM', face: 'PZ',
-    desc: 'Solve a cube that changes its look as you play.',
-    how: 'Same goal as CUBE — the colours keep moving under you.',
+    desc: 'Keep solving as the colors shift.',
+    how: 'Solve all six faces. The palette and tile style change every 10 seconds.',
     chips: ['2×2 – 7×7', 'Twist'],
     cta: 'PLAY',
   },
   {
     id: 'store', label: 'STORE', face: 'PY',
-    desc: 'Spend Parity Points on worms, skins, and tile styles.',
+    desc: 'Find your next look.',
     how: 'Earn points by playing; everything you buy is yours for good.',
     chips: ['No cube', 'Cosmetic'],
     cta: 'OPEN STORE',
@@ -1504,7 +1512,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
               }}
             >Back</button>
         <p style={{ margin: 0, fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: PAPER_TEXT, fontFamily: UI_FONT, background: PAPER_SHEET, border: `1px solid ${PAPER_BORDER}`, borderRadius: '100px', padding: '8px 16px' }}>
-          Choose your mode
+          Play
         </p>
         </div>
 
@@ -1516,7 +1524,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           ref={stageRef}
           className="mc-cube-window"
           style={{
-            position: 'relative', width: 'min(560px, 96vw)', marginTop: 32,
+            position: 'relative', width: 'min(560px, 96vw)', marginTop: 16,
             // The stage used to be a fixed height that refused to shrink, so a
             // tall viewport's leftover pixels fell past it and pooled as dead
             // space above PLAY. Growing into that space is what turns the gap
@@ -1572,64 +1580,17 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           ))}
         </div>
 
-        {/* Mode info panel */}
-        <div style={{ width: 'min(400px, 94vw)', marginTop: '10px', opacity, transition: 'opacity 150ms ease' }}>
-          <div style={{
-            borderRadius: '16px',
-            background: PAPER_SHEET,
-            border: `1px solid ${PAPER_BORDER}`,
-            padding: '14px 18px', position: 'relative', overflow: 'hidden',
-          }} aria-label={`${mode.label} mode details`}>
-            <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
-            <h2 style={{ margin: '0 0 8px', textAlign: 'center', fontFamily: DISPLAY_FONT, fontSize: 18, lineHeight: 1.35, color: PAPER_TEXT }}>{mode.label}</h2>
-            {/* What the mode is. */}
-            <p style={{ margin: 0, textAlign: 'center', fontSize: 'clamp(12.5px, 3.4vw, 14.5px)', lineHeight: 1.4, color: PAPER_TEXT, fontFamily: UI_FONT, fontWeight: 600 }}>
-              {mode.desc}
-            </p>
-            <details key={mode.id} style={{ marginTop: 10 }}>
-              <summary className="ui-focusable" style={{ cursor: 'pointer', textAlign: 'center', fontFamily: UI_FONT, fontSize: 12, color: PAPER_TEXT_MUTED, padding: '10px 0', minHeight: 24 }}>Rules & progress</summary>
-            {/* Rules and history remain available without competing with Play. */}
-            <p style={{ margin: '6px 0 0', textAlign: 'center', fontSize: 'clamp(11.5px, 3vw, 12.5px)', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: UI_FONT, fontWeight: 500 }}>
-              {mode.how}
-            </p>
-
-            {/* The two facts worth knowing before committing to a session. */}
-            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              {modeChips.map((chip) => (
-                <span key={chip} style={{
-                  fontFamily: UI_FONT, fontSize: '10.5px', fontWeight: 700,
-                  letterSpacing: '0.06em', textTransform: 'uppercase',
-                  color: PAPER_TEXT_MUTED, background: PAPER_BG_MUTED,
-                  border: `1px solid ${PAPER_BORDER_SOFT}`, borderRadius: '100px',
-                  padding: '4px 10px', whiteSpace: 'nowrap',
-                }}>{chip}</span>
-              ))}
-            </div>
-
-            {/* Your history with this mode, when there is any. A mode you have
-                never opened shows nothing rather than a row of zeroes — see
-                modeStatItems for why that is most of them. */}
-            {statItems.length > 0 && (
-              <div style={{
-                display: 'flex', justifyContent: 'center', gap: 22,
-                marginTop: 10, paddingTop: 10, borderTop: `1px solid ${PAPER_BORDER_SOFT}`,
-              }}>
-                {statItems.map((stat) => (
-                  <div key={stat.label} style={{ textAlign: 'center', minWidth: 0 }}>
-                    <div style={{
-                      fontFamily: UI_FONT, fontSize: '9.5px', fontWeight: 700,
-                      letterSpacing: '0.12em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT,
-                    }}>{stat.label}</div>
-                    <div style={{
-                      fontFamily: UI_FONT, fontSize: '14px', fontWeight: 800,
-                      color: PAPER_TEXT, marginTop: 2, whiteSpace: 'nowrap',
-                    }}>{stat.value}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="mc-mode-copy" style={{ opacity, transition: 'opacity 150ms ease', '--mode-accent': mode.tileColor }}>
+          <article aria-label={`${mode.label} mode details`}>
+            <header><h2>{mode.label === 'CUBE' ? 'Cube' : mode.label.charAt(0) + mode.label.slice(1).toLowerCase()}</h2><span aria-hidden="true" /></header>
+            <p>{mode.desc}</p>
+            <details key={mode.id}>
+              <summary className="ui-focusable">How to play</summary>
+              <p>{mode.how}</p>
+              {statItems.length > 0 && <div className="mc-mode-history">{statItems.map(stat => <div key={stat.label}><strong>{stat.value}</strong><small>{stat.label}</small></div>)}</div>}
+              <div className="mc-mode-facts">{modeChips.map(chip => <span key={chip}>{chip}</span>)}</div>
             </details>
-          </div>
+          </article>
         </div>
 
         {/* Bottom action area grows into the available space on tall phones. */}

@@ -50,15 +50,15 @@ export default function PlayerProgressScreen() {
     setUnlocked({ ...unlocked, equipped: true });
   };
   return <DemoDialog className="xp-screen" onClose={() => close(false)} aria-labelledby="xp-screen-title">
-    <header className="xp-screen-header"><button type="button" className="xp-back" onClick={() => close(false)} data-demo-autofocus aria-label="Back to game">←</button><span>YOUR JOURNEY</span><span>{progress.xp.toLocaleString()} XP</span></header>
+    <header className="xp-screen-header"><button type="button" className="xp-back" onClick={() => close(false)} data-demo-autofocus aria-label="Back to game">←</button><span>Your progress</span><span>{progress.xp.toLocaleString()} XP</span></header>
     <main className="xp-screen-content">
-      <section className="xp-player-heading"><span className="xp-level-seal xp-level-seal-large" aria-hidden="true">{level}</span><div><h1 id="xp-screen-title">LEVEL {level}</h1><p>{playerRank(level)}</p></div></section>
+      <section className="xp-player-heading"><span className="xp-level-seal xp-level-seal-large" aria-hidden="true">{level}</span><div><h1 id="xp-screen-title">Level {level}</h1><p>{playerRank(level)}</p></div></section>
       <XpMeter xp={progress.xp} />
       <p className="xp-rule">+25 PP per level · Reward choice every 5 levels</p>
       {nextRewards.length > 0 && <nav className="xp-next-rewards" aria-label="Upcoming rewards">{nextRewards.map(n => <button type="button" key={n} onClick={() => chooseLevel(n)} aria-pressed={selectedLevel === n}><small>LEVEL {n}</small><strong>{rewardTitle(n)}</strong><span>{n <= level ? 'Ready to choose' : 'Preview →'}</span></button>)}</nav>}
       <section className="xp-reward-panel" aria-labelledby="xp-reward-title">
         <div className="xp-reward-heading"><div><small>LEVEL {selectedLevel}</small><h2 id="xp-reward-title">{isMilestone ? rewardTitle(selectedLevel) : 'Keep exploring'}</h2></div><span>{claimed ? '✓ Claimed' : canClaim ? 'Reward ready' : selectedLevel <= level ? '✓ Reached' : 'Ahead'}</span></div>
-        {unlocked ? <div className="xp-unlocked" role="status"><span className="xp-flip-cube" aria-hidden="true">✦</span><h3>{unlocked.items.length ? 'UNLOCKED' : 'POINTS ADDED'}</h3><p>{unlocked.label}</p>{unlocked.items.length > 0 && <button type="button" className="xp-primary" onClick={equip} disabled={unlocked.equipped}>{unlocked.equipped ? 'Equipped ✓' : 'Equip now'}</button>}</div> : claimed ? <p className="xp-rule">Reward saved. Equip it in the Store.</p> : <>
+        {unlocked ? <div className="xp-unlocked" role="status"><span className="xp-flip-cube" aria-hidden="true">✦</span><h3>{unlocked.items.length ? 'Unlocked' : 'Points added'}</h3><p>{unlocked.label}</p>{unlocked.items.length > 0 && <button type="button" className="xp-primary" onClick={equip} disabled={unlocked.equipped}>{unlocked.equipped ? 'Equipped ✓' : 'Equip now'}</button>}</div> : claimed ? <p className="xp-rule">Reward saved. Equip it in the Store.</p> : <>
           <div className="xp-reward-preview"><RewardPreview choice={isMilestone ? selected : { points: selectedLevel === 1 ? 0 : 25, label: 'Parity Points' }} /></div>
           {isMilestone && <><div className="xp-choice-grid" role="group" aria-label="Choose a reward">{options.map(c => <button type="button" key={c.id} onClick={() => selectChoice(c.id)} aria-pressed={selected?.id === c.id}><small>{c.item?.type === 'scheme' ? 'Palette' : c.item?.type === 'tile' ? 'Tile style' : c.item?.type || (c.points ? 'Points' : 'Collection')}</small><strong>{c.label}</strong></button>)}</div>
           {selected?.items.length > 1 && <p className="xp-bundle-items">{selected.items.map(id => STORE_ITEMS.find(i => i.id === id)?.label).join(' · ')}</p>}
@@ -67,7 +67,7 @@ export default function PlayerProgressScreen() {
         </>}
       </section>
       <section className="xp-collection" aria-labelledby="xp-collection-title">
-        <h2 id="xp-collection-title">Achievement collection</h2>
+        <h2 id="xp-collection-title">Achievements</h2>
         <p>{discoveries} / {ACHIEVEMENTS.length} discovered · First discovery in each feat family earns +10 XP.</p>
         <div className="xp-achievement-filters" role="group" aria-label="Achievement mode">
           {Object.entries(XP_MODES).map(([mode, label]) => <button key={mode} type="button" aria-pressed={achievementMode === mode} onClick={() => setAchievementMode(mode)}>{label}</button>)}

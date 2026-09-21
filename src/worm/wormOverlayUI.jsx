@@ -14,7 +14,7 @@
 // screens additionally tint that scrim toward their cause's colour.
 import React from 'react';
 import {
-    UI_FONT, DISPLAY_FONT, MONO_FONT,
+    UI_FONT, HEADING_FONT, MONO_FONT,
     NIGHT_BACKDROP_BLUR, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHEET, NIGHT_BORDER, UI_MOSS, UI_ACTION_SHADOW,
 } from '../utils/uiTheme.js';
 
@@ -94,7 +94,7 @@ export function Eyebrow({ accent, children }) {
 export function OverlayTitle({ children, size, outline: _outline, glow: _glow, animation }) {
     return (
         <div style={{
-            fontFamily: DISPLAY_FONT,
+            fontFamily: HEADING_FONT, fontWeight: 750,
             fontSize: size,
             lineHeight: 1.02,
             letterSpacing: '-1px',
@@ -128,7 +128,7 @@ export function HeroStat({ accent, value, label }) {
             border: '1px solid rgba(255,245,220,0.10)',
         }}>
             <div style={{
-                fontFamily: DISPLAY_FONT,
+                fontFamily: HEADING_FONT, fontWeight: 750,
                 fontSize: 'clamp(30px, min(12vw, 8vh), 56px)',
                 lineHeight: 1,
                 color: accent,
@@ -136,7 +136,7 @@ export function HeroStat({ accent, value, label }) {
             }}>{value}</div>
             <div style={{
                 marginTop: 'clamp(4px, 1vh, 8px)', fontSize: 10.5, fontWeight: 800,
-                letterSpacing: 2.4, textTransform: 'uppercase', color: NIGHT_TEXT_MUTED,
+                letterSpacing: 0, textTransform: 'none', color: NIGHT_TEXT_MUTED,
             }}>{label}</div>
         </div>
     );
@@ -155,13 +155,13 @@ export function StatTiles({ stats, columns }) {
                 <div key={label} style={{
                     padding: 'clamp(6px, 1.4vh, 10px) 6px',
                     borderRadius: 12,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,245,220,0.08)',
+                    background: 'transparent',
+                    border: 'none',
                 }}>
                     <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', lineHeight: 1.1 }}>{value}</div>
                     <div style={{
-                        marginTop: 5, fontSize: 9.5, fontWeight: 700,
-                        letterSpacing: 1.4, textTransform: 'uppercase', color: NIGHT_TEXT_MUTED,
+                        marginTop: 5, fontSize: 12, fontWeight: 500,
+                        letterSpacing: 0, textTransform: 'none', color: NIGHT_TEXT_MUTED,
                     }}>{label}</div>
                 </div>
             ))}

@@ -62,7 +62,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       onSelect={setStep}
       onBack={handleBack}
       onPrimary={handleNext}
-      finishLabel="Start Playing"
+      finishLabel="Play random"
       mobile={isMobile}
     />
   );

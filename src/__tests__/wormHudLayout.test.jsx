@@ -62,7 +62,7 @@ it('replaces secondary context with one healing readout and keeps pause usable d
   expect(host.querySelector('[aria-label="Healing energy deposited"]')).toBeNull();
   act(() => host.querySelector('[aria-label="Pause"]').click());
   expect(useGameStore.getState().wormPaused).toBe(true);
-  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'RESUME').click());
+  act(() => [...host.querySelectorAll('button')].find(b => b.classList.contains('worm-pause-resume')).click());
   expect(useGameStore.getState().wormPaused).toBe(false);
   wormBuffs.tunnelNeeds = null;
   renderPhase('crawling'); act(() => vi.advanceTimersByTime(110));
@@ -87,7 +87,7 @@ it('keeps live Story progress in a single compact button and pauses to inspect t
   expect(useGameStore.getState().wormPaused).toBe(true);
   expect(host.querySelector('.worm-pause-card .worm-story-checklist')).not.toBeNull();
   expect(top.hasAttribute('inert')).toBe(true);
-  expect(document.activeElement.textContent).toBe('RESUME');
+  expect(document.activeElement.classList.contains('worm-pause-resume')).toBe(true);
   act(() => document.activeElement.click());
   expect(useGameStore.getState().wormPaused).toBe(false);
   expect(host.querySelector('.worm-story-checklist')).toBeNull();

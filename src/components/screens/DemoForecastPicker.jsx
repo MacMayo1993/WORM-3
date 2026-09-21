@@ -1,7 +1,7 @@
 import DemoDialog from './DemoDialog.jsx';
 import React, { useState } from 'react';
 import {
-  UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT, UI_ACTION_SHADOW,
+  UI_FONT, HEADING_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT, UI_ACTION_SHADOW,
 } from '../../utils/uiTheme.js';
 
 // The three twin pairs, named by the two colours a player can actually see on
@@ -31,7 +31,7 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
         Chaos Forecast
       </p>
       <h2 style={{
-        fontFamily: DISPLAY_FONT, fontSize: 28, color: UI_CREAM,
+        fontFamily: HEADING_FONT, fontSize: 28, color: UI_CREAM,
         margin: '0 0 8px', letterSpacing: '0.04em',
       }}>
         Which pair survives?

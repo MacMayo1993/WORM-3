@@ -1,3 +1,4 @@
+import ModeArtwork from '../../components/ui/ModeArtwork.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -15,9 +16,9 @@ export function StoryRewardChoices({ level }) {
   const earned = storyStars(progress, level.id) > 0;
   const allOwned = level.reward.every(id => owned.includes(id));
   return <div className="worm-story-rewards" aria-label={level.rewardLabel}>
-    {allOwned ? <button disabled={!earned} onClick={() => claim(level.id, 'points')}>Already own both? Claim {level.fallback} points</button>
+    {allOwned ? <button disabled={!earned} onClick={() => claim(level.id, 'points')}>Claim {level.fallback} points</button>
       : level.reward.map(id => <button key={id} disabled={!earned || owned.includes(id)} onClick={() => claim(level.id, id)}>
-        {getStoreItem(id)?.label}{owned.includes(id) ? ' · Owned' : earned ? ' · Choose' : ' · Clear to earn'}
+        {getStoreItem(id)?.label}{owned.includes(id) ? ' · Owned' : earned ? ' · Choose' : ''}
       </button>)}
   </div>;
 }
@@ -106,9 +107,9 @@ export function StoryResult({ onNext, onRetry, onLevels }) {
   const level = storyLevel(result?.levelId);
   if (!result || !level) return null;
   return <div ref={ref} className="worm-story-result" role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" style={{ zIndex: Z.MODAL, fontFamily: UI_FONT }}>
-    <div className="worm-story-result-sheet"><small>STORY · LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><h2 id="worm-story-result-title">{level.id === WORM_STORY_LEVELS.at(-1).id ? 'CHAPTER COMPLETE!' : 'LEVEL CLEAR!'}</h2>
-      <div className="worm-story-result-stars" aria-label={`${result.stars} out of 3 stars`}>{'★'.repeat(result.stars)}{'☆'.repeat(3-result.stars)}</div>
-      <p>{level.title} · {result.seconds}s<br />+{result.xp} XP · +{result.points} Parity Points</p>
+    <div className="worm-story-result-sheet"><ModeArtwork mode="success" className="screen-results-art" /><small>STORY · LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><h2 id="worm-story-result-title">{level.id === WORM_STORY_LEVELS.at(-1).id ? 'Chapter complete' : 'Level clear'}</h2>
+      <div className="worm-story-result-stars" aria-label={`${result.stars} out of 3 stars`}>{[0,1,2].map(i => <span key={i} data-earned={i < result.stars} style={{ '--star-index': i }} aria-hidden="true">★</span>)}</div>
+      <p>{level.title}</p><div className="screen-stat-row"><div><strong>{result.seconds}s</strong><span>Time</span></div><div><strong>+{result.xp}</strong><span>XP</span></div><div><strong>+{result.points}</strong><span>Parity Points</span></div></div>
       <StoryRewardChoices level={level} />
       <button className="worm-story-primary" onClick={level.id < WORM_STORY_LEVELS.at(-1).id ? onNext : onLevels}>{level.id < WORM_STORY_LEVELS.at(-1).id ? 'Next level' : 'Back to chapter'} <span>→</span></button>
       <button className="worm-story-secondary" onClick={onRetry}>Replay</button><button className="worm-story-secondary" onClick={onLevels}>Chapter map</button>

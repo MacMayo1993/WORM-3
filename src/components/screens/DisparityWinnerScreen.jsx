@@ -4,7 +4,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { bettingPalette, getFaceFromGridId } from '../../utils/disparityBetting.js';
 import { predictionLabel } from '../../game/chaosExperience.js';
 import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
-import { Z, UI_FONT, DISPLAY_FONT, MONO_FONT } from '../../utils/uiTheme.js';
+import { Z, UI_FONT, HEADING_FONT, MONO_FONT } from '../../utils/uiTheme.js';
 import '../../chaos/chaos.css';
 import { ChaosGlyph } from '../../chaos/ChaosArt.jsx';
 import { useDialogBehavior } from '../ui/Panel.jsx';
@@ -35,8 +35,8 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
     <div className="chaos-result-sheet">
       <header className="chaos-result-hero">
         <ChaosGlyph kind="trophy" />
-        <div className="chaos-kicker">CHAOS · Last pair standing</div>
-        <h1 id="chaos-result-title" style={{ fontFamily: DISPLAY_FONT }}>{run?.winningPair || 'Storm settled'}</h1>
+        <div className="chaos-kicker">Chaos</div>
+        <h1 id="chaos-result-title" style={{ fontFamily: HEADING_FONT }}>Last pair standing</h1>
         
         <div className="chaos-winners">
           {pair.map((id, i) => <React.Fragment key={id}>
@@ -54,21 +54,24 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
           <div>
             <strong>{outcome}</strong>
             {run?.prediction && <p>Your call: {predictionLabel(run.prediction, paletteSettings)}.</p>}
-            {result && <p>{result.description}</p>}
             {!result && <p>{deaths.length} tiles eliminated.</p>}
-            {lastBackedEvent && <p>Latest elimination in your color group: {sourceName(lastBackedEvent.source).toLowerCase()} at {Math.max(0, Math.round((lastBackedEvent.at - run.startedAt) / 1000))}s, with {lastBackedEvent.alive} tiles left on the cube.</p>}
+
           </div>
         </div>
         <div className="chaos-result-grid">
-          <div><ChaosGlyph kind="SPEED" /><strong>{elapsed == null ? '—' : `${elapsed}s`}</strong><small>Round duration</small></div>
-          <div><ChaosGlyph /><strong>{run?.peakBurst || 0}</strong><small>Largest elimination burst</small></div>
+          <div><ChaosGlyph kind="SPEED" /><strong>{elapsed == null ? '—' : `${elapsed}s`}</strong><small>Time</small></div>
+          <div><ChaosGlyph /><strong>{run?.peakBurst || 0}</strong><small>Biggest burst</small></div>
           <div><ChaosGlyph kind="heal" /><strong>+{run?.healPoints || 0}</strong><small>Healing PP</small></div>
         </div>
         {!!run?.medals?.length && <><div className="chaos-kicker">This round’s feats</div>
           <div className="chaos-medals">{run.medals.map(medal => <span key={medal}><ChaosGlyph kind="trophy" />{medal}</span>)}</div></>}
-        <XpRunSummary mode="chaos" />
+        <details className="chaos-timeline"><summary>Round details</summary>
+          {result && <p>{result.description}</p>}
+            {lastBackedEvent && <p>Latest elimination in your color group: {sourceName(lastBackedEvent.source).toLowerCase()} at {Math.max(0, Math.round((lastBackedEvent.at - run.startedAt) / 1000))}s, with {lastBackedEvent.alive} tiles left on the cube.</p>}
+          <XpRunSummary mode="chaos" />
+        </details>
         <details className="chaos-timeline">
-          <summary tabIndex={0}>Round timeline · latest {events.length} elimination bursts</summary>
+          <summary tabIndex={0}>Timeline · {events.length} bursts</summary>
           <ol>{events.map((event, i) => <li key={`${event.at}-${i}`}>
             <time>{Math.max(0, Math.round((event.at - run.startedAt) / 1000))}s</time>
             <div>{sourceName(event.source)} · {event.tiles.length} eliminated · {event.alive} left
@@ -76,7 +79,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
           </li>)}</ol>
         </details>
         <details className="chaos-timeline">
-          <summary tabIndex={0}>Full tile ledger · {deaths.length} eliminations</summary>
+          <summary tabIndex={0}>Eliminated tiles · {deaths.length}</summary>
           <ol>{[...deaths].reverse().map(entry => <li key={entry.gridId}>
             <time>#{entry.rank}</time><div style={{ fontFamily: MONO_FONT }}>{entry.gridId}
               {entry.endGridId && entry.endGridId !== entry.gridId && <small>Final position: {entry.endGridId}</small>}</div>

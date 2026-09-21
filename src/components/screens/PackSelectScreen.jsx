@@ -1,3 +1,4 @@
+import ModeArtwork from '../ui/ModeArtwork.jsx';
 // PackSelectScreen.jsx — choose a campaign, or today's Daily Descent.
 //
 // Story used to open chapter 1 directly, so the chapter map was reachable only
@@ -26,7 +27,7 @@ import {
 import { EARN_DAILY_CHALLENGE } from '../../utils/economyConstants.js';
 import { progressManager } from '../../utils/levels.js';
 import {
-  UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
+  UI_FONT, HEADING_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED,
   PAPER_CARD_SHADOW, UI_MOSS,
  Z, TEXT_MICRO } from '../../utils/uiTheme.js';
@@ -135,18 +136,19 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
       boxSizing: 'border-box', overflowY: 'auto',
     }}>
       <div style={{ width: '100%', maxWidth: '560px' }}>
-        <div style={{ padding: '6px 4px 18px' }}>
+        <div className="screen-heading" style={{ padding: '6px 4px 18px' }}><div>
           <div style={{
             fontSize: '11px', fontWeight: 900, letterSpacing: '0.18em',
             textTransform: 'uppercase', color: PAPER_TEXT_FAINT,
           }}>Story</div>
           <h1 style={{
-            margin: '4px 0 6px', fontFamily: DISPLAY_FONT, color: PAPER_TEXT,
+            margin: '4px 0 6px', fontFamily: HEADING_FONT, color: PAPER_TEXT,
             fontSize: 'clamp(26px, 7vw, 40px)', letterSpacing: '0.02em', lineHeight: 1,
           }}>Choose a campaign</h1>
           <p style={{ margin: 0, fontSize: '13px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>
-            Progress is saved per campaign.
+            Pick up where you left off.
           </p>
+          </div><ModeArtwork mode="cube" />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '90px' }}>

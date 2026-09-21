@@ -112,7 +112,7 @@ it('waits for Try it and keeps a paused or completed exercise frozen', () => {
   const pos = { ...worm.pos.current }; frames(40);
   expect(worm.pos.current).toEqual(pos); expect(state().demoWormComplete).toBe(false);
   act(() => host.querySelector('[aria-label="Pause"]').click());
-  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'RESUME').click());
+  act(() => [...host.querySelectorAll('button')].find(b => b.classList.contains('worm-pause-resume')).click());
   expect(state().wormPaused).toBe(true);
   act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'Try it').click());
   input('turnRight'); until(() => state().demoWormComplete);
