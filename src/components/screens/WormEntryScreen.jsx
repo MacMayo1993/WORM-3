@@ -39,7 +39,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   const totalStars = WORM_STORY_LEVELS.reduce((n, item) => n + storyStars(progress, item.id), 0);
   const launch = () => { wormMenuFeedback(); onComplete({ ...initialSettings, perFaceStyles: initialSettings?.manifoldStyles,
     wormColor: getSkin(wormSkin).body,
-    storyLevel: level.id, cubeSize: 5, megaMode: false, wormSpeed: level.speed, wormOrbCount: 1,
+    storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: false, wormSpeed: level.speed, wormOrbCount: 1,
     wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false }); };
   return <div ref={root} className={`mode-wizard worm-entry${page === 'choice' ? ' worm-entry-choice' : ''}`} role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
     style={{ '--mode-accent': MODE_THEMES.worm.accent, '--story-display': HEADING_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>

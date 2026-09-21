@@ -1,23 +1,27 @@
 import { it, expect } from 'vitest';
 import { makeWormSim } from '../worm/healerWorm/wormSim.js';
+import { getStickerWorldPos } from '../game/coordinates.js';
 import { stageStory, storyMetrics } from '../worm/story/runtime.js';
 import { recordStoryMechanic, offerStoryPower, nextStoryPower } from '../worm/story/mastery.js';
 import { storyLevel, storyOutcome, nextStoryLevel, sanitizeStoryProgress } from '../worm/story/levels.js';
 import { getActiveTunnels } from '../worm/wormLogic.js';
 import { makeStoryCombat, stepStoryCombat } from '../worm/story/combat.js';
 import { surfacePose } from '../worm/combat/portalCombat.js';
+import { shAt, ttAt } from '../worm/circularBuffers.js';
+import { WORM_LIFT } from '../worm/healerWorm/constants.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 
 function setup(id = 10) {
   resetLiveRotation();
-  const sim = makeWormSim(5), level = storyLevel(id), p = stageStory(sim, 5, level);
+  const level = storyLevel(id), size = level.cubeSize ?? 5;
+  const sim = makeWormSim(size), p = stageStory(sim, size, level);
   p.rotationEpoch = 0;
   const read = (delta = 0.05) => storyMetrics(sim, p, level, { wormSessionOrbs: 0, rotationEpoch: 0 }, [], delta);
   return { sim, level, p, read };
 }
 it.each([7, 8, 9, 10])('authors level %i with enough matching orbs and real healing pairs', id => {
   const { sim, p, level } = setup(id);
-  expect(getActiveTunnels(p.cubies, 5)).toHaveLength(level.target);
+  expect(getActiveTunnels(p.cubies, level.cubeSize ?? 5)).toHaveLength(level.target);
   expect(sim.powerups.length).toBeGreaterThanOrEqual(level.orbs);
   for (const color of [1,2,3,4,5,6]) expect(sim.powerups.filter(t => p.cubies[t.x][t.y][t.z].stickers[t.dirKey].curr === color).length).toBeGreaterThanOrEqual(4);
   expect(sim.specials.length).toBeLessThanOrEqual(1);
@@ -29,6 +33,25 @@ it('requires every final-level mechanic, a safe landing, tail clearance and sett
   for (const [key, target] of Object.entries(level.mechanics)) expect(storyOutcome(level, { ...won, [key]: target - 1 })).toBeNull();
   for (const key of ['alive', 'tailClear', 'landed', 'rotationSettled']) expect(storyOutcome(level, { ...won, [key]: false })).toBeNull();
   expect(storyOutcome(level, { ...won, elapsed: 541 })).toBeNull();
+});
+it('stages the Stage 9 body on the 7x7 exterior and completes with one bomb and enemy', () => {
+  const { sim, level, p } = setup(9);
+  expect(level.cubeSize).toBe(7);
+  expect(p.cubies).toHaveLength(7);
+  expect(sim.pos).toMatchObject({ x: 3, y: 0, z: 6, dirKey: 'PZ' });
+  const headZ = getStickerWorldPos(3, 0, 6, 'PZ', 7, 0)[2] + WORM_LIFT;
+  for (let i = 0; i < sim.stepHistory.count; i++) {
+    const point = shAt(sim.stepHistory, i);
+    expect(point.tz).toBe(6);
+    expect(point.pos.z).toBeCloseTo(headZ, 8);
+    if (i > 0) expect(point.pos.distanceTo(shAt(sim.stepHistory, i - 1).pos)).toBeCloseTo(0.02, 8);
+  }
+  expect(ttAt(sim.tileTrail, 0)).toBe('3,0,6,PZ');
+  const won = { alive: true, elapsed: 200, cuts: 0, orbs: 24, healed: 4, remaining: 0,
+    tailClear: true, landed: true, rotationSettled: true, ringHeals: 1, signatures: 2, bombs: 1, kills: 1 };
+  expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
+  expect(storyOutcome(level, { ...won, bombs: 0 })).toBeNull();
+  expect(storyOutcome(level, { ...won, kills: 0 })).toBeNull();
 });
 it('counts completed boosts, double-jump landings and rocket landings once per episode', () => {
   const { sim, read } = setup(7);

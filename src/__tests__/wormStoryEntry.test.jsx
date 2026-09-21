@@ -17,6 +17,17 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); state().clearDisparityGame(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
 const show = props => act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={cancel} initialSettings={{ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 }} {...props} />));
+it('launches Stage 9 on 7x7 and returns other chapters to 5x5', () => {
+  useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])), claimed: {}
+  } } });
+  show({ initialPage: 'story' });
+  click('Under Siege'); click('Replay level');
+  expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 9, cubeSize: 7, megaMode: false });
+  expect(host.querySelector('[aria-label="Selected level"]').textContent).toContain('defeat one enemy');
+  click('Worm Ascendant'); click('Play level');
+  expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 10, cubeSize: 5 });
+});
 it('opens with Story on the left and Free Play on the right, without launching either', async () => {
   show(); const cards = [...host.querySelector('.worm-path-split').children];
   expect(cards).toHaveLength(2);
