@@ -5,7 +5,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import WormChaseCamera from '../worm/WormChaseCamera.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION } from '../worm/healerWorm/constants.js';
+import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
 import { rocketOrbitInto, rocketOrbitT } from '../worm/healerWorm/rocketOrbit.js';
 import { getWindWorldPosInto } from '../worm/wormLogic.js';
 
@@ -149,4 +149,53 @@ it('retains whole-board framing on desktop', () => {
   const origin = new Vector3().project(scene.camera);
   expect(origin.x).toBeCloseTo(0, 6);
   expect(origin.y).toBeCloseTo(0.06, 6);
+});
+
+it('does not pump the camera out and back on a Mega orb pickup', () => {
+  const worm = makeWorm(15);
+  render(worm, 15); tick();
+  useGameStore.setState({ wormGamePhase: 'active' });
+  for (let i = 0; i < 360; i++) tick();
+  const head = worm.headInterpPos.current;
+  let previous = scene.camera.position.distanceTo(head);
+  worm.tailLength.current += ORB_SEGMENT_GROWTH;
+  for (let i = 0; i < 180; i++) {
+    tick();
+    const distance = scene.camera.position.distanceTo(head);
+    // Growth can gently widen the shot, but a pickup must not reverse it.
+    expect(distance).toBeGreaterThanOrEqual(previous - 1e-8);
+    previous = distance;
+    expectCentered(worm, 15);
+  }
+});
+
+it('settles the same camera offset after equal elapsed time at different frame rates', () => {
+  const results = [];
+  for (const hz of [30, 60, 120]) {
+    const worm = makeWorm(15);
+    useGameStore.setState({ wormGamePhase: 'countdown' });
+    render(worm, 15, String(hz)); tick();
+    useGameStore.setState({ wormGamePhase: 'active' });
+    for (let i = 0; i < 360; i++) tick();
+    worm.headInterpPos.current.x += 1;
+    for (let i = 0; i < hz / 5; i++) scene.frame({}, 1 / hz);
+    results.push(scene.camera.position.clone());
+  }
+  expect(results[0].distanceTo(results[1])).toBeLessThan(1e-7);
+  expect(results[1].distanceTo(results[2])).toBeLessThan(1e-7);
+});
+
+it('does not snap the chase position to its target after a long frame', () => {
+  const worm = makeWorm(15);
+  render(worm, 15); tick();
+  useGameStore.setState({ wormGamePhase: 'active' });
+  for (let i = 0; i < 360; i++) tick();
+  const before = scene.camera.position.clone();
+  worm.headInterpPos.current.x += 1;
+  scene.frame({}, 2);
+  const movement = scene.camera.position.x - before.x;
+  expect(movement).toBeGreaterThan(0);
+  expect(movement).toBeLessThan(0.8);
+  scene.camera.updateMatrixWorld(true);
+  expectCentered(worm, 15);
 });

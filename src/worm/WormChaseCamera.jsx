@@ -25,8 +25,7 @@ import {
     LOOK_AHEAD,
     CAM_CENTER_BIAS,
     CAM_LERP,
-    ZOOM_BURST,
-    MAX_EXTRA_ZOOM,
+    MAX_TICK_DELTA,
     FACE_NORMALS,
     DIR_FORWARD,
     BASE_TAIL_LENGTH,
@@ -177,14 +176,12 @@ export default function WormChaseCamera({ worm, size }) {
     const camUpRef = useRef(new THREE.Vector3(0, 1, 0));  // smoothed up — prevents instant snap
     const prevPhaseRef = useRef('crawling');              // detect phase transitions for snap logic
     const prevGamePhaseRef = useRef('scrambling');         // detect entry into the opening scramble
-    const zoomExtraRef = useRef(0);   // burst zoom accumulated
     const prevDirKeyRef = useRef(null);                   // detect face boundary crossings
     const faceTransT = useRef(0);                         // countdown timer for face-transition blend
     const oldNormalRef = useRef(new THREE.Vector3());     // normal at moment of face change
     const oldForwardRef = useRef(new THREE.Vector3());    // forward at moment of face change
     const lastNormalRef = useRef(new THREE.Vector3(0, 0, 1));   // blended normal from previous frame
     const lastForwardRef = useRef(new THREE.Vector3(0, 0, -1)); // blended forward from previous frame
-    const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
     const postTunnelEaseRef = useRef(0);  // seconds remaining of gentle re-framing after exiting a tunnel
     const solvedAngleRef = useRef(0);     // accumulated azimuth of the victory orbit
     const sliceFreezeActiveRef = useRef(false); // are we mid slice-death freeze frame?
@@ -211,6 +208,8 @@ export default function WormChaseCamera({ worm, size }) {
     }, [camera]);
 
     useFrame((_, delta) => {
+        // Match the simulation clock after a hitch; never snap the lens on resume.
+        delta = Math.min(Math.max(0, delta), MAX_TICK_DELTA);
         const gameState = useGameStore.getState();
         const gamePhase = gameState.wormGamePhase ?? 'active';
         // Read per frame rather than through a subscription: this callback already
@@ -393,29 +392,19 @@ export default function WormChaseCamera({ worm, size }) {
             : 0;
         const rocketLift = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
         const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 16, tunnelMix) + rocketLift * 7;
-        const fovAlpha = Math.min(1, delta * 6);
+        const fovAlpha = 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
             camera.fov = nextFov;
             camera.updateProjectionMatrix();
         }
 
-        // Detect new pickup → brief burst zoom that decays quickly
-        if (tailLen > prevTailLen.current) {
-            prevTailLen.current = tailLen;
-            zoomExtraRef.current = Math.min(zoomExtraRef.current + ZOOM_BURST, MAX_EXTRA_ZOOM);
-        }
-        // Decay burst zoom over time
-        if (zoomExtraRef.current > 0) {
-            zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 3.0);
-        }
-
-        // Growth and pickup bursts share one ceiling. The furthest backward
-        // distance is 20% closer, including the base/portrait offset in that ratio.
+        // Grow the framing gently with the tail. Pickup feedback lives on the
+        // worm/orb: a repeated zoom burst made dense Mega pickups pump the view.
         const orbCount = Math.max(0, Math.floor((tailLen - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
         const aspectZoomBoost = THREE.MathUtils.lerp(0, 0.4, portraitFactor);
         const extraZoom = boundedWormZoom(size, CAM_BACK_BASE + aspectZoomBoost * 0.9,
-            orbCount, Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM));
+            orbCount, 0);
         const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
         const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
 
@@ -462,7 +451,7 @@ export default function WormChaseCamera({ worm, size }) {
             if (horizonMode === 'face') _camUp.copy(_camNormal);
             else _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
 
-            const revealA = enteredReveal ? 1 : Math.min(1, CAM_LERP * delta);
+            const revealA = enteredReveal ? 1 : 1 - Math.exp(-CAM_LERP * delta);
             if (enteredReveal) {
                 camPosRef.current.copy(_camTargetCam);
                 lookAtRef.current.copy(_camTargetLook);
@@ -677,9 +666,9 @@ export default function WormChaseCamera({ worm, size }) {
                 crawlK = THREE.MathUtils.lerp(3.0, CAM_LERP, 1 - postTunnelEaseRef.current / 0.7);
             }
 
-            const alpha = rocketLift > 0
-                ? 1 - Math.exp(-crawlK * (1 + rocketLift * 0.6) * delta)
-                : Math.min(1, crawlK * delta);
+            // Exponential damping has the same response at 30/60/120 Hz.
+            // Linear dt gains made Mega's fluctuating frame times change the drag.
+            const alpha = 1 - Math.exp(-crawlK * (1 + rocketLift * 0.6) * delta);
             camPosRef.current.lerp(_camTargetCam, alpha);
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
@@ -759,7 +748,7 @@ export default function WormChaseCamera({ worm, size }) {
         }
 
         prevPhaseRef.current = phase;
-    });
+    }, -0.25); // After simulation (-0.5), before body/effects (0); retain automatic rendering.
 
     return null;
 }

@@ -7,10 +7,8 @@ export const LOOK_AHEAD = 4.0;      // look-at ahead of worm
 // whole cube stays framed instead of the camera staring off the worm's nose.
 // 0 = pure chase (worm centred, cube drifts off-screen), 1 = always look at cube centre.
 export const CAM_CENTER_BIAS = 0.35;
-export const CAM_LERP = 8;          // camera smoothing (× delta)
+export const CAM_LERP = 8;          // camera damping rate (per second)
 export const WORM_LIFT = 0.08; // worm sits right on tile surface
-export const ZOOM_BURST = 0.8; // brief camera pull-back on pickup (decays fast)
-export const MAX_EXTRA_ZOOM = 2.0; // hard cap so camera never flies away
 
 export const GLASS_MIN_OPACITY = 0.12;
 export const GLASS_MAX_OPACITY = 0.28;
