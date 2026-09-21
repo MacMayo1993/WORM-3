@@ -17,39 +17,49 @@ const MOUTHS = [[1,2,4,'PZ'], [4,2,1,'PX'], [1,4,2,'PY'], [3,2,4,'PZ'], [4,2,3,'
 
 function seedBody(sim, size, path) {
   const normal = new THREE.Vector3(0, 0, 1);
+  // Keep the authored unit-length trail aligned to the centered spawn column.
+  // Only its face depth changes; stretching the path would stretch the body.
+  const edge = size - 1, offset = Math.floor(size / 2) - 2;
+  path = path.map(([x, y]) => [x + offset, y]);
   shReset(sim.stepHistory);
-  ttReset(sim.tileTrail, `${path.at(-1).join(',')},4,PZ`);
+  ttReset(sim.tileTrail, `${path.at(-1).join(',')},${edge},PZ`);
   const point = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3();
   for (let i = path.length - 1; i > 0; i--) {
-    a.fromArray(getStickerWorldPos(...path[i], 4, 'PZ', size, 0)).addScaledVector(normal, WORM_LIFT);
-    b.fromArray(getStickerWorldPos(...path[i - 1], 4, 'PZ', size, 0)).addScaledVector(normal, WORM_LIFT);
-    for (let n = 0; n < 50; n++) shPush(sim.stepHistory, point.lerpVectors(a, b, n / 50), normal, path[i][0], path[i][1], 4);
-    ttPush(sim.tileTrail, `${path[i - 1][0]},${path[i - 1][1]},4,PZ`);
+    a.fromArray(getStickerWorldPos(...path[i], edge, 'PZ', size, 0)).addScaledVector(normal, WORM_LIFT);
+    b.fromArray(getStickerWorldPos(...path[i - 1], edge, 'PZ', size, 0)).addScaledVector(normal, WORM_LIFT);
+    for (let n = 0; n < 50; n++) shPush(sim.stepHistory, point.lerpVectors(a, b, n / 50), normal, path[i][0], path[i][1], edge);
+    ttPush(sim.tileTrail, `${path[i - 1][0]},${path[i - 1][1]},${edge},PZ`);
   }
   sim.tailLength = Math.floor((path.length - 1) / BODY_BALL_SPACING);
 }
 
 export function stageStory(sim, size, level, character) {
   const base = stageWormPractice(sim, size, { id: 'steer' });
+  const edge = size - 1, offset = Math.floor(size / 2) - 2;
   const pairCount = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
   for (const [x, y, z, dir] of MOUTHS.slice(0, pairCount)) {
-    base.cubies = flipStickerPair(base.cubies, size, x, y, z, dir, buildManifoldGridMap(base.cubies, size));
+    // The template mouths are on positive faces of a 5x5. Keep their lateral
+    // spacing while anchoring them to the actual exterior of the story board.
+    base.cubies = flipStickerPair(base.cubies, size,
+      dir === 'PX' ? edge : x + offset, dir === 'PY' ? edge : y + offset,
+      dir === 'PZ' ? edge : z + offset, dir, buildManifoldGridMap(base.cubies, size));
   }
   // Every level includes matching healing resources on all six faces.
   // Route-trial pairs can seal after traversal without losing their recorded credit.
   sim.powerups = [];
   const cells = level.kind === 'mastery' ? [[1,1],[3,1],[1,3],[3,3],[2,1],[2,3],[1,2],[3,2]] : level.kind === 'restore' ? [[1,1],[3,1],[1,3],[3,3],[2,1],[2,3]] : [[1,1],[3,1],[1,3],[3,3]];
   for (const dirKey of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
-    for (const [a, b] of cells) {
-      const [x, y, z] = dirKey === 'PZ' || dirKey === 'NZ' ? [a, b, dirKey === 'PZ' ? 4 : 0]
-        : dirKey === 'PX' || dirKey === 'NX' ? [dirKey === 'PX' ? 4 : 0, a, b] : [a, dirKey === 'PY' ? 4 : 0, b];
+    for (const [u, v] of cells) {
+      const a = u + offset, b = v + offset;
+      const [x, y, z] = dirKey === 'PZ' || dirKey === 'NZ' ? [a, b, dirKey === 'PZ' ? edge : 0]
+        : dirKey === 'PX' || dirKey === 'NX' ? [dirKey === 'PX' ? edge : 0, a, b] : [a, dirKey === 'PY' ? edge : 0, b];
       const sticker = base.cubies[x][y][z].stickers[dirKey];
       if (sticker.curr === sticker.orig) sim.powerups.push({ x, y, z, dirKey, type: 'apple' });
     }
   }
   if (level.kind === 'jump') {
     seedBody(sim, size, CROSSING_PATH);
-    base.target = { x: 2, y: 2, z: 4, dirKey: 'PZ' };
+    base.target = { x: 2 + offset, y: 2, z: edge, dirKey: 'PZ' };
   } else seedBody(sim, size, level.id === 1 ? LONG_PATH.slice(0, 6) : LONG_PATH);
   if (level.kind === 'tunnel') base.target = getActiveTunnels(base.cubies, size)[0]?.entry ?? null;
   const targetCount = characterOrbCount(sim.powerups.length, character);

@@ -874,7 +874,8 @@ export default function WORM3() {
     // Mega Mode is the dedicated 15×15 Worm preset. Keep the explicit mode flag
     // authoritative so future wizard changes cannot accidentally launch it on
     // the last ordinary slider value.
-    const targetSize = wizardSettings.megaMode ? 15 : (wizardSettings.cubeSize || 3);
+    const targetSize = chapterLevel ? (chapterLevel.cubeSize ?? 5)
+      : wizardSettings.megaMode ? 15 : (wizardSettings.cubeSize || 3);
     // Establish the Mega quality tier before mounting the new cube. Waiting for
     // Mobi completion means the entire intro pays for full-size effects, and New
     // Game can re-enter the wizard with size 15 still mounted.
@@ -955,7 +956,7 @@ export default function WORM3() {
     const id = (s.wormStoryResult?.levelId ?? 0) + 1;
     if (!s.wormStoryResult || !storyUnlocked(s.playerProgress, id)) return;
     handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles,
-      storyLevel: id, cubeSize: 5, megaMode: false, wormSpeed: storyLevel(id).speed, wormOrbCount: 1,
+      storyLevel: id, cubeSize: storyLevel(id).cubeSize ?? 5, megaMode: false, wormSpeed: storyLevel(id).speed, wormOrbCount: 1,
       wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
   }, [handleWormSetupComplete]);
 
