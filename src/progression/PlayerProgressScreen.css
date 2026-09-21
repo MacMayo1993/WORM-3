@@ -1,4 +1,4 @@
-.xp-screen { position: fixed; inset: 0; z-index: 100100; display: flex; flex-direction: column; background: #f4f0e7; color: #2c3427; font-family: system-ui, sans-serif; overflow: hidden; }
+.xp-screen { position: fixed; inset: 0; z-index: 100100; display: flex; flex-direction: column; background: #f4f0e7; color: #2c3427; font-family: var(--ui-font, system-ui); overflow: hidden; }
 .xp-screen *, .xp-screen *::before, .xp-screen *::after { box-sizing: border-box; }
 .xp-screen button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .xp-screen button:disabled { cursor: default; opacity: .65; }
@@ -72,5 +72,5 @@
 .xp-collection-list p { margin: 4px 0; font-size: 12px; line-height: 1.45; }
 .xp-collection-list small { color: #7a6e62; font-size: 10px; }
 
-.xp-player-heading h1,.xp-reward-heading h2,.xp-unlocked h3 { font-family:var(--ui-font,system-ui); font-weight:750; letter-spacing:-.04em; }
+.xp-player-heading h1,.xp-reward-heading h2,.xp-unlocked h3 { font-family:var(--heading-font,system-ui); font-weight:750; letter-spacing:-.04em; }
 .xp-screen-header { letter-spacing:0; }

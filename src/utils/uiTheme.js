@@ -15,10 +15,26 @@
  */
 
 // ─── Fonts ────────────────────────────────────────────────────────────────────
-// Keep in sync with --ui-font in App.css.
-export const UI_FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
-// Screen headings use the body family at a stronger weight; Bungee stays on the game brand.
-export const HEADING_FONT = UI_FONT;
+// Four self-hosted faces, one job each. Every one ships with the bundle via
+// Fontsource (imported in main.jsx) — never a CDN <link>, which silently falls
+// back to a system serif on a blocked or slow connection and destroys the
+// game's typography on exactly the devices that can least afford it.
+//
+//   UI_FONT      Nunito   — body, buttons, labels, HUD. Rounded terminals and a
+//                           tall x-height, so 11px tile captions stay legible
+//                           and the warm paper surfaces do not read as a form.
+//   HEADING_FONT Outfit   — screen and card titles. Geometric and wide where
+//                           Nunito is soft and narrow, which is what makes a
+//                           heading read as a heading without a size jump.
+//   DISPLAY_FONT Bungee   — the game brand and celebration headlines only.
+//   HAND_FONT    Annie…   — Mobi's dialogue.
+//
+// Both new faces are variable (wght axis), so weight is a free axis: use 400
+// for body, 600 for emphasis, 700–800 for headings, rather than reaching for a
+// different family. Keep in sync with --ui-font / --heading-font in App.css.
+export const UI_FONT = "'Nunito Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
+// Screen headings get their own geometric face; Bungee stays on the game brand.
+export const HEADING_FONT = "'Outfit Variable', 'Nunito Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 // Chunky display font for big titles (mode carousel, headers).
 // Fallbacks are heavy sans faces — never `cursive`: on Android the generic
 // cursive is Dancing Script, which flashes wildly different text while the
@@ -167,6 +183,7 @@ export const UI_CSS_VARS = {
   '--text-primary': PAPER_TEXT,
   '--text-secondary': PAPER_TEXT_MUTED,
   '--ui-font': UI_FONT,
+  '--heading-font': HEADING_FONT,
   '--display-font': DISPLAY_FONT,
   '--ui-title-size': TEXT_DISPLAY_FLUID,
   '--ui-heading-size': TEXT_2XL_FLUID,

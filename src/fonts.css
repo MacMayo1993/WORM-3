@@ -1,0 +1,44 @@
+/**
+ * fonts.css — the two variable faces the game's interface is set in.
+ *
+ * These declarations are copied from `@fontsource-variable/{nunito,outfit}`'s
+ * own `wght.css`, narrowed to the latin subset. Importing the package entry
+ * points instead would be less code, but each ships every subset it has —
+ * Cyrillic, Vietnamese, latin-ext — and seven @font-face blocks of dense
+ * unicode-range pushed the single bundled stylesheet past its 80 KB ceiling in
+ * `scripts/check-bundle-size.mjs`. The extra subsets were never downloaded at
+ * runtime (unicode-range sees to that), but the service worker precached all
+ * ten files regardless, so trimming here is a win on both counts.
+ *
+ * WORM³'s interface is English: this subset covers ASCII, Latin-1 (including
+ * the ³ in the title), general punctuation, and the curly quotes and em dashes
+ * the copy actually uses. If the game is ever localised, swap these back for
+ * the package entry points and raise CSS_MAX_BYTES with it.
+ *
+ * Both are variable fonts — one file spans the whole weight axis — so any
+ * weight in the declared range is free. Never replace these with a Google
+ * Fonts <link>: a blocked or slow CDN silently falls the whole game back to a
+ * system serif.
+ */
+
+/* nunito-latin-wght-normal — UI_FONT: body, buttons, labels, HUD */
+@font-face {
+  font-family: 'Nunito Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 1000;
+  src: url('@fontsource-variable/nunito/files/nunito-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* outfit-latin-wght-normal — HEADING_FONT: screen and card titles */
+@font-face {
+  font-family: 'Outfit Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/outfit/files/outfit-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

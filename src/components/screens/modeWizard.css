@@ -37,7 +37,7 @@
 
 /* One compact identity row; the specimen is the hero, not another page title. */
 .mode-wizard-heading { display:flex; align-items:center; justify-content:space-between; gap:18px; padding-block:10px; background:none; }
-.mode-wizard-heading h1 { font-family:var(--ui-font,system-ui); font-size:clamp(25px,5vw,34px); font-weight:750; letter-spacing:-.04em; }
+.mode-wizard-heading h1 { font-family:var(--heading-font,system-ui); font-size:clamp(25px,5vw,34px); font-weight:750; letter-spacing:-.04em; }
 .mode-wizard-heading p { margin-top:5px; font-size:13px; font-weight:500; color:var(--wiz-text-muted); }
 .mode-wizard-heading .mode-artwork { width:58px; color:var(--mode-accent); }
 .mode-wizard-kicker { text-transform:none; letter-spacing:0; font-size:14px; }
