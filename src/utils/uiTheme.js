@@ -17,6 +17,8 @@
 // ─── Fonts ────────────────────────────────────────────────────────────────────
 // Keep in sync with --ui-font in App.css.
 export const UI_FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
+// Screen headings use the body family at a stronger weight; Bungee stays on the game brand.
+export const HEADING_FONT = UI_FONT;
 // Chunky display font for big titles (mode carousel, headers).
 // Fallbacks are heavy sans faces — never `cursive`: on Android the generic
 // cursive is Dancing Script, which flashes wildly different text while the

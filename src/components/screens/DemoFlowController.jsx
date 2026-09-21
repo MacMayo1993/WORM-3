@@ -2,7 +2,7 @@ import DemoDialog from './DemoDialog.jsx';
 import { WORM_DEMO_LESSON_COUNT } from '../../game/wormDemoState.js';
 import { useDemoTarget } from './useDemoTarget.js';
 import React from 'react';
-import { UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../../utils/uiTheme.js';
+import { UI_FONT, HEADING_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -131,7 +131,7 @@ const ensureDemoShellStyle = () => {
     }
 
     .demo-intro-title {
-      font-family: ${DISPLAY_FONT};
+      font-family: ${HEADING_FONT};
       font-size: clamp(24px, 7.2vw, 36px);
       line-height: 0.96;
       color: #24331e;
@@ -286,7 +286,7 @@ const ensureDemoShellStyle = () => {
     }
 
     .demo-beat-title {
-      font-family: ${DISPLAY_FONT};
+      font-family: ${HEADING_FONT};
       font-size: clamp(34px, 9.5vw, 62px);
       line-height: 0.95;
       letter-spacing: 0.03em;

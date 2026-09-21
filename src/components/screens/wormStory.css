@@ -114,3 +114,26 @@
 .worm-hud-bottom .worm-story-start { pointer-events:auto; min-height:56px; margin:0; justify-content:space-between; font-size:17px; }
 .worm-story-start:disabled { opacity:0.5; cursor:wait; }
 @media(max-width:360px) { .worm-story-checklist { gap:4px 8px; } .worm-story-checklist li { font-size:11px; } }
+
+/* A small chapter map leaves room for the selected level and your worm. */
+.worm-entry-choice .worm-path-card>.mode-artwork { height:clamp(85px,18dvh,158px); width:100%; color:var(--mode-accent); margin-bottom:14px; }
+.worm-entry-choice .worm-path-free>.mode-artwork { color:#f4d35e; }
+.worm-entry-choice .worm-path-cta { font-family:var(--ui-font,system-ui); font-size:clamp(16px,3vw,21px); font-weight:750; }
+.worm-entry-choice .worm-entry-scroll { gap:16px; }
+.worm-entry-heading { padding:10px 0 18px; text-align:left; }
+.worm-entry-heading h1,.worm-level-detail>h2 { font-family:var(--ui-font,system-ui); font-weight:750; letter-spacing:-.04em; }
+.worm-level-grid { grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin:18px 0; }
+.worm-level-grid button { align-items:center; justify-content:center; padding:10px 3px; gap:5px; min-height:68px; box-shadow:0 3px 0 #091417; }
+.worm-level-grid button.selected { background:var(--mode-accent); color:#122025; border-color:var(--mode-accent); }
+.worm-level-grid button.selected .worm-level-number,.worm-level-grid button.selected small { color:inherit; }
+.worm-level-number { font:750 22px/1.1 var(--ui-font,system-ui); }
+.worm-level-goals { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.worm-level-goals li { display:flex; align-items:center; gap:10px; font-size:12px; line-height:1.3; }
+.worm-level-goals b { font-size:22px; font-weight:700; color:var(--mode-accent); min-width:24px; }
+.worm-story-result-sheet { text-align:center; }
+.worm-story-result h2 { font:750 clamp(28px,7vw,40px)/1.1 var(--ui-font,system-ui); letter-spacing:-.04em; }
+.worm-story-result-stars { display:flex; justify-content:center; gap:8px; letter-spacing:0; }
+.worm-story-result-stars span { color:#ffffff30; }
+.worm-story-result-stars [data-earned="true"] { color:#f4d35e; animation:screen-arrive .35s ease-out both; animation-delay:calc(var(--star-index)*100ms); }
+@media(max-height:520px) { .worm-entry-choice .worm-path-card>.mode-artwork { height:58px; margin-bottom:4px; } }
+@media(prefers-reduced-motion:reduce) { .worm-story-result-stars [data-earned="true"] { animation:none; } }

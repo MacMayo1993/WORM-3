@@ -37,7 +37,7 @@ it('displays two cubies and the matching-pair upgrade without charging twice on 
   act(() => { button('Roll two cubies').click(); button('Roll two cubies')?.click(); });
   expect(state().chestWallet.rolls).toBe(1); expect(state().chestWallet.gems).toBe(5);
   act(() => vi.advanceTimersByTime(2400));
-  expect(host.querySelector('[role="status"]').textContent).toContain('Matching pair! Upgraded one tier.');
+  expect(host.querySelector('[role="status"]').textContent).toContain('A match — one tier higher.');
   expect(state().ownedItems.length).toBe(1);
   expect(host.querySelectorAll('.chest-choice-card')).toHaveLength(3);
   const itemId = state().chestWallet.history.at(-1).reward.itemIds[1];
@@ -59,7 +59,7 @@ it('retains a paid result and releases the animation lock when leaving early', (
 
 it('opens chests from the actual store and returns to equip a newly owned worm', () => {
   act(() => root.render(<ParityStoreScreen onClose={close} />));
-  act(() => button('Cubie Chests').click()); expect(host.querySelector('#chest-title').textContent).toBe('CUBIE CHESTS');
+  act(() => button('Cubie Chests').click()); expect(host.querySelector('#chest-title').textContent).toBe('Cubie chests');
   act(() => button('Collection').click());
   act(() => useGameStore.setState({ ownedItems: [...state().ownedItems, 'character_mobi'] }));
   act(() => button('Worms').click());
@@ -79,7 +79,7 @@ it('switches catalogue categories, filters ownership, and previews without spend
   act(() => button('Owned only').click());
   expect(host.querySelectorAll('.store-card')).toHaveLength(1);
   act(() => button('Hats').click());
-  expect(host.textContent).toContain('No owned items in this category yet.');
+  expect(host.textContent).toContain('Nothing collected here yet');
   act(() => button('Browse all items').click());
   expect(host.querySelectorAll('.store-card').length).toBeGreaterThan(1);
   act(() => host.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
@@ -135,7 +135,7 @@ it('restores a paid cosmetic choice after leaving mid-roll, without another char
   act(() => root.render(<ChestRoom onClose={close} onBack={back} />));
   expect(host.querySelectorAll('.chest-die')).toHaveLength(2);
   expect(host.querySelectorAll('.chest-choice-card')).toHaveLength(3);
-  expect(button('Choose your reward above').disabled).toBe(true);
+  expect(button('Pick a reward').disabled).toBe(true);
   expect(state().chestWallet.history.at(-1).reward.itemIds).toEqual(offered);
   const cards = [...host.querySelectorAll('.chest-choice-card')];
   act(() => { cards[0].click(); cards[1].click(); });

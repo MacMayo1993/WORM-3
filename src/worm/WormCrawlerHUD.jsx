@@ -1,3 +1,4 @@
+import { ScreenHeading } from '../components/ui/ModeArtwork.jsx';
 import { storyLevel, WORM_STORY_LEVELS } from './story/levels.js';
 import { StoryObjectiveCard, StoryStartButton, StoryResult } from './story/StoryCards.jsx';
 import { AmbientCombatActions, CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
@@ -35,7 +36,7 @@ import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
 import {
-    overlayScrimStyle, overlayCardStyle, Eyebrow, OverlayTitle, StatTiles,
+    overlayScrimStyle, overlayCardStyle, StatTiles,
     SETTING_ROW_STYLE, SETTING_LABEL_STYLE, togglePillStyle, segmentStyle,
     primaryBtnStyle, LIST_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
@@ -1114,18 +1115,16 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
         // not escape it, so the scrim is absolute against that instead of the viewport.
         <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onClick={onResume}>
             <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className="worm-pause-card" role="dialog" aria-modal="true" aria-label="Game paused" style={overlayCardStyle(green, { width: 420 })} onClick={e => e.stopPropagation()}>
-                <Eyebrow accent={green}>Paused</Eyebrow>
-                <button type="button" className="worm-pause-resume worm-hud-chip" onClick={onResume}>RESUME</button>
+                <ScreenHeading mode="pause" title="Paused" />
+                <button type="button" className="worm-pause-resume worm-hud-chip" onClick={onResume}>Resume <span aria-hidden="true">→</span></button>
                 {storyId && <StoryObjectiveCard />}
-                <BuffStrip detailed />
-                <TunnelNeedsCard />
-                <SignatureGuide />
-                <ParityWallet dark neutral />
                 <WormMissionCard summary />
-            <XpRunSummary mode="worm" />
-                <OverlayTitle size="clamp(26px, min(9vw, 8vh), 44px)" outline="#14310f" glow={`${green}55`}>
-                    TAKE A BREATHER
-                </OverlayTitle>
+                <details className="screen-disclosure"><summary>Abilities & tunnels</summary>
+                  <BuffStrip detailed /><TunnelNeedsCard /><SignatureGuide />
+                </details>
+                <details className="screen-disclosure"><summary>Run rewards</summary>
+                  <ParityWallet dark neutral /><XpRunSummary mode="worm" />
+                </details>
 
                 <StatTiles columns={2} stats={[
                     ['Time', formatTime(wormTimeAlive)],
@@ -1134,6 +1133,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
+                <details className="screen-disclosure"><summary>Controls & sound</summary>
                 {/* Named speed presets — keep the underlying multipliers out of the UI. */}
                 <div style={{ ...SETTING_ROW_STYLE, marginTop: 'clamp(10px, 2vh, 16px)' }}>
                     <span style={SETTING_LABEL_STYLE}>{storyId ? 'Level speed' : 'Speed'}</span>
@@ -1195,6 +1195,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     </div>
                 </div>
 
+                </details>
                 {/* Secondary navigation */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'clamp(10px, 2vh, 14px)' }}>
                     {onToggleAntipodal && (

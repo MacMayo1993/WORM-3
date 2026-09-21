@@ -11,7 +11,7 @@ import {
   unregisterTilePreview,
 } from '../../3d/TilePreviewRenderer.js';
 import {
-  UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, UI_MOSS,
+  UI_FONT, HEADING_FONT, PAPER_SHEET_RAISED, UI_MOSS,
   PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_CARD_SHADOW, PAPER_BG_MUTED, NIGHT_SHEET, NIGHT_TEXT, NIGHT_TEXT_MUTED,
   Z, TEXT_MICRO, TEXT_XS
@@ -456,10 +456,10 @@ const StoreCollection = ({ onClose, onChests }) => {
     <div ref={dialogRef} onKeyDown={onKeyDown} className="store-catalogue" role="dialog" aria-modal="true" aria-labelledby="catalogue-title"
       style={{ ...wizardPaperBackground, zIndex: Z.TOAST, fontFamily: FONT,
         '--paper-ink': PAPER_TEXT, '--paper-muted': PAPER_TEXT_MUTED, '--paper-line': PAPER_BORDER_SOFT,
-        '--paper-soft': PAPER_BG_MUTED, '--moss': UI_MOSS, '--display-font': DISPLAY_FONT,
+        '--paper-soft': PAPER_BG_MUTED, '--moss': UI_MOSS, '--display-font': HEADING_FONT,
         '--night': NIGHT_SHEET, '--night-ink': NIGHT_TEXT, '--night-muted': NIGHT_TEXT_MUTED, '--category': activeTabAccent }}>
       <header className="catalogue-header">
-        <div><span className="catalogue-kicker">THE PARITY STORE</span><h1 id="catalogue-title">COLLECTION</h1>
+        <div><h1 id="catalogue-title">Store</h1>
           <div className="catalogue-progress"><span style={{ width: `${collectedPct}%` }} /></div>
           <small>{ownedCount}/{ALL_ITEMS.length} collected</small>
         </div>
@@ -468,7 +468,7 @@ const StoreCollection = ({ onClose, onChests }) => {
       </header>
       <div className="catalogue-layout">
         <nav className="catalogue-sidebar" aria-label="Store categories">
-          <span className="catalogue-kicker">CATALOGUE</span>
+
           {TABS.map(t => <button key={t.id} className="catalogue-category" aria-pressed={tab === t.id}
             aria-controls="catalogue-selector" style={{ '--category': t.accent }}
             onClick={() => { setTab(t.id); setFocusedId(null); resetScroll(); }}>
@@ -477,7 +477,7 @@ const StoreCollection = ({ onClose, onChests }) => {
           <button className="catalogue-chests" onClick={onChests}><span aria-hidden="true">◇</span><strong>Cubie Chests</strong><small>Open →</small></button>
         </nav>
         <section ref={selectorRef} className="catalogue-selector" id="catalogue-selector" aria-label={`${activeTab.label} selector`}>
-          <div className="catalogue-section-heading"><div><span className="catalogue-kicker">MAKE IT YOURS</span><h2>{activeTab.label}</h2></div>
+          <div className="catalogue-section-heading"><div><h2>{activeTab.label}</h2></div>
             <button className="catalogue-owned" aria-pressed={ownedOnly} onClick={() => setOwnedOnly(v => !v)}>Owned only</button></div>
           {tab === 'tiles' && <nav className="catalogue-families" aria-label="Tile families">{TILE_SECTIONS.map(section =>
             <button key={section.key} aria-pressed={tileFamily === section.key} onClick={() => { setTileFamily(section.key); setFocusedId(null); resetScroll(); }}>{section.label}<small>{section.items.length}</small></button>
@@ -492,7 +492,7 @@ const StoreCollection = ({ onClose, onChests }) => {
               {!heroOwned && !canAfford && <small>{focused.price - parityPoints} more PP needed</small>}
             </div>
             <div className="catalogue-preview-nav"><button aria-label="Previous item" onClick={() => stepFocus(-1)}>‹</button><button aria-label="Next item" onClick={() => stepFocus(1)}>›</button></div>
-          </div> : <div className="catalogue-empty"><h3>No items yet</h3><p>No owned items in this category yet.</p><button onClick={() => setOwnedOnly(false)}>Browse all items</button></div>}
+          </div> : <div className="catalogue-empty"><h3>Nothing collected here yet</h3><button onClick={() => setOwnedOnly(false)}>Browse all items</button></div>}
           <div className="catalogue-grid-heading"><span>{tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).label : 'Items'}</span><small>{items.length} items</small></div>
           {renderItems(items)}
         </section>

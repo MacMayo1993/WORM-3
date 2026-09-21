@@ -77,7 +77,7 @@ it('holds the remaining countdown in Pause and removes the prompt on retry', () 
   frame(1);
   expect(wormBuffs.jumpRescueT).toBeCloseTo(0.9);
   expect(host.querySelector('.worm-jump-rescue')).toBeNull();
-  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'RESUME').click());
+  act(() => [...host.querySelectorAll('button')].find(b => b.classList.contains('worm-pause-resume')).click());
   expect(host.querySelector('.worm-jump-rescue')).not.toBeNull();
   act(() => state().initWormMode());
   expect(state().wormJumpRescueActive).toBe(false);

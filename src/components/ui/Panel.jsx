@@ -28,9 +28,26 @@ import {
 import { CloseButton } from './Button.jsx';
 
 const FOCUSABLE = [
-  'a[href]', 'button:not([disabled])', 'input:not([disabled])',
+  'a[href]', 'button:not([disabled])', 'summary', 'input:not([disabled])',
   'select:not([disabled])', 'textarea:not([disabled])', '[tabindex]:not([tabindex="-1"])'
 ].join(',');
+
+// Closed disclosures keep their controls in the DOM. Skip them when entering
+// or trapping focus, but retain the summary that opens the disclosure.
+function visibleControls(root) {
+  return Array.from(root?.querySelectorAll(FOCUSABLE) || []).filter(node => {
+    for (let parent = node; parent && parent !== root; parent = parent.parentElement) {
+      if (parent.hidden || parent.hasAttribute('inert')) return false;
+      if (parent.tagName === 'DETAILS' && !parent.open) {
+        const summary = Array.from(parent.children).find(child => child.tagName === 'SUMMARY');
+        if (!summary?.contains(node)) return false;
+      }
+      const style = window.getComputedStyle(parent);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+    }
+    return true;
+  });
+}
 
 /**
  * Escape-to-close, focus trap, focus restore, and scroll lock for a dialog.
@@ -51,7 +68,7 @@ export function useDialogBehavior(ref, onClose, { trapFocus = true, lockScroll =
 
     if (e.key !== 'Tab' || !trapFocus || !ref.current) return;
 
-    const items = Array.from(ref.current.querySelectorAll(FOCUSABLE)).filter(el => el.offsetParent !== null || el === document.activeElement);
+    const items = visibleControls(ref.current);
     if (items.length === 0) {
       // Nothing focusable inside — keep focus on the panel rather than letting
       // Tab escape to the page behind it.
@@ -76,7 +93,7 @@ export function useDialogBehavior(ref, onClose, { trapFocus = true, lockScroll =
 
     // Focus the first real control if there is one, otherwise the panel itself,
     // so the Escape/Tab handling below actually receives keys.
-    const firstItem = node?.querySelector(FOCUSABLE);
+    const firstItem = visibleControls(node)[0];
     (firstItem || node)?.focus?.({ preventScroll: true });
 
     const prevOverflow = lockScroll ? document.body.style.overflow : null;

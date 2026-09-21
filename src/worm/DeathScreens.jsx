@@ -27,10 +27,12 @@ import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
 // hit / Impact progress: 0.55" — the two tile values name the same square so
 // they were usually identical, and a 0-to-1 interpolation factor means nothing
 // to anyone who has not read the collision code. One location chip replaces it.
-import React from 'react';
+import React, { useRef } from 'react';
+import ModeArtwork from '../components/ui/ModeArtwork.jsx';
+import { useDialogBehavior } from '../components/ui/Panel.jsx';
 import {
     overlayScrimStyle, overlayCardStyle,
-    Eyebrow, OverlayTitle, OverlayBlurb,
+    OverlayTitle, OverlayBlurb,
     HeroStat, StatTiles, OverlayChip,
     primaryBtnStyle, SECONDARY_BTN_STYLE, TERTIARY_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
@@ -53,22 +55,22 @@ function classifyDeath(reason) {
 //   a near-white field. That screen borrows the red from the slice hazard.
 const DEATHS = {
     'time-up': {
-        eyebrow: 'Story challenge', title: "TIME’S UP",
-        blurb: 'The clock ran out. Plan a tighter route and try again.',
+        eyebrow: 'Story challenge', title: "Time’s up",
+        blurb: 'Try a shorter route.',
         accent: '#f4d35e', accentSoft: 'rgba(244,211,94,0.45)', deep: '#705019',
         titleSize: 'clamp(32px, min(11vw, 10vh), 76px)',
     },
     overrun: {
         eyebrow: 'Portal encounter',
-        title: 'SHIELDS DOWN',
-        blurb: 'Portal enemies broke your last shield. Jump to dodge; healing a tunnel restores one.',
+        title: 'Shields down',
+        blurb: 'Jump to dodge. Heal a tunnel to restore a shield.',
         accent: '#d5b4ff', accentSoft: 'rgba(181,145,235,0.45)', deep: '#492468',
         titleSize: 'clamp(27px, min(9vw, 8vh), 64px)',
     },
     'tail-bite': {
         eyebrow: 'Worm collision',
-        title: 'TAIL BITE',
-        blurb: 'You crossed your own body.',
+        title: 'Tail bite',
+        blurb: 'Jump over your tail to keep going.',
         accent: '#f87171',
         accentSoft: 'rgba(248,113,113,0.45)',
         deep: '#7f1d1d',
@@ -76,7 +78,7 @@ const DEATHS = {
     },
     'event-horizon': {
         eyebrow: 'Void breach',
-        title: 'EVENT HORIZON',
+        title: 'Lost in the void',
         blurb: 'The tunnel collapsed with you inside it.',
         accent: '#a78bfa',
         accentSoft: 'rgba(167,139,250,0.45)',
@@ -86,7 +88,7 @@ const DEATHS = {
     },
     sliced: {
         eyebrow: 'Slice collision',
-        title: 'SLICED',
+        title: 'Sliced',
         blurb: 'A rotating slice caught you mid-crawl.',
         accent: '#e2e8f0',
         accentSoft: 'rgba(226,232,240,0.40)',
@@ -97,7 +99,7 @@ const DEATHS = {
     },
     blasted: {
         eyebrow: 'Direct hit',
-        title: 'DETONATED',
+        title: 'Caught in the blast',
         blurb: 'The fuse ran out. Surround the next one to disarm it.',
         accent: '#fb923c',
         accentSoft: 'rgba(249,115,22,0.45)',
@@ -133,6 +135,8 @@ export default function DeathScreen({
     deathDetails, wormTimeAlive, wormHealedCount, wormTunnelCount, wormBodyTiles,
     formatTime, onRetry, onNewGame, onExamine,
 }) {
+    const dialogRef = useRef(null);
+    const onDialogKeyDown = useDialogBehavior(dialogRef);
     const kind = classifyDeath(deathDetails?.reason);
     const config = DEATHS[kind];
     const location = locationFor(kind, deathDetails);
@@ -143,18 +147,16 @@ export default function DeathScreen({
     return (
         <>
             <div style={overlayScrimStyle({ tint: config.accent })}>
-                <div style={overlayCardStyle(config.accent)}>
-                    <Eyebrow accent={config.accent}>{config.eyebrow}</Eyebrow>
+                <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={config.title} className="run-result" style={{ ...overlayCardStyle(config.accent), '--mode-accent': config.accent }}>
+                    <ModeArtwork mode={kind} className="screen-results-art" />
                     <OverlayTitle
-                        size={config.titleSize}
+                        size="clamp(28px, 7vw, 42px)"
                         outline={config.deep}
                         glow={config.accentSoft}
                         animation={config.titleAnim}
                     >{config.title}</OverlayTitle>
                     <OverlayBlurb>{config.blurb}</OverlayBlurb>
 
-                    <WormMissionCard summary />
-            <XpRunSummary mode="worm" />
                     <HeroStat accent={config.accent} value={wormBodyTiles} label="Final length" />
                     <StatTiles stats={[
                         ['Time', formatTime(wormTimeAlive)],
@@ -162,20 +164,22 @@ export default function DeathScreen({
                         ['Tunnels', wormTunnelCount],
                     ]} />
 
-                    {location && (
-                        <OverlayChip accent={config.accent} label={location.label} value={location.value} />
-                    )}
+
 
                     <div style={ACTION_ROW_STYLE}>
                         <button
-                            onPointerDown={onRetry}
+                            onClick={onRetry}
                             style={primaryBtnStyle(config.btnFrom ?? config.accent, config.btnTo ?? config.deep)}
                         ><WormReplayLabel /></button>
-                        <button onPointerDown={onNewGame} style={SECONDARY_BTN_STYLE}>New Game</button>
+                        <button onClick={onNewGame} style={SECONDARY_BTN_STYLE}>New Game</button>
                     </div>
                     {canExamine && (
-                        <button onPointerDown={onExamine} style={TERTIARY_BTN_STYLE}>Examine the board</button>
+                        <button onClick={onExamine} style={TERTIARY_BTN_STYLE}>Examine the board</button>
                     )}
+                    <details className="screen-disclosure"><summary>Run details</summary>
+                      <WormMissionCard summary /><XpRunSummary mode="worm" />
+                      {location && <OverlayChip accent={config.accent} label={location.label} value={location.value} />}
+                    </details>
                 </div>
             </div>
 

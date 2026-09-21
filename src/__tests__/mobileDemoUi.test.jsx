@@ -78,7 +78,7 @@ it('publishes pause-menu ownership and provides a 48px pause target', () => {
   act(() => pause.dispatchEvent(new Event('pointerdown', {bubbles:true})));
   expect(useGameStore.getState().wormPauseMenuOpen).toBe(true);
   expect(useGameStore.getState().wormPaused).toBe(true);
-  const resume = [...host.querySelectorAll('button')].find(b => b.textContent === 'RESUME');
+  const resume = [...host.querySelectorAll('button')].find(b => b.classList.contains('worm-pause-resume'));
   act(() => resume.click());
   expect(useGameStore.getState().wormPauseMenuOpen).toBe(false);
   expect(useGameStore.getState().wormPaused).toBe(false);

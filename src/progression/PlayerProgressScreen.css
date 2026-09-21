@@ -71,3 +71,6 @@
 .xp-collection-list strong { font-size: 13px; }
 .xp-collection-list p { margin: 4px 0; font-size: 12px; line-height: 1.45; }
 .xp-collection-list small { color: #7a6e62; font-size: 10px; }
+
+.xp-player-heading h1,.xp-reward-heading h2,.xp-unlocked h3 { font-family:var(--ui-font,system-ui); font-weight:750; letter-spacing:-.04em; }
+.xp-screen-header { letter-spacing:0; }

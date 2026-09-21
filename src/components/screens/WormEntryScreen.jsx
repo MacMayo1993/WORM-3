@@ -1,8 +1,9 @@
+import ModeArtwork from '../ui/ModeArtwork.jsx';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { WORM_STORY_LEVELS, nextStoryLevel, storyStars, storyUnlocked } from '../../worm/story/levels.js';
+import { WORM_STORY_LEVELS, nextStoryLevel, storyStars, storyUnlocked, storyChecklist } from '../../worm/story/levels.js';
 import { MODE_THEMES } from '../../utils/modeThemes.js';
-import { DISPLAY_FONT, UI_FONT, Z } from '../../utils/uiTheme.js';
+import { HEADING_FONT, UI_FONT, Z } from '../../utils/uiTheme.js';
 import { StoryRewardChoices } from '../../worm/story/StoryCards.jsx';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import WormProfile from './WormProfile.jsx';
@@ -10,17 +11,6 @@ import { wormMenuFeedback } from './wormMenuFeedback.js';
 import './modeWizard.css';
 import './wormStory.css';
 const FreePlaySetup = React.lazy(() => import('./WormModeSetupWizard.jsx'));
-
-function PathArt({ story }) {
-  return <svg viewBox="0 0 220 170" aria-hidden="true" className="worm-path-art">
-    <path d={story ? 'M25 140H70V99H116V58H168V21H198' : 'M24 84C24 12 107 12 110 84S196 156 196 84S114 12 110 84S24 156 24 84'} fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray="4 8" opacity=".45" />
-    {story && [[70,140],[116,99],[168,58]].map(([x,y], i) => <g key={x}><circle cx={x} cy={y} r="16" fill="var(--wiz-base)" stroke="currentColor" strokeWidth="2" /><text x={x} y={y+5} textAnchor="middle" fill="currentColor" fontSize="14">{i+1}</text></g>)}
-    <path d={story ? 'M29 133Q24 118 39 111T52 86Q49 68 67 65' : 'M70 73Q65 50 83 49T107 65Q119 87 137 75'} fill="none" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
-    <circle cx={story ? 67 : 137} cy={story ? 65 : 75} r="12" fill="currentColor" />
-    <circle cx={story ? 65 : 136} cy={story ? 61 : 71} r="2.5" fill="#122025" /><circle cx={story ? 72 : 143} cy={story ? 62 : 72} r="2.5" fill="#122025" />
-    {story && <path d="m193 11 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" fill="currentColor" />}
-  </svg>;
-}
 
 export default function WormEntryScreen({ onComplete, onCancel, initialSettings, initialPage = 'choice' }) {
   const [page, setPage] = useState(initialPage);
@@ -52,32 +42,32 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
     storyLevel: level.id, cubeSize: 5, megaMode: false, wormSpeed: level.speed, wormOrbCount: 1,
     wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false }); };
   return <div ref={root} className={`mode-wizard worm-entry${page === 'choice' ? ' worm-entry-choice' : ''}`} role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
-    style={{ '--mode-accent': MODE_THEMES.worm.accent, '--story-display': DISPLAY_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
+    style={{ '--mode-accent': MODE_THEMES.worm.accent, '--story-display': HEADING_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
     <div className="worm-entry-sheet">
       <nav className="worm-entry-nav"><button onClick={back} aria-label={page === 'choice' ? 'Back to modes' : 'Back to WORM choices'}>← Back</button>{page !== 'choice' && <span className="mode-wizard-kicker">Choose your path</span>}<span>WORM³</span></nav>
       <div className="worm-entry-scroll">
-        {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><h1 id="worm-entry-title">THE FIRST TURN</h1></header>}
+        {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><h1 id="worm-entry-title">The first turn</h1></header>}
         {page === 'choice' ? <>
           <div className="worm-path-split">
-            <button className="worm-path-card worm-path-story" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
-              <PathArt story /><span className="worm-path-cta">STORY LEVELS <b aria-hidden="true">→</b></span>
+            <button className="worm-path-card worm-path-story" aria-label="Story levels" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
+              <ModeArtwork mode="cube" /><span className="worm-path-cta">Story <b aria-hidden="true">→</b></span>
             </button>
-            <button className="worm-path-card worm-path-free" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
-              <PathArt /><span className="worm-path-cta">FREE PLAY <b aria-hidden="true">→</b></span>
+            <button className="worm-path-card worm-path-free" aria-label="Free play" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
+              <ModeArtwork mode="worm" /><span className="worm-path-cta">Free play <b aria-hidden="true">→</b></span>
             </button>
           </div>
           <WormProfile />
         </> : <>
-          <div className="worm-chapter-progress"><span>CHAPTER PROGRESS</span><strong>{totalStars} / {WORM_STORY_LEVELS.length * 3} ★</strong><progress value={totalStars} max={WORM_STORY_LEVELS.length * 3} aria-label="Chapter stars" /></div>
+          <div className="worm-chapter-progress"><span>Chapter stars</span><strong>{totalStars} / {WORM_STORY_LEVELS.length * 3} ★</strong><progress value={totalStars} max={WORM_STORY_LEVELS.length * 3} aria-label="Chapter stars" /></div>
           <div className="worm-level-grid">{WORM_STORY_LEVELS.map(item => {
             const unlocked = storyUnlocked(progress, item.id), stars = storyStars(progress, item.id);
-            return <button key={item.id} disabled={!unlocked} aria-pressed={selected === item.id} aria-label={`Level ${item.id}: ${item.title}${unlocked ? `, ${stars} stars` : ', locked'}`} onClick={() => { wormMenuFeedback(); setSelected(item.id); }} className={selected === item.id ? 'selected' : ''}>
-              <span className="worm-level-number">{String(item.id).padStart(2, '0')}</span><strong>{item.title}</strong><small>{unlocked ? `${'★'.repeat(stars)}${'☆'.repeat(3-stars)}` : 'Clear the previous level'}</small>
+            return <button key={item.id} disabled={!unlocked} title={item.title} aria-pressed={selected === item.id} aria-label={`Level ${item.id}: ${item.title}${unlocked ? `, ${stars} stars` : ', locked'}`} onClick={() => { wormMenuFeedback(); setSelected(item.id); }} className={selected === item.id ? 'selected' : ''}>
+              <span className="worm-level-number">{String(item.id).padStart(2, '0')}</span><small aria-hidden="true">{unlocked ? `${'★'.repeat(stars)}${'☆'.repeat(3-stars)}` : '—'}</small>
             </button>;
           })}</div>
-          <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">LEVEL {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><strong>{level.goal}</strong>
-            <p className="worm-story-limit">Time limit: {level.limit} seconds{level.rotateEvery ? ` · Layer turns every ${level.rotateEvery}s while moving on the surface` : ''}</p>
-            <details><summary>Stars & rewards</summary><ul><li>★ Finish before time runs out</li><li>★ Finish within {level.par}s</li><li>★ No tail cuts</li></ul><small>Rewards pay once. Extra stars earn bonuses.</small></details>
+          <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">LEVEL {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
+            <p className="worm-story-limit">{Math.floor(level.limit / 60)}:{String(level.limit % 60).padStart(2, '0')} to finish{level.rotateEvery ? ` · Turns every ${level.rotateEvery}s` : ''}</p>
+            <details><summary>Guide & rewards</summary><p>{level.goal}</p><ul><li>★ Finish before time runs out</li><li>★ Finish within {level.par}s</li><li>★ No tail cuts</li></ul></details>
             <div className="worm-level-reward"><span>FIRST CLEAR</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>
             <StoryRewardChoices level={level} />
             <div className="worm-level-profile"><WormProfile /></div>

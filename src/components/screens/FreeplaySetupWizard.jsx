@@ -73,9 +73,9 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       onSelect={setStep}
       onBack={handleBack}
       onPrimary={handleNext}
-      finishLabel="Start Playing"
+      finishLabel="Play cube"
       mobile={isMobile}
-      secondary={step < categories.length - 1 ? { label: 'Just play — 3×3 with what is set', onClick: finish } : null}
+      secondary={step < categories.length - 1 ? { label: 'Play now', onClick: finish } : null}
     >
       <WizardImageInput cos={cos} />
     </WizardShell>

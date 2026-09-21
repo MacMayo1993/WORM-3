@@ -34,3 +34,18 @@
   .mode-wizard-heading h1 { font-size: 28px; }
   .mode-wizard-heading p { margin: 0; }
 }
+
+/* One compact identity row; the specimen is the hero, not another page title. */
+.mode-wizard-heading { display:flex; align-items:center; justify-content:space-between; gap:18px; padding-block:10px; background:none; }
+.mode-wizard-heading h1 { font-family:var(--ui-font,system-ui); font-size:clamp(25px,5vw,34px); font-weight:750; letter-spacing:-.04em; }
+.mode-wizard-heading p { margin-top:5px; font-size:13px; font-weight:500; color:var(--wiz-text-muted); }
+.mode-wizard-heading .mode-artwork { width:58px; color:var(--mode-accent); }
+.mode-wizard-kicker { text-transform:none; letter-spacing:0; font-size:14px; }
+.mode-wizard-kicker::before { display:none; }
+.mode-wizard-count { border:0; font-family:var(--ui-font,system-ui); color:var(--wiz-text-muted); }
+.mode-wizard-step-track { display:flex; gap:5px; }
+.mode-wizard-step-track i { flex:1; height:3px; border-radius:2px; background:var(--wiz-border); }
+.mode-wizard-step-track i[data-reached="true"] { background:var(--mode-accent); }
+.mode-wizard-sheet>div:last-child>button:first-of-type { display:flex; align-items:center; justify-content:space-between; text-transform:none!important; letter-spacing:0!important; font-size:16px!important; }
+.mode-wizard-sheet>div:last-child>button:last-child:not(:first-of-type) { text-transform:none!important; letter-spacing:0!important; }
+@media(max-height:520px) { .mode-wizard-heading .mode-artwork { width:36px; } .mode-wizard-heading { padding-block:4px; } }

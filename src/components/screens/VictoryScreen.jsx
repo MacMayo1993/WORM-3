@@ -1,8 +1,9 @@
+import ModeArtwork from '../ui/ModeArtwork.jsx';
 import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { VICTORY } from '../../utils/constants.js';
 import {
-  UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
+  UI_FONT, HEADING_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
   NIGHT_BACKDROP, NIGHT_BACKDROP_BLUR, NIGHT_PANEL, NIGHT_BORDER,
   NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_TITLE_SHADOW, NIGHT_SOFT_SHADOW,
  TEXT_XS, TEXT_SM, TEXT_LG, Z } from '../../utils/uiTheme.js';
@@ -142,20 +143,20 @@ const VictoryScreen = ({
   // mascot glyph color shifts. Only classic and worm victories remain.
   const winConfig = {
     rubiks: {
-      title: 'Cube Solved!',
+      title: 'Cube solved',
       subtitle: 'Classic Victory',
-      description: "You've arranged every face with a single uniform color.",
+      description: 'All six faces, back in place.',
     },
     worm: {
-      title: 'WORM³ Complete!',
+      title: 'Wormhole solve',
       subtitle: 'Secret Achievement',
-      description: "You solved the entire cube through the WORMHOLES — every sticker traveled through antipodal space.",
+      description: 'Every face solved through wormholes.',
     },
   };
 
   const config = isCampaignFinale
     ? {
-      title: 'Life Journey Complete!',
+      title: 'Journey complete',
       subtitle: 'Topology Master',
       description: 'You carried the cube from its first turn to the Singularity.',
     }
@@ -170,7 +171,7 @@ const VictoryScreen = ({
   const CELEBRATION_TYPE = {
     fontSize: TEXT_SM,
     letterSpacing: '0.08em',
-    textTransform: 'uppercase'
+    textTransform: 'none'
   };
 
   return (
@@ -236,39 +237,18 @@ const VictoryScreen = ({
         boxSizing: 'border-box',
         animation: 'vsPanelRise 0.45s cubic-bezier(0.16,1,0.3,1)'
       }}>
-        {/* Green check — echoes the demo STEP COMPLETE stamp */}
-        <div style={{
-          fontSize: 'clamp(40px, 11vw, 64px)',
-          lineHeight: 1,
-          color: GREEN_LIGHT,
-          textShadow: '0 4px 0 rgba(43,53,35,0.5), 0 12px 38px rgba(24,31,18,0.65)',
-          margin: '0 0 8px'
-        }}>✓</div>
-
-        {/* Subtitle (eyebrow) */}
-        <p style={{
-          fontSize: 'clamp(12px, 3.4vw, 15px)',
-          color: GOLD,
-          margin: '0 0 8px 0',
-          fontFamily: UI_FONT,
-          fontWeight: 900,
-          letterSpacing: '0.22em',
-          textTransform: 'uppercase',
-          textShadow: SOFT_SHADOW
-        }}>
-          {config.subtitle}
-        </p>
+        <ModeArtwork mode="success" className="screen-results-art" />
 
         {/* Title */}
         <h1 style={{
           fontSize: 'clamp(30px, 8vw, 52px)',
-          fontWeight: 900,
+          fontWeight: 750,
           margin: '0 0 14px 0',
           color: INK_CREAM,
-          fontFamily: DISPLAY_FONT,
+          fontFamily: HEADING_FONT,
           lineHeight: 0.95,
           letterSpacing: '0.02em',
-          textTransform: 'uppercase',
+          textTransform: 'none',
           textShadow: TITLE_SHADOW
         }}>
           {config.title}
@@ -283,7 +263,7 @@ const VictoryScreen = ({
           fontFamily: UI_FONT,
           fontWeight: 700,
           letterSpacing: '0.04em',
-          textTransform: 'uppercase'
+          textTransform: 'none'
         }}>
           {levelWinMessage || config.description}
         </p>
@@ -303,7 +283,7 @@ const VictoryScreen = ({
               fontWeight: 800,
               color: GOLD,
               fontFamily: UI_FONT,
-              textTransform: 'uppercase',
+              textTransform: 'none',
               letterSpacing: '0.14em'
             }}>
               Level {currentLevel} Complete
@@ -336,7 +316,7 @@ const VictoryScreen = ({
             </div>
             <div style={{
               marginTop: '7px', fontSize: TEXT_XS, fontWeight: 800, letterSpacing: '0.14em',
-              textTransform: 'uppercase', color: underPar ? GREEN_LIGHT : GOLD, fontFamily: UI_FONT,
+              textTransform: 'none', color: underPar ? GREEN_LIGHT : GOLD, fontFamily: UI_FONT,
               // Lands after the last star, so the verdict reads as the summary
               // of the reveal rather than racing it.
               animation: `vsVerdictIn 0.4s ease-out ${STAR_DELAY_BASE + 3 * STAR_DELAY_STEP}s both`
@@ -349,7 +329,7 @@ const VictoryScreen = ({
         {isCampaignFinale && (
           <p style={{
             fontSize: '12px', color: GOLD, margin: '-4px 0 20px', lineHeight: 1.5,
-            fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+            fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'none',
           }}>
             Every chapter is available to replay for more stars.
           </p>
@@ -380,7 +360,7 @@ const VictoryScreen = ({
               border: `1px solid ${stat.highlight ? 'rgba(159,219,122,0.5)' : WARM_BORDER}`
             }}>
               <div style={{
-                fontSize: '10px', textTransform: 'uppercase', color: CREAM_MUTED,
+                fontSize: '10px', textTransform: 'none', color: CREAM_MUTED,
                 letterSpacing: '0.14em', marginBottom: '6px', fontWeight: 800,
                 fontFamily: UI_FONT
               }}>{stat.label}</div>
@@ -389,7 +369,7 @@ const VictoryScreen = ({
                 format={stat.format}
                 style={{
                   fontSize: '26px', fontWeight: 900, color: stat.highlight ? GREEN_LIGHT : INK_CREAM,
-                  fontFamily: DISPLAY_FONT
+                  fontFamily: HEADING_FONT
                 }}
               />
             </div>
@@ -427,38 +407,14 @@ const VictoryScreen = ({
               surface="night"
               size="sm"
               onClick={onMainMenu}
-              style={{ fontSize: TEXT_XS, letterSpacing: '0.06em', textTransform: 'uppercase' }}
+              style={{ fontSize: TEXT_XS, letterSpacing: '0.06em', textTransform: 'none' }}
             >
               ← Main Menu
             </ActionButton>
           </div>
         )}
 
-        {/* Secret achievement message for worm victory */}
-        {winType === VICTORY.WORM && (
-          <div style={{
-            marginTop: '22px',
-            padding: '14px 18px',
-            background: WARM_PANEL,
-            borderRadius: '14px',
-            border: `1px solid ${WARM_BORDER}`
-          }}>
-            <p style={{
-              margin: 0,
-              fontSize: '13px',
-              color: GOLD,
-              fontWeight: 800,
-              fontFamily: UI_FONT,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase'
-            }}>
-              You discovered the SECRET WORM VICTORY!<br/>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: CREAM_SOFT, letterSpacing: '0.03em' }}>
-                The rarest achievement — solving through pure manifold chaos.
-              </span>
-            </p>
-          </div>
-        )}
+
       </div>
 
       <style>{`

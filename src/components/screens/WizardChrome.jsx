@@ -1,7 +1,10 @@
+import ModeArtwork from '../ui/ModeArtwork.jsx';
+import { wormMenuFeedback } from './wormMenuFeedback.js';
 // Shared forecast-style setup shell for CUBE, WORM, CHAOS and RANDOM.
 // Scoped CSS variables keep paper styling for notebook and store consumers.
 
 import React from 'react';
+import { useDialogBehavior } from '../ui/Panel.jsx';
 import { UI_FONT, PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BG_MUTED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_SHADOW, PAPER_CARD_SHADOW, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
 import { modeTheme } from '../../utils/modeThemes.js';
 import './modeWizard.css';
@@ -444,7 +447,7 @@ export function WizardChipRow({ styles, families, activeChild, onSelect, label }
             type="button"
             aria-pressed={active}
             className="ui-focusable"
-            onClick={() => onSelect(child.key)}
+            onClick={() => { wormMenuFeedback(); onSelect(child.key); }}
             style={styles.chip(active)}
           >
             {child.label}
@@ -473,6 +476,7 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
   const tabs = React.useRef([]);
 
   const focus = index => {
+    wormMenuFeedback();
     onSelect(index);
     tabs.current[index]?.focus();
   };
@@ -499,7 +503,7 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
             aria-current={isActive ? 'true' : undefined}
             aria-controls={WIZARD_PANEL_ID}
             className="ui-focusable"
-            onClick={() => onSelect(i)}
+            onClick={() => { wormMenuFeedback(); onSelect(i); }}
             onKeyDown={e => handleKeyDown(e, i)}
             style={styles.categoryTab(isActive)}
           >
@@ -571,20 +575,15 @@ export function WizardShell({
   children
 }) {
   const scrollRef = React.useRef(null);
+  const dialogRef = React.useRef(null);
+  const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
   React.useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
   const theme = modeTheme(mode);
   const cat = categories[active];
   const last = active === categories.length - 1;
   // Keep the cube above the setup selector and its style-family controls.
   const isStyle = cat.key === 'style';
-  const specimen = cat.hero ? (
-    <div style={styles.hero}>{cat.hero}</div>
-  ) : (
-    <div style={styles.heroHeading}>
-      <h2 style={styles.title}>{cat.title}</h2>
-      {cat.subtitle && <p style={styles.subtitle}>{cat.subtitle}</p>}
-    </div>
-  );
+  const specimen = cat.hero ? <div style={styles.hero}>{cat.hero}</div> : null;
   const categoryBar = (
     <WizardCategoryBar
       styles={styles}
@@ -597,7 +596,7 @@ export function WizardShell({
   );
 
   return (
-    <div className="mode-wizard" style={{ ...styles.overlay, '--mode-accent': accent }}>
+    <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${theme.name} setup`} className="mode-wizard" style={{ ...styles.overlay, '--mode-accent': accent }}>
       {children}
 
       <div className="mode-wizard-sheet" style={styles.sheet}>
@@ -608,14 +607,14 @@ export function WizardShell({
             </svg>
             {!mobile && (active === 0 ? 'Cancel' : 'Back')}
           </button>
-          <span className="mode-wizard-kicker">Configure your run</span>
+          <span className="mode-wizard-kicker">{theme.name.charAt(0) + theme.name.slice(1).toLowerCase()}</span>
           <span className="mode-wizard-count">{String(active + 1).padStart(2, '0')} / {String(categories.length).padStart(2, '0')}</span>
         </div>
 
         <div className="mode-wizard-scroll" ref={scrollRef}>
         <header className="mode-wizard-heading">
-          <h1>{theme.name}</h1>
-          
+          <div><h1>{cat.hero ? cat.label : cat.title}</h1>{!cat.hero && cat.subtitle && <p>{cat.subtitle}</p>}</div>
+          <ModeArtwork mode={theme.name === 'CUBE' ? 'freeplay' : theme.name.toLowerCase()} />
         </header>
         {specimen}
         {isStyle && categoryBar}
@@ -636,22 +635,22 @@ export function WizardShell({
 
         </div>
         <div style={styles.footer}>
-          <div className="mode-wizard-footer-note">{cat.label} · {cat.summary}</div>
+          <div className="mode-wizard-step-track" aria-hidden="true">{categories.map((item, i) => <i key={item.key} data-reached={i <= active} />)}</div>
           <button
             type="button"
             style={styles.btnPrimary}
-            onClick={onPrimary}
+            onClick={() => { wormMenuFeedback(); onPrimary(); }}
             onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.08)'; }}
             onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
           >
-            {last ? finishLabel : (cat.primaryLabel || `Confirm ${cat.label} & Continue`)}
+            {last ? finishLabel : (cat.primaryLabel || 'Next')} <span aria-hidden="true">→</span>
           </button>
 
           {secondary && (
             <button
               type="button"
               style={styles.btnSecondary}
-              onClick={secondary.onClick}
+              onClick={() => { wormMenuFeedback(); secondary.onClick(); }}
               onMouseEnter={e => { e.currentTarget.style.color = WIZ_TEXT; }}
               onMouseLeave={e => { e.currentTarget.style.color = WIZ_TEXT_FAINT; }}
             >

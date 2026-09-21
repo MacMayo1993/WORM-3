@@ -35,7 +35,7 @@ it('claims a chosen reward once, shows its reveal, and equips it',()=>{
   expect(host.querySelectorAll('[data-preview]')).toHaveLength(1);
   expect(host.querySelector('.xp-primary').textContent).toContain('Claim');
   click(host.querySelector('.xp-primary'));
-  expect(host.textContent).toContain('UNLOCKED');expect(state().ownedItems).toContain('hat_party');
+  expect(host.textContent).toContain('Unlocked');expect(state().ownedItems).toContain('hat_party');
   click(host.querySelector('.xp-primary'));expect(state().wormHat).toBe('party');
   expect(host.querySelector('.xp-primary').disabled).toBe(true);
   expect(state().playerProgress.claimedRewards[5]).toBe('hat_party');

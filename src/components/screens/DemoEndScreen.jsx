@@ -3,7 +3,7 @@ import DemoDialog from './DemoDialog.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import React, { useState } from 'react';
 import {
-  UI_FONT, DISPLAY_FONT,
+  UI_FONT, HEADING_FONT,
   UI_CREAM, UI_MOSS, UI_ACTION_SHADOW,
  Z } from '../../utils/uiTheme.js';
 
@@ -60,7 +60,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
         </p>
         <XpReceipt mode="demo" />
         <h1 style={{
-          fontFamily: DISPLAY_FONT,
+          fontFamily: HEADING_FONT,
           fontSize: 26,
           color: '#24331e',
           margin: '0 0 8px',
