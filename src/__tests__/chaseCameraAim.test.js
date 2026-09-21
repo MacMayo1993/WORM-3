@@ -95,3 +95,22 @@ it('holds the cube above screen center across all surface faces and changing cam
     expect(finite(c.quaternion)).toBe(true);
   }
 });
+
+it('centers a moving mobile subject through horizon changes without changing camera clearance or FOV', () => {
+  const c = new THREE.PerspectiveCamera(82, 0.46, 0.1, 100);
+  for (let i = 0; i <= 180; i++) {
+    const a = i * Math.PI / 90;
+    const head = new THREE.Vector3(7 * Math.sin(a), 7 * Math.cos(a), 5 * Math.cos(a / 2));
+    c.position.copy(head).add(new THREE.Vector3(3 * Math.cos(a), 4, 3 * Math.sin(a)));
+    const eye = c.position.clone();
+    aimCamera(c, eye, head, new THREE.Vector3(Math.sin(a), Math.cos(a), 0), 0.1);
+    frameSurfaceCamera(c, 1, head);
+    c.updateMatrixWorld(true);
+    const center = head.project(c);
+    expect(center.x).toBeCloseTo(0, 6);
+    expect(center.y).toBeCloseTo(0, 6);
+    expect(c.position.equals(eye)).toBe(true);
+    expect(c.fov).toBe(82);
+    expect(finite(c.quaternion)).toBe(true);
+  }
+});

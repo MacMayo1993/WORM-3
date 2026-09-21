@@ -3,6 +3,8 @@ import React, { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { useIsMobile } from '../hooks/useIsMobile.js';
+import { bodyPathHeadInto } from './healerWorm/sliceBodyPath.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { rocketOrbitInto, rocketOrbitT, rocketFrameInto } from './healerWorm/rocketOrbit.js';
 import { tunnelState } from './tunnelProgressBridge.js';
@@ -23,7 +25,6 @@ import {
     LOOK_AHEAD,
     CAM_CENTER_BIAS,
     CAM_LERP,
-    WORM_LIFT,
     ZOOM_BURST,
     MAX_EXTRA_ZOOM,
     FACE_NORMALS,
@@ -46,6 +47,7 @@ const _aimQuat = new THREE.Quaternion();
 const _aimDir = new THREE.Vector3();
 const _aimUp = new THREE.Vector3();
 const _camWormWorld = new THREE.Vector3();
+const _mobileHeadWorld = new THREE.Vector3();
 const _camNormal = new THREE.Vector3();
 const _camTargetCam = new THREE.Vector3();
 const _camTargetLook = new THREE.Vector3();
@@ -149,23 +151,27 @@ const frameForward = new THREE.Vector3();
 const frameDirection = new THREE.Vector3();
 const frameCorrection = new THREE.Quaternion();
 
-// Camera position and roll still ease around the worm, but their independent
-// lags must not drag the cube underneath the controls during a face crossing.
-export function frameSurfaceCamera(camera, portraitFactor) {
-    frameDirection.copy(camera.position).negate();
+// Correct aim after position/roll smoothing, so neither lag moves the subject
+// around the screen. Mobile anchors the visible head at (0, 0); desktop retains
+// its whole-board composition above center. Rotating the existing frame keeps
+// the smoothed horizon and never changes the lens or tunnel clearance.
+export function frameSurfaceCamera(camera, portraitFactor, head = null) {
+    if (head) frameDirection.subVectors(head, camera.position);
+    else frameDirection.copy(camera.position).negate();
     if (frameDirection.lengthSq() < 1e-8) return;
     frameDirection.normalize();
     frameForward.set(0, 0, -1).applyQuaternion(camera.quaternion);
     frameCorrection.setFromUnitVectors(frameForward, frameDirection);
     camera.quaternion.premultiply(frameCorrection);
     // A fixed screen-space anchor survives every cube face and horizon roll.
-    const screenY = THREE.MathUtils.lerp(0.06, 0.12, portraitFactor);
+    const screenY = head ? 0 : THREE.MathUtils.lerp(0.06, 0.12, portraitFactor);
     camera.rotateX(-Math.atan(screenY * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))));
     camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
 }
 
 export default function WormChaseCamera({ worm, size }) {
     const { camera, size: viewportSize } = useThree();
+    const mobile = useIsMobile();
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
     const lookAtRef = useRef(new THREE.Vector3(0, 0, 0));
     const camUpRef = useRef(new THREE.Vector3(0, 1, 0));  // smoothed up — prevents instant snap
@@ -214,6 +220,14 @@ export default function WormChaseCamera({ worm, size }) {
         const phase = worm.phase.current;
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
+        if (mobile) {
+            // Match the body's rendered anchor, including jump lift and rocket
+            // flight. Tunnel handoffs already contain their own surface lift.
+            bodyPathHeadInto(_mobileHeadWorld, worm, phase !== 'crawling' && !!worm.activeTunnel.current);
+            rocketOrbitInto(_mobileHeadWorld, size, rocketOrbitT(
+                worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current
+            ));
+        }
 
         // A layer slice is staged as a comic-book freeze frame while ThunkEffect
         // plays WORM'D. Rather than merely holding wherever the smoothed chase lens
@@ -441,6 +455,7 @@ export default function WormChaseCamera({ worm, size }) {
             _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
             // Centre the spawning worm first; ease out to the chase aim as the pull expires.
             _camTargetLook.lerp(_camWormWorld, pull * 0.8);
+            if (mobile) _camTargetLook.copy(_mobileHeadWorld);
 
             // Same horizon the chase will use, so the countdown reveal hands over to
             // live play without the view rolling on the first crawling frame.
@@ -465,6 +480,10 @@ export default function WormChaseCamera({ worm, size }) {
 
             camera.position.copy(camPosRef.current);
             aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, revealA);
+            if (mobile) {
+                frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
+                lookAtRef.current.copy(_mobileHeadWorld);
+            }
             camUpRef.current.copy(camera.up);
             prevPhaseRef.current = phase;
             return;
@@ -558,9 +577,10 @@ export default function WormChaseCamera({ worm, size }) {
                 .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 - 0.24 * rocketLift))
                 .addScaledVector(_camForward, -camBack * rakeTuck - rocketLift * 0.6);
             _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead + rocketLift * 0.9);
-            // Pull the look target partway toward the cube centre (origin) so the whole cube
-            // stays framed rather than drifting off-screen as the camera tracks the worm.
-            _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS * (1 - rocketLift));
+            // Mobile follows the player on every board size. A center bias grows
+            // with the board and used to pull Mega's head out of the viewport.
+            if (mobile) _camTargetLook.copy(_mobileHeadWorld);
+            else _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS * (1 - rocketLift));
 
             // Heal focus: while a ring heal freezes the worm (worm.healPauseT), push the
             // camera in on the surrounded tile with a slow circular track, then ease back to
@@ -664,7 +684,10 @@ export default function WormChaseCamera({ worm, size }) {
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
             aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, alpha);
-            if (!rocketLift && !(worm.healPauseT?.current > 0) && !(worm.cutFocusT?.current > 0)) {
+            if (mobile) {
+                frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
+                lookAtRef.current.copy(_mobileHeadWorld);
+            } else if (!rocketLift && !(worm.healPauseT?.current > 0) && !(worm.cutFocusT?.current > 0)) {
                 frameSurfaceCamera(camera, portraitFactor);
             }
             camUpRef.current.copy(camera.up);
@@ -691,6 +714,11 @@ export default function WormChaseCamera({ worm, size }) {
                 tunnelEntryPoseInto(transitionPose.current, tunnel, tp, size, phaseStartPose.current);
             }
             applyTunnelPose(transitionPose.current);
+            if (mobile && phase === 'windup') {
+                frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
+                lookAtRef.current.copy(_mobileHeadWorld);
+                camUpRef.current.copy(camera.up);
+            }
         } else if (phase === 'tunnel' || phase === 'exiting') {
             const tunnel = worm.activeTunnel.current;
             const tp = THREE.MathUtils.clamp(worm.tunnelProgress.current, 0, 1);
@@ -715,6 +743,7 @@ export default function WormChaseCamera({ worm, size }) {
                 .addScaledVector(_camForward, -camBack * rakeTuck);
             _rails.look.copy(worm.headInterpPos.current).addScaledVector(_camForward, rakeAhead)
                 .multiplyScalar(1 - CAM_CENTER_BIAS);
+            if (mobile) _rails.look.copy(_mobileHeadWorld);
             _rails.up.copy(horizonMode === 'face' ? extN : _WORLD_UP);
             if (horizonMode !== 'face' && extN.y < -0.8) _rails.up.negate();
             // Start at the actual exit pose; the existing post-tunnel crawl
@@ -722,6 +751,11 @@ export default function WormChaseCamera({ worm, size }) {
             blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails,
                 diveEase(tp * TUNNEL_HANDOFF_SECONDS / 0.7));
             applyTunnelPose(transitionPose.current);
+            if (mobile) {
+                frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
+                lookAtRef.current.copy(_mobileHeadWorld);
+                camUpRef.current.copy(camera.up);
+            }
         }
 
         prevPhaseRef.current = phase;
