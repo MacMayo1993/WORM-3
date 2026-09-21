@@ -22,7 +22,7 @@ it('launches Stage 9 on 7x7 and returns other chapters to 5x5', () => {
     stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])), claimed: {}
   } } });
   show({ initialPage: 'story' });
-  click('Under Siege'); click('Replay level');
+  click('Under Siege'); click('Play again');
   expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 9, cubeSize: 7, megaMode: false });
   expect(host.querySelector('[aria-label="Selected level"]').textContent).toContain('defeat one enemy');
   click('Worm Ascendant'); click('Play level');
