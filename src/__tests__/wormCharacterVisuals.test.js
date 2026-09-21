@@ -100,7 +100,7 @@ describe('picker character switching', () => {
     draw('inch');
     expect(scene.getObjectByName('worm-hat').children).toHaveLength(0);
   });
-  it('frames all twelve handmade pieces on every character and clears unequipped models', async () => {
+  it('frames all twenty-six handmade pieces on every character and clears unequipped models', async () => {
     for(const characterId of ['classic','book','inch','prism','glow','mobi','wiggle']) {
       for(const item of [...HANDMADE_HATS,...WORM_ACCESSORIES]) {
         const opts={characterId, skinId:'slime',hatId:item.slot?'none':item.id,

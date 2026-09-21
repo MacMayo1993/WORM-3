@@ -10,8 +10,8 @@ import { createAccessoryRig, buildCraftModel, poseHeadAccessories, beginAccessor
 const initial = useGameStore.getState();
 afterEach(() => { useGameStore.setState(initial); localStorage.removeItem('worm3_accessories'); });
 
-it('offers all twelve handmade models through the real catalog and reward pool', () => {
-  expect(HANDMADE_HATS.length + WORM_ACCESSORIES.length).toBe(12);
+it('offers all twenty-six handmade models through the real catalog and reward pool', () => {
+  expect(HANDMADE_HATS.length + WORM_ACCESSORIES.length).toBe(26);
   for(const item of [...HANDMADE_HATS,...WORM_ACCESSORIES]) {
     const id=`${item.slot?'accessory':'hat'}_${item.id}`, entry=getStoreItem(id);
     expect(entry.label).toBe(item.label); expect(chestItemTier(entry)).toBe(4);

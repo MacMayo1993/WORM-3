@@ -33,7 +33,7 @@ export function createAccessoryRig(equipment) {
   const entries = [];
   for (const [slot,id] of Object.entries(safeAccessories(equipment))) {
     if (id==='none') continue;
-    const repeats = ['friendshipBeads','quiltPatches'].includes(id) ? 3 : 1;
+    const repeats = ['friendshipBeads','quiltPatches','buttonTrail'].includes(id) ? 3 : 1;
     for(let i=0;i<repeats;i++) {
       const group = new THREE.Group(), model = buildCraftModel(id);
       group.name = `accessory-${id}-${i}`; group.visible = false; group.add(model); root.add(group);
@@ -72,7 +72,7 @@ export function poseHeadAccessories(rig, center, forward, normal, radius, time=0
     poseAccessoryFrame(entry.group,center,forward,normal,radius);
     entry.group.visible=true; detail(entry,time,transit);
     entry.model.position.set(0,0,0);
-    if(character==='mobi' && entry.id==='buttonGoggles') {
+    if(character==='mobi' && entry.slot==='face') {
       entry.model.rotation.x=-.665; entry.model.position.set(0,.35,.10);
     }
   }
