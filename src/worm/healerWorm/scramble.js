@@ -4,7 +4,7 @@ const AXES = ['col', 'row', 'depth'];
 
 // Build the opening turns shared by the scramble and its timed inverse. Only
 // Mega has enough room for the two independently rotating, non-adjacent planes;
-// the regular 2x2-7x7 boards use one plane per turn.
+// the regular 2x2-10x10 boards use one plane per turn.
 export function buildWormScramble(size, steps, random = Math.random) {
   const useParallelPlanes = size === MEGA_WORM_CUBE_SIZE;
   const seq = [];

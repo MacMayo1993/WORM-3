@@ -4,6 +4,15 @@ import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 
 describe('getMirrorLayerWidths', () => {
+  it.each([8, 9, 10])('keeps size %i asymmetric with exact exterior bounds', size => {
+    const widths = getMirrorLayerWidths(size), centers = getMirrorCenters(size);
+    expect(widths).toHaveLength(size);
+    expect(new Set(widths).size).toBe(size);
+    expect(widths.reduce((a, b) => a + b, 0)).toBeCloseTo(size, 8);
+    expect(centers[0] - widths[0] / 2).toBeCloseTo(-size / 2, 8);
+    expect(centers.at(-1) + widths.at(-1) / 2).toBeCloseTo(size / 2, 8);
+    widths.forEach(width => expect(width).toBeGreaterThan(0.02));
+  });
   it('returns widths that sum to the cube size', () => {
     for (const size of [2, 3, 4, 5]) {
       const widths = getMirrorLayerWidths(size);
