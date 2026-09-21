@@ -943,13 +943,11 @@ function tryWormholeRingHeal(sim, size, ctx) {
 
 // Claim a special orb reachable from the given tile.
 //
-// Contact is enough: crawling onto the orb's tile takes it. Being airborne widens
-// the claim by SPECIAL_JUMP_REACH, and an active magnet widens it further — both are
-// help, not requirements, so a special is never gated behind a second skill check on
-// top of steering onto its tile inside its lifetime.
-function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey) {
+// Rocket/magnet retain their assisted reach. Elements require the tile center:
+// interpT runs from the PREVIOUS center to this one, so 0.5 is still the border.
+function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = false) {
     if (sim.specials.length === 0) return;
-    const radius = Math.max(
+    const radius = elementsOnly ? 0 : Math.max(
         sim.isJumping ? SPECIAL_JUMP_REACH : 0,
         sim.magnetT > 0 ? MAGNET_RADIUS : 0,
     );
@@ -959,14 +957,17 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey) {
     const headKey = `${x},${y},${z},${dirKey}`;
     const idx = sim.specials.findIndex(s => {
         const key = `${s.x},${s.y},${s.z},${s.dirKey}`;
-        return reach ? reach.has(key) : key === headKey;
+        if (isElementalType(s.type)) return key === headKey && sim.interpT >= 1;
+        return !elementsOnly && (reach ? reach.has(key) : key === headKey);
     });
     if (idx === -1) return;
     const [claimed] = sim.specials.splice(idx, 1);
-    sim.pendingSpecialFlash = { type: claimed.type, pos: sim.curWorldPos.toArray() };
+    evaluatePosAndNormal(sim, sim.interpT, _evalHPos);
+    sim.pendingSpecialFlash = { type: claimed.type, pos: _evalHPos.toArray() };
     // Claiming an element is a choice: grabbing one wipes the rest of the offering
     // off the board until the next spawn cycle. Rocket/magnet are untouched.
     if (isElementalType(claimed.type)) {
+        ctx.onStoryMechanic?.('elementPickups');
         for (let i = sim.specials.length - 1; i >= 0; i--) {
             if (isElementalType(sim.specials[i].type)) sim.specials.splice(i, 1);
         }
@@ -977,6 +978,7 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey) {
     }
     ctx.onSpecialsChanged(sim.specials.slice());
     activateSpecial(sim, ctx, claimed.type);
+    return true;
 }
 
 // Tiles the visible body currently occupies — a special dropped onto one of these
@@ -1408,7 +1410,11 @@ const PHASE_HANDLERS = {
             // Advance interpolation
             if (sim.interpT < 1) {
                 const before = sim.interpT;
-                sim.interpT = Math.min(1, sim.interpT + delta / STEP_SEC);
+                // Finish the spatial step when its clock finishes. A carried
+                // frame remainder can otherwise choose the next tile while the
+                // head is still short of this center, skipping contact entirely.
+                sim.interpT = sim.stepAcc + delta >= STEP_SEC
+                    ? 1 : Math.min(1, sim.interpT + delta / STEP_SEC);
                 // The corner pivot holds position from .45 to .55; count only
                 // movement, and use the step being traversed, not the next tile.
                 const progress = t => t < 0.45 ? t / 0.9 : t <= 0.55 ? 0.5 : 0.5 + (t - 0.55) / 0.9;
@@ -1543,6 +1549,15 @@ const PHASE_HANDLERS = {
             // -----------------------------------------------------------
 
             sim.stepAcc += delta;
+            // Entry-time checks leave elements on the board. Claim only after
+            // the rendered head reaches the center, and after hazards/path samples
+            // are resolved. Committed rest-read contents are checked at rotation
+            // completion; never collect an outgoing tile's orb mid-turn.
+            if (headOnSurface && sim.interpT >= 1 &&
+                !restReadProtectsTile(sim.restRead, sim.pos.x, sim.pos.y, sim.pos.z) &&
+                trySpecialPickupAt(sim, size, ctx, sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, true)) {
+                return true;
+            }
             // When navigating a corner, traversing double the distance means we should
             // theoretically give it more time so the speed looks constant, but the Bezier
             // arc covers it nicely.

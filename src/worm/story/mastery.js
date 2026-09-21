@@ -12,7 +12,7 @@ const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
 // Events originate after a successful pickup/disarm/heal, never from button input.
 export function recordStoryMechanic(practice, key, id) {
   if (practice && key === 'grassLaunch') { practice.grassJump = true; return; }
-  if (!practice || !['ringHeals', 'magnetOrbs', 'bombs'].includes(key)) return;
+  if (!practice || !['ringHeals', 'magnetOrbs', 'bombs', 'elementPickups'].includes(key)) return;
   if (key === 'bombs') {
     if (id == null || practice.bombIds.has(id)) return;
     practice.bombIds.add(id);
@@ -54,6 +54,10 @@ export function nextStoryPower(p, level) {
   if (!m) return null;
   if ((p.mechanics.rockets ?? 0) < (m.rockets ?? 0)) return 'rocket';
   if ((p.mechanics.magnetOrbs ?? 0) < (m.magnetOrbs ?? 0)) return 'magnet';
+  if (m.elementPickups) {
+    const collected = p.mechanics.elementPickups ?? 0;
+    return collected < m.elementPickups ? STORY_ELEMENTS[collected % STORY_ELEMENTS.length] : null;
+  }
   return m.elements ? STORY_ELEMENTS.find(type => !p.elements.has(type)) ?? null : null;
 }
 export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
@@ -70,7 +74,7 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
 // only while remote catches are still outstanding.
 export function offerStoryPower(sim, p, level, size, cubies) {
   const type = nextStoryPower(p, level);
-  p.powerHint = type ? HINTS[type] : null;
+  p.powerHint = type ? (level.mechanics?.elementPickups ? 'Steer onto the marked elemental orb to collect it' : HINTS[type]) : null;
   if (!type || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.elementalT > 0 || sim.phase !== 'crawling') return false;
   const occupied = new Set(sim.powerups.map(tileKey));
   for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));

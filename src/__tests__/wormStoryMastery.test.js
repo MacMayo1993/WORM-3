@@ -53,7 +53,9 @@ it('does not count fatal landings or an Inch signature that only charged', () =>
   sim.alive = false; sim.isJumping = false; expect(read().doubleJumps).toBeUndefined();
 });
 it('checks all five elemental effects and reoffers a missed or expired power', () => {
-  const { sim, p, level, read } = setup(8);
+  const { sim, p, level, read } = setup(10);
+  p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 4;
+  sim.specials = []; offerStoryPower(sim, p, level, 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
   sim.specials = []; expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('water');
@@ -75,6 +77,29 @@ it('checks all five elemental effects and reoffers a missed or expired power', (
     expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(false); // don't replace an active element
   }
   expect(read().elements).toBe(5); expect(nextStoryPower(p, level)).toBeNull();
+});
+it('finishes level eight with two collected elements without waiting for mastery', () => {
+  const { sim, p, level, read } = setup(8);
+  expect(level.mechanics).toEqual({ elementPickups: 2 });
+  expect(sim.specials[0].type).toBe('water');
+  sim.specials = []; // missed offerings do not count and can be offered again
+  expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
+  expect(read().elementPickups).toBeUndefined();
+  const won = { alive: true, elapsed: 80, cuts: 0, orbs: 24, healed: 3, remaining: 0,
+    tailClear: true, landed: true, rotationSettled: true };
+  recordStoryMechanic(p, 'elementPickups');
+  expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).toBeNull();
+  expect(nextStoryPower(p, level)).toBe('fire');
+  sim.specials = []; sim.elementalT = 10;
+  expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(false);
+  sim.elementalT = 0;
+  expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
+  expect(sim.specials[0].type).toBe('fire');
+  recordStoryMechanic(p, 'elementPickups');
+  expect(p.elements.size).toBe(0);
+  expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).not.toBeNull();
+  expect(nextStoryPower(p, level)).toBeNull();
+  expect(stageStory(sim, 5, level).mechanics).toEqual({});
 });
 it('deduplicates disarms and resets every mastery counter on retry', () => {
   const { sim, p, level } = setup();
