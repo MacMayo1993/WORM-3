@@ -1,3 +1,4 @@
+import { ACCESSORY_SLOTS, EMPTY_ACCESSORIES, getAccessory } from '../../worm/handmadeAccessoriesData.js';
 import { characterXpMultiplier } from '../../worm/characterAbilities.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { storyLevel, storyUnlocked } from '../../worm/story/levels.js';
@@ -43,6 +44,16 @@ export const createWormSlice = (set, get) => ({
   setWormSkin: (id) => {
     try { localStorage.setItem('worm3_skin', id); } catch { }
     set({ wormSkin: id });
+  },
+  wormAccessories: persistedState.wormAccessories ?? EMPTY_ACCESSORIES,
+  setWormAccessory: (slot, id) => {
+    if (!ACCESSORY_SLOTS.includes(slot)) return false;
+    const item = getAccessory(id);
+    if (id !== 'none' && (item?.slot !== slot || (!get().demoMode && !get().ownedItems.includes(`accessory_${id}`)))) return false;
+    const equipment = { ...EMPTY_ACCESSORIES, ...get().wormAccessories, [slot]: id };
+    try { localStorage.setItem('worm3_accessories', JSON.stringify(equipment)); } catch { }
+    set({ wormAccessories: equipment });
+    return true;
   },
   wormHat: persistedState.wormHat,
   setWormHat: (id) => {

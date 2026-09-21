@@ -77,6 +77,7 @@ const EXPECTED_KEYS = [
   'setTeachModeActive', 'setTunnelDetail', 'setUpcomingRotation', 'setVictory',
   'setVisualMode', 'setWormAlive', 'setWormBodyTiles', 'setWormBoostState',
   'setWormCharacter', 'setWormColor', 'setWormControlMode', 'setWormCountdownStep',
+  'wormAccessories', 'setWormAccessory',
   'setWormDeathDetails', 'setWormElementalTheme', 'setWormGamePhase', 'setWormHat', 'setWormHealedCount',
   'setWormHealerMode', 'setWormHealingProgress', 'setWormOnFlippedTile', 'setWormOrbCount',
   'setWormOrbInventory', 'setWormPaused', 'setWormPhase', 'setWormPowerups',

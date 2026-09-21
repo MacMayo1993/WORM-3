@@ -7,7 +7,7 @@ export const CHEST_TIERS = [
   { id: 'green', name: 'Uncommon', color: '#53b968', label: 'Color palettes', compensation: 2 },
   { id: 'blue', name: 'Rare', color: '#469dea', label: 'Tile styles', compensation: 4 },
   { id: 'yellow', name: 'Very rare', color: '#f4cd46', label: 'Advanced tile styles', compensation: 6 },
-  { id: 'orange', name: 'Legendary', color: '#ed8a39', label: 'Hats, skins + trails', compensation: 10 },
+  { id: 'orange', name: 'Legendary', color: '#ed8a39', label: 'Wearables, skins + trails', compensation: 10 },
   { id: 'red', name: 'Mythic', color: '#ed5353', label: 'Worm characters', compensation: 15 },
 ];
 export const CHEST_MODES = {
@@ -38,7 +38,7 @@ const basicStyles = new Set([...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS]);
 export function chestItemTier(item) {
   if (!item || item.price <= 0) return null;
   if (item.type === 'character') return 5;
-  if (['hat', 'skin', 'trail'].includes(item.type)) return 4;
+  if (['hat', 'skin', 'trail', 'accessory'].includes(item.type)) return 4;
   if (item.type === 'tile') return basicStyles.has(item.tileKey) ? 2 : 3;
   if (item.type === 'scheme') return 1;
   return null;

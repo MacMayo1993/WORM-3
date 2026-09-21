@@ -168,3 +168,22 @@ it('keeps a three-face sweep connected and outside the cube through both reversa
     previous = points;
   }
 });
+
+it('anchors the paintbrush to the last rendered bead through a cut and tunnel handoff', () => {
+  act(() => useGameStore.setState({wormAccessories:{face:'none',neck:'none',body:'quiltPatches',tail:'paintbrushTail'}}));
+  // The test harness has re-rendered; its mesh ref remains the body output sink.
+  React.Children.toArray(tree.props.children).find(child=>child.type==='instancedMesh').ref.current=mesh;
+  const rig=React.Children.toArray(tree.props.children).find(child=>child.type==='primitive'&&child.props.object.name==='worm-accessories').props.object;
+  shReset(sim.stepHistory);
+  for(let z=6;z>=1.5;z-=.01)shPush(sim.stepHistory,new THREE.Vector3(0,0,z),new THREE.Vector3(0,1,0),-1,-1,-1,true);
+  sim.activeTunnel=route;
+  traverse('entering');traverse('tunnel');traverse('exiting');traverse('windout');
+  for(const length of [40,9,4]) {
+    sim.tailLength=length;
+    const points=renderPoints();
+    const tail=rig.getObjectByName('accessory-paintbrushTail-0');
+    expect(tail.visible).toBe(true);
+    expect(tail.position.distanceTo(points[points.length-1])).toBeLessThan(1e-6);
+    expect(tail.quaternion.length()).toBeCloseTo(1);
+  }
+});

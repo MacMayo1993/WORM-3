@@ -1,3 +1,6 @@
+import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody } from '../wormAccessories.js';
+import { EMPTY_ACCESSORIES } from '../handmadeAccessoriesData.js';
+import { resolveColors } from '../../utils/colorSchemes.js';
 import { wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelSwim.js';
 import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
@@ -95,6 +98,9 @@ const _pathCursor = makeStepPathCursor();
 const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal, tx: -1, ty: -1, tz: -1 };
 
 export function WormBody({ worm, size }) {
+    const equipment = useGameStore(s => s.wormAccessories ?? EMPTY_ACCESSORIES);
+    const accessoryRig = useMemo(() => createAccessoryRig({body: equipment.body, tail: equipment.tail}), [equipment.body, equipment.tail]);
+    useEffect(() => () => accessoryRig.dispose(), [accessoryRig]);
     const surface = useMemo(() => createBodySurface(), []);
     const bookPages = useMemo(() => [createBookPageGeometry(1), createBookPageGeometry(-1)], []);
     useEffect(() => () => bookPages.forEach(g => g.dispose()), [bookPages]);
@@ -123,6 +129,7 @@ export function WormBody({ worm, size }) {
     const mobiAssets = useMemo(() => isMobi ? createMobiSegmentAssets(MAX_TAIL) : null, [isMobi]);
     useEffect(() => () => { if (mobiAssets) disposeMobiSegmentAssets(mobiAssets); }, [mobiAssets]);
     const settings = useGameStore(s => s.settings);
+    const accessoryPalette = useMemo(() => resolveColors(settings), [settings]);
     const mobiPalette = useMemo(() => isMobi ? createMobiOrbPalette(settings) : null, [isMobi, settings]);
     const mobiBandsRef = useRef([]);
     const mobiBandCounts = useRef(new Uint16Array(7));
@@ -185,6 +192,7 @@ export function WormBody({ worm, size }) {
     const prevColorStateRef = useRef({ epoch: -1, visibleCount: -1, baseColor: null, bellyCol: null, isGlow: null, isInch: null });
 
     useFrame((state, delta) => {
+        beginAccessoryBody(accessoryRig);
         const frozen = useGameStore.getState().wormPaused || !useGameStore.getState().wormAlive;
         const animationDelta = frozen ? 0 : delta;
         characterTimeRef.current += animationDelta;
@@ -424,6 +432,7 @@ export function WormBody({ worm, size }) {
 
             const fade = 1 - i / (sweep ? visibleCount : tLen);
             let swimWeight = 0;
+            let segmentTransit = false;
 
             if (i === 0) {
                 // Head — reset quaternion every frame: body segments (below) rotate this
@@ -456,7 +465,7 @@ export function WormBody({ worm, size }) {
 
                 // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
-                let segmentTransit = false;
+
 
                 while (_pathCursor.index < pathPointCount - 1) {
                     const ptA = _pathCursor.a;
@@ -647,6 +656,10 @@ export function WormBody({ worm, size }) {
             // through the curve walk, the live-slice ride and the LOD thinning —
             // anything re-deriving it would drift from what the player sees.
             pushWormSegment(_wormDummy.position.x, _wormDummy.position.y, _wormDummy.position.z);
+            if (i > 0) poseBodyAccessories(accessoryRig, writeIdx, _wormDummy.position, _bodySegForward,
+                _bodyCloneNormal, Math.max(_wormDummy.scale.x, _wormDummy.scale.y),
+                reducedPickupMotion ? 0 : time, segmentTransit,
+                orbColors[orbColors.length - 1] ?? skin.body, accessoryPalette);
 
             // Glow worm: a soft camera-facing halo at this segment. The material's
             // own uScale widens it, so the instance carries the segment's scale
@@ -777,6 +790,8 @@ export function WormBody({ worm, size }) {
             band.count = mobiBandCounts.current[face];
             band.instanceMatrix.needsUpdate = true;
         });
+        finishAccessoryBody(accessoryRig, reducedPickupMotion ? 0 : time, _transitCull,
+            orbColors[orbColors.length - 1] ?? skin.body, accessoryPalette);
         mesh.count = writeIdx;
         mesh.instanceMatrix.needsUpdate = true;
         endWormSegments();
@@ -814,6 +829,7 @@ export function WormBody({ worm, size }) {
            and wormBookFX.js for the hinge math). The head gets a standing
            open-book face with inked paper leaves instead of a page stack. */
         <>
+            <primitive object={accessoryRig.root} dispose={null} />
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
                 {/* Thin spine/binding — the pages (below) are the visible body now, not a
                     flat square slab the pages ride on top of. */}
@@ -851,6 +867,7 @@ export function WormBody({ worm, size }) {
            pass through unmodified. Three.js multiplies instanceColor × material.color,
            so any non-white material color taints every orb pickup color. */
         <>
+            <primitive object={accessoryRig.root} dispose={null} />
             <instancedMesh key={isMobi ? 'mobi' : 'worm'} ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false} renderOrder={isMobi ? 2 : 0}>
                 {isMobi ? <primitive object={mobiAssets.shellGeometry} attach="geometry" /> : <primitive object={characterGeometry} attach="geometry" />}
                 {/* Wet-slime clearcoat is just the "slime" skin's starting point now —

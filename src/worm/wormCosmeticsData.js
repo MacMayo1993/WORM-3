@@ -2,6 +2,7 @@
 // Skin and hat data — pure constants, no JSX.
 
 import * as THREE from 'three';
+import { HANDMADE_HATS } from './handmadeAccessoriesData.js';
 
 export const WORM_SKINS = [
   { id: 'slime',  label: 'Slime',  body: '#00ff88', belly: '#00cc66', antenna: '#88ffbb', glow: '#00ff88' },
@@ -30,7 +31,8 @@ export const WORM_HATS = [
   { id: 'beanie', label: 'Beanie' },
   { id: 'wizard', label: 'Wizard' },
   { id: 'flower', label: 'Flower' },
-  { id: 'grad',   label: 'Grad Cap' }
+  { id: 'grad',   label: 'Grad Cap' },
+  ...HANDMADE_HATS
 ];
 
 // Trails recolor the surface stroke WormTrail.jsx paints behind the worm.

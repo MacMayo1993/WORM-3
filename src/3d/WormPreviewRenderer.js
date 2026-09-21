@@ -1,3 +1,5 @@
+import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody, poseHeadAccessories, poseHandmadeHat } from '../worm/wormAccessories.js';
+import { safeAccessories } from '../worm/handmadeAccessoriesData.js';
 import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormPreviewMotion.js';
 // WormPreviewRenderer.js
 // Renders worm thumbnails — the character picker's plate, the store's skin and
@@ -87,6 +89,8 @@ function requestHatParts() {
 
 const _color = new THREE.Color();
 const _accentColor = new THREE.Color();
+const _tailPreviewCenter = new THREE.Vector3();
+const _tailPreviewOffset = new THREE.Vector3(-0.48, 0.38, 0.62);
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
@@ -177,10 +181,12 @@ function _buildRig() {
   hatGroup.name = 'worm-hat';
   group.add(hatGroup);
 
+  const accessories = createAccessoryRig({});
+  group.add(accessories.root);
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, disposeEyes, characterGeometries, accents, mobi, mobiTails, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, skinKey: null };
+  return { group, accessories, accessoryKey: null, disposeEyes, characterGeometries, accents, mobi, mobiTails, beads, boxes, halos, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -200,6 +206,7 @@ const FRAMING = {
   character: { pos: [0.12, 1.0, 1.82], look: [-0.30, 0.06, 0], yaw: 0 },
   // Level runway: travel along X projects horizontally onto the menu's floor.
   runway: { pos: [-0.36, 0.62, 1.68], look: [-0.36, 0.02, 0], yaw: 0 },
+  tail: { pos: [-1.08, .40, .58], look: [-.63, .02, 0], yaw: 0 },
   body: { pos: [0.34, 0.66, 0.97], look: [-0.30, 0.05, -0.12], yaw: -0.38 },
   head: { pos: [0.20, 0.30, 0.40], look: [0.0, 0.05, -0.02], yaw: -0.55 },
   portrait: { pos: [0.34, 0.52, 0.68], look: [0.0, 0.10, -0.02], yaw: -0.55 },
@@ -373,6 +380,14 @@ const _pbZAxisUnit = new THREE.Vector3(0, 0, 1);
 
 function _poseWorm(opts, time) {
   const { characterId, skinId, hatId } = opts;
+  const equipment = safeAccessories(opts.accessories);
+  const accessoryKey = JSON.stringify(equipment);
+  if (rig.accessoryKey !== accessoryKey) {
+    rig.group.remove(rig.accessories.root); rig.accessories.dispose();
+    rig.accessories = createAccessoryRig(equipment); rig.group.add(rig.accessories.root);
+    rig.accessoryKey = accessoryKey;
+  }
+  beginAccessoryBody(rig.accessories);
   const headOnly = opts.framing === 'head';
   const roaming = opts.framing === 'character';
   if (roaming) {
@@ -411,6 +426,7 @@ function _poseWorm(opts, time) {
   }
   for (let i = 0; i < SEGMENTS; i++) updateWormSkinMaterialTime(rig.beads[i].material, time);
 
+  let accessoryIndex = isMobi ? 0 : 1;
   for (let i = 0; i < SEGMENTS; i++) {
     if (opts.companion) menuWormSegment(opts.companion, i, _off);
     else _segmentOffset(i, characterId, time, _off, (opts.framing === 'runway' || opts.framing === 'character'), opts.framing === 'character');
@@ -467,6 +483,11 @@ function _poseWorm(opts, time) {
 
     body.scale.multiplyScalar(wormBodyTaper(i, SEGMENTS, characterId));
 
+    if(i > 0 && shown && (!isMobi || i === 2 || (i >= 4 && (i - 4) % 3 === 1))) {
+      _segmentOffset(i - 1, characterId, time, _pbPrevOff, opts.framing === 'runway' || roaming, roaming);
+      _pbZ.copy(_pbPrevOff).sub(_off).normalize();
+      poseBodyAccessories(rig.accessories, accessoryIndex++, body.position, _pbZ, UP, isMobi ? MOBI_SEGMENT_RADIUS : body.scale.x, time, false, skin.body, opts.palette);
+    }
     // Segment colour, following WormBody: prism cycles the spectrum, the inch
     // worm bands body/belly, everything else is the skin's body colour.
     if (isPrism) {
@@ -582,14 +603,15 @@ function _poseWorm(opts, time) {
   // Face — same layout the played worm uses.
   if (opts.companion) menuWormSegment(opts.companion, 0, _anchor);
   else _segmentOffset(0, characterId, time, _anchor, (opts.framing === 'runway' || opts.framing === 'character'), opts.framing === 'character');
-  rig.glasses.forEach(g => { g.visible = isBook; });
+  const showBookGlasses = isBook && equipment.face === 'none';
+  rig.glasses.forEach(g => { g.visible = showBookGlasses; });
   _faceParts.eyes[0] = rig.eyes[0];
   _faceParts.eyes[1] = rig.eyes[1];
   _faceParts.pupils[0] = rig.pupils[0];
   _faceParts.pupils[1] = rig.pupils[1];
   _faceParts.mouth = rig.mouth;
-  _faceParts.glasses[0] = isBook ? rig.glasses[0] : null;
-  _faceParts.glasses[1] = isBook ? rig.glasses[1] : null;
+  _faceParts.glasses[0] = showBookGlasses ? rig.glasses[0] : null;
+  _faceParts.glasses[1] = showBookGlasses ? rig.glasses[1] : null;
   _faceParts.hat = rig.hatGroup;
   // The Book Worm's head is a sphere now, so every character shares one layout.
   // Its head rides at the book body's height, matching WormFace in gameplay.
@@ -619,15 +641,19 @@ function _poseWorm(opts, time) {
     rig.hatGroup.quaternion.copy(rig.mobi.group.quaternion);
   }
 
+  poseHeadAccessories(rig.accessories, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD,
+    UP, isMobi ? MOBI_RADIUS : HEAD_SCALE, time, false, characterId);
+  finishAccessoryBody(rig.accessories,time,false,skin.body,opts.palette);
+
   // Hat — rebuilt only when the hat changes, then parked above the head.
-  if (rig.hatKey !== hatId) {
+  if (rig.hatKey !== `${hatId}|${characterId}`) {
     rig.hatGroup.children.forEach(part => { part.geometry.dispose(); part.material.dispose(); });
     rig.hatGroup.clear();
     if (hatId && hatId !== 'none' && !getHatParts) {
       requestHatParts();
       return;
     }
-    for (const part of getHatParts ? getHatParts(hatId, HAT_SCALE) : []) {
+    for (const part of getHatParts ? getHatParts(hatId, isMobi ? MOBI_RADIUS * FACE_LAYOUT.hatScale : HAT_SCALE) : []) {
       const [geoName, args] = part.geo;
       const geo = _geometry(geoName, args);
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
@@ -642,7 +668,19 @@ function _poseWorm(opts, time) {
       if (part.scale) mesh.scale.set(part.scale[0], part.scale[1], part.scale[2]);
       rig.hatGroup.add(mesh);
     }
-    rig.hatKey = hatId;
+    rig.hatKey = `${hatId}|${characterId}`;
+  }
+  // The shared rig may have just shown another character's oriented hat.
+  if(!isMobi) rig.hatGroup.quaternion.identity();
+  poseHandmadeHat(rig.hatGroup,hatId,opts.companion ? _menuForward : roaming ? _roamForward : FWD,UP,time);
+  if(opts.framing === 'tail') {
+    const tail = rig.accessories.entries.find(entry => entry.slot === 'tail');
+    if(tail?.group.visible) {
+      tail.group.getWorldPosition(_tailPreviewCenter);
+      _tailPreviewCenter.x -= .06;
+      camera.position.copy(_tailPreviewCenter).add(_tailPreviewOffset);
+      camera.lookAt(_tailPreviewCenter);
+    }
   }
 }
 

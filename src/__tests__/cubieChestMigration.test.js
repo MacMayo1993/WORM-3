@@ -20,3 +20,20 @@ it('keeps an empty gem wallet empty and rejects an unowned saved character', asy
   const { persistedState: s } = await import('../hooks/storeSlices/persistedState.js');
   expect(s.chestWallet.gems).toBe(0); expect(s.wormCharacter).toBe('classic'); expect(s.ownedItems).not.toContain('character_mobi');
 });
+
+it('loads owned accessory slots without disturbing an existing hat', async () => {
+  localStorage.setItem('worm3_player_progress_v1', JSON.stringify({version:1,progress:{xp:0},points:0,
+    ownedItems:['hat_tophat','accessory_seedSatchel','accessory_ribbonTail']}));
+  localStorage.setItem('worm3_hat','tophat');
+  localStorage.setItem('worm3_accessories',JSON.stringify({face:'buttonGoggles',body:'seedSatchel',tail:'ribbonTail',neck:'seedSatchel'}));
+  const {persistedState:s}=await import('../hooks/storeSlices/persistedState.js');
+  expect(s.wormHat).toBe('tophat');
+  expect(s.wormAccessories).toEqual({face:'none',neck:'none',body:'seedSatchel',tail:'ribbonTail'});
+});
+it('ignores damaged accessory storage without resetting the player wallet', async () => {
+  localStorage.setItem('worm3_player_progress_v1',JSON.stringify({version:1,progress:{xp:0},points:71,ownedItems:['character_classic']}));
+  localStorage.setItem('worm3_accessories','{');
+  const {persistedState:s}=await import('../hooks/storeSlices/persistedState.js');
+  expect(s.parityPoints).toBe(71);
+  expect(s.wormAccessories).toEqual({face:'none',neck:'none',body:'none',tail:'none'});
+});
