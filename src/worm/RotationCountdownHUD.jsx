@@ -84,7 +84,7 @@ export default function RotationCountdownHUD() {
       // The wording stays put and the colour escalates: a label that rewrites
       // itself next to a number that is already moving is one moving thing too
       // many at the moment the player most needs to read it.
-      if (label) label.textContent = held ? 'TURN HELD' : 'TURN IN';
+      if (label) label.textContent = held ? 'Turn paused' : 'Turn in';
     };
     rafRef.current = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(rafRef.current);
@@ -113,14 +113,14 @@ export default function RotationCountdownHUD() {
         ref={labelRef}
         style={{
           fontSize: 8.5,
-          fontWeight: 800,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
+          fontWeight: 700,
+          letterSpacing: "0.01em",
+          textTransform: "none",
           color: NIGHT_TEXT_MUTED,
           whiteSpace: 'nowrap'
         }}
       >
-        TURN IN
+        Turn in
       </span>
 
       <div style={{ width: BAR_W, flex: '1 1 auto', minWidth: 0, height: 5, borderRadius: 999, background: 'rgba(255,245,220,0.14)', overflow: 'hidden' }}>
@@ -131,7 +131,7 @@ export default function RotationCountdownHUD() {
         ref={secondsRef}
         style={{
           fontSize: 13,
-          fontWeight: 800,
+          fontWeight: 700,
           fontFamily: MONO_FONT,
           fontVariantNumeric: 'tabular-nums',
           color: CALM,

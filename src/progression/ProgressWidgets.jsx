@@ -85,5 +85,5 @@ export function LevelUpCue() {
     const timer = setTimeout(() => setShow(null), 1600);
     return () => clearTimeout(timer);
   }, [level, hidden]);
-  return show && !hidden ? <div className="xp-level-toast" role="status"><span className="xp-flip-cube" aria-hidden="true">✦</span><div><small>LEVEL UP</small><strong>Level {show.level}</strong><small>+{show.points} Parity Points</small></div></div> : null;
+  return show && !hidden ? <div className="xp-level-toast" role="status"><span className="xp-flip-cube" aria-hidden="true">✦</span><div><small>Level up</small><strong>Level {show.level}</strong><small>+{show.points} Parity Points</small></div></div> : null;
 }

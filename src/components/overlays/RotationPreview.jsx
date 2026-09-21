@@ -78,7 +78,7 @@ const RotationPreview = ({ upcomingRotation, size }) => {
   return (
     <div className="rotation-preview">
       <div className="preview-header">
-        <span className="preview-title">NEXT</span>
+        <span className="preview-title">Next</span>
         <span ref={arrowRef} className="preview-arrow">{dir === 1 ? '↻' : '↺'}</span>
       </div>
 

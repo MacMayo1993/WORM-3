@@ -59,8 +59,8 @@ it('retains a paid result and releases the animation lock when leaving early', (
 
 it('opens chests from the actual store and returns to equip a newly owned worm', () => {
   act(() => root.render(<ParityStoreScreen onClose={close} />));
-  act(() => button('Cubie Chests').click()); expect(host.querySelector('#chest-title').textContent).toBe('Cubie chests');
-  act(() => button('Collection').click());
+  act(() => button('Cubie chests').click()); expect(host.querySelector('#chest-title').textContent).toBe('Cubie chests');
+  act(() => button('Store').click());
   act(() => useGameStore.setState({ ownedItems: [...state().ownedItems, 'character_mobi'] }));
   act(() => button('Worms').click());
   act(() => button('MOBI').click()); act(() => button('Equip').click());

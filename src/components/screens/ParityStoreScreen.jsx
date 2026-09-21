@@ -49,7 +49,7 @@ const TYPE_LABEL = {
   skin: 'Worm Skin',
   hat: 'Hat',
   trail: 'Trail',
-  scheme: 'Color Palette',
+  scheme: "Colors",
   tile: 'Tile Style',
 };
 
@@ -227,7 +227,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
         <span style={{
           position: 'absolute', top: -7, right: -5, zIndex: 2,
           display: 'flex', alignItems: 'center', gap: '3px',
-          fontSize: TEXT_XS, fontWeight: 900, letterSpacing: '0.1em',
+          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: "0.01em",
           color: '#fff', background: ac,
           borderRadius: '999px', padding: '3px 7px', fontFamily: FONT,
           boxShadow: `0 2px 5px ${ac}66`,
@@ -256,7 +256,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
       {owned ? (
         <span style={{
           marginTop: 'auto',
-          fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+          fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
           color: equipped ? ac : PAPER_TEXT_FAINT, fontFamily: FONT,
         }}>
           {equipped ? 'Equipped' : 'Owned'}
@@ -270,7 +270,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
           border: `1px solid ${canAfford ? `${ac}44` : PAPER_BORDER_SOFT}`,
         }}>
           <PPCoin size={10} color={canAfford ? ac : PAPER_TEXT_FAINT} />
-          <span style={{ fontSize: '11px', fontWeight: 800, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>{item.price}</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>{item.price}</span>
         </div>
       )}
     </button>
@@ -474,7 +474,7 @@ const StoreCollection = ({ onClose, onChests }) => {
             onClick={() => { setTab(t.id); setFocusedId(null); resetScroll(); }}>
             <i aria-hidden="true" /><span><strong>{t.label}</strong><small>{tabOwned[t.id]} / {t.items.length} owned</small></span><b aria-hidden="true">›</b>
           </button>)}
-          <button className="catalogue-chests" onClick={onChests}><span aria-hidden="true">◇</span><strong>Cubie Chests</strong><small>Open →</small></button>
+          <button className="catalogue-chests" onClick={onChests}><span aria-hidden="true">◇</span><strong>Cubie chests</strong><small>Open →</small></button>
         </nav>
         <section ref={selectorRef} className="catalogue-selector" id="catalogue-selector" aria-label={`${activeTab.label} selector`}>
           <div className="catalogue-section-heading"><div><h2>{activeTab.label}</h2></div>

@@ -280,7 +280,7 @@ const VictoryScreen = ({
           }}>
             <span style={{
               fontSize: '11px',
-              fontWeight: 800,
+              fontWeight: 700,
               color: GOLD,
               fontFamily: UI_FONT,
               textTransform: 'none',

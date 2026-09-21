@@ -164,7 +164,7 @@ export function LockPip({ size = 10, color = WIZ_TEXT_FAINT }) {
 export function PickerHeading({ label, hint, locked = 0, children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: '9px', margin: '0 0 8px' }}>
-      <span style={{ fontSize: '11px', fontWeight: 700, color: WIZ_TEXT_MUTED, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+      <span style={{ fontSize: '11px', fontWeight: 700, color: WIZ_TEXT_MUTED, letterSpacing: "0.01em", textTransform: "none" }}>
         {label}
       </span>
       {hint && <span style={{ fontSize: '10px', color: WIZ_TEXT_FAINT }}>{hint}</span>}
@@ -172,7 +172,7 @@ export function PickerHeading({ label, hint, locked = 0, children }) {
       {locked > 0 && (
         <span style={{
           marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.06em', color: WIZ_TEXT_FAINT
+          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: "0.01em", color: WIZ_TEXT_FAINT
         }}>
           <LockPip size={9} /> {locked} in the store
         </span>

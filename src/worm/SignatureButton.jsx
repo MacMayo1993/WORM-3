@@ -20,7 +20,7 @@ export default function SignatureButton({ compact = false }) {
   if (!def || def.passive) return null;
   const current = readout?.character === character ? readout : null;
   const disabled = !alive || paused || !['active', 'finalHealing'].includes(phase) || !current || (!current.returnReady && (current.seconds > 0 || current.active));
-  const label = current?.returnReady ? `${current.activeSeconds}s` : current?.charges > 0 ? `${current.charges} LEFT` : current?.active ? 'ACTIVE' : current?.seconds > 0 ? `${current.seconds}s` : 'Q';
+  const label = current?.returnReady ? `${current.activeSeconds}s` : current?.charges > 0 ? `${current.charges} left` : current?.active ? 'Active' : current?.seconds > 0 ? `${current.seconds}s` : 'Q';
   const status = current?.notice || (!current?.ready && !current?.active && !current?.seconds ? current?.reason : '') || '';
   const activate = () => {
     const state = useGameStore.getState();
@@ -49,7 +49,7 @@ export default function SignatureButton({ compact = false }) {
             : <><path d="M7 13V7h6m6 0h6v6M7 19v6h6m6 0h6v-6" /><rect x="12" y="12" width="8" height="8" /></>}
         </g>
       </svg>
-      <span style={{ fontWeight: 800, fontSize: 12 }}>{current?.returnReady ? 'Return' : def.short}</span>
+      <span style={{ fontWeight: 700, fontSize: 12 }}>{current?.returnReady ? 'Return' : def.short}</span>
       <span className={label === 'Q' ? 'worm-keyboard-hint' : undefined} style={{ fontSize: 10, minWidth: 30 }}>{label}</span>
     </button>
     {status && <div className="worm-hud-sr" role={current?.notice ? 'status' : undefined}>{status}</div>}

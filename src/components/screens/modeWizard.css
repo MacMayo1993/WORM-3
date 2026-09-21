@@ -17,11 +17,11 @@
 .mode-wizard button { touch-action: manipulation; }
 .mode-wizard button:focus-visible { outline: 2px solid var(--mode-accent); outline-offset: 3px; }
 .mode-wizard-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #586563 transparent; }
-.mode-wizard-kicker { color: var(--wiz-text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: .14em; font-weight: 750; }
+.mode-wizard-kicker { color: var(--wiz-text-muted); text-transform: none; font-size: 10px; letter-spacing: 0.01em; font-weight: 750; }
 .mode-wizard-kicker::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--mode-accent); }
 .mode-wizard-count { margin-left: auto; padding: 8px; border: 1px solid var(--wiz-border); border-radius: 8px; color: var(--mode-accent); font: 11px ui-monospace, monospace; }
 .mode-wizard-heading { padding: 18px 28px 14px; background: radial-gradient(ellipse at top right, color-mix(in srgb, var(--mode-accent) 12%, transparent), transparent 70%); }
-.mode-wizard-heading h1 { margin: 0; font-family: 'Bungee', 'Arial Black', sans-serif; font-size: clamp(32px, 7vw, 50px); font-weight: 400; line-height: 1.05; letter-spacing: -.04em; }
+.mode-wizard-heading h1 { margin: 0; font-family: var(--ui-font); font-size: clamp(32px, 7vw, 50px); font-weight: 700; line-height: 1.05; letter-spacing: -.04em; }
 .mode-wizard-heading p { margin: 10px 0 0; font-size: 12px; font-weight: 750; color: var(--mode-accent); }
 .mode-wizard-footer-note { color: var(--wiz-text-muted); font-size: 11px; text-align: center; }
 .mode-wizard nav[aria-label="Setup categories"] { position: sticky; top: 0; z-index: 3; }

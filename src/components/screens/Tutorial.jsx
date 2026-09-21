@@ -35,7 +35,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             margin: '12px 0',
             border: '1px solid rgba(255, 255, 255, 0.10)'
           }}>
-            <p style={{ margin: '0 0 8px 0', fontWeight: 700, fontSize: '13px', color: 'rgba(255, 255, 255, 0.85)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The Three Antipodal Pairs:</p>
+            <p style={{ margin: '0 0 8px 0', fontWeight: 700, fontSize: '13px', color: 'rgba(255, 255, 255, 0.85)', letterSpacing: "0.01em", textTransform: "none" }}>The Three Antipodal Pairs:</p>
             <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '8px' }}>
               <span><span style={{ color: COLORS.red }}>●</span> Red ↔ Orange <span style={{ color: COLORS.orange }}>●</span></span>
               <span><span style={{ color: COLORS.green }}>●</span> Green ↔ Blue <span style={{ color: COLORS.blue }}>●</span></span>
@@ -166,7 +166,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             <li><b>WORM³:</b> Solve the cube after every sticker has traveled through a wormhole at least once</li>
           </ul>
           <p style={{ marginTop: '12px', padding: '12px', background: 'rgba(168, 85, 247, 0.12)', borderRadius: '10px', fontSize: '13px', border: '1px solid rgba(168, 85, 247, 0.28)' }}>
-            <b>Tip:</b> Hit <b>SHUFFLE</b> in the menu to scramble and start a new game. Victory badges unlock as you achieve each condition!
+            <b>Tip:</b> Hit <b>Shuffle</b> in the menu to scramble and start a new game. Victory badges unlock as you achieve each condition!
           </p>
         </>
       )
@@ -178,8 +178,8 @@ const Tutorial = ({ onClose, onMainMenu }) => {
   return (
     <div className="tutorial-overlay">
       <div className="tutorial-card" style={{ maxWidth: '620px' }}>
-        <h2 style={{ marginBottom: '4px', color: '#e8edf8', fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '-0.01em' }}>{currentStep.title}</h2>
-        <div style={{ fontSize: '11px', color: NIGHT_TEXT_MUTED, marginBottom: '16px', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: UI_FONT }}>
+        <h2 style={{ marginBottom: '4px', color: '#e8edf8', fontFamily: UI_FONT, fontWeight: 700, letterSpacing: '-0.01em' }}>{currentStep.title}</h2>
+        <div style={{ fontSize: '11px', color: NIGHT_TEXT_MUTED, marginBottom: '16px', letterSpacing: "0.01em", textTransform: "none", fontFamily: UI_FONT }}>
           Step {step} of {totalSteps}
         </div>
         <div style={{ fontSize: '14px', lineHeight: '1.65', color: NIGHT_TEXT, fontFamily: UI_FONT }}>
@@ -190,7 +190,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             <button className="bauhaus-btn" onClick={onClose}>Skip Tutorial</button>
             {onMainMenu && (
               <button className="bauhaus-btn" onClick={onMainMenu} style={{ opacity: 0.7 }}>
-                Main Menu
+                Main menu
               </button>
             )}
           </div>

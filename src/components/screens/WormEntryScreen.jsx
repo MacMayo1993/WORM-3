@@ -34,7 +34,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
     window.addEventListener('keydown', key, true);
     return () => { window.removeEventListener('keydown', key, true); prior?.focus?.(); };
   }, [page, onCancel]);
-  if (page === 'free') return <Suspense fallback={<div className="worm-story-loading" role="status">Loading Free Play…</div>}><FreePlaySetup onComplete={onComplete} onCancel={() => setPage('choice')} initialSettings={initialSettings} /></Suspense>;
+  if (page === 'free') return <Suspense fallback={<div className="worm-story-loading" role="status">Loading…</div>}><FreePlaySetup onComplete={onComplete} onCancel={() => setPage('choice')} initialSettings={initialSettings} /></Suspense>;
   const level = WORM_STORY_LEVELS.find(item => item.id === selected);
   const totalStars = WORM_STORY_LEVELS.reduce((n, item) => n + storyStars(progress, item.id), 0);
   const launch = () => { wormMenuFeedback(); onComplete({ ...initialSettings, perFaceStyles: initialSettings?.manifoldStyles,
@@ -44,13 +44,13 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   return <div ref={root} className={`mode-wizard worm-entry${page === 'choice' ? ' worm-entry-choice' : ''}`} role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
     style={{ '--mode-accent': MODE_THEMES.worm.accent, '--story-display': HEADING_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
     <div className="worm-entry-sheet">
-      <nav className="worm-entry-nav"><button onClick={back} aria-label={page === 'choice' ? 'Back to modes' : 'Back to WORM choices'}>← Back</button>{page !== 'choice' && <span className="mode-wizard-kicker">Choose your path</span>}<span>WORM³</span></nav>
+      <nav className="worm-entry-nav"><button onClick={back} aria-label={page === 'choice' ? 'Back to modes' : 'Back to WORM choices'}>← Back</button><span>WORM³</span></nav>
       <div className="worm-entry-scroll">
-        {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><h1 id="worm-entry-title">The first turn</h1></header>}
+        {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><h1 id="worm-entry-title">Levels</h1></header>}
         {page === 'choice' ? <>
           <div className="worm-path-split">
-            <button className="worm-path-card worm-path-story" aria-label="Story levels" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
-              <ModeArtwork mode="cube" /><span className="worm-path-cta">Story <b aria-hidden="true">→</b></span>
+            <button className="worm-path-card worm-path-story" aria-label="Levels" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
+              <ModeArtwork mode="cube" /><span className="worm-path-cta">Levels <b aria-hidden="true">→</b></span>
             </button>
             <button className="worm-path-card worm-path-free" aria-label="Free play" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
               <ModeArtwork mode="worm" /><span className="worm-path-cta">Free play <b aria-hidden="true">→</b></span>
@@ -65,13 +65,13 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
               <span className="worm-level-number">{String(item.id).padStart(2, '0')}</span><small aria-hidden="true">{unlocked ? `${'★'.repeat(stars)}${'☆'.repeat(3-stars)}` : '—'}</small>
             </button>;
           })}</div>
-          <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">LEVEL {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
+          <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">Level {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
             <p className="worm-story-limit">{Math.floor(level.limit / 60)}:{String(level.limit % 60).padStart(2, '0')} to finish{level.rotateEvery ? ` · Turns every ${level.rotateEvery}s` : ''}</p>
             <details><summary>Guide & rewards</summary><p>{level.goal}</p><ul><li>★ Finish before time runs out</li><li>★ Finish within {level.par}s</li><li>★ No tail cuts</li></ul></details>
-            <div className="worm-level-reward"><span>FIRST CLEAR</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>
+            <div className="worm-level-reward"><span>First win</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>
             <StoryRewardChoices level={level} />
             <div className="worm-level-profile"><WormProfile /></div>
-            <button className="worm-story-primary" onClick={launch}>{storyStars(progress, level.id) ? 'Replay level' : 'Play level'} <span>→</span></button>
+            <button className="worm-story-primary" onClick={launch}>{storyStars(progress, level.id) ? "Play again" : 'Play level'} <span>→</span></button>
             
           </section>
         </>}

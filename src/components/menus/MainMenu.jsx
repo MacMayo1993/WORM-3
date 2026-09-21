@@ -1138,45 +1138,45 @@ const CAROUSEL_MODES = [
     desc: 'Jump your tail to keep the run alive.',
     how: 'Heal every flipped tile before the worm runs out of room.',
     chips: ['2×2 – Mega', 'Arcade'],
-    cta: 'PLAY',
+    cta: "Play",
   },
   {
     id: 'freeplay', label: 'CUBE', face: 'NY',
     desc: 'Solve at your own pace.',
     how: 'Done when all six faces show a single colour.',
     chips: ['2×2 – 7×7', 'Relaxed'],
-    cta: 'PLAY',
+    cta: "Play",
   },
   {
-    id: 'cube', label: 'STORY', face: 'PX',
+    id: 'cube', label: "Story", face: 'PX',
     // No chapter count in the copy: it said "ten" while the campaign has had
     // twelve for some time. The chip carries the number now, derived from the
     // level data (see chipsFor) so it cannot drift again.
     desc: 'Learn a new move each chapter.',
     how: 'Clear a chapter to unlock the next one.',
     chips: ['Campaign', 'Guided'],
-    cta: 'PLAY',
+    cta: "Play",
   },
   {
     id: 'chaos', label: 'CHAOS', face: 'NZ',
     desc: 'Pick a pair. Watch the cube fall apart.',
     how: 'Back the pair that outlasts the rest to win Parity Points.',
     chips: ['2×2 – 7×7', 'Wager'],
-    cta: 'PLAY',
+    cta: "Play",
   },
   {
     id: 'random', label: 'RANDOM', face: 'PZ',
     desc: 'Keep solving as the colors shift.',
     how: 'Solve all six faces. The palette and tile style change every 10 seconds.',
     chips: ['2×2 – 7×7', 'Twist'],
-    cta: 'PLAY',
+    cta: "Play",
   },
   {
     id: 'store', label: 'STORE', face: 'PY',
     desc: 'Find your next look.',
     how: 'Earn points by playing; everything you buy is yours for good.',
     chips: ['No cube', 'Cosmetic'],
-    cta: 'OPEN STORE',
+    cta: "Open store",
   },
 ].map(withFaceColor);
 
@@ -1506,7 +1506,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
                 background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
                 borderRadius: '100px', padding: '8px 18px',
                 color: PAPER_TEXT, fontSize: '11.5px', fontWeight: 700,
-                letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
+                letterSpacing: "0.01em", cursor: 'pointer', fontFamily: MENU_FONT,
                 transition: 'filter 160ms ease, background 160ms ease',
                 WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
               }}
@@ -1598,7 +1598,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           <button
             type="button" className="mc-play" onClick={handlePlay}
             style={{ '--play-color': mode.tileColor, '--play-ink': mode.textColor, fontFamily: DISPLAY_FONT }}
-          ><span className="worm-cta-emblem"><MenuCubeGlyph /></span><span className="worm-cta-label">{mode.cta || 'PLAY'}</span><span className="worm-cta-glyph" aria-hidden="true">→</span></button>
+          ><span className="worm-cta-emblem"><MenuCubeGlyph /></span><span className="worm-cta-label">{mode.cta || "Play"}</span><span className="worm-cta-glyph" aria-hidden="true">→</span></button>
 
 
         </div>
@@ -1667,7 +1667,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
       onClick={onClick}
     >
       <span className="worm-cta-emblem"><MenuCubeGlyph /></span>
-      <span className="worm-cta-label">START</span>
+      <span className="worm-cta-label">Play</span>
       <span className="worm-cta-glyph" aria-hidden="true">→</span>
     </button>
     <div className="worm-menu-utilities">

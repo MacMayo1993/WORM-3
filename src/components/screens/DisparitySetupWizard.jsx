@@ -16,10 +16,10 @@ const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maxim
 const LEVEL_ACCENT = { 1: '#88e59a', 2: '#f4d35e', 3: '#ffad70', 4: '#ff9090', 5: '#d6a0ff' };
 
 const FLIP_CAP_PRESETS = [
-  { label: 'Fragile', value: 3, sub: 'Fast massacre' },
-  { label: 'Standard', value: 8, sub: 'Balanced carnage' },
-  { label: 'Endurance', value: 13, sub: 'Slow attrition' },
-  { label: 'Titan', value: 20, sub: 'War of attrition' }
+  { label: 'Fragile', value: 3, sub: "3 lives" },
+  { label: 'Standard', value: 8, sub: "8 lives" },
+  { label: 'Endurance', value: 13, sub: "13 lives" },
+  { label: 'Titan', value: 20, sub: "20 lives" }
 ];
 
 const GAME_LENGTH_OPTIONS = [
@@ -83,7 +83,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const renderGameplay = () => (
     <div style={{ display: 'grid', gap: '18px' }}>
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Disparity Level <span style={{ color: levelAccent }}>{LEVEL_LABELS[settings.disparityLevel]}</span>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -103,7 +103,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Tile Endurance
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -126,7 +126,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Game Length
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -170,7 +170,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       key: 'colors',
       icon: 'colors',
       label: 'Colors',
-      title: 'Color Palette',
+      title: "Colors",
       subtitle: '',
       summary: paletteLabel(settings),
       hero: <PaletteStep cos={cos} slot="hero" />,
@@ -192,7 +192,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       key: 'size',
       icon: 'size',
       label: 'Size',
-      title: 'Cube Size',
+      title: "Cube size",
       subtitle: '',
       summary: sizeLabel(cos.cubeSize),
       hero: <SizeStep cos={cos} slot="hero" />,
@@ -217,7 +217,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       onSelect={setStep}
       onBack={handleBack}
       onPrimary={handleNext}
-      finishLabel="Start Playing"
+      finishLabel="Play"
       mobile={isMobile}
     >
       <WizardImageInput cos={cos} />

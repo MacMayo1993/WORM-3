@@ -79,7 +79,7 @@ export default function MobiusHUD() {
                 marginBottom: '2px',
                 textShadow: '0 0 6px rgba(0,200,255,0.6)',
             }}>
-                MÖBIUS BAND
+                Möbius band
             </div>
             <svg
                 width={W} height={H}
@@ -119,7 +119,7 @@ export default function MobiusHUD() {
 
                 <text x={xL + (tL - xL) / 2} y={bY2 + 12} textAnchor="middle"
                     fill={entryColor} fontSize="7.5" fontFamily={MONO_FONT} opacity="0.75">
-                    ENTRY
+                    Entry
                 </text>
                 <text x={tMid} y={bY2 + 12} textAnchor="middle"
                     fill="rgba(255,255,255,0.42)" fontSize="7.5" fontFamily={MONO_FONT}>
@@ -127,7 +127,7 @@ export default function MobiusHUD() {
                 </text>
                 <text x={tR + (xR - tR) / 2} y={bY2 + 12} textAnchor="middle"
                     fill={exitColor} fontSize="7.5" fontFamily={MONO_FONT} opacity="0.75">
-                    EXIT
+                    Exit
                 </text>
 
                 <g ref={dotGlowRef} filter="url(#mbDotGlow)" visibility="hidden">

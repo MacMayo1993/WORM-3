@@ -76,7 +76,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
           border: `2.5px solid ${accent}`,
           boxShadow: `0 2px 0 ${WIZ_CARD_SHADOW}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '13px', fontWeight: 800, color: WIZ_TEXT,
+          fontSize: '13px', fontWeight: 700, color: WIZ_TEXT,
           transition: 'left 0.16s cubic-bezier(0.22,1,0.36,1)',
           pointerEvents: 'none'
         }}>
@@ -126,7 +126,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
                 {n}
               </span>
               {!compact && n === DEFAULT_SIZE && (
-                <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT }}>
+                <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: WIZ_TEXT_FAINT }}>
                   Normal
                 </span>
               )}
@@ -142,8 +142,8 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
         boxShadow: `0 2px 10px ${WIZ_CARD_SHADOW}`,
         display: 'flex', alignItems: 'baseline', gap: '8px'
       }}>
-        <span style={{ fontSize: '17px', fontWeight: 800, color: WIZ_TEXT, letterSpacing: '-0.4px' }}>{tier.name}</span>
-        <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: accent }}>{tier.tag}</span>
+        <span style={{ fontSize: '17px', fontWeight: 700, color: WIZ_TEXT, letterSpacing: '-0.4px' }}>{tier.name}</span>
+        <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: accent }}>{tier.tag}</span>
         <span style={{ marginLeft: 'auto', fontSize: '12px', color: WIZ_TEXT_MUTED, textAlign: 'right' }}>{tier.desc}</span>
       </div>}
     </div>

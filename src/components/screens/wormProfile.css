@@ -2,7 +2,7 @@
 .worm-profile-summary { display:grid; grid-template-columns:112px minmax(0,1fr) auto; gap:14px; align-items:center; padding:14px; background:radial-gradient(ellipse at 0 50%,color-mix(in srgb,var(--profile-color) 10%,transparent),transparent 65%); }
 .worm-profile-preview { min-width:0; border-radius:14px; background:var(--wiz-base); border-bottom:3px solid var(--profile-color); overflow:hidden; }
 .worm-profile-identity { display:flex; flex-direction:column; gap:5px; min-width:0; }
-.worm-profile-identity h2 { margin:0; font-size:10px; letter-spacing:.14em; color:var(--mode-accent); }
+.worm-profile-identity h2 { margin:0; font-size:10px; letter-spacing: 0.01em; color:var(--mode-accent); }
 .worm-profile-identity>strong { font-size:clamp(18px,4vw,24px); line-height:1.15; }
 .worm-profile-identity>span { font-size:12px; line-height:1.4; }
 .worm-profile-identity>small { font-size:10px; color:var(--wiz-text-muted); }

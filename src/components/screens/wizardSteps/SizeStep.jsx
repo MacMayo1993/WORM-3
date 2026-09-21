@@ -21,7 +21,7 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS, slot, compact = fals
     <>
       {slot !== 'body' && (
       <CubePlate
-        caption="Cube Size"
+        caption="Cube size"
         index={compact ? undefined : sizeIndex + 1}
         total={compact ? undefined : tiers.length}
         title={tier.name}

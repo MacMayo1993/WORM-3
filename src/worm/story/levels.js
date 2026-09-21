@@ -32,12 +32,12 @@ export const WORM_STORY_LEVELS = [
     mechanics: { elementPickups: 2 },
     reward: ['scheme_aurora', 'scheme_cosmic'], rewardLabel: 'Choose a palette', fallback: 150 },
   { id: 9, title: 'Under Siege', subtitle: 'Fight. Encircle. Turn danger into a route.',
-    goal: 'Surround a tunnel to heal it, use your character signature twice, disarm two bombs by encircling them, defeat four enemies, collect 24 orbs and restore four pairs. Tunnel deposits seal after the ring and signature goals.',
+    goal: 'Surround a tunnel to heal it, use your ability twice, disarm two bombs by encircling them, defeat four enemies, collect 24 orbs and restore four pairs. Tunnel deposits seal after the surround and ability tasks.',
     kind: 'mastery', target: 4, orbs: 24, speed: 3, rotateEvery: 10, par: 240, limit: 380,
     mechanics: { ringHeals: 1, signatures: 2, bombs: 2, kills: 4 },
     reward: ['hat_crown', 'hat_wizard'], rewardLabel: 'Choose a hat', fallback: 150 },
   { id: 10, title: 'Worm Ascendant', subtitle: 'Everything you learned. One restless cube.',
-    goal: 'Master all five elements, boost twice, land two double jumps and a rocket flight, attract four remote orbs, surround a tunnel, use two signatures, disarm two bombs and defeat six enemies. Collect 36 orbs, survive eight turns and restore all six pairs. Ring and signature goals unlock tunnel sealing.',
+    goal: 'Master all five elements, boost twice, land two double jumps and a rocket flight, attract four remote orbs, surround a tunnel, use your ability twice, disarm two bombs and defeat six enemies. Collect 36 orbs, survive eight turns and restore all six pairs. Surround and ability tasks unlock tunnel sealing.',
     kind: 'mastery', target: 6, orbs: 36, rotations: 8, speed: 3.2, rotateEvery: 8, par: 360, limit: 540,
     mechanics: { ringHeals: 1, signatures: 2, boosts: 2, doubleJumps: 2, rockets: 1, magnetOrbs: 4, elements: 5, bombs: 2, kills: 6 },
     reward: ['skin_gold', 'skin_galaxy'], rewardLabel: 'Choose a champion skin', fallback: 300 },
@@ -109,10 +109,10 @@ export function storyChecklist(level, metrics = {}) {
   const primary = { orbs: 'orbs', tunnel: 'uniqueTunnels', jump: 'bodyJumps', rotation: 'rotations' }[level.kind] ?? 'healed';
   const targets = { ...level.mechanics, [primary]: level.target };
   for (const key of ['orbs', 'colors', 'rotations']) if (level[key]) targets[key] = level[key];
-  const labels = { boosts: 'Finish boosts', doubleJumps: 'Land double jumps', rockets: 'Land a rocket flight',
-    magnetOrbs: 'Magnet catches', elements: 'Master all 5 elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
+  const labels = { boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
+    magnetOrbs: 'Catch orbs with a magnet', elements: 'Use each element', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
     signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
-    orbs: 'Collect orbs', colors: 'Collect all 6 colors', uniqueTunnels: 'Cross different tunnel pairs',
+    orbs: 'Collect orbs', colors: "Collect each color", uniqueTunnels: "Cross tunnel pairs",
     bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };
   return Object.entries(targets).map(([key, target]) => {
     const value = Math.min(target, Math.max(0, metrics[key] ?? 0));

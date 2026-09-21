@@ -417,14 +417,14 @@ const GLANCE_LABEL_STYLE = {
     fontWeight: 700,
     letterSpacing: 0.4,
     color: TEXT_MUTED,
-    textTransform: 'uppercase',
+    textTransform: "none",
     lineHeight: 1,
     marginBottom: 3,
 };
 
 const GLANCE_VALUE_STYLE = {
     fontSize: 16,
-    fontWeight: 800,
+    fontWeight: 700,
     lineHeight: 1,
     fontVariantNumeric: 'tabular-nums',
 };
@@ -448,7 +448,7 @@ const THUMB_TRAY_STYLE = {
 };
 
 // The action pair rides a little above the steering keys' bottom edge: dropping
-// JUMP to the same line put it where the hand rests, and it was getting palmed.
+// Jump to the same line put it where the hand rests, and it was getting palmed.
 const ACTION_CLUSTER_STYLE = {
     position: 'relative',
     // Takes the space between the two steering keys and centres inside it, so the
@@ -477,8 +477,8 @@ const JUMP_BTN_BASE = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    fontWeight: 800,
-    letterSpacing: 1.2,
+    fontWeight: 700,
+    letterSpacing: 0.2,
     color: TEXT,
     boxShadow: SHADOW,
 };
@@ -594,8 +594,8 @@ const SPECIAL_NOTICE_STYLE = {
     borderRadius: 999,
     background: 'rgba(15, 23, 42, 0.78)',
     fontSize: 11,
-    fontWeight: 800,
-    letterSpacing: 1.0,
+    fontWeight: 700,
+    letterSpacing: 0.2,
     boxShadow: SHADOW,
     pointerEvents: 'none',
     whiteSpace: 'normal',
@@ -629,7 +629,7 @@ const EXAMINE_DOT_STYLE = {
     flexShrink: 0,
 };
 
-const EXAMINE_LABEL_STYLE = { fontSize: 12, fontWeight: 800, letterSpacing: 0.7, color: '#991b1b' };
+const EXAMINE_LABEL_STYLE = { fontSize: 12, fontWeight: 700, letterSpacing: 0.7, color: '#991b1b' };
 
 const EXAMINE_RESTORE_BTN_STYLE = {
     fontSize: 11, fontWeight: 700, color: '#1e293b',
@@ -674,14 +674,14 @@ const WINNER_STARS_STYLE = {
 
 const WINNER_TITLE_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 'clamp(30px, 8vw, 64px)', fontWeight: 900, letterSpacing: '-2px',
+    fontSize: 'clamp(30px, 8vw, 64px)', fontWeight: 700, letterSpacing: '-2px',
     color: UI_GOLD,
     textShadow: '0 3px 0 rgba(0,0,0,0.2)',
     userSelect: 'none', marginBottom: 4, lineHeight: 1, textAlign: 'center',
 };
 
 const WINNER_SUB_STYLE = {
-    color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, letterSpacing: 2, marginBottom: 28, textAlign: 'center',
+    color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, letterSpacing: 0.2, marginBottom: 28, textAlign: 'center',
 };
 
 const WINNER_STATS_STYLE = {
@@ -695,10 +695,10 @@ const WINNER_STAT_BOX_STYLE = {
 };
 
 const WINNER_STAT_LABEL_STYLE = {
-    fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: 'rgba(255,255,255,0.45)', marginBottom: 2,
+    fontSize: 9, fontWeight: 700, letterSpacing: 0.2, color: 'rgba(255,255,255,0.45)', marginBottom: 2,
 };
 
-const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.1 };
+const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 700, color: '#fff', lineHeight: 1.1 };
 
 const WINNER_PP_STYLE = {
     fontFamily: DISPLAY_FONT,
@@ -734,7 +734,7 @@ const PODIUM_BASE_STYLE = {
 
 const PODIUM_LABEL_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 18, fontWeight: 900, color: '#3d2000', letterSpacing: 2,
+    fontSize: 18, fontWeight: 700, color: '#3d2000', letterSpacing: 0.2,
     textShadow: '0 1px 0 rgba(255,255,255,0.3)',
 };
 
@@ -759,8 +759,8 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
     return (
         <div style={WINNER_SCREEN_STYLE}>
             <div style={WINNER_STARS_STYLE} />
-            <div style={WINNER_TITLE_STYLE}>WINNER WORM!</div>
-            <div style={WINNER_SUB_STYLE}>CUBE SOLVED · ALL TUNNELS HEALED</div>
+            <div style={WINNER_TITLE_STYLE}>Cube healed!</div>
+            <div style={WINNER_SUB_STYLE}>All tunnels healed</div>
             <div style={PODIUM_WRAP_STYLE}>
                 <div style={PODIUM_WORM_ROW_STYLE}>
                     {segments.map((seg, i) => (
@@ -772,23 +772,23 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                         }} />
                     ))}
                     {overflow > 0 && (
-                        <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.6)', flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
                     )}
                     {wormBodyTiles === 0 && (
                         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>no orbs</div>
                     )}
                 </div>
                 <div style={PODIUM_BASE_STYLE}>
-                    <span style={PODIUM_LABEL_STYLE}>FINAL LENGTH: {wormBodyTiles}</span>
+                    <span style={PODIUM_LABEL_STYLE}>Final length: {wormBodyTiles}</span>
                 </div>
             </div>
-            <div style={WINNER_PP_STYLE}>+{ppEarned} PARITY POINTS</div>
+            <div style={WINNER_PP_STYLE}>+{ppEarned} Parity Points</div>
             <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} orbs x 5 PP x 2x WIN BONUS</div>
             <div style={WINNER_STATS_STYLE}>
                 {[
                     ['TIME', formatTime(wormTimeAlive)],
-                    ['COLLECTED', wormSessionOrbs],
-                    ['HEALED', wormHealedCount],
+                    ['Collected', wormSessionOrbs],
+                    ['Healed', wormHealedCount],
                     ['TOTAL PPs', parityPoints],
                 ].map(([label, value]) => (
                     <div key={label} style={WINNER_STAT_BOX_STYLE}>
@@ -801,7 +801,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
             <XpRunSummary mode="worm" />
             <div style={WINNER_BTN_ROW_STYLE}>
                 <button onClick={onRetry} style={WINNER_PLAY_AGAIN_STYLE}><WormReplayLabel /></button>
-                <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New Game</button>
+                <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New game</button>
             </div>
         </div>
     );
@@ -1130,7 +1130,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     ['Time', formatTime(wormTimeAlive)],
                     ['Healed', wormHealedCount],
                     ['Collected', wormSessionOrbs],
-                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
+                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
                 <details className="screen-disclosure"><summary>Controls & sound</summary>
@@ -1159,21 +1159,21 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                         onClick={() => toggleWormControlMode()}
                         style={togglePillStyle(wormControlMode === 'oriented', blue)}
                     >
-                        {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
+                        {wormControlMode === 'oriented' ? 'Relative turns' : 'Fixed turns'}
                     </button>
                 </div>
 
                 {/* Which way is up while crawling. A feel call rather than a right
                     answer, and one you can only judge in motion, so it is here in
                     the run rather than buried in setup: FACE rolls the horizon with
-                    the cube face you are on, LEVEL keeps it world-up. */}
+                    the cube face you are on, Keep level keeps it world-up. */}
                 <div style={SETTING_ROW_STYLE}>
                     <span style={SETTING_LABEL_STYLE}>Horizon</span>
                     <button
                         onClick={() => toggleCameraHorizon?.()}
                         style={togglePillStyle(cameraHorizon === 'face', blue)}
                     >
-                        {cameraHorizon === 'face' ? 'FOLLOWS FACE' : 'LEVEL'}
+                        {cameraHorizon === 'face' ? 'Follow the face' : 'Keep level'}
                     </button>
                 </div>
 
@@ -1184,13 +1184,13 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                             onClick={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))}
                             style={togglePillStyle(sfxOn, green)}
                         >
-                            {sfxOn ? 'SFX ON' : 'SFX OFF'}
+                            {sfxOn ? 'Sound on' : 'Sound off'}
                         </button>
                         <button
                             onClick={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))}
                             style={togglePillStyle(hapticsOn, green)}
                         >
-                            {hapticsOn ? 'HAPTICS ON' : 'HAPTICS OFF'}
+                            {hapticsOn ? 'Vibration on' : 'Vibration off'}
                         </button>
                     </div>
                 </div>
@@ -1219,7 +1219,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     {onHome && (
                         <button onClick={onHome} style={LIST_BTN_STYLE}>
                             <span aria-hidden="true">⌂</span>
-                            <span>Main Menu</span>
+                            <span>Main menu</span>
                         </button>
                     )}
                 </div>
@@ -1439,7 +1439,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                                     disabled={!controlsEnabled}
                                 >
                                     <JumpIcon size={19} />
-                                    {jumpRescue ? 'JUMP NOW' : isPortalReady ? 'DIVE' : 'JUMP'}
+                                    {jumpRescue ? 'Jump now' : isPortalReady ? 'Dive' : 'Jump'}
                                 </button>
                             </div>
                             <BoostButton wormAlive={controlsEnabled && !jumpRescue} />
@@ -1478,7 +1478,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 <div style={EXAMINE_MINIMIZED_OUTER_STYLE}>
                     <div style={EXAMINE_BAR_STYLE}>
                         <div style={EXAMINE_DOT_STYLE} />
-                        <span style={EXAMINE_LABEL_STYLE}>EXAMINE MODE</span>
+                        <span style={EXAMINE_LABEL_STYLE}>Look around</span>
                         <button onPointerDown={() => setIsMinimized(false)} style={EXAMINE_RESTORE_BTN_STYLE}>
                             View Card
                         </button>

@@ -199,7 +199,7 @@ describe('character abilities', () => {
     sim.phase = 'crawling'; sim.tunnelPassages = [];
     tickSignature(sim, 9.9, SIZE, ctx); expect(isParityLocked(sim, entry, ctx)).toBe(true);
     tickSignature(sim, .11, SIZE, ctx); expect(isParityLocked(sim, entry, ctx)).toBe(false);
-    expect(signatureAvailability(sim, SIZE, ctx).reason).toContain('Heal your previous');
+    expect(signatureAvailability(sim, SIZE, ctx).reason).toContain('Heal your tunnel first');
     releaseMobiTunnel(sim, { pairId: 'other' }); expect(sim.signature.mobiTunnel).not.toBeNull();
     releaseMobiTunnel(sim, tunnel); expect(sim.signature.mobiTunnel).toBeNull();
   });

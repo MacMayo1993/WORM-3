@@ -135,17 +135,17 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
       }}>
         <div>
           <div style={{
-            fontSize: '11px', fontWeight: 900, color: PAPER_TEXT,
-            letterSpacing: '0.16em', textTransform: 'uppercase',
+            fontSize: '11px', fontWeight: 700, color: PAPER_TEXT,
+            letterSpacing: "0.01em", textTransform: "none",
           }}>{pack.name}</div>
           <div style={{
             marginTop: '3px', fontSize: '10px', fontWeight: 700,
-            color: PAPER_TEXT_MUTED, letterSpacing: '0.07em', textTransform: 'uppercase',
+            color: PAPER_TEXT_MUTED, letterSpacing: "0.01em", textTransform: "none",
           }}>{completedInPack}/{LEVELS.length} chapters complete</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
           <span style={{
-            fontSize: '20px', fontWeight: 800, color: PAPER_TEXT, letterSpacing: '0.02em',
+            fontSize: '20px', fontWeight: 700, color: PAPER_TEXT, letterSpacing: '0.02em',
           }}>
             {earnedStars}/{totalStars}
           </span>
@@ -220,7 +220,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                           position: 'absolute', top: '8px', right: '8px',
                           width: '20px', height: '20px', borderRadius: '50%',
                           background: UI_MOSS, color: '#fffdf5',
-                          fontSize: '12px', fontWeight: 900, lineHeight: '20px',
+                          fontSize: '12px', fontWeight: 700, lineHeight: '20px',
                           textAlign: 'center',
                         }}
                       >✓</span>
@@ -228,13 +228,13 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                     {isNext && (
                       <span style={{
                         position: 'absolute', top: '8px', left: '8px',
-                        fontSize: TEXT_MICRO, fontWeight: 900, letterSpacing: '0.14em',
-                        textTransform: 'uppercase', color: UI_MOSS,
+                        fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em",
+                        textTransform: "none", color: UI_MOSS,
                       }}>Next</span>
                     )}
                     <span style={{
                       fontSize: '26px',
-                      fontWeight: 800,
+                      fontWeight: 700,
                       color: PAPER_TEXT,
                       lineHeight: 1,
                     }}>
@@ -242,9 +242,9 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                     </span>
                     <span style={{
                       marginTop: '7px', padding: '0 8px',
-                      color: PAPER_TEXT_MUTED, fontSize: '10px', fontWeight: 800,
-                      letterSpacing: '0.06em', lineHeight: 1.2, textAlign: 'center',
-                      textTransform: 'uppercase',
+                      color: PAPER_TEXT_MUTED, fontSize: '10px', fontWeight: 700,
+                      letterSpacing: "0.01em", lineHeight: 1.2, textAlign: 'center',
+                      textTransform: "none",
                     }}>
                       {level.name}
                     </span>
@@ -257,15 +257,15 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
                      toward makes the ladder visible. */
                   <>
                     <span style={{
-                      fontSize: '22px', fontWeight: 800, color: PAPER_TEXT_FAINT, lineHeight: 1,
+                      fontSize: '22px', fontWeight: 700, color: PAPER_TEXT_FAINT, lineHeight: 1,
                     }}>
                       {level.id}
                     </span>
                     <span style={{
                       marginTop: '6px', padding: '0 8px',
-                      color: PAPER_TEXT_FAINT, fontSize: '10px', fontWeight: 800,
-                      letterSpacing: '0.06em', lineHeight: 1.2, textAlign: 'center',
-                      textTransform: 'uppercase', opacity: 0.85,
+                      color: PAPER_TEXT_FAINT, fontSize: '10px', fontWeight: 700,
+                      letterSpacing: "0.01em", lineHeight: 1.2, textAlign: 'center',
+                      textTransform: "none", opacity: 0.85,
                     }}>
                       {level.name}
                     </span>

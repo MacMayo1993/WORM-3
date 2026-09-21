@@ -19,11 +19,11 @@ const MODES = [
     blurb: 'Steer a worm, collect orbs, and heal the cube.',
     primary: true,
   },
-  { id: 'story', name: 'STORY', blurb: 'Ten guided levels that build up one rule at a time.' },
-  { id: 'freeplay', name: 'FREEPLAY', blurb: 'Solve the cube your way — no timer, no pressure.' },
-  { id: 'chaos', name: 'CHAOS', blurb: 'Call the surviving pair and ride out the flipping cube.' },
-  { id: 'random', name: 'RANDOM', blurb: 'Let the cube remix the rules and the look.' },
-  { id: 'store', name: 'STORE', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
+  { id: 'story', name: 'Levels', blurb: 'Ten guided levels that build up one rule at a time.' },
+  { id: 'freeplay', name: 'Free play', blurb: 'Solve the cube your way — no timer, no pressure.' },
+  { id: 'chaos', name: 'Chaos', blurb: 'Call the surviving pair and ride out the flipping cube.' },
+  { id: 'random', name: 'Random', blurb: 'Let the cube remix the rules and the look.' },
+  { id: 'store', name: 'Store', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
 ];
 
 const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit, onExplore }) => {
@@ -53,8 +53,8 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
         textAlign: 'center',
       }}>
         <p style={{
-          color: '#7b6f45', fontSize: 11, fontWeight: 800,
-          letterSpacing: '0.18em', textTransform: 'uppercase', margin: '0 0 6px',
+          color: '#7b6f45', fontSize: 11, fontWeight: 700,
+          letterSpacing: "0.01em", textTransform: "none", margin: '0 0 6px',
         }}>
           {explored ? 'Explore Complete' : 'Demo Complete'}
         </p>
@@ -99,7 +99,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  color: mode.primary ? UI_CREAM : '#26331f', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em',
+                  color: mode.primary ? UI_CREAM : '#26331f', fontSize: 15, fontWeight: 700, letterSpacing: "0.01em",
                 }}>
                   {mode.primary ? 'Play WORM' : mode.name}
 

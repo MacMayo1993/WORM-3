@@ -118,7 +118,7 @@ export function ThunkEffect({ thunkRef }) {
                     <div ref={divRef} style={{
                         fontFamily: DISPLAY_FONT,
                         fontSize: '54px',
-                        fontWeight: 900,
+                        fontWeight: 700,
                         color: '#ffdd00',
                         textShadow: '-3px -3px 0 #cc2200, 3px -3px 0 #cc2200, -3px 3px 0 #cc2200, 3px 3px 0 #cc2200',
                         pointerEvents: 'none',
@@ -128,7 +128,7 @@ export function ThunkEffect({ thunkRef }) {
                         transformOrigin: 'center',
                         display: 'none',
                     }}>
-                        WORM&apos;D
+                        Worm'd
                     </div>
                     {/* text is overwritten imperatively via divRef.current.textContent */}
                 </Html>

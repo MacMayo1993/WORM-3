@@ -4,7 +4,7 @@
 .worm-combat-card p { font-size: 12px; line-height: 1.4; margin: 5px 0; }
 .worm-combat-card button { min-height: 44px; border: 1px solid #c994ff; border-radius: 10px; background: #57367a; color: #fff5de; padding: 6px 14px; font: inherit; font-size: 12px; cursor: pointer; }
 .worm-combat-results { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
-.worm-combat-fire { min-width: 0; min-height: 48px; width: 100%; border: 1px solid #ca9fff; border-radius: 16px; background: #5b3385; color: #fff5de; font: inherit; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; touch-action: manipulation; }
+.worm-combat-fire { min-width: 0; min-height: 48px; width: 100%; border: 1px solid #ca9fff; border-radius: 16px; background: #5b3385; color: #fff5de; font: inherit; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; touch-action: manipulation; }
 .worm-combat-fire small { font-size: 10px; opacity: .65; }
 .worm-combat-ammo { display: flex; gap: 5px; }
 .worm-combat-ammo i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #d6bbff; background: #251334; }

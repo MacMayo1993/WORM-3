@@ -59,7 +59,7 @@ export default function DisparityHUD() {
     <section className="chaos-hud" style={{ zIndex: Z.HUD_RAISED }} aria-label="Chaos match">
       <div className="chaos-match" data-finale={board.alive <= 6}>
         <div className="chaos-scoreline">
-          <div><div className="chaos-kicker"><i className="chaos-status-dot" /> CHAOS · {s.cap} flip limit</div><h2 aria-live="polite">{stage}</h2></div>
+          <div><div className="chaos-kicker"><i className="chaos-status-dot" /> Chaos · {s.cap} flip limit</div><h2 aria-live="polite">{stage}</h2></div>
           <div className="chaos-count">{board.alive}<small> / {board.total} tiles</small></div>
         </div>
         <div className="chaos-survival" role="progressbar" aria-label="Surviving tiles" aria-valuenow={board.alive} aria-valuemin={0} aria-valuemax={board.total}>

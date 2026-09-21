@@ -14,11 +14,11 @@ export function FieldGuideSheet({ children, style, ...props }) {
 }
 
 export function FieldGuideEyebrow({ children, style }) {
-  return <p style={{ margin: 0, color: UI_GOLD, fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', ...style }}>{children}</p>;
+  return <p style={{ margin: 0, color: UI_GOLD, fontSize: 11, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", ...style }}>{children}</p>;
 }
 
 export function FieldGuideButton({ children, secondary = false, style, ...props }) {
-  return <button {...props} style={{ padding: '10px 18px', borderRadius: 999, border: secondary ? FIELD_GUIDE_BORDER : '1px solid rgba(95,127,74,0.55)', background: secondary ? 'rgba(255,255,255,0.56)' : UI_MOSS, color: secondary ? FIELD_GUIDE_INK : UI_CREAM, fontFamily: UI_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer', boxShadow: secondary ? 'none' : UI_ACTION_SHADOW, ...style }}>{children}</button>;
+  return <button {...props} style={{ padding: '10px 18px', borderRadius: 999, border: secondary ? FIELD_GUIDE_BORDER : '1px solid rgba(95,127,74,0.55)', background: secondary ? 'rgba(255,255,255,0.56)' : UI_MOSS, color: secondary ? FIELD_GUIDE_INK : UI_CREAM, fontFamily: UI_FONT, fontSize: 12, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", cursor: 'pointer', boxShadow: secondary ? 'none' : UI_ACTION_SHADOW, ...style }}>{children}</button>;
 }
 
 export const fieldGuide = { paper: FIELD_GUIDE_PAPER, border: FIELD_GUIDE_BORDER, ink: FIELD_GUIDE_INK, muted: FIELD_GUIDE_MUTED, goldInk: FIELD_GUIDE_GOLD_INK, moss: UI_MOSS, mossLight: UI_MOSS_LIGHT, cream: UI_CREAM, gold: UI_GOLD };

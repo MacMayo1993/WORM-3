@@ -20,7 +20,7 @@
 
 export const ELEMENTAL_DEFS = {
   water: {
-    label: 'WATER',
+    label: "Water",
     element: true,
     // The living tile style whose identity this orb borrows.
     tileStyle: 'water',
@@ -39,7 +39,7 @@ export const ELEMENTAL_DEFS = {
     description: 'Build up to 25% extra speed on straight routes; turning sheds momentum.',
   },
   fire: {
-    label: 'FIRE',
+    label: "Fire",
     element: true,
     // Borrows the "lava" Living tile style's identity; the cube skin itself is
     // the bomb's flame sprites (see ElementalFireSkin), not a molten surface —
@@ -56,7 +56,7 @@ export const ELEMENTAL_DEFS = {
     description: 'Leave three-second fire trails: hot tiles burn bomb fuses faster and block blast damage.',
   },
   grass: {
-    label: 'NATURE',
+    label: "Nature",
     element: true,
     tileStyle: 'grass',
     renderer: 'blades',
@@ -70,7 +70,7 @@ export const ELEMENTAL_DEFS = {
     description: 'Land to grow an eight-second spring pad. Jump from it for a longer, higher leap.',
   },
   ice: {
-    label: 'ICE',
+    label: "Ice",
     element: true,
     tileStyle: 'ice',
     renderer: 'surface',
@@ -84,7 +84,7 @@ export const ELEMENTAL_DEFS = {
     description: 'Slide to the next tile before turning. Jump to regain immediate steering.',
   },
   lightning: {
-    label: 'LIGHTNING',
+    label: "Lightning",
     element: true,
     // There is no dedicated "lightning" Living style, and inventing a catalogue key
     // that nothing renders would only satisfy the definition test while leaving the

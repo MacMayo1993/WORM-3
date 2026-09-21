@@ -59,7 +59,7 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
           onClick={onEnter}
           style={{ pointerEvents: 'auto' }}
         >
-          LET’S PLAY
+          Let’s play
         </button>
       )}
     </div>

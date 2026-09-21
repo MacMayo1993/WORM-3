@@ -39,10 +39,10 @@ export default function WormProfile({ defaultExpanded = false }) {
           size={112} maxRenderPixels={224} framing="character" style={{ width: '100%', height: 'auto', aspectRatio: '1' }} />
       </div>
       <div className="worm-profile-identity">
-        <h2 id={`${id}-title`}>YOUR WORM</h2>
+        <h2 id={`${id}-title`}>Your worm</h2>
         <strong>{character.label}</strong>
         <span>{skin.label} · {hat.id === 'none' ? 'No hat' : hat.label}</span>
-        <small>Story & Free Play</small>
+        <small>Levels & free play</small>
       </div>
       <button type="button" className="worm-profile-edit" aria-expanded={expanded} aria-controls={`${id}-editor`}
         onClick={() => { wormMenuFeedback(); setExpanded(value => !value); }}>
@@ -68,12 +68,12 @@ export default function WormProfile({ defaultExpanded = false }) {
                   framing={category === 'hat' ? 'head' : 'body'} />}
             </span>
             <strong>{item.label}</strong>
-            <small>{!owned ? 'Locked' : equipped ? 'Equipped ✓' : 'Select'}</small>
+            <small>{!owned ? 'Locked' : equipped ? "Using ✓" : "Choose"}</small>
           </button>;
         })}
       </div>
       {category === 'character' && <p className="worm-profile-ability"><strong>{character.type}</strong> · {character.special}</p>}
-      <p className="worm-profile-note">Saved automatically for both modes. Unlock more in the Store.</p>
+      <p className="worm-profile-note">More worms and styles in the store.</p>
     </div>}
   </section>;
 }

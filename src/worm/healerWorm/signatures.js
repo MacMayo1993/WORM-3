@@ -8,11 +8,11 @@ import { jumpLandingTile } from './jumpLanding.js';
 
 export const SIGNATURES = {
   classic: { name: 'Orb Abundance', short: 'Abundance', passive: true, cooldown: 0, duration: 0, color: '#a6eb9b', hint: '50% more orbs on the cube.' },
-  book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: 'Pause the rotation-layer timer for 5 seconds. Earn 25% more XP.' },
+  book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: 'Pause layer turns for 5 seconds. Earn 25% more XP.' },
   prism: { name: 'Spectrum', short: 'Spectrum', passive: true, cooldown: 0, duration: 0, color: '#ffd2fb', hint: 'Every orb color can heal every wormhole tunnel.' },
   wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs. Steering locks until finished.' },
   inch: { name: 'Spring Loaded', short: 'Spring', cooldown: 24, duration: 0, color: '#c6ec86', hint: 'Long spring jump. Landing must be clear.' },
-  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Leave a luminous trail for 3 seconds. Enemies always glow brighter.' },
+  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Leave a glowing trail for 3 seconds. Enemies glow brighter.' },
   mobi: { name: 'Create Wormhole', short: 'Tunnel', cooldown: 0, duration: 0, color: '#ceacff', hint: 'Open a tunnel beneath you without spending orbs. No re-entry for 10 seconds. Heal it before creating another.' },
 };
 export const SPRING_CHARGE = 0.24;
@@ -44,15 +44,18 @@ export function signatureAvailability(sim, size, ctx, launching = false) {
   const character = ctx.getCharacter?.() ?? 'classic';
   const sig = sim.signature;
   let reason = '';
-  if (!SIGNATURES[character]) reason = 'No signature';
+  if (!SIGNATURES[character]) reason = 'No ability';
   else if (SIGNATURES[character].passive) reason = 'Always active';
-  else if (!sim.alive || ctx.isPaused() || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || (ctx.isDemoLesson?.() && !ctx.allowDemoSignature?.())) reason = 'Not available now';
+  else if (!sim.alive) reason = 'Run ended';
+  else if (ctx.isPaused()) reason = 'Paused';
+  else if (!['active', 'finalHealing'].includes(ctx.getGamePhase())) reason = 'Start playing first';
+  else if (ctx.isDemoLesson?.() && !ctx.allowDemoSignature?.()) reason = 'Finish this lesson first';
   else if (sim.phase !== 'crawling' || sim.rocketActive || sim.restRead || liveRotation.active) reason = 'Wait for a clear surface';
   else if (sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0) reason = 'Wait a moment';
   else if (!launching && (sig.cooldown > 0 || sig.active > 0 || sig.charge > 0)) reason = 'Recharging';
   else if (['inch', 'wiggle', 'mobi'].includes(character) && sim.isJumping) reason = 'Land first';
   else if (['wiggle', 'mobi'].includes(character) && (sim.crossingCorner || sim.pendingVoidKill || sim.pendingTunnelHeal || sim.tunnelPassages.length)) reason = 'Finish the crossing first';
-  else if (character === 'mobi' && sig.mobiTunnel) reason = 'Heal your previous wormhole first';
+  else if (character === 'mobi' && sig.mobiTunnel) reason = 'Heal your tunnel first';
   else if (character === 'mobi' && !ctx.canCreateMobiTunnel?.(sim.pos)) reason = 'Find an unflipped tile';
   const target = reason ? null : targetFor(sim, size, ctx, character);
   if (!reason && !target) reason = 'No entrance ahead';

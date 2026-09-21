@@ -58,7 +58,7 @@ export function StoryObjectiveCard({ compact = false, onInspect }) {
     aria-haspopup="dialog" title={level.title}>
     <span className="worm-story-glance-level">L{level.id}</span>
     <span className="worm-story-glance-progress">
-      <span>{recent ? `✓ ${recent.label}` : live?.settling ? 'Land + clear tail' : `Tasks ${completed}/${goals.length}`}</span>
+      <span>{recent ? `✓ ${recent.label}` : live?.settling ? "Land and clear your tail" : `Tasks ${completed}/${goals.length}`}</span>
       <span className="worm-story-goal-bars" aria-hidden="true">{goals.map(goal => <i key={goal.key} data-done={goal.done}>
         <i style={{ transform: `scaleX(${Math.max(0, Math.min(1, goal.value / goal.target))})` }} />
       </i>)}</span>
@@ -67,7 +67,7 @@ export function StoryObjectiveCard({ compact = false, onInspect }) {
     <span className="worm-hud-sr" role="status">{recent ? `${recent.label} complete.` : ''}</span>
   </button>;
   return <section className="worm-story-card" aria-label="Story objective">
-    <small>LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><strong>{level.title}</strong>
+    <small>Level {level.id} / {WORM_STORY_LEVELS.length}</small><strong>{level.title}</strong>
     <ul className="worm-story-checklist" aria-label="Level tasks">{goals.map(goal => <li key={goal.key} className={goal.done ? 'is-complete' : ''}
       aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
       <span className="worm-story-check" aria-hidden="true">{goal.done ? '✓' : '○'}</span>
@@ -84,7 +84,7 @@ export function StoryStartButton() {
     alive: s.wormAlive, result: s.wormStoryResult, start: s.startWormStory })));
   if (!s.level || !s.alive || s.result || s.started) return null;
   return <button className="worm-story-primary worm-story-start" disabled={!s.ready} onClick={() => { resumeFeel(); feel('uiKey'); s.start(); }}>
-    {s.ready ? 'Start level' : 'Preparing level…'}<span aria-hidden="true">→</span>
+    {s.ready ? 'Start level' : "Loading…"}<span aria-hidden="true">→</span>
   </button>;
 }
 
@@ -107,12 +107,12 @@ export function StoryResult({ onNext, onRetry, onLevels }) {
   const level = storyLevel(result?.levelId);
   if (!result || !level) return null;
   return <div ref={ref} className="worm-story-result" role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" style={{ zIndex: Z.MODAL, fontFamily: UI_FONT }}>
-    <div className="worm-story-result-sheet"><ModeArtwork mode="success" className="screen-results-art" /><small>STORY · LEVEL {level.id} / {WORM_STORY_LEVELS.length}</small><h2 id="worm-story-result-title">{level.id === WORM_STORY_LEVELS.at(-1).id ? 'Chapter complete' : 'Level clear'}</h2>
+    <div className="worm-story-result-sheet"><ModeArtwork mode="success" className="screen-results-art" /><small>Level {level.id} / {WORM_STORY_LEVELS.length}</small><h2 id="worm-story-result-title">{level.id === WORM_STORY_LEVELS.at(-1).id ? 'Chapter complete' : 'Level complete'}</h2>
       <div className="worm-story-result-stars" aria-label={`${result.stars} out of 3 stars`}>{[0,1,2].map(i => <span key={i} data-earned={i < result.stars} style={{ '--star-index': i }} aria-hidden="true">★</span>)}</div>
       <p>{level.title}</p><div className="screen-stat-row"><div><strong>{result.seconds}s</strong><span>Time</span></div><div><strong>+{result.xp}</strong><span>XP</span></div><div><strong>+{result.points}</strong><span>Parity Points</span></div></div>
       <StoryRewardChoices level={level} />
-      <button className="worm-story-primary" onClick={level.id < WORM_STORY_LEVELS.at(-1).id ? onNext : onLevels}>{level.id < WORM_STORY_LEVELS.at(-1).id ? 'Next level' : 'Back to chapter'} <span>→</span></button>
-      <button className="worm-story-secondary" onClick={onRetry}>Replay</button><button className="worm-story-secondary" onClick={onLevels}>Chapter map</button>
+      <button className="worm-story-primary" onClick={level.id < WORM_STORY_LEVELS.at(-1).id ? onNext : onLevels}>{level.id < WORM_STORY_LEVELS.at(-1).id ? 'Next level' : "Levels"} <span>→</span></button>
+      <button className="worm-story-secondary" onClick={onRetry}>Play again</button><button className="worm-story-secondary" onClick={onLevels}>Levels</button>
     </div>
   </div>;
 }

@@ -69,8 +69,8 @@
   margin: 0;
   font-family: var(--wl-display-font);
   font-size: clamp(42px, 11vw, 82px);
-  font-weight: 900;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   line-height: 1;
   background: linear-gradient(
     100deg,
@@ -112,8 +112,8 @@
   margin: 0;
   font-family: var(--wl-ui-font);
   font-size: clamp(9px, 1.6vw, 12px);
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   font-weight: 600;
   color: rgba(200, 220, 255, 0.9);
   text-shadow: 0 0 20px rgba(100, 160, 255, 0.5);
@@ -264,8 +264,8 @@
   margin: 0;
   font-family: var(--wl-ui-font);
   font-size: clamp(12px, 1.9vw, 15px);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   font-weight: 600;
   color: rgba(210, 226, 255, 0.92);
   text-shadow: 0 0 18px rgba(90, 140, 255, 0.45);

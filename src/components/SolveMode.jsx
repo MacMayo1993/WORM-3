@@ -139,7 +139,7 @@ function ctrlBtn(accent, disabled) {
     border: `1px solid ${disabled ? 'rgba(92, 111, 76, 0.18)' : accent}`,
     color: disabled ? 'rgba(101, 113, 86, 0.45)' : accent,
     cursor: disabled ? 'default' : 'pointer',
-    fontSize: 11.5, fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.02em',
+    fontSize: 11.5, fontFamily: UI_FONT, fontWeight: 700, letterSpacing: '0.02em',
     transition: 'all 0.15s',
   };
 }
@@ -219,8 +219,8 @@ export default function SolveMode({ cubies, size, onClose }) {
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
             <span style={{
-              fontSize: 10, letterSpacing: '0.14em', fontWeight: 900,
-              textTransform: 'uppercase', color: GOLD, fontFamily: UI_FONT,
+              fontSize: 10, letterSpacing: "0.01em", fontWeight: 700,
+              textTransform: "none", color: GOLD, fontFamily: UI_FONT,
             }}>
               Kociemba
             </span>
@@ -231,7 +231,7 @@ export default function SolveMode({ cubies, size, onClose }) {
               Solver
             </span>
           </div>
-          <span style={{ fontSize: 12, color: statusColor, fontWeight: 800, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 12, color: statusColor, fontWeight: 700, whiteSpace: 'nowrap' }}>
             {statusLabel}
           </span>
           <button onClick={onClose} aria-label="Close solver" style={{
@@ -285,7 +285,7 @@ export default function SolveMode({ cubies, size, onClose }) {
           </div>
         )}
         {isDone && (
-          <div style={{ padding: '8px 14px', fontSize: 12.5, color: SAGE, textAlign: 'center', fontWeight: 800 }}>
+          <div style={{ padding: '8px 14px', fontSize: 12.5, color: SAGE, textAlign: 'center', fontWeight: 700 }}>
             {alreadySolved ? '✓ Already solved!' : '✓ Cube solved!'}
           </div>
         )}
@@ -328,7 +328,7 @@ function primaryBtn(accent, disabled) {
     border: 'none',
     color: disabled ? 'rgba(101, 113, 86, 0.5)' : '#fffdf5',
     cursor: disabled ? 'default' : 'pointer',
-    fontSize: 12.5, fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.02em',
+    fontSize: 12.5, fontFamily: UI_FONT, fontWeight: 700, letterSpacing: '0.02em',
     boxShadow: disabled ? 'none' : '0 6px 14px rgba(95, 127, 74, 0.26)',
     transition: 'all 0.15s',
   };
@@ -342,7 +342,7 @@ function ghostBtn(disabled) {
     border: `1px solid ${disabled ? 'rgba(92, 111, 76, 0.18)' : GOLD_ACCENT}`,
     color: disabled ? 'rgba(101, 113, 86, 0.45)' : GOLD_ACCENT,
     cursor: disabled ? 'default' : 'pointer',
-    fontSize: 12.5, fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.02em',
+    fontSize: 12.5, fontFamily: UI_FONT, fontWeight: 700, letterSpacing: '0.02em',
     transition: 'all 0.15s',
   };
 }
@@ -355,7 +355,7 @@ export function SolveModeButton({ active, onClick }) {
       className={`btn-compact text ${active ? 'active' : ''}`}
       style={{ color: active ? SAGE : undefined, borderColor: active ? SAGE : undefined }}
     >
-      SOLVE
+      Solve
     </button>
   );
 }

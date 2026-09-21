@@ -22,7 +22,7 @@ import { ELEMENTAL_DEFS, ELEMENTAL_TYPES, isElementalType } from './elementalDef
 
 const BASE_SPECIAL_DEFS = {
   rocket: {
-    label: 'ROCKET',
+    label: "Rocket",
     color: '#ff9d2e',
     accent: '#fff1cf',
     icon: 'rocket',
@@ -33,7 +33,7 @@ const BASE_SPECIAL_DEFS = {
     description: 'Blasts ahead for three seconds; fire marks immunity to collisions and wormholes.',
   },
   magnet: {
-    label: 'MAGNET',
+    label: "Magnet",
     color: '#38e0ff',
     accent: '#ff5a6e',
     icon: 'magnet',

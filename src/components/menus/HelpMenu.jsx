@@ -66,7 +66,7 @@ const KeyRow = ({ keys, desc }) => (
 const HelpMenu = ({ onClose }) => (
   <Overlay surface="night" zIndex={Z.MENU_DIALOG} onClose={onClose} labelledBy="help-title">
     <Panel surface="night" width={560}>
-      <PanelHeader surface="night" title="How to Play" titleId="help-title" onClose={onClose} />
+      <PanelHeader surface="night" title="How to play" titleId="help-title" onClose={onClose} />
 
       <PanelBody>
         <Section title="The One Rule That Isn't Rubik's">

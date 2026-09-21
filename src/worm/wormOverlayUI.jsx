@@ -85,8 +85,8 @@ export function overlayCardStyle(accent, { width = 460 } = {}) {
 export function Eyebrow({ accent, children }) {
     return (
         <div style={{
-            fontSize: 11, fontWeight: 800, letterSpacing: 3.2,
-            color: accent, textTransform: 'uppercase', opacity: 0.9,
+            fontSize: 11, fontWeight: 700, letterSpacing: 0.2,
+            color: accent, textTransform: "none", opacity: 0.9,
         }}>{children}</div>
     );
 }
@@ -158,7 +158,7 @@ export function StatTiles({ stats, columns }) {
                     background: 'transparent',
                     border: 'none',
                 }}>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', lineHeight: 1.1 }}>{value}</div>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: '#fff', lineHeight: 1.1 }}>{value}</div>
                     <div style={{
                         marginTop: 5, fontSize: 12, fontWeight: 500,
                         letterSpacing: 0, textTransform: 'none', color: NIGHT_TEXT_MUTED,
@@ -190,8 +190,8 @@ export function OverlayChip({ accent, label, value, mono = true }) {
             border: '1px solid rgba(255,245,220,0.10)',
         }}>
             <span style={{
-                fontSize: 9.5, fontWeight: 800, letterSpacing: 1.4,
-                textTransform: 'uppercase', color: NIGHT_TEXT_MUTED, flexShrink: 0,
+                fontSize: 9.5, fontWeight: 700, letterSpacing: 0.2,
+                textTransform: "none", color: NIGHT_TEXT_MUTED, flexShrink: 0,
             }}>{label}</span>
             <span style={{
                 fontFamily: mono ? MONO_FONT : UI_FONT, fontSize: 12, color: accent,
@@ -256,7 +256,7 @@ export function segmentStyle(selected, accent, enabled = true) {
 // ─── Buttons ──────────────────────────────────────────────────────────────────
 const BTN_BASE = {
     borderRadius: 13,
-    fontWeight: 800,
+    fontWeight: 700,
     letterSpacing: 0.6,
     cursor: 'pointer',
     touchAction: 'manipulation',

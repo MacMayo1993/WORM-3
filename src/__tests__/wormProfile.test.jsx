@@ -67,7 +67,7 @@ it('keeps locked items visible without equipping them or playing a confirmation 
   }
 });
 
-it.each(['Story →', 'Free play →'])('launches %s with the shared profile instead of stale setup equipment', async path => {
+it.each(['Levels →', 'Free play →'])('launches %s with the shared profile instead of stale setup equipment', async path => {
   const complete = vi.fn(settings => state().initWormMode(9999, 0, settings.wormSpeed, settings.wormOrbCount,
     settings.wormholeInterval, settings.wormColor, false, settings.wormEnemiesEnabled, settings.storyLevel ?? null));
   act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={vi.fn()}
@@ -77,14 +77,14 @@ it.each(['Story →', 'Free play →'])('launches %s with the shared profile ins
   click('Customize ✎'); click('Book Worm'); click('Color'); click('Royal'); click('Hats'); click('Crown');
   await act(async () => { button(path).click(); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(preview()).toBe('book/royal/crown');
-  if (path.startsWith('Story')) click('Play level →');
+  if (path.startsWith('Levels')) click('Play level →');
   else {
     // Editing within Free Play must also update the shared profile.
     click('Classic');
     click('Play'); click('Start Playing');
   }
   expect(complete).toHaveBeenCalledWith(expect.objectContaining({ wormColor: '#a855f7' }));
-  expect(state().wormCharacter).toBe(path.startsWith('Story') ? 'book' : 'classic');
+  expect(state().wormCharacter).toBe(path.startsWith('Levels') ? 'book' : 'classic');
   if (path.startsWith('FREE')) expect(state().xpRun.character).toBe('classic');
   expect(state().wormSkin).toBe('royal'); expect(state().wormHat).toBe('crown');
   expect(state().wormColor).toBe('#a855f7');

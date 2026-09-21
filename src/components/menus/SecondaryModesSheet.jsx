@@ -113,7 +113,7 @@ const SecondaryModesSheet = ({
 
             {/* Cube Size */}
             <div className="sheet-group">
-              <div className="sheet-group-title">Cube Size</div>
+              <div className="sheet-group-title">Cube size</div>
               <div className="sheet-grid">
                 {[2, 3, 4, 5].map((n) => (
                   <SheetItem

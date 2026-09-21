@@ -23,7 +23,7 @@ const STAR = '★';
 /** The day's result, once it has one: three stars and the move count. */
 function SolvedStars({ stars }) {
   return (
-    <span aria-label={`${stars} of 3 stars`} style={{ letterSpacing: '0.08em', color: '#c8902a', fontSize: '13px' }}>
+    <span aria-label={`${stars} of 3 stars`} style={{ letterSpacing: "0.01em", color: '#c8902a', fontSize: '13px' }}>
       {STAR.repeat(Math.max(0, stars))}
       <span style={{ color: PAPER_TEXT_FAINT }}>{STAR.repeat(Math.max(0, 3 - stars))}</span>
     </span>
@@ -35,11 +35,11 @@ function Stat({ label, value, tone }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
       <span style={{
-        fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em',
-        textTransform: 'uppercase', color: PAPER_TEXT_FAINT,
+        fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em",
+        textTransform: "none", color: PAPER_TEXT_FAINT,
       }}>{label}</span>
       <span style={{
-        fontSize: '17px', fontWeight: 900, letterSpacing: '-0.02em',
+        fontSize: '17px', fontWeight: 700, letterSpacing: '-0.02em',
         color: tone || PAPER_TEXT, fontVariantNumeric: 'tabular-nums',
       }}>{value}</span>
     </div>
@@ -89,11 +89,11 @@ export default function DailyDescentCard({
       }} />
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '18px', fontWeight: 900, color: PAPER_TEXT, letterSpacing: '-0.02em' }}>
+        <span style={{ fontSize: '18px', fontWeight: 700, color: PAPER_TEXT, letterSpacing: '-0.02em' }}>
           Daily Descent
         </span>
         <span style={{
-          fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+          fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
           color: accent, background: `${accent}16`, border: `1px solid ${accent}3a`,
           borderRadius: '4px', padding: '2px 7px',
         }}>
@@ -101,7 +101,7 @@ export default function DailyDescentCard({
         </span>
         {solved && (
           <span style={{
-            fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+            fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
             color: UI_CREAM, background: accent, borderRadius: '4px', padding: '2px 7px',
           }}>Solved</span>
         )}
@@ -128,8 +128,8 @@ export default function DailyDescentCard({
           {solved
             ? <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span style={{
-                  fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em',
-                  textTransform: 'uppercase', color: PAPER_TEXT_FAINT,
+                  fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em",
+                  textTransform: "none", color: PAPER_TEXT_FAINT,
                 }}>Today</span>
                 <SolvedStars stars={stars} />
               </div>
@@ -137,7 +137,7 @@ export default function DailyDescentCard({
         </div>
 
         <span style={{
-          fontSize: '12px', fontWeight: 900, letterSpacing: '0.10em', textTransform: 'uppercase',
+          fontSize: '12px', fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
           color: solved ? PAPER_TEXT_MUTED : UI_CREAM,
           background: solved ? PAPER_BG_MUTED : accent,
           border: `1px solid ${solved ? PAPER_BORDER : accent}`,

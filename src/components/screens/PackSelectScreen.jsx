@@ -138,8 +138,8 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
       <div style={{ width: '100%', maxWidth: '560px' }}>
         <div className="screen-heading" style={{ padding: '6px 4px 18px' }}><div>
           <div style={{
-            fontSize: '11px', fontWeight: 900, letterSpacing: '0.18em',
-            textTransform: 'uppercase', color: PAPER_TEXT_FAINT,
+            fontSize: '11px', fontWeight: 700, letterSpacing: "0.01em",
+            textTransform: "none", color: PAPER_TEXT_FAINT,
           }}>Story</div>
           <h1 style={{
             margin: '4px 0 6px', fontFamily: HEADING_FONT, color: PAPER_TEXT,
@@ -193,11 +193,11 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '18px', fontWeight: 900, color: PAPER_TEXT, letterSpacing: '-0.02em' }}>
+                  <span style={{ fontSize: '18px', fontWeight: 700, color: PAPER_TEXT, letterSpacing: '-0.02em' }}>
                     {pack.name}
                   </span>
                   <span style={{
-                    fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+                    fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
                     color: accent, background: `${accent}16`, border: `1px solid ${accent}3a`,
                     borderRadius: '4px', padding: '2px 7px',
                   }}>
@@ -205,7 +205,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
                   </span>
                   {done === ids.length && ids.length > 0 && (
                     <span style={{
-                      fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+                      fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
                       color: '#fffdf5', background: UI_MOSS, borderRadius: '4px', padding: '2px 7px',
                     }}>Complete</span>
                   )}

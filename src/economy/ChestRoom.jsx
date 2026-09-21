@@ -20,7 +20,7 @@ function CubieDie({ face, rolling, index }) {
 }
 function rewardLabel(receipt) {
   const r = receipt.reward;
-  return r.kind === 'choice' ? 'Choose your cosmetic' : r.kind === 'item' ? getStoreItem(r.itemId)?.label : r.kind === 'currency' ? `${r.points} Parity Points + ${r.xp} XP` : `${r.gems} gems · Owned reward`;
+  return r.kind === 'choice' ? "Choose a reward" : r.kind === 'item' ? getStoreItem(r.itemId)?.label : r.kind === 'currency' ? `${r.points} Parity Points + ${r.xp} XP` : `${r.gems} gems · Owned reward`;
 }
 export default function ChestRoom({ onBack, onClose }) {
   const state = useGameStore(useShallow(s => ({ chestWallet: s.chestWallet, chestRolling: s.chestRolling,
@@ -45,7 +45,7 @@ export default function ChestRoom({ onBack, onClose }) {
   const percent = n => `${Number((n * 100).toFixed(4))}%`;
   return <div ref={root} onKeyDown={onKeyDown} className="chest-room" style={{ zIndex: Z.TOAST, fontFamily: UI_FONT, '--display-font': DISPLAY_FONT, '--paper': PAPER_SHEET, '--ink': PAPER_TEXT, '--muted': PAPER_TEXT_MUTED, '--line': PAPER_BORDER_SOFT, '--night': NIGHT_SHEET, '--night-ink': NIGHT_TEXT, '--night-muted': NIGHT_TEXT_MUTED, '--moss': UI_MOSS }} role="dialog" aria-modal="true" aria-labelledby="chest-title">
     <div className="chest-page">
-      <header className="chest-header"><button onClick={onBack}>← Collection</button><div className="chest-wallet"><strong>◆ {state.chestWallet.gems.toLocaleString()} gems</strong><span>{state.parityPoints.toLocaleString()} PP</span></div><button onClick={onClose} aria-label="Close chests">✕</button></header>
+      <header className="chest-header"><button onClick={onBack}>← Store</button><div className="chest-wallet"><strong>◆ {state.chestWallet.gems.toLocaleString()} gems</strong><span>{state.parityPoints.toLocaleString()} PP</span></div><button onClick={onClose} aria-label="Close chests">✕</button></header>
       <div className="chest-masthead"><div><h1 id="chest-title">Cubie chests</h1></div><div className="chest-spectrum" aria-hidden="true">{[...CHEST_TIERS].reverse().map(t => <i key={t.id} style={{ background: t.color }} />)}</div></div>
       <div className="chest-layout">
         <section className="chest-roll-panel" aria-label="Roll a chest">
@@ -55,7 +55,7 @@ export default function ChestRoom({ onBack, onClose }) {
             <div className="chest-orbit" aria-hidden="true" /><div className="chest-orbit chest-orbit-inner" aria-hidden="true" />
             <div className="chest-dice-row">{faces.map((face, i) => <CubieDie key={i} face={face} index={i} rolling={rolling} />)}</div>
             <div className="chest-landing-ring" aria-hidden="true" />
-            <span className="chest-arena-note">{rolling ? 'Tumbling · landing · revealing' : 'One roll. One reward.'}</span>
+            <span className="chest-arena-note">{rolling ? "Rolling…" : ""}</span>
           </div>
           <div className={`chest-result${!rolling && receipt ? ' is-revealed' : ''}`}  ref={resultRef} tabIndex={-1} role="status" aria-live="polite" style={{ '--tier': tier.color }}>
             {rolling ? <><strong>Rolling…</strong></> : receipt ? <><small><i aria-hidden="true" />Last reward · {tier.name}{receipt.faces.length === 2 && receipt.faces[0] === receipt.faces[1] ? receipt.faces[0] === 5 ? ' · MATCH' : ' · MATCH BONUS' : ''}</small><strong>{rewardLabel(receipt)}</strong><p>{receipt.faces.length === 2 ? receipt.faces[0] === receipt.faces[1] ? receipt.tier === 5 && receipt.faces[0] === 5 ? 'Double mythic.' : 'A match — one tier higher.' : 'The lower tier wins.' : ''} {choosing ? 'Choose one to keep.' : 'Added to your collection.'}</p></> : <><strong>Your next find</strong></>}

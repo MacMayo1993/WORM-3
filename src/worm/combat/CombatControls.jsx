@@ -25,7 +25,7 @@ export function CombatCard({ onRetry, onHome }) {
     : charging ? 'Portal charging — watch for the next enemy.'
     : element ? `${element.effect}. Collect colored drops to change your shots.` : 'Steer to line up the reticle. Hold Fire to shoot forward. Jump to dodge.';
   return <section className="worm-combat-card" aria-label="Portal Combat">
-    <div className="worm-combat-heading"><strong>{c.won ? c.endReason === 'waves' ? 'ARENA CLEARED' : 'PORTAL SEALED' : `WAVE ${c.wave+1}/${WAVES.length}`}</strong><span>Shield {c.health}/{COMBAT.health} · {c.kills} defeated</span></div>
+    <div className="worm-combat-heading"><strong>{c.won ? c.endReason === 'waves' ? 'Waves complete!' : 'Portal sealed!' : `Wave ${c.wave+1}/${WAVES.length}`}</strong><span>Shield {c.health}/{COMBAT.health} · {c.kills} defeated</span></div>
     {c.started && <div className="worm-combat-readout"><span>{c.score.toLocaleString()} pts {c.combo > 1 ? `· ×${c.combo}` : ''}</span>{alive && !c.won && <span style={{color:element?.color}}>{element ? `${element.label} · ${Math.ceil(c.elementT)}s` : `${Math.max(0,wave.enemies.length-c.waveSpawned)+c.enemies.length} remaining`}</span>}</div>}
     <p role="status">{message}</p>
     {!c.started && alive && <button onClick={() => callWormTurn('combat-start')}>Start combat</button>}
@@ -54,6 +54,6 @@ export function CombatFireButton() {
     disabled={!active || !c?.started || c.won || c.held || (c.ambient && !c.encounter)}
     onPointerDown={start} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}
     onClick={e => { if (e.detail === 0) callWormTurn('fire'); }}>
-    <span key={c?.shotsFired ?? 0} className={c?.shotsFired > 0 ? 'worm-shot-confirm' : ''}>✦ {c?.aimHeld ? 'TURNING' : c?.ammo === 0 ? 'CHARGING' : 'FIRE'} <small>HOLD / F</small></span><span className="worm-combat-ammo" aria-hidden="true">{[0,1,2].map(i => <i key={i} className={i < (c?.ammo ?? 0) ? 'ready' : ''} />)}</span>
+    <span key={c?.shotsFired ?? 0} className={c?.shotsFired > 0 ? 'worm-shot-confirm' : ''}>✦ {c?.aimHeld ? 'Turning' : c?.ammo === 0 ? 'Charging' : 'Fire'} <small>Hold / F</small></span><span className="worm-combat-ammo" aria-hidden="true">{[0,1,2].map(i => <i key={i} className={i < (c?.ammo ?? 0) ? 'ready' : ''} />)}</span>
   </button>;
 }

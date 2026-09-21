@@ -46,7 +46,7 @@
 .worm-instrument .orb-slot-pickup { background: var(--hud-active); border-color: var(--orb-color); }
 .worm-instrument .orb-slot-pickup .orb-sample { animation: worm-reserve-pop 360ms ease-out; }
 .worm-instrument .orb-slot-face { display: none; }
-.worm-instrument .orb-slot-count { font-size: 17px; line-height: 1.1; font-weight: 800; min-width: 0; }
+.worm-instrument .orb-slot-count { font-size: 17px; line-height: 1.1; font-weight: 700; min-width: 0; }
 @keyframes worm-reserve-pop { 35% { transform: scale(1.13); filter: brightness(1.35); } }
 @media (max-width: 360px) {
   .worm-instrument .orb-reserve { gap: 2px; }
@@ -67,7 +67,7 @@
   position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
   width: max-content; max-width: 190px; padding: 8px 12px;
   border: 1px solid #ffe58a; border-radius: 9px; background: var(--hud-surface, #20251e);
-  color: #ffe58a; font-size: 13px; font-weight: 800; line-height: 1.3;
+  color: #ffe58a; font-size: 13px; font-weight: 700; line-height: 1.3;
   pointer-events: none; z-index: 3;
 }
 .worm-jump-rescue-meter { display: block; height: 3px; margin-top: 6px; background: rgba(255, 229, 138, 0.2); }
@@ -106,7 +106,7 @@
 .worm-instrument .worm-mission-glance { flex:1 1 55%; width:auto; min-width:0; pointer-events:auto; text-align:left; justify-content:space-between; }
 .worm-mission-glance-title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .worm-mission-glance>strong { flex-shrink:0; font-variant-numeric:tabular-nums; color:#c4df91; }
-.worm-story-glance-level { font-weight:800; color:#88e59a; flex-shrink:0; }
+.worm-story-glance-level { font-weight: 700; color:#88e59a; flex-shrink:0; }
 .worm-story-glance-progress { flex:1; min-width:0; display:grid; gap:5px; }
 .worm-story-glance-progress>span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .worm-story-glance-clock { flex-shrink:0; font-weight:750; font-variant-numeric:tabular-nums; }
@@ -132,14 +132,14 @@
 .worm-buffs-detailed p,.worm-signature-guide p { font-size:12px; line-height:1.5; margin:8px 0; color:var(--hud-muted,#ced8d0); }
 .worm-signature-guide { text-align:left; padding:12px 0; font-size:13px; }
 .worm-pause-card .worm-story-card { margin-block:14px; text-align:left; }
-.worm-pause-resume { position:sticky; top:0; z-index:2; width:100%; margin:10px 0 16px; background:#88e59a; color:#122025; font-size:15px; font-weight:800; min-height:48px; }
+.worm-pause-resume { position:sticky; top:0; z-index:2; width:100%; margin:10px 0 16px; background:#88e59a; color:#122025; font-size:15px; font-weight: 700; min-height:48px; }
 .worm-story-briefing { pointer-events:auto; border:1px solid var(--hud-border); border-radius:16px; padding:10px; background:var(--hud-surface); }
 .worm-story-briefing .worm-story-card { max-height:30dvh; overflow:auto; border:0; padding:4px; background:transparent; box-shadow:none; }
 .worm-hud-bottom .worm-story-briefing .worm-story-start { margin-top:10px; }
 .worm-tunnel-glance { flex:1; min-width:0; color:#f5dddd; border-color:#f08d91; text-align:left; }
 .worm-tunnel-glance[data-heal-ready=true] { border-color:#8ee5a6; color:#c7f4d3; }
 .worm-tunnel-glance>span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }
-.worm-tunnel-orb { width:22px; height:22px; flex-shrink:0; border-radius:50%; display:grid; place-items:center; font-weight:800; color:#16201a; border:1px solid #ffffff80; }
+.worm-tunnel-orb { width:22px; height:22px; flex-shrink:0; border-radius:50%; display:grid; place-items:center; font-weight: 700; color:#16201a; border:1px solid #ffffff80; }
 .worm-hud-context .worm-special-notice { align-self:center; font-size:10px!important; min-width:0; }
 .worm-special-notice>span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .worm-hud-sr { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }

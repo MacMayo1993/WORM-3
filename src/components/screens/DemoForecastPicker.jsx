@@ -25,8 +25,8 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
       fontFamily: UI_FONT, textAlign: 'center', padding: 24,
     }}>
       <p style={{
-        color: UI_GOLD, fontSize: 12, fontWeight: 800,
-        letterSpacing: '0.16em', textTransform: 'uppercase', margin: '0 0 8px',
+        color: UI_GOLD, fontSize: 12, fontWeight: 700,
+        letterSpacing: "0.01em", textTransform: "none", margin: '0 0 8px',
       }}>
         Chaos Forecast
       </p>
@@ -86,10 +86,10 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
           minHeight: 48, flexShrink: 0, marginTop: 28, padding: '12px 44px',
           background: selected ? UI_MOSS : 'rgba(95,127,74,0.30)',
           color: UI_CREAM, border: selected ? '1px solid rgba(159,219,122,0.55)' : '1px solid transparent', borderRadius: 999,
-          fontFamily: UI_FONT, fontSize: 13, fontWeight: 800,
+          fontFamily: UI_FONT, fontSize: 13, fontWeight: 700,
           cursor: selected ? 'pointer' : 'default',
           opacity: selected ? 1 : 0.5,
-          letterSpacing: '0.1em', textTransform: 'uppercase',
+          letterSpacing: "0.01em", textTransform: "none",
           transition: 'all 0.2s ease',
         }}
       >
