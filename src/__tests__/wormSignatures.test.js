@@ -118,10 +118,10 @@ describe('Inch: Spring Loaded', () => {
     expect(sim.signature.charge).toBeGreaterThan(0);
     expect(sim.pos).toEqual(pos); expect(sim.interpT).toBe(interp);
     run(sim, ctx, 0.2);
-    expect(sim.isJumping).toBe(true); expect(sim.jumpSpan).toBe(2.2);
-    expect(sim.jumpHeight).toBe(1.8); expect(sim.signature.cooldown).toBeGreaterThan(23);
+    expect(sim.isJumping).toBe(true); expect(sim.jumpSpan).toBe(3.2);
+    expect(sim.jumpHeight).toBe(3.0); expect(sim.signature.cooldown).toBeGreaterThan(23);
     const jumpT = sim.jumpT; startJump(sim, ctx, SIZE); expect(sim.jumpT).toBe(jumpT);
-    run(sim, ctx, 2.4); expect(sim.isJumping).toBe(false); expect(sim.signature.active).toBe(0);
+    run(sim, ctx, 3.5); expect(sim.isJumping).toBe(false); expect(sim.signature.active).toBe(0);
   });
   it('rejects a flipped landing without spending a charge', () => {
     const { sim, ctx, cubies } = world('inch');
