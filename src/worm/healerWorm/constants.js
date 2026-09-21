@@ -283,7 +283,7 @@ export const AUTO_ROTATE_INTERVAL_MAX = 15;
 export const AUTO_ROTATE_WARNING = 3.75;     // seconds of beam warning before rotation fires (longer telegraph so the turn looms)
 
 // ─── Scramble-solve game mode ─────────────────────────────────────────────────
-// Mega turns two non-adjacent planes per step; regular 2x2-7x7 boards turn one.
+// Mega turns two non-adjacent planes per step; regular 2x2-10x10 boards turn one.
 // The hazard phase plays the inverse of these moves to return the cube to solved.
 export const SCRAMBLE_STEPS = 20;            // moves in the opening scramble
 export const SCRAMBLE_MOVE_INTERVAL = 0.55;  // seconds between each scramble move during opening

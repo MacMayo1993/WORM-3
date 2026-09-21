@@ -1323,8 +1323,8 @@ export default function WORM3() {
   // has to frame Mega Mode during its intro rather than falling back to the 3×3
   // camera position. Mobile needs extra room for its narrower portrait viewport.
   const cameraZ = (isMobile
-    ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54, 15: 116 }
-    : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44, 15: 94 }
+    ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54, 8: 62, 9: 70, 10: 78, 15: 116 }
+    : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44, 8: 50, 9: 57, 10: 63, 15: 94 }
   )[size] || 11;
   const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const introPerformanceMode = isMobile || prefersReducedMotion;

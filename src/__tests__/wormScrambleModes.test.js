@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { makeCubies } from '../game/cubeState.js';
+import { rotateSliceCubies } from '../game/cubeRotation.js';
 import {
   buildWormScramble,
   invertWormScramble,
@@ -13,7 +15,7 @@ function seededRandom() {
 }
 
 describe('worm scramble plane counts', () => {
-  for (let size = 2; size <= 7; size++) {
+  for (let size = 2; size <= 10; size++) {
     it(`${size}x${size} uses one plane per rotation`, () => {
       const moves = buildWormScramble(size, 20, seededRandom());
       expect(moves).toHaveLength(20);
@@ -30,6 +32,15 @@ describe('worm scramble plane counts', () => {
       );
     });
   }
+
+  it.each([8, 9, 10])('restores every cubie and sticker after a size-%i scramble and inverse', size => {
+    const initial = makeCubies(size);
+    expect(initial.flat(2).reduce((n, cubie) => n + Object.keys(cubie.stickers).length, 0)).toBe(6 * size * size);
+    const moves = buildWormScramble(size, 20, seededRandom());
+    const result = [...moves, ...invertWormScramble(moves)].reduce((cubies, move) =>
+      rotateSliceCubies(cubies, size, move.axis, move.sliceIndex, move.dir), initial);
+    expect(result).toEqual(initial);
+  });
 
   it('reserves two non-adjacent, opposite-turning planes for Mega Mode', () => {
     const moves = buildWormScramble(15, 20, seededRandom());

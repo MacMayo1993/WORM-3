@@ -70,6 +70,7 @@ afterEach(() => {
 it.each([
   ['small free play', 2, {}], ['free play', 3, {}],
   ['story', 5, { wormStoryLevel: 8 }], ['large free play', 7, {}],
+  ['8x8 free play', 8, {}], ['9x9 free play', 9, {}], ['10x10 free play', 10, {}],
   ['Mega', 15, {}], ['combat', 5, { wormCombatMode: true }],
   ['practice', 3, { demoMode: true }]
 ])('centers the head in %s during countdown, movement and phone rotation', (_name, size, mode) => {

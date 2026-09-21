@@ -1,8 +1,8 @@
-// CubeSizeSlider.jsx — cube size as one continuous choice instead of six cards.
+// CubeSizeSlider.jsx — cube size as one continuous choice.
 //
 // Size is the only setting in the wizard that changes the puzzle rather than its
 // looks, and it is the one people fiddle with: a grid of cards makes you compare
-// six static thumbnails, where a slider lets you sweep 2×2 → 7×7 and watch the
+// static thumbnails, where a slider lets you sweep the supported sizes and watch the
 // hero cube grow under your thumb. Parked at 3×3, which is what most players want.
 //
 // The visible slider is drawn by hand; a transparent native range input sits on
@@ -32,7 +32,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
 
   return (
     <div style={{ padding: '4px 2px 0' }}>
-      <div style={{ position: 'relative', height: `${KNOB + 6}px`, display: 'flex', alignItems: 'center' }}>
+      <div style={{ position: 'relative', height: '48px', display: 'flex', alignItems: 'center' }}>
         {/* Track — a shallow channel in the shared paper surface. */}
         <div style={{
           position: 'absolute', left: 0, right: 0, height: '10px', borderRadius: '6px',
@@ -94,28 +94,28 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
           aria-valuetext={`${tier.name}, ${tier.tag}`}
           style={{
             position: 'absolute', left: 0, right: 0, width: '100%',
-            height: `${KNOB + 6}px`, margin: 0, opacity: 0, cursor: 'pointer',
+            height: '48px', margin: 0, opacity: 0, cursor: 'pointer',
             WebkitAppearance: 'none', appearance: 'none', background: 'transparent'
           }}
         />
       </div>
 
-      {/* Stops — tappable as well, for anyone who knows the size they want.
-          Positioned on the same curve as the detents so each number sits under
-          the notch it selects. */}
-      <div style={{ position: 'relative', height: '30px', marginTop: '2px' }}>
+      {/* Wrapping touch targets stay distinct even with ten choices on a phone. */}
+      <div role="group" aria-label="Size choices" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(48px, 1fr))', gap: '4px', marginTop: '4px' }}>
         {tiers.map(({ n }) => {
           const selected = n === value;
           return (
             <button
               key={n}
+              type="button"
               onClick={() => onChange(n)}
               aria-label={`${n} by ${n}`}
+              aria-pressed={selected}
               style={{
-                position: 'absolute', left: stopAt(n, tiers), transform: 'translateX(-50%)',
-                background: 'none', border: 'none', padding: '4px 8px 0',
+                minWidth: 48, minHeight: 48, borderRadius: 8,
+                background: selected ? WIZ_SURFACE : 'none', border: `1px solid ${selected ? accent : WIZ_BORDER_SOFT}`, padding: '4px',
                 cursor: 'pointer', fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px'
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px'
               }}
             >
               <span style={{

@@ -225,7 +225,7 @@ function renderToCanvas(opts, time, targetCanvas) {
   const size = targetCanvas.width;
   if (!size) return;
 
-  // The setup preview is deliberately representative for Mega Mode. Building a
+  // The setup preview is deliberately representative for large boards (8–15). Building a
   // literal 15×15 rig here creates 1,350 independent sticker meshes and redraws
   // them at 24 FPS while the player is still in the wizard — often more expensive
   // than the optimized game scene itself. A 7×7 proxy preserves the selected

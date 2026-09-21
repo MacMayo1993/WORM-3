@@ -1144,7 +1144,7 @@ const CAROUSEL_MODES = [
     id: 'freeplay', label: 'CUBE', face: 'NY',
     desc: 'Solve at your own pace.',
     how: 'Done when all six faces show a single colour.',
-    chips: ['2×2 – 7×7', 'Relaxed'],
+    chips: ['2×2 – 10×10', 'Relaxed'],
     cta: 'PLAY',
   },
   {
@@ -1161,14 +1161,14 @@ const CAROUSEL_MODES = [
     id: 'chaos', label: 'CHAOS', face: 'NZ',
     desc: 'Pick a pair. Watch the cube fall apart.',
     how: 'Back the pair that outlasts the rest to win Parity Points.',
-    chips: ['2×2 – 7×7', 'Wager'],
+    chips: ['2×2 – 10×10', 'Wager'],
     cta: 'PLAY',
   },
   {
     id: 'random', label: 'RANDOM', face: 'PZ',
     desc: 'Keep solving as the colors shift.',
     how: 'Solve all six faces. The palette and tile style change every 10 seconds.',
-    chips: ['2×2 – 7×7', 'Twist'],
+    chips: ['2×2 – 10×10', 'Twist'],
     cta: 'PLAY',
   },
   {

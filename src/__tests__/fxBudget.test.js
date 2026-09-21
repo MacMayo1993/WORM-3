@@ -28,10 +28,11 @@ describe('fx budget', () => {
     expect(b.trailGlowCap).toBeLessThanOrEqual(fxBudget(3).trailGlowCap);
   });
 
-  it('catches a board between the two ladders on the cheap side', () => {
-    // Nothing sits between 7 and 15 today. A future 9×9 should land on the
-    // reduced budget by default rather than by someone remembering to add it.
-    expect(fxBudget(9).tier).toBe('big');
+  it('uses the reduced effects budget for the new 8–10 boards', () => {
+    for (const size of [8, 9, 10]) {
+      expect(fxBudget(size)).toBe(fxBudget(MEGA_SIZE));
+      expect(isBigBoard(size)).toBe(true);
+    }
     expect(fxBudget(11).warning).toBe('lite');
   });
 
