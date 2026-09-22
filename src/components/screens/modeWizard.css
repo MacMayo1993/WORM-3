@@ -1,15 +1,15 @@
-/* The forecast screen's dark sheet, bold heading and accented selection cards. */
+/* Store paper, readable ink, and mode-colored frames across every selector. */
 .mode-wizard {
   --wiz-check-ink: #111d20;
-  --wiz-base: #121e22;
-  --wiz-surface: #162428;
-  --wiz-surface-raised: #1a282c;
-  --wiz-border: #ffffff26;
-  --wiz-border-soft: #ffffff20;
-  --wiz-text: #f5f4e9;
-  --wiz-text-muted: #aebbb9;
-  --wiz-text-faint: #aebbb9;
-  --wiz-card-shadow: #091417;
+  --wiz-base: #f5f0e8;
+  --wiz-surface: #f0ebe2;
+  --wiz-surface-raised: #ffffff;
+  --wiz-border: var(--mode-accent);
+  --wiz-border-soft: var(--mode-accent);
+  --wiz-text: #302c24;
+  --wiz-text-muted: #665f52;
+  --wiz-text-faint: #665f52;
+  --wiz-card-shadow: #33261620;
   color: var(--wiz-text);
   font-variant-numeric: tabular-nums;
 }
@@ -49,3 +49,27 @@
 .mode-wizard-sheet>div:last-child>button:first-of-type { display:flex; align-items:center; justify-content:space-between; text-transform:none!important; letter-spacing:0!important; font-size:16px!important; }
 .mode-wizard-sheet>div:last-child>button:last-child:not(:first-of-type) { text-transform:none!important; letter-spacing:0!important; }
 @media(max-height:520px) { .mode-wizard-heading .mode-artwork { width:36px; } .mode-wizard-heading { padding-block:4px; } }
+
+/* Color existing frames, including inline-style cards and accessory previews.
+   This sets no border widths: unboxed layout containers remain unboxed. */
+.mode-wizard *, .mode-wizard *::before, .mode-wizard *::after,
+.cube-path-screen *, .cube-path-screen *::before, .cube-path-screen *::after,
+.mode-paper-selector *, .mode-paper-selector *::before, .mode-paper-selector *::after {
+  border-color:var(--mode-accent)!important;
+}
+.mode-wizard button:focus-visible,.mode-wizard input:focus-visible,.mode-wizard summary:focus-visible,
+.cube-path-screen button:focus-visible { outline:3px solid var(--mode-accent); outline-offset:3px; }
+.mode-wizard :is(.mode-wizard-count,.worm-chapter-progress,.worm-level-number,.worm-path-kicker) { color:var(--mode-ink); }
+.mode-wizard [aria-pressed="true"]:not([role="tab"]),.mode-wizard .worm-level-grid .selected {
+  outline:2px solid var(--mode-accent); outline-offset:-2px;
+}
+.mode-wizard .worm-profile { --wardrobe-line:var(--mode-accent); }
+.mode-wizard .worm-profile :is(.worm-profile-filter[aria-pressed=true],.worm-profile-footer>button) { background:var(--mode-accent); color:var(--wiz-check-ink); }
+.mode-wizard .worm-profile-categories button[aria-selected=true] { box-shadow:inset 3px 0 var(--mode-accent); }
+.mode-wizard .worm-profile-option[aria-pressed=true] { box-shadow:0 0 0 2px var(--mode-accent); }
+.mode-wizard .worm-path-card { box-shadow:0 4px 0 var(--wiz-card-shadow); }
+.mode-wizard .worm-path-free :is(.worm-path-art,.worm-path-kicker) { color:var(--mode-ink); }
+
+.cube-path-screen>section { border:1px solid var(--mode-accent); }
+.mode-paper-selector button:focus-visible { outline:3px solid var(--mode-accent); outline-offset:3px; }
+.mode-wizard.worm-entry-choice .worm-path-free .worm-path-cta { background:var(--mode-accent); }

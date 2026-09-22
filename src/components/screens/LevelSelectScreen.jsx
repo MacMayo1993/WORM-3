@@ -1,3 +1,4 @@
+import { PACK_ACCENTS } from '../../utils/modeThemes.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { loadProgress, progressManager } from '../../utils/levels.js';
 import { getPack } from '../../levels/index.js';
@@ -99,6 +100,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
       role="dialog"
       aria-modal="true"
       aria-label="Choose a level"
+      className="mode-paper-selector"
       tabIndex={-1}
       onKeyDown={onDialogKeyDown}
       style={{
@@ -109,7 +111,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
       // Mobi's graph paper — the same surface as the setup wizards and dialogue
       // panel. Level Select is a decision screen, so it belongs to the paper
       // half of the system, not a bespoke palette of its own.
-      ...wizardPaperBackground,
+      ...wizardPaperBackground, '--mode-accent': PACK_ACCENTS[pack.id] ?? PACK_ACCENTS['story-campaign'],
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',

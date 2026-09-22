@@ -1,3 +1,4 @@
+import { wizardPaperBackground } from './WizardChrome.jsx';
 import WormWordmark from '../branding/WormWordmark.jsx';
 import ModeArtwork from '../ui/ModeArtwork.jsx';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
@@ -43,8 +44,8 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
     storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: false, wormSpeed: level.speed, wormOrbCount: 1,
     wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false }); };
   return <div ref={root} className={`mode-wizard worm-entry${page === 'choice' ? ' worm-entry-choice' : ''}`} role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
-    style={{ '--mode-accent': MODE_THEMES.worm.accent, '--story-display': HEADING_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
-    <div className="worm-entry-sheet">
+    style={{ '--mode-accent': MODE_THEMES.worm.accent, '--mode-ink': MODE_THEMES.worm.shadow, '--story-display': HEADING_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
+    <div className="worm-entry-sheet" style={wizardPaperBackground}>
       <nav className="worm-entry-nav"><button onClick={back} aria-label={page === 'choice' ? 'Back to modes' : 'Back to WORM choices'}>← Back</button><span><WormWordmark inline /></span></nav>
       <div className="worm-entry-scroll">
         {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><h1 id="worm-entry-title">Levels</h1></header>}

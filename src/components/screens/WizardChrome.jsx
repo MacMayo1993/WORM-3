@@ -56,14 +56,8 @@ export const WIZ_TEXT_FAINT = `var(--wiz-text-faint, ${PAPER_TEXT_MUTED})`;
 export const WIZ_SHADOW = PAPER_SHADOW;
 export const WIZ_CARD_SHADOW = `var(--wiz-card-shadow, ${PAPER_CARD_SHADOW})`;
 
-/** Unruled paper with a restrained wash of the mode's accent. */
-export const wizardBackground = accent => ({
-  backgroundColor: WIZ_BASE,
-  backgroundImage: [
-    `radial-gradient(ellipse at 100% 0%, ${accent}0c, transparent 55%)`,
-    'linear-gradient(120deg, #1b2c30, #121e22)'
-  ].join(',')
-});
+/** The same graph-paper recipe used by the store. */
+export const wizardBackground = () => ({ ...wizardPaperBackground });
 
 /**
  * Layout styles shared by every wizard, tinted with the caller's accent and its
@@ -286,7 +280,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       gap: 8,
       flexShrink: 0,
       borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
-      background: '#0d181c'
+      background: WIZARD_FOOTER_BG
     },
 
     // One wide action. A wizard has exactly one thing to do next, and on a phone
@@ -528,7 +522,7 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
                   fontSize: TEXT_MICRO,
                   fontWeight: 600,
                   lineHeight: 1.2,
-                  color: isActive ? accent : WIZ_TEXT_FAINT,
+                  color: isActive ? 'var(--mode-ink)' : WIZ_TEXT_FAINT,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
@@ -596,7 +590,7 @@ export function WizardShell({
   );
 
   return (
-    <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${theme.name} setup`} className="mode-wizard" style={{ ...styles.overlay, '--mode-accent': accent }}>
+    <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${theme.name} setup`} className="mode-wizard" style={{ ...styles.overlay, '--mode-accent': accent, '--mode-ink': theme.shadow }}>
       {children}
 
       <div className="mode-wizard-sheet" style={styles.sheet}>
