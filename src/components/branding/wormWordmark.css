@@ -1,0 +1,21 @@
+.worm-wordmark { display:inline-flex; align-items:flex-start; justify-content:center; white-space:nowrap; font-family:var(--display-font,'Bungee'),'Arial Black',sans-serif; font-size:inherit; font-weight:400; line-height:1.1; letter-spacing:.025em; vertical-align:baseline; -webkit-text-fill-color:initial; }
+.worm-wordmark-letters { display:inline-flex; transform:skewX(-5deg); }
+.worm-wordmark-letter { display:inline-block; -webkit-text-fill-color:currentColor; -webkit-text-stroke:.028em #fffdf2; paint-order:stroke fill; text-shadow:.025em .025em 0 #1a1a2e,.045em .05em 0 #1a1a2e,.06em .08em .08em #0006; }
+.worm-wordmark-cube { width:.25em; height:.25em; margin:.1em 0 0 .075em; perspective:3em; flex-shrink:0; }
+.worm-wordmark-cube-inner { display:block; width:100%; height:100%; position:relative; transform-style:preserve-3d; transform:rotateX(-25deg) rotateY(35deg); }
+.worm-wordmark-face { position:absolute; width:100%; height:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:center; background:#fffdf2; border:.012em solid #1a1a2e; color:#d69f00; -webkit-text-fill-color:#d69f00; -webkit-text-stroke:0; text-shadow:none; font-size:1em; line-height:1; }
+/* Keep the glyph small without scaling the cube's physical depth. */
+.worm-wordmark-face { font-size:.2em; width:1.25em; height:1.25em; border-width:.06em; }
+.worm-wordmark-face--front { transform:translateZ(.625em); }.worm-wordmark-face--right { transform:rotateY(90deg) translateZ(.625em); background:#ddd; }.worm-wordmark-face--top { transform:rotateX(90deg) translateZ(.625em); background:#f5f5f5; }.worm-wordmark-face--back { transform:rotateY(180deg) translateZ(.625em); background:#ccc; }.worm-wordmark-face--left { transform:rotateY(-90deg) translateZ(.625em); background:#ddd; }.worm-wordmark-face--bottom { transform:rotateX(-90deg) translateZ(.625em); background:#ccc; }
+.worm-wordmark--menu { font-size:clamp(95px,26vw,170px); }
+.worm-wordmark--inline { font-size:.95em; letter-spacing:0; }.worm-wordmark--inline .worm-wordmark-letter { -webkit-text-stroke:0; text-shadow:0 1px 0 #0003; }.worm-wordmark--inline .worm-wordmark-cube { margin-top:0; }
+.worm-wordmark--animated .worm-wordmark-letter { animation:brandLetterIn .6s both,brandLetterFloat 3.4s ease-in-out infinite; animation-delay:var(--letter-delay),calc(var(--letter-delay) + .7s); }
+.worm-wordmark--animated .worm-wordmark-cube-inner { animation:brandCubeSpin 14s linear infinite; }
+@keyframes brandLetterIn { from { opacity:0; transform:translateY(-.25em) scale(.85); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes brandLetterFloat { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-.04em); } }
+@keyframes brandCubeSpin { from { transform:rotateX(-25deg) rotateY(35deg); } to { transform:rotateX(-25deg) rotateY(395deg); } }
+@media(max-width:480px) { .worm-wordmark--menu { font-size:clamp(74px,21vw,120px); } }
+@media(prefers-reduced-motion:reduce) { .worm-wordmark--animated .worm-wordmark-letter,.worm-wordmark--animated .worm-wordmark-cube-inner { animation:none; } }
+
+.worm-wordmark--menu .worm-wordmark-letter { filter:drop-shadow(0 0 16px color-mix(in srgb,currentColor 55%,transparent)); }
+@media(prefers-reduced-motion:reduce) { .worm-wordmark--menu .worm-wordmark-letter { filter:none; } }

@@ -48,7 +48,7 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
         className="opening-skip"
         onClick={onEnter}
       >
-        Skip →
+        Skip Intro →
       </button>
 
       {(introSeen || reducedMotion || introTime >= TITLE_END) && (
@@ -59,7 +59,7 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
           onClick={onEnter}
           style={{ pointerEvents: 'auto' }}
         >
-          Let’s play
+          Play <span aria-hidden="true">→</span>
         </button>
       )}
     </div>

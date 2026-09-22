@@ -3432,91 +3432,6 @@ select.btn-compact:disabled {
 /* ========================================
    WORM³ Animated Title — Bungee + 3D CSS Cube
    ======================================== */
-@keyframes wormBounceIn {
-  0%   { opacity: 0; transform: translateY(-50px) scale(0.8); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes wormIdlePulse {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.05); }
-}
-
-.worm-title-letter {
-  display: inline-block;
-  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
-  font-size: clamp(95px, 26vw, 170px);
-  letter-spacing: 5px;
-  -webkit-text-stroke: 5px white;
-  text-shadow:
-    2px 2px 0 #1a1a2e,
-    4px 4px 0 #1a1a2e,
-    6px 6px 0 rgba(0, 0, 0, 0.55),
-    8px 8px 0 rgba(0, 0, 0, 0.30),
-    10px 10px 14px rgba(0, 0, 0, 0.45);
-  line-height: 1;
-  opacity: 0;
-  transform: translateY(-50px) scale(0.8);
-  animation: wormBounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
-  animation-delay: var(--bounce-delay, 0s);
-}
-
-/* On narrow screens the four 26vw letters plus the superscript cube overran the
-   viewport and clipped the ³ at the right edge. Trim the letter size and gaps a
-   touch below 480px so the whole wordmark fits with room to spare. */
-@media (max-width: 480px) {
-  .worm-title-letter {
-    font-size: clamp(74px, 21vw, 120px);
-    letter-spacing: 2px;
-    -webkit-text-stroke-width: 4px;
-  }
-  .worm-cube-sup {
-    margin-left: 4px;
-  }
-}
-
-.worm-cube-sup {
-  width: 28px;
-  height: 28px;
-  perspective: 300px;
-  margin-left: 8px;
-  margin-top: 10px;
-  opacity: 0;
-  animation: wormBounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
-  animation-delay: 0.60s;
-  flex-shrink: 0;
-}
-
-.worm-cube-inner {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  transform-style: preserve-3d;
-  transform: rotateX(-25deg) rotateY(35deg);
-}
-
-.worm-cube-face {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border: 2px solid #1a1a2e;
-  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
-  color: #FFD500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  -webkit-text-stroke: 1px #000;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-}
-
-.worm-cube-face--front  { transform: translateZ(14px);                   background: #ffffff; }
-.worm-cube-face--right  { transform: rotateY(90deg)  translateZ(14px);   background: #e0e0e0; }
-.worm-cube-face--top    { transform: rotateX(90deg)  translateZ(14px);   background: #f0f0f0; }
-.worm-cube-face--back   { transform: rotateY(180deg) translateZ(14px);   background: #cccccc; }
-.worm-cube-face--left   { transform: rotateY(-90deg) translateZ(14px);   background: #d8d8d8; }
-.worm-cube-face--bottom { transform: rotateX(-90deg) translateZ(14px);   background: #cccccc; }
-
 /* Menu actions: raised tile surfaces echo the cube without covering the scene. */
 .worm-menu-actions { width: min(340px, calc(100vw - 40px)); display: grid; gap: 14px; }
 .worm-menu-utilities { display: flex; gap: 10px; }
@@ -3558,7 +3473,6 @@ select.btn-compact:disabled {
   outline: 3px solid #fff7d9; outline-offset: 5px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .worm-title-letter, .worm-cube-sup { animation: none !important; opacity: 1 !important; transform: none !important; }
   .worm-tactile-btn, .worm-menu-cta-secondary, .mc-play { transition: none; transform: none !important; }
 }
 
@@ -3625,48 +3539,6 @@ select.btn-compact:disabled {
 @keyframes wormStageBreathe {
   0%, 100% { opacity: 0.78; transform: scale(1); }
   50%      { opacity: 1;    transform: scale(1.06); }
-}
-
-/* ── Title lockup ──────────────────────────────────────────────────────────
-   A per-letter bloom in the letter's own colour, so the wordmark glows rather
-   than merely sitting on the scene. --glow is set inline next to the colour;
-   the fallback keeps the shadow neutral if a letter ever ships without one. */
-.worm-title-letter {
-  filter: drop-shadow(0 0 16px var(--glow, rgba(255, 255, 255, 0.35)));
-}
-
-/* After the bounce lands, the letters settle into a slow stagger — the same
-   delay that ordered the entrance now orders the wave, so the wordmark keeps a
-   heartbeat instead of freezing. Two animations, so two delays: the float waits
-   out its letter's bounce (0.6s) before taking the transform over. */
-.worm-title-letter {
-  animation:
-    wormBounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards,
-    wormTitleFloat 3.4s ease-in-out infinite;
-  animation-delay: var(--bounce-delay, 0s), calc(var(--bounce-delay, 0s) + 0.7s);
-}
-
-@keyframes wormTitleFloat {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-7px); }
-}
-
-/* The ³ cube keeps spinning once it has landed — it is the one piece of the
-   lockup that is literally the game's object, so it earns the motion. */
-.worm-cube-sup {
-  animation:
-    wormBounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards,
-    wormTitleFloat 3.4s ease-in-out infinite;
-  animation-delay: 0.60s, 1.3s;
-}
-
-.worm-cube-inner {
-  animation: wormSupSpin 14s linear infinite;
-}
-
-@keyframes wormSupSpin {
-  0%   { transform: rotateX(-25deg) rotateY(35deg); }
-  100% { transform: rotateX(-25deg) rotateY(395deg); }
 }
 
 /* Tagline. One line of eyebrow type under the wordmark, ruled on both sides —
@@ -3751,15 +3623,7 @@ select.btn-compact:disabled {
     transform: none !important;
   }
 
-  /* The ³ stops spinning but keeps its isometric pose — clearing the transform
-     as well would flatten the cube into a plain square. */
-  .worm-cube-inner {
-    animation: none !important;
-  }
 
-  .worm-title-letter {
-    filter: none !important;
-  }
 }
 
 /* =====================================================================

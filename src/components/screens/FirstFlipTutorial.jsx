@@ -1,3 +1,4 @@
+import WormWordmark from '../branding/WormWordmark.jsx';
 import React, { useState } from 'react';
 import { FACE_COLORS } from '../../utils/constants.js';
 import {
@@ -18,7 +19,7 @@ const steps = [
           That color change you just saw? You sent a sticker through an <strong>antipodal tunnel</strong>—a wormhole connecting two opposite points on the cube's surface.
         </p>
         <p style={{ margin: '0 0 14px 0' }}>
-          In WORM³, opposite faces of the cube are secretly linked. Flip a sticker on one face and its partner on the opposite face changes color simultaneously.
+          In <WormWordmark inline />, opposite faces of the cube are secretly linked. Flip a sticker on one face and its partner on the opposite face changes color simultaneously.
         </p>
         <p style={{ margin: 0, color: PAPER_TEXT_FAINT, fontStyle: 'italic' }}>
           "Walk far enough in any direction and you return from the other side—inverted."
@@ -101,12 +102,12 @@ const steps = [
     subtitle: "Speed, strategy & elegance",
     content: (
       <>
-        <p style={{ margin: '0 0 10px 0' }}>Tips for mastering WORM³:</p>
+        <p style={{ margin: '0 0 10px 0' }}>Tips for mastering <WormWordmark inline />:</p>
         <ul style={{ margin: '0 0 14px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: 1.8 }}>
           <li>Use <strong>Explode view (X)</strong> to see all antipodal connections clearly</li>
           <li>Track parity — plan flips to stay on even parity when possible</li>
           <li>In Chaos Mode, work from the center outward to minimize cascade spread</li>
-          <li>For WORM³ victory, ensure every sticker has flipped before your final solve</li>
+          <li>For <WormWordmark inline /> victory, ensure every sticker has flipped before your final solve</li>
           <li>Use <strong>Teach Mode</strong> (available for 3×3) to learn step-by-step algorithms</li>
         </ul>
         <p style={{ margin: 0, color: PAPER_TEXT_FAINT, fontStyle: 'italic' }}>

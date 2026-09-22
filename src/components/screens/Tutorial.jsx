@@ -1,3 +1,4 @@
+import WormWordmark from '../branding/WormWordmark.jsx';
 import React, { useState, useEffect } from 'react';
 import { COLORS } from '../../utils/constants.js';
 import { UI_FONT, NIGHT_TEXT, NIGHT_TEXT_MUTED } from '../../utils/uiTheme.js';
@@ -13,12 +14,12 @@ const Tutorial = ({ onClose, onMainMenu }) => {
 
   const stepContent = {
     1: {
-      title: "Welcome to WORM³",
+      title: <>Welcome to <WormWordmark inline /></>,
       content: (
         <>
-          <p><b>WORM³</b> is a Rubik's Cube puzzle built on real projective plane topology—every face is secretly connected to its opposite through <b>wormholes</b>.</p>
+          <p><b><WormWordmark inline /></b> is a Rubik's Cube puzzle built on real projective plane topology—every face is secretly connected to its opposite through <b>wormholes</b>.</p>
           <p>Flip a sticker and it travels through the manifold, swapping color with its <b>antipodal partner</b> on the opposite side of the cube.</p>
-          <p>Solve the cube while managing these wormhole connections—that's what makes WORM³ unique.</p>
+          <p>Solve the cube while managing these wormhole connections—that's what makes <WormWordmark inline /> unique.</p>
         </>
       )
     },
@@ -43,7 +44,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             </div>
           </div>
 
-          <p>Think of the Earth: your antipodal point is the exact opposite side of the planet—where you'd emerge if you dug straight through. In WORM³, flipping a sticker sends it on exactly that journey.</p>
+          <p>Think of the Earth: your antipodal point is the exact opposite side of the planet—where you'd emerge if you dug straight through. In <WormWordmark inline />, flipping a sticker sends it on exactly that journey.</p>
           <p style={{ fontSize: '13px', color: NIGHT_TEXT_MUTED }}><b>Small circle on a sticker</b> = its original color, a breadcrumb of its journey through the manifold.</p>
         </>
       )
@@ -88,7 +89,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
 
           <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px', margin: '12px 0', border: '1px solid rgba(255,255,255,0.10)', fontSize: '13px', lineHeight: 1.7 }}>
             <p style={{ margin: '0 0 4px 0' }}>Every flip is tracked—tally marks accumulate on each sticker.</p>
-            <p style={{ margin: 0 }}>The WORM³ victory condition requires <em>every</em> sticker to have flipped at least once.</p>
+            <p style={{ margin: 0 }}>The <WormWordmark inline /> victory condition requires <em>every</em> sticker to have flipped at least once.</p>
           </div>
         </>
       )
@@ -163,7 +164,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             <li><b>Classic:</b> All six faces show a single uniform color</li>
             <li><b>Sudokube:</b> Every face shows all its numbers once — 1–9 on a 3×3, no repeats</li>
             <li><b>Ultimate:</b> Classic AND Sudokube simultaneously — the hardest challenge</li>
-            <li><b>WORM³:</b> Solve the cube after every sticker has traveled through a wormhole at least once</li>
+            <li><b><WormWordmark inline />:</b> Solve the cube after every sticker has traveled through a wormhole at least once</li>
           </ul>
           <p style={{ marginTop: '12px', padding: '12px', background: 'rgba(168, 85, 247, 0.12)', borderRadius: '10px', fontSize: '13px', border: '1px solid rgba(168, 85, 247, 0.28)' }}>
             <b>Tip:</b> Hit <b>Shuffle</b> in the menu to scramble and start a new game. Victory badges unlock as you achieve each condition!
