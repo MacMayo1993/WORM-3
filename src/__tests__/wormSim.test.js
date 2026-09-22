@@ -35,7 +35,7 @@ import * as THREE from 'three';
 import { liveRotation } from '../worm/liveRotation.js';
 import { inchCrawlAdvance, advanceInchGaitState } from '../worm/healerWorm/inchGait.js';
 import { shPush, shAt, shReset, ttAt, ttReset, ttPush } from '../worm/circularBuffers.js';
-import { getNextSurfacePosition } from '../worm/wormLogic.js';
+import { getNextSurfacePosition, getWormholeHealRing } from '../worm/wormLogic.js';
 import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 
 const SIZE = 3;
@@ -103,6 +103,77 @@ function runUntil(sim, ctx, predicate, maxSeconds = 30, dt = 0.05) {
 }
 
 const eventsOf = (ctx, type) => ctx.events.filter(e => e.type === type);
+
+describe('ring healing waits for visible tile contact', () => {
+  function setup(speed = 1) {
+    const size = 5;
+    const sim = makeWormSim(size);
+    resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
+    const tunnel = {
+      entry: { x: 2, y: 3, z: 4, dirKey: 'PZ' },
+      exit: { x: 2, y: 1, z: 0, dirKey: 'NZ' },
+    };
+    const ctx = makeCtx({
+      getSpeed: () => speed,
+      getCubies: () => makeCubies(size),
+      getActiveTunnels: () => [{ tunnel, tunnelKey: 'ring' }],
+      isStoryMode: () => true,
+    });
+    stepWormSim(sim, 0, size, ctx);
+    sim.moveDir = 'right';
+    sim.tailLength = 100;
+    const next = getNextSurfacePosition(sim.pos, sim.moveDir, size);
+    const body = [...getWormholeHealRing(tunnel.entry, size)]
+      .filter(key => key !== tileKey(sim.pos) && key !== tileKey(next));
+    ttReset(sim.tileTrail, body[0]);
+    body.slice(1).forEach(key => ttPush(sim.tileTrail, key));
+    ttPush(sim.tileTrail, tileKey(sim.pos));
+    sim.stepAcc = 1 / speed;
+    stepWormSim(sim, 0, size, ctx);
+    const advance = fraction => {
+      for (let i = 0; i < Math.round(fraction * 100); i++) stepWormSim(sim, 0.01 / speed, size, ctx);
+    };
+    return { sim, ctx, next, advance };
+  }
+
+  it.each([1, 4])('heals at the tile center, not logical entry or the border, at speed %s', speed => {
+    const { sim, ctx, next, advance } = setup(speed);
+    expect(tileKey(sim.pos)).toBe(tileKey(next));
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    advance(0.55);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    advance(0.44);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    advance(0.02);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+    expect(sim.interpT).toBe(1);
+    expect(sim.headInterpPos.distanceTo(sim.curWorldPos)).toBeLessThan(1e-9);
+    expect(sim.healPauseT).toBeGreaterThan(0);
+    advance(0.1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+  });
+
+  it('rechecks coverage if the tail is shortened before contact', () => {
+    const { sim, ctx, advance } = setup();
+    advance(0.55);
+    sim.tailLength = 20;
+    advance(0.46);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+  });
+
+  it('holds contact progress while the game is paused', () => {
+    const { sim, ctx, advance } = setup();
+    advance(0.55);
+    const progress = sim.interpT;
+    ctx.isPaused = () => true;
+    advance(1);
+    expect(sim.interpT).toBe(progress);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    ctx.isPaused = () => false;
+    advance(0.46);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+  });
+});
 
 describe('jump rescue window', () => {
   function setup(overrides = {}, size = 5) {

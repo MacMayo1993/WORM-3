@@ -912,6 +912,9 @@ const _ringOccupied = new Set();
 // cells around either mouth. Occupancy comes from the logical trail, not the
 // footprint spring, whose intentional rebound would otherwise count departed tiles.
 function tryWormholeRingHeal(sim, size, ctx) {
+    // The logical trail includes the destination before the head reaches it.
+    // Wait for its center (0.5 is only the border), including rotation landings.
+    if (sim.interpT < 1) return false;
     if (ctx.allowRingHeal?.() === false) return false;
     const tunnels = ctx.getActiveTunnels?.() ?? [];
     // Prune stale healed keys, but only when there are any — the common case is an
@@ -1586,6 +1589,13 @@ const PHASE_HANDLERS = {
                 trySpecialPickupAt(sim, size, ctx, sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, true)) {
                 return true;
             }
+            // Recheck live coverage at visible contact, then hold this exact pose
+            // for the heal payoff before choosing the next logical destination.
+            if (headOnSurface && sim.interpT >= 1 &&
+                !restReadProtectsTile(sim.restRead, sim.pos.x, sim.pos.y, sim.pos.z) &&
+                tryWormholeRingHeal(sim, size, ctx)) {
+                return true;
+            }
             // When navigating a corner, traversing double the distance means we should
             // theoretically give it more time so the speed looks constant, but the Bezier
             // arc covers it nicely.
@@ -1646,13 +1656,8 @@ const PHASE_HANDLERS = {
                         ttPush(sim.pathHistory, nextKey);
                         const _rr = sim.restRead;
                         markRestReadTile(sim, nextKey, _rr, nextPos.x, nextPos.y, nextPos.z);
-                        // A rest-read destination is already expressed in committed
-                        // coordinates, but the cube/tunnel lookup is still pre-commit.
-                        // Mixing those frames can heal the outgoing (wrong) tunnel.
-                        // applyRotationToSim re-runs this check after the turn commits.
-                        if (!restReadProtectsTile(_rr, nextPos.x, nextPos.y, nextPos.z)) {
-                            tryWormholeRingHeal(sim, size, ctx);
-                        }
+                        // Ring healing waits for visible center contact above;
+                        // rest-read landings also wait for the rotation to commit.
                     }
                     if (next.moveDir) sim.moveDir = next.moveDir;
 
