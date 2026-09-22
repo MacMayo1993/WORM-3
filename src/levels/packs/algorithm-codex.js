@@ -12,7 +12,7 @@ import { ALGORITHM_CODEX_LEVELS } from '../data/algorithm-codex.js';
 export default createLevelPack({
   id: 'algorithm-codex',
   name: 'Algorithm Codex',
-  description: 'Ten levels, ten famous speedcubing algorithms. Each cube is scrambled by exactly the inverse of its algorithm, so par is the algorithm itself.',
+  description: 'Practice ten cube algorithms. Each reverses the level’s scramble.',
   author: 'WORM³ Team',
   version: '1.0.0',
   levels: ALGORITHM_CODEX_LEVELS,

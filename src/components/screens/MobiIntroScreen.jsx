@@ -20,9 +20,8 @@ import { UI_FONT, HAND_FONT, PAPER_BACKDROP_BLUR, Z } from '../../utils/uiTheme.
 // instead of at the theory. The formal name shows up once, later, as an aside
 // (TWIN_ASIDE in demoStepCopy.js).
 export const MOBI_LINES_DEMO_INTRO = [
-  "Aloha! I’m Mobi. What if opposite was the same place?",
-  "On this cube, each tile has an opposite twin. Flip one and the pair moves together.",
-  "I’ll show you the controls, then you can try them. Skip any step whenever you like."
+  "Each tile has an opposite twin. Flip one and both move together.",
+  "Try the controls one step at a time. You can skip any step.",
 ];
 
 // Worm mode intro. Kept short and literal: a first-timer needs to know the
@@ -31,81 +30,46 @@ export const MOBI_LINES_DEMO_INTRO = [
 // it as riding the worm's head. Each line names one concrete thing to do:
 // steer, collect, heal, survive.
 export const MOBI_LINES_WORM = [
-  "Aloha! I'm Mobi, and now YOU are the worm.",
-  "Tap LEFT or RIGHT to steer, like you're riding the worm's head.",
-  "Glide across the cube and grab the glowing parity orbs.",
-  "Crawl into a swirling wormhole to heal it shut.",
-  "Don't bite your own tail. Keep moving and survive!",
-  "That's the whole game. Ready? Let's crawl.",
+  "Tap Left or Right to steer. Collect orbs to heal wormholes.",
+  "Enter a wormhole to spend your collected orbs on healing.",
+  "Jump over your body or steer around it.",
 ];
 
 export const MOBI_LINES_FREEPLAY = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "Welcome to Freeplay — the cube on your terms.",
-  "Scramble it, solve it, explore it. No objectives, no pressure.",
-  "Flip Mode is your best friend here — toggle it on to visit a tile's twin on the opposite face.",
-  "Ready? The cube's already shuffled. Dig in.",
+  "Turn the cube until each face is one color.",
+  "Enable Flip Mode to move paired tiles through the cube.",
 ];
 
 export const MOBI_LINES_TEACH = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "Welcome to Teach Mode — I'll walk you through this one step at a time.",
-  "Three sub-modes: Guided, Demo, and Quiz. Start with Demo if you want to watch first.",
-  "The beginner method uses layers — bottom, middle, then top. Simple in theory.",
-  "Your move, student.",
+  "Use Guided for step-by-step practice, Demo for playback, Notation for move symbols, or Quiz to test your next move.",
+  "The beginner method solves the bottom, middle, then top layer.",
 ];
 
 export const MOBI_LINES_HOLLOW = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "Hollow Void — the shell remains, the core is gone.",
-  "Only the outer layer exists here. Rotate carefully.",
-  "Solve the surface. Ignore the void within.",
+  "View and solve the cube’s outer shell.",
 ];
 
 export const MOBI_LINES_MIRROR = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "Mirror Mode — every move you make, the other side mirrors it.",
-  "Symmetry is both your tool and your constraint.",
-  "Solve one half and the other follows. Or does it?",
+  "Moves are mirrored on the opposite side.",
 ];
 
 export const MOBI_LINES_CHAOS = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "Chaos Mode. Some tiles have already... wandered.",
-  "Your job is to restore order — but the manifold has other ideas.",
-  "Every flip you make, the chaos counter rises. Flip smart.",
-  "You've placed your bet. Time to earn it.",
+  "Tiles flip and disappear as the round progresses.",
+  "Choose a prediction before the round, or skip betting.",
 ];
 
 export const MOBI_LINES_CAMPAIGN = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "Ten levels. Three rule sets. One manifold.",
-  "Classic, Sudokube, Ultimate — each plays by different rules.",
-  "The cube always has a solution. So do you.",
-  "Let's begin.",
+  "Complete each level’s goal to unlock the next.",
+  "Classic requires matching colors. Sudokube requires every number once per face. Ultimate requires both.",
 ];
 
 export const MOBI_LINES_BIOME = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "Biome Mode — six faces, six ecosystems.",
-  "Each face of the cube represents a living world.",
-  "Solve the cube to restore balance across all biomes.",
-  "Nature is watching.",
+  "Solve the cube with grass, ice, sand, water, wood, and stone faces.",
 ];
 
 export const MOBI_LINES_RANDOM = [
-  "Aloha! I'm a Multi Orientable Block Intelligence...",
-  "...but you can call me Mobi for short!",
-  "Random Mode — the cube picks the rules. You just solve it.",
-  "Settings have been randomized. Embrace the chaos.",
-  "Every run is different. Adapt.",
+  "Solve the cube while its palette and tile style change every 10 seconds.",
+  "Your chosen size and background stay fixed.",
 ];
 
 // ── CSS ───────────────────────────────────────────────────────────────────────

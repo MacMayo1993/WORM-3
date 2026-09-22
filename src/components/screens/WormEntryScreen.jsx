@@ -54,13 +54,13 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
             <button className="worm-path-card worm-path-story" aria-label="Levels" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
               <WormPathArtwork levels /><span className="worm-path-cta">Levels <b aria-hidden="true">→</b></span>
             </button>
-            <button className="worm-path-card worm-path-free" aria-label="Free play" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
-              <WormPathArtwork /><span className="worm-path-cta">Free play <b aria-hidden="true">→</b></span>
+            <button className="worm-path-card worm-path-free" aria-label="Free Play" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
+              <WormPathArtwork /><span className="worm-path-cta">Free Play <b aria-hidden="true">→</b></span>
             </button>
           </div>
           <WormProfile />
         </> : <>
-          <div className="worm-chapter-progress"><span>Chapter stars</span><strong>{totalStars} / {WORM_STORY_LEVELS.length * 3} ★</strong><progress value={totalStars} max={WORM_STORY_LEVELS.length * 3} aria-label="Chapter stars" /></div>
+          <div className="worm-chapter-progress"><span>Stars</span><strong>{totalStars} / {WORM_STORY_LEVELS.length * 3} ★</strong><progress value={totalStars} max={WORM_STORY_LEVELS.length * 3} aria-label="Chapter stars" /></div>
           <div className="worm-level-grid">{WORM_STORY_LEVELS.map(item => {
             const unlocked = storyUnlocked(progress, item.id), stars = storyStars(progress, item.id);
             return <button key={item.id} disabled={!unlocked} title={item.title} aria-pressed={selected === item.id} aria-label={`Level ${item.id}: ${item.title}${unlocked ? `, ${stars} stars` : ', locked'}`} onClick={() => { wormMenuFeedback(); setSelected(item.id); }} className={selected === item.id ? 'selected' : ''}>
@@ -69,12 +69,12 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
           })}</div>
           <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">Level {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
             <p className="worm-story-limit">{Math.floor(level.limit / 60)}:{String(level.limit % 60).padStart(2, '0')} to finish{level.rotateEvery ? ` · Turns every ${level.rotateEvery}s` : ''}</p>
-            <details><summary>Guide & rewards</summary><p>{level.goal}</p><ul><li>★ Finish before time runs out</li><li>★ Finish within {level.par}s</li><li>★ No tail cuts</li></ul></details>
-            <div className="worm-level-reward"><span>First win</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>
+            <details><summary>Goals & Rewards</summary><p>{level.goal}</p><ul><li>★ Finish before time runs out</li><li>★ Finish within {level.par}s</li><li>★ No tail cuts</li></ul></details>
+            <div className="worm-level-reward"><span>First Win</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>
             <StoryRewardChoices level={level} />
             <div className="worm-level-profile"><WormProfile /></div>
             <button className="worm-story-primary" onClick={launch}>{storyStars(progress, level.id) ? "Play again" : 'Play level'} <span>→</span></button>
-            
+
           </section>
         </>}
       </div>

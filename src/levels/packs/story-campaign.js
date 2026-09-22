@@ -18,7 +18,7 @@ import { STORY_DESCENT_LEVELS } from '../data/index.js';
 export default createLevelPack({
   id: 'story-campaign',
   name: 'Topological Descent',
-  description: 'Descend the antipodal quotient from a single reflection to the Singularity. Every level has an exact par.',
+  description: 'Cube puzzles with move targets for each level.',
   author: 'WORM³ Team',
   version: '2.0.0',
   levels: STORY_DESCENT_LEVELS,

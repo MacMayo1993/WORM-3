@@ -31,13 +31,13 @@ it('offers Biome and Möbius Cubelet without retired mode cards', () => {
   const biome = vi.fn(), cubelet = vi.fn();
   render(<ComingSoonScreen onBiome={biome} onMobiusCubelet={cubelet} />);
   expect(host.textContent).not.toMatch(/Hands|Holonomy|Merge Mode|Crawler|Co-op/i);
-  const grow = [...host.querySelectorAll('[role="button"], button')].find(n => n.textContent.trim().startsWith('Grow a cube'));
+  const grow = [...host.querySelectorAll('[role="button"], button')].find(n => n.textContent.trim().startsWith('Play'));
   expect(grow).toBeTruthy();
   act(() => grow.click());
   expect(biome).toHaveBeenCalledOnce();
   const card = [...host.querySelectorAll('button')].find(n => n.textContent.includes('Möbius Cubelet'));
   act(() => card.click());
-  const look = [...host.querySelectorAll('[role="button"], button')].find(n => n.textContent.trim().startsWith('Take a look'));
+  const look = [...host.querySelectorAll('[role="button"], button')].find(n => n.textContent.trim().startsWith('Open'));
   expect(look).toBeTruthy();
   act(() => look.click());
   expect(cubelet).toHaveBeenCalledOnce();

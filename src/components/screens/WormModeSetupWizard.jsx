@@ -50,7 +50,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <div style={{ display: 'grid', gap: 18 }}>
       <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 48, color: WIZ_TEXT, cursor: 'pointer' }}>
         <input type="checkbox" checked={!!settings.wormCombatMode} onChange={e => cos.setSettings(current => ({ ...current, wormCombatMode: e.target.checked }))} style={{ width: 22, height: 22, flexShrink: 0 }} />
-        <span><strong>Portal combat · Preview</strong><br /><small>3 waves · 5×5 · No layer turns</small></span>
+        <span><strong>Portal Combat · Preview</strong><br /><small>3 waves · 5×5 · No Layer Turns</small></span>
       </label>
       {!settings.wormCombatMode && <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 64, padding: 14, borderRadius: 12, border: `1px solid ${WIZ_BORDER_SOFT}`, background: WIZ_SURFACE_RAISED, color: WIZ_TEXT, cursor: 'pointer' }}>
         <input type="checkbox" role="switch" aria-label="Portal enemies" aria-describedby="worm-enemies-description"
@@ -64,7 +64,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         </span>
         <strong style={{ color: ACCENT }}>{settings.wormEnemiesEnabled ? 'On' : 'Off'}</strong>
       </label>}
-      {!settings.wormCombatMode && <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="body" compact />}
+      {!settings.wormCombatMode && <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <legend style={{ fontSize: 13, fontWeight: 700, color: WIZ_TEXT, marginBottom: 10 }}>Cube Size</legend>
+        <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="body" compact />
+      </fieldset>}
       {!settings.wormCombatMode && <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <legend style={{ fontSize: 13, fontWeight: 700, color: WIZ_TEXT, marginBottom: 10 }}>Difficulty</legend>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
@@ -87,7 +90,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       key: 'character',
       icon: 'character',
       label: 'Character',
-      title: "Your worm",
+      title: "Character",
       primaryLabel: 'Continue',
       summary: `${activeCharacter.label} · ${activeSkin.label}`,
       content: <WormProfile defaultExpanded />
@@ -116,8 +119,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     {
       key: 'play',
       icon: 'gameplay',
-      label: 'Play',
-      title: 'Choose your challenge',
+      label: 'Gameplay',
+      title: 'Gameplay',
       summary: settings.wormCombatMode ? 'Portal Combat · 5×5' : `${sizeLabel(cos.cubeSize, WORM_SIZE_TIERS)} · ${difficulty.label}`,
       hero: <SizeStep cos={settings.wormCombatMode ? { ...cos, cubeSize: 5 } : cos} tiers={WORM_SIZE_TIERS} slot="hero" compact locked={!!settings.wormCombatMode} />,
       content: renderPlay()

@@ -169,7 +169,7 @@ describe('achievement UI', () => {
     expect(host.querySelectorAll('ol li')[6].textContent).toContain('Collect a dozen orbs');
     expect(host.textContent).toContain('Challenges complete');
     expect(host.textContent).toContain('+220 PP · +275 XP');
-    expect(host.textContent).toContain('New run, fresh challenges.');
+    expect(host.textContent).toContain('Start a run for new goals.');
     expect(host.querySelector('[role="progressbar"]')).toBeNull();
     expect(host.textContent).toContain('Play again');
     act(() => root.render(<WormMissionCard summary key="reopen" />));
@@ -186,7 +186,7 @@ describe('achievement UI', () => {
   it('shows an honest empty result when no achievement was earned', () => {
     start(); set({ wormAlive: false }); act(() => root.render(<WormMissionCard summary />));
     expect(host.textContent).toContain('No achievements earned yet.');
-    expect(host.textContent).toContain('New run, fresh challenges.');
+    expect(host.textContent).toContain('Start a run for new goals.');
     expect(host.querySelector('ol')).toBeNull();
   });
   it('hides live achievements on pause, death and victory, and every achievement surface in the demo', () => {
