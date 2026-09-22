@@ -1250,6 +1250,7 @@ function HudContext({ surface, demo, onInspect }) {
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame, onStoryNext }) {
     const [isMinimized, setIsMinimized] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
+    const captureMode = useGameStore(s => s.captureMode);
 
     ensureHudStyle();
     const combatMode = useGameStore(s => s.wormCombatMode);
@@ -1271,7 +1272,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     useEffect(() => { setIsPaused(false); }, [runId]);
     useLayoutEffect(() => {
         const tray = trayRef.current;
-        if (!tray) return;
+        if (!tray || captureMode) return;
         const measure = () => {
             const clearance = `${Math.max(0, window.innerHeight - tray.getBoundingClientRect().top) + 10}px`;
             document.documentElement.style.setProperty('--worm-tray-clearance', clearance);
@@ -1281,7 +1282,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
         observer?.observe(tray); window.addEventListener('resize', measure);
         return () => { observer?.disconnect(); window.removeEventListener('resize', measure); document.documentElement.style.removeProperty('--demo-tray-clearance'); document.documentElement.style.removeProperty('--worm-tray-clearance'); };
-    }, [demoLesson, phase]);
+    }, [demoLesson, phase, captureMode]);
 
     useEffect(() => {
         if (showDeathMenu) setIsMinimized(false);
@@ -1344,6 +1345,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         setIsPaused(false);
         setWormPaused((storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
     }, [setWormPaused, demoLesson, combatMode, storyId]);
+
+    useEffect(() => {
+        // Settings can be opened from Pause. Start Capture must resume that
+        // user pause, while retaining story/demo/combat readiness gates.
+        if (captureMode && isPaused) handleResume();
+    }, [captureMode, isPaused, handleResume]);
 
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 

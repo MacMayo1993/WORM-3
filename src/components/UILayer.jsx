@@ -42,7 +42,6 @@ import { isMobile } from '../utils/device.js';
 
 // Lazy-loaded — deferred to reduce initial parse time
 const ComingSoonScreen = React.lazy(() => import('./screens/ComingSoonScreen.jsx'));
-const MobiusCubeletScreen = React.lazy(() => import('./screens/MobiusCubeletScreen.jsx'));
 const VictoryScreen = React.lazy(() => import('./screens/VictoryScreen.jsx'));
 const LevelSelectScreen = React.lazy(() => import('./screens/LevelSelectScreen.jsx'));
 const PackSelectScreen = React.lazy(() => import('./screens/PackSelectScreen.jsx'));
@@ -100,7 +99,7 @@ export default function UILayer({
     disparityCountdown,
     showAntipodalPiP, onToggleAntipodalPiP,
     showComingSoon, onCloseComingSoon,
-    showMobiusCubelet, onCloseMobiusCubelet,
+    showMobiusCubelet,
     onOpenModeSelect,
     demoDialogueVisible,
   } = ui;
@@ -496,12 +495,6 @@ export default function UILayer({
             onBiome={() => { onCloseComingSoon(); onMenuBiome?.(); }}
             onMobiusCubelet={() => { onCloseComingSoon(); onMenuMobiusCubelet?.(); }}
           />
-        </Suspense>
-      </ScreenTransition>
-
-      <ScreenTransition show={showMobiusCubelet}>
-        <Suspense fallback={<ScreenFallback label="Loading" />}>
-          <MobiusCubeletScreen onBack={onCloseMobiusCubelet} />
         </Suspense>
       </ScreenTransition>
 

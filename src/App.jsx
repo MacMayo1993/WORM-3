@@ -17,6 +17,9 @@ import { PerformanceMonitor } from '@react-three/drei';
 import SafeEnvironment from './3d/SafeEnvironment.jsx';
 const SceneEffects = React.lazy(() => import('./3d/SceneEffects.jsx'));
 import './App.css';
+import CaptureChrome from './components/capture/CaptureChrome.jsx';
+import CaptureController from './components/capture/CaptureController.jsx';
+const MobiusCubeletScreen = React.lazy(() => import('./components/screens/MobiusCubeletScreen.jsx'));
 
 // Utils
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
@@ -1332,6 +1335,8 @@ export default function WORM3() {
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
+      <CaptureController />
+      <CaptureChrome>
       {/* Mode-transition cover: sits above the game HUD / FX (≤9990) but below the
           Mobi dialogue (10500), so it fills the gap after Mobi while the scene's
           background decodes. Self-dismisses when nothing is loading. */}
@@ -1358,6 +1363,7 @@ export default function WORM3() {
         </Suspense>
       )}
 
+      </CaptureChrome>
       {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
           Also renders the main-menu cube scene so there is never a second WebGL context.
           Stays VISIBLE while the mode selector is open: the carousel is a transparent
@@ -1419,6 +1425,7 @@ export default function WORM3() {
       </div>
       </CanvasErrorBoundary>
 
+      <CaptureChrome>
       {/* Antipodal PiP frame overlay — border + label drawn over the canvas scissor region */}
       {showAntipodalFrame && (
         <div
@@ -1493,7 +1500,7 @@ export default function WORM3() {
               disparityCountdown,
               showAntipodalPiP, onToggleAntipodalPiP: toggleAntipodalPiP,
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
-              showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
+              showMobiusCubelet,
               onOpenModeSelect: () => setShowModeSelect(true),
               // True only while a Mobi dialogue PANEL is presenting — the cold
               // open, the step intro, or the coach's mid-step aside. Those are
@@ -1681,6 +1688,12 @@ export default function WORM3() {
       <ScreenTransition show={showStore} style={{ position: 'relative', zIndex: 100000 }}>
         <Suspense fallback={null}>
           <ParityStoreScreen onClose={handleCloseStore} />
+        </Suspense>
+      </ScreenTransition>
+      </CaptureChrome>
+      <ScreenTransition show={showMobiusCubelet}>
+        <Suspense fallback={null}>
+          <MobiusCubeletScreen onBack={() => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); }} />
         </Suspense>
       </ScreenTransition>
     </div>

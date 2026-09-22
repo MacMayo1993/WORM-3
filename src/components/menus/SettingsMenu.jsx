@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import CapturePanel from '../capture/CapturePanel.jsx';
 import { ColorsPanel } from './settings/ColorsPanel.jsx';
 import { TilesPanel } from './settings/TilesPanel.jsx';
 import { ScenePanel } from './settings/ScenePanel.jsx';
@@ -11,6 +12,7 @@ const TABS = [
   { id: 'tiles', label: 'Tiles' },
   { id: 'scene', label: 'Scene' },
   { id: 'display', label: 'Display' },
+  { id: 'capture', label: 'Capture' },
   { id: 'modes', label: 'Modes' }
 ];
 
@@ -61,7 +63,7 @@ const SettingsMenu = ({ onClose, settings, onSettingsChange, faceImages = {}, on
               aria-selected={activeTab === tab.id}
               aria-controls="settings-tabpanel"
               // Roving tabindex: Tab reaches the tab strip once, then Left/Right
-              // move within it, rather than stopping on all five.
+              // move within it, rather than stopping on every tab.
               tabIndex={activeTab === tab.id ? 0 : -1}
               className={`settings-tab ui-focusable${activeTab === tab.id ? ' active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
@@ -73,6 +75,7 @@ const SettingsMenu = ({ onClose, settings, onSettingsChange, faceImages = {}, on
 
         {/* Active panel */}
         <div className="settings-body" id="settings-tabpanel" role="tabpanel" aria-labelledby={`settings-tab-${activeTab}`}>
+          {activeTab === 'capture' && <CapturePanel />}
           {activeTab === 'colors' && (
             <ColorsPanel
               settings={settings}

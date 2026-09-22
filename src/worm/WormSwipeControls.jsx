@@ -60,11 +60,21 @@ export default function WormSwipeControls({ onTurn, worm }) {
     }, [wormControlMode, onTurn, mapOrientedDirection]);
 
     useEffect(() => {
+        let fireTimer = null;
+        let firing = false;
+        const cancelFire = () => { clearTimeout(fireTimer); fireTimer = null; };
         const onTouchStart = (e) => {
+            cancelFire();
+            if (e.touches.length !== 1) { touchStart.current = null; firing = false; onTurn('fire-stop'); return; }
             const t = e.touches[0];
             touchStart.current = { x: t.clientX, y: t.clientY };
+            if (useGameStore.getState().captureMode) fireTimer = setTimeout(() => {
+                firing = true; onTurn('fire-start');
+            }, 350);
         };
         const onTouchEnd = (e) => {
+            cancelFire();
+            if (firing) { firing = false; touchStart.current = null; onTurn('fire-stop'); return; }
             if (!touchStart.current) return;
             const t = e.changedTouches[0];
             const dx = t.clientX - touchStart.current.x;
@@ -72,7 +82,10 @@ export default function WormSwipeControls({ onTurn, worm }) {
             touchStart.current = null;
 
             const adx = Math.abs(dx), ady = Math.abs(dy);
-            if (adx < 12 && ady < 12) return;
+            if (adx < 12 && ady < 12) {
+                if (useGameStore.getState().captureMode) onTurn('jump');
+                return;
+            }
 
             if (adx > ady) {
                 emitDirection(dx > 0 ? 'right' : 'left');
@@ -81,6 +94,8 @@ export default function WormSwipeControls({ onTurn, worm }) {
             } else if (dy > 0) {
                 // non-oriented mode supports 180° turn via downward swipe
                 emitDirection('down');
+            } else if (useGameStore.getState().captureMode) {
+                onTurn('boost');
             }
         };
         const onKey = (e) => {
@@ -98,17 +113,28 @@ export default function WormSwipeControls({ onTurn, worm }) {
                 onTurn('jump');
             }
         };
-        const stopFire = () => onTurn('fire-stop');
+        const stopFire = () => { cancelFire(); firing = false; onTurn('fire-stop'); };
+        const onTouchMove = e => {
+            const t = e.touches[0], origin = touchStart.current;
+            if (e.touches.length !== 1 || (origin && t && Math.hypot(t.clientX - origin.x, t.clientY - origin.y) > 12)) cancelFire();
+        };
+        const cancelTouch = () => { touchStart.current = null; stopFire(); };
         const onKeyUp = e => { if (e.key.toLowerCase() === 'f') stopFire(); };
+        const unsubscribeCapture = useGameStore.subscribe(s => s.captureMode, cancelTouch);
         window.addEventListener('keyup', onKeyUp);
         window.addEventListener('blur', stopFire);
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+        window.addEventListener('touchcancel', cancelTouch);
         window.addEventListener('touchstart', onTouchStart, { passive: true });
         window.addEventListener('touchend', onTouchEnd, { passive: true });
         window.addEventListener('keydown', onKey, { capture: true });
         return () => {
+            unsubscribeCapture();
             stopFire();
             window.removeEventListener('keyup', onKeyUp);
             window.removeEventListener('blur', stopFire);
+            window.removeEventListener('touchmove', onTouchMove);
+            window.removeEventListener('touchcancel', cancelTouch);
             window.removeEventListener('touchstart', onTouchStart);
             window.removeEventListener('touchend', onTouchEnd);
             window.removeEventListener('keydown', onKey, { capture: true });
