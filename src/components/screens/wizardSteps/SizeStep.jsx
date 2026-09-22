@@ -36,7 +36,7 @@ export default function SizeStep({ cos, tiers = SIZE_TIERS, slot, compact = fals
 
       {slot !== 'hero' && (
       <>
-      <CubeSizeSlider value={cubeSize} onChange={setCubeSize} accent={accent} accentShadow={accentShadow} tiers={tiers} compact={compact} />
+      <CubeSizeSlider value={cubeSize} onChange={setCubeSize} accent={accent} accentShadow={accentShadow} tiers={tiers} />
 
       </>
       )}

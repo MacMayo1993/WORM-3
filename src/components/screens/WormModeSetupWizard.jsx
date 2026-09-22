@@ -19,8 +19,8 @@ const ACCENT = MODE_THEMES.worm.accent;
 const ACCENT_SHADOW = MODE_THEMES.worm.shadow;
 const MEGA_CUBE_SIZE = 15;
 const WORM_SIZE_TIERS = [
-  ...SIZE_TIERS.map(tier => tier.n === 6 ? { ...tier, tag: 'Giant' } : tier),
-  { n: MEGA_CUBE_SIZE, name: '15×15×15', tag: 'Mega', desc: '1,350 stickers of mayhem' }
+  ...SIZE_TIERS,
+  { n: MEGA_CUBE_SIZE, name: '15×15×15' }
 ];
 
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {

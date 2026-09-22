@@ -15,12 +15,7 @@ const ACCENT_SHADOW = MODE_THEMES.chaos.shadow;
 
 const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
 
-const FLIP_CAP_PRESETS = [
-  { label: 'Fragile', value: 3, sub: "3 lives" },
-  { label: 'Standard', value: 8, sub: "8 lives" },
-  { label: 'Endurance', value: 13, sub: "13 lives" },
-  { label: 'Titan', value: 20, sub: "20 lives" }
-];
+const FLIP_CAP_PRESETS = [3, 8, 13, 20].map(value => ({ value, label: `${value} flips` }));
 
 const GAME_LENGTH_OPTIONS = [
   { value: 'short', label: 'Short', sub: '10 shuffles' },
@@ -92,7 +87,7 @@ const DisparitySetupWizard = ({ onStart, onCancel, initialSettings }) => {
           aria-pressed={settings[key] === option.value}
           onClick={() => select(key, option.value)}
           style={cardStyle(settings[key] === option.value, ACCENT)}>
-          <strong>{option.label}</strong><small>{option.sub}</small>
+          <strong>{option.label}</strong>{option.sub && <small>{option.sub}</small>}
           <span className="chaos-gameplay-check" aria-hidden="true">{settings[key] === option.value ? '✓' : '+'}</span>
         </button>)}
       </div>
