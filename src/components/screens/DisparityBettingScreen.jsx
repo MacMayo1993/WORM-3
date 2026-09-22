@@ -1,3 +1,5 @@
+import { wizardPaperBackground } from './WizardChrome.jsx';
+import { chaosSetupSettings } from '../../utils/chaosSetup.js';
 import React, { useState, useMemo, useRef } from 'react';
 import { useDialogBehavior } from '../ui/Panel.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -7,6 +9,7 @@ import { MODE_THEMES } from '../../utils/modeThemes.js';
 import { Z } from '../../utils/uiTheme.js';
 import { ChaosGlyph, ChaosEmblem } from '../../chaos/ChaosArt.jsx';
 import '../../chaos/chaos.css';
+import '../../chaos/chaosSetup.css';
 
 const WAGER_PRESETS = [10, 25, 50, 100, 250, 500];
 const StepLabel = ({ n, done, label }) => <div className="chaos-step-label">
@@ -18,7 +21,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
   const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
   const parityPoints = useGameStore(s => s.parityPoints);
   const currentSettings = useGameStore(s => s.settings);
-  const paletteSettings = settings || currentSettings;
+  const paletteSettings = useMemo(() => chaosSetupSettings(currentSettings, settings), [currentSettings, settings]);
   const { faces: faceInfo, pairs } = useMemo(() => bettingPalette(paletteSettings), [paletteSettings]);
   const betStreak = useGameStore(s => s.betStreak);
   const record = useGameStore(s => s.chaosRecord);
@@ -61,8 +64,8 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
   const size = settings?.cubeSize || 3;
   const selectedPair = pairs.find(p => p.id === pick);
   return (
-    <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-overlay" style={{ zIndex: Z.FULLSCREEN, '--chaos-accent': MODE_THEMES.chaos.accent, '--chaos-accent-shadow': MODE_THEMES.chaos.shadow }} role="dialog" aria-modal="true" aria-label="Choose a Chaos prediction">
-      <div className="chaos-forecast-sheet">
+    <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-overlay chaos-forecast mode-wizard" style={{ zIndex: Z.FULLSCREEN, '--mode-accent': MODE_THEMES.chaos.accent, '--mode-ink': MODE_THEMES.chaos.shadow, '--chaos-accent': MODE_THEMES.chaos.accent, '--chaos-accent-shadow': MODE_THEMES.chaos.shadow }} role="dialog" aria-modal="true" aria-label="Choose a Chaos prediction">
+      <div className="chaos-forecast-sheet" style={wizardPaperBackground}>
         <div className="chaos-forecast-scroll">
           <header className="chaos-hero">
             <div className="chaos-topline"><span className="chaos-kicker"><i className="chaos-status-dot" /> Chaos</span>
@@ -82,7 +85,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
           </header>
           <div className="chaos-forecast-body">
             <section className="chaos-step">
-              <StepLabel n={1} done={!!selectedType} label="Choose a Bet Type" />
+              <StepLabel n={1} done={!!selectedType} label="Prediction" />
               <div className="chaos-bet-types">{Object.values(BET_TYPES).map(bt =>
                 <button key={bt.id} className="chaos-bet-type" aria-pressed={selectedType === bt.id} onClick={() => handleSelectType(bt.id)}>
                   <span className="chaos-bet-type-top"><ChaosGlyph kind={bt.id} /><span className="chaos-odds">{bt.odds}×</span></span>
@@ -91,12 +94,12 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
               )}</div>
             </section>
             <section className="chaos-step">
-              <StepLabel n={2} done={pick !== null} label="Make Your Pick" />
+              <StepLabel n={2} done={pick !== null} label="Your pick" />
               <p className="chaos-step-description">{betDef.desc}</p>
               {selectedType === 'PAIR' && <div className="chaos-pick-pairs">{pairs.map(pair =>
-                <button key={pair.id} className="chaos-pick-pair" style={{ '--pair-a': faceInfo[pair.faces[0]].hex, '--pair-b': faceInfo[pair.faces[1]].hex }} aria-pressed={pick === pair.id} onClick={() => setPick(pair.id)}>
-                  <span className="chaos-pair-art" aria-hidden="true"><i /><i /></span>
-                  <strong>{pair.label}</strong><small>{2 * size * size} tiles · one color family</small>
+                <button key={pair.id} className="chaos-pick-pair" data-pair-id={pair.id} style={{ '--pair-a': faceInfo[pair.faces[0]].hex, '--pair-b': faceInfo[pair.faces[1]].hex }} aria-pressed={pick === pair.id} onClick={() => setPick(pair.id)}>
+                  <span className="chaos-pair-art" aria-hidden="true">{pair.faces.map(id => <i key={id} data-face-id={id} style={{ backgroundColor: faceInfo[id].hex }} />)}</span>
+                  <strong>{pair.label}</strong><small>{2 * size * size} tiles · opposite faces</small>
                   <span className="chaos-selection-mark" aria-hidden="true">{pick === pair.id ? '✓' : '+'}</span>
                 </button>
               )}</div>}
@@ -117,7 +120,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
               </p></div>
             </section>
             <section className="chaos-step">
-              <StepLabel n={3} done={canPlace} label="Set Your Wager" />
+              <StepLabel n={3} done={canPlace} label="Your wager" />
               <div className="chaos-wager-presets">{WAGER_PRESETS.map(preset =>
                 <button key={preset} disabled={preset > maxWager} aria-pressed={wager === preset} onClick={() => setWager(preset)}>{preset}<small> PP</small></button>
               )}{maxWager >= BET_MIN && <button aria-pressed={wager === maxWager} onClick={() => setWager(maxWager)}>All-in ({maxWager} PP)</button>}</div>

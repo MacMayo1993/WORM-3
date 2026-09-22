@@ -11,6 +11,7 @@ import { resolveBet, calcPayout, speedThresholdFor } from '../utils/disparityBet
 import { DISPARITY_GAME_LENGTHS } from '../utils/economyConstants.js';
 import { makeCubies } from '../game/cubeState.js';
 import { vibrate } from '../utils/audio.js';
+import { chaosSetupSettings } from '../utils/chaosSetup.js';
 import { resolveWizardTileStyles } from '../utils/wizardTileStyles.js';
 
 export function useDisparityGame({
@@ -213,13 +214,11 @@ export function useDisparityGame({
     const manifoldStyles = resolveWizardTileStyles(wizardSettings);
 
     const newSettings = {
-      ...settings,
-      colorScheme: wizardSettings.colorScheme || settings.colorScheme,
+      ...chaosSetupSettings(settings, wizardSettings),
       backgroundTheme: wizardSettings.backgroundTheme || settings.backgroundTheme,
       manifoldStyles,
       biomeMode: { enabled: false, faceAssignment: null },
     };
-    if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
     setSettings(newSettings);
 
     if (wizardSettings.visualMode) setVisualMode(wizardSettings.visualMode);
@@ -265,8 +264,9 @@ export function useDisparityGame({
 
   const handleDisparitySetupComplete = useCallback((wizardSettings) => {
     setShowDisparityWizard(false);
-    pendingWizardSettingsRef.current = wizardSettings;
-    setChaosPreview(wizardSettings);
+    const preview = chaosSetupSettings(settings, wizardSettings);
+    pendingWizardSettingsRef.current = preview;
+    setChaosPreview(preview);
     // Any bet still active here belongs to a round that never resolved
     // (the player quit mid-round) — return the wager before taking a new bet.
     useGameStore.getState().refundActiveBet();
@@ -274,7 +274,7 @@ export function useDisparityGame({
     setSpeedThresholdSec(speedThresholdFor(wizardSettings.disparityLevel, wizardSettings.flipCap));
     // Show betting screen so the player can wager before chaos starts.
     setShowDisparityBetting(true);
-  }, []);
+  }, [settings]);
 
   const launchRound = useCallback(() => {
     useGameStore.getState().setRotatedCubies(makeCubies(size));

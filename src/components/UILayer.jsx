@@ -1,3 +1,4 @@
+import ChaosCountdown from '../chaos/ChaosCountdown.jsx';
 // src/components/UILayer.jsx
 /**
  * UILayer — all DOM overlays rendered after the welcome screen dismisses.
@@ -293,32 +294,7 @@ export default function UILayer({
             event across the three camera regimes it cuts between. */}
         <TunnelTransitOverlay />
 
-        {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
-        {disparityCountdown !== null && (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: Z.COUNTDOWN,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            pointerEvents: 'none',
-          }}>
-            <div key={disparityCountdown} style={{
-              fontSize: disparityCountdown === 'GO!' ? '6rem' : '9rem',
-              fontWeight: 900, fontFamily: MONO_FONT,
-              color: disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444',
-              textShadow: `0 0 40px ${disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444'}`,
-              animation: 'disparity-cd-pop 0.3s cubic-bezier(0.22,1,0.36,1) forwards',
-              letterSpacing: '0.02em',
-            }}>
-              {disparityCountdown}
-            </div>
-            <style>{`
-              @keyframes disparity-cd-pop {
-                0%   { transform: scale(1.6); opacity: 0; }
-                40%  { transform: scale(0.95); opacity: 1; }
-                100% { transform: scale(1); opacity: 0.9; }
-              }
-            `}</style>
-          </div>
-        )}
+        <ChaosCountdown value={disparityCountdown} settings={settings} />
 
         {/* Disparity Betting Screen — intercepts before chaos starts */}
         <ScreenTransition show={showDisparityBetting}>
@@ -565,6 +541,7 @@ export default function UILayer({
       <ScreenTransition show={showDisparityWizard}>
         <Suspense fallback={<ScreenFallback label="Loading setup" />}>
           <DisparitySetupWizard
+            initialSettings={chaosPreview}
             onStart={onDisparitySetupComplete}
             onCancel={() => { setShowDisparityWizard(false); useGameStore.getState().setShowMainMenu(true); }}
           />
