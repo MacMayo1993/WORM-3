@@ -1,0 +1,15 @@
+/* Scene-space text uses drei portals, outside the DOM chrome boundary. */
+.capture-active .capture-scene-label { display: none !important; }
+.capture-active canvas { cursor: none; }
+
+.capture-start {
+  min-height: 48px;
+  padding: 12px 18px;
+  border: 2px solid #5f7f4a;
+  border-radius: 12px;
+  background: #d7edba;
+  color: #24321c;
+  font-weight: 800;
+  cursor: pointer;
+}
+.capture-start:disabled { opacity: 0.5; cursor: default; }

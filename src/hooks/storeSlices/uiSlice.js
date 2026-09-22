@@ -39,6 +39,12 @@ export const createUiSlice = (set, _get) => ({
   // The intro cinematic plays on every visit (it is the game's opening
   // statement). Returning players get the ENTER button immediately instead
   // of waiting 10 s — see WelcomeScreen — so a replay costs one tap.
+  // Session-only: never reopen a visit with invisible controls.
+  captureMode: false,
+  setCaptureMode: (captureMode) => set(captureMode
+    ? { captureMode: true, showSettings: false, showHelp: false, showDevConsole: false,
+        showNetPanel: false, showLeaderboard: false, showPlayerProgress: false }
+    : { captureMode: false }),
   showWelcome: true,
   showTutorial: false,
   showFirstFlipTutorial: false,
@@ -60,7 +66,7 @@ export const createUiSlice = (set, _get) => ({
     ? (state) => ({ showHelp: showHelp(state.showHelp) })
     : { showHelp }),
   setShowSettings: (showSettings) => set({ showSettings }),
-  setShowMainMenu: (showMainMenu) => set({ showMainMenu }),
+  setShowMainMenu: (showMainMenu) => set(showMainMenu ? { showMainMenu, captureMode: false } : { showMainMenu }),
   setShowLevelSelect: (showLevelSelect) => set({ showLevelSelect }),
   setShowPackSelect: (showPackSelect) => set({ showPackSelect }),
   setActivePackId: (activePackId) => set({ activePackId }),

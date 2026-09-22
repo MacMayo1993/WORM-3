@@ -114,7 +114,7 @@ export function ThunkEffect({ thunkRef }) {
     return (
         <>
             <group ref={groupRef} visible={false}>
-                <Html center distanceFactor={10}>
+                <Html center distanceFactor={10} wrapperClass="capture-scene-label">
                     <div ref={divRef} style={{
                         fontFamily: DISPLAY_FONT,
                         fontSize: '54px',

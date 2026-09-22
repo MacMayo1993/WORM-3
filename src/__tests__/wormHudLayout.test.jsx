@@ -172,3 +172,16 @@ it('gives healing priority over power and spawn text while keeping emergency jum
   expect(host.querySelector('.worm-jump-rescue-cue')).not.toBeNull();
   expect(host.querySelector('.worm-hud-status-row').textContent).toContain('Need 2 orbs');
 });
+
+it('resumes a user pause when starting capture and restores the HUD afterward', () => {
+  useGameStore.setState({ captureMode: false });
+  renderPhase('crawling');
+  act(() => host.querySelector('[aria-label="Pause"]').click());
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  act(() => useGameStore.getState().setCaptureMode(true));
+  expect(useGameStore.getState().wormPaused).toBe(false);
+  expect(useGameStore.getState().wormPauseMenuOpen).toBe(false);
+  expect(host.querySelector('.worm-pause-card')).toBeNull();
+  act(() => useGameStore.getState().setCaptureMode(false));
+  expect(host.querySelector('[aria-label="Pause"]')).not.toBeNull();
+});

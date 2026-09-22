@@ -5,6 +5,8 @@
 // antipodal face pair — demonstrating how RP² identification works:
 // travelling through a face returns you to the opposite face with a half-twist.
 
+import CaptureChrome from '../capture/CaptureChrome.jsx';
+import CapturePanel from '../capture/CapturePanel.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { XpReceipt } from '../../progression/ProgressWidgets.jsx';
 import React, { useState, useEffect, Suspense } from 'react';
@@ -106,6 +108,7 @@ export default function MobiusCubeletScreen({ onBack }) {
         transition: 'opacity 0.32s ease, transform 0.32s cubic-bezier(0.22,1,0.36,1)',
       }}
     >
+      <CaptureChrome>
       {/* ── Header ── */}
       <div
         style={{
@@ -198,6 +201,7 @@ export default function MobiusCubeletScreen({ onBack }) {
         </button>
       </div>
 
+      </CaptureChrome>
       {/* ── 3D Canvas ── */}
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <Canvas
@@ -217,6 +221,7 @@ export default function MobiusCubeletScreen({ onBack }) {
           {!autoRotate && <OrbitControls enablePan={false} minDistance={3} maxDistance={10} />}
         </Canvas>
 
+        <CaptureChrome>
         {/* Drag hint when auto-rotate is off */}
         {!autoRotate && (
           <div
@@ -235,8 +240,10 @@ export default function MobiusCubeletScreen({ onBack }) {
             Drag to rotate
           </div>
         )}
+        </CaptureChrome>
       </div>
 
+      <CaptureChrome>
       {/* ── Legend ── */}
       <div
         style={{
@@ -268,6 +275,8 @@ export default function MobiusCubeletScreen({ onBack }) {
         </div>
         <XpReceipt mode="explore" />
       </div>
+      <details style={{ padding: '0 20px 16px', color: NIGHT_TEXT, fontFamily: UI_FONT }}><summary>Capture Mode</summary><CapturePanel viewer /></details>
+      </CaptureChrome>
     </div>
   );
 }
