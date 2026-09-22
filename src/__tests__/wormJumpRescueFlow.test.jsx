@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import React, { act, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -8,7 +9,7 @@ import { resetLiveRotation } from '../worm/liveRotation.js';
 import { combatBridge } from '../worm/combat/portalCombat.js';
 import { getNextSurfacePosition } from '../worm/wormLogic.js';
 import { tileKey } from '../worm/healerWorm/wormSim.js';
-import { ttReset, ttPush } from '../worm/circularBuffers.js';
+import { ttReset, ttPush, shReset, shPush } from '../worm/circularBuffers.js';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import WormSwipeControls from '../worm/WormSwipeControls.jsx';
 import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
@@ -40,6 +41,11 @@ beforeEach(() => {
   ttReset(worm.tileTrail.current, key);
   ttPush(worm.tileTrail.current, '0,0,4,PZ');
   ttPush(worm.tileTrail.current, tileKey(worm.pos.current));
+  const center = worm.curWorldPos.current.clone().add(new THREE.Vector3(1, 0, 0.08));
+  const n = new THREE.Vector3(0, 0, 1);
+  shReset(worm.stepHistory.current);
+  shPush(worm.stepHistory.current, center.clone().add(new THREE.Vector3(0, -1, 0)), n, 0, 0, 4);
+  shPush(worm.stepHistory.current, center.clone().add(new THREE.Vector3(0, 1, 0)), n, 0, 0, 4);
   for (let i = 0; i < 100 && !state().wormJumpRescueActive; i++) frame();
   expect(state().wormJumpRescueActive).toBe(true);
 });

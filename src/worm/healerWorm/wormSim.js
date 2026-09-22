@@ -2,7 +2,7 @@ import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js
 import { makeSignature, activateSignature, tickSignature, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
-import { makeInchGaitState, advanceInchGaitState } from './inchGait.js';
+import { makeInchGaitState, advanceInchGaitState, inchGaitInto } from './inchGait.js';
 // src/worm/healerWorm/wormSim.js
 //
 // Pure(-ish) worm simulation core, extracted from useWormCrawler.js (2026-07).
@@ -457,13 +457,13 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
     const next = size ? getNextSurfacePosition(sim.pos, sim.moveDir, size) : null;
     if (sim.crossingCorner || (next && next.dirKey !== sim.pos.dirKey)) {
-        sim.jumpSpan = 2.4;
-        sim.jumpHeight = 2.4;
+        sim.jumpSpan = 1.6;
+        sim.jumpHeight = 1.5;
         // An in-progress corner keeps its existing path; changing it mid-step would snap.
     }
     if (grounded && !sim.restRead && !liveRotation.active && consumeSpring(sim)) {
-        sim.jumpSpan = 3.2;
-        sim.jumpHeight = 3.0;
+        sim.jumpSpan = 2.2;
+        sim.jumpHeight = 1.8;
         ctx.onStoryMechanic?.('grassLaunch');
     }
     ctx.feel('jump');
@@ -471,32 +471,55 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     sim.pendingTunnelTrigger = null;
 }
 
-/** Compare each nearby body height: a head can pass above OR below a jump arc. */
-export function hasJumpClearance(sim) {
-    const normal = evaluatePosAndNormal(sim, sim.interpT, _evalHPos);
-    const headHeight = _evalHPos.dot(normal) + WORM_LIFT + jumpLiftOf(sim);
-    let nearbyBody = false;
-    let distance = 0;
+const collisionHead = new THREE.Vector3();
+const collisionBody = new THREE.Vector3();
+const collisionNormal = new THREE.Vector3();
+const collisionGait = { dist: 0, arch: 0 };
+
+/** Tile trails are broad phase only: test the occupied body, including inch arches. */
+export function hasJumpClearance(sim, progress = sim.interpT) {
+    const normal = evaluatePosAndNormal(sim, progress, _evalHPos);
+    collisionHead.copy(_evalHPos).addScaledVector(normal, WORM_LIFT + jumpLiftOf(sim));
     const history = sim.stepHistory;
-    const reach = sim.tailLength * BODY_BALL_SPACING;
-    for (let i = 1; i < history.count; i++) {
-        const point = shAt(history, i);
-        distance += point.pos.distanceTo(shAt(history, i - 1).pos);
-        if (distance > reach) break;
-        if (distance < 1 || point.transit || point.normal.dot(normal) < 0.9) continue;
-        const height = point.pos.dot(normal);
-        const dx = point.pos.x - _evalHPos.x;
-        const dy = point.pos.y - _evalHPos.y;
-        const dz = point.pos.z - _evalHPos.z;
-        const vertical = height - _evalHPos.dot(normal);
-        if (dx * dx + dy * dy + dz * dz - vertical * vertical < 0.25) {
-            nearbyBody = true;
-            if (Math.abs(headHeight - height) <= 0.45) return false;
+    // A missing path cannot disprove a tile collision (e.g. during initialization).
+    if (history.count < 2) return jumpLiftOf(sim) > 0.45;
+    let a = collisionHead;
+    let an = normal;
+    let index = 0;
+    let b = shAt(history, index);
+    let distance = 0;
+    let length = a.distanceTo(b.pos);
+    const gait = sim.bodyGait;
+    for (let bead = 1; bead < sim.tailLength; bead++) {
+        let target = bead * BODY_BALL_SPACING;
+        let arch = 0;
+        if (gait?.enabled && gait.shape.height !== undefined) {
+            inchGaitInto(collisionGait, bead, sim.tailLength, gait.phase, gait.move, gait.shape);
+            target = collisionGait.dist;
+            arch = collisionGait.arch * gait.shape.height;
         }
+        while (distance + length < target && index + 1 < history.count) {
+            distance += length;
+            a = b.pos;
+            an = b.normal;
+            b = shAt(history, ++index);
+            length = a.distanceTo(b.pos);
+        }
+        if (target > distance + length) break;
+        // The connected neck is not a self-crossing.
+        if (target < 1 || b.transit) continue;
+        const t = length > 0 ? (target - distance) / length : 0;
+        collisionNormal.lerpVectors(an, b.normal, t).normalize();
+        if (collisionNormal.dot(normal) < 0.9) continue;
+        collisionBody.lerpVectors(a, b.pos, t).addScaledVector(collisionNormal, arch);
+        collisionBody.sub(collisionHead);
+        const vertical = collisionBody.dot(normal);
+        // Two 0.092-radius beads, with a small tolerance for sampling.
+        if (collisionBody.lengthSq() - vertical * vertical < 0.04 && Math.abs(vertical) <= 0.2) return false;
     }
-    // If no local samples are available, retain the conservative tile-level
-    // ground-body fallback. Never let one high segment hide a lower segment.
-    return nearbyBody || jumpLiftOf(sim) > 0.45;
+    // Empty space on a previously visited tile is safe, including the approach
+    // to an overhead strand. Keep checking until the head leaves the tile.
+    return true;
 }
 
 /** Start or refresh the protected rocket arc. */
@@ -606,7 +629,8 @@ function tickJumpRescue(sim, delta, size, ctx) {
         return true;
     }
     if (!ctx.isJumpRescueEnabled?.() || !eligible || candidate.rescueOffered ||
-        sim.interpT > 0.1 || !pendingBodyStillPresent(sim) || hasJumpClearance(sim)) return false;
+        sim.interpT > 0.1 || !pendingBodyStillPresent(sim) ||
+        (hasJumpClearance(sim, 0.6) && hasJumpClearance(sim, 0.8) && hasJumpClearance(sim, 1))) return false;
     const queuedJump = sim.pendingTurns.indexOf('jump');
     if (queuedJump >= 0) {
         // Reward proactive jumping without interrupting it or hiding it behind steering.

@@ -34,8 +34,8 @@ describe('elemental gameplay', () => {
         const sim = simOf('grass');
         addElementalPatch(sim, sim.pos, 'grass');
         startJump(sim, { feel() {} });
-        expect(sim.jumpSpan).toBe(3.2);
-        expect(sim.jumpHeight).toBe(3.0);
+        expect(sim.jumpSpan).toBe(2.2);
+        expect(sim.jumpHeight).toBe(1.8);
         expect(sim.elementalPatches.size).toBe(0);
         addElementalPatch(sim, sim.pos, 'grass');
         startJump(sim, { feel() {} });

@@ -20,7 +20,7 @@ export function bodyDistanceAt(worm, index) {
 // its lift; only the live head needs that offset added here.
 export function bodyPathHeadInto(out, worm, transit = false) {
   out.copy(worm.headInterpPos.current);
-  const lift = WORM_LIFT + (worm.isJumping?.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0);
+  const lift = WORM_LIFT + (worm.isJumping?.current ? worm.jumpLift() : 0);
   return out.addScaledVector(worm.currentNormal.current, transit ? 0 : lift);
 }
 

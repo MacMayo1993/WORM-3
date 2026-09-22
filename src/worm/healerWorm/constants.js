@@ -151,8 +151,8 @@ export const CUT_FOCUS_DURATION = 1.6;
 export const TRAIL_HISTORY_CAP = 8000;
 
 // Surface-worm jump physics (distinct from crawlerPhysics.js JUMP_HEIGHT which is 0.35).
-export const SURFACE_JUMP_HEIGHT = 2.2;   // tall arc — astronaut bounding in low gravity
-export const SURFACE_JUMP_TILE_SPAN = 2;  // two traversed tiles at every crawl speed
+export const SURFACE_JUMP_HEIGHT = 1.3;   // compact hop with room to clear a strand
+export const SURFACE_JUMP_TILE_SPAN = 1.25; // distance stays consistent at every crawl speed
 
 // ─── Speed boost (HUD button beside JUMP) ─────────────────────────────────────
 export const WORM_SPEED_OPTIONS = [

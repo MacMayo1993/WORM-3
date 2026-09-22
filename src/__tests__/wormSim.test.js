@@ -33,7 +33,7 @@ import {
 import { makeCubies } from '../game/cubeState.js';
 import * as THREE from 'three';
 import { liveRotation } from '../worm/liveRotation.js';
-import { inchCrawlAdvance } from '../worm/healerWorm/inchGait.js';
+import { inchCrawlAdvance, advanceInchGaitState } from '../worm/healerWorm/inchGait.js';
 import { shPush, shAt, shReset, ttAt, ttReset, ttPush } from '../worm/circularBuffers.js';
 import { getNextSurfacePosition } from '../worm/wormLogic.js';
 import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
@@ -120,6 +120,14 @@ describe('jump rescue window', () => {
     sim.stepAcc = 100; // start the next step now, then restore its accumulator
     stepWormSim(sim, 0, size, ctx);
     sim.stepAcc = 0;
+    // Supply an occupied crossing, not only a tile-trail label.
+    const center = new THREE.Vector3();
+    const normal = evaluatePosAndNormal(sim, 0.6, center).clone();
+    center.addScaledVector(normal, 0.08);
+    const side = new THREE.Vector3(0, 1, 0);
+    shReset(sim.stepHistory);
+    shPush(sim.stepHistory, center.clone().addScaledVector(side, -1), normal, 0, 0, 0);
+    shPush(sim.stepHistory, center.clone().addScaledVector(side, 1), normal, 0, 0, 0);
     expect(sim.pendingSelfCollision?.key).toBe(key);
     return { sim, ctx };
   }
@@ -1006,7 +1014,7 @@ describe('contextual jump mechanics', () => {
     sim.pos = { x: 1, y: 2, z: 2, dirKey: 'PZ' };
     sim.moveDir = 'up';
     startJump(sim, makeCtx(), SIZE);
-    expect(sim.jumpSpan).toBe(2.4);
+    expect(sim.jumpSpan).toBe(1.6);
     sim.crossingCorner = true;
     sim.cornerVault = true;
     sim.prevDirKey = 'PZ';
@@ -1055,6 +1063,46 @@ describe('contextual jump mechanics', () => {
       stepWormSim(sim, 0, SIZE, ctx);
       expect(sim.alive).toBe(false);
     });
+
+  it('allows the entire approach beneath an arch, including empty space before it', () => {
+    const sim = makeSim();
+    sim.prevWorldPos = new THREE.Vector3(-1, 0, 1.52);
+    sim.curWorldPos = new THREE.Vector3(0, 0, 1.52);
+    sim.pos.dirKey = 'PZ';
+    sim.tailLength = 100;
+    const normal = new THREE.Vector3(0, 0, 1);
+    shReset(sim.stepHistory);
+    shPush(sim.stepHistory, new THREE.Vector3(0, -1, 2.8), normal, 1, 1, 2);
+    shPush(sim.stepHistory, new THREE.Vector3(0, 1, 2.8), normal, 1, 1, 2);
+    for (let progress = 0; progress <= 1; progress += 0.05) {
+      sim.interpT = progress;
+      expect(hasJumpClearance(sim)).toBe(true);
+    }
+    // Sparse records still describe a continuous strand between their endpoints.
+    shReset(sim.stepHistory);
+    shPush(sim.stepHistory, new THREE.Vector3(0, -1, 1.6), normal, 1, 1, 2);
+    shPush(sim.stepHistory, new THREE.Vector3(0, 1, 1.6), normal, 1, 1, 2);
+    sim.interpT = 1;
+    expect(hasJumpClearance(sim)).toBe(false);
+  });
+
+  it('includes the inch gait lift when checking a low raised strand', () => {
+    const sim = makeSim();
+    sim.interpT = 1;
+    sim.curWorldPos = new THREE.Vector3(0, 0, 1.52);
+    sim.pos.dirKey = 'PZ';
+    sim.tailLength = 100;
+    const normal = new THREE.Vector3(0, 0, 1);
+    shReset(sim.stepHistory);
+    shPush(sim.stepHistory, new THREE.Vector3(0, -1, 1.75), normal, 1, 1, 2);
+    shPush(sim.stepHistory, new THREE.Vector3(0, 1, 1.75), normal, 1, 1, 2);
+    expect(hasJumpClearance(sim)).toBe(false);
+    advanceInchGaitState(sim.bodyGait, 1, 100, 10);
+    Object.assign(sim.bodyGait, { enabled: true, move: 1, phase: 0 });
+    expect(hasJumpClearance(sim)).toBe(true);
+    sim.bodyGait.move = 0;
+    expect(hasJumpClearance(sim)).toBe(false);
+  });
 
   it('requires real clearance and detects an already airborne body underneath', () => {
     const sim = makeSim();
