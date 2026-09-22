@@ -1,4 +1,4 @@
-import { accessoryFraming, accessoryPreviewEquipment, EMPTY_ACCESSORIES } from '../../worm/handmadeAccessoriesData.js';
+import { getCraftDetails, accessoryFraming, accessoryPreviewEquipment, EMPTY_ACCESSORIES } from '../../worm/handmadeAccessoriesData.js';
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -496,6 +496,7 @@ const StoreCollection = ({ onClose, onChests }) => {
             <div className="catalogue-preview-art">{heroArt()}</div>
             <div className="catalogue-preview-info"><span className="catalogue-kicker">{TYPE_LABEL[focused.type]} · {focusIndex + 1}/{items.length}</span>
               <h3>{focused.label}</h3>
+              {getCraftDetails(focused.accessoryId ?? focused.hatId) && <p>{getCraftDetails(focused.accessoryId ?? focused.hatId).description}</p>}
               <button className="catalogue-action" disabled={heroEquipped || (!heroOwned && !canAfford)} onClick={() => {
                 if (heroOwned) { equip(focused); showToast(`${focused.label} applied`); } else buy(focused);
               }}>{heroEquipped ? '✓ Equipped' : heroOwned ? 'Equip' : `Unlock · ${focused.price} PP`}</button>
