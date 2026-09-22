@@ -16,8 +16,8 @@ export const SIGNATURES = {
   mobi: { name: 'Create Wormhole', short: 'Tunnel', cooldown: 0, duration: 0, color: '#ceacff', hint: 'Open a tunnel beneath you without spending orbs. No re-entry for 10 seconds. Heal it before creating another.' },
 };
 export const SPRING_CHARGE = 0.24;
-export const SPRING_SPAN = 3.2;
-export const SPRING_HEIGHT = 3.0;
+export const SPRING_SPAN = 2.2;
+export const SPRING_HEIGHT = 1.8;
 export const signatureKey = p => p ? `${p.x},${p.y},${p.z},${p.dirKey}` : '';
 export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, sweep: null, mobiTunnel: null, mobiOpening: false, trailStartSeq: 0, fxT: 0, fxTile: null });
 const stickerAt = (ctx, p) => ctx.getCubies()?.[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];

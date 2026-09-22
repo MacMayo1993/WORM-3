@@ -30,6 +30,7 @@ function makeWorm(size, dirKey = 'PZ') {
     phase: ref('crawling'), tailLength: ref(28), pos: ref(pos), moveDir: ref('up'),
     headInterpPos: ref(head), currentNormal: ref(FACE_NORMALS[dirKey].clone()),
     prevWorldPos: ref(null), curWorldPos: ref(null), activeTunnel: ref(null), tunnelProgress: ref(0),
+    jumpLift() { return this.isJumping.current ? Math.sin(this.jumpT.current * Math.PI) * 1.3 : 0; },
     rocketActive: ref(false), rocketT: ref(0), isJumping: ref(false), jumpT: ref(0)
   };
 }
@@ -44,7 +45,7 @@ function expectCentered(worm, size) {
   const head = worm.headInterpPos.current.clone();
   if (worm.phase.current === 'crawling') {
     head.addScaledVector(worm.currentNormal.current, WORM_LIFT +
-      (worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0));
+      (worm.isJumping.current ? worm.jumpLift() : 0));
   }
   rocketOrbitInto(head, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current));
   const ndc = head.project(scene.camera);

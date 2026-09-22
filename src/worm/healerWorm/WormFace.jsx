@@ -135,7 +135,7 @@ export function WormFace({ worm, size }) {
                 _faceHeadPos.copy(cur);
             }
             const jumpLiftVal = worm.isJumping.current
-                ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
+                ? worm.jumpLift() : 0;
             _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal);
             // Ride the same orbit the body rides during a rocket burn, so the face
             // stays on the risen head instead of tracking its own face normal.
@@ -165,7 +165,7 @@ export function WormFace({ worm, size }) {
             normal = worm.currentNormal.current;
             mobi.group.position.copy(worm.headInterpPos.current);
             if (!bodyTransit) {
-                const jump = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
+                const jump = worm.isJumping.current ? worm.jumpLift() : 0;
                 mobi.group.position.addScaledVector(normal, WORM_LIFT + jump);
             }
             rocketOrbitInto(mobi.group.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
