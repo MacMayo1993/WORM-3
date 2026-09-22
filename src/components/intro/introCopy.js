@@ -4,9 +4,9 @@ import { ramp } from './introChoreography.js';
  * Keep the complete-line hold and title handoff enforced by introCopy.test.js.
  */
 export const INTRO_COPY = [
-  { start: 0.1, end: 2.5, label: '01 / THE FLIP', text: 'Flip the familiar.' },
-  { start: 2.7, end: 4.8, label: '02 / THE SHORTCUT', text: 'Find another way.' },
-  { start: 5.0, end: 7.0, label: '03 / YOUR MOVE', text: 'Make your move.' }
+  { start: 0.1, end: 2.5, text: 'Flip the familiar.' },
+  { start: 2.7, end: 4.8, text: 'Find another way.' },
+  { start: 5.0, end: 7.0, text: 'Make your move.' }
 ];
 
 export const WORD_INTERVAL = 0.22; // gap between word reveals — must exceed WORD_FADE
