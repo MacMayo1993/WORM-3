@@ -75,7 +75,7 @@ const DRAG_THRESHOLD = isTouchDevice ? 8 : 5;
 
 // Max camera distance per cube size — defined once at module scope to avoid
 // creating a new object literal on every CubeAssembly render.
-const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85, 15: 175 };
+const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85, 8: 98, 9: 110, 10: 123, 15: 175 };
 
 // Pixels of drag to complete a 90° rotation
 const PIXELS_PER_90DEG = 100;

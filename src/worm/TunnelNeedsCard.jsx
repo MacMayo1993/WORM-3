@@ -24,10 +24,10 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
   return <aside className="worm-tunnel-needs" data-heal-ready={funded} aria-label="Tunnel healing requirements" style={{ color: GAME_HUD.text, background: funded ? 'rgba(22,65,39,0.94)' : 'rgba(76,27,32,0.94)', border: `1px solid ${funded ? '#8ee5a6' : '#f08d91'}`, borderRadius: 16, padding: '8px 10px', width: '100%', boxSizing: 'border-box', pointerEvents: 'none', boxShadow: '0 6px 20px #0005' }}>
 
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span aria-hidden="true" style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: need.isPrism ? 'conic-gradient(#ff739a,#ffdc72,#93e59c,#7cdaff,#b996ff,#ff739a)' : need.color, border: '2px solid #ffffffc0', boxShadow: `0 0 12px ${need.color}70`, display: 'grid', placeItems: 'center', color: '#16201a', fontWeight: 700 }}>{need.voided ? '×' : need.ready ? '✓' : need.pickupsNeeded}</span>
+      <span aria-hidden="true" style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: need.isPrism ? 'conic-gradient(#ff739a,#ffdc72,#93e59c,#7cdaff,#b996ff,#ff739a)' : need.color, border: '2px solid #ffffffc0', boxShadow: `0 0 12px ${need.color}70`, display: 'grid', placeItems: 'center', color: '#16201a', fontWeight: 900 }}>{need.voided ? '×' : need.ready ? '✓' : need.pickupsNeeded}</span>
       <div>
-        <div style={{ fontSize: 9, letterSpacing: 0.2, opacity: 0.72 }}>{location}</div>
-        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>{title}</div>
+        <div style={{ fontSize: 9, letterSpacing: 1.1, opacity: 0.72 }}>{location}</div>
+        <div style={{ fontSize: 13, fontWeight: 900, lineHeight: 1.5 }}>{title}</div>
       </div>
     </div>
     {!need.voided && !need.inTransit && <div role="progressbar" aria-label="Healing energy deposited" aria-valuetext={`${Math.round(need.savedFraction * 100)}% deposited, ${Math.round(need.payableFraction * 100)}% available from carried orbs`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(need.savedFraction * 100)} style={{ display: 'flex', overflow: 'hidden', height: 5, background: '#0005', borderRadius: 4, margin: '7px 0 5px' }}>

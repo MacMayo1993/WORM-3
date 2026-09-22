@@ -169,13 +169,13 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
           }}>
             <span style={{
               fontFamily: UI_FONT,
-              fontSize: 14, fontWeight: 700, letterSpacing: "0.01em",
-              textTransform: "none", color: pencilLead,
+              fontSize: 14, fontWeight: 700, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: pencilLead,
             }}>MOBI</span>
             <span style={{
               fontFamily: UI_FONT,
-              fontSize: 9, fontWeight: 600, letterSpacing: "0.01em",
-              textTransform: "none", color: accentSolid, opacity: 0.82,
+              fontSize: 9, fontWeight: 600, letterSpacing: '0.15em',
+              textTransform: 'uppercase', color: accentSolid, opacity: 0.82,
             }}>
               {`Level ${isFinale ? '∞' : level.id} · ${level.name}`}
             </span>
@@ -225,7 +225,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '6px',
         }}>
           <span style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
             color: accentSolid, opacity: 0.82, fontFamily: UI_FONT,
           }}>
             {`${level.cubeSize}×${level.cubeSize}`} · {level.difficulty}
@@ -285,7 +285,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
                   background: 'none', border: '1px solid rgba(53,64,74,0.22)',
                   color: 'rgba(53,64,74,0.58)', fontSize: '11px', fontWeight: 500,
                   padding: '5px 12px', borderRadius: '999px', cursor: 'pointer',
-                  fontFamily: UI_FONT, letterSpacing: "0.01em", transition: 'all 0.15s',
+                  fontFamily: UI_FONT, letterSpacing: '0.06em', transition: 'all 0.15s',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.42)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(53,64,74,0.58)'; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
@@ -303,7 +303,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
                   background: 'none', border: '1px solid rgba(53,64,74,0.22)',
                   color: 'rgba(53,64,74,0.58)', fontSize: '11px', fontWeight: 500,
                   padding: '5px 12px', borderRadius: '999px', cursor: 'pointer',
-                  fontFamily: UI_FONT, letterSpacing: "0.01em", transition: 'all 0.15s',
+                  fontFamily: UI_FONT, letterSpacing: '0.06em', transition: 'all 0.15s',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.42)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(53,64,74,0.58)'; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
@@ -320,7 +320,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
                 color: isLast ? '#fbf7e9' : accentSolid,
                 fontSize: '12px', fontWeight: 700,
                 padding: '6px 22px', borderRadius: '999px', cursor: 'pointer',
-                fontFamily: UI_FONT, letterSpacing: "0.01em", textTransform: "none",
+                fontFamily: UI_FONT, letterSpacing: '0.08em', textTransform: 'uppercase',
                 boxShadow: isLast ? '0 6px 14px rgba(53,64,74,0.20)' : '0 3px 8px rgba(53,64,74,0.08)',
                 transition: 'all 0.18s',
               }}

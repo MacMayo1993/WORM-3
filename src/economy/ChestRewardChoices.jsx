@@ -1,3 +1,4 @@
+import { accessoryFraming, accessoryPreviewEquipment } from '../worm/handmadeAccessoriesData.js';
 import React, { useEffect, useRef } from 'react';
 import WormPreviewCanvas from '../3d/WormPreviewCanvas.jsx';
 import CubePreviewCanvas from '../3d/CubePreviewCanvas.jsx';
@@ -17,7 +18,7 @@ function RewardPreview({ item }) {
     </svg>;
   }
   return <WormPreviewCanvas size={88} characterId={item.characterId ?? 'classic'}
-    skinId={item.skinId ?? 'slime'} hatId={item.hatId ?? 'none'} framing={item.type === 'hat' ? 'head' : 'body'} />;
+    accessories={accessoryPreviewEquipment(item)} skinId={item.skinId ?? 'slime'} hatId={item.hatId ?? 'none'} framing={item.type === 'accessory' ? accessoryFraming(item.slot) : item.type === 'hat' ? 'head' : 'body'} />;
 }
 
 export default function ChestRewardChoices({ receipt, ownedItems, onChoose }) {

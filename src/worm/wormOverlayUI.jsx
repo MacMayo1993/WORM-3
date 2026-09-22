@@ -14,7 +14,7 @@
 // screens additionally tint that scrim toward their cause's colour.
 import React from 'react';
 import {
-    UI_FONT, HEADING_FONT, MONO_FONT,
+    UI_FONT, HEADING_FONT, DISPLAY_FONT, MONO_FONT,
     NIGHT_BACKDROP_BLUR, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHEET, NIGHT_BORDER, UI_MOSS, UI_ACTION_SHADOW,
 } from '../utils/uiTheme.js';
 
@@ -85,8 +85,8 @@ export function overlayCardStyle(accent, { width = 460 } = {}) {
 export function Eyebrow({ accent, children }) {
     return (
         <div style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: 0.2,
-            color: accent, textTransform: "none", opacity: 0.9,
+            fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+            color: accent, textTransform: "uppercase", opacity: 0.9,
         }}>{children}</div>
     );
 }
@@ -94,10 +94,10 @@ export function Eyebrow({ accent, children }) {
 export function OverlayTitle({ children, size, outline: _outline, glow: _glow, animation }) {
     return (
         <div style={{
-            fontFamily: HEADING_FONT, fontWeight: 750,
+            fontFamily: DISPLAY_FONT, fontWeight: 400, textTransform: 'uppercase',
             fontSize: size,
             lineHeight: 1.02,
-            letterSpacing: '-1px',
+            letterSpacing: '0.02em',
             color: '#fff',
             marginTop: 6,
             textShadow: '0 2px 0 rgba(0,0,0,0.2)',
@@ -136,7 +136,7 @@ export function HeroStat({ accent, value, label }) {
             }}>{value}</div>
             <div style={{
                 marginTop: 'clamp(4px, 1vh, 8px)', fontSize: 10.5, fontWeight: 800,
-                letterSpacing: 0, textTransform: 'none', color: NIGHT_TEXT_MUTED,
+                letterSpacing: '0.06em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED,
             }}>{label}</div>
         </div>
     );
@@ -160,8 +160,8 @@ export function StatTiles({ stats, columns }) {
                 }}>
                     <div style={{ fontSize: 17, fontWeight: 700, color: '#fff', lineHeight: 1.1 }}>{value}</div>
                     <div style={{
-                        marginTop: 5, fontSize: 12, fontWeight: 500,
-                        letterSpacing: 0, textTransform: 'none', color: NIGHT_TEXT_MUTED,
+                        marginTop: 5, fontSize: 10, fontWeight: 800,
+                        letterSpacing: '0.06em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED,
                     }}>{label}</div>
                 </div>
             ))}
@@ -190,8 +190,8 @@ export function OverlayChip({ accent, label, value, mono = true }) {
             border: '1px solid rgba(255,245,220,0.10)',
         }}>
             <span style={{
-                fontSize: 9.5, fontWeight: 700, letterSpacing: 0.2,
-                textTransform: "none", color: NIGHT_TEXT_MUTED, flexShrink: 0,
+                fontSize: 9.5, fontWeight: 700, letterSpacing: '0.08em',
+                textTransform: "uppercase", color: NIGHT_TEXT_MUTED, flexShrink: 0,
             }}>{label}</span>
             <span style={{
                 fontFamily: mono ? MONO_FONT : UI_FONT, fontSize: 12, color: accent,

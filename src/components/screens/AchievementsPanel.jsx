@@ -49,7 +49,7 @@ function AchievementTile({ achievement }) {
 
       <span style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
         <span style={{
-          fontSize: '12px', fontWeight: 700, letterSpacing: '-0.01em',
+          fontSize: '12px', fontWeight: 800, letterSpacing: '-0.01em',
           color: earned ? PAPER_TEXT : PAPER_TEXT_MUTED,
         }}>{label}</span>
         {/* The description is how it is earned — locked tiles need it most, so it
@@ -85,11 +85,11 @@ export default function AchievementsPanel({ earned = [] }) {
           boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`,
         }}
       >
-        <span style={{ fontSize: '15px', fontWeight: 700, color: PAPER_TEXT, letterSpacing: '-0.02em' }}>
+        <span style={{ fontSize: '15px', fontWeight: 900, color: PAPER_TEXT, letterSpacing: '-0.02em' }}>
           Achievements
         </span>
         <span style={{
-          fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
+          fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
           color: earnedCount > 0 ? EARNED_ACCENT : PAPER_TEXT_FAINT,
           background: earnedCount > 0 ? `${EARNED_ACCENT}18` : PAPER_BG_MUTED,
           border: `1px solid ${earnedCount > 0 ? `${EARNED_ACCENT}44` : PAPER_BORDER}`,

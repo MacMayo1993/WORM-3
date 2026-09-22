@@ -152,9 +152,9 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       flex: 1,
       textAlign: 'center',
       fontSize: mobile ? TEXT_XS : TEXT_SM,
-      fontWeight: 700,
-      letterSpacing: "0.01em",
-      textTransform: "none",
+      fontWeight: 800,
+      letterSpacing: '0.22em',
+      textTransform: 'uppercase',
       color: WIZ_TEXT,
       textShadow: 'none',
       // Balances the back button so the name sits on the sheet's centre line.
@@ -297,8 +297,8 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       border: `1px solid ${accent}`,
       fontSize: TEXT_SM,
       fontWeight: '800',
-      letterSpacing: "0.01em",
-      textTransform: "none",
+      letterSpacing: '0.10em',
+      textTransform: 'uppercase',
       color: '#111d20',
       cursor: 'pointer',
       minHeight: TOUCH_TARGET + 4,
@@ -343,8 +343,8 @@ export function WizardSectionHeading({ children, style }) {
         padding: '6px 0',
         fontSize: TEXT_MICRO,
         fontWeight: '700',
-        letterSpacing: "0.01em",
-        textTransform: "none",
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
         color: WIZ_TEXT_FAINT,
         background: WIZ_BASE,
         ...style
@@ -511,9 +511,9 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
             <span
               style={{
                 fontSize: TEXT_MICRO,
-                fontWeight: 700,
-                letterSpacing: "0.01em",
-                textTransform: "none",
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
                 lineHeight: 1.2,
                 color: isActive ? WIZ_TEXT : WIZ_TEXT_MUTED,
                 whiteSpace: 'nowrap'
@@ -607,7 +607,7 @@ export function WizardShell({
             </svg>
             {!mobile && (active === 0 ? 'Cancel' : 'Back')}
           </button>
-          <span className="mode-wizard-kicker">{theme.name.charAt(0) + theme.name.slice(1).toLowerCase()}</span>
+          <span className="mode-wizard-kicker">{theme.name}</span>
           <span className="mode-wizard-count">{String(active + 1).padStart(2, '0')} / {String(categories.length).padStart(2, '0')}</span>
         </div>
 

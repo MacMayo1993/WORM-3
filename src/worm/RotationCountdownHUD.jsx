@@ -113,9 +113,9 @@ export default function RotationCountdownHUD() {
         ref={labelRef}
         style={{
           fontSize: 8.5,
-          fontWeight: 700,
-          letterSpacing: "0.01em",
-          textTransform: "none",
+          fontWeight: 800,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
           color: NIGHT_TEXT_MUTED,
           whiteSpace: 'nowrap'
         }}
@@ -131,7 +131,7 @@ export default function RotationCountdownHUD() {
         ref={secondsRef}
         style={{
           fontSize: 13,
-          fontWeight: 700,
+          fontWeight: 800,
           fontFamily: MONO_FONT,
           fontVariantNumeric: 'tabular-nums',
           color: CALM,

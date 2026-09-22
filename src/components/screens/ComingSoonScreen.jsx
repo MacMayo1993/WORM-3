@@ -55,8 +55,8 @@ const Tag = ({ label, accent }) => (
       borderRadius: '20px',
       fontSize: '10px',
       fontWeight: 700,
-      letterSpacing: "0.01em",
-      textTransform: "none",
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase',
       color: accent,
       background: `${accent}14`,
       border: `1px solid ${accent}28`,
@@ -113,7 +113,7 @@ const ModeCard = ({ item, isSelected, onClick, onPlay }) => {
             <span
               style={{
                 fontSize: '16px',
-                fontWeight: 700,
+                fontWeight: 800,
                 color: isSelected ? item.accent : PAPER_TEXT,
                 letterSpacing: '-0.02em',
                 transition: 'color 0.2s ease',
@@ -125,8 +125,8 @@ const ModeCard = ({ item, isSelected, onClick, onPlay }) => {
               style={{
                 fontSize: TEXT_MICRO,
                 fontWeight: 700,
-                letterSpacing: "0.01em",
-                textTransform: "none",
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
                 color: playable ? item.accent : PAPER_TEXT_FAINT,
                 background: playable ? `${item.accent}14` : `${PAPER_BORDER}60`,
                 border: `1px solid ${playable ? `${item.accent}44` : PAPER_BORDER}`,
@@ -179,9 +179,9 @@ const ModeCard = ({ item, isSelected, onClick, onPlay }) => {
                   background: item.accent,
                   color: '#fff',
                   fontSize: '12px',
-                  fontWeight: 700,
-                  letterSpacing: "0.01em",
-                  textTransform: "none",
+                  fontWeight: 800,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
                   cursor: 'pointer',
                   boxShadow: `0 3px 0 ${item.accent}88`,
                   fontFamily: UI_FONT,
@@ -315,9 +315,9 @@ export default function ComingSoonScreen({ onBack, onBiome, onMobiusCubelet }) {
               margin: '0 0 8px',
               color: PAPER_TEXT_FAINT,
               fontSize: '12px',
-              fontWeight: 700,
-              letterSpacing: "0.01em",
-              textTransform: "none",
+              fontWeight: 800,
+              letterSpacing: '0.24em',
+              textTransform: 'uppercase',
             }}
           >
             Off the main menu
@@ -326,7 +326,7 @@ export default function ComingSoonScreen({ onBack, onBiome, onMobiusCubelet }) {
             style={{
               margin: '0 0 8px',
               fontSize: 'clamp(24px, 6vw, 34px)',
-              fontWeight: 700,
+              fontWeight: 900,
               letterSpacing: '-0.03em',
               color: PAPER_TEXT,
               lineHeight: 1.1,
@@ -366,7 +366,7 @@ export default function ComingSoonScreen({ onBack, onBiome, onMobiusCubelet }) {
             textAlign: 'center',
             fontSize: '11px',
             color: PAPER_TEXT_FAINT,
-            letterSpacing: "0.01em",
+            letterSpacing: '0.08em',
           }}
         >
           Nothing here is on a timer. Wander.

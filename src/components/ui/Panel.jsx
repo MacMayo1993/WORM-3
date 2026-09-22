@@ -313,8 +313,8 @@ export function PanelSectionTitle({ surface = 'paper', children, style }) {
         fontSize: TEXT_SM - 2,
         fontWeight: 700,
         color: s.muted,
-        textTransform: "none",
-        letterSpacing: "0.01em",
+        textTransform: 'uppercase',
+        letterSpacing: '0.10em',
         ...style
       }}
     >

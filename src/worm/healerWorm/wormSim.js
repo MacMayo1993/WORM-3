@@ -457,13 +457,13 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
     const next = size ? getNextSurfacePosition(sim.pos, sim.moveDir, size) : null;
     if (sim.crossingCorner || (next && next.dirKey !== sim.pos.dirKey)) {
-        sim.jumpSpan = 1.6;
-        sim.jumpHeight = 1.7;
+        sim.jumpSpan = 2.4;
+        sim.jumpHeight = 2.4;
         // An in-progress corner keeps its existing path; changing it mid-step would snap.
     }
     if (grounded && !sim.restRead && !liveRotation.active && consumeSpring(sim)) {
-        sim.jumpSpan = 2.2;
-        sim.jumpHeight = 2.1;
+        sim.jumpSpan = 3.2;
+        sim.jumpHeight = 3.0;
         ctx.onStoryMechanic?.('grassLaunch');
     }
     ctx.feel('jump');
@@ -471,11 +471,11 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     sim.pendingTunnelTrigger = null;
 }
 
-/** Compare head height with the nearby, recorded body, including raised hops. */
+/** Compare each nearby body height: a head can pass above OR below a jump arc. */
 export function hasJumpClearance(sim) {
     const normal = evaluatePosAndNormal(sim, sim.interpT, _evalHPos);
     const headHeight = _evalHPos.dot(normal) + WORM_LIFT + jumpLiftOf(sim);
-    let obstacleHeight = _evalHPos.dot(normal) + WORM_LIFT;
+    let nearbyBody = false;
     let distance = 0;
     const history = sim.stepHistory;
     const reach = sim.tailLength * BODY_BALL_SPACING;
@@ -490,10 +490,13 @@ export function hasJumpClearance(sim) {
         const dz = point.pos.z - _evalHPos.z;
         const vertical = height - _evalHPos.dot(normal);
         if (dx * dx + dy * dy + dz * dz - vertical * vertical < 0.25) {
-            obstacleHeight = Math.max(obstacleHeight, height);
+            nearbyBody = true;
+            if (Math.abs(headHeight - height) <= 0.45) return false;
         }
     }
-    return headHeight - obstacleHeight > 0.45;
+    // If no local samples are available, retain the conservative tile-level
+    // ground-body fallback. Never let one high segment hide a lower segment.
+    return nearbyBody || jumpLiftOf(sim) > 0.45;
 }
 
 /** Start or refresh the protected rocket arc. */
@@ -603,7 +606,7 @@ function tickJumpRescue(sim, delta, size, ctx) {
         return true;
     }
     if (!ctx.isJumpRescueEnabled?.() || !eligible || candidate.rescueOffered ||
-        sim.interpT > 0.1 || !pendingBodyStillPresent(sim)) return false;
+        sim.interpT > 0.1 || !pendingBodyStillPresent(sim) || hasJumpClearance(sim)) return false;
     const queuedJump = sim.pendingTurns.indexOf('jump');
     if (queuedJump >= 0) {
         // Reward proactive jumping without interrupting it or hiding it behind steering.
@@ -1460,7 +1463,8 @@ const PHASE_HANDLERS = {
                 } else if (sim.isJumping && sim.interpT < SELF_COLLISION_TRIGGER_PROGRESS) {
                     // Keep the contact armed until the crossing: pressing jump
                     // alone must not grant immunity to a low or late hop.
-                } else if (sim.isJumping && hasJumpClearance(sim)) {
+                } else if (hasJumpClearance(sim)) {
+                    // Grounded heads can pass beneath an airborne body too.
                     // Retain the candidate until we leave the tile, so landing
                     // back onto the body cannot inherit an apex-only exemption.
                 } else if (sim.pendingTunnelTrigger && !sim.isJumping) {

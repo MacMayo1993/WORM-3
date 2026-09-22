@@ -1,3 +1,5 @@
+import { useGameStore } from '../hooks/useGameStore.js';
+import { resolveColors } from '../utils/colorSchemes.js';
 import { registerDirectWormPreview, updateDirectWormPreview, unregisterDirectWormPreview } from './directWormPreview.js';
 // WormPreviewCanvas.jsx
 // Drop-in <canvas> that shows the real 3D worm — same body, face, and hat you
@@ -5,7 +7,7 @@ import { registerDirectWormPreview, updateDirectWormPreview, unregisterDirectWor
 // worm needs to appear outside the game: the character plate, the store's skin
 // and hat cards, the cosmetic pickers.
 
-import React, { useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import {
   registerWormPreview,
   updateWormPreview,
@@ -32,6 +34,7 @@ export default function WormPreviewCanvas({
   characterId = 'classic',
   skinId = 'slime',
   hatId = 'none',
+  accessories,
   size = 64,
   animated = false,
   direct = false,
@@ -41,6 +44,8 @@ export default function WormPreviewCanvas({
   companion,
   style,
 }) {
+  const settings = useGameStore(s => s.settings);
+  const palette = useMemo(() => resolveColors(settings || {}), [settings]);
   const canvasRef = useRef(null);
   const idRef = useRef(null);
 
@@ -48,14 +53,14 @@ export default function WormPreviewCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (direct) {
-      const entry = registerDirectWormPreview(canvas, { characterId, skinId, hatId, animated, framing, companion });
+      const entry = registerDirectWormPreview(canvas, { characterId, skinId, hatId, accessories, palette, animated, framing, companion });
       idRef.current = entry;
       return () => { unregisterDirectWormPreview(entry); idRef.current = null; };
     }
     const px = Math.min(maxRenderPixels, Math.round(size * renderScale(maxPixelRatio)));
     canvas.width = px;
     canvas.height = px;
-    idRef.current = registerWormPreview(canvas, { characterId, skinId, hatId, animated, framing, companion });
+    idRef.current = registerWormPreview(canvas, { characterId, skinId, hatId, accessories, palette, animated, framing, companion });
     return () => {
       if (idRef.current !== null) unregisterWormPreview(idRef.current);
       idRef.current = null;
@@ -65,8 +70,8 @@ export default function WormPreviewCanvas({
   }, [size, maxPixelRatio, maxRenderPixels, direct]);
 
   useEffect(() => {
-    if (idRef.current !== null) (direct ? updateDirectWormPreview : updateWormPreview)(idRef.current, { characterId, skinId, hatId, animated, framing, companion });
-  }, [characterId, skinId, hatId, animated, framing, companion, direct]);
+    if (idRef.current !== null) (direct ? updateDirectWormPreview : updateWormPreview)(idRef.current, { characterId, skinId, hatId, accessories, palette, animated, framing, companion });
+  }, [characterId, skinId, hatId, accessories, palette, animated, framing, companion, direct]);
 
   const Surface = direct ? 'div' : 'canvas';
   return (

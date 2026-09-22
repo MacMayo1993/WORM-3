@@ -53,8 +53,8 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
         textAlign: 'center',
       }}>
         <p style={{
-          color: '#7b6f45', fontSize: 11, fontWeight: 700,
-          letterSpacing: "0.01em", textTransform: "none", margin: '0 0 6px',
+          color: '#7b6f45', fontSize: 11, fontWeight: 800,
+          letterSpacing: '0.18em', textTransform: 'uppercase', margin: '0 0 6px',
         }}>
           {explored ? 'Explore Complete' : 'Demo Complete'}
         </p>
@@ -99,7 +99,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  color: mode.primary ? UI_CREAM : '#26331f', fontSize: 15, fontWeight: 700, letterSpacing: "0.01em",
+                  color: mode.primary ? UI_CREAM : '#26331f', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em',
                 }}>
                   {mode.primary ? 'Play WORM' : mode.name}
 

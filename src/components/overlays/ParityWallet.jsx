@@ -135,7 +135,7 @@ export default function ParityWallet({ dark = false, neutral = false }) {
             whiteSpace: 'nowrap',
             fontFamily: FONT,
             fontSize: '13px',
-            fontWeight: 700,
+            fontWeight: 900,
             letterSpacing: '0.01em',
             fontVariantNumeric: 'tabular-nums',
             color: popup.amount > 0 ? upColor : downColor,
@@ -149,7 +149,7 @@ export default function ParityWallet({ dark = false, neutral = false }) {
       <span style={{
         fontSize: TEXT_XS,
         color: flashColor ?? baseColor,
-        fontWeight: 700,
+        fontWeight: 900,
         lineHeight: 1,
         transition: 'color 0.35s ease',
       }}>◈</span>
@@ -157,7 +157,7 @@ export default function ParityWallet({ dark = false, neutral = false }) {
       {/* Number */}
       <span style={{
         fontSize: '12px',
-        fontWeight: 700,
+        fontWeight: 800,
         color: flashColor ?? numColor,
         fontFamily: FONT,
         letterSpacing: '0.02em',

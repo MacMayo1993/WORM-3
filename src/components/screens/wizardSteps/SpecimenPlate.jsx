@@ -145,12 +145,12 @@ export default function SpecimenPlate({
         {/* Caption row */}
         {(caption || index != null) && (
           <div style={{ alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 1 }}>
-            <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: NIGHT_TEXT_MUTED }}>
+            <span style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
               {caption}
             </span>
             <div style={{ flex: 1, height: '1px', background: NIGHT_BORDER }} />
             {index != null && total != null && (
-              <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", color: NIGHT_TEXT_MUTED, fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.1em', color: NIGHT_TEXT_MUTED, fontVariantNumeric: 'tabular-nums' }}>
                 {index} / {total}
               </span>
             )}
@@ -197,8 +197,8 @@ export default function SpecimenPlate({
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px',
                 background: `${glow}28`, border: `1px solid ${glow}55`,
-                color: glow, fontSize: TEXT_MICRO, fontWeight: 700,
-                letterSpacing: "0.01em", textTransform: "none",
+                color: glow, fontSize: TEXT_MICRO, fontWeight: 800,
+                letterSpacing: '0.14em', textTransform: 'uppercase',
                 padding: '3px 11px', borderRadius: '999px',
                 transition: 'all 0.4s ease'
               }}>
@@ -211,7 +211,7 @@ export default function SpecimenPlate({
         {children}
 
         {hint && (
-          <div style={{ fontSize: TEXT_XS, color: NIGHT_TEXT, letterSpacing: "0.01em", zIndex: 1 }}>
+          <div style={{ fontSize: TEXT_XS, color: NIGHT_TEXT, letterSpacing: '0.06em', zIndex: 1 }}>
             {hint}
           </div>
         )}

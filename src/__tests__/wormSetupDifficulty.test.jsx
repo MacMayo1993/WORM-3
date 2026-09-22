@@ -13,6 +13,34 @@ vi.mock('../components/screens/WizardChrome.jsx', async importOriginal => ({
   </>,
 }));
 import WormModeSetupWizard from '../components/screens/WormModeSetupWizard.jsx';
+import FreeplaySetupWizard from '../components/screens/FreeplaySetupWizard.jsx';
+import RandomModeSetupWizard from '../components/screens/RandomModeSetupWizard.jsx';
+import DisparitySetupWizard from '../components/screens/DisparitySetupWizard.jsx';
+
+for (const [name, Wizard, category] of [
+  ['Worm', WormModeSetupWizard, 'Play'], ['Cube', FreeplaySetupWizard, 'Size'],
+  ['Random', RandomModeSetupWizard, 'Size'], ['Chaos', DisparitySetupWizard, 'Size']
+]) {
+  it.each([8, 9, 10])(`${name} launches the selected size-%i board`, size => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement('div'); document.body.appendChild(host);
+    const root = createRoot(host), launch = vi.fn();
+    const click = label => act(() => [...host.querySelectorAll('button')]
+      .find(b => b.textContent === label || b.getAttribute('aria-label') === label).click());
+    try {
+      act(() => root.render(<Wizard onComplete={launch} onStart={launch} />));
+      click(category); click(`${size} by ${size}`);
+      expect(host.querySelector('[aria-label="Cube size"]').getAttribute('aria-valuetext')).toContain(`${size}×${size}×${size}`);
+      const choice = host.querySelector(`[aria-label="${size} by ${size}"]`);
+      expect(choice.getAttribute('aria-pressed')).toBe('true');
+      expect(choice.style.minHeight).toBe('48px');
+      click('Scene'); click(category); // selection survives category changes
+      click('Continue');
+      expect(launch).toHaveBeenCalledWith(expect.objectContaining({ cubeSize: size }));
+      if (name === 'Worm') expect(launch.mock.lastCall[0].megaMode).toBe(false);
+    } finally { act(() => root.unmount()); host.remove(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; }
+  });
+}
 
 it.each([
   ['Easy', 2, 12, 20], ['Medium', 2.75, 10, 10], ['Hard', 3.5, 8, 5],

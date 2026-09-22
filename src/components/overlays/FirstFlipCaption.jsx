@@ -37,7 +37,7 @@ const FirstFlipCaption = () => {
         fontSize: 20,
         fontWeight: 700,
         color: '#fff',
-        letterSpacing: "0.01em",
+        letterSpacing: '0.06em',
         textAlign: 'center',
         padding: '12px 32px',
         background: 'rgba(4,6,20,0.70)',

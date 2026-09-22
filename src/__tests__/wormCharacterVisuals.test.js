@@ -1,3 +1,4 @@
+import { HANDMADE_HATS, WORM_ACCESSORIES, accessoryFraming } from '../worm/handmadeAccessoriesData.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { createCharacterGeometry, applyCharacterFinish, poseCharacterAccents } from '../worm/wormCharacterVisuals.js';
@@ -48,13 +49,13 @@ describe('character visual safety', () => {
 // Exercise the real picker rig through its renderer boundary. No WebGL mocks
 // stand in for geometry/poses; only the GPU draw and canvas texture are omitted.
 describe('picker character switching', () => {
-  let scene;
+  let scene, camera;
   const gl = {
     getRenderTarget: () => null, getScissorTest: () => false, getClearAlpha: () => 0,
     getViewport: v => v.set(0, 0, 360, 360), getScissor: v => v.set(0, 0, 360, 360),
     getClearColor: c => c.set('black'), getSize: v => v.set(360, 360),
     setRenderTarget() {}, setScissorTest() {}, setViewport() {}, setClearColor() {}, setScissor() {},
-    render: s => { scene = s; },
+    render: (s,c) => { scene = s; camera = c; },
   };
   beforeAll(() => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -99,4 +100,32 @@ describe('picker character switching', () => {
     draw('inch');
     expect(scene.getObjectByName('worm-hat').children).toHaveLength(0);
   });
+  it('frames all twenty-six handmade pieces on every character and clears unequipped models', async () => {
+    for(const characterId of ['classic','book','inch','prism','glow','mobi','wiggle']) {
+      for(const item of [...HANDMADE_HATS,...WORM_ACCESSORIES]) {
+        const opts={characterId, skinId:'slime',hatId:item.slot?'none':item.id,
+          accessories:item.slot?{[item.slot]:item.id}:{},framing:item.slot?accessoryFraming(item.slot):'portrait'};
+        drawDirectWormPreview(gl,opts,0);
+        if(!item.slot) await vi.waitFor(()=>{
+          drawDirectWormPreview(gl,opts,0);
+          expect(scene.getObjectByName('worm-hat').children.length).toBeGreaterThan(0);
+        });
+        scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
+        const root=scene.getObjectByName(item.slot?'worm-accessories':'worm-hat');
+        const groups=item.slot?root.children.filter(g=>g.visible):[root];
+        expect(groups.length).toBeGreaterThan(0);
+        for(const group of groups) {
+          const b=new THREE.Box3().setFromObject(group);
+          for(const x of [b.min.x,b.max.x])for(const y of [b.min.y,b.max.y])for(const z of [b.min.z,b.max.z]) {
+            const ndc=new THREE.Vector3(x,y,z).project(camera);
+            expect(Math.abs(ndc.x),`${characterId}/${item.id}: horizontal crop`).toBeLessThan(1.05);
+            expect(Math.abs(ndc.y),`${characterId}/${item.id}: vertical crop`).toBeLessThan(1.05);
+          }
+        }
+      }
+    }
+    draw('classic');
+    expect(scene.getObjectByName('worm-accessories').children).toHaveLength(0);
+  });
+
 });

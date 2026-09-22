@@ -73,7 +73,8 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
     case 'magnet': done = sim.magnetT > 0 && state.wormSessionOrbs >= 2; break;
     case 'water': done = practice.elementTime >= 3 && sim.waterMomentum > 0.75; break;
     case 'fire': done = practice.elementTime >= 3 && [...sim.elementalPatches.values()].some(p => p.type === 'fire'); break;
-    case 'grass': done = sim.elementalType === 'grass' && sim.isJumping && sim.jumpHeight > 2; break;
+    // Height alone cannot distinguish a normal jump from consuming a spring.
+    case 'grass': done = sim.elementalType === 'grass' && sim.isJumping && !!practice.grassLaunch; break;
     case 'ice': done = sim.elementalType === 'ice' && sim.isJumping; break;
     case 'lightning': done = practice.elementTime >= 4; break;
     case 'signature': done = practice.sawSignature && practice.elapsed >= 3; break;

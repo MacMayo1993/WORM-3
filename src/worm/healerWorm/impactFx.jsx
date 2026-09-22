@@ -118,7 +118,7 @@ export function ThunkEffect({ thunkRef }) {
                     <div ref={divRef} style={{
                         fontFamily: DISPLAY_FONT,
                         fontSize: '54px',
-                        fontWeight: 700,
+                        fontWeight: 900,
                         color: '#ffdd00',
                         textShadow: '-3px -3px 0 #cc2200, 3px -3px 0 #cc2200, -3px 3px 0 #cc2200, 3px 3px 0 #cc2200',
                         pointerEvents: 'none',

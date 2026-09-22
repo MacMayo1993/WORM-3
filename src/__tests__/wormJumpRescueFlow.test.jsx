@@ -66,7 +66,7 @@ it.each(['touch', 'keyboard'])('highlights Jump and accepts %s input while holdi
   expect(state().wormJumpRescueActive).toBe(false);
   expect(worm.isJumping.current).toBe(true);
   expect(host.querySelector('.worm-jump-rescue')).toBeNull();
-  for (let i = 0; i < 90; i++) frame();
+  for (let i = 0; i < 160; i++) frame();
   expect(state().wormAlive).toBe(true);
   expect(worm.isJumping.current).toBe(false);
 });

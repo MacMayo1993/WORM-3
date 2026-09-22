@@ -44,7 +44,10 @@ export const SIZE_TIERS = [
   { n: 4, name: '4×4×4', tag: 'Master', desc: 'Expert territory' },
   { n: 5, name: '5×5×5', tag: 'Ultra', desc: '150 stickers of chaos' },
   { n: 6, name: '6×6×6', tag: 'Mega', desc: '216 stickers of madness' },
-  { n: 7, name: '7×7×7', tag: 'Titan', desc: '294 stickers of insanity' }
+  { n: 7, name: '7×7×7', tag: 'Titan', desc: '294 stickers of insanity' },
+  { n: 8, name: '8×8×8', tag: 'Colossus', desc: '384 stickers' },
+  { n: 9, name: '9×9×9', tag: 'Goliath', desc: '486 stickers' },
+  { n: 10, name: '10×10×10', tag: 'Leviathan', desc: '600 stickers' }
 ];
 
 export const MIN_CUBE_SIZE = SIZE_TIERS[0].n;
@@ -164,7 +167,7 @@ export function LockPip({ size = 10, color = WIZ_TEXT_FAINT }) {
 export function PickerHeading({ label, hint, locked = 0, children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: '9px', margin: '0 0 8px' }}>
-      <span style={{ fontSize: '11px', fontWeight: 700, color: WIZ_TEXT_MUTED, letterSpacing: "0.01em", textTransform: "none" }}>
+      <span style={{ fontSize: '11px', fontWeight: 700, color: WIZ_TEXT_MUTED, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
         {label}
       </span>
       {hint && <span style={{ fontSize: '10px', color: WIZ_TEXT_FAINT }}>{hint}</span>}
@@ -172,7 +175,7 @@ export function PickerHeading({ label, hint, locked = 0, children }) {
       {locked > 0 && (
         <span style={{
           marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: "0.01em", color: WIZ_TEXT_FAINT
+          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: '0.06em', color: WIZ_TEXT_FAINT
         }}>
           <LockPip size={9} /> {locked} in the store
         </span>

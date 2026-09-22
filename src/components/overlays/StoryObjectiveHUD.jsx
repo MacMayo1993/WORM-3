@@ -73,7 +73,7 @@ export default function StoryObjectiveHUD({ level }) {
             <span
               title="Moves so far / Par"
               aria-label={`${moves} move${moves === 1 ? '' : 's'} of ${par} par`}
-              style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', color: parColor }}
+              style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.04em', color: parColor }}
             >
               <span aria-hidden="true">⛳ {moves}/{par}</span>
             </span>
@@ -99,8 +99,8 @@ export default function StoryObjectiveHUD({ level }) {
               background: 'rgba(30, 22, 18, 0.05)', border: '1px solid rgba(30, 22, 18, 0.10)',
             }}>
               <div style={{
-                fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em",
-                textTransform: "none", color: PAPER_TEXT_MUTED, marginBottom: '4px',
+                fontSize: TEXT_MICRO, fontWeight: 800, letterSpacing: '0.14em',
+                textTransform: 'uppercase', color: PAPER_TEXT_MUTED, marginBottom: '4px',
               }}>
                 {level.name} · {level.algorithm.quarterTurns} turns
               </div>

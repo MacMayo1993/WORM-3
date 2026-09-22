@@ -417,14 +417,14 @@ const GLANCE_LABEL_STYLE = {
     fontWeight: 700,
     letterSpacing: 0.4,
     color: TEXT_MUTED,
-    textTransform: "none",
+    textTransform: 'uppercase',
     lineHeight: 1,
     marginBottom: 3,
 };
 
 const GLANCE_VALUE_STYLE = {
     fontSize: 16,
-    fontWeight: 700,
+    fontWeight: 800,
     lineHeight: 1,
     fontVariantNumeric: 'tabular-nums',
 };
@@ -477,8 +477,8 @@ const JUMP_BTN_BASE = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    fontWeight: 700,
-    letterSpacing: 0.2,
+    fontWeight: 800,
+    letterSpacing: 1.2,
     color: TEXT,
     boxShadow: SHADOW,
 };
@@ -594,8 +594,8 @@ const SPECIAL_NOTICE_STYLE = {
     borderRadius: 999,
     background: 'rgba(15, 23, 42, 0.78)',
     fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: 0.2,
+    fontWeight: 800,
+    letterSpacing: 1.0,
     boxShadow: SHADOW,
     pointerEvents: 'none',
     whiteSpace: 'normal',
@@ -629,7 +629,7 @@ const EXAMINE_DOT_STYLE = {
     flexShrink: 0,
 };
 
-const EXAMINE_LABEL_STYLE = { fontSize: 12, fontWeight: 700, letterSpacing: 0.7, color: '#991b1b' };
+const EXAMINE_LABEL_STYLE = { fontSize: 12, fontWeight: 800, letterSpacing: 0.7, color: '#991b1b' };
 
 const EXAMINE_RESTORE_BTN_STYLE = {
     fontSize: 11, fontWeight: 700, color: '#1e293b',
@@ -674,14 +674,14 @@ const WINNER_STARS_STYLE = {
 
 const WINNER_TITLE_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 'clamp(30px, 8vw, 64px)', fontWeight: 700, letterSpacing: '-2px',
+    fontSize: 'clamp(30px, 8vw, 64px)', fontWeight: 900, letterSpacing: '-2px',
     color: UI_GOLD,
     textShadow: '0 3px 0 rgba(0,0,0,0.2)',
     userSelect: 'none', marginBottom: 4, lineHeight: 1, textAlign: 'center',
 };
 
 const WINNER_SUB_STYLE = {
-    color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, letterSpacing: 0.2, marginBottom: 28, textAlign: 'center',
+    color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, letterSpacing: 2, marginBottom: 28, textAlign: 'center',
 };
 
 const WINNER_STATS_STYLE = {
@@ -695,10 +695,10 @@ const WINNER_STAT_BOX_STYLE = {
 };
 
 const WINNER_STAT_LABEL_STYLE = {
-    fontSize: 9, fontWeight: 700, letterSpacing: 0.2, color: 'rgba(255,255,255,0.45)', marginBottom: 2,
+    fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: 'rgba(255,255,255,0.45)', marginBottom: 2,
 };
 
-const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 700, color: '#fff', lineHeight: 1.1 };
+const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.1 };
 
 const WINNER_PP_STYLE = {
     fontFamily: DISPLAY_FONT,
@@ -734,7 +734,7 @@ const PODIUM_BASE_STYLE = {
 
 const PODIUM_LABEL_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 18, fontWeight: 700, color: '#3d2000', letterSpacing: 0.2,
+    fontSize: 18, fontWeight: 900, color: '#3d2000', letterSpacing: 2,
     textShadow: '0 1px 0 rgba(255,255,255,0.3)',
 };
 
@@ -772,7 +772,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                         }} />
                     ))}
                     {overflow > 0 && (
-                        <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.6)', flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
                     )}
                     {wormBodyTiles === 0 && (
                         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>no orbs</div>

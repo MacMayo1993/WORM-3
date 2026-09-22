@@ -150,7 +150,7 @@ export default function MobiusCubeletScreen({ onBack }) {
             style={{
               margin: 0,
               fontSize: 'clamp(20px, 5vw, 30px)',
-              fontWeight: 700,
+              fontWeight: 900,
               fontFamily: UI_FONT,
               letterSpacing: '0.03em',
               background: 'linear-gradient(100deg,#ef4444 0%,#f97316 30%,#3b82f6 65%,#FFD500 100%)',
@@ -228,7 +228,7 @@ export default function MobiusCubeletScreen({ onBack }) {
               fontSize: '11px',
               color: 'rgba(140,170,255,0.40)',
               fontFamily: UI_FONT,
-              letterSpacing: "0.01em",
+              letterSpacing: '0.08em',
               pointerEvents: 'none',
             }}
           >
@@ -251,8 +251,8 @@ export default function MobiusCubeletScreen({ onBack }) {
           style={{
             fontSize: '10px',
             fontWeight: 700,
-            letterSpacing: "0.01em",
-            textTransform: "none",
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
             color: 'rgba(140,170,255,0.40)',
             fontFamily: UI_FONT,
             marginBottom: '4px',

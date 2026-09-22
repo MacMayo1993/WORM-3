@@ -344,8 +344,8 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
                 fontFamily: UI_FONT,
                 fontSize: 14,
                 fontWeight: 700,
-                letterSpacing: "0.01em",
-                textTransform: "none",
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
                 color: pencilLead,
               }}>
                 MOBI
@@ -354,8 +354,8 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
                 fontFamily: UI_FONT,
                 fontSize: 9,
                 fontWeight: 600,
-                letterSpacing: "0.01em",
-                textTransform: "none",
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
                 color: accentSolid,
                 opacity: 0.78,
               }}>
@@ -422,7 +422,7 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
                 borderRadius: '999px',
                 cursor: 'pointer',
                 fontFamily: UI_FONT,
-                letterSpacing: "0.01em",
+                letterSpacing: '0.06em',
                 transition: 'all 0.15s',
               }}
               onMouseEnter={e => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.42)'; }}
@@ -449,8 +449,8 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
                 borderRadius: '999px',
                 cursor: 'pointer',
                 fontFamily: UI_FONT,
-                letterSpacing: "0.01em",
-                textTransform: "none",
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
                 boxShadow: isLast ? '0 6px 14px rgba(53,64,74,0.20)' : '0 3px 8px rgba(53,64,74,0.08)',
                 transition: 'all 0.18s',
               }}

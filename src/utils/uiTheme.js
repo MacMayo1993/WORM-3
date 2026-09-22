@@ -26,14 +26,14 @@
 //   HEADING_FONT Outfit   — screen and card titles. Geometric and wide where
 //                           Nunito is soft and narrow, which is what makes a
 //                           heading read as a heading without a size jump.
-//   DISPLAY_FONT Bungee   — the game brand and celebration headlines only.
+//   DISPLAY_FONT Bungee   — mode names, screen/result titles and the brand.
 //   HAND_FONT    Annie…   — Mobi's dialogue.
 //
 // Both new faces are variable (wght axis), so weight is a free axis: use 400
 // for body, 600 for emphasis, 700–800 for headings, rather than reaching for a
 // different family. Keep in sync with --ui-font / --heading-font in App.css.
 export const UI_FONT = "'Nunito Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
-// Screen headings get their own geometric face; Bungee stays on the game brand.
+// Geometric headings for compact sections; Bungee carries major game titles.
 export const HEADING_FONT = "'Outfit Variable', 'Nunito Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 // Chunky display font for big titles (mode carousel, headers).
 // Fallbacks are heavy sans faces — never `cursive`: on Android the generic

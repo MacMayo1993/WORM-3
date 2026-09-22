@@ -83,7 +83,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const renderGameplay = () => (
     <div style={{ display: 'grid', gap: '18px' }}>
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Disparity Level <span style={{ color: levelAccent }}>{LEVEL_LABELS[settings.disparityLevel]}</span>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -103,7 +103,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Tile Endurance
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -126,7 +126,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: "0.01em", textTransform: "none", color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
           Game Length
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>

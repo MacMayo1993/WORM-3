@@ -1,7 +1,8 @@
+import { accessoryFraming, accessoryPreviewEquipment, EMPTY_ACCESSORIES } from '../../worm/handmadeAccessoriesData.js';
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
-import { getSkins, getHats, getSchemes, getTiles, getTrails, STORE_CHARACTERS } from '../../utils/storeCatalog.js';
+import { getAccessories, getSkins, getHats, getSchemes, getTiles, getTrails, STORE_CHARACTERS } from '../../utils/storeCatalog.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import { TILE_STYLE_SECTIONS } from '../../utils/tileStyleCatalog.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
@@ -30,6 +31,7 @@ const TOUCH = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transpare
 
 const SKINS   = getSkins();
 const HATS    = getHats();
+const ACCESSORIES = getAccessories();
 const SCHEMES = getSchemes();
 const TILES   = getTiles();
 
@@ -37,17 +39,19 @@ const TABS = [
   { id: 'characters', label: 'Worms', accent: '#ed5353', items: STORE_CHARACTERS },
   { id: 'trails', label: 'Trails', accent: '#ed8a39', items: getTrails() },
   { id: 'skins',   label: 'Skins',    accent: '#ed8a39', items: SKINS },
+  { id: 'accessories', label: 'Accessories', accent: '#81a594', items: ACCESSORIES },
   { id: 'hats',    label: 'Hats',     accent: '#ed8a39', items: HATS },
   { id: 'schemes', label: 'Palettes', accent: '#53b968', items: SCHEMES },
   { id: 'tiles',   label: 'Tiles',    accent: '#469dea', items: TILES },
 ];
 
-const ALL_ITEMS = [...STORE_CHARACTERS, ...getTrails(), ...SKINS, ...HATS, ...SCHEMES, ...TILES];
+const ALL_ITEMS = [...STORE_CHARACTERS, ...getTrails(), ...SKINS, ...HATS, ...ACCESSORIES, ...SCHEMES, ...TILES];
 
 const TYPE_LABEL = {
   character: 'Worm Character',
   skin: 'Worm Skin',
   hat: 'Hat',
+  accessory: 'Accessory',
   trail: 'Trail',
   scheme: "Colors",
   tile: 'Tile Style',
@@ -152,6 +156,7 @@ const TrailPreview = ({ body, glow, size = 44 }) => (
 // flat shader tiles. The live, turning version of whatever you tapped is on the
 // plate above — one animated preview for the whole screen.
 const CardArt = ({ item, size, characterId, skinId, tileColor }) => {
+  if (item.type === 'accessory') return <WormPreviewCanvas characterId={characterId} skinId={skinId} accessories={accessoryPreviewEquipment(item)} size={size} framing={accessoryFraming(item.slot)} />;
   if (item.type === 'character') return <WormPreviewCanvas characterId={item.characterId} skinId={skinId} size={size} />;
   if (item.type === 'skin') return (
     <WormPreviewCanvas characterId={characterId} skinId={item.skinId} size={size} />
@@ -227,7 +232,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
         <span style={{
           position: 'absolute', top: -7, right: -5, zIndex: 2,
           display: 'flex', alignItems: 'center', gap: '3px',
-          fontSize: TEXT_XS, fontWeight: 700, letterSpacing: "0.01em",
+          fontSize: TEXT_XS, fontWeight: 900, letterSpacing: '0.1em',
           color: '#fff', background: ac,
           borderRadius: '999px', padding: '3px 7px', fontFamily: FONT,
           boxShadow: `0 2px 5px ${ac}66`,
@@ -256,7 +261,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
       {owned ? (
         <span style={{
           marginTop: 'auto',
-          fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: "0.01em", textTransform: "none",
+          fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
           color: equipped ? ac : PAPER_TEXT_FAINT, fontFamily: FONT,
         }}>
           {equipped ? 'Equipped' : 'Owned'}
@@ -270,7 +275,7 @@ const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skin
           border: `1px solid ${canAfford ? `${ac}44` : PAPER_BORDER_SOFT}`,
         }}>
           <PPCoin size={10} color={canAfford ? ac : PAPER_TEXT_FAINT} />
-          <span style={{ fontSize: '11px', fontWeight: 700, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>{item.price}</span>
+          <span style={{ fontSize: '11px', fontWeight: 800, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>{item.price}</span>
         </div>
       )}
     </button>
@@ -287,7 +292,7 @@ const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
 // catalogue order.
 const TILE_ORDER = TILE_SECTIONS.flatMap(s => s.items);
 
-const TAB_ITEMS = { characters: STORE_CHARACTERS, trails: getTrails(), skins: SKINS, hats: HATS, schemes: SCHEMES, tiles: TILE_ORDER };
+const TAB_ITEMS = { characters: STORE_CHARACTERS, trails: getTrails(), skins: SKINS, hats: HATS, accessories: ACCESSORIES, schemes: SCHEMES, tiles: TILE_ORDER };
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 const StoreCollection = ({ onClose, onChests }) => {
@@ -301,6 +306,8 @@ const StoreCollection = ({ onClose, onChests }) => {
   const resetScroll = () => { if (selectorRef.current) selectorRef.current.scrollTop = 0; };
   const onKeyDown = useDialogBehavior(dialogRef, onClose);
 
+  const equipment = useGameStore(s => s.wormAccessories ?? EMPTY_ACCESSORIES);
+  const setAccessory = useGameStore(s => s.setWormAccessory);
   const { parityPoints, ownedItems, wormSkin, wormHat, wormTrail, wormCharacter, buyItem, setWormSkin, setWormHat, setWormTrail, setWormCharacter } =
     useGameStore(useShallow(s => ({
       parityPoints: s.parityPoints,
@@ -330,6 +337,7 @@ const StoreCollection = ({ onClose, onChests }) => {
   };
 
   const isEquipped = useCallback((item) => {
+    if (item.type === 'accessory') return equipment[item.slot] === item.accessoryId;
     if (item.type === 'character') return wormCharacter === item.characterId;
     if (item.type === 'skin')   return wormSkin === item.skinId;
     if (item.type === 'hat')    return wormHat === item.hatId;
@@ -340,7 +348,7 @@ const StoreCollection = ({ onClose, onChests }) => {
       return [1, 2, 3, 4, 5, 6].every(id => (styles[id] || 'solid') === item.tileKey);
     }
     return false;
-  }, [wormSkin, wormHat, wormTrail, wormCharacter, settings]);
+  }, [wormSkin, wormHat, wormTrail, wormCharacter, settings, equipment]);
 
   const categoryItems = tab === 'tiles' ? TILE_SECTIONS.find(s => s.key === tileFamily).items : TAB_ITEMS[tab];
   const items = useMemo(() => ownedOnly ? categoryItems.filter(i => ownedItems.includes(i.id)) : categoryItems, [categoryItems, ownedOnly, ownedItems]);
@@ -358,7 +366,8 @@ const StoreCollection = ({ onClose, onChests }) => {
   const stepFocus = delta => { if (items.length) setFocusedId(items[(focusIndex + delta + items.length) % items.length].id); };
 
   const equip = (item) => {
-    if (item.type === 'character') setWormCharacter(item.characterId);
+    if (item.type === 'accessory') setAccessory(item.slot,item.accessoryId);
+    else if (item.type === 'character') setWormCharacter(item.characterId);
     else if (item.type === 'skin') setWormSkin(item.skinId);
     else if (item.type === 'hat') setWormHat(item.hatId);
     else if (item.type === 'trail') setWormTrail(item.trailId);
@@ -420,12 +429,13 @@ const StoreCollection = ({ onClose, onChests }) => {
   // exactly what you will be looking at afterwards.
   const heroArt = () => {
     if (!focused) return null;
-    if (focused.type === 'character') return <WormPreviewCanvas characterId={focused.characterId} skinId={wormSkin} hatId={wormHat} size={heroPx} animated />;
+    if (focused.type === 'accessory') return <WormPreviewCanvas characterId={wormCharacter} skinId={wormSkin} hatId={wormHat} accessories={accessoryPreviewEquipment(focused, equipment)} size={heroPx} animated framing={accessoryFraming(focused.slot)} />;
+    if (focused.type === 'character') return <WormPreviewCanvas characterId={focused.characterId} skinId={wormSkin} hatId={wormHat} accessories={equipment} size={heroPx} animated />;
     if (focused.type === 'skin') {
-      return <WormPreviewCanvas characterId={wormCharacter} skinId={focused.skinId} hatId={wormHat} size={heroPx} animated />;
+      return <WormPreviewCanvas characterId={wormCharacter} skinId={focused.skinId} hatId={wormHat} accessories={equipment} size={heroPx} animated />;
     }
     if (focused.type === 'hat') {
-      return <WormPreviewCanvas characterId={wormCharacter} skinId={wormSkin} hatId={focused.hatId} size={heroPx} animated framing="portrait" />;
+      return <WormPreviewCanvas characterId={wormCharacter} skinId={wormSkin} hatId={focused.hatId} accessories={equipment} size={heroPx} animated framing="portrait" />;
     }
     if (focused.type === 'trail') {
       const equippedSkin = getSkin(wormSkin);

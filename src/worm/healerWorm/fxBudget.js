@@ -17,10 +17,7 @@
 /** The largest board the game offers, and the one every budget below is about. */
 export const MEGA_SIZE = 15;
 
-// Anything past the ordinary size ladder (2–7) is on the big-board budget. There
-// is nothing between 7 and 15 today; the threshold is written as a range rather
-// than as `=== 15` so a future 9×9 or 11×11 lands on the cheap side by default
-// rather than by being remembered.
+// Boards from 8×8 upward share the reduced effects budget, including Mega.
 const BIG_FROM = 8;
 
 // The ordinary board. Everything on, at the counts the effects were authored for.

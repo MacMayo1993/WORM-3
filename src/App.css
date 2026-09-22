@@ -190,8 +190,8 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   background: var(--bg-tertiary);
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   line-height: 1;
   border: 1px solid var(--border-medium);
 }
@@ -206,8 +206,8 @@ body {
   color: var(--rubiks-red);
   background: rgba(229, 57, 53, 0.12);
   border: 1px solid rgba(229, 57, 53, 0.3);
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   animation: chaos-pulse 1.5s ease-in-out infinite;
 }
 
@@ -221,8 +221,8 @@ body {
   color: var(--rubiks-blue);
   background: rgba(30, 136, 229, 0.12);
   border: 1px solid rgba(30, 136, 229, 0.3);
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 @keyframes chaos-pulse {
@@ -259,7 +259,7 @@ body {
    tabular figures so the row does not jitter as it ticks. */
 .top-bar-progress {
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-primary);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
@@ -316,7 +316,7 @@ body {
   align-items: baseline;
   gap: 5px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ui-ink-subtle);
@@ -325,10 +325,10 @@ body {
 
 .flip-stat-key {
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   opacity: 0.55;
-  text-transform: none;
+  text-transform: uppercase;
 }
 
 .flip-stat-punch {
@@ -500,7 +500,7 @@ textarea:focus-visible,
   color: #657156;
   letter-spacing: 0.04em;
   line-height: 1;
-  text-transform: none;
+  text-transform: uppercase;
 }
 
 /* ========================================
@@ -578,8 +578,8 @@ textarea:focus-visible,
   font-size: 11px;
   font-weight: 600;
   color: #657156;
-  text-transform: none;
-  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   margin-bottom: 10px;
 }
 
@@ -740,8 +740,8 @@ textarea:focus-visible,
   margin-bottom: 0.3rem;
   font-weight: 600;
   font-size: 0.75rem;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: #7a6e62;
 }
 
@@ -791,9 +791,9 @@ textarea:focus-visible,
 .preview-title {
   font-size: 0.65rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.15em;
   color: rgba(200, 200, 220, 0.8);
-  text-transform: none;
+  text-transform: uppercase;
 }
 
 .preview-arrow {
@@ -908,8 +908,8 @@ textarea:focus-visible,
   font-weight: 700;
   font-family: var(--ui-font);
   font-size: 12px;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   transition: background 0.15s ease, border-color 0.15s ease;
   border-radius: 100px;
 }
@@ -1013,7 +1013,7 @@ textarea:focus-visible,
   background-clip: text;
   font-weight: 700;
   font-style: normal;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.05em;
   font-family: var(--ui-font);
   filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.4));
 }
@@ -1022,10 +1022,10 @@ textarea:focus-visible,
   margin: 16px 0 0;
   font-size: 16px;
   color: rgba(255, 255, 255, 0.85);
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   font-style: normal;
-  font-weight: 700;
+  font-weight: 400;
   font-family: var(--ui-font);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
@@ -1037,7 +1037,7 @@ textarea:focus-visible,
   letter-spacing: 0.01em;
   font-family: var(--ui-font);
   font-style: normal;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .intro-instructions p {
@@ -1058,8 +1058,8 @@ textarea:focus-visible,
   font-family: var(--ui-font);
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s ease;
   pointer-events: all;
@@ -1086,11 +1086,11 @@ textarea:focus-visible,
   background: rgba(249, 115, 22, 0.90);
   border: 1px solid rgba(251, 146, 60, 0.55);
   color: #ffffff;
-  font-family: var(--ui-font);
+  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  font-weight: 400;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s ease;
   pointer-events: all;
@@ -1115,9 +1115,9 @@ textarea:focus-visible,
   transform: translateX(-50%);
   margin: 0;
   color: rgba(255, 255, 255, 0.80);
-  font-family: var(--ui-font);
+  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   font-size: 18px;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.08em;
   text-shadow: 0 0 20px rgba(255,255,255,0.3), 0 2px 6px rgba(0, 0, 0, 0.6);
   white-space: nowrap;
   pointer-events: none;
@@ -1172,8 +1172,8 @@ textarea:focus-visible,
   text-align: center;
   font-size: 10px;
   color: #9a8e82;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   opacity: 0.5;
   padding-bottom: 0.5rem;
 }
@@ -1496,8 +1496,8 @@ textarea:focus-visible,
   font-family: var(--ui-font);
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.85);
 }
 
@@ -1693,8 +1693,8 @@ textarea:focus-visible,
   font-size: 11px;
   font-weight: 600;
   color: #ffffff;
-  text-transform: none;
-  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   font-family: var(--ui-font);
   text-shadow:
     -1px -1px 0 #000,
@@ -1994,7 +1994,7 @@ textarea:focus-visible,
   font-weight: 600;
   color: rgba(0, 0, 0, 0.7);
   text-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
-  text-transform: none;
+  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -2066,8 +2066,8 @@ textarea:focus-visible,
   font-size: 10px;
   color: rgba(255, 255, 255, 0.65);
   font-family: var(--ui-font);
-  text-transform: none;
-  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* Toggle Switches */
@@ -2147,8 +2147,8 @@ textarea:focus-visible,
   font-size: 12px;
   font-weight: 600;
   font-family: var(--ui-font);
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   padding: 10px 4px 9px;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
@@ -2564,8 +2564,8 @@ select.locked:hover {
   font-family: var(--ui-font);
   font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
-  text-transform: none;
-  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 /* Story objective — the chapter briefing establishes the why; this compact
@@ -2607,8 +2607,8 @@ select.locked:hover {
 
 .story-objective-kicker {
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-weight: 800;
+  letter-spacing: 0.14em;
 }
 
 .story-objective-chevron {
@@ -2627,8 +2627,8 @@ select.locked:hover {
   font-family: var(--ui-font);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .story-objective-content p {
@@ -2648,7 +2648,7 @@ select.locked:hover {
   cursor: pointer;
   font-family: var(--ui-font);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -3531,7 +3531,7 @@ select.btn-compact:disabled {
   width: 100%; min-height: 70px; padding: 10px 16px 10px 10px;
   border-radius: 18px 18px 18px 6px;
   background: var(--play-color, #e8efce); color: var(--play-ink, #202d25);
-  font-family: var(--ui-font); font-size: 22px; letter-spacing: 0.01em;
+  font-family: 'Bungee', 'Arial Black', sans-serif; font-size: 22px; letter-spacing: .06em;
   box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 6px 0 #344638, 0 10px 18px rgba(0,0,0,.24);
 }
 .worm-cta-emblem {
@@ -3686,7 +3686,7 @@ select.btn-compact:disabled {
      phones it needs to fit. */
   --tag-track: 0.26em;
   letter-spacing: var(--tag-track);
-  text-transform: none;
+  text-transform: uppercase;
   white-space: nowrap;
   /* Cream, not gold: the scene behind the title is a yellow-lit room as often
      as it is a night sky, and gold on yellow disappears. */
@@ -3864,11 +3864,11 @@ textarea:focus-visible {
 .home-wordmark { font-family: 'Bungee', sans-serif; font-size: 22px; letter-spacing: -.06em; }
 .home-wordmark sup { font-size: 12px; vertical-align: super; }
 .home-heading { position: absolute; top: max(84px, calc(env(safe-area-inset-top) + 64px)); left: 16px; right: 16px; text-align: center; transition: opacity .3s; }
-.home-eyebrow { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.01em; color: var(--text-secondary); }
-.home-heading h1 { font-family: var(--ui-font); font-size: clamp(24px, 6vw, 38px); line-height: 1.2; margin: 12px 0; font-weight: 700; }
+.home-eyebrow { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; color: var(--text-secondary); }
+.home-heading h1 { font-family: 'Bungee', sans-serif; font-size: clamp(24px, 6vw, 38px); line-height: 1.2; margin: 12px 0; font-weight: 400; }
 .home-actions { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, 420px); box-sizing: border-box; padding: 12px 20px max(4px, env(safe-area-inset-bottom)); display: grid; gap: 12px; transition: opacity .3s; }
 .home-mode-card { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 16px; border: 1px solid #cec8be; border-radius: 20px; background: #fffdf2; box-shadow: 0 3px 0 #d6d0c8; }
-.home-mode-card strong { display: block; font-family: var(--ui-font); font-weight: 700; font-size: 23px; margin: 4px 0; }
+.home-mode-card strong { display: block; font-family: 'Bungee', sans-serif; font-weight: 400; font-size: 23px; margin: 4px 0; }
 .home-mode-card p { font-size: 13px; margin: 0; color: var(--text-secondary); line-height: 1.4; }
 .home-text-button { flex-shrink: 0; min-height: 48px; padding: 0 8px; border: 0; border-radius: 12px; background: #ede8df; color: #426b2e; font: inherit; font-size: 12px; font-weight: 700; }
 .home-nav { display: flex; justify-content: space-around; border-top: 1px solid #d6d0c8; padding-top: 6px; margin-top: 4px; }

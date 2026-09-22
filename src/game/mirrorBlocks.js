@@ -9,7 +9,7 @@
 // Asymmetric layer widths per cube size.
 // Values must sum to exactly `size`. The intentional asymmetry makes each
 // piece uniquely shaped so the puzzle is solvable by shape alone.
-// All supported sizes (2–7) must have an entry — the fallback produces
+// All supported puzzle sizes (2–10) must have an entry — the fallback produces
 // uniform widths which makes all pieces identical and the puzzle unsolvable.
 const LAYER_WIDTHS = {
   2: [0.75, 1.25],
@@ -18,6 +18,10 @@ const LAYER_WIDTHS = {
   5: [0.5, 0.75, 1.0, 1.25, 1.5],
   6: [0.45, 0.65, 0.85, 1.05, 1.35, 1.65],
   7: [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6],
+  // Mean width 1 preserves total size; every layer remains distinct.
+  ...Object.fromEntries([8, 9, 10].map(size => [size,
+    Array.from({ length: size }, (_, i) => 0.4 + 1.2 * i / (size - 1))
+  ])),
 };
 
 const GAP = 0.02; // small cosmetic gap between pieces

@@ -1,3 +1,4 @@
+import { HANDMADE_HATS, WORM_ACCESSORIES } from '../worm/handmadeAccessoriesData.js';
 // src/utils/storeCatalog.js
 // Complete Parity Store catalog.
 // price: 0 = free / default-owned.
@@ -27,6 +28,7 @@ export const STORE_SKINS = [
 
 // ── Hats ──────────────────────────────────────────────────────────────────────
 export const STORE_HATS = [
+  ...HANDMADE_HATS.map(item => ({ ...item, id: `hat_${item.id}`, hatId: item.id, type: 'hat', category: 'hats' })),
   { id: 'hat_none',   type: 'hat', category: 'hats', hatId: 'none',   label: 'No Hat',  price: 0 },
   { id: 'hat_tophat', type: 'hat', category: 'hats', hatId: 'tophat', label: 'Top Hat', price: 100 },
   { id: 'hat_party',  type: 'hat', category: 'hats', hatId: 'party',  label: 'Party',   price: 100 },
@@ -151,7 +153,10 @@ export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({
 // ── Combined catalog ──────────────────────────────────────────────────────────
 export const STORE_CHARACTERS = WORM_CHARACTERS.map(c => ({ id: `character_${c.id}`, type: 'character', category: 'characters', characterId: c.id, label: c.label, price: c.id === 'classic' ? 0 : 1000 }));
 
+export const STORE_ACCESSORIES = WORM_ACCESSORIES.map(item => ({ ...item, id: `accessory_${item.id}`, accessoryId: item.id, type: 'accessory', category: 'accessories' }));
+
 export const STORE_ITEMS = [
+  ...STORE_ACCESSORIES,
   ...STORE_CHARACTERS,
   ...STORE_SKINS,
   ...STORE_HATS,
@@ -175,3 +180,5 @@ export const getHats    = () => STORE_HATS;
 export const getTrails  = () => STORE_TRAILS;
 export const getSchemes = () => STORE_SCHEMES;
 export const getTiles   = () => STORE_TILES;
+
+export const getAccessories = () => STORE_ACCESSORIES;

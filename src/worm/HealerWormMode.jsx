@@ -659,7 +659,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             warningProgressRef.current = 0;
             autoTimerRef.current = 0;
         }
-    });
+    }, -0.5); // After live cubie transforms (-1), before chase camera (-0.25) and body (0).
 
     const wormInTunnel = wormPhaseReactive === 'windup' || wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting' || wormPhaseReactive === 'windout';
     const wormAlive = wormGamePhase !== 'scrambling';

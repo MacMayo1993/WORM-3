@@ -416,7 +416,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             textShadow: '0 0 60px rgba(139, 92, 246, 0.8)',
-            letterSpacing: "0.01em"
+            letterSpacing: '0.1em'
           }}>
             Singularity
           </h1>
@@ -424,7 +424,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             fontSize: 'clamp(14px, 3vw, 24px)',
             color: 'rgba(255, 255, 255, 0.6)',
             marginTop: '8px',
-            letterSpacing: "0.01em"
+            letterSpacing: '0.3em'
           }}>
             Level 10
           </p>
@@ -441,7 +441,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
           <p style={{
             fontSize: 'clamp(16px, 4vw, 28px)',
             color: 'rgba(255, 255, 255, 0.8)',
-            letterSpacing: "0.01em",
+            letterSpacing: '0.2em',
             textShadow: '0 0 20px rgba(78, 205, 196, 0.6)'
           }}>
             Seams tear... symmetry breaks
@@ -468,7 +468,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
           <p style={{
             fontSize: 'clamp(14px, 3vw, 22px)',
             color: 'rgba(255, 200, 100, 0.9)',
-            letterSpacing: "0.01em",
+            letterSpacing: '0.15em',
             textShadow: '0 0 30px rgba(255, 150, 50, 0.6)'
           }}>
             Approaching event horizon
@@ -486,7 +486,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
           <p style={{
             fontSize: 'clamp(14px, 3.5vw, 26px)',
             color: 'rgba(255, 255, 255, 0.95)',
-            letterSpacing: "0.01em",
+            letterSpacing: '0.12em',
             textShadow: '0 0 40px rgba(139, 92, 246, 0.8)',
             fontWeight: 500
           }}>
@@ -496,7 +496,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             fontSize: 'clamp(12px, 2.5vw, 20px)',
             color: '#c084fc',
             marginTop: '8px',
-            letterSpacing: "0.01em"
+            letterSpacing: '0.2em'
           }}>
             Survive the singularity
           </p>
@@ -615,7 +615,7 @@ const Level10Cutscene = ({ onComplete, onSkip }) => {
             fontSize: '14px',
             cursor: 'pointer',
             fontFamily: UI_FONT,
-            letterSpacing: "0.01em",
+            letterSpacing: '0.1em',
             transition: 'all 0.2s',
             zIndex: 10
           }}

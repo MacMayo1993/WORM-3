@@ -1,3 +1,4 @@
+import { safeAccessories, EMPTY_ACCESSORIES } from '../../worm/handmadeAccessoriesData.js';
 import { readPlayerSave, newProgress } from '../../progression/model.js';
 /**
  * persistedState.js — the one read of localStorage at module load.
@@ -105,6 +106,8 @@ const loadPersistedState = () => {
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin  = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
+    let accessorySave = {};
+    try { accessorySave = JSON.parse(localStorage.getItem('worm3_accessories') || '{}'); } catch { /* Ignore only the damaged accessory key. */ }
     const safeHat   = ownedItems.includes(`hat_${wormHat}`) ? wormHat : 'none';
     const safeTrail = ownedItems.includes(`trail_${wormTrail}`) ? wormTrail : 'classic';
 
@@ -133,6 +136,7 @@ const loadPersistedState = () => {
       mobileHintShown,
       wormSkin: safeSkin,
       wormHat: safeHat,
+      wormAccessories: safeAccessories(accessorySave, ownedItems),
       wormTrail: safeTrail,
       wormCharacter: ownedItems.includes(`character_${wormCharacter}`) ? wormCharacter : 'classic',
       wormShowTrail,
@@ -153,6 +157,7 @@ const loadPersistedState = () => {
       mobileHintShown: false,
       wormSkin: 'slime',
       wormHat: 'none',
+      wormAccessories: EMPTY_ACCESSORIES,
       wormTrail: 'classic',
       wormCharacter: 'classic',
       wormShowTrail: true,

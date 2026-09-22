@@ -76,7 +76,7 @@ const LABEL_STYLE = {
   fontWeight: 600,
   color: 'rgba(255, 255, 255, 0.9)',
   marginTop: '4px',
-  letterSpacing: "0.01em",
+  letterSpacing: '0.05em',
 };
 
 const HINT_STYLE = {

@@ -39,6 +39,7 @@ export default function PlayerProgressScreen() {
       if (!s.ownedItems.includes(id)) continue;
       const item = STORE_ITEMS.find(i => i.id === id);
       if (item?.type === 'skin') s.setWormSkin(item.skinId);
+      if (item?.type === 'accessory') s.setWormAccessory(item.slot, item.accessoryId);
       if (item?.type === 'hat') s.setWormHat(item.hatId);
       if (item?.type === 'scheme') settings = { ...settings, colorScheme: item.schemeKey };
       if (item?.type === 'tile' && !tileEquipped) {

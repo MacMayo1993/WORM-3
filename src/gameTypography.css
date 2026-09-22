@@ -1,0 +1,51 @@
+/* Arcade hierarchy: display names, strong controls, readable instructions.
+   Scoped roles keep paragraphs, Mobi dialogue and tiny numeric HUDs legible. */
+:root { --game-display:var(--display-font,'Bungee','Arial Black',sans-serif); --game-label:var(--heading-font,'Outfit Variable',sans-serif); }
+.screen-heading h1,
+.mode-wizard .mode-wizard-heading h1,
+.worm-entry .worm-choice-title,
+.worm-entry .worm-entry-heading h1,
+.chaos-result-hero h1,
+.chaos-hero h1,
+.cube-path-screen h1,
+.run-result-heading {
+ font-family:var(--game-display)!important; font-weight:400!important; text-transform:uppercase;
+ letter-spacing:.015em; line-height:1.12; text-wrap:balance;
+}
+.screen-heading h1,.mode-wizard .mode-wizard-heading h1 { font-size:clamp(23px,5vw,36px); }
+.mode-wizard .mode-wizard-heading { padding-block:16px; }
+.mode-wizard .mode-wizard-heading .mode-artwork { width:68px; }
+.mode-wizard .mode-wizard-kicker,.chaos-kicker,.story-objective-kicker,
+.worm-profile-header h2,.worm-level-reward>span,.worm-path-kicker,
+.worm-buff-name,.worm-story-glance-level,.worm-rotation-clock>span:first-child {
+ font-family:var(--game-label); text-transform:uppercase; font-weight:800; letter-spacing:.08em; font-size:10px;
+}
+.mode-wizard .mode-wizard-kicker { font-size:11px; }
+.mode-wizard .mode-wizard-count { font-family:var(--game-label); font-weight:800; font-variant-numeric:tabular-nums; }
+.mode-wizard .mode-wizard-sheet>div:last-child>button,
+.worm-story-primary,.worm-story-start,.worm-pause-resume,
+.run-result button,.worm-path-cta,.mc-play,.chaos-primary {
+ font-family:var(--game-label); font-weight:900!important; text-transform:uppercase!important; letter-spacing:.045em!important;
+}
+.worm-path-cta { font-family:var(--game-display); font-size:clamp(17px,4vw,25px); font-weight:400!important; }
+.worm-level-detail h2,.worm-profile-panel-heading h3,
+.worm-mission-card h2,.worm-story-card h2,
+.chaos-scoreline h2,.story-objective-chapter {
+ font-family:var(--game-label); font-weight:850; text-transform:uppercase; letter-spacing:.025em; line-height:1.2;
+}
+.worm-profile .worm-profile-categories strong { font-family:var(--game-label); font-weight:850; text-transform:uppercase; letter-spacing:.035em; }
+.worm-profile .worm-profile-categories small { font-weight:600; letter-spacing:0; text-transform:none; }
+.worm-instrument .worm-action { font-family:var(--game-label)!important; font-weight:900!important; text-transform:uppercase; letter-spacing:.05em; }
+.worm-instrument .orb-slot-count,.worm-story-glance-clock,.chaos-count { font-family:var(--game-label); font-weight:850; font-variant-numeric:tabular-nums; }
+.screen-disclosure>summary,.chaos-timeline>summary,.worm-level-detail summary { font-family:var(--game-label); font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.screen-stat-row strong { font-family:var(--game-label); font-weight:850; letter-spacing:0; font-variant-numeric:tabular-nums; }
+.screen-stat-row span { font-family:var(--game-label); font-weight:750; text-transform:uppercase; letter-spacing:.06em; font-size:10px; }
+@media(max-width:380px) {
+ .mode-wizard .mode-wizard-heading h1,.screen-heading h1 { font-size:23px; }
+ .mode-wizard .mode-wizard-heading .mode-artwork { width:48px; }
+}
+@media(max-height:520px) {
+ .mode-wizard .mode-wizard-heading { padding-block:8px; }
+ .mode-wizard .mode-wizard-heading h1,.screen-heading h1 { font-size:22px; }
+ .mode-wizard .mode-wizard-heading .mode-artwork { width:40px; }
+}

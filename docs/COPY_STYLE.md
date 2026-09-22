@@ -1,13 +1,14 @@
-# Game copy
+# WORM³ Game Text
 
-Keep the voice calm, direct, and a little playful. Let the characters and level names carry the personality.
+Use an arcade hierarchy: bold mode names and outcome titles, decisive controls, and readable instructions.
 
-- Use sentence case for headings, buttons, and labels. Keep WORM³, character names, PP, and XP intact.
-- Use Nunito for controls and reading, and Outfit for headings, through the shared font tokens. The logo and Mobi’s dialogue have their own faces.
-- Call destinations Levels, Free play, Store, and Your worm. Use Play to begin, Resume to return to play, Next to advance setup, Try again after a loss, and Play again after a win.
-- Start instructions with the action: Collect orbs, Heal tunnel pairs, Use your ability. Put counts beside the task and cross it off when complete.
-- Keep one heading per section. Avoid slogans, repeated explanations, and labels that describe the interface itself.
-- Say why an action is unavailable when the reason helps: Heal your tunnel first, or Not enough gems.
-- Keep costs, odds, rewards, and rules accurate. Put longer explanations behind a clearly named disclosure.
-- Use ability in player instructions; reserve signature for code identifiers.
-- Do not shorten copy by hiding requirements or replacing clear words with jargon.
+- Use Bungee (`DISPLAY_FONT`) for cube-face names, mode titles, pause/result headlines, and major screen titles. Keep the illustration visible alongside each title.
+- Use bold Outfit (`HEADING_FONT`) for section headings, buttons, tab labels, status labels, and scores. Render short headings and actions in uppercase; retain accessible wording and meaningful labels.
+- Use Nunito (`UI_FONT`) in sentence case for rules, explanations, and objective sentences. Keep Mobi dialogue in its existing handwritten face.
+- Keep names intact: WORM³, MOBI, PP, XP, Story, Free Play. Do not mechanically lowercase mode names.
+- Use PLAY, RESUME, NEXT, TRY AGAIN after a loss, PLAY AGAIN after a win, and EQUIP. Avoid vague navigation language.
+- Mode cards show the mode name, one punchy description, and size/session facts. Longer rules and history live under HOW TO PLAY; store information uses GEAR & REWARDS.
+- Put task counts beside the action. Preserve costs, odds, ownership, timers, difficulty, and unlock requirements exactly.
+- Explain unavailable actions with a short reason. Reserve signature for code identifiers; use ability in instructions.
+- Apply typography by semantic role through `gameTypography.css` and shared components. Do not uppercase paragraphs, shrink body text, or add a glow to every label.
+- Keep 44–48px controls, short landscape layouts, focus visibility, safe areas, and reduced-motion behavior intact.

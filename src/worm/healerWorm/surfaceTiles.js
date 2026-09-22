@@ -1,4 +1,4 @@
-// Module-level cache: cube sizes range 2–7, so this is at most 6 entries.
+// Module-level cache: playable cube sizes are 2–10 and 15, so this has at most 10 entries.
 // Both callers (randomFreeTile, randomUnflippedTile) immediately call .filter() on
 // the result, which creates a new array — the cached reference is never mutated.
 const _tileCache = new Map();

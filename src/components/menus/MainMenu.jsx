@@ -780,7 +780,7 @@ function makeContactShadowTexture() {
 }
 
 // Renders a beveled, glossy solid-color tile on every cube face, with the
-// illustrated mode scene and a small label on each face. Fully opaque,
+// illustrated mode scene and a bold display title on each face. Fully opaque,
 // depth-writing tiles occlude the faces behind them, so only the words on
 // visible faces read — hidden faces are naturally masked by the front tile.
 const ModeFacePlates = React.forwardRef((_props, rootRef) => {
@@ -824,19 +824,20 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               <meshPhysicalMaterial ref={material => { enamelRefs.current[m.face] = material; }} color={m.tileColor} metalness={0.08} roughness={0.3}
                 clearcoat={1} clearcoatRoughness={0.2} envMapIntensity={0.3} />
             </mesh>
-            {decals[m.id] && <mesh position={[0, 0.25, 0.035]} renderOrder={33}>
-              <planeGeometry args={[2.35, 2.35]} />
+            {decals[m.id] && <mesh position={[0, 0.46, 0.035]} renderOrder={33}>
+              <planeGeometry args={[1.95, 1.95]} />
               <meshBasicMaterial map={decals[m.id]} transparent depthWrite={false} toneMapped={false} />
             </mesh>}
-            {/* A scene first, with a small name along the edge of each face. */}
+            {/* Keep the illustration and give each face a legible arcade title. */}
             <Text
-              position={[0, -1.08, 0.04]}
+              position={[0, -0.86, 0.055]}
               font={bungeeWoffUrl}
-              fontSize={0.32}
+              fontSize={m.label.length > 5 ? 0.48 : 0.62}
+              maxWidth={2.5}
               color={m.textColor}
               anchorX="center"
               anchorY="middle"
-              outlineWidth={0.004}
+              outlineWidth={0.012}
               outlineColor={m.textColor === '#fffdf2' ? '#162035' : '#f4f1e8'}
               renderOrder={34}
             >
@@ -1135,48 +1136,48 @@ const withFaceColor = (mode) => {
 const CAROUSEL_MODES = [
   {
     id: 'worm', label: 'WORM', face: 'NX',
-    desc: 'Jump your tail to keep the run alive.',
-    how: 'Heal every flipped tile before the worm runs out of room.',
+    desc: 'Collect orbs. Jump your tail. Heal the cube.',
+    how: 'Choose Story challenges or Free Play. Cross tunnels, build your worm, and spend collected orbs to heal flipped tiles.',
     chips: ['2×2 – Mega', 'Arcade'],
-    cta: "Play",
+    cta: 'PLAY',
   },
   {
     id: 'freeplay', label: 'CUBE', face: 'NY',
-    desc: 'Solve at your own pace.',
-    how: 'Done when all six faces show a single colour.',
-    chips: ['2×2 – 7×7', 'Relaxed'],
-    cta: "Play",
+    desc: 'Scramble it. Turn it. Solve it.',
+    how: 'Solve all six faces so each shows one color. Choose your cube size and solve at your own pace.',
+    chips: ['2×2 – 10×10', 'Relaxed'],
+    cta: 'PLAY',
   },
   {
-    id: 'cube', label: "Story", face: 'PX',
+    id: 'cube', label: 'STORY', face: 'PX',
     // No chapter count in the copy: it said "ten" while the campaign has had
     // twelve for some time. The chip carries the number now, derived from the
     // level data (see chipsFor) so it cannot drift again.
-    desc: 'Learn a new move each chapter.',
+    desc: 'Master the cube, one chapter at a time.',
     how: 'Clear a chapter to unlock the next one.',
     chips: ['Campaign', 'Guided'],
-    cta: "Play",
+    cta: 'PLAY',
   },
   {
     id: 'chaos', label: 'CHAOS', face: 'NZ',
-    desc: 'Pick a pair. Watch the cube fall apart.',
+    desc: 'Pick your pair. Survive the chaos.',
     how: 'Back the pair that outlasts the rest to win Parity Points.',
-    chips: ['2×2 – 7×7', 'Wager'],
-    cta: "Play",
+    chips: ['2×2 – 10×10', 'Wager'],
+    cta: 'PLAY',
   },
   {
     id: 'random', label: 'RANDOM', face: 'PZ',
-    desc: 'Keep solving as the colors shift.',
+    desc: 'Keep solving. Nothing stays the same.',
     how: 'Solve all six faces. The palette and tile style change every 10 seconds.',
-    chips: ['2×2 – 7×7', 'Twist'],
-    cta: "Play",
+    chips: ['2×2 – 10×10', 'Twist'],
+    cta: 'PLAY',
   },
   {
     id: 'store', label: 'STORE', face: 'PY',
-    desc: 'Find your next look.',
+    desc: 'Build your signature look.',
     how: 'Earn points by playing; everything you buy is yours for good.',
     chips: ['No cube', 'Cosmetic'],
-    cta: "Open store",
+    cta: 'OPEN STORE',
   },
 ].map(withFaceColor);
 
@@ -1582,13 +1583,13 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
         <div className="mc-mode-copy" style={{ opacity, transition: 'opacity 150ms ease', '--mode-accent': mode.tileColor }}>
           <article aria-label={`${mode.label} mode details`}>
-            <header><h2>{mode.label === 'CUBE' ? 'Cube' : mode.label.charAt(0) + mode.label.slice(1).toLowerCase()}</h2><span aria-hidden="true" /></header>
-            <p>{mode.desc}</p>
+            <header><div><span className="mc-mode-kicker">{mode.id === 'store' ? 'GEAR UP' : 'SELECT YOUR CHALLENGE'}</span><h2>{mode.label}</h2></div><span aria-hidden="true" /></header>
+            <p className="mc-mode-pitch">{mode.desc}</p>
+            <div className="mc-mode-facts">{modeChips.map(chip => <span key={chip}>{chip}</span>)}</div>
             <details key={mode.id}>
-              <summary className="ui-focusable">How to play</summary>
+              <summary className="ui-focusable">{mode.id === 'store' ? 'GEAR & REWARDS' : 'HOW TO PLAY'}</summary>
               <p>{mode.how}</p>
               {statItems.length > 0 && <div className="mc-mode-history">{statItems.map(stat => <div key={stat.label}><strong>{stat.value}</strong><small>{stat.label}</small></div>)}</div>}
-              <div className="mc-mode-facts">{modeChips.map(chip => <span key={chip}>{chip}</span>)}</div>
             </details>
           </article>
         </div>

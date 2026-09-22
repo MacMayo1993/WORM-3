@@ -63,7 +63,7 @@ export default function ScreenFallback({ label = 'Loading', delayMs = APPEAR_AFT
           animation: 'screenFallbackSpin 0.7s linear infinite'
         }}
       />
-      <span style={{ color: NIGHT_TEXT_MUTED, fontSize: TEXT_SM, fontWeight: 600, letterSpacing: "0.01em" }}>
+      <span style={{ color: NIGHT_TEXT_MUTED, fontSize: TEXT_SM, fontWeight: 600, letterSpacing: '0.06em' }}>
         {label}
       </span>
     </div>

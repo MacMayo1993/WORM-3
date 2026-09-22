@@ -303,7 +303,7 @@ export default function UILayer({
           }}>
             <div key={disparityCountdown} style={{
               fontSize: disparityCountdown === 'GO!' ? '6rem' : '9rem',
-              fontWeight: 700, fontFamily: MONO_FONT,
+              fontWeight: 900, fontFamily: MONO_FONT,
               color: disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444',
               textShadow: `0 0 40px ${disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444'}`,
               animation: 'disparity-cd-pop 0.3s cubic-bezier(0.22,1,0.36,1) forwards',
