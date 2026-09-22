@@ -1,0 +1,19 @@
+.chaos-countdown { position:fixed; inset:0; display:grid; place-items:center; pointer-events:none; font-family:var(--ui-font,system-ui); }
+.chaos-countdown-card { text-align:center; color:#fffaf0; filter:drop-shadow(0 8px 20px #0009); }
+.chaos-countdown-label { display:block; margin-bottom:18px; font-size:14px; font-weight:750; letter-spacing:.08em; text-shadow:0 2px 8px #000; }
+.chaos-countdown-face { position:relative; width:clamp(150px,37vw,230px); aspect-ratio:1; display:grid; place-items:center; animation:chaos-countdown-land .32s cubic-bezier(.2,.8,.2,1) both; }
+.chaos-countdown-face::before { content:''; position:absolute; inset:9px; background:#132026ee; border:2px solid var(--countdown-accent); border-radius:28px; transform:rotate(-4deg); box-shadow:0 6px 0 #090f14; }
+.chaos-countdown-face strong { position:relative; font-family:var(--heading-font,system-ui); font-size:clamp(84px,24vw,150px); line-height:1; font-weight:900; letter-spacing:-.07em; padding-right:.07em; font-variant-numeric:tabular-nums; }
+.chaos-countdown-card[data-go=true] strong { font-size:clamp(65px,19vw,110px); color:var(--countdown-accent); }
+.chaos-countdown-sweep { position:absolute; inset:0; width:100%; height:100%; fill:none; stroke:var(--countdown-accent); stroke-width:3; stroke-dasharray:1; stroke-dashoffset:0; transform:rotate(-4deg); animation:chaos-countdown-sweep .9s linear both; }
+.chaos-countdown-tiles { position:absolute; inset:0; }
+.chaos-countdown-tiles i { position:absolute; width:30px; height:30px; background:var(--tile-color); border:2px solid #fff9; border-radius:7px; box-shadow:0 3px 0 #0005;  top:-15px; transform:rotate(-12deg); }
+.chaos-countdown-tiles i:nth-child(n+4) { top:auto; bottom:-15px; transform:rotate(12deg); }
+.chaos-countdown-tiles i:nth-child(3n+1) { left:12%; }.chaos-countdown-tiles i:nth-child(3n+2) { left:42%; }.chaos-countdown-tiles i:nth-child(3n) { left:72%; }
+.chaos-countdown-beats { display:flex; justify-content:center; gap:10px; margin-top:28px; }
+.chaos-countdown-beats span { display:grid; place-items:center; width:30px; height:30px; border:1px solid var(--countdown-accent); border-radius:8px; background:#132026; font-size:13px; }
+.chaos-countdown-beats [data-active=true],.chaos-countdown-beats [data-done=true] { background:var(--countdown-accent); color:#302c24; }
+@keyframes chaos-countdown-land { from { opacity:0; transform:translateY(12px) scale(.88) rotate(3deg); } to { opacity:1; transform:translateY(0) scale(1) rotate(0); } }
+@keyframes chaos-countdown-sweep { to { stroke-dashoffset:1; } }
+@media(max-height:450px) { .chaos-countdown-face { width:140px; }.chaos-countdown-face strong { font-size:85px; }.chaos-countdown-card[data-go=true] strong { font-size:65px; }.chaos-countdown-label { margin-bottom:8px; }.chaos-countdown-beats { margin-top:15px; } }
+@media(prefers-reduced-motion:reduce) { .chaos-countdown * { animation:none!important; }.chaos-countdown-sweep { display:none; } }

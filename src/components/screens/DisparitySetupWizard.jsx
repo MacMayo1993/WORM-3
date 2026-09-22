@@ -1,8 +1,9 @@
 import { MODE_THEMES } from '../../utils/modeThemes.js';
 import React, { useState, useMemo } from 'react';
-import { TEXT_MICRO, TEXT_XS } from '../../utils/uiTheme.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import '../../chaos/chaosSetup.css';
 import { useIsMobile } from '../../hooks/index.js';
-import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_CARD_SHADOW, WIZ_SURFACE_RAISED, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from './WizardChrome.jsx';
+import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_TEXT, WIZ_TEXT_MUTED } from './WizardChrome.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, SizeStep, styleCategory,
@@ -13,7 +14,6 @@ const ACCENT = MODE_THEMES.chaos.accent;
 const ACCENT_SHADOW = MODE_THEMES.chaos.shadow;
 
 const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
-const LEVEL_ACCENT = { 1: '#88e59a', 2: '#f4d35e', 3: '#ffad70', 4: '#ff9090', 5: '#d6a0ff' };
 
 const FLIP_CAP_PRESETS = [
   { label: 'Fragile', value: 3, sub: "3 lives" },
@@ -31,6 +31,8 @@ const GAME_LENGTH_OPTIONS = [
 const ToggleRow = ({ label, sub, value, onChange }) => (
   <button
     type="button"
+    aria-pressed={value}
+    className="chaos-gameplay-toggle"
     onClick={() => onChange(!value)}
     style={{
       ...cardStyle(value, ACCENT),
@@ -60,11 +62,14 @@ const ToggleRow = ({ label, sub, value, onChange }) => (
   </button>
 );
 
-const DisparitySetupWizard = ({ onStart, onCancel }) => {
+const DisparitySetupWizard = ({ onStart, onCancel, initialSettings }) => {
+  const currentSettings = useGameStore(s => s.settings);
+  const currentSize = useGameStore(s => s.size);
   const [step, setStep] = useState(0);
   const isMobile = useIsMobile();
   const S = useMemo(() => wizardLayout(ACCENT, ACCENT_SHADOW, isMobile), [isMobile]);
   const cos = useWizardCosmetics({
+    initialSettings: { ...currentSettings, ...initialSettings, size: initialSettings?.cubeSize || currentSize },
     accent: ACCENT,
     accentShadow: ACCENT_SHADOW,
     extra: {
@@ -73,82 +78,34 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       visualMode: 'classic',
       flipMode: true,
       showTunnels: false,
-      gameLength: 'medium'
+      gameLength: 'medium',
+      ...initialSettings
     }
   });
   const { settings, select } = cos;
 
-  const levelAccent = LEVEL_ACCENT[settings.disparityLevel];
+  const optionGroup = (label, key, options) => (
+    <fieldset className="chaos-gameplay-group">
+      <legend>{label}</legend>
+      <div className="chaos-gameplay-options" data-kind={key}>
+        {options.map(option => <button key={option.value} type="button"
+          aria-pressed={settings[key] === option.value}
+          onClick={() => select(key, option.value)}
+          style={cardStyle(settings[key] === option.value, ACCENT)}>
+          <strong>{option.label}</strong><small>{option.sub}</small>
+          <span className="chaos-gameplay-check" aria-hidden="true">{settings[key] === option.value ? '✓' : '+'}</span>
+        </button>)}
+      </div>
+    </fieldset>
+  );
 
   const renderGameplay = () => (
-    <div style={{ display: 'grid', gap: '18px' }}>
-      <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
-          Disparity Level <span style={{ color: levelAccent }}>{LEVEL_LABELS[settings.disparityLevel]}</span>
-        </div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {[1, 2, 3, 4, 5].map(n => (
-            <button key={n} onClick={() => select('disparityLevel', n)} style={{
-              flex: 1, padding: '9px 0',
-              border: `2px solid ${settings.disparityLevel === n ? LEVEL_ACCENT[n] : WIZ_BORDER_SOFT}`,
-              borderRadius: '10px', fontSize: '14px', fontWeight: settings.disparityLevel === n ? 700 : 500,
-              background: settings.disparityLevel === n ? `${LEVEL_ACCENT[n]}18` : WIZ_SURFACE_RAISED,
-              color: settings.disparityLevel === n ? LEVEL_ACCENT[n] : WIZ_TEXT_FAINT,
-              boxShadow: settings.disparityLevel === n ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
-              transform: settings.disparityLevel === n ? 'translateY(1px)' : 'none',
-              cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit'
-            }}>{n}</button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
-          Tile Endurance
-        </div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {FLIP_CAP_PRESETS.map(p => (
-            <button key={p.value} onClick={() => select('flipCap', p.value)} style={{
-              flex: 1, padding: '8px 4px',
-              border: `2px solid ${settings.flipCap === p.value ? levelAccent : WIZ_BORDER_SOFT}`,
-              borderRadius: '10px', fontSize: '11px', fontWeight: settings.flipCap === p.value ? 700 : 500,
-              background: settings.flipCap === p.value ? `${levelAccent}18` : WIZ_SURFACE_RAISED,
-              color: settings.flipCap === p.value ? levelAccent : WIZ_TEXT_FAINT,
-              boxShadow: settings.flipCap === p.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
-              transform: settings.flipCap === p.value ? 'translateY(1px)' : 'none',
-              cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3
-            }}>
-              <div>{p.label}</div>
-              <div style={{ fontSize: TEXT_MICRO, marginTop: '2px', opacity: 0.75 }}>{p.sub}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT, marginBottom: '10px' }}>
-          Game Length
-        </div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {GAME_LENGTH_OPTIONS.map(opt => (
-            <button key={opt.value} onClick={() => select('gameLength', opt.value)} style={{
-              flex: 1, padding: '8px 4px',
-              border: `2px solid ${settings.gameLength === opt.value ? levelAccent : WIZ_BORDER_SOFT}`,
-              borderRadius: '10px', fontSize: '11px', fontWeight: settings.gameLength === opt.value ? 700 : 500,
-              background: settings.gameLength === opt.value ? `${levelAccent}18` : WIZ_SURFACE_RAISED,
-              color: settings.gameLength === opt.value ? levelAccent : WIZ_TEXT_FAINT,
-              boxShadow: settings.gameLength === opt.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${WIZ_CARD_SHADOW}`,
-              transform: settings.gameLength === opt.value ? 'translateY(1px)' : 'none',
-              cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3
-            }}>
-              <div>{opt.label}</div>
-              <div style={{ fontSize: TEXT_XS, marginTop: '2px', opacity: 0.75 }}>{opt.sub}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gap: '10px' }}>
+    <div className="chaos-gameplay">
+      {optionGroup('Intensity', 'disparityLevel', [1, 2, 3, 4, 5].map(value => ({ value,
+        label: LEVEL_LABELS[value], sub: `${value} / 5` })))}
+      {optionGroup('Tile endurance', 'flipCap', FLIP_CAP_PRESETS)}
+      {optionGroup('Game length', 'gameLength', GAME_LENGTH_OPTIONS)}
+      <div className="chaos-gameplay-toggles">
         <ToggleRow label="Flip Mode" sub="Allow manual tile flips" value={settings.flipMode} onChange={v => select('flipMode', v)} />
         <ToggleRow label="Wormhole Tunnels" sub="Show antipodal connections" value={settings.showTunnels} onChange={v => select('showTunnels', v)} />
       </div>
@@ -217,7 +174,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       onSelect={setStep}
       onBack={handleBack}
       onPrimary={handleNext}
-      finishLabel="Play"
+      finishLabel="Make your prediction"
       mobile={isMobile}
     >
       <WizardImageInput cos={cos} />

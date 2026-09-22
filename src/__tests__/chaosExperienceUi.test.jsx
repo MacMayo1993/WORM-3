@@ -132,3 +132,31 @@ it('updates single-color picks when the setup palette changes', () => {
   expect(choice.textContent).toContain(faces[1].name);
   expect(choice.querySelector('i').style.background).toBe('rgb(18, 52, 86)');
 });
+
+it('uses the inherited custom palette through setup, betting, back, and launch', () => {
+  vi.useFakeTimers();
+  const customColors = { 1:'#663399', 2:'#00aacc', 3:'#ffeedd', 4:'#ff99bb', 5:'#55bb66', 6:'#ffcc00' };
+  const settings = { colorScheme:'custom', customColors, backgroundTheme:'blackhole' };
+  const api = { current:null }, applied = vi.fn();
+  const options = { settings, size:3, setSettings:applied, reset:vi.fn(), changeSize:vi.fn(),
+    setVisualMode:vi.fn(), setFlipMode:vi.fn(), setShowTunnels:vi.fn(), setChaosLevel:vi.fn(),
+    cancelShuffle:vi.fn(), startAnimatedShuffle:vi.fn() };
+  function Harness() {
+    const game = useDisparityGame(options);
+    React.useLayoutEffect(() => { api.current = game; });
+    return game.showDisparityBetting ? <DisparityBettingScreen settings={game.chaosPreview} onBetPlaced={vi.fn()} onSkip={vi.fn()} onBack={game.handleBetBack} /> : null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => api.current.handleDisparitySetupComplete({ cubeSize:5, disparityLevel:4, flipCap:13 }));
+  expect(api.current.chaosPreview.customColors).toEqual(customColors);
+  const choice = host.querySelector('[data-pair-id="RO"]');
+  expect(choice.querySelector('[data-face-id="1"]').style.backgroundColor).toBe('rgb(102, 51, 153)');
+  expect(choice.querySelector('[data-face-id="4"]').style.backgroundColor).toBe('rgb(255, 153, 187)');
+  act(() => api.current.handleBetBack());
+  expect(api.current.chaosPreview).toMatchObject({ colorScheme:'custom', cubeSize:5, flipCap:13 });
+  const preview = api.current.chaosPreview;
+  customColors[1] = '#000000'; // An unrelated settings edit cannot alter this round's snapshot.
+  act(() => api.current.startDisparityGame(preview));
+  expect(applied.mock.calls[0][0].customColors[1]).toBe('#663399');
+  expect(bettingPalette(applied.mock.calls[0][0])).toEqual(bettingPalette(preview));
+});
