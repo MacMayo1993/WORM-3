@@ -9,3 +9,5 @@ export function modeTheme(mode) {
   const key = String(mode).toLowerCase();
   return MODE_THEMES[key.includes('worm') ? 'worm' : key.includes('chaos') || key.includes('disparity') ? 'chaos' : key.includes('random') ? 'random' : 'cube'];
 }
+
+export const PACK_ACCENTS = { 'story-campaign': '#3b82f6', 'cube-academy': '#5f7f4a', 'algorithm-codex': '#b06a2e' };

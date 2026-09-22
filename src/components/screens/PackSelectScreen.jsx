@@ -1,3 +1,4 @@
+import { PACK_ACCENTS } from '../../utils/modeThemes.js';
 import ModeArtwork from '../ui/ModeArtwork.jsx';
 // PackSelectScreen.jsx — choose a campaign, or today's Daily Descent.
 //
@@ -37,15 +38,7 @@ import DailyDescentCard from './DailyDescentCard.jsx';
 import AchievementsPanel from './AchievementsPanel.jsx';
 
 const STARS_PER_LEVEL = 3;
-const ACCENTS = {
-  'story-campaign': '#3b82f6',
-  // Deliberately literal, not UI_MOSS/PAPER_WARN: these identify a pack, and
-  // only happen to share a value with the shared action and warning inks.
-  // Pointing them at those tokens would make a pack's identity shift if the
-  // action colour ever moved.
-  'cube-academy': '#5f7f4a',
-  'algorithm-codex': '#b06a2e',
-};
+
 
 export default function PackSelectScreen({ onSelectPack, onBack }) {
   const [completed, setCompleted] = useState([]);
@@ -125,11 +118,12 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
       role="dialog"
       aria-modal="true"
       aria-label="Choose a level pack"
+      className="mode-paper-selector"
       tabIndex={-1}
       onKeyDown={onDialogKeyDown}
       style={{
       position: 'fixed', inset: 0, height: '100dvh', zIndex: Z.MODAL_RAISED,
-      ...wizardPaperBackground,
+      ...wizardPaperBackground, '--mode-accent': PACK_ACCENTS['story-campaign'],
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       fontFamily: UI_FONT, animation: 'lvSelIn 0.3s ease',
       padding: 'max(18px, env(safe-area-inset-top, 0px)) 16px max(18px, env(safe-area-inset-bottom, 0px))',
@@ -172,7 +166,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
             const stars = ids.reduce((sum, id) => sum + Math.min(stats[id]?.stars || 0, STARS_PER_LEVEL), 0);
             const maxStars = ids.length * STARS_PER_LEVEL;
             const pct = ids.length ? done / ids.length : 0;
-            const accent = ACCENTS[pack.id] || UI_MOSS;
+            const accent = PACK_ACCENTS[pack.id] || UI_MOSS;
             const isHover = hovered === pack.id;
 
             return (
@@ -183,7 +177,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
                 onMouseLeave={() => setHovered(null)}
                 aria-label={`Play ${pack.name}: ${done} of ${ids.length} complete`}
                 style={{
-                  textAlign: 'left', padding: '18px 20px', borderRadius: '16px',
+                  '--mode-accent': accent, textAlign: 'left', padding: '18px 20px', borderRadius: '16px',
                   border: `1.5px solid ${isHover ? accent : PAPER_BORDER_SOFT}`,
                   background: PAPER_SHEET_RAISED, cursor: 'pointer',
                   boxShadow: `0 4px 0 ${PAPER_CARD_SHADOW}, 0 7px 14px rgba(60,48,34,${isHover ? 0.16 : 0.10})`,
