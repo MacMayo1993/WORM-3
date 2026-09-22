@@ -137,3 +137,10 @@
 .worm-story-result-stars [data-earned="true"] { color:#f4d35e; animation:screen-arrive .35s ease-out both; animation-delay:calc(var(--star-index)*100ms); }
 @media(max-height:520px) { .worm-entry-choice .worm-path-card>.mode-artwork { height:58px; margin-bottom:4px; } }
 @media(prefers-reduced-motion:reduce) { .worm-story-result-stars [data-earned="true"] { animation:none; } }
+
+/* Filled artwork occupies the card instead of floating as a thin outline. */
+.worm-entry-choice .worm-path-card { background:color-mix(in srgb,var(--mode-accent) 10%,var(--wiz-surface-raised)); padding:clamp(10px,2vw,18px); }
+.worm-entry-choice .worm-path-illustration { display:block; width:100%; height:clamp(128px,23dvh,206px); color:#70ce86; margin:0 0 12px; filter:drop-shadow(0 5px 0 #24563418); }
+.worm-entry-choice .worm-path-free .worm-path-illustration { color:#88e59a; }
+@media(max-width:380px) { .worm-entry-choice .worm-path-illustration { height:clamp(116px,20dvh,154px); } }
+@media(max-height:520px) { .worm-entry-choice .worm-path-illustration { height:88px; margin-bottom:6px; } }
