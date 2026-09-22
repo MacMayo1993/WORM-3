@@ -205,6 +205,11 @@ export function useWormCrawler(size, cubies) {
             },
             onStoryMechanic: (key, id) => {
                 const s = useGameStore.getState(), p = storyPracticeRef.current;
+                const demo = demoPracticeRef.current;
+                if (key === 'grassLaunch' && wormDemoActive(s) && !s.demoWormFinished &&
+                    s.demoWormStarted && !s.demoWormComplete && s.wormAlive && !s.wormPaused &&
+                    demo?.attempt === `${s.wormRunId}:${s.demoWormLessonIndex}:${s.demoWormAttempt}`)
+                    demo.grassLaunch = true;
                 if (p?.runId === s.wormRunId && s.wormStoryStarted && !s.wormStoryResult && s.wormAlive && !s.wormPaused)
                     recordStoryMechanic(p, key, id);
             },
