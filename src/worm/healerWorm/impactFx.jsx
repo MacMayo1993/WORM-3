@@ -128,7 +128,7 @@ export function ThunkEffect({ thunkRef }) {
                         transformOrigin: 'center',
                         display: 'none',
                     }}>
-                        WORM&apos;D
+                        Worm'd
                     </div>
                     {/* text is overwritten imperatively via divRef.current.textContent */}
                 </Html>

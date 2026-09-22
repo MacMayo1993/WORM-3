@@ -35,6 +35,7 @@ for (const href of [nunitoWoff2, outfitWoff2, bungeeWoff2, annieWoff2]) {
 }
 import App from './App.jsx'
 import './App.css'
+import './gameTypography.css'
 import { UI_CSS_VARS } from './utils/uiTheme.js'
 
 for (const [name, value] of Object.entries(UI_CSS_VARS)) {

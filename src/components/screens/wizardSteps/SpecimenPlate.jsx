@@ -191,7 +191,7 @@ export default function SpecimenPlate({
               color: UI_CREAM, letterSpacing: '0.02em', lineHeight: 1.15,
               textShadow: NIGHT_TITLE_SHADOW, marginBottom: subtitle ? '7px' : 0
             }}>
-              {String(title).toUpperCase()}
+              {title}
             </div>
             {typeof subtitle === 'string' ? (
               <div style={{

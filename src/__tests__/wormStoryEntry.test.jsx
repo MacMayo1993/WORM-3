@@ -22,7 +22,7 @@ it('launches Stage 9 on 7x7 and returns other chapters to 5x5', () => {
     stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])), claimed: {}
   } } });
   show({ initialPage: 'story' });
-  click('Under Siege'); click('Replay level');
+  click('Under Siege'); click('Play again');
   expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 9, cubeSize: 7, megaMode: false });
   expect(host.querySelector('[aria-label="Selected level"]').textContent).toContain('defeat one enemy');
   click('Worm Ascendant'); click('Play level');
@@ -32,9 +32,9 @@ it('opens with Story on the left and Free Play on the right, without launching e
   show(); const cards = [...host.querySelector('.worm-path-split').children];
   expect(cards).toHaveLength(2);
   expect(cards.every(card => card.tagName === 'BUTTON')).toBe(true);
-  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Story', 'Free play']);
+  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Levels', 'Free play']);
   expect(complete).not.toHaveBeenCalled();
-  click('Story levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
+  click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false, perFaceStyles: {1:'grass'} }));
   click('Back'); await act(async () => { click('Free play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
@@ -45,7 +45,7 @@ it('traps keyboard focus and handles Back/Escape within the mode boundary', () =
   show(); const buttons = host.querySelectorAll('button'); expect(document.activeElement).toBe(buttons[0]);
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true })));
   expect(document.activeElement).toBe(buttons[buttons.length-1]);
-  click('Story levels'); act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  click('Levels'); act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(host.querySelector('.worm-path-split')).not.toBeNull(); expect(cancel).not.toHaveBeenCalled();
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); expect(cancel).toHaveBeenCalledOnce();
 });
@@ -61,7 +61,7 @@ it('offers Next, Replay and chapter navigation from completion', () => {
   useGameStore.setState({ wormStoryResult: { levelId: 1, stars: 3, seconds: 8, xp: 70, points: 45 } });
   act(() => root.render(<StoryResult onNext={next} onRetry={retry} onLevels={levels} />));
   expect(host.querySelector('[aria-label="3 out of 3 stars"]')).not.toBeNull();
-  click('Next level'); click('Replay'); click('Chapter map');
+  click('Next level'); click('Play again'); click('Levels');
   expect(next).toHaveBeenCalledOnce(); expect(retry).toHaveBeenCalledOnce(); expect(levels).toHaveBeenCalledOnce();
 });
 
@@ -78,9 +78,9 @@ it('continues level six into seven and reserves chapter completion for ten', () 
   for (const id of [6, 10]) {
     act(() => useGameStore.setState({ wormStoryResult: { levelId: id, stars: 1, seconds: 200, xp: 50, points: 0 } }));
     act(() => root.render(<StoryResult onNext={next} onLevels={levels} />));
-    expect(host.textContent).toContain(`LEVEL ${id} / 10`);
+    expect(host.textContent).toContain(`Level ${id} / 10`);
     expect(host.textContent.includes('Chapter complete')).toBe(id === 10);
-    click(id === 6 ? 'Next level' : 'Back to chapter');
+    click(id === 6 ? 'Next level' : 'Levels');
   }
   expect(next).toHaveBeenCalledOnce(); expect(levels).toHaveBeenCalledOnce();
 });

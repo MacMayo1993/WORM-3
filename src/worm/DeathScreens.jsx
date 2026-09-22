@@ -1,5 +1,5 @@
 import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
-import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
+import WormMissionCard from './WormMissionCard.jsx';
 // src/worm/DeathScreens.jsx
 // Full-screen death takeovers for Worm Healer mode — a distinct themed
 // experience per death cause instead of one generic "you died" card.
@@ -170,8 +170,8 @@ export default function DeathScreen({
                         <button
                             onClick={onRetry}
                             style={primaryBtnStyle(config.btnFrom ?? config.accent, config.btnTo ?? config.deep)}
-                        ><WormReplayLabel /></button>
-                        <button onClick={onNewGame} style={SECONDARY_BTN_STYLE}>New Game</button>
+                        >Try again</button>
+                        <button onClick={onNewGame} style={SECONDARY_BTN_STYLE}>New game</button>
                     </div>
                     {canExamine && (
                         <button onClick={onExamine} style={TERTIARY_BTN_STYLE}>Examine the board</button>

@@ -347,7 +347,7 @@ export default function UILayer({
                   setShowDisparityWizard(true);
                 }}
                 primaryLabel="Next round · same setup"
-                secondaryLabel="Main Menu"
+                secondaryLabel="Main menu"
                 onSecondary={() => {
                   useGameStore.getState().clearDisparityGame();
                   useGameStore.getState().clearLastBetResult();

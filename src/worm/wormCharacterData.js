@@ -8,7 +8,7 @@ export const WORM_CHARACTERS = [
     type: 'Intelligence Unit',
     subtitle: 'Multi Orientable Block Intelligence',
     stats: { speed: 55, healing: 60, agility: 65, glow: 45 },
-    special: 'Create Wormhole — escape through a new tunnel without spending orbs; re-entry locks for 10 seconds; heal it before creating another',
+    special: 'Create Wormhole — Open a tunnel for free. Wait 10 seconds to re-enter. Heal it before making another.',
   },
   {
     id: 'classic',
@@ -16,7 +16,7 @@ export const WORM_CHARACTERS = [
     type: 'Ranger',
     subtitle: 'Original rounded crawler',
     stats: { speed: 55, healing: 60, agility: 65, glow: 10 },
-    special: 'Orb Abundance — 50% more orbs on the cube',
+    special: 'Orb Abundance — 50% more orbs on the cube.',
   },
   {
     id: 'inch',
@@ -24,7 +24,7 @@ export const WORM_CHARACTERS = [
     type: 'Brute',
     subtitle: 'Ribbed caterpillar with soft feelers',
     stats: { speed: 30, healing: 85, agility: 35, glow: 10 },
-    special: 'Accordion Step — gathers into low arches as it crawls',
+    special: 'Spring Loaded — Spring forward in a long jump. Land on a clear tile.',
   },
   {
     id: 'glow',
@@ -32,7 +32,7 @@ export const WORM_CHARACTERS = [
     type: 'Scout',
     subtitle: 'Bioluminescent trail crawler',
     stats: { speed: 90, healing: 40, agility: 80, glow: 100 },
-    special: 'Light Trail — brighter enemy outlines; press the ability button to paint a luminous trail for 3 seconds',
+    special: 'Light Trail — Enemies glow brighter. Leave a glowing trail for 3 seconds.',
   },
   {
     id: 'book',
@@ -40,7 +40,7 @@ export const WORM_CHARACTERS = [
     type: 'Sage',
     subtitle: 'Gilded pages and brass spectacles',
     stats: { speed: 40, healing: 75, agility: 50, glow: 15 },
-    special: "Time Out — earn 25% more XP and pause the rotation timer for 5 seconds",
+    special: 'Time Out — Earn 25% more XP. Pause layer turns for 5 seconds.',
   },
   {
     id: 'wiggle',
@@ -48,7 +48,7 @@ export const WORM_CHARACTERS = [
     type: 'Dancer',
     subtitle: 'Hyper-flexible sidewinder',
     stats: { speed: 80, healing: 50, agility: 100, glow: 20 },
-    special: 'Tail Wipers — sweep three tiles left and right twice to collect orbs; steering locks during the sweep',
+    special: 'Tail Wipers — Sweep three tiles left and right twice to collect orbs. You cannot turn during the sweep.',
   },
   {
     id: 'prism',
@@ -56,7 +56,7 @@ export const WORM_CHARACTERS = [
     type: 'Trickster',
     subtitle: 'Faceted crystal spectrum',
     stats: { speed: 70, healing: 55, agility: 75, glow: 60 },
-    special: 'Spectrum — body cycles every color; carried orbs deposit as any color (wildcard)',
+    special: 'Spectrum — Every orb color heals any tunnel.',
   }
 ];
 

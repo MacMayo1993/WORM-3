@@ -448,7 +448,7 @@ const THUMB_TRAY_STYLE = {
 };
 
 // The action pair rides a little above the steering keys' bottom edge: dropping
-// JUMP to the same line put it where the hand rests, and it was getting palmed.
+// Jump to the same line put it where the hand rests, and it was getting palmed.
 const ACTION_CLUSTER_STYLE = {
     position: 'relative',
     // Takes the space between the two steering keys and centres inside it, so the
@@ -759,8 +759,8 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
     return (
         <div style={WINNER_SCREEN_STYLE}>
             <div style={WINNER_STARS_STYLE} />
-            <div style={WINNER_TITLE_STYLE}>WINNER WORM!</div>
-            <div style={WINNER_SUB_STYLE}>CUBE SOLVED · ALL TUNNELS HEALED</div>
+            <div style={WINNER_TITLE_STYLE}>Cube healed!</div>
+            <div style={WINNER_SUB_STYLE}>All tunnels healed</div>
             <div style={PODIUM_WRAP_STYLE}>
                 <div style={PODIUM_WORM_ROW_STYLE}>
                     {segments.map((seg, i) => (
@@ -779,16 +779,16 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                     )}
                 </div>
                 <div style={PODIUM_BASE_STYLE}>
-                    <span style={PODIUM_LABEL_STYLE}>FINAL LENGTH: {wormBodyTiles}</span>
+                    <span style={PODIUM_LABEL_STYLE}>Final length: {wormBodyTiles}</span>
                 </div>
             </div>
-            <div style={WINNER_PP_STYLE}>+{ppEarned} PARITY POINTS</div>
+            <div style={WINNER_PP_STYLE}>+{ppEarned} Parity Points</div>
             <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} orbs x 5 PP x 2x WIN BONUS</div>
             <div style={WINNER_STATS_STYLE}>
                 {[
                     ['TIME', formatTime(wormTimeAlive)],
-                    ['COLLECTED', wormSessionOrbs],
-                    ['HEALED', wormHealedCount],
+                    ['Collected', wormSessionOrbs],
+                    ['Healed', wormHealedCount],
                     ['TOTAL PPs', parityPoints],
                 ].map(([label, value]) => (
                     <div key={label} style={WINNER_STAT_BOX_STYLE}>
@@ -801,7 +801,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
             <XpRunSummary mode="worm" />
             <div style={WINNER_BTN_ROW_STYLE}>
                 <button onClick={onRetry} style={WINNER_PLAY_AGAIN_STYLE}><WormReplayLabel /></button>
-                <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New Game</button>
+                <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New game</button>
             </div>
         </div>
     );
@@ -1130,7 +1130,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     ['Time', formatTime(wormTimeAlive)],
                     ['Healed', wormHealedCount],
                     ['Collected', wormSessionOrbs],
-                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'FINAL' : `${wormholeCountdown.toFixed(1)}s`],
+                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
                 <details className="screen-disclosure"><summary>Controls & sound</summary>
@@ -1159,21 +1159,21 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                         onClick={() => toggleWormControlMode()}
                         style={togglePillStyle(wormControlMode === 'oriented', blue)}
                     >
-                        {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
+                        {wormControlMode === 'oriented' ? 'Relative turns' : 'Fixed turns'}
                     </button>
                 </div>
 
                 {/* Which way is up while crawling. A feel call rather than a right
                     answer, and one you can only judge in motion, so it is here in
                     the run rather than buried in setup: FACE rolls the horizon with
-                    the cube face you are on, LEVEL keeps it world-up. */}
+                    the cube face you are on, Keep level keeps it world-up. */}
                 <div style={SETTING_ROW_STYLE}>
                     <span style={SETTING_LABEL_STYLE}>Horizon</span>
                     <button
                         onClick={() => toggleCameraHorizon?.()}
                         style={togglePillStyle(cameraHorizon === 'face', blue)}
                     >
-                        {cameraHorizon === 'face' ? 'FOLLOWS FACE' : 'LEVEL'}
+                        {cameraHorizon === 'face' ? 'Follow the face' : 'Keep level'}
                     </button>
                 </div>
 
@@ -1184,13 +1184,13 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                             onClick={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))}
                             style={togglePillStyle(sfxOn, green)}
                         >
-                            {sfxOn ? 'SFX ON' : 'SFX OFF'}
+                            {sfxOn ? 'Sound on' : 'Sound off'}
                         </button>
                         <button
                             onClick={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))}
                             style={togglePillStyle(hapticsOn, green)}
                         >
-                            {hapticsOn ? 'HAPTICS ON' : 'HAPTICS OFF'}
+                            {hapticsOn ? 'Vibration on' : 'Vibration off'}
                         </button>
                     </div>
                 </div>
@@ -1219,7 +1219,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     {onHome && (
                         <button onClick={onHome} style={LIST_BTN_STYLE}>
                             <span aria-hidden="true">⌂</span>
-                            <span>Main Menu</span>
+                            <span>Main menu</span>
                         </button>
                     )}
                 </div>
@@ -1439,7 +1439,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                                     disabled={!controlsEnabled}
                                 >
                                     <JumpIcon size={19} />
-                                    {jumpRescue ? 'JUMP NOW' : isPortalReady ? 'DIVE' : 'JUMP'}
+                                    {jumpRescue ? 'Jump now' : isPortalReady ? 'Dive' : 'Jump'}
                                 </button>
                             </div>
                             <BoostButton wormAlive={controlsEnabled && !jumpRescue} />
@@ -1478,7 +1478,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 <div style={EXAMINE_MINIMIZED_OUTER_STYLE}>
                     <div style={EXAMINE_BAR_STYLE}>
                         <div style={EXAMINE_DOT_STYLE} />
-                        <span style={EXAMINE_LABEL_STYLE}>EXAMINE MODE</span>
+                        <span style={EXAMINE_LABEL_STYLE}>Look around</span>
                         <button onPointerDown={() => setIsMinimized(false)} style={EXAMINE_RESTORE_BTN_STYLE}>
                             View Card
                         </button>

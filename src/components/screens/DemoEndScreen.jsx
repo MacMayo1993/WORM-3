@@ -19,11 +19,11 @@ const MODES = [
     blurb: 'Steer a worm, collect orbs, and heal the cube.',
     primary: true,
   },
-  { id: 'story', name: 'STORY', blurb: 'Ten guided levels that build up one rule at a time.' },
-  { id: 'freeplay', name: 'FREEPLAY', blurb: 'Solve the cube your way — no timer, no pressure.' },
-  { id: 'chaos', name: 'CHAOS', blurb: 'Call the surviving pair and ride out the flipping cube.' },
-  { id: 'random', name: 'RANDOM', blurb: 'Let the cube remix the rules and the look.' },
-  { id: 'store', name: 'STORE', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
+  { id: 'story', name: 'Levels', blurb: 'Ten guided levels that build up one rule at a time.' },
+  { id: 'freeplay', name: 'Free play', blurb: 'Solve the cube your way — no timer, no pressure.' },
+  { id: 'chaos', name: 'Chaos', blurb: 'Call the surviving pair and ride out the flipping cube.' },
+  { id: 'random', name: 'Random', blurb: 'Let the cube remix the rules and the look.' },
+  { id: 'store', name: 'Store', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
 ];
 
 const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit, onExplore }) => {

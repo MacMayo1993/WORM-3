@@ -166,7 +166,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             <li><b>WORM³:</b> Solve the cube after every sticker has traveled through a wormhole at least once</li>
           </ul>
           <p style={{ marginTop: '12px', padding: '12px', background: 'rgba(168, 85, 247, 0.12)', borderRadius: '10px', fontSize: '13px', border: '1px solid rgba(168, 85, 247, 0.28)' }}>
-            <b>Tip:</b> Hit <b>SHUFFLE</b> in the menu to scramble and start a new game. Victory badges unlock as you achieve each condition!
+            <b>Tip:</b> Hit <b>Shuffle</b> in the menu to scramble and start a new game. Victory badges unlock as you achieve each condition!
           </p>
         </>
       )
@@ -190,7 +190,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             <button className="bauhaus-btn" onClick={onClose}>Skip Tutorial</button>
             {onMainMenu && (
               <button className="bauhaus-btn" onClick={onMainMenu} style={{ opacity: 0.7 }}>
-                Main Menu
+                Main menu
               </button>
             )}
           </div>

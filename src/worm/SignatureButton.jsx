@@ -20,7 +20,7 @@ export default function SignatureButton({ compact = false }) {
   if (!def || def.passive) return null;
   const current = readout?.character === character ? readout : null;
   const disabled = !alive || paused || !['active', 'finalHealing'].includes(phase) || !current || (!current.returnReady && (current.seconds > 0 || current.active));
-  const label = current?.returnReady ? `${current.activeSeconds}s` : current?.charges > 0 ? `${current.charges} LEFT` : current?.active ? 'ACTIVE' : current?.seconds > 0 ? `${current.seconds}s` : 'Q';
+  const label = current?.returnReady ? `${current.activeSeconds}s` : current?.charges > 0 ? `${current.charges} left` : current?.active ? 'Active' : current?.seconds > 0 ? `${current.seconds}s` : 'Q';
   const status = current?.notice || (!current?.ready && !current?.active && !current?.seconds ? current?.reason : '') || '';
   const activate = () => {
     const state = useGameStore.getState();

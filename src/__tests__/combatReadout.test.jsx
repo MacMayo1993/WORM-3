@@ -39,7 +39,7 @@ it.each([null, 'fire'])('hides live wave details after sealing with surviving en
   });
   expect(c.won).toBe(true);
   expect(c.enemies).toHaveLength(0);
-  expect(host.textContent).toContain('PORTAL SEALED');
+  expect(host.textContent).toContain('Portal sealed!');
   expect(host.textContent).toContain('100 pts');
   expect(host.textContent).toContain('1 defeated');
   expect(host.textContent).toContain('Try again');

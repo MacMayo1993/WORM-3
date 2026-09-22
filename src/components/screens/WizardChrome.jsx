@@ -569,7 +569,7 @@ export function WizardShell({
   onSelect,
   onBack,
   onPrimary,
-  finishLabel = 'Start Playing',
+  finishLabel = "Play",
   secondary = null,
   mobile = isMobile,
   children
@@ -607,7 +607,7 @@ export function WizardShell({
             </svg>
             {!mobile && (active === 0 ? 'Cancel' : 'Back')}
           </button>
-          <span className="mode-wizard-kicker">{theme.name.charAt(0) + theme.name.slice(1).toLowerCase()}</span>
+          <span className="mode-wizard-kicker">{theme.name}</span>
           <span className="mode-wizard-count">{String(active + 1).padStart(2, '0')} / {String(categories.length).padStart(2, '0')}</span>
         </div>
 

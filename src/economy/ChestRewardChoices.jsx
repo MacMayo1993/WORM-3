@@ -33,7 +33,7 @@ export default function ChestRewardChoices({ receipt, ownedItems, onChoose }) {
     }
   }, [receipt.id]);
   return <section ref={panel} className="chest-choices" aria-labelledby="chest-choice-title" style={{ '--choice-tier': tier.color }}>
-    <h2 ref={heading} tabIndex={-1} id="chest-choice-title">CHOOSE ONE</h2>
+    <h2 ref={heading} tabIndex={-1} id="chest-choice-title">Choose a reward</h2>
     <p>New items unlock. Owned items give gems.</p>
     <div className="chest-choice-grid">{receipt.reward.itemIds.map((id, index) => {
       const item = getStoreItem(id), owned = ownedItems.includes(id);

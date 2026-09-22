@@ -53,7 +53,7 @@ const TYPE_LABEL = {
   hat: 'Hat',
   accessory: 'Accessory',
   trail: 'Trail',
-  scheme: 'Color Palette',
+  scheme: "Colors",
   tile: 'Tile Style',
 };
 
@@ -484,7 +484,7 @@ const StoreCollection = ({ onClose, onChests }) => {
             onClick={() => { setTab(t.id); setFocusedId(null); resetScroll(); }}>
             <i aria-hidden="true" /><span><strong>{t.label}</strong><small>{tabOwned[t.id]} / {t.items.length} owned</small></span><b aria-hidden="true">›</b>
           </button>)}
-          <button className="catalogue-chests" onClick={onChests}><span aria-hidden="true">◇</span><strong>Cubie Chests</strong><small>Open →</small></button>
+          <button className="catalogue-chests" onClick={onChests}><span aria-hidden="true">◇</span><strong>Cubie chests</strong><small>Open →</small></button>
         </nav>
         <section ref={selectorRef} className="catalogue-selector" id="catalogue-selector" aria-label={`${activeTab.label} selector`}>
           <div className="catalogue-section-heading"><div><h2>{activeTab.label}</h2></div>

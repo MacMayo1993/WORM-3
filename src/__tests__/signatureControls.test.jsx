@@ -47,7 +47,7 @@ it('uses the real character store, button bridge, sim and cooldown mirror', () =
   frame();
   expect(worm.signature.current.seq).toBe(1);
   expect(worm.signature.current.active).toBeGreaterThan(2);
-  expect(button.disabled).toBe(true); expect(button.textContent).toContain('ACTIVE');
+  expect(button.disabled).toBe(true); expect(button.textContent).toContain('Active');
   const seconds = wormBuffs.signature.seconds;
   act(() => useGameStore.setState({ wormPaused: true }));
   for (let i = 0; i < 30; i++) frame();
@@ -96,14 +96,14 @@ it('shows correct pickup requirements through the real tunnel lookup and store',
   const state = useGameStore.getState();
   const cubies = flipStickerPair(state.cubies, 5, 2, 3, 4, 'PZ', getManifoldMap(state.cubies, 5, state.rotationEpoch));
   act(() => useGameStore.setState({ cubies })); frame();
-  expect(host.textContent).toContain('COLLECT 2 MORE ORBS');
+  expect(host.textContent).toContain('Collect 2 more orbs');
   expect(host.querySelector('.worm-tunnel-needs').dataset.healReady).toBe('false');
   const face = cubies[2][3][4].stickers.PZ.curr;
   act(() => { worm.tailLength.current = 7; useGameStore.setState({ wormOrbInventory: { [face]: 3 } }); }); frame();
-  expect(host.textContent).toContain('COLLECT 1 MORE ORB');
+  expect(host.textContent).toContain('Collect 1 more orb');
   const key = getStableKey(2, 3, 4, 'PZ', cubies);
   act(() => useGameStore.setState({ wormHealingProgress: { [key]: { deposited: 1, faceId: face } } })); frame();
-  expect(host.textContent).toContain('READY TO HEAL');
+  expect(host.textContent).toContain('Ready to heal');
   expect(host.querySelector('.worm-tunnel-needs').dataset.healReady).toBe('true');
   expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('25');
   act(() => useGameStore.setState({ wormOrbInventory: { [face]: 0 } })); frame();

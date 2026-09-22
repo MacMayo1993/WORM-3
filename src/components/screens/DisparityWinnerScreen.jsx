@@ -90,7 +90,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
         <div className="chaos-actions">
           <button disabled={!ready} onClick={onDismiss}>{primaryLabel}</button>
           {onConfigure && <button disabled={!ready} onClick={onConfigure}>Change setup</button>}
-          {onSecondary && <button disabled={!ready} onClick={onSecondary}>{secondaryLabel || 'Main Menu'}</button>}
+          {onSecondary && <button disabled={!ready} onClick={onSecondary}>{secondaryLabel || "Main menu"}</button>}
         </div>
       </div>
     </div>

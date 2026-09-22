@@ -11,7 +11,7 @@ export const XP_MODES = {
   daily: 'Daily Descent', teach: 'Teach', explore: 'Exploration', demo: 'Introduction',
 };
 // Chests grant XP, but are not a gameplay mode with run achievements.
-export const XP_SOURCES = { ...XP_MODES, chests: 'Cubie Chests' };
+export const XP_SOURCES = { ...XP_MODES, chests: "Cubie chests" };
 export const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
 export const xpForLevel = level => {
   const n = Math.max(0, Math.min(MAX_PLAYER_LEVEL - 1, (Number.isFinite(level) ? Math.floor(level) : 1) - 1));

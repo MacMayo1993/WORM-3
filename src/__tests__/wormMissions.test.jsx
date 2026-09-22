@@ -167,7 +167,7 @@ describe('achievement UI', () => {
     expect(host.querySelectorAll('ol li')).toHaveLength(7);
     expect(host.querySelectorAll('ol li')[0].textContent).toContain('Collect 8 orbs');
     expect(host.querySelectorAll('ol li')[6].textContent).toContain('Collect a dozen orbs');
-    expect(host.textContent).toContain('CHALLENGES COMPLETED');
+    expect(host.textContent).toContain('Challenges complete');
     expect(host.textContent).toContain('+220 PP · +275 XP');
     expect(host.textContent).toContain('New run, fresh challenges.');
     expect(host.querySelector('[role="progressbar"]')).toBeNull();
@@ -178,7 +178,7 @@ describe('achievement UI', () => {
   it('keeps the active objective separate from the earned list when paused', () => {
     start(); finishCurrent(); set({ wormPauseMenuOpen: true, wormPaused: true });
     act(() => root.render(<WormMissionCard summary />));
-    expect(host.textContent).toContain('CHALLENGES SO FAR');
+    expect(host.textContent).toContain('Challenges');
     expect(host.querySelectorAll('ol li')).toHaveLength(1);
     expect(host.querySelector('ol').textContent).not.toContain('Complete 1 tunnel trip');
     expect(host.querySelector('[role="progressbar"]').getAttribute('aria-label')).toBe('Complete 1 tunnel trip');

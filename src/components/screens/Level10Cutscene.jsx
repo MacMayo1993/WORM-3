@@ -418,7 +418,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             textShadow: '0 0 60px rgba(139, 92, 246, 0.8)',
             letterSpacing: '0.1em'
           }}>
-            SINGULARITY
+            Singularity
           </h1>
           <p style={{
             fontSize: 'clamp(14px, 3vw, 24px)',
@@ -426,7 +426,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             marginTop: '8px',
             letterSpacing: '0.3em'
           }}>
-            LEVEL 10
+            Level 10
           </p>
         </div>
       );
@@ -444,7 +444,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             letterSpacing: '0.2em',
             textShadow: '0 0 20px rgba(78, 205, 196, 0.6)'
           }}>
-            SEAMS TEAR... SYMMETRY BREAKS
+            Seams tear... symmetry breaks
           </p>
           <p style={{
             fontSize: 'clamp(10px, 2vw, 16px)',
@@ -471,7 +471,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             letterSpacing: '0.15em',
             textShadow: '0 0 30px rgba(255, 150, 50, 0.6)'
           }}>
-            APPROACHING EVENT HORIZON
+            Approaching event horizon
           </p>
         </div>
       );
@@ -490,7 +490,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             textShadow: '0 0 40px rgba(139, 92, 246, 0.8)',
             fontWeight: 500
           }}>
-            MASTER THE MANIFOLD
+            Master the manifold
           </p>
           <p style={{
             fontSize: 'clamp(12px, 2.5vw, 20px)',
@@ -498,7 +498,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             marginTop: '8px',
             letterSpacing: '0.2em'
           }}>
-            SURVIVE THE SINGULARITY
+            Survive the singularity
           </p>
         </div>
       );
@@ -628,7 +628,7 @@ const Level10Cutscene = ({ onComplete, onSkip }) => {
             e.target.style.color = 'rgba(255, 255, 255, 0.7)';
           }}
         >
-          SKIP {'>>>'}
+          Skip {'>>>'}
         </button>
       )}
 

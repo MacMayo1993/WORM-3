@@ -67,7 +67,7 @@ export default function StoryObjectiveHUD({ level }) {
         onClick={() => setCollapsed((value) => !value)}
         aria-expanded={!collapsed}
       >
-        <span className="story-objective-kicker">MOBI&apos;S OBJECTIVE</span>
+        <span className="story-objective-kicker">Mobi's objective</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
           {par != null && (
             <span

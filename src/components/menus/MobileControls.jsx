@@ -280,7 +280,7 @@ const MobileControls = React.memo(({
               style={flipMode ? activeSmallButtonStyle : smallButtonStyle}
               aria-label="Toggle flip mode"
             >
-              <span style={flipLabelStyle}>FLIP</span>
+              <span style={flipLabelStyle}>Flip</span>
             </button>
 
             {/* Tunnels — three-state: Off → Hints → Full → Off. The ring around the
@@ -326,7 +326,7 @@ const MobileControls = React.memo(({
                 style={teachModeActive ? teachActiveButtonStyle : smallButtonStyle}
                 aria-label="Toggle teach mode"
               >
-                <span style={teachLabelStyle}>TEACH</span>
+                <span style={teachLabelStyle}>Teach</span>
               </button>
             )}
 

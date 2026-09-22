@@ -6,7 +6,7 @@ import './wormMissions.css';
 function ActiveAchievement({ mission, xp, number, compact = false }) {
   return <>
     {!compact && <div className="worm-mission-heading">
-      <span className="worm-mission-label">CHALLENGE {number}</span>
+      <span className="worm-mission-label">Challenge {number}</span>
       <span className="worm-mission-reward">+{mission.reward} PP · +{xp} XP</span>
     </div>}
     <div className="worm-mission-current" key={mission.sequence}>
@@ -42,7 +42,7 @@ export default function WormMissionCard({ summary = false, onInspect }) {
   const xp = earned.reduce((sum, achievement) => sum + achievement.xpEarned, 0);
   return <section className="worm-mission worm-mission-summary" aria-label={finished ? 'Achievements earned this run' : 'Achievements this run'}>
     <div className="worm-mission-heading">
-      <h3 className="worm-mission-label">{finished ? 'CHALLENGES COMPLETED' : 'CHALLENGES SO FAR'}</h3>
+      <h3 className="worm-mission-label">{finished ? 'Challenges complete' : 'Challenges'}</h3>
       <span className="worm-achievement-count" aria-label={`${earned.length} earned`}>{earned.length}</span>
     </div>
     {earned.length > 0 ? <>

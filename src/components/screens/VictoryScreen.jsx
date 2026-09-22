@@ -3,7 +3,7 @@ import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { VICTORY } from '../../utils/constants.js';
 import {
-  UI_FONT, HEADING_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
+  UI_FONT, HEADING_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
   NIGHT_BACKDROP, NIGHT_BACKDROP_BLUR, NIGHT_PANEL, NIGHT_BORDER,
   NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_TITLE_SHADOW, NIGHT_SOFT_SHADOW,
  TEXT_XS, TEXT_SM, TEXT_LG, Z } from '../../utils/uiTheme.js';
@@ -241,14 +241,14 @@ const VictoryScreen = ({
 
         {/* Title */}
         <h1 style={{
-          fontSize: 'clamp(30px, 8vw, 52px)',
-          fontWeight: 750,
+          fontSize: 'clamp(28px, 7vw, 48px)',
+          fontWeight: 400,
           margin: '0 0 14px 0',
           color: INK_CREAM,
-          fontFamily: HEADING_FONT,
-          lineHeight: 0.95,
+          fontFamily: DISPLAY_FONT,
+          lineHeight: 1.1,
           letterSpacing: '0.02em',
-          textTransform: 'none',
+          textTransform: 'uppercase',
           textShadow: TITLE_SHADOW
         }}>
           {config.title}
@@ -280,7 +280,7 @@ const VictoryScreen = ({
           }}>
             <span style={{
               fontSize: '11px',
-              fontWeight: 800,
+              fontWeight: 700,
               color: GOLD,
               fontFamily: UI_FONT,
               textTransform: 'none',

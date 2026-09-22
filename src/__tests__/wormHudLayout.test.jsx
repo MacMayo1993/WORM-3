@@ -57,7 +57,7 @@ it('replaces secondary context with one healing readout and keeps pause usable d
   wormBuffs.tunnelNeeds = { ready: true, inTransit: true, color: '#8094ef', savedFraction: 1, payableFraction: 0 };
   renderPhase('tunnel'); act(() => vi.advanceTimersByTime(110));
   expect(host.querySelectorAll('.worm-tunnel-needs')).toHaveLength(1);
-  expect(host.textContent).toContain('HEALING ON EXIT');
+  expect(host.textContent).toContain('Heals when you exit');
   expect(host.querySelector('.worm-hud-context .worm-buffs')).toBeNull();
   expect(host.querySelector('[aria-label="Healing energy deposited"]')).toBeNull();
   act(() => host.querySelector('[aria-label="Pause"]').click());

@@ -355,7 +355,7 @@ export function SolveModeButton({ active, onClick }) {
       className={`btn-compact text ${active ? 'active' : ''}`}
       style={{ color: active ? SAGE : undefined, borderColor: active ? SAGE : undefined }}
     >
-      SOLVE
+      Solve
     </button>
   );
 }
