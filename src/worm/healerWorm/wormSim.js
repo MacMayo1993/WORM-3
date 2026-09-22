@@ -1589,12 +1589,14 @@ const PHASE_HANDLERS = {
                 trySpecialPickupAt(sim, size, ctx, sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, true)) {
                 return true;
             }
-            // Recheck live coverage at visible contact, then hold this exact pose
-            // for the heal payoff before choosing the next logical destination.
+            // Recheck live coverage at visible contact. Consume the completed step
+            // below before pausing, dropping its unused frame remainder: the next
+            // traversal must resume with stepAcc and interpT both at zero. Its
+            // interpolation source preserves this exact visible contact pose.
             if (headOnSurface && sim.interpT >= 1 &&
                 !restReadProtectsTile(sim.restRead, sim.pos.x, sim.pos.y, sim.pos.z) &&
                 tryWormholeRingHeal(sim, size, ctx)) {
-                return true;
+                sim.stepAcc = STEP_SEC;
             }
             // When navigating a corner, traversing double the distance means we should
             // theoretically give it more time so the speed looks constant, but the Bezier
