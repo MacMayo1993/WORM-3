@@ -54,7 +54,7 @@ export default function CubePlate({
       onNext={onNext}
       glow={glow}
       backdrop={backdrop}
-      hint={onPrev ? 'drag the cube to turn it' : null}
+      hint={onPrev ? 'Drag to Rotate' : null}
       art={
         <CubePreviewCanvas
           px={cubePx}

@@ -1130,22 +1130,17 @@ const withFaceColor = (mode) => {
   return { ...mode, tileColor, textColor: readableInk(tileColor) };
 };
 
-// `desc` says what the mode is; `how` says how it ends, which is the question a
-// one-liner kept leaving open ("solve it your way" — and then what?). `chips`
-// are the two facts worth knowing before committing: how big the cube gets, and
-// what kind of session it is.
+// The title and chips identify the mode; the disclosure explains its rules.
 const CAROUSEL_MODES = [
   {
     id: 'worm', label: 'WORM', face: 'NX',
-    desc: 'Collect orbs. Jump your tail. Heal the cube.',
-    how: 'Choose Story challenges or Free Play. Cross tunnels, build your worm, and spend collected orbs to heal flipped tiles.',
+    how: 'Steer, collect orbs, and use tunnels to heal flipped tiles.',
     chips: ['2×2 – Mega', 'Arcade'],
     cta: 'PLAY',
   },
   {
     id: 'freeplay', label: 'CUBE', face: 'NY',
-    desc: 'Scramble it. Turn it. Solve it.',
-    how: 'Solve all six faces so each shows one color. Choose your cube size and solve at your own pace.',
+    how: 'Make each face one color.',
     chips: ['2×2 – 10×10', 'Relaxed'],
     cta: 'PLAY',
   },
@@ -1154,29 +1149,25 @@ const CAROUSEL_MODES = [
     // No chapter count in the copy: it said "ten" while the campaign has had
     // twelve for some time. The chip carries the number now, derived from the
     // level data (see chipsFor) so it cannot drift again.
-    desc: 'Master the cube, one chapter at a time.',
     how: 'Clear a chapter to unlock the next one.',
     chips: ['Campaign', 'Guided'],
     cta: 'PLAY',
   },
   {
     id: 'chaos', label: 'CHAOS', face: 'NZ',
-    desc: 'Pick your pair. Survive the chaos.',
     how: 'Back the pair that outlasts the rest to win Parity Points.',
     chips: ['2×2 – 10×10', 'Wager'],
     cta: 'PLAY',
   },
   {
     id: 'random', label: 'RANDOM', face: 'PZ',
-    desc: 'Keep solving. Nothing stays the same.',
     how: 'Solve all six faces. The palette and tile style change every 10 seconds.',
     chips: ['2×2 – 10×10', 'Twist'],
     cta: 'PLAY',
   },
   {
     id: 'store', label: 'STORE', face: 'PY',
-    desc: 'Build your signature look.',
-    how: 'Earn points by playing; everything you buy is yours for good.',
+    how: 'Spend Parity Points on palettes, styles, and worm equipment.',
     chips: ['No cube', 'Cosmetic'],
     cta: 'OPEN STORE',
   },
@@ -1584,8 +1575,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
         <div className="mc-mode-copy" style={{ opacity, transition: 'opacity 150ms ease', '--mode-accent': mode.tileColor }}>
           <article aria-label={`${mode.label} mode details`}>
-            <header><div><span className="mc-mode-kicker">{mode.id === 'store' ? 'GEAR UP' : 'SELECT YOUR CHALLENGE'}</span><h2>{mode.label}</h2></div><span aria-hidden="true" /></header>
-            <p className="mc-mode-pitch">{mode.desc}</p>
+            <header><div><h2>{mode.label}</h2></div><span aria-hidden="true" /></header>
             <div className="mc-mode-facts">{modeChips.map(chip => <span key={chip}>{chip}</span>)}</div>
             <details key={mode.id}>
               <summary className="ui-focusable">{mode.id === 'store' ? 'GEAR & REWARDS' : 'HOW TO PLAY'}</summary>
@@ -1711,7 +1701,7 @@ export const MenuTitleCard = ({ visible }) => (
     {/* One line of eyebrow type, ruled on both sides. It fills the gap between
         the wordmark and the cube and answers the question a first-time player
         actually has: what is the cube in front of me doing? */}
-    
+
   </div>
 );
 

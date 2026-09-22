@@ -19,10 +19,10 @@ const MODES = [
     blurb: 'Steer a worm, collect orbs, and heal the cube.',
     primary: true,
   },
-  { id: 'story', name: 'Levels', blurb: 'Ten guided levels that build up one rule at a time.' },
-  { id: 'freeplay', name: 'Free play', blurb: 'Solve the cube your way — no timer, no pressure.' },
-  { id: 'chaos', name: 'Chaos', blurb: 'Call the surviving pair and ride out the flipping cube.' },
-  { id: 'random', name: 'Random', blurb: 'Let the cube remix the rules and the look.' },
+  { id: 'story', name: 'Levels', blurb: 'Complete guided cube puzzles.' },
+  { id: 'freeplay', name: 'Free Play', blurb: 'Solve a cube of your chosen size.' },
+  { id: 'chaos', name: 'Chaos', blurb: 'Bet on the surviving color pair.' },
+  { id: 'random', name: 'Random', blurb: 'Solve while palettes and tile styles change.' },
   { id: 'store', name: 'Store', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
 ];
 
@@ -66,14 +66,9 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           margin: '0 0 8px',
           letterSpacing: '0.04em',
         }}>
-          Ready for your first run?
+          Choose a Mode
         </h1>
-        <p style={{
-          color: '#43513a', fontSize: 13.5, lineHeight: 1.5,
-          margin: '0 auto 22px', maxWidth: 360,
-        }}>
-          Twist, flip, and travel through. Your first run is ready.
-        </p>
+
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
           {MODES.filter(mode => mode.primary || expanded).map((mode) => (

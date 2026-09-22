@@ -60,13 +60,12 @@ export default function WormProfile({ defaultExpanded = false }) {
   const identity = <div className="worm-profile-identity">
     <strong>{character.label}</strong>
     <span>{skin.label} · {hat.id === 'none' ? 'No hat' : hat.label}</span>
-    <small>{expanded ? character.type : 'Story & Free Play'}</small>
   </div>;
 
   return <section className={`worm-profile${expanded ? ' worm-profile-expanded' : ''}`} aria-labelledby={`${id}-title`}
     style={{ '--profile-color': skin.body }}>
     <header className="worm-profile-header">
-      <div><h2 id={`${id}-title`}>YOUR WORM</h2>{expanded && <span>Make it yours.</span>}</div>
+      <div><h2 id={`${id}-title`}>YOUR WORM</h2></div>
       <button ref={editButton} type="button" className="worm-profile-edit" aria-expanded={expanded} aria-controls={`${id}-editor`}
         onClick={() => { wormMenuFeedback(); setExpanded(value => !value); }}>
         {expanded ? 'Done' : 'Customize'} <span aria-hidden="true">{expanded ? '✓' : '✎'}</span>
@@ -84,7 +83,7 @@ export default function WormProfile({ defaultExpanded = false }) {
         </div>
         <div className="worm-profile-workspace">
           <div className="worm-profile-stage">
-            <div className="worm-profile-stage-art">{preview}<span className="worm-profile-stage-tag">YOUR LOADOUT</span></div>
+            <div className="worm-profile-stage-art">{preview}</div>
             {identity}
             <div className="worm-profile-loadout" aria-label="Equipped pieces">
               {CATEGORIES.slice(2).filter(cat => selected[cat.id] && selected[cat.id] !== 'none').map(cat =>
@@ -108,7 +107,7 @@ export default function WormProfile({ defaultExpanded = false }) {
                         framing={accessorySlot ? accessoryFraming(category) : category === 'hat' ? 'head' : 'body'} />}
                   </span>
                   <strong>{item.label}</strong>
-                  <small>{!owned ? 'Locked' : equipped ? 'Equipped ✓' : category === 'character' ? item.type : 'Equip'}</small>
+                  <small>{!owned ? 'Locked' : equipped ? 'Equipped ✓' : 'Equip'}</small>
                 </button>;
               })}
             </div>
@@ -116,8 +115,8 @@ export default function WormProfile({ defaultExpanded = false }) {
           </div>
         </div>
       </div>}
-    {expanded && <footer className="worm-profile-footer"><span><b aria-hidden="true">✓</b> Saved for Story & Free Play</span>
-      <button type="button" onClick={() => { wormMenuFeedback(); setExpanded(false); editButton.current?.focus(); }}>Ready <span aria-hidden="true">→</span></button>
+    {expanded && <footer className="worm-profile-footer"><span><b aria-hidden="true">✓</b> Saved</span>
+      <button type="button" onClick={() => { wormMenuFeedback(); setExpanded(false); editButton.current?.focus(); }}>Done <span aria-hidden="true">✓</span></button>
     </footer>}
   </section>;
 }

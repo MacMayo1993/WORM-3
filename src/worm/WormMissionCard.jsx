@@ -55,7 +55,7 @@ export default function WormMissionCard({ summary = false, onInspect }) {
       </ol>
       <div className="worm-achievement-total"><span>Achievement rewards</span><strong>+{points} PP · +{xp} XP</strong></div>
     </> : <p>No achievements earned yet.</p>}
-    {finished ? <p className="worm-achievement-next">New run, fresh challenges.</p> : <div className="worm-achievement-active">{active}</div>}
+    {finished ? <p className="worm-achievement-next">Start a run for new goals.</p> : <div className="worm-achievement-active">{active}</div>}
   </section>;
 }
 

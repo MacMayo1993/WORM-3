@@ -22,7 +22,7 @@ const DEMO_STEPS = [
   { id: 'learn-to-solve', label: 'Learn to Solve', num: 5 },
   { id: 'control-tour', label: 'Your Controls', num: 6 },
   { id: 'view-showcase', label: 'Every Look', num: 7 },
-  { id: 'make-it-yours', label: 'Make It Yours', num: 8 },
+  { id: 'make-it-yours', label: 'Settings', num: 8 },
   { id: 'chaos-forecast', label: 'Call the Winner', num: 9 },
   { id: 'random-showcase', label: 'Surprise Cube', num: 10 },
   { id: 'cosmetic-reward', label: 'Spend Your Points', num: 11 },

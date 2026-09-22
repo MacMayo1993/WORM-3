@@ -23,25 +23,25 @@ const MODES = [
     label: 'Biome Mode',
     accent: '#2e7d32',
     description:
-      'Six faces, six living ecosystems — grass, ice, sand, water, wood, stone. Same cube rules, but the surface breathes while you solve it. The prettiest way to play.',
-    tags: ['Sandbox', 'No pressure', 'Living tiles'],
-    playLabel: 'Grow a cube',
+      'Solve a cube with grass, ice, sand, water, wood, and stone faces.',
+    tags: ['Puzzle', 'Biome Tiles'],
+    playLabel: 'Play',
   },
   {
     id: 'mobius',
     label: 'Möbius Cubelet',
     accent: '#0891B2',
     description:
-      'A single cubelet with a Möbius band threaded through each antipodal pair. Spin it around to see exactly what a flip does to a tile before you rely on one mid-puzzle.',
-    tags: ['Explainer', 'Interactive', '1 minute'],
-    playLabel: 'Take a look',
+      'Rotate a cubelet to view the connections between opposite faces.',
+    tags: ['Interactive Viewer'],
+    playLabel: 'Open',
   },
   {
     id: 'mirror',
     label: 'Mirror Blocks',
     accent: '#78716c',
     description:
-      'One colour, six faces, every cubelet a different size. You solve it by shape alone — the silhouette tells you everything the colours used to.',
+      'Restore the cube’s shape using differently sized pieces.',
     tags: ['Puzzle', 'Shape-based'],
     soon: true,
   },
@@ -310,18 +310,7 @@ export default function ComingSoonScreen({ onBack, onBiome, onMobiusCubelet }) {
 
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
-          <p
-            style={{
-              margin: '0 0 8px',
-              color: PAPER_TEXT_FAINT,
-              fontSize: '12px',
-              fontWeight: 800,
-              letterSpacing: '0.24em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Off the main menu
-          </p>
+
           <h1
             style={{
               margin: '0 0 8px',
@@ -334,16 +323,7 @@ export default function ComingSoonScreen({ onBack, onBiome, onMobiusCubelet }) {
           >
             More Modes
           </h1>
-          <p
-            style={{
-              margin: 0,
-              fontSize: '14px',
-              color: PAPER_TEXT_MUTED,
-              lineHeight: 1.5,
-            }}
-          >
-            Explore living surfaces and a different view of the cube.
-          </p>
+
         </div>
 
         {/* Mode cards */}
@@ -360,17 +340,7 @@ export default function ComingSoonScreen({ onBack, onBiome, onMobiusCubelet }) {
         </div>
 
         {/* Footer */}
-        <p
-          style={{
-            marginTop: '28px',
-            textAlign: 'center',
-            fontSize: '11px',
-            color: PAPER_TEXT_FAINT,
-            letterSpacing: '0.08em',
-          }}
-        >
-          Nothing here is on a timer. Wander.
-        </p>
+
       </div>
     </div>
   );

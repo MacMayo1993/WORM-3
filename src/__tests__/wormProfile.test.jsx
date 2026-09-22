@@ -49,7 +49,7 @@ it('saves equipment immediately, updates the preview, and preserves it when the 
   click('Customize ✎'); click('Book Worm'); click('Color'); click('Royal'); click('Hats'); click('Crown');
   expect(preview()).toBe('book/royal/crown');
   expect(profileKeys.map(key => localStorage.getItem(key))).toEqual(['book', 'royal', 'crown']);
-  click('Done ✓'); expect(host.querySelector('.worm-profile-options')).toBeNull();
+  act(() => host.querySelector('.worm-profile-footer button').click()); expect(host.querySelector('.worm-profile-options')).toBeNull();
   act(() => root.render(null));
   act(() => root.render(<WormProfile />));
   expect(preview()).toBe('book/royal/crown');
@@ -67,7 +67,7 @@ it('keeps locked items visible without equipping them or playing a confirmation 
   }
 });
 
-it.each(['Levels →', 'Free play →'])('launches %s with the shared profile instead of stale setup equipment', async path => {
+it.each(['Levels →', 'Free Play →'])('launches %s with the shared profile instead of stale setup equipment', async path => {
   const complete = vi.fn(settings => state().initWormMode(9999, 0, settings.wormSpeed, settings.wormOrbCount,
     settings.wormholeInterval, settings.wormColor, false, settings.wormEnemiesEnabled, settings.storyLevel ?? null));
   act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={vi.fn()}
@@ -81,7 +81,7 @@ it.each(['Levels →', 'Free play →'])('launches %s with the shared profile in
   else {
     // Editing within Free Play must also update the shared profile.
     click('Classic');
-    click('Play'); click('Start Playing');
+    click('Gameplay'); click('Start Playing');
   }
   expect(complete).toHaveBeenCalledWith(expect.objectContaining({ wormColor: '#a855f7' }));
   expect(state().wormCharacter).toBe(path.startsWith('Levels') ? 'book' : 'classic');
@@ -147,7 +147,7 @@ it('shows equipment in the category rail and returns focus when finishing custom
   act(() => root.render(<WormProfile defaultExpanded />));
   click('Color'); click('Royal');
   expect(host.querySelector('[role="tab"][aria-label="Color"]').textContent).toContain('Royal');
-  click('Ready →');
+  act(() => host.querySelector('.worm-profile-footer button').click());
   expect(host.querySelector('[role="tablist"]')).toBeNull();
   expect(document.activeElement).toBe(button('Customize ✎'));
   expect(preview()).toBe('classic/royal/none');

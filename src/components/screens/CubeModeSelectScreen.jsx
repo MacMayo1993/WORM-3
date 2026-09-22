@@ -15,8 +15,8 @@ export default function CubeModeSelectScreen({ onRubiks, onDisparity, onBack }) 
       <button className="cube-path-back" onClick={onBack}>← Back</button>
       <h1 id="cube-mode-title">Solve or survive?</h1>
       <div className="cube-path-options">
-        {[{ id: 'freeplay', label: 'Cube', note: 'No clock. Just you and six faces.', action: onRubiks, accent: MODE_THEMES.cube.accent },
-          { id: 'chaos', label: 'Chaos', note: 'Back the last pair standing.', action: onDisparity, accent: MODE_THEMES.chaos.accent }].map(option =>
+        {[{ id: 'freeplay', label: 'Cube', note: 'Solve all six faces.', action: onRubiks, accent: MODE_THEMES.cube.accent },
+          { id: 'chaos', label: 'Chaos', note: 'Bet on the surviving color pair.', action: onDisparity, accent: MODE_THEMES.chaos.accent }].map(option =>
           <button key={option.id} style={{ '--mode-accent': option.accent }} onClick={() => { wormMenuFeedback(); option.action(); }}>
             <ModeArtwork mode={option.id} /><strong>{option.label}<span aria-hidden="true">↗</span></strong><span>{option.note}</span>
           </button>)}

@@ -156,9 +156,9 @@ const VictoryScreen = ({
 
   const config = isCampaignFinale
     ? {
-      title: 'Journey complete',
-      subtitle: 'Topology Master',
-      description: 'You carried the cube from its first turn to the Singularity.',
+      title: 'Campaign Complete',
+      subtitle: 'All Levels Cleared',
+      description: 'Replay levels to improve your stars.',
     }
     : (winConfig[winType] || winConfig.rubiks);
 

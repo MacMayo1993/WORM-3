@@ -38,7 +38,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       icon: 'size',
       label: 'Size',
       title: "Cube size",
-      subtitle: 'Size stays fixed.',
+      subtitle: '',
       summary: sizeLabel(cos.cubeSize),
       hero: <SizeStep cos={cos} slot="hero" />,
       content: <SizeStep cos={cos} slot="body" />
@@ -62,7 +62,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       onSelect={setStep}
       onBack={handleBack}
       onPrimary={handleNext}
-      finishLabel="Play random"
+      finishLabel="Play"
       mobile={isMobile}
     />
   );

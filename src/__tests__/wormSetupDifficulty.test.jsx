@@ -18,7 +18,7 @@ import RandomModeSetupWizard from '../components/screens/RandomModeSetupWizard.j
 import DisparitySetupWizard from '../components/screens/DisparitySetupWizard.jsx';
 
 for (const [name, Wizard, category] of [
-  ['Worm', WormModeSetupWizard, 'Play'], ['Cube', FreeplaySetupWizard, 'Size'],
+  ['Worm', WormModeSetupWizard, 'Gameplay'], ['Cube', FreeplaySetupWizard, 'Size'],
   ['Random', RandomModeSetupWizard, 'Size'], ['Chaos', DisparitySetupWizard, 'Size']
 ]) {
   it.each([8, 9, 10])(`${name} launches the selected size-%i board`, size => {
@@ -51,8 +51,8 @@ it.each([
   const click = name => act(() => [...host.querySelectorAll('button')].find(b => b.textContent === name || b.getAttribute('aria-label') === name).click());
   try {
     act(() => root.render(<WormModeSetupWizard onComplete={onComplete} />));
-    expect([...host.querySelectorAll('nav button')].map(b => b.textContent)).toEqual(['Character', 'Scene', 'Colors', 'Style', 'Play']);
-    click('Play');
+    expect([...host.querySelectorAll('nav button')].map(b => b.textContent)).toEqual(['Character', 'Scene', 'Colors', 'Style', 'Gameplay']);
+    click('Gameplay');
     expect(host.querySelector('[aria-label="Cube size"]')).not.toBeNull();
     expect(host.textContent).not.toContain('Orb Count');
     click('15 by 15'); click(label);
@@ -70,7 +70,7 @@ it.each([true, false])('loads the saved enemy choice %s and submits changes inde
   const click = name => act(() => [...host.querySelectorAll('button')].find(b => b.textContent === name).click());
   try {
     act(() => root.render(<WormModeSetupWizard onComplete={onComplete} initialSettings={{ wormEnemiesEnabled: saved }} />));
-    click('Play');
+    click('Gameplay');
     const toggle = () => host.querySelector('[role="switch"][aria-label="Portal enemies"]');
     expect(toggle().checked).toBe(saved);
     act(() => toggle().click());

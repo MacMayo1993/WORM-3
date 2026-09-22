@@ -195,9 +195,9 @@ const TM_ALGO_LIST_LABEL_STYLE = { fontSize: '10px', color: 'rgba(38,51,31,0.54)
 const SubModeTabs = ({ subMode, onSwitch }) => {
   const tabs = [
     { id: 'guided',   label: 'Guided',   icon: '▶',  desc: 'Follow along' },
-    { id: 'demo',     label: 'Demo',     icon: '⏩', desc: 'Watch & learn' },
-    { id: 'notation', label: 'Notation', icon: 'ƒ',  desc: 'Read the letters' },
-    { id: 'quiz',     label: 'Quiz',     icon: '?',  desc: 'Test yourself' },
+    { id: 'demo',     label: 'Demo',     icon: '⏩', desc: 'Watch the algorithm' },
+    { id: 'notation', label: 'Notation', icon: 'ƒ',  desc: 'Cube notation' },
+    { id: 'quiz',     label: 'Quiz',     icon: '?',  desc: 'Identify the next move' },
   ];
 
   return (

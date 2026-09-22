@@ -32,11 +32,11 @@ it('opens with Story on the left and Free Play on the right, without launching e
   show(); const cards = [...host.querySelector('.worm-path-split').children];
   expect(cards).toHaveLength(2);
   expect(cards.every(card => card.tagName === 'BUTTON')).toBe(true);
-  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Levels', 'Free play']);
+  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Levels', 'Free Play']);
   expect(complete).not.toHaveBeenCalled();
   click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false, perFaceStyles: {1:'grass'} }));
-  click('Back'); await act(async () => { click('Free play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
+  click('Back'); await act(async () => { click('Free Play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
   click('Launch free run'); expect(complete.mock.lastCall[0]).toEqual({ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 });
   click('Cancel setup'); expect(host.querySelector('.worm-path-split')).not.toBeNull();

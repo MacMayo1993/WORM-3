@@ -138,10 +138,8 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
           <h1 style={{
             margin: '4px 0 6px', fontFamily: HEADING_FONT, color: PAPER_TEXT,
             fontSize: 'clamp(26px, 7vw, 40px)', letterSpacing: '0.02em', lineHeight: 1,
-          }}>Choose a campaign</h1>
-          <p style={{ margin: 0, fontSize: '13px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>
-            Pick up where you left off.
-          </p>
+          }}>Campaigns</h1>
+
           </div><ModeArtwork mode="cube" />
         </div>
 

@@ -51,7 +51,7 @@ export function styleCategory(cos) {
     icon: 'style',
     label: 'Style',
     title: 'Tile Style',
-    subtitle: 'Choose how your tiles look and feel',
+    subtitle: '',
     summary: styleLabel(settings),
     children,
     activeChild: family,
