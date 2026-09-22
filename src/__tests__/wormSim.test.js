@@ -146,8 +146,8 @@ describe('ring healing waits for visible tile contact', () => {
     expect(eventsOf(ctx, 'heal')).toHaveLength(0);
     advance(0.02);
     expect(eventsOf(ctx, 'heal')).toHaveLength(1);
-    expect(sim.interpT).toBe(1);
-    expect(sim.headInterpPos.distanceTo(sim.curWorldPos)).toBeLessThan(1e-9);
+    expect(sim.interpT).toBe(0);
+    expect(sim.headInterpPos.distanceTo(sim.prevWorldPos)).toBeLessThan(1e-9);
     expect(sim.healPauseT).toBeGreaterThan(0);
     advance(0.1);
     expect(eventsOf(ctx, 'heal')).toHaveLength(1);
@@ -160,6 +160,37 @@ describe('ring healing waits for visible tile contact', () => {
     advance(0.46);
     expect(eventsOf(ctx, 'heal')).toHaveLength(0);
   });
+
+  it.each([[1, 60], [4, 15], [10, 15]])(
+    'consumes the healed step and resumes in sync at speed %s and %s fps', (speed, fps) => {
+      const { sim, ctx, advance } = setup(speed);
+      advance(0.93);
+      const contact = sim.curWorldPos.clone();
+      const dt = Math.min(1 / fps, MAX_TICK_DELTA);
+      for (let i = 0; i < 20 && !sim.healPauseT; i++) stepWormSim(sim, dt, 5, ctx);
+      expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+      expect(sim.stepAcc).toBe(0);
+      expect(sim.interpT).toBe(0);
+      expect(sim.headInterpPos.distanceTo(contact)).toBeLessThan(1e-9);
+      for (let i = 0; i < 100 && sim.healPauseT > 0; i++) {
+        stepWormSim(sim, dt, 5, ctx);
+        expect(sim.headInterpPos.distanceTo(contact)).toBeLessThan(1e-9);
+        expect(sim.stepAcc).toBe(0);
+      }
+      expect(sim.healPauseT).toBe(0);
+      const destination = sim.curWorldPos.clone();
+      const steps = Math.max(1, Math.floor(0.9 / (dt * speed)));
+      for (let i = 1; i <= steps; i++) {
+        stepWormSim(sim, dt, 5, ctx);
+        const progress = i * dt * speed;
+        expect(sim.interpT).toBeCloseTo(progress, 10);
+        expect(sim.stepAcc * speed).toBeCloseTo(progress, 10);
+        const expected = contact.clone().lerp(destination, progress);
+        expect(sim.headInterpPos.distanceTo(expected)).toBeLessThan(1e-9);
+      }
+      expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+    }
+  );
 
   it('holds contact progress while the game is paused', () => {
     const { sim, ctx, advance } = setup();
