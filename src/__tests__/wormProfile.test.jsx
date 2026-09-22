@@ -119,3 +119,36 @@ it('mixes a hat with body and tail pieces, then removes only the selected slot',
   expect(state().wormAccessories).toMatchObject({body:'seedSatchel',tail:'none'});
   expect(state().wormHat).toBe('acorn');
 });
+
+it('uses a vertical tab rail with one tab stop and arrow-key navigation', () => {
+  act(() => root.render(<WormProfile defaultExpanded />));
+  const rail = host.querySelector('[role="tablist"]');
+  const tabs = [...rail.querySelectorAll('[role="tab"]')];
+  const panel = () => host.querySelector('[role="tabpanel"]');
+  expect(rail.getAttribute('aria-orientation')).toBe('vertical');
+  expect(tabs.filter(tab => tab.tabIndex === 0)).toHaveLength(1);
+  tabs[0].focus();
+  const key = value => act(() => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true })));
+  vi.clearAllMocks(); key('ArrowDown');
+  expect(document.activeElement).toBe(tabs[1]);
+  expect(tabs[1].getAttribute('aria-selected')).toBe('true');
+  expect(panel().getAttribute('aria-labelledby')).toBe(tabs[1].id);
+  expect(tabs[1].getAttribute('aria-controls')).toBe(panel().id);
+  expect(host.querySelector('[aria-label="Color options"]')).not.toBeNull();
+  expect(feel).toHaveBeenCalledExactlyOnceWith('uiKey');
+  key('End'); expect(document.activeElement).toBe(tabs.at(-1));
+  key('ArrowDown'); expect(document.activeElement).toBe(tabs[0]);
+  key('ArrowUp'); expect(document.activeElement).toBe(tabs.at(-1));
+  key('Home'); expect(document.activeElement).toBe(tabs[0]);
+  expect(tabs.filter(tab => tab.tabIndex === 0)).toHaveLength(1);
+});
+
+it('shows equipment in the category rail and returns focus when finishing customization', () => {
+  act(() => root.render(<WormProfile defaultExpanded />));
+  click('Color'); click('Royal');
+  expect(host.querySelector('[role="tab"][aria-label="Color"]').textContent).toContain('Royal');
+  click('Ready →');
+  expect(host.querySelector('[role="tablist"]')).toBeNull();
+  expect(document.activeElement).toBe(button('Customize ✎'));
+  expect(preview()).toBe('classic/royal/none');
+});
