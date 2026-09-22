@@ -10,21 +10,30 @@ it('frames the surface like a 10% closer camera at every portrait blend and grow
 });
 
 describe('worm maximum zoom', () => {
-    it('brings the maximum backward distance 20% closer for every cube size and aspect', () => {
-        for (const size of [2, 3, 5, 7, 15]) for (const portraitBoost of [0, 0.2, 0.4]) {
+    it('keeps a large collection close on every board and aspect', () => {
+        for (const size of [2, 3, 5, 7, 8, 9, 10, 15]) for (const portraitBoost of [0, 0.2, 0.4]) {
             const base = 2.4 + portraitBoost * 0.9;
-            const previousMax = base + (size * 2.6 * 0.8) * 0.8;
-            expect(base + wormZoomLimit(size, base) * 0.8).toBeCloseTo(previousMax * 0.8);
+            expect(wormZoomLimit(size, base)).toBeLessThanOrEqual(1.5);
             expect(boundedWormZoom(size, base, 10000, 2)).toBe(wormZoomLimit(size, base));
+            expect(base + boundedWormZoom(size, base, 10000, 0) * 0.8).toBeLessThanOrEqual(base + 1.2 + 1e-12);
         }
     });
-    it('preserves starting distance and early growth', () => {
+    it('preserves the starting distance and eases growth with diminishing returns', () => {
         expect(boundedWormZoom(3, 2.4, 0, 0)).toBe(0);
-        expect(boundedWormZoom(3, 2.4, 3, 0)).toBeCloseTo(0.54);
+        let previous = 0, previousStep = Infinity;
+        for (let orbs = 1; orbs <= 250; orbs++) {
+            const zoom = boundedWormZoom(15, 2.4, orbs, 0);
+            const step = zoom - previous;
+            expect(step).toBeGreaterThanOrEqual(0);
+            expect(step).toBeLessThan(previousStep);
+            expect(step).toBeLessThan(0.08);
+            previous = zoom; previousStep = step;
+        }
     });
-    it('allows a pickup burst only within the common ceiling', () => {
+    it('bounds bursts and negative inputs', () => {
+        expect(boundedWormZoom(3, 2.4, -1, -1)).toBe(0);
         expect(boundedWormZoom(3, 2.4, 0, 0.8)).toBeCloseTo(0.8);
         expect(boundedWormZoom(3, 2.4, 24, 2)).toBe(wormZoomLimit(3, 2.4));
-        expect(boundedWormZoom(3, 2.4, 20, 0)).toBeLessThan(boundedWormZoom(3, 2.4, 24, 0));
+        expect(boundedWormZoom(0, 2.4, 100, 2)).toBe(0);
     });
 });

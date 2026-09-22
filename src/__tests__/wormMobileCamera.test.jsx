@@ -5,7 +5,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import WormChaseCamera from '../worm/WormChaseCamera.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
+import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
 import { rocketOrbitInto, rocketOrbitT } from '../worm/healerWorm/rocketOrbit.js';
 import { getWindWorldPosInto } from '../worm/wormLogic.js';
 
@@ -199,4 +199,20 @@ it('does not snap the chase position to its target after a long frame', () => {
   expect(movement).toBeLessThan(0.8);
   scene.camera.updateMatrixWorld(true);
   expectCentered(worm, 15);
+});
+
+it.each([3, 7, 15])('keeps a full collection close and centered on a %s cube', size => {
+  const worm = makeWorm(size);
+  worm.tailLength.current = BASE_TAIL_LENGTH;
+  render(worm, size); tick();
+  useGameStore.setState({ wormGamePhase: 'active' });
+  for (let i = 0; i < 360; i++) tick();
+  const head = worm.headInterpPos.current;
+  const startingDistance = scene.camera.position.distanceTo(head);
+  for (const orbs of [20, 50, 100, 250]) {
+    worm.tailLength.current = BASE_TAIL_LENGTH + orbs * ORB_SEGMENT_GROWTH;
+    for (let i = 0; i < 360; i++) tick();
+    expect(scene.camera.position.distanceTo(head)).toBeLessThan(startingDistance * 1.5);
+    expectCentered(worm, size);
+  }
 });
