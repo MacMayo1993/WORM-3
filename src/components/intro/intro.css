@@ -45,3 +45,23 @@
 @media (orientation: landscape) and (max-height: 500px) {
   .opening-copy .opening-poem-line { font-size: min(5vh, 26px); }
 }
+
+/* Cinematic title card: leave the cube clear and anchor the story at its feet. */
+.opening-edge { background:linear-gradient(180deg,#10191545,transparent 25%,transparent 48%,#101915e8); }
+.opening-brand { font-size:clamp(20px,4vw,28px); letter-spacing:0; padding:10px 12px; border:1px solid #ffffff1f; border-radius:12px; background:#14201bc9; }
+.opening-copy { bottom:max(124px,calc(env(safe-area-inset-bottom) + 110px)); max-width:720px; }
+.opening-copy-beat { gap:12px; }
+.opening-beat-label { padding:7px 12px; border:1px solid #ffffff2e; border-radius:6px; background:#15231be6; color:#c8d7bd; font:750 10px/1.2 var(--ui-font,system-ui); letter-spacing:.15em; }
+.opening-copy .opening-poem-line { font:750 clamp(25px,6vw,44px)/1.15 var(--heading-font,system-ui); letter-spacing:-.035em; text-shadow:0 3px 18px #0008; }
+.opening-copy .opening-title { font-size:clamp(58px,15vw,108px); line-height:1.15; letter-spacing:0; }
+.opening-tagline { color:#e2e8db; font-size:clamp(13px,3.2vw,17px); letter-spacing:.015em; max-width:32ch; }
+.opening-skip { min-height:48px; border-radius:12px; background:#15231be6; border-color:#ffffff35; color:#edf1e7; font-size:12px; font-weight:750; }
+.opening-enter { display:flex; align-items:center; justify-content:space-between; gap:44px; min-width:200px; min-height:56px; padding:0 22px; border-radius:14px 14px 14px 5px; background:#c3ed9f; box-shadow:inset 0 2px 0 #ffffff80,0 5px 0 #496139,0 12px 28px #0004; font-size:20px; letter-spacing:.025em; transition:background .15s,box-shadow .15s; }
+.opening-enter span { font-family:var(--ui-font,system-ui); font-size:25px; }.opening-enter:active { box-shadow:inset 0 2px 0 #ffffff40,0 2px 0 #496139; }
+.opening-progress { height:3px; }.opening-progress span { background:linear-gradient(90deg,#ef4444,#f97316,#22c55e,#3b82f6); }
+@media(orientation:landscape) and (max-height:500px) {
+ .opening-brand { top:12px; left:16px; font-size:18px; padding:7px 10px; }
+ .opening-copy { bottom:88px; }.opening-copy-beat { gap:6px; }.opening-copy .opening-title { font-size:min(12vh,58px); }.opening-copy .opening-poem-line { font-size:min(7vh,30px); }
+ .opening-tagline { font-size:12px; }.opening-enter { min-height:48px; min-width:180px; font-size:16px; }.opening-beat-label { font-size:9px; padding:5px 9px; }
+}
+@media(prefers-reduced-motion:reduce) { .opening-enter { transition:none; } }

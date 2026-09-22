@@ -1,3 +1,4 @@
+import WormWordmark from '../branding/WormWordmark.jsx';
 import { createModePlateArtwork } from '../../3d/modePlateArtwork.js';
 import '../ui/screenDesign.css';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
@@ -1706,24 +1707,7 @@ export const MenuTitleCard = ({ visible }) => (
     opacity: visible ? 1 : 0,
     transform: visible ? 'translateY(0)' : 'translateY(-18px)',
   }}>
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-      <div style={{ display: 'flex', transform: 'skewX(-5deg)' }}>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0s', color: '#ef4444', '--glow': 'rgba(239,68,68,0.55)' }}>W</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.15s', color: '#f97316', '--glow': 'rgba(249,115,22,0.55)' }}>O</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.30s', color: '#22c55e', '--glow': 'rgba(34,197,94,0.55)' }}>R</span>
-        <span className="worm-title-letter" style={{ '--bounce-delay': '0.45s', color: '#3b82f6', '--glow': 'rgba(59,130,246,0.55)' }}>M</span>
-      </div>
-      <div className="worm-cube-sup">
-        <div className="worm-cube-inner">
-          <div className="worm-cube-face worm-cube-face--front">3</div>
-          <div className="worm-cube-face worm-cube-face--right">3</div>
-          <div className="worm-cube-face worm-cube-face--top">3</div>
-          <div className="worm-cube-face worm-cube-face--back">3</div>
-          <div className="worm-cube-face worm-cube-face--left">3</div>
-          <div className="worm-cube-face worm-cube-face--bottom">3</div>
-        </div>
-      </div>
-    </div>
+    <WormWordmark menu animated />
     {/* One line of eyebrow type, ruled on both sides. It fills the gap between
         the wordmark and the cube and answers the question a first-time player
         actually has: what is the cube in front of me doing? */}

@@ -701,7 +701,7 @@ export default function WORM3() {
     setShowWelcome(false);
     markIntroSeen();
     // Cover the first cube frame after the opening cinematic.
-    armSceneGate('Welcome to WORM³', { eager: true, holdMs: 300, z: 10000 });
+    armSceneGate('Opening the cube…', { eager: true, holdMs: 300, z: 10000 });
     // Show main menu after intro (not tutorial).
     useGameStore.getState().setShowMainMenu(true);
   }, [setShowWelcome, markIntroSeen, armSceneGate]);

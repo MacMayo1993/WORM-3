@@ -66,38 +66,9 @@
 }
 
 .wl-title {
-  margin: 0;
-  font-family: var(--wl-display-font);
-  font-size: clamp(42px, 11vw, 82px);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  line-height: 1;
-  background: linear-gradient(
-    100deg,
-    #ef4444 0%,
-    #f97316 18%,
-    #FFD500 36%,
-    #22c55e 54%,
-    #3b82f6 72%,
-    #a855f7 90%,
-    #ef4444 100%
-  );
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: wl-title-shimmer 6s linear infinite;
-}
-
-.wl-title sup {
-  font-size: 0.42em;
-  vertical-align: super;
-}
-
-@keyframes wl-title-shimmer {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
+  margin:0;
+  font-size:clamp(42px,11vw,82px);
+  line-height:1.1;
 }
 
 .wl-title-sub {

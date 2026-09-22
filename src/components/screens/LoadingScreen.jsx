@@ -1,3 +1,4 @@
+import WormWordmark from '../branding/WormWordmark.jsx';
 // src/components/screens/LoadingScreen.jsx
 /**
  * LoadingScreen — the WORM³ loading cube levitating over a black-hole portal.
@@ -107,11 +108,11 @@ export default function LoadingScreen({
       {showTitle && (
         <div className="wl-title-card">
           <h1 className="wl-title">
-            WORM<sup>3</sup>
+            <WormWordmark />
           </h1>
           <div className="wl-title-sub">
             <span className="wl-line left" />
-            <p>A Cube That Remembers</p>
+            <p>A new way around every corner.</p>
             <span className="wl-line right" />
           </div>
         </div>

@@ -1,3 +1,4 @@
+import WormWordmark from '../branding/WormWordmark.jsx';
 import React from 'react';
 import { INTRO_END, ramp } from './introChoreography.js';
 import './intro.css';
@@ -11,9 +12,10 @@ export default function TextOverlay({ time, reducedMotion = false }) {
   return (
     <>
       <div className="opening-edge" aria-hidden="true" />
-      <div className="opening-brand" aria-hidden="true">WORM<sup>3</sup></div>
+      <div className="opening-brand" aria-hidden="true"><WormWordmark /></div>
       <div className="opening-copy" aria-hidden="true">
         {!reducedMotion && title === 0 && frame && <div className="opening-copy-beat" key={frame.beat.start}>
+          <span className="opening-beat-label">{frame.beat.label}</span>
           <h1 className="opening-poem-line">{frame.words.map((word, index) => <React.Fragment key={index}>
             {index > 0 ? ' ' : null}<span className="opening-poem-word" style={{
               opacity: word.opacity,
@@ -23,7 +25,8 @@ export default function TextOverlay({ time, reducedMotion = false }) {
           </React.Fragment>)}</h1>
         </div>}
         {title > 0 && <div className="opening-copy-beat" style={{ opacity: title, transform: reducedMotion ? undefined : `translateY(${(1 - title) * 12}px) scale(${0.9 + title * 0.1})` }}>
-          <h1 className="opening-title">WORM<sup>3</sup></h1>
+          <h1 className="opening-title"><WormWordmark animated={!reducedMotion} /></h1>
+          <p className="opening-tagline">A new way around every corner.</p>
         </div>}
       </div>
       <div className="opening-progress" aria-hidden="true"><span style={{ transform: `scaleX(${reducedMotion ? 1 : Math.min(1, time / INTRO_END)})` }} /></div>
