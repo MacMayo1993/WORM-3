@@ -1,6 +1,6 @@
 import { wizardPaperBackground } from './WizardChrome.jsx';
 import WormWordmark from '../branding/WormWordmark.jsx';
-import ModeArtwork from '../ui/ModeArtwork.jsx';
+import WormPathArtwork from '../ui/WormPathArtwork.jsx';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { WORM_STORY_LEVELS, nextStoryLevel, storyStars, storyUnlocked, storyChecklist } from '../../worm/story/levels.js';
@@ -52,10 +52,10 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
         {page === 'choice' ? <>
           <div className="worm-path-split">
             <button className="worm-path-card worm-path-story" aria-label="Levels" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
-              <ModeArtwork mode="cube" /><span className="worm-path-cta">Levels <b aria-hidden="true">→</b></span>
+              <WormPathArtwork levels /><span className="worm-path-cta">Levels <b aria-hidden="true">→</b></span>
             </button>
             <button className="worm-path-card worm-path-free" aria-label="Free play" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
-              <ModeArtwork mode="worm" /><span className="worm-path-cta">Free play <b aria-hidden="true">→</b></span>
+              <WormPathArtwork /><span className="worm-path-cta">Free play <b aria-hidden="true">→</b></span>
             </button>
           </div>
           <WormProfile />
