@@ -39,15 +39,15 @@ export const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Rig
 
 // One row per stop on the size slider.
 export const SIZE_TIERS = [
-  { n: 2, name: '2×2×2', tag: 'Mini', desc: 'Fast & approachable' },
-  { n: 3, name: '3×3×3', tag: 'Classic', desc: 'The original challenge' },
-  { n: 4, name: '4×4×4', tag: 'Master', desc: 'Expert territory' },
-  { n: 5, name: '5×5×5', tag: 'Ultra', desc: '150 stickers of chaos' },
-  { n: 6, name: '6×6×6', tag: 'Mega', desc: '216 stickers of madness' },
-  { n: 7, name: '7×7×7', tag: 'Titan', desc: '294 stickers of insanity' },
-  { n: 8, name: '8×8×8', tag: 'Colossus', desc: '384 stickers' },
-  { n: 9, name: '9×9×9', tag: 'Goliath', desc: '486 stickers' },
-  { n: 10, name: '10×10×10', tag: 'Leviathan', desc: '600 stickers' }
+  { n: 2, name: '2×2×2' },
+  { n: 3, name: '3×3×3' },
+  { n: 4, name: '4×4×4' },
+  { n: 5, name: '5×5×5' },
+  { n: 6, name: '6×6×6' },
+  { n: 7, name: '7×7×7' },
+  { n: 8, name: '8×8×8' },
+  { n: 9, name: '9×9×9' },
+  { n: 10, name: '10×10×10' }
 ];
 
 export const MIN_CUBE_SIZE = SIZE_TIERS[0].n;

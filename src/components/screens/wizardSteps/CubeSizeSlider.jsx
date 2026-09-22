@@ -9,13 +9,11 @@
 // top of it, so dragging, tapping, arrow keys, Home/End, and screen-reader
 // semantics all come for free rather than being reimplemented badly.
 
-import React from 'react';
-import { TEXT_MICRO } from '../../../utils/uiTheme.js';
+import React, { useEffect, useRef } from 'react';
 import { WIZ_BORDER_SOFT, WIZ_CARD_SHADOW, WIZ_SURFACE, WIZ_TEXT, WIZ_TEXT_FAINT, WIZ_TEXT_MUTED } from '../WizardChrome.jsx';
 import { SIZE_TIERS, sizeTier } from './shared.jsx';
 
 const KNOB = 30;
-const DEFAULT_SIZE = 3;
 
 // Where a stop sits along the rail. The knob's travel is inset by half its own
 // width at each end so it never hangs off, and the detents and their labels have
@@ -26,9 +24,20 @@ const stopAt = (n, tiers) => {
   return `calc(${p * 100}% + ${(0.5 - p) * KNOB}px)`;
 };
 
-export default function CubeSizeSlider({ value, onChange, accent, accentShadow, tiers = SIZE_TIERS, compact = false }) {
+export default function CubeSizeSlider({ value, onChange, accent, accentShadow, tiers = SIZE_TIERS }) {
   const tier = sizeTier(value, tiers);
   const knobLeft = stopAt(value, tiers);
+  const choicesRef = useRef(null);
+  useEffect(() => {
+    const row = choicesRef.current;
+    const selected = row?.querySelector('[aria-pressed="true"]');
+    if (!selected) return;
+    // Reveal changes from the range/preview arrows without scrolling the page.
+    const left = selected.offsetLeft;
+    const right = left + selected.offsetWidth;
+    if (left < row.scrollLeft) row.scrollLeft = left;
+    else if (right > row.scrollLeft + row.clientWidth) row.scrollLeft = right - row.clientWidth;
+  }, [value, tiers]);
 
   return (
     <div style={{ padding: '4px 2px 0' }}>
@@ -91,7 +100,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
           value={Math.max(0, tiers.findIndex(option => option.n === value))}
           onChange={e => onChange(tiers[parseInt(e.target.value, 10)].n)}
           aria-label="Cube size"
-          aria-valuetext={`${tier.name}, ${tier.tag}`}
+          aria-valuetext={tier.name}
           style={{
             position: 'absolute', left: 0, right: 0, width: '100%',
             height: '48px', margin: 0, opacity: 0, cursor: 'pointer',
@@ -100,8 +109,8 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
         />
       </div>
 
-      {/* Wrapping touch targets stay distinct even with ten choices on a phone. */}
-      <div role="group" aria-label="Size choices" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(48px, 1fr))', gap: '4px', marginTop: '4px' }}>
+      {/* One row in every mode; smaller screens can swipe to the larger sizes. */}
+      <div ref={choicesRef} role="group" aria-label="Size choices" style={{ position: 'relative', display: 'flex', flexWrap: 'nowrap', overflowX: 'auto', overscrollBehaviorX: 'contain', gap: '4px', marginTop: '4px', padding: '2px 0 6px' }}>
         {tiers.map(({ n }) => {
           const selected = n === value;
           return (
@@ -112,7 +121,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
               aria-label={`${n} by ${n}`}
               aria-pressed={selected}
               style={{
-                minWidth: 48, minHeight: 48, borderRadius: 8,
+                flex: '1 0 48px', minWidth: 48, minHeight: 48, boxSizing: 'border-box', borderRadius: 8,
                 background: selected ? WIZ_SURFACE : 'none', border: `1px solid ${selected ? accent : WIZ_BORDER_SOFT}`, padding: '4px',
                 cursor: 'pointer', fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px'
@@ -125,27 +134,11 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow, 
               }}>
                 {n}
               </span>
-              {!compact && n === DEFAULT_SIZE && (
-                <span style={{ fontSize: TEXT_MICRO, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: WIZ_TEXT_FAINT }}>
-                  Normal
-                </span>
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* What you just landed on */}
-      {!compact && <div style={{
-        marginTop: '10px', padding: '12px 14px', borderRadius: '12px',
-        background: WIZ_SURFACE, border: `1.5px solid ${accent}44`,
-        boxShadow: `0 2px 10px ${WIZ_CARD_SHADOW}`,
-        display: 'flex', alignItems: 'baseline', gap: '8px'
-      }}>
-        <span style={{ fontSize: '17px', fontWeight: 800, color: WIZ_TEXT, letterSpacing: '-0.4px' }}>{tier.name}</span>
-        <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: accent }}>{tier.tag}</span>
-        <span style={{ marginLeft: 'auto', fontSize: '12px', color: WIZ_TEXT_MUTED, textAlign: 'right' }}>{tier.desc}</span>
-      </div>}
     </div>
   );
 }

@@ -159,11 +159,11 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "Victory Conditions",
       content: (
         <>
-          <p>Four ways to win—mix and match for the ultimate challenge:</p>
+          <p>Win conditions:</p>
           <ul style={{ margin: '8px 0', paddingLeft: '20px', fontSize: '14px', lineHeight: '1.8' }}>
             <li><b>Classic:</b> All six faces show a single uniform color</li>
             <li><b>Sudokube:</b> Every face shows all its numbers once — 1–9 on a 3×3, no repeats</li>
-            <li><b>Ultimate:</b> Classic AND Sudokube simultaneously — the hardest challenge</li>
+            <li><b>Ultimate:</b> Classic and Sudokube together</li>
             <li><b><WormWordmark inline />:</b> Solve the cube after every sticker has traveled through a wormhole at least once</li>
           </ul>
           <p style={{ marginTop: '12px', padding: '12px', background: 'rgba(168, 85, 247, 0.12)', borderRadius: '10px', fontSize: '13px', border: '1px solid rgba(168, 85, 247, 0.28)' }}>

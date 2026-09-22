@@ -35,7 +35,7 @@ export default createLevel({
 
   tutorial: {
     title: 'Rocket Launch 🚀',
-    text: "3... 2... 1... LIFTOFF! Colors AND numbers must BOTH be correct! This is the ultimate challenge. You're leaving Earth!",
+    text: "Make each face one color, with every number appearing once.",
     objective: 'Repair the seam, then reverse the three-layer route while checking color and number rules.',
     tip: 'Get the colors right first and ignore the numbers. Once a face is one solid color, the numbers only have to shuffle around within it.',
     mobiLines: [
