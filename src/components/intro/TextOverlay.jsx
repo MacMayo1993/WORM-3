@@ -15,7 +15,6 @@ export default function TextOverlay({ time, reducedMotion = false }) {
       <div className="opening-brand" aria-hidden="true"><WormWordmark /></div>
       <div className="opening-copy" aria-hidden="true">
         {!reducedMotion && title === 0 && frame && <div className="opening-copy-beat" key={frame.beat.start}>
-          <span className="opening-beat-label">{frame.beat.label}</span>
           <h1 className="opening-poem-line">{frame.words.map((word, index) => <React.Fragment key={index}>
             {index > 0 ? ' ' : null}<span className="opening-poem-word" style={{
               opacity: word.opacity,
