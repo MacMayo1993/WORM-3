@@ -1,13 +1,17 @@
-// Keep the starting camera distance while bringing the fully grown worm's
-// maximum backward distance 20% closer. Solve base + 0.8 * extra = 0.8 * oldMax.
+// Follow the head even on Mega: body growth must not become a board overview.
+// Retain the small-board bound, but cap growth at 1.5 world units on every board.
 export function wormZoomLimit(size, baseBack) {
     const previousGrowthLimit = size * 2.6 * 0.8;
-    return Math.max(0, previousGrowthLimit * 0.8 - baseBack * 0.25);
+    return Math.max(0, Math.min(1.5, previousGrowthLimit * 0.8 - baseBack * 0.25));
 }
 
 export function boundedWormZoom(size, baseBack, orbCount, burst) {
-    return Math.min(wormZoomLimit(size, baseBack),
-        Math.max(0, orbCount) * 0.18 + Math.max(0, burst));
+    const limit = wormZoomLimit(size, baseBack);
+    if (limit === 0) return 0;
+    // Diminishing returns avoid an abrupt stop at the ceiling. The initial slope
+    // is 0.08 units/orb (formerly 0.18), tending smoothly to zero with growth.
+    const growth = -limit * Math.expm1(-Math.max(0, orbCount) * 0.08 / limit);
+    return Math.min(limit, growth + Math.max(0, burst));
 }
 
 // Match a 10% closer view optically, preserving surface and tunnel clearance.
