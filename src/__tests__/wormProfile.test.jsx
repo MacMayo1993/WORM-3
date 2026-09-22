@@ -25,7 +25,14 @@ let host, root;
 const state = () => useGameStore.getState();
 const button = name => [...host.querySelectorAll('button')].find(item =>
   item.getAttribute('aria-label') === name || item.textContent.trim() === name || item.querySelector('.worm-path-cta')?.textContent.trim() === name);
-const click = name => act(() => button(name).click());
+const click = name => {
+  const target = button(name);
+  act(() => target.click());
+  if (target.classList.contains('worm-profile-option') && !name.endsWith(', locked')) {
+    const equip = host.querySelector('.worm-profile-equip');
+    if (!equip.disabled) act(() => equip.click());
+  }
+};
 const preview = () => host.querySelector('.worm-profile-preview [data-preview]').dataset.preview;
 const profileKeys = ['worm3_character', 'worm3_skin', 'worm3_hat'];
 
@@ -56,13 +63,13 @@ it('saves equipment immediately, updates the preview, and preserves it when the 
   expect(host.querySelector('.worm-profile-identity').textContent).toContain('Book WormRoyal · Crown');
 });
 
-it('keeps locked items visible without equipping them or playing a confirmation cue', () => {
+it('previews locked items without equipping them', () => {
   act(() => root.render(<WormProfile defaultExpanded />));
   for (const [category, locked] of [['Worm', 'MOBI'], ['Color', 'Lava'], ['Hats', 'Wizard']]) {
     click(category); vi.clearAllMocks();
-    expect(button(`${locked}, locked`).disabled).toBe(true);
+    expect(button(`${locked}, locked`).disabled).toBe(false);
     click(`${locked}, locked`);
-    expect(feel).not.toHaveBeenCalled();
+    expect(host.querySelector('.worm-profile-equip').disabled).toBe(true);
     expect(preview()).toBe('classic/slime/none');
   }
 });
@@ -95,7 +102,7 @@ it('emits one tactile cue per activation and wraps focus around the expanded sel
   click('Customize ✎');
   expect(feel).toHaveBeenCalledExactlyOnceWith('uiKey');
   vi.clearAllMocks(); click('Book Worm');
-  expect(feel).toHaveBeenCalledExactlyOnceWith('uiKey');
+  expect(feel).toHaveBeenCalledTimes(2);
   const buttons = [...host.querySelectorAll('button:not(:disabled)')];
   buttons.at(-1).focus();
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true })));
@@ -110,12 +117,12 @@ it('mixes a hat with body and tail pieces, then removes only the selected slot',
     wormHat:'acorn',demoMode:false,ownedItems:['hat_acorn','accessory_seedSatchel','accessory_ribbonTail']}));
   act(() => root.render(<WormProfile defaultExpanded />));
   act(() => button('Body').click());
-  act(() => host.querySelector('button[aria-label="Seed Satchel"]').click());
+  click('Seed Satchel');
   act(() => button('Tail').click());
-  act(() => host.querySelector('button[aria-label="Ribbon Tail"]').click());
+  click('Ribbon Tail');
   expect(state().wormAccessories).toMatchObject({body:'seedSatchel',tail:'ribbonTail'});
-  expect(host.querySelector('button[aria-label="Paintbrush Tail, locked"]').disabled).toBe(true);
-  act(() => host.querySelector('button[aria-label="None"]').click());
+  expect(host.querySelector('button[aria-label="Paintbrush Tail, locked"]').disabled).toBe(false);
+  click('None');
   expect(state().wormAccessories).toMatchObject({body:'seedSatchel',tail:'none'});
   expect(state().wormHat).toBe('acorn');
 });
@@ -151,4 +158,18 @@ it('shows equipment in the category rail and returns focus when finishing custom
   expect(host.querySelector('[role="tablist"]')).toBeNull();
   expect(document.activeElement).toBe(button('Customize ✎'));
   expect(preview()).toBe('classic/royal/none');
+});
+
+it('previews before equipping and filters the collection without changing equipment', () => {
+  act(() => root.render(<WormProfile defaultExpanded />));
+  act(() => button('Book Worm').click());
+  expect(state().wormCharacter).toBe('classic');
+  expect(host.querySelector('.worm-profile-feature [data-preview]').dataset.preview).toBe('book/slime/none');
+  click('Equip');
+  expect(state().wormCharacter).toBe('book');
+  click('Owned only');
+  expect(host.querySelector('button[aria-label="MOBI, locked"]')).toBeNull();
+  expect(state().wormCharacter).toBe('book');
+  click('Next item');
+  expect(state().wormCharacter).toBe('book');
 });
