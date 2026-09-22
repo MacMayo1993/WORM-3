@@ -394,8 +394,8 @@ describe('jump and boost', () => {
       run(sim, ctx, 0.1);
     }
     expect(sim.jumpCount).toBeLessThanOrEqual(MAX_JUMPS);
-    // Jump spans one tile of travel, then lands and resets the counter
-    run(sim, ctx, 1.5);
+    // Jump spans two tiles of travel, then lands and resets the counter
+    run(sim, ctx, 2.5);
     expect(sim.isJumping).toBe(false);
     expect(sim.jumpCount).toBe(0);
   });
@@ -1006,7 +1006,7 @@ describe('contextual jump mechanics', () => {
     sim.pos = { x: 1, y: 2, z: 2, dirKey: 'PZ' };
     sim.moveDir = 'up';
     startJump(sim, makeCtx(), SIZE);
-    expect(sim.jumpSpan).toBe(1.6);
+    expect(sim.jumpSpan).toBe(2.4);
     sim.crossingCorner = true;
     sim.cornerVault = true;
     sim.prevDirKey = 'PZ';
@@ -1024,6 +1024,37 @@ describe('contextual jump mechanics', () => {
     expect(a.distanceTo(sim.prevWorldPos)).toBeLessThan(1e-10);
     expect(b.distanceTo(sim.curWorldPos)).toBeLessThan(1e-10);
   });
+
+  it.each(['classic', 'book', 'prism', 'wiggle', 'inch', 'glow', 'mobi'])(
+    '%s can crawl beneath a raised jump arc, but not a low segment', character => {
+      const sim = makeSim();
+      sim.interpT = 1;
+      sim.curWorldPos = new THREE.Vector3(0, 0, 1.52);
+      sim.prevWorldPos = sim.curWorldPos.clone();
+      sim.pos.dirKey = 'PZ';
+      sim.tailLength = 100;
+      sim.signature.character = character;
+      const n = new THREE.Vector3(0, 0, 1);
+      shReset(sim.stepHistory);
+      shPush(sim.stepHistory, new THREE.Vector3(0, 0, 3), n, 1, 1, 2);
+      shPush(sim.stepHistory, new THREE.Vector3(2, 0, 3), n, 2, 1, 2);
+      expect(hasJumpClearance(sim)).toBe(true);
+      sim.pendingSelfCollision = { key: tileKey(sim.pos) };
+      ttReset(sim.tileTrail, tileKey(sim.pos));
+      ttPush(sim.tileTrail, tileKey(sim.pos));
+      const ctx = makeCtx({ getCharacter: () => character });
+      stepWormSim(sim, 0, SIZE, ctx);
+      expect(sim.alive).toBe(true);
+      expect(eventsOf(ctx, 'death')).toHaveLength(0);
+      // A low strand in the same column must still block the route.
+      shReset(sim.stepHistory);
+      shPush(sim.stepHistory, new THREE.Vector3(0, 0, 1.7), n, 1, 1, 2);
+      shPush(sim.stepHistory, new THREE.Vector3(0, 0, 3), n, 1, 1, 2);
+      shPush(sim.stepHistory, new THREE.Vector3(2, 0, 3), n, 2, 1, 2);
+      expect(hasJumpClearance(sim)).toBe(false);
+      stepWormSim(sim, 0, SIZE, ctx);
+      expect(sim.alive).toBe(false);
+    });
 
   it('requires real clearance and detects an already airborne body underneath', () => {
     const sim = makeSim();
@@ -1086,7 +1117,7 @@ describe('elemental movement integration', () => {
     sim.elementalType = 'grass';
     sim.elementalT = 10;
     queueTurn(sim, 'jump');
-    run(sim, ctx, 1.1);
+    run(sim, ctx, 2.5);
     expect([...sim.elementalPatches.values()].some(p => p.type === 'grass')).toBe(true);
     sim.elementalType = 'fire';
     run(sim, ctx, 2);

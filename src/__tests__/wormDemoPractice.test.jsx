@@ -75,8 +75,11 @@ it.each(['rocket', 'magnet', 'water', 'fire', 'lightning'])('stages and complete
 it('teaches ice jumping and a real nature spring consumption', () => {
   lesson('ice'); until(() => state().wormElementalTheme === 'ice'); frames(35); input('jump'); until(() => state().demoWormComplete);
   lesson('grass'); until(() => state().wormElementalTheme === 'grass'); frames(35);
-  input('jump'); until(() => worm.isJumping.current); until(() => !worm.isJumping.current);
+  input('jump'); until(() => worm.isJumping.current);
+  expect(state().demoWormComplete).toBe(false);
+  until(() => !worm.isJumping.current);
   expect(worm.elementalPatches.current.size).toBeGreaterThan(0);
+  expect(state().demoWormComplete).toBe(false);
   input('jump'); until(() => state().demoWormComplete); expect(worm.jumpSpan.current).toBeGreaterThan(2);
 });
 it('allows Beacon only in the signature lesson, through the real button bridge', () => {
