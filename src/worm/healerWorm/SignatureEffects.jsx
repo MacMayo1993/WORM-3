@@ -7,6 +7,7 @@ import { prefersReducedMotion } from '../../utils/device.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { FACE_NORMALS } from './constants.js';
 import { SPRING_CHARGE, SIGNATURES } from './signatures.js';
+import { ttAt } from '../circularBuffers.js';
 
 const Z = new THREE.Vector3(0, 0, 1);
 function instances(geometry, color, count, reveal = false) {
@@ -83,11 +84,15 @@ export function SignatureEffects({ worm, size }) {
             const tile = sig.mobiTunnel ? sig.target : sig.preview;
             r.lock.material.opacity = sig.mobiTunnel ? 0.6 : 0.35;
             place(r.lock, tile, 1.12, 0.14, Math.PI / 4);
-        } else if (sig.character === 'glow' && sig.active > 0) {
+        } else if (sig.character === 'glow' && sig.active > 0 && sig.glowTrail?.path.count) {
+            const key = ttAt(sig.glowTrail.path, 0);
+            if (!key) return;
+            const [x, y, z, dirKey] = key.split(',');
+            const tailTile = { x: Number(x), y: Number(y), z: Number(z), dirKey };
             const age = SIGNATURES.glow.duration - sig.active;
             const fade = Math.min(1, sig.active * 2);
             r.pulse.material.color.set('#8eefff'); r.pulse.material.opacity = 0.24 * fade;
-            for (let i = 0; i < 3; i++) place(r.pulse, worm.pos.current,
+            for (let i = 0; i < 3; i++) place(r.pulse, tailTile,
                 reduced ? 1.4 + i * 0.8 : 0.7 + ((age * 1.8 + i) % 3), 0.12 + i * 0.02);
         }
     });

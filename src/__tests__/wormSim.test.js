@@ -1287,3 +1287,61 @@ it('reports a grass launch only after actually consuming the spring under the he
   expect(launches).toEqual(['grassLaunch']);
   startJump(sim, ctx, SIZE); expect(launches).toEqual(['grassLaunch']);
 });
+
+describe('self-collision after a ring heal', () => {
+  function followRing(tailLength, speed = 1, fps = 60, rescue = 'disabled') {
+    const size = 5;
+    const sim = makeWormSim(size);
+    resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
+    sim.tailLength = tailLength;
+    const tunnel = {
+      entry: { x: 2, y: 3, z: 4, dirKey: 'PZ' },
+      exit: { x: 2, y: 1, z: 0, dirKey: 'NZ' },
+    };
+    const ctx = makeCtx({
+      isStoryMode: () => true,
+      getSpeed: () => speed,
+      isJumpRescueEnabled: () => rescue !== 'disabled',
+      getActiveTunnels: () => sim.healed ? [] : [{ tunnel, tunnelKey: 'ring' }],
+    });
+    ctx.onJumpRescue = active => ctx.events.push({ type: 'rescue', active });
+    // Walk the actual eight-cell ring and then close the loop. Record the body
+    // through the sim, including the heal pause: tile labels alone miss this bug.
+    const directions = ['right', 'up', 'up', 'left', 'left', 'down', 'down', 'right', 'right'];
+    sim.moveDir = directions[0];
+    sim.stepAcc = 1 / speed;
+    stepWormSim(sim, 0, size, ctx);
+    let step = 1;
+    sim.moveDir = directions[step];
+    let last = tileKey(sim.pos);
+    for (let i = 0; i < fps * 20 && sim.alive && step < directions.length; i++) {
+      if (rescue === 'jump' && sim.jumpRescueT > 0) queueTurn(sim, 'jump');
+      stepWormSim(sim, 1 / fps, size, ctx);
+      const key = tileKey(sim.pos);
+      if (key !== last) {
+        last = key;
+        step++;
+        sim.moveDir = directions[step] ?? 'right';
+      }
+    }
+    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+    return { sim, ctx };
+  }
+
+  it.each([
+    [80, 1, 60, true], [88, 1, 60, false], [90, 1, 60, false], [100, 1, 60, false],
+    [80, 4, 30, true], [88, 4, 30, false], [88, 4, 120, false],
+  ])('resolves %s beads at speed %s, %s Hz (survives: %s)', (length, speed, fps, survives) => {
+    const { sim, ctx } = followRing(length, speed, fps);
+    expect(sim.alive).toBe(survives);
+    expect(eventsOf(ctx, 'death')).toHaveLength(survives ? 0 : 1);
+    if (!survives) expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('self-collision');
+  });
+
+  it.each(['jump', 'timeout'])('preserves the rescue %s for a tail-tip collision after healing', rescue => {
+    const { sim, ctx } = followRing(88, 1, 60, rescue);
+    expect(eventsOf(ctx, 'rescue').map(e => e.active)).toEqual([true, false]);
+    expect(sim.alive).toBe(rescue === 'jump');
+    expect(eventsOf(ctx, 'death')).toHaveLength(rescue === 'jump' ? 0 : 1);
+  });
+});

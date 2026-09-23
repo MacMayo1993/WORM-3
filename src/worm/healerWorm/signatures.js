@@ -5,6 +5,7 @@ import { BODY_BALL_SPACING } from './constants.js';
 import { ttAt } from '../circularBuffers.js';
 import { liveRotation } from '../liveRotation.js';
 import { jumpLandingTile } from './jumpLanding.js';
+import { makeGlowTrail } from './glowTrail.js';
 
 export const SIGNATURES = {
   classic: { name: 'Orb Abundance', short: 'Abundance', passive: true, cooldown: 0, duration: 0, color: '#a6eb9b', hint: '50% more orbs on the cube.' },
@@ -12,14 +13,14 @@ export const SIGNATURES = {
   prism: { name: 'Spectrum', short: 'Spectrum', passive: true, cooldown: 0, duration: 0, color: '#ffd2fb', hint: 'Every orb color can heal every wormhole tunnel.' },
   wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs. Steering locks until finished.' },
   inch: { name: 'Spring Loaded', short: 'Spring', cooldown: 24, duration: 0, color: '#c6ec86', hint: 'Long spring jump. Landing must be clear.' },
-  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Leave a glowing trail for 3 seconds. Enemies glow brighter.' },
+  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Paint behind your tail for 8 seconds. The trail stays for 12 more seconds. Enemies glow brighter.' },
   mobi: { name: 'Create Wormhole', short: 'Tunnel', cooldown: 0, duration: 0, color: '#ceacff', hint: 'Open a tunnel beneath you without spending orbs. No re-entry for 10 seconds. Heal it before creating another.' },
 };
 export const SPRING_CHARGE = 0.24;
 export const SPRING_SPAN = 2.2;
 export const SPRING_HEIGHT = 1.8;
 export const signatureKey = p => p ? `${p.x},${p.y},${p.z},${p.dirKey}` : '';
-export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, sweep: null, mobiTunnel: null, mobiOpening: false, trailStartSeq: 0, fxT: 0, fxTile: null });
+export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, sweep: null, mobiTunnel: null, mobiOpening: false, glowTrail: null, fxT: 0, fxTile: null });
 const stickerAt = (ctx, p) => ctx.getCubies()?.[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
 
 // The restriction follows sticker identity when either mouth rotates to another face.
@@ -90,7 +91,7 @@ export function activateSignature(sim, size, ctx) {
   sig.notice = def.name; sig.noticeT = 1.8;
   if (sig.character === 'inch') sig.charge = SPRING_CHARGE;
   else { sig.active = def.duration; sig.cooldown = def.cooldown; }
-  if (sig.character === 'glow') sig.trailStartSeq = sim.pathHistory.nextSeq;
+  if (sig.character === 'glow') sig.glowTrail = makeGlowTrail();
   if (created) {
     sig.mobiTunnel = { pairId: created.tunnel.pairId, stableKeys: created.stableKeys, reentryT: MOBI_REENTRY_SECONDS };
     sig.mobiOpening = true;

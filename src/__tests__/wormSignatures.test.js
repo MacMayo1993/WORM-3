@@ -2,10 +2,10 @@ import { Vector3 } from 'three';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from '../worm/healerWorm/wiggleSweep.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
-import { makeWormSim, resetWormSim, stepWormSim, queueTurn, killWormSim, startJump } from '../worm/healerWorm/wormSim.js';
+import { makeWormSim, resetWormSim, stepWormSim, queueTurn, killWormSim, startJump, applyRotationToSim } from '../worm/healerWorm/wormSim.js';
 import { signatureAvailability, signatureReadout, isParityLocked, releaseMobiTunnel, tickSignature, SIGNATURES } from '../worm/healerWorm/signatures.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
-import { ttPush } from '../worm/circularBuffers.js';
+import { ttPush, ttAt } from '../worm/circularBuffers.js';
 import { characterOrbCount, characterXpMultiplier, holdsRotationTimer } from '../worm/characterAbilities.js';
 import { getStableKey } from '../worm/wormLogic.js';
 
@@ -88,10 +88,13 @@ describe('signature input and lifecycle', () => {
   it('freezes active and cooldown clocks during pause and tunnel transit', () => {
     const { sim, ctx } = world('glow'); activate(sim, ctx);
     const { active, cooldown } = sim.signature;
+    const life = sim.signature.glowTrail.life;
     ctx.isPaused = () => true; run(sim, ctx, 1);
     expect(sim.signature).toMatchObject({ active, cooldown });
+    expect(sim.signature.glowTrail.life).toBe(life);
     ctx.isPaused = () => false; sim.phase = 'windup'; sim.activeTunnel = null;
     step(sim, ctx); expect(sim.signature).toMatchObject({ active, cooldown });
+    expect(sim.signature.glowTrail.life).toBe(life);
   });
   it('coalesces repeated presses and keeps the steering queue', () => {
     const { sim, ctx } = world('glow');
@@ -106,6 +109,7 @@ describe('signature input and lifecycle', () => {
     expect(sim.signature.active).toBe(0); expect(sim.signature.cooldown).toBe(0);
     ctx.getCharacter = () => 'glow'; activate(sim, ctx);
     killWormSim(sim, ctx); expect(sim.signature.active).toBe(0);
+    expect(sim.signature.glowTrail).toBeNull();
     resetWormSim(sim, SIZE, { orbCount: 0 }); expect(sim.signature.target).toBeNull();
   });
 });
@@ -168,14 +172,30 @@ describe('character abilities', () => {
     expect(characterXpMultiplier('book')).toBe(1.25);
     expect(characterXpMultiplier('glow')).toBe(1);
   });
-  it('Glow paints for three seconds without granting the old magnet reach', () => {
+  it('Glow paints for eight seconds and retains its route without granting magnet reach', () => {
     const { sim, ctx } = world('glow');
-    const seq = sim.pathHistory.nextSeq;
     sim.powerups = [{ x: 3, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }];
-    activate(sim, ctx); expect(sim.signature.trailStartSeq).toBe(seq);
-    expect(sim.signature.active).toBeCloseTo(2.95);
+    activate(sim, ctx);
+    expect(sim.signature.glowTrail).not.toBeNull();
+    expect(sim.signature.active).toBeCloseTo(7.95);
     run(sim, ctx, 1.05); expect(eventsOf(ctx, 'pickup')).toHaveLength(0);
-    tickSignature(sim, 3, SIZE, ctx); expect(sim.signature.active).toBe(0);
+    run(sim, ctx, 7);
+    expect(sim.signature.active).toBe(0);
+    expect(sim.signature.glowTrail.life).toBeGreaterThan(11);
+    expect(sim.signature.glowTrail.path.count).toBeGreaterThan(1);
+  });
+  it('carries retained Glow paint with its sticker through a layer turn', () => {
+    const { sim, ctx } = world('glow');
+    activate(sim, ctx);
+    const paint = sim.signature.glowTrail.path;
+    ttPush(paint, '2,2,4,PZ');
+    ttPush(paint, ''); // tunnel gap must survive remapping too
+    const life = sim.signature.glowTrail.life;
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'row', sliceIndex: 2, dir: 1 }, { inOpeningScramble: false, paused: false });
+    expect(ttAt(paint, 0)).toBe('');
+    expect(ttAt(paint, 1)).not.toBe('2,2,4,PZ');
+    expect(ttAt(paint, 1)).toBe(ttAt(sim.tileTrail, 0));
+    expect(sim.signature.glowTrail.life).toBe(life);
   });
   it('MOBI creates beneath its head, enters without a deposit, and must heal before creating again', () => {
     const { sim, ctx, cubies } = world('mobi');

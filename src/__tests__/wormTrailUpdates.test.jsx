@@ -7,6 +7,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { makeTileTrail, ttPush, ttReset, ttMapInPlace } from '../worm/circularBuffers.js';
+import { makeGlowTrail } from '../worm/healerWorm/glowTrail.js';
 import { uploadTrailRange } from '../worm/healerWorm/trailUpdates.js';
 let frame, tree, root, host, meshes, worm, abilityTrail = false;
 vi.mock('@react-three/fiber', () => ({ useFrame: callback => { frame = callback; } }));
@@ -91,14 +92,40 @@ it('keeps pending off-camera upload ranges bounded without discarding earlier ed
   expect(attr.updateRanges).toEqual([{ start: 0, count: 23 }]);
 });
 
-it('Glow paints only the new ability path and hides it when the three-second effect ends', () => {
+it('retains released tail paint after emission, fades without rebuilding, and expires cleanly', () => {
   abilityTrail = true;
-  worm.signature = { current: { character: 'glow', active: 3, trailStartSeq: worm.pathHistory.current.nextSeq } };
+  const paint = makeGlowTrail();
+  paint.life = 12;
+  worm.signature = { current: { character: 'glow', active: 8, glowTrail: paint } };
   act(() => { useGameStore.setState({ wormShowTrail: false, wormCharacter: 'glow' }); root.render(<Harness />); });
   tick(); expect(meshes[0].count).toBe(0);
-  ttPush(worm.pathHistory.current, '1,2,2,PZ');
-  ttPush(worm.pathHistory.current, '0,2,2,PZ');
+  ttPush(paint.path, '0,0,2,PZ');
+  ttPush(paint.path, '1,0,2,PZ');
   tick(); expect(meshes[0].count).toBeGreaterThan(0);
+  // Head history can move/reset without removing paint already left behind.
   worm.signature.current.active = 0;
+  ttReset(worm.pathHistory.current, '2,2,2,PZ');
+  tick(); expect(meshes[0].count).toBeGreaterThan(0);
+  const version = meshes[0].instanceMatrix.version;
+  paint.life = 1; tick();
+  expect(meshes[0].material.opacity).toBeCloseTo(0.45);
+  expect(meshes[0].instanceMatrix.version).toBe(version);
+  paint.life = 0;
   tick(); expect(meshes[0].count).toBe(0); expect(meshes[1].count).toBe(0);
+});
+
+it('keeps separate painted runs across a tunnel without connecting them', () => {
+  abilityTrail = true;
+  const paint = makeGlowTrail();
+  paint.life = 12;
+  for (const key of ['0,0,2,PZ', '1,0,2,PZ', '', '1,2,2,PZ', '2,2,2,PZ']) ttPush(paint.path, key);
+  worm.signature = { current: { character: 'glow', active: 0, glowTrail: paint } };
+  act(() => { useGameStore.setState({ wormCharacter: 'glow' }); root.render(<Harness />); });
+  tick();
+  const mesh = meshes[0], matrix = new THREE.Matrix4(), pos = new THREE.Vector3();
+  expect(mesh.count).toBeGreaterThan(0);
+  for (let i = 0; i < mesh.count; i++) {
+    mesh.getMatrixAt(i, matrix); pos.setFromMatrixPosition(matrix);
+    expect(Math.abs(pos.y)).toBeGreaterThan(0.85);
+  }
 });

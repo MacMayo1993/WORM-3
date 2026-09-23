@@ -1,19 +1,9 @@
 // src/worm/healerWorm/WormTrail.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split).
 //
-// ── Parked ────────────────────────────────────────────────────────────────────
-// This is not mounted (see TRAIL_PAINTING_ENABLED below and HealerWormMode's
-// render). The painted route was never wrong so much as unreadable: the stroke is
-// pinned to tiles, so every hazard turn carries a slab of old paint away with the
-// slice it was painted on, and after a few turns the route reads as scattered
-// fragments rather than as anywhere the worm has been. On a 15×15, where the
-// hazard turns two planes every ten seconds, that happens to most of the route.
-//
-// Kept whole rather than deleted because the idea is worth reviving as something
-// you pick up — a paintbrush that paints for a while and then wears off, which is
-// short enough that no turn has time to shred it. The sim still records
-// pathHistory, the store still sells seven trail colours, and the skin/trail
-// plumbing below still resolves them: flipping the constant is all it takes.
+// The permanent cosmetic route remains parked. Glow's ability uses a separate,
+// bounded history of tiles released behind the tail, retained after emission ends.
+// Both paths share the instanced paint renderer and live cube transforms below.
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -26,6 +16,7 @@ import { liveRotation } from '../liveRotation.js';
 import { FACE_NORMALS, BODY_BALL_SPACING } from './constants.js';
 import { fxBudget } from './fxBudget.js';
 import { writeTrailMatrix, uploadTrailRange } from './trailUpdates.js';
+import { GLOW_TRAIL_FADE_SECONDS } from '../characterAbilities.js';
 
 /** Whether the painted route is drawn at all. See the note at the top. */
 export const TRAIL_PAINTING_ENABLED = false;
@@ -167,16 +158,25 @@ export function WormTrail({ abilityTrail = false, worm, size }) {
         if (!mesh) return;
         const glowMesh = glowRef.current;
 
-        const trailActive = worm.signature?.current?.character === 'glow' && worm.signature.current.active > 0;
+        const painted = worm.signature?.current?.glowTrail;
+        const trailActive = worm.signature?.current?.character === 'glow' && painted?.life > 0;
         if (abilityTrail ? !trailActive : !wormShowTrail) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+        // Lifetime belongs to the retained paint, not to the emission timer.
+        // Material opacity can fade it without rebuilding/uploading the route.
+        if (abilityTrail) {
+            const fade = Math.min(1, painted.life / GLOW_TRAIL_FADE_SECONDS);
+            const eased = fade * fade * (3 - 2 * fade);
+            mesh.material.opacity = 0.90 * eased;
+            if (glowMesh) glowMesh.material.opacity = 0.24 * eased;
+        }
 
         // Hide the surface trail whenever the worm is not crawling on the surface — during
         // wormhole entry/tunnel/exit and the wind spirals the camera is inside the cube, and
         // the surface daubs would otherwise shine through. Only the cube interior should show.
         if (worm.phase.current !== 'crawling') { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
-        const trail = worm.pathHistory.current;
-        const count = abilityTrail ? Math.min(trail.count, trail.nextSeq - worm.signature.current.trailStartSeq + 1) : trail.count;
+        const trail = abilityTrail ? painted.path : worm.pathHistory.current;
+        const count = trail.count;
         if (count < 2) { lastPaint.current = null; mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
         const state = useGameStore.getState();
@@ -220,6 +220,7 @@ export function WormTrail({ abilityTrail = false, worm, size }) {
         // seeding one tile short of that end makes the freshest daubs overlap the last orb (no
         // gap) and then stream backward. Seeding exactly at the body end left a visible gap;
         // seeding near index 1 painted under the whole body near the head.
+        // Ability history contains only tiles already released behind the tail.
         let aIdx = abilityTrail ? 0 : Math.max(1, bodyTiles - 1);
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
@@ -237,12 +238,22 @@ export function WormTrail({ abilityTrail = false, worm, size }) {
         let i = aIdx;
         while (i < capCount && visible < daubCap) {
             const age = i - aIdx;
-            const lodStep = age < 60 ? 1 : age < 180 ? 2 : age < 500 ? 4 : 8;
+            // Every ability entry must be visited so LOD cannot skip a tunnel gap.
+            const lodStep = abilityTrail || age < 60 ? 1 : age < 180 ? 2 : age < 500 ? 4 : 8;
             const subStep = age < 60 ? TRAIL_SUB_STEP : age < 180 ? 0.22 : age < 500 ? 0.45 : 0.9;
             const nextI = i + lodStep;
             if (nextI >= capCount) break; // never bridge into stale ring-buffer slots
-            // Skip unavailable tiles; the segment simply bridges A → next valid tile.
-            if (!resolveTrailTile(trail, nextI, lSize, _trailCB, _trailNB)) { i = nextI; continue; }
+            // A tunnel leaves a deliberate break. Retain paint on both sides,
+            // without drawing a stripe between unrelated entry/exit faces.
+            if (!resolveTrailTile(trail, nextI, lSize, _trailCB, _trailNB)) {
+                if (!abilityTrail) { i = nextI; continue; }
+                i = nextI + 1;
+                while (i < capCount && !resolveTrailTile(trail, i, lSize, _trailCA, _trailNA)) i++;
+                if (i >= capCount) break;
+                seqA = trail.seq[(trail.head + i) % trail.capacity];
+                havePrev = false;
+                continue;
+            }
             const seqB = trail.seq[(trail.head + nextI) % trail.capacity];
 
             _trailTangent.subVectors(_trailCA, _trailCB); // points toward the newer tile
@@ -342,7 +353,7 @@ export function WormTrail({ abilityTrail = false, worm, size }) {
                 <meshStandardMaterial
                     color="white"
                     emissive="white"
-                    emissiveIntensity={0.18}
+                    emissiveIntensity={abilityTrail ? 0.45 : 0.18}
                     roughness={0.12}
                     metalness={0}
                     transparent

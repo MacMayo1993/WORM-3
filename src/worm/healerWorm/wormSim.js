@@ -1,5 +1,6 @@
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { makeSignature, activateSignature, tickSignature, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
+import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState, inchGaitInto } from './inchGait.js';
@@ -587,7 +588,10 @@ export const isReversal = (current, next) =>
 function pendingBodyStillPresent(sim) {
     const key = sim.pendingSelfCollision?.key;
     if (!key) return false;
-    const limit = Math.min(Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)), sim.tileTrail.count);
+    // The trail already includes the next destination while the head is still
+    // moving from its source. Retain the extra oldest cell until the geometric
+    // check proves the tail has left it; dropping it here misses tight ring loops.
+    const limit = Math.min(Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)) + 1, sim.tileTrail.count);
     for (let i = 1; i < limit; i++) if (ttAt(sim.tileTrail, i) === key) return true;
     return false;
 }
@@ -1318,8 +1322,9 @@ const PHASE_HANDLERS = {
             // The grace period covers the initial steps where the trail is too short to
             // reliably catch real collisions.
             ttReset(sim.tileTrail, tileKey(sim.pos));
-            // Möbius travel teleports the worm to a new surface region, so the painted
-            // route restarts here too (cross-tunnel persistence is a separate follow-up).
+            // Restart the source route at this exit. Glow keeps released paint
+            // separately, with a gap so neither surface is joined across the cube.
+            breakGlowTrail(sim.signature);
             ttReset(sim.pathHistory, tileKey(sim.pos));
             ctx.onCrawlResume();
             sim.onFlippedTile = false;
@@ -1508,13 +1513,7 @@ const PHASE_HANDLERS = {
                     // check that stale flag still fires a kill even though the colliding
                     // tail tile no longer exists ("false tail bite" after a cut).
                     const collisionKey = sim.pendingSelfCollision.key;
-                    const occupiedTilesNow = Math.max(1, Math.ceil((sim.tailLength * BODY_BALL_SPACING) / 1.0));
-                    const trailLimitNow = Math.min(occupiedTilesNow, sim.tileTrail.count);
-                    let stillPresent = false;
-                    for (let ti = 1; ti < trailLimitNow; ti++) {
-                        if (ttAt(sim.tileTrail, ti) === collisionKey) { stillPresent = true; break; }
-                    }
-                    if (!stillPresent) {
+                    if (!pendingBodyStillPresent(sim)) {
                         sim.pendingSelfCollision = null;
                     } else {
                         killWormSim(sim, ctx, {
@@ -1632,9 +1631,10 @@ const PHASE_HANDLERS = {
                     // that is currently rotating away.
                     sim.restRead = nextRestRead(sim.restRead, liveRotation, sim.prevTile, nextPos);
                     // tailLength is measured in visual balls, not tiles. Convert to
-                    // approximate occupied tile count so collision checks align with what
-                    // players see.
-                    const occupiedTiles = Math.max(1, Math.ceil((sim.tailLength * BODY_BALL_SPACING) / 1.0));
+                    // conservative occupied tile count. A tail tip can still touch
+                    // the adjacent cell; hasJumpClearance checks actual body contact
+                    // before killing, so an extra candidate is safe here.
+                    const occupiedTiles = Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)) + 1;
                     const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
                     // Direct indexed scan over tileTrail avoids allocating an intermediate
                     // slice just for Array.includes(). bodyTilesBehindHead ≤ ~167 at MAX_TAIL.
@@ -2152,6 +2152,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // A phase handler can kill the worm. Death is terminal for this tick too:
     // queued tail clearance must not heal tiles or spawn rewards afterward.
     if (!sim.alive) return;
+    if (currentPhase === 'crawling') tickGlowTrail(sim, delta);
     for (let i = sim.tunnelPassages.length - 1; i >= 0; i--) {
         const passage = sim.tunnelPassages[i];
         // Re-entering a still-occupied pair must not close it around the new
@@ -2399,6 +2400,9 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     if (sim.signature.fxTile) sim.signature.fxTile = rotateByOwnLayer(sim.signature.fxTile);
     ttMapInPlace(sim.tileTrail, _remapTileKey);
     ttMapInPlace(sim.pathHistory, _remapTileKey);
+    if (sim.signature.glowTrail) {
+        ttMapInPlace(sim.signature.glowTrail.path, key => key ? _remapTileKey(key) : key);
+    }
     // Pressure uses the same positional keys as the trail, so its displacement
     // and velocity must ride the slice instead of rebounding in the vacated cell.
     remapWormPress(_remapTileKey);
