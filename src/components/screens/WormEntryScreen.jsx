@@ -7,6 +7,9 @@ import { WORM_STORY_LEVELS, nextStoryLevel, storyStars, storyUnlocked, storyChec
 import { MODE_THEMES } from '../../utils/modeThemes.js';
 import { HEADING_FONT, UI_FONT, Z } from '../../utils/uiTheme.js';
 import { StoryRewardChoices } from '../../worm/story/StoryCards.jsx';
+import StoryWorldPreview from '../../worm/story/StoryWorldPreview.jsx';
+import { STORY_WORLDS, storyAppearance } from '../../worm/story/worlds.js';
+import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import WormProfile from './WormProfile.jsx';
 import { wormMenuFeedback } from './wormMenuFeedback.js';
@@ -39,7 +42,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   if (page === 'free') return <Suspense fallback={<div className="worm-story-loading" role="status">Loading…</div>}><FreePlaySetup onComplete={onComplete} onCancel={() => setPage('choice')} initialSettings={initialSettings} /></Suspense>;
   const level = WORM_STORY_LEVELS.find(item => item.id === selected);
   const totalStars = WORM_STORY_LEVELS.reduce((n, item) => n + storyStars(progress, item.id), 0);
-  const launch = () => { wormMenuFeedback(); onComplete({ ...initialSettings, perFaceStyles: initialSettings?.manifoldStyles,
+  const launch = () => { wormMenuFeedback(); onComplete({ ...initialSettings, ...storyAppearance(level.id), perFaceStyles: STORY_WORLDS[level.id].styles,
     wormColor: getSkin(wormSkin).body,
     storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: false, wormSpeed: level.speed, wormOrbCount: 1,
     wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false }); };
@@ -63,11 +66,15 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
           <div className="worm-chapter-progress"><span>Stars</span><strong>{totalStars} / {WORM_STORY_LEVELS.length * 3} ★</strong><progress value={totalStars} max={WORM_STORY_LEVELS.length * 3} aria-label="Chapter stars" /></div>
           <div className="worm-level-grid">{WORM_STORY_LEVELS.map(item => {
             const unlocked = storyUnlocked(progress, item.id), stars = storyStars(progress, item.id);
-            return <button key={item.id} disabled={!unlocked} title={item.title} aria-pressed={selected === item.id} aria-label={`Level ${item.id}: ${item.title}${unlocked ? `, ${stars} stars` : ', locked'}`} onClick={() => { wormMenuFeedback(); setSelected(item.id); }} className={selected === item.id ? 'selected' : ''}>
+            return <button key={item.id} disabled={!unlocked} title={item.title} aria-pressed={selected === item.id} aria-label={`Level ${item.id}: ${item.title}${unlocked ? `, ${stars} stars` : ', locked'}`} onClick={() => { wormMenuFeedback(); setSelected(item.id); }} className={selected === item.id ? 'selected' : ''}
+              style={{ '--world-color': COLOR_SCHEMES[STORY_WORLDS[item.id].palette][1] }}>
+              <StoryWorldPreview levelId={item.id} compact />
               <span className="worm-level-number">{String(item.id).padStart(2, '0')}</span><small aria-hidden="true">{unlocked ? `${'★'.repeat(stars)}${'☆'.repeat(3-stars)}` : '—'}</small>
             </button>;
           })}</div>
-          <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">Level {String(level.id).padStart(2, '0')}</div><h2>{level.title}</h2><ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
+          <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">Level {String(level.id).padStart(2, '0')} · {STORY_WORLDS[level.id].name}</div><h2>{level.title}</h2>
+            <StoryWorldPreview levelId={level.id} />
+            <ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
             <p className="worm-story-limit">{Math.floor(level.limit / 60)}:{String(level.limit % 60).padStart(2, '0')} to finish{level.rotateEvery ? ` · Turns every ${level.rotateEvery}s` : ''}</p>
             <details><summary>Goals & Rewards</summary><p>{level.goal}</p><ul><li>★ Finish before time runs out</li><li>★ Finish within {level.par}s</li><li>★ No tail cuts</li></ul></details>
             <div className="worm-level-reward"><span>First Win</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>

@@ -6,6 +6,7 @@ import DeathScreen from '../worm/DeathScreens.jsx';
 import { StoryResult } from '../worm/story/StoryCards.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress } from '../progression/model.js';
+import { STORY_WORLDS } from '../worm/story/worlds.js';
 vi.mock('../components/screens/WormModeSetupWizard.jsx', () => ({ default: ({ onComplete, onCancel, initialSettings }) => <div aria-label="Free Play setup"><button onClick={onCancel}>Cancel setup</button><button onClick={() => onComplete(initialSettings)}>Launch free run</button></div> }));
 let host, root, complete, cancel;
 const state = () => useGameStore.getState();
@@ -35,7 +36,9 @@ it('opens with Story on the left and Free Play on the right, without launching e
   expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Levels', 'Free Play']);
   expect(complete).not.toHaveBeenCalled();
   click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
-  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false, perFaceStyles: {1:'grass'} }));
+  expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
+  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false,
+    colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));
   click('Back'); await act(async () => { click('Free Play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
   click('Launch free run'); expect(complete.mock.lastCall[0]).toEqual({ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 });

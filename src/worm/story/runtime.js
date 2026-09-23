@@ -10,6 +10,7 @@ import { BODY_BALL_SPACING, WORM_LIFT } from '../healerWorm/constants.js';
 import { getActiveTunnels } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
 import { hasJumpClearance, tileKey } from '../healerWorm/wormSim.js';
+import { STORY_WORLDS, STORY_ORB_ROUTES } from './worlds.js';
 
 const CROSSING_PATH = [[2,0],[1,0],[0,0],[0,1],[0,2],[1,2],[2,2],[3,2],[4,2],[4,3],[3,3],[2,3],[1,3],[0,3]];
 const LONG_PATH = [[2,0],[1,0],[0,0],[0,1],[0,2],[0,3],[0,4],[1,4],[1,3]];
@@ -47,14 +48,24 @@ export function stageStory(sim, size, level, character) {
   // Every level includes matching healing resources on all six faces.
   // Route-trial pairs can seal after traversal without losing their recorded credit.
   sim.powerups = [];
-  const cells = level.kind === 'mastery' ? [[1,1],[3,1],[1,3],[3,3],[2,1],[2,3],[1,2],[3,2]] : level.kind === 'restore' ? [[1,1],[3,1],[1,3],[3,3],[2,1],[2,3]] : [[1,1],[3,1],[1,3],[3,3]];
+  const cells = STORY_ORB_ROUTES[STORY_WORLDS[level.id].route];
   for (const dirKey of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
-    for (const [u, v] of cells) {
+    // A tunnel may occupy a route tile. Fill locally with distinct safe cells
+    // to retain the full matching-color supply on every face.
+    const fallback = Array.from({ length: 25 }, (_, i) => [i % 5, Math.floor(i / 5)]);
+    const used = new Set();
+    for (const [u, v] of [...cells, ...fallback]) {
+      if (used.size >= cells.length) break;
+      const key = `${u},${v}`;
+      if (used.has(key)) continue;
       const a = u + offset, b = v + offset;
       const [x, y, z] = dirKey === 'PZ' || dirKey === 'NZ' ? [a, b, dirKey === 'PZ' ? edge : 0]
         : dirKey === 'PX' || dirKey === 'NX' ? [dirKey === 'PX' ? edge : 0, a, b] : [a, dirKey === 'PY' ? edge : 0, b];
       const sticker = base.cubies[x][y][z].stickers[dirKey];
-      if (sticker.curr === sticker.orig) sim.powerups.push({ x, y, z, dirKey, type: 'apple' });
+      if (sticker.curr === sticker.orig && tileKey({ x, y, z, dirKey }) !== tileKey(sim.pos)) {
+        used.add(key);
+        sim.powerups.push({ x, y, z, dirKey, type: 'apple' });
+      }
     }
   }
   if (level.kind === 'jump') {

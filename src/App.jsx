@@ -870,7 +870,8 @@ export default function WORM3() {
       wormEnemiesEnabled: chapterLevel ? settings.wormEnemiesEnabled : wizardSettings.wormEnemiesEnabled !== false,
     };
     if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
-    setSettings(newSettings);
+    if (chapterLevel) useGameStore.getState().applyWormStoryLook(chapterLevel.id);
+    else setSettings(newSettings);
 
     // Switch to game scene (showMainMenu already false), reset cube so it's
     // visible and styled before the worm gameplay starts.
