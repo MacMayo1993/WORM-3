@@ -1,3 +1,4 @@
+import { persistentStorySettings } from '../worm/story/worlds.js';
 import { createChestSlice } from './storeSlices/chestSlice.js';
 import { CHAOS_RECORD_KEY } from '../game/chaosExperience.js';
 import { persistLatest } from '../utils/persistenceBatch.js';
@@ -118,7 +119,7 @@ useGameStore.subscribe(
   (state) => state.settings,
   (settings) => {
     try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(persistentStorySettings({ ...useGameStore.getState(), settings })));
       localStorage.setItem(SETTINGS_VERSION_KEY, String(CURRENT_SETTINGS_VERSION));
     } catch { }
   }

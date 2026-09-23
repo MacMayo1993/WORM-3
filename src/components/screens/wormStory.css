@@ -144,3 +144,8 @@
 .worm-entry-choice .worm-path-free .worm-path-illustration { color:#367347; }
 @media(max-width:380px) { .worm-entry-choice .worm-path-illustration { height:clamp(116px,20dvh,154px); } }
 @media(max-height:520px) { .worm-entry-choice .worm-path-illustration { height:88px; margin-bottom:6px; } }
+.worm-world-preview { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; margin:14px 0; }
+.worm-world-preview.is-compact { display:block; width:36px; height:36px; margin:0; }
+.worm-world-tile { display:block; aspect-ratio:1; overflow:hidden; border-radius:7px; border:1px solid #ffffff40; box-shadow:0 2px 0 #0004; }
+.worm-level-grid button { background:linear-gradient(145deg,color-mix(in srgb,var(--world-color) 28%,transparent),transparent),var(--wiz-surface); }
+.worm-level-grid button.selected { background:linear-gradient(145deg,color-mix(in srgb,var(--world-color) 40%,transparent),transparent),var(--wiz-surface); color:var(--wiz-text); box-shadow:0 0 0 2px var(--mode-accent),0 3px 0 #091417; }
