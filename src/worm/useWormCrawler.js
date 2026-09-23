@@ -754,6 +754,7 @@ export function useWormCrawler(size, cubies) {
             interpT: f('interpT'),
             crawlDistance: f('crawlDistance'),
             prevWorldPos: f('prevWorldPos'),
+            rotationDeparture: f('rotationDeparture'),
             curWorldPos: f('curWorldPos'),
             prevTile: f('prevTile'),
             restRead: f('restRead'),

@@ -1,6 +1,7 @@
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { makeSignature, activateSignature, tickSignature, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
 import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
+import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState, inchGaitInto } from './inchGait.js';
@@ -51,7 +52,7 @@ import {
     collectManifoldRing,
     findCoveredWormholeRing,
 } from '../wormLogic.js';
-import { liveRotation } from '../liveRotation.js';
+import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
 import { remapWormPress } from '../tilePressBridge.js';
 import {
@@ -135,6 +136,8 @@ const _bakeAxis = new THREE.Vector3();
 const _evalHPos = new THREE.Vector3();
 const _evalCornerVtx = new THREE.Vector3();
 const _evalCornerNorm = new THREE.Vector3(); // reused for face-crossing normal blend
+const _departureSource = new THREE.Vector3();
+const _departureNormal = new THREE.Vector3();
 // Extra scratch for computing the lifted position before writing into stepHistory
 const _evalLiftedPos = new THREE.Vector3();
 
@@ -171,6 +174,7 @@ export function makeWormSim(size) {
         // Smooth inter-tile interpolation
         interpT: 1,               // 0→1 between prev and current tile
         prevWorldPos: null,       // null = no prev yet; otherwise aliases _prevWP below
+        rotationDeparture: null,
         curWorldPos: null,        // always aliases _curWP below (set in makeWormSim tail)
         headInterpPos: new THREE.Vector3(),
         currentNormal: new THREE.Vector3(0, 0, 1),
@@ -356,6 +360,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.interpT = 1;
     sim.crawlDistance = 0;
     sim.prevWorldPos = null;
+    sim.rotationDeparture = null;
     setCurWorldPosFromTile(sim, size);
     sim.headInterpPos.copy(sim.curWorldPos);
     sim.currentNormal.copy(FACE_NORMALS[startPos.dirKey] ?? FACE_NORMALS.PZ);
@@ -470,12 +475,17 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
     sim.pendingTunnelTrigger = null;
+    updateRotationDeparture(sim);
 }
 
 const collisionHead = new THREE.Vector3();
 const collisionBody = new THREE.Vector3();
 const collisionNormal = new THREE.Vector3();
 const collisionGait = { dist: 0, arch: 0 };
+const collisionA = new THREE.Vector3();
+const collisionANormal = new THREE.Vector3();
+const collisionB = new THREE.Vector3();
+const collisionBNormal = new THREE.Vector3();
 
 /** Tile trails are broad phase only: test the occupied body, including inch arches. */
 export function hasJumpClearance(sim, progress = sim.interpT) {
@@ -488,8 +498,12 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
     let an = normal;
     let index = 0;
     let b = shAt(history, index);
+    const departure = hasLiveDeparture(sim);
+    if (departure) departureBodySample(b, collisionB, collisionBNormal);
+    let bPos = departure ? collisionB : b.pos;
+    let bNormal = departure ? collisionBNormal : b.normal;
     let distance = 0;
-    let length = a.distanceTo(b.pos);
+    let length = a.distanceTo(bPos);
     const gait = sim.bodyGait;
     for (let bead = 1; bead < sim.tailLength; bead++) {
         let target = bead * BODY_BALL_SPACING;
@@ -501,18 +515,21 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
         }
         while (distance + length < target && index + 1 < history.count) {
             distance += length;
-            a = b.pos;
-            an = b.normal;
+            a = departure ? collisionA.copy(bPos) : bPos;
+            an = departure ? collisionANormal.copy(bNormal) : bNormal;
             b = shAt(history, ++index);
-            length = a.distanceTo(b.pos);
+            if (departure) departureBodySample(b, collisionB, collisionBNormal);
+            bPos = departure ? collisionB : b.pos;
+            bNormal = departure ? collisionBNormal : b.normal;
+            length = a.distanceTo(bPos);
         }
         if (target > distance + length) break;
         // The connected neck is not a self-crossing.
         if (target < 1 || b.transit) continue;
         const t = length > 0 ? (target - distance) / length : 0;
-        collisionNormal.lerpVectors(an, b.normal, t).normalize();
+        collisionNormal.lerpVectors(an, bNormal, t).normalize();
         if (collisionNormal.dot(normal) < 0.9) continue;
-        collisionBody.lerpVectors(a, b.pos, t).addScaledVector(collisionNormal, arch);
+        collisionBody.lerpVectors(a, bPos, t).addScaledVector(collisionNormal, arch);
         collisionBody.sub(collisionHead);
         const vertical = collisionBody.dot(normal);
         // Two 0.092-radius beads, with a small tolerance for sampling.
@@ -1264,14 +1281,26 @@ export const CORNER_VERTEX_LIFT = 0.52;
 export const CORNER_STEP_LENGTH = 2 * CORNER_VERTEX_LIFT;
 
 export function evaluatePosAndNormal(sim, tValue, outPos) {
-    const pWorld = sim.prevWorldPos;
+    let pWorld = sim.prevWorldPos;
     const cWorld = sim.curWorldPos;
+    const liveDeparture = pWorld && hasLiveDeparture(sim);
+    const departure = liveDeparture || (pWorld && sim.rotationDeparture?.committed);
+    if (departure) {
+        _departureNormal.copy(FACE_NORMALS[sim.prevDirKey] ?? FACE_NORMALS[sim.pos.dirKey]);
+        if (liveDeparture) {
+            setDepartureAxis();
+            const p = sim.prevTile;
+            const angle = liveLayerAngle(p.x, p.y, p.z) ?? 0;
+            pWorld = _departureSource.copy(pWorld).applyAxisAngle(departureAxis, angle);
+            _departureNormal.applyAxisAngle(departureAxis, angle);
+        }
+    }
     outPos.copy(cWorld);
     let cNorm = FACE_NORMALS[sim.pos.dirKey] ?? FACE_NORMALS.PZ;
 
     if (pWorld && tValue < 1) {
         if (sim.crossingCorner) {
-            const oldNormal = FACE_NORMALS[sim.prevDirKey];
+            const oldNormal = departure ? _departureNormal : FACE_NORMALS[sim.prevDirKey];
             const newNormal = FACE_NORMALS[sim.pos.dirKey];
             _evalCornerVtx.copy(pWorld).addScaledVector(newNormal, CORNER_VERTEX_LIFT);
 
@@ -1301,6 +1330,7 @@ export function evaluatePosAndNormal(sim, tValue, outPos) {
             }
         } else {
             outPos.copy(pWorld).lerp(cWorld, tValue);
+            if (departure) cNorm = _evalCornerNorm.lerpVectors(_departureNormal, cNorm, tValue).normalize();
         }
     }
     return cNorm;
@@ -1349,6 +1379,7 @@ const PHASE_HANDLERS = {
             sim.restRead = nextRestReadDuringStep(
                 previousRestRead, liveRotation, sim.interpT, sim.prevTile, sim.pos
             );
+            updateRotationDeparture(sim);
             if (sim.restRead && sim.restRead !== previousRestRead) {
                 markRestReadTile(sim, tileKey(sim.pos), sim.restRead, sim.pos.x, sim.pos.y, sim.pos.z);
                 // Some samples from this same traversal may have been recorded before
@@ -1568,7 +1599,10 @@ const PHASE_HANDLERS = {
                 // their committed positions — the -1 sentinel opts them out of the body
                 // ride/bake, which would otherwise swing them along with the outgoing slice.
                 const _rrs = sim.restRead;
-                if (_rrs && restReadProtectsTile(_rrs, _htx, _hty, _htz)) {
+                if (hasLiveDeparture(sim)) {
+                    shPush(sim.stepHistory, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
+                    shMarkRestRead(shAt(sim.stepHistory, 0), sim.rotationDeparture.txnId);
+                } else if (_rrs && restReadProtectsTile(_rrs, _htx, _hty, _htz)) {
                     shPush(sim.stepHistory, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
                     shMarkRestRead(shAt(sim.stepHistory, 0), _rrs.txnId);
                 } else {
@@ -1605,6 +1639,7 @@ const PHASE_HANDLERS = {
                 sim.stepAcc -= STEP_SEC;
                 sim.interpT = 0;
                 sim.lastRecordedT = 0;
+                sim.rotationDeparture = null;
                 sim._prevWP.copy(sim._curWP);
                 sim.prevWorldPos = sim._prevWP;
                 sim.prevDirKey = sim.pos.dirKey;
@@ -1683,6 +1718,7 @@ const PHASE_HANDLERS = {
 
                 // Immediately update curWorldPos so the interpolation target is correct
                 setCurWorldPosFromTile(sim, size);
+                updateRotationDeparture(sim);
 
                 // Powerup collision
                 const { x, y, z, dirKey } = sim.pos;
@@ -2555,5 +2591,6 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     // exactly once, here — releasing it per layer is what let the first plane of a
     // two-plane turn erase the protection belonging to the second.
     sim.restRead = null;
+    if (sim.rotationDeparture?.txnId === liveRotation.completedTxnId) sim.rotationDeparture.committed = true;
     restTiles.clear();
 }
