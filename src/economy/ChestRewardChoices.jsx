@@ -2,12 +2,16 @@ import { accessoryFraming, accessoryPreviewEquipment } from '../worm/handmadeAcc
 import React, { useEffect, useRef } from 'react';
 import WormPreviewCanvas from '../3d/WormPreviewCanvas.jsx';
 import CubePreviewCanvas from '../3d/CubePreviewCanvas.jsx';
+import PaletteSwatches from '../components/PaletteSwatches.jsx';
 import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
 import { getStoreItem } from '../utils/storeCatalog.js';
 import { CHEST_TIERS } from './chests.js';
 
 function RewardPreview({ item }) {
-  if (item.type === 'scheme' || item.type === 'tile') {
+  if (item.type === 'scheme') {
+    return <PaletteSwatches colors={COLOR_SCHEMES[item.schemeKey] ?? COLOR_SCHEMES.standard} />;
+  }
+  if (item.type === 'tile') {
     return <CubePreviewCanvas px={88} size={3} animated={false} interactive={false}
       colors={COLOR_SCHEMES[item.schemeKey] ?? COLOR_SCHEMES.standard} tileStyle={item.tileKey ?? 'solid'} />;
   }
