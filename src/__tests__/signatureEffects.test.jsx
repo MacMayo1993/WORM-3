@@ -3,6 +3,8 @@ import { Matrix4 } from 'three';
 import { applyProps } from '@react-three/fiber';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
+import { makeGlowTrail } from '../worm/healerWorm/glowTrail.js';
+import { ttPush } from '../worm/circularBuffers.js';
 import { makeSignature } from '../worm/healerWorm/signatures.js';
 import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 const { cleanups, frames } = vi.hoisted(() => ({ cleanups: [], frames: [] }));
@@ -16,6 +18,8 @@ beforeEach(() => {
   useGameStore.setState({ cubies, wormAlive: true, wormGamePhase: 'active', wormPowerups: [{ x: 2, y: 3, z: 4, dirKey: 'PZ' }] });
   worm = { signature: { current: { ...makeSignature(), character: 'glow', active: 3, seq: 1 } },
     pos: { current: { x: 2, y: 2, z: 4, dirKey: 'PZ' } }, phase: { current: 'crawling' } };
+  worm.signature.current.glowTrail = makeGlowTrail();
+  ttPush(worm.signature.current.glowTrail.path, '0,0,4,PZ');
   meshes = SignatureEffects({ worm, size: 5 }).props.children.map(child => {
     const { object, ...props } = child.props; applyProps(object, props); return object;
   });
@@ -24,6 +28,9 @@ afterEach(() => { while (cleanups.length) cleanups.pop()(); resetLiveRotation();
 it('removes Glow pulses on expiry, death and tunnel entry', () => {
   frames[0](); expect(meshes[1].count).toBe(3);
   expect(meshes[1].material.depthTest).toBe(true);
+  const tailPulse = new Matrix4(); meshes[1].getMatrixAt(0, tailPulse);
+  expect(tailPulse.elements[12]).toBe(-2);
+  expect(tailPulse.elements[13]).toBe(-2);
   worm.signature.current.active = 0; frames[0](); expect(meshes.every(m => m.count === 0)).toBe(true);
   worm.signature.current.active = 4; worm.phase.current = 'tunnel'; frames[0](); expect(meshes.every(m => m.count === 0)).toBe(true);
   worm.phase.current = 'crawling'; useGameStore.setState({ wormAlive: false }); frames[0]();

@@ -32,7 +32,7 @@ export const WORM_CHARACTERS = [
     type: 'Scout',
     subtitle: 'Bioluminescent trail crawler',
     stats: { speed: 90, healing: 40, agility: 80, glow: 100 },
-    special: 'Light Trail — Enemies glow brighter. Leave a glowing trail for 3 seconds.',
+    special: 'Light Trail — Paint behind your tail for 8 seconds; the trail stays for 12 more seconds. Enemies glow brighter.',
   },
   {
     id: 'book',
