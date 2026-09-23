@@ -1,3 +1,5 @@
+import { tickExpansion } from '../worm/healerWorm/expansion.js';
+import { EXPLODE_AMOUNT, EXPLODE_TRANSITION } from '../worm/wormExpansion.js';
 // Deterministic tests for the worm simulation core (healerWorm/wormSim.js).
 // The sim is driven with fixed dt values and a stubbed ctx port — no React,
 // no store, no renderer. This is the test surface the wormSim extraction exists
@@ -1289,7 +1291,7 @@ it('reports a grass launch only after actually consuming the spring under the he
 });
 
 describe('self-collision after a ring heal', () => {
-  function followRing(tailLength, speed = 1, fps = 60, rescue = 'disabled') {
+  function followRing(tailLength, speed = 1, fps = 60, rescue = 'disabled', expanded = false, expectedHeals = 1) {
     const size = 5;
     const sim = makeWormSim(size);
     resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
@@ -1305,6 +1307,11 @@ describe('self-collision after a ring heal', () => {
       getActiveTunnels: () => sim.healed ? [] : [{ tunnel, tunnelKey: 'ring' }],
     });
     ctx.onJumpRescue = active => ctx.events.push({ type: 'rescue', active });
+    if (expanded) {
+      sim.explodeT = 9999;
+      tickExpansion(sim, size, EXPLODE_TRANSITION, ctx);
+      expect(sim.expansionAmount).toBe(EXPLODE_AMOUNT);
+    }
     // Walk the actual eight-cell ring and then close the loop. Record the body
     // through the sim, including the heal pause: tile labels alone miss this bug.
     const directions = ['right', 'up', 'up', 'left', 'left', 'down', 'down', 'right', 'right'];
@@ -1324,7 +1331,7 @@ describe('self-collision after a ring heal', () => {
         sim.moveDir = directions[step] ?? 'right';
       }
     }
-    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(expectedHeals);
     return { sim, ctx };
   }
 
@@ -1336,6 +1343,17 @@ describe('self-collision after a ring heal', () => {
     expect(sim.alive).toBe(survives);
     expect(eventsOf(ctx, 'death')).toHaveLength(survives ? 0 : 1);
     if (!survives) expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('self-collision');
+  });
+
+  it.each([[1, 60], [4, 30], [4, 120]])('does not heal a logical ring beyond the expanded body at speed %s and %s Hz', (speed, fps) => {
+    const { sim } = followRing(88, speed, fps, 'disabled', true, 0);
+    expect(sim.healed).toBe(0);
+    expect(sim.ringHealedTunnelKeys.size).toBe(0);
+  });
+
+  it('still heals an expanded ring when the physical body is long enough', () => {
+    const { sim } = followRing(140, 1, 60, 'disabled', true);
+    expect(sim.healed).toBe(1);
   });
 
   it.each(['jump', 'timeout'])('preserves the rescue %s for a tail-tip collision after healing', rescue => {
