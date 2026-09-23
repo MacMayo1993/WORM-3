@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { makeWormSim, resetWormSim } from '../worm/healerWorm/wormSim.js';
+import { makeWormSim, resetWormSim, jumpLiftOf } from '../worm/healerWorm/wormSim.js';
 import { checkWormHitBySlice, cutWormTail, resolveSliceHits } from '../worm/wormHelpers.js';
 import { bodyDistanceAt } from '../worm/healerWorm/sliceBodyPath.js';
 import { advanceInchGaitState } from '../worm/healerWorm/inchGait.js';
@@ -33,12 +33,43 @@ function fixture(points, size = 7, count = 100, normal = new THREE.Vector3(0, 0,
     get current() { return sim[key]; }, set current(value) { sim[key] = value; },
   }]));
   for (const key of ['orbPickupColors', 'orbPickupFaceIds', 'colorEpoch']) worm[`${key}Ref`] = worm[key];
+  worm.jumpLift = () => jumpLiftOf(sim);
   return { sim, worm };
 }
 const line = n => Array.from({ length: n + 1 }, (_, i) => new THREE.Vector3(-2 + i * 5 / n, 0, 3.6));
 beforeEach(() => useGameStore.setState({ wormOrbInventory: { 1: 96, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 } }));
 
 describe('physical slice cuts', () => {
+  it.each(['col', 'row', 'depth'].flatMap(axis => [-1, 1].map(sign => [axis, sign])))(
+    'retains the viable head-side body on the rotating outer cap: %s / %s', (axis, sign) => {
+      const coord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
+      const other = coord === 'x' ? 'y' : 'x';
+      const normal = new THREE.Vector3(); normal[coord] = sign;
+      const a = new THREE.Vector3(); a[coord] = sign * 3.6;
+      const b = a.clone(); b[other] = 3.6;
+      const c = b.clone(); c[coord] = sign * 2;
+      const { worm, sim } = fixture([a, b, c], 7, 100, normal);
+      const hit = checkWormHitBySlice(worm, axis, sign > 0 ? 6 : 0, 7);
+      expect(hit.type).toBe('cut');
+      expect(hit.keepCount).toBeGreaterThan(4);
+      cutWormTail(worm, hit);
+      expect(sim.tailLength).toBe(hit.keepCount);
+      expect(checkWormHitBySlice(worm, axis, sign > 0 ? 6 : 0, 7)).toBeNull();
+    });
+
+  it('does not cut an airborne strand on an imaginary extension of the seam', () => {
+    const { worm } = fixture([new THREE.Vector3(-2, 0, 4.5), new THREE.Vector3(2, 0, 4.5)]);
+    expect(checkWormHitBySlice(worm, 'col', 3, 7)).toBeNull();
+  });
+
+  it('keeps grounded tail damage when the head jumps above a turning slice', () => {
+    const { worm, sim } = fixture([
+      new THREE.Vector3(0, 0, 3.6), new THREE.Vector3(0, 1, 3.6), new THREE.Vector3(2, 1, 3.6),
+    ]);
+    sim.isJumping = true; sim.jumpT = 0.5; sim.jumpHeight = 1;
+    expect(checkWormHitBySlice(worm, 'col', 3, 7).type).toBe('cut');
+  });
+
   it.each([2, 3, 5, 7, 15].flatMap(size => ['col', 'row', 'depth'].map(axis => [size, axis])))('locates the seam on size %s / %s', (size, axis) => {
     const k = (size - 1) / 2;
     const coord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
