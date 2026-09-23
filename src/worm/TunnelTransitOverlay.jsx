@@ -78,7 +78,7 @@ export default function TunnelTransitOverlay() {
         const mid = Math.sin(Math.PI * Math.min(1, Math.max(0, t)));
 
         if (vignetteRef.current) {
-          vignetteRef.current.style.opacity = String(amp * (reduced ? 0.18 : 0.20 + mid * 0.08));
+          vignetteRef.current.style.opacity = String(amp * (reduced ? 0.06 : 0.08 + mid * 0.03));
         }
         if (fringeRef.current) {
           fringeRef.current.style.opacity = String(amp * (reduced ? 0.15 : 0.22 + mid * 0.20));
@@ -124,7 +124,7 @@ export default function TunnelTransitOverlay() {
         style={{
           ...base,
           background:
-            'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 26%, rgba(0,0,0,0.45) 62%, rgba(0,0,0,0.88) 100%)',
+            'radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(0,0,0,0.25) 78%, rgba(0,0,0,0.60) 100%)',
         }}
       />
       {/* Colour fringing toward the edges, tinted by the two tiles being joined —
