@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { FACE_NORMALS } from './constants.js';

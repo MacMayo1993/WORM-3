@@ -1,3 +1,4 @@
+import { wormExpansion } from './wormExpansion.js';
 import { getStableKey } from './wormLogic.js';
 import { characterOrbCount } from './characterAbilities.js';
 import { orbsCarried } from './healerWorm/economy.js';
@@ -253,7 +254,7 @@ export function useWormCrawler(size, cubies) {
                 // screen — clear both the live readout and the store transitions.
                 resetWormBuffs();
                 resetWormSegments();
-                useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null });
+                useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null });
                 if (deathMenuTimer.current) {
                     clearTimeout(deathMenuTimer.current);
                     deathMenuTimer.current = null;
@@ -383,6 +384,11 @@ export function useWormCrawler(size, cubies) {
             // Remaining time lives on the wormBuffs bridge, mirrored from the sim each
             // tick, so the countdown freezes with the simulation during a pause or a
             // tunnel transit instead of running off a wall clock.
+            onExpansionAmount: (amount) => {
+                wormExpansion.amount = amount;
+                useGameStore.setState({ explosionT: amount });
+            },
+            onExplodeState: (active) => useGameStore.setState({ wormExplodeActive: active }),
             onRocketState: (active) => {
                 wormBuffs.rocketActive = active;
                 if (useGameStore.getState().wormRocketActive !== active) {
@@ -481,7 +487,7 @@ export function useWormCrawler(size, cubies) {
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
                 wormSessionOrbs: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
                 wormPhase: 'crawling', wormAlive: true, wormPaused: true, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
-                wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormSpecialNotice: null,
+                wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormSpecialNotice: null,
                 wormBoostState: 'ready', wormOrbFlash: null, demoWormSteered: false, demoWormTarget: practice.target,
                 demoWormProgress: '', demoWormHazardCleared: null });
             return; // Let the shared tunnel snapshot observe the staged board first.
@@ -596,6 +602,7 @@ export function useWormCrawler(size, cubies) {
         let springs = 0;
         for (const patch of sim.elementalPatches.values()) if (patch.type === 'grass') springs++;
         wormBuffs.springCount = springs;
+        wormBuffs.explodeT = sim.explodeT;
         wormBuffs.magnetT = sim.magnetT;
         wormBuffs.magnetMaxT = sim.magnetMaxT;
         wormBuffs.rocketActive = sim.rocketActive;
@@ -640,6 +647,8 @@ export function useWormCrawler(size, cubies) {
         storyPracticeRef.current = null;
         combatRunRef.current = null; sim.combat = null; combatBridge.current = null;
         feedbackRef.current.reset();
+        wormExpansion.amount = 0;
+        useGameStore.setState({ exploded: false, explosionT: 0, wormExplodeActive: false });
         resetWormSim(sim, size, { orbCount: characterOrbCount(wormOrbCount, useGameStore.getState().wormCharacter), wormholeInterval });
         resetWormBuffs();
         resetWormSegments();
@@ -648,7 +657,7 @@ export function useWormCrawler(size, cubies) {
         useGameStore.setState({
             wormPowerups: sim.powerups,
             wormSpecials: [],
-            wormRocketActive: false,
+            wormExplodeActive: false, wormRocketActive: false,
             wormMagnetActive: false,
             wormMagnetSeq: 0,
             wormSpecialNotice: null,
@@ -678,13 +687,15 @@ export function useWormCrawler(size, cubies) {
             clearTimeout(deathMenuTimer.current);
             deathMenuTimer.current = null;
         }
+        wormExpansion.amount = 0;
+        useGameStore.setState({ exploded: false, explosionT: 0, wormExplodeActive: false });
         // Leaving worm mode entirely: the bridges are module-level state that would
         // otherwise still be holding the last run's buff (and its dents) when the
         // mode remounts.
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
-        useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false });
+        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false });
     }, []);
 
     // When a cube rotation commits, transform the whole sim (worm, powerups, trails,
@@ -764,6 +775,7 @@ export function useWormCrawler(size, cubies) {
             isJumping: f('isJumping'),
             rocketActive: f('rocketActive'),
             rocketT: f('rocketT'),
+            expansionAmount: f('expansionAmount'),
             rocketFlight: f('rocketFlight'),
             landingGraceT: f('landingGraceT'),
             magnetT: f('magnetT'),

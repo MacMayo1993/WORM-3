@@ -1,3 +1,4 @@
+import { wormExpansion } from '../wormExpansion.js';
 // src/worm/healerWorm/TunnelTube.jsx
 //
 // The wormhole made into an actual enclosure.
@@ -260,7 +261,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
     }
     meshRef.current.visible = true;
 
-    const key = `${size}:${tunnel.entry.x},${tunnel.entry.y},${tunnel.entry.z},${tunnel.entry.dirKey}:${tunnel.exit.x},${tunnel.exit.y},${tunnel.exit.z},${tunnel.exit.dirKey}`;
+    const key = `${size}:${wormExpansion.amount}:${tunnel.entry.x},${tunnel.entry.y},${tunnel.entry.z},${tunnel.entry.dirKey}:${tunnel.exit.x},${tunnel.exit.y},${tunnel.exit.z},${tunnel.exit.dirKey}`;
     if (builtForRef.current !== key) {
       const st = useGameStore.getState();
       const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;

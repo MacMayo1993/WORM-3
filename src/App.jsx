@@ -669,6 +669,7 @@ export default function WORM3() {
   // ========================================================================
   const explosionTRef = useRef(0);
   useEffect(() => {
+    if (wormHealerMode) return; // WORM pickup owns its simulation-driven expansion.
     if (exploded && explosionTRef.current >= 1) return;
     if (!exploded && explosionTRef.current <= 0) return;
 
@@ -688,7 +689,7 @@ export default function WORM3() {
     };
     raf = requestAnimationFrame(animate);
     return () => { if (raf) cancelAnimationFrame(raf); };
-  }, [exploded, setExplosionT]);
+  }, [exploded, setExplosionT, wormHealerMode]);
 
   // Dismiss mobile touch hint after delay
   useEffect(() => {

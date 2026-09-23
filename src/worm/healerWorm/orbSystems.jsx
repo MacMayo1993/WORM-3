@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerSafe } from '../../game/cubeState.js';
-import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { getAntipodalOrbColor, getOrbColor, readLiveTile } from '../wormHelpers.js';
 import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX, ORB_HOVER_HEIGHT, ORB_ELEVATED_HOVER_HEIGHT } from './constants.js';
@@ -71,7 +71,8 @@ function PowerupOrbsImpl({ size }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orbSignature, faceColors, manifoldStyles]);
 
-    return <ParityOrbs orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
+    const expansion = useGameStore(s => s.explosionT);
+    return <ParityOrbs explosionFactor={expansion} orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
 }
 
 export const PowerupOrbs = memo(PowerupOrbsImpl);
@@ -84,6 +85,8 @@ export const PowerupOrbs = memo(PowerupOrbsImpl);
 // Shared geometry — one set for every special ever spawned (at most one is on the
 // board at a time, but the cost is paid once for the whole session either way).
 const _specialGeos = {
+    cubie: new THREE.BoxGeometry(0.13, 0.13, 0.13),
+    core: new THREE.IcosahedronGeometry(0.075, 0),
     body: new THREE.CapsuleGeometry(0.1, 0.18, 6, 14),
     nose: new THREE.ConeGeometry(0.1, 0.17, 14),
     fin: new THREE.BoxGeometry(0.025, 0.1, 0.1),
@@ -176,7 +179,15 @@ function SpecialOrb({ special, size }) {
     return (
         <group ref={groupRef}>
             <group ref={spinRef}>
-                {special.type === 'rocket' ? (
+                {special.type === 'explode' ? (
+                    <>
+                        {Array.from({ length: 8 }, (_, i) => <mesh key={i} geometry={_specialGeos.cubie}
+                            position={[(i & 1 ? 1 : -1) * 0.13, (i & 2 ? 1 : -1) * 0.13, (i & 4 ? 1 : -1) * 0.13]} ref={tag(1)}>
+                            <meshStandardMaterial color={look.color} emissive={look.color} emissiveIntensity={0.5} roughness={0.28} metalness={0.3} transparent />
+                        </mesh>)}
+                        <mesh geometry={_specialGeos.core} ref={tag(1)}><meshBasicMaterial color={look.accent} toneMapped={false} transparent /></mesh>
+                    </>
+                ) : special.type === 'rocket' ? (
                     <>
                         <mesh geometry={_specialGeos.body} ref={tag(1)}>
                             <meshStandardMaterial
@@ -226,7 +237,9 @@ function SpecialOrb({ special, size }) {
                 )}
             </group>
 
-            {special.type === 'rocket' ? (
+            {special.type === 'explode' ? <mesh geometry={_specialGeos.cubie} scale={3.6} ref={tag(0.3)}>
+                <meshBasicMaterial color={look.accent} wireframe transparent opacity={0.3} depthWrite={false} />
+            </mesh> : special.type === 'rocket' ? (
                 /* Tall triangular exhaust beacon: points along the rocket and cannot
                    be confused with the round orbit rings on parity orbs. */
                 <mesh geometry={_specialGeos.rocketBeacon} position={[0, -0.36, 0]} rotation={[0, 0, Math.PI]} ref={tag(0.34)}>

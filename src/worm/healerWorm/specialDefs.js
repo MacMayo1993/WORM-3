@@ -21,6 +21,12 @@
 import { ELEMENTAL_DEFS, ELEMENTAL_TYPES, isElementalType } from './elementalDefs.js';
 
 const BASE_SPECIAL_DEFS = {
+  explode: {
+    label: 'Explode', color: '#ba8cff', accent: '#fff0a8', icon: 'explode',
+    iconPath: 'M2 2h7v7H2zm13 0h7v7h-7zM2 15h7v7H2zm13 0h7v7h-7z',
+    iconAccent: 'M10 10h4v4h-4z',
+    description: 'Touch the split cube to open gaps for 12 seconds. The cube closes smoothly; the timer waits for jumps, turns and tunnel exits.',
+  },
   rocket: {
     label: "Rocket",
     color: '#ff9d2e',
@@ -46,7 +52,7 @@ const BASE_SPECIAL_DEFS = {
 };
 
 /**
- * All claimable orb types — the two worm buffs plus every elemental wash.
+ * All claimable orb types — the worm pickups plus every elemental wash.
  * Elements are appended after rocket/magnet so the shuffle bag (specialSpawn.js)
  * spreads them evenly alongside the buffs.
  */
@@ -55,7 +61,7 @@ export const SPECIAL_DEFS = { ...BASE_SPECIAL_DEFS, ...ELEMENTAL_DEFS };
 /** Canonical list of supported special types (buffs + elements). */
 export const SPECIAL_TYPES = Object.keys(SPECIAL_DEFS);
 
-/** Just the worm buffs (rocket / magnet) — the always-present half of each bag. */
+/** Just the ambient pickups (explode / rocket / magnet) — the always-present half of each bag. */
 export const BUFF_TYPES = Object.keys(BASE_SPECIAL_DEFS);
 
 /** Just the elemental orb types, in catalogue order. */

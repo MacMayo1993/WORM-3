@@ -1,3 +1,4 @@
+import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import * as THREE from 'three';
 import { shAt } from '../circularBuffers.js';
 import { BASE_TAIL_LENGTH, BODY_BALL_SPACING, WORM_LIFT } from './constants.js';
@@ -33,9 +34,10 @@ export function findSlicePathHit(worm, axis, layer, size) {
   if (!history?.count || !worm.headInterpPos?.current || !worm.currentNormal?.current) return null;
   const coord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
   const k = (size - 1) / 2;
+  const scale = cubeExpansionScale(size, worm.expansionAmount?.current ?? 0);
   // An outward-facing bead still belongs to the outermost cubie layer.
-  const low = layer === 0 ? -Infinity : layer - k - 0.5;
-  const high = layer === size - 1 ? Infinity : layer - k + 0.5;
+  const low = layer === 0 ? -Infinity : (layer - k - 0.5) * scale;
+  const high = layer === size - 1 ? Infinity : (layer - k + 0.5) * scale;
   const planes = [low, high];
   let a = bodyPathHeadInto(head, worm);
   const headOnLayer = a[coord] >= low && a[coord] <= high;
@@ -59,7 +61,7 @@ export function findSlicePathHit(worm, axis, layer, size) {
         const bounded = Math.max(0, Math.min(1, at));
         // A slice seam does not extend infinitely into the air. A lifted strand
         // can clear it; keep looking for a later grounded part of the body.
-        const surfaceLimit = size / 2 + 0.2;
+        const surfaceLimit = k * scale + 0.7;
         const aboveSurface = ['x', 'y', 'z'].some(other => other !== coord &&
           Math.abs(a[other] + (b[other] - a[other]) * bounded) > surfaceLimit);
         if (!aboveSurface) t = Math.min(t, bounded);

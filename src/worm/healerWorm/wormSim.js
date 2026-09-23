@@ -1,3 +1,6 @@
+import { tickExpansion } from './expansion.js';
+import { EXPLODE_DURATION } from '../wormExpansion.js';
+import { cubeGridIndex } from '../../game/cubeWorldGeometry.js';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { makeSignature, activateSignature, tickSignature, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
 import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
@@ -228,6 +231,8 @@ export function makeWormSim(size) {
         // ── Special power-ups (rocket / magnet) ────────────────────────────────
         specials: [],             // hovering rocket/magnet + elemental orbs on the board
         specialTimer: SPECIAL_SPAWN_INTERVAL,
+        explodeT: 0,
+        expansionAmount: 0,
         elementalSpawnTimer: ELEMENTAL_SPAWN_INTERVAL, // own clock for the elemental offering
         specialSeq: 0,            // monotonic id source for spawned specials
         specialPicker: makeSpecialPicker(),
@@ -318,7 +323,7 @@ export function makeWormSim(size) {
 }
 
 const setCurWorldPosFromTile = (sim, size) => {
-    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, 0);
+    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, sim.expansionAmount);
     sim._curWP.set(wp[0], wp[1], wp[2]);
     sim.curWorldPos = sim._curWP;
 };
@@ -361,6 +366,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.crawlDistance = 0;
     sim.prevWorldPos = null;
     sim.rotationDeparture = null;
+    sim.expansionAmount = 0;
     setCurWorldPosFromTile(sim, size);
     sim.headInterpPos.copy(sim.curWorldPos);
     sim.currentNormal.copy(FACE_NORMALS[startPos.dirKey] ?? FACE_NORMALS.PZ);
@@ -371,8 +377,12 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
     sim.specials = [];
     sim.specialTimer = SPECIAL_SPAWN_INTERVAL;
+    sim.explodeT = 0;
+    sim.expansionAmount = 0;
     sim.elementalSpawnTimer = ELEMENTAL_SPAWN_INTERVAL;
     sim.specialPicker = makeSpecialPicker();
+    // Introduce the new pickup first; subsequent spawns use the normal shuffle bag.
+    sim.specialPicker.bag = ['explode'];
     sim.rocketActive = false;
     sim.rocketT = 0;
     sim.rocketFlight = 0;
@@ -595,6 +605,11 @@ export function startElemental(sim, ctx, type) {
 export function activateSpecial(sim, ctx, type) {
     if (type === 'rocket') startRocket(sim, ctx);
     else if (type === 'magnet') startMagnet(sim, ctx);
+    else if (type === 'explode') {
+        sim.explodeT = EXPLODE_DURATION;
+        ctx.onExplodeState?.(true);
+        ctx.feel('specialSpawn');
+    }
     else if (isElementalType(type)) startElemental(sim, ctx, type);
 }
 
@@ -875,7 +890,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         // Reward is immediate. The renderer consumes a short gulp on the head
         // tile or a longer attraction for a remote magnet catch.
         if (sim.pendingOrbAttractions.length < MAX_ORB_ATTRACTION_FX) {
-            const from = getStickerWorldPos(pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey, size, 0);
+            const from = getStickerWorldPos(pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey, size, sim.expansionAmount);
             sim.pendingOrbAttractions.push({
                 id: `att-${sim.attractionSeq++}`,
                 from,
@@ -906,7 +921,7 @@ function tickWiggleSweep(sim, delta, size, ctx) {
     const samples = Math.max(1, Math.ceil((sweep.elapsed - oldTime) / 0.008));
     const bodySamples = Math.max(32, Math.ceil((sweep.length + 6) / 0.15));
     for (const orb of [...sim.powerups]) {
-        _sweepOrb.fromArray(getStickerWorldPos(orb.x, orb.y, orb.z, orb.dirKey, size, 0))
+        _sweepOrb.fromArray(getStickerWorldPos(orb.x, orb.y, orb.z, orb.dirKey, size, sim.expansionAmount))
             .addScaledVector(FACE_NORMALS[orb.dirKey], WORM_LIFT);
         let hit = false;
         for (let t = 0; t <= samples && !hit; t++) {
@@ -1008,6 +1023,7 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = fals
     const headKey = `${x},${y},${z},${dirKey}`;
     const idx = sim.specials.findIndex(s => {
         const key = `${s.x},${s.y},${s.z},${s.dirKey}`;
+        if (s.type === 'explode') return key === headKey && sim.interpT >= 1 && !sim.isJumping;
         if (isElementalType(s.type)) return key === headKey && sim.interpT >= 1;
         return !elementsOnly && (reach ? reach.has(key) : key === headKey);
     });
@@ -1591,10 +1607,9 @@ const PHASE_HANDLERS = {
                 // Tag the point with the grid cell it occupies, derived from the pre-lift
                 // surface point (origin-centred coords → nearest lattice index). Used to ride
                 // a mid-rotation slice and to bake the turn into history at commit.
-                const _hk = (size - 1) / 2;
-                const _htx = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.x + _hk)));
-                const _hty = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.y + _hk)));
-                const _htz = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.z + _hk)));
+                const _htx = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.x, size, sim.expansionAmount)));
+                const _hty = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.y, size, sim.expansionAmount)));
+                const _htz = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.z, size, sim.expansionAmount)));
                 // Points recorded while rest-reading a mid-rotation slice already sit at
                 // their committed positions — the -1 sentinel opts them out of the body
                 // ride/bake, which would otherwise swing them along with the outgoing slice.
@@ -1976,6 +1991,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // clock in this tick (jump, wormhole spawn, boost, movement) reads this value, so
     // they all pause together through a stall and resume cleanly instead of lurching.
     if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
+    tickExpansion(sim, size, delta, ctx);
     if (sim.signatureRequested) {
         sim.signatureRequested = false;
         activateSignature(sim, size, ctx);
@@ -2399,7 +2415,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
             sim.prevTile = rPrev;
             sim.prevDirKey = rPrev.dirKey;
             if (sim.prevWorldPos) {
-                const _wp = getStickerWorldPos(rPrev.x, rPrev.y, rPrev.z, rPrev.dirKey, size, 0);
+                const _wp = getStickerWorldPos(rPrev.x, rPrev.y, rPrev.z, rPrev.dirKey, size, sim.expansionAmount);
                 sim.prevWorldPos.set(_wp[0], _wp[1], _wp[2]);
             }
         }

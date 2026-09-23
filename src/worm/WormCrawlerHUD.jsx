@@ -1,3 +1,4 @@
+import { EXPLODE_DURATION } from './wormExpansion.js';
 import { ScreenHeading } from '../components/ui/ModeArtwork.jsx';
 import { storyLevel, WORM_STORY_LEVELS } from './story/levels.js';
 import { StoryObjectiveCard, StoryStartButton, StoryResult } from './story/StoryCards.jsx';
@@ -891,6 +892,9 @@ function SpecialIcon({ type, size = 14 }) {
 // instead of draining against a wall clock.
 
 function BuffStrip({ detailed = false, onInspect }) {
+    const explodeActive = useGameStore(s => s.wormExplodeActive ?? false);
+    const explodeSeconds = useRef(null);
+    const explodeFill = useRef(null);
     const rocketActive = useGameStore(s => s.wormRocketActive ?? false);
     const magnetActive = useGameStore(s => s.wormMagnetActive ?? false);
     const magnetSeq = useGameStore(s => s.wormMagnetSeq ?? 0);
@@ -939,13 +943,32 @@ function BuffStrip({ detailed = false, onInspect }) {
         return () => cancelAnimationFrame(raf);
     }, [elementalTheme, detailed]);
 
-    if (!rocketActive && !magnetActive && !elementalTheme) return null;
+    useEffect(() => {
+        if (!explodeActive) return;
+        let raf;
+        const paint = () => {
+            if (explodeSeconds.current) explodeSeconds.current.textContent = `${Math.max(0, wormBuffs.explodeT).toFixed(1)}s`;
+            if (explodeFill.current) explodeFill.current.style.width = `${100 * Math.max(0, wormBuffs.explodeT) / EXPLODE_DURATION}%`;
+            raf = requestAnimationFrame(paint);
+        };
+        paint();
+        return () => cancelAnimationFrame(raf);
+    }, [explodeActive]);
+    if (!rocketActive && !magnetActive && !elementalTheme && !explodeActive) return null;
 
     const rocketDef = getSpecialDef('rocket');
     const magnetDef = getSpecialDef('magnet');
     const elemDef = elementalTheme ? getElementalDef(elementalTheme) : null;
 
     return <div className={`worm-buffs${detailed ? ' worm-buffs-detailed' : ''}`} aria-label="Active powers">
+        {explodeActive && <div className="worm-buff-item">
+            <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
+                style={{ '--power-color': getSpecialDef('explode').color }} aria-label="Explode active" aria-haspopup={detailed ? undefined : 'dialog'}>
+                <span ref={explodeFill} className="worm-buff-meter" aria-hidden="true" style={{ width: '100%' }} />
+                <SpecialIcon type="explode" /><span>Explode</span><span ref={explodeSeconds} aria-hidden="true" />
+            </button>
+            {detailed && <p>{getSpecialDef('explode').description}</p>}
+        </div>}
         {rocketActive && <div className="worm-buff-item">
             <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
                 style={{ '--power-color': rocketDef.color }} aria-label="Rocket active" aria-haspopup={detailed ? undefined : 'dialog'}>
@@ -1231,7 +1254,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
 }
 
 function HudContext({ surface, demo, onInspect }) {
-    const hasBuff = useGameStore(s => s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme);
+    const hasBuff = useGameStore(s => s.wormExplodeActive || s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme);
     const [hasTunnel, setHasTunnel] = useState(!!wormBuffs.tunnelNeeds);
     useEffect(() => {
         const id = setInterval(() => setHasTunnel(!!wormBuffs.tunnelNeeds), 100);

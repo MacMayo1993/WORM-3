@@ -1,3 +1,5 @@
+import { EXPLODE_DURATION, EXPLODE_AMOUNT } from '../worm/wormExpansion.js';
+import { tickExpansion } from '../worm/healerWorm/expansion.js';
 // Deterministic tests for the special power-ups (rocket / magnet).
 //
 // Same approach as wormSim.test.js: the sim is driven with fixed dt values and a
@@ -10,6 +12,7 @@ import {
   resetWormSim,
   stepWormSim,
   applyRotationToSim,
+  activateSpecial,
   startRocket,
   startMagnet,
   queueTurn,
@@ -88,6 +91,8 @@ function makeCtx(overrides = {}) {
     onPowerupsChanged: log('powerups'),
     applyHeal: log('heal'),
     onSpecialsChanged: log('specials'),
+    onExplodeState: log('explodeState'),
+    onExpansionAmount: log('expansion'),
     onRocketState: log('rocketState'),
     onMagnetState: log('magnetState'),
     onSpecialSpawned: log('specialSpawned'),
@@ -786,7 +791,7 @@ describe('special type chooser', () => {
     expect(sim.specialPicker.lastType).not.toBeNull();
     resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
     expect(sim.specialPicker.lastType).toBeNull();
-    expect(sim.specialPicker.bag).toHaveLength(0);
+    expect(sim.specialPicker.bag).toEqual(['explode']);
   });
 });
 
@@ -1206,4 +1211,72 @@ it.each(['remote', 'head', 'glow'])('credits Story magnet catches for remote mag
   stepUntilCommit(sim, ctx);
   expect(eventsOf(ctx, 'pickup')).toHaveLength(kind === 'glow' ? 0 : 1);
   expect(events).toEqual(kind === 'remote' ? ['magnetOrbs'] : []);
+});
+
+
+describe('Explode pickup', () => {
+  it('offers Explode as the first ambient pickup, then uses all three types', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.specialTimer = 0;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.specials.find(s => !isElementalType(s.type))?.type).toBe('explode');
+    const types = new Set(Array.from({ length: 3 }, () => drawSpecialType(sim.specialPicker)));
+    expect(types).toEqual(new Set(['explode', 'rocket', 'magnet']));
+  });
+
+  it('requires contact at the tile center, even while magnet is active', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.specials = [special(2, 3, 4, 'PZ', 'explode')];
+    sim.magnetT = 8;
+    stepUntilCommit(sim, ctx);
+    run(sim, ctx, 0.9, 0.01);
+    expect(sim.explodeT).toBe(0);
+    expect(sim.specials).toHaveLength(1);
+    run(sim, ctx, 0.1, 0.01);
+    expect(sim.explodeT).toBe(EXPLODE_DURATION);
+    expect(sim.specials).toHaveLength(0);
+    expect(eventsOf(ctx, 'explodeState')).toEqual([{ type: 'explodeState', args: [true] }]);
+  });
+
+  it('opens gradually, refreshes without stacking, then closes completely', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    activateSpecial(sim, ctx, 'explode');
+    tickExpansion(sim, SIZE, 0.1, ctx);
+    expect(sim.expansionAmount).toBeGreaterThan(0);
+    expect(sim.expansionAmount).toBeLessThan(EXPLODE_AMOUNT);
+    for (let i = 0; i < 20; i++) tickExpansion(sim, SIZE, 0.1, ctx);
+    expect(sim.expansionAmount).toBe(EXPLODE_AMOUNT);
+    activateSpecial(sim, ctx, 'explode');
+    expect(sim.explodeT).toBe(EXPLODE_DURATION);
+    for (let i = 0; i < 140; i++) tickExpansion(sim, SIZE, 0.1, ctx);
+    expect(sim.explodeT).toBe(0);
+    expect(sim.expansionAmount).toBe(0);
+    expect(eventsOf(ctx, 'explodeState').at(-1).args).toEqual([false]);
+  });
+
+  it.each(['pause', 'jump', 'turn', 'tunnel', 'tail'])('holds geometry and countdown during %s', condition => {
+    const sim = makeSim(), ctx = makeCtx({ isPaused: () => condition === 'pause' });
+    activateSpecial(sim, ctx, 'explode');
+    if (condition === 'jump') sim.isJumping = true;
+    if (condition === 'turn') liveRotation.active = true;
+    if (condition === 'tunnel') sim.phase = 'tunnel';
+    if (condition === 'tail') sim.tunnelPassages.push({});
+    if (condition === 'pause') stepWormSim(sim, 0.05, SIZE, ctx);
+    else tickExpansion(sim, SIZE, 0.05, ctx);
+    expect(sim.explodeT).toBe(EXPLODE_DURATION);
+    expect(sim.expansionAmount).toBe(0);
+  });
+
+  it('clears the effect on a new run and leaves a dead simulation frozen', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    activateSpecial(sim, ctx, 'explode');
+    tickExpansion(sim, SIZE, 0.1, ctx);
+    const amount = sim.expansionAmount;
+    sim.alive = false;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.expansionAmount).toBe(amount);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.expansionAmount).toBe(0);
+    expect(sim.explodeT).toBe(0);
+  });
 });

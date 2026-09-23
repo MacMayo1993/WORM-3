@@ -26,7 +26,7 @@ import { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { getStickerWorldPos } from '../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
 import { getActiveTunnels, collectManifoldRing } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';

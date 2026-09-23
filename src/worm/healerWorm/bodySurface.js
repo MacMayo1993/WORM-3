@@ -1,3 +1,5 @@
+import { wormExpansion } from '../wormExpansion.js';
+import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 // Render-only clearance against the cube's current solid slices. Gameplay paths
 // and collision rules stay authoritative; character motion cannot push beads
 // into a tile. Contiguous stationary planes share one box, so work scales with
@@ -10,6 +12,7 @@ export function createBodySurface() {
 }
 
 export function updateBodySurface(surface, size, rotation) {
+  const scale = cubeExpansionScale(size, wormExpansion.amount);
   const axis = rotation.active ? ({ col: 'x', row: 'y', depth: 'z' }[rotation.axis] || 'y') : 'y';
   surface.axis.set(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
   let count = 0;
@@ -29,9 +32,9 @@ export function updateBodySurface(surface, size, rotation) {
       surface.boxes[count] = box;
     }
     box.center.set(0, 0, 0);
-    box.center[axis] = (start + end - size) * 0.5;
-    box.half.setScalar(size * 0.5);
-    box.half[axis] = (end - start) * 0.5;
+    box.center[axis] = (start + end - size) * 0.5 * scale;
+    box.half.setScalar((size - 1) * scale * 0.5 + 0.5);
+    box.half[axis] = (end - start - 1) * scale * 0.5 + 0.5;
     box.inverse.setFromAxisAngle(surface.axis, -angle);
     count++;
     start = end;
