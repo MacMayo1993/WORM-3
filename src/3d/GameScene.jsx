@@ -131,14 +131,13 @@ export default function GameScene({
   // skip it too — their translucent bodies don't read shadows usefully.
   const shadowsOn = !isMobile && !perfReducedFX && visualMode !== 'wireframe' && visualMode !== 'glass';
 
-  // Ambient occlusion shares the same capability gate as shadows (skip mobile,
-  // sustained-low-FPS, and the translucent wireframe/glass modes that don't read
-  // occlusion usefully).
-  const aoEnabled = shadowsOn;
-
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
+  // AO shares the shadow capability gate. Its half-resolution pass is for opaque
+  // cubie seams. Inside the translucent bore
+  // it adds speckled shadows from surfaces that the camera is looking through.
+  const aoEnabled = shadowsOn && !wormholePhaseActive;
   // Antipodal PiP is shown only when the player toggles it on (in any mode), and is
   // suppressed during wormhole travel where the dedicated tunnel camera takes over.
   // (Previously worm mode force-showed it, which made the HUD toggle a no-op there.)
