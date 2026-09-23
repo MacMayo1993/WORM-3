@@ -1,3 +1,4 @@
+import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 // src/worm/healerWorm/TunnelInteriorView.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import { tunnelCameraInside } from '../tunnelVisibility.js';
@@ -55,6 +56,8 @@ export function TunnelInteriorView({ worm, size }) {
     // Antipodal partner resolution is deferred to tunnel-entry time so it always reflects
     // the current manifold map rather than the geometric (n-sx, n-sy, n-sz) position that
     // becomes wrong after any slice rotation or scramble.
+    const expansion = useGameStore(s => s.wormPhase === 'crawling' ? 0 : s.explosionT);
+    const scale = cubeExpansionScale(size, expansion);
     const stickerLayout = useMemo(() => {
         const n = size - 1;
         const layout = [];
@@ -63,7 +66,7 @@ export function TunnelInteriorView({ worm, size }) {
             for (let a = 0; a < size; a++) {
                 for (let b = 0; b < size; b++) {
                     const [sx, sy, sz] = pos(a, b, n);
-                    const wp = getStickerWorldPos(sx, sy, sz, dirKey, size, 0);
+                    const wp = getStickerWorldPos(sx, sy, sz, dirKey, size, expansion);
                     if (!wp) continue;
                     layout.push({
                         sx, sy, sz, dirKey, px: wp[0], py: wp[1], pz: wp[2], rx, ry, rz,
@@ -72,7 +75,7 @@ export function TunnelInteriorView({ worm, size }) {
             }
         }
         return layout;
-    }, [size]);
+    }, [size, expansion]);
 
     // One merged BufferGeometry of 12-edge outlines for every cubie.
     const edgeGeo = useMemo(() => {
@@ -85,7 +88,7 @@ export function TunnelInteriorView({ worm, size }) {
             pts[i++]=bx; pts[i++]=by; pts[i++]=bz;
         };
         for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) {
-            const cx=x-k, cy=y-k, cz=z-k;
+            const cx=(x-k)*scale, cy=(y-k)*scale, cz=(z-k)*scale;
             ln(cx-hs,cy-hs,cz-hs, cx+hs,cy-hs,cz-hs); ln(cx-hs,cy+hs,cz-hs, cx+hs,cy+hs,cz-hs);
             ln(cx-hs,cy-hs,cz+hs, cx+hs,cy-hs,cz+hs); ln(cx-hs,cy+hs,cz+hs, cx+hs,cy+hs,cz+hs);
             ln(cx-hs,cy-hs,cz-hs, cx-hs,cy+hs,cz-hs); ln(cx+hs,cy-hs,cz-hs, cx+hs,cy+hs,cz-hs);
@@ -96,16 +99,16 @@ export function TunnelInteriorView({ worm, size }) {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
         return geo;
-    }, [size]);
+    }, [size, scale]);
 
     const planeGeo = useMemo(() => new THREE.PlaneGeometry(0.88, 0.88), []);
 
     // Solid black backing box, seen from inside (BackSide) — sits just beyond the sticker
     // planes so it shows through the gaps between tiles instead of background/exterior cube.
     const backingGeo = useMemo(() => {
-        const half = (size - 1) / 2 + SURFACE_OFFSET + 0.03;
+        const half = (size - 1) / 2 * scale + SURFACE_OFFSET + 0.03;
         return new THREE.BoxGeometry(half * 2, half * 2, half * 2);
-    }, [size]);
+    }, [size, scale]);
 
     // Dimming shell — sits just INSIDE the sticker planes and is drawn after them,
     // so it tints the whole interior down. Without it the six inner faces sit at
@@ -113,9 +116,9 @@ export function TunnelInteriorView({ worm, size }) {
     // thing the player is supposed to be looking at. Tinting rather than fading
     // keeps the antipodal colours readable, which is the point of this view.
     const dimGeo = useMemo(() => {
-        const half = (size - 1) / 2 + SURFACE_OFFSET - 0.02;
+        const half = (size - 1) / 2 * scale + SURFACE_OFFSET - 0.02;
         return new THREE.BoxGeometry(half * 2, half * 2, half * 2);
-    }, [size]);
+    }, [size, scale]);
 
     // Set static positions/rotations after mount (or size change).
     useEffect(() => {
@@ -128,8 +131,9 @@ export function TunnelInteriorView({ worm, size }) {
     }, [stickerLayout]);
 
     useEffect(() => () => {
-        edgeGeo.dispose(); planeGeo.dispose(); backingGeo.dispose(); dimGeo.dispose();
-    }, [edgeGeo, planeGeo, backingGeo, dimGeo]);
+        edgeGeo.dispose(); backingGeo.dispose(); dimGeo.dispose();
+    }, [edgeGeo, backingGeo, dimGeo]);
+    useEffect(() => () => planeGeo.dispose(), [planeGeo]);
 
     useFrame((_state, delta) => {
         const phase = worm.phase.current;

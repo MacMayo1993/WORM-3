@@ -107,14 +107,15 @@ beforeEach(() => {
 describe('jumping off a turning outer layer', () => {
   for (const axis of ['col', 'row', 'depth']) {
     for (const dir of [-1, 1]) {
-      it(`keeps the launch, landing and body continuous through ${axis} / ${dir}`, () => {
+      it.each([0, 0.35])(`keeps the launch, landing and body continuous through ${axis} / ${dir} at expansion %s`, amount => {
         const sim = makeSim(), ctx = makeCtx();
+        sim.expansionAmount = amount;
         const coord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
         const source = axis === 'col'
           ? { x: 2, y: 1, z: 2, dirKey: 'PZ' }
           : { x: 1, y: 2, z: 2, dirKey: axis === 'row' ? 'PZ' : 'PY' };
         const target = { ...source, [coord]: 1 };
-        const world = p => new THREE.Vector3().fromArray(getStickerWorldPos(p.x, p.y, p.z, p.dirKey, SIZE));
+        const world = p => new THREE.Vector3().fromArray(getStickerWorldPos(p.x, p.y, p.z, p.dirKey, SIZE, amount));
         const rotationAxis = new THREE.Vector3(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
         sim.prevTile = source;
         sim.prevDirKey = source.dirKey;

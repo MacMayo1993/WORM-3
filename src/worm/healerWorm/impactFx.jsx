@@ -5,7 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { DISPLAY_FONT } from '../../utils/uiTheme.js';
 import { FACE_NORMALS } from './constants.js';
 

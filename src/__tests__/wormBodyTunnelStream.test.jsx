@@ -1,3 +1,5 @@
+import { tickExpansion } from '../worm/healerWorm/expansion.js';
+import { wormExpansion } from '../worm/wormExpansion.js';
 import { makeWiggleSweep, wiggleOffset } from '../worm/healerWorm/wiggleSweep.js';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -39,6 +41,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   resetLiveRotation();
+  wormExpansion.amount = 0;
   act(() => root.unmount()); host.remove();
   mesh.geometry.dispose(); mesh.material.dispose();
   vi.unstubAllGlobals(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
@@ -186,4 +189,21 @@ it('anchors the paintbrush to the last rendered bead through a cut and tunnel ha
     expect(tail.position.distanceTo(points[points.length-1])).toBeLessThan(1e-6);
     expect(tail.quaternion.length()).toBeCloseTo(1);
   }
+});
+
+
+it('keeps rendered head and body above the expanded face with bead spacing intact', () => {
+  sim.tailLength = 8;
+  sim.phase = 'crawling';
+  sim.currentNormal.set(0, 0, 1);
+  sim.headInterpPos.set(0, 0, 1.52);
+  sim.curWorldPos.copy(sim.headInterpPos);
+  shReset(sim.stepHistory);
+  for (let x = -1; x <= 0; x += 0.01) shPush(sim.stepHistory, new THREE.Vector3(x, 0, 1.6), sim.currentNormal, 1, 1, 2);
+  sim.explodeT = 12;
+  for (let i = 0; i < 12; i++) tickExpansion(sim, 3, 0.1, { onExpansionAmount: amount => { wormExpansion.amount = amount; } });
+  const points = renderPoints();
+  expect(points).toHaveLength(8);
+  for (const point of points) expect(point.z).toBeGreaterThan(2.1);
+  for (let i = 1; i < points.length; i++) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.2);
 });

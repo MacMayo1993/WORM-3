@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { liveRotation } from '../liveRotation.js';
 import { FACE_NORMALS } from './constants.js';
 import { jumpLandingTile } from './jumpLanding.js';

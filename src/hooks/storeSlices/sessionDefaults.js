@@ -52,6 +52,7 @@ export const makeWormSessionDefaults = () => ({
   // Buff TRANSITIONS only — enough to mount/unmount the HUD strip. Remaining time
   // lives on the wormBuffs bridge (mirrored from the sim each tick), so a paused or
   // mid-tunnel countdown freezes with the simulation instead of a wall clock.
+  wormExplodeActive: false,
   wormRocketActive: false,
   wormMagnetActive: false,
   wormMagnetSeq: 0,

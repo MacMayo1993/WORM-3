@@ -4,7 +4,7 @@ import { wormBuffs } from '../wormBuffs.js';
 import { useRef, useState, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { readLiveTile } from '../wormHelpers.js';
 import { liveCubies } from '../liveCubies.js';
 import { FACE_NORMALS } from './constants.js';

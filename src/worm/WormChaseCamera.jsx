@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { bodyPathHeadInto } from './healerWorm/sliceBodyPath.js';
-import { getStickerWorldPos } from '../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
 import { rocketOrbitInto, rocketOrbitT, rocketFrameInto } from './healerWorm/rocketOrbit.js';
 import { tunnelState } from './tunnelProgressBridge.js';
 import {

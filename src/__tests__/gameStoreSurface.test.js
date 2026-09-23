@@ -103,7 +103,7 @@ const EXPECTED_KEYS = [
   'wormHat', 'wormHealedCount', 'wormHealerMode', 'wormHealingProgress', 'wormJumpRescueActive',
   'wormMagnetActive', 'wormMagnetSeq', 'wormOnFlippedTile', 'wormOrbCount',
   'wormOrbFlash', 'wormOrbInventory', 'wormPaused', 'wormPhase',
-  'wormPowerups', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs',
+  'wormPowerups', 'wormExplodeActive', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs',
   'wormShowTrail', 'wormSkin', 'wormSpecialNotice', 'wormSpecials',
   'wormSpeed', 'wormTimeAlive', 'wormTrail', 'wormTunnelCount',
   'wormholeInterval'

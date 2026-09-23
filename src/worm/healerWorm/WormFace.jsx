@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { getTunnelWorldPosInto, getWindWorldPosInto } from '../wormLogic.js';
 import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';

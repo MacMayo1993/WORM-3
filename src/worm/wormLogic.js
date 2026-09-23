@@ -1,3 +1,4 @@
+import { wormExpansion } from './wormExpansion.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 // src/worm/wormLogic.js
 // Core game logic for WORM mode: tunnel geometry/centerline math, the active-tunnel
@@ -367,7 +368,7 @@ export function updateTunnelLookupIncremental(lookup, cubies, prevCubies, size, 
  * @param {number} explosionFactor - Explosion animation factor
  * @returns {THREE.Vector3} The `out` vector
  */
-export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0) => {
+export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = wormExpansion.amount) => {
   buildTunnelPathForTunnel(_scratchPath, tunnel, size, explosionFactor);
   return tunnelPathPointInto(out, _scratchPath, t);
 };
@@ -380,7 +381,7 @@ export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0)
  * parameterisation to the shared module — so the worm rides the band it can see
  * instead of a private copy of the route.
  */
-export const buildTunnelPathForTunnel = (path, tunnel, size, explosionFactor = 0) => {
+export const buildTunnelPathForTunnel = (path, tunnel, size, explosionFactor = wormExpansion.amount) => {
   const k = (size - 1) / 2;
   const scale = cubeExpansionScale(size, explosionFactor);
 
@@ -424,7 +425,7 @@ export const makeTunnelCenterline = () => makeTunnelPath();
  * Fill `cl` (from makeTunnelCenterline) with the tunnel's centerline control
  * points and per-leg world lengths. Reuses module scratch — call once per frame.
  */
-export const buildTunnelCenterlineInto = (cl, tunnel, size, explosionFactor = 0) =>
+export const buildTunnelCenterlineInto = (cl, tunnel, size, explosionFactor = wormExpansion.amount) =>
   buildTunnelPathForTunnel(cl, tunnel, size, explosionFactor);
 
 /** Convert a parametric position t (0..1) to world arc-length along a built centerline. */
@@ -461,7 +462,7 @@ export function getTunnelArcPosSmoothInto(out, cl, arc) {
 }
 
 /** Corner-rounded position at traversal parameter `t` (0=entry mouth, 1=exit mouth). */
-export function getTunnelWorldPosSmoothInto(out, tunnel, t, size, explosionFactor = 0) {
+export function getTunnelWorldPosSmoothInto(out, tunnel, t, size, explosionFactor = wormExpansion.amount) {
   buildTunnelPathForTunnel(_scratchPath, tunnel, size, explosionFactor);
   const arc = tunnelPathTToArc(_scratchPath, t);
   return getTunnelArcPosSmoothInto(out, _scratchPath, arc);
@@ -508,10 +509,10 @@ const ZERO3 = [0, 0, 0];
  * @param {number} s - 0 = lifted crawl position, 1 = aperture centre
  * @param {number} size - cube size
  */
-export const getWindWorldPosInto = (out, tunnel, side, s, size) => {
+export const getWindWorldPosInto = (out, tunnel, side, s, size, explosionFactor = wormExpansion.amount) => {
   const tile = side === 'exit' ? tunnel.exit : tunnel.entry;
   const n = TUNNEL_FACE_NORMALS[tile.dirKey] || ZERO3;
-  const wp = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, 0);
+  const wp = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, explosionFactor);
   const cl = Math.max(0, Math.min(1, s));
   const lift = THREE.MathUtils.lerp(WORM_LIFT, TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, cl);
   return out.set(wp[0] + n[0] * lift, wp[1] + n[1] * lift, wp[2] + n[2] * lift);
@@ -866,6 +867,6 @@ export const rotateMoveDir = (moveDir, oldDirKey, newDirKey, axis, dir) => {
  * @param {number} explosionFactor - Explosion animation factor
  * @returns {Array} [x, y, z] world coordinates
  */
-export const getSegmentWorldPos = (seg, size, explosionFactor = 0) => {
+export const getSegmentWorldPos = (seg, size, explosionFactor = wormExpansion.amount) => {
   return getStickerWorldPos(seg.x, seg.y, seg.z, seg.dirKey, size, explosionFactor);
 };

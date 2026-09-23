@@ -2,7 +2,7 @@ import { ENEMIES, WAVES, ELEMENTS, ELEMENT_ORDER, ELEMENT_DURATION } from './com
 import { DIR_FORWARD } from '../healerWorm/constants.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
 import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
-import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 
 export const COMBAT = Object.freeze({ magazine: 3, recharge: 1.4, fireInterval: 0.32,
   health: 3, maxEnemies: 4, warning: 2.5, spawnInterval: 6, enemySpeed: 0.425,

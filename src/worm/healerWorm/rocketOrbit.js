@@ -1,3 +1,5 @@
+import { wormExpansion } from '../wormExpansion.js';
+import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 // src/worm/healerWorm/rocketOrbit.js
 //
 // Where the worm flies during a rocket burn.
@@ -44,7 +46,7 @@ export function rocketOrbitT(active, rocketT, flightPhase) {
 }
 
 /** Half-extent of the cube's own box, sticker faces included. */
-export const cubeHalfExtent = (size) => (size - 1) / 2 + SURFACE_OFFSET;
+export const cubeHalfExtent = (size) => (size - 1) / 2 * cubeExpansionScale(size, wormExpansion.amount) + SURFACE_OFFSET;
 
 /**
  * Outward direction of the rounded-cube shell at `pos`, written into `out`.
@@ -56,7 +58,7 @@ export const cubeHalfExtent = (size) => (size - 1) / 2 + SURFACE_OFFSET;
  * orbit round the cube rather than turn a corner.
  */
 export function cubeShellDirInto(out, pos, size) {
-  const k = (size - 1) / 2;
+  const k = (size - 1) / 2 * cubeExpansionScale(size, wormExpansion.amount);
   out.set(
     Math.sign(pos.x) * Math.max(0, Math.abs(pos.x) - k),
     Math.sign(pos.y) * Math.max(0, Math.abs(pos.y) - k),
