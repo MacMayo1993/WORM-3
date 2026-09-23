@@ -3,6 +3,7 @@ import { COLOR_SCHEMES, PALETTE_GROUPS, PALETTE_INFO } from '../../../utils/colo
 import { WIZ_TEXT, WIZ_TEXT_MUTED, WIZ_SURFACE, WIZ_SURFACE_RAISED, WIZ_BORDER } from '../WizardChrome.jsx';
 import { DISPLAY_FONT } from '../../../utils/uiTheme.js';
 import CubePlate from './CubePlate.jsx';
+import PaletteSwatches from '../../PaletteSwatches.jsx';
 import { WIZARD_SCHEME_KEYS, Checkmark, LockPip, sizeTier, bgOptionFor, paletteLabel, styleLabel } from './shared.jsx';
 import './PaletteStep.css';
 
@@ -54,9 +55,7 @@ export default function PaletteStep({ cos, slot }) {
             disabled={!available} aria-label={`${label}${available ? '' : ', available in the store'}`}
             title={`${label} · ${PALETTE_INFO[key]?.description || ''}${selected ? ' · Selected' : ''}`}
             onClick={() => select('colorScheme', key)}>
-            <span className="palette-card-colors" aria-hidden="true">
-              {[1, 2, 3, 4, 5, 6].map(id => <span key={id} style={{ background: COLOR_SCHEMES[key][id] }} />)}
-            </span>
+            <PaletteSwatches className="palette-card-colors" colors={COLOR_SCHEMES[key]} />
             <span className="palette-card-heading">{label}</span>
             {(selected || !available) && <span className="palette-card-badge" aria-hidden="true">
               {selected ? <Checkmark accent={accent} accentShadow={accentShadow} size={16} /> : <LockPip size={12} color={WIZ_TEXT} />}
