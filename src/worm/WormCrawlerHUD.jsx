@@ -37,12 +37,15 @@ import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
 import {
-    overlayScrimStyle, overlayCardStyle, StatTiles,
+    overlayScrimStyle, overlayCardStyle, OVERLAY_CARD_CLASS, StatTiles,
     SETTING_ROW_STYLE, SETTING_LABEL_STYLE, togglePillStyle, segmentStyle,
-    primaryBtnStyle, LIST_BTN_STYLE, ACTION_ROW_STYLE,
+    primaryBtnStyle, SECONDARY_BTN_STYLE, LIST_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
+import ModeArtwork from '../components/ui/ModeArtwork.jsx';
+import { arcadeModeVars } from '../utils/arcadeTheme.js';
 import { useDialogBehavior } from '../components/ui/Panel.jsx';
-import { UI_FONT, DISPLAY_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEET, NIGHT_TEXT_MUTED, GAME_HUD, GAME_HUD_VARS, Z } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, HEADING_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEET, NIGHT_TEXT_MUTED, GAME_HUD, GAME_HUD_VARS, Z,
+    ARCADE_INK, ARCADE_INK_STRONG, ARCADE_MUTED, ARCADE_LINE_SOFT } from '../utils/uiTheme.js';
 
 // ─── Worm Countdown Overlay ─────────────────────────────────────────────────
 const WORM_COUNTDOWN_STYLE_ID = 'worm3-countdown-style';
@@ -657,65 +660,57 @@ const COUNTDOWN_OVERLAY_STYLE = {
 const WINNER_SCREEN_STYLE = {
     position: 'fixed', inset: 0, zIndex: Z.CELEBRATION,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'safe center',
-    background: NIGHT_SHEET,
     pointerEvents: 'auto', overflowY: 'auto', fontFamily: FONT, boxSizing: 'border-box',
     padding: 'max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom))',
 };
 
-const WINNER_STARS_STYLE = {
-    position: 'absolute', inset: 0, pointerEvents: 'none',
-    background: `
-        radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px) 12% 18%/200px 200px,
-        radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px) 37% 44%/150px 150px,
-        radial-gradient(circle, rgba(255,255,255,0.7) 1px, transparent 1px) 68% 22%/180px 180px,
-        radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px) 84% 67%/120px 120px,
-        radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px) 22% 78%/160px 160px
-    `,
+// The celebration is the mode carousel's paper with one ivory card on it.
+const WINNER_CARD_STYLE = {
+    width: 'min(94vw, 540px)', padding: 'clamp(18px, 3.4vh, 28px) 20px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
 };
 
 const WINNER_TITLE_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 'clamp(30px, 8vw, 64px)', fontWeight: 900, letterSpacing: '-2px',
-    color: UI_GOLD,
-    textShadow: '0 3px 0 rgba(0,0,0,0.2)',
-    userSelect: 'none', marginBottom: 4, lineHeight: 1, textAlign: 'center',
+    fontSize: 'clamp(30px, 8vw, 54px)', fontWeight: 400, letterSpacing: '0.01em', textTransform: 'uppercase',
+    color: ARCADE_INK,
+    userSelect: 'none', marginBottom: 6, lineHeight: 1.02, textAlign: 'center',
 };
 
 const WINNER_SUB_STYLE = {
-    color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, letterSpacing: 2, marginBottom: 28, textAlign: 'center',
+    color: ARCADE_MUTED, font: `800 11px/1.3 ${HEADING_FONT}`, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 22, textAlign: 'center',
 };
 
 const WINNER_STATS_STYLE = {
-    display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', justifyContent: 'safe center',
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: 8, width: '100%', marginBottom: 18,
 };
 
 const WINNER_STAT_BOX_STYLE = {
-    borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(255,255,255,0.10)',
-    padding: '10px 16px', textAlign: 'center', minWidth: 90,
+    borderRadius: 14, border: `2px solid ${ARCADE_LINE_SOFT}`,
+    background: '#f7f2e3',
+    padding: '10px 12px', textAlign: 'center',
 };
 
 const WINNER_STAT_LABEL_STYLE = {
-    fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: 'rgba(255,255,255,0.45)', marginBottom: 2,
+    font: `800 10px/1.3 ${HEADING_FONT}`, letterSpacing: '0.07em', textTransform: 'uppercase', color: ARCADE_MUTED, marginBottom: 3,
 };
 
-const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.1 };
+const WINNER_STAT_VALUE_STYLE = { font: `800 20px/1.1 ${HEADING_FONT}`, color: ARCADE_INK, fontVariantNumeric: 'tabular-nums' };
 
 const WINNER_PP_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 'clamp(28px, 6vw, 44px)', color: UI_GOLD, letterSpacing: '-1px',
-    textShadow: '0 3px 0 rgba(0,0,0,0.2)',
-    marginBottom: 6, textAlign: 'center',
+    fontSize: 'clamp(24px, 6vw, 36px)', color: ARCADE_INK_STRONG, textTransform: 'uppercase',
+    marginBottom: 4, textAlign: 'center',
 };
 
 const WINNER_PP_NOTE_STYLE = {
-    fontSize: 11, color: NIGHT_TEXT_MUTED, marginBottom: 22, textAlign: 'center',
+    fontSize: 12, color: ARCADE_MUTED, marginBottom: 20, textAlign: 'center',
 };
 
-const WINNER_BTN_ROW_STYLE = { display: 'flex', gap: 12, justifyContent: 'safe center' };
+const WINNER_BTN_ROW_STYLE = { display: 'flex', gap: 12, justifyContent: 'safe center', width: '100%', marginTop: 8 };
 
 const WINNER_PLAY_AGAIN_STYLE = { ...primaryBtnStyle(), minWidth: 140 };
-const WINNER_NEW_GAME_STYLE = { ...LIST_BTN_STYLE, width: 'auto', minWidth: 120, justifyContent: 'center' };
+const WINNER_NEW_GAME_STYLE = { ...SECONDARY_BTN_STYLE, minWidth: 120 };
 
 const PODIUM_WRAP_STYLE = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22, position: 'relative',
@@ -758,8 +753,9 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
     }, [displayCount]);
 
     return (
-        <div style={WINNER_SCREEN_STYLE}>
-            <div style={WINNER_STARS_STYLE} />
+        <div style={WINNER_SCREEN_STYLE} className="arcade-paper">
+          <div className={`run-result ${OVERLAY_CARD_CLASS}`} style={WINNER_CARD_STYLE}>
+            <ModeArtwork mode="success" className="screen-results-art" />
             <div style={WINNER_TITLE_STYLE}>Cube healed!</div>
             <div style={WINNER_SUB_STYLE}>All tunnels healed</div>
             <div style={PODIUM_WRAP_STYLE}>
@@ -768,15 +764,15 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                         <div key={i} style={{
                             width: seg.size, height: seg.size, borderRadius: '50%',
                             background: wormColor, opacity: seg.alpha, flexShrink: 0,
-                            boxShadow: i === 0 ? `0 0 12px 4px ${wormColor}` : 'none',
-                            border: i === 0 ? '2px solid rgba(255,255,255,0.5)' : 'none',
+                            boxShadow: i === 0 ? `0 0 10px 2px ${wormColor}88` : 'none',
+                            border: i === 0 ? `2px solid ${ARCADE_INK_STRONG}` : `1px solid ${ARCADE_INK_STRONG}55`,
                         }} />
                     ))}
                     {overflow > 0 && (
-                        <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.6)', flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: ARCADE_MUTED, flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
                     )}
                     {wormBodyTiles === 0 && (
-                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>No orbs yet</div>
+                        <div style={{ fontSize: 13, color: ARCADE_MUTED }}>No orbs yet</div>
                     )}
                 </div>
                 <div style={PODIUM_BASE_STYLE}>
@@ -794,7 +790,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                 ].map(([label, value]) => (
                     <div key={label} style={WINNER_STAT_BOX_STYLE}>
                         <div style={WINNER_STAT_LABEL_STYLE}>{label}</div>
-                        <div style={{ ...WINNER_STAT_VALUE_STYLE, ...(label === 'Total PP' ? { color: UI_GOLD } : {}) }}>{value}</div>
+                        <div style={WINNER_STAT_VALUE_STYLE}>{value}</div>
                     </div>
                 ))}
             </div>
@@ -804,6 +800,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                 <button onClick={onRetry} style={WINNER_PLAY_AGAIN_STYLE}><WormReplayLabel /></button>
                 <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New game</button>
             </div>
+          </div>
         </div>
     );
 }
@@ -1137,16 +1134,16 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
         // Not fixed: the pause menu lives inside the HUD's stacking context and must
         // not escape it, so the scrim is absolute against that instead of the viewport.
         <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onClick={onResume}>
-            <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className="worm-pause-card" role="dialog" aria-modal="true" aria-label="Game paused" style={overlayCardStyle(green, { width: 420 })} onClick={e => e.stopPropagation()}>
+            <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className={`worm-pause-card ${OVERLAY_CARD_CLASS}`} role="dialog" aria-modal="true" aria-label="Game paused" style={{ ...overlayCardStyle(green, { width: 420 }), ...arcadeModeVars('worm') }} onClick={e => e.stopPropagation()}>
                 <ScreenHeading mode="pause" title="Paused" />
-                <button type="button" className="worm-pause-resume worm-hud-chip" onClick={onResume}>Resume <span aria-hidden="true">→</span></button>
+                <button type="button" className="worm-pause-resume arcade-primary" onClick={onResume}>Resume <span aria-hidden="true">→</span></button>
                 {storyId && <StoryObjectiveCard />}
                 <WormMissionCard summary />
                 <details className="screen-disclosure"><summary>Abilities & tunnels</summary>
                   <BuffStrip detailed /><TunnelNeedsCard /><SignatureGuide />
                 </details>
                 <details className="screen-disclosure"><summary>Run rewards</summary>
-                  <ParityWallet dark neutral /><XpRunSummary mode="worm" />
+                  <ParityWallet /><XpRunSummary mode="worm" />
                 </details>
 
                 <StatTiles columns={2} stats={[
@@ -1226,7 +1223,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                             onClick={onToggleAntipodal}
                             style={{
                                 ...LIST_BTN_STYLE,
-                                ...(antipodalActive ? { background: `${blue}26`, borderColor: `${blue}66`, color: '#fff' } : {}),
+                                ...(antipodalActive ? { background: `${blue}33`, borderColor: ARCADE_INK_STRONG, color: ARCADE_INK, boxShadow: `0 2px 0 ${ARCADE_INK_STRONG}`, transform: 'translateY(2px)' } : {}),
                             }}
                         >
                             <span aria-hidden="true">⊕</span>

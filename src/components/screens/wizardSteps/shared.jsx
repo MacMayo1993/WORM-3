@@ -114,15 +114,18 @@ export function resolveWizardColors(settings) {
 // ─── Card chrome ──────────────────────────────────────────────────────────────
 
 // Paper cards use a clear accent border and a subtle pressed selection.
-export const cardStyle = (selected, accent) => ({
+// Option cards are carousel keys: ivory on a ledge, and the chosen one sinks
+// onto an ink edge with the mode's face colour behind it. `accent` is kept for
+// callers; the tint reads --mode-accent, which the wizard shell sets.
+export const cardStyle = (selected, _accent) => ({
   display: 'flex',
   padding: '14px 16px',
-  borderRadius: '10px',
-  border: `2px solid ${selected ? accent : WIZ_BORDER_SOFT}`,
-  background: selected ? `${accent}12` : WIZ_SURFACE_RAISED,
+  borderRadius: '14px',
+  border: `2px solid ${selected ? 'var(--arcade-ink-strong)' : WIZ_BORDER_SOFT}`,
+  background: selected ? 'color-mix(in srgb, var(--mode-accent) 18%, var(--arcade-card))' : WIZ_SURFACE_RAISED,
   boxShadow: selected
-    ? `inset 0 0 0 1px ${accent}22`
-    : `0 2px 0 ${WIZ_CARD_SHADOW}`,
+    ? '0 2px 0 var(--arcade-ink-strong)'
+    : `0 4px 0 ${WIZ_CARD_SHADOW}`,
   color: WIZ_TEXT,
   cursor: 'pointer',
   transition: 'all 0.15s ease',

@@ -7,6 +7,7 @@ import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 import { Z, UI_FONT, HEADING_FONT, MONO_FONT } from '../../utils/uiTheme.js';
 import '../../chaos/chaos.css';
 import { ChaosGlyph } from '../../chaos/ChaosArt.jsx';
+import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import { useDialogBehavior } from '../ui/Panel.jsx';
 
 const sourceName = source => source === 'conway' ? 'Surface surge' : source === 'chain' ? 'Chain spread' : 'Chaos';
@@ -31,7 +32,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
   const outcome = result?.push ? `${result.wager} PP returned`
     : result?.won ? `Prediction won · +${result.net ?? result.payout - result.wager} PP`
     : result ? `Prediction missed · −${result.wager} PP` : 'Round complete';
-  return <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-results" style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT }} role="dialog" aria-modal="true" aria-labelledby="chaos-result-title">
+  return <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-results" style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT, ...arcadeModeVars('chaos'), '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'] }} role="dialog" aria-modal="true" aria-labelledby="chaos-result-title">
     <div className="chaos-result-sheet">
       <header className="chaos-result-hero">
         <ChaosGlyph kind="trophy" />

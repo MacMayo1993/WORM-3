@@ -3,6 +3,7 @@ import { Vector3 } from 'three';
 const point = new Vector3();
 const viewPoint = new Vector3();
 const result = { x: 0, y: 1.2, scale: 0.8 };
+const SIDE_RESERVE = 40;
 
 // Project the DOM stage's center onto the menu cube's z=0 plane. Unlike a fixed
 // portrait offset, this also works when a short screen scrolls or turns sideways.
@@ -17,7 +18,9 @@ export function fitCarouselCube(camera, viewport, stage) {
   viewPoint.copy(point).applyMatrix4(camera.matrixWorldInverse);
   const distance = -viewPoint.z;
   const pixelsPerUnit = camera.projectionMatrix.elements[5] * viewport.height / (2 * distance);
-  const available = Math.max(80, Math.min(stage.width - 56, stage.height - 42));
+  // The side arrows sit over the stage edges; the cube may pass under their
+  // outer half, so only 20px per side is held back for them.
+  const available = Math.max(80, Math.min(stage.width - SIDE_RESERVE, stage.height - 42));
   result.x = point.x;
   result.y = point.y;
   result.scale = available / (4.8 * pixelsPerUnit + available * 2 / distance);

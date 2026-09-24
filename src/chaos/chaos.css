@@ -149,3 +149,56 @@
 .chaos-kicker { letter-spacing:.04em; text-transform:none; font-size:12px; }
 .chaos-count { font-family:var(--ui-font,system-ui); font-weight:750; }
 .chaos-result-grid>div { background:transparent; border:0; }
+
+/* ── Arcade look for the two full-screen Chaos sheets ─────────────────────────
+   Betting (.chaos-overlay) and results (.chaos-results) follow the mode carousel
+   (components/ui/arcadeTheme.css): graph paper, an ivory sheet, ivory keys on a
+   ledge, one primary key in Chaos's orange cube face. The live match HUD, which
+   is .chaos-ui without these classes, keeps its dark instruments. */
+.chaos-overlay, .chaos-results {
+  --chaos-ink: var(--arcade-ink);
+  --chaos-muted: var(--arcade-muted);
+  --chaos-panel: var(--arcade-card);
+  --chaos-line: var(--arcade-line-soft);
+  color: var(--arcade-ink);
+  background-color: var(--arcade-paper);
+  background-image: radial-gradient(ellipse at 50% 45%, #fffdf5d9, transparent 72%), var(--arcade-grid);
+  background-size: 100% 100%, var(--arcade-grid-size), var(--arcade-grid-size);
+}
+:is(.chaos-overlay, .chaos-results) :is(.chaos-forecast-sheet, .chaos-result-sheet) { background-color: var(--arcade-card); border: 2px solid var(--arcade-line); box-shadow: var(--arcade-card-shadow); scrollbar-color: var(--arcade-line) transparent; }
+:is(.chaos-overlay, .chaos-results) :is(.chaos-hero, .chaos-result-hero) { background: #f7f2e3; border-bottom: 2px solid var(--arcade-line-soft); }
+:is(.chaos-overlay, .chaos-results) :is(.chaos-hero h1, .chaos-result-hero h1) { color: var(--arcade-ink); font-family: var(--display-font) !important; font-weight: 400; text-transform: uppercase; letter-spacing: .01em; }
+:is(.chaos-overlay, .chaos-results) .chaos-hero h1 span { color: var(--arcade-ink-strong); }
+:is(.chaos-overlay, .chaos-results) :is(.chaos-hero p, .chaos-timeline summary, .chaos-objective, .chaos-objective .chaos-note, .chaos-field-note) { color: var(--arcade-muted); }
+:is(.chaos-overlay, .chaos-results) .chaos-kicker { color: var(--arcade-muted); font-family: var(--heading-font); font-weight: 800; }
+:is(.chaos-overlay, .chaos-results) .chaos-danger { color: #b34700; }
+:is(.chaos-overlay, .chaos-results) :is(.chaos-wallet, .chaos-emblem-coord, .chaos-odds, .chaos-payoff, .chaos-result-call, .chaos-result-grid > div, .chaos-medals span) { background: #f7f2e3; border-color: var(--arcade-line-soft); color: var(--arcade-ink); }
+:is(.chaos-overlay, .chaos-results) :is(.chaos-wallet small, .chaos-payoff > div + div strong, .chaos-medals span, .chaos-result-call > .chaos-glyph) { color: var(--arcade-ink-strong); }
+:is(.chaos-overlay, .chaos-results) .chaos-step-label > span { border-color: var(--arcade-line); color: var(--arcade-ink-strong); }
+/* Choice cards and small keys: ivory on a ledge; the chosen one sinks onto ink. */
+:is(.chaos-overlay, .chaos-results) :is(.chaos-bet-type, .chaos-pick-pair, .chaos-face-choice, .chaos-speed-picker button, .chaos-wager-presets button) {
+  background: var(--arcade-card); color: var(--arcade-ink); border: 2px solid var(--arcade-line-soft); box-shadow: 0 4px 0 var(--arcade-line-soft);
+}
+:is(.chaos-overlay, .chaos-results) :is(.chaos-bet-type, .chaos-pick-pair, .chaos-face-choice, .chaos-speed-picker button, .chaos-wager-presets button)[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--arcade-accent, #FF7A00) 18%, var(--arcade-card)); color: var(--arcade-ink); border-color: var(--arcade-ink-strong); box-shadow: 0 2px 0 var(--arcade-ink-strong);
+}
+:is(.chaos-overlay, .chaos-results) .chaos-wager-presets button[aria-pressed="true"] small { color: var(--arcade-ink-strong); }
+:is(.chaos-overlay, .chaos-results) .chaos-forecast-footer { background: #fffcf1eb; border-top: 2px solid var(--arcade-line-soft); }
+:is(.chaos-overlay, .chaos-results) :is(.chaos-button, .chaos-actions button) {
+  min-height: 52px; border: 2px solid var(--arcade-line); border-radius: 16px; background: var(--arcade-card); color: var(--arcade-ink-strong);
+  box-shadow: var(--arcade-key-shadow); font: 800 13px/1.2 var(--heading-font); letter-spacing: .06em; text-transform: uppercase;
+}
+:is(.chaos-overlay, .chaos-results) :is(.chaos-button-primary, .chaos-actions button:first-child) {
+  min-height: 60px; border: 2px solid var(--arcade-ink-strong); border-radius: 18px;
+  background: var(--arcade-accent, #FF7A00); color: var(--arcade-accent-ink, #fffdf2);
+  box-shadow: var(--arcade-primary-shadow); font: 400 clamp(15px, 4.5vw, 20px)/1.25 var(--display-font); text-transform: uppercase; letter-spacing: 0;
+}
+:is(.chaos-overlay, .chaos-results) :is(.chaos-button, .chaos-actions button):enabled:active { transform: none; translate: 0 3px; box-shadow: 0 1px 0 var(--arcade-line); }
+:is(.chaos-overlay, .chaos-results) :is(.chaos-button-primary, .chaos-actions button:first-child):enabled:active { box-shadow: 0 1px 0 var(--arcade-ink-strong), inset 0 2px 0 #ffffff50; }
+:is(.chaos-overlay, .chaos-results) :is(button, summary):focus-visible { outline: 3px solid var(--arcade-focus); outline-offset: 4px; }
+:is(.chaos-overlay, .chaos-results) .xp-run-summary { background: #f7f2e3; border: 2px solid var(--arcade-line-soft); color: var(--arcade-ink); }
+:is(.chaos-overlay, .chaos-results) .xp-summary-heading > strong { color: var(--arcade-ink); }
+:is(.chaos-overlay, .chaos-results) .xp-meter { background: var(--arcade-line-soft); }
+@media (hover: hover) { :is(.chaos-overlay, .chaos-results) .chaos-ui button:not(:disabled):hover, :is(.chaos-overlay, .chaos-results) button:not(:disabled):hover { border-color: var(--arcade-ink-strong); } }
+:is(.chaos-overlay, .chaos-results) .chaos-result-grid strong { font: 800 clamp(20px, 5vw, 26px)/1.1 var(--heading-font); font-variant-numeric: tabular-nums; color: var(--arcade-ink); }
+:is(.chaos-overlay, .chaos-results) .chaos-result-grid small { font: 800 10px/1.3 var(--heading-font); letter-spacing: .07em; text-transform: uppercase; color: var(--arcade-muted); }

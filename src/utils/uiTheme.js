@@ -175,6 +175,25 @@ export const Z = {
   DEBUG: 100000 // dev console — always on top, by definition
 };
 
+// ARCADE_* — the mode carousel's look, shared by every screen that stops play
+// or sets it up: cream graph paper, deep green ink, ivory keys that sit on a
+// hard 4px ledge, and one chunky primary key in the mode's cube-face colour.
+// PAPER_* and NIGHT_* remain for panels this family has not replaced yet.
+export const ARCADE_INK = '#26372d';
+export const ARCADE_INK_STRONG = '#354d3c';
+export const ARCADE_MUTED = '#6a705e';
+export const ARCADE_PAPER = '#f8f4e8';
+export const ARCADE_CARD = '#fffcf1';
+export const ARCADE_LINE = '#c6c5ac';
+export const ARCADE_LINE_SOFT = '#d1d0b8';
+export const ARCADE_FOCUS = '#2774ad';
+// Graph paper: the carousel's in-scene backdrop, as CSS for DOM screens.
+export const ARCADE_GRID = 'linear-gradient(#cfcdbf66 1px, transparent 1px), linear-gradient(90deg, #cfcdbf66 1px, transparent 1px)';
+export const ARCADE_GRID_SIZE = '30px 30px';
+export const ARCADE_KEY_SHADOW = `0 4px 0 ${ARCADE_LINE}, inset 0 2px 0 #fff`;
+export const ARCADE_PRIMARY_SHADOW = `0 6px 0 ${ARCADE_INK_STRONG}, 0 10px 18px ${ARCADE_INK_STRONG}20, inset 0 3px 0 #ffffff70`;
+export const ARCADE_CARD_SHADOW = `0 6px 0 ${ARCADE_LINE}, 0 18px 40px ${ARCADE_INK_STRONG}24`;
+
 /** CSS screens consume the same tokens as inline React styles. */
 export const UI_CSS_VARS = {
   '--bg-primary': PAPER_SHEET,
@@ -202,6 +221,19 @@ export const UI_CSS_VARS = {
   '--night-text-muted': NIGHT_TEXT_MUTED,
   '--night-shadow': NIGHT_SHADOW,
   '--ui-moss': UI_MOSS,
+  '--arcade-ink': ARCADE_INK,
+  '--arcade-ink-strong': ARCADE_INK_STRONG,
+  '--arcade-muted': ARCADE_MUTED,
+  '--arcade-paper': ARCADE_PAPER,
+  '--arcade-card': ARCADE_CARD,
+  '--arcade-line': ARCADE_LINE,
+  '--arcade-line-soft': ARCADE_LINE_SOFT,
+  '--arcade-focus': ARCADE_FOCUS,
+  '--arcade-grid': ARCADE_GRID,
+  '--arcade-grid-size': ARCADE_GRID_SIZE,
+  '--arcade-key-shadow': ARCADE_KEY_SHADOW,
+  '--arcade-primary-shadow': ARCADE_PRIMARY_SHADOW,
+  '--arcade-card-shadow': ARCADE_CARD_SHADOW,
   '--ui-action-shadow': UI_ACTION_SHADOW,
 };
 

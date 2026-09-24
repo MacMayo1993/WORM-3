@@ -1,15 +1,15 @@
 import ModeArtwork from '../ui/ModeArtwork.jsx';
 import { XpRunSummary } from '../../progression/ProgressWidgets.jsx';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import '../ui/arcadeTheme.css';
 import { VICTORY } from '../../utils/constants.js';
 import {
-  UI_FONT, HEADING_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
-  NIGHT_BACKDROP, NIGHT_BACKDROP_BLUR, NIGHT_PANEL, NIGHT_BORDER,
-  NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_TITLE_SHADOW, NIGHT_SOFT_SHADOW,
- TEXT_XS, TEXT_SM, TEXT_LG, Z } from '../../utils/uiTheme.js';
+  UI_FONT, HEADING_FONT, DISPLAY_FONT, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
+ TEXT_XS, Z,
+  ARCADE_INK, ARCADE_MUTED, ARCADE_CARD, ARCADE_LINE, ARCADE_LINE_SOFT, ARCADE_CARD_SHADOW } from '../../utils/uiTheme.js';
+import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import { computeStars, getLevelPar } from '../../levels/scoring.js';
 import { prefersReducedMotion } from '../../utils/device.js';
-import { ActionButton } from '../ui/Button.jsx';
 
 // ─── Reward beat timings ──────────────────────────────────────────────────────
 // The stars are the payoff for the run, so they arrive one at a time rather than
@@ -65,17 +65,20 @@ const CountUpValue = ({ value, format, style }) => {
 // ─── STEP COMPLETE palette ─────────────────────────────────────────────────────
 // This treatment is now the shared NIGHT family in uiTheme.js; these aliases
 // keep the local names readable while there is a single source of truth.
-const BG_RADIAL = NIGHT_BACKDROP;
-const INK_CREAM = UI_CREAM;
-const GOLD = UI_GOLD;
-const CREAM_SOFT = NIGHT_TEXT;
-const CREAM_MUTED = NIGHT_TEXT_MUTED;
-const GREEN = UI_MOSS;
-const GREEN_LIGHT = UI_MOSS_LIGHT;
-const TITLE_SHADOW = NIGHT_TITLE_SHADOW;
-const SOFT_SHADOW = NIGHT_SOFT_SHADOW;
-const WARM_PANEL = NIGHT_PANEL;
-const WARM_BORDER = NIGHT_BORDER;
+// The celebration wears the mode carousel's arcade look: translucent graph
+// paper over the solved cube, an ivory card, and dark ink. Gold and green are
+// deepened so they still read as text on cream.
+const BG_RADIAL = 'radial-gradient(ellipse at 50% 45%, rgba(255,253,245,0.85), transparent 72%) 0 0 / 100% 100%, '
+  + 'linear-gradient(rgba(207,205,191,0.40) 1px, transparent 1px) 0 0 / 30px 30px, '
+  + 'linear-gradient(90deg, rgba(207,205,191,0.40) 1px, transparent 1px) 0 0 / 30px 30px, rgba(248,244,232,0.84)';
+const INK_CREAM = ARCADE_INK;
+const GOLD = '#a87400';
+const CREAM_SOFT = ARCADE_MUTED;
+const CREAM_MUTED = ARCADE_MUTED;
+const GREEN_LIGHT = '#2f6e2c';
+const TITLE_SHADOW = 'none';
+const WARM_PANEL = '#f7f2e3';
+const WARM_BORDER = ARCADE_LINE_SOFT;
 
 const VictoryScreen = ({
   winType,
@@ -94,7 +97,7 @@ const VictoryScreen = ({
   // Warm celebratory confetti — no neon cyan / magenta.
   // The celebration palette is the shared theme plus three warm accents that
   // exist only here; the tokens carry the ones that are the theme.
-  const CONFETTI_COLORS = [UI_GOLD, UI_MOSS_LIGHT, UI_MOSS, '#e0b25c', '#d98a3d', UI_CREAM, '#c94f3d'];
+  const CONFETTI_COLORS = [UI_GOLD, UI_MOSS_LIGHT, UI_MOSS, '#e0b25c', '#d98a3d', '#2774ad', '#c94f3d'];
   const confettiParticles = useMemo(() => {
     const count = 35;
     return Array.from({ length: count }).map((_, i) => {
@@ -162,17 +165,6 @@ const VictoryScreen = ({
     }
     : (winConfig[winType] || winConfig.rubiks);
 
-  // Shared button styles ----------------------------------------------------
-  // The victory actions are the canonical primary/secondary pair, so they take
-  // <ActionButton> rather than re-declaring the pill a third time. This carries
-  // only what is genuinely local to this screen — the uppercase celebration
-  // lettering — while the surface, hover, press, focus ring and 44px hit area
-  // come from the primitive.
-  const CELEBRATION_TYPE = {
-    fontSize: TEXT_SM,
-    letterSpacing: '0.08em',
-    textTransform: 'none'
-  };
 
   return (
     <div style={{
@@ -180,12 +172,13 @@ const VictoryScreen = ({
       inset: 0,
       height: '100dvh',
       background: BG_RADIAL,
-      backdropFilter: NIGHT_BACKDROP_BLUR,
-      WebkitBackdropFilter: NIGHT_BACKDROP_BLUR,
+      backdropFilter: 'blur(6px)',
+      WebkitBackdropFilter: 'blur(6px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: Z.CELEBRATION,
+      ...arcadeModeVars('cube'),
       animation: 'vsFadeIn 0.45s ease-out',
       padding: 'max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px))',
       boxSizing: 'border-box'
@@ -232,9 +225,14 @@ const VictoryScreen = ({
         maxWidth: '460px',
         width: '92%',
         padding: 'clamp(24px, 5vw, 36px)',
-        maxHeight: 'calc(100dvh - 32px)',
+        maxHeight: 'calc(100dvh - 40px)',
         overflowY: 'auto',
         boxSizing: 'border-box',
+        color: ARCADE_INK,
+        background: ARCADE_CARD,
+        border: `2px solid ${ARCADE_LINE}`,
+        borderRadius: 24,
+        boxShadow: ARCADE_CARD_SHADOW,
         animation: 'vsPanelRise 0.45s cubic-bezier(0.16,1,0.3,1)'
       }}>
         <ModeArtwork mode="success" className="screen-results-art" />
@@ -302,8 +300,8 @@ const VictoryScreen = ({
                     key={i}
                     style={{
                       fontSize: '38px', lineHeight: 1,
-                      color: earned ? GOLD : 'rgba(255,245,220,0.16)',
-                      textShadow: earned ? '0 2px 10px rgba(224,178,92,0.55)' : 'none',
+                      color: earned ? '#f2b705' : ARCADE_LINE_SOFT,
+                      textShadow: earned ? '0 2px 0 #354d3c' : 'none',
                       // Earned stars pop in one at a time; empty sockets are
                       // present from the first frame so the row never reflows.
                       transform: earned ? 'translateY(0)' : 'translateY(2px)',
@@ -376,42 +374,33 @@ const VictoryScreen = ({
           ))}
         </div>
 
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <ActionButton variant="secondary" surface="night" pill onClick={onContinue} style={CELEBRATION_TYPE}>
-            Keep Playing
-          </ActionButton>
-
-          {hasNextLevel && onNextLevel && (
-            <ActionButton variant="primary" surface="night" pill onClick={onNextLevel} style={CELEBRATION_TYPE}>
-              Next Level <span style={{ fontSize: TEXT_LG }}>→</span>
-            </ActionButton>
+        {/* Keys: one primary in the Cube face colour, then ivory keys. */}
+        <div style={{ display: 'grid', gap: '12px', marginTop: '4px' }}>
+          {hasNextLevel && onNextLevel ? (
+            <button type="button" className="arcade-primary" onClick={onNextLevel} style={{ justifyContent: 'space-between', width: '100%' }}>
+              Next level <span aria-hidden="true">→</span>
+            </button>
+          ) : (
+            <button type="button" className="arcade-primary" onClick={onNewGame} style={{ justifyContent: 'space-between', width: '100%' }}>
+              {currentLevel ? 'Retry level' : 'New puzzle'} <span aria-hidden="true">→</span>
+            </button>
           )}
-
-          <ActionButton
-            variant={hasNextLevel ? 'secondary' : 'primary'}
-            surface="night"
-            pill
-            onClick={onNewGame}
-            style={CELEBRATION_TYPE}
-          >
-            {currentLevel ? 'Retry Level' : 'New Puzzle'}
-          </ActionButton>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="button" className="arcade-key" onClick={onContinue} style={{ flex: 1 }}>Keep playing</button>
+            {hasNextLevel && onNextLevel && (
+              <button type="button" className="arcade-key" onClick={onNewGame} style={{ flex: 1 }}>
+                {currentLevel ? 'Retry level' : 'New puzzle'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Main Menu escape hatch */}
         {onMainMenu && (
-          <div style={{ marginTop: '16px' }}>
-            <ActionButton
-              variant="ghost"
-              surface="night"
-              size="sm"
-              onClick={onMainMenu}
-              style={{ fontSize: TEXT_XS, letterSpacing: '0.06em', textTransform: 'none' }}
-            >
-              ← Main Menu
-            </ActionButton>
-          </div>
+          <button type="button" className="arcade-key" onClick={onMainMenu}
+            style={{ marginTop: '14px', border: 0, boxShadow: 'none', background: 'transparent', textDecoration: 'underline', textDecorationColor: ARCADE_LINE, textUnderlineOffset: 4 }}>
+            ← Main menu
+          </button>
         )}
 
 

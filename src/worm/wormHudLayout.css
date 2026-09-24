@@ -149,7 +149,7 @@
 .worm-buffs-detailed p,.worm-signature-guide p { font-size:12px; line-height:1.5; margin:8px 0; color:var(--hud-muted,#ced8d0); }
 .worm-signature-guide { text-align:left; padding:12px 0; font-size:13px; }
 .worm-pause-card .worm-story-card { margin-block:14px; text-align:left; }
-.worm-pause-resume { position:sticky; top:0; z-index:2; width:100%; margin:10px 0 16px; background:#88e59a; color:#122025; font-size:15px; font-weight:800; min-height:48px; }
+.worm-pause-resume { position:sticky; top:0; z-index:2; width:100%; margin:10px 0 18px; justify-content:space-between; }
 .worm-story-briefing { pointer-events:auto; border:1px solid var(--hud-border); border-radius:16px; padding:10px; background:var(--hud-surface); }
 .worm-story-briefing .worm-story-card { max-height:30dvh; overflow:auto; border:0; padding:4px; background:transparent; box-shadow:none; }
 .worm-hud-bottom .worm-story-briefing .worm-story-start { margin-top:10px; }
