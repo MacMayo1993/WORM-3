@@ -34,21 +34,39 @@ export function useRandomMode() {
   const showTutorial = useGameStore(s => s.showTutorial);
   const wormPaused = useGameStore(s => s.wormPaused);
   const wormHealerMode = useGameStore(s => s.wormHealerMode);
+  const wormRunId = useGameStore(s => s.wormRunId);
 
   const inGame = !showMainMenu && !showSettings && !showWelcome && !showTutorial;
 
   const activeRef = useRef(false);
-  activeRef.current = randomMode && inGame && !(wormHealerMode && wormPaused);
+  const active = randomMode && inGame && !(wormHealerMode && wormPaused);
+  activeRef.current = active;
+  const remainingRef = useRef(CYCLE_MS);
+  const runId = wormHealerMode ? wormRunId : null;
+
+  // A new run gets a fresh cycle. A ready card keeps its authored look until
+  // ten seconds of play have elapsed; resuming a pause must not remix at once.
+  useEffect(() => {
+    remainingRef.current = CYCLE_MS;
+    if (!randomMode || !inGame) return;
+    if (activeRef.current) applyRandomStyle();
+  }, [randomMode, inGame, runId]);
 
   useEffect(() => {
-    if (!randomMode || !inGame) return;
+    if (!active) return;
+    let startedAt = performance.now();
+    let id;
+    const remix = () => {
+      remainingRef.current = CYCLE_MS;
+      startedAt = performance.now();
+      applyRandomStyle();
+      id = setTimeout(remix, CYCLE_MS);
+    };
+    id = setTimeout(remix, remainingRef.current);
 
-    if (activeRef.current) applyRandomStyle();
-
-    const id = setInterval(() => {
-      if (activeRef.current) applyRandomStyle();
-    }, CYCLE_MS);
-
-    return () => clearInterval(id);
-  }, [randomMode, inGame]);
+    return () => {
+      clearTimeout(id);
+      remainingRef.current = Math.max(0, remainingRef.current - (performance.now() - startedAt));
+    };
+  }, [active, randomMode, inGame, runId]);
 }

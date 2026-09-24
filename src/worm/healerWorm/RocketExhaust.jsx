@@ -25,7 +25,7 @@ const fragmentShader = `
     varying vec2 vUv;
     void main() {
         float distance = vUv.y;
-        float ripple = sin(distance * 45.0 - uTime * 32.0) * uMotion;
+        float ripple = sin(distance * 30.0 - uTime * 12.0) * uMotion;
         float diamonds = pow(max(0.0, cos(distance * 23.0)), 8.0);
         vec3 blue = vec3(0.18, 0.58, 1.6);
         vec3 gold = vec3(1.7, 0.53, 0.08);
@@ -55,8 +55,8 @@ export default function RocketExhaust({ worm }) {
         group.current.position.copy(tail).addScaledVector(direction, 0.055);
         group.current.quaternion.setFromUnitVectors(axis, direction);
         const throttle = rocketOrbitT(true, worm.rocketT.current, worm.rocketFlight?.current);
-        const pulse = reducedMotion ? 1 : 1 + Math.sin(time.current * 38) * 0.045;
-        group.current.scale.set(0.75 + throttle * 0.25, (0.25 + throttle * 0.95) * pulse, 0.75 + throttle * 0.25);
+        const pulse = reducedMotion ? 1 : 1 + Math.sin(time.current * 10) * 0.02;
+        group.current.scale.set(0.7 + throttle * 0.2, (0.2 + throttle * 0.6) * pulse, 0.7 + throttle * 0.2);
         uniforms.uTime.value = time.current;
         uniforms.uMotion.value = reducedMotion ? 0 : 1;
     });
@@ -68,7 +68,7 @@ export default function RocketExhaust({ worm }) {
         </mesh>
         <mesh position={[0, 0.22, 0]}>
             <coneGeometry args={[0.065, 0.44, 12]} />
-            <meshBasicMaterial color="#c9f6ff" transparent opacity={0.94} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+            <meshBasicMaterial color="#c9f6ff" transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </mesh>
     </group>;
 }

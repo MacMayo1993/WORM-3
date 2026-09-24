@@ -37,3 +37,37 @@ it('retains cached materials, updates a remix atomically, and skips paused story
   expect(updates).toHaveLength(3);
   unsubscribe(); cached.removeEventListener('dispose', disposed);
 });
+
+it('counts only active play time from the ready card and across partial-cycle pauses', () => {
+  vi.useFakeTimers(); globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  useGameStore.setState({ randomMode: true, wormHealerMode: true, wormPaused: true, wormRunId: 100,
+    showMainMenu: false, showSettings: false, showWelcome: false, showTutorial: false });
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  act(() => root.render(<Harness />));
+  const tick = () => useGameStore.getState().randomStyleTick;
+  const initial = tick();
+  const advance = ms => act(() => vi.advanceTimersByTime(ms));
+  const pause = value => act(() => useGameStore.setState({ wormPaused: value }));
+
+  advance(9000); // Ready card time must not use nine seconds of the first cycle.
+  pause(false);
+  expect(tick()).toBe(initial); // No immediate remix/shake on Start.
+  advance(9999); expect(tick()).toBe(initial);
+  advance(1); expect(tick()).toBe(initial + 1);
+
+  advance(6000); pause(true);
+  advance(45000); expect(tick()).toBe(initial + 1);
+  pause(false);
+  advance(3999); expect(tick()).toBe(initial + 1);
+  advance(1); expect(tick()).toBe(initial + 2);
+  advance(10000); expect(tick()).toBe(initial + 3);
+
+  advance(8000); pause(true);
+  act(() => useGameStore.setState({ wormRunId: 101 })); // Retry resets remaining time.
+  advance(29000); pause(false);
+  advance(9999); expect(tick()).toBe(initial + 3);
+  advance(1); expect(tick()).toBe(initial + 4);
+
+  act(() => root.unmount()); root = null;
+  advance(30000); expect(tick()).toBe(initial + 4);
+});

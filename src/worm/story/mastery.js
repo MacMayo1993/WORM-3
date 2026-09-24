@@ -2,8 +2,11 @@ import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { tileKey } from '../healerWorm/wormSim.js';
 import { ttAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING } from '../healerWorm/constants.js';
+import { getNextSurfacePosition } from '../wormLogic.js';
 
 export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning'];
+export const STORY_POWER_OPENING_DELAY = 10;
+export const STORY_POWER_COOLDOWN = 5;
 const HINTS = { rocket: 'Rocket: steer the flight and land', magnet: 'Magnet: pull orbs from neighboring tiles',
   explode: 'Explode: the cube spreads apart for 12 seconds. Keep crawling until it closes',
   water: 'Water: build momentum in a straight line', fire: 'Fire: leave a trail for 3 seconds',
@@ -22,6 +25,12 @@ export function recordStoryMechanic(practice, key, id) {
 }
 export function updateMastery(sim, p, level, delta) {
   if (!level.mechanics || !sim.alive) return;
+  // This clock runs only through active story metrics, so ready cards, pauses
+  // and rescue holds cannot consume the opening window or recovery time.
+  const powerBusy = sim.specials.length > 0 || sim.rocketActive || sim.magnetT > 0 ||
+    sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0;
+  p.powerDelay = powerBusy ? STORY_POWER_COOLDOWN
+    : Math.max(0, (p.powerDelay ?? STORY_POWER_OPENING_DELAY) - Math.min(Math.max(delta, 0), 0.1));
   const safe = sim.phase === 'crawling' && !sim.isJumping && !sim.rocketActive;
   if (sim.boostActiveT > 0) p.boosting = true;
   else if (p.boosting && sim.phase === 'crawling') { add(p, 'boosts'); p.boosting = false; }
@@ -56,14 +65,16 @@ export function updateMastery(sim, p, level, delta) {
 export function nextStoryPower(p, level) {
   const m = level.mechanics;
   if (!m) return null;
-  if ((p.mechanics.rockets ?? 0) < (m.rockets ?? 0)) return 'rocket';
   if ((p.mechanics.magnetOrbs ?? 0) < (m.magnetOrbs ?? 0)) return 'magnet';
-  if ((p.mechanics.explodes ?? 0) < (m.explodes ?? 0)) return 'explode';
   if (m.elementPickups) {
     const collected = p.mechanics.elementPickups ?? 0;
-    return collected < m.elementPickups ? STORY_ELEMENTS[collected % STORY_ELEMENTS.length] : null;
+    if (collected < m.elementPickups) return STORY_ELEMENTS[collected % STORY_ELEMENTS.length];
   }
-  return m.elements ? STORY_ELEMENTS.slice(0, m.elements).find(type => !p.elements.has(type)) ?? null : null;
+  const element = m.elements && STORY_ELEMENTS.slice(0, m.elements).find(type => !p.elements.has(type));
+  if (element) return element;
+  if ((p.mechanics.explodes ?? 0) < (m.explodes ?? 0)) return 'explode';
+  if ((p.mechanics.rockets ?? 0) < (m.rockets ?? 0)) return 'rocket';
+  return null;
 }
 export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
   const { x, y, z, dirKey } = sim.pos;
@@ -88,13 +99,29 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
 // only while remote catches are still outstanding.
 export function offerStoryPower(sim, p, level, size, cubies) {
   const type = nextStoryPower(p, level);
-  p.powerHint = type ? (level.mechanics?.elementPickups ? 'Steer onto the marked elemental orb to collect it' : HINTS[type]) : null;
+  const displayedType = sim.specials[0]?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
+    : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : null);
+  const hint = offered => level.mechanics?.elementPickups && STORY_ELEMENTS.includes(offered)
+    ? 'Steer onto the marked elemental orb to collect it' : HINTS[offered];
+  p.powerHint = displayedType ? hint(displayedType) : null;
   if (!type || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
+  if ((p.powerDelay ?? STORY_POWER_OPENING_DELAY) > 0) return false;
   const occupied = new Set(sim.powerups.map(tileKey));
+  occupied.add(tileKey(sim.pos));
+  // A pickup is a deliberate turn, never a surprise on the next straight steps.
+  // Follow the surface across seams too, rather than checking one grid axis.
+  let ahead = sim.pos, heading = sim.moveDir;
+  for (let i = 0; i < 3; i++) {
+    ahead = getNextSurfacePosition(ahead, heading, size);
+    if (!ahead) break;
+    occupied.add(tileKey(ahead)); heading = ahead.moveDir;
+  }
   for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
   const tile = storySurfaceTile(sim, size, cubies, occupied);
   if (!tile) return false;
   sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: 20, maxTtl: 20 }];
+  p.powerDelay = STORY_POWER_COOLDOWN;
+  p.powerHint = hint(type);
   if (type === 'magnet') {
     let added = 0;
     for (const nearby of getAllSurfaceTiles(size)) {

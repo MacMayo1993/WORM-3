@@ -115,9 +115,11 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
     }
   });
 
-  it('offers its first power at the start, or as soon as the head’s face has room', () => {
+  it('keeps the opening clear and offers a required power after the delay when there is room', () => {
     const { size, sim, staged } = stage(level);
+    expect(sim.specials).toHaveLength(0);
     if (!nextStoryPower(staged, level)) return;
+    staged.powerDelay = 0; // Opening clock is exercised in storyPowerPacing.test.js.
     if (!sim.specials.length) {
       // Offers retry every tick; eating the orbs around the head frees a tile.
       sim.powerups = sim.powerups.filter(orb => orb.dirKey !== sim.pos.dirKey);
@@ -138,7 +140,7 @@ describe('explode mechanic', () => {
   it('counts one explosion only after the cube closes with the worm crawling on it', () => {
     const level = storyLevel(18), { sim, staged } = stage(level);
     expect(nextStoryPower(staged, level)).toBe('explode');
-    expect(sim.specials[0].type).toBe('explode');
+    expect(sim.specials).toHaveLength(0);
     sim.explodeT = 5; sim.expansionAmount = 0.35;
     updateMastery(sim, staged, level, 0.1);
     sim.explodeT = 0; updateMastery(sim, staged, level, 0.1);

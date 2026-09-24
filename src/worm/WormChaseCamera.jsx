@@ -391,7 +391,7 @@ export default function WormChaseCamera({ worm, size }) {
             : phase === 'exiting' ? 1 - diveEase((_enterP - 0.5) / 0.5)
             : 0;
         const rocketLift = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
-        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 16, tunnelMix) + rocketLift * 7;
+        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 16, tunnelMix) + rocketLift * 2;
         const fovAlpha = 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -563,9 +563,9 @@ export default function WormChaseCamera({ worm, size }) {
             // Camera: behind worm (opposite of forward) + above face (along normal),
             // pitched down by the portrait rake on narrow viewports.
             _camTargetCam.copy(_camWormWorld)
-                .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 - 0.24 * rocketLift))
-                .addScaledVector(_camForward, -camBack * rakeTuck - rocketLift * 0.6);
-            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead + rocketLift * 0.9);
+                .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 + 0.12 * rocketLift))
+                .addScaledVector(_camForward, -camBack * rakeTuck - rocketLift * 0.9);
+            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead + rocketLift * 0.35);
             // Mobile follows the player on every board size. A center bias grows
             // with the board and used to pull Mega's head out of the viewport.
             if (mobile) _camTargetLook.copy(_mobileHeadWorld);
@@ -668,7 +668,7 @@ export default function WormChaseCamera({ worm, size }) {
 
             // Exponential damping has the same response at 30/60/120 Hz.
             // Linear dt gains made Mega's fluctuating frame times change the drag.
-            const alpha = 1 - Math.exp(-crawlK * (1 + rocketLift * 0.6) * delta);
+            const alpha = 1 - Math.exp(-crawlK * delta);
             camPosRef.current.lerp(_camTargetCam, alpha);
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);

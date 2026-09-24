@@ -187,16 +187,21 @@ it.each([2, 5, 6])('can collect the resources and heal every authored pair for l
   if (id === 6) expect(state().wormStoryResult).toBeNull(); // turns + 30 orbs still required
 });
 
-it('collects a real authored rocket, lands before credit, then offers a magnet', () => {
+it('offers a magnet after the opening, then a rocket after the magnet recovery window', () => {
   act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [i+1, 1])), claimed: {} } } }));
   begin(7);
   expect(state().wormEnemiesEnabled).toBe(false);
-  const rocket = state().wormSpecials[0]; expect(rocket.type).toBe('rocket');
+  expect(state().wormSpecials).toHaveLength(0);
+  travelUntil(() => state().wormSpecials.length > 0);
+  const magnet = state().wormSpecials[0]; expect(magnet.type).toBe('magnet');
+  seek(magnet, () => worm.magnetT.current > 0);
+  travelUntil(() => state().wormSpecials.some(p => p.type === 'rocket'));
+  const rocket = state().wormSpecials.find(p => p.type === 'rocket');
   seek(rocket, () => state().wormRocketActive);
   expect(state().wormStoryResult).toBeNull();
   travelUntil(() => !state().wormRocketActive);
   frame();
-  expect(state().wormSpecials[0].type).toBe('magnet');
+  expect(state().wormSpecials).toHaveLength(0);
   expect(state().wormStoryResult).toBeNull();
 });
 it('enables Story enemies independently of the Free Play option and rejects stale bomb events', () => {
