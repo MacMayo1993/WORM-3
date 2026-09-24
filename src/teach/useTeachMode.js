@@ -66,6 +66,7 @@ export function useTeachMode() {
   // Core state
   const [active, setActive] = useState(false);
   const [courseActive, setCourseActive] = useState(false);
+  const [courseResume, setCourseResume] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [selectedAlgo, setSelectedAlgo] = useState(null); // { stageIndex, algoIndex }
   const [algoMoves, setAlgoMoves] = useState([]);
@@ -125,6 +126,7 @@ export function useTeachMode() {
   const enterTeachMode = useCallback((options = {}) => {
     if (useGameStore.getState().size !== 3) return;
     setCourseActive(!!options.course);
+    setCourseResume(!!options.resume);
     useGameStore.setState({ teachCourseActive: !!options.course });
     setActive(true);
     useGameStore.getState().setTeachModeActive(true);
@@ -367,6 +369,7 @@ export function useTeachMode() {
     // Core state
     active,
     courseActive,
+    courseResume,
     setLayerHighlight,
     analysis,
     selectedAlgo,

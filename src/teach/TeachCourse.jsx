@@ -3,13 +3,15 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { checkRubiksSolvedRotationInvariant } from '../game/winDetection.js';
 import { parseAlgorithm } from './algorithms.js';
 import { TEACH_LESSONS, FULL_SOLVE, COURSE_STORAGE_KEY, readCourseProgress, prepareLesson, courseSignature, courseHome, inspectCourseStage } from './course.js';
+import { ArcadeHeader, ArcadeAction, ArcadeArtwork } from '../components/ui/ArcadeChrome.jsx';
+import { MODE_THEMES } from '../utils/modeThemes.js';
 import './teachCourse.css';
 
 const LESSONS = [...TEACH_LESSONS, FULL_SOLVE];
 const TOKENS = ['U', "U'", 'U2', 'R', "R'", 'R2', 'F', "F'", 'F2', 'L', "L'", 'L2', 'D', "D'", 'D2', 'B', "B'", 'B2'];
 const HOME = courseSignature(courseHome());
 
-export default function TeachCourse({ onClose, onHighlight, onPuzzles }) {
+export default function TeachCourse({ onClose, onHighlight, onPuzzles, autoStart = false }) {
   const [completed, setCompleted] = useState(readCourseProgress);
   const [index, setIndex] = useState(() => Math.max(0, LESSONS.findIndex(l => !readCourseProgress().includes(l.id))));
   const [map, setMap] = useState(true);
@@ -49,6 +51,14 @@ export default function TeachCourse({ onClose, onHighlight, onPuzzles }) {
     useGameStore.setState({ cubies: p.frames[0], rotationEpoch: s.rotationEpoch + 1, lastRotation: null,
       pendingMove: null, victory: null, hasShuffled: false, moves: 0, solveHighlights: [] });
   }, []);
+
+  const pendingAutoStart = useRef(autoStart);
+  useEffect(() => {
+    if (pendingAutoStart.current && !anim) {
+      pendingAutoStart.current = false;
+      load(index);
+    }
+  }, [anim, index, load]);
 
   // Confirm the committed board, never the click or the start of an animation.
   useEffect(() => {
@@ -125,18 +135,23 @@ export default function TeachCourse({ onClose, onHighlight, onPuzzles }) {
   };
   const exit = () => { setPlaying(false); useGameStore.getState().clearAnimation(); onHighlight(null); onClose(); };
 
-  return <section className={`teach-course ${map ? 'teach-course-map' : ''} ${compact ? 'teach-course-compact' : ''}`} aria-label="Teach mode">
-    <header><div><small>TEACH · 3×3</small><h1>{map ? 'Learn to solve a cube' : lesson.title}</h1></div>
-      <button aria-label="Exit Teach mode" onClick={exit}>×</button></header>
-    {map ? <>
-      <p>Learn a complete beginner method. Watch a prepared case, practice its turns, then solve independently.</p>
-      <p className="teach-progress">{completed.length} / {LESSONS.length} practiced · No timer</p>
-      <div className="teach-lesson-list">{LESSONS.map((l, i) => <button key={l.id} onClick={() => load(i)} disabled={!!anim}>
-        <span>{completed.includes(l.id) ? '✓' : String(i + 1).padStart(2, '0')}</span><div><small>{l.chapter}</small><strong>{l.title}</strong></div><span>→</span>
-      </button>)}</div>
-      <button className="teach-primary" disabled={!!anim} onClick={() => load(index)}>Continue learning</button>
-      <button disabled={!!anim} onClick={() => { exit(); onPuzzles(); }}>Cube puzzle campaigns</button>
-    </> : <>
+  return <section className={`teach-course ${map ? 'teach-course-map arcade-paper' : ''} ${compact ? 'teach-course-compact' : ''}`} aria-label="Teach mode" style={{ '--mode-accent': MODE_THEMES.teach.accent, '--mode-shadow': MODE_THEMES.teach.shadow }}>
+    {map ? <div className="teach-map-shell">
+      <ArcadeHeader onHome={exit} />
+      <nav className="teach-map-heading"><button className="arcade-icon-button" aria-label="Exit Teach mode" onClick={exit}>←</button><h1>Teach</h1></nav>
+      <div className="teach-map-scroll">
+        <div className="teach-map-hero"><ArcadeArtwork mode="teach" /><div><h2>Learn to solve</h2><p>Watch. Practice. Try it yourself.</p></div></div>
+        <p className="teach-progress">{completed.length} / {LESSONS.length} practiced · No timer</p>
+        <div className="teach-lesson-list">{LESSONS.map((l, i) => <button key={l.id} onClick={() => load(i)} disabled={!!anim}>
+          <span>{completed.includes(l.id) ? '✓' : String(i + 1).padStart(2, '0')}</span><div><small>{l.chapter}</small><strong>{l.title}</strong></div><span>→</span>
+        </button>)}</div>
+      </div>
+      <footer className="teach-map-footer">
+        <ArcadeAction disabled={!!anim} onClick={() => load(index)}>{completed.length ? 'Continue lesson' : 'Start learning'}</ArcadeAction>
+        <button className="arcade-link" disabled={!!anim} onClick={() => { exit(); onPuzzles(); }}>Cube puzzle campaigns</button>
+      </footer>
+    </div> : <>
+      <header><div><small>TEACH · 3×3</small><h1>{lesson.title}</h1></div><button aria-label="Exit Teach mode" onClick={exit}>×</button></header>
       <nav><button disabled={!!anim} onClick={() => { setPlaying(false); setMap(true); }}>← Lessons</button>
         <button onClick={() => setCompact(!compact)}>{compact ? 'Show explanation' : 'Focus on cube'}</button></nav>
       <div className="teach-explanation"><small>{lesson.chapter}</small><p><strong>{lesson.goal}</strong></p><p>{lesson.notice}</p>

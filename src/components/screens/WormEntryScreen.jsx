@@ -1,6 +1,6 @@
 import { wizardPaperBackground } from './WizardChrome.jsx';
-import WormWordmark from '../branding/WormWordmark.jsx';
-import WormPathArtwork from '../ui/WormPathArtwork.jsx';
+import { ArcadeHeader, ArcadeAction, ArcadeArtwork } from '../ui/ArcadeChrome.jsx';
+import './wormReady.css';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { WORM_STORY_CHAPTERS, nextStoryLevel, storyStars, storyUnlocked, storyChecklist, storyChapter, storyLaunchSettings } from '../../worm/story/levels.js';
@@ -17,14 +17,17 @@ import './modeWizard.css';
 import './wormStory.css';
 const FreePlaySetup = React.lazy(() => import('./WormModeSetupWizard.jsx'));
 
-export default function WormEntryScreen({ onComplete, onCancel, initialSettings, initialPage = 'choice' }) {
+export default function WormEntryScreen({ onComplete, onCancel, initialSettings, initialPage = 'choice', onSettings }) {
   const [page, setPage] = useState(initialPage);
+  const [path, setPath] = useState('levels');
   const progress = useGameStore(s => s.playerProgress);
   const wormSkin = useGameStore(s => s.wormSkin);
+  const settingsOpen = useGameStore(s => s.showSettings);
   const [selected, setSelected] = useState(() => nextStoryLevel(progress).id);
   const root = useRef(null);
   const back = () => { wormMenuFeedback(); if (page === 'choice') onCancel(); else setPage('choice'); };
   useEffect(() => {
+    if (settingsOpen) return;
     const prior = document.activeElement;
     root.current?.querySelector('button')?.focus();
     const key = e => {
@@ -38,7 +41,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
     };
     window.addEventListener('keydown', key, true);
     return () => { window.removeEventListener('keydown', key, true); prior?.focus?.(); };
-  }, [page, onCancel]);
+  }, [page, onCancel, settingsOpen]);
   if (page === 'free') return <Suspense fallback={<div className="worm-story-loading" role="status">Loading…</div>}><FreePlaySetup onComplete={onComplete} onCancel={() => setPage('choice')} initialSettings={initialSettings} /></Suspense>;
   const chapter = storyChapter(selected);
   const level = chapter.levels.find(item => item.id === selected);
@@ -48,23 +51,42 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   const openChapter = next => { wormMenuFeedback(); setSelected((next.levels.find(item => storyUnlocked(progress, item.id) && !storyStars(progress, item.id)) ?? next.levels[0]).id); };
   const launch = () => { wormMenuFeedback(); onComplete({ ...initialSettings, ...storyAppearance(level.id), perFaceStyles: STORY_WORLDS[level.id].styles,
     wormColor: getSkin(wormSkin).body, ...storyLaunchSettings(level) }); };
-  return <div ref={root} className={`mode-wizard worm-entry${page === 'choice' ? ' worm-entry-choice' : ''}`} role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
+  const theme = { '--mode-accent': MODE_THEMES.worm.accent, '--mode-shadow': MODE_THEMES.worm.shadow, zIndex: Z.MODAL };
+  if (page === 'choice') return <section ref={root} className="worm-ready arcade-paper" role="dialog" aria-modal="true" aria-labelledby="worm-entry-title" style={theme}>
+    <div className="worm-ready-shell">
+      <ArcadeHeader onSettings={onSettings} />
+      <nav className="worm-ready-heading"><button className="arcade-icon-button" onClick={back} aria-label="Back to modes">←</button><h1 id="worm-entry-title">WORM</h1></nav>
+      <div className="worm-ready-content">
+      <div className="worm-ready-hero"><ArcadeArtwork mode="worm" /></div>
+      <div className="worm-ready-tabs" role="tablist" aria-label="WORM play style">
+        {['levels', 'free'].map(value => <button key={value} role="tab" id={`worm-${value}-tab`} aria-selected={path === value} aria-controls="worm-ready-panel" tabIndex={path === value ? 0 : -1}
+          onClick={() => { wormMenuFeedback(); setPath(value); }} onKeyDown={e => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) { e.preventDefault(); const target = e.key === 'Home' ? 'levels' : e.key === 'End' ? 'free' : path === 'levels' ? 'free' : 'levels'; setPath(target); document.getElementById(`worm-${target}-tab`)?.focus(); } }}>
+          {value === 'levels' ? 'Levels' : 'Free Play'}
+        </button>)}
+      </div>
+      <div className="worm-ready-objective" id="worm-ready-panel" role="tabpanel" aria-labelledby={`worm-${path}-tab`}>
+        <strong>{path === 'levels' ? `Level ${level.id}` : 'Free Play'}</strong>
+        <span>{path === 'levels' ? level.goal : 'Choose your cube, style, and challenge.'}</span>
+      </div>
+      <div className="worm-ready-options">
+        <div className="worm-ready-look" aria-label={`Level world: ${STORY_WORLDS[level.id].name}`}><img src={`${import.meta.env.BASE_URL}images/arcade/cube.webp`} alt="" width="60" height="60" /><div><small>{path === 'levels' ? STORY_WORLDS[level.id].name : 'Your next adventure'}</small><span>{path === 'levels' ? `${size}×${size} · ${Math.floor(level.limit / 60)}:${String(level.limit % 60).padStart(2, '0')} to finish` : 'No level objectives'}</span></div></div>
+        <button className="arcade-link" onClick={() => { wormMenuFeedback(); setPage('customize'); }}>Customize</button>
+      </div>
+      </div>
+      <footer className="worm-ready-footer">
+        <ArcadeAction onClick={path === 'levels' ? launch : () => { wormMenuFeedback(); setPage('free'); }}>{path === 'levels' ? 'Start level' : 'Set up Free Play'}</ArcadeAction>
+        <button className="arcade-link" onClick={() => { wormMenuFeedback(); setPage('story'); }}>All levels</button>
+      </footer>
+    </div>
+  </section>;
+  return <div ref={root} className="mode-wizard worm-entry" role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
     style={{ '--mode-accent': MODE_THEMES.worm.accent, '--mode-ink': MODE_THEMES.worm.shadow, '--story-display': HEADING_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
     <div className="worm-entry-sheet" style={wizardPaperBackground}>
-      <nav className="worm-entry-nav"><button onClick={back} aria-label={page === 'choice' ? 'Back to modes' : 'Back to WORM choices'}>← Back</button><span><WormWordmark inline /></span></nav>
+      <div className="worm-entry-brand"><ArcadeHeader onSettings={onSettings} /></div>
+      <nav className="worm-entry-nav"><button onClick={back} aria-label="Back to WORM choices">← Back</button><span>WORM</span></nav>
       <div className="worm-entry-scroll">
-        {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><h1 id="worm-entry-title">Levels</h1></header>}
-        {page === 'choice' ? <>
-          <div className="worm-path-split">
-            <button className="worm-path-card worm-path-story" aria-label="Levels" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
-              <WormPathArtwork levels /><span className="worm-path-cta">Levels <b aria-hidden="true">→</b></span>
-            </button>
-            <button className="worm-path-card worm-path-free" aria-label="Free Play" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
-              <WormPathArtwork /><span className="worm-path-cta">Free Play <b aria-hidden="true">→</b></span>
-            </button>
-          </div>
-          <WormProfile />
-        </> : <>
+        <header className="worm-entry-heading"><h1 id="worm-entry-title">{page === 'customize' ? 'Your worm' : 'Levels'}</h1></header>
+        {page === 'customize' ? <WormProfile defaultExpanded /> : <>
           <div className="worm-chapter-tabs" role="group" aria-label="Chapters">{WORM_STORY_CHAPTERS.map(item => {
             const open = storyUnlocked(progress, item.levels[0].id);
             const stars = item.levels.reduce((n, l) => n + storyStars(progress, l.id), 0);

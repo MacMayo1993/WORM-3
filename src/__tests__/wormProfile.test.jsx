@@ -67,32 +67,34 @@ it('keeps locked items visible without equipping them or playing a confirmation 
   }
 });
 
-it.each(['Levels →', 'Free Play →'])('launches %s with the shared profile instead of stale setup equipment', async path => {
+it.each(['Levels', 'Free Play'])('launches %s with the shared profile instead of stale setup equipment', async path => {
   const complete = vi.fn(settings => state().initWormMode(9999, 0, settings.wormSpeed, settings.wormOrbCount,
     settings.wormholeInterval, settings.wormColor, false, settings.wormEnemiesEnabled, settings.storyLevel ?? null));
   act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={vi.fn()}
     initialSettings={{ wormColor: '#123456', wormCharacter: 'classic', wormSkin: 'slime' }} />));
-  const split = host.querySelector('.worm-path-split');
-  expect(split.nextElementSibling.classList.contains('worm-profile')).toBe(true);
-  click('Customize ✎'); click('Book Worm'); click('Color'); click('Royal'); click('Hats'); click('Crown');
-  await act(async () => { button(path).click(); await import('../components/screens/WormModeSetupWizard.jsx'); });
+  expect(host.querySelector('.worm-ready')).not.toBeNull();
+  click('Customize'); click('Book Worm'); click('Color'); click('Royal'); click('Hats'); click('Crown');
   expect(preview()).toBe('book/royal/crown');
-  if (path.startsWith('Levels')) click('Play level →');
+  click('Back to WORM choices');
+  if (path === 'Levels') click('Start level');
   else {
+    click('Free Play');
+    await act(async () => { button('Set up Free Play').click(); await import('../components/screens/WormModeSetupWizard.jsx'); });
+    expect(preview()).toBe('book/royal/crown');
     // Editing within Free Play must also update the shared profile.
     click('Classic');
     click('Gameplay'); click('Start Playing');
   }
   expect(complete).toHaveBeenCalledWith(expect.objectContaining({ wormColor: '#a855f7' }));
   expect(state().wormCharacter).toBe(path.startsWith('Levels') ? 'book' : 'classic');
-  if (path.startsWith('FREE')) expect(state().xpRun.character).toBe('classic');
+  if (path === 'Free Play') expect(state().xpRun.character).toBe('classic');
   expect(state().wormSkin).toBe('royal'); expect(state().wormHat).toBe('crown');
   expect(state().wormColor).toBe('#a855f7');
 });
 
 it('emits one tactile cue per activation and wraps focus around the expanded selector', () => {
   act(() => root.render(<WormEntryScreen onComplete={vi.fn()} onCancel={vi.fn()} />));
-  click('Customize ✎');
+  click('Customize');
   expect(feel).toHaveBeenCalledExactlyOnceWith('uiKey');
   vi.clearAllMocks(); click('Book Worm');
   expect(feel).toHaveBeenCalledExactlyOnceWith('uiKey');
