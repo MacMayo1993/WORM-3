@@ -14,7 +14,7 @@
 
 import { getNextSurfacePosition, getWormholeHealRing } from '../wormLogic.js';
 import { ttAt } from '../circularBuffers.js';
-import { BODY_BALL_SPACING } from './constants.js';
+import { bodyCoverageCount } from './bodyCoverage.js';
 
 // ─── Tuning ──────────────────────────────────────────────────────────────────
 export const BOMB_FUSE_SECONDS = 5; // countdown from spawn to detonation
@@ -124,15 +124,15 @@ export function isBombDisarmed(bomb, occupiedKeys, size) {
  * @param {Set<string>} blastKeys - tile keys the blast covers
  * @returns {{type:'death'} | {type:'cut', cutTrailIdx:number} | null}
  */
-export function checkBlastHitWorm(worm, blastKeys) {
+export function checkBlastHitWorm(worm, blastKeys, size = 5) {
   // A rocket-boosting worm barrels through hazards untouched, same as the slice check.
   if (worm.rocketActive?.current) return null;
   const trail = worm.tileTrail?.current;
   if (!trail || trail.count === 0 || !blastKeys || blastKeys.size === 0) return null;
 
   const airborne = worm.isJumping?.current || (worm.landingGraceT?.current ?? 0) > 0;
-  const activeTiles = Math.max(1, Math.ceil((worm.tailLength?.current ?? 1) * BODY_BALL_SPACING));
-  const bodyEnd = Math.min(activeTiles, trail.count);
+  const bodyEnd = bodyCoverageCount(worm.tailLength?.current ?? 1, trail.count,
+    size, worm.expansionAmount?.current ?? 0);
 
   // Head kills first (only when grounded — a jump clears the blast).
   if (!airborne && blastKeys.has(ttAt(trail, 0))) return { type: 'death' };

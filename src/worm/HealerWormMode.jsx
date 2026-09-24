@@ -1,6 +1,7 @@
 import { holdsRotationTimer } from './characterAbilities.js';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { storySurfaceTile } from './story/mastery.js';
+import { bodyCoverageCount } from './healerWorm/bodyCoverage.js';
 import { storyLevel, storyRotationCycle } from './story/levels.js';
 import { combatBridge } from './combat/portalCombat.js';
 import CombatScene from './combat/CombatScene.jsx';
@@ -42,7 +43,6 @@ import {
     BASE_TAIL_LENGTH,
     BODY_BALL_SPACING,
     CUT_FOCUS_DURATION,
-    MAX_TAIL,
 } from './healerWorm/constants.js';
 import { shPush, ttAt } from './circularBuffers.js';
 import { feel, setFeelEnabled } from '../utils/feel.js';
@@ -405,8 +405,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // Tiles the visible body currently covers — the same reach the wormhole
             // ring-heal uses, so surrounding a bomb reads identically to sealing a hole.
             const trail = worm.tileTrail.current;
-            const bodyReach = Math.min(MAX_TAIL, worm.tailLength.current) * BODY_BALL_SPACING;
-            const occupiedCount = Math.min(trail.count, Math.max(1, Math.ceil(bodyReach)));
+            const occupiedCount = bodyCoverageCount(worm.tailLength.current, trail.count, size, worm.expansionAmount.current);
             // Reused across frames: a long worm rebuilds this every frame for the
             // whole run, and a fresh Set per frame is garbage the collector has to
             // come back for mid-crawl. Cleared and refilled instead.
@@ -506,7 +505,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     for (const key of keys) {
                         if (isHotTile(worm.elementalPatches.current, key)) keys.delete(key);
                     }
-                    const hit = checkBlastHitWorm(worm, keys);
+                    const hit = checkBlastHitWorm(worm, keys, size);
                     if (hit) {
                         const histEntry = hit.type === 'cut'
                             ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)

@@ -115,3 +115,20 @@ describe('checkBlastHitWorm', () => {
     expect(checkBlastHitWorm(worm, new Set(['9,9,9,PZ']))).toBeNull();
   });
 });
+
+it('does not disarm or hit a bomb using logical cells beyond the expanded visible body', async () => {
+  const { bodyCoverageCount } = await import('../worm/healerWorm/bodyCoverage.js');
+  const ring = [...bombDisarmRing({ tile: CENTER }, SIZE)];
+  const worm = makeWorm({ buf: ring, tailLength: 88 });
+  const covered = amount => new Set(ring.slice(0, bodyCoverageCount(88, ring.length, SIZE, amount)));
+  expect(isBombDisarmed({ tile: CENTER }, covered(0), SIZE)).toBe(true);
+  expect(isBombDisarmed({ tile: CENTER }, covered(0.35), SIZE)).toBe(false);
+  // tileTrail starts at head=0 and walks backwards around the circular buffer.
+  const trail = worm.tileTrail.current;
+  const { ttAt } = await import('../worm/circularBuffers.js');
+  const oldTailTile = ttAt(trail, 7);
+  expect(checkBlastHitWorm(worm, new Set([oldTailTile]), SIZE)?.type).toBe('cut');
+  worm.expansionAmount = { current: 0.35 };
+  expect(checkBlastHitWorm(worm, new Set([oldTailTile]), SIZE)).toBeNull();
+  expect(checkBlastHitWorm(worm, new Set([ttAt(trail, 0)]), SIZE)?.type).toBe('death');
+});

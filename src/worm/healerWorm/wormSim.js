@@ -1,6 +1,7 @@
 import { tickExpansion } from './expansion.js';
 import { EXPLODE_DURATION } from '../wormExpansion.js';
-import { cubeGridIndex, cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
+import { cubeGridIndex } from '../../game/cubeWorldGeometry.js';
+import { bodyCoverageCount } from './bodyCoverage.js';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { makeSignature, activateSignature, tickSignature, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
 import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
@@ -968,13 +969,11 @@ function tryWormholeRingHeal(sim, size, ctx) {
     }
     if (tunnels.length === 0) return false;
     _ringOccupied.clear();
-    const bodyReach = Math.min(MAX_TAIL, sim.tailLength) * BODY_BALL_SPACING;
     // Bead count/spacing stay fixed while Explode increases the distance between
     // cells. Convert physical reach back to lattice steps at the CURRENT amount,
     // including opening/closing, before counting the trail prefix. The count
     // already includes index 0 (the head); older logical visits are not coverage.
-    const cellStride = cubeExpansionScale(size, sim.expansionAmount);
-    const occupiedCount = Math.min(sim.tileTrail.count, Math.max(1, Math.ceil(bodyReach / cellStride)));
+    const occupiedCount = bodyCoverageCount(sim.tailLength, sim.tileTrail.count, size, sim.expansionAmount);
     for (let i = 0; i < occupiedCount; i++) _ringOccupied.add(ttAt(sim.tileTrail, i));
     const hit = findCoveredWormholeRing(tunnels, _ringOccupied, size);
     if (!hit || (hit.tunnelKey && sim.ringHealedTunnelKeys.has(hit.tunnelKey))) return false;
