@@ -27,6 +27,8 @@ import {
   SPECIAL_SPAWN_RETRY,
   ROCKET_DURATION,
   ROCKET_SPEED_MULT,
+  ROCKET_FLIGHT_TAKEOFF,
+  ROCKET_FLIGHT_LANDING,
   MAGNET_DURATION,
   SURFACE_JUMP_HEIGHT,
   SURFACE_JUMP_TILE_SPAN,
@@ -926,11 +928,22 @@ describe('spawn placement in the sim', () => {
 // ─── Rocket overdrive ────────────────────────────────────────────────────────
 
 describe('rocket overdrive', () => {
-  it('runs at double its former speed and clearly outruns boost', () => {
-    expect(ROCKET_SPEED_MULT).toBe(4);
+  it('keeps flight below double crawl speed for readable steering', () => {
+    expect(ROCKET_SPEED_MULT).toBeGreaterThan(1);
+    expect(ROCKET_SPEED_MULT).toBeLessThan(2);
   });
 
-  it('runs on the surface for three seconds and publishes one start/end pair', () => {
+  it('caps actual flight speed even when a boost was active at pickup', () => {
+    const sim = makeSim(), ctx = makeCtx({ getSpeed: () => 3.5 });
+    sim.boostActiveT = 3;
+    startRocket(sim, ctx);
+    for (let frame = 0; frame < 120; frame++) {
+      stepWormSim(sim, 1 / 60, SIZE, ctx);
+      expect(1 / sim.prevStepSec).toBeLessThanOrEqual(3.5 * ROCKET_SPEED_MULT + 1e-8);
+    }
+  });
+
+  it('runs for its full flight duration and publishes one start/end pair', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     startRocket(sim, ctx);
@@ -1141,21 +1154,21 @@ describe('rocket launch, refresh and touchdown continuity', () => {
     run(sim, ctx, ROCKET_DURATION / 2 - 0.1);
     expect(sim.rocketFlight).toBeCloseTo(1, 5);
   });
-  it('launches quickly, sustains cruise, and eases down only before touchdown', () => {
+  it('launches gradually, sustains cruise, and eases down only before touchdown', () => {
     const sim = makeSim(), ctx = makeCtx();
     startRocket(sim, ctx);
     run(sim, ctx, 0.15);
     const rising = rocketFlightLift(true, sim.rocketT, sim.rocketFlight);
     expect(rising).toBeGreaterThan(0);
     expect(rising).toBeLessThan(ROCKET_FLIGHT_HEIGHT);
-    run(sim, ctx, 0.35);
+    run(sim, ctx, ROCKET_FLIGHT_TAKEOFF - 0.15);
     expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeCloseTo(ROCKET_FLIGHT_HEIGHT);
-    run(sim, ctx, 1.8);
+    run(sim, ctx, ROCKET_DURATION - ROCKET_FLIGHT_TAKEOFF - ROCKET_FLIGHT_LANDING - 0.1);
     expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeCloseTo(ROCKET_FLIGHT_HEIGHT);
-    run(sim, ctx, 0.45);
+    run(sim, ctx, ROCKET_FLIGHT_LANDING / 2 + 0.1);
     expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeLessThan(ROCKET_FLIGHT_HEIGHT);
     expect(sim.rocketActive).toBe(true);
-    run(sim, ctx, 0.3);
+    run(sim, ctx, ROCKET_FLIGHT_LANDING / 2 + 0.1);
     expect(rocketFlightLift(sim.rocketActive, sim.rocketT, sim.rocketFlight)).toBe(0);
   });
   it('refreshes fuel without resetting altitude, including during descent', () => {

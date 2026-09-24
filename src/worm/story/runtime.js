@@ -1,6 +1,6 @@
 import { characterOrbCount } from '../characterAbilities.js';
 import { randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
-import { updateMastery, offerStoryPower } from './mastery.js';
+import { updateMastery, STORY_POWER_OPENING_DELAY } from './mastery.js';
 import * as THREE from 'three';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
@@ -141,9 +141,9 @@ export function stageStory(sim, size, level, character) {
     sim.powerups.push({ ...tile, type: 'apple' });
   }
   sim.specials = [];
-  const practice = { ...base, elapsed: 0, cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
+  const practice = { ...base, elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null,
+    cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), elementTime: 0, powerSeq: 0, bombIds: new Set() };
-  offerStoryPower(sim, practice, level, size, base.cubies);
   return practice;
 }
 

@@ -237,7 +237,7 @@ export function makeWormSim(size) {
         elementalSpawnTimer: ELEMENTAL_SPAWN_INTERVAL, // own clock for the elemental offering
         specialSeq: 0,            // monotonic id source for spawned specials
         specialPicker: makeSpecialPicker(),
-        rocketActive: false,      // protected three-second overdrive
+        rocketActive: false,      // protected flight with gradual takeoff/landing
         rocketT: 0,
         rocketFlight: 0, // launch/landing progress, independent of refreshed fuel
         magnetT: 0,               // seconds of magnet reach remaining
@@ -2091,7 +2091,8 @@ export function stepWormSim(sim, delta, size, ctx) {
     // Blend back to any remaining ordinary boost instead of snapping at touchdown.
     const flight = sim.rocketFlight ?? 0;
     const throttle = flight * flight * (3 - 2 * flight);
-    const speedMult = sim.rocketActive ? boostMult + (ROCKET_SPEED_MULT - boostMult) * throttle : boostMult * (1 + 0.25 * sim.waterMomentum);
+    const rocketBase = Math.min(boostMult, ROCKET_SPEED_MULT);
+    const speedMult = sim.rocketActive ? rocketBase + (ROCKET_SPEED_MULT - rocketBase) * throttle : boostMult * (1 + 0.25 * sim.waterMomentum);
     const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step

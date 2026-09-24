@@ -78,9 +78,9 @@ it('does not count fatal landings or an Inch signature that only charged', () =>
 it('checks all five elemental effects and reoffers a missed or expired power', () => {
   const { sim, p, level, read } = setup(10);
   p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 4;
-  sim.specials = []; offerStoryPower(sim, p, level, 5, p.cubies);
+  sim.specials = []; p.powerDelay = 0; offerStoryPower(sim, p, level, 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
-  sim.specials = []; expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
+  sim.specials = []; p.powerDelay = 0; expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('water');
   for (const type of ['water', 'fire', 'grass', 'ice', 'lightning']) {
     sim.specials = []; sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0;
@@ -104,7 +104,9 @@ it('checks all five elemental effects and reoffers a missed or expired power', (
 it('finishes level eight with two collected elements without waiting for mastery', () => {
   const { sim, p, level, read } = setup(8);
   expect(level.mechanics).toEqual({ elementPickups: 2 });
+  p.powerDelay = 0; offerStoryPower(sim, p, level, 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
+  p.powerDelay = 0;
   sim.specials = []; // missed offerings do not count and can be offered again
   expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
   expect(read().elementPickups).toBeUndefined();
@@ -115,7 +117,7 @@ it('finishes level eight with two collected elements without waiting for mastery
   expect(nextStoryPower(p, level)).toBe('fire');
   sim.specials = []; sim.elementalT = 10;
   expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(false);
-  sim.elementalT = 0;
+  sim.elementalT = 0; p.powerDelay = 0;
   expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('fire');
   recordStoryMechanic(p, 'elementPickups');
