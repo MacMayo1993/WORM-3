@@ -1,4 +1,4 @@
-import { BOOK_PAUSE_SECONDS, GLOW_TRAIL_SECONDS, MOBI_REENTRY_SECONDS } from '../characterAbilities.js';
+import { BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN, GLOW_TRAIL_SECONDS, MOBI_REENTRY_SECONDS } from '../characterAbilities.js';
 import { makeWiggleSweep, WIGGLE_DURATION } from './wiggleSweep.js';
 import { getStableKey } from '../wormLogic.js';
 import { BODY_BALL_SPACING } from './constants.js';
@@ -8,7 +8,7 @@ import { jumpLandingTile } from './jumpLanding.js';
 import { makeGlowTrail } from './glowTrail.js';
 
 export const SIGNATURES = {
-  classic: { name: 'Orb Abundance', short: 'Abundance', passive: true, cooldown: 0, duration: 0, color: '#a6eb9b', hint: '50% more orbs on the cube.' },
+  classic: { name: 'Orb Call', short: 'Orb Call', cooldown: CLASSIC_ORB_CALL_COOLDOWN, duration: CLASSIC_ORB_CALL_SECONDS, color: '#a6eb9b', hint: `Attract nearby parity orbs for ${CLASSIC_ORB_CALL_SECONDS} seconds. Recharge: ${CLASSIC_ORB_CALL_COOLDOWN} seconds. Also spawns 50% more orbs.` },
   book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: 'Pause layer turns for 5 seconds. Earn 25% more XP.' },
   prism: { name: 'Spectrum', short: 'Spectrum', passive: true, cooldown: 0, duration: 0, color: '#ffd2fb', hint: 'Every orb color can heal every wormhole tunnel.' },
   wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs. Steering locks until finished.' },
@@ -54,6 +54,7 @@ export function signatureAvailability(sim, size, ctx, launching = false) {
   else if (sim.phase !== 'crawling' || sim.rocketActive || sim.restRead || liveRotation.active) reason = 'Wait for a clear surface';
   else if (sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0) reason = 'Wait a moment';
   else if (!launching && (sig.cooldown > 0 || sig.active > 0 || sig.charge > 0)) reason = 'Recharging';
+  else if (character === 'classic' && sim.magnetT > 0) reason = 'Magnet already active';
   else if (['inch', 'wiggle', 'mobi'].includes(character) && sim.isJumping) reason = 'Land first';
   else if (['wiggle', 'mobi'].includes(character) && (sim.crossingCorner || sim.pendingVoidKill || sim.pendingTunnelHeal || sim.tunnelPassages.length)) reason = 'Finish the crossing first';
   else if (character === 'mobi' && sig.mobiTunnel) reason = 'Heal your tunnel first';
@@ -92,6 +93,13 @@ export function activateSignature(sim, size, ctx) {
   if (sig.character === 'inch') sig.charge = SPRING_CHARGE;
   else { sig.active = def.duration; sig.cooldown = def.cooldown; }
   if (sig.character === 'glow') sig.glowTrail = makeGlowTrail();
+  if (sig.character === 'classic') {
+    // Use the real magnet pickup path, including edge wrapping, attraction FX
+    // and remote-orb quest credit. Eligibility protects an existing magnet.
+    sim.magnetT = def.duration;
+    sim.magnetMaxT = def.duration;
+    ctx.onMagnetState?.(def.duration, def.duration);
+  }
   if (created) {
     sig.mobiTunnel = { pairId: created.tunnel.pairId, stableKeys: created.stableKeys, reentryT: MOBI_REENTRY_SECONDS };
     sig.mobiOpening = true;

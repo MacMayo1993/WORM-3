@@ -650,7 +650,6 @@ function tickJumpRescue(sim, delta, size, ctx) {
     const eligible = sim.phase === 'crawling' && candidate && !sim.isJumping &&
         !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 &&
         !sim.pendingTunnelTrigger && !sim.pendingVoidKill &&
-        !(sim.signature.character === 'classic' && sim.signature.active > 0 && sim.tailLength >= BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH) &&
         !(sim.signature.character === 'inch' && sim.signature.active > 0) && sim.jumpCount < MAX_JUMPS;
     if (sim.jumpRescueCollision) {
         if (!eligible || candidate !== sim.jumpRescueCollision || !pendingBodyStillPresent(sim)) {

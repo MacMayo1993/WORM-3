@@ -162,11 +162,9 @@ describe('character abilities', () => {
     expect(signatureReadout(sim, SIZE, ctx).returnReady).toBe(false);
     tickSignature(sim, 5, SIZE, ctx); expect(holdsRotationTimer(sim.signature)).toBe(false);
   });
-  it('Classic and Prism are always-on passives', () => {
-    for (const id of ['classic', 'prism']) {
-      const { sim, ctx } = world(id); activate(sim, ctx);
-      expect(sim.signature.active).toBe(0); expect(SIGNATURES[id].passive).toBe(true);
-    }
+  it('keeps Prism passive and preserves Classic orb abundance', () => {
+    const { sim, ctx } = world('prism'); activate(sim, ctx);
+    expect(sim.signature.active).toBe(0); expect(SIGNATURES.prism.passive).toBe(true);
     expect(characterOrbCount(5, 'classic')).toBe(8);
     expect(characterOrbCount(5, 'prism')).toBe(5);
     expect(characterXpMultiplier('book')).toBe(1.25);
@@ -297,4 +295,40 @@ it('caps dense Classic orb layouts at distinct surface tiles', () => {
   resetWormSim(sim, 3, { orbCount: characterOrbCount(100, 'classic'), wormholeInterval: 9999 });
   expect(sim.powerups).toHaveLength(53);
   expect(new Set(sim.powerups.map(p => `${p.x},${p.y},${p.z},${p.dirKey}`)).size).toBe(53);
+});
+
+it('Classic Orb Call attracts real parity orbs, preserves elemental pickups, and recharges', () => {
+  const { sim, ctx } = world('classic', { isStoryMode: () => true });
+  sim.powerups = [{ x: 3, y: 3, z: 4, dirKey: 'PZ', type: 'apple' }];
+  sim.specials = [{ x: 3, y: 3, z: 4, dirKey: 'PZ', type: 'fire', id: 'keep-on-surface', ttl: 100 }];
+  queueTurn(sim, 'signature'); queueTurn(sim, 'signature'); step(sim, ctx);
+  expect(sim.signature.seq).toBe(1);
+  expect(sim.signature.active).toBeGreaterThan(5.8);
+  expect(sim.magnetT).toBeGreaterThan(5.8);
+  expect(sim.magnetMaxT).toBe(6);
+  expect(eventsOf(ctx, 'magnetState')[0].args).toEqual([6, 6]);
+  run(sim, ctx, 1.05);
+  expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
+  expect(sim.pendingOrbAttractions.some(fx => !fx.gulp)).toBe(true);
+  expect(sim.specials.some(item => item.id === 'keep-on-surface')).toBe(true);
+  expect(sim.elementalType).toBeNull();
+  activate(sim, ctx); expect(sim.signature.seq).toBe(1);
+  sim.specials = [];
+  run(sim, ctx, 5.1);
+  expect(sim.magnetT).toBe(0); expect(sim.signature.active).toBe(0);
+  expect(signatureReadout(sim, SIZE, ctx).ready).toBe(false);
+  expect(eventsOf(ctx, 'magnetState').at(-1).args).toEqual([0, 0]);
+  run(sim, ctx, 14.1);
+  expect(signatureReadout(sim, SIZE, ctx).ready).toBe(true);
+  activate(sim, ctx); expect(sim.signature.seq).toBe(2);
+});
+
+it('Classic does not replace an existing magnet or earn an activation for a rejected press', () => {
+  const { sim, ctx } = world('classic');
+  sim.magnetT = 8; sim.magnetMaxT = 8;
+  activate(sim, ctx);
+  expect(sim.signature.seq).toBe(0); expect(sim.signature.cooldown).toBe(0);
+  expect(sim.magnetT).toBeGreaterThan(7.9); expect(sim.magnetMaxT).toBe(8);
+  expect(eventsOf(ctx, 'magnetState')).toHaveLength(0);
+  expect(signatureReadout(sim, SIZE, ctx).reason).toBe('Magnet already active');
 });
