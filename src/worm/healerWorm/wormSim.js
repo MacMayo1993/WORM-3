@@ -648,7 +648,7 @@ function tickJumpRescue(sim, delta, size, ctx) {
     const candidate = sim.pendingSelfCollision;
     const eligible = sim.phase === 'crawling' && candidate && !sim.isJumping &&
         !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 &&
-        !sim.pendingTunnelTrigger && !sim.pendingVoidKill?.armed &&
+        !sim.pendingTunnelTrigger && !sim.pendingVoidKill &&
         !(sim.signature.character === 'classic' && sim.signature.active > 0 && sim.tailLength >= BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH) &&
         !(sim.signature.character === 'inch' && sim.signature.active > 0) && sim.jumpCount < MAX_JUMPS;
     if (sim.jumpRescueCollision) {
@@ -733,13 +733,8 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     // for the "void on the 4th traversal" rule.
     const traversalVerdict = classifyTraversal(nextTraversals);
     if (traversalVerdict === 'void-arm') {
-        // The worm completes this tunnel, then collapses when it steps off the
-        // exit tile (deferred kill, checked in the crawling phase).
-        sim.pendingVoidKill = {
-            tunnelKey,
-            exitTileKey: tileKey(tunnel.exit),
-            armed: false,
-        };
+        // The fourth trip collapses at the interior midpoint, never after escape.
+        sim.pendingVoidKill = { tunnelKey, traversals: nextTraversals };
     } else if (traversalVerdict === 'collapse') {
         // Past the void traversal the tunnel is fully collapsed and kills on contact.
         sim.voidTunnelKeys.add(tunnelKey);
@@ -1512,20 +1507,6 @@ const PHASE_HANDLERS = {
                 sim.crawlDistance += distance;
             }
 
-            if (sim.pendingVoidKill?.armed) {
-                const { tunnelKey, exitTileKey } = sim.pendingVoidKill;
-                const headTileKey = tileKey(sim.pos);
-                const hasClearedExitTile = headTileKey !== exitTileKey;
-                const fullyOnNextTile = sim.interpT >= 1;
-
-                if (headOnSurface && hasClearedExitTile && fullyOnNextTile) {
-                    sim.pendingVoidKill = null;
-                    sim.voidTunnelKeys.add(tunnelKey);
-                    killWormSim(sim, ctx, { reason: 'voided', tunnelKey, exitTileKey, headTile: headTileKey });
-                    return true;
-                }
-            }
-
             if (headOnSurface && sim.pendingTunnelTrigger) {
                 const { x, y, z, dirKey } = sim.pendingTunnelTrigger;
                 // Landing grace also holds off an instant wormhole dive: a rocket that
@@ -1822,10 +1803,19 @@ const PHASE_HANDLERS = {
         enter(_sim, _size, ctx) {
             ctx.onPhase('tunnel');
         },
-        update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (0.65 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
+        update(sim, size, ctx, delta) {
+            const collapsing = sim.pendingVoidKill?.tunnelKey === sim.currentTunnelKey;
+            const nextProgress = Math.min(collapsing ? 0.5 : 1,
+                sim.tunnelProgress + delta * (0.65 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE));
             advanceTunnelHead(sim, 'tunnel', nextProgress, size);
             sim.tunnelProgress = nextProgress;
+            if (collapsing && nextProgress >= 0.5) {
+                const { tunnelKey, traversals } = sim.pendingVoidKill;
+                sim.pendingVoidKill = null;
+                sim.voidTunnelKeys.add(tunnelKey);
+                killWormSim(sim, ctx, { reason: 'void-tunnel-exhausted', tunnelKey, traversals, progress: 0.5 });
+                return true;
+            }
             if (sim.tunnelProgress >= 1) {
                 sim.tunnelProgress = 0;
                 sim.phase = 'exiting';
@@ -1851,16 +1841,12 @@ const PHASE_HANDLERS = {
             advanceTunnelHead(sim, 'exiting', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
-                const voidKillState = sim.pendingVoidKill;
                 const exitedTunnel = sim.activeTunnel; // capture (kept alive for windout)
                 const exitStableKey = sim.currentTunnelStableKey;
                 const exitTunnelKey = sim.currentTunnelKey;
                 sim.tunnelProgress = 0;
                 sim.currentTunnelStableKey = null;
                 sim.currentTunnelKey = null;
-                if (voidKillState) {
-                    sim.pendingVoidKill = { ...voidKillState, armed: true };
-                }
 
                 // Arm the heal now, but leave both flipped tiles and the tunnel intact
                 // until the recorded route proves the final segment has cleared the exit.
@@ -2578,17 +2564,6 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     for (const passage of sim.tunnelPassages) {
         passage.tunnel = rotateTunnel(passage.tunnel);
         if (passage.heal) passage.heal = { ...passage.heal, tunnel: passage.tunnel };
-    }
-
-    // The armed void kill compares the head's CURRENT tile against the exit tile it
-    // must step off before collapsing. Left un-rotated, the comparison is against a
-    // slot the exit no longer occupies, so the collapse fires a step early or late.
-    if (sim.pendingVoidKill?.exitTileKey) {
-        parseTileKey(sim.pendingVoidKill.exitTileKey, _parseTile);
-        const rotated = rotateByOwnLayer(_parseTile);
-        if (rotated !== _parseTile) {
-            sim.pendingVoidKill = { ...sim.pendingVoidKill, exitTileKey: tileKey(rotated) };
-        }
     }
 
     // A turn that carried any of the visible body earns a few steps of self-collision

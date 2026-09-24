@@ -1,7 +1,7 @@
 import { isParityLocked } from './signatures.js';
 import { getNextSurfacePosition, getStableKey } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
-import { BASE_TAIL_LENGTH, HEAL_COST, ORB_SEGMENT_GROWTH } from './constants.js';
+import { BASE_TAIL_LENGTH, HEAL_COST, ORB_SEGMENT_GROWTH, WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
 // Inventory and deposits are segments; the UI reports actual pickups required.
 export function healingNeed({ deposited = 0, inventory = {}, faceId, tailLength, isPrism = false }) {
@@ -12,6 +12,12 @@ export function healingNeed({ deposited = 0, inventory = {}, faceId, tailLength,
   const missing = Math.max(0, remaining - payable);
   return { saved, remaining, payable, missing, pickupsNeeded: Math.ceil(missing / ORB_SEGMENT_GROWTH),
     ready: missing === 0, savedFraction: saved / HEAL_COST, payableFraction: payable / HEAL_COST };
+}
+export function tunnelDanger(need) {
+  if (need.voided) return 'collapsed';
+  if (need.inTransit) return need.collapsing ? 'collapsing' : null;
+  if (!need.locked && need.uses >= WORMHOLE_MAX_TRAVERSALS) return 'lethal';
+  return null;
 }
 export function tunnelAt(sim, ctx, pos, distance = 0) {
   const cubies = ctx.getCubies();
@@ -31,7 +37,7 @@ export function tunnelReadout(sim, size, ctx) {
   if (!sim.alive || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || liveRotation.active || sim.restRead) return null;
   if (sim.phase !== 'crawling') {
     const need = sim.activeTunnel && tunnelAt(sim, ctx, sim.activeTunnel.entry);
-    return need ? { ...need, inTransit: true } : null;
+    return need ? { ...need, inTransit: true, collapsing: !!sim.pendingVoidKill } : null;
   }
   let pos = sim.pos, direction = sim.moveDir;
   for (let distance = 0; distance <= 3; distance++) {
