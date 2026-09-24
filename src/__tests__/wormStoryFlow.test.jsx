@@ -288,3 +288,24 @@ it('Classic adds 50 percent more Story orbs without changing the authored tunnel
     expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(tunnels);
   }
 });
+
+it('Classic can complete level 10’s two-use ability task through real queued activations', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'classic', playerProgress: {
+    ...state().playerProgress, wormStory: { stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])), claimed: {} },
+  } }));
+  begin(10); frame();
+  const goal = () => state().wormStoryChecklist.goals.find(g => g.key === 'signatures');
+  expect(goal()).toMatchObject({ value: 0, target: 2, done: false });
+  act(() => { worm.queueTurn('signature'); worm.queueTurn('signature'); }); frame();
+  expect(goal()).toMatchObject({ value: 1, done: false });
+  act(() => worm.queueTurn('signature')); frame();
+  expect(goal()).toMatchObject({ value: 1, done: false });
+  // Expiry/recharge clocks are exercised in wormSignatures; isolate quest wiring
+  // here so unrelated flight, tunnel, and combat objectives do not intervene.
+  act(() => {
+    worm.signature.current.active = 0; worm.signature.current.cooldown = 0;
+    worm.magnetT.current = 0; worm.queueTurn('signature');
+  }); frame();
+  expect(goal()).toMatchObject({ value: 2, target: 2, done: true });
+  frame(); expect(goal().value).toBe(2);
+});

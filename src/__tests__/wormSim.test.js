@@ -315,7 +315,14 @@ describe('jump rescue window', () => {
     expect(next.sim.jumpRescueRequested).toBe(false);
   });
 
-  it.each(['queued', 'airborne', 'grace', 'tunnel', 'disabled', 'spent', 'shed'])('does not interrupt %s movement', kind => {
+  it('still offers a rescue while Classic is using Orb Call', () => {
+    const { sim, ctx } = setup();
+    sim.signature.character = 'classic'; sim.signature.active = 6; sim.magnetT = 6;
+    stepWormSim(sim, 0.01, 5, ctx);
+    expect(sim.jumpRescueT).toBeGreaterThan(0);
+  });
+
+  it.each(['queued', 'airborne', 'grace', 'tunnel', 'disabled', 'spent'])('does not interrupt %s movement', kind => {
     const { sim, ctx } = setup();
     if (kind === 'queued') { queueTurn(sim, 'left'); queueTurn(sim, 'jump'); }
     if (kind === 'airborne') startJump(sim, ctx, 5);
@@ -323,7 +330,6 @@ describe('jump rescue window', () => {
     if (kind === 'tunnel') sim.pendingTunnelTrigger = { ...sim.pos };
     if (kind === 'disabled') ctx.isJumpRescueEnabled = () => false;
     if (kind === 'spent') sim.jumpCount = MAX_JUMPS;
-    if (kind === 'shed') { sim.signature.character = 'classic'; sim.signature.active = 1; }
     stepWormSim(sim, 0.01, 5, ctx);
     expect(sim.jumpRescueT).toBe(0);
     if (kind === 'queued') expect(sim.isJumping).toBe(true);
