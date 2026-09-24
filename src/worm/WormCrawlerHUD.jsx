@@ -1438,7 +1438,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
 
                 <div className="worm-hud-status-row">
-                    {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact onInspect={handlePause} />}
+                    {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
                     {!combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
                     {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} />}
                 </div>
