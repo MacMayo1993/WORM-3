@@ -50,6 +50,7 @@ const Level10Cutscene = React.lazy(() => import('./screens/Level10Cutscene.jsx')
 const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
 const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
 const RandomModeSetupWizard = React.lazy(() => import('./screens/RandomModeSetupWizard.jsx'));
+const TeachCourse = React.lazy(() => import('../teach/TeachCourse.jsx'));
 const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectScreen.jsx'));
 const WormEntryScreen = React.lazy(() => import('./screens/WormEntryScreen.jsx'));
 import MobiIntroScreen from './screens/MobiIntroScreen.jsx';
@@ -223,7 +224,7 @@ export default function UILayer({
     // the game chrome (top bar, bottom nav, sheet) so nothing crowds him.
     || showLevelTutorial || showCutscene;
 
-  const showGameHUD = !wormHealerMode && !showMainMenu && !hasFullScreenOverlay;
+  const showGameHUD = !teachMode.courseActive && !wormHealerMode && !showMainMenu && !hasFullScreenOverlay;
 
   return (
     <>
@@ -254,7 +255,7 @@ export default function UILayer({
             Was hardcoded black-on-white monospace, predating the field-guide
             system; now the NIGHT surface, and a real <button> so it is
             reachable by keyboard and announces its move count. */}
-        {moveHistory.length > 0 && !isMobile && !demoDialogueVisible && (
+        {!teachMode.courseActive && moveHistory.length > 0 && !isMobile && !demoDialogueVisible && (
           <button
             type="button"
             className="ui-focusable"
@@ -283,7 +284,7 @@ export default function UILayer({
         )}
 
         {/* Floating HUD — auto-fade parity/chaos notifications */}
-        {!wormHealerMode && !chaosMode && !disparityWinner && <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />}
+        {!teachMode.courseActive && !wormHealerMode && !chaosMode && !disparityWinner && <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />}
 
         {/* Disparity HUD — RIP death log + winner announcement */}
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <Suspense fallback={null}><DisparityHUD /></Suspense>}
@@ -575,7 +576,7 @@ export default function UILayer({
 
       <ScreenTransition show={teachMode.active} freezeOnExit>
         <Suspense fallback={null}>
-          <TeachMode
+          {teachMode.courseActive ? <TeachCourse onHighlight={teachMode.setLayerHighlight} onClose={() => { teachMode.exitTeachMode(); onBackToMainMenu(); }} onPuzzles={onMenuLevels} /> : <TeachMode
             analysis={teachMode.analysis}
             stages={teachMode.stages}
             methodName={teachMode.methodName}
@@ -602,7 +603,7 @@ export default function UILayer({
             onPreviewNotation={teachMode.previewNotation}
             onPlayNotation={teachMode.playNotation}
             onClose={teachMode.exitTeachMode}
-          />
+          />}
         </Suspense>
       </ScreenTransition>
 
@@ -647,7 +648,7 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      {isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
+      {!teachMode.courseActive && isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
         <MobileControls
           actionSlot={topBarActionSlot}
           onShowHelp={() => setShowHelp(true)}

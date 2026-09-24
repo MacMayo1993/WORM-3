@@ -70,7 +70,6 @@ import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 const Tutorial = React.lazy(() => import('./components/screens/Tutorial.jsx'));
 import MobiIntroScreen, {
   MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
-  MOBI_LINES_TEACH,
   MOBI_LINES_BIOME, MOBI_LINES_CHAOS,
   MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
@@ -329,7 +328,7 @@ export default function WORM3() {
   // ========================================================================
   const {
     size, cubies, manifoldMap, metrics, resolvedColors,
-    setCubies, setRotatedCubies, changeSize, shuffle, reset, flipSticker, healSticker
+    setCubies, setRotatedCubies, changeSize, reset, flipSticker, healSticker
   } = useCubeState();
 
   const { moves, gameTime, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
@@ -838,14 +837,21 @@ export default function WORM3() {
   }, []);
 
   const handleMenuTeach = useCallback(() => {
-    useGameStore.getState().setShowMainMenu(false);
-    useGameStore.getState().clearLevel();
-    if (size !== 3) changeSize(3);
-    shuffle();
-    launchWithMobi(MOBI_LINES_TEACH, 'TEACH MODE', () => {
-      setTimeout(() => teachMode.enterTeachMode(), 0);
-    });
-  }, [size, changeSize, shuffle, teachMode, launchWithMobi]);
+    const state = useGameStore.getState();
+    state.setShowMainMenu(false);
+    setShowCubeModeSelect(false);
+    state.clearLevel();
+    cancelShuffle();
+    state.resetGame();
+    state.setRandomMode(false);
+    state.setWormHealerMode(false);
+    state.setFlipMode(false);
+    state.setVisualMode('classic');
+    state.setHollowMode(false);
+    state.setShowTunnels(false);
+    state.setSize(3);
+    teachMode.enterTeachMode({ course: true });
+  }, [cancelShuffle, teachMode]);
 
   const handleMenuWormHealer = useCallback(() => {
     setWormEntryPage('choice');
@@ -993,6 +999,7 @@ export default function WORM3() {
   }, [setShowTutorial, markTutorialDone]);
 
   const onTapFlip = useCallback((pos, dirKey) => {
+    if (useGameStore.getState().teachCourseActive) return;
     flipSticker(pos, dirKey);
   }, [flipSticker]);
   onTapFlipRef.current = onTapFlip;
@@ -1301,7 +1308,7 @@ export default function WORM3() {
 
   // Surfaces that own the screen but live in App's local state rather than the
   // store, so selectCubeInputBlocked cannot see them.
-  const keyboardDisabled = showStore || showModeSelect || showCubeModeSelect || showComingSoon
+  const keyboardDisabled = teachMode.courseActive || showStore || showModeSelect || showCubeModeSelect || showComingSoon
     || showMobiusCubelet || showMobiIntro
     || showFreeplayWizard || showRandomWizard || showWormModeWizard
     || showDisparityWizard || showDisparityBetting;
@@ -1348,7 +1355,7 @@ export default function WORM3() {
         <Suspense fallback={null}>
           <ModeCarousel
             onBack={() => setShowModeSelect(false)}
-            onCubeSelect={() => { setShowModeSelect(false); handleStartCampaign(); }}
+            onCubeSelect={() => { setShowModeSelect(false); handleMenuTeach(); }}
             onWormSelect={() => { setShowModeSelect(false); handleMenuWormHealer(); }}
             onChaos={() => { setShowModeSelect(false); handleMenuDisparity(); }}
             onFreeplay={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
@@ -1397,7 +1404,7 @@ export default function WORM3() {
           ) : showMainMenu ? (
             // Stop the cube/worm animation when a full-screen overlay covers the menu
             showSettings ? <color attach="background" args={['#000005']} /> : (
-              <MenuScene onCubeClick={handleMenuCube} background={menuBackground} />
+              <MenuScene onCubeClick={handleMenuTeach} background={menuBackground} />
             )
           ) : (
             <Suspense fallback={null}>
@@ -1666,7 +1673,7 @@ export default function WORM3() {
         <Suspense fallback={null}>
           <DemoEndScreen
             onWorm={() => { handleExitDemo(); handleMenuWormHealer(); }}
-            onStory={() => { handleExitDemo(); handleStartCampaign(); }}
+            onStory={() => { handleExitDemo(); handleMenuTeach(); }}
             onFreeplay={handleDemoFreeplay}
             onChaos={() => { handleExitDemo(); handleMenuDisparity(); }}
             onRandom={() => { handleExitDemo(); handleMenuRandomMode(); }}

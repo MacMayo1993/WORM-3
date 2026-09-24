@@ -17,7 +17,7 @@ import bungeeWoffUrl from '@fontsource/bungee/files/bungee-latin-400-normal.woff
 // Warm troika's glyph atlas for the mode labels at module load so the first
 // face's label renders instantly instead of popping in a frame late.
 preloadFont(
-  { font: bungeeWoffUrl, characters: 'WORMCUBESTORYCHAOSRANDE' },
+  { font: bungeeWoffUrl, characters: 'WORMCUBETEACHOSRND' },
   () => {}
 );
 import { makeCubies } from '../../game/cubeState.js';
@@ -35,7 +35,6 @@ import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '
 import { UI_FONT, DISPLAY_FONT, PAPER_SHEET, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_BG_MUTED, Z } from '../../utils/uiTheme.js';
 import { TOUCH_TARGET } from '../ui/Button.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { progressManager } from '../../levels/ProgressManager.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -1145,12 +1144,9 @@ const CAROUSEL_MODES = [
     cta: 'PLAY',
   },
   {
-    id: 'cube', label: 'STORY', face: 'PX',
-    // No chapter count in the copy: it said "ten" while the campaign has had
-    // twelve for some time. The chip carries the number now, derived from the
-    // level data (see chipsFor) so it cannot drift again.
-    how: 'Clear a chapter to unlock the next one.',
-    chips: ['Campaign', 'Guided'],
+    id: 'cube', label: 'TEACH', face: 'PX',
+    how: 'Learn to solve a cube, one move at a time.',
+    chips: ['3×3', 'Step by step'],
     cta: 'PLAY',
   },
   {
@@ -1178,12 +1174,7 @@ const LAST_MODE_KEY = 'worm3_last_mode_id';
 // ─── Per-mode stats ──────────────────────────────────────────────────────────
 // What the card can honestly say about your history with a mode.
 //
-// Almost nothing is recorded per mode anywhere in the game: STORY has real
-// progress through ProgressManager, STORE has the wallet and your purchases,
-// and every other mode has only the play count this menu itself keeps (see
-// modesSlice's modePlays). So rather than invent a stat line per mode, each one
-// reports whichever of those it actually has, and a mode you have never opened
-// says so instead of showing a row of zeroes.
+// Teach shows its method; Store shows the wallet; other modes show recorded plays.
 const RELATIVE_DAY = [
   [0, 'Today'],
   [1, 'Yesterday'],
@@ -1198,23 +1189,8 @@ const lastPlayedLabel = (ts, now = Date.now()) => {
   return 'A while ago';
 };
 
-/**
- * Two short facts for a mode's card, or an empty list when there is nothing
- * true to say yet.
- *
- * @param mode     the CAROUSEL_MODES entry
- * @param ctx      { plays, story: { completed, total, stars }, points, owned }
- * @returns        [{ label, value }] — at most two
- */
-/**
- * The mode's chips, with any count resolved against live data rather than
- * hardcoded. STORY is the one that needs it — its chapter count is level data,
- * and the description used to state it from memory and be wrong.
- */
-export function chipsFor(mode, ctx) {
-  if (mode.id === 'cube' && ctx?.story?.total > 0) {
-    return [`${ctx.story.total} chapters`, ...mode.chips.slice(1)];
-  }
+// Campaign stars are deliberately not presented as Teach progress.
+export function chipsFor(mode, _ctx) {
   return mode.chips;
 }
 
@@ -1222,11 +1198,7 @@ export function modeStatItems(mode, ctx) {
   const play = ctx.plays?.[mode.id];
   const stats = [];
 
-  if (mode.id === 'cube') {
-    stats.push({ label: 'Chapters', value: `${ctx.story.completed}/${ctx.story.total}` });
-    if (ctx.story.stars > 0) stats.push({ label: 'Stars', value: `${ctx.story.stars}★` });
-    return stats;
-  }
+  if (mode.id === 'cube') return [{ label: 'Method', value: 'Beginner 3×3' }];
 
   if (mode.id === 'store') {
     stats.push({ label: 'Balance', value: `${ctx.points.toLocaleString()} PP` });
@@ -1268,27 +1240,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   const [show, setShow] = useState(true);
   const [diving, setDiving] = useState(false);
 
-  // Stats for the card. STORY's progress lives outside the store in
-  // ProgressManager, so it is read once on open rather than subscribed to —
-  // nothing can complete a chapter while this overlay is up.
   const modePlays = useGameStore(s => s.modePlays);
   const parityPoints = useGameStore(s => s.parityPoints);
   const ownedItems = useGameStore(s => s.ownedItems);
   const recordModePlay = useGameStore(s => s.recordModePlay);
-  // STORY's progress lives outside the store, in ProgressManager. Read once on
-  // open rather than subscribed to: nothing can complete a chapter while this
-  // overlay is up. A static import costs nothing here — useLevelSystem already
-  // puts the level catalogue on the initial route — and reading it synchronously
-  // avoids the chip visibly changing from its placeholder a frame later.
-  const storyProgress = useMemo(() => {
-    try {
-      const summary = progressManager.getProgressSummary();
-      return { completed: summary.completedLevels, total: summary.totalLevels, stars: summary.totalStars };
-    } catch {
-      return { completed: 0, total: 0, stars: 0 };
-    }
-  }, []);
-
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
   const animatingRef = useRef(false);
@@ -1415,15 +1370,14 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   }, []);
 
   const mode = CAROUSEL_MODES[activeIndex];
-  const modeChips = useMemo(() => chipsFor(mode, { story: storyProgress }), [mode, storyProgress]);
+  const modeChips = useMemo(() => chipsFor(mode), [mode]);
   const statItems = useMemo(
     () => modeStatItems(mode, {
       plays: modePlays,
-      story: storyProgress,
       points: parityPoints ?? 0,
       owned: ownedItems?.length ?? 0,
     }),
-    [mode, modePlays, storyProgress, parityPoints, ownedItems]
+    [mode, modePlays, parityPoints, ownedItems]
   );
   const opacity = show ? 1 : 0;
 

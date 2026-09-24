@@ -10,7 +10,6 @@
 import React from 'react';
 import { UI_FONT, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_PANEL, NIGHT_BORDER, UI_GOLD, UI_MOSS_LIGHT, TEXT_XS, TEXT_SM, RADIUS_SM, RADIUS_MD, Z } from '../../utils/uiTheme.js';
 import { Overlay, Panel, PanelHeader, PanelBody, PanelSectionTitle } from '../ui/index.js';
-import { STORY_LEVELS } from '../../levels/data/index.js';
 
 const ROW_STYLE = {
   display: 'flex',
@@ -84,7 +83,7 @@ const HelpMenu = ({ onClose }) => (
         </Section>
 
         <Section title="Game modes">
-          <Row label="Story" desc={`${STORY_LEVELS.length} chapters, each a little harder. Start here if you're new`} />
+          <Row label="Teach" desc="Learn notation, practice the beginner method, then solve a 3×3 independently" />
           <Row label="Cube" desc="Free play: any size from 2×2 to 10×10, your colors, no timer" />
           <Row label="Worm" desc="Steer a worm across the cube, collect orbs, and heal flipped tiles" />
           <Row label="Chaos" desc="Tiles flip on their own. Predict which color pair lasts longest" />
