@@ -63,16 +63,24 @@ export function nextStoryPower(p, level) {
     const collected = p.mechanics.elementPickups ?? 0;
     return collected < m.elementPickups ? STORY_ELEMENTS[collected % STORY_ELEMENTS.length] : null;
   }
-  return m.elements ? STORY_ELEMENTS.find(type => !p.elements.has(type)) ?? null : null;
+  return m.elements ? STORY_ELEMENTS.slice(0, m.elements).find(type => !p.elements.has(type)) ?? null : null;
 }
 export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
-  return getAllSurfaceTiles(size).find(tile => {
-    const sticker = cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers[tile.dirKey];
-    const distance = Math.hypot(tile.x - sim.pos.x, tile.y - sim.pos.y, tile.z - sim.pos.z);
-    // A 2×2 or 3×3 face has no tile two steps from its center; take the nearest ring there.
-    return tile.dirKey === sim.pos.dirKey && distance >= (size >= 4 ? 2 : 1) && distance <= 3 &&
-      sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile));
-  });
+  const { x, y, z, dirKey } = sim.pos;
+  const axes = dirKey.endsWith('X') ? ['y', 'z'] : dirKey.endsWith('Y') ? ['x', 'z'] : ['x', 'y'];
+  const u = sim.pos[axes[0]], v = sim.pos[axes[1]];
+  const minDistanceSq = size >= 4 ? 4 : 1;
+  // Only the local radius-three patch can qualify. Preserve surface-cache order
+  // so spawn positions stay identical, without scanning all 6*size² stickers.
+  for (let a = Math.max(0, u - 3); a <= Math.min(size - 1, u + 3); a++) {
+    for (let b = Math.max(0, v - 3); b <= Math.min(size - 1, v + 3); b++) {
+      const distanceSq = (a - u) ** 2 + (b - v) ** 2;
+      if (distanceSq < minDistanceSq || distanceSq > 9) continue;
+      const tile = { x, y, z, dirKey, [axes[0]]: a, [axes[1]]: b };
+      const sticker = cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers[dirKey];
+      if (sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile))) return tile;
+    }
+  }
 }
 // One marked offering at a time; expiration reoffers it near the current face.
 // A completed power is not replaced until its effect ends, so elements never

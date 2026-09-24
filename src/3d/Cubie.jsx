@@ -9,6 +9,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import StickerPlane from './StickerPlane.jsx';
 import MergedLedEdges from './MergedLedEdges.jsx';
+import { hollowFrameGeometry } from './hollowFrameGeometry.js';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps } from './cubeViewStyles.js';
@@ -28,37 +29,8 @@ useGameStore.subscribe(
   (pops) => { _anyCubiePops = !!pops && Object.keys(pops).length > 0; }
 );
 
-// Hollow cube edge beams — 12 beams forming a skeletal cube frame
-const EDGE_H = 0.49; // half of cube size
-const BEAM_T = 0.04;  // beam half-thickness — slimmer for a more open cage
-
-// Dimension arrays for each beam orientation (used by declarative <boxGeometry>)
-const BEAM_DIMS = {
-  x: [EDGE_H * 2, BEAM_T * 2, BEAM_T * 2],
-  y: [BEAM_T * 2, EDGE_H * 2, BEAM_T * 2],
-  z: [BEAM_T * 2, BEAM_T * 2, EDGE_H * 2],
-};
-
-const HOLLOW_EDGES = [
-  // X-axis edges (4)
-  { pos: [0, -EDGE_H, -EDGE_H], geo: 'x' },
-  { pos: [0, -EDGE_H, EDGE_H], geo: 'x' },
-  { pos: [0, EDGE_H, -EDGE_H], geo: 'x' },
-  { pos: [0, EDGE_H, EDGE_H], geo: 'x' },
-  // Y-axis edges (4)
-  { pos: [-EDGE_H, 0, -EDGE_H], geo: 'y' },
-  { pos: [-EDGE_H, 0, EDGE_H], geo: 'y' },
-  { pos: [EDGE_H, 0, -EDGE_H], geo: 'y' },
-  { pos: [EDGE_H, 0, EDGE_H], geo: 'y' },
-  // Z-axis edges (4)
-  { pos: [-EDGE_H, -EDGE_H, 0], geo: 'z' },
-  { pos: [-EDGE_H, EDGE_H, 0], geo: 'z' },
-  { pos: [EDGE_H, -EDGE_H, 0], geo: 'z' },
-  { pos: [EDGE_H, EDGE_H, 0], geo: 'z' },
-];
-
 // Shared hollow beam materials — one per visualMode string.
-// 12 beams × 27 cubies = 324 draws, but only 3 material instances (classic/wireframe/glass).
+// Each cubie uses one merged frame mesh and a shared material.
 // All beams in the same mode share identical properties so one GPU material suffices.
 const _hollowBeamMaterials = {};
 function getHollowBeamMaterial(visualMode) {
@@ -473,13 +445,9 @@ const Cubie = React.forwardRef(function Cubie({
             <boxGeometry args={[0.98, 0.98, 0.98]} />
           </mesh>
 
-          {/* 12 edge beams forming a hollow cube frame */}
-          {HOLLOW_EDGES.map((edge, idx) => (
-            <mesh key={idx} position={edge.pos} castShadow={enableShadows} receiveShadow={enableShadows}>
-              <boxGeometry args={BEAM_DIMS[edge.geo]} />
-              <primitive object={getHollowBeamMaterial(effectiveVisualMode)} attach="material" />
-            </mesh>
-          ))}
+          {/* Shared merged beams keep the open frame with one draw per cubie. */}
+          <mesh castShadow={enableShadows} receiveShadow={enableShadows} dispose={null}
+            geometry={hollowFrameGeometry} material={getHollowBeamMaterial(effectiveVisualMode)} />
         </>
       ) : omitBody ? null : hideBody ? (
         // Exit-arm ride: camera is inside the cube and the solid body would occlude the
