@@ -4,8 +4,8 @@
   --wiz-base: #f5f0e8;
   --wiz-surface: #f0ebe2;
   --wiz-surface-raised: #ffffff;
-  --wiz-border: #d9cbb3;
-  --wiz-border-soft: #e4d9c5;
+  --wiz-border: var(--mode-accent);
+  --wiz-border-soft: var(--mode-accent);
   --wiz-text: #302c24;
   --wiz-text-muted: #665f52;
   --wiz-text-faint: #665f52;
@@ -50,8 +50,9 @@
 .mode-wizard-sheet>div:last-child>button:last-child:not(:first-of-type) { text-transform:none!important; letter-spacing:0!important; }
 @media(max-height:520px) { .mode-wizard-heading .mode-artwork { width:36px; } .mode-wizard-heading { padding-block:4px; } }
 
-/* Older paper selectors retain their accent frames. Setup uses neutral borders
-   and reserves the mode color for selected choices and the primary action. */
+/* Color existing frames, including inline-style cards and accessory previews.
+   This sets no border widths: unboxed layout containers remain unboxed. */
+.mode-wizard *, .mode-wizard *::before, .mode-wizard *::after,
 .cube-path-screen *, .cube-path-screen *::before, .cube-path-screen *::after,
 .mode-paper-selector *, .mode-paper-selector *::before, .mode-paper-selector *::after {
   border-color:var(--mode-accent)!important;
@@ -62,8 +63,7 @@
 .mode-wizard [aria-pressed="true"]:not([role="tab"]),.mode-wizard .worm-level-grid .selected {
   outline:2px solid var(--mode-accent); outline-offset:-2px;
 }
-.mode-wizard .worm-profile { --wardrobe-line:var(--wiz-border); }
-.mode-wizard .worm-profile-header h2 { color:var(--mode-ink); }
+.mode-wizard .worm-profile { --wardrobe-line:var(--mode-accent); }
 .mode-wizard .worm-profile :is(.worm-profile-filter[aria-pressed=true],.worm-profile-footer>button) { background:var(--mode-accent); color:var(--wiz-check-ink); }
 .mode-wizard .worm-profile-categories button[aria-selected=true] { box-shadow:inset 3px 0 var(--mode-accent); }
 .mode-wizard .worm-profile-option[aria-pressed=true] { box-shadow:0 0 0 2px var(--mode-accent); }
@@ -73,13 +73,3 @@
 .cube-path-screen>section { border:1px solid var(--mode-accent); }
 .mode-paper-selector button:focus-visible { outline:3px solid var(--mode-accent); outline-offset:3px; }
 .mode-wizard.worm-entry-choice .worm-path-free .worm-path-cta { background:var(--mode-accent); }
-
-/* Carry the carousel's identity into every setup flow. */
-.mode-wizard-brand { padding:18px 28px 6px; flex:none; }
-.arcade-setup .mode-wizard-kicker { font:400 23px/1.2 var(--display-font); text-transform:uppercase; color:#0b203c; }
-.arcade-setup .mode-wizard-sheet>div:last-child>.arcade-action { justify-content:center; gap:18px; font:400 20px/1.2 var(--display-font)!important; text-transform:uppercase!important; }
-.arcade-setup .arcade-brand *,.arcade-setup .arcade-icon-button { border-color:#d9cdb7!important; }
-.arcade-setup .arcade-action { border-color:color-mix(in srgb,var(--mode-accent) 60%,white)!important; }
-.arcade-setup .mode-wizard-step-track { margin-bottom:6px; }
-@media(max-width:600px) { .mode-wizard-brand { padding:max(14px,env(safe-area-inset-top)) 18px 4px; }.mode-wizard-brand .worm-wordmark { font-size:40px; } }
-@media(max-height:520px) { .mode-wizard-brand { display:none; } }

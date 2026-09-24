@@ -29,28 +29,27 @@ it('launches Stage 9 on 7x7 and returns other chapters to 5x5', () => {
   click('Worm Ascendant'); click('Play level');
   expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 10, cubeSize: 5 });
 });
-it('shows a ready level and keeps Free Play and the level map within reach', async () => {
-  show(); const tabs = [...host.querySelectorAll('[role="tab"]')];
-  expect(tabs.map(tab => tab.textContent.trim())).toEqual(['Levels', 'Free Play']);
-  expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+it('opens with Story on the left and Free Play on the right, without launching either', async () => {
+  show(); const cards = [...host.querySelector('.worm-path-split').children];
+  expect(cards).toHaveLength(2);
+  expect(cards.every(card => card.tagName === 'BUTTON')).toBe(true);
+  expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Levels', 'Free Play']);
   expect(complete).not.toHaveBeenCalled();
-  click('Start level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
-    colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));
-  click('All levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
+  click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
-  click('Back'); click('Free Play');
-  expect(host.querySelector('[role="tabpanel"]').textContent).toContain('Choose your cube');
-  await act(async () => { click('Set up Free Play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
+  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
+    colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));
+  click('Back'); await act(async () => { click('Free Play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
   click('Launch free run'); expect(complete.mock.lastCall[0]).toEqual({ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 });
-  click('Cancel setup'); expect(host.querySelector('[role="tablist"]')).not.toBeNull();
+  click('Cancel setup'); expect(host.querySelector('.worm-path-split')).not.toBeNull();
 });
 it('traps keyboard focus and handles Back/Escape within the mode boundary', () => {
   show(); const buttons = host.querySelectorAll('button'); expect(document.activeElement).toBe(buttons[0]);
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true })));
   expect(document.activeElement).toBe(buttons[buttons.length-1]);
-  click('All levels'); act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-  expect(host.querySelector('[role="tablist"]')).not.toBeNull(); expect(cancel).not.toHaveBeenCalled();
+  click('Levels'); act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(host.querySelector('.worm-path-split')).not.toBeNull(); expect(cancel).not.toHaveBeenCalled();
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); expect(cancel).toHaveBeenCalledOnce();
 });
 it('resumes at the next unlocked level and lets a completed level claim its reward from the map', () => {

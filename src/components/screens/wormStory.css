@@ -159,9 +159,3 @@
 .worm-world-tile { display:block; aspect-ratio:1; overflow:hidden; border-radius:7px; border:1px solid #ffffff40; box-shadow:0 2px 0 #0004; }
 .worm-level-grid button { background:linear-gradient(145deg,color-mix(in srgb,var(--world-color) 28%,transparent),transparent),var(--wiz-surface); }
 .worm-level-grid button.selected { background:linear-gradient(145deg,color-mix(in srgb,var(--world-color) 40%,transparent),transparent),var(--wiz-surface); color:var(--wiz-text); box-shadow:0 0 0 2px var(--mode-accent),0 3px 0 #091417; }
-
-/* Keep the level map and wardrobe in the same game as the ready screen. */
-.worm-entry-brand { padding:20px 24px 8px; flex:none; }
-.worm-entry-nav>span { font:400 20px/1.2 var(--display-font); color:#0b203c; }
-@media(max-width:600px) { .worm-entry { padding:0; }.worm-entry-sheet { border-radius:0; }.worm-entry-brand { padding:max(16px,env(safe-area-inset-top)) 18px 6px; }.worm-entry-brand .worm-wordmark { font-size:48px; } }
-@media(max-height:520px) { .worm-entry-brand { display:none; } }
