@@ -1,6 +1,4 @@
 import ModeArtwork from '../ui/ModeArtwork.jsx';
-import { ArcadeHeader, ArcadeAction } from '../ui/ArcadeChrome.jsx';
-import { useGameStore } from '../../hooks/useGameStore.js';
 import { wormMenuFeedback } from './wormMenuFeedback.js';
 // Shared forecast-style setup shell for CUBE, WORM, CHAOS and RANDOM.
 // Scoped CSS variables keep paper styling for notebook and store consumers.
@@ -93,14 +91,14 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       // dvh tracks the collapsing mobile URL bar; browsers without it fall back
       // to the inset:0 box, which is what this used to rely on entirely.
       height: '100dvh',
-      padding: mobile ? 0 : 18,
+      padding: mobile ? 'max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left))' : 18,
       boxSizing: 'border-box',
       animation: 'modalBackdropIn 0.22s ease'
     },
 
     sheet: {
       ...wizardBackground(accent),
-      borderRadius: mobile ? 0 : 24,
+      borderRadius: mobile ? 20 : 24,
       width: mobile ? '100%' : 'min(720px, 96vw)',
       height: '100%',
       maxHeight: mobile ? '100%' : '94dvh',
@@ -592,13 +590,12 @@ export function WizardShell({
   );
 
   return (
-    <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${theme.name} setup`} className="mode-wizard arcade-setup" style={{ ...styles.overlay, '--mode-accent': accent, '--mode-shadow': theme.shadow, '--mode-ink': theme.shadow }}>
+    <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${theme.name} setup`} className="mode-wizard" style={{ ...styles.overlay, '--mode-accent': accent, '--mode-ink': theme.shadow }}>
       {children}
 
-      <div className="mode-wizard-sheet arcade-paper" style={styles.sheet}>
-        <div className="mode-wizard-brand"><ArcadeHeader onSettings={() => useGameStore.getState().setShowSettings(true)} /></div>
+      <div className="mode-wizard-sheet" style={styles.sheet}>
         <div style={styles.modeBar}>
-          <button type="button" onClick={onBack} className="arcade-icon-button" aria-label="Back">
+          <button type="button" onClick={onBack} className="ui-focusable" style={styles.backBtn} aria-label="Back">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M10 3L5 8l5 5" />
             </svg>
@@ -633,9 +630,15 @@ export function WizardShell({
         </div>
         <div style={styles.footer}>
           <div className="mode-wizard-step-track" aria-hidden="true">{categories.map((item, i) => <i key={item.key} data-reached={i <= active} />)}</div>
-          <ArcadeAction onClick={() => { wormMenuFeedback(); onPrimary(); }}>
-            {last ? finishLabel : (cat.primaryLabel || 'Next')}
-          </ArcadeAction>
+          <button
+            type="button"
+            style={styles.btnPrimary}
+            onClick={() => { wormMenuFeedback(); onPrimary(); }}
+            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.08)'; }}
+            onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
+          >
+            {last ? finishLabel : (cat.primaryLabel || 'Next')} <span aria-hidden="true">→</span>
+          </button>
 
           {secondary && (
             <button

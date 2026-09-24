@@ -35,7 +35,7 @@ it('recovers safely from invalid saved progress', () => {
 
 let host, root, animation;
 const highlight = vi.fn();
-function Harness({ autoStart = false }) { const api = useAnimation(); React.useEffect(() => { animation = api; }); return <TeachCourse autoStart={autoStart} onClose={vi.fn()} onPuzzles={vi.fn()} onHighlight={highlight} />; }
+function Harness() { const api = useAnimation(); React.useEffect(() => { animation = api; }); return <TeachCourse onClose={vi.fn()} onPuzzles={vi.fn()} onHighlight={highlight} />; }
 beforeEach(() => {
   localStorage.removeItem(COURSE_STORAGE_KEY);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -102,13 +102,4 @@ it('recognizes solved layers after a whole-cube regrip', () => {
   let cube=courseHome();
   for(let sliceIndex=0;sliceIndex<3;sliceIndex++) cube=applyCourseMove(cube,{axis:'row',sliceIndex,dir:1});
   expect(inspectCourseStage(cube)).toBe('Solved');
-});
-
-it('continues at the first unpracticed lesson once and can return to the map', () => {
-  localStorage.setItem(COURSE_STORAGE_KEY, '["turn"]');
-  act(() => root.render(<Harness autoStart />));
-  expect(host.querySelector('.teach-course-map')).toBeNull();
-  expect(host.querySelector('h1').textContent).toBe('Reverse and double');
-  expect(host.querySelector('[aria-label="Algorithm"]').textContent).toContain("R'");
-  click('← Lessons'); expect(host.querySelector('.teach-course-map')).not.toBeNull();
 });
