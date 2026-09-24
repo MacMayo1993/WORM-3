@@ -1,4 +1,9 @@
 import WormWordmark from '../branding/WormWordmark.jsx';
+import { ArcadeHeader, ArcadeAction, ArcadeArtwork } from '../ui/ArcadeChrome.jsx';
+import { MODE_THEMES } from '../../utils/modeThemes.js';
+import { readCourseProgress } from '../../teach/course.js';
+import './modeCarousel.css';
+import { useDialogBehavior } from '../ui/Panel.jsx';
 import { createModePlateArtwork } from '../../3d/modePlateArtwork.js';
 import '../ui/screenDesign.css';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
@@ -31,9 +36,8 @@ import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import MenuGridGlow from './MenuGridGlow.jsx';
-import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
-import { UI_FONT, DISPLAY_FONT, PAPER_SHEET, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_BG_MUTED, Z } from '../../utils/uiTheme.js';
-import { TOUCH_TARGET } from '../ui/Button.jsx';
+import { ANTIPODAL_COLOR, readableInk } from '../../utils/constants.js';
+import { UI_FONT, DISPLAY_FONT, PAPER_SHEET, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_BORDER, Z } from '../../utils/uiTheme.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
@@ -1105,28 +1109,12 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 
 // ─── Mode carousel constants ──────────────────────────────────────────────────
 
-// Six modes, six faces: each mode lives on the cube face whose canonical color
-// matches its tileColor (red PZ, green NX, white PY, orange NZ, blue PX,
-// yellow NY). Swiping the carousel rotates the live 3D menu cube to present
-// that mode's face; PLAY dives through the face into the mode.
-/**
- * Each mode owns a cube face, and its carousel colour is simply that face's
- * sticker colour — no longer a hand-picked hex per mode.
- *
- * The hand-picked set had drifted off the cube it is meant to represent: STORE
- * sat on PY, which is the WHITE face, but was rendering teal; and the red and
- * orange modes were #ef4444/#f97316, only ~25 degrees of hue apart at the same
- * lightness, so the two read as a pair of reds rather than as red and orange.
- * Deriving from RUBIKS_FACE_COLORS makes the carousel a picture of the cube,
- * and makes a wrong colour impossible to introduce by hand.
- *
- * `ink` is computed from the fill's luminance, which matters now that two faces
- * are light: every mode previously hardcoded white type, which on the yellow
- * face was already weak and on the new white face would have been invisible.
- */
-const withFaceColor = (mode) => {
-  const tileColor = RUBIKS_FACE_COLORS[DIR_TO_COLOR[mode.face]];
-  return { ...mode, tileColor, textColor: readableInk(tileColor) };
+// Preserve each mode's face so the existing 3D launch transition stays stable.
+// Mode accents are shared with setup screens; they are independent of stickers.
+const withModeColor = (mode) => {
+  const theme = MODE_THEMES[mode.id === 'freeplay' ? 'cube' : mode.id === 'cube' ? 'teach' : mode.id] ?? { accent: '#79dfd1', shadow: '#35857a' };
+  const tileColor = theme.accent;
+  return { ...mode, tileColor, shadow: theme.shadow, textColor: readableInk(tileColor) };
 };
 
 // The title and chips identify the mode; the disclosure explains its rules.
@@ -1167,7 +1155,7 @@ const CAROUSEL_MODES = [
     chips: ['No cube', 'Cosmetic'],
     cta: 'OPEN STORE',
   },
-].map(withFaceColor);
+].map(withModeColor);
 
 const LAST_MODE_KEY = 'worm3_last_mode_id';
 
@@ -1225,11 +1213,13 @@ const stageBaselineFor = (w, h) => (w <= 600 ? Math.min(0.45 * h, 395) : Math.mi
 const MAX_STAGE_GROWTH = 1.45;
 
 // ─── Mode carousel overlay ───────────────────────────────────────────────────
-// Clean, single-card implementation. No overlapping absolutely-positioned tiles,
-// no CSS transform transitions on positioned elements → no GPU compositor ordering
-// issues on mobile Chrome.
+// The DOM owns the illustrated cards; the shared 3D cube owns the launch dive.
+// Neighbour cards stay inside an isolated deck so mobile compositing cannot leak
+// them above the active card or footer.
 
-export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon }) => {
+export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onSettings }) => {
+  const dialogRef = useRef(null);
+  const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
   // Open on the last-played mode so returning players are one tap from their game.
   const [activeIndex, setActiveIndex] = useState(() => {
     try {
@@ -1244,8 +1234,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   const parityPoints = useGameStore(s => s.parityPoints);
   const ownedItems = useGameStore(s => s.ownedItems);
   const recordModePlay = useGameStore(s => s.recordModePlay);
-  const touchStartX = useRef(null);
-  const mouseStartX = useRef(null);
+  const pointerStart = useRef(null);
+  const suppressClick = useRef(false);
+  const [courseProgress] = useState(readCourseProgress);
   const animatingRef = useRef(false);
   const activeIndexRef = useRef(activeIndex);
   const timerRef = useRef(null);
@@ -1300,7 +1291,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   }, []);
 
   const launch = useCallback((id) => {
-    if (id === 'cube')             onCubeSelect?.();
+    if (id === 'cube')             onCubeSelect?.({ resume: true });
     else if (id === 'worm')        onWormSelect?.();
     else if (id === 'chaos')       onChaos?.();
     else if (id === 'freeplay')    onFreeplay?.();
@@ -1313,7 +1304,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   // the dive request and fires the callback when the face fills the screen;
   // a fallback timer launches anyway if the canvas is unavailable.
   const handlePlay = useCallback(() => {
-    if (divingRef.current) return;
+    if (divingRef.current || animatingRef.current) return;
     divingRef.current = true;
     setDiving(true);
     vibrate(18);
@@ -1331,10 +1322,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
   useEffect(() => {
     const fn = (e) => {
-      if (e.key === 'ArrowLeft') navigate(-1);
-      if (e.key === 'ArrowRight') navigate(1);
-      if (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a, input, select, textarea'))) handlePlay();
-      if (e.key === 'Escape') onBack();
+      if (divingRef.current) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); navigate(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); navigate(1); }
+      if (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a, input, select, textarea, summary'))) handlePlay();
     };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
@@ -1345,15 +1336,11 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   // it also changes when something else in the column grows (a longer mode
   // description, a stat row appearing), not only when the window resizes.
   const stageRef = useRef(null);
-  const [stageBaseline, setStageBaseline] = useState(
-    () => stageBaselineFor(window.innerWidth, window.innerHeight)
-  );
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
     const publish = () => {
       const baseline = stageBaselineFor(window.innerWidth, window.innerHeight);
-      setStageBaseline(baseline);
       setCarouselStage({ height: el.getBoundingClientRect().height, baseline });
     };
     publish();
@@ -1370,188 +1357,63 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   }, []);
 
   const mode = CAROUSEL_MODES[activeIndex];
-  const modeChips = useMemo(() => chipsFor(mode), [mode]);
-  const statItems = useMemo(
-    () => modeStatItems(mode, {
-      plays: modePlays,
-      points: parityPoints ?? 0,
-      owned: ownedItems?.length ?? 0,
-    }),
-    [mode, modePlays, parityPoints, ownedItems]
-  );
-  const opacity = show ? 1 : 0;
-
-  const arrowStyle = {
-    background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
-    borderRadius: '50%', width: '48px', height: '48px', flexShrink: 0,
-    color: PAPER_TEXT, fontSize: '24px', lineHeight: 1,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-    pointerEvents: 'auto',
+  const previous = CAROUSEL_MODES[(activeIndex - 1 + N) % N];
+  const next = CAROUSEL_MODES[(activeIndex + 1) % N];
+  const statItems = modeStatItems(mode, { plays: modePlays, points: parityPoints ?? 0, owned: ownedItems?.length ?? 0 });
+  const artMode = item => item.id === 'cube' ? 'teach' : item.id === 'freeplay' ? 'cube' : item.id;
+  const themeStyle = item => ({ '--mode-accent': item.tileColor, '--mode-shadow': item.shadow });
+  const taglines = { worm: 'Levels + Free Play', freeplay: 'Find your flow', cube: 'Learn to solve', chaos: 'Pick your pair', random: 'Expect the unexpected', store: 'Make it yours' };
+  const playLabel = mode.id === 'cube' ? (courseProgress.length ? 'Continue lesson' : 'Start learning') : mode.id === 'store' ? 'Open store' : `Play ${mode.label}`;
+  const secondary = () => {
+    if (mode.id === 'cube') onCubeSelect?.({ resume: false });
+    else if (mode.id === 'worm') onWormSelect?.({ page: 'customize' });
+    else launch(mode.id);
   };
-
   const swipeHandlers = {
-    onTouchStart: e => { touchStartX.current = e.touches[0].clientX; },
-    onTouchEnd: e => {
-      if (touchStartX.current === null) return;
-      const delta = e.changedTouches[0].clientX - touchStartX.current;
-      touchStartX.current = null;
-      if (Math.abs(delta) > 40) { e.preventDefault(); navigate(delta < 0 ? 1 : -1); }
+    onPointerDown: e => { pointerStart.current = { x: e.clientX, y: e.clientY }; suppressClick.current = false; },
+    onPointerUp: e => {
+      const start = pointerStart.current; pointerStart.current = null;
+      if (!start) return;
+      const dx = e.clientX - start.x, dy = e.clientY - start.y;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+        suppressClick.current = true; navigate(dx < 0 ? 1 : -1);
+      }
     },
-    onMouseDown: e => { mouseStartX.current = e.clientX; },
-    onMouseUp: e => {
-      if (mouseStartX.current === null) return;
-      const delta = e.clientX - mouseStartX.current;
-      mouseStartX.current = null;
-      if (Math.abs(delta) > 40) navigate(delta < 0 ? 1 : -1);
-    },
-    onMouseLeave: () => { mouseStartX.current = null; },
+    onPointerCancel: () => { pointerStart.current = null; },
+    onPointerLeave: e => { if (e.pointerType === 'mouse') pointerStart.current = null; },
+    onClickCapture: e => { if (suppressClick.current) { e.preventDefault(); e.stopPropagation(); suppressClick.current = false; } },
   };
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: Z.MENU, overflowY: 'auto' }}>
-
-      {/* Edge vignette only — the center stays clear so the live 3D cube
-          (rotating to the active mode's face) reads through the overlay.
-          It had stopped being an edge: 0.78 opaque by 74% of the radius and
-          0.97 at the corner, which is past a frame and into fog. It washed the
-          backdrop out to near-paper and left the edges of the screen BRIGHTER
-          than its middle, the opposite of what a vignette is for. The controls
-          do not depend on it — the pills, arrows and card all carry their own
-          PAPER_SHEET backgrounds — so it only has to soften the photo where it
-          meets the frame. */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle at 50% 38%, rgba(245,240,232,0) 0%, rgba(245,240,232,0) 55%, rgba(245,240,232,0.30) 86%, rgba(245,240,232,0.62) 100%)',
-      }} />
-
-      <style>{`
-        .mc-arrow:active { background: #ede8df !important; }
-        /* Keep utility actions comfortable to tap on phones. */
-        .mc-pill         { min-height: 48px; }
-        .mc-pill:hover   { filter: brightness(1.14); }
-        .mc-pill:active  { transform: scale(0.97); }
-      `}</style>
-
-      {/* Scroll column — DOM fades out during the PLAY dive so the cube face
-          filling the screen is the only thing left on it. */}
-      <div style={{
-        position: 'relative', zIndex: 1,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        minHeight: '100%', boxSizing: 'border-box',
-        paddingTop: 'max(20px, env(safe-area-inset-top, 20px))',
-        paddingBottom: `calc(max(20px, env(safe-area-inset-bottom, 20px)) + ${MENU_BUTTON_LIFT_PX}px)`,
-        paddingLeft: '12px', paddingRight: '12px',
-        opacity: diving ? 0 : 1,
-        transition: 'opacity 420ms ease',
-        pointerEvents: diving ? 'none' : 'auto',
-      }}>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: 'min(560px, 100%)', minHeight: 48 }}>
-            <button
-              type="button" className="mc-pill" onClick={onBack}
-              style={{
-                background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
-                borderRadius: '100px', padding: '8px 18px',
-                color: PAPER_TEXT, fontSize: '11.5px', fontWeight: 700,
-                letterSpacing: "0.01em", cursor: 'pointer', fontFamily: MENU_FONT,
-                transition: 'filter 160ms ease, background 160ms ease',
-                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-              }}
-            >Back</button>
-        <p style={{ margin: 0, fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: PAPER_TEXT, fontFamily: UI_FONT, background: PAPER_SHEET, border: `1px solid ${PAPER_BORDER}`, borderRadius: '100px', padding: '8px 16px' }}>
-          Play
-        </p>
-        </div>
-
-        {/* Cube window — transparent stage for the live 3D cube behind this
-            overlay. Swipe here (or use the arrows) to rotate the cube from
-            face to face; every mode owns one of the six faces. */}
-        <div
-          {...swipeHandlers}
-          ref={stageRef}
-          className="mc-cube-window"
-          style={{
-            position: 'relative', width: 'min(560px, 96vw)', marginTop: 16,
-            // The stage used to be a fixed height that refused to shrink, so a
-            // tall viewport's leftover pixels fell past it and pooled as dead
-            // space above PLAY. Growing into that space is what turns the gap
-            // into a bigger cube. The old height stays as the floor, so nothing
-            // about a short screen changes.
-            flex: '1 1 auto', minHeight: stageBaseline, maxHeight: stageBaseline * MAX_STAGE_GROWTH,
-            userSelect: 'none', touchAction: 'pan-y',
-          }}
-        >
-          <button type="button" className="mc-arrow" aria-label="Previous mode" onClick={() => navigate(-1)}
-            style={{ ...arrowStyle, position: 'absolute', left: '2px', top: '50%', transform: 'translateY(-50%)' }}>&lsaquo;</button>
-          <button type="button" className="mc-arrow" aria-label="Next mode" onClick={() => navigate(1)}
-            style={{ ...arrowStyle, position: 'absolute', right: '2px', top: '50%', transform: 'translateY(-50%)' }}>&rsaquo;</button>
-        </div>
-
-        {/* Face map — one colored tile per cube face, tap to jump */}
-        {/* The gap moves onto the buttons as transparent padding so the tap
-            targets tile edge to edge instead of leaving 8px dead gutters
-            between 12px dots. The coloured bar inside is unchanged, so the
-            row looks identical — it is only the hit area that grows. */}
-        <div style={{ display: 'flex', gap: 0, alignItems: 'center', marginTop: 0 }}>
-          {CAROUSEL_MODES.map((m, i) => (
-            <button
-              key={m.id} type="button" aria-label={`Show ${m.label} mode`} aria-current={i === activeIndex ? "true" : undefined} title={m.label}
-              onClick={() => selectIndex(i)}
-              className="ui-focusable"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                height: TOUCH_TARGET, padding: '0 4px',
-                background: 'none', border: 'none', borderRadius: '8px',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-              }}
-            >
-              <span
-                style={{
-                  display: 'block',
-                  width: i === activeIndex ? '26px' : '12px', height: '12px',
-                  borderRadius: '4px',
-                  background: m.tileColor,
-                  // No dimming at all. 0.45 pushed every inactive dot toward the
-                  // scene behind it — the yellow face read as mustard, red and
-                  // orange collapsed into one brown, and the white face came out
-                  // grey, which is the one colour that cannot survive being
-                  // faded. The active dot is already marked by width and outline,
-                  // so opacity was carrying no load the shape was not.
-                  opacity: 1,
-                  boxShadow: i === activeIndex ? `0 0 0 2px ${PAPER_TEXT}` : `0 0 0 1px ${PAPER_BORDER}`,
-                  transition: 'width 200ms ease, opacity 200ms ease',
-                }}
-              />
-            </button>
-          ))}
-        </div>
-
-        <div className="mc-mode-copy" style={{ opacity, transition: 'opacity 150ms ease', '--mode-accent': mode.tileColor }}>
-          <article aria-label={`${mode.label} mode details`}>
-            <header><div><h2>{mode.label}</h2></div><span aria-hidden="true" /></header>
-            <div className="mc-mode-facts">{modeChips.map(chip => <span key={chip}>{chip}</span>)}</div>
-            <details key={mode.id}>
-              <summary className="ui-focusable">{mode.id === 'store' ? 'GEAR & REWARDS' : 'HOW TO PLAY'}</summary>
-              <p>{mode.how}</p>
-              {statItems.length > 0 && <div className="mc-mode-history">{statItems.map(stat => <div key={stat.label}><strong>{stat.value}</strong><small>{stat.label}</small></div>)}</div>}
-            </details>
-          </article>
-        </div>
-
-        {/* Bottom action area grows into the available space on tall phones. */}
-        <div style={{ width: 'min(400px, 94vw)', marginTop: 'auto', paddingTop: 12 }}>
-          <button
-            type="button" className="mc-play" onClick={handlePlay}
-            style={{ '--play-color': mode.tileColor, '--play-ink': mode.textColor, fontFamily: DISPLAY_FONT }}
-          ><span className="worm-cta-emblem"><MenuCubeGlyph /></span><span className="worm-cta-label">{mode.cta || "Play"}</span><span className="worm-cta-glyph" aria-hidden="true">→</span></button>
-
-
-        </div>
-
+  return <section ref={dialogRef} onKeyDown={onDialogKeyDown} inert={diving ? '' : undefined} tabIndex={-1} role="dialog" aria-modal="true" className={`mode-carousel arcade-paper${diving ? ' is-diving' : ''}`} aria-label="Choose your mode" style={{ ...themeStyle(mode), zIndex: Z.MENU }}>
+    <div className="mc-shell">
+      <ArcadeHeader onHome={onBack} onSettings={onSettings} />
+      <h1 className="mc-heading">Choose your mode</h1>
+      <div className={`mc-deck${show ? '' : ' is-changing'}`} {...swipeHandlers}>
+        {[{ item: previous, side: 'previous', direction: -1 }, { item: next, side: 'next', direction: 1 }].map(({ item, side, direction }) =>
+          <button key={side} className={`mc-peek mc-peek--${side}`} style={themeStyle(item)} onClick={() => navigate(direction)} aria-label={`Show ${item.label} mode`} disabled={diving}>
+            <span>{item.label}</span><ArcadeArtwork mode={artMode(item)} />
+          </button>)}
+        <article className="mc-card" data-mode={mode.id} aria-label={`${mode.label} mode details`} ref={stageRef}>
+          <h2>{mode.label}</h2>
+          <ArcadeArtwork mode={artMode(mode)} />
+          <p className="mc-card-tagline">{taglines[mode.id]}</p>
+        </article>
+        <button type="button" className="arcade-icon-button mc-arrow mc-arrow--previous" aria-label="Previous mode" disabled={diving} onClick={() => navigate(-1)}>‹</button>
+        <button type="button" className="arcade-icon-button mc-arrow mc-arrow--next" aria-label="Next mode" disabled={diving} onClick={() => navigate(1)}>›</button>
       </div>
+      <nav className="mc-pagination" aria-label="Game modes">
+        {CAROUSEL_MODES.map((item, i) => <button key={item.id} type="button" aria-label={`Select ${item.label} mode`} aria-current={i === activeIndex ? 'true' : undefined} disabled={diving} onClick={() => selectIndex(i)} style={themeStyle(item)}><span /></button>)}
+      </nav>
+      <p className="mc-description" aria-live="polite" aria-atomic="true">{mode.how}</p>
+      <footer className="mc-footer">
+        <ArcadeAction onClick={handlePlay} disabled={diving || !show}>{playLabel}</ArcadeAction>
+        <div className="mc-footer-links">
+          {mode.id !== 'store' && <button className="arcade-link" disabled={diving} onClick={secondary}>{mode.id === 'cube' ? 'All lessons' : 'Customize'}</button>}
+          <details key={mode.id} className="mc-details"><summary>Mode info</summary><div><p>{mode.chips.join(' · ')}</p>{statItems.map(stat => <p key={stat.label}>{stat.label}: <strong>{stat.value}</strong></p>)}</div></details>
+        </div>
+      </footer>
     </div>
-  );
+  </section>;
 };
 
 // ─── Start button ─────────────────────────────────────────────────────────────

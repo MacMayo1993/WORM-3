@@ -1,0 +1,25 @@
+.worm-ready { position:fixed; inset:0; height:100dvh; overflow:auto; }
+.worm-ready-shell { box-sizing:border-box; width:min(520px,100%); margin:auto; height:100%; min-height:0; display:flex; flex-direction:column; gap:14px; padding:max(18px,env(safe-area-inset-top)) 24px max(12px,env(safe-area-inset-bottom)); }
+.worm-ready-heading { display:flex; align-items:center; gap:22px; flex:none; }
+.worm-ready-heading h1 { margin:0; font:400 36px/1.2 var(--display-font); }
+.worm-ready-hero { position:relative; min-height:200px; max-height:390px; flex:1; overflow:hidden; border:2px solid #8bf36d; border-radius:24px; background:radial-gradient(ellipse at 35% 10%,#8be95b,#26ac32 70%); box-shadow:inset 0 2px 0 #ffffff80,0 3px 0 #208329,0 7px 12px #51442420; }
+.worm-ready-hero .arcade-artwork { position:absolute; height:120%; width:100%; top:0; }
+.worm-ready-tabs { display:flex; flex:none; min-height:48px; background:linear-gradient(#fff8e9,#f1e5c8); border:1px solid #dfcfae; border-radius:17px; box-shadow:inset 0 2px 0 #fff,0 2px 0 #d8c9aa; }
+.worm-ready-tabs button { flex:1; border:0; background:none; color:#203c55; border-radius:16px; font:400 16px/1.2 var(--display-font); text-transform:uppercase; cursor:pointer; }
+.worm-ready-tabs [aria-selected=true] { background:linear-gradient(#55e743,#1fb82d); color:#fffdf2; text-shadow:0 1px 0 #1c6625; border:1px solid #209c25; box-shadow:inset 0 2px 0 #b1ff8f,0 2px 0 #208329; }
+.worm-ready-objective { display:flex; align-items:center; gap:14px; flex:none; min-height:58px; padding:10px 16px; border:1px solid #daceb6; border-radius:18px; background:#fff9efaa; box-shadow:inset 0 2px 0 #fff; }
+.worm-ready-objective strong { flex:none; font:400 15px/1.3 var(--display-font); text-transform:uppercase; }
+.worm-ready-objective>span { border-left:1px solid #d1c5ad; padding-left:14px; font-size:13px; line-height:1.4; font-weight:750; }
+.worm-ready-options { display:flex; flex:none; align-items:center; justify-content:space-between; gap:8px; }
+.worm-ready-look { display:flex; align-items:center; gap:10px; min-width:0; }
+.worm-ready-look img { border:1px solid #dacba8; border-radius:16px; padding:4px; background:#fffdf5; box-shadow:0 2px 0 #d6c4a3; }
+.worm-ready-look small { display:block; font-weight:850; font-size:12px; }.worm-ready-look span { display:block; font-size:11px; color:#536d85; margin-top:3px; }
+.worm-ready-options .arcade-link { padding-inline:4px; font-size:13px; }
+.worm-ready-footer { text-align:center; flex:none; margin-top:auto; }
+@media(max-height:740px) { .worm-ready-shell { min-height:0; gap:10px; padding-top:max(10px,env(safe-area-inset-top)); }.worm-ready-hero { min-height:155px; }.worm-ready-heading h1 { font-size:28px; }.worm-ready-objective { min-height:50px; padding:8px 12px; }.worm-ready-look img { width:48px; height:48px; }.worm-ready-footer .arcade-action { min-height:58px; } }
+@media(max-width:350px) { .worm-ready-shell { padding-inline:16px; }.worm-ready-objective { gap:10px; }.worm-ready-objective strong { font-size:13px; }.worm-ready-objective>span { font-size:12px; padding-left:10px; }.worm-ready-look small { max-width:100px; } }
+@media(max-height:500px) and (min-width:600px) { .worm-ready-shell { width:min(900px,100%); min-height:360px; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto auto 1fr auto; column-gap:24px; gap:8px 24px; }.worm-ready-shell>.arcade-brand { grid-column:2; }.worm-ready-heading { grid-column:1; grid-row:1; }.worm-ready-hero { grid-column:1; grid-row:2/6; height:100%; max-height:none; }.worm-ready-tabs { grid-column:2; grid-row:2; }.worm-ready-objective { grid-column:2; grid-row:3; }.worm-ready-options { grid-column:2; grid-row:4; }.worm-ready-footer { grid-column:2; grid-row:5; } }
+
+.worm-ready-content { display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; gap:14px; padding-bottom:4px; }
+@media(max-height:740px) { .worm-ready-content { gap:10px; } }
+@media(max-height:500px) and (min-width:600px) { .worm-ready-content { display:contents; } }

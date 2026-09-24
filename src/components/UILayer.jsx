@@ -527,7 +527,7 @@ export default function UILayer({
 
       <ScreenTransition show={showWormModeWizard}>
         <Suspense fallback={<ScreenFallback label="Loading setup" />}>
-          <WormEntryScreen initialPage={wormEntryPage} onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
+          <WormEntryScreen onSettings={onMenuSettings} initialPage={wormEntryPage} onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
         </Suspense>
       </ScreenTransition>
 
@@ -576,7 +576,7 @@ export default function UILayer({
 
       <ScreenTransition show={teachMode.active} freezeOnExit>
         <Suspense fallback={null}>
-          {teachMode.courseActive ? <TeachCourse onHighlight={teachMode.setLayerHighlight} onClose={() => { teachMode.exitTeachMode(); onBackToMainMenu(); }} onPuzzles={onMenuLevels} /> : <TeachMode
+          {teachMode.courseActive ? <TeachCourse autoStart={teachMode.courseResume} onHighlight={teachMode.setLayerHighlight} onClose={() => { teachMode.exitTeachMode(); onBackToMainMenu(); }} onPuzzles={onMenuLevels} /> : <TeachMode
             analysis={teachMode.analysis}
             stages={teachMode.stages}
             methodName={teachMode.methodName}

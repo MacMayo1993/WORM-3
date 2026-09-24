@@ -25,3 +25,21 @@
 .teach-course summary { cursor:pointer; min-height:30px; }
 .teach-course-compact .teach-explanation { display:none; }
 @media(max-width:640px) { .teach-course:not(.teach-course-map) { top:auto; bottom:76px; left:8px; right:8px; width:auto; max-height:45dvh; padding:12px; } .teach-course h1 { font-size:20px; } .teach-course-map { inset:12px 8px 76px; } }
+
+.teach-course-map.arcade-paper { inset:0; width:100%; height:100dvh; padding:0; border:0; border-radius:0; z-index:10000; box-shadow:none; color:#0b203c; }
+.teach-map-shell { box-sizing:border-box; display:flex; flex-direction:column; gap:14px; width:min(560px,100%); height:100%; min-height:500px; margin:auto; padding:max(18px,env(safe-area-inset-top)) 24px max(12px,env(safe-area-inset-bottom)); }
+.teach-course .arcade-home,.teach-course .arcade-link { border:0; background:none; }
+.teach-course .arcade-home { padding:0 0 6px; }.teach-course .arcade-link { color:#536d85; font-size:14px; }
+.teach-course .arcade-icon-button { padding:0; border-radius:16px; font-size:28px; background:linear-gradient(#fffef8,#f6ecd8); border-color:#ddd1bb; }
+.teach-map-heading { justify-content:flex-start!important; gap:22px!important; flex:none; }
+.teach-map-heading h1 { margin:0; font:400 32px/1.2 var(--display-font); text-transform:uppercase; }
+.teach-map-scroll { min-height:0; flex:1; overflow:auto; overscroll-behavior:contain; padding:0 4px 8px; }
+.teach-map-hero { display:flex; align-items:center; min-height:150px; padding:8px 16px; border-radius:22px; border:2px solid #ffe880; background:radial-gradient(ellipse at top left,#fff19b,#ffd52d 70%); box-shadow:inset 0 2px 0 #fff8,0 3px 0 #be8509; }
+.teach-map-hero .arcade-artwork { width:46%; height:160px; flex:none; }.teach-map-hero h2 { font:400 24px/1.2 var(--display-font); text-transform:uppercase; margin:0; }.teach-map-hero p { font-size:12px; line-height:1.4; margin:8px 0 0; }
+.teach-course-map .teach-progress { color:#657184; font-size:12px; font-weight:800; margin:18px 0 12px; }
+.teach-course-map .teach-lesson-list button { border-color:#ddcfb5; border-radius:15px; background:#fffdf6; color:#17314d; min-height:68px; box-shadow:0 2px 0 #d7c9ae; }
+.teach-course-map .teach-lesson-list button>span:first-child { display:grid; place-items:center; width:36px; height:36px; flex:none; background:#fff0a7; border-radius:11px; color:#775817; font-weight:850; }
+.teach-course-map small { color:#6a7380; }.teach-course-map .teach-lesson-list strong { font-size:14px; }
+.teach-map-footer { flex:none; text-align:center; padding-top:2px; }
+.teach-course .arcade-action { border:2px solid #fff098; border-radius:22px; background:linear-gradient(170deg,#fff18f,#ffd52d 60%); color:#092039; font:400 20px/1.2 var(--display-font); padding:12px 16px; }
+@media(max-height:650px) { .teach-map-shell { gap:8px; padding-top:10px; }.teach-map-hero { min-height:120px; }.teach-map-hero .arcade-artwork { height:120px; }.teach-map-hero h2 { font-size:20px; }.teach-map-footer .arcade-action { min-height:54px; } }

@@ -836,7 +836,7 @@ export default function WORM3() {
     useGameStore.getState().setShowMainMenu(true);
   }, []);
 
-  const handleMenuTeach = useCallback(() => {
+  const handleMenuTeach = useCallback((options = {}) => {
     const state = useGameStore.getState();
     state.setShowMainMenu(false);
     setShowCubeModeSelect(false);
@@ -850,11 +850,11 @@ export default function WORM3() {
     state.setHollowMode(false);
     state.setShowTunnels(false);
     state.setSize(3);
-    teachMode.enterTeachMode({ course: true });
+    teachMode.enterTeachMode({ course: true, resume: options.resume === true });
   }, [cancelShuffle, teachMode]);
 
-  const handleMenuWormHealer = useCallback(() => {
-    setWormEntryPage('choice');
+  const handleMenuWormHealer = useCallback((options = {}) => {
+    setWormEntryPage(options.page === 'customize' ? 'customize' : 'choice');
     useGameStore.getState().setShowMainMenu(false);
     setShowWormModeWizard(true);
   }, []);
@@ -944,6 +944,7 @@ export default function WORM3() {
   const handleWormWizardCancel = useCallback(() => {
     clearMegaReducedFXOverride();
     setShowWormModeWizard(false);
+    setShowModeSelect(true);
     useGameStore.getState().setShowMainMenu(true);
   }, [clearMegaReducedFXOverride]);
 
@@ -1351,12 +1352,13 @@ export default function WORM3() {
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Suspense fallback={<LoadingScreen message="Loading guide" />}><Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} /></Suspense>
       </ScreenTransition>
-      {showModeSelect && (
+      {showModeSelect && !showSettings && (
         <Suspense fallback={null}>
           <ModeCarousel
             onBack={() => setShowModeSelect(false)}
-            onCubeSelect={() => { setShowModeSelect(false); handleMenuTeach(); }}
-            onWormSelect={() => { setShowModeSelect(false); handleMenuWormHealer(); }}
+            onCubeSelect={options => { setShowModeSelect(false); handleMenuTeach(options); }}
+            onSettings={handleMenuSettings}
+            onWormSelect={options => { setShowModeSelect(false); handleMenuWormHealer(options); }}
             onChaos={() => { setShowModeSelect(false); handleMenuDisparity(); }}
             onFreeplay={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
             onRandom={() => { setShowModeSelect(false); handleMenuRandomMode(); }}
@@ -1371,12 +1373,8 @@ export default function WORM3() {
       )}
 
       </CaptureChrome>
-      {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
-          Also renders the main-menu cube scene so there is never a second WebGL context.
-          Stays VISIBLE while the mode selector is open: the carousel is a transparent
-          overlay and the live menu cube (rotating to the active mode's face) is its
-          centerpiece. The carousel deliberately avoids CSS transforms on positioned
-          elements so the old mobile-Chrome compositor bleed-through cannot recur. */}
+      {/* One persistent WebGL context for the intro, menu and game. The mode
+          cards fade away for the existing cube-face launch transition. */}
       <CanvasErrorBoundary>
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas
