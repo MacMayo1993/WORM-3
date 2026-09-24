@@ -14,7 +14,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 const EXPECTED_KEYS = [
   'captureMode', 'setCaptureMode',
   'wormStoryLevel', 'wormStoryStarted', 'wormStoryReady', 'wormStoryTarget', 'wormStoryProgress', 'wormStoryChecklist', 'wormStoryResult', 'startWormStory', 'completeWormStory', 'claimWormStoryReward',
-  'wormStoryVisualBase', 'applyWormStoryLook',
+  'wormStoryVisualBase', 'wormStoryViewBase', 'applyWormStoryLook',
   'chaosExperience', 'chaosFocusFaces', 'chaosRecord', 'setChaosFocusFaces', 'startChaosExperience', 'recordChaosTick', 'finishChaosExperience',
   'xpActivityRuns', 'beginAchievementActivity',
   'playerProgress', 'xpRun', 'xpNotice', 'showPlayerProgress', 'setShowPlayerProgress',

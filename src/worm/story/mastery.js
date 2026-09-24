@@ -5,6 +5,7 @@ import { BODY_BALL_SPACING } from '../healerWorm/constants.js';
 
 export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning'];
 const HINTS = { rocket: 'Rocket: steer the flight and land', magnet: 'Magnet: pull orbs from neighboring tiles',
+  explode: 'Explode: the cube spreads apart for 12 seconds. Keep crawling until it closes',
   water: 'Water: build momentum in a straight line', fire: 'Fire: leave a trail for 3 seconds',
   grass: 'Grass: land, then jump from your spring patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: survive the storm for 4 seconds' };
 const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
@@ -29,6 +30,9 @@ export function updateMastery(sim, p, level, delta) {
     if (sim.elementalT > 0 && sim.elementalType === 'ice') p.iceJump = true;
   }
   if (sim.rocketActive) { p.flying = true; p.doubleJump = false; p.grassJump = false; p.iceJump = false; }
+  // An explosion counts once the cube has closed again with the worm still on it.
+  if (sim.explodeT > 0) p.exploding = true;
+  else if (p.exploding && safe && !(sim.expansionAmount > 0)) { add(p, 'explodes'); p.exploding = false; }
   if (safe) {
     if (p.doubleJump) { add(p, 'doubleJumps'); p.doubleJump = false; }
     if (p.flying) { add(p, 'rockets'); p.flying = false; }
@@ -54,6 +58,7 @@ export function nextStoryPower(p, level) {
   if (!m) return null;
   if ((p.mechanics.rockets ?? 0) < (m.rockets ?? 0)) return 'rocket';
   if ((p.mechanics.magnetOrbs ?? 0) < (m.magnetOrbs ?? 0)) return 'magnet';
+  if ((p.mechanics.explodes ?? 0) < (m.explodes ?? 0)) return 'explode';
   if (m.elementPickups) {
     const collected = p.mechanics.elementPickups ?? 0;
     return collected < m.elementPickups ? STORY_ELEMENTS[collected % STORY_ELEMENTS.length] : null;
@@ -64,7 +69,8 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
   return getAllSurfaceTiles(size).find(tile => {
     const sticker = cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers[tile.dirKey];
     const distance = Math.hypot(tile.x - sim.pos.x, tile.y - sim.pos.y, tile.z - sim.pos.z);
-    return tile.dirKey === sim.pos.dirKey && distance >= 2 && distance <= 3 &&
+    // A 2×2 or 3×3 face has no tile two steps from its center; take the nearest ring there.
+    return tile.dirKey === sim.pos.dirKey && distance >= (size >= 4 ? 2 : 1) && distance <= 3 &&
       sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile));
   });
 }
@@ -75,7 +81,7 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
 export function offerStoryPower(sim, p, level, size, cubies) {
   const type = nextStoryPower(p, level);
   p.powerHint = type ? (level.mechanics?.elementPickups ? 'Steer onto the marked elemental orb to collect it' : HINTS[type]) : null;
-  if (!type || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.elementalT > 0 || sim.phase !== 'crawling') return false;
+  if (!type || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
   const occupied = new Set(sim.powerups.map(tileKey));
   for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
   const tile = storySurfaceTile(sim, size, cubies, occupied);

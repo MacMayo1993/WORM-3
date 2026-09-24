@@ -3,12 +3,12 @@ import WormWordmark from '../branding/WormWordmark.jsx';
 import WormPathArtwork from '../ui/WormPathArtwork.jsx';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { WORM_STORY_LEVELS, nextStoryLevel, storyStars, storyUnlocked, storyChecklist } from '../../worm/story/levels.js';
+import { WORM_STORY_CHAPTERS, nextStoryLevel, storyStars, storyUnlocked, storyChecklist, storyChapter, storyLaunchSettings } from '../../worm/story/levels.js';
 import { MODE_THEMES } from '../../utils/modeThemes.js';
 import { HEADING_FONT, UI_FONT, Z } from '../../utils/uiTheme.js';
 import { StoryRewardChoices } from '../../worm/story/StoryCards.jsx';
 import StoryWorldPreview from '../../worm/story/StoryWorldPreview.jsx';
-import { STORY_WORLDS, storyAppearance } from '../../worm/story/worlds.js';
+import { STORY_WORLDS, storyAppearance, storyViewLabel } from '../../worm/story/worlds.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import WormProfile from './WormProfile.jsx';
@@ -40,12 +40,14 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
     return () => { window.removeEventListener('keydown', key, true); prior?.focus?.(); };
   }, [page, onCancel]);
   if (page === 'free') return <Suspense fallback={<div className="worm-story-loading" role="status">Loading…</div>}><FreePlaySetup onComplete={onComplete} onCancel={() => setPage('choice')} initialSettings={initialSettings} /></Suspense>;
-  const level = WORM_STORY_LEVELS.find(item => item.id === selected);
-  const totalStars = WORM_STORY_LEVELS.reduce((n, item) => n + storyStars(progress, item.id), 0);
+  const chapter = storyChapter(selected);
+  const level = chapter.levels.find(item => item.id === selected);
+  const chapterStars = chapter.levels.reduce((n, item) => n + storyStars(progress, item.id), 0);
+  const size = level.cubeSize ?? 5, view = storyViewLabel(level.id);
+  // Opening a chapter lands on its next unplayed level, or its first.
+  const openChapter = next => { wormMenuFeedback(); setSelected((next.levels.find(item => storyUnlocked(progress, item.id) && !storyStars(progress, item.id)) ?? next.levels[0]).id); };
   const launch = () => { wormMenuFeedback(); onComplete({ ...initialSettings, ...storyAppearance(level.id), perFaceStyles: STORY_WORLDS[level.id].styles,
-    wormColor: getSkin(wormSkin).body,
-    storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: false, wormSpeed: level.speed, wormOrbCount: 1,
-    wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false }); };
+    wormColor: getSkin(wormSkin).body, ...storyLaunchSettings(level) }); };
   return <div ref={root} className={`mode-wizard worm-entry${page === 'choice' ? ' worm-entry-choice' : ''}`} role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
     style={{ '--mode-accent': MODE_THEMES.worm.accent, '--mode-ink': MODE_THEMES.worm.shadow, '--story-display': HEADING_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
     <div className="worm-entry-sheet" style={wizardPaperBackground}>
@@ -63,8 +65,18 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
           </div>
           <WormProfile />
         </> : <>
-          <div className="worm-chapter-progress"><span>Stars</span><strong>{totalStars} / {WORM_STORY_LEVELS.length * 3} ★</strong><progress value={totalStars} max={WORM_STORY_LEVELS.length * 3} aria-label="Chapter stars" /></div>
-          <div className="worm-level-grid">{WORM_STORY_LEVELS.map(item => {
+          <div className="worm-chapter-tabs" role="group" aria-label="Chapters">{WORM_STORY_CHAPTERS.map(item => {
+            const open = storyUnlocked(progress, item.levels[0].id);
+            const stars = item.levels.reduce((n, l) => n + storyStars(progress, l.id), 0);
+            return <button key={item.id} type="button" disabled={!open} aria-pressed={item.id === chapter.id}
+              aria-label={`Chapter ${item.id}: ${item.title}${open ? `, ${stars} of ${item.levels.length * 3} stars` : ', locked'}`}
+              className={item.id === chapter.id ? 'selected' : ''} onClick={() => openChapter(item)}>
+              <small>Chapter {item.id}</small><strong>{item.title}</strong><span aria-hidden="true">{open ? `${stars} ★` : 'Locked'}</span>
+            </button>;
+          })}</div>
+          <p className="worm-chapter-blurb">{chapter.blurb}</p>
+          <div className="worm-chapter-progress"><span>Chapter {chapter.id} stars</span><strong>{chapterStars} / {chapter.levels.length * 3} ★</strong><progress value={chapterStars} max={chapter.levels.length * 3} aria-label="Chapter stars" /></div>
+          <div className="worm-level-grid">{chapter.levels.map(item => {
             const unlocked = storyUnlocked(progress, item.id), stars = storyStars(progress, item.id);
             return <button key={item.id} disabled={!unlocked} title={item.title} aria-pressed={selected === item.id} aria-label={`Level ${item.id}: ${item.title}${unlocked ? `, ${stars} stars` : ', locked'}`} onClick={() => { wormMenuFeedback(); setSelected(item.id); }} className={selected === item.id ? 'selected' : ''}
               style={{ '--world-color': COLOR_SCHEMES[STORY_WORLDS[item.id].palette][1] }}>
@@ -73,6 +85,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
             </button>;
           })}</div>
           <section className="worm-level-detail" aria-label="Selected level"><div className="worm-path-kicker">Level {String(level.id).padStart(2, '0')} · {STORY_WORLDS[level.id].name}</div><h2>{level.title}</h2>
+            <p className="worm-level-board">{size}×{size} cube{view ? ` · ${view}` : ''}</p>
             <StoryWorldPreview levelId={level.id} />
             <ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
             <p className="worm-story-limit">{Math.floor(level.limit / 60)}:{String(level.limit % 60).padStart(2, '0')} to finish{level.rotateEvery ? ` · Turns every ${level.rotateEvery}s` : ''}</p>

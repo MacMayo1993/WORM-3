@@ -132,12 +132,14 @@ it('deduplicates disarms and resets every mastery counter on retry', () => {
   const retry = stageStory(sim, 5, level);
   expect(retry.mechanics).toEqual({}); expect(retry.elements.size).toBe(0); expect(retry.bombIds.size).toBe(0);
 });
-it('keeps six-level saves and claims intact, resumes at seven, and ends at ten', () => {
+it('keeps six-level saves and claims intact, resumes at seven, and carries chapter one into chapter two', () => {
   const old = { stars: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [i+1, 3])), claimed: { 6: 'skin_royal' } };
   expect(sanitizeStoryProgress(old)).toEqual(old);
   expect(nextStoryLevel({ wormStory: old }).id).toBe(7);
   const complete = { wormStory: { stars: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i+1, 3])) } };
-  expect(nextStoryLevel(complete).id).toBe(10);
+  expect(nextStoryLevel(complete).id).toBe(11);
+  const all = { wormStory: { stars: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [i+1, 3])) } };
+  expect(nextStoryLevel(all).id).toBe(40);
 });
 
 const head = { x: 0, y: 0, z: 4, dirKey: 'PZ' };

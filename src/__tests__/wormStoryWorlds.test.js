@@ -1,6 +1,6 @@
 import { beforeEach, expect, it } from 'vitest';
 import { STORY_WORLDS, storyAppearance } from '../worm/story/worlds.js';
-import { WORM_STORY_LEVELS } from '../worm/story/levels.js';
+import { WORM_STORY_LEVELS, WORM_STORY_CHAPTERS } from '../worm/story/levels.js';
 import { COLOR_SCHEMES, DEFAULT_SETTINGS, TILE_STYLES } from '../utils/colorSchemes.js';
 import { BACKGROUNDS } from '../utils/backgrounds.js';
 import { makeWormSim, resetWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
@@ -20,10 +20,17 @@ beforeEach(() => {
   });
 });
 
-it('gives every level a distinct shipped palette, material set, environment, and orb route', () => {
+it('gives every level in a chapter a distinct shipped palette and environment, and every level its own material set', () => {
   const worlds = Object.values(STORY_WORLDS);
-  for (const key of ['palette', 'background', 'route']) expect(new Set(worlds.map(w => w[key])).size).toBe(10);
-  expect(new Set(worlds.map(w => JSON.stringify(w.styles))).size).toBe(10);
+  expect(worlds).toHaveLength(WORM_STORY_LEVELS.length);
+  for (const chapter of WORM_STORY_CHAPTERS) {
+    const own = chapter.levels.map(level => STORY_WORLDS[level.id]);
+    for (const key of ['palette', 'background']) expect(new Set(own.map(w => w[key])).size).toBe(own.length);
+  }
+  // Chapter one keeps its original one-route-per-level layout.
+  expect(new Set(WORM_STORY_CHAPTERS[0].levels.map(level => STORY_WORLDS[level.id].route)).size).toBe(10);
+  expect(new Set(worlds.map(w => JSON.stringify(w.styles))).size).toBe(worlds.length);
+  expect(new Set(worlds.map(w => w.name)).size).toBe(worlds.length);
   for (const level of WORM_STORY_LEVELS) {
     const world = STORY_WORLDS[level.id];
     expect(COLOR_SCHEMES[world.palette]).toBeTruthy();
@@ -48,7 +55,8 @@ it.each(WORM_STORY_LEVELS)('keeps level $id routes unique, on safe tiles, and su
     colors[sticker.curr] = (colors[sticker.curr] ?? 0) + 1;
   }
   expect(Object.keys(colors)).toHaveLength(6);
-  for (const count of Object.values(colors)) expect(count).toBeGreaterThanOrEqual(4);
+  // A 2×2 or 3×3 face has only four or nine tiles to share with the head, body and tunnels.
+  for (const count of Object.values(colors)) expect(count).toBeGreaterThanOrEqual(size >= 4 ? 4 : 1);
 });
 
 it('applies and reapplies each look on launch, retry, and next level without saving it over the player settings', () => {
