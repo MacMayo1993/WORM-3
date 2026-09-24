@@ -174,3 +174,16 @@
  .worm-task-confirmed { animation:none; }
  .worm-hud-chip:enabled:active { transform:none; }
 }
+
+.worm-tunnel-glance[data-tunnel-danger=true] { border:2px solid #ff796f; color:#fff; background:#731e28; }
+.worm-tunnel-glance[data-tunnel-danger=true]>span:last-child { white-space:normal; font-weight:900; }
+
+/* Safety is the first line; healing cost is independent and secondary. */
+.worm-tunnel-glance { min-height:48px; border:2px solid #ffffffc0; background:#17212e; color:#fff; padding:7px 10px; }
+.worm-tunnel-glance[data-heal-ready=true] { border-color:#ffffffc0; color:#fff; }
+.worm-tunnel-glance .worm-tunnel-safety-copy { display:flex; flex-direction:column; gap:2px; overflow:visible; white-space:normal; }
+.worm-tunnel-safety-copy strong { font-size:13px; line-height:1.2; }
+.worm-tunnel-safety-copy small { font-size:11px; line-height:1.2; color:#e1e6ee; }
+.worm-tunnel-safety-symbol { display:grid; place-items:center; flex-shrink:0; width:30px; height:30px; border:2px solid currentColor; border-radius:50%; font-size:23px; font-weight:900; }
+.worm-tunnel-glance[data-tunnel-danger=true] { border:3px solid #ffe4ba; background:#781d25; box-shadow:0 0 0 2px #17121b; }
+.worm-tunnel-glance[data-tunnel-danger=true] .worm-tunnel-safety-symbol { border-radius:6px; }

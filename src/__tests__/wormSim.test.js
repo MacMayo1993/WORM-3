@@ -335,7 +335,11 @@ describe('terminal death ordering', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     const tunnel = { entry: { ...sim.pos }, exit: { ...sim.pos, x: 0 } };
-    sim.pendingVoidKill = { tunnelKey: 'fatal', exitTileKey: tileKey(tunnel.exit), armed: true };
+    sim.activeTunnel = tunnel;
+    sim.currentTunnelKey = 'fatal';
+    sim.pendingVoidKill = { tunnelKey: 'fatal', traversals: 4 };
+    sim.phase = sim.prevPhase = 'tunnel';
+    sim.tunnelProgress = 0.499;
     sim.stepHistory.distance = 100;
     sim.tunnelPassages.push({
       tunnel, tunnelKey: 'healing', exitDistance: 0, clearFrame: true,
@@ -351,7 +355,7 @@ describe('terminal death ordering', () => {
     killWormSim(sim, ctx, { reason: 'slice-rotation' });
     run(sim, ctx, 1);
     expect(ctx.events).toHaveLength(eventCount);
-    expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('voided');
+    expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('void-tunnel-exhausted');
   });
 });
 
@@ -818,6 +822,38 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(sim.alive).toBe(true);
   });
 
+  it.each([1 / 120, 1 / 30, 0.1])('collapses the fourth trip inside the tunnel at dt %s, never after exit', dt => {
+    const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    const sim = makeSim();
+    let paused = false;
+    const ctx = makeCtx({ getCubies: () => cubies, resolveTunnel: () => ({ tunnel, tunnelKey }), isPaused: () => paused });
+    sim.tunnelUseCounts.set(tunnelKey, 3);
+    expect(runUntil(sim, ctx, () => sim.phase === 'tunnel', 30, dt)).toBe(true);
+    expect(sim.alive).toBe(true);
+    const progress = sim.tunnelProgress;
+    paused = true;
+    run(sim, ctx, 3, dt);
+    expect(sim.tunnelProgress).toBe(progress);
+    expect(sim.alive).toBe(true);
+    paused = false;
+    expect(runUntil(sim, ctx, () => !sim.alive, 30, dt)).toBe(true);
+    expect(sim.tunnelProgress).toBe(0.5);
+    expect(eventsOf(ctx, 'death')[0].args[0]).toMatchObject({ reason: 'void-tunnel-exhausted', traversals: 4 });
+    expect(eventsOf(ctx, 'crawlResume')).toHaveLength(0);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+  });
+
+  it('allows the third trip to exit without a delayed void death', () => {
+    const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    const sim = makeSim();
+    const ctx = makeCtx({ getCubies: () => cubies, resolveTunnel: () => ({ tunnel, tunnelKey }) });
+    sim.tunnelUseCounts.set(tunnelKey, 2);
+    expect(runUntil(sim, ctx, () => sim.phase === 'tunnel')).toBe(true);
+    expect(runUntil(sim, ctx, () => sim.phase === 'crawling')).toBe(true);
+    expect(sim.pendingVoidKill).toBeNull();
+    expect(sim.alive).toBe(true);
+  });
+
   it('collapses the tunnel into a void kill past the traversal cap', () => {
     const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
     const sim = makeSim();
@@ -923,32 +959,6 @@ describe('applyRotationToSim', () => {
       paused: false,
     });
     expect(sim.pendingTunnelHeal.tunnel.entry).not.toEqual({ x: 0, y: 1, z: 2, dirKey: 'PZ' });
-  });
-
-  it('carries an armed void kill\'s exit tile through the turn', () => {
-    // The collapse fires once the head steps OFF the exit tile; comparing against a
-    // slot the exit no longer occupies fires it a step early or late.
-    const sim = makeSim();
-    const ctx = makeCtx();
-    sim.pendingVoidKill = { tunnelKey: 'k', exitTileKey: tileKey({ x: 0, y: 1, z: 2, dirKey: 'PZ' }), armed: true };
-    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', sliceIndex: 2, dir: 1 }, {
-      inOpeningScramble: false,
-      paused: false,
-    });
-    expect(sim.pendingVoidKill.exitTileKey).not.toBe(tileKey({ x: 0, y: 1, z: 2, dirKey: 'PZ' }));
-    expect(sim.pendingVoidKill.armed).toBe(true);
-  });
-
-  it('leaves an armed void kill alone when its exit tile was not in the slice', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    const key = tileKey({ x: 0, y: 1, z: 0, dirKey: 'NZ' });
-    sim.pendingVoidKill = { tunnelKey: 'k', exitTileKey: key, armed: true };
-    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', sliceIndex: 2, dir: 1 }, {
-      inOpeningScramble: false,
-      paused: false,
-    });
-    expect(sim.pendingVoidKill.exitTileKey).toBe(key);
   });
 
   it('preserves the pre-game heading during the opening scramble', () => {

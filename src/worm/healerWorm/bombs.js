@@ -68,9 +68,11 @@ export function computeBlastTiles(bomb, size, radius = BOMB_BLAST_RADIUS) {
   for (const dir of BLAST_DIRS) {
     const arm = [];
     let cell = center;
+    let heading = dir;
     for (let step = 0; step < radius; step++) {
-      cell = getNextSurfacePosition(cell, dir, size);
+      cell = getNextSurfacePosition(cell, heading, size);
       if (!cell) break;
+      heading = cell.moveDir ?? heading;
       const key = tileKeyOf(cell);
       // A wrapped arm can loop back onto a cell another arm already claimed
       // (small cubes especially); keep the render segment but don't double-count.
@@ -135,7 +137,10 @@ export function checkBlastHitWorm(worm, blastKeys, size = 5) {
     size, worm.expansionAmount?.current ?? 0);
 
   // Head kills first (only when grounded — a jump clears the blast).
-  if (!airborne && blastKeys.has(ttAt(trail, 0))) return { type: 'death' };
+  const previous = worm.prevTile?.current;
+  const head = previous && (worm.interpT?.current ?? 1) < 0.5 ? previous : worm.pos?.current;
+  const headKey = head ? tileKeyOf(head) : ttAt(trail, 0);
+  if (!airborne && blastKeys.has(headKey)) return { type: 'death' };
 
   // Otherwise the earliest body segment in the blast is where the tail burns off.
   for (let i = 1; i < bodyEnd; i++) {

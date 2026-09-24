@@ -1,3 +1,4 @@
+import { getNextSurfacePosition } from '../worm/wormLogic.js';
 import { describe, it, expect } from 'vitest';
 import {
   bombCap,
@@ -131,4 +132,29 @@ it('does not disarm or hit a bomb using logical cells beyond the expanded visibl
   worm.expansionAmount = { current: 0.35 };
   expect(checkBlastHitWorm(worm, new Set([oldTailTile]), SIZE)).toBeNull();
   expect(checkBlastHitWorm(worm, new Set([ttAt(trail, 0)]), SIZE)?.type).toBe('death');
+});
+
+it('tests the visibly occupied head tile on both sides of a step midpoint', () => {
+  const worm = makeWorm({ buf: ['2,2,4,PZ'], tailLength: 1 });
+  worm.prevTile = { current: { x: 1, y: 2, z: 4, dirKey: 'PZ' } };
+  worm.pos = { current: CENTER };
+  worm.interpT = { current: 0.49 };
+  expect(checkBlastHitWorm(worm, new Set(['2,2,4,PZ']))).toBeNull();
+  expect(checkBlastHitWorm(worm, new Set(['1,2,4,PZ']))).toEqual({ type: 'death' });
+  worm.interpT.current = 0.51;
+  expect(checkBlastHitWorm(worm, new Set(['2,2,4,PZ']))).toEqual({ type: 'death' });
+  expect(checkBlastHitWorm(worm, new Set(['1,2,4,PZ']))).toBeNull();
+});
+
+it.each([2, 3, 5])('keeps every blast arm straight after crossing a size %s cube seam', size => {
+  const tile = { x: 0, y: size - 1, z: size - 1, dirKey: 'PZ' };
+  const { arms } = computeBlastTiles({ tile }, size, 8);
+  ['up', 'right', 'down', 'left'].forEach((heading, index) => {
+    let cell = tile;
+    for (const actual of arms[index]) {
+      cell = getNextSurfacePosition(cell, heading, size);
+      expect(actual).toEqual(cell);
+      heading = cell.moveDir ?? heading;
+    }
+  });
 });

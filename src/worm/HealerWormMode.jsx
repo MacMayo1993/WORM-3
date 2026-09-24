@@ -483,8 +483,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     if (bomb.fuse > 0) { bombs[kept++] = bomb; continue; }
 
                     // Detonate: shoot fire out along the arms, then resolve the hit.
-                    // Flames ignite staggered by distance so the blast reads as
-                    // bursting outward from the bomb (Bomberman-style).
+                    // All arms ignite on the damage frame so a distant hit never
+                    // kills before its flame appears.
                     const { keys, arms, center } = computeBlastTiles(bomb, size);
                     const flames = [];
                     const pushFlame = (t, delay) => {
@@ -497,7 +497,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                         flames.push({ pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay });
                     };
                     pushFlame(center, 0);
-                    for (const arm of arms) arm.forEach((t, idx) => pushFlame(t, (idx + 1) * 0.05));
+                    for (const arm of arms) arm.forEach(t => pushFlame(t, 0));
                     blastApiRef.current?.spawn(flames);
                     worm.feel('cut');
 

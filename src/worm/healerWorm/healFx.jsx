@@ -1,3 +1,4 @@
+import { tunnelDanger } from './tunnelReadout.js';
 import { wormBuffs } from '../wormBuffs.js';
 // src/worm/healerWorm/healFx.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
@@ -124,8 +125,8 @@ export function HealBurstSystem({ worm, size }) {
     );
 }
 
-// One surface ring links the contextual HUD card to its entrance. No scene text
-// can overlap other tunnel signs or show through the cube.
+// One surface ring links the contextual HUD card to its entrance.
+// Fatal entry takes priority over the healing affordability color.
 export function TunnelHealProgress({ size, worm }) {
     const ring = useRef();
     const scratch = useMemo(() => ({ position: new THREE.Vector3(), normal: new THREE.Vector3(), view: new THREE.Vector3() }), []);
@@ -143,7 +144,7 @@ export function TunnelHealProgress({ size, worm }) {
         mesh.visible = true;
         mesh.position.copy(position).addScaledVector(normal, 0.07);
         mesh.quaternion.setFromUnitVectors(_healRingZ, normal);
-        mesh.material.color.set(need.ready && !need.voided ? '#8ee5a6' : '#f08d91');
+        mesh.material.color.set(tunnelDanger(need) ? '#ff493d' : need.ready ? '#8ee5a6' : '#ffffff');
     });
     return <mesh ref={ring} visible={false} raycast={() => null}>
         <ringGeometry args={[0.4, 0.44, 40]} />
