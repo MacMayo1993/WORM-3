@@ -1,11 +1,11 @@
 import { wizardPaperBackground } from './WizardChrome.jsx';
 import { chaosSetupSettings } from '../../utils/chaosSetup.js';
+import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import React, { useState, useMemo, useRef } from 'react';
 import { useDialogBehavior } from '../ui/Panel.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { BET_TYPES, bettingPalette, calcPayout, streakMultiplier, formatSpeedThreshold } from '../../utils/disparityBetting.js';
 import { BET_MIN, BET_MAX } from '../../utils/economyConstants.js';
-import { MODE_THEMES } from '../../utils/modeThemes.js';
 import { Z } from '../../utils/uiTheme.js';
 import { ChaosGlyph, ChaosEmblem } from '../../chaos/ChaosArt.jsx';
 import '../../chaos/chaos.css';
@@ -64,7 +64,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
   const size = settings?.cubeSize || 3;
   const selectedPair = pairs.find(p => p.id === pick);
   return (
-    <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-overlay chaos-forecast mode-wizard" style={{ zIndex: Z.FULLSCREEN, '--mode-accent': MODE_THEMES.chaos.accent, '--mode-ink': MODE_THEMES.chaos.shadow, '--chaos-accent': MODE_THEMES.chaos.accent, '--chaos-accent-shadow': MODE_THEMES.chaos.shadow }} role="dialog" aria-modal="true" aria-label="Choose a Chaos prediction">
+    <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-overlay chaos-forecast mode-wizard" style={{ zIndex: Z.FULLSCREEN, ...arcadeModeVars('chaos'), '--mode-accent': arcadeModeVars('chaos')['--arcade-accent'], '--mode-ink': 'var(--arcade-ink-strong)', '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'], '--chaos-accent-shadow': 'var(--arcade-ink-strong)' }} role="dialog" aria-modal="true" aria-label="Choose a Chaos prediction">
       <div className="chaos-forecast-sheet" style={wizardPaperBackground}>
         <div className="chaos-forecast-scroll">
           <header className="chaos-hero">
