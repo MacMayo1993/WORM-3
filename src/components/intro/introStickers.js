@@ -17,7 +17,7 @@ export const INTRO_STICKERS = [original, flipped, restored].map(cubies => TILES.
   const [x, y, z] = tile.position.map(v => v + 1);
   return cubies[x][y][z].stickers[directions[tile.faceIndex]];
 }));
-export const INTRO_PRESENTATION = { config: {
+export const INTRO_PRESENTATION = { flipAnimation: 'chaos', config: {
   settings: { ...applyDemoOverrides(DEFAULT_SETTINGS), colorScheme: 'standard', biomeMode: { enabled: false } },
   biomeEnabled: false, chaosLevel: 0, disparityFlipCap: 3, faceTextures: {},
   wormHealerMode: true, perfReducedFX: true
