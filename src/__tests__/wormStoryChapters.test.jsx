@@ -19,10 +19,10 @@ vi.mock('../components/screens/WormModeSetupWizard.jsx', () => ({ default: () =>
 
 const state = () => useGameStore.getState();
 const cleared = n => ({ ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, 1])), claimed: {} } });
-const stage = level => {
+const stage = (level, character = 'classic') => {
   const size = level.cubeSize ?? 5, sim = makeWormSim(size);
   resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
-  return { size, sim, staged: stageStory(sim, size, level, 'classic') };
+  return { size, sim, staged: stageStory(sim, size, level, character) };
 };
 const VISUAL_MODES = ['classic', 'grid', 'sudokube', 'wireframe', 'glass', 'chrome', 'neon', 'gap', 'lego'];
 
@@ -63,16 +63,48 @@ describe('the new chapters use the whole cube', () => {
     expect(later.some(level => level.rotateEvery)).toBe(true);
   });
 
-  it('gets faster every chapter and ends each one on its biggest task list', () => {
-    const pace = chapter => chapter.levels.reduce((n, level) => n + level.speed, 0) / chapter.levels.length;
-    const paces = WORM_STORY_CHAPTERS.map(pace);
-    for (let i = 1; i < paces.length; i++) expect(paces[i]).toBeGreaterThan(paces[i - 1]);
+  it('ends each chapter on its biggest task list', () => {
     for (const chapter of WORM_STORY_CHAPTERS) {
       const goals = chapter.levels.map(level => storyChecklist(level).length);
       expect(goals.at(-1)).toBe(Math.max(...goals));
     }
     const finale = storyLevel(40);
     expect(finale.limit).toBe(Math.max(...WORM_STORY_LEVELS.map(level => level.limit)));
+  });
+});
+
+describe('mini cube precision stages', () => {
+  const minis = WORM_STORY_LEVELS.filter(level => level.cubeSize <= 3);
+  it.each(minis)('leaves steering time and recovery space in level $id', level => {
+    // Later chapters increase the task difficulty, not speed regardless of size.
+    expect(level.cubeSize / level.speed).toBeGreaterThanOrEqual(1);
+    if (level.rotateEvery) {
+      expect(level.rotateEvery).toBeGreaterThanOrEqual(7);
+      expect(level.target * level.rotateEvery).toBeLessThan(level.par);
+    }
+    const normal = stage(level, 'glow');
+    const classic = stage(level, 'classic');
+    expect(classic.sim.powerups.length).toBeGreaterThan(normal.sim.powerups.length);
+    for (const { size, sim, staged } of [normal, classic]) {
+      const tiles = 6 * size * size;
+      expect(sim.powerups.length / tiles).toBeLessThanOrEqual(0.6);
+      expect(sim.powerups.length).toBeGreaterThan(level.orbs ?? (level.kind === 'orbs' ? level.target : 0));
+      for (const face of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
+        const pickups = sim.powerups.filter(orb => orb.dirKey === face);
+        expect(pickups.length).toBeGreaterThanOrEqual(2);
+        for (const orb of pickups) {
+          const sticker = staged.cubies[orb.x][orb.y][orb.z].stickers[face];
+          expect(sticker.curr).toBe(sticker.orig);
+        }
+      }
+      expect(sim.specials).toHaveLength(0);
+      expect(getActiveTunnels(staged.cubies, size)).toHaveLength(level.kind === 'tunnel' ? level.target : 0);
+    }
+  });
+  it('retains the later pocket stage as a harder rotation challenge', () => {
+    expect(storyLevel(33).speed).toBeGreaterThan(storyLevel(11).speed);
+    expect(storyLevel(11).rotateEvery).toBeUndefined();
+    expect(storyLevel(33).target).toBeGreaterThan(storyLevel(14).target);
   });
 });
 

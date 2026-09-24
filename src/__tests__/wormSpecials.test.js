@@ -29,6 +29,9 @@ import {
   ROCKET_SPEED_MULT,
   ROCKET_FLIGHT_TAKEOFF,
   ROCKET_FLIGHT_LANDING,
+  ROCKET_BOOST_HANDOFF,
+  BOOST_DURATION,
+  BOOST_MULTIPLIER,
   MAGNET_DURATION,
   SURFACE_JUMP_HEIGHT,
   SURFACE_JUMP_TILE_SPAN,
@@ -1144,6 +1147,67 @@ describe('buff readout (HUD presentation rules)', () => {
 });
 
 describe('rocket launch, refresh and touchdown continuity', () => {
+  it.each([1 / 60, 0.05])('smoothly restores a late boost after touchdown at dt=%s', (dt) => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION - 0.25, dt);
+    sim.boostActiveT = BOOST_DURATION;
+    let lastAirSpeed = 1 / sim.prevStepSec;
+    for (let frame = 0; sim.rocketActive && frame < 60; frame++) {
+      stepWormSim(sim, dt, SIZE, ctx);
+      if (sim.rocketActive) {
+        lastAirSpeed = 1 / sim.prevStepSec;
+        expect(lastAirSpeed).toBeLessThanOrEqual(ROCKET_SPEED_MULT + 1e-8);
+      }
+    }
+    expect(sim.rocketActive).toBe(false);
+    expect(1 / sim.prevStepSec).toBeCloseTo(lastAirSpeed, 8);
+    const boostAtLanding = sim.boostActiveT;
+    let previous = 1 / sim.prevStepSec;
+    for (let frame = 0; frame < Math.round(ROCKET_BOOST_HANDOFF / dt); frame++) {
+      stepWormSim(sim, dt, SIZE, ctx);
+      const speed = 1 / sim.prevStepSec;
+      expect(speed).toBeGreaterThanOrEqual(previous - 1e-8);
+      expect(speed - previous).toBeLessThan(0.16);
+      previous = speed;
+    }
+    expect(previous).toBeCloseTo(BOOST_MULTIPLIER, 8);
+    expect(sim.boostActiveT).toBeCloseTo(boostAtLanding - ROCKET_BOOST_HANDOFF, 8);
+  });
+  it('does not prolong a boost that expires during the landing handoff', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION - 0.1);
+    sim.boostActiveT = 0.25;
+    run(sim, ctx, 0.3);
+    expect(sim.rocketBoostHandoffT).toBeGreaterThan(0);
+    expect(sim.boostActiveT).toBe(0);
+    expect(1 / sim.prevStepSec).toBeCloseTo(1, 8);
+    expect(eventsOf(ctx, 'boost').map(e => e.args[0])).toEqual(['cooldown']);
+  });
+  it('freezes the handoff while paused and clears it on relaunch or reset', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION - 0.1);
+    sim.boostActiveT = BOOST_DURATION;
+    run(sim, ctx, 0.2);
+    const remaining = sim.rocketBoostHandoffT;
+    const speed = 1 / sim.prevStepSec;
+    expect(remaining).toBeGreaterThan(0);
+    run(sim, { ...ctx, isPaused: () => true }, 2);
+    expect(sim.rocketBoostHandoffT).toBe(remaining);
+    expect(1 / sim.prevStepSec).toBe(speed);
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.rocketBoostHandoffT).toBeCloseTo(remaining - 0.05, 8);
+    startRocket(sim, ctx);
+    expect(sim.rocketBoostHandoffT).toBe(0);
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(1 / sim.prevStepSec).toBeLessThanOrEqual(ROCKET_SPEED_MULT);
+    run(sim, ctx, ROCKET_DURATION);
+    expect(sim.rocketBoostHandoffT).toBeGreaterThan(0);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.rocketBoostHandoffT).toBe(0);
+  });
   it('ramps up instead of starting at full throttle', () => {
     const sim = makeSim(), ctx = makeCtx();
     startRocket(sim, ctx);
