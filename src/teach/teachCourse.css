@@ -14,12 +14,12 @@
 .teach-lesson-list button>div { flex:1; }
 .teach-lesson-list strong { display:block; margin-top:4px; }
 .teach-sequence { display:flex; flex-wrap:wrap; gap:5px; margin:14px 0; max-height:110px; overflow:auto; }
-.teach-sequence span { padding:6px; border-radius:6px; font-family:monospace; }
+.teach-sequence span { padding:6px; border-radius:6px; font-family:var(--mono-font); }
 .teach-sequence [aria-current] { background:#9b5524; color:white; }
 .teach-sequence .done { color:#5d6f52; background:#dce8d1; }
 .teach-feedback { font-size:14px; line-height:1.5; margin:12px 0; min-height:24px; }
 .teach-turns { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; margin:10px 0; }
-.teach-turns button { padding:4px; font-family:monospace; font-size:17px; }
+.teach-turns button { padding:4px; font-family:var(--mono-font); font-size:17px; }
 .teach-grip { border-left:3px solid #c37839; padding-left:10px; }
 .teach-course details { font-size:14px; }
 .teach-course summary { cursor:pointer; min-height:30px; }

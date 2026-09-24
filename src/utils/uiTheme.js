@@ -185,6 +185,7 @@ export const UI_CSS_VARS = {
   '--ui-font': UI_FONT,
   '--heading-font': HEADING_FONT,
   '--display-font': DISPLAY_FONT,
+  '--mono-font': MONO_FONT,
   '--ui-title-size': TEXT_DISPLAY_FLUID,
   '--ui-heading-size': TEXT_2XL_FLUID,
   '--ui-body-size': `${TEXT_MD}px`,

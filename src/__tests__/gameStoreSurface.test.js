@@ -92,7 +92,7 @@ const EXPECTED_KEYS = [
   'showPackSelect', 'showSettings', 'showTunnels', 'showTutorial',
   'showWelcome', 'showWormDeathMenu', 'size', 'solveFocusedStep',
   'solveHighlights', 'solveModeActive', 'spendCoins', 'startDemo',
-  'teachModeActive', 'toggleAntipodalPiP', 'toggleChaos', 'toggleDevConsole',
+  'teachCourseActive', 'teachModeActive', 'toggleAntipodalPiP', 'toggleChaos', 'toggleDevConsole',
   'toggleExploded', 'toggleFlipMode', 'toggleHelp',
   'toggleHollowMode', 'toggleLeaderboard', 'toggleMirrorMode', 'toggleNetPanel',
   'toggleTunnels', 'toggleWormCameraHorizon', 'toggleWormControlMode', 'triggerCameraOrbit', 'tunnelBirths',
