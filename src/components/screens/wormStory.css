@@ -21,6 +21,16 @@
 .worm-path-cta { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:auto; border-top:1px solid var(--wiz-border); padding-top:17px; font-size:13px; font-weight:800; }
 .worm-path-cta b { font-size:23px; color:var(--mode-accent); }
 .worm-entry-foot { text-align:center; font-size:11px; color:var(--wiz-text-muted); padding:27px 0 0; }
+.worm-chapter-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:0 0 12px; }
+.worm-chapter-tabs button { display:flex; flex-direction:column; gap:3px; align-items:flex-start; text-align:left; min-height:64px; padding:10px 12px; border:1px solid var(--wiz-border); border-radius:12px; background:var(--wiz-surface); color:var(--wiz-text); font:inherit; cursor:pointer; }
+.worm-chapter-tabs button small { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--wiz-text-muted); }
+.worm-chapter-tabs button strong { font-size:13px; line-height:1.2; }
+.worm-chapter-tabs button span { font-size:11px; color:var(--mode-accent); }
+.worm-chapter-tabs button.selected { border-color:var(--mode-accent); box-shadow:inset 0 0 0 1px var(--mode-accent); }
+.worm-chapter-tabs button:disabled { opacity:.5; cursor:default; }
+.worm-chapter-blurb { font-size:12px; line-height:1.5; color:var(--wiz-text-muted); margin:0 0 12px; }
+.worm-level-board { margin:-4px 0 12px; font-weight:700; color:var(--wiz-text)!important; }
+@media(max-width:600px) { .worm-chapter-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 .worm-chapter-progress { display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; font-size:11px; color:var(--mode-accent); }
 .worm-chapter-progress progress { width:100%; height:6px; accent-color:var(--mode-accent); }
 .worm-level-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:22px 0; }

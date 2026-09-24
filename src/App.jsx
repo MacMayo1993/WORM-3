@@ -1,4 +1,4 @@
-import { storyLevel, storyUnlocked } from './worm/story/levels.js';
+import { storyLevel, storyUnlocked, storyLaunchSettings } from './worm/story/levels.js';
 import { LevelUpCue, AchievementCue } from './progression/ProgressWidgets.jsx';
 import { getDirectWormPreview, subscribeDirectWormPreview } from './3d/directWormPreview.js';
 import DirectWormPreviewHost from './3d/DirectWormPreviewHost.jsx';
@@ -960,9 +960,7 @@ export default function WORM3() {
     const s = useGameStore.getState();
     const id = (s.wormStoryResult?.levelId ?? 0) + 1;
     if (!s.wormStoryResult || !storyUnlocked(s.playerProgress, id)) return;
-    handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles,
-      storyLevel: id, cubeSize: storyLevel(id).cubeSize ?? 5, megaMode: false, wormSpeed: storyLevel(id).speed, wormOrbCount: 1,
-      wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
+    handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles, ...storyLaunchSettings(storyLevel(id)) });
   }, [handleWormSetupComplete]);
 
   const handleMenuComingSoon = useCallback(() => {

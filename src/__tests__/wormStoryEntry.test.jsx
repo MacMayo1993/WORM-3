@@ -54,7 +54,7 @@ it('traps keyboard focus and handles Back/Escape within the mode boundary', () =
 });
 it('resumes at the next unlocked level and lets a completed level claim its reward from the map', () => {
   useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: {1:3,2:2,3:1}, claimed: {} } } });
-  show({ initialPage: 'story' }); expect(host.querySelector('[aria-pressed="true"]').getAttribute('aria-label')).toContain('Moving Ground');
+  show({ initialPage: 'story' }); expect(host.querySelector('.worm-level-grid [aria-pressed="true"]').getAttribute('aria-label')).toContain('Moving Ground');
   click('Clear Your Tail'); const choices = host.querySelector('.worm-story-rewards');
   act(() => choices.querySelector('button').click());
   expect(state().ownedItems).toHaveLength(1); expect(host.querySelector('[role="status"]').textContent).toContain('unlocked');

@@ -1,6 +1,6 @@
 import { EXPLODE_DURATION } from './wormExpansion.js';
 import { ScreenHeading } from '../components/ui/ModeArtwork.jsx';
-import { storyLevel, WORM_STORY_LEVELS } from './story/levels.js';
+import { storyLevel, storyChapterId, storyChapterIndex, STORY_CHAPTER_SIZE } from './story/levels.js';
 import { StoryObjectiveCard, StoryStartButton, StoryResult } from './story/StoryCards.jsx';
 import { AmbientCombatActions, CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
 import { combatBridge } from './combat/portalCombat.js';
@@ -1153,7 +1153,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     ['Time', formatTime(wormTimeAlive)],
                     ['Healed', wormHealedCount],
                     ['Collected', wormSessionOrbs],
-                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next tunnel', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
+                    storyId ? [`Chapter ${storyChapterId(storyId)}`, `Level ${storyChapterIndex(storyId)} / ${STORY_CHAPTER_SIZE}`] : ['Next tunnel', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
                 <details className="screen-disclosure"><summary>Controls & sound</summary>

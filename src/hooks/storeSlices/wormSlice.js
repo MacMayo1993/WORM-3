@@ -23,6 +23,7 @@ export const createWormSlice = (set, get) => ({
   // ── Mode flag ─────────────────────────────────────────────────────────────
   wormHealerMode: false,
   wormStoryVisualBase: null,
+  wormStoryViewBase: null,
   applyWormStoryLook: id => set(s => id !== null && !storyUnlocked(s.playerProgress, id) ? s : storyVisualChanges(s, id)),
   startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen ? { wormStoryStarted: true, wormPaused: false } : s),
   completeWormStory: (runId, metrics) => set(s => completeStoryChanges(s, runId, metrics)),
