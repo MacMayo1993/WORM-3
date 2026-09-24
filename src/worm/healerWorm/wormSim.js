@@ -114,6 +114,7 @@ import {
     ROCKET_SPEED_MULT,
     ROCKET_FLIGHT_TAKEOFF,
     ROCKET_FLIGHT_LANDING,
+    ROCKET_BOOST_HANDOFF,
     ROCKET_LANDING_GRACE,
     MAGNET_DURATION,
     MAGNET_RADIUS,
@@ -240,6 +241,7 @@ export function makeWormSim(size) {
         rocketActive: false,      // protected flight with gradual takeoff/landing
         rocketT: 0,
         rocketFlight: 0, // launch/landing progress, independent of refreshed fuel
+        rocketBoostHandoffT: 0, // crawling seconds left to restore ground speed
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalPatches: new Map(),
@@ -387,6 +389,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.rocketActive = false;
     sim.rocketT = 0;
     sim.rocketFlight = 0;
+    sim.rocketBoostHandoffT = 0;
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.elementalPatches.clear();
@@ -560,6 +563,7 @@ export function startRocket(sim, ctx) {
     }
     sim.rocketActive = true;
     sim.rocketFlight = 0;
+    sim.rocketBoostHandoffT = 0;
     sim.rocketT = ROCKET_DURATION;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -2068,6 +2072,9 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (sim.phase === 'crawling' && sim.landingGraceT > 0) {
         sim.landingGraceT = Math.max(0, sim.landingGraceT - delta);
     }
+    if (sim.phase === 'crawling' && sim.rocketBoostHandoffT > 0) {
+        sim.rocketBoostHandoffT = Math.max(0, sim.rocketBoostHandoffT - delta);
+    }
     if (sim.phase === 'crawling' && sim.rocketT > 0) {
         sim.rocketT = Math.max(0, sim.rocketT - delta);
         sim.rocketFlight = Math.max(0, Math.min(
@@ -2076,6 +2083,7 @@ export function stepWormSim(sim, delta, size, ctx) {
         ));
         if (sim.rocketT === 0) {
             sim.rocketActive = false;
+            sim.rocketBoostHandoffT = ROCKET_BOOST_HANDOFF;
             sim.landingGraceT = ROCKET_LANDING_GRACE;
             sim.selfCollisionGraceSteps = Math.max(sim.selfCollisionGraceSteps, STEPS_PER_TILE);
             sim.pendingSelfCollision = null;
@@ -2088,11 +2096,17 @@ export function stepWormSim(sim, delta, size, ctx) {
     tickElementalGameplay(sim, delta);
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
     // Throttle follows the same smooth flight phase as the rendered body.
-    // Blend back to any remaining ordinary boost instead of snapping at touchdown.
+    // Flight stays capped even with an ordinary boost. Restore ground speed only
+    // after touchdown, easing from the capped baseline on the crawling clock.
     const flight = sim.rocketFlight ?? 0;
     const throttle = flight * flight * (3 - 2 * flight);
     const rocketBase = Math.min(boostMult, ROCKET_SPEED_MULT);
-    const speedMult = sim.rocketActive ? rocketBase + (ROCKET_SPEED_MULT - rocketBase) * throttle : boostMult * (1 + 0.25 * sim.waterMomentum);
+    const handoff = 1 - (sim.rocketBoostHandoffT ?? 0) / ROCKET_BOOST_HANDOFF;
+    const groundBlend = handoff * handoff * (3 - 2 * handoff);
+    const groundSpeed = boostMult * (1 + 0.25 * sim.waterMomentum);
+    const speedMult = sim.rocketActive
+        ? rocketBase + (ROCKET_SPEED_MULT - rocketBase) * throttle
+        : rocketBase + (groundSpeed - rocketBase) * groundBlend;
     const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step

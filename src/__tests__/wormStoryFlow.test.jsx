@@ -80,6 +80,37 @@ it('requires four distinct traversals, keeps the long tail in transit, and does 
   travelUntil(() => !!state().wormStoryResult);
   expect(worm.tunnelPassages.current).toHaveLength(0);
 });
+it('completes the pocket collection route through real movement with all six colors', () => {
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(11);
+  expect(state().wormPowerups).toHaveLength(12);
+  for (let pickups = 0; pickups < 12 && !state().wormStoryResult; pickups++) {
+    const orb = state().wormPowerups[0];
+    expect(orb).toBeTruthy();
+    seek(orb, () => !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
+  }
+  expect(state().wormStoryResult).toMatchObject({ levelId: 11 });
+  expect(state().wormAlive).toBe(true);
+  expect(state().wormSessionOrbs).toBeGreaterThanOrEqual(10);
+});
+it('crosses all three mini-cube tunnel pairs and clears the tail with the sparser layout', () => {
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 11 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(12);
+  expect(state().wormPowerups).toHaveLength(18);
+  const tunnels = getActiveTunnels(state().cubies, state().size);
+  for (const tunnel of tunnels) {
+    const before = state().wormTunnelCount;
+    seek(tunnel.entry, () => state().wormTunnelCount > before);
+    until(() => worm.phase.current === 'crawling');
+  }
+  travelUntil(() => !!state().wormStoryResult);
+  expect(state().wormStoryResult).toMatchObject({ levelId: 12 });
+  expect(worm.tunnelPassages.current).toHaveLength(0);
+});
 it('counts a real body clearance only on landing and requires more than one hop', () => {
   begin(3); until(() => state().wormJumpRescueActive);
   const clock = state().wormStoryProgress; frame(0.2); expect(state().wormStoryProgress).toBe(clock);

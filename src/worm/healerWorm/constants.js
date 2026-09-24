@@ -203,6 +203,8 @@ export const ROCKET_SPEED_MULT = 1.6;
 export const ROCKET_FLIGHT_HEIGHT = 1.2;
 export const ROCKET_FLIGHT_TAKEOFF = 1.0;
 export const ROCKET_FLIGHT_LANDING = 1.3;
+// Restore any remaining ground boost smoothly after the airborne speed cap ends.
+export const ROCKET_BOOST_HANDOFF = 0.4;
 export const rocketFlightLift = (active, rocketT, flightPhase) => {
   if (!active) return 0;
   const elapsed = ROCKET_DURATION - rocketT;

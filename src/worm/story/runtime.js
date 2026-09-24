@@ -109,13 +109,14 @@ export function stageStory(sim, size, level, character) {
   // Route-trial pairs can seal after traversal without losing their recorded credit.
   sim.powerups = [];
   const cells = STORY_ORB_ROUTES[STORY_WORLDS[level.id].route];
+  const orbsPerFace = level.orbsPerFace ?? cells.length;
   for (const dirKey of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
     // A tunnel may occupy a route tile. Fill locally with distinct safe cells
     // to retain the full matching-color supply on every face.
     const fallback = Array.from({ length: size * size }, (_, i) => [i % size, Math.floor(i / size)]);
     const used = new Set();
     for (const [a, b] of [...cells.map(cell => routeCell(size, cell)), ...fallback]) {
-      if (used.size >= cells.length) break;
+      if (used.size >= orbsPerFace) break;
       const key = `${a},${b}`;
       if (used.has(key)) continue;
       const [x, y, z] = dirKey === 'PZ' || dirKey === 'NZ' ? [a, b, dirKey === 'PZ' ? edge : 0]
@@ -134,7 +135,10 @@ export function stageStory(sim, size, level, character) {
     base.target = { x: Math.floor(size / 2), y: row, z: edge, dirKey: 'PZ' };
   }
   if (level.kind === 'tunnel') base.target = getActiveTunnels(base.cubies, size)[0]?.entry ?? null;
-  const targetCount = characterOrbCount(sim.powerups.length, character);
+  // Mini stages need empty routes as well as food. Classic still gets extra
+  // orbs, but cannot fill almost every remaining tile on the pocket cube.
+  const pickupBudget = size <= 3 ? Math.floor(6 * size * size * 0.6) : Infinity;
+  const targetCount = Math.min(characterOrbCount(sim.powerups.length, character), pickupBudget);
   while (sim.powerups.length < targetCount) {
     const tile = randomUnflippedTile(base.cubies, size, [...sim.powerups, sim.pos, ...body.map(([x, y]) => ({ x, y, z: edge, dirKey: 'PZ' }))]);
     if (!tile) break;
