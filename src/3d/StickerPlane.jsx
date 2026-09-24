@@ -705,7 +705,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
     [settings]
   );
-  const cleanChaosFlip = !presentation && chaosLevel > 0 && !wormHealerMode;
+  // Cinematics can reuse Chaos's opaque, closed-seam color swap without
+  // enabling Chaos gameplay or changing the player's saved mode/settings.
+  const cleanChaosFlip = presentation
+    ? presentation.flipAnimation === 'chaos'
+    : chaosLevel > 0 && !wormHealerMode;
   const manifoldStyles = settings?.manifoldStyles;
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   // Same decision as selectEffectiveFlipCap, kept local because both inputs are
