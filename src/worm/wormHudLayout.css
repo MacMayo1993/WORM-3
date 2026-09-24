@@ -106,16 +106,16 @@
 .worm-instrument .worm-mission-glance { flex:1 1 55%; width:auto; min-width:0; pointer-events:auto; text-align:left; justify-content:space-between; }
 .worm-mission-glance-title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .worm-mission-glance>strong { flex-shrink:0; font-variant-numeric:tabular-nums; color:#c4df91; }
-.worm-story-glance-level { font-weight:800; color:#88e59a; flex-shrink:0; }
+.worm-story-glance-level { font-weight:800; color:#009B48; flex-shrink:0; }
 .worm-story-glance-progress { flex:1; min-width:0; display:grid; gap:5px; }
 .worm-story-glance-progress>span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .worm-story-glance-clock { flex-shrink:0; font-weight:750; font-variant-numeric:tabular-nums; }
 .worm-story-glance-clock[data-urgent=true] { color:#ffb648; }
 .worm-story-goal-bars { display:flex; gap:3px; }
 .worm-story-goal-bars>i { flex:1; height:3px; overflow:hidden; background:#ffffff25; border-radius:3px; }
-.worm-story-goal-bars>i>i { display:block; height:100%; background:#88e59a; transform-origin:left; transition:transform .2s; }
-.worm-story-goal-bars>i[data-done=true] { outline:1px solid #88e59a80; }
-.worm-task-confirmed { animation:worm-task-tap .35s ease-out; border-color:#88e59a; }
+.worm-story-goal-bars>i>i { display:block; height:100%; background:#009B48; transform-origin:left; transition:transform .2s; }
+.worm-story-goal-bars>i[data-done=true] { outline:1px solid #009b4880; }
+.worm-task-confirmed { animation:worm-task-tap .35s ease-out; border-color:#009B48; }
 /* In-play task tracker: the header chip toggles; the task rows are read-only and
    let touches through to the playfield. */
 .worm-hud-status-row:has(.worm-story-tracker) { align-items:flex-start; }
@@ -126,14 +126,14 @@
 .worm-story-live:empty { display:none; }
 .worm-story-live>li { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; row-gap:2px; align-items:center; }
 .worm-story-live-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.worm-story-live b { font-weight:750; font-variant-numeric:tabular-nums; color:#88e59a; }
+.worm-story-live b { font-weight:750; font-variant-numeric:tabular-nums; color:#009B48; }
 .worm-story-live-bar { grid-column:1 / -1; display:block; height:2px; border-radius:2px; overflow:hidden; background:#ffffff22; }
-.worm-story-live-bar>i { display:block; height:100%; background:#88e59a; transform-origin:left; transition:transform .2s; }
+.worm-story-live-bar>i { display:block; height:100%; background:#009B48; transform-origin:left; transition:transform .2s; }
 .worm-story-live .is-settling { color:#ffd98a; font-weight:700; }
 .worm-story-live-more { color:var(--hud-muted,#ced8d0); font-size:10px; }
 .worm-story-live-hint { margin:0; padding:4px 9px; border-radius:10px; font-size:10.5px; line-height:1.3; color:#ffe7a8; background:color-mix(in srgb,#3a2f14 80%,transparent); border:1px solid #ffd98a55; }
 .worm-story-tracker.is-collapsed .worm-story-live { padding-block:4px; }
-@keyframes worm-task-tap { 40% { box-shadow:0 3px 0 #0b100dcc,inset 0 0 0 2px #88e59a; transform:translateY(-1px); } }
+@keyframes worm-task-tap { 40% { box-shadow:0 3px 0 #0b100dcc,inset 0 0 0 2px #009B48; transform:translateY(-1px); } }
 .worm-buffs { display:flex; gap:5px; min-width:0; max-width:100%; overflow-x:auto; scrollbar-width:none; pointer-events:auto; }
 .worm-buff-item { flex-shrink:0; min-width:0; }
 .worm-buff-chip { position:relative; overflow:hidden; color:var(--power-color); border-color:color-mix(in srgb,var(--power-color) 55%,transparent); white-space:nowrap; font-size:10px; font-weight:750; font-variant-numeric:tabular-nums; gap:5px; }
@@ -187,3 +187,22 @@
 .worm-tunnel-safety-symbol { display:grid; place-items:center; flex-shrink:0; width:30px; height:30px; border:2px solid currentColor; border-radius:50%; font-size:23px; font-weight:900; }
 .worm-tunnel-glance[data-tunnel-danger=true] { border:3px solid #ffe4ba; background:#781d25; box-shadow:0 0 0 2px #17121b; }
 .worm-tunnel-glance[data-tunnel-danger=true] .worm-tunnel-safety-symbol { border-radius:6px; }
+
+/* ── Arcade plastic (uiTheme GAME_HUD / ARCADE_*) ────────────────────────────
+   Every in-play chip is an ivory key on a ledge with dark-green ink, readable
+   over bright photo skies and dark ones alike. Danger stays red on purpose. */
+.worm-hud-chip { border:2px solid var(--hud-border); border-radius:16px; background:var(--hud-surface); color:var(--hud-text); box-shadow:0 4px 0 var(--hud-border),0 8px 18px #26372d1a; font-family:var(--heading-font); font-weight:800; }
+.worm-hud-chip:enabled:active { transform:translateY(3px); box-shadow:0 1px 0 var(--hud-border); }
+@keyframes worm-task-tap { 40% { box-shadow:0 4px 0 var(--hud-border),inset 0 0 0 2px #009B48; transform:translateY(-1px); } }
+.worm-instrument .orb-slot { background:var(--hud-raised); border:2px solid var(--hud-border); }
+.worm-mission-glance>strong { color:#1f6b3a; }
+.worm-story-glance-clock[data-urgent=true] { color:#b34700; }
+.worm-story-goal-bars>i,.worm-story-live-bar { background:#26372d1f; }
+.worm-story-live { background:color-mix(in srgb,var(--hud-surface) 94%,transparent); border:2px solid var(--hud-border); border-radius:14px; }
+.worm-story-live .is-settling { color:#8a5a00; }
+.worm-story-live-hint { color:#5a3d00; background:#fff3c4f2; border:2px solid #e7c75a; border-radius:12px; }
+.worm-tunnel-glance { background:var(--hud-surface); color:var(--hud-text); border:2px solid var(--hud-border); }
+.worm-tunnel-glance[data-heal-ready=true] { border-color:#1f6b3a; color:var(--hud-text); background:#e3f0d8; }
+.worm-tunnel-safety-copy small { color:var(--hud-muted); }
+.worm-tunnel-orb { border-color:#26372d55; }
+.worm-tunnel-glance[data-tunnel-danger=true] { border:2px solid #7a1520; color:#fff; background:#c41e3a; box-shadow:0 4px 0 #7a1520; }

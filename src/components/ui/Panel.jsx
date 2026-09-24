@@ -23,7 +23,7 @@ import {
   PAPER_TEXT_MUTED, PAPER_FOOTER_BG, PAPER_SHADOW,
   NIGHT_BACKDROP, NIGHT_BACKDROP_BLUR, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT,
   NIGHT_TEXT_MUTED, NIGHT_SHADOW,
-  RADIUS_LG, TEXT_SM, TEXT_LG, Z
+  RADIUS_LG, TEXT_SM, TEXT_LG, DISPLAY_FONT, Z
 } from '../../utils/uiTheme.js';
 import { CloseButton } from './Button.jsx';
 
@@ -253,7 +253,7 @@ export function PanelHeader({ surface = 'paper', title, titleId, onClose, childr
       }}
     >
       {title && (
-        <h2 id={titleId} style={{ margin: 0, flex: 1, fontSize: TEXT_LG, fontWeight: 700, letterSpacing: '0.01em', color: s.text }}>
+        <h2 id={titleId} style={{ margin: 0, flex: 1, fontFamily: DISPLAY_FONT, fontSize: TEXT_LG + 2, fontWeight: 400, letterSpacing: '0.01em', textTransform: 'uppercase', color: s.text }}>
           {title}
         </h2>
       )}
