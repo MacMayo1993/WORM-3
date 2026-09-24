@@ -63,7 +63,7 @@ function StyleGrid({ keys, label, globalStyle, onApply, tileOwned }) {
               className={`style-card${globalStyle === key ? ' selected' : ''}${!owned ? ' locked' : ''}`}
               onClick={() => owned && onApply(key)}
               style={!owned ? { opacity: 0.4, cursor: 'not-allowed', position: 'relative' } : { position: 'relative' }}
-              title={!owned ? `Locked — buy in Parity Store` : `Apply ${style.label} to all faces`}
+              title={!owned ? 'Locked. Unlock it in the Store' : `Apply ${style.label} to all faces`}
             >
               <TilePreviewCanvas active={globalStyle === key} styleKey={key} size={56} className="style-card-preview" />
               <span className="style-card-label">{style.label}{!owned ? ' 🔒' : ''}</span>
