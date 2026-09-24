@@ -98,7 +98,7 @@ describe('mini cube precision stages', () => {
         }
       }
       expect(sim.specials).toHaveLength(0);
-      expect(getActiveTunnels(staged.cubies, size)).toHaveLength(level.kind === 'tunnel' ? level.target : 0);
+      expect(getActiveTunnels(staged.cubies, size)).toHaveLength(level.kind === 'tunnel' ? Math.min(2,level.target) : 0);
     }
   });
   it('retains the later pocket stage as a harder rotation challenge', () => {
@@ -113,7 +113,8 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
     const { size, sim, staged } = stage(level);
     const tunnels = getActiveTunnels(staged.cubies, size);
     const pairs = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
-    expect(tunnels).toHaveLength(pairs);
+    expect(tunnels).toHaveLength(Math.min(2,pairs));
+    expect(tunnels.length + staged.pendingMouths.length).toBe(pairs);
     // Story orbs never respawn: the route must hold enough for every orb goal.
     expect(sim.powerups.length).toBeGreaterThanOrEqual(Math.max(level.orbs ?? 0, level.kind === 'orbs' ? level.target : 0));
     const colors = new Set(sim.powerups.map(orb => staged.cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].curr));

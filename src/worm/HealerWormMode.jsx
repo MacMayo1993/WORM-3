@@ -134,6 +134,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // once the turn is nearly on top of them.
     const pendingRotRef     = useRef(null);   // {axis,dir,sliceIndex} for the whole cycle
     const warningProgressRef = useRef(0);     // 0→1 through warning window
+    const liveDeathRef = useRef(null);
     const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
 
     // ── Bomb hazard state ──────────────────────────────────────────────────────
@@ -214,6 +215,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         const rotationInterval = story?.rotateEvery || ACTIVE_ROTATE_INTERVAL;
         worm.tick(delta, { busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
             autoTimerRef.current >= rotationInterval - AUTO_ROTATE_WARNING - 0.2 });
+
+        const deathState = useGameStore.getState();
+        if (deathState.wormAlive) liveDeathRef.current = null;
+        else if (deathState.wormDeathDetails?.liveCrossing && liveDeathRef.current !== deathState.wormDeathDetails) {
+            liveDeathRef.current = deathState.wormDeathDetails;
+            thunkRef.current = { active: true, pos: deathState.wormDeathDetails.impactPosition,
+                colors: ['#ffdd44', '#ff4444'], text: "WORM'D" };
+        }
 
         // While a slice the worm sits on is mid-rotation during live play, ride it so the
         // worm visually turns with the cube rather than snapping into place only when the

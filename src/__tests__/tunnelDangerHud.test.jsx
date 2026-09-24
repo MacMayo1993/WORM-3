@@ -38,3 +38,10 @@ it('shows safe entry separately from unaffordable healing', () => {
   expect(host.textContent).toContain('Need 2 orbs to heal');
   expect(host.querySelector('[data-tunnel-danger="true"]')).toBeNull();
 });
+
+it('explains automatic tail clearance in traversal lessons', () => {
+  wormBuffs.tunnelNeeds = { uses: 1, ready: true, traversalTrial: true, inTransit: true, color: '#fff' };
+  act(() => root.render(<TunnelNeedsCard compact />));
+  expect(host.textContent).toContain('Clears after your tail');
+  expect(host.textContent).not.toContain('orbs to heal');
+});

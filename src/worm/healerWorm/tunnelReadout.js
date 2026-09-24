@@ -28,10 +28,12 @@ export function tunnelAt(sim, ctx, pos, distance = 0) {
   const key = getStableKey(pos.x, pos.y, pos.z, pos.dirKey, cubies);
   const deposited = ctx.getHealingProgress()?.[key]?.deposited ?? 0;
   const isPrism = ctx.isPrismCharacter();
+  const traversalTrial = !!ctx.isStoryTunnelTrial?.();
   return { key, pos: { ...pos }, distance, faceId: sticker.curr, color: ctx.getOrbColor(sticker.curr), isPrism,
     locked: isParityLocked(sim, pos, ctx), lockSeconds: Math.ceil(sim.signature.mobiTunnel?.reentryT ?? 0),
     voided: sim.voidTunnelKeys.has(resolved.tunnelKey), uses: sim.tunnelUseCounts.get(resolved.tunnelKey) ?? 0,
-    ...healingNeed({ deposited, inventory: ctx.getOrbInventory(), faceId: sticker.curr, tailLength: sim.tailLength, isPrism }) };
+    ...healingNeed({ deposited, inventory: ctx.getOrbInventory(), faceId: sticker.curr, tailLength: sim.tailLength, isPrism }),
+    ...(traversalTrial ? { traversalTrial: true, ready: true, pickupsNeeded: 0 } : {}) };
 }
 export function tunnelReadout(sim, size, ctx) {
   if (!sim.alive || !['active', 'finalHealing'].includes(ctx.getGamePhase()) || liveRotation.active || sim.restRead) return null;

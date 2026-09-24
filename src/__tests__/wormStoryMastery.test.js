@@ -21,7 +21,7 @@ function setup(id = 10) {
 }
 it.each([7, 8, 9, 10])('authors level %i with enough matching orbs and real healing pairs', id => {
   const { sim, p, level } = setup(id);
-  expect(getActiveTunnels(p.cubies, level.cubeSize ?? 5)).toHaveLength(level.target);
+  expect(getActiveTunnels(p.cubies, level.cubeSize ?? 5)).toHaveLength(Math.min(2,level.target));
   expect(sim.powerups.length).toBeGreaterThanOrEqual(level.orbs);
   for (const color of [1,2,3,4,5,6]) expect(sim.powerups.filter(t => p.cubies[t.x][t.y][t.z].stickers[t.dirKey].curr === color).length).toBeGreaterThanOrEqual(4);
   expect(sim.specials.length).toBeLessThanOrEqual(1);
@@ -32,7 +32,7 @@ it('requires every final-level mechanic, a safe landing, tail clearance and sett
   expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
   for (const [key, target] of Object.entries(level.mechanics)) expect(storyOutcome(level, { ...won, [key]: target - 1 })).toBeNull();
   for (const key of ['alive', 'tailClear', 'landed', 'rotationSettled']) expect(storyOutcome(level, { ...won, [key]: false })).toBeNull();
-  expect(storyOutcome(level, { ...won, elapsed: 541 })).toBeNull();
+  expect(storyOutcome(level, { ...won, elapsed: level.limit + 1 })).toBeNull();
 });
 it('stages the Stage 9 body on the 7x7 exterior and completes with one bomb and enemy', () => {
   const { sim, level, p } = setup(9);

@@ -24,7 +24,7 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
   const safety = danger ? warning : need.locked ? `Locked ${need.lockSeconds}s` : need.inTransit
     ? (passes === 0 ? 'Final safe trip' : 'Safe traversal')
     : `${passes} safe ${passes === 1 ? 'pass' : 'passes'} left`;
-  const healing = need.ready ? (need.inTransit ? 'Healing after tail clears' : 'Heal ready')
+  const healing = need.traversalTrial ? 'Clears after your tail' : need.ready ? (need.inTransit ? 'Healing after tail clears' : 'Heal ready')
     : `Need ${need.pickupsNeeded} ${need.pickupsNeeded === 1 ? 'orb' : 'orbs'} to heal`;
 
   if (compact) return <button type="button" onClick={onInspect} className="worm-tunnel-needs worm-tunnel-glance worm-hud-chip"
@@ -44,10 +44,10 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
         {!danger && <div style={{ fontSize: 12 }}>{healing}</div>}
       </div>
     </div>
-    {!danger && !need.inTransit && <div role="progressbar" aria-label="Healing energy deposited" aria-valuetext={`${Math.round(need.savedFraction * 100)}% deposited, ${Math.round(need.payableFraction * 100)}% available from carried orbs`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(need.savedFraction * 100)} style={{ display: 'flex', overflow: 'hidden', height: 5, background: '#0005', borderRadius: 4, margin: '7px 0 5px' }}>
+    {!danger && !need.inTransit && !need.traversalTrial && <div role="progressbar" aria-label="Healing energy deposited" aria-valuetext={`${Math.round(need.savedFraction * 100)}% deposited, ${Math.round(need.payableFraction * 100)}% available from carried orbs`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(need.savedFraction * 100)} style={{ display: 'flex', overflow: 'hidden', height: 5, background: '#0005', borderRadius: 4, margin: '7px 0 5px' }}>
       <span style={{ width: `${need.savedFraction * 100}%`, background: need.color }} />
       <span style={{ width: `${need.payableFraction * 100}%`, background: 'repeating-linear-gradient(120deg,#ffffff70 0 3px,#ffffff25 3px 6px)' }} />
     </div>}
-    <div style={{ fontSize: 10, opacity: 0.85, marginTop: need.voided ? 5 : 0 }}>{caption}</div>
+    <div style={{ fontSize: 10, opacity: 0.85, marginTop: need.voided ? 5 : 0 }}>{need.traversalTrial && !danger ? 'Cross once to clear this route' : caption}</div>
   </aside>;
 }

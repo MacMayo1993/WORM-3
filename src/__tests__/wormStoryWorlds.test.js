@@ -46,7 +46,9 @@ it.each(WORM_STORY_LEVELS)('keeps level $id routes unique, on safe tiles, and su
   resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
   const staged = stageStory(sim, size, level, 'glow');
   expect(new Set(sim.powerups.map(tileKey)).size).toBe(sim.powerups.length);
-  expect(getActiveTunnels(staged.cubies, size)).toHaveLength(['tunnel','collector','restore','mastery'].includes(level.kind) ? level.target : 0);
+  expect(getActiveTunnels(staged.cubies, size)).toHaveLength(['tunnel','collector','restore','mastery'].includes(level.kind) ? Math.min(2,level.target) : 0);
+  expect(sim.tailLength).toBe(4);
+  expect(staged.pendingMouths.length + getActiveTunnels(staged.cubies,size).length).toBe(['tunnel','collector','restore','mastery'].includes(level.kind) ? level.target : 0);
   const colors = {};
   for (const orb of sim.powerups) {
     const sticker = staged.cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey];

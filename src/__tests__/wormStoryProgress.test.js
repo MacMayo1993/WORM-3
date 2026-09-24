@@ -17,8 +17,8 @@ beforeEach(() => {
 it('locks future levels, fixes story rules, and restores ordinary Free Play runs', () => {
   const id = state().wormRunId;
   start(2); expect(state().wormRunId).toBe(id);
-  start(); expect(state()).toMatchObject({ wormSpeed: 2, wormEnemiesEnabled: false, wormCombatMode: false, xpRun: null, wormMission: null });
-  state().setWormSpeed(3); expect(state().wormSpeed).toBe(2);
+  start(); expect(state()).toMatchObject({ wormSpeed: 1.5, wormEnemiesEnabled: false, wormCombatMode: false, xpRun: null, wormMission: null });
+  state().setWormSpeed(3); expect(state().wormSpeed).toBe(storyLevel(1).speed);
   state().clearDisparityGame(); state().initWormMode(); state().setWormSpeed(2);
   expect(state()).toMatchObject({ wormStoryLevel: null, wormStoryReady: false, wormStoryResult: null, wormSpeed: 2 });
   expect(state().xpRun).not.toBeNull(); expect(state().wormMission).not.toBeNull();
@@ -30,7 +30,7 @@ it.each([{ wormPaused: true }, { wormAlive: false }, { wormStoryStarted: false }
 it('pays first clears and newly improved stars once, persists them, and rejects stale runs', () => {
   start(); state().completeWormStory(state().wormRunId - 1, won);
   expect(state().wormStoryResult).toBeNull();
-  state().completeWormStory(state().wormRunId, { ...won, elapsed: 65, cuts: 1 });
+  state().completeWormStory(state().wormRunId, { ...won, elapsed: storyLevel(1).par + 15, cuts: 1 });
   expect(state().wormStoryResult).toMatchObject({ stars: 1, points: 25, xp: 50 });
   expect(storyUnlocked(state().playerProgress, 2)).toBe(true);
   expect(storyUnlocked(state().playerProgress, 3)).toBe(false);
@@ -79,7 +79,7 @@ it('requires every physical objective and rejects expiration or old tutorial cle
 
 it('Book receives its XP bonus on first Story clears', () => {
   useGameStore.setState({ wormCharacter: 'book' }); start();
-  state().completeWormStory(state().wormRunId, { ...won, elapsed: 65, cuts: 1 });
+  state().completeWormStory(state().wormRunId, { ...won, elapsed: storyLevel(1).par + 15, cuts: 1 });
   expect(state().wormStoryResult.xp).toBe(63);
   useGameStore.setState({ wormCharacter: 'classic' });
 });

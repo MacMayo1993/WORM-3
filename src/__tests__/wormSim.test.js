@@ -34,7 +34,7 @@ import {
 } from '../worm/healerWorm/constants.js';
 import { makeCubies } from '../game/cubeState.js';
 import * as THREE from 'three';
-import { liveRotation } from '../worm/liveRotation.js';
+import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { inchCrawlAdvance, advanceInchGaitState } from '../worm/healerWorm/inchGait.js';
 import { shPush, shAt, shReset, ttAt, ttReset, ttPush } from '../worm/circularBuffers.js';
 import { getNextSurfacePosition, getWormholeHealRing } from '../worm/wormLogic.js';
@@ -1371,5 +1371,24 @@ describe('self-collision after a ring heal', () => {
     expect(eventsOf(ctx, 'rescue').map(e => e.active)).toEqual([true, false]);
     expect(sim.alive).toBe(rescue === 'jump');
     expect(eventsOf(ctx, 'death')).toHaveLength(rescue === 'jump' ? 0 : 1);
+  });
+});
+
+describe('crossing a moving slice after its initial hazard check', () => {
+  it('dies at visible contact, emits one slice death, and holds the impact pose through commit', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    expect(runUntil(sim,ctx,() => !!sim.prevTile && sim.interpT >= 0.35)).toBe(true);
+    expect(sim.interpT).toBeLessThan(0.5);
+    setLiveRotation('row',[sim.pos.y],[0.6],sim.pos.y,0.6);
+    run(sim,ctx,0.05);
+    expect(sim.alive).toBe(true);
+    expect(runUntil(sim,ctx,() => !sim.alive)).toBe(true);
+    expect(sim.interpT).toBe(0.5);
+    expect(eventsOf(ctx,'death')).toHaveLength(1);
+    expect(eventsOf(ctx,'death')[0].args[0]).toMatchObject({ reason:'slice-rotation', liveCrossing:true });
+    const head = sim.headInterpPos.clone();
+    applyRotationToSim(sim,SIZE,ctx,{axis:'row',sliceIndex:sim.pos.y,dir:1},{paused:false,inOpeningScramble:false});
+    expect(sim.headInterpPos.equals(head)).toBe(true);
+    resetLiveRotation();
   });
 });

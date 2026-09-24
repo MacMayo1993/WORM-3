@@ -6,7 +6,7 @@ import { storyLevel, storyOutcome } from './story/levels.js';
 import { storyHudSnapshot } from './story/hudSnapshot.js';
 import { offerStoryPower, recordStoryMechanic } from './story/mastery.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
-import { stageStory, storyMetrics } from './story/runtime.js';
+import { stageStory, storyMetrics, replenishStoryTunnel } from './story/runtime.js';
 import { wormEventChanges } from './wormEventChanges.js';
 import { withPersistenceBatch } from '../utils/persistenceBatch.js';
 import { cancelAmbientEncounter, makeAmbientCombat, stepAmbientCombat } from './combat/ambientCombat.js';
@@ -194,6 +194,7 @@ export function useWormCrawler(size, cubies) {
             isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
             isCombatMode: () => useGameStore.getState().wormCombatMode,
             isStoryMode: () => !!useGameStore.getState().wormStoryLevel,
+            isStoryTunnelTrial: () => storyLevel(useGameStore.getState().wormStoryLevel)?.kind === 'tunnel',
             allowRingHeal: () => {
                 const level = storyLevel(useGameStore.getState().wormStoryLevel);
                 const p = storyPracticeRef.current;
@@ -273,7 +274,7 @@ export function useWormCrawler(size, cubies) {
                     const current = useGameStore.getState();
                     if (!current.demoMode) useGameStore.setState({ showWormDeathMenu: true });
                     deathMenuTimer.current = null;
-                }, 520);
+                }, details?.reason === 'slice-rotation' ? 1400 : 520);
             },
             onTunnelEnter: (tunnel) => {
                 const practice = storyPracticeRef.current;
@@ -564,6 +565,8 @@ export function useWormCrawler(size, cubies) {
         }
         if (story && state.wormStoryStarted && !state.wormPaused && !document.hidden && sim.alive && !state.wormStoryResult && storyPracticeRef.current?.runId === state.wormRunId) {
             const live = useGameStore.getState();
+            const replenished = replenishStoryTunnel(sim, storyPracticeRef.current, live, sizeRef.current, activeTunnelsRef.current.length);
+            if (replenished) { useGameStore.setState({ cubies: replenished }); return; }
             // Observe a landing even if it immediately triggers the next rescue.
             // The rescue holds the deadline and completion until play resumes.
             const metrics = storyMetrics(sim, storyPracticeRef.current, story, live, activeTunnelsRef.current, sim.jumpRescueHeld ? 0 : delta);
