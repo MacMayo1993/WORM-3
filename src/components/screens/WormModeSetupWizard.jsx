@@ -50,7 +50,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <div style={{ display: 'grid', gap: 18 }}>
       <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 48, color: WIZ_TEXT, cursor: 'pointer' }}>
         <input type="checkbox" checked={!!settings.wormCombatMode} onChange={e => cos.setSettings(current => ({ ...current, wormCombatMode: e.target.checked }))} style={{ width: 22, height: 22, flexShrink: 0 }} />
-        <span><strong>Portal Combat · Preview</strong><br /><small>3 waves · 5×5 · No Layer Turns</small></span>
+        <span><strong>Portal Combat (preview)</strong><br /><small>Survive 3 waves on a 5×5 cube. Slices don’t turn.</small></span>
       </label>
       {!settings.wormCombatMode && <label style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 64, padding: 14, borderRadius: 12, border: `1px solid ${WIZ_BORDER_SOFT}`, background: WIZ_SURFACE_RAISED, color: WIZ_TEXT, cursor: 'pointer' }}>
         <input type="checkbox" role="switch" aria-label="Portal enemies" aria-describedby="worm-enemies-description"
@@ -59,13 +59,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           style={{ width: 24, height: 24, flexShrink: 0, accentColor: ACCENT }} />
         <span style={{ flex: 1 }}><strong>Enemies</strong><br />
           <small id="worm-enemies-description">{settings.wormEnemiesEnabled
-            ? 'Steer to aim. Hold Fire to shoot.'
-            : 'No enemies.'}</small>
+            ? 'Enemies come through the portals. Steer to aim, hold Fire to shoot.'
+            : 'Just you and the cube. No one shoots back.'}</small>
         </span>
         <strong style={{ color: ACCENT }}>{settings.wormEnemiesEnabled ? 'On' : 'Off'}</strong>
       </label>}
       {!settings.wormCombatMode && <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        <legend style={{ fontSize: 13, fontWeight: 700, color: WIZ_TEXT, marginBottom: 10 }}>Cube Size</legend>
+        <legend style={{ fontSize: 13, fontWeight: 700, color: WIZ_TEXT, marginBottom: 10 }}>Cube size</legend>
         <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} slot="body" compact />
       </fieldset>}
       {!settings.wormCombatMode && <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>

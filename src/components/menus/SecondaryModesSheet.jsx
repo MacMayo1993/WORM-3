@@ -76,7 +76,7 @@ const SecondaryModesSheet = ({
           <>
             {/* Visual Modes */}
             <div className="sheet-group">
-              <div className="sheet-group-title">Visual Style</div>
+              <div className="sheet-group-title">Visual style</div>
               <div className="sheet-grid">
                 {['classic', 'grid', 'sudokube', 'wireframe', 'glass', 'chrome', 'neon', 'gap', 'lego'].map((m) => (
                   <SheetItem
@@ -92,7 +92,7 @@ const SecondaryModesSheet = ({
 
             {/* View Toggles */}
             <div className="sheet-group">
-              <div className="sheet-group-title">View Options</div>
+              <div className="sheet-group-title">View options</div>
               <div className="sheet-grid">
                 <SheetItem label="Explode" active={exploded} onClick={onToggleExplode} color="#FF9800" locked={explodeLocked} />
                 <SheetItem label="Net" active={showNetPanel} onClick={onToggleNet} color="#FF9800" locked={netLocked} />
@@ -107,7 +107,7 @@ const SecondaryModesSheet = ({
                   color="#FF9800"
                   locked={tunnelsLocked}
                 />
-                <SheetItem label="Leaders" active={showLeaderboard} onClick={onToggleLeaderboard} color="#764ba2" />
+                <SheetItem label="Leaderboard" active={showLeaderboard} onClick={onToggleLeaderboard} color="#764ba2" />
               </div>
             </div>
 
@@ -132,7 +132,7 @@ const SecondaryModesSheet = ({
           <>
             {/* Core Modes */}
             <div className="sheet-group">
-              <div className="sheet-group-title">Core Modes</div>
+              <div className="sheet-group-title">Chaos</div>
               <div className="sheet-grid">
                 <SheetItem label="Chaos" active={chaosMode} onClick={onToggleChaos} color="#ef4444" locked={chaosLocked} />
                 {chaosMode && !chaosLocked && (
@@ -140,14 +140,14 @@ const SecondaryModesSheet = ({
                     {[1, 2, 3, 4, 5].map((l) => (
                       <SheetItem
                         key={l}
-                        label={`L${l}`}
+                        label={`Level ${l}`}
                         active={chaosLevel === l}
                         onClick={() => onSetChaosLevel(l)}
                         color="#ef4444"
                         locked={l > maxChaosLevel}
                       />
                     ))}
-                    <SheetItem label="Auto" active={autoRotateEnabled} onClick={onToggleAutoRotate} color="#ef4444" />
+                    <SheetItem label="Auto-turn" active={autoRotateEnabled} onClick={onToggleAutoRotate} color="#ef4444" />
                   </>
                 )}
               </div>
@@ -167,8 +167,8 @@ const SecondaryModesSheet = ({
               <div className="sheet-group">
                 <div className="sheet-group-title">Level</div>
                 <div className="sheet-grid">
-                  <SheetItem label="Levels" active={false} onClick={onShowLevels} color="#9370DB" />
-                  <SheetItem label="Freeplay" active={false} onClick={onFreeplay} color="#9370DB" />
+                  <SheetItem label="All levels" active={false} onClick={onShowLevels} color="#9370DB" />
+                  <SheetItem label="Free play" active={false} onClick={onFreeplay} color="#9370DB" />
                 </div>
               </div>
             )}

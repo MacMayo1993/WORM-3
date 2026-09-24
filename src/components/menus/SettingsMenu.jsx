@@ -3,7 +3,6 @@ import CapturePanel from '../capture/CapturePanel.jsx';
 import { ColorsPanel } from './settings/ColorsPanel.jsx';
 import { TilesPanel } from './settings/TilesPanel.jsx';
 import { ScenePanel } from './settings/ScenePanel.jsx';
-import { DisplayPanel } from './settings/DisplayPanel.jsx';
 import { ModesPanel } from './settings/ModesPanel.jsx';
 import { useDialogBehavior } from '../ui/index.js';
 
@@ -11,7 +10,6 @@ const TABS = [
   { id: 'colors', label: 'Colors' },
   { id: 'tiles', label: 'Tiles' },
   { id: 'scene', label: 'Scene' },
-  { id: 'display', label: 'Display' },
   { id: 'capture', label: 'Capture' },
   { id: 'modes', label: 'Modes' }
 ];
@@ -89,9 +87,6 @@ const SettingsMenu = ({ onClose, settings, onSettingsChange, faceImages = {}, on
           )}
           {activeTab === 'scene' && (
             <ScenePanel settings={settings} onSettingsChange={onSettingsChange} />
-          )}
-          {activeTab === 'display' && (
-            <DisplayPanel settings={settings} onSettingsChange={onSettingsChange} />
           )}
           {activeTab === 'modes' && (
             <ModesPanel />

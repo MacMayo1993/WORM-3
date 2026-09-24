@@ -25,14 +25,14 @@ const FloatingHUD = ({ metrics, chaosLevel, chaosMode }) => {
     const newParity = metrics.flips % 2;
     if (newParity !== prevParity.current) {
       prevParity.current = newParity;
-      push(`Parity flipped — ${newParity === 0 ? 'Even' : 'Odd'}`);
+      push(`${metrics.flips} ${metrics.flips === 1 ? 'flip' : 'flips'} · ${newParity === 0 ? 'even' : 'odd'} count`);
     }
   }, [metrics.flips, push]);
 
   useEffect(() => {
     if (chaosMode && chaosLevel !== prevChaosLevel.current) {
       prevChaosLevel.current = chaosLevel;
-      push(`Chaos Level ${chaosLevel}`);
+      push(`Chaos level ${chaosLevel}`);
     }
   }, [chaosLevel, chaosMode, push]);
 

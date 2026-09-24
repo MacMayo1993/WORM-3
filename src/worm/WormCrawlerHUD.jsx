@@ -776,7 +776,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                         <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.6)', flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
                     )}
                     {wormBodyTiles === 0 && (
-                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>no orbs</div>
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>No orbs yet</div>
                     )}
                 </div>
                 <div style={PODIUM_BASE_STYLE}>
@@ -784,17 +784,17 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                 </div>
             </div>
             <div style={WINNER_PP_STYLE}>+{ppEarned} Parity Points</div>
-            <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} orbs x 5 PP x 2x WIN BONUS</div>
+            <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} {wormBodyTiles === 1 ? 'orb' : 'orbs'} × 5 PP × 2 win bonus</div>
             <div style={WINNER_STATS_STYLE}>
                 {[
-                    ['TIME', formatTime(wormTimeAlive)],
+                    ['Time', formatTime(wormTimeAlive)],
                     ['Collected', wormSessionOrbs],
                     ['Healed', wormHealedCount],
-                    ['TOTAL PPs', parityPoints],
+                    ['Total PP', parityPoints],
                 ].map(([label, value]) => (
                     <div key={label} style={WINNER_STAT_BOX_STYLE}>
                         <div style={WINNER_STAT_LABEL_STYLE}>{label}</div>
-                        <div style={{ ...WINNER_STAT_VALUE_STYLE, ...(label === 'TOTAL PPs' ? { color: UI_GOLD } : {}) }}>{value}</div>
+                        <div style={{ ...WINNER_STAT_VALUE_STYLE, ...(label === 'Total PP' ? { color: UI_GOLD } : {}) }}>{value}</div>
                     </div>
                 ))}
             </div>
@@ -1153,7 +1153,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     ['Time', formatTime(wormTimeAlive)],
                     ['Healed', wormHealedCount],
                     ['Collected', wormSessionOrbs],
-                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
+                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next tunnel', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
                 <details className="screen-disclosure"><summary>Controls & sound</summary>
