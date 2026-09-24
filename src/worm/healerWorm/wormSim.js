@@ -1,3 +1,4 @@
+import { movingSliceCrossing } from './sliceCrossing.js';
 import { tickExpansion } from './expansion.js';
 import { EXPLODE_DURATION } from '../wormExpansion.js';
 import { cubeGridIndex } from '../../game/cubeWorldGeometry.js';
@@ -1505,6 +1506,14 @@ const PHASE_HANDLERS = {
                     ? (progress(sim.interpT) - progress(before)) * CORNER_STEP_LENGTH
                     : (sim.interpT - before) * (sim.prevWorldPos ? sim.prevWorldPos.distanceTo(sim.curWorldPos) : 0);
                 sim.crawlDistance += distance;
+                const sliceHit = ctx.getGamePhase() === 'active' && movingSliceCrossing(sim, before, jumpLiftOf(sim));
+                if (sliceHit) {
+                    sim.interpT = 0.5;
+                    sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
+                    killWormSim(sim, ctx, { reason: 'slice-rotation', ...sliceHit,
+                        liveCrossing: true, impactPosition: sim.headInterpPos.toArray() });
+                    return true;
+                }
             }
 
             if (headOnSurface && sim.pendingTunnelTrigger) {
@@ -1851,7 +1860,7 @@ const PHASE_HANDLERS = {
                 // Arm the heal now, but leave both flipped tiles and the tunnel intact
                 // until the recorded route proves the final segment has cleared the exit.
                 const exitProgress = exitStableKey ? (ctx.getHealingProgress()?.[exitStableKey]) : null;
-                const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel && ctx.allowTunnelHeal?.() !== false;
+                const didHeal = (isHealReady(exitProgress?.deposited) || ctx.isStoryTunnelTrial?.()) && !!exitedTunnel && ctx.allowTunnelHeal?.() !== false;
                 if (didHeal && !sim.tunnelPassages.some(p => p.heal?.tunnelKey === exitTunnelKey)) {
                     sim.pendingTunnelHeal = {
                         tunnel: exitedTunnel,
@@ -2302,6 +2311,7 @@ function dropStaleRestReadTiles(sim, txnId) {
  * @param {object} opts - { inOpeningScramble, paused } snapshot flags
  */
 export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, paused }) {
+    if (!sim.alive) return; // Preserve the impact pose when an in-flight turn commits after death.
     const { axis, dir, sliceIndex } = rot;
     const numTurns = rot.numTurns ?? 1;
     // Every plane this move turned, each with its own direction. A hazard turn spins

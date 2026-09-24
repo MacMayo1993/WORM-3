@@ -383,12 +383,16 @@ describe('applyRotationToSim — multi-layer commit', () => {
     sim.prevWorldPos = new THREE.Vector3(-1, 0, 1.5);
     sim.curWorldPos.set(-1, 1, 1.5);
     sim.interpT = 0.3; sim.stepAcc = 0.3;
+    // This case tests pickup timing across a survivable crossing. Grounded
+    // unprotected crossings now die at the moving seam.
+    sim.landingGraceT = 1.2;
     // This orb is carried INTO the destination, not the outgoing face there.
     const source = rotateTilePosition(destination, 'row', 2, -1, SIZE);
     sim.specials = [{ ...source, id: 'water', type: 'water', ttl: 20 }];
     beginTurn('row', [2], [1]);
     stepWormSim(sim, 0.01, SIZE, ctx);
     if (progress > 0.5) for (let i = 0; i < 4; i++) stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(sim.alive).toBe(true);
     expect(sim.restRead).not.toBeNull();
     expect(sim.elementalType).toBeNull();
     resetLiveRotation();

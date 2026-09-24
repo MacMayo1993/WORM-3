@@ -6,8 +6,8 @@ import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { shReset, shPush, ttReset, ttPush, ttAt } from '../circularBuffers.js';
-import { BODY_BALL_SPACING, WORM_LIFT } from '../healerWorm/constants.js';
-import { getActiveTunnels } from '../wormLogic.js';
+import { BASE_TAIL_LENGTH, BODY_BALL_SPACING, WORM_LIFT } from '../healerWorm/constants.js';
+import { getActiveTunnels, getStableKey, findStickerByStableKey } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
 import { hasJumpClearance, tileKey } from '../healerWorm/wormSim.js';
 import { STORY_WORLDS, STORY_ORB_ROUTES } from './worlds.js';
@@ -93,15 +93,20 @@ function seedBody(sim, size, path) {
     for (let n = 0; n < 50; n++) shPush(sim.stepHistory, point.lerpVectors(a, b, n / 50), normal, path[i][0], path[i][1], edge);
     ttPush(sim.tileTrail, `${path[i - 1][0]},${path[i - 1][1]},${edge},PZ`);
   }
-  sim.tailLength = Math.floor((path.length - 1) / BODY_BALL_SPACING);
+  sim.tailLength = BASE_TAIL_LENGTH;
 }
 
 export function stageStory(sim, size, level, character) {
   const base = stageWormPractice(sim, size, { id: 'steer' });
   const edge = size - 1;
   const pairCount = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
-  for (const [x, y, z, dir] of storyMouths(size, pairCount)) {
-    base.cubies = flipStickerPair(base.cubies, size, x, y, z, dir, buildManifoldGridMap(base.cubies, size));
+  const mouths = storyMouths(size, pairCount);
+  const pendingMouths = mouths.slice(2).map(([x,y,z,dir]) => getStableKey(x,y,z,dir,base.cubies));
+  // Reserve future mouths from food placement without opening the whole network.
+  let reserved = base.cubies;
+  for (const [i, [x,y,z,dir]] of mouths.entries()) {
+    reserved = flipStickerPair(reserved, size, x,y,z,dir,buildManifoldGridMap(reserved,size));
+    if (i < 2) base.cubies = reserved;
   }
   const body = storyBodyPath(size, level);
   const bodyKeys = new Set(body.map(([x, y]) => `${x},${y},${edge},PZ`));
@@ -109,7 +114,7 @@ export function stageStory(sim, size, level, character) {
   // Route-trial pairs can seal after traversal without losing their recorded credit.
   sim.powerups = [];
   const cells = STORY_ORB_ROUTES[STORY_WORLDS[level.id].route];
-  const orbsPerFace = level.orbsPerFace ?? cells.length;
+  const orbsPerFace = Math.max(level.orbsPerFace ?? cells.length, level.mechanics?.ringHeals ? 6 : 0);
   for (const dirKey of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
     // A tunnel may occupy a route tile. Fill locally with distinct safe cells
     // to retain the full matching-color supply on every face.
@@ -123,7 +128,7 @@ export function stageStory(sim, size, level, character) {
         : dirKey === 'PX' || dirKey === 'NX' ? [dirKey === 'PX' ? edge : 0, a, b] : [a, dirKey === 'PY' ? edge : 0, b];
       const sticker = base.cubies[x][y][z].stickers[dirKey];
       const tile = { x, y, z, dirKey };
-      if (sticker.curr === sticker.orig && tileKey(tile) !== tileKey(sim.pos) && !bodyKeys.has(tileKey(tile))) {
+      if (reserved[x][y][z].stickers[dirKey].curr === sticker.orig && tileKey(tile) !== tileKey(sim.pos) && !bodyKeys.has(tileKey(tile))) {
         used.add(key);
         sim.powerups.push({ ...tile, type: 'apple' });
       }
@@ -139,13 +144,14 @@ export function stageStory(sim, size, level, character) {
   // orbs, but cannot fill almost every remaining tile on the pocket cube.
   const pickupBudget = size <= 3 ? Math.floor(6 * size * size * 0.6) : Infinity;
   const targetCount = Math.min(characterOrbCount(sim.powerups.length, character), pickupBudget);
+  const reservedMouths = getActiveTunnels(reserved, size).flatMap(tunnel => [tunnel.entry, tunnel.exit]);
   while (sim.powerups.length < targetCount) {
-    const tile = randomUnflippedTile(base.cubies, size, [...sim.powerups, sim.pos, ...body.map(([x, y]) => ({ x, y, z: edge, dirKey: 'PZ' }))]);
+    const tile = randomUnflippedTile(base.cubies, size, [...sim.powerups, sim.pos, ...reservedMouths, ...body.map(([x, y]) => ({ x, y, z: edge, dirKey: 'PZ' }))]);
     if (!tile) break;
     sim.powerups.push({ ...tile, type: 'apple' });
   }
   sim.specials = [];
-  const practice = { ...base, elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null,
+  const practice = { ...base, pendingMouths, elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), elementTime: 0, powerSeq: 0, bombIds: new Set() };
   return practice;
@@ -183,6 +189,28 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
     nextTarget: level.kind === 'tunnel' ? activeTunnels.find(record => !practice.tunnels.has(record.tunnel.pairId))?.tunnel.entry ?? null : null,
     bodyJumps: practice.bodyJumps, landed: !sim.isJumping && sim.phase === 'crawling',
     rotations: state.rotationEpoch - practice.rotationEpoch,
-    rotationSettled: !state.animState && !liveRotation.active, remaining: activeTunnels.length,
+    rotationSettled: !state.animState && !liveRotation.active, remaining: activeTunnels.length + (practice.pendingMouths?.length ?? 0),
   };
+}
+
+// Introduce one replacement only after the previous tail clears. Stable sticker
+// identities follow cube rotations; never open a mouth under the body or a pickup.
+export function replenishStoryTunnel(sim, practice, state, size, activeCount = getActiveTunnels(state.cubies,size).length) {
+  if (!practice.pendingMouths?.length || sim.phase !== 'crawling' || sim.tunnelPassages.length ||
+      sim.healPauseT > 0 || state.animState || liveRotation.active || activeCount >= 2) return null;
+  const map = buildManifoldGridMap(state.cubies, size);
+  const occupied = new Set([...sim.powerups, ...sim.specials].map(tileKey));
+  occupied.add(tileKey(sim.pos));
+  if (sim.prevTile) occupied.add(tileKey(sim.prevTile));
+  for (let i=0; i<Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail,i));
+  for (let i=0; i<practice.pendingMouths.length; i++) {
+    const pos = findStickerByStableKey(state.cubies,size,practice.pendingMouths[i],map);
+    if (!pos || occupied.has(tileKey(pos))) continue;
+    const cubies = flipStickerPair(state.cubies,size,pos.x,pos.y,pos.z,pos.dirKey,map);
+    const pair = getActiveTunnels(cubies,size).find(t => tileKey(t.entry) === tileKey(pos) || tileKey(t.exit) === tileKey(pos));
+    if (!pair || occupied.has(tileKey(pair.entry)) || occupied.has(tileKey(pair.exit))) continue;
+    practice.pendingMouths.splice(i,1);
+    return cubies;
+  }
+  return null;
 }

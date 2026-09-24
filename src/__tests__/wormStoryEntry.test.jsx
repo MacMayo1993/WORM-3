@@ -37,7 +37,7 @@ it('opens with Story on the left and Free Play on the right, without launching e
   expect(complete).not.toHaveBeenCalled();
   click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
-  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false,
+  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
     colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));
   click('Back'); await act(async () => { click('Free Play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
@@ -69,7 +69,7 @@ it('offers Next, Replay and chapter navigation from completion', () => {
 });
 
 it('explains the hard deadline before play and distinguishes timeout from a collision', () => {
-  show({ initialPage: 'story' }); expect(host.textContent).toContain('1:30 to finish');
+  show({ initialPage: 'story' }); expect(host.textContent).toContain('2:05 to finish');
   act(() => root.render(<DeathScreen deathDetails={{ reason: 'story-timeout' }} wormTimeAlive={90}
     wormBodyTiles={12} wormHealedCount={0} wormTunnelCount={0} formatTime={n => `${n}s`} />));
   expect(host.textContent).toContain('Time’s up'); expect(host.textContent).toContain('Try a shorter route');
