@@ -70,28 +70,53 @@ it('replaces secondary context with one healing readout and keeps pause usable d
   expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
 });
 
-it('keeps live Story progress in a single compact button and pauses to inspect the checklist', () => {
-  useGameStore.setState({ wormStoryLevel: 7, wormStoryReady: true, wormStoryStarted: true,
-    wormStoryProgress: '1/6 goals · 0/2 boosts finished' });
+it('lists unfinished Story tasks during play, collapses them on tap, and keeps the full checklist in Pause', () => {
+  localStorage.removeItem('worm3_story_tracker_collapsed');
+  const runId = useGameStore.getState().wormRunId;
+  useGameStore.setState({ wormStoryLevel: 7, wormStoryReady: true, wormStoryStarted: true, wormStoryChecklist: { runId, levelId: 7, seconds: 250,
+    hint: 'Rocket: steer the flight and land', goals: [
+      { key: 'boosts', label: 'Finish boosts', value: 2, target: 2, done: true },
+      { key: 'doubleJumps', label: 'Land double-jumps', value: 1, target: 2, done: false },
+      { key: 'rockets', label: 'Land a rocket flight', value: 0, target: 1, done: false },
+      { key: 'magnetOrbs', label: 'Catch orbs with a magnet', value: 0, target: 4, done: false },
+      { key: 'healed', label: 'Heal tunnel pairs', value: 0, target: 2, done: false },
+      { key: 'orbs', label: 'Collect orbs', value: 5, target: 24, done: false }] } });
   renderPhase('crawling');
   const top = host.querySelector('.worm-hud-top');
-  const card = top.querySelector('.worm-story-glance');
-  expect(card).not.toBeNull();
-  expect(card.getAttribute('aria-label')).toContain('Full Throttle');
-  expect(card.textContent).toContain('Tasks 0/6');
-  expect(host.querySelector('.worm-story-checklist')).toBeNull();
-  expect(top.querySelector('.worm-hud-bar').compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(host.querySelector('.worm-hud-bottom [aria-label="Story objective"]')).toBeNull();
+  const header = top.querySelector('.worm-story-glance');
+  expect(header.getAttribute('aria-label')).toContain('Full Throttle');
+  expect(header.textContent).toContain('Tasks 1/6');
+  expect(top.querySelector('.worm-hud-bar').compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // The next three unfinished tasks are readable without pausing; finished ones drop off.
+  const rows = () => [...top.querySelectorAll('.worm-story-live li')].map(li => li.textContent);
+  expect(rows()).toEqual(['Land double-jumps1/2', 'Land a rocket flight0/1', 'Catch orbs with a magnet0/4', '+2 more · full list in Pause']);
+  expect(top.querySelector('.worm-story-live-hint').textContent).toBe('Rocket: steer the flight and land');
   expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
-  act(() => card.click());
-  expect(useGameStore.getState().wormPaused).toBe(true);
-  expect(host.querySelector('.worm-pause-card .worm-story-checklist')).not.toBeNull();
-  expect(top.hasAttribute('inert')).toBe(true);
-  expect(document.activeElement.classList.contains('worm-pause-resume')).toBe(true);
-  act(() => document.activeElement.click());
+  // Tapping the header collapses to the next task instead of pausing, and remembers it.
+  act(() => header.click());
   expect(useGameStore.getState().wormPaused).toBe(false);
-  expect(host.querySelector('.worm-story-checklist')).toBeNull();
+  expect(header.getAttribute('aria-expanded')).toBe('false');
+  expect(rows()).toEqual(['Land double-jumps1/2']);
+  expect(top.querySelector('.worm-story-live-hint')).toBeNull();
+  expect(localStorage.getItem('worm3_story_tracker_collapsed')).toBe('1');
+  act(() => header.click());
+  expect(rows()).toHaveLength(4);
+  // Pause still opens the complete checklist.
+  act(() => host.querySelector('[aria-label="Pause"]').click());
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  expect(host.querySelectorAll('.worm-pause-card .worm-story-checklist li')).toHaveLength(6);
+  expect(top.hasAttribute('inert')).toBe(true);
+  act(() => host.querySelector('.worm-pause-resume').click());
+  expect(useGameStore.getState().wormPaused).toBe(false);
   expect(top.hasAttribute('inert')).toBe(false);
+});
+
+it('replaces the task rows with the finishing instruction once every task is done', () => {
+  const runId = useGameStore.getState().wormRunId;
+  useGameStore.setState({ wormStoryLevel: 2, wormStoryReady: true, wormStoryStarted: true, wormStoryChecklist: { runId, levelId: 2, seconds: 60, settling: true,
+    goals: [{ key: 'uniqueTunnels', label: 'Cross tunnel pairs', value: 4, target: 4, done: true }] } });
+  renderPhase('crawling');
+  expect([...host.querySelectorAll('.worm-story-live li')].map(li => li.textContent)).toEqual(['Land and clear your tail to finish']);
 });
 
 it('puts Start level at the bottom, then shows controls and automatic checked tasks', () => {
@@ -112,7 +137,7 @@ it('puts Start level at the bottom, then shows controls and automatic checked ta
   expect(host.querySelector('.worm-story-checklist')).toBeNull();
   expect(host.querySelector('.worm-story-glance').getAttribute('aria-label')).toContain('1 of 1 tasks complete');
   expect(feel.mock.calls.filter(([event]) => event === 'storyTask')).toHaveLength(1);
-  act(() => host.querySelector('.worm-story-glance').click());
+  act(() => host.querySelector('[aria-label="Pause"]').click());
   expect(host.querySelector('.worm-pause-card .worm-story-checklist .is-complete').getAttribute('aria-label')).toContain('complete');
   // A retry must not show marks from the previous attempt.
   act(() => useGameStore.setState({ wormRunId: runId + 1 }));
@@ -154,7 +179,7 @@ it('confirms each completed task once without adding a banner or replaying it on
   act(() => vi.advanceTimersByTime(1500));
   expect(host.querySelector('.worm-task-confirmed')).toBeNull();
   expect(host.querySelector('.worm-story-glance').textContent).toContain('Tasks 1/1');
-  act(() => host.querySelector('.worm-story-glance').click());
+  act(() => host.querySelector('[aria-label="Pause"]').click());
   act(() => host.querySelector('.worm-pause-resume').click());
   expect(feel.mock.calls.filter(([event]) => event === 'storyTask')).toHaveLength(1);
   act(() => useGameStore.setState({ wormRunId: runId + 1 }));
