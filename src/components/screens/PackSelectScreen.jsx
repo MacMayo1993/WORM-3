@@ -134,7 +134,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
           <div style={{
             fontSize: '11px', fontWeight: 900, letterSpacing: '0.18em',
             textTransform: 'uppercase', color: PAPER_TEXT_FAINT,
-          }}>Story</div>
+          }}>Cube puzzles</div>
           <h1 style={{
             margin: '4px 0 6px', fontFamily: HEADING_FONT, color: PAPER_TEXT,
             fontSize: 'clamp(26px, 7vw, 40px)', letterSpacing: '0.02em', lineHeight: 1,

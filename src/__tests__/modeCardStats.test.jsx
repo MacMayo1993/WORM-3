@@ -20,15 +20,14 @@ const CTX = (over = {}) => ({
 });
 
 describe('chipsFor', () => {
-  it('derives STORY\'s chapter count from the level data', () => {
-    // The description used to say "ten chapters" while the campaign had twelve.
-    // Deriving it is what makes that class of drift impossible.
-    const chips = chipsFor(MODE('cube', ['Campaign', 'Guided']), CTX({ story: { completed: 3, total: 12, stars: 7 } }));
-    expect(chips).toEqual(['12 chapters', 'Guided']);
+  it('keeps Teach chips independent of old campaign completion', () => {
+    // Old campaign data must not overwrite the teaching method label.
+    const chips = chipsFor(MODE('cube', ['3×3', 'Step by step']), CTX({ story: { completed: 3, total: 12, stars: 7 } }));
+    expect(chips).toEqual(['3×3', 'Step by step']);
   });
 
   it('leaves the placeholder alone when the level data is unavailable', () => {
-    expect(chipsFor(MODE('cube', ['Campaign', 'Guided']), CTX())).toEqual(['Campaign', 'Guided']);
+    expect(chipsFor(MODE('cube', ['3×3', 'Step by step']), CTX())).toEqual(['3×3', 'Step by step']);
   });
 
   it('passes every other mode through untouched', () => {
@@ -37,7 +36,7 @@ describe('chipsFor', () => {
   });
 
   it('tolerates a missing context', () => {
-    const mode = MODE('cube', ['Campaign', 'Guided']);
+    const mode = MODE('cube', ['3×3', 'Step by step']);
     expect(chipsFor(mode, undefined)).toBe(mode.chips);
   });
 });
@@ -52,20 +51,19 @@ describe('modeStatItems', () => {
     expect(modeStatItems(MODE('random'), CTX())).toEqual([]);
   });
 
-  it('reports STORY from campaign progress, not from the play count', () => {
+  it('shows the Teach method without claiming old campaign stars as lesson progress', () => {
     const items = modeStatItems(MODE('cube'), CTX({
       story: { completed: 3, total: 12, stars: 7 },
       plays: { cube: { plays: 99, lastPlayed: Date.now() } },
     }));
     expect(items).toEqual([
-      { label: 'Chapters', value: '3/12' },
-      { label: 'Stars', value: '7★' },
+      { label: 'Method', value: 'Beginner 3×3' },
     ]);
   });
 
-  it('shows STORY chapters even at zero, and drops the star line until one is earned', () => {
+  it('shows the Teach method before any practice', () => {
     const items = modeStatItems(MODE('cube'), CTX({ story: { completed: 0, total: 12, stars: 0 } }));
-    expect(items).toEqual([{ label: 'Chapters', value: '0/12' }]);
+    expect(items).toEqual([{ label: 'Method', value: 'Beginner 3×3' }]);
   });
 
   it('reports STORE from the wallet and the collection', () => {

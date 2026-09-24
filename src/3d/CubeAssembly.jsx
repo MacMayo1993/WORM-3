@@ -809,7 +809,7 @@ const CubeAssembly = React.memo(({
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
       value: 1,
       paused: jumpRescueActive(),
-      duration: isWormHazard ? baseDuration * 4.0 : baseDuration,
+      duration: animState.teachSlow ? 0.8 : isWormHazard ? baseDuration * 4.0 : baseDuration,
       ease: isWormHazard ? "power2.inOut" : isFast ? "power2.out" : "back.out(1.4)",
       onComplete: () => {
         if (useGameStore.getState().animState !== animState) return;

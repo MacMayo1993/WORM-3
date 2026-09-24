@@ -19,7 +19,7 @@ const MODES = [
     blurb: 'Steer a worm, collect orbs, and heal the cube.',
     primary: true,
   },
-  { id: 'story', name: 'Story', blurb: 'Clear chapters of guided cube puzzles.' },
+  { id: 'story', name: 'Teach', blurb: 'Learn a complete beginner cube method.' },
   { id: 'freeplay', name: 'Cube', blurb: 'Solve a cube at any size, no timer.' },
   { id: 'chaos', name: 'Chaos', blurb: 'Predict which color pair lasts longest.' },
   { id: 'random', name: 'Random', blurb: 'Solve while the colors and tile styles change.' },
