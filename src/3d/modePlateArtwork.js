@@ -6,10 +6,10 @@ import { modeArtwork } from '../utils/modeArtwork.js';
 export function createModePlateArtwork(mode, ink) {
   if (typeof document === 'undefined' || typeof Path2D === 'undefined') return null;
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 256;
+  canvas.width = canvas.height = 512;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  ctx.scale(256 / 160, 256 / 160);
+  ctx.scale(512 / 160, 512 / 160);
   ctx.strokeStyle = ctx.fillStyle = ink;
   ctx.lineCap = ctx.lineJoin = 'round';
   for (const shape of modeArtwork(mode)) {
@@ -20,5 +20,19 @@ export function createModePlateArtwork(mode, ink) {
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  // Artwork is a decal ON the live mesh, so it turns and dives with the cube.
+  // Keep the vector underneath until loading succeeds, including offline visits.
+  const asset = { worm: 'worm', freeplay: 'cube', cube: 'teach', chaos: 'chaos', random: 'cube', store: 'cube' }[mode];
+  if (asset && typeof Image !== 'undefined') {
+    const image = new Image();
+    image.onload = () => {
+      ctx.clearRect(0, 0, 160, 160);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(image, 0, 0, 160, 160);
+      texture.needsUpdate = true;
+    };
+    image.src = `${import.meta.env.BASE_URL}images/arcade/${asset}.webp`;
+    texture.addEventListener('dispose', () => { image.onload = null; });
+  }
   return texture;
 }

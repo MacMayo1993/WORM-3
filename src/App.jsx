@@ -59,6 +59,8 @@ import {
 import IntroScene from './components/intro/IntroScene.jsx';
 import IntroBackdrop from './components/intro/IntroBackdrop.jsx';
 import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
+import MenuPaperBackdrop from './3d/MenuPaperBackdrop.jsx';
+import { subscribeCarouselActive, isCarouselActive } from './components/menus/menuCarouselState.js';
 import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 import { setWormSharedRenderer, tickWormPreviews, hasActiveWormPreviews } from './3d/WormPreviewRenderer.js';
@@ -191,6 +193,7 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
 function MenuScene({ onCubeClick, background }) {
+  const carouselActive = useSyncExternalStore(subscribeCarouselActive, isCarouselActive, () => false);
   const directPreview = useSyncExternalStore(subscribeDirectWormPreview, getDirectWormPreview, () => null);
   return (
     <>
@@ -204,6 +207,7 @@ function MenuScene({ onCubeClick, background }) {
       <directionalLight position={[2, 4, -6]} intensity={1.3} color="#e6edff" />
       <Suspense fallback={null}>
         <InteractivePhotoBackground
+          visible={!carouselActive}
           files={getBackgroundUrl(background.file)}
           // Counter-rotate the panorama against the menu cube. The faster but
           // still gentle orbit lets a player read the whole environment instead
@@ -214,10 +218,11 @@ function MenuScene({ onCubeClick, background }) {
         />
       </Suspense>
       <Suspense fallback={null}>
+        {carouselActive && <MenuPaperBackdrop />}
         <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
       {!isMobile && (
-        <Suspense fallback={null}><SceneEffects kind="menu" enabled={!directPreview} /></Suspense>
+        <Suspense fallback={null}><SceneEffects kind="menu" enabled={!directPreview && !carouselActive} /></Suspense>
       )}
     </>
   );
@@ -944,6 +949,7 @@ export default function WORM3() {
   const handleWormWizardCancel = useCallback(() => {
     clearMegaReducedFXOverride();
     setShowWormModeWizard(false);
+    setShowModeSelect(true);
     useGameStore.getState().setShowMainMenu(true);
   }, [clearMegaReducedFXOverride]);
 
@@ -1351,10 +1357,11 @@ export default function WORM3() {
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Suspense fallback={<LoadingScreen message="Loading guide" />}><Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} /></Suspense>
       </ScreenTransition>
-      {showModeSelect && (
+      {showModeSelect && !showSettings && (
         <Suspense fallback={null}>
           <ModeCarousel
             onBack={() => setShowModeSelect(false)}
+            onSettings={handleMenuSettings}
             onCubeSelect={() => { setShowModeSelect(false); handleMenuTeach(); }}
             onWormSelect={() => { setShowModeSelect(false); handleMenuWormHealer(); }}
             onChaos={() => { setShowModeSelect(false); handleMenuDisparity(); }}
