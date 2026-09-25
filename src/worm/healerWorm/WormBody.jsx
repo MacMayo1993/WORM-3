@@ -546,6 +546,14 @@ export function WormBody({ worm, size }) {
                     const edge = Math.min(sweep.elapsed / 0.12, (WIGGLE_DURATION - sweep.elapsed) / 0.12, 1);
                     const blend = Math.max(0, edge);
                     _bodyClonePos.lerp(_bodyEffA, blend * blend * (3 - 2 * blend));
+                    // The sweep maps onto a bare cube shell only WORM_LIFT out, closer than
+                    // a bead's radius and tighter still at edges, and it lands after the
+                    // clearance above — so Tail Wipers sank the tail into the cube. Clear
+                    // it again, outward from the cube where the bead now actually is.
+                    if (blend > 0 && !segmentTransit && orbitT === 0) {
+                        cubeShellDirInto(_bodyCloneNormal, _bodyClonePos, size);
+                        clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, 0.10, surface);
+                    }
                 }
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isBook || isMobi || _isInch || _isPrism) {
@@ -607,6 +615,15 @@ export function WormBody({ worm, size }) {
             }
             _wormDummy.scale.multiplyScalar(wormBodyTaper(i, sweep ? visibleCount : tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
+            // Surface clearance above was solved for the resting bead radius; the
+            // pickup pulse swells beads past it. Lift a swollen bead by the extra
+            // radius so it grows away from the tiles instead of into them. (Unit
+            // sphere geometry: uniform scale is the radius. Inch Worm's squash
+            // presses down on purpose; the Book Worm's box is not a sphere.)
+            if (i !== 0 && !segmentTransit && orbitT === 0 && !_isBook && !_isInch) {
+                const excess = _wormDummy.scale.x - (isMobi ? 0.15 : 0.10);
+                if (excess > 0) _wormDummy.position.addScaledVector(_bodyCloneNormal, excess);
+            }
             // LOD removes distant instances to control cost, but must never make
             // the survivors larger: that produced an abrupt size jump at segment
             // 200/600 and made collected-orb growth look non-uniform.
