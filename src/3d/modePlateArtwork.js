@@ -20,7 +20,7 @@ export function createModePlateArtwork(mode, ink) {
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  // Decals are rendered from real cubies and legal moves (scripts/carousel-art).
+  // Each mode has its own transparent character/object illustration.
   // They stay ON the live mesh, turning and diving with the carousel cube.
   // Keep the vector underneath until loading succeeds, including offline visits.
   const asset = { worm: 'worm', freeplay: 'cube', cube: 'teach', chaos: 'chaos', random: 'random', store: 'store' }[mode];
