@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { INTRO_COPY, INTRO_COPY_TEXT, introCopyFrame, WORD_INTERVAL, WORD_FADE, LINE_DISSOLVE } from '../components/intro/introCopy.js';
+import { INTRO_COPY, INTRO_COPY_TEXT, introCopyFrame, WORD_INTERVAL, WORD_FADE, LINE_DISSOLVE, INTRO_ACCENTS } from '../components/intro/introCopy.js';
 import { TITLE_START } from '../components/intro/introTiming.js';
 
 it('reveals words in order and holds each complete line for a readable beat', () => {
@@ -59,5 +59,26 @@ describe('the opening script', () => {
 
   it('summarises the whole script for screen readers', () => {
     for (const line of INTRO_COPY) expect(INTRO_COPY_TEXT).toContain(line.text);
+  });
+});
+
+// Three words carry their own move (a box drawn round "box", a somersault on
+// "flip", a sticker flip under "cube"). Each must be found in the script and
+// finish before its line starts to dissolve, or the move is cut off mid-air.
+describe('accent words', () => {
+  it('finds every accent in the script and completes its move while the line is fully on screen', () => {
+    const found = new Set();
+    for (const line of INTRO_COPY) {
+      const settled = introCopyFrame(line.end - LINE_DISSOLVE - 0.001);
+      for (const word of settled.words) {
+        expect(word.reveal).toBe(1);
+        if (!word.accent) { expect(word.move).toBe(0); continue; }
+        found.add(word.accent);
+        expect(word.move, `${word.text} still moving as the line dissolves`).toBe(1);
+      }
+      const opening = introCopyFrame(line.start);
+      expect(opening.words.every(w => w.move === 0 && w.reveal === 0)).toBe(true);
+    }
+    expect([...found].sort()).toEqual(Object.values(INTRO_ACCENTS).sort());
   });
 });
