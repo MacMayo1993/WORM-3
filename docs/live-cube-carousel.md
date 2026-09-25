@@ -14,25 +14,17 @@ Captured at 390×844 from the running app with the WebGL cube visible.
 
 ## Artwork
 
-All six decals are authored as reproducible Three.js scenes in `scripts/carousel-art/model.js`, then exported as 768×768 transparent WebP. The puzzle stickers come from `makeCubies(3)` and `rotateSliceCubies`; no sticker colors are invented or painted independently.
+Six distinct character/object illustrations are applied as transparent decals to the existing live cube. They use rounded toy forms and a shared colorful palette. None depicts a six-faced puzzle cube or a sticker configuration.
 
 | Mode | Image |
 | --- | --- |
-| WORM | Solved 3×3 with a green worm resting on top |
-| CUBE | Legal three-turn scramble |
-| TEACH | Solved 3×3 with a golden turn arrow |
-| CHAOS | Legal scramble with one intact outer layer partway through a turn |
-| RANDOM | A different legal scramble with two directional arrows |
-| STORE | Gift box with a ribbon; no puzzle stickers |
+| WORM | Green worm curling through a turquoise portal |
+| CUBE | Shallow 3×3 tile puzzle with one tile lifted from its slot |
+| TEACH | Bookworm teacher with glasses and an open book |
+| CHAOS | Red and blue orbs with a golden lightning bolt |
+| RANDOM | Purple magician's hat with colored tiles and shuffle arrows |
+| STORE | Teal treasure chest with a hat, star and colorful orbs |
 
-The recipe lists every completed move. Tests reverse each sequence back to the solved cube, check all 54 stickers and their face normals, and verify that the turning layer contains exactly nine intact cubies. These are decorative mode illustrations, not algorithm instructions.
+Generated with the built-in image generator, one new transparent image per mode. Exact prompts are recorded in `carousel-art-prompts.json`. Original outputs were fitted without cropping to 768×768 RGBA canvases and encoded as WebP at quality 92. The application only loads these six static assets; no generation runs in the client.
 
-To re-render, install the optional authoring browser without changing the project dependencies:
-
-```sh
-npm install --no-save --package-lock=false playwright
-npx playwright install chromium
-node scripts/render-carousel-art.mjs
-```
-
-The exporter also accepts `PLAYWRIGHT_MODULE`, `CHROMIUM_EXECUTABLE` and `CHROMIUM_ARGS` for an existing browser installation. It uses the local Vite base and no remote assets. The renderer and its environment stay outside the application bundle; the live carousel only loads the exported images onto its existing faces.
+The earlier reproducible geometric scenes remain in `scripts/carousel-art/model.js` as an authoring alternative, with tests for their legal cube moves. They do not describe or validate the current illustrations. `scripts/render-carousel-art.mjs` exports those scenes to `output/carousel-geometry/`, so running it cannot overwrite the current decals.
