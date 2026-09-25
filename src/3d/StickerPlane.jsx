@@ -1976,7 +1976,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           already compiled lazily on first use — gating changes node count, not
           compile timing. hasFlipHistory latches true on the flip that mounts them,
           the same commit whose flip-start effect then wires their refs. */}
-      {hasFlipHistory && (
+      {hasFlipHistory && !presentation?.suppressFlipBursts && (
         <mesh ref={spiderPlaneRef} position={[0, 0, -1.01]} rotation={[0, Math.PI, 0]} visible={false}>
           <planeGeometry args={[0.92, 0.92]} />
           <shaderMaterial
