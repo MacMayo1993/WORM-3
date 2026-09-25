@@ -698,6 +698,8 @@ const FACE_TARGET_QUAT = {
 const _wobbleEuler = new THREE.Euler();
 const _wobbleQ = new THREE.Quaternion();
 const _presentQ = new THREE.Quaternion();
+const FACE_TARGETS = Object.values(FACE_TARGET_QUAT);
+const _parkedQ = new THREE.Quaternion();
 const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the camera
 
 // ─── Idle spin ───────────────────────────────────────────────────────────────
@@ -954,9 +956,16 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       } else {
         // Ease back while turning between faces so the wider mid-turn
         // silhouette stays on a phone screen; parked, it is full size.
-        const turning = carouselTurnScale(cubeRef.current.quaternion.angleTo(_presentQ), fit.turnPullback);
-        cubeCurrentScale.current += (1.022 * presentScale * turning - cubeCurrentScale.current) * Math.min(1, delta * 10);
-        cubeRef.current.scale.setScalar(cubeCurrentScale.current);
+        cubeCurrentScale.current += (1.022 * presentScale - cubeCurrentScale.current) * Math.min(1, delta * 10);
+        // Ease back while between faces so the wider mid-turn silhouette stays
+        // on a phone screen. Measured from this frame's pose (nearest parked
+        // face), so the shrink moves in lockstep with the rotation.
+        let fromFace = Math.PI;
+        if (fit.turnPullback) for (const target of FACE_TARGETS) {
+          _parkedQ.multiplyQuaternions(_wobbleQ, target).premultiply(_stageViewQ);
+          fromFace = Math.min(fromFace, cubeRef.current.quaternion.angleTo(_parkedQ));
+        }
+        cubeRef.current.scale.setScalar(cubeCurrentScale.current * carouselTurnScale(fromFace, fit.turnPullback));
       }
       return;
     }

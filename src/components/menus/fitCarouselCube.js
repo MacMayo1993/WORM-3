@@ -10,15 +10,21 @@ const SIDE_RESERVE = 40;
 // (fitCarouselCube.test.js walks every face-to-face turn): the cube fills the
 // blank band the tumble allowance used to leave above and below it. A turn
 // between faces swings an edge or corner wider than a parked face, so the cube
-// eases back by up to TURN_PULLBACK while it turns (see carouselTurnScale).
+// eases back by up to TURN_PULLBACK while it is between faces. The shrink is a
+// function of the pose itself, not of a separate scale easing, so it can never
+// lag the rotation: see carouselTurnScale.
 const TUMBLE_ENVELOPE = 4.8;
 const PRESENTED_ENVELOPE = 4.0;
 const PHONE_STAGE_MAX_WIDTH = 600;
 const TURN_PULLBACK = 0.18;
 
-/** Scale factor while the cube is `angle` radians from its parked face. */
-export function carouselTurnScale(angle, pullback) {
-  return 1 - pullback * Math.sin(Math.min(Math.max(angle, 0), Math.PI / 2));
+/**
+ * Scale factor for a cube `angleFromFace` radians from the nearest parked face
+ * pose. 1 when parked (at both ends of every turn, so there is no pop), full
+ * pullback from 45° on, where the silhouette is widest.
+ */
+export function carouselTurnScale(angleFromFace, pullback) {
+  return 1 - pullback * Math.sin(Math.min(Math.max(angleFromFace, 0) * 2, Math.PI / 2));
 }
 
 // Project the DOM stage's center onto the menu cube's z=0 plane. Unlike a fixed
