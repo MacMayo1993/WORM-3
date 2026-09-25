@@ -42,31 +42,40 @@ const wormAt = (fromX, toX, t) => ({
 });
 it('reports a head entering or leaving the turning layer before and early in the turn', () => {
   const worm = wormAt(0, 1, 0.4);
-  const watch = armTurnWatch(worm, 'col', [1]);
+  const watch = armTurnWatch(worm, 'col', [1], 7);
   expect(watch.headOn).toBe(false);
-  expect(stepTurnWatch(watch, worm)).toBeNull();
+  expect(stepTurnWatch(watch, worm, 7)).toBeNull();
   worm.interpT.current = 0.55; // crossed before the animation started
-  expect(stepTurnWatch(watch, worm)).toBe('crossed');
+  expect(stepTurnWatch(watch, worm, 7)).toBe('crossed');
   expect(watch.headOn).toBe(true);
-  expect(stepTurnWatch(watch, worm)).toBeNull(); // once per crossing
+  expect(stepTurnWatch(watch, worm, 7)).toBeNull(); // once per crossing
   setLiveRotation('col', [1], [0.03], 1, 0.03);
   worm.prevTile.current = { x: 1, y: 1, z: 4 }; worm.pos.current = { x: 2, y: 1, z: 4 }; worm.interpT.current = 0.6;
-  expect(stepTurnWatch(watch, worm)).toBe('crossed'); // leaving, at an aligned angle
+  expect(stepTurnWatch(watch, worm, 7)).toBe('crossed'); // leaving, at an aligned angle
   resetLiveRotation();
-  expect(stepTurnWatch(watch, worm)).toBe('done');
+  expect(stepTurnWatch(watch, worm, 7)).toBe('done');
 });
 it('leaves late crossings to the live check and end alignment, and honours jump, rocket and landing grace', () => {
   const worm = wormAt(0, 1, 0.4);
-  let watch = armTurnWatch(worm, 'col', [1]);
+  let watch = armTurnWatch(worm, 'col', [1], 7);
   setLiveRotation('col', [1], [1.2], 1, 1.2);
   worm.interpT.current = 0.55;
-  expect(stepTurnWatch(watch, worm)).toBeNull();
+  expect(stepTurnWatch(watch, worm, 7)).toBeNull();
   for (const guard of [w => { w.isJumping.current = true; w.jumpLift = () => 0.7; }, w => { w.rocketActive.current = true; }, w => { w.landingGraceT.current = 0.1; }]) {
     const w = wormAt(0, 1, 0.4); guard(w);
-    watch = armTurnWatch(w, 'col', [1]);
+    watch = armTurnWatch(w, 'col', [1], 7);
     setLiveRotation('col', [1], [0.02], 1, 0.02);
     w.interpT.current = 0.55;
-    expect(stepTurnWatch(watch, w)).toBeNull();
+    expect(stepTurnWatch(watch, w, 7)).toBeNull();
     expect(watch.headOn).toBe(true); // tracked, so landing later is not a second crossing
   }
+});
+
+it('ends at the commit even when no frame of the tween was observed', () => {
+  const worm = wormAt(0, 1, 0.4);
+  const watch = armTurnWatch(worm, 'col', [1], 7);
+  // Committed (epoch bumped) without the watch ever seeing liveRotation.active:
+  // a later idle crossing of the old layer must not read as a hit.
+  worm.interpT.current = 0.55;
+  expect(stepTurnWatch(watch, worm, 8)).toBe('done');
 });

@@ -36,19 +36,26 @@ function headCoord(worm, axis) {
   return tile[coord];
 }
 
-export function armTurnWatch(worm, axis, layers) {
-  return { axis, layers: layers.slice(), headOn: layers.includes(headCoord(worm, axis)), started: false };
+/** @param {number} epoch the store's rotationEpoch when the turn fires; its commit bumps it. */
+export function armTurnWatch(worm, axis, layers, epoch) {
+  return { axis, layers: layers.slice(), headOn: layers.includes(headCoord(worm, axis)), started: false, epoch };
 }
 
 const LATE_TURN = Math.PI / 4;
 
 /**
- * Advance the watch one frame.
+ * Advance the watch one frame. Must run every frame of the hazard tween, while
+ * the store's animState is set (see HealerWormMode).
+ * @param {number} epoch the store's current rotationEpoch
  * @returns {'crossed'|'done'|null} 'crossed' when the head changed sides early in
  *   the turn and the body must be re-resolved; 'done' once the turn has finished.
  */
-export function stepTurnWatch(watch, worm) {
+export function stepTurnWatch(watch, worm, epoch) {
   if (!watch) return null;
+  // The commit ends the watch even if no frame of the tween was observed: an
+  // armed watch outliving its turn would read the next idle crossing of the old
+  // layer as a hit.
+  if (epoch !== watch.epoch) return 'done';
   if (liveRotation.active) watch.started = true;
   else if (watch.started) return 'done';
   const onLayer = watch.layers.includes(headCoord(worm, watch.axis));
