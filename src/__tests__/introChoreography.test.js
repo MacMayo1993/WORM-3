@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from 'three';
 import { TILES, PAIRS, flippedColor, pairPoint } from '../components/intro/introTopology.js';
-import { WORM_START, IMPLODE_START, IMPLODE_END, TITLE_START, TITLE_END } from '../components/intro/introTiming.js';
+import { WORM_START, IMPLODE_START, IMPLODE_END, TITLE_START, TITLE_END, DISSOLVE_START, DISSOLVE_END } from '../components/intro/introTiming.js';
 import { INTRO_END, sampleIntro, introCameraDistance } from '../components/intro/introChoreography.js';
 
 // These protect animation failure modes: discontinuous cuts, clipped framing,
 // mistaken antipodes, and a supposedly reduced-motion path that still moves.
 describe('opening cinematic choreography', () => {
   it('has no jumps at camera or animation beat boundaries', () => {
-    for (const t of [0.1, 0.6, 1.0, 2.1, 2.2, 2.3, 3.2, 3.3, IMPLODE_START, TITLE_START, IMPLODE_END, TITLE_END]) {
+    for (const t of [0.1, 0.6, 1.0, 2.1, 2.2, 2.3, 3.2, 3.3, IMPLODE_START, TITLE_START, IMPLODE_END, TITLE_END, DISSOLVE_START, DISSOLVE_END]) {
       const before = sampleIntro(t - 0.00001);
       const after = sampleIntro(t + 0.00001);
       for (const key of ['open', 'reveal', 'turn', 'orbit', 'distance', 'flip', 'passage', 'title']) {
@@ -69,6 +69,8 @@ describe('all-pairs reveal', () => {
     expect(lastArrival).toBeLessThan(IMPLODE_START);
     expect(IMPLODE_START - lastArrival).toBeGreaterThan(0.2);
     expect(IMPLODE_START - lastArrival).toBeLessThan(0.5);
-    expect(INTRO_END).toBeLessThan(9);
+    // The title card lingers and dissolves before the menu (introOutro.js), but
+    // the whole opening still stays short enough to sit through.
+    expect(INTRO_END).toBeLessThan(12);
   });
 });
