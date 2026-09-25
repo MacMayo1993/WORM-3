@@ -23,6 +23,7 @@ import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
 import InteractivePhotoBackground from './InteractivePhotoBackground.jsx';
+import BackgroundAmbience from './BackgroundAmbience.jsx';
 
 const HealerWormMode3DWrapper = React.lazy(() =>
   import('../worm/HealerWormMode.jsx').then((mod) => ({ default: mod.HealerWormMode3DWrapper }))
@@ -250,6 +251,9 @@ export default function GameScene({
         )}
         {/* Default lighting env for levels without a custom background */}
         {currentLevelData && !currentLevelData.background && <SafeEnvironment preset="city" />}
+
+        {/* Mini cubes and twin wormholes drifting far beyond the camera. */}
+        <ErrorBoundary3D><BackgroundAmbience size={size} /></ErrorBoundary3D>
 
         <WormholeWarpFX
           enabled={wormholePhaseActive}

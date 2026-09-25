@@ -72,7 +72,6 @@
 
 .cube-path-screen>section { border:1px solid var(--mode-accent); }
 .mode-paper-selector button:focus-visible { outline:3px solid var(--mode-accent); outline-offset:3px; }
-.mode-wizard.worm-entry-choice .worm-path-free .worm-path-cta { background:var(--mode-accent); }
 
 /* ── Arcade look (see components/ui/arcadeTheme.css) ─────────────────────────
    The wizard follows the mode carousel: neutral line borders, deep-green ink,
@@ -114,4 +113,4 @@
 .mode-wizard .worm-profile :is(.worm-profile-filter[aria-pressed=true],.worm-profile-footer>button) { background: var(--mode-accent); color: var(--arcade-accent-ink); }
 .mode-wizard .worm-profile-option[aria-pressed=true] { box-shadow: 0 0 0 3px var(--arcade-ink-strong); }
 .mode-wizard .worm-path-card { border: 2px solid var(--arcade-line) !important; background: var(--arcade-card); box-shadow: 0 6px 0 var(--arcade-line); }
-.mode-wizard.worm-entry-choice .worm-path-free .worm-path-cta { background: transparent; }
+.mode-wizard.worm-entry-choice .worm-path-free .worm-path-cta { background: #FFD500; color: #1a1410; }

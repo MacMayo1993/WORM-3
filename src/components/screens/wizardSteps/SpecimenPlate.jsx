@@ -13,7 +13,7 @@
 import React from 'react';
 import {
   DISPLAY_FONT, UI_CREAM,
-  NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW, TEXT_MICRO, TEXT_XS, UI_MOSS_LIGHT } from '../../../utils/uiTheme.js';
+  VIEWPORT_BORDER as NIGHT_BORDER, VIEWPORT_TEXT as NIGHT_TEXT, VIEWPORT_TEXT_MUTED as NIGHT_TEXT_MUTED, NIGHT_SHADOW, VIEWPORT_TITLE_SHADOW as NIGHT_TITLE_SHADOW, TEXT_MICRO, TEXT_XS, UI_MOSS_LIGHT } from '../../../utils/uiTheme.js';
 import { useIsMobile } from '../../../hooks/index.js';
 import { WIZARD_PAPER_BASE } from '../WizardChrome.jsx';
 import { TOUCH_TARGET } from '../../ui/Button.jsx';

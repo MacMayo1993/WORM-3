@@ -218,7 +218,7 @@ const toRgb = (color) => {
 // stickers pasted on the game rather than part of it.
 
 const FONT = UI_FONT;
-const SHADOW = '0 3px 0 #141711, 0 6px 18px rgba(10,14,8,0.22)';
+const SHADOW = `0 4px 0 ${GAME_HUD.border}, 0 8px 18px rgba(38,55,45,0.14)`;
 const BORDER = GAME_HUD.border;
 const HUD_SURFACE = GAME_HUD.surface;
 const HUD_SURFACE_SOFT = GAME_HUD.raised;
@@ -299,11 +299,11 @@ const ensureHudStyle = () => {
            the inner shading flips from a lit top edge to a shadowed one. That is
            the whole trick: the light says raised, then it says sunk. */
         .worm-steer-key, .worm-action {
-            box-shadow: 0 3px 0 #141711, 0 6px 18px rgba(10,14,8,0.22), inset 0 1px 0 rgba(255,245,220,0.09);
+            box-shadow: 0 4px 0 ${GAME_HUD.ink}, 0 8px 18px rgba(38,55,45,0.16), inset 0 2px 0 #fff;
         }
         .worm-steer-key:active, .worm-action:active {
-            transform: translateY(2px);
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.28);
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 ${GAME_HUD.ink}, inset 0 2px 4px rgba(38,55,45,0.18);
         }
         /* The key's own surface has to live here, not inline: an inline background
            outranks any :active rule, which is exactly how the press state silently
@@ -321,7 +321,8 @@ const ensureHudStyle = () => {
             background: ${GAME_HUD.surface};
             backdrop-filter: ${HUD_BLUR};
             -webkit-backdrop-filter: ${HUD_BLUR};
-            border: 1px solid ${BORDER};
+            border: 2px solid ${GAME_HUD.ink};
+            color: ${GAME_HUD.text};
             display: flex; align-items: center; justify-content: center;
             padding: 0;
         }
@@ -331,11 +332,11 @@ const ensureHudStyle = () => {
         .worm-steer-key:active {
             background:
                 linear-gradient(180deg,
-                    rgba(0, 0, 0, 0.26) 0%,
-                    rgba(0, 0, 0, 0.05) 35%,
+                    rgba(38, 55, 45, 0.16) 0%,
+                    rgba(38, 55, 45, 0.04) 35%,
                     rgba(255, 253, 242, 0.05) 100%),
-                var(--key-press, rgba(255, 253, 242, 0.22));
-            border-color: var(--key-edge, rgba(255, 253, 242, 0.5));
+                var(--key-press, #efe9d6);
+            border-color: var(--key-edge, ${GAME_HUD.ink});
         }
         /* The glyph rides the cap down with it and dims a touch, the way ink on a
            key face falls into its own shadow when the key bottoms out. */
@@ -563,9 +564,10 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
 const PAUSE_BTN_STYLE = {
     width: 48,
     height: 48,
-    borderRadius: 11,
+    borderRadius: 14,
     background: HUD_SURFACE_SOFT,
-    border: '1px solid rgba(255,245,220,0.16)',
+    border: `2px solid ${GAME_HUD.border}`,
+    boxShadow: `0 3px 0 ${GAME_HUD.border}`,
     color: TEXT,
     padding: 0,
     display: 'flex',
@@ -595,8 +597,9 @@ const SPECIAL_NOTICE_STYLE = {
     alignItems: 'center',
     gap: 6,
     padding: '5px 12px',
-    borderRadius: 999,
-    background: 'rgba(15, 23, 42, 0.78)',
+    borderRadius: 12,
+    background: HUD_SURFACE,
+    border: `2px solid ${GAME_HUD.border}`,
     fontSize: 11,
     fontWeight: 800,
     letterSpacing: 1.0,
@@ -987,7 +990,7 @@ function BuffStrip({ detailed = false, onInspect }) {
                 style={{ '--power-color': elemDef.color }} aria-label={`${elemDef.label} element active`} aria-haspopup={detailed ? undefined : 'dialog'}>
                 <span className="worm-element-medal" aria-hidden="true">
                     <svg width="24" height="24" viewBox="0 0 22 22">
-                        <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="#ffffff25" strokeWidth="2" />
+                        <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="#26372d22" strokeWidth="2" />
                         <circle ref={elemFillRef} cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke={elemDef.color} strokeWidth="2.4"
                             strokeLinecap="round" strokeDasharray={ELEM_RING_CIRC} strokeDashoffset={0} transform="rotate(-90 11 11)" />
                     </svg>
@@ -1031,8 +1034,8 @@ function SpecialNotice({ suppressed = false }) {
             className="worm-special-notice"
             style={{
                 ...SPECIAL_NOTICE_STYLE,
-                color: expired ? 'rgba(255,255,255,0.72)' : def.color,
-                border: `1px solid ${expired ? 'rgba(255,255,255,0.22)' : def.color}`,
+                color: expired ? GAME_HUD.muted : def.color,
+                border: `2px solid ${expired ? GAME_HUD.border : def.color}`,
                 opacity: expired ? 0.75 : 1,
             }}
             role="status"

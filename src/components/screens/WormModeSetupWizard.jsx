@@ -77,7 +77,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             style={{ minHeight: 48, padding: '12px 6px', borderRadius: 10,
               border: `2px solid ${difficulty.id === option.id ? ACCENT : WIZ_BORDER_SOFT}`,
               background: difficulty.id === option.id ? ACCENT : WIZ_SURFACE_RAISED,
-              color: difficulty.id === option.id ? '#111d20' : WIZ_TEXT,
+              color: difficulty.id === option.id ? MODE_THEMES.worm.ink : WIZ_TEXT,
               cursor: 'pointer', font: 'inherit', fontSize: 14, fontWeight: 700 }}
           >{option.label}</button>)}
         </div>
