@@ -1,10 +1,12 @@
+import { wormExpansion } from './wormExpansion.js';
 import { getStableKey } from './wormLogic.js';
 import { characterOrbCount } from './characterAbilities.js';
 import { orbsCarried } from './healerWorm/economy.js';
-import { storyLevel, storyOutcome, storyProgressText, storyChecklist } from './story/levels.js';
+import { storyLevel, storyOutcome } from './story/levels.js';
+import { storyHudSnapshot } from './story/hudSnapshot.js';
 import { offerStoryPower, recordStoryMechanic } from './story/mastery.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
-import { stageStory, storyMetrics } from './story/runtime.js';
+import { stageStory, storyMetrics, replenishStoryTunnel } from './story/runtime.js';
 import { wormEventChanges } from './wormEventChanges.js';
 import { withPersistenceBatch } from '../utils/persistenceBatch.js';
 import { cancelAmbientEncounter, makeAmbientCombat, stepAmbientCombat } from './combat/ambientCombat.js';
@@ -192,6 +194,7 @@ export function useWormCrawler(size, cubies) {
             isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
             isCombatMode: () => useGameStore.getState().wormCombatMode,
             isStoryMode: () => !!useGameStore.getState().wormStoryLevel,
+            isStoryTunnelTrial: () => storyLevel(useGameStore.getState().wormStoryLevel)?.kind === 'tunnel',
             allowRingHeal: () => {
                 const level = storyLevel(useGameStore.getState().wormStoryLevel);
                 const p = storyPracticeRef.current;
@@ -253,7 +256,7 @@ export function useWormCrawler(size, cubies) {
                 // screen — clear both the live readout and the store transitions.
                 resetWormBuffs();
                 resetWormSegments();
-                useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null });
+                useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null });
                 if (deathMenuTimer.current) {
                     clearTimeout(deathMenuTimer.current);
                     deathMenuTimer.current = null;
@@ -271,7 +274,7 @@ export function useWormCrawler(size, cubies) {
                     const current = useGameStore.getState();
                     if (!current.demoMode) useGameStore.setState({ showWormDeathMenu: true });
                     deathMenuTimer.current = null;
-                }, 520);
+                }, details?.reason === 'slice-rotation' ? 1400 : 520);
             },
             onTunnelEnter: (tunnel) => {
                 const practice = storyPracticeRef.current;
@@ -383,6 +386,11 @@ export function useWormCrawler(size, cubies) {
             // Remaining time lives on the wormBuffs bridge, mirrored from the sim each
             // tick, so the countdown freezes with the simulation during a pause or a
             // tunnel transit instead of running off a wall clock.
+            onExpansionAmount: (amount) => {
+                wormExpansion.amount = amount;
+                useGameStore.setState({ explosionT: amount });
+            },
+            onExplodeState: (active) => useGameStore.setState({ wormExplodeActive: active }),
             onRocketState: (active) => {
                 wormBuffs.rocketActive = active;
                 if (useGameStore.getState().wormRocketActive !== active) {
@@ -481,7 +489,7 @@ export function useWormCrawler(size, cubies) {
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
                 wormSessionOrbs: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
                 wormPhase: 'crawling', wormAlive: true, wormPaused: true, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
-                wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormSpecialNotice: null,
+                wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormSpecialNotice: null,
                 wormBoostState: 'ready', wormOrbFlash: null, demoWormSteered: false, demoWormTarget: practice.target,
                 demoWormProgress: '', demoWormHazardCleared: null });
             return; // Let the shared tunnel snapshot observe the staged board first.
@@ -557,6 +565,8 @@ export function useWormCrawler(size, cubies) {
         }
         if (story && state.wormStoryStarted && !state.wormPaused && !document.hidden && sim.alive && !state.wormStoryResult && storyPracticeRef.current?.runId === state.wormRunId) {
             const live = useGameStore.getState();
+            const replenished = replenishStoryTunnel(sim, storyPracticeRef.current, live, sizeRef.current, activeTunnelsRef.current.length);
+            if (replenished) { useGameStore.setState({ cubies: replenished }); return; }
             // Observe a landing even if it immediately triggers the next rescue.
             // The rescue holds the deadline and completion until play resumes.
             const metrics = storyMetrics(sim, storyPracticeRef.current, story, live, activeTunnelsRef.current, sim.jumpRescueHeld ? 0 : delta);
@@ -568,17 +578,17 @@ export function useWormCrawler(size, cubies) {
                 const target = sim.specials[0] ?? null;
                 if (live.wormStoryTarget !== target) useGameStore.setState({ wormStoryTarget: target });
             }
-            const progress = storyProgressText(story, metrics);
-            const checklist = { runId: state.wormRunId, levelId: story.id, goals: storyChecklist(story, metrics),
-                seconds: Math.max(0, Math.ceil(story.limit - metrics.elapsed)), hint: metrics.powerHint || '',
-                settling: !storyOutcome(story, metrics) && storyChecklist(story, metrics).every(goal => goal.done) };
-            if (progress !== live.wormStoryProgress || JSON.stringify(checklist) !== JSON.stringify(live.wormStoryChecklist)) {
-                useGameStore.setState({ wormStoryProgress: progress, wormStoryChecklist: checklist });
+            const outcome = storyOutcome(story, metrics);
+            const practice = storyPracticeRef.current;
+            const hud = storyHudSnapshot(practice.hud, story, metrics, state.wormRunId, outcome);
+            if (hud !== practice.hud) {
+                practice.hud = hud;
+                useGameStore.setState({ wormStoryProgress: hud.progress, wormStoryChecklist: hud.checklist });
             }
             if (story.kind === 'tunnel' && live.wormStoryTarget !== metrics.nextTarget) useGameStore.setState({ wormStoryTarget: metrics.nextTarget });
             if (story.kind === 'jump' && metrics.bodyJumps > 0 && live.wormStoryTarget) useGameStore.setState({ wormStoryTarget: null });
             if (!sim.jumpRescueHeld) {
-                if (storyOutcome(story, metrics)) live.completeWormStory(state.wormRunId, metrics);
+                if (outcome) live.completeWormStory(state.wormRunId, metrics);
                 else if (metrics.elapsed >= story.limit) killWormSim(sim, ctxRef.current, { reason: 'story-timeout', levelId: story.id });
             }
         }
@@ -596,6 +606,7 @@ export function useWormCrawler(size, cubies) {
         let springs = 0;
         for (const patch of sim.elementalPatches.values()) if (patch.type === 'grass') springs++;
         wormBuffs.springCount = springs;
+        wormBuffs.explodeT = sim.explodeT;
         wormBuffs.magnetT = sim.magnetT;
         wormBuffs.magnetMaxT = sim.magnetMaxT;
         wormBuffs.rocketActive = sim.rocketActive;
@@ -640,6 +651,8 @@ export function useWormCrawler(size, cubies) {
         storyPracticeRef.current = null;
         combatRunRef.current = null; sim.combat = null; combatBridge.current = null;
         feedbackRef.current.reset();
+        wormExpansion.amount = 0;
+        useGameStore.setState({ exploded: false, explosionT: 0, wormExplodeActive: false });
         resetWormSim(sim, size, { orbCount: characterOrbCount(wormOrbCount, useGameStore.getState().wormCharacter), wormholeInterval });
         resetWormBuffs();
         resetWormSegments();
@@ -648,7 +661,7 @@ export function useWormCrawler(size, cubies) {
         useGameStore.setState({
             wormPowerups: sim.powerups,
             wormSpecials: [],
-            wormRocketActive: false,
+            wormExplodeActive: false, wormRocketActive: false,
             wormMagnetActive: false,
             wormMagnetSeq: 0,
             wormSpecialNotice: null,
@@ -678,13 +691,15 @@ export function useWormCrawler(size, cubies) {
             clearTimeout(deathMenuTimer.current);
             deathMenuTimer.current = null;
         }
+        wormExpansion.amount = 0;
+        useGameStore.setState({ exploded: false, explosionT: 0, wormExplodeActive: false });
         // Leaving worm mode entirely: the bridges are module-level state that would
         // otherwise still be holding the last run's buff (and its dents) when the
         // mode remounts.
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
-        useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false });
+        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false });
     }, []);
 
     // When a cube rotation commits, transform the whole sim (worm, powerups, trails,
@@ -754,6 +769,7 @@ export function useWormCrawler(size, cubies) {
             interpT: f('interpT'),
             crawlDistance: f('crawlDistance'),
             prevWorldPos: f('prevWorldPos'),
+            rotationDeparture: f('rotationDeparture'),
             curWorldPos: f('curWorldPos'),
             prevTile: f('prevTile'),
             restRead: f('restRead'),
@@ -763,6 +779,7 @@ export function useWormCrawler(size, cubies) {
             isJumping: f('isJumping'),
             rocketActive: f('rocketActive'),
             rocketT: f('rocketT'),
+            expansionAmount: f('expansionAmount'),
             rocketFlight: f('rocketFlight'),
             landingGraceT: f('landingGraceT'),
             magnetT: f('magnetT'),
@@ -787,6 +804,7 @@ export function useWormCrawler(size, cubies) {
             cutFocusT: f('cutFocusT'),
             jumpRescueHeld: f('jumpRescueHeld'),
             cutFocusPos: f('cutFocusPos'),
+            cutFocusSlice: f('cutFocusSlice'),
             elementalFocusT: f('elementalFocusT'),
             elementalT: f('elementalT'),
             elementalMaxT: f('elementalMaxT'),

@@ -1,5 +1,12 @@
+import { movingSliceCrossing } from './sliceCrossing.js';
+import { tickExpansion } from './expansion.js';
+import { EXPLODE_DURATION } from '../wormExpansion.js';
+import { cubeGridIndex } from '../../game/cubeWorldGeometry.js';
+import { bodyCoverageCount } from './bodyCoverage.js';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { makeSignature, activateSignature, tickSignature, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
+import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
+import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState, inchGaitInto } from './inchGait.js';
@@ -50,7 +57,7 @@ import {
     collectManifoldRing,
     findCoveredWormholeRing,
 } from '../wormLogic.js';
-import { liveRotation } from '../liveRotation.js';
+import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
 import { remapWormPress } from '../tilePressBridge.js';
 import {
@@ -108,6 +115,7 @@ import {
     ROCKET_SPEED_MULT,
     ROCKET_FLIGHT_TAKEOFF,
     ROCKET_FLIGHT_LANDING,
+    ROCKET_BOOST_HANDOFF,
     ROCKET_LANDING_GRACE,
     MAGNET_DURATION,
     MAGNET_RADIUS,
@@ -134,6 +142,8 @@ const _bakeAxis = new THREE.Vector3();
 const _evalHPos = new THREE.Vector3();
 const _evalCornerVtx = new THREE.Vector3();
 const _evalCornerNorm = new THREE.Vector3(); // reused for face-crossing normal blend
+const _departureSource = new THREE.Vector3();
+const _departureNormal = new THREE.Vector3();
 // Extra scratch for computing the lifted position before writing into stepHistory
 const _evalLiftedPos = new THREE.Vector3();
 
@@ -170,6 +180,7 @@ export function makeWormSim(size) {
         // Smooth inter-tile interpolation
         interpT: 1,               // 0→1 between prev and current tile
         prevWorldPos: null,       // null = no prev yet; otherwise aliases _prevWP below
+        rotationDeparture: null,
         curWorldPos: null,        // always aliases _curWP below (set in makeWormSim tail)
         headInterpPos: new THREE.Vector3(),
         currentNormal: new THREE.Vector3(0, 0, 1),
@@ -223,12 +234,15 @@ export function makeWormSim(size) {
         // ── Special power-ups (rocket / magnet) ────────────────────────────────
         specials: [],             // hovering rocket/magnet + elemental orbs on the board
         specialTimer: SPECIAL_SPAWN_INTERVAL,
+        explodeT: 0,
+        expansionAmount: 0,
         elementalSpawnTimer: ELEMENTAL_SPAWN_INTERVAL, // own clock for the elemental offering
         specialSeq: 0,            // monotonic id source for spawned specials
         specialPicker: makeSpecialPicker(),
-        rocketActive: false,      // protected three-second overdrive
+        rocketActive: false,      // protected flight with gradual takeoff/landing
         rocketT: 0,
         rocketFlight: 0, // launch/landing progress, independent of refreshed fuel
+        rocketBoostHandoffT: 0, // crawling seconds left to restore ground speed
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalPatches: new Map(),
@@ -302,6 +316,7 @@ export function makeWormSim(size) {
         healFocusTile: null,      // the surrounded tile the camera pushes in on during that pause
         cutFocusT: 0,             // seconds remaining of the "WORM'D" body-cut camera beat
         cutFocusPos: null,        // world-space impact point the camera swings out to watch
+        cutFocusSlice: null,      // { axis, layer } that made the cut, so the camera frames it (null: a bomb)
         pendingOrbFlash: null,
         pendingSpecialFlash: null,
         // Queue of magnet attraction visuals awaiting a renderer; drained each frame.
@@ -313,7 +328,7 @@ export function makeWormSim(size) {
 }
 
 const setCurWorldPosFromTile = (sim, size) => {
-    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, 0);
+    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, sim.expansionAmount);
     sim._curWP.set(wp[0], wp[1], wp[2]);
     sim.curWorldPos = sim._curWP;
 };
@@ -355,6 +370,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.interpT = 1;
     sim.crawlDistance = 0;
     sim.prevWorldPos = null;
+    sim.rotationDeparture = null;
+    sim.expansionAmount = 0;
     setCurWorldPosFromTile(sim, size);
     sim.headInterpPos.copy(sim.curWorldPos);
     sim.currentNormal.copy(FACE_NORMALS[startPos.dirKey] ?? FACE_NORMALS.PZ);
@@ -365,11 +382,16 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
     sim.specials = [];
     sim.specialTimer = SPECIAL_SPAWN_INTERVAL;
+    sim.explodeT = 0;
+    sim.expansionAmount = 0;
     sim.elementalSpawnTimer = ELEMENTAL_SPAWN_INTERVAL;
     sim.specialPicker = makeSpecialPicker();
+    // Introduce the new pickup first; subsequent spawns use the normal shuffle bag.
+    sim.specialPicker.bag = ['explode'];
     sim.rocketActive = false;
     sim.rocketT = 0;
     sim.rocketFlight = 0;
+    sim.rocketBoostHandoffT = 0;
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.elementalPatches.clear();
@@ -410,6 +432,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.healFocusTile = null;
     sim.cutFocusT = 0;
     sim.cutFocusPos = null;
+    sim.cutFocusSlice = null;
     sim.pendingOrbFlash = null;
     sim.pendingSpecialFlash = null;
     sim.pendingOrbAttractions = [];
@@ -469,12 +492,17 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
     sim.pendingTunnelTrigger = null;
+    updateRotationDeparture(sim);
 }
 
 const collisionHead = new THREE.Vector3();
 const collisionBody = new THREE.Vector3();
 const collisionNormal = new THREE.Vector3();
 const collisionGait = { dist: 0, arch: 0 };
+const collisionA = new THREE.Vector3();
+const collisionANormal = new THREE.Vector3();
+const collisionB = new THREE.Vector3();
+const collisionBNormal = new THREE.Vector3();
 
 /** Tile trails are broad phase only: test the occupied body, including inch arches. */
 export function hasJumpClearance(sim, progress = sim.interpT) {
@@ -487,8 +515,12 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
     let an = normal;
     let index = 0;
     let b = shAt(history, index);
+    const departure = hasLiveDeparture(sim);
+    if (departure) departureBodySample(b, collisionB, collisionBNormal);
+    let bPos = departure ? collisionB : b.pos;
+    let bNormal = departure ? collisionBNormal : b.normal;
     let distance = 0;
-    let length = a.distanceTo(b.pos);
+    let length = a.distanceTo(bPos);
     const gait = sim.bodyGait;
     for (let bead = 1; bead < sim.tailLength; bead++) {
         let target = bead * BODY_BALL_SPACING;
@@ -500,18 +532,21 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
         }
         while (distance + length < target && index + 1 < history.count) {
             distance += length;
-            a = b.pos;
-            an = b.normal;
+            a = departure ? collisionA.copy(bPos) : bPos;
+            an = departure ? collisionANormal.copy(bNormal) : bNormal;
             b = shAt(history, ++index);
-            length = a.distanceTo(b.pos);
+            if (departure) departureBodySample(b, collisionB, collisionBNormal);
+            bPos = departure ? collisionB : b.pos;
+            bNormal = departure ? collisionBNormal : b.normal;
+            length = a.distanceTo(bPos);
         }
         if (target > distance + length) break;
         // The connected neck is not a self-crossing.
         if (target < 1 || b.transit) continue;
         const t = length > 0 ? (target - distance) / length : 0;
-        collisionNormal.lerpVectors(an, b.normal, t).normalize();
+        collisionNormal.lerpVectors(an, bNormal, t).normalize();
         if (collisionNormal.dot(normal) < 0.9) continue;
-        collisionBody.lerpVectors(a, b.pos, t).addScaledVector(collisionNormal, arch);
+        collisionBody.lerpVectors(a, bPos, t).addScaledVector(collisionNormal, arch);
         collisionBody.sub(collisionHead);
         const vertical = collisionBody.dot(normal);
         // Two 0.092-radius beads, with a small tolerance for sampling.
@@ -531,6 +566,7 @@ export function startRocket(sim, ctx) {
     }
     sim.rocketActive = true;
     sim.rocketFlight = 0;
+    sim.rocketBoostHandoffT = 0;
     sim.rocketT = ROCKET_DURATION;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -577,6 +613,11 @@ export function startElemental(sim, ctx, type) {
 export function activateSpecial(sim, ctx, type) {
     if (type === 'rocket') startRocket(sim, ctx);
     else if (type === 'magnet') startMagnet(sim, ctx);
+    else if (type === 'explode') {
+        sim.explodeT = EXPLODE_DURATION;
+        ctx.onExplodeState?.(true);
+        ctx.feel('specialSpawn');
+    }
     else if (isElementalType(type)) startElemental(sim, ctx, type);
 }
 
@@ -587,7 +628,10 @@ export const isReversal = (current, next) =>
 function pendingBodyStillPresent(sim) {
     const key = sim.pendingSelfCollision?.key;
     if (!key) return false;
-    const limit = Math.min(Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)), sim.tileTrail.count);
+    // The trail already includes the next destination while the head is still
+    // moving from its source. Retain the extra oldest cell until the geometric
+    // check proves the tail has left it; dropping it here misses tight ring loops.
+    const limit = Math.min(Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)) + 1, sim.tileTrail.count);
     for (let i = 1; i < limit; i++) if (ttAt(sim.tileTrail, i) === key) return true;
     return false;
 }
@@ -607,8 +651,7 @@ function tickJumpRescue(sim, delta, size, ctx) {
     const candidate = sim.pendingSelfCollision;
     const eligible = sim.phase === 'crawling' && candidate && !sim.isJumping &&
         !sim.rocketActive && sim.landingGraceT <= 0 && sim.selfCollisionGraceSteps <= 0 &&
-        !sim.pendingTunnelTrigger && !sim.pendingVoidKill?.armed &&
-        !(sim.signature.character === 'classic' && sim.signature.active > 0 && sim.tailLength >= BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH) &&
+        !sim.pendingTunnelTrigger && !sim.pendingVoidKill &&
         !(sim.signature.character === 'inch' && sim.signature.active > 0) && sim.jumpCount < MAX_JUMPS;
     if (sim.jumpRescueCollision) {
         if (!eligible || candidate !== sim.jumpRescueCollision || !pendingBodyStillPresent(sim)) {
@@ -692,13 +735,8 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     // for the "void on the 4th traversal" rule.
     const traversalVerdict = classifyTraversal(nextTraversals);
     if (traversalVerdict === 'void-arm') {
-        // The worm completes this tunnel, then collapses when it steps off the
-        // exit tile (deferred kill, checked in the crawling phase).
-        sim.pendingVoidKill = {
-            tunnelKey,
-            exitTileKey: tileKey(tunnel.exit),
-            armed: false,
-        };
+        // The fourth trip collapses at the interior midpoint, never after escape.
+        sim.pendingVoidKill = { tunnelKey, traversals: nextTraversals };
     } else if (traversalVerdict === 'collapse') {
         // Past the void traversal the tunnel is fully collapsed and kills on contact.
         sim.voidTunnelKeys.add(tunnelKey);
@@ -854,7 +892,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         // Reward is immediate. The renderer consumes a short gulp on the head
         // tile or a longer attraction for a remote magnet catch.
         if (sim.pendingOrbAttractions.length < MAX_ORB_ATTRACTION_FX) {
-            const from = getStickerWorldPos(pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey, size, 0);
+            const from = getStickerWorldPos(pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey, size, sim.expansionAmount);
             sim.pendingOrbAttractions.push({
                 id: `att-${sim.attractionSeq++}`,
                 from,
@@ -885,7 +923,7 @@ function tickWiggleSweep(sim, delta, size, ctx) {
     const samples = Math.max(1, Math.ceil((sweep.elapsed - oldTime) / 0.008));
     const bodySamples = Math.max(32, Math.ceil((sweep.length + 6) / 0.15));
     for (const orb of [...sim.powerups]) {
-        _sweepOrb.fromArray(getStickerWorldPos(orb.x, orb.y, orb.z, orb.dirKey, size, 0))
+        _sweepOrb.fromArray(getStickerWorldPos(orb.x, orb.y, orb.z, orb.dirKey, size, sim.expansionAmount))
             .addScaledVector(FACE_NORMALS[orb.dirKey], WORM_LIFT);
         let hit = false;
         for (let t = 0; t <= samples && !hit; t++) {
@@ -932,10 +970,11 @@ function tryWormholeRingHeal(sim, size, ctx) {
     }
     if (tunnels.length === 0) return false;
     _ringOccupied.clear();
-    const bodyReach = Math.min(MAX_TAIL, sim.tailLength) * BODY_BALL_SPACING;
-    // ceil(bodyReach) is the TOTAL number of occupied trail cells and already
-    // includes index 0 (the head), matching bodyTrailKeys and self-collision.
-    const occupiedCount = Math.min(sim.tileTrail.count, Math.max(1, Math.ceil(bodyReach)));
+    // Bead count/spacing stay fixed while Explode increases the distance between
+    // cells. Convert physical reach back to lattice steps at the CURRENT amount,
+    // including opening/closing, before counting the trail prefix. The count
+    // already includes index 0 (the head); older logical visits are not coverage.
+    const occupiedCount = bodyCoverageCount(sim.tailLength, sim.tileTrail.count, size, sim.expansionAmount);
     for (let i = 0; i < occupiedCount; i++) _ringOccupied.add(ttAt(sim.tileTrail, i));
     const hit = findCoveredWormholeRing(tunnels, _ringOccupied, size);
     if (!hit || (hit.tunnelKey && sim.ringHealedTunnelKeys.has(hit.tunnelKey))) return false;
@@ -987,6 +1026,7 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = fals
     const headKey = `${x},${y},${z},${dirKey}`;
     const idx = sim.specials.findIndex(s => {
         const key = `${s.x},${s.y},${s.z},${s.dirKey}`;
+        if (s.type === 'explode') return key === headKey && sim.interpT >= 1 && !sim.isJumping;
         if (isElementalType(s.type)) return key === headKey && sim.interpT >= 1;
         return !elementsOnly && (reach ? reach.has(key) : key === headKey);
     });
@@ -1260,14 +1300,26 @@ export const CORNER_VERTEX_LIFT = 0.52;
 export const CORNER_STEP_LENGTH = 2 * CORNER_VERTEX_LIFT;
 
 export function evaluatePosAndNormal(sim, tValue, outPos) {
-    const pWorld = sim.prevWorldPos;
+    let pWorld = sim.prevWorldPos;
     const cWorld = sim.curWorldPos;
+    const liveDeparture = pWorld && hasLiveDeparture(sim);
+    const departure = liveDeparture || (pWorld && sim.rotationDeparture?.committed);
+    if (departure) {
+        _departureNormal.copy(FACE_NORMALS[sim.prevDirKey] ?? FACE_NORMALS[sim.pos.dirKey]);
+        if (liveDeparture) {
+            setDepartureAxis();
+            const p = sim.prevTile;
+            const angle = liveLayerAngle(p.x, p.y, p.z) ?? 0;
+            pWorld = _departureSource.copy(pWorld).applyAxisAngle(departureAxis, angle);
+            _departureNormal.applyAxisAngle(departureAxis, angle);
+        }
+    }
     outPos.copy(cWorld);
     let cNorm = FACE_NORMALS[sim.pos.dirKey] ?? FACE_NORMALS.PZ;
 
     if (pWorld && tValue < 1) {
         if (sim.crossingCorner) {
-            const oldNormal = FACE_NORMALS[sim.prevDirKey];
+            const oldNormal = departure ? _departureNormal : FACE_NORMALS[sim.prevDirKey];
             const newNormal = FACE_NORMALS[sim.pos.dirKey];
             _evalCornerVtx.copy(pWorld).addScaledVector(newNormal, CORNER_VERTEX_LIFT);
 
@@ -1297,6 +1349,7 @@ export function evaluatePosAndNormal(sim, tValue, outPos) {
             }
         } else {
             outPos.copy(pWorld).lerp(cWorld, tValue);
+            if (departure) cNorm = _evalCornerNorm.lerpVectors(_departureNormal, cNorm, tValue).normalize();
         }
     }
     return cNorm;
@@ -1318,8 +1371,9 @@ const PHASE_HANDLERS = {
             // The grace period covers the initial steps where the trail is too short to
             // reliably catch real collisions.
             ttReset(sim.tileTrail, tileKey(sim.pos));
-            // Möbius travel teleports the worm to a new surface region, so the painted
-            // route restarts here too (cross-tunnel persistence is a separate follow-up).
+            // Restart the source route at this exit. Glow keeps released paint
+            // separately, with a gap so neither surface is joined across the cube.
+            breakGlowTrail(sim.signature);
             ttReset(sim.pathHistory, tileKey(sim.pos));
             ctx.onCrawlResume();
             sim.onFlippedTile = false;
@@ -1344,6 +1398,7 @@ const PHASE_HANDLERS = {
             sim.restRead = nextRestReadDuringStep(
                 previousRestRead, liveRotation, sim.interpT, sim.prevTile, sim.pos
             );
+            updateRotationDeparture(sim);
             if (sim.restRead && sim.restRead !== previousRestRead) {
                 markRestReadTile(sim, tileKey(sim.pos), sim.restRead, sim.pos.x, sim.pos.y, sim.pos.z);
                 // Some samples from this same traversal may have been recorded before
@@ -1452,18 +1507,12 @@ const PHASE_HANDLERS = {
                     ? (progress(sim.interpT) - progress(before)) * CORNER_STEP_LENGTH
                     : (sim.interpT - before) * (sim.prevWorldPos ? sim.prevWorldPos.distanceTo(sim.curWorldPos) : 0);
                 sim.crawlDistance += distance;
-            }
-
-            if (sim.pendingVoidKill?.armed) {
-                const { tunnelKey, exitTileKey } = sim.pendingVoidKill;
-                const headTileKey = tileKey(sim.pos);
-                const hasClearedExitTile = headTileKey !== exitTileKey;
-                const fullyOnNextTile = sim.interpT >= 1;
-
-                if (headOnSurface && hasClearedExitTile && fullyOnNextTile) {
-                    sim.pendingVoidKill = null;
-                    sim.voidTunnelKeys.add(tunnelKey);
-                    killWormSim(sim, ctx, { reason: 'voided', tunnelKey, exitTileKey, headTile: headTileKey });
+                const sliceHit = ctx.getGamePhase() === 'active' && movingSliceCrossing(sim, before, jumpLiftOf(sim));
+                if (sliceHit) {
+                    sim.interpT = 0.5;
+                    sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
+                    killWormSim(sim, ctx, { reason: 'slice-rotation', ...sliceHit,
+                        liveCrossing: true, impactPosition: sim.headInterpPos.toArray() });
                     return true;
                 }
             }
@@ -1508,13 +1557,7 @@ const PHASE_HANDLERS = {
                     // check that stale flag still fires a kill even though the colliding
                     // tail tile no longer exists ("false tail bite" after a cut).
                     const collisionKey = sim.pendingSelfCollision.key;
-                    const occupiedTilesNow = Math.max(1, Math.ceil((sim.tailLength * BODY_BALL_SPACING) / 1.0));
-                    const trailLimitNow = Math.min(occupiedTilesNow, sim.tileTrail.count);
-                    let stillPresent = false;
-                    for (let ti = 1; ti < trailLimitNow; ti++) {
-                        if (ttAt(sim.tileTrail, ti) === collisionKey) { stillPresent = true; break; }
-                    }
-                    if (!stillPresent) {
+                    if (!pendingBodyStillPresent(sim)) {
                         sim.pendingSelfCollision = null;
                     } else {
                         killWormSim(sim, ctx, {
@@ -1561,15 +1604,17 @@ const PHASE_HANDLERS = {
                 // Tag the point with the grid cell it occupies, derived from the pre-lift
                 // surface point (origin-centred coords → nearest lattice index). Used to ride
                 // a mid-rotation slice and to bake the turn into history at commit.
-                const _hk = (size - 1) / 2;
-                const _htx = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.x + _hk)));
-                const _hty = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.y + _hk)));
-                const _htz = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.z + _hk)));
+                const _htx = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.x, size, sim.expansionAmount)));
+                const _hty = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.y, size, sim.expansionAmount)));
+                const _htz = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.z, size, sim.expansionAmount)));
                 // Points recorded while rest-reading a mid-rotation slice already sit at
                 // their committed positions — the -1 sentinel opts them out of the body
                 // ride/bake, which would otherwise swing them along with the outgoing slice.
                 const _rrs = sim.restRead;
-                if (_rrs && restReadProtectsTile(_rrs, _htx, _hty, _htz)) {
+                if (hasLiveDeparture(sim)) {
+                    shPush(sim.stepHistory, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
+                    shMarkRestRead(shAt(sim.stepHistory, 0), sim.rotationDeparture.txnId);
+                } else if (_rrs && restReadProtectsTile(_rrs, _htx, _hty, _htz)) {
                     shPush(sim.stepHistory, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
                     shMarkRestRead(shAt(sim.stepHistory, 0), _rrs.txnId);
                 } else {
@@ -1606,6 +1651,7 @@ const PHASE_HANDLERS = {
                 sim.stepAcc -= STEP_SEC;
                 sim.interpT = 0;
                 sim.lastRecordedT = 0;
+                sim.rotationDeparture = null;
                 sim._prevWP.copy(sim._curWP);
                 sim.prevWorldPos = sim._prevWP;
                 sim.prevDirKey = sim.pos.dirKey;
@@ -1632,9 +1678,10 @@ const PHASE_HANDLERS = {
                     // that is currently rotating away.
                     sim.restRead = nextRestRead(sim.restRead, liveRotation, sim.prevTile, nextPos);
                     // tailLength is measured in visual balls, not tiles. Convert to
-                    // approximate occupied tile count so collision checks align with what
-                    // players see.
-                    const occupiedTiles = Math.max(1, Math.ceil((sim.tailLength * BODY_BALL_SPACING) / 1.0));
+                    // conservative occupied tile count. A tail tip can still touch
+                    // the adjacent cell; hasJumpClearance checks actual body contact
+                    // before killing, so an extra candidate is safe here.
+                    const occupiedTiles = Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING)) + 1;
                     const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
                     // Direct indexed scan over tileTrail avoids allocating an intermediate
                     // slice just for Array.includes(). bodyTilesBehindHead ≤ ~167 at MAX_TAIL.
@@ -1683,6 +1730,7 @@ const PHASE_HANDLERS = {
 
                 // Immediately update curWorldPos so the interpolation target is correct
                 setCurWorldPosFromTile(sim, size);
+                updateRotationDeparture(sim);
 
                 // Powerup collision
                 const { x, y, z, dirKey } = sim.pos;
@@ -1765,10 +1813,19 @@ const PHASE_HANDLERS = {
         enter(_sim, _size, ctx) {
             ctx.onPhase('tunnel');
         },
-        update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (0.65 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
+        update(sim, size, ctx, delta) {
+            const collapsing = sim.pendingVoidKill?.tunnelKey === sim.currentTunnelKey;
+            const nextProgress = Math.min(collapsing ? 0.5 : 1,
+                sim.tunnelProgress + delta * (0.65 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE));
             advanceTunnelHead(sim, 'tunnel', nextProgress, size);
             sim.tunnelProgress = nextProgress;
+            if (collapsing && nextProgress >= 0.5) {
+                const { tunnelKey, traversals } = sim.pendingVoidKill;
+                sim.pendingVoidKill = null;
+                sim.voidTunnelKeys.add(tunnelKey);
+                killWormSim(sim, ctx, { reason: 'void-tunnel-exhausted', tunnelKey, traversals, progress: 0.5 });
+                return true;
+            }
             if (sim.tunnelProgress >= 1) {
                 sim.tunnelProgress = 0;
                 sim.phase = 'exiting';
@@ -1794,21 +1851,17 @@ const PHASE_HANDLERS = {
             advanceTunnelHead(sim, 'exiting', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
-                const voidKillState = sim.pendingVoidKill;
                 const exitedTunnel = sim.activeTunnel; // capture (kept alive for windout)
                 const exitStableKey = sim.currentTunnelStableKey;
                 const exitTunnelKey = sim.currentTunnelKey;
                 sim.tunnelProgress = 0;
                 sim.currentTunnelStableKey = null;
                 sim.currentTunnelKey = null;
-                if (voidKillState) {
-                    sim.pendingVoidKill = { ...voidKillState, armed: true };
-                }
 
                 // Arm the heal now, but leave both flipped tiles and the tunnel intact
                 // until the recorded route proves the final segment has cleared the exit.
                 const exitProgress = exitStableKey ? (ctx.getHealingProgress()?.[exitStableKey]) : null;
-                const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel && ctx.allowTunnelHeal?.() !== false;
+                const didHeal = (isHealReady(exitProgress?.deposited) || ctx.isStoryTunnelTrial?.()) && !!exitedTunnel && ctx.allowTunnelHeal?.() !== false;
                 if (didHeal && !sim.tunnelPassages.some(p => p.heal?.tunnelKey === exitTunnelKey)) {
                     sim.pendingTunnelHeal = {
                         tunnel: exitedTunnel,
@@ -1907,7 +1960,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // delta first so a hitch can't skip most of the freeze.
     if (sim.cutFocusT > 0) {
         sim.cutFocusT = Math.max(0, sim.cutFocusT - Math.min(delta, MAX_TICK_DELTA));
-        if (sim.cutFocusT === 0) sim.cutFocusPos = null;
+        if (sim.cutFocusT === 0) { sim.cutFocusPos = null; sim.cutFocusSlice = null; }
         return;
     }
 
@@ -1940,6 +1993,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // clock in this tick (jump, wormhole spawn, boost, movement) reads this value, so
     // they all pause together through a stall and resume cleanly instead of lurching.
     if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
+    tickExpansion(sim, size, delta, ctx);
     if (sim.signatureRequested) {
         sim.signatureRequested = false;
         activateSignature(sim, size, ctx);
@@ -2014,6 +2068,9 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (sim.phase === 'crawling' && sim.landingGraceT > 0) {
         sim.landingGraceT = Math.max(0, sim.landingGraceT - delta);
     }
+    if (sim.phase === 'crawling' && sim.rocketBoostHandoffT > 0) {
+        sim.rocketBoostHandoffT = Math.max(0, sim.rocketBoostHandoffT - delta);
+    }
     if (sim.phase === 'crawling' && sim.rocketT > 0) {
         sim.rocketT = Math.max(0, sim.rocketT - delta);
         sim.rocketFlight = Math.max(0, Math.min(
@@ -2022,6 +2079,7 @@ export function stepWormSim(sim, delta, size, ctx) {
         ));
         if (sim.rocketT === 0) {
             sim.rocketActive = false;
+            sim.rocketBoostHandoffT = ROCKET_BOOST_HANDOFF;
             sim.landingGraceT = ROCKET_LANDING_GRACE;
             sim.selfCollisionGraceSteps = Math.max(sim.selfCollisionGraceSteps, STEPS_PER_TILE);
             sim.pendingSelfCollision = null;
@@ -2034,10 +2092,17 @@ export function stepWormSim(sim, delta, size, ctx) {
     tickElementalGameplay(sim, delta);
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
     // Throttle follows the same smooth flight phase as the rendered body.
-    // Blend back to any remaining ordinary boost instead of snapping at touchdown.
+    // Flight stays capped even with an ordinary boost. Restore ground speed only
+    // after touchdown, easing from the capped baseline on the crawling clock.
     const flight = sim.rocketFlight ?? 0;
     const throttle = flight * flight * (3 - 2 * flight);
-    const speedMult = sim.rocketActive ? boostMult + (ROCKET_SPEED_MULT - boostMult) * throttle : boostMult * (1 + 0.25 * sim.waterMomentum);
+    const rocketBase = Math.min(boostMult, ROCKET_SPEED_MULT);
+    const handoff = 1 - (sim.rocketBoostHandoffT ?? 0) / ROCKET_BOOST_HANDOFF;
+    const groundBlend = handoff * handoff * (3 - 2 * handoff);
+    const groundSpeed = boostMult * (1 + 0.25 * sim.waterMomentum);
+    const speedMult = sim.rocketActive
+        ? rocketBase + (ROCKET_SPEED_MULT - rocketBase) * throttle
+        : rocketBase + (groundSpeed - rocketBase) * groundBlend;
     const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step
@@ -2152,6 +2217,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // A phase handler can kill the worm. Death is terminal for this tick too:
     // queued tail clearance must not heal tiles or spawn rewards afterward.
     if (!sim.alive) return;
+    if (currentPhase === 'crawling') tickGlowTrail(sim, delta);
     for (let i = sim.tunnelPassages.length - 1; i >= 0; i--) {
         const passage = sim.tunnelPassages[i];
         // Re-entering a still-occupied pair must not close it around the new
@@ -2246,6 +2312,7 @@ function dropStaleRestReadTiles(sim, txnId) {
  * @param {object} opts - { inOpeningScramble, paused } snapshot flags
  */
 export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, paused }) {
+    if (!sim.alive) return; // Preserve the impact pose when an in-flight turn commits after death.
     const { axis, dir, sliceIndex } = rot;
     const numTurns = rot.numTurns ?? 1;
     // Every plane this move turned, each with its own direction. A hazard turn spins
@@ -2362,7 +2429,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
             sim.prevTile = rPrev;
             sim.prevDirKey = rPrev.dirKey;
             if (sim.prevWorldPos) {
-                const _wp = getStickerWorldPos(rPrev.x, rPrev.y, rPrev.z, rPrev.dirKey, size, 0);
+                const _wp = getStickerWorldPos(rPrev.x, rPrev.y, rPrev.z, rPrev.dirKey, size, sim.expansionAmount);
                 sim.prevWorldPos.set(_wp[0], _wp[1], _wp[2]);
             }
         }
@@ -2399,6 +2466,9 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     if (sim.signature.fxTile) sim.signature.fxTile = rotateByOwnLayer(sim.signature.fxTile);
     ttMapInPlace(sim.tileTrail, _remapTileKey);
     ttMapInPlace(sim.pathHistory, _remapTileKey);
+    if (sim.signature.glowTrail) {
+        ttMapInPlace(sim.signature.glowTrail.path, key => key ? _remapTileKey(key) : key);
+    }
     // Pressure uses the same positional keys as the trail, so its displacement
     // and velocity must ride the slice instead of rebounding in the vacated cell.
     remapWormPress(_remapTileKey);
@@ -2507,17 +2577,6 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         if (passage.heal) passage.heal = { ...passage.heal, tunnel: passage.tunnel };
     }
 
-    // The armed void kill compares the head's CURRENT tile against the exit tile it
-    // must step off before collapsing. Left un-rotated, the comparison is against a
-    // slot the exit no longer occupies, so the collapse fires a step early or late.
-    if (sim.pendingVoidKill?.exitTileKey) {
-        parseTileKey(sim.pendingVoidKill.exitTileKey, _parseTile);
-        const rotated = rotateByOwnLayer(_parseTile);
-        if (rotated !== _parseTile) {
-            sim.pendingVoidKill = { ...sim.pendingVoidKill, exitTileKey: tileKey(rotated) };
-        }
-    }
-
     // A turn that carried any of the visible body earns a few steps of self-collision
     // immunity on the small boards. The turn itself never kills — but it can drop the
     // worm's own tail across the head's path with no warning the player could have
@@ -2551,5 +2610,6 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     // exactly once, here — releasing it per layer is what let the first plane of a
     // two-plane turn erase the protection belonging to the second.
     sim.restRead = null;
+    if (sim.rotationDeparture?.txnId === liveRotation.completedTxnId) sim.rotationDeparture.committed = true;
     restTiles.clear();
 }

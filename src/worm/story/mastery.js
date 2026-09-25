@@ -2,9 +2,13 @@ import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { tileKey } from '../healerWorm/wormSim.js';
 import { ttAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING } from '../healerWorm/constants.js';
+import { getNextSurfacePosition } from '../wormLogic.js';
 
 export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning'];
+export const STORY_POWER_OPENING_DELAY = 10;
+export const STORY_POWER_COOLDOWN = 5;
 const HINTS = { rocket: 'Rocket: steer the flight and land', magnet: 'Magnet: pull orbs from neighboring tiles',
+  explode: 'Explode: the cube spreads apart for 12 seconds. Keep crawling until it closes',
   water: 'Water: build momentum in a straight line', fire: 'Fire: leave a trail for 3 seconds',
   grass: 'Grass: land, then jump from your spring patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: survive the storm for 4 seconds' };
 const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
@@ -21,6 +25,12 @@ export function recordStoryMechanic(practice, key, id) {
 }
 export function updateMastery(sim, p, level, delta) {
   if (!level.mechanics || !sim.alive) return;
+  // This clock runs only through active story metrics, so ready cards, pauses
+  // and rescue holds cannot consume the opening window or recovery time.
+  const powerBusy = sim.specials.length > 0 || sim.rocketActive || sim.magnetT > 0 ||
+    sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0;
+  p.powerDelay = powerBusy ? STORY_POWER_COOLDOWN
+    : Math.max(0, (p.powerDelay ?? STORY_POWER_OPENING_DELAY) - Math.min(Math.max(delta, 0), 0.1));
   const safe = sim.phase === 'crawling' && !sim.isJumping && !sim.rocketActive;
   if (sim.boostActiveT > 0) p.boosting = true;
   else if (p.boosting && sim.phase === 'crawling') { add(p, 'boosts'); p.boosting = false; }
@@ -29,6 +39,9 @@ export function updateMastery(sim, p, level, delta) {
     if (sim.elementalT > 0 && sim.elementalType === 'ice') p.iceJump = true;
   }
   if (sim.rocketActive) { p.flying = true; p.doubleJump = false; p.grassJump = false; p.iceJump = false; }
+  // An explosion counts once the cube has closed again with the worm still on it.
+  if (sim.explodeT > 0) p.exploding = true;
+  else if (p.exploding && safe && !(sim.expansionAmount > 0)) { add(p, 'explodes'); p.exploding = false; }
   if (safe) {
     if (p.doubleJump) { add(p, 'doubleJumps'); p.doubleJump = false; }
     if (p.flying) { add(p, 'rockets'); p.flying = false; }
@@ -52,21 +65,33 @@ export function updateMastery(sim, p, level, delta) {
 export function nextStoryPower(p, level) {
   const m = level.mechanics;
   if (!m) return null;
-  if ((p.mechanics.rockets ?? 0) < (m.rockets ?? 0)) return 'rocket';
   if ((p.mechanics.magnetOrbs ?? 0) < (m.magnetOrbs ?? 0)) return 'magnet';
   if (m.elementPickups) {
     const collected = p.mechanics.elementPickups ?? 0;
-    return collected < m.elementPickups ? STORY_ELEMENTS[collected % STORY_ELEMENTS.length] : null;
+    if (collected < m.elementPickups) return STORY_ELEMENTS[collected % STORY_ELEMENTS.length];
   }
-  return m.elements ? STORY_ELEMENTS.find(type => !p.elements.has(type)) ?? null : null;
+  const element = m.elements && STORY_ELEMENTS.slice(0, m.elements).find(type => !p.elements.has(type));
+  if (element) return element;
+  if ((p.mechanics.explodes ?? 0) < (m.explodes ?? 0)) return 'explode';
+  if ((p.mechanics.rockets ?? 0) < (m.rockets ?? 0)) return 'rocket';
+  return null;
 }
 export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
-  return getAllSurfaceTiles(size).find(tile => {
-    const sticker = cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers[tile.dirKey];
-    const distance = Math.hypot(tile.x - sim.pos.x, tile.y - sim.pos.y, tile.z - sim.pos.z);
-    return tile.dirKey === sim.pos.dirKey && distance >= 2 && distance <= 3 &&
-      sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile));
-  });
+  const { x, y, z, dirKey } = sim.pos;
+  const axes = dirKey.endsWith('X') ? ['y', 'z'] : dirKey.endsWith('Y') ? ['x', 'z'] : ['x', 'y'];
+  const u = sim.pos[axes[0]], v = sim.pos[axes[1]];
+  const minDistanceSq = size >= 4 ? 4 : 1;
+  // Only the local radius-three patch can qualify. Preserve surface-cache order
+  // so spawn positions stay identical, without scanning all 6*size² stickers.
+  for (let a = Math.max(0, u - 3); a <= Math.min(size - 1, u + 3); a++) {
+    for (let b = Math.max(0, v - 3); b <= Math.min(size - 1, v + 3); b++) {
+      const distanceSq = (a - u) ** 2 + (b - v) ** 2;
+      if (distanceSq < minDistanceSq || distanceSq > 9) continue;
+      const tile = { x, y, z, dirKey, [axes[0]]: a, [axes[1]]: b };
+      const sticker = cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers[dirKey];
+      if (sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile))) return tile;
+    }
+  }
 }
 // One marked offering at a time; expiration reoffers it near the current face.
 // A completed power is not replaced until its effect ends, so elements never
@@ -74,13 +99,29 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
 // only while remote catches are still outstanding.
 export function offerStoryPower(sim, p, level, size, cubies) {
   const type = nextStoryPower(p, level);
-  p.powerHint = type ? (level.mechanics?.elementPickups ? 'Steer onto the marked elemental orb to collect it' : HINTS[type]) : null;
-  if (!type || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.elementalT > 0 || sim.phase !== 'crawling') return false;
+  const displayedType = sim.specials[0]?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
+    : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : null);
+  const hint = offered => level.mechanics?.elementPickups && STORY_ELEMENTS.includes(offered)
+    ? 'Steer onto the marked elemental orb to collect it' : HINTS[offered];
+  p.powerHint = displayedType ? hint(displayedType) : null;
+  if (!type || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
+  if ((p.powerDelay ?? STORY_POWER_OPENING_DELAY) > 0) return false;
   const occupied = new Set(sim.powerups.map(tileKey));
+  occupied.add(tileKey(sim.pos));
+  // A pickup is a deliberate turn, never a surprise on the next straight steps.
+  // Follow the surface across seams too, rather than checking one grid axis.
+  let ahead = sim.pos, heading = sim.moveDir;
+  for (let i = 0; i < 3; i++) {
+    ahead = getNextSurfacePosition(ahead, heading, size);
+    if (!ahead) break;
+    occupied.add(tileKey(ahead)); heading = ahead.moveDir;
+  }
   for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
   const tile = storySurfaceTile(sim, size, cubies, occupied);
   if (!tile) return false;
   sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: 20, maxTtl: 20 }];
+  p.powerDelay = STORY_POWER_COOLDOWN;
+  p.powerHint = hint(type);
   if (type === 'magnet') {
     let added = 0;
     for (const nearby of getAllSurfaceTiles(size)) {

@@ -1,5 +1,6 @@
 // src/worm/wormCharacterData.js
 // Core playable worm character archetypes (distinct silhouette + movement personality).
+import { CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN } from './characterAbilities.js';
 
 export const WORM_CHARACTERS = [
   {
@@ -16,7 +17,7 @@ export const WORM_CHARACTERS = [
     type: 'Ranger',
     subtitle: 'Original rounded crawler',
     stats: { speed: 55, healing: 60, agility: 65, glow: 10 },
-    special: 'Orb Abundance — 50% more orbs on the cube.',
+    special: `Orb Call — Attract nearby parity orbs for ${CLASSIC_ORB_CALL_SECONDS} seconds. Recharge: ${CLASSIC_ORB_CALL_COOLDOWN} seconds. Also spawns 50% more orbs.`,
   },
   {
     id: 'inch',
@@ -32,7 +33,7 @@ export const WORM_CHARACTERS = [
     type: 'Scout',
     subtitle: 'Bioluminescent trail crawler',
     stats: { speed: 90, healing: 40, agility: 80, glow: 100 },
-    special: 'Light Trail — Enemies glow brighter. Leave a glowing trail for 3 seconds.',
+    special: 'Light Trail — Paint behind your tail for 8 seconds; the trail stays for 12 more seconds. Enemies glow brighter.',
   },
   {
     id: 'book',

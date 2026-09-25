@@ -7,6 +7,9 @@ import React from 'react';
 import { useDialogBehavior } from '../ui/Panel.jsx';
 import { UI_FONT, PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BG_MUTED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_SHADOW, PAPER_CARD_SHADOW, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
 import { modeTheme } from '../../utils/modeThemes.js';
+import { ARCADE_PAPER, ARCADE_CARD, ARCADE_INK, ARCADE_INK_STRONG, ARCADE_MUTED, ARCADE_LINE, ARCADE_LINE_SOFT,
+  ARCADE_GRID_SIZE, ARCADE_KEY_SHADOW, ARCADE_PRIMARY_SHADOW, ARCADE_CARD_SHADOW, DISPLAY_FONT, HEADING_FONT } from '../../utils/uiTheme.js';
+import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import './modeWizard.css';
 import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
@@ -16,27 +19,24 @@ import { isMobile } from '../../utils/device.js';
 // (MobiIntroScreen): a warm paper base, a fine 18px grid, a 90px major grid, and
 // a soft corner highlight + diagonal wash. Still worn by the store, level select,
 // the pack picker and the merge theme picker.
-const GRAPH_LINE = 'rgba(122,110,98,0.04)';
-const GRAPH_MAJOR = 'rgba(122,110,98,0.06)';
-export const WIZARD_PAPER_BASE = PAPER_SHEET;
+// The mode carousel's graph paper (MenuPaperBackdrop), as CSS: one warm base,
+// one even grid, a soft centre highlight.
+const GRAPH_LINE = 'rgba(207,205,191,0.40)';
+export const WIZARD_PAPER_BASE = ARCADE_PAPER;
 
 export const wizardPaperBackground = {
   backgroundColor: WIZARD_PAPER_BASE,
   backgroundImage: [
+    'radial-gradient(ellipse at 50% 45%, rgba(255,253,245,0.85), transparent 72%)',
     `linear-gradient(${GRAPH_LINE} 1px, transparent 1px)`,
-    `linear-gradient(90deg, ${GRAPH_LINE} 1px, transparent 1px)`,
-    `linear-gradient(${GRAPH_MAJOR} 1px, transparent 1px)`,
-    `linear-gradient(90deg, ${GRAPH_MAJOR} 1px, transparent 1px)`,
-    'radial-gradient(circle at 16% 8%, rgba(255,255,255,0.6), transparent 34%)',
-    'linear-gradient(160deg, rgba(255,255,255,0.34), rgba(219,205,176,0.16))'
+    `linear-gradient(90deg, ${GRAPH_LINE} 1px, transparent 1px)`
   ].join(','),
-  backgroundSize: '18px 18px, 18px 18px, 90px 90px, 90px 90px, 100% 100%, 100% 100%',
-  backgroundPosition: '0 0, 0 0, -1px -1px, -1px -1px, 0 0, 0 0'
+  backgroundSize: `100% 100%, ${ARCADE_GRID_SIZE}, ${ARCADE_GRID_SIZE}`
 };
 
 // Translucent paper wash for the footer strip: the action buttons keep a base to
 // sit on while the graph grid still reads faintly through it.
-export const WIZARD_FOOTER_BG = 'rgba(245, 238, 222, 0.82)';
+export const WIZARD_FOOTER_BG = 'rgba(255, 252, 241, 0.92)';
 
 // Pencil-lead ink used for handwritten copy on this paper (matches Mobi's dialogue).
 // Exported so any screen writing on the paper — the store's footer note, for one —
@@ -83,9 +83,9 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: `radial-gradient(ellipse at 20% 0%, ${accent}18, transparent 55%), #060e12ed`,
-      backdropFilter: PAPER_BACKDROP_BLUR,
-      WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
+      // The wizard owns the screen, like the mode carousel it follows: the same
+      // graph paper, with the sheet as an ivory card on it.
+      ...wizardPaperBackground,
       zIndex: Z.MODAL,
       fontFamily: UI_FONT,
       // dvh tracks the collapsing mobile URL bar; browsers without it fall back
@@ -97,7 +97,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
     },
 
     sheet: {
-      ...wizardBackground(accent),
+      background: ARCADE_CARD,
       borderRadius: mobile ? 20 : 24,
       width: mobile ? '100%' : 'min(720px, 96vw)',
       height: '100%',
@@ -105,9 +105,9 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      boxShadow: '0 30px 100px #0008',
-      border: `1px solid ${WIZ_BORDER}`,
-      color: WIZ_TEXT,
+      boxShadow: mobile ? 'none' : ARCADE_CARD_SHADOW,
+      border: `2px solid ${ARCADE_LINE}`,
+      color: ARCADE_INK,
       animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)'
     },
 
@@ -124,21 +124,26 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       borderBottom: `1px solid ${WIZ_BORDER_SOFT}`
     },
 
+    // The carousel's ivory icon key.
     backBtn: {
       display: 'inline-flex',
       alignItems: 'center',
-      gap: 4,
+      justifyContent: 'center',
+      gap: 6,
       minHeight: TOUCH_TARGET,
       minWidth: TOUCH_TARGET,
-      padding: '6px 10px 6px 4px',
-      marginLeft: -4,
-      background: 'none',
-      border: 'none',
-      color: WIZ_TEXT_MUTED,
-      fontSize: TEXT_SM,
-      fontWeight: 600,
-      fontFamily: 'inherit',
+      padding: mobile ? 0 : '0 14px 0 10px',
+      boxSizing: 'border-box',
+      background: ARCADE_CARD,
+      border: `2px solid ${ARCADE_LINE}`,
+      borderRadius: 16,
+      boxShadow: ARCADE_KEY_SHADOW,
+      color: ARCADE_INK_STRONG,
+      font: `800 12px/1.2 ${HEADING_FONT}`,
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
       cursor: 'pointer',
+      touchAction: 'manipulation',
       WebkitTapHighlightColor: 'transparent'
     },
 
@@ -169,10 +174,11 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
     },
 
     title: {
+      fontFamily: DISPLAY_FONT,
       fontSize: mobile ? TEXT_XL - 3 : TEXT_XL,
-      fontWeight: '700',
-      letterSpacing: '-0.5px',
-      color: WIZ_TEXT,
+      fontWeight: 400,
+      textTransform: 'uppercase',
+      color: ARCADE_INK,
       margin: '0 0 2px',
       lineHeight: 1.15
     },
@@ -206,14 +212,14 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       flexShrink: 0,
       minHeight: TOUCH_TARGET,
       padding: '7px 14px',
-      borderRadius: 999,
-      border: `1px solid ${active ? accent : WIZ_BORDER}`,
-      background: active ? `${accent}14` : WIZ_SURFACE_RAISED,
-      color: active ? WIZ_TEXT : WIZ_TEXT_MUTED,
-      boxShadow: active ? `inset 0 0 0 1px ${accent}33` : 'none',
-      fontSize: TEXT_XS,
-      fontWeight: active ? 800 : 600,
-      letterSpacing: '0.04em',
+      borderRadius: 10,
+      border: `2px solid ${active ? ARCADE_INK_STRONG : ARCADE_LINE_SOFT}`,
+      background: active ? 'color-mix(in srgb, var(--mode-accent) 22%, #fffcf1)' : ARCADE_CARD,
+      color: active ? ARCADE_INK : ARCADE_INK_STRONG,
+      boxShadow: active ? `0 2px 0 ${ARCADE_INK_STRONG}` : `0 3px 0 ${ARCADE_LINE_SOFT}`,
+      font: `800 11px/1.2 ${HEADING_FONT}`,
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
       whiteSpace: 'nowrap',
       fontFamily: 'inherit',
       cursor: 'pointer',
@@ -229,9 +235,9 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       alignItems: 'stretch',
       gap: 2,
       padding: `0 ${Math.max(GUTTER - 8, 6)}px`,
-      borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
-      borderBottom: `1px solid ${WIZ_BORDER_SOFT}`,
-      background: WIZ_SURFACE,
+      borderTop: `1px solid ${ARCADE_LINE_SOFT}`,
+      borderBottom: `1px solid ${ARCADE_LINE_SOFT}`,
+      background: '#f7f2e3',
       overflowX: 'auto',
       overscrollBehaviorX: 'contain',
       WebkitOverflowScrolling: 'touch',
@@ -248,7 +254,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       gap: 3,
       padding: mobile ? '8px 6px 7px' : '10px 10px 9px',
       border: 'none',
-      borderBottom: `2px solid ${active ? accent : 'transparent'}`,
+      borderBottom: `3px solid ${active ? ARCADE_INK_STRONG : 'transparent'}`,
       background: 'transparent',
       cursor: 'pointer',
       fontFamily: 'inherit',
@@ -279,7 +285,7 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       flexDirection: 'column',
       gap: 8,
       flexShrink: 0,
-      borderTop: `1px solid ${WIZ_BORDER_SOFT}`,
+      borderTop: `2px solid ${ARCADE_LINE_SOFT}`,
       background: WIZARD_FOOTER_BG
     },
 
@@ -287,29 +293,36 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
     // it belongs across the thumb rather than in a corner.
     btnPrimary: {
       width: '100%',
-      background: accent,
-      border: `1px solid ${accent}`,
-      fontSize: TEXT_SM,
-      fontWeight: '800',
-      letterSpacing: '0.10em',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      background: 'var(--arcade-accent)',
+      border: `2px solid ${ARCADE_INK_STRONG}`,
+      font: `400 clamp(15px, 4.5vw, 20px)/1.25 ${DISPLAY_FONT}`,
       textTransform: 'uppercase',
-      color: '#111d20',
+      color: 'var(--arcade-accent-ink)',
       cursor: 'pointer',
-      minHeight: TOUCH_TARGET + 4,
-      padding: '13px 20px',
-      borderRadius: '12px',
-      transition: 'all 0.12s ease',
-      fontFamily: 'inherit',
+      minHeight: 60,
+      padding: '12px 18px',
+      marginBottom: 6,
+      borderRadius: 18,
+      fontFamily: DISPLAY_FONT,
       WebkitTapHighlightColor: 'transparent',
-      boxShadow: `0 3px 0 ${_accentShadow}`
+      touchAction: 'manipulation',
+      boxShadow: ARCADE_PRIMARY_SHADOW
     },
 
     btnSecondary: {
       background: 'none',
       border: 'none',
-      fontSize: TEXT_XS,
-      fontWeight: '600',
-      color: WIZ_TEXT_FAINT,
+      font: `800 11px/1.3 ${HEADING_FONT}`,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      textDecoration: 'underline',
+      textDecorationColor: ARCADE_LINE,
+      textUnderlineOffset: 4,
+      color: ARCADE_INK_STRONG,
       cursor: 'pointer',
       minHeight: TOUCH_TARGET,
       padding: '4px 8px',
@@ -573,6 +586,9 @@ export function WizardShell({
   const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
   React.useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
   const theme = modeTheme(mode);
+  // The carousel's face colour for this mode drives the primary key and the
+  // selection tint; the shell's own lines and ink are the arcade neutrals.
+  const modeVars = arcadeModeVars(theme.name.toLowerCase());
   const cat = categories[active];
   const last = active === categories.length - 1;
   // Keep the cube above the setup selector and its style-family controls.
@@ -590,7 +606,7 @@ export function WizardShell({
   );
 
   return (
-    <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${theme.name} setup`} className="mode-wizard" style={{ ...styles.overlay, '--mode-accent': accent, '--mode-ink': theme.shadow }}>
+    <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${theme.name} setup`} className="mode-wizard" style={{ ...styles.overlay, ...modeVars, '--mode-accent': modeVars['--arcade-accent'], '--mode-ink': ARCADE_INK_STRONG }}>
       {children}
 
       <div className="mode-wizard-sheet" style={styles.sheet}>
@@ -634,7 +650,8 @@ export function WizardShell({
             type="button"
             style={styles.btnPrimary}
             onClick={() => { wormMenuFeedback(); onPrimary(); }}
-            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.08)'; }}
+            className="mode-wizard-primary"
+            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.06)'; }}
             onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
           >
             {last ? finishLabel : (cat.primaryLabel || 'Next')} <span aria-hidden="true">→</span>
@@ -645,8 +662,8 @@ export function WizardShell({
               type="button"
               style={styles.btnSecondary}
               onClick={() => { wormMenuFeedback(); secondary.onClick(); }}
-              onMouseEnter={e => { e.currentTarget.style.color = WIZ_TEXT; }}
-              onMouseLeave={e => { e.currentTarget.style.color = WIZ_TEXT_FAINT; }}
+              onMouseEnter={e => { e.currentTarget.style.color = ARCADE_INK; }}
+              onMouseLeave={e => { e.currentTarget.style.color = ARCADE_INK_STRONG; }}
             >
               {secondary.label}
             </button>

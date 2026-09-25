@@ -1,6 +1,7 @@
 import { holdsRotationTimer } from './characterAbilities.js';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { storySurfaceTile } from './story/mastery.js';
+import { bodyCoverageCount } from './healerWorm/bodyCoverage.js';
 import { storyLevel, storyRotationCycle } from './story/levels.js';
 import { combatBridge } from './combat/portalCombat.js';
 import CombatScene from './combat/CombatScene.jsx';
@@ -26,7 +27,7 @@ import { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { getStickerWorldPos } from '../game/coordinates.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
 import { getActiveTunnels, collectManifoldRing } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
@@ -42,7 +43,6 @@ import {
     BASE_TAIL_LENGTH,
     BODY_BALL_SPACING,
     CUT_FOCUS_DURATION,
-    MAX_TAIL,
 } from './healerWorm/constants.js';
 import { shPush, ttAt } from './circularBuffers.js';
 import { feel, setFeelEnabled } from '../utils/feel.js';
@@ -50,6 +50,7 @@ import { EARN_ORB_COLLECT } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
 import { shAt } from './circularBuffers.js';
 import { rideLiveRotation, resolveSliceHits, cutWormTail } from './wormHelpers.js';
+import { armTurnWatch, stepTurnWatch } from './healerWorm/sliceCrossing.js';
 import { useWormCrawler } from './useWormCrawler.js';
 import WormChaseCamera from './WormChaseCamera.jsx';
 import WormSwipeControls from './WormSwipeControls.jsx';
@@ -134,7 +135,38 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // once the turn is nearly on top of them.
     const pendingRotRef     = useRef(null);   // {axis,dir,sliceIndex} for the whole cycle
     const warningProgressRef = useRef(0);     // 0→1 through warning window
+    const liveDeathRef = useRef(null);
     const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
+    // Early-turn crossing watch for the hazard turn in flight (see sliceCrossing.js).
+    const turnWatchRef = useRef(null);
+
+    // One set of consequences for a slice hit, whether it is decided when the
+    // hazard fires or when the head crosses a seam early in the turn.
+    // Returns true when the worm died.
+    const applySliceHit = (hit, axis, fallbackSlice, details = null) => {
+        const hitPos = hit.cutPosition ?? worm.headInterpPos.current.toArray();
+        const cutColors = worm.orbPickupColorsRef.current.slice(0, 5);
+        thunkRef.current = {
+            active: true,
+            pos: hitPos,
+            colors: cutColors.length ? cutColors : ['#ffdd44', '#ff8800'],
+        };
+        const layer = hit.sliceIndex ?? fallbackSlice;
+        if (hit.type === 'death') {
+            if (Number.isFinite(hit.cutDistance)) cutWormTail(worm, hit);
+            // The plane that actually caught the worm, not the anchor.
+            worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex: layer, impactPosition: hitPos, ...details });
+            return true;
+        }
+        cutWormTail(worm, hit);
+        worm.feel('cut');
+        // Cue the chase camera to swing out to the slice shot for the WORM'D beat,
+        // then ease back to the chase (see WormChaseCamera / sliceShot.js).
+        worm.cutFocusT.current = CUT_FOCUS_DURATION;
+        worm.cutFocusPos.current = hitPos;
+        worm.cutFocusSlice.current = { axis, layer };
+        return false;
+    };
 
     // ── Bomb hazard state ──────────────────────────────────────────────────────
     // Bombs are a separate scheduled hazard, kept in a ref (written from the frame
@@ -214,6 +246,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         const rotationInterval = story?.rotateEvery || ACTIVE_ROTATE_INTERVAL;
         worm.tick(delta, { busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
             autoTimerRef.current >= rotationInterval - AUTO_ROTATE_WARNING - 0.2 });
+
+        const deathState = useGameStore.getState();
+        if (deathState.wormAlive) liveDeathRef.current = null;
+        else if (deathState.wormDeathDetails?.liveCrossing && liveDeathRef.current !== deathState.wormDeathDetails) {
+            liveDeathRef.current = deathState.wormDeathDetails;
+            thunkRef.current = { active: true, pos: deathState.wormDeathDetails.impactPosition,
+                colors: ['#ffdd44', '#ff4444'], text: "WORM'D" };
+        }
 
         // While a slice the worm sits on is mid-rotation during live play, ride it so the
         // worm visually turns with the cube rather than snapping into place only when the
@@ -361,6 +401,23 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
         if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
+        // A head that changed sides of the turning layer early in the turn is
+        // resolved as if it had been there when the turn fired. This must run
+        // before the animState guard below: the hazard's own tween sets animState
+        // for its whole length, which is exactly when the watch has to look.
+        if (turnWatchRef.current && worm.phase.current === 'crawling') {
+            const watch = turnWatchRef.current;
+            const step = stepTurnWatch(watch, worm, store.rotationEpoch);
+            if (step === 'done') turnWatchRef.current = null;
+            else if (step === 'crossed') {
+                const hit = resolveSliceHits(worm, watch.axis, watch.layers, size);
+                if (hit && applySliceHit(hit, watch.axis, watch.layers[0], { liveCrossing: true })) {
+                    turnWatchRef.current = null;
+                    return;
+                }
+            }
+        }
+
         // Do not replace an uncommitted move or classify damage in its
         // intermediate geometry. Resume the queued hazard after that commit.
         if (store.animState) { rotationClock.held = true; return; }
@@ -405,8 +462,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // Tiles the visible body currently covers — the same reach the wormhole
             // ring-heal uses, so surrounding a bomb reads identically to sealing a hole.
             const trail = worm.tileTrail.current;
-            const bodyReach = Math.min(MAX_TAIL, worm.tailLength.current) * BODY_BALL_SPACING;
-            const occupiedCount = Math.min(trail.count, Math.max(1, Math.ceil(bodyReach)));
+            const occupiedCount = bodyCoverageCount(worm.tailLength.current, trail.count, size, worm.expansionAmount.current);
             // Reused across frames: a long worm rebuilds this every frame for the
             // whole run, and a fresh Set per frame is garbage the collector has to
             // come back for mid-crawl. Cleared and refilled instead.
@@ -484,8 +540,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     if (bomb.fuse > 0) { bombs[kept++] = bomb; continue; }
 
                     // Detonate: shoot fire out along the arms, then resolve the hit.
-                    // Flames ignite staggered by distance so the blast reads as
-                    // bursting outward from the bomb (Bomberman-style).
+                    // All arms ignite on the damage frame so a distant hit never
+                    // kills before its flame appears.
                     const { keys, arms, center } = computeBlastTiles(bomb, size);
                     const flames = [];
                     const pushFlame = (t, delay) => {
@@ -498,7 +554,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                         flames.push({ pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay });
                     };
                     pushFlame(center, 0);
-                    for (const arm of arms) arm.forEach((t, idx) => pushFlame(t, (idx + 1) * 0.05));
+                    for (const arm of arms) arm.forEach(t => pushFlame(t, 0));
                     blastApiRef.current?.spawn(flames);
                     worm.feel('cut');
 
@@ -506,7 +562,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     for (const key of keys) {
                         if (isHotTile(worm.elementalPatches.current, key)) keys.delete(key);
                     }
-                    const hit = checkBlastHitWorm(worm, keys);
+                    const hit = checkBlastHitWorm(worm, keys, size);
                     if (hit) {
                         const histEntry = hit.type === 'cut'
                             ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)
@@ -519,6 +575,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                             cutWormTail(worm, hit.cutTrailIdx);
                             worm.cutFocusT.current = CUT_FOCUS_DURATION;
                             worm.cutFocusPos.current = hitPos;
+                            worm.cutFocusSlice.current = null; // a blast, not a layer
                         }
                     }
                     // bomb consumed — not compacted into the kept range
@@ -607,38 +664,21 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // in: a tail cut on plane 0 masked a death on plane 2 and the worm walked
             // away from a turn that had it trapped. See resolveSliceHits.
             //
-            // Evaluate once, before the turn starts, against the occupied body
-            // centre-line, including the live head's partial step. Making this continuous would
-            // need a rule for what a crossing worm is allowed to do — it would otherwise
-            // re-damage the same body every frame of the tween and punish exactly the
-            // crossings rest-read protection exists to allow — so it stays a single
-            // decision at the start of the turn until that rule is designed.
+            // Evaluate before the turn starts, against the occupied body centre-line,
+            // including the live head's partial step. It is not re-run every frame
+            // (that would re-damage the same body through the tween and punish the
+            // crossings rest-read protection exists to allow). Instead the rule is
+            // re-applied only when the head changes sides of the turning layer early
+            // in the turn (turnWatchRef, stepTurnWatch); mid-turn crossings are the
+            // sim's live check (movingSliceCrossing).
             const layers = sliceIndices?.length ? sliceIndices : [sliceIndex];
             const hit = resolveSliceHits(worm, axis, layers, size);
-            if (hit) {
-                const hitPos = hit.cutPosition ?? worm.headInterpPos.current.toArray();
-                const cutColors = worm.orbPickupColorsRef.current.slice(0, 5);
-                thunkRef.current = {
-                    active: true,
-                    pos: hitPos,
-                    colors: cutColors.length ? cutColors : ['#ffdd44', '#ff8800'],
-                };
-                if (hit.type === 'death') {
-                    if (Number.isFinite(hit.cutDistance)) cutWormTail(worm, hit);
-                    // The plane that actually caught the worm, not the anchor.
-                    worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex: hit.sliceIndex ?? sliceIndex });
-                    // Death freezes the severed body; don't keep rotating its
-                    // history under a stationary head during the death overlay.
-                    return;
-                } else {
-                    cutWormTail(worm, hit);
-                    worm.feel('cut');
-                    // Cue the chase camera to swing out to the impact for the WORM'D
-                    // beat, then ease back to the chase (see WormChaseCamera).
-                    worm.cutFocusT.current = CUT_FOCUS_DURATION;
-                    worm.cutFocusPos.current = hitPos;
-                }
-            }
+            // Death freezes the severed body; don't keep rotating its history
+            // under a stationary head during the death overlay.
+            if (hit && applySliceHit(hit, axis, sliceIndex)) return;
+            // Watch the head through the start of the turn, where the live check
+            // lets it cross aligned faces (see stepTurnWatch).
+            turnWatchRef.current = armTurnWatch(worm, axis, layers, useGameStore.getState().rotationEpoch);
 
             if (onRotate) {
                 // liveRotation exposes ONE anchor slice (+ its direction) to the

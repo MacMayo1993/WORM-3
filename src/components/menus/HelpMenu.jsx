@@ -69,67 +69,65 @@ const HelpMenu = ({ onClose }) => (
       <PanelHeader surface="night" title="How to play" titleId="help-title" onClose={onClose} />
 
       <PanelBody>
-        <Section title="The One Rule That Isn't Rubik's">
-          <Row label="Every tile has a twin" desc="Directly opposite it, through the middle of the cube" />
-          <Row label="Flipping" desc="Tap a tile to swap it with its twin — both change at once" />
-          <Row label="Why it matters" desc="Some tangles are far quicker to fix through the cube than around it" />
+        <Section title="The one rule that isn't Rubik's">
+          <Row label="Every tile has a twin" desc="The tile directly opposite it, straight through the middle of the cube" />
+          <Row label="Flip" desc="With Flip on, tap a tile to swap it with its twin. Both change at once" />
+          <Row label="Why it matters" desc="Some tangles are much quicker to fix through the cube than around it" />
         </Section>
 
-        <Section title="Moving the Cube">
-          <Row label="Drag" desc="Rotates a slice — just like a real Rubik's Cube" />
-          <Row label="Shift + Drag" desc="Twists the entire face" />
-          <Row label="Click a sticker" desc="Sends it through the middle to its twin — the tile dead opposite it" />
-          <Row label="Bottom bar" desc="Reset, Shuffle, Flip, Views and More — everything without a keyboard" />
+        <Section title="Moving the cube">
+          <Row label="Drag a tile" desc="Turns that row or column, like a real Rubik's Cube" />
+          <Row label="Shift + drag" desc="Twists the whole face you're dragging on" />
+          <Row label="Drag empty space" desc="Spins the cube so you can see every side" />
+          <Row label="Bottom bar" desc="Undo, Flip, Views and More. Shuffle and Reset live under More" />
         </Section>
 
-        <Section title="Game Modes">
-          <Row label="Story" desc="Ten chapters, one new idea each. Start here if you're new" />
-          <Row label="Cube" desc="Freeplay — any size 2×2 to 7×7, your palette, no timer" />
-          <Row label="Worm" desc="Steer a worm across the cube to heal it. Eat orbs, earn points" />
-          <Row label="Chaos" desc="Tiles flip on their own. Stake points on how long you last" />
-          <Row label="Random" desc="The cube redecorates itself mid-solve" />
-          <Row label="More Modes" desc="Biome and Möbius Cubelet — more ways to explore" />
-        </Section>
-
-        <Section title="Special Features">
-          <Row label="Tunnels" desc="Colored tunnels drawn between a tile and its twin on the far side" />
-          <Row label="Flip Mode" desc="Toggle color flipping on or off" />
-          <Row label="Chaos Mode" desc="Watch instability cascade across the cube!" />
+        <Section title="Game modes">
+          <Row label="Teach" desc="Learn notation, practice the beginner method, then solve a 3×3 independently" />
+          <Row label="Cube" desc="Free play: any size from 2×2 to 10×10, your colors, no timer" />
+          <Row label="Worm" desc="Steer a worm across the cube, collect orbs, and heal flipped tiles" />
+          <Row label="Chaos" desc="Tiles flip on their own. Predict which color pair lasts longest" />
+          <Row label="Random" desc="The colors and tile styles change every 10 seconds while you solve" />
+          <Row label="More modes" desc="Biome and Möbius Cubelet, from the main menu" />
         </Section>
 
         <Section title="Views">
-          <Row label="Classic" desc="Standard colorful cube" />
-          <Row label="Grid" desc="Position labels (M1-001, etc.)" />
+          <Row label="Classic" desc="The standard colored cube" />
+          <Row label="Grid" desc="Every tile labeled with its position (M1-001 and so on)" />
           <Row label="Sudoku" desc="Numbers instead of colors" />
-          <Row label="Wireframe" desc="See-through edges with lights" />
-          <Row label="Explode" desc="Spreads cube apart to see all sides" />
+          <Row label="More looks" desc="Wireframe, Glass, Chrome, Neon, Gap and Lego" />
+          <Row label="Explode" desc="Pulls the pieces apart so you can see inside" />
+          <Row label="Net" desc="A flat map of all six faces" />
+          <Row label="Tunnels" desc="Draws a tunnel from each tile to its twin. Tap again for more detail" />
         </Section>
 
-        <Section title="HUD Numbers">
-          <Row label="M" desc="Moves made" />
-          <Row label="F" desc="Color flips" />
-          <Row label="W" desc="Active flipped pairs" />
-          <Row label="Pressure bar" desc="Shows chaos intensity" />
+        <Section title="Top bar">
+          <Row label="%" desc="How much of the cube is solved" />
+          <Row label="Chaos / Flip tags" desc="Which rules are switched on right now" />
+          <Row label="Menu (☰)" desc="Your Parity Points, flip counts, Settings and Main menu" />
+          <Row label="Pressure bar" desc="In Chaos, how much of the cube is flipping" />
         </Section>
 
-        <Section title="Keyboard Controls (optional)">
-          <KeyRow keys="Arrow keys" desc="Move cursor to select a tile" />
-          <KeyRow keys="W / S" desc="Rotate selected row up / down" />
-          <KeyRow keys="A / D" desc="Rotate selected column left / right" />
-          <KeyRow keys="Q / E" desc="Rotate face counter-clockwise / clockwise" />
-          <KeyRow keys="F" desc="Send the selected tile through to its twin" />
+        <Section title="Keyboard (optional)">
+          <KeyRow keys="Arrow keys" desc="Move the cursor between tiles" />
+          <KeyRow keys="W / S" desc="Turn the selected column up / down" />
+          <KeyRow keys="A / D" desc="Turn the selected row left / right" />
+          <KeyRow keys="Q / E" desc="Turn the face counter-clockwise / clockwise" />
+          <KeyRow keys="F" desc="Flip the selected tile with its twin (Flip must be on)" />
         </Section>
 
-        <Section title="Quick Shortcuts">
-          <KeyRow keys="H / ?" desc="Open / close this help menu" />
+        <Section title="Shortcuts">
+          <KeyRow keys="H / ?" desc="Open or close this help" />
+          <KeyRow keys="U" desc="Undo the last move" />
           <KeyRow keys="Space" desc="Shuffle the cube" />
-          <KeyRow keys="R" desc="Reset everything" />
-          <KeyRow keys="G" desc="Toggle flip mode" />
-          <KeyRow keys="T" desc="Show / hide tunnels" />
-          <KeyRow keys="X" desc="Toggle explosion view" />
-          <KeyRow keys="V" desc="Cycle view mode" />
-          <KeyRow keys="C" desc="Toggle Chaos Mode" />
-          <KeyRow keys="Esc" desc="Close menus / hide cursor" />
+          <KeyRow keys="R" desc="Reset the cube" />
+          <KeyRow keys="G" desc="Turn Flip on or off" />
+          <KeyRow keys="T" desc="Show or hide tunnels" />
+          <KeyRow keys="X" desc="Explode view" />
+          <KeyRow keys="N" desc="Show or hide the net" />
+          <KeyRow keys="V" desc="Next view style" />
+          <KeyRow keys="C" desc="Turn Chaos on or off" />
+          <KeyRow keys="Esc" desc="Close the top menu, or hide the cursor" />
         </Section>
 
         {/* Footnote — the one place this screen earns an accent, so it reads as
@@ -146,9 +144,8 @@ const HelpMenu = ({ onClose }) => (
             border: `1px solid ${UI_MOSS_LIGHT}33`
           }}
         >
-          <strong style={{ color: UI_GOLD }}>What you're learning:</strong> This puzzle demonstrates a special mathematical space —
-          the real projective plane — where opposite points are the same location. When you flip a color you're creating a connection
-          through this space. That's what the tunnels represent.
+          <strong style={{ color: UI_GOLD }}>The math, if you want it:</strong> treating opposite points as the same point turns the cube's
+          surface into a shape called the real projective plane. Twins are two views of one spot, and each tunnel is the path between them.
         </div>
       </PanelBody>
     </Panel>

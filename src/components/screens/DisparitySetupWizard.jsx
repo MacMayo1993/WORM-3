@@ -98,11 +98,11 @@ const DisparitySetupWizard = ({ onStart, onCancel, initialSettings }) => {
     <div className="chaos-gameplay">
       {optionGroup('Intensity', 'disparityLevel', [1, 2, 3, 4, 5].map(value => ({ value,
         label: LEVEL_LABELS[value], sub: `${value} / 5` })))}
-      {optionGroup('Tile endurance', 'flipCap', FLIP_CAP_PRESETS)}
+      {optionGroup('Flips before a tile is spent', 'flipCap', FLIP_CAP_PRESETS)}
       {optionGroup('Game length', 'gameLength', GAME_LENGTH_OPTIONS)}
       <div className="chaos-gameplay-toggles">
-        <ToggleRow label="Flip Mode" sub="Allow manual tile flips" value={settings.flipMode} onChange={v => select('flipMode', v)} />
-        <ToggleRow label="Wormhole Tunnels" sub="Show antipodal connections" value={settings.showTunnels} onChange={v => select('showTunnels', v)} />
+        <ToggleRow label="Flip" sub="Let yourself tap tiles to flip them with their twins" value={settings.flipMode} onChange={v => select('flipMode', v)} />
+        <ToggleRow label="Tunnels" sub="Draw a tunnel from each tile to its twin" value={settings.showTunnels} onChange={v => select('showTunnels', v)} />
       </div>
     </div>
   );

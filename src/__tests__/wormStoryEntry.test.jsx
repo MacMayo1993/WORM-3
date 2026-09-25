@@ -6,6 +6,7 @@ import DeathScreen from '../worm/DeathScreens.jsx';
 import { StoryResult } from '../worm/story/StoryCards.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress } from '../progression/model.js';
+import { STORY_WORLDS } from '../worm/story/worlds.js';
 vi.mock('../components/screens/WormModeSetupWizard.jsx', () => ({ default: ({ onComplete, onCancel, initialSettings }) => <div aria-label="Free Play setup"><button onClick={onCancel}>Cancel setup</button><button onClick={() => onComplete(initialSettings)}>Launch free run</button></div> }));
 let host, root, complete, cancel;
 const state = () => useGameStore.getState();
@@ -35,7 +36,9 @@ it('opens with Story on the left and Free Play on the right, without launching e
   expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Levels', 'Free Play']);
   expect(complete).not.toHaveBeenCalled();
   click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
-  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 2, wormEnemiesEnabled: false, perFaceStyles: {1:'grass'} }));
+  expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
+  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
+    colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));
   click('Back'); await act(async () => { click('Free Play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();
   click('Launch free run'); expect(complete.mock.lastCall[0]).toEqual({ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 });
@@ -51,7 +54,7 @@ it('traps keyboard focus and handles Back/Escape within the mode boundary', () =
 });
 it('resumes at the next unlocked level and lets a completed level claim its reward from the map', () => {
   useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: {1:3,2:2,3:1}, claimed: {} } } });
-  show({ initialPage: 'story' }); expect(host.querySelector('[aria-pressed="true"]').getAttribute('aria-label')).toContain('Moving Ground');
+  show({ initialPage: 'story' }); expect(host.querySelector('.worm-level-grid [aria-pressed="true"]').getAttribute('aria-label')).toContain('Moving Ground');
   click('Clear Your Tail'); const choices = host.querySelector('.worm-story-rewards');
   act(() => choices.querySelector('button').click());
   expect(state().ownedItems).toHaveLength(1); expect(host.querySelector('[role="status"]').textContent).toContain('unlocked');
@@ -66,7 +69,7 @@ it('offers Next, Replay and chapter navigation from completion', () => {
 });
 
 it('explains the hard deadline before play and distinguishes timeout from a collision', () => {
-  show({ initialPage: 'story' }); expect(host.textContent).toContain('1:30 to finish');
+  show({ initialPage: 'story' }); expect(host.textContent).toContain('2:05 to finish');
   act(() => root.render(<DeathScreen deathDetails={{ reason: 'story-timeout' }} wormTimeAlive={90}
     wormBodyTiles={12} wormHealedCount={0} wormTunnelCount={0} formatTime={n => `${n}s`} />));
   expect(host.textContent).toContain('Time’s up'); expect(host.textContent).toContain('Try a shorter route');

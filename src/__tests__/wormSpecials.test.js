@@ -1,3 +1,5 @@
+import { EXPLODE_DURATION, EXPLODE_AMOUNT } from '../worm/wormExpansion.js';
+import { tickExpansion } from '../worm/healerWorm/expansion.js';
 // Deterministic tests for the special power-ups (rocket / magnet).
 //
 // Same approach as wormSim.test.js: the sim is driven with fixed dt values and a
@@ -10,6 +12,7 @@ import {
   resetWormSim,
   stepWormSim,
   applyRotationToSim,
+  activateSpecial,
   startRocket,
   startMagnet,
   queueTurn,
@@ -24,6 +27,11 @@ import {
   SPECIAL_SPAWN_RETRY,
   ROCKET_DURATION,
   ROCKET_SPEED_MULT,
+  ROCKET_FLIGHT_TAKEOFF,
+  ROCKET_FLIGHT_LANDING,
+  ROCKET_BOOST_HANDOFF,
+  BOOST_DURATION,
+  BOOST_MULTIPLIER,
   MAGNET_DURATION,
   SURFACE_JUMP_HEIGHT,
   SURFACE_JUMP_TILE_SPAN,
@@ -88,6 +96,8 @@ function makeCtx(overrides = {}) {
     onPowerupsChanged: log('powerups'),
     applyHeal: log('heal'),
     onSpecialsChanged: log('specials'),
+    onExplodeState: log('explodeState'),
+    onExpansionAmount: log('expansion'),
     onRocketState: log('rocketState'),
     onMagnetState: log('magnetState'),
     onSpecialSpawned: log('specialSpawned'),
@@ -786,7 +796,7 @@ describe('special type chooser', () => {
     expect(sim.specialPicker.lastType).not.toBeNull();
     resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
     expect(sim.specialPicker.lastType).toBeNull();
-    expect(sim.specialPicker.bag).toHaveLength(0);
+    expect(sim.specialPicker.bag).toEqual(['explode']);
   });
 });
 
@@ -921,11 +931,22 @@ describe('spawn placement in the sim', () => {
 // ─── Rocket overdrive ────────────────────────────────────────────────────────
 
 describe('rocket overdrive', () => {
-  it('runs at double its former speed and clearly outruns boost', () => {
-    expect(ROCKET_SPEED_MULT).toBe(4);
+  it('keeps flight below double crawl speed for readable steering', () => {
+    expect(ROCKET_SPEED_MULT).toBeGreaterThan(1);
+    expect(ROCKET_SPEED_MULT).toBeLessThan(2);
   });
 
-  it('runs on the surface for three seconds and publishes one start/end pair', () => {
+  it('caps actual flight speed even when a boost was active at pickup', () => {
+    const sim = makeSim(), ctx = makeCtx({ getSpeed: () => 3.5 });
+    sim.boostActiveT = 3;
+    startRocket(sim, ctx);
+    for (let frame = 0; frame < 120; frame++) {
+      stepWormSim(sim, 1 / 60, SIZE, ctx);
+      expect(1 / sim.prevStepSec).toBeLessThanOrEqual(3.5 * ROCKET_SPEED_MULT + 1e-8);
+    }
+  });
+
+  it('runs for its full flight duration and publishes one start/end pair', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     startRocket(sim, ctx);
@@ -1126,6 +1147,67 @@ describe('buff readout (HUD presentation rules)', () => {
 });
 
 describe('rocket launch, refresh and touchdown continuity', () => {
+  it.each([1 / 60, 0.05])('smoothly restores a late boost after touchdown at dt=%s', (dt) => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION - 0.25, dt);
+    sim.boostActiveT = BOOST_DURATION;
+    let lastAirSpeed = 1 / sim.prevStepSec;
+    for (let frame = 0; sim.rocketActive && frame < 60; frame++) {
+      stepWormSim(sim, dt, SIZE, ctx);
+      if (sim.rocketActive) {
+        lastAirSpeed = 1 / sim.prevStepSec;
+        expect(lastAirSpeed).toBeLessThanOrEqual(ROCKET_SPEED_MULT + 1e-8);
+      }
+    }
+    expect(sim.rocketActive).toBe(false);
+    expect(1 / sim.prevStepSec).toBeCloseTo(lastAirSpeed, 8);
+    const boostAtLanding = sim.boostActiveT;
+    let previous = 1 / sim.prevStepSec;
+    for (let frame = 0; frame < Math.round(ROCKET_BOOST_HANDOFF / dt); frame++) {
+      stepWormSim(sim, dt, SIZE, ctx);
+      const speed = 1 / sim.prevStepSec;
+      expect(speed).toBeGreaterThanOrEqual(previous - 1e-8);
+      expect(speed - previous).toBeLessThan(0.16);
+      previous = speed;
+    }
+    expect(previous).toBeCloseTo(BOOST_MULTIPLIER, 8);
+    expect(sim.boostActiveT).toBeCloseTo(boostAtLanding - ROCKET_BOOST_HANDOFF, 8);
+  });
+  it('does not prolong a boost that expires during the landing handoff', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION - 0.1);
+    sim.boostActiveT = 0.25;
+    run(sim, ctx, 0.3);
+    expect(sim.rocketBoostHandoffT).toBeGreaterThan(0);
+    expect(sim.boostActiveT).toBe(0);
+    expect(1 / sim.prevStepSec).toBeCloseTo(1, 8);
+    expect(eventsOf(ctx, 'boost').map(e => e.args[0])).toEqual(['cooldown']);
+  });
+  it('freezes the handoff while paused and clears it on relaunch or reset', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, ROCKET_DURATION - 0.1);
+    sim.boostActiveT = BOOST_DURATION;
+    run(sim, ctx, 0.2);
+    const remaining = sim.rocketBoostHandoffT;
+    const speed = 1 / sim.prevStepSec;
+    expect(remaining).toBeGreaterThan(0);
+    run(sim, { ...ctx, isPaused: () => true }, 2);
+    expect(sim.rocketBoostHandoffT).toBe(remaining);
+    expect(1 / sim.prevStepSec).toBe(speed);
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.rocketBoostHandoffT).toBeCloseTo(remaining - 0.05, 8);
+    startRocket(sim, ctx);
+    expect(sim.rocketBoostHandoffT).toBe(0);
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(1 / sim.prevStepSec).toBeLessThanOrEqual(ROCKET_SPEED_MULT);
+    run(sim, ctx, ROCKET_DURATION);
+    expect(sim.rocketBoostHandoffT).toBeGreaterThan(0);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.rocketBoostHandoffT).toBe(0);
+  });
   it('ramps up instead of starting at full throttle', () => {
     const sim = makeSim(), ctx = makeCtx();
     startRocket(sim, ctx);
@@ -1136,21 +1218,21 @@ describe('rocket launch, refresh and touchdown continuity', () => {
     run(sim, ctx, ROCKET_DURATION / 2 - 0.1);
     expect(sim.rocketFlight).toBeCloseTo(1, 5);
   });
-  it('launches quickly, sustains cruise, and eases down only before touchdown', () => {
+  it('launches gradually, sustains cruise, and eases down only before touchdown', () => {
     const sim = makeSim(), ctx = makeCtx();
     startRocket(sim, ctx);
     run(sim, ctx, 0.15);
     const rising = rocketFlightLift(true, sim.rocketT, sim.rocketFlight);
     expect(rising).toBeGreaterThan(0);
     expect(rising).toBeLessThan(ROCKET_FLIGHT_HEIGHT);
-    run(sim, ctx, 0.35);
+    run(sim, ctx, ROCKET_FLIGHT_TAKEOFF - 0.15);
     expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeCloseTo(ROCKET_FLIGHT_HEIGHT);
-    run(sim, ctx, 1.8);
+    run(sim, ctx, ROCKET_DURATION - ROCKET_FLIGHT_TAKEOFF - ROCKET_FLIGHT_LANDING - 0.1);
     expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeCloseTo(ROCKET_FLIGHT_HEIGHT);
-    run(sim, ctx, 0.45);
+    run(sim, ctx, ROCKET_FLIGHT_LANDING / 2 + 0.1);
     expect(rocketFlightLift(true, sim.rocketT, sim.rocketFlight)).toBeLessThan(ROCKET_FLIGHT_HEIGHT);
     expect(sim.rocketActive).toBe(true);
-    run(sim, ctx, 0.3);
+    run(sim, ctx, ROCKET_FLIGHT_LANDING / 2 + 0.1);
     expect(rocketFlightLift(sim.rocketActive, sim.rocketT, sim.rocketFlight)).toBe(0);
   });
   it('refreshes fuel without resetting altitude, including during descent', () => {
@@ -1206,4 +1288,72 @@ it.each(['remote', 'head', 'glow'])('credits Story magnet catches for remote mag
   stepUntilCommit(sim, ctx);
   expect(eventsOf(ctx, 'pickup')).toHaveLength(kind === 'glow' ? 0 : 1);
   expect(events).toEqual(kind === 'remote' ? ['magnetOrbs'] : []);
+});
+
+
+describe('Explode pickup', () => {
+  it('offers Explode as the first ambient pickup, then uses all three types', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.specialTimer = 0;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.specials.find(s => !isElementalType(s.type))?.type).toBe('explode');
+    const types = new Set(Array.from({ length: 3 }, () => drawSpecialType(sim.specialPicker)));
+    expect(types).toEqual(new Set(['explode', 'rocket', 'magnet']));
+  });
+
+  it('requires contact at the tile center, even while magnet is active', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.specials = [special(2, 3, 4, 'PZ', 'explode')];
+    sim.magnetT = 8;
+    stepUntilCommit(sim, ctx);
+    run(sim, ctx, 0.9, 0.01);
+    expect(sim.explodeT).toBe(0);
+    expect(sim.specials).toHaveLength(1);
+    run(sim, ctx, 0.1, 0.01);
+    expect(sim.explodeT).toBe(EXPLODE_DURATION);
+    expect(sim.specials).toHaveLength(0);
+    expect(eventsOf(ctx, 'explodeState')).toEqual([{ type: 'explodeState', args: [true] }]);
+  });
+
+  it('opens gradually, refreshes without stacking, then closes completely', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    activateSpecial(sim, ctx, 'explode');
+    tickExpansion(sim, SIZE, 0.1, ctx);
+    expect(sim.expansionAmount).toBeGreaterThan(0);
+    expect(sim.expansionAmount).toBeLessThan(EXPLODE_AMOUNT);
+    for (let i = 0; i < 20; i++) tickExpansion(sim, SIZE, 0.1, ctx);
+    expect(sim.expansionAmount).toBe(EXPLODE_AMOUNT);
+    activateSpecial(sim, ctx, 'explode');
+    expect(sim.explodeT).toBe(EXPLODE_DURATION);
+    for (let i = 0; i < 140; i++) tickExpansion(sim, SIZE, 0.1, ctx);
+    expect(sim.explodeT).toBe(0);
+    expect(sim.expansionAmount).toBe(0);
+    expect(eventsOf(ctx, 'explodeState').at(-1).args).toEqual([false]);
+  });
+
+  it.each(['pause', 'jump', 'turn', 'tunnel', 'tail'])('holds geometry and countdown during %s', condition => {
+    const sim = makeSim(), ctx = makeCtx({ isPaused: () => condition === 'pause' });
+    activateSpecial(sim, ctx, 'explode');
+    if (condition === 'jump') sim.isJumping = true;
+    if (condition === 'turn') liveRotation.active = true;
+    if (condition === 'tunnel') sim.phase = 'tunnel';
+    if (condition === 'tail') sim.tunnelPassages.push({});
+    if (condition === 'pause') stepWormSim(sim, 0.05, SIZE, ctx);
+    else tickExpansion(sim, SIZE, 0.05, ctx);
+    expect(sim.explodeT).toBe(EXPLODE_DURATION);
+    expect(sim.expansionAmount).toBe(0);
+  });
+
+  it('clears the effect on a new run and leaves a dead simulation frozen', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    activateSpecial(sim, ctx, 'explode');
+    tickExpansion(sim, SIZE, 0.1, ctx);
+    const amount = sim.expansionAmount;
+    sim.alive = false;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.expansionAmount).toBe(amount);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.expansionAmount).toBe(0);
+    expect(sim.explodeT).toBe(0);
+  });
 });

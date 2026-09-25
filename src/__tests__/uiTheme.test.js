@@ -136,6 +136,7 @@ describe('font tokens', () => {
     expect(UI_CSS_VARS['--ui-font']).toBe(UI_FONT);
     expect(UI_CSS_VARS['--heading-font']).toBe(HEADING_FONT);
     expect(UI_CSS_VARS['--display-font']).toBe(DISPLAY_FONT);
+    expect(UI_CSS_VARS['--mono-font']).toBe(MONO_FONT);
   });
 
   // App.css declares the same two stacks as a pre-hydration fallback. They are
@@ -177,7 +178,7 @@ describe('stylesheets take their type from the tokens', () => {
   const ALLOWED_LITERALS = /'Bungee'|'Courier New'|ui-monospace|font-family: Arial,/;
   // A declared token, or one of the locally-scoped aliases a screen sets from
   // DISPLAY_FONT/HEADING_FONT before using it (--story-display, --wl-*).
-  const TOKEN = /var\(--(ui-font|heading-font|display-font|story-display|wl-[a-z-]+)\b/;
+  const TOKEN = /var\(--(ui-font|heading-font|display-font|mono-font|story-display|wl-[a-z-]+)\b/;
 
   it('never hardcodes a system font stack', () => {
     const offenders = [];
@@ -208,7 +209,7 @@ describe('stylesheets take their type from the tokens', () => {
     const offenders = [];
     for (const file of cssFiles('src')) {
       readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-        for (const ref of line.match(/var\(--(ui-font|heading-font|display-font|font-[a-z-]+)\b/g) ?? []) {
+        for (const ref of line.match(/var\(--(ui-font|heading-font|display-font|mono-font|font-[a-z-]+)\b/g) ?? []) {
           const name = ref.slice(4);
           if (!defined.has(name)) offenders.push(`${file}:${i + 1}  ${name} is never defined`);
         }

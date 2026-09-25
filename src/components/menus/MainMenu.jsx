@@ -1,6 +1,8 @@
 import WormWordmark from '../branding/WormWordmark.jsx';
 import { createModePlateArtwork } from '../../3d/modePlateArtwork.js';
 import '../ui/screenDesign.css';
+import './liveCubeCarousel.css';
+import { fitCarouselCube, carouselTurnScale } from './fitCarouselCube.js';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
 import { MENU_FLIP_PAIRS, flipMenuCenters } from './menuCenterPortals.js';
 import { carouselPlateGeometry } from './carouselPlateGeometry.js';
@@ -17,7 +19,7 @@ import bungeeWoffUrl from '@fontsource/bungee/files/bungee-latin-400-normal.woff
 // Warm troika's glyph atlas for the mode labels at module load so the first
 // face's label renders instantly instead of popping in a frame late.
 preloadFont(
-  { font: bungeeWoffUrl, characters: 'WORMCUBESTORYCHAOSRANDE' },
+  { font: bungeeWoffUrl, characters: 'WORMCUBETEACHOSRND' },
   () => {}
 );
 import { makeCubies } from '../../game/cubeState.js';
@@ -32,10 +34,8 @@ import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import MenuGridGlow from './MenuGridGlow.jsx';
 import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
-import { UI_FONT, DISPLAY_FONT, PAPER_SHEET, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_BG_MUTED, Z } from '../../utils/uiTheme.js';
-import { TOUCH_TARGET } from '../ui/Button.jsx';
+import { UI_FONT, Z } from '../../utils/uiTheme.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { progressManager } from '../../levels/ProgressManager.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -698,6 +698,8 @@ const FACE_TARGET_QUAT = {
 const _wobbleEuler = new THREE.Euler();
 const _wobbleQ = new THREE.Quaternion();
 const _presentQ = new THREE.Quaternion();
+const FACE_TARGETS = Object.values(FACE_TARGET_QUAT);
+const _parkedQ = new THREE.Quaternion();
 const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the camera
 
 // ─── Idle spin ───────────────────────────────────────────────────────────────
@@ -729,7 +731,7 @@ const DRIFT_NOD_RATE = 0.043; // rad/s — and tips, on a period that does not
 const DRIFT_NOD_AMP = 0.60; //   divide the yaw's, so the pose never quite repeats
 
 // ─── Menu cube scale ─────────────────────────────────────────────────────────
-// Grow both menu presentations by 5%, keeping each pose's existing proportions.
+// Home-screen cube scale. The carousel instead fits its measured stage.
 const MENU_CUBE_GROWTH = 1.05;
 const MENU_BUTTON_LIFT_PX = 24;
 const MENU_CUBE_ZOOM = 0.8 * MENU_CUBE_GROWTH;
@@ -747,12 +749,9 @@ const CUBE_HALF = 1.56;
 const SHADOW_DROP = 0.14;
 const SHADOW_SPREAD = 3.5;
 const SHADOW_SQUASH = 0.30;
-// How much of the grown stage is kept clear beneath the cube, in CSS pixels, so
-// the pool has somewhere to be. Read as a lift applied to the cube.
-const SHADOW_BAND_PX = 26;
-// Fraction of the stage's spare height the cube actually takes. The rest is what
-// keeps it off the dots below it.
-const STAGE_GAIN_DAMPING = 0.62;
+const _stageLook = new THREE.Matrix4();
+const _stageViewQ = new THREE.Quaternion();
+const _stageCenter = new THREE.Vector3();
 
 // Contact shadow: a soft dark pool the presented cube sits on. Without it the
 // cube floats in front of whatever photograph the scene picked, with nothing
@@ -795,7 +794,7 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
     const selected = getCarouselFace() || 'PZ';
     for (const [face, material] of Object.entries(enamelRefs.current)) {
       if (!material) continue;
-      targetColor.copy(faceColors[face]).multiplyScalar(face === selected ? 1 : 0.55);
+      targetColor.copy(faceColors[face]).multiplyScalar(face === selected ? 1 : 0.72);
       material.color.lerp(targetColor, 1 - Math.exp(-8 * delta));
       material.roughness = face === selected ? 0.3 : 0.55;
       material.clearcoat = face === selected ? 1 : 0.25;
@@ -825,8 +824,8 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               <meshPhysicalMaterial ref={material => { enamelRefs.current[m.face] = material; }} color={m.tileColor} metalness={0.08} roughness={0.3}
                 clearcoat={1} clearcoatRoughness={0.2} envMapIntensity={0.3} />
             </mesh>
-            {decals[m.id] && <mesh position={[0, 0.46, 0.035]} renderOrder={33}>
-              <planeGeometry args={[1.95, 1.95]} />
+            {decals[m.id] && <mesh position={[0, 0.36, 0.045]} renderOrder={33}>
+              <planeGeometry args={[2.35, 2.35]} />
               <meshBasicMaterial map={decals[m.id]} transparent depthWrite={false} toneMapped={false} />
             </mesh>}
             {/* Keep the illustration and give each face a legible arcade title. */}
@@ -838,7 +837,7 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               color={m.textColor}
               anchorX="center"
               anchorY="middle"
-              outlineWidth={0.012}
+              outlineWidth={0.02}
               outlineColor={m.textColor === '#fffdf2' ? '#162035' : '#f4f1e8'}
               renderOrder={34}
             >
@@ -891,52 +890,26 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 
     if (carouselActive) {
       updateSharedTime(t);
+      // Fit the physical cube to the transparent DOM stage, including scrolling
+      // disclosures and landscape layouts. Both use the measured rectangle.
+      const fit = fitCarouselCube(state.camera, state.size, getCarouselStage());
+      const presentY = fit.y;
+      const presentScale = fit.scale;
+      _stageCenter.set(fit.x, fit.y, 0);
+      _stageLook.lookAt(state.camera.position, _stageCenter, state.camera.up);
+      _stageViewQ.setFromRotationMatrix(_stageLook);
       // Present the active mode's face: slerp toward its target orientation
       // with a slow breathing wobble so the cube stays alive while parked.
       const face = getCarouselFace() || 'PZ';
       _wobbleEuler.set(
-        -0.13 + Math.sin(t * 0.65) * 0.012,
-        0.20 + Math.sin(t * 0.5 + 1.7) * 0.016,
+        0.18 + Math.sin(t * 0.65) * 0.018,
+        0.30 + Math.sin(t * 0.5 + 1.7) * 0.022,
         0
       );
       _wobbleQ.setFromEuler(_wobbleEuler);
       _presentQ.multiplyQuaternions(_wobbleQ, FACE_TARGET_QUAT[face] ?? FACE_TARGET_QUAT.PZ);
+      _presentQ.premultiply(_stageViewQ);
       cubeRef.current.quaternion.slerp(_presentQ, 1 - Math.exp(-6 * delta));
-
-      // Lift the cube clear of the info panel/PLAY button below. On portrait
-      // (phone) screens the cube renders much larger and the panel eats more of
-      // the viewport, so raise it further and shrink it a touch there.
-      const portrait = state.size.height > state.size.width;
-      // On portrait (phone) the presented mode cube sits higher with a large empty
-      // gap below it, so drop it down into that space and size it up ~10%.
-      let presentY = portrait ? 1.75 : 1.2;
-      let presentScale = (portrait ? 0.79 : 1.0) * MENU_CUBE_GROWTH;
-
-      // Grow into whatever height the DOM stage actually claimed. The overlay
-      // measures itself and posts { height, baseline } (see menuCarouselState);
-      // scaling by their ratio means a stage that did not grow reproduces the
-      // framing above exactly, and only genuine free space changes anything.
-      //
-      // The stage's top edge is pinned by the header, so all of its growth
-      // happens below: its centre drops by half the gain, and the cube follows
-      // it down rather than drifting up out of its own window.
-      const stage = getCarouselStage();
-      const worldPerPx = state.viewport.height / state.size.height;
-      if (stage && stage.baseline > 0 && stage.height > stage.baseline) {
-        // Damped, not one-for-one. The cube's bottom edge already sat right on
-        // the face-colour dots at the old size, so handing it every pixel of the
-        // gain walks it straight through them — and leaves nothing underneath
-        // for the shadow that is supposed to ground it.
-        const gain = Math.min(stage.height / stage.baseline, MAX_STAGE_GROWTH);
-        const damped = 1 + (gain - 1) * STAGE_GAIN_DAMPING;
-        presentScale *= damped;
-        const grownPx = stage.baseline * (damped - 1);
-        presentY -= (grownPx / 2) * worldPerPx;
-      }
-      // Float the cube just clear of the stage floor so the contact shadow has a
-      // band to live in. Without this the pool renders behind the description
-      // card, where it grounds nothing.
-      presentY += (SHADOW_BAND_PX - 32) * worldPerPx;
 
       // The selector can open after the cube has been off-screen for a long
       // game. Snap to the requested face on entry instead of showing a frame
@@ -948,7 +921,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         cubeRef.current.scale.setScalar(cubeCurrentScale.current);
       }
       carouselWasActive.current = true;
-      cubeRef.current.position.set(0, presentY + Math.sin(t * 0.8) * 0.045, 0);
+      cubeRef.current.position.set(fit.x, presentY + Math.sin(t * 0.8) * 0.025, 0);
 
       // Park the contact shadow under the cube. It tracks the cube's settled
       // scale rather than its bobbing Y, so the pool stays put on the floor and
@@ -956,7 +929,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       if (shadowRef.current) {
         const settled = cubeCurrentScale.current;
         shadowRef.current.visible = true;
-        shadowRef.current.position.set(0, presentY - CUBE_HALF * settled - SHADOW_DROP * settled, -0.2);
+        shadowRef.current.position.set(fit.x, presentY - CUBE_HALF * settled - SHADOW_DROP * settled, -0.2);
         shadowRef.current.scale.set(SHADOW_SPREAD * settled, SHADOW_SPREAD * SHADOW_SQUASH * settled, 1);
       }
 
@@ -981,8 +954,18 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
           }
         }
       } else {
+        // Ease back while turning between faces so the wider mid-turn
+        // silhouette stays on a phone screen; parked, it is full size.
         cubeCurrentScale.current += (1.022 * presentScale - cubeCurrentScale.current) * Math.min(1, delta * 10);
-        cubeRef.current.scale.setScalar(cubeCurrentScale.current);
+        // Ease back while between faces so the wider mid-turn silhouette stays
+        // on a phone screen. Measured from this frame's pose (nearest parked
+        // face), so the shrink moves in lockstep with the rotation.
+        let fromFace = Math.PI;
+        if (fit.turnPullback) for (const target of FACE_TARGETS) {
+          _parkedQ.multiplyQuaternions(_wobbleQ, target).premultiply(_stageViewQ);
+          fromFace = Math.min(fromFace, cubeRef.current.quaternion.angleTo(_parkedQ));
+        }
+        cubeRef.current.scale.setScalar(cubeCurrentScale.current * carouselTurnScale(fromFace, fit.turnPullback));
       }
       return;
     }
@@ -1145,12 +1128,9 @@ const CAROUSEL_MODES = [
     cta: 'PLAY',
   },
   {
-    id: 'cube', label: 'STORY', face: 'PX',
-    // No chapter count in the copy: it said "ten" while the campaign has had
-    // twelve for some time. The chip carries the number now, derived from the
-    // level data (see chipsFor) so it cannot drift again.
-    how: 'Clear a chapter to unlock the next one.',
-    chips: ['Campaign', 'Guided'],
+    id: 'cube', label: 'TEACH', face: 'PX',
+    how: 'Learn to solve a cube, one move at a time.',
+    chips: ['3×3', 'Step by step'],
     cta: 'PLAY',
   },
   {
@@ -1178,12 +1158,7 @@ const LAST_MODE_KEY = 'worm3_last_mode_id';
 // ─── Per-mode stats ──────────────────────────────────────────────────────────
 // What the card can honestly say about your history with a mode.
 //
-// Almost nothing is recorded per mode anywhere in the game: STORY has real
-// progress through ProgressManager, STORE has the wallet and your purchases,
-// and every other mode has only the play count this menu itself keeps (see
-// modesSlice's modePlays). So rather than invent a stat line per mode, each one
-// reports whichever of those it actually has, and a mode you have never opened
-// says so instead of showing a row of zeroes.
+// Teach shows its method; Store shows the wallet; other modes show recorded plays.
 const RELATIVE_DAY = [
   [0, 'Today'],
   [1, 'Yesterday'],
@@ -1198,23 +1173,8 @@ const lastPlayedLabel = (ts, now = Date.now()) => {
   return 'A while ago';
 };
 
-/**
- * Two short facts for a mode's card, or an empty list when there is nothing
- * true to say yet.
- *
- * @param mode     the CAROUSEL_MODES entry
- * @param ctx      { plays, story: { completed, total, stars }, points, owned }
- * @returns        [{ label, value }] — at most two
- */
-/**
- * The mode's chips, with any count resolved against live data rather than
- * hardcoded. STORY is the one that needs it — its chapter count is level data,
- * and the description used to state it from memory and be wrong.
- */
-export function chipsFor(mode, ctx) {
-  if (mode.id === 'cube' && ctx?.story?.total > 0) {
-    return [`${ctx.story.total} chapters`, ...mode.chips.slice(1)];
-  }
+// Campaign stars are deliberately not presented as Teach progress.
+export function chipsFor(mode, _ctx) {
   return mode.chips;
 }
 
@@ -1222,11 +1182,7 @@ export function modeStatItems(mode, ctx) {
   const play = ctx.plays?.[mode.id];
   const stats = [];
 
-  if (mode.id === 'cube') {
-    stats.push({ label: 'Chapters', value: `${ctx.story.completed}/${ctx.story.total}` });
-    if (ctx.story.stars > 0) stats.push({ label: 'Stars', value: `${ctx.story.stars}★` });
-    return stats;
-  }
+  if (mode.id === 'cube') return [{ label: 'Method', value: 'Beginner 3×3' }];
 
   if (mode.id === 'store') {
     stats.push({ label: 'Balance', value: `${ctx.points.toLocaleString()} PP` });
@@ -1241,23 +1197,9 @@ export function modeStatItems(mode, ctx) {
   return stats;
 }
 
-// ─── Cube stage sizing ───────────────────────────────────────────────────────
-// The height the cube window gets before it is allowed to grow. These are the
-// values the stylesheet used to hold; they moved into JS so the DOM measurement
-// and the 3D cube's scale are driven by one source of truth rather than by a
-// media query one side cannot read.
-const stageBaselineFor = (w, h) => (w <= 600 ? Math.min(0.45 * h, 395) : Math.min(0.47 * h, 415));
-// A ceiling on how far the stage may stretch. Without it a very tall, narrow
-// window would hand the cube the whole column and crowd the controls it is
-// supposed to be giving room to.
-const MAX_STAGE_GROWTH = 1.45;
-
 // ─── Mode carousel overlay ───────────────────────────────────────────────────
-// Clean, single-card implementation. No overlapping absolutely-positioned tiles,
-// no CSS transform transitions on positioned elements → no GPU compositor ordering
-// issues on mobile Chrome.
-
-export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon }) => {
+// Controls frame the live cube. The stage has no DOM artwork or opaque panel.
+export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onSettings }) => {
   // Open on the last-played mode so returning players are one tap from their game.
   const [activeIndex, setActiveIndex] = useState(() => {
     try {
@@ -1268,27 +1210,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   const [show, setShow] = useState(true);
   const [diving, setDiving] = useState(false);
 
-  // Stats for the card. STORY's progress lives outside the store in
-  // ProgressManager, so it is read once on open rather than subscribed to —
-  // nothing can complete a chapter while this overlay is up.
   const modePlays = useGameStore(s => s.modePlays);
   const parityPoints = useGameStore(s => s.parityPoints);
   const ownedItems = useGameStore(s => s.ownedItems);
   const recordModePlay = useGameStore(s => s.recordModePlay);
-  // STORY's progress lives outside the store, in ProgressManager. Read once on
-  // open rather than subscribed to: nothing can complete a chapter while this
-  // overlay is up. A static import costs nothing here — useLevelSystem already
-  // puts the level catalogue on the initial route — and reading it synchronously
-  // avoids the chip visibly changing from its placeholder a frame later.
-  const storyProgress = useMemo(() => {
-    try {
-      const summary = progressManager.getProgressSummary();
-      return { completed: summary.completedLevels, total: summary.totalLevels, stars: summary.totalStars };
-    } catch {
-      return { completed: 0, total: 0, stars: 0 };
-    }
-  }, []);
-
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
   const animatingRef = useRef(false);
@@ -1358,7 +1283,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   // the dive request and fires the callback when the face fills the screen;
   // a fallback timer launches anyway if the canvas is unavailable.
   const handlePlay = useCallback(() => {
-    if (divingRef.current) return;
+    if (animatingRef.current || divingRef.current) return;
     divingRef.current = true;
     setDiving(true);
     vibrate(18);
@@ -1378,63 +1303,48 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     const fn = (e) => {
       if (e.key === 'ArrowLeft') navigate(-1);
       if (e.key === 'ArrowRight') navigate(1);
-      if (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a, input, select, textarea'))) handlePlay();
+      if (e.key === 'Enter' && !(e.target instanceof Element && e.target.closest('button, a, input, select, textarea, summary, [contenteditable="true"]'))) handlePlay();
       if (e.key === 'Escape') onBack();
     };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
   }, [navigate, handlePlay, onBack]);
 
-  // The stage measures itself and posts its height to the cube behind it. A
-  // ResizeObserver rather than a resize listener: the height is flex-derived, so
-  // it also changes when something else in the column grows (a longer mode
-  // description, a stat row appearing), not only when the window resizes.
+  // A stage's location can move without its size changing (e.g. a disclosure
+  // opened in landscape), so observe the column too, and publish on scrolling.
   const stageRef = useRef(null);
-  const [stageBaseline, setStageBaseline] = useState(
-    () => stageBaselineFor(window.innerWidth, window.innerHeight)
-  );
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
     const publish = () => {
-      const baseline = stageBaselineFor(window.innerWidth, window.innerHeight);
-      setStageBaseline(baseline);
-      setCarouselStage({ height: el.getBoundingClientRect().height, baseline });
+      const { left, top, width, height } = el.getBoundingClientRect();
+      setCarouselStage({ left, top, width, height });
     };
     publish();
     const ro = new ResizeObserver(publish);
     ro.observe(el);
+    ro.observe(el.parentElement);
     window.addEventListener('resize', publish);
+    window.addEventListener('scroll', publish, true);
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', publish);
-      // Leave no stale height behind: the cube reads this on its next carousel
-      // frame, and a measurement from a closed overlay is not a stage.
+      window.removeEventListener('scroll', publish, true);
       setCarouselStage(null);
     };
   }, []);
 
   const mode = CAROUSEL_MODES[activeIndex];
-  const modeChips = useMemo(() => chipsFor(mode, { story: storyProgress }), [mode, storyProgress]);
+  const modeChips = useMemo(() => chipsFor(mode), [mode]);
   const statItems = useMemo(
     () => modeStatItems(mode, {
       plays: modePlays,
-      story: storyProgress,
       points: parityPoints ?? 0,
       owned: ownedItems?.length ?? 0,
     }),
-    [mode, modePlays, storyProgress, parityPoints, ownedItems]
+    [mode, modePlays, parityPoints, ownedItems]
   );
   const opacity = show ? 1 : 0;
-
-  const arrowStyle = {
-    background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
-    borderRadius: '50%', width: '48px', height: '48px', flexShrink: 0,
-    color: PAPER_TEXT, fontSize: '24px', lineHeight: 1,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-    pointerEvents: 'auto',
-  };
 
   const swipeHandlers = {
     onTouchStart: e => { touchStartX.current = e.touches[0].clientX; },
@@ -1454,147 +1364,51 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     onMouseLeave: () => { mouseStartX.current = null; },
   };
 
+  const actionLabel = mode.id === 'cube' ? 'Learn to solve' : mode.id === 'store' ? 'Open store' : `Play ${mode.label}`;
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: Z.MENU, overflowY: 'auto' }}>
+    <div className="live-carousel" style={{ zIndex: Z.MENU, '--mode-accent': mode.tileColor, '--mode-ink': mode.textColor }}>
+      <div className="live-carousel-layout" style={{ opacity: diving ? 0 : 1, pointerEvents: diving ? 'none' : 'auto' }} inert={diving ? '' : undefined}>
+        <header className="lc-header">
+          <button type="button" className="lc-icon-button" aria-label="Back to main menu" onClick={onBack}>‹</button>
+          <WormWordmark />
+          {onSettings && <button type="button" className="lc-icon-button" aria-label="Settings" onClick={onSettings}>
+            <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 2 3-1 1-3 3-1 2-3-2-2 1-3-3-2-3 1-2-2Z" strokeLinejoin="round" />
+              <circle cx="12" cy="11" r="3" />
+            </svg>
+          </button>}
+        </header>
+        <h1 className="lc-heading">Choose your mode</h1>
 
-      {/* Edge vignette only — the center stays clear so the live 3D cube
-          (rotating to the active mode's face) reads through the overlay.
-          It had stopped being an edge: 0.78 opaque by 74% of the radius and
-          0.97 at the corner, which is past a frame and into fog. It washed the
-          backdrop out to near-paper and left the edges of the screen BRIGHTER
-          than its middle, the opposite of what a vignette is for. The controls
-          do not depend on it — the pills, arrows and card all carry their own
-          PAPER_SHEET backgrounds — so it only has to soften the photo where it
-          meets the frame. */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle at 50% 38%, rgba(245,240,232,0) 0%, rgba(245,240,232,0) 55%, rgba(245,240,232,0.30) 86%, rgba(245,240,232,0.62) 100%)',
-      }} />
-
-      <style>{`
-        .mc-arrow:active { background: #ede8df !important; }
-        /* Keep utility actions comfortable to tap on phones. */
-        .mc-pill         { min-height: 48px; }
-        .mc-pill:hover   { filter: brightness(1.14); }
-        .mc-pill:active  { transform: scale(0.97); }
-      `}</style>
-
-      {/* Scroll column — DOM fades out during the PLAY dive so the cube face
-          filling the screen is the only thing left on it. */}
-      <div style={{
-        position: 'relative', zIndex: 1,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        minHeight: '100%', boxSizing: 'border-box',
-        paddingTop: 'max(20px, env(safe-area-inset-top, 20px))',
-        paddingBottom: `calc(max(20px, env(safe-area-inset-bottom, 20px)) + ${MENU_BUTTON_LIFT_PX}px)`,
-        paddingLeft: '12px', paddingRight: '12px',
-        opacity: diving ? 0 : 1,
-        transition: 'opacity 420ms ease',
-        pointerEvents: diving ? 'none' : 'auto',
-      }}>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: 'min(560px, 100%)', minHeight: 48 }}>
-            <button
-              type="button" className="mc-pill" onClick={onBack}
-              style={{
-                background: PAPER_SHEET, border: `1.5px solid ${PAPER_BORDER}`,
-                borderRadius: '100px', padding: '8px 18px',
-                color: PAPER_TEXT, fontSize: '11.5px', fontWeight: 700,
-                letterSpacing: "0.01em", cursor: 'pointer', fontFamily: MENU_FONT,
-                transition: 'filter 160ms ease, background 160ms ease',
-                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-              }}
-            >Back</button>
-        <p style={{ margin: 0, fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: PAPER_TEXT, fontFamily: UI_FONT, background: PAPER_SHEET, border: `1px solid ${PAPER_BORDER}`, borderRadius: '100px', padding: '8px 16px' }}>
-          Play
-        </p>
+        <div {...swipeHandlers} ref={stageRef} className="mc-cube-window" role="group" aria-label="Rotating cube mode selector">
+          <span className="lc-sr-only" role="status" aria-live="polite">{mode.label} mode, {activeIndex + 1} of {N}</span>
+          <button type="button" className="lc-icon-button lc-previous" aria-label="Previous mode" disabled={!show || diving} onClick={() => navigate(-1)}>‹</button>
+          <button type="button" className="lc-icon-button lc-next" aria-label="Next mode" disabled={!show || diving} onClick={() => navigate(1)}>›</button>
         </div>
 
-        {/* Cube window — transparent stage for the live 3D cube behind this
-            overlay. Swipe here (or use the arrows) to rotate the cube from
-            face to face; every mode owns one of the six faces. */}
-        <div
-          {...swipeHandlers}
-          ref={stageRef}
-          className="mc-cube-window"
-          style={{
-            position: 'relative', width: 'min(560px, 96vw)', marginTop: 16,
-            // The stage used to be a fixed height that refused to shrink, so a
-            // tall viewport's leftover pixels fell past it and pooled as dead
-            // space above PLAY. Growing into that space is what turns the gap
-            // into a bigger cube. The old height stays as the floor, so nothing
-            // about a short screen changes.
-            flex: '1 1 auto', minHeight: stageBaseline, maxHeight: stageBaseline * MAX_STAGE_GROWTH,
-            userSelect: 'none', touchAction: 'pan-y',
-          }}
-        >
-          <button type="button" className="mc-arrow" aria-label="Previous mode" onClick={() => navigate(-1)}
-            style={{ ...arrowStyle, position: 'absolute', left: '2px', top: '50%', transform: 'translateY(-50%)' }}>&lsaquo;</button>
-          <button type="button" className="mc-arrow" aria-label="Next mode" onClick={() => navigate(1)}
-            style={{ ...arrowStyle, position: 'absolute', right: '2px', top: '50%', transform: 'translateY(-50%)' }}>&rsaquo;</button>
-        </div>
-
-        {/* Face map — one colored tile per cube face, tap to jump */}
-        {/* The gap moves onto the buttons as transparent padding so the tap
-            targets tile edge to edge instead of leaving 8px dead gutters
-            between 12px dots. The coloured bar inside is unchanged, so the
-            row looks identical — it is only the hit area that grows. */}
-        <div style={{ display: 'flex', gap: 0, alignItems: 'center', marginTop: 0 }}>
-          {CAROUSEL_MODES.map((m, i) => (
-            <button
-              key={m.id} type="button" aria-label={`Show ${m.label} mode`} aria-current={i === activeIndex ? "true" : undefined} title={m.label}
-              onClick={() => selectIndex(i)}
-              className="ui-focusable"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                height: TOUCH_TARGET, padding: '0 4px',
-                background: 'none', border: 'none', borderRadius: '8px',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-              }}
-            >
-              <span
-                style={{
-                  display: 'block',
-                  width: i === activeIndex ? '26px' : '12px', height: '12px',
-                  borderRadius: '4px',
-                  background: m.tileColor,
-                  // No dimming at all. 0.45 pushed every inactive dot toward the
-                  // scene behind it — the yellow face read as mustard, red and
-                  // orange collapsed into one brown, and the white face came out
-                  // grey, which is the one colour that cannot survive being
-                  // faded. The active dot is already marked by width and outline,
-                  // so opacity was carrying no load the shape was not.
-                  opacity: 1,
-                  boxShadow: i === activeIndex ? `0 0 0 2px ${PAPER_TEXT}` : `0 0 0 1px ${PAPER_BORDER}`,
-                  transition: 'width 200ms ease, opacity 200ms ease',
-                }}
-              />
-            </button>
-          ))}
-        </div>
-
-        <div className="mc-mode-copy" style={{ opacity, transition: 'opacity 150ms ease', '--mode-accent': mode.tileColor }}>
-          <article aria-label={`${mode.label} mode details`}>
-            <header><div><h2>{mode.label}</h2></div><span aria-hidden="true" /></header>
-            <div className="mc-mode-facts">{modeChips.map(chip => <span key={chip}>{chip}</span>)}</div>
+        <div className="lc-footer">
+          <nav className="lc-face-map" aria-label="Game modes">
+            {CAROUSEL_MODES.map((m, i) => (
+              <button key={m.id} type="button" aria-label={`Show ${m.label} mode`} aria-current={i === activeIndex ? 'true' : undefined}
+                title={m.label} onClick={() => selectIndex(i)} disabled={!show || diving} style={{ '--face-color': m.tileColor }}>
+                <span />
+              </button>
+            ))}
+          </nav>
+          <p className="lc-swipe-hint">Swipe the cube to explore</p>
+          <article className="lc-info" aria-label={`${mode.label} mode details`} style={{ opacity }}>
+            <div className="lc-facts">{modeChips.map(chip => <span key={chip}>{chip}</span>)}</div>
             <details key={mode.id}>
-              <summary className="ui-focusable">{mode.id === 'store' ? 'GEAR & REWARDS' : 'HOW TO PLAY'}</summary>
+              <summary>{mode.id === 'store' ? 'GEAR & REWARDS' : 'HOW TO PLAY'}</summary>
               <p>{mode.how}</p>
-              {statItems.length > 0 && <div className="mc-mode-history">{statItems.map(stat => <div key={stat.label}><strong>{stat.value}</strong><small>{stat.label}</small></div>)}</div>}
+              {statItems.length > 0 && <div className="lc-history">{statItems.map(stat => <div key={stat.label}><strong>{stat.value}</strong><small>{stat.label}</small></div>)}</div>}
             </details>
           </article>
+          <button type="button" className="lc-play" onClick={handlePlay} disabled={!show || diving}>
+            <span aria-hidden="true"><MenuCubeGlyph /></span><span>{actionLabel}</span><span aria-hidden="true">→</span>
+          </button>
         </div>
-
-        {/* Bottom action area grows into the available space on tall phones. */}
-        <div style={{ width: 'min(400px, 94vw)', marginTop: 'auto', paddingTop: 12 }}>
-          <button
-            type="button" className="mc-play" onClick={handlePlay}
-            style={{ '--play-color': mode.tileColor, '--play-ink': mode.textColor, fontFamily: DISPLAY_FONT }}
-          ><span className="worm-cta-emblem"><MenuCubeGlyph /></span><span className="worm-cta-label">{mode.cta || "Play"}</span><span className="worm-cta-glyph" aria-hidden="true">→</span></button>
-
-
-        </div>
-
       </div>
     </div>
   );

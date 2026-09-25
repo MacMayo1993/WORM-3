@@ -115,7 +115,7 @@ export function ColorsPanel({ settings, onSettingsChange, faceImages, onFaceImag
     <>
       {/* Color Scheme */}
       <section className="settings-section">
-        <h3 className="settings-section-title">Color Scheme</h3>
+        <h3 className="settings-section-title">Color scheme</h3>
         <div className="settings-radio-group scheme-grid">
           {Object.keys(SCHEME_LABELS).map(key => {
             const owned = schemeOwned(key);
@@ -124,7 +124,7 @@ export function ColorsPanel({ settings, onSettingsChange, faceImages, onFaceImag
               <label key={key}
                 className={`settings-radio${active ? ' active' : ''}${!owned ? ' locked' : ''}`}
                 style={!owned ? { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' } : {}}
-                title={!owned ? `Locked — buy in Parity Store` : undefined}
+                title={!owned ? 'Locked. Unlock it in the Store' : undefined}
               >
                 <input type="radio" name="colorScheme" value={key}
                   checked={active}
@@ -151,7 +151,7 @@ export function ColorsPanel({ settings, onSettingsChange, faceImages, onFaceImag
       {/* Custom Colors — only shown when custom scheme is active */}
       {settings.colorScheme === 'custom' && (
         <section className="settings-section">
-          <h3 className="settings-section-title">Custom Colors</h3>
+          <h3 className="settings-section-title">Custom colors</h3>
           <div className="image-upload-area">
             <input ref={fileInputRef} type="file" accept="image/*"
               onChange={handleImageUpload} style={{ display: 'none' }} />
@@ -184,7 +184,7 @@ export function ColorsPanel({ settings, onSettingsChange, faceImages, onFaceImag
 
       {/* Face Textures */}
       <section className="settings-section">
-        <h3 className="settings-section-title">Face Textures</h3>
+        <h3 className="settings-section-title">Face textures</h3>
         <p className="settings-hint">Upload an image to map onto a cube face</p>
         <div className="face-texture-grid">
           {[1, 2, 3, 4, 5, 6].map(faceId => (

@@ -138,11 +138,11 @@ const TopMenuBar = ({
             <ParityWallet dark neutral />
             <dl className="instrument-stats">
               <div><dt>Flips</dt><dd>{metrics?.flips ?? 0}</dd></div>
-              <div><dt>Wormholes</dt><dd>{metrics?.wormholes ?? 0}</dd></div>
+              <div title="Tiles showing their twin’s color right now"><dt>Flipped tiles</dt><dd>{metrics?.wormholes ?? 0}</dd></div>
               {chaosStats && <>
                 <div><dt>Active tiles</dt><dd>{chaosStats.flipPct}%</dd></div>
-                <div><dt>Disparity</dt><dd>{chaosStats.disparityPct}%</dd></div>
-                <div title={`Flip cap: ${flipCap}`}><dt>Dead tiles</dt><dd>{chaosStats.deadTiles}</dd></div>
+                <div title="Tiles not showing their original color"><dt>Off-color</dt><dd>{chaosStats.disparityPct}%</dd></div>
+                <div title={`A tile is spent after ${flipCap} flips`}><dt>Spent tiles</dt><dd>{chaosStats.deadTiles}</dd></div>
                 <div><dt>Bolts</dt><dd>{cascadeCount}/{MAX_CASCADES}</dd></div>
               </>}
             </dl>

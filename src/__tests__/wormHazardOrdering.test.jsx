@@ -5,6 +5,7 @@ import { makeWormSim, resetWormSim, killWormSim } from '../worm/healerWorm/wormS
 import { makeCubies } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
+import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 
 let frameCb, worm, tree;
 const scene = {};
@@ -61,6 +62,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetLiveRotation();
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
@@ -115,13 +117,28 @@ it('holds bombs and the rotation countdown through a rescue and its release fram
   expect(bomb.fuse).toBeCloseTo(0.2);
 });
 
+it('clears rotation framing metadata when a bomb severs the tail', () => {
+  sim.tailLength = 80;
+  sim.cutFocusSlice = { axis: 'row', layer: 1 };
+  checkBlastHitWorm.mockReturnValueOnce({ type: 'cut', cutTrailIdx: 1 });
+  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  props.bombsRef.current.push({ id: 4, tile: { ...sim.pos }, fuse: 0.001, maxFuse: 5 });
+  tick();
+  expect(useGameStore.getState().wormAlive).toBe(true);
+  expect(sim.cutFocusT).toBeGreaterThan(0);
+  expect(sim.cutFocusPos).not.toBeNull();
+  expect(sim.cutFocusSlice).toBeNull();
+});
+
 it('severs a fatal slice hit and stops the turn before it can drag the dead body apart', () => {
+  const impactPosition = [-1.58, 0, 0.5];
+  expect(sim.headInterpPos.toArray()).not.toEqual(impactPosition);
   resolveSliceHits.mockReturnValueOnce({ type: 'death', sliceIndex: 1,
     cutTrailIdx: 1, cutDistance: 0.2, keepCount: 2, historyIndex: 0, historyT: 0.5,
-    cutPosition: sim.headInterpPos.toArray() });
+    cutPosition: impactPosition });
   tick(110);
   expect(useGameStore.getState().wormAlive).toBe(false);
-  expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'slice-rotation', sliceIndex: 1 });
+  expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'slice-rotation', sliceIndex: 1, impactPosition });
   expect(sim.tailLength).toBe(2);
   expect(sim.stepHistory.count).toBe(1);
   expect(rotate).not.toHaveBeenCalled();
@@ -142,7 +159,7 @@ it.each([1, 2, 3])('keeps story level %i free of ambient bombs, rotations and or
   expect(props.bombsRef.current).toHaveLength(0);
 });
 
-it.each([[4,10], [5,10], [6,8]])('repeats the full warned cycle for story level %i at %is intervals and holds it while paused', (id, interval) => {
+it.each([[4,14], [5,14], [6,11]])('repeats the full warned cycle for story level %i at %is intervals and holds it while paused', (id, interval) => {
   act(() => {
     useGameStore.setState({ playerProgress: { ...useGameStore.getState().playerProgress, wormStory: { stars: {1:1,2:1,3:1,4:1,5:1}, claimed: {} } } });
     useGameStore.getState().initWormMode(undefined, undefined, 1.4, 1, 30, null, false, false, id);
@@ -195,4 +212,62 @@ it('Book freezes only the layer countdown and resumes the same pending turn', ()
   sim.signature.active = 0;
   tick(21);
   expect(rotate).toHaveBeenCalledTimes(1);
+});
+
+it('publishes the impact effect once for a death caused during the live rotation', async () => {
+  const { ThunkEffect } = await import('../worm/healerWorm/impactFx.jsx');
+  const details = { reason: 'slice-rotation', liveCrossing: true, axis: 'row', sliceIndex: 1, impactPosition: [1,2,3] };
+  worm.tick.mockImplementationOnce(() => worm.killWorm(details));
+  tick();
+  const effect = React.Children.toArray(tree.props.children).find(child => child.type === ThunkEffect).props.thunkRef;
+  expect(effect.current).toMatchObject({ active: true, text: "WORM'D", pos: [1,2,3] });
+  effect.current.active = false;
+  tick(5);
+  expect(effect.current.active).toBe(false);
+  expect(rotate).not.toHaveBeenCalled();
+});
+
+// The hazard's own tween holds store.animState for its whole length. The early-turn
+// watch has to run through it, and must not outlive the commit.
+const COORD = { col: 'x', row: 'y', depth: 'z' };
+function fireHazardWithHeadOff() {
+  tick(95); // armed: the clock publishes the threatened layer
+  const { axis, sliceIndex: layer } = rotationClock;
+  const coord = COORD[axis], off = (layer + 1) % 3;
+  sim.pos = { ...sim.pos, [coord]: off }; sim.prevTile = { ...sim.pos }; sim.interpT = 1;
+  tick(15);
+  expect(rotate).toHaveBeenCalledTimes(1);
+  expect(resolveSliceHits).toHaveBeenCalledTimes(1); // the fire-time decision
+  return { axis, layer, coord, off };
+}
+const stepOnto = ({ coord, off, layer }) => {
+  sim.prevTile = { ...sim.pos, [coord]: off }; sim.pos = { ...sim.pos, [coord]: layer }; sim.interpT = 0.6;
+};
+
+it('resolves a head that steps onto the turning layer early in the hazard tween', () => {
+  const turn = fireHazardWithHeadOff();
+  act(() => useGameStore.setState({ animState: { axis: turn.axis, sliceIndex: turn.layer, dir: 1 } }));
+  setLiveRotation(turn.axis, [turn.layer], [0.02], turn.layer, 0.02);
+  tick();
+  expect(resolveSliceHits).toHaveBeenCalledTimes(1);
+  resolveSliceHits.mockReturnValueOnce({ type: 'death', sliceIndex: turn.layer, cutTrailIdx: 1,
+    cutPosition: sim.headInterpPos.toArray() });
+  stepOnto(turn);
+  tick();
+  expect(resolveSliceHits).toHaveBeenCalledTimes(2);
+  expect(useGameStore.getState().wormAlive).toBe(false);
+  expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'slice-rotation', axis: turn.axis,
+    sliceIndex: turn.layer, liveCrossing: true });
+});
+
+it('forgets the turn at its commit, so crossing the old layer on an idle cube is not a hit', () => {
+  const turn = fireHazardWithHeadOff();
+  act(() => useGameStore.setState({ animState: { axis: turn.axis, sliceIndex: turn.layer, dir: 1 } }));
+  tick(3); // the tween runs without liveRotation ever being observed
+  act(() => useGameStore.setState(state => ({ animState: null, rotationEpoch: state.rotationEpoch + 1 })));
+  tick();
+  stepOnto(turn);
+  tick(5);
+  expect(resolveSliceHits).toHaveBeenCalledTimes(1);
+  expect(useGameStore.getState().wormAlive).toBe(true);
 });

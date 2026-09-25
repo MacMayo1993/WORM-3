@@ -45,6 +45,10 @@ export function readLiveTile(tile, outPos, outNorm) {
 // it rides a mid-rotation slice and lands on the committed tile automatically.
 export function rideLiveRotation(worm) {
     const cur = worm.pos.current;
+    if (worm.expansionAmount?.current > 0 && !liveRotation.active) return false;
+    // The sim already evaluated a jump from its moving source to a stationary
+    // landing and recorded that world-space path for the body. Do not ride it twice.
+    if (worm.rotationDeparture?.current) return false;
 
     // Rest-read: the current step crossed onto (or is stepping back off) a mid-rotation
     // slice from static ground. tick()'s grid math already targets the committed

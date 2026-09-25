@@ -1,3 +1,4 @@
+import { wormExpansion } from '../wormExpansion.js';
 // src/worm/healerWorm/TunnelTube.jsx
 //
 // The wormhole made into an actual enclosure.
@@ -60,11 +61,9 @@ const _tmp = new THREE.Vector3();
 
 const vertexShader = `
   varying vec2 vUv;
-  varying vec3 vViewPos;
   void main() {
     vUv = uv;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    vViewPos = mv.xyz;
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -81,74 +80,53 @@ const fragmentShader = `
   uniform float uOpacity;
   uniform float uHead;
   varying vec2 vUv;
-  varying vec3 vViewPos;
 
-  float hash13(vec3 p) {
-    p = fract(p * 0.1031);
-    p += dot(p, p.zyx + 31.32);
-    return fract((p.x + p.y) * p.z);
+  // Distance to a repeated band, with a footprint wide enough for phone pixels.
+  // Fade sub-pixel detail instead of letting distant hoops sparkle as we move.
+  float band(float phase, float width) {
+    float footprint = max(fwidth(phase), 0.002);
+    float distance = abs(fract(phase + 0.5) - 0.5);
+    float line = 1.0 - smoothstep(width, width + footprint, distance);
+    return line * (1.0 - smoothstep(0.12, 0.45, footprint));
   }
-  float noise3(vec3 p) {
-    vec3 i = floor(p), f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(mix(hash13(i), hash13(i + vec3(1,0,0)), f.x),
-          mix(hash13(i + vec3(0,1,0)), hash13(i + vec3(1,1,0)), f.x), f.y),
-      mix(mix(hash13(i + vec3(0,0,1)), hash13(i + vec3(1,0,1)), f.x),
-          mix(hash13(i + vec3(0,1,1)), hash13(i + vec3(1,1,1)), f.x), f.y), f.z);
-  }
+
   void main() {
     float y = vUv.y;
     float angle = vUv.x * 6.2831853;
     float twist = angle - y * 3.14159265;
     float coreDistance = abs(y - 0.5);
-    float coreFade = smoothstep(0.045, 0.14, coreDistance);
-    float mouth = smoothstep(0.0, 0.1, y) * (1.0 - smoothstep(0.90, 1.0, y));
+    float mouth = smoothstep(0.0, 0.08, y) * (1.0 - smoothstep(0.92, 1.0, y));
 
-    // Retain both palette identities through the half-twist. Opposing lanes
-    // trade places while the body stays dark enough to see the ribbon and worm.
-    vec3 base = mix(uColorA, uColorB, smoothstep(0.42, 0.58, y));
-    base = mix(base, vec3(0.62, 0.68, 0.78), 0.22);
+    // Broad, softly lit panels give the shaft shape without cloudy grain or
+    // random pinpricks. A neutral floor keeps dark palette pairs readable too.
+    vec3 base = mix(uColorA, uColorB, smoothstep(0.40, 0.60, y));
+    base = mix(base, vec3(0.64, 0.72, 0.82), 0.30);
     vec3 laneColor = mix(uColorA, uColorB, 0.5 + 0.5 * sin(twist));
-    vec3 hot = mix(base, vec3(1.0, 0.97, 0.88), 0.3);
-    vec2 circle = vec2(cos(angle), sin(angle));
-    float cloud = noise3(vec3(circle * 2.0, y * 10.0 - uTime * 0.30));
-    float filaments = pow(1.0 - abs(noise3(vec3(circle * 5.0, y * 5.0 - uTime * 0.75)) * 2.0 - 1.0), 14.0);
+    vec3 hot = mix(laneColor, vec3(0.94, 0.98, 1.0), 0.65);
+    float panel = 0.5 + 0.5 * cos(twist * 2.0);
+    float flow = 0.5 + 0.5 * sin(y * 12.5663706 - uTime * 0.65);
 
-    // Broken hoops read as depth stations, leaving open windows between them.
-    // Derivative smoothing keeps the distant lines stable on phone displays.
-    float hoopDistance = abs(fract(y * 14.0 - uTime * 0.16) - 0.5);
-    float aa = max(fwidth(y) * 14.0, 0.012);
-    float hoop = 1.0 - smoothstep(0.05, 0.05 + aa, hoopDistance);
-    float segments = smoothstep(-0.5, -0.1, cos(angle * 8.0 + y * 6.2831853));
-    hoop *= segments;
-    float helix = pow(0.5 + 0.5 * cos(twist * 2.0), 42.0);
-    float packets = pow(0.5 + 0.5 * cos(y * 40.0 - uTime * 1.8), 10.0);
+    // Eight slow depth stations and two continuous guide rails. All sharp
+    // features are filtered in screen space, including the twisting rails.
+    float hoop = band(y * 8.0 - uTime * 0.08, 0.035);
+    float rail = band(twist / 3.14159265, 0.035);
+    float railHalo = 0.5 + 0.5 * cos(twist * 2.0);
+    railHalo *= railHalo;
+    float nearHead = exp(-pow((y - uHead) / 0.22, 2.0));
+    float arrival = exp(-pow((y - uHead - 0.08) / 0.09, 2.0));
 
-    float nearHead = exp(-pow((y - uHead) / 0.19, 2.0));
-    float wake = step(y, uHead) * exp(-abs(uHead - y) * 6.0);
-    float arrival = exp(-pow((y - uHead - 0.06) / 0.045, 2.0));
-    // Sparse glints are shader detail, not a particle emitter or extra draw call.
-    vec2 cell = vec2(vUv.x * 32.0, y * 45.0 - uTime * 0.45);
-    vec2 local = fract(cell) - 0.5;
-    float seed = hash13(vec3(floor(cell), 7.0));
-    float glint = (1.0 - smoothstep(0.02, 0.13, length(local * vec2(1.0, 0.42)))) * step(0.91, seed);
+    vec3 col = base * (0.48 + panel * 0.14 + flow * 0.04 + nearHead * 0.10);
+    col += hot * hoop * (0.32 + nearHead * 0.12);
+    col += hot * rail * (0.36 + flow * 0.10);
+    col += laneColor * railHalo * 0.08;
+    col += hot * arrival * hoop * 0.20;
 
-    vec3 col = base * (0.32 + cloud * 0.24 + nearHead * 0.16);
-    col += hot * hoop * (0.50 + nearHead * 0.30);
-    col += laneColor * helix * (0.55 + packets * 0.5 + wake * 0.25);
-    col += hot * filaments * (0.26 + nearHead * 0.20);
-    col += hot * arrival * hoop * 0.65;
-    col += mix(base, vec3(1.0), 0.7) * glint * 0.75;
-
-    // A braided color bridge replaces the broad white midpoint wash. Its
-    // angular gaps preserve the core silhouette during the orientation change.
-    float seam = (1.0 - smoothstep(0.0, 0.13, coreDistance));
-    float braid = pow(0.5 + 0.5 * cos(twist * 2.0 - y * 20.0), 8.0);
-    col = col * mix(0.65, 1.0, coreFade) + mix(laneColor, hot, 0.25) * seam * (0.22 + braid * 0.65);
-    float wall = (0.52 + cloud * 0.10 + hoop * 0.18 + helix * 0.14 + filaments * 0.08 + glint * 0.10) * mix(0.8, 1.0, coreFade);
-    float bridge = seam * (0.10 + braid * 0.30);
-    gl_FragColor = vec4(col, min(0.86, (wall + bridge) * mouth * uOpacity));
+    // Keep illumination continuous through the half-twist; no dark midpoint
+    // dip or white wash hiding the worm during the camera's orientation change.
+    float seam = 1.0 - smoothstep(0.0, 0.14, coreDistance);
+    col += hot * seam * railHalo * 0.08;
+    float wall = 0.38 + panel * 0.05 + hoop * 0.12 + rail * 0.10;
+    gl_FragColor = vec4(col, min(0.68, wall * mouth * uOpacity));
     #include <colorspace_fragment>
   }
 `;
@@ -283,7 +261,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
     }
     meshRef.current.visible = true;
 
-    const key = `${size}:${tunnel.entry.x},${tunnel.entry.y},${tunnel.entry.z},${tunnel.entry.dirKey}:${tunnel.exit.x},${tunnel.exit.y},${tunnel.exit.z},${tunnel.exit.dirKey}`;
+    const key = `${size}:${wormExpansion.amount}:${tunnel.entry.x},${tunnel.entry.y},${tunnel.entry.z},${tunnel.entry.dirKey}:${tunnel.exit.x},${tunnel.exit.y},${tunnel.exit.z},${tunnel.exit.dirKey}`;
     if (builtForRef.current !== key) {
       const st = useGameStore.getState();
       const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;

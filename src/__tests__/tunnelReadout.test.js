@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { healingNeed } from '../worm/healerWorm/tunnelReadout.js';
+import { healingNeed, tunnelDanger } from '../worm/healerWorm/tunnelReadout.js';
 
 describe('tunnel requirement units', () => {
   it('reports two pickups for four missing segments', () => {
@@ -19,4 +19,13 @@ describe('tunnel requirement units', () => {
   it('shows a fully paid tunnel ready even with no remaining inventory', () => {
     expect(healingNeed({ deposited: 4, faceId: 1, tailLength: 4 })).toMatchObject({ ready: true, pickupsNeeded: 0, savedFraction: 1 });
   });
+});
+
+it('distinguishes the third safe trip from fatal re-entry, even when heal-ready', () => {
+  expect(tunnelDanger({ uses: 2, ready: true })).toBeNull();
+  expect(tunnelDanger({ uses: 3, inTransit: true })).toBeNull();
+  expect(tunnelDanger({ uses: 3, ready: true })).toBe('lethal');
+  expect(tunnelDanger({ uses: 4, inTransit: true, collapsing: true })).toBe('collapsing');
+  expect(tunnelDanger({ uses: 3, locked: true })).toBeNull();
+  expect(tunnelDanger({ voided: true, ready: true })).toBe('collapsed');
 });

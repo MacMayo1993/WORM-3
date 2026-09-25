@@ -21,7 +21,7 @@ function setup(id = 10) {
 }
 it.each([7, 8, 9, 10])('authors level %i with enough matching orbs and real healing pairs', id => {
   const { sim, p, level } = setup(id);
-  expect(getActiveTunnels(p.cubies, level.cubeSize ?? 5)).toHaveLength(level.target);
+  expect(getActiveTunnels(p.cubies, level.cubeSize ?? 5)).toHaveLength(Math.min(2,level.target));
   expect(sim.powerups.length).toBeGreaterThanOrEqual(level.orbs);
   for (const color of [1,2,3,4,5,6]) expect(sim.powerups.filter(t => p.cubies[t.x][t.y][t.z].stickers[t.dirKey].curr === color).length).toBeGreaterThanOrEqual(4);
   expect(sim.specials.length).toBeLessThanOrEqual(1);
@@ -32,7 +32,7 @@ it('requires every final-level mechanic, a safe landing, tail clearance and sett
   expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
   for (const [key, target] of Object.entries(level.mechanics)) expect(storyOutcome(level, { ...won, [key]: target - 1 })).toBeNull();
   for (const key of ['alive', 'tailClear', 'landed', 'rotationSettled']) expect(storyOutcome(level, { ...won, [key]: false })).toBeNull();
-  expect(storyOutcome(level, { ...won, elapsed: 541 })).toBeNull();
+  expect(storyOutcome(level, { ...won, elapsed: level.limit + 1 })).toBeNull();
 });
 it('stages the Stage 9 body on the 7x7 exterior and completes with one bomb and enemy', () => {
   const { sim, level, p } = setup(9);
@@ -78,9 +78,9 @@ it('does not count fatal landings or an Inch signature that only charged', () =>
 it('checks all five elemental effects and reoffers a missed or expired power', () => {
   const { sim, p, level, read } = setup(10);
   p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 4;
-  sim.specials = []; offerStoryPower(sim, p, level, 5, p.cubies);
+  sim.specials = []; p.powerDelay = 0; offerStoryPower(sim, p, level, 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
-  sim.specials = []; expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
+  sim.specials = []; p.powerDelay = 0; expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('water');
   for (const type of ['water', 'fire', 'grass', 'ice', 'lightning']) {
     sim.specials = []; sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0;
@@ -104,7 +104,9 @@ it('checks all five elemental effects and reoffers a missed or expired power', (
 it('finishes level eight with two collected elements without waiting for mastery', () => {
   const { sim, p, level, read } = setup(8);
   expect(level.mechanics).toEqual({ elementPickups: 2 });
+  p.powerDelay = 0; offerStoryPower(sim, p, level, 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
+  p.powerDelay = 0;
   sim.specials = []; // missed offerings do not count and can be offered again
   expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
   expect(read().elementPickups).toBeUndefined();
@@ -115,7 +117,7 @@ it('finishes level eight with two collected elements without waiting for mastery
   expect(nextStoryPower(p, level)).toBe('fire');
   sim.specials = []; sim.elementalT = 10;
   expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(false);
-  sim.elementalT = 0;
+  sim.elementalT = 0; p.powerDelay = 0;
   expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('fire');
   recordStoryMechanic(p, 'elementPickups');
@@ -132,12 +134,14 @@ it('deduplicates disarms and resets every mastery counter on retry', () => {
   const retry = stageStory(sim, 5, level);
   expect(retry.mechanics).toEqual({}); expect(retry.elements.size).toBe(0); expect(retry.bombIds.size).toBe(0);
 });
-it('keeps six-level saves and claims intact, resumes at seven, and ends at ten', () => {
+it('keeps six-level saves and claims intact, resumes at seven, and carries chapter one into chapter two', () => {
   const old = { stars: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [i+1, 3])), claimed: { 6: 'skin_royal' } };
   expect(sanitizeStoryProgress(old)).toEqual(old);
   expect(nextStoryLevel({ wormStory: old }).id).toBe(7);
   const complete = { wormStory: { stars: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i+1, 3])) } };
-  expect(nextStoryLevel(complete).id).toBe(10);
+  expect(nextStoryLevel(complete).id).toBe(11);
+  const all = { wormStory: { stars: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [i+1, 3])) } };
+  expect(nextStoryLevel(all).id).toBe(40);
 });
 
 const head = { x: 0, y: 0, z: 4, dirKey: 'PZ' };

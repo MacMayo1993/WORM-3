@@ -20,8 +20,8 @@ import WormMissionCard from './WormMissionCard.jsx';
 // opaque wash and then rake nine full-screen glowing lines across it, straight
 // through the stats — the FX fought the text, and throwing the board away meant
 // the screen that ends your run was the one place you could not see it. It is
-// now the shared NIGHT scrim: warm, translucent, blurred, with the cube still
-// there behind it and only a soft tint of the cause's colour.
+// now the mode carousel's graph paper, translucent and blurred, with the cube
+// still there behind it and only a soft tint of the cause's colour.
 //
 // And there is no monospace diagnostics block. It read "Head tile / Body tile
 // hit / Impact progress: 0.55" — the two tile values name the same square so
@@ -31,7 +31,7 @@ import React, { useRef } from 'react';
 import ModeArtwork from '../components/ui/ModeArtwork.jsx';
 import { useDialogBehavior } from '../components/ui/Panel.jsx';
 import {
-    overlayScrimStyle, overlayCardStyle,
+    overlayScrimStyle, overlayCardStyle, OVERLAY_CARD_CLASS,
     OverlayTitle, OverlayBlurb,
     HeroStat, StatTiles, OverlayChip,
     primaryBtnStyle, SECONDARY_BTN_STYLE, TERTIARY_BTN_STYLE, ACTION_ROW_STYLE,
@@ -44,7 +44,8 @@ function classifyDeath(reason) {
     if (reason === 'slice-rotation') return 'sliced';
     if (reason === 'bomb') return 'blasted';
     if (reason === 'portal-crawler') return 'overrun';
-    return 'tail-bite'; // self-collision, plus any legacy/unknown reason
+    if (reason === 'self-collision') return 'tail-bite';
+    return 'unknown';
 }
 
 // ─── Per-cause identity ───────────────────────────────────────────────────────
@@ -54,6 +55,10 @@ function classifyDeath(reason) {
 //   SLICED is steel-white and filling a button with it left white label text on
 //   a near-white field. That screen borrows the red from the slice hazard.
 const DEATHS = {
+    unknown: {
+        title: 'Run ended', blurb: 'Try again for another run.',
+        accent: '#f87171', accentSoft: 'rgba(248,113,113,0.45)', deep: '#7f1d1d',
+    },
     'time-up': {
         eyebrow: 'Story challenge', title: "Time’s up",
         blurb: 'Try a shorter route.',
@@ -139,6 +144,8 @@ export default function DeathScreen({
     const onDialogKeyDown = useDialogBehavior(dialogRef);
     const kind = classifyDeath(deathDetails?.reason);
     const config = DEATHS[kind];
+    const blurb = deathDetails?.reason === 'voided' || deathDetails?.reason === 'void-zone'
+        ? 'You entered a collapsed tunnel. Take another route.' : config.blurb;
     const location = locationFor(kind, deathDetails);
     // Examine hides the overlay to show the board behind it, which is only worth
     // offering when there is a spot on the board to go and look at.
@@ -147,7 +154,7 @@ export default function DeathScreen({
     return (
         <>
             <div style={overlayScrimStyle({ tint: config.accent })}>
-                <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={config.title} className="run-result" style={{ ...overlayCardStyle(config.accent), '--mode-accent': config.accent }}>
+                <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={config.title} className={`run-result ${OVERLAY_CARD_CLASS}`} style={{ ...overlayCardStyle(config.accent), '--mode-accent': config.accent }}>
                     <ModeArtwork mode={kind} className="screen-results-art" />
                     <OverlayTitle
                         size="clamp(28px, 7vw, 42px)"
@@ -155,7 +162,7 @@ export default function DeathScreen({
                         glow={config.accentSoft}
                         animation={config.titleAnim}
                     >{config.title}</OverlayTitle>
-                    <OverlayBlurb>{config.blurb}</OverlayBlurb>
+                    <OverlayBlurb>{blurb}</OverlayBlurb>
 
                     <HeroStat accent={config.accent} value={wormBodyTiles} label="Final length" />
                     <StatTiles stats={[

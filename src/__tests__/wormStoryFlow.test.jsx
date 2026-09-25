@@ -50,7 +50,7 @@ it('requires cross-face routing for 18 orbs and all six colors, then resets on r
   expect(state().wormStoryResult).toBeNull(); // cruising straight cannot clear it
   expect(state().wormSessionOrbs).toBeLessThan(18);
   begin(1);
-  const initialLength = state().wormBodyTiles; expect(initialLength).toBeGreaterThan(0);
+  const initialLength = state().wormBodyTiles; expect(initialLength).toBe(0);
   while (!state().wormStoryResult) {
     const orb = state().wormPowerups[0]; expect(orb).toBeTruthy();
     seek(orb, () => !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
@@ -60,28 +60,63 @@ it('requires cross-face routing for 18 orbs and all six colors, then resets on r
   expect(state().wormSessionOrbs).toBeGreaterThanOrEqual(18);
   begin(1); expect(state().wormSessionOrbs).toBe(0); expect(state().wormPowerups).toHaveLength(24);
 });
-it('requires four distinct traversals, keeps the long tail in transit, and does not count repeats', () => {
+it('opens at most two tunnel pairs and replaces cleared routes until all four are crossed', () => {
   begin(2);
-  const tunnels = getActiveTunnels(state().cubies, state().size);
-  expect(tunnels).toHaveLength(4);
-  expect(worm.tailLength.current * 0.09).toBeGreaterThan(7.8);
-  const route = [tunnels[0], tunnels[0], ...tunnels.slice(1)];
-  for (let i = 0; i < route.length; i++) {
+  expect(state().wormBodyTiles).toBe(0);
+  const visited = new Set();
+  for (let i=0; i<4; i++) {
+    const tunnels = getActiveTunnels(state().cubies,state().size);
+    expect(tunnels.length).toBeLessThanOrEqual(2);
+    const tunnel = tunnels.find(t => !visited.has(t.pairId));
+    expect(tunnel).toBeTruthy();
+    visited.add(tunnel.pairId);
     const before = state().wormTunnelCount;
-    seek(route[i].entry, () => state().wormTunnelCount > before);
-    expect(state().wormStoryResult).toBeNull();
-    until(() => worm.phase.current === 'crawling'); frame();
-    expect(worm.tunnelPassages.current.length).toBeGreaterThan(0);
-    expect(state().wormStoryResult).toBeNull();
-    expect(state().wormStoryProgress).toContain(`${Math.max(1, i)}/4 pairs crossed`);
-    if (i < route.length - 1) expect(tileKey(state().wormStoryTarget)).not.toBe(tileKey(route[i].entry));
-    else expect(state().wormStoryTarget).toBeNull();
+    seek(tunnel.entry, () => state().wormTunnelCount > before);
+    until(() => worm.phase.current === 'crawling');
+    travelUntil(() => worm.tunnelPassages.current.length === 0);
+    frame();
   }
   travelUntil(() => !!state().wormStoryResult);
+  expect(visited.size).toBe(4);
+  expect(worm.tunnelPassages.current).toHaveLength(0);
+});
+it('completes the pocket collection route through real movement with all six colors', () => {
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(11);
+  expect(state().wormPowerups).toHaveLength(12);
+  for (let pickups = 0; pickups < 12 && !state().wormStoryResult; pickups++) {
+    const orb = state().wormPowerups[0];
+    expect(orb).toBeTruthy();
+    seek(orb, () => !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
+  }
+  expect(state().wormStoryResult).toMatchObject({ levelId: 11 });
+  expect(state().wormAlive).toBe(true);
+  expect(state().wormSessionOrbs).toBeGreaterThanOrEqual(10);
+});
+it('crosses all three mini-cube tunnel pairs and clears the tail with the sparser layout', () => {
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 11 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(12);
+  expect(state().wormPowerups).toHaveLength(18);
+  for (let i=0; i<storyLevel(12).target; i++) {
+    const tunnel = getActiveTunnels(state().cubies,state().size)[0];
+    const before = state().wormTunnelCount;
+    seek(tunnel.entry, () => state().wormTunnelCount > before);
+    until(() => worm.phase.current === 'crawling');
+    travelUntil(() => worm.tunnelPassages.current.length === 0); frame();
+  }
+  travelUntil(() => !!state().wormStoryResult);
+  expect(state().wormStoryResult).toMatchObject({ levelId: 12 });
   expect(worm.tunnelPassages.current).toHaveLength(0);
 });
 it('counts a real body clearance only on landing and requires more than one hop', () => {
-  begin(3); until(() => state().wormJumpRescueActive);
+  begin(3);
+  // Exercise the crossing after growth; the opening itself is now clear.
+  worm.tailLength.current = 140;
+  until(() => state().wormJumpRescueActive);
   const clock = state().wormStoryProgress; frame(0.2); expect(state().wormStoryProgress).toBe(clock);
   act(() => worm.queueTurn('jump'));
   until(() => worm.isJumping.current);
@@ -89,12 +124,12 @@ it('counts a real body clearance only on landing and requires more than one hop'
   until(() => !worm.isJumping.current);
   expect(state().wormStoryProgress).toContain('1/4 body jumps');
   expect(state().wormStoryResult).toBeNull();
-  begin(3); until(() => !state().wormAlive); expect(state().wormStoryResult).toBeNull();
+  begin(3); worm.tailLength.current = 140; until(() => !state().wormAlive); expect(state().wormStoryResult).toBeNull();
 });
-it('stages the increased healing network with enough ordinary matching pickups', () => {
+it('stages at most two pairs with enough ordinary matching pickups', () => {
   for (const id of [2, 5, 6]) {
     begin(id); const tunnels = getActiveTunnels(state().cubies, state().size);
-    expect(tunnels).toHaveLength(storyLevel(id).target);
+    expect(tunnels).toHaveLength(Math.min(2,storyLevel(id).target));
     expect(state().wormPowerups.length).toBeGreaterThanOrEqual(id === 6 ? 30 : 24);
     for (const color of [1,2,3,4,5,6]) expect(state().wormPowerups.filter(p => state().cubies[p.x][p.y][p.z].stickers[p.dirKey].curr === color).length).toBeGreaterThanOrEqual(4);
   }
@@ -113,10 +148,10 @@ it('cannot win Moving Ground by waiting out six turns without collecting the orb
 });
 it('expires with a clear cause and resets the deadline on retry', () => {
   begin(1);
-  for (let i = 0; i < 4600 && state().wormAlive; i++) frame();
+  for (let i = 0; i < 6500 && state().wormAlive; i++) frame();
   expect(state().wormDeathDetails).toMatchObject({ reason: 'story-timeout' });
   expect(state().wormStoryResult).toBeNull();
-  begin(1); frame(); expect(state().wormStoryProgress).toContain('90s left');
+  begin(1); frame(); expect(state().wormStoryProgress).toContain(`${storyLevel(1).limit}s left`);
 });
 
 // Navigate through the real surface movement and tunnel triggers. Only steering
@@ -187,16 +222,21 @@ it.each([2, 5, 6])('can collect the resources and heal every authored pair for l
   if (id === 6) expect(state().wormStoryResult).toBeNull(); // turns + 30 orbs still required
 });
 
-it('collects a real authored rocket, lands before credit, then offers a magnet', () => {
+it('offers a magnet after the opening, then a rocket after the magnet recovery window', () => {
   act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [i+1, 1])), claimed: {} } } }));
   begin(7);
   expect(state().wormEnemiesEnabled).toBe(false);
-  const rocket = state().wormSpecials[0]; expect(rocket.type).toBe('rocket');
+  expect(state().wormSpecials).toHaveLength(0);
+  travelUntil(() => state().wormSpecials.length > 0);
+  const magnet = state().wormSpecials[0]; expect(magnet.type).toBe('magnet');
+  seek(magnet, () => worm.magnetT.current > 0);
+  travelUntil(() => state().wormSpecials.some(p => p.type === 'rocket'));
+  const rocket = state().wormSpecials.find(p => p.type === 'rocket');
   seek(rocket, () => state().wormRocketActive);
   expect(state().wormStoryResult).toBeNull();
   travelUntil(() => !state().wormRocketActive);
   frame();
-  expect(state().wormSpecials[0].type).toBe('magnet');
+  expect(state().wormSpecials).toHaveLength(0);
   expect(state().wormStoryResult).toBeNull();
 });
 it('enables Story enemies independently of the Free Play option and rejects stale bomb events', () => {
@@ -232,7 +272,7 @@ it('keeps deposited tunnels open until the ring and signature objectives are met
   seek(mouth, () => state().wormTunnelCount > 0);
   travelUntil(() => worm.phase.current === 'crawling' && worm.tunnelPassages.current.length === 0);
   expect(state().wormHealedCount).toBe(0);
-  expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(4);
+  expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(2);
   expect(Object.values(state().wormHealingProgress).some(p => isHealReady(p.deposited))).toBe(true);
 });
 
@@ -247,4 +287,25 @@ it('Classic adds 50 percent more Story orbs without changing the authored tunnel
     expect(state().wormPowerups).toHaveLength(Math.ceil(ordinaryOrbs * 1.5));
     expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(tunnels);
   }
+});
+
+it('Classic can complete level 10’s two-use ability task through real queued activations', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'classic', playerProgress: {
+    ...state().playerProgress, wormStory: { stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])), claimed: {} },
+  } }));
+  begin(10); frame();
+  const goal = () => state().wormStoryChecklist.goals.find(g => g.key === 'signatures');
+  expect(goal()).toMatchObject({ value: 0, target: 2, done: false });
+  act(() => { worm.queueTurn('signature'); worm.queueTurn('signature'); }); frame();
+  expect(goal()).toMatchObject({ value: 1, done: false });
+  act(() => worm.queueTurn('signature')); frame();
+  expect(goal()).toMatchObject({ value: 1, done: false });
+  // Expiry/recharge clocks are exercised in wormSignatures; isolate quest wiring
+  // here so unrelated flight, tunnel, and combat objectives do not intervene.
+  act(() => {
+    worm.signature.current.active = 0; worm.signature.current.cooldown = 0;
+    worm.magnetT.current = 0; worm.queueTurn('signature');
+  }); frame();
+  expect(goal()).toMatchObject({ value: 2, target: 2, done: true });
+  frame(); expect(goal().value).toBe(2);
 });

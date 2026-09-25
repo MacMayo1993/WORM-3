@@ -8,6 +8,7 @@ import { getStickerWorldPos } from '../game/coordinates.js';
 import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH, CUT_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
 import { rocketOrbitInto, rocketOrbitT } from '../worm/healerWorm/rocketOrbit.js';
 import { getWindWorldPosInto } from '../worm/wormLogic.js';
+import { sliceShotInto } from '../worm/sliceShot.js';
 
 const scene = vi.hoisted(() => ({ frame: null, camera: null, size: null, mobile: true }));
 vi.mock('@react-three/fiber', () => ({
@@ -177,22 +178,23 @@ it.each([3, 7, 15])('shows the cut and full rotating layer on a %s cube, then re
       const impact = new Vector3().fromArray(getStickerWorldPos(
         impactTile.x, impactTile.y, impactTile.z, dirKey, size, 0));
       worm.cutFocusT = ref(0); worm.cutFocusPos = ref(impact.toArray());
+      worm.cutFocusSlice = ref({ axis: dirKey[1] === 'Y' ? 'col' : 'row', layer: 0 });
       useGameStore.setState({ wormGamePhase: 'countdown' });
       render(worm, size, `${width}-${mobile}-${dirKey}`); tick();
       useGameStore.setState({ wormGamePhase: 'active' });
       for (let i = 0; i < 180; i++) tick();
       const chaseDistance = scene.camera.position.distanceTo(worm.headInterpPos.current);
-      for (let i = 0; i <= 60; i++) {
+      for (let i = 0; i <= 72; i++) {
         worm.cutFocusT.current = CUT_FOCUS_DURATION - i / 60;
         tick();
-        if (i >= 36) {
+        if (i >= 54) {
           expectBoardInFrame(size);
           expectInFrame(impact);
           expectInFrame(worm.headInterpPos.current);
         }
       }
       expect(scene.camera.position.distanceTo(worm.headInterpPos.current)).toBeGreaterThan(chaseDistance);
-      for (let i = 61; i <= 96; i++) {
+      for (let i = 73; i <= CUT_FOCUS_DURATION * 60 + 30; i++) {
         worm.cutFocusT.current = Math.max(0, CUT_FOCUS_DURATION - i / 60); tick();
       }
       if (mobile) expectCentered(worm, size);
@@ -215,6 +217,52 @@ it('pulls out for a fatal slice and holds the overview still', () => {
   for (let i = 0; i < 60; i++) tick();
   expect(scene.camera.position.distanceTo(pose)).toBeLessThan(1e-9);
   expect(scene.camera.quaternion.angleTo(orientation)).toBeLessThan(1e-7);
+});
+
+it('aims a fatal neck cut at the recorded cut face instead of the head face', () => {
+  const size = 15, worm = makeWorm(size, 'PZ');
+  worm.headInterpPos.current.set(-7.4, 0, 7.58);
+  const impact = [-7.58, 0, 6.5];
+  render(worm, size); tick();
+  useGameStore.setState({ wormGamePhase: 'active' });
+  for (let i = 0; i < 180; i++) tick();
+  const shot = sliceShotInto({ cam: new Vector3(), look: new Vector3(), up: new Vector3() },
+    impact, 'depth', 14, size, { fov: scene.camera.fov, aspect: scene.camera.aspect });
+  useGameStore.setState({ wormAlive: false, wormDeathDetails: {
+    reason: 'slice-rotation', axis: 'depth', sliceIndex: 14, impactPosition: impact,
+  } });
+  for (let i = 0; i < 60; i++) tick();
+  expect(scene.camera.position.distanceTo(shot.cam)).toBeLessThan(1e-8);
+  expect(scene.camera.position.x).toBeLessThan(impact[0]);
+  expectInFrame(new Vector3(...impact));
+  expectBoardInFrame(size);
+  const aim = shot.look.clone().project(scene.camera);
+  expect(aim.x).toBeCloseTo(0, 8);
+  expect(aim.y).toBeCloseTo(0, 8);
+});
+
+it.each(Object.keys(FACE_NORMALS))('keeps a portrait Mega bomb cut close on %s and returns to the head', dirKey => {
+  const size = 15, worm = makeWorm(size, dirKey);
+  const impact = FACE_NORMALS[dirKey].clone().multiplyScalar(size / 2 + 0.08);
+  worm.cutFocusT = ref(0); worm.cutFocusPos = ref(impact.toArray());
+  worm.cutFocusSlice = ref(null);
+  render(worm, size); tick();
+  useGameStore.setState({ wormGamePhase: 'active' });
+  for (let i = 0; i < 180; i++) tick();
+  for (let i = 0; i <= 72; i++) {
+    worm.cutFocusT.current = CUT_FOCUS_DURATION - i / 60; tick();
+  }
+  // The original blast shot is about 10–14 units from the hit on Mega;
+  // a full-board portrait overview would be several times farther away.
+  expect(scene.camera.position.distanceTo(impact)).toBeLessThan(15);
+  expect(scene.camera.position.clone().sub(impact).dot(FACE_NORMALS[dirKey])).toBeGreaterThan(0);
+  const hit = impact.clone().project(scene.camera);
+  expect(Math.abs(hit.x)).toBeLessThan(0.05);
+  expect(Math.abs(hit.y)).toBeLessThan(0.05);
+  for (let i = 73; i <= CUT_FOCUS_DURATION * 60 + 30; i++) {
+    worm.cutFocusT.current = Math.max(0, CUT_FOCUS_DURATION - i / 60); tick();
+  }
+  expectCentered(worm, size);
 });
 
 it('does not pump the camera out and back on a Mega orb pickup', () => {

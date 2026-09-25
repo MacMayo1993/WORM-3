@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { COLOR_SCHEMES, TILE_STYLES } from '../utils/colorSchemes.js';
-import { clearMaterialCache } from '../3d/styles/TileStyleMaterials.jsx';
 
 const CYCLE_MS = 10000;
 
@@ -12,43 +11,62 @@ function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function applyRandomStyle(setSettings, bumpTick, setHollowMode) {
+function applyRandomStyle() {
   const scheme = pick(SCHEME_KEYS);
   const manifoldStyles = {};
   for (let i = 1; i <= 6; i++) manifoldStyles[i] = pick(TILE_KEYS);
-  clearMaterialCache();
-  setSettings(prev => ({ ...prev, colorScheme: scheme, manifoldStyles }));
+  // The bounded material cache is keyed by style and colors. Retain reusable
+  // shaders instead of disposing every program at each ten-second remix.
   // Per-cubelet view styles (classic/grid/sudoku/wireframe/glass) are derived in Cubie
   // from randomStyleTick, so bumping the tick reshuffles them. Force hollow off — it's a
   // whole-cube structural mode that would hide the per-cubelet mix.
-  setHollowMode(false);
-  bumpTick();
+  useGameStore.setState(state => ({
+    settings: { ...state.settings, colorScheme: scheme, manifoldStyles },
+    hollowMode: false, randomStyleTick: state.randomStyleTick + 1,
+  }));
 }
 
 export function useRandomMode() {
   const randomMode = useGameStore(s => s.randomMode);
-  const setSettings = useGameStore(s => s.setSettings);
-  const bumpRandomTick = useGameStore(s => s.bumpRandomTick);
-  const setHollowMode = useGameStore(s => s.setHollowMode);
   const showMainMenu = useGameStore(s => s.showMainMenu);
   const showSettings = useGameStore(s => s.showSettings);
   const showWelcome = useGameStore(s => s.showWelcome);
   const showTutorial = useGameStore(s => s.showTutorial);
+  const wormPaused = useGameStore(s => s.wormPaused);
+  const wormHealerMode = useGameStore(s => s.wormHealerMode);
+  const wormRunId = useGameStore(s => s.wormRunId);
 
   const inGame = !showMainMenu && !showSettings && !showWelcome && !showTutorial;
 
   const activeRef = useRef(false);
-  activeRef.current = randomMode && inGame;
+  const active = randomMode && inGame && !(wormHealerMode && wormPaused);
+  activeRef.current = active;
+  const remainingRef = useRef(CYCLE_MS);
+  const runId = wormHealerMode ? wormRunId : null;
+
+  // A new run gets a fresh cycle. A ready card keeps its authored look until
+  // ten seconds of play have elapsed; resuming a pause must not remix at once.
+  useEffect(() => {
+    remainingRef.current = CYCLE_MS;
+    if (!randomMode || !inGame) return;
+    if (activeRef.current) applyRandomStyle();
+  }, [randomMode, inGame, runId]);
 
   useEffect(() => {
-    if (!randomMode || !inGame) return;
+    if (!active) return;
+    let startedAt = performance.now();
+    let id;
+    const remix = () => {
+      remainingRef.current = CYCLE_MS;
+      startedAt = performance.now();
+      applyRandomStyle();
+      id = setTimeout(remix, CYCLE_MS);
+    };
+    id = setTimeout(remix, remainingRef.current);
 
-    applyRandomStyle(setSettings, bumpRandomTick, setHollowMode);
-
-    const id = setInterval(() => {
-      if (activeRef.current) applyRandomStyle(setSettings, bumpRandomTick, setHollowMode);
-    }, CYCLE_MS);
-
-    return () => clearInterval(id);
-  }, [randomMode, inGame, setSettings, bumpRandomTick, setHollowMode]);
+    return () => {
+      clearTimeout(id);
+      remainingRef.current = Math.max(0, remainingRef.current - (performance.now() - startedAt));
+    };
+  }, [active, randomMode, inGame, runId]);
 }

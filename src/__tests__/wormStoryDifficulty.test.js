@@ -8,6 +8,8 @@ import { resetLiveRotation } from '../worm/liveRotation.js';
 function crossing() {
   resetLiveRotation();
   const sim = makeWormSim(5), level = storyLevel(3), practice = stageStory(sim, 5, level);
+  // Model a body grown through pickups; levels now start with an empty tail.
+  sim.tailLength = 140;
   practice.rotationEpoch = 0;
   sim.pos = { ...practice.target };
   sim._curWP.fromArray(getStickerWorldPos(2, 2, 4, 'PZ', 5, 0));

@@ -65,6 +65,7 @@ export const createModesSlice = (set, _get) => ({
   // TEACH MODE STATE
   // ========================================================================
   teachModeActive: false,
+  teachCourseActive: false,
 
   setTeachModeActive: (teachModeActive) => set(state => ({ teachModeActive,
     ...(teachModeActive && !state.teachModeActive ? { xpActivityRuns: { ...state.xpActivityRuns, teach: null }, xpNotice: state.xpNotice?.mode === 'teach' ? null : state.xpNotice } : {}),

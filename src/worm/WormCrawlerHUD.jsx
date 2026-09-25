@@ -1,5 +1,6 @@
+import { EXPLODE_DURATION } from './wormExpansion.js';
 import { ScreenHeading } from '../components/ui/ModeArtwork.jsx';
-import { storyLevel, WORM_STORY_LEVELS } from './story/levels.js';
+import { storyLevel, storyChapterId, storyChapterIndex, STORY_CHAPTER_SIZE } from './story/levels.js';
 import { StoryObjectiveCard, StoryStartButton, StoryResult } from './story/StoryCards.jsx';
 import { AmbientCombatActions, CombatCard, CombatFireButton } from './combat/CombatControls.jsx';
 import { combatBridge } from './combat/portalCombat.js';
@@ -36,12 +37,15 @@ import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
 import {
-    overlayScrimStyle, overlayCardStyle, StatTiles,
+    overlayScrimStyle, overlayCardStyle, OVERLAY_CARD_CLASS, StatTiles,
     SETTING_ROW_STYLE, SETTING_LABEL_STYLE, togglePillStyle, segmentStyle,
-    primaryBtnStyle, LIST_BTN_STYLE, ACTION_ROW_STYLE,
+    primaryBtnStyle, SECONDARY_BTN_STYLE, LIST_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
+import ModeArtwork from '../components/ui/ModeArtwork.jsx';
+import { arcadeModeVars } from '../utils/arcadeTheme.js';
 import { useDialogBehavior } from '../components/ui/Panel.jsx';
-import { UI_FONT, DISPLAY_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEET, NIGHT_TEXT_MUTED, GAME_HUD, GAME_HUD_VARS, Z } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, HEADING_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEET, NIGHT_TEXT_MUTED, GAME_HUD, GAME_HUD_VARS, Z,
+    ARCADE_INK, ARCADE_INK_STRONG, ARCADE_MUTED, ARCADE_LINE_SOFT } from '../utils/uiTheme.js';
 
 // ─── Worm Countdown Overlay ─────────────────────────────────────────────────
 const WORM_COUNTDOWN_STYLE_ID = 'worm3-countdown-style';
@@ -214,7 +218,7 @@ const toRgb = (color) => {
 // stickers pasted on the game rather than part of it.
 
 const FONT = UI_FONT;
-const SHADOW = '0 3px 0 #141711, 0 6px 18px rgba(10,14,8,0.22)';
+const SHADOW = `0 4px 0 ${GAME_HUD.border}, 0 8px 18px rgba(38,55,45,0.14)`;
 const BORDER = GAME_HUD.border;
 const HUD_SURFACE = GAME_HUD.surface;
 const HUD_SURFACE_SOFT = GAME_HUD.raised;
@@ -295,11 +299,11 @@ const ensureHudStyle = () => {
            the inner shading flips from a lit top edge to a shadowed one. That is
            the whole trick: the light says raised, then it says sunk. */
         .worm-steer-key, .worm-action {
-            box-shadow: 0 3px 0 #141711, 0 6px 18px rgba(10,14,8,0.22), inset 0 1px 0 rgba(255,245,220,0.09);
+            box-shadow: 0 4px 0 ${GAME_HUD.ink}, 0 8px 18px rgba(38,55,45,0.16), inset 0 2px 0 #fff;
         }
         .worm-steer-key:active, .worm-action:active {
-            transform: translateY(2px);
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.28);
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 ${GAME_HUD.ink}, inset 0 2px 4px rgba(38,55,45,0.18);
         }
         /* The key's own surface has to live here, not inline: an inline background
            outranks any :active rule, which is exactly how the press state silently
@@ -317,7 +321,8 @@ const ensureHudStyle = () => {
             background: ${GAME_HUD.surface};
             backdrop-filter: ${HUD_BLUR};
             -webkit-backdrop-filter: ${HUD_BLUR};
-            border: 1px solid ${BORDER};
+            border: 2px solid ${GAME_HUD.ink};
+            color: ${GAME_HUD.text};
             display: flex; align-items: center; justify-content: center;
             padding: 0;
         }
@@ -327,11 +332,11 @@ const ensureHudStyle = () => {
         .worm-steer-key:active {
             background:
                 linear-gradient(180deg,
-                    rgba(0, 0, 0, 0.26) 0%,
-                    rgba(0, 0, 0, 0.05) 35%,
+                    rgba(38, 55, 45, 0.16) 0%,
+                    rgba(38, 55, 45, 0.04) 35%,
                     rgba(255, 253, 242, 0.05) 100%),
-                var(--key-press, rgba(255, 253, 242, 0.22));
-            border-color: var(--key-edge, rgba(255, 253, 242, 0.5));
+                var(--key-press, #efe9d6);
+            border-color: var(--key-edge, ${GAME_HUD.ink});
         }
         /* The glyph rides the cap down with it and dims a touch, the way ink on a
            key face falls into its own shadow when the key bottoms out. */
@@ -559,9 +564,12 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
 const PAUSE_BTN_STYLE = {
     width: 48,
     height: 48,
-    borderRadius: 11,
+    // Full 48px target; it bleeds into the bar's padding so the rail stays short.
+    marginBlock: -3,
+    borderRadius: 14,
     background: HUD_SURFACE_SOFT,
-    border: '1px solid rgba(255,245,220,0.16)',
+    border: `2px solid ${GAME_HUD.border}`,
+    boxShadow: `0 3px 0 ${GAME_HUD.border}`,
     color: TEXT,
     padding: 0,
     display: 'flex',
@@ -591,8 +599,9 @@ const SPECIAL_NOTICE_STYLE = {
     alignItems: 'center',
     gap: 6,
     padding: '5px 12px',
-    borderRadius: 999,
-    background: 'rgba(15, 23, 42, 0.78)',
+    borderRadius: 12,
+    background: HUD_SURFACE,
+    border: `2px solid ${GAME_HUD.border}`,
     fontSize: 11,
     fontWeight: 800,
     letterSpacing: 1.0,
@@ -656,65 +665,57 @@ const COUNTDOWN_OVERLAY_STYLE = {
 const WINNER_SCREEN_STYLE = {
     position: 'fixed', inset: 0, zIndex: Z.CELEBRATION,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'safe center',
-    background: NIGHT_SHEET,
     pointerEvents: 'auto', overflowY: 'auto', fontFamily: FONT, boxSizing: 'border-box',
     padding: 'max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom))',
 };
 
-const WINNER_STARS_STYLE = {
-    position: 'absolute', inset: 0, pointerEvents: 'none',
-    background: `
-        radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px) 12% 18%/200px 200px,
-        radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px) 37% 44%/150px 150px,
-        radial-gradient(circle, rgba(255,255,255,0.7) 1px, transparent 1px) 68% 22%/180px 180px,
-        radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px) 84% 67%/120px 120px,
-        radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px) 22% 78%/160px 160px
-    `,
+// The celebration is the mode carousel's paper with one ivory card on it.
+const WINNER_CARD_STYLE = {
+    width: 'min(94vw, 540px)', padding: 'clamp(18px, 3.4vh, 28px) 20px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
 };
 
 const WINNER_TITLE_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 'clamp(30px, 8vw, 64px)', fontWeight: 900, letterSpacing: '-2px',
-    color: UI_GOLD,
-    textShadow: '0 3px 0 rgba(0,0,0,0.2)',
-    userSelect: 'none', marginBottom: 4, lineHeight: 1, textAlign: 'center',
+    fontSize: 'clamp(30px, 8vw, 54px)', fontWeight: 400, letterSpacing: '0.01em', textTransform: 'uppercase',
+    color: ARCADE_INK,
+    userSelect: 'none', marginBottom: 6, lineHeight: 1.02, textAlign: 'center',
 };
 
 const WINNER_SUB_STYLE = {
-    color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, letterSpacing: 2, marginBottom: 28, textAlign: 'center',
+    color: ARCADE_MUTED, font: `800 11px/1.3 ${HEADING_FONT}`, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 22, textAlign: 'center',
 };
 
 const WINNER_STATS_STYLE = {
-    display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', justifyContent: 'safe center',
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: 8, width: '100%', marginBottom: 18,
 };
 
 const WINNER_STAT_BOX_STYLE = {
-    borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(255,255,255,0.10)',
-    padding: '10px 16px', textAlign: 'center', minWidth: 90,
+    borderRadius: 14, border: `2px solid ${ARCADE_LINE_SOFT}`,
+    background: '#f7f2e3',
+    padding: '10px 12px', textAlign: 'center',
 };
 
 const WINNER_STAT_LABEL_STYLE = {
-    fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: 'rgba(255,255,255,0.45)', marginBottom: 2,
+    font: `800 10px/1.3 ${HEADING_FONT}`, letterSpacing: '0.07em', textTransform: 'uppercase', color: ARCADE_MUTED, marginBottom: 3,
 };
 
-const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.1 };
+const WINNER_STAT_VALUE_STYLE = { font: `800 20px/1.1 ${HEADING_FONT}`, color: ARCADE_INK, fontVariantNumeric: 'tabular-nums' };
 
 const WINNER_PP_STYLE = {
     fontFamily: DISPLAY_FONT,
-    fontSize: 'clamp(28px, 6vw, 44px)', color: UI_GOLD, letterSpacing: '-1px',
-    textShadow: '0 3px 0 rgba(0,0,0,0.2)',
-    marginBottom: 6, textAlign: 'center',
+    fontSize: 'clamp(24px, 6vw, 36px)', color: ARCADE_INK_STRONG, textTransform: 'uppercase',
+    marginBottom: 4, textAlign: 'center',
 };
 
 const WINNER_PP_NOTE_STYLE = {
-    fontSize: 11, color: NIGHT_TEXT_MUTED, marginBottom: 22, textAlign: 'center',
+    fontSize: 12, color: ARCADE_MUTED, marginBottom: 20, textAlign: 'center',
 };
 
-const WINNER_BTN_ROW_STYLE = { display: 'flex', gap: 12, justifyContent: 'safe center' };
+const WINNER_BTN_ROW_STYLE = { display: 'flex', gap: 12, justifyContent: 'safe center', width: '100%', marginTop: 8 };
 
 const WINNER_PLAY_AGAIN_STYLE = { ...primaryBtnStyle(), minWidth: 140 };
-const WINNER_NEW_GAME_STYLE = { ...LIST_BTN_STYLE, width: 'auto', minWidth: 120, justifyContent: 'center' };
+const WINNER_NEW_GAME_STYLE = { ...SECONDARY_BTN_STYLE, minWidth: 120 };
 
 const PODIUM_WRAP_STYLE = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22, position: 'relative',
@@ -757,8 +758,9 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
     }, [displayCount]);
 
     return (
-        <div style={WINNER_SCREEN_STYLE}>
-            <div style={WINNER_STARS_STYLE} />
+        <div style={WINNER_SCREEN_STYLE} className="arcade-paper">
+          <div className={`run-result ${OVERLAY_CARD_CLASS}`} style={WINNER_CARD_STYLE}>
+            <ModeArtwork mode="success" className="screen-results-art" />
             <div style={WINNER_TITLE_STYLE}>Cube healed!</div>
             <div style={WINNER_SUB_STYLE}>All tunnels healed</div>
             <div style={PODIUM_WRAP_STYLE}>
@@ -767,15 +769,15 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                         <div key={i} style={{
                             width: seg.size, height: seg.size, borderRadius: '50%',
                             background: wormColor, opacity: seg.alpha, flexShrink: 0,
-                            boxShadow: i === 0 ? `0 0 12px 4px ${wormColor}` : 'none',
-                            border: i === 0 ? '2px solid rgba(255,255,255,0.5)' : 'none',
+                            boxShadow: i === 0 ? `0 0 10px 2px ${wormColor}88` : 'none',
+                            border: i === 0 ? `2px solid ${ARCADE_INK_STRONG}` : `1px solid ${ARCADE_INK_STRONG}55`,
                         }} />
                     ))}
                     {overflow > 0 && (
-                        <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.6)', flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: ARCADE_MUTED, flexShrink: 0, marginLeft: 4 }}>+{overflow}</div>
                     )}
                     {wormBodyTiles === 0 && (
-                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>no orbs</div>
+                        <div style={{ fontSize: 13, color: ARCADE_MUTED }}>No orbs yet</div>
                     )}
                 </div>
                 <div style={PODIUM_BASE_STYLE}>
@@ -783,17 +785,17 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                 </div>
             </div>
             <div style={WINNER_PP_STYLE}>+{ppEarned} Parity Points</div>
-            <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} orbs x 5 PP x 2x WIN BONUS</div>
+            <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} {wormBodyTiles === 1 ? 'orb' : 'orbs'} × 5 PP × 2 win bonus</div>
             <div style={WINNER_STATS_STYLE}>
                 {[
-                    ['TIME', formatTime(wormTimeAlive)],
+                    ['Time', formatTime(wormTimeAlive)],
                     ['Collected', wormSessionOrbs],
                     ['Healed', wormHealedCount],
-                    ['TOTAL PPs', parityPoints],
+                    ['Total PP', parityPoints],
                 ].map(([label, value]) => (
                     <div key={label} style={WINNER_STAT_BOX_STYLE}>
                         <div style={WINNER_STAT_LABEL_STYLE}>{label}</div>
-                        <div style={{ ...WINNER_STAT_VALUE_STYLE, ...(label === 'TOTAL PPs' ? { color: UI_GOLD } : {}) }}>{value}</div>
+                        <div style={WINNER_STAT_VALUE_STYLE}>{value}</div>
                     </div>
                 ))}
             </div>
@@ -803,6 +805,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                 <button onClick={onRetry} style={WINNER_PLAY_AGAIN_STYLE}><WormReplayLabel /></button>
                 <button onClick={onNewGame} style={WINNER_NEW_GAME_STYLE}>New game</button>
             </div>
+          </div>
         </div>
     );
 }
@@ -891,6 +894,9 @@ function SpecialIcon({ type, size = 14 }) {
 // instead of draining against a wall clock.
 
 function BuffStrip({ detailed = false, onInspect }) {
+    const explodeActive = useGameStore(s => s.wormExplodeActive ?? false);
+    const explodeSeconds = useRef(null);
+    const explodeFill = useRef(null);
     const rocketActive = useGameStore(s => s.wormRocketActive ?? false);
     const magnetActive = useGameStore(s => s.wormMagnetActive ?? false);
     const magnetSeq = useGameStore(s => s.wormMagnetSeq ?? 0);
@@ -939,13 +945,32 @@ function BuffStrip({ detailed = false, onInspect }) {
         return () => cancelAnimationFrame(raf);
     }, [elementalTheme, detailed]);
 
-    if (!rocketActive && !magnetActive && !elementalTheme) return null;
+    useEffect(() => {
+        if (!explodeActive) return;
+        let raf;
+        const paint = () => {
+            if (explodeSeconds.current) explodeSeconds.current.textContent = `${Math.max(0, wormBuffs.explodeT).toFixed(1)}s`;
+            if (explodeFill.current) explodeFill.current.style.width = `${100 * Math.max(0, wormBuffs.explodeT) / EXPLODE_DURATION}%`;
+            raf = requestAnimationFrame(paint);
+        };
+        paint();
+        return () => cancelAnimationFrame(raf);
+    }, [explodeActive]);
+    if (!rocketActive && !magnetActive && !elementalTheme && !explodeActive) return null;
 
     const rocketDef = getSpecialDef('rocket');
     const magnetDef = getSpecialDef('magnet');
     const elemDef = elementalTheme ? getElementalDef(elementalTheme) : null;
 
     return <div className={`worm-buffs${detailed ? ' worm-buffs-detailed' : ''}`} aria-label="Active powers">
+        {explodeActive && <div className="worm-buff-item">
+            <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
+                style={{ '--power-color': getSpecialDef('explode').color }} aria-label="Explode active" aria-haspopup={detailed ? undefined : 'dialog'}>
+                <span ref={explodeFill} className="worm-buff-meter" aria-hidden="true" style={{ width: '100%' }} />
+                <SpecialIcon type="explode" /><span>Explode</span><span ref={explodeSeconds} aria-hidden="true" />
+            </button>
+            {detailed && <p>{getSpecialDef('explode').description}</p>}
+        </div>}
         {rocketActive && <div className="worm-buff-item">
             <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
                 style={{ '--power-color': rocketDef.color }} aria-label="Rocket active" aria-haspopup={detailed ? undefined : 'dialog'}>
@@ -967,7 +992,7 @@ function BuffStrip({ detailed = false, onInspect }) {
                 style={{ '--power-color': elemDef.color }} aria-label={`${elemDef.label} element active`} aria-haspopup={detailed ? undefined : 'dialog'}>
                 <span className="worm-element-medal" aria-hidden="true">
                     <svg width="24" height="24" viewBox="0 0 22 22">
-                        <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="#ffffff25" strokeWidth="2" />
+                        <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="#26372d22" strokeWidth="2" />
                         <circle ref={elemFillRef} cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke={elemDef.color} strokeWidth="2.4"
                             strokeLinecap="round" strokeDasharray={ELEM_RING_CIRC} strokeDashoffset={0} transform="rotate(-90 11 11)" />
                     </svg>
@@ -1011,8 +1036,8 @@ function SpecialNotice({ suppressed = false }) {
             className="worm-special-notice"
             style={{
                 ...SPECIAL_NOTICE_STYLE,
-                color: expired ? 'rgba(255,255,255,0.72)' : def.color,
-                border: `1px solid ${expired ? 'rgba(255,255,255,0.22)' : def.color}`,
+                color: expired ? GAME_HUD.muted : def.color,
+                border: `2px solid ${expired ? GAME_HUD.border : def.color}`,
                 opacity: expired ? 0.75 : 1,
             }}
             role="status"
@@ -1114,23 +1139,23 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
         // Not fixed: the pause menu lives inside the HUD's stacking context and must
         // not escape it, so the scrim is absolute against that instead of the viewport.
         <div style={overlayScrimStyle({ tint: green, fixed: false, zIndex: 10 })} onClick={onResume}>
-            <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className="worm-pause-card" role="dialog" aria-modal="true" aria-label="Game paused" style={overlayCardStyle(green, { width: 420 })} onClick={e => e.stopPropagation()}>
+            <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} className={`worm-pause-card ${OVERLAY_CARD_CLASS}`} role="dialog" aria-modal="true" aria-label="Game paused" style={{ ...overlayCardStyle(green, { width: 420 }), ...arcadeModeVars('worm') }} onClick={e => e.stopPropagation()}>
                 <ScreenHeading mode="pause" title="Paused" />
-                <button type="button" className="worm-pause-resume worm-hud-chip" onClick={onResume}>Resume <span aria-hidden="true">→</span></button>
+                <button type="button" className="worm-pause-resume arcade-primary" onClick={onResume}>Resume <span aria-hidden="true">→</span></button>
                 {storyId && <StoryObjectiveCard />}
                 <WormMissionCard summary />
                 <details className="screen-disclosure"><summary>Abilities & tunnels</summary>
                   <BuffStrip detailed /><TunnelNeedsCard /><SignatureGuide />
                 </details>
                 <details className="screen-disclosure"><summary>Run rewards</summary>
-                  <ParityWallet dark neutral /><XpRunSummary mode="worm" />
+                  <ParityWallet /><XpRunSummary mode="worm" />
                 </details>
 
                 <StatTiles columns={2} stats={[
                     ['Time', formatTime(wormTimeAlive)],
                     ['Healed', wormHealedCount],
                     ['Collected', wormSessionOrbs],
-                    storyId ? ['Story level', `${storyId} / ${WORM_STORY_LEVELS.length}`] : ['Next hole', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
+                    storyId ? [`Chapter ${storyChapterId(storyId)}`, `Level ${storyChapterIndex(storyId)} / ${STORY_CHAPTER_SIZE}`] : ['Next tunnel', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
                 <details className="screen-disclosure"><summary>Controls & sound</summary>
@@ -1203,7 +1228,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                             onClick={onToggleAntipodal}
                             style={{
                                 ...LIST_BTN_STYLE,
-                                ...(antipodalActive ? { background: `${blue}26`, borderColor: `${blue}66`, color: '#fff' } : {}),
+                                ...(antipodalActive ? { background: `${blue}33`, borderColor: ARCADE_INK_STRONG, color: ARCADE_INK, boxShadow: `0 2px 0 ${ARCADE_INK_STRONG}`, transform: 'translateY(2px)' } : {}),
                             }}
                         >
                             <span aria-hidden="true">⊕</span>
@@ -1231,7 +1256,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
 }
 
 function HudContext({ surface, demo, onInspect }) {
-    const hasBuff = useGameStore(s => s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme);
+    const hasBuff = useGameStore(s => s.wormExplodeActive || s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme);
     const [hasTunnel, setHasTunnel] = useState(!!wormBuffs.tunnelNeeds);
     useEffect(() => {
         const id = setInterval(() => setHasTunnel(!!wormBuffs.tunnelNeeds), 100);
@@ -1415,7 +1440,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
 
                 <div className="worm-hud-status-row">
-                    {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact onInspect={handlePause} />}
+                    {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
                     {!combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
                     {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} />}
                 </div>

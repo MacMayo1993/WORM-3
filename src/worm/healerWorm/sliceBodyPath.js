@@ -1,3 +1,4 @@
+import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import * as THREE from 'three';
 import { shAt } from '../circularBuffers.js';
 import { BASE_TAIL_LENGTH, BODY_BALL_SPACING, WORM_LIFT } from './constants.js';
@@ -33,12 +34,17 @@ export function findSlicePathHit(worm, axis, layer, size) {
   if (!history?.count || !worm.headInterpPos?.current || !worm.currentNormal?.current) return null;
   const coord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
   const k = (size - 1) / 2;
+  const scale = cubeExpansionScale(size, worm.expansionAmount?.current ?? 0);
   // An outward-facing bead still belongs to the outermost cubie layer.
-  const low = layer === 0 ? -Infinity : layer - k - 0.5;
-  const high = layer === size - 1 ? Infinity : layer - k + 0.5;
+  const low = layer === 0 ? -Infinity : (layer - k - 0.5) * scale;
+  const high = layer === size - 1 ? Infinity : (layer - k + 0.5) * scale;
   const planes = [low, high];
   let a = bodyPathHeadInto(head, worm);
   const headOnLayer = a[coord] >= low && a[coord] <= high;
+  // The outward cap rides the slab. A seam behind it can shed a tail without
+  // killing a viable head-side body, just like a head on stationary ground.
+  const headOnOuterCap = (layer === 0 && worm.currentNormal.current[coord] < -0.9) ||
+    (layer === size - 1 && worm.currentNormal.current[coord] > 0.9);
   const reach = bodyDistanceAt(worm, worm.tailLength.current - 1);
   let distance = 0;
   let previous = null;
@@ -51,7 +57,14 @@ export function findSlicePathHit(worm, axis, layer, size) {
     if (length > EPS && Math.abs(change) > EPS && !record.transit && !previous?.transit) {
       for (const plane of planes) {
         const at = (plane - a[coord]) / change;
-        if (at >= -EPS && at <= 1 + EPS) t = Math.min(t, Math.max(0, Math.min(1, at)));
+        if (at < -EPS || at > 1 + EPS) continue;
+        const bounded = Math.max(0, Math.min(1, at));
+        // A slice seam does not extend infinitely into the air. A lifted strand
+        // can clear it; keep looking for a later grounded part of the body.
+        const surfaceLimit = k * scale + 0.7;
+        const aboveSurface = ['x', 'y', 'z'].some(other => other !== coord &&
+          Math.abs(a[other] + (b[other] - a[other]) * bounded) > surfaceLimit);
+        if (!aboveSurface) t = Math.min(t, bounded);
       }
     }
     const cutDistance = distance + length * t;
@@ -66,9 +79,10 @@ export function findSlicePathHit(worm, axis, layer, size) {
         else hi = mid;
       }
       const keepCount = Math.max(1, lo);
-      const protectedHead = (worm.landingGraceT?.current ?? 0) > 0;
+      const protectedHead = (worm.landingGraceT?.current ?? 0) > 0 ||
+        (worm.isJumping?.current && (worm.jumpLift?.() ?? 0) > 0.45);
       return {
-        type: (headOnLayer && !protectedHead) || keepCount < BASE_TAIL_LENGTH ? 'death' : 'cut',
+        type: (headOnLayer && !headOnOuterCap && !protectedHead) || keepCount < BASE_TAIL_LENGTH ? 'death' : 'cut',
         cutDistance, keepCount, historyIndex: i, historyT: t,
         cutPosition: [a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t],
         headOnLayer,

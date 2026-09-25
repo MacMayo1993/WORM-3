@@ -65,6 +65,7 @@ export function useTeachMode() {
 
   // Core state
   const [active, setActive] = useState(false);
+  const [courseActive, setCourseActive] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [selectedAlgo, setSelectedAlgo] = useState(null); // { stageIndex, algoIndex }
   const [algoMoves, setAlgoMoves] = useState([]);
@@ -91,7 +92,7 @@ export function useTeachMode() {
 
   // Analyze cube state whenever cubies change and teach mode is active
   useEffect(() => {
-    if (!active || size !== 3) return;
+    if (!active || courseActive || size !== 3) return;
     const result = analyzeState(cubies);
     setAnalysis(result);
     setSolveHighlights(result.highlights || []);
@@ -101,7 +102,7 @@ export function useTeachMode() {
       setQuizAnswered(null);
       setQuizHintShown(false);
     }
-  }, [active, cubies, size, setSolveHighlights, subMode]);
+  }, [active, courseActive, cubies, size, setSolveHighlights, subMode]);
 
   // When animation finishes and we're auto-playing (demo mode), advance to next step
   useEffect(() => {
@@ -121,11 +122,13 @@ export function useTeachMode() {
   // ---------------------------------------------------------------------------
   // Enter / exit
   // ---------------------------------------------------------------------------
-  const enterTeachMode = useCallback(() => {
-    if (size !== 3) return;
+  const enterTeachMode = useCallback((options = {}) => {
+    if (useGameStore.getState().size !== 3) return;
+    setCourseActive(!!options.course);
+    useGameStore.setState({ teachCourseActive: !!options.course });
     setActive(true);
     useGameStore.getState().setTeachModeActive(true);
-    const result = analyzeState(cubies);
+    const result = analyzeState(useGameStore.getState().cubies);
     setAnalysis(result);
     setSolveHighlights(result.highlights || []);
     setSelectedAlgo(null);
@@ -139,10 +142,12 @@ export function useTeachMode() {
     setQuizHintShown(false);
     setNotationToken(null);
     setQuizOptions(buildQuizOptions(result.stageIndex, BEGINNER_METHOD_3x3.stages));
-  }, [cubies, size, setSolveHighlights]);
+  }, [setSolveHighlights]);
 
   const exitTeachMode = useCallback(() => {
     setActive(false);
+    setCourseActive(false);
+    useGameStore.setState({ teachCourseActive: false });
     useGameStore.getState().setTeachModeActive(false);
     setAnalysis(null);
     setSelectedAlgo(null);
@@ -361,6 +366,8 @@ export function useTeachMode() {
   return {
     // Core state
     active,
+    courseActive,
+    setLayerHighlight,
     analysis,
     selectedAlgo,
     algoMoves,

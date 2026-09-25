@@ -77,18 +77,29 @@ export const PAPER_GOOD = '#426b2e';
 //   NIGHT — the panel is a layer over something alive that must stay visible
 //           (victory, the carousel over the menu cube, in-scene viewers).
 //
-// These values were previously copied by hand into VictoryScreen and SolveMode;
-// they live here now so the treatment stays one thing.
-export const NIGHT_BACKDROP = 'radial-gradient(ellipse at center, rgba(24,31,18,0.55) 0%, rgba(24,31,18,0.86) 100%)';
+// NIGHT now wears the ARCADE day palette (see ARCADE_* below): the game is one
+// light family, so a layer over the live scene is the same ivory card on
+// translucent graph paper as any other screen. The names stay so every panel,
+// button and overlay built on them follows without a rewrite.
+export const NIGHT_BACKDROP = 'radial-gradient(ellipse at 50% 45%, rgba(255,253,245,0.72), transparent 72%) 0 0 / 100% 100%, '
+  + 'linear-gradient(rgba(207,205,191,0.40) 1px, transparent 1px) 0 0 / 30px 30px, '
+  + 'linear-gradient(90deg, rgba(207,205,191,0.40) 1px, transparent 1px) 0 0 / 30px 30px, rgba(248,244,232,0.80)';
 export const NIGHT_BACKDROP_BLUR = 'var(--night-blur, blur(6px))';
-export const NIGHT_SHEET = 'rgba(28,35,22,0.94)';
-export const NIGHT_PANEL = 'rgba(250,247,238,0.08)';
-export const NIGHT_BORDER = 'rgba(255,245,220,0.18)';
-export const NIGHT_TEXT = 'rgba(255,253,242,0.86)';
-export const NIGHT_TEXT_MUTED = 'rgba(255,253,242,0.60)';
-export const NIGHT_TITLE_SHADOW = '0 3px 0 rgba(43,53,35,0.55), 0 10px 34px rgba(24,31,18,0.6)';
-export const NIGHT_SOFT_SHADOW = '0 2px 12px rgba(24,31,18,0.7)';
-export const NIGHT_SHADOW = '0 24px 70px rgba(24,31,18,0.55)';
+export const NIGHT_SHEET = '#fffcf1';
+export const NIGHT_PANEL = '#f7f2e3';
+export const NIGHT_BORDER = '#c6c5ac';
+export const NIGHT_TEXT = '#26372d';
+export const NIGHT_TEXT_MUTED = '#5f6857';
+export const NIGHT_TITLE_SHADOW = 'none';
+export const NIGHT_SOFT_SHADOW = 'none';
+export const NIGHT_SHADOW = '0 6px 0 #c6c5ac, 0 18px 40px #354d3c24';
+
+// VIEWPORT_* is for type laid directly over a photo or live 3D preview (the
+// wizard specimen plate), where light type with a shadow is what stays legible.
+export const VIEWPORT_TEXT = 'rgba(255,253,242,0.92)';
+export const VIEWPORT_TEXT_MUTED = 'rgba(255,253,242,0.66)';
+export const VIEWPORT_BORDER = 'rgba(255,245,220,0.18)';
+export const VIEWPORT_TITLE_SHADOW = '0 3px 0 rgba(43,53,35,0.55), 0 10px 34px rgba(24,31,18,0.6)';
 
 // ─── Shared semantic accents ─────────────────────────────────────────────────
 // These are intentionally mode-neutral. Use FACE colours only for game state.
@@ -175,6 +186,25 @@ export const Z = {
   DEBUG: 100000 // dev console — always on top, by definition
 };
 
+// ARCADE_* — the mode carousel's look, shared by every screen that stops play
+// or sets it up: cream graph paper, deep green ink, ivory keys that sit on a
+// hard 4px ledge, and one chunky primary key in the mode's cube-face colour.
+// PAPER_* and NIGHT_* remain for panels this family has not replaced yet.
+export const ARCADE_INK = '#26372d';
+export const ARCADE_INK_STRONG = '#354d3c';
+export const ARCADE_MUTED = '#6a705e';
+export const ARCADE_PAPER = '#f8f4e8';
+export const ARCADE_CARD = '#fffcf1';
+export const ARCADE_LINE = '#c6c5ac';
+export const ARCADE_LINE_SOFT = '#d1d0b8';
+export const ARCADE_FOCUS = '#2774ad';
+// Graph paper: the carousel's in-scene backdrop, as CSS for DOM screens.
+export const ARCADE_GRID = 'linear-gradient(#cfcdbf66 1px, transparent 1px), linear-gradient(90deg, #cfcdbf66 1px, transparent 1px)';
+export const ARCADE_GRID_SIZE = '30px 30px';
+export const ARCADE_KEY_SHADOW = `0 4px 0 ${ARCADE_LINE}, inset 0 2px 0 #fff`;
+export const ARCADE_PRIMARY_SHADOW = `0 6px 0 ${ARCADE_INK_STRONG}, 0 10px 18px ${ARCADE_INK_STRONG}20, inset 0 3px 0 #ffffff70`;
+export const ARCADE_CARD_SHADOW = `0 6px 0 ${ARCADE_LINE}, 0 18px 40px ${ARCADE_INK_STRONG}24`;
+
 /** CSS screens consume the same tokens as inline React styles. */
 export const UI_CSS_VARS = {
   '--bg-primary': PAPER_SHEET,
@@ -185,6 +215,7 @@ export const UI_CSS_VARS = {
   '--ui-font': UI_FONT,
   '--heading-font': HEADING_FONT,
   '--display-font': DISPLAY_FONT,
+  '--mono-font': MONO_FONT,
   '--ui-title-size': TEXT_DISPLAY_FLUID,
   '--ui-heading-size': TEXT_2XL_FLUID,
   '--ui-body-size': `${TEXT_MD}px`,
@@ -201,21 +232,39 @@ export const UI_CSS_VARS = {
   '--night-text-muted': NIGHT_TEXT_MUTED,
   '--night-shadow': NIGHT_SHADOW,
   '--ui-moss': UI_MOSS,
+  '--arcade-ink': ARCADE_INK,
+  '--arcade-ink-strong': ARCADE_INK_STRONG,
+  '--arcade-muted': ARCADE_MUTED,
+  '--arcade-paper': ARCADE_PAPER,
+  '--arcade-card': ARCADE_CARD,
+  '--arcade-line': ARCADE_LINE,
+  '--arcade-line-soft': ARCADE_LINE_SOFT,
+  '--arcade-focus': ARCADE_FOCUS,
+  '--arcade-grid': ARCADE_GRID,
+  '--arcade-grid-size': ARCADE_GRID_SIZE,
+  '--arcade-key-shadow': ARCADE_KEY_SHADOW,
+  '--arcade-primary-shadow': ARCADE_PRIMARY_SHADOW,
+  '--arcade-card-shadow': ARCADE_CARD_SHADOW,
   '--ui-action-shadow': UI_ACTION_SHADOW,
 };
 
 // In-game instruments: neutral warm charcoal with one active-control accent.
 // Face colours remain reserved for the cube and its inventory samples.
+// In-game instruments wear the same ARCADE plastic as every other screen:
+// ivory keys with dark-green ink and a hard ledge, slightly translucent so the
+// live scene still reads behind the bars. Face colours stay reserved for the
+// cube, its inventory samples and each mode's one primary key.
 export const GAME_HUD = {
-  surface: 'rgba(32,35,29,0.94)',
-  raised: '#34372f',
-  inset: '#1b1e19',
-  border: 'rgba(255,245,220,0.18)',
-  text: '#fff6e8',
-  muted: '#b8b6aa',
-  accent: '#d8a1cf',
-  active: '#574052',
-  warning: '#eab879',
+  surface: 'rgba(255,252,241,0.94)',
+  raised: '#fffcf1',
+  inset: '#e8e3d0',
+  border: '#c6c5ac',
+  text: '#26372d',
+  muted: '#5f6857',
+  accent: '#1f6b3a',
+  active: '#e3f0d8',
+  warning: '#b34700',
+  ink: '#354d3c',
 };
 export const GAME_HUD_VARS = Object.fromEntries(
   Object.entries(GAME_HUD).map(([key, value]) => [`--hud-${key}`, value])

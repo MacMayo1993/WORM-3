@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { INTRO_COPY, INTRO_COPY_TEXT, introCopyFrame, WORD_INTERVAL, WORD_FADE, LINE_DISSOLVE } from '../components/intro/introCopy.js';
+import { INTRO_COPY, INTRO_COPY_TEXT, introCopyFrame, WORD_INTERVAL, WORD_FADE, LINE_DISSOLVE, INTRO_ACCENTS, TILE_FACES } from '../components/intro/introCopy.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { TITLE_START } from '../components/intro/introTiming.js';
 
 it('reveals words in order and holds each complete line for a readable beat', () => {
@@ -22,7 +23,7 @@ it('clears every line before the next and before the title', () => {
   expect(introCopyFrame(TITLE_START)).toBeNull();
 });
 
-// The script is three sentences timed against three things the camera is doing.
+// The script is two clauses timed against the opening choreography.
 // It is rewritten by hand, so these pin the properties a rewrite can silently
 // break: a line that runs past the title reveal, two beats overlapping into an
 // unreadable double exposure, or a word interval short enough that the reveal
@@ -53,14 +54,52 @@ describe('the opening script', () => {
     expect(WORD_FADE).toBeLessThan(WORD_INTERVAL);
   });
 
-  it('reads as whole sentences, not fragments', () => {
-    for (const line of INTRO_COPY) {
-      expect(line.text, `"${line.text}" should end a sentence`).toMatch(/[.!?\u2026]$/);
-      expect(line.text[0], `"${line.text}" should start capitalised`).toBe(line.text[0].toUpperCase());
-    }
+  it('preserves the requested trailer line across its two beats', () => {
+    expect(INTRO_COPY_TEXT).toBe("Don't just think outside the box, flip through the cube");
   });
 
   it('summarises the whole script for screen readers', () => {
     for (const line of INTRO_COPY) expect(INTRO_COPY_TEXT).toContain(line.text);
+  });
+});
+
+// Three words carry their own move (a box drawn round "box", a sticker flip
+// under "flip" and "cube"). Each must be found in the script and finish before
+// its line starts to dissolve, or the move is cut off mid-air.
+describe('accent words', () => {
+  it('finds every accent in the script and completes its move while the line is fully on screen', () => {
+    const found = new Set();
+    for (const line of INTRO_COPY) {
+      const settled = introCopyFrame(line.end - LINE_DISSOLVE - 0.001);
+      for (const word of settled.words) {
+        expect(word.reveal).toBe(1);
+        if (!word.accent) { expect(word.move).toBe(0); continue; }
+        found.add(word.text.toLowerCase().replace(/[^a-z]/g, ''));
+        expect(word.move, `${word.text} still moving as the line dissolves`).toBe(1);
+      }
+      const opening = introCopyFrame(line.start);
+      expect(opening.words.every(w => w.move === 0 && w.reveal === 0)).toBe(true);
+    }
+    expect([...found].sort()).toEqual(Object.keys(INTRO_ACCENTS).sort());
+  });
+
+  it('puts FLIP on a blue sticker that turns green and CUBE on a red one that turns orange', () => {
+    // Face ids: 5 blue, 2 green, 1 red, 4 orange — each pair antipodal, like the cube's own flips.
+    expect(TILE_FACES).toEqual({ flip: [5, 2], cube: [1, 4] });
+    for (const [front, back] of Object.values(TILE_FACES)) expect(ANTIPODAL_COLOR[front]).toBe(back);
+    for (const word of Object.keys(TILE_FACES)) expect(INTRO_ACCENTS[word]).toBe('tile');
+  });
+
+  it('turns FLIP first and CUBE after it, both after the line has landed', () => {
+    const line = INTRO_COPY.find(l => /flip/i.test(l.text));
+    const turnStart = word => {
+      for (let t = line.start; t < line.end; t += 0.005) {
+        if (introCopyFrame(t).words.find(w => w.text.toLowerCase() === word).move > 0) return t;
+      }
+      return Infinity;
+    };
+    const landed = line.start + (line.text.split(' ').length - 1) * WORD_INTERVAL + WORD_FADE;
+    expect(turnStart('flip')).toBeGreaterThan(landed);
+    expect(turnStart('cube')).toBeGreaterThan(turnStart('flip') + 0.1);
   });
 });

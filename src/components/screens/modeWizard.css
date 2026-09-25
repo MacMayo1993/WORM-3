@@ -72,4 +72,45 @@
 
 .cube-path-screen>section { border:1px solid var(--mode-accent); }
 .mode-paper-selector button:focus-visible { outline:3px solid var(--mode-accent); outline-offset:3px; }
-.mode-wizard.worm-entry-choice .worm-path-free .worm-path-cta { background:var(--mode-accent); }
+
+/* ── Arcade look (see components/ui/arcadeTheme.css) ─────────────────────────
+   The wizard follows the mode carousel: neutral line borders, deep-green ink,
+   ivory keys on a ledge, and the mode's face colour only on the primary key and
+   the chosen option's tint. Later rules here override the frame colouring above. */
+.mode-wizard {
+  --wiz-base: var(--arcade-paper);
+  --wiz-surface: #f7f2e3;
+  --wiz-surface-raised: var(--arcade-card);
+  --wiz-border: var(--arcade-line);
+  --wiz-border-soft: var(--arcade-line-soft);
+  --wiz-text: var(--arcade-ink);
+  --wiz-text-muted: var(--arcade-muted);
+  --wiz-text-faint: var(--arcade-muted);
+  --wiz-card-shadow: var(--arcade-line-soft);
+  --wiz-check-ink: var(--arcade-ink);
+  color: var(--arcade-ink);
+}
+.mode-wizard *, .mode-wizard *::before, .mode-wizard *::after,
+.cube-path-screen *, .cube-path-screen *::before, .cube-path-screen *::after,
+.mode-paper-selector *, .mode-paper-selector *::before, .mode-paper-selector *::after {
+  border-color: var(--arcade-line-soft) !important;
+}
+.mode-wizard [aria-pressed="true"]:not([role="tab"]),.mode-wizard .worm-level-grid .selected {
+  outline: 3px solid var(--arcade-ink-strong); outline-offset: -3px;
+  background-color: color-mix(in srgb, var(--mode-accent) 16%, var(--arcade-card));
+}
+.mode-wizard .mode-wizard-kicker { flex: 1; text-align: center; color: var(--arcade-ink); font: 400 clamp(18px, 5vw, 24px)/1 var(--display-font); letter-spacing: .01em; text-transform: uppercase; }
+.mode-wizard .mode-wizard-count { padding: 7px 10px; border: 1px solid var(--arcade-line-soft) !important; border-radius: 8px; background: var(--arcade-card); color: var(--arcade-ink); font: 800 11px/1.3 var(--heading-font); letter-spacing: .055em; }
+.mode-wizard .mode-wizard-heading h1 { font: 400 clamp(22px, 5.5vw, 32px)/1.05 var(--display-font); letter-spacing: .01em; text-transform: uppercase; color: var(--arcade-ink); }
+.mode-wizard .mode-wizard-heading p { color: var(--arcade-muted); }
+.mode-wizard-step-track i { height: 4px; background: var(--arcade-line-soft); }
+.mode-wizard-step-track i[data-reached="true"] { background: var(--arcade-ink-strong); }
+.mode-wizard nav button[aria-current="true"] { background: color-mix(in srgb, var(--mode-accent) 14%, transparent) !important; }
+.mode-wizard .mode-wizard-primary:active { translate: 0 3px; box-shadow: 0 1px 0 var(--arcade-ink-strong), inset 0 2px 0 #ffffff50 !important; }
+.mode-wizard button:focus-visible, .mode-wizard input:focus-visible, .mode-wizard summary:focus-visible,
+.cube-path-screen button:focus-visible { outline: 3px solid var(--arcade-focus); outline-offset: 4px; }
+.mode-wizard .mode-wizard-sheet > div:last-child > button:first-of-type { font-size: clamp(15px, 4.5vw, 20px) !important; }
+.mode-wizard .worm-profile :is(.worm-profile-filter[aria-pressed=true],.worm-profile-footer>button) { background: var(--mode-accent); color: var(--arcade-accent-ink); }
+.mode-wizard .worm-profile-option[aria-pressed=true] { box-shadow: 0 0 0 3px var(--arcade-ink-strong); }
+.mode-wizard .worm-path-card { border: 2px solid var(--arcade-line) !important; background: var(--arcade-card); box-shadow: 0 6px 0 var(--arcade-line); }
+.mode-wizard.worm-entry-choice .worm-path-free .worm-path-cta { background: #FFD500; color: #1a1410; }

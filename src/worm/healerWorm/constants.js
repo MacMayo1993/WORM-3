@@ -142,8 +142,9 @@ export const HEAL_PAUSE_DURATION = 0.85;
 // spins into view (the slice rotation is a GSAP tween, so it plays on through
 // the freeze), then the camera eases back and the worm resumes exactly where it
 // was. Long enough to cover the hazard turn (~1.4s, see CubeAssembly's isWormHazard
-// GSAP duration) plus a short hold so the hit reads and the WORM'D card plays.
-export const CUT_FOCUS_DURATION = 1.6;
+// GSAP duration) plus the swing out to the whole-cube slice shot and back (0.45s
+// in, 0.5s out, see sliceShot.js), leaving about a second held on the layer.
+export const CUT_FOCUS_DURATION = 2.0;
 
 // Render-only full-route trail history: how many tiles of the worm's path are retained for
 // painting the persistent "where I've been" trail (see useWormCrawler's pathHistory ring).
@@ -192,17 +193,19 @@ export const SPECIAL_TUNNEL_RADIUS = 2;
 // long instead of falling back to an arbitrary tile somewhere on the cube.
 export const SPECIAL_SPAWN_RETRY = 2;
 
-// Rocket — protected flight with a smooth ramp up to four times the configured speed
+// Rocket — readable protected flight, gently faster than the configured crawl
 // (rather than replacing it with a jump), ignores collisions and wormhole mouths,
 // and advertises the protected window with a flame at the tail.
-export const ROCKET_DURATION = 3;
-export const ROCKET_SPEED_MULT = 4;
-// Fast ignition, sustained cruise, then a short controlled landing.
+export const ROCKET_DURATION = 6;
+export const ROCKET_SPEED_MULT = 1.6;
+// Give the player time to read takeoff, steer the cruise and choose a landing.
 // Smoothstep keeps the launch and touchdown free of altitude snaps.
 // The shared flight phase also ramps thrust and preserves altitude on fuel refresh.
-export const ROCKET_FLIGHT_HEIGHT = 1.8;
-export const ROCKET_FLIGHT_TAKEOFF = 0.35;
-export const ROCKET_FLIGHT_LANDING = 0.55;
+export const ROCKET_FLIGHT_HEIGHT = 1.2;
+export const ROCKET_FLIGHT_TAKEOFF = 1.0;
+export const ROCKET_FLIGHT_LANDING = 1.3;
+// Restore any remaining ground boost smoothly after the airborne speed cap ends.
+export const ROCKET_BOOST_HANDOFF = 0.4;
 export const rocketFlightLift = (active, rocketT, flightPhase) => {
   if (!active) return 0;
   const elapsed = ROCKET_DURATION - rocketT;

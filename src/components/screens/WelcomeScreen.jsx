@@ -8,8 +8,22 @@
 
 import React, { useEffect } from 'react';
 import { TITLE_END } from '../intro/introTiming.js';
+import { ramp } from '../intro/introChoreography.js';
 import TextOverlay from '../intro/TextOverlay.jsx';
 import { INTRO_COPY_TEXT } from '../intro/introCopy.js';
+import { introOutro } from '../intro/introOutro.js';
+
+// Play springs up from below the title card as the cinematic hands over.
+const playSpring = p => {
+  if (p >= 1) return undefined;
+  const c = 1.9, spring = 1 + (c + 1) * (p - 1) ** 3 + c * (p - 1) ** 2;
+  return { opacity: Math.min(1, p * 2.5), transform: `translateX(-50%) translateY(${(1 - spring) * 40}px) scale(${0.8 + 0.2 * spring})` };
+};
+
+// The buttons dissolve with the rest of the screen so only the last line is
+// left; once gone they are hidden, not just transparent, so nothing invisible
+// can be tapped or focused. Enter and S still skip from the keyboard.
+const chromeFade = amount => amount > 0 ? { opacity: 1 - amount, visibility: amount >= 1 ? 'hidden' : undefined } : undefined;
 
 const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
   // Returning players have seen the cinematic — give them ENTER immediately
@@ -30,6 +44,7 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onEnter]);
+  const fade = chromeFade(introOutro(introTime, reducedMotion).chrome);
 
   return (
     <div
@@ -47,6 +62,7 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
         aria-label="Skip intro and enter game"
         className="opening-skip"
         onClick={onEnter}
+        style={fade}
       >
         Skip Intro →
       </button>
@@ -57,7 +73,9 @@ const WelcomeScreen = ({ onEnter, introTime, reducedMotion = false }) => {
           aria-label="Enter game"
           className="opening-enter"
           onClick={onEnter}
-          style={{ pointerEvents: 'auto' }}
+          style={{
+            pointerEvents: 'auto', ...playSpring(introSeen || reducedMotion ? 1 : ramp(introTime, TITLE_END, TITLE_END + 0.45)), ...fade
+          }}
         >
           Play <span aria-hidden="true">→</span>
         </button>

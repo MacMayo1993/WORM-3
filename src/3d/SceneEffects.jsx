@@ -1,5 +1,5 @@
 import React from 'react';
-import { EffectComposer, Bloom, Vignette, N8AO } from '@react-three/postprocessing';
+import { EffectComposer, Vignette, N8AO } from '@react-three/postprocessing';
 
 // Optional GPU passes load only when their owning scene enables them.
 export default function SceneEffects({ kind, enabled = true }) {
@@ -10,8 +10,7 @@ export default function SceneEffects({ kind, enabled = true }) {
   );
   return (
     <EffectComposer enabled={enabled}>
-      {kind === 'intro' && <Bloom intensity={0.35} luminanceThreshold={0.85} luminanceSmoothing={0.85} mipmapBlur />}
-      <Vignette offset={kind === 'intro' ? 0.35 : 0.46} darkness={kind === 'intro' ? 0.35 : 0.23} />
+      <Vignette offset={0.46} darkness={0.23} />
     </EffectComposer>
   );
 }

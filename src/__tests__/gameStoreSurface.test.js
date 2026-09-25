@@ -14,6 +14,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 const EXPECTED_KEYS = [
   'captureMode', 'setCaptureMode',
   'wormStoryLevel', 'wormStoryStarted', 'wormStoryReady', 'wormStoryTarget', 'wormStoryProgress', 'wormStoryChecklist', 'wormStoryResult', 'startWormStory', 'completeWormStory', 'claimWormStoryReward',
+  'wormStoryVisualBase', 'wormStoryViewBase', 'applyWormStoryLook',
   'chaosExperience', 'chaosFocusFaces', 'chaosRecord', 'setChaosFocusFaces', 'startChaosExperience', 'recordChaosTick', 'finishChaosExperience',
   'xpActivityRuns', 'beginAchievementActivity',
   'playerProgress', 'xpRun', 'xpNotice', 'showPlayerProgress', 'setShowPlayerProgress',
@@ -91,7 +92,7 @@ const EXPECTED_KEYS = [
   'showPackSelect', 'showSettings', 'showTunnels', 'showTutorial',
   'showWelcome', 'showWormDeathMenu', 'size', 'solveFocusedStep',
   'solveHighlights', 'solveModeActive', 'spendCoins', 'startDemo',
-  'teachModeActive', 'toggleAntipodalPiP', 'toggleChaos', 'toggleDevConsole',
+  'teachCourseActive', 'teachModeActive', 'toggleAntipodalPiP', 'toggleChaos', 'toggleDevConsole',
   'toggleExploded', 'toggleFlipMode', 'toggleHelp',
   'toggleHollowMode', 'toggleLeaderboard', 'toggleMirrorMode', 'toggleNetPanel',
   'toggleTunnels', 'toggleWormCameraHorizon', 'toggleWormControlMode', 'triggerCameraOrbit', 'tunnelBirths',
@@ -102,7 +103,7 @@ const EXPECTED_KEYS = [
   'wormHat', 'wormHealedCount', 'wormHealerMode', 'wormHealingProgress', 'wormJumpRescueActive',
   'wormMagnetActive', 'wormMagnetSeq', 'wormOnFlippedTile', 'wormOrbCount',
   'wormOrbFlash', 'wormOrbInventory', 'wormPaused', 'wormPhase',
-  'wormPowerups', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs',
+  'wormPowerups', 'wormExplodeActive', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs',
   'wormShowTrail', 'wormSkin', 'wormSpecialNotice', 'wormSpecials',
   'wormSpeed', 'wormTimeAlive', 'wormTrail', 'wormTunnelCount',
   'wormholeInterval'

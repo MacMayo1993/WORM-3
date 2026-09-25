@@ -86,6 +86,10 @@ export default defineConfig({
         manualChunks(id) {
           // Stable wallet rules and catalog data can cache independently from the app.
           if (id.endsWith('/src/economy/chests.js')) return 'economy';
+          // Story definitions are shared by startup progress/settings and lazy
+          // gameplay/screens. Cache this dependency-free data independently so
+          // adding authored worlds does not inflate the main application chunk.
+          if (/\/src\/worm\/story\/(levels|worlds)\.js$/.test(id)) return 'worm-story-data';
           // Shared CJS helpers must not live in the optional solver chunk.
           if (id.includes('commonjsHelpers')) return 'vendor-react';
           if (!id.includes('node_modules')) return;

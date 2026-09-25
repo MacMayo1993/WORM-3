@@ -10,12 +10,15 @@ export const windowOpacity = (t, a, b) => ramp(t, a, a + 0.45) * (1 - ramp(t, b 
 export function sampleIntro(t, reducedMotion = false) {
   const open = reducedMotion ? 0 : ramp(t, EXPLOSION_START, EXPLOSION_END) * (1 - ramp(t, IMPLODE_START, IMPLODE_END));
   const turn = ramp(t, 0.6, 3.2);
+  // Once shut, the cube keeps drifting round and the camera eases in while the
+  // title card lingers and the cube dissolves.
+  const linger = ramp(t, IMPLODE_END, INTRO_FINISH);
   return {
     open,
     reveal: reducedMotion ? 1 : ramp(t, 0.1, 0.6),
-    turn: reducedMotion ? 0 : 0.4 * turn,
+    turn: reducedMotion ? 0 : 0.4 * turn + 0.35 * linger,
     orbit: reducedMotion ? 0.65 : 0.65 + 0.25 * ramp(t, 0, 1) + 0.65 * ramp(t, 2.2, 5.6),
-    distance: reducedMotion ? 12.5 : 10.5 + 5 * open + 2 * (1 - ramp(t, 0, 0.8)),
+    distance: reducedMotion ? 12.5 : 10.5 + 5 * open + 2 * (1 - ramp(t, 0, 0.8)) - 0.6 * linger,
     flip: reducedMotion ? 0 : Math.PI * ramp(t, 1.0, 2.1) * (1 - ramp(t, IMPLODE_START, IMPLODE_END)),
     passage: reducedMotion ? 0 : windowOpacity(t, 2.2, TITLE_START),
     worm: clamp01((t - WORM_START) / 2.2),

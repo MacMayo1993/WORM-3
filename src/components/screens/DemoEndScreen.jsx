@@ -19,11 +19,11 @@ const MODES = [
     blurb: 'Steer a worm, collect orbs, and heal the cube.',
     primary: true,
   },
-  { id: 'story', name: 'Levels', blurb: 'Complete guided cube puzzles.' },
-  { id: 'freeplay', name: 'Free Play', blurb: 'Solve a cube of your chosen size.' },
-  { id: 'chaos', name: 'Chaos', blurb: 'Bet on the surviving color pair.' },
-  { id: 'random', name: 'Random', blurb: 'Solve while palettes and tile styles change.' },
-  { id: 'store', name: 'Store', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
+  { id: 'story', name: 'Teach', blurb: 'Learn a complete beginner cube method.' },
+  { id: 'freeplay', name: 'Cube', blurb: 'Solve a cube at any size, no timer.' },
+  { id: 'chaos', name: 'Chaos', blurb: 'Predict which color pair lasts longest.' },
+  { id: 'random', name: 'Random', blurb: 'Solve while the colors and tile styles change.' },
+  { id: 'store', name: 'Store', blurb: 'Spend Parity Points on palettes, styles, and worm gear.' },
 ];
 
 const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit, onExplore }) => {
@@ -66,7 +66,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           margin: '0 0 8px',
           letterSpacing: '0.04em',
         }}>
-          Choose a Mode
+          Choose a mode
         </h1>
 
 
@@ -119,11 +119,11 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
 
         <button type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}
           style={{ minHeight: 48, marginTop: 12, background: 'transparent', border: 0, color: '#43513a', font: 'inherit' }}>
-          {expanded ? 'Fewer choices' : 'Explore other modes'}
+          {expanded ? 'Show fewer modes' : 'Show all modes'}
         </button>
         {!explored && <button type="button" onClick={onExplore}
           style={{ display: 'block', width: '100%', minHeight: 48, background: 'transparent', border: '1px solid #cec8be', borderRadius: 12, color: '#43513a', font: 'inherit' }}>
-          Explore more
+          Keep learning: 7 more lessons
         </button>}
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button
@@ -139,7 +139,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
               cursor: 'pointer', letterSpacing: '0.03em',
             }}
           >
-            Replay Demo
+            Replay demo
           </button>
           <button
             type="button"
@@ -154,7 +154,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
               cursor: 'pointer', letterSpacing: '0.03em',
             }}
           >
-            Back to Menu
+            Main menu
           </button>
         </div>
       </div>

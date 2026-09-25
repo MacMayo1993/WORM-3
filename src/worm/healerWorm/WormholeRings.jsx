@@ -1,3 +1,5 @@
+import TunnelSafetyMarkers from './TunnelSafetyMarkers.jsx';
+import { getWormStickerWorldPos } from '../wormExpansion.js';
 // src/worm/healerWorm/WormholeRings.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import React, { useRef } from 'react';
@@ -43,7 +45,7 @@ const _sparkBlack = new THREE.Color('#080308');
 const VOID_OUTER_COLOR = '#b8b1ff';   // inverted-feel rim over dark tiles
 const VOID_INNER_COLOR = '#121a3b';   // cool inverted core
 const VOID_BUBBLE_COLOR = '#39ff14';  // neon green ooze
-const CRITICAL_ARC_COLOR = '#7dff2a';  // electrical warning before full void
+const CRITICAL_ARC_COLOR = '#ff493d';  // electrical warning before full void
 const _criticalArcColor = new THREE.Color(CRITICAL_ARC_COLOR);
 const _tapeYellow = new THREE.Color('#ffe000');
 const _tapeBlack = new THREE.Color('#111111');
@@ -241,13 +243,14 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
 
         for (let i = 0; i < allPositions.length; i++) {
             const tile = allPositions[i];
-            const { tunnelKey, wp, normal: n, faceId } = tile;
+            const { tunnelKey, normal: n, faceId } = tile;
+            const wp = getWormStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size);
             const isVoid = !!(tunnelKey && voidKeys.has(tunnelKey));
             const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
             const isCritical = !isVoid && traversals >= WORMHOLE_MAX_TRAVERSALS;
             const faceColor = faceColorObjs.get(faceId) ?? _faceColorFallback;
             const stableKey = getStableKey(tile.x, tile.y, tile.z, tile.dirKey, cubies);
-            const ready = !isVoid && !!tunnelKey && !isParityLocked({ signature }, tile, { getCubies: () => cubies }) && healingNeed({
+            const ready = !isVoid && !isCritical && !!tunnelKey && !isParityLocked({ signature }, tile, { getCubies: () => cubies }) && healingNeed({
                 deposited: state.wormHealingProgress?.[stableKey]?.deposited ?? 0,
                 inventory: state.wormOrbInventory ?? {}, faceId, tailLength,
                 isPrism: state.wormCharacter === 'prism',
@@ -312,7 +315,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 // important thing about a wormhole — which orbs it wants — was not
                 // visible anywhere on the board. Kept part-way toward the old pink so
                 // portals still read as one family (and so a dark face colour still
-                // glows), and driven to the critical green once it turns deadly, which
+                // glows), and driven to the critical red once it turns deadly, which
                 // has to beat the face colour to be a warning at all.
                 _liveColor.copy(faceColor).lerp(_liveBaseColor, 0.25);
                 _liveColor.lerp(_criticalArcColor, isCritical ? 0.65 : 0).multiplyScalar(glowMul);
@@ -465,7 +468,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             }
 
 
-            if (isVoid) {
+            if (isVoid || isCritical) {
                 const framePulse = 1 + Math.sin(t * 6.5 + i * 0.9) * 0.22;
                 const half = 0.50;
                 const lift = 0.11;
@@ -538,6 +541,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
 
     return (
         <group visible={!hidden}>
+            <TunnelSafetyMarkers positions={allPositions} size={size} worm={worm} cubies={cubies}
+                voidTunnelKeysRef={voidTunnelKeysRef} tunnelUseCountsRef={tunnelUseCountsRef} hidden={hidden} />
             {/* Live wormhole rings — bright neon pink, fast spin */}
             <instancedMesh ref={liveRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
                 <torusGeometry args={[0.42, 0.025, 8, 32]} />
@@ -589,7 +594,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             {/* Void tile frame booster — brighter than neighbor tile frames */}
             <instancedMesh ref={voidFrameRef} args={[undefined, undefined, MAX_VOID_FRAME_SEGMENTS]} frustumCulled={false}>
                 <boxGeometry args={[1, 1, 1]} />
-                <meshBasicMaterial color="#9aff00" transparent opacity={0.95} blending={THREE.AdditiveBlending} depthWrite={false} />
+                <meshBasicMaterial color="#fff3d7" toneMapped={false} />
             </instancedMesh>
         </group>
     );

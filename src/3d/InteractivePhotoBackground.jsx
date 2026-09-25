@@ -37,7 +37,7 @@ class SkyBoundary extends React.Component {
   }
 }
 
-function PanoramaSky({ preset, files, rotationSpeed, intensity }) {
+function PanoramaSky({ preset, files, rotationSpeed, intensity, visible }) {
   const texture = useEnvironment(files ? { files } : { preset });
   const meshRef = useRef();
 
@@ -69,7 +69,7 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity }) {
   });
 
   return (
-    <mesh ref={meshRef} frustumCulled={false} renderOrder={-1}>
+    <mesh ref={meshRef} visible={visible} frustumCulled={false} renderOrder={-1}>
       <sphereGeometry args={[100, 64, 40]} />
       {/* meshBasicMaterial = map.rgb * color, so a scalar colour reproduces the
           drei background's `backgroundIntensity` multiply. depthWrite off keeps
@@ -81,7 +81,7 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity }) {
 
 // rotationSpeed defaults to 0 (static): only the main menu / mode-select scene
 // opts into the drift by passing a speed. In-game photo panoramas stay still.
-export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0, intensity = 1.2, blurriness = 0 }) {
+export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0, intensity = 1.2, blurriness = 0, visible = true }) {
   return (
     <>
       {/* Reflections / ambient IBL only (no `background`) so the rotating sphere
@@ -90,7 +90,7 @@ export default function InteractivePhotoBackground({ preset, files, rotationSpee
       <SafeEnvironment preset={files ? undefined : preset} files={files} backgroundBlurriness={blurriness} />
       <SkyBoundary>
         <React.Suspense fallback={null}>
-          <PanoramaSky preset={preset} files={files} rotationSpeed={rotationSpeed} intensity={intensity} />
+          <PanoramaSky visible={visible} preset={preset} files={files} rotationSpeed={rotationSpeed} intensity={intensity} />
         </React.Suspense>
       </SkyBoundary>
     </>

@@ -67,7 +67,7 @@ it('finishes Explore as 7/7 and removes its already-completed invitation', () =>
   useGameStore.setState({demoExploring:true, demoExploreComplete:true});
   render(<><DemoProgressBar currentStep="end"/><DemoEndScreen /></>);
   expect(host.textContent).toContain('7 / 7'); expect(host.textContent).toContain('Explore Complete');
-  expect(host.textContent).not.toContain('Explore more');
+  expect(host.textContent).not.toContain('Keep learning');
 });
 
 it('publishes pause-menu ownership and provides a 48px pause target', () => {

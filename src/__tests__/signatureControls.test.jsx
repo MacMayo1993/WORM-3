@@ -96,14 +96,14 @@ it('shows correct pickup requirements through the real tunnel lookup and store',
   const state = useGameStore.getState();
   const cubies = flipStickerPair(state.cubies, 5, 2, 3, 4, 'PZ', getManifoldMap(state.cubies, 5, state.rotationEpoch));
   act(() => useGameStore.setState({ cubies })); frame();
-  expect(host.textContent).toContain('Collect 2 more orbs');
+  expect(host.textContent).toContain('Need 2 orbs to heal');
   expect(host.querySelector('.worm-tunnel-needs').dataset.healReady).toBe('false');
   const face = cubies[2][3][4].stickers.PZ.curr;
   act(() => { worm.tailLength.current = 7; useGameStore.setState({ wormOrbInventory: { [face]: 3 } }); }); frame();
-  expect(host.textContent).toContain('Collect 1 more orb');
+  expect(host.textContent).toContain('Need 1 orb to heal');
   const key = getStableKey(2, 3, 4, 'PZ', cubies);
   act(() => useGameStore.setState({ wormHealingProgress: { [key]: { deposited: 1, faceId: face } } })); frame();
-  expect(host.textContent).toContain('Ready to heal');
+  expect(host.textContent).toContain('Heal ready');
   expect(host.querySelector('.worm-tunnel-needs').dataset.healReady).toBe('true');
   expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('25');
   act(() => useGameStore.setState({ wormOrbInventory: { [face]: 0 } })); frame();
@@ -117,4 +117,23 @@ it('Classic receives extra orbs from the actual run reset', () => {
   expect(useGameStore.getState().wormPowerups).toHaveLength(8);
   act(() => useGameStore.setState({ wormCharacter: 'glow', wormRunId: 104 })); frame();
   expect(useGameStore.getState().wormPowerups).toHaveLength(5);
+});
+
+it('exposes Classic Orb Call on the touch dock and Q, with a paused countdown and retry reset', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'classic', wormRunId: 105 })); frame();
+  const button = host.querySelector('button');
+  expect(button.getAttribute('aria-label')).toBe('Orb Call'); expect(button.disabled).toBe(false);
+  act(() => button.dispatchEvent(new Event('pointerdown', { bubbles: true }))); frame();
+  expect(worm.signature.current.seq).toBe(1);
+  expect(useGameStore.getState().wormMagnetActive).toBe(true);
+  expect(wormBuffs.magnetMaxT).toBe(6);
+  expect(button.textContent).toContain('Active'); expect(button.disabled).toBe(true);
+  const remaining = wormBuffs.magnetT, cooldown = worm.signature.current.cooldown;
+  act(() => useGameStore.setState({ wormPaused: true }));
+  for (let i = 0; i < 20; i++) frame();
+  expect(wormBuffs.magnetT).toBe(remaining); expect(worm.signature.current.cooldown).toBe(cooldown);
+  act(() => useGameStore.setState({ wormRunId: 106, wormPaused: false })); frame();
+  expect(wormBuffs.magnetT).toBe(0); expect(button.disabled).toBe(false);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', bubbles: true }))); frame();
+  expect(worm.signature.current.seq).toBe(1); expect(wormBuffs.magnetT).toBeGreaterThan(0);
 });

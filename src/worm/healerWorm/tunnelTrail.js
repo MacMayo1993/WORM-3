@@ -22,7 +22,7 @@ export function advanceTunnelHead(sim, phase, nextProgress, size) {
     const from = Math.min(1, sim.tunnelProgress);
     const to = Math.min(1, nextProgress);
     const wind = phase === 'windup' || phase === 'windout';
-    if (!wind) buildTunnelCenterlineInto(path, tunnel, size);
+    if (!wind) buildTunnelCenterlineInto(path, tunnel, size, sim.expansionAmount);
     const entryN = FACE_NORMALS[tunnel.entry.dirKey];
     const exitN = FACE_NORMALS[tunnel.exit.dirKey];
     startNormal.copy(entryN);
@@ -37,10 +37,10 @@ export function advanceTunnelHead(sim, phase, nextProgress, size) {
                 // cross the solid tile beside the aperture.
                 const aligned = THREE.MathUtils.smoothstep(p, 0, 0.65);
                 const dive = THREE.MathUtils.smoothstep(p, 0.65, 1);
-                getWindWorldPosInto(sim.headInterpPos, tunnel, 'entry', dive, size);
+                getWindWorldPosInto(sim.headInterpPos, tunnel, 'entry', dive, size, sim.expansionAmount);
                 sim.headInterpPos.lerp(sim.tunnelApproach, 1 - aligned);
             } else {
-                getWindWorldPosInto(sim.headInterpPos, tunnel, exiting ? 'exit' : 'entry', exiting ? windoutHeadS(p) : p, size);
+                getWindWorldPosInto(sim.headInterpPos, tunnel, exiting ? 'exit' : 'entry', exiting ? windoutHeadS(p) : p, size, sim.expansionAmount);
             }
             normal.copy(exiting ? exitN : entryN);
         } else {

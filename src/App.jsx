@@ -1,4 +1,4 @@
-import { storyLevel, storyUnlocked } from './worm/story/levels.js';
+import { storyLevel, storyUnlocked, storyLaunchSettings } from './worm/story/levels.js';
 import { LevelUpCue, AchievementCue } from './progression/ProgressWidgets.jsx';
 import { getDirectWormPreview, subscribeDirectWormPreview } from './3d/directWormPreview.js';
 import DirectWormPreviewHost from './3d/DirectWormPreviewHost.jsx';
@@ -57,8 +57,9 @@ import {
 
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
-import IntroBackdrop from './components/intro/IntroBackdrop.jsx';
 import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
+import MenuPaperBackdrop from './3d/MenuPaperBackdrop.jsx';
+import { subscribeCarouselActive, isCarouselActive } from './components/menus/menuCarouselState.js';
 import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 import { setWormSharedRenderer, tickWormPreviews, hasActiveWormPreviews } from './3d/WormPreviewRenderer.js';
@@ -70,7 +71,6 @@ import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 const Tutorial = React.lazy(() => import('./components/screens/Tutorial.jsx'));
 import MobiIntroScreen, {
   MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
-  MOBI_LINES_TEACH,
   MOBI_LINES_BIOME, MOBI_LINES_CHAOS,
   MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
@@ -113,24 +113,23 @@ const DEFAULT_CAMERA_FOV = 40;
 
 /**
  * IntroBranch — 3D content rendered inside the Canvas during the welcome/intro.
- * Contains IntroScene, post-processing, and intro lights.
+ * Contains IntroScene, the shared paper backdrop and the intro lights.
  * Unmounting is avoided by conditionally hiding it (never fully unmounting the Canvas).
  */
 function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode = false }) {
+  // Daylight on cream paper, the same world as the arcade menus that follow:
+  // a warm key from above, a cool fill, and a soft environment for the stickers'
+  // gloss. No bloom — on a light page it only washes the paper out.
   return (
     <>
-      <color attach="background" args={['#111b1e']} />
-      <ambientLight intensity={1.0} />
-      <pointLight position={[10, 10, 10]} intensity={2.2} />
-      <pointLight position={[-10, -10, -10]} intensity={1.6} />
-      <pointLight position={[-6, 2, 8]} intensity={1.4} color="#4a7ccc" />
-      <pointLight position={[5, -4, -6]} intensity={0.8} color="#2a4a8a" />
-      <IntroBackdrop time={time} reducedMotion={reducedMotion} performanceMode={performanceMode} />
+      <color attach="background" args={['#f8f4e8']} />
+      <ambientLight intensity={0.85} />
+      <directionalLight position={[6, 12, 8]} intensity={2.4} color="#fff4de" />
+      <directionalLight position={[-8, 4, -6]} intensity={0.9} color="#dfe9ff" />
+      <pointLight position={[-6, 2, 8]} intensity={1.2} color="#ffffff" />
+      <MenuPaperBackdrop />
       <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <SafeEnvironment preset="city" />
-      {!performanceMode && (
-        <Suspense fallback={null}><SceneEffects kind="intro" /></Suspense>
-      )}
     </>
   );
 }
@@ -192,6 +191,7 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
 function MenuScene({ onCubeClick, background }) {
+  const carouselActive = useSyncExternalStore(subscribeCarouselActive, isCarouselActive, () => false);
   const directPreview = useSyncExternalStore(subscribeDirectWormPreview, getDirectWormPreview, () => null);
   return (
     <>
@@ -205,6 +205,7 @@ function MenuScene({ onCubeClick, background }) {
       <directionalLight position={[2, 4, -6]} intensity={1.3} color="#e6edff" />
       <Suspense fallback={null}>
         <InteractivePhotoBackground
+          visible={!carouselActive}
           files={getBackgroundUrl(background.file)}
           // Counter-rotate the panorama against the menu cube. The faster but
           // still gentle orbit lets a player read the whole environment instead
@@ -215,10 +216,11 @@ function MenuScene({ onCubeClick, background }) {
         />
       </Suspense>
       <Suspense fallback={null}>
+        {carouselActive && <MenuPaperBackdrop />}
         <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
       {!isMobile && (
-        <Suspense fallback={null}><SceneEffects kind="menu" enabled={!directPreview} /></Suspense>
+        <Suspense fallback={null}><SceneEffects kind="menu" enabled={!directPreview && !carouselActive} /></Suspense>
       )}
     </>
   );
@@ -329,7 +331,7 @@ export default function WORM3() {
   // ========================================================================
   const {
     size, cubies, manifoldMap, metrics, resolvedColors,
-    setCubies, setRotatedCubies, changeSize, shuffle, reset, flipSticker, healSticker
+    setCubies, setRotatedCubies, changeSize, reset, flipSticker, healSticker
   } = useCubeState();
 
   const { moves, gameTime, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
@@ -669,6 +671,7 @@ export default function WORM3() {
   // ========================================================================
   const explosionTRef = useRef(0);
   useEffect(() => {
+    if (wormHealerMode) return; // WORM pickup owns its simulation-driven expansion.
     if (exploded && explosionTRef.current >= 1) return;
     if (!exploded && explosionTRef.current <= 0) return;
 
@@ -688,7 +691,7 @@ export default function WORM3() {
     };
     raf = requestAnimationFrame(animate);
     return () => { if (raf) cancelAnimationFrame(raf); };
-  }, [exploded, setExplosionT]);
+  }, [exploded, setExplosionT, wormHealerMode]);
 
   // Dismiss mobile touch hint after delay
   useEffect(() => {
@@ -703,8 +706,8 @@ export default function WORM3() {
   const handleWelcomeComplete = useCallback(() => {
     setShowWelcome(false);
     markIntroSeen();
-    // Cover the first cube frame after the opening cinematic.
-    armSceneGate('Opening the cube…', { eager: true, holdMs: 300, z: 10000 });
+    // Only cover a real asset load; an eager cover flashes over a ready menu.
+    armSceneGate('Opening the cube…', { eager: false, holdMs: 300, z: 10000 });
     // Show main menu after intro (not tutorial).
     useGameStore.getState().setShowMainMenu(true);
   }, [setShowWelcome, markIntroSeen, armSceneGate]);
@@ -837,14 +840,21 @@ export default function WORM3() {
   }, []);
 
   const handleMenuTeach = useCallback(() => {
-    useGameStore.getState().setShowMainMenu(false);
-    useGameStore.getState().clearLevel();
-    if (size !== 3) changeSize(3);
-    shuffle();
-    launchWithMobi(MOBI_LINES_TEACH, 'TEACH MODE', () => {
-      setTimeout(() => teachMode.enterTeachMode(), 0);
-    });
-  }, [size, changeSize, shuffle, teachMode, launchWithMobi]);
+    const state = useGameStore.getState();
+    state.setShowMainMenu(false);
+    setShowCubeModeSelect(false);
+    state.clearLevel();
+    cancelShuffle();
+    state.resetGame();
+    state.setRandomMode(false);
+    state.setWormHealerMode(false);
+    state.setFlipMode(false);
+    state.setVisualMode('classic');
+    state.setHollowMode(false);
+    state.setShowTunnels(false);
+    state.setSize(3);
+    teachMode.enterTeachMode({ course: true });
+  }, [cancelShuffle, teachMode]);
 
   const handleMenuWormHealer = useCallback(() => {
     setWormEntryPage('choice');
@@ -870,7 +880,8 @@ export default function WORM3() {
       wormEnemiesEnabled: chapterLevel ? settings.wormEnemiesEnabled : wizardSettings.wormEnemiesEnabled !== false,
     };
     if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
-    setSettings(newSettings);
+    if (chapterLevel) useGameStore.getState().applyWormStoryLook(chapterLevel.id);
+    else setSettings(newSettings);
 
     // Switch to game scene (showMainMenu already false), reset cube so it's
     // visible and styled before the worm gameplay starts.
@@ -936,6 +947,7 @@ export default function WORM3() {
   const handleWormWizardCancel = useCallback(() => {
     clearMegaReducedFXOverride();
     setShowWormModeWizard(false);
+    setShowModeSelect(true);
     useGameStore.getState().setShowMainMenu(true);
   }, [clearMegaReducedFXOverride]);
 
@@ -958,9 +970,7 @@ export default function WORM3() {
     const s = useGameStore.getState();
     const id = (s.wormStoryResult?.levelId ?? 0) + 1;
     if (!s.wormStoryResult || !storyUnlocked(s.playerProgress, id)) return;
-    handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles,
-      storyLevel: id, cubeSize: storyLevel(id).cubeSize ?? 5, megaMode: false, wormSpeed: storyLevel(id).speed, wormOrbCount: 1,
-      wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
+    handleWormSetupComplete({ ...s.settings, perFaceStyles: s.settings.manifoldStyles, ...storyLaunchSettings(storyLevel(id)) });
   }, [handleWormSetupComplete]);
 
   const handleMenuComingSoon = useCallback(() => {
@@ -993,6 +1003,7 @@ export default function WORM3() {
   }, [setShowTutorial, markTutorialDone]);
 
   const onTapFlip = useCallback((pos, dirKey) => {
+    if (useGameStore.getState().teachCourseActive) return;
     flipSticker(pos, dirKey);
   }, [flipSticker]);
   onTapFlipRef.current = onTapFlip;
@@ -1301,7 +1312,7 @@ export default function WORM3() {
 
   // Surfaces that own the screen but live in App's local state rather than the
   // store, so selectCubeInputBlocked cannot see them.
-  const keyboardDisabled = showStore || showModeSelect || showCubeModeSelect || showComingSoon
+  const keyboardDisabled = teachMode.courseActive || showStore || showModeSelect || showCubeModeSelect || showComingSoon
     || showMobiusCubelet || showMobiIntro
     || showFreeplayWizard || showRandomWizard || showWormModeWizard
     || showDisparityWizard || showDisparityBetting;
@@ -1344,11 +1355,12 @@ export default function WORM3() {
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Suspense fallback={<LoadingScreen message="Loading guide" />}><Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} /></Suspense>
       </ScreenTransition>
-      {showModeSelect && (
+      {showModeSelect && !showSettings && (
         <Suspense fallback={null}>
           <ModeCarousel
             onBack={() => setShowModeSelect(false)}
-            onCubeSelect={() => { setShowModeSelect(false); handleStartCampaign(); }}
+            onSettings={handleMenuSettings}
+            onCubeSelect={() => { setShowModeSelect(false); handleMenuTeach(); }}
             onWormSelect={() => { setShowModeSelect(false); handleMenuWormHealer(); }}
             onChaos={() => { setShowModeSelect(false); handleMenuDisparity(); }}
             onFreeplay={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
@@ -1397,7 +1409,7 @@ export default function WORM3() {
           ) : showMainMenu ? (
             // Stop the cube/worm animation when a full-screen overlay covers the menu
             showSettings ? <color attach="background" args={['#000005']} /> : (
-              <MenuScene onCubeClick={handleMenuCube} background={menuBackground} />
+              <MenuScene onCubeClick={handleMenuTeach} background={menuBackground} />
             )
           ) : (
             <Suspense fallback={null}>
@@ -1666,7 +1678,7 @@ export default function WORM3() {
         <Suspense fallback={null}>
           <DemoEndScreen
             onWorm={() => { handleExitDemo(); handleMenuWormHealer(); }}
-            onStory={() => { handleExitDemo(); handleStartCampaign(); }}
+            onStory={() => { handleExitDemo(); handleMenuTeach(); }}
             onFreeplay={handleDemoFreeplay}
             onChaos={() => { handleExitDemo(); handleMenuDisparity(); }}
             onRandom={() => { handleExitDemo(); handleMenuRandomMode(); }}

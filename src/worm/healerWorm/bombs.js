@@ -14,7 +14,7 @@
 
 import { getNextSurfacePosition, getWormholeHealRing } from '../wormLogic.js';
 import { ttAt } from '../circularBuffers.js';
-import { BODY_BALL_SPACING } from './constants.js';
+import { bodyCoverageCount } from './bodyCoverage.js';
 
 // ─── Tuning ──────────────────────────────────────────────────────────────────
 export const BOMB_FUSE_SECONDS = 5; // countdown from spawn to detonation
@@ -68,9 +68,11 @@ export function computeBlastTiles(bomb, size, radius = BOMB_BLAST_RADIUS) {
   for (const dir of BLAST_DIRS) {
     const arm = [];
     let cell = center;
+    let heading = dir;
     for (let step = 0; step < radius; step++) {
-      cell = getNextSurfacePosition(cell, dir, size);
+      cell = getNextSurfacePosition(cell, heading, size);
       if (!cell) break;
+      heading = cell.moveDir ?? heading;
       const key = tileKeyOf(cell);
       // A wrapped arm can loop back onto a cell another arm already claimed
       // (small cubes especially); keep the render segment but don't double-count.
@@ -124,18 +126,21 @@ export function isBombDisarmed(bomb, occupiedKeys, size) {
  * @param {Set<string>} blastKeys - tile keys the blast covers
  * @returns {{type:'death'} | {type:'cut', cutTrailIdx:number} | null}
  */
-export function checkBlastHitWorm(worm, blastKeys) {
+export function checkBlastHitWorm(worm, blastKeys, size = 5) {
   // A rocket-boosting worm barrels through hazards untouched, same as the slice check.
   if (worm.rocketActive?.current) return null;
   const trail = worm.tileTrail?.current;
   if (!trail || trail.count === 0 || !blastKeys || blastKeys.size === 0) return null;
 
   const airborne = worm.isJumping?.current || (worm.landingGraceT?.current ?? 0) > 0;
-  const activeTiles = Math.max(1, Math.ceil((worm.tailLength?.current ?? 1) * BODY_BALL_SPACING));
-  const bodyEnd = Math.min(activeTiles, trail.count);
+  const bodyEnd = bodyCoverageCount(worm.tailLength?.current ?? 1, trail.count,
+    size, worm.expansionAmount?.current ?? 0);
 
   // Head kills first (only when grounded — a jump clears the blast).
-  if (!airborne && blastKeys.has(ttAt(trail, 0))) return { type: 'death' };
+  const previous = worm.prevTile?.current;
+  const head = previous && (worm.interpT?.current ?? 1) < 0.5 ? previous : worm.pos?.current;
+  const headKey = head ? tileKeyOf(head) : ttAt(trail, 0);
+  if (!airborne && blastKeys.has(headKey)) return { type: 'death' };
 
   // Otherwise the earliest body segment in the blast is where the tail burns off.
   for (let i = 1; i < bodyEnd; i++) {

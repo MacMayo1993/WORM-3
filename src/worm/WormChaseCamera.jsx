@@ -1,12 +1,13 @@
 import { boundedWormZoom, wormSurfaceFov } from './healerWorm/zoomLimit.js';
-import { sliceOverviewInto } from './healerWorm/sliceCamera.js';
 import React, { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { bodyPathHeadInto } from './healerWorm/sliceBodyPath.js';
-import { getStickerWorldPos } from '../game/coordinates.js';
+import { bombImpactShotInto, sliceShotInto } from './sliceShot.js';
+import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
+import { getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
 import { rocketOrbitInto, rocketOrbitT, rocketFrameInto } from './healerWorm/rocketOrbit.js';
 import { tunnelState } from './tunnelProgressBridge.js';
 import {
@@ -127,23 +128,23 @@ const REVEAL_LIFT = 2.2;     // extra height at the start, as a multiple of camH
 const REVEAL_BACK = 2.6;     // extra setback at the start, as a multiple of camBack
 
 // Slice-death freeze frame ("WORM'D") scratch + tuning. On the hit we ease once
-// into an overview of the cut side, keeping the severed head and layer visible,
-// then hold that pose dead still. Computed a single time on entry; the settled
-// hold does no per-frame target math or projection-matrix work.
+// out to the slice shot (sliceShot.js): the whole cube in the lens, aimed between
+// the layer that did the cutting and the impact, so the player sees what hit
+// them. Then it holds that pose dead still; the settled hold does no per-frame
+// target math or projection-matrix work.
 const _freezeStartCam = new THREE.Vector3();
 const _freezeStartLook = new THREE.Vector3();
-const _freezeTargetCam = new THREE.Vector3();
-const _freezeTargetLook = new THREE.Vector3();
-const _freezeTargetUp = new THREE.Vector3();
-const SLICE_FREEZE_SETTLE = 0.42;
+const _freezeStartUp = new THREE.Vector3();
+const _sliceShot = { cam: new THREE.Vector3(), look: new THREE.Vector3(), up: new THREE.Vector3() };
+const _freezeShot = { cam: new THREE.Vector3(), look: new THREE.Vector3(), up: new THREE.Vector3() };
+const SLICE_FREEZE_SETTLE = 0.65; // seconds to pull out to the slice shot
 
-// Body-cut ("WORM'D" survives) beat scratch. The worm pauses; the chase
-// framing swings out to an exterior shot of the impact side of the cube so the
-// player sees the hit, then eases back to the chase as the beat expires.
+// Body-cut ("WORM'D" survives) beat scratch. The worm keeps its pose; the chase
+// framing swings out to the same slice shot so the player sees the layer that
+// sheared the tail, then eases back to the chase as the beat expires.
 const _cutFocusPos = new THREE.Vector3();
-const _cutCam = new THREE.Vector3();
-const _cutLook = new THREE.Vector3();
 const _cutUp = new THREE.Vector3();
+const CUT_FOCUS_PEAK = 1; // the swing reaches the full slice shot
 
 const frameForward = new THREE.Vector3();
 const frameDirection = new THREE.Vector3();
@@ -228,33 +229,41 @@ export default function WormChaseCamera({ worm, size }) {
 
         // A layer slice is staged as a comic-book freeze frame while ThunkEffect
         // plays WORM'D. Rather than merely holding wherever the smoothed chase lens
-        // happened to lag to, we ease ONCE — over SLICE_FREEZE_SETTLE — into a
-        // screen-fitted overview of the severed head and rotating layer,
-        // so the location of the hit is visible. After that it holds perfectly
-        // still (no per-frame target math, no projection-matrix churn) so the death
-        // card sits on a rock-steady plate.
+        // happened to lag to, we ease ONCE — over SLICE_FREEZE_SETTLE — out to the
+        // slice shot: the whole cube, aimed between the cutting layer and the hit,
+        // so the player sees what caught them. After that it holds perfectly still
+        // (no per-frame target math, no projection-matrix churn) so the death card
+        // sits on a rock-steady plate.
         if (!gameState.wormAlive && gameState.wormDeathDetails?.reason === 'slice-rotation') {
             if (!sliceFreezeActiveRef.current) {
                 sliceFreezeActiveRef.current = true;
                 sliceFreezeTRef.current = 0;
                 _freezeStartCam.copy(camPosRef.current);
                 _freezeStartLook.copy(lookAtRef.current);
-                // The sim has stopped, so the head holds the impact point.
-                _camWormWorld.copy(worm.headInterpPos.current);
-                sliceOverviewInto(_freezeTargetCam, _freezeTargetLook, _freezeTargetUp,
-                    _camWormWorld, size, camera.fov, viewportAspect);
+                _freezeStartUp.copy(camUpRef.current);
+                // A fatal neck cut can be on another face from the head. Prefer
+                // the recorded severing point for both scheduled and live cuts.
+                const details = gameState.wormDeathDetails;
+                const impact = details.impactPosition ?? worm.headInterpPos.current.toArray();
+                sliceShotInto(_freezeShot, impact, details.axis ?? null, details.sliceIndex ?? null, size, {
+                    scale: cubeExpansionScale(size, worm.expansionAmount?.current ?? 0),
+                    fov: camera.fov,
+                    aspect: camera.aspect
+                });
             }
             if (sliceFreezeTRef.current < SLICE_FREEZE_SETTLE) {
                 sliceFreezeTRef.current = Math.min(SLICE_FREEZE_SETTLE, sliceFreezeTRef.current + delta);
                 const ft = sliceFreezeTRef.current / SLICE_FREEZE_SETTLE;
                 const eased = ft * ft * (3 - 2 * ft); // smoothstep
-                camPosRef.current.copy(_freezeStartCam).lerp(_freezeTargetCam, eased);
-                lookAtRef.current.copy(_freezeStartLook).lerp(_freezeTargetLook, eased);
+                camPosRef.current.copy(_freezeStartCam).lerp(_freezeShot.cam, eased);
+                lookAtRef.current.copy(_freezeStartLook).lerp(_freezeShot.look, eased);
+                camUpRef.current.copy(_freezeStartUp).lerp(_freezeShot.up, eased);
+                if (camUpRef.current.lengthSq() < 1e-6) camUpRef.current.copy(_freezeShot.up);
+                camUpRef.current.normalize();
             }
             camera.position.copy(camPosRef.current);
-            aimCamera(camera, camPosRef.current, lookAtRef.current, _freezeTargetUp,
-                sliceFreezeTRef.current >= SLICE_FREEZE_SETTLE ? 1 : 1 - Math.exp(-12 * delta));
-            camUpRef.current.copy(camera.up);
+            camera.up.copy(camUpRef.current);
+            camera.lookAt(lookAtRef.current);
             prevGamePhaseRef.current = gamePhase;
             return;
         }
@@ -377,7 +386,7 @@ export default function WormChaseCamera({ worm, size }) {
             : phase === 'exiting' ? 1 - diveEase((_enterP - 0.5) / 0.5)
             : 0;
         const rocketLift = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
-        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 16, tunnelMix) + rocketLift * 7;
+        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 16, tunnelMix) + rocketLift * 2;
         const fovAlpha = 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -549,9 +558,9 @@ export default function WormChaseCamera({ worm, size }) {
             // Camera: behind worm (opposite of forward) + above face (along normal),
             // pitched down by the portrait rake on narrow viewports.
             _camTargetCam.copy(_camWormWorld)
-                .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 - 0.24 * rocketLift))
-                .addScaledVector(_camForward, -camBack * rakeTuck - rocketLift * 0.6);
-            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead + rocketLift * 0.9);
+                .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 + 0.12 * rocketLift))
+                .addScaledVector(_camForward, -camBack * rakeTuck - rocketLift * 0.9);
+            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead + rocketLift * 0.35);
             // Mobile follows the player on every board size. A center bias grows
             // with the board and used to pull Mega's head out of the viewport.
             if (mobile) _camTargetLook.copy(_mobileHeadWorld);
@@ -602,24 +611,34 @@ export default function WormChaseCamera({ worm, size }) {
             // Body-cut beat: a rotating layer sheared off part of the tail but the
             // worm lived. The game freezes for this beat (the sim and the rotation
             // hazard clock both stop — see stepWormSim / HealerWormMode), so swing
-            // the framing out to an exterior shot of the impact side of the cube —
-            // level and pulled back so the hit and the WORM'D card read, while the
-            // severing slice spins into view — then ease back to the chase as the
-            // beat expires ("he comes back") and the frozen worm resumes.
+            // the framing out to the slice shot (sliceShot.js) — the whole cube,
+            // level, aimed between the severing layer and the hit — while that layer
+            // spins, then ease back to the chase as the beat expires ("he comes
+            // back") and the frozen worm resumes. Bombs use a close impact shot.
             const cutFocusT = worm.cutFocusT?.current ?? 0;
             const cutPos = worm.cutFocusPos?.current;
-            let cutBlend = 0;
             if (cutFocusT > 0 && cutPos) {
                 const elapsed = CUT_FOCUS_DURATION - cutFocusT;
-                const rampIn = THREE.MathUtils.smoothstep(elapsed, 0, 0.18);
-                const rampOut = THREE.MathUtils.smoothstep(cutFocusT, 0, 0.3);
-                cutBlend = Math.min(rampIn, rampOut);
+                // A longer swing than the old push-in: the shot travels out to hold
+                // the whole cube, and a snap that far reads as a cut, not a move.
+                const rampIn = THREE.MathUtils.smoothstep(elapsed, 0, 0.45);
+                const rampOut = THREE.MathUtils.smoothstep(cutFocusT, 0, 0.5);
+                const cutBlend = Math.min(rampIn, rampOut) * CUT_FOCUS_PEAK;
                 if (cutBlend > 0.001) {
                     _cutFocusPos.fromArray(cutPos);
-                    sliceOverviewInto(_cutCam, _cutLook, _cutUp, _cutFocusPos,
-                        size, camera.fov, viewportAspect);
-                    _camTargetCam.lerp(_cutCam, cutBlend);
-                    _camTargetLook.lerp(_cutLook, cutBlend);
+                    const cutSlice = worm.cutFocusSlice?.current;
+                    if (cutSlice) {
+                        sliceShotInto(_sliceShot, _cutFocusPos, cutSlice.axis, cutSlice.layer, size, {
+                            scale: cubeExpansionScale(size, worm.expansionAmount?.current ?? 0),
+                            fov: camera.fov,
+                            aspect: camera.aspect
+                        });
+                    } else {
+                        bombImpactShotInto(_sliceShot, _cutFocusPos, size);
+                    }
+                    _camTargetCam.lerp(_sliceShot.cam, cutBlend);
+                    _camTargetLook.lerp(_sliceShot.look, cutBlend);
+                    _cutUp.copy(_sliceShot.up);
                     _camUp.lerp(_cutUp, cutBlend);
                     if (_camUp.lengthSq() < 1e-6) _camUp.copy(_cutUp);
                     _camUp.normalize();
@@ -640,18 +659,19 @@ export default function WormChaseCamera({ worm, size }) {
 
             // Exponential damping has the same response at 30/60/120 Hz.
             // Linear dt gains made Mega's fluctuating frame times change the drag.
-            const alpha = 1 - Math.exp(-crawlK * (1 + rocketLift * 0.6) * delta);
+            const alpha = 1 - Math.exp(-crawlK * delta);
             camPosRef.current.lerp(_camTargetCam, alpha);
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
             aimCamera(camera, camPosRef.current, lookAtRef.current, _camUp, alpha);
-            if (mobile) {
-                // Let the cut composition take over from the head lock, then
-                // ease back to the player as the animation finishes.
-                if (cutBlend > 0.001) _mobileHeadWorld.lerp(_cutLook, cutBlend);
+            // The cut beat owns its framing: re-aiming at the head here is what
+            // kept phones from ever seeing the slice (the shot swung out, then
+            // this pulled the head back to the centre of a tight view).
+            const cutBeat = worm.cutFocusT?.current > 0;
+            if (mobile && !cutBeat) {
                 frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
                 lookAtRef.current.copy(_mobileHeadWorld);
-            } else if (!rocketLift && !(worm.healPauseT?.current > 0) && !(worm.cutFocusT?.current > 0)) {
+            } else if (!mobile && !rocketLift && !(worm.healPauseT?.current > 0) && !cutBeat) {
                 frameSurfaceCamera(camera, portraitFactor);
             }
             camUpRef.current.copy(camera.up);

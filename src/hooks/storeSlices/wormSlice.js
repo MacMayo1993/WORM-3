@@ -2,6 +2,7 @@ import { ACCESSORY_SLOTS, EMPTY_ACCESSORIES, getAccessory } from '../../worm/han
 import { characterXpMultiplier } from '../../worm/characterAbilities.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { storyLevel, storyUnlocked } from '../../worm/story/levels.js';
+import { storyVisualChanges } from '../../worm/story/worlds.js';
 import { completeStoryChanges, claimStoryChanges } from '../../worm/story/rewards.js';
 import { createXpRun, wormMultiplier } from '../../progression/model.js';
 import { wormMissionChanges } from '../../worm/wormEventChanges.js';
@@ -21,10 +22,13 @@ const WORM_CHARACTER_KEY = 'worm3_character';
 export const createWormSlice = (set, get) => ({
   // ── Mode flag ─────────────────────────────────────────────────────────────
   wormHealerMode: false,
+  wormStoryVisualBase: null,
+  wormStoryViewBase: null,
+  applyWormStoryLook: id => set(s => id !== null && !storyUnlocked(s.playerProgress, id) ? s : storyVisualChanges(s, id)),
   startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen ? { wormStoryStarted: true, wormPaused: false } : s),
   completeWormStory: (runId, metrics) => set(s => completeStoryChanges(s, runId, metrics)),
   claimWormStoryReward: (id, choice) => set(s => claimStoryChanges(s, id, choice)),
-  setWormHealerMode: (v) => set({ wormHealerMode: v }),
+  setWormHealerMode: (v) => set(s => ({ wormHealerMode: v, ...(!v ? storyVisualChanges(s, null) : {}) })),
 
   // ── Config (persists across sessions or set by wizard) ────────────────────
   wormRunId: 0,
@@ -123,13 +127,15 @@ export const createWormSlice = (set, get) => ({
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   // Tears down BOTH a disparity round and a worm run — the two share the same
   // runtime fields. Lives in the worm slice because initWormMode is its mirror.
-  clearDisparityGame: () => set({
+  clearDisparityGame: () => set(state => ({
+    ...storyVisualChanges(state, null),
     xpRun: null,
     ...makeDisparityRuntimeDefaults(),
     ...makeWormSessionDefaults(),
     wormHealerMode: false,
-  }),
+  })),
   initWormMode: (flipCap = 9999, _chaosLevel = 0, speed = null, orbCount = null, interval = null, color = null, combat = false, enemies = true, storyId = null) => set((state) => storyId !== null && !storyUnlocked(state.playerProgress, storyId) ? state : ({
+    ...storyVisualChanges(state, storyId),
     ...makeDisparityRuntimeDefaults(),
     ...makeWormSessionDefaults(),
     wormHealerMode: true,

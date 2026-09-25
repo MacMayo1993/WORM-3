@@ -14,6 +14,8 @@ import {
   resetWormSim,
   stepWormSim,
   applyRotationToSim,
+  evaluatePosAndNormal,
+  startJump,
   tileKey,
 } from '../worm/healerWorm/wormSim.js';
 import {
@@ -28,6 +30,7 @@ import { nextRestRead, nextRestReadDuringStep, restReadProtectsTile } from '../w
 import { resolveSliceHits, rideLiveRotation, rotateTilePosition } from '../worm/wormHelpers.js';
 import { ttAt, ttPush, makeTileTrail, shPush, shAt } from '../worm/circularBuffers.js';
 import { BODY_BALL_SPACING, BASE_TAIL_LENGTH } from '../worm/healerWorm/constants.js';
+import { getStickerWorldPos } from '../game/coordinates.js';
 
 const SIZE = 3;
 
@@ -92,13 +95,67 @@ const asWorm = (sim) => {
     interpT: f('interpT'), prevTile: f('prevTile'), tileTrail: f('tileTrail'),
     tailLength: f('tailLength'), headInterpPos: f('headInterpPos'),
     currentNormal: f('currentNormal'), rocketActive: f('rocketActive'),
-    landingGraceT: f('landingGraceT'),
+    landingGraceT: f('landingGraceT'), rotationDeparture: f('rotationDeparture'),
   };
 };
 
 beforeEach(() => {
   resetLiveRotation();
   liveRotation.completedTxnId = 0;
+});
+
+describe('jumping off a turning outer layer', () => {
+  for (const axis of ['col', 'row', 'depth']) {
+    for (const dir of [-1, 1]) {
+      it.each([0, 0.35])(`keeps the launch, landing and body continuous through ${axis} / ${dir} at expansion %s`, amount => {
+        const sim = makeSim(), ctx = makeCtx();
+        sim.expansionAmount = amount;
+        const coord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
+        const source = axis === 'col'
+          ? { x: 2, y: 1, z: 2, dirKey: 'PZ' }
+          : { x: 1, y: 2, z: 2, dirKey: axis === 'row' ? 'PZ' : 'PY' };
+        const target = { ...source, [coord]: 1 };
+        const world = p => new THREE.Vector3().fromArray(getStickerWorldPos(p.x, p.y, p.z, p.dirKey, SIZE, amount));
+        const rotationAxis = new THREE.Vector3(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+        sim.prevTile = source;
+        sim.prevDirKey = source.dirKey;
+        sim.pos = target;
+        sim.prevWorldPos = sim._prevWP.copy(world(source));
+        sim.curWorldPos.copy(world(target));
+        sim.interpT = sim.stepAcc = 0.25;
+        sim.lastRecordedT = 0.26;
+        beginTurn(axis, [2], [dir]);
+        startJump(sim, ctx, SIZE, { allowDive: false });
+        stepWormSim(sim, 0.05, SIZE, ctx);
+        expect(sim.rotationDeparture?.txnId).toBe(liveRotation.txnId);
+        const expected = world(source).applyAxisAngle(rotationAxis, dir * Math.PI / 4).lerp(world(target), sim.interpT);
+        expect(sim.headInterpPos.distanceTo(expected)).toBeLessThan(1e-8);
+        expect(rideLiveRotation(asWorm(sim))).toBe(false);
+        expect(sim.headInterpPos.distanceTo(expected)).toBeLessThan(1e-8);
+        const record = shAt(sim.stepHistory, 0);
+        expect(record.tx).toBe(-1);
+        expect(record.restTxn).toBe(liveRotation.txnId);
+        const recordedPosition = record.pos.clone();
+        beginTurn(axis, [2], [dir], 1);
+        const before = new THREE.Vector3();
+        const normalBefore = evaluatePosAndNormal(sim, sim.interpT, before).clone();
+        resetLiveRotation();
+        applyRotationToSim(sim, SIZE, ctx, { axis, sliceIndex: 2, dir }, { inOpeningScramble: false, paused: false });
+        const after = new THREE.Vector3();
+        const normalAfter = evaluatePosAndNormal(sim, sim.interpT, after);
+        expect(after.distanceTo(before)).toBeLessThan(1e-8);
+        expect(normalAfter.distanceTo(normalBefore)).toBeLessThan(1e-8);
+        expect(record.pos.distanceTo(recordedPosition)).toBeLessThan(1e-8);
+        expect(record.restTxn).toBe(0);
+        expect(sim.rotationDeparture.committed).toBe(true);
+        evaluatePosAndNormal(sim, 1, after);
+        expect(after.distanceTo(world(target))).toBeLessThan(1e-8);
+        for (let frame = 0; frame < 15; frame++) stepWormSim(sim, 0.05, SIZE, ctx);
+        expect(sim.rotationDeparture).toBeNull();
+        expect(ctx.events.some(event => event.type === 'death')).toBe(false);
+      });
+    }
+  }
 });
 
 // ── The bridge ───────────────────────────────────────────────────────────────
@@ -326,12 +383,16 @@ describe('applyRotationToSim — multi-layer commit', () => {
     sim.prevWorldPos = new THREE.Vector3(-1, 0, 1.5);
     sim.curWorldPos.set(-1, 1, 1.5);
     sim.interpT = 0.3; sim.stepAcc = 0.3;
+    // This case tests pickup timing across a survivable crossing. Grounded
+    // unprotected crossings now die at the moving seam.
+    sim.landingGraceT = 1.2;
     // This orb is carried INTO the destination, not the outgoing face there.
     const source = rotateTilePosition(destination, 'row', 2, -1, SIZE);
     sim.specials = [{ ...source, id: 'water', type: 'water', ttl: 20 }];
     beginTurn('row', [2], [1]);
     stepWormSim(sim, 0.01, SIZE, ctx);
     if (progress > 0.5) for (let i = 0; i < 4; i++) stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(sim.alive).toBe(true);
     expect(sim.restRead).not.toBeNull();
     expect(sim.elementalType).toBeNull();
     resetLiveRotation();
