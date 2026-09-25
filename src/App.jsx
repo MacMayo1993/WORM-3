@@ -57,7 +57,6 @@ import {
 
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
-import IntroBackdrop from './components/intro/IntroBackdrop.jsx';
 import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import MenuPaperBackdrop from './3d/MenuPaperBackdrop.jsx';
 import { subscribeCarouselActive, isCarouselActive } from './components/menus/menuCarouselState.js';
@@ -126,12 +125,9 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <pointLight position={[-10, -10, -10]} intensity={1.6} />
       <pointLight position={[-6, 2, 8]} intensity={1.4} color="#4a7ccc" />
       <pointLight position={[5, -4, -6]} intensity={0.8} color="#2a4a8a" />
-      <IntroBackdrop time={time} reducedMotion={reducedMotion} performanceMode={performanceMode} />
+      <MenuPaperBackdrop />
       <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <SafeEnvironment preset="city" />
-      {!performanceMode && (
-        <Suspense fallback={null}><SceneEffects kind="intro" /></Suspense>
-      )}
     </>
   );
 }

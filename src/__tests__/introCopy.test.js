@@ -22,7 +22,7 @@ it('clears every line before the next and before the title', () => {
   expect(introCopyFrame(TITLE_START)).toBeNull();
 });
 
-// The script is three sentences timed against three things the camera is doing.
+// The script is two clauses timed against the opening choreography.
 // It is rewritten by hand, so these pin the properties a rewrite can silently
 // break: a line that runs past the title reveal, two beats overlapping into an
 // unreadable double exposure, or a word interval short enough that the reveal
@@ -53,11 +53,8 @@ describe('the opening script', () => {
     expect(WORD_FADE).toBeLessThan(WORD_INTERVAL);
   });
 
-  it('reads as whole sentences, not fragments', () => {
-    for (const line of INTRO_COPY) {
-      expect(line.text, `"${line.text}" should end a sentence`).toMatch(/[.!?\u2026]$/);
-      expect(line.text[0], `"${line.text}" should start capitalised`).toBe(line.text[0].toUpperCase());
-    }
+  it('preserves the requested trailer line across its two beats', () => {
+    expect(INTRO_COPY_TEXT).toBe("Don't just think outside the box, flip through the cube");
   });
 
   it('summarises the whole script for screen readers', () => {

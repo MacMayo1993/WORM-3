@@ -1,12 +1,11 @@
 import { ramp } from './introChoreography.js';
 
-/** Three short, readable beats: the flip, the tunnel, and the crawler.
+/** Two trailer beats: the setup, then the invitation through the cube.
  * Keep the complete-line hold and title handoff enforced by introCopy.test.js.
  */
 export const INTRO_COPY = [
-  { start: 0.1, end: 2.5, text: 'Flip the familiar.' },
-  { start: 2.7, end: 4.8, text: 'Find another way.' },
-  { start: 5.0, end: 7.0, text: 'Make your move.' }
+  { start: 0.1, end: 3.35, text: "Don't just think outside the box," },
+  { start: 3.55, end: 7.0, text: 'flip through the cube' }
 ];
 
 export const WORD_INTERVAL = 0.22; // gap between word reveals — must exceed WORD_FADE
