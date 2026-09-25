@@ -704,8 +704,8 @@ export default function WORM3() {
   const handleWelcomeComplete = useCallback(() => {
     setShowWelcome(false);
     markIntroSeen();
-    // Cover the first cube frame after the opening cinematic.
-    armSceneGate('Opening the cube…', { eager: true, holdMs: 300, z: 10000 });
+    // Only cover a real asset load; an eager cover flashes over a ready menu.
+    armSceneGate('Opening the cube…', { eager: false, holdMs: 300, z: 10000 });
     // Show main menu after intro (not tutorial).
     useGameStore.getState().setShowMainMenu(true);
   }, [setShowWelcome, markIntroSeen, armSceneGate]);

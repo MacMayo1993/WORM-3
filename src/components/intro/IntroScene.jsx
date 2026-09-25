@@ -121,7 +121,8 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
     <group ref={root} scale={INTRO_SCALE}>
       <IntroEnergy time={time} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <instancedMesh ref={bodies} args={[assets.body, null, CELLS.length]} frustumCulled={false}>
-        <meshStandardMaterial color="#293329" roughness={0.32} metalness={0.2} transparent depthWrite={false} />
+        <meshStandardMaterial color="#e8e0cb" emissive="#e8e0cb" emissiveIntensity={0.18}
+          roughness={0.72} metalness={0} transparent depthWrite={false} />
       </instancedMesh>
       {TILES.map((tile, i) => <group key={i} ref={node => { tiles.current[i] = node; }}>
         <StickerPlane meta={INTRO_STICKERS[stickerStage][i]} pos={TILE_OFFSETS[i]} rot={tile.face.rotation}

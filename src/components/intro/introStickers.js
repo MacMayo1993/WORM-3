@@ -17,7 +17,8 @@ export const INTRO_STICKERS = [original, flipped, restored].map(cubies => TILES.
   const [x, y, z] = tile.position.map(v => v + 1);
   return cubies[x][y][z].stickers[directions[tile.faceIndex]];
 }));
-export const INTRO_PRESENTATION = { flipAnimation: 'chaos', config: {
+// All 54 faces flip together: per-tile impact bursts would combine into a flash.
+export const INTRO_PRESENTATION = { flipAnimation: 'chaos', suppressFlipBursts: true, config: {
   settings: { ...applyDemoOverrides(DEFAULT_SETTINGS), colorScheme: 'standard', biomeMode: { enabled: false } },
   biomeEnabled: false, chaosLevel: 0, disparityFlipCap: 3, faceTextures: {},
   wormHealerMode: true, perfReducedFX: true
