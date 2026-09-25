@@ -401,6 +401,23 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
         if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
+        // A head that changed sides of the turning layer early in the turn is
+        // resolved as if it had been there when the turn fired. This must run
+        // before the animState guard below: the hazard's own tween sets animState
+        // for its whole length, which is exactly when the watch has to look.
+        if (turnWatchRef.current && worm.phase.current === 'crawling') {
+            const watch = turnWatchRef.current;
+            const step = stepTurnWatch(watch, worm, store.rotationEpoch);
+            if (step === 'done') turnWatchRef.current = null;
+            else if (step === 'crossed') {
+                const hit = resolveSliceHits(worm, watch.axis, watch.layers, size);
+                if (hit && applySliceHit(hit, watch.axis, watch.layers[0], { liveCrossing: true })) {
+                    turnWatchRef.current = null;
+                    return;
+                }
+            }
+        }
+
         // Do not replace an uncommitted move or classify damage in its
         // intermediate geometry. Resume the queued hazard after that commit.
         if (store.animState) { rotationClock.held = true; return; }
@@ -574,21 +591,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // not dequeue a slice or overwrite its death cue in the same frame.
         if (!useGameStore.getState().wormAlive) return;
 
-        // A head that changed sides of the turning layer early in the turn is
-        // resolved as if it had been there when the turn fired.
-        if (turnWatchRef.current && worm.phase.current === 'crawling') {
-            const watch = turnWatchRef.current;
-            const step = stepTurnWatch(watch, worm);
-            if (step === 'done') turnWatchRef.current = null;
-            else if (step === 'crossed') {
-                const hit = resolveSliceHits(worm, watch.axis, watch.layers, size);
-                if (hit && applySliceHit(hit, watch.axis, watch.layers[0], { liveCrossing: true })) {
-                    turnWatchRef.current = null;
-                    return;
-                }
-            }
-        }
-
         if (demo && (practiceLesson !== 'rotation' || (!pendingRotRef.current && inverseQueueRef.current.length === 0))) return;
         if (holdsRotationTimer(worm.signature.current)) { rotationClock.held = true; return; }
         rotationClock.held = false;
@@ -676,7 +678,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             if (hit && applySliceHit(hit, axis, sliceIndex)) return;
             // Watch the head through the start of the turn, where the live check
             // lets it cross aligned faces (see stepTurnWatch).
-            turnWatchRef.current = armTurnWatch(worm, axis, layers);
+            turnWatchRef.current = armTurnWatch(worm, axis, layers, useGameStore.getState().rotationEpoch);
 
             if (onRotate) {
                 // liveRotation exposes ONE anchor slice (+ its direction) to the

@@ -5,6 +5,7 @@ import { makeWormSim, resetWormSim, killWormSim } from '../worm/healerWorm/wormS
 import { makeCubies } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
+import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 
 let frameCb, worm, tree;
 const scene = {};
@@ -61,6 +62,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetLiveRotation();
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
@@ -208,4 +210,49 @@ it('publishes the impact effect once for a death caused during the live rotation
   tick(5);
   expect(effect.current.active).toBe(false);
   expect(rotate).not.toHaveBeenCalled();
+});
+
+// The hazard's own tween holds store.animState for its whole length. The early-turn
+// watch has to run through it, and must not outlive the commit.
+const COORD = { col: 'x', row: 'y', depth: 'z' };
+function fireHazardWithHeadOff() {
+  tick(95); // armed: the clock publishes the threatened layer
+  const { axis, sliceIndex: layer } = rotationClock;
+  const coord = COORD[axis], off = (layer + 1) % 3;
+  sim.pos = { ...sim.pos, [coord]: off }; sim.prevTile = { ...sim.pos }; sim.interpT = 1;
+  tick(15);
+  expect(rotate).toHaveBeenCalledTimes(1);
+  expect(resolveSliceHits).toHaveBeenCalledTimes(1); // the fire-time decision
+  return { axis, layer, coord, off };
+}
+const stepOnto = ({ coord, off, layer }) => {
+  sim.prevTile = { ...sim.pos, [coord]: off }; sim.pos = { ...sim.pos, [coord]: layer }; sim.interpT = 0.6;
+};
+
+it('resolves a head that steps onto the turning layer early in the hazard tween', () => {
+  const turn = fireHazardWithHeadOff();
+  act(() => useGameStore.setState({ animState: { axis: turn.axis, sliceIndex: turn.layer, dir: 1 } }));
+  setLiveRotation(turn.axis, [turn.layer], [0.02], turn.layer, 0.02);
+  tick();
+  expect(resolveSliceHits).toHaveBeenCalledTimes(1);
+  resolveSliceHits.mockReturnValueOnce({ type: 'death', sliceIndex: turn.layer, cutTrailIdx: 1,
+    cutPosition: sim.headInterpPos.toArray() });
+  stepOnto(turn);
+  tick();
+  expect(resolveSliceHits).toHaveBeenCalledTimes(2);
+  expect(useGameStore.getState().wormAlive).toBe(false);
+  expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'slice-rotation', axis: turn.axis,
+    sliceIndex: turn.layer, liveCrossing: true });
+});
+
+it('forgets the turn at its commit, so crossing the old layer on an idle cube is not a hit', () => {
+  const turn = fireHazardWithHeadOff();
+  act(() => useGameStore.setState({ animState: { axis: turn.axis, sliceIndex: turn.layer, dir: 1 } }));
+  tick(3); // the tween runs without liveRotation ever being observed
+  act(() => useGameStore.setState(state => ({ animState: null, rotationEpoch: state.rotationEpoch + 1 })));
+  tick();
+  stepOnto(turn);
+  tick(5);
+  expect(resolveSliceHits).toHaveBeenCalledTimes(1);
+  expect(useGameStore.getState().wormAlive).toBe(true);
 });
