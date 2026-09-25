@@ -14,25 +14,25 @@ Captured at 390×844 from the running app with the WebGL cube visible.
 
 ## Artwork
 
-Generated with the built-in image tool, then resized to 768×768 WebP with transparency. Project assets:
+All six decals are authored as reproducible Three.js scenes in `scripts/carousel-art/model.js`, then exported as 768×768 transparent WebP. The puzzle stickers come from `makeCubies(3)` and `rotateSliceCubies`; no sticker colors are invented or painted independently.
 
-- `public/images/arcade/worm.webp`
-- `public/images/arcade/cube.webp`
-- `public/images/arcade/chaos.webp`
-- `public/images/arcade/teach.webp`
+| Mode | Image |
+| --- | --- |
+| WORM | Solved 3×3 with a green worm resting on top |
+| CUBE | Legal three-turn scramble |
+| TEACH | Solved 3×3 with a golden turn arrow |
+| CHAOS | Legal scramble with one intact outer layer partway through a turn |
+| RANDOM | A different legal scramble with two directional arrows |
+| STORE | Gift box with a ribbon; no puzzle stickers |
 
-Teach uses a small blue cube guide from the approved mockup. Random and Store reuse the cube illustration. The illustrations are painted onto cube-face textures; they are never DOM hero images. Vector decals remain as loading/offline fallbacks. All asset URLs respect Vite's deployment base.
+The recipe lists every completed move. Tests reverse each sequence back to the solved cube, check all 54 stickers and their face normals, and verify that the turning layer contains exactly nine intact cubies. These are decorative mode illustrations, not algorithm instructions.
 
-Prompt template:
+To re-render, install the optional authoring browser without changing the project dependencies:
 
-> Use case: stylized-concept. Asset type: production transparent mobile game hero artwork for WORM³ Pocket Arcade. Subject: [subject below] Style: premium playful soft 3D toy render, beveled glossy plastic with soft warm studio lighting, clear forms, tactile highlights, candy colors. Centered square composition fills 90% of canvas, entire object visible, transparent background, subtle tight contact shadow only. NO background scene, NO labels, NO text, NO UI, NO frame, NO watermark. Render with the polish of the approved mobile game card mockup.
+```sh
+npm install --no-save --package-lock=false playwright
+npx playwright install chromium
+node scripts/render-carousel-art.mjs
+```
 
-Subjects:
-
-- **Worm:** One adorable lime green segmented worm with exactly ONE head, two big expressive eyes and small smile, tail is round tapered WITHOUT eyes or face. Worm crawls in a smooth arch across the top of a chunky rounded 3x3 puzzle cube with ivory, emerald green, royal blue, yellow and coral red tiles. 3/4 view shows cube top and two sides, hero product illustration.
-- **Cube:** A single chunky rounded 3x3 puzzle cube, slightly unsolved with ivory, royal blue, yellow, emerald green and coral red tiles, top layer turned 20 degrees. 3/4 view shows cube top and two sides. No creatures, no extra props, no arrows.
-- **Chaos:** A chunky rounded 3x3 puzzle cube dramatically exploding into a controlled cluster of 15 floating colorful rounded cubelets, navy charcoal, coral red and golden yellow, some blue. Strong central silhouette, playful sparkling burst action, no text.
-
-Teach prompt:
-
-> Use case: stylized-concept. Asset type: production transparent hero artwork for the TEACH mode of WORM³ Pocket Arcade. A chunky, beautifully rounded glossy 3x3 puzzle cube in three-quarter view, ivory tiles with a few bright blue, yellow, coral red and green tiles. In front of it at bottom left stands a very small friendly translucent sky-blue cube character, with large black eyes, tiny smiling mouth, small blue arms and feet. The cube character is one fifth the size of the puzzle cube. One smooth golden yellow curved arrow floats at the right of the large cube, suggesting a turn. Style: premium playful soft 3D mobile game toy render, beveled plastic, warm studio highlights, candy colors. Centered square composition, entire scene visible with tight framing filling 90% of canvas. Genuinely transparent background, subtle tight contact shadow only. No text, no letters, no UI, no frame, no watermark. This is decorative mode-card artwork, not an algorithm diagram.
+The exporter also accepts `PLAYWRIGHT_MODULE`, `CHROMIUM_EXECUTABLE` and `CHROMIUM_ARGS` for an existing browser installation. It uses the local Vite base and no remote assets. The renderer and its environment stay outside the application bundle; the live carousel only loads the exported images onto its existing faces.
