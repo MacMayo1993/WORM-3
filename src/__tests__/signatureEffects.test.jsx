@@ -50,3 +50,11 @@ it('disposes every mesh, geometry and material on retry/unmount', () => {
   });
   cleanups.pop()(); listeners.forEach(listener => expect(listener).toHaveBeenCalledTimes(1));
 });
+
+it('shows Classic attraction rings on the current face and removes them after the effect', () => {
+  worm.signature.current = { ...makeSignature(), character: 'classic', active: 6, seq: 1 };
+  frames[0](); expect(meshes[1].count).toBe(3); expect(meshes[1].material.depthTest).toBe(true);
+  const ring = new Matrix4(); meshes[1].getMatrixAt(0, ring);
+  expect(ring.elements[12]).toBe(0); expect(ring.elements[13]).toBe(0);
+  worm.signature.current.active = 0; frames[0](); expect(meshes[1].count).toBe(0);
+});

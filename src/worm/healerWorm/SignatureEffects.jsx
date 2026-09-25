@@ -58,7 +58,13 @@ export function SignatureEffects({ worm, size }) {
             mesh.setMatrixAt(mesh.count++, pose.matrix);
             mesh.instanceMatrix.needsUpdate = true;
         };
-        if (sig.character === 'book' && (sig.active > 0 || sig.fxT > 0)) {
+        if (sig.character === 'classic' && sig.active > 0) {
+            const age = SIGNATURES.classic.duration - sig.active;
+            r.pulse.material.color.set(SIGNATURES.classic.color);
+            r.pulse.material.opacity = 0.35 * Math.min(1, sig.active * 2);
+            for (let i = 0; i < 3; i++) place(r.pulse, worm.pos.current,
+                reduced ? 1 + i * 0.7 : 3 - ((age * 1.5 + i) % 2.4), 0.12 + i * 0.02);
+        } else if (sig.character === 'book' && (sig.active > 0 || sig.fxT > 0)) {
             r.pages.material.opacity = sig.active > 0 ? 0.8 : sig.fxT;
             const tile = worm.pos.current;
             for (let i = 0; i < 3; i++) place(r.pages, tile, 0.85, 0.18 + i * 0.07, (i - 1) * 0.2);

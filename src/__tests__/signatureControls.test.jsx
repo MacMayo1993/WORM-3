@@ -118,3 +118,22 @@ it('Classic receives extra orbs from the actual run reset', () => {
   act(() => useGameStore.setState({ wormCharacter: 'glow', wormRunId: 104 })); frame();
   expect(useGameStore.getState().wormPowerups).toHaveLength(5);
 });
+
+it('exposes Classic Orb Call on the touch dock and Q, with a paused countdown and retry reset', () => {
+  act(() => useGameStore.setState({ wormCharacter: 'classic', wormRunId: 105 })); frame();
+  const button = host.querySelector('button');
+  expect(button.getAttribute('aria-label')).toBe('Orb Call'); expect(button.disabled).toBe(false);
+  act(() => button.dispatchEvent(new Event('pointerdown', { bubbles: true }))); frame();
+  expect(worm.signature.current.seq).toBe(1);
+  expect(useGameStore.getState().wormMagnetActive).toBe(true);
+  expect(wormBuffs.magnetMaxT).toBe(6);
+  expect(button.textContent).toContain('Active'); expect(button.disabled).toBe(true);
+  const remaining = wormBuffs.magnetT, cooldown = worm.signature.current.cooldown;
+  act(() => useGameStore.setState({ wormPaused: true }));
+  for (let i = 0; i < 20; i++) frame();
+  expect(wormBuffs.magnetT).toBe(remaining); expect(worm.signature.current.cooldown).toBe(cooldown);
+  act(() => useGameStore.setState({ wormRunId: 106, wormPaused: false })); frame();
+  expect(wormBuffs.magnetT).toBe(0); expect(button.disabled).toBe(false);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', bubbles: true }))); frame();
+  expect(worm.signature.current.seq).toBe(1); expect(wormBuffs.magnetT).toBeGreaterThan(0);
+});
