@@ -319,3 +319,14 @@ Instead, refactor the visual primitive without changing Chaos behavior:
 - Do not make lightning strikes damage or control the worm.
 - Do not replace the existing orb/badge/HUD language with unrelated assets; extend it consistently.
 - Do not solve cross-face continuity with one monolithic mesh that breaks during live slice rotations.
+
+## Flip Cube Main Design (Design Only)
+
+The brief for making the Flip Cube the game's hero object lives in `docs/features/flip-cube-main-design.md`. It covers:
+
+- flipped tiles popping out as bouncing flip pads with Möbius-funnel springs;
+- WORM's jump-to-ride tunnel entry, behind a `tunnelEntry` flag;
+- the Rumbler under the tiles;
+- Mobi's WORM³ lore.
+
+Like the elemental plan above, it is a plan with open decisions (§13 there), not an instruction to change gameplay while doing unrelated work. Read it before touching pad, tunnel-entry or rumble code.
