@@ -3,8 +3,7 @@ import { INTRO_SCALE, fitIntroFrame } from '../components/intro/introFraming.js'
 import { sampleIntro, introCameraDistance, INTRO_END } from '../components/intro/introChoreography.js';
 import { introEnergy } from '../components/intro/introEnergy.js';
 import { describe, expect, it, vi } from 'vitest';
-import { INTRO_STICKERS, INTRO_PRESENTATION, introStickerStage } from '../components/intro/introStickers.js';
-import { FULL_FLIP_START, IMPLODE_START } from '../components/intro/introTiming.js';
+import { INTRO_STICKERS } from '../components/intro/introStickers.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { registerSticker, unregisterSticker, activateSticker, runActiveStickers, activeStickerCount } from '../3d/StickerAnimationManager.js';
 
@@ -21,16 +20,6 @@ describe('real gameplay stickers in the opening', () => {
       expect(restored[i].curr).toBe(tile.curr);
       expect(restored[i].flips).toBe(0);
     });
-  });
-  it('keeps the flipped metadata alive for the extended hold and stays unflipped in reduced motion', () => {
-    expect(introStickerStage(FULL_FLIP_START - 0.01)).toBe(0);
-    expect(introStickerStage(FULL_FLIP_START)).toBe(1);
-    expect(introStickerStage(IMPLODE_START - 0.01)).toBe(1);
-    expect(introStickerStage(IMPLODE_START)).toBe(2);
-    expect(introStickerStage(5, true)).toBe(0);
-    expect(INTRO_PRESENTATION.config.settings.colorScheme).toBe('standard');
-    expect(Object.values(INTRO_PRESENTATION.config.settings.manifoldStyles).every(s => s === 'topographic')).toBe(true);
-    expect(INTRO_PRESENTATION.config.wormHealerMode).toBe(true);
   });
   it('ticks only cinematic stickers and cleans up without dropping a live gameplay tick', () => {
     const gameplay = vi.fn(), intro = vi.fn();

@@ -113,18 +113,20 @@ const DEFAULT_CAMERA_FOV = 40;
 
 /**
  * IntroBranch — 3D content rendered inside the Canvas during the welcome/intro.
- * Contains IntroScene, post-processing, and intro lights.
+ * Contains IntroScene, the shared paper backdrop and the intro lights.
  * Unmounting is avoided by conditionally hiding it (never fully unmounting the Canvas).
  */
 function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode = false }) {
+  // Daylight on cream paper, the same world as the arcade menus that follow:
+  // a warm key from above, a cool fill, and a soft environment for the stickers'
+  // gloss. No bloom — on a light page it only washes the paper out.
   return (
     <>
-      <color attach="background" args={['#111b1e']} />
-      <ambientLight intensity={1.0} />
-      <pointLight position={[10, 10, 10]} intensity={2.2} />
-      <pointLight position={[-10, -10, -10]} intensity={1.6} />
-      <pointLight position={[-6, 2, 8]} intensity={1.4} color="#4a7ccc" />
-      <pointLight position={[5, -4, -6]} intensity={0.8} color="#2a4a8a" />
+      <color attach="background" args={['#f8f4e8']} />
+      <ambientLight intensity={0.85} />
+      <directionalLight position={[6, 12, 8]} intensity={2.4} color="#fff4de" />
+      <directionalLight position={[-8, 4, -6]} intensity={0.9} color="#dfe9ff" />
+      <pointLight position={[-6, 2, 8]} intensity={1.2} color="#ffffff" />
       <MenuPaperBackdrop />
       <IntroScene time={time} onComplete={onComplete} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <SafeEnvironment preset="city" />
