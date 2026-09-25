@@ -2,7 +2,7 @@ import WormWordmark from '../branding/WormWordmark.jsx';
 import { createModePlateArtwork } from '../../3d/modePlateArtwork.js';
 import '../ui/screenDesign.css';
 import './liveCubeCarousel.css';
-import { fitCarouselCube } from './fitCarouselCube.js';
+import { fitCarouselCube, carouselTurnScale } from './fitCarouselCube.js';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
 import { MENU_FLIP_PAIRS, flipMenuCenters } from './menuCenterPortals.js';
 import { carouselPlateGeometry } from './carouselPlateGeometry.js';
@@ -952,7 +952,10 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
           }
         }
       } else {
-        cubeCurrentScale.current += (1.022 * presentScale - cubeCurrentScale.current) * Math.min(1, delta * 10);
+        // Ease back while turning between faces so the wider mid-turn
+        // silhouette stays on a phone screen; parked, it is full size.
+        const turning = carouselTurnScale(cubeRef.current.quaternion.angleTo(_presentQ), fit.turnPullback);
+        cubeCurrentScale.current += (1.022 * presentScale * turning - cubeCurrentScale.current) * Math.min(1, delta * 10);
         cubeRef.current.scale.setScalar(cubeCurrentScale.current);
       }
       return;
