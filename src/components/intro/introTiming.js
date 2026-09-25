@@ -16,4 +16,8 @@ export const IMPLODE_END = 7.3;
 
 export const TITLE_START = 7.0;
 export const TITLE_END = 7.5;
-export const INTRO_FINISH = 8.6;
+// The title card lingers, then everything but "flip through the cube" dissolves
+// (see introOutro.js); that phrase takes the last beat before the menu.
+export const DISSOLVE_START = 8.8;
+export const DISSOLVE_END = 10.4;
+export const INTRO_FINISH = 11.8;

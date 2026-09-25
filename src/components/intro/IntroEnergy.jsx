@@ -3,16 +3,19 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { introEnergy } from './introEnergy.js';
 import { sampleIntro } from './introChoreography.js';
-import { introConfetti, introShockwaves, introFloorY, SHOCKWAVES } from './introMotion.js';
+import { introConfetti, introFleck, introShockwaves, introFloorY, SHOCKWAVES } from './introMotion.js';
 
-// Bounded accents: one instanced confetti draw, one instanced ring draw and one
-// light. No downloaded assets, physics, lights per particle, or per-frame
-// geometry allocation. Every position is a function of the intro clock.
+// Bounded accents: one instanced confetti draw, one instanced draw of the flecks
+// the cube sheds as it dissolves, one instanced ring draw and one light. No
+// downloaded assets, physics, lights per particle, or per-frame geometry
+// allocation. Every position is a function of the intro clock.
 export default function IntroEnergy({ time, reducedMotion, performanceMode }) {
   const confetti = useRef();
+  const flecks = useRef();
   const rings = useRef();
   const light = useRef();
   const count = performanceMode ? 32 : 64;
+  const fleckCount = performanceMode ? 24 : 54;
   const scratch = useMemo(() => ({ dummy: new THREE.Object3D(), color: new THREE.Color() }), []);
   const geometry = useMemo(() => new THREE.PlaneGeometry(1, 0.62), []);
   useEffect(() => () => geometry.dispose(), [geometry]);
@@ -39,6 +42,23 @@ export default function IntroEnergy({ time, reducedMotion, performanceMode }) {
     confetti.current.instanceMatrix.needsUpdate = true;
     if (confetti.current.instanceColor) confetti.current.instanceColor.needsUpdate = true;
 
+    let shed = 0;
+    for (let i = 0; i < fleckCount; i++) {
+      const fleck = introFleck(i, time, reducedMotion);
+      if (fleck) {
+        shed++;
+        dummy.position.fromArray(fleck.position);
+        dummy.rotation.set(...fleck.spin);
+        dummy.scale.setScalar(fleck.scale);
+        flecks.current.setColorAt(i, color.set(fleck.color));
+      } else dummy.scale.setScalar(0);
+      dummy.updateMatrix();
+      flecks.current.setMatrixAt(i, dummy.matrix);
+    }
+    flecks.current.visible = shed > 0;
+    flecks.current.instanceMatrix.needsUpdate = true;
+    if (flecks.current.instanceColor) flecks.current.instanceColor.needsUpdate = true;
+
     // Shockwaves ride the paper under the cube, wherever its base is.
     const floor = introFloorY(1 + 1.5 * sampleIntro(time, reducedMotion).open);
     let rippling = 0;
@@ -58,6 +78,9 @@ export default function IntroEnergy({ time, reducedMotion, performanceMode }) {
   return <group>
     <instancedMesh ref={confetti} args={[geometry, null, count]} frustumCulled={false}>
       <meshStandardMaterial side={THREE.DoubleSide} roughness={0.5} />
+    </instancedMesh>
+    <instancedMesh ref={flecks} args={[geometry, null, fleckCount]} frustumCulled={false}>
+      <meshStandardMaterial side={THREE.DoubleSide} roughness={0.4} />
     </instancedMesh>
     <instancedMesh ref={rings} args={[null, null, SHOCKWAVES.length]} frustumCulled={false} renderOrder={-5}>
       <ringGeometry args={[0.94, 1, 64]} />

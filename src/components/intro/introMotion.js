@@ -2,8 +2,11 @@
 // the intro clock, so a scrub, a dropped frame or a remount lands on the same pose.
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { clamp01, ramp } from './introChoreography.js';
-import { FULL_FLIP_START, FULL_FLIP_END, IMPLODE_START, IMPLODE_END, TUNNEL_FORM_START, EXPLOSION_START } from './introTiming.js';
+import {
+  FULL_FLIP_START, FULL_FLIP_END, IMPLODE_START, IMPLODE_END, TUNNEL_FORM_START, EXPLOSION_START, DISSOLVE_START, DISSOLVE_END
+} from './introTiming.js';
 import { introMote } from './introEnergy.js';
+import { FACES } from './introTopology.js';
 
 /** Sticker colour for a face id (1–6): the same classic Rubik's palette as the menu cube. */
 export const introColor = id => RUBIKS_FACE_COLORS[id] ?? '#f0f0f0';
@@ -32,6 +35,24 @@ export function introSquash(t, reducedMotion = false) {
   if (reducedMotion) return 0;
   const fall = t < LAND_TIME ? -0.14 * clamp01(t / LAND_TIME) ** 2 : 0;
   return fall + impulse(t, LAND_TIME, 0.22) + impulse(t, LAND_TIME + BOUNCE_TIME, 0.09) + impulse(t, IMPLODE_END - 0.05, 0.16);
+}
+
+// ── Top-layer twist ────────────────────────────────────────────────────────
+/** The layer that twists as the cube lands: the top one, y = +1. */
+export const TWIST_LAYER = { axis: 1, index: 1 };
+const TWIST_SETTLE = 0.35;
+
+/**
+ * Angle of the top layer about +y. The cube is thrown in a quarter turn off
+ * solved, the layer finishes its turn as the cube falls, and it clacks into
+ * place on landing with a small recoil. Exactly 0 once settled, so the flip
+ * wave, tunnels and worms all see a solved cube.
+ */
+export function introLayerTurn(t, reducedMotion = false) {
+  if (reducedMotion) return 0;
+  const recoil = (t - LAND_TIME) / TWIST_SETTLE;
+  const clack = recoil > 0 && recoil < 1 ? 0.09 * Math.sin(recoil * 3 * Math.PI) * (1 - recoil) ** 2 : 0;
+  return -(Math.PI / 2) * (1 - ramp(t, 0.04, LAND_TIME - 0.03)) + clack;
 }
 
 // ── Sticker flip wave ──────────────────────────────────────────────────────
@@ -114,4 +135,40 @@ export function introShockwaves(t, reducedMotion = false) {
     if (p <= 0 || p >= 1) return { radius: 0, opacity: 0 };
     return { radius: 1.6 + p * 5.2, opacity: 0.55 * (1 - p) ** 2 };
   });
+}
+
+// ── Dissolve flecks ────────────────────────────────────────────────────────
+export const FLECK_LIFE = 1.1;
+const FLECK_PLASTIC = '#1b1b1d';
+const fract = v => v - Math.floor(v);
+
+/**
+ * Fleck `index` shed by the cube as it dissolves: born on the cube's surface
+ * when the dissolve front (top first, like introDissolve.js) passes, it drifts
+ * off the face and up, spinning, and shrinks away. Most are sticker coloured,
+ * every third is black plastic. `null` while it is not in the air.
+ */
+export function introFleck(index, t, reducedMotion = false) {
+  if (reducedMotion) return null;
+  const faceIndex = index % FACES.length;
+  const face = FACES[faceIndex];
+  const position = [0, 0, 0], normal = [0, 0, 0];
+  const [a, b] = [0, 1, 2].filter(axis => axis !== face.axis);
+  position[face.axis] = 1.52 * face.sign;
+  position[a] = (fract(index * 0.7548776662) * 2 - 1) * 1.35;
+  position[b] = (fract(index * 0.5698402910) * 2 - 1) * 1.35;
+  normal[face.axis] = face.sign;
+  const sweep = clamp01((1.7 - position[1]) / 3.4);
+  const born = DISSOLVE_START + (DISSOLVE_END - DISSOLVE_START) * (0.1 + 0.6 * sweep + 0.2 * fract(index * 0.381966));
+  const age = t - born;
+  if (age <= 0 || age >= FLECK_LIFE) return null;
+  const off = 0.55 * (1 - Math.exp(-age * 2.6));
+  const rise = 1.1 * age + 0.5 * age * age;
+  const sway = 0.14 * Math.sin(age * 4 + index);
+  return {
+    position: position.map((v, axis) => v + normal[axis] * off + (axis === 1 ? rise : 0) + (axis === a ? sway : 0)),
+    spin: [age * (4 + index % 4), age * (3 + index % 3), age * 1.5],
+    scale: 0.1 * Math.min(1, age / 0.08) * (1 - ramp(age, FLECK_LIFE * 0.45, FLECK_LIFE)),
+    color: index % 3 === 2 ? FLECK_PLASTIC : introColor(face.color)
+  };
 }

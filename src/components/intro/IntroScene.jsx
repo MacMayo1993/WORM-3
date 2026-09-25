@@ -10,7 +10,11 @@ import IntroEnergy from './IntroEnergy.jsx';
 import { introEnergy } from './introEnergy.js';
 import { WORM_START } from './introTiming.js';
 import { CELLS, TILES, PAIRS, pairPoint } from './introTopology.js';
-import { introColor, introDrop, introSquash, stickerFlip, tunnelGrowth, introFloorY, DROP_HEIGHT } from './introMotion.js';
+import {
+  introColor, introDrop, introSquash, introLayerTurn, TWIST_LAYER, stickerFlip, tunnelGrowth, introFloorY, DROP_HEIGHT
+} from './introMotion.js';
+import { introOutro } from './introOutro.js';
+import { addIntroDissolve } from './introDissolve.js';
 
 const WORM_SEGMENTS = 10;
 const LANDSCAPE_SHIFT = 0.2; // of the width, matching the copy column in intro.css
@@ -51,11 +55,27 @@ function shadowTexture() {
   return texture;
 }
 
+// A real Rubik's cube: black plastic cubies with a thin border round each glossy
+// sticker, and (seen only when it bursts open) the core its centres turn on.
+// The plastic and stickers dissolve together at the end (introDissolve.js).
+function introMaterials(performanceMode, dissolve) {
+  const Material = performanceMode ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
+  const gloss = coat => performanceMode ? {} : coat;
+  return {
+    plastic: addIntroDissolve(new Material({ color: '#141416', roughness: 0.34, metalness: 0,
+      ...gloss({ clearcoat: 0.4, clearcoatRoughness: 0.35 }) }), dissolve),
+    sticker: addIntroDissolve(new Material({ roughness: 0.24, metalness: 0,
+      ...gloss({ clearcoat: 1, clearcoatRoughness: 0.12 }) }), dissolve)
+  };
+}
+const inTwistLayer = position => position[TWIST_LAYER.axis] === TWIST_LAYER.index;
+
 // All 54 stickers and 27 antipodal tunnels; bodies, stickers and worms are instanced.
 export default function IntroScene({ time, onComplete, reducedMotion = false, performanceMode = false }) {
   const root = useRef();
   const body = useRef();
   const bodies = useRef();
+  const core = useRef();
   const stickers = useRef();
   const worms = useRef();
   const whites = useRef();
@@ -68,9 +88,13 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
     const colors = {};
     for (let id = 1; id <= 6; id++) colors[id] = new THREE.Color(introColor(id));
     return {
-      body: new RoundedBoxGeometry(0.96, 0.96, 0.96, 2, 0.08),
+      body: new RoundedBoxGeometry(0.96, 0.96, 0.96, 3, 0.08),
+      coreArm: new THREE.CylinderGeometry(0.1, 0.1, 1, 14),
+      coreHub: new THREE.SphereGeometry(0.34, 20, 14),
       sticker: stickerGeometry(),
       shadow: shadowTexture(),
+      dissolve: { value: 0 },
+      layerQuat: new THREE.Quaternion(), yAxis: new THREE.Vector3(0, 1, 0),
       dummy: new THREE.Object3D(), color: new THREE.Color(), euler: new THREE.Euler(),
       faceQuat: new THREE.Quaternion(), flipQuat: new THREE.Quaternion(), xAxis: new THREE.Vector3(1, 0, 0),
       normal: new THREE.Vector3(), head: new THREE.Vector3(), ahead: new THREE.Vector3(), dir: new THREE.Vector3(),
@@ -78,7 +102,11 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
       colors
     };
   }, []);
-  useEffect(() => () => { assets.body.dispose(); assets.sticker.dispose(); assets.shadow.dispose(); }, [assets]);
+  useEffect(() => () => {
+    for (const key of ['body', 'coreArm', 'coreHub', 'sticker', 'shadow']) assets[key].dispose();
+  }, [assets]);
+  const materials = useMemo(() => introMaterials(performanceMode, assets.dissolve), [performanceMode, assets]);
+  useEffect(() => () => { materials.plastic.dispose(); materials.sticker.dispose(); }, [materials]);
   useEffect(() => {
     if (time >= INTRO_END && !finished.current) { finished.current = true; onComplete?.(); }
   }, [time, onComplete]);
@@ -88,7 +116,8 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
     cameraRef.current = camera;
     const pose = sampleIntro(time, reducedMotion);
     const energy = introEnergy(time, reducedMotion);
-    const { dummy, color, euler, faceQuat, flipQuat, xAxis, normal } = assets;
+    const outro = introOutro(time, reducedMotion);
+    const { dummy, color, euler, faceQuat, flipQuat, xAxis, normal, layerQuat } = assets;
     const spacing = 1 + 1.5 * pose.open;
     const lift = 0.51;
     root.current.rotation.set(0.12 + 0.1 * pose.open, pose.turn, 0);
@@ -101,21 +130,35 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
     const base = spacing + 0.5;
     body.current.position.y = drop - squash * base;
     body.current.scale.set(1 + squash * 0.5, 1 - squash, 1 + squash * 0.5);
+    assets.dissolve.value = outro.cube;
+    body.current.visible = outro.cube < 1;
+    // The top layer finishes a quarter turn as the cube falls and clacks home on landing.
+    layerQuat.setFromAxisAngle(assets.yAxis, introLayerTurn(time, reducedMotion));
 
     const floor = introFloorY(spacing);
     const airborne = Math.min(1, drop / DROP_HEIGHT);
     shadow.current.position.y = floor + 0.01;
     shadow.current.scale.setScalar(base * 2.4 * (1 + squash * 0.35) * (1 - airborne * 0.45));
-    shadow.current.material.opacity = 0.34 * (1 - airborne * 0.85) * (1 - 0.45 * pose.open);
+    shadow.current.material.opacity = 0.34 * (1 - airborne * 0.85) * (1 - 0.45 * pose.open) * (1 - outro.cube);
 
     CELLS.forEach((p, i) => {
       dummy.position.set(p[0] * spacing, p[1] * spacing, p[2] * spacing);
       dummy.quaternion.identity();
+      if (inTwistLayer(p)) { dummy.position.applyQuaternion(layerQuat); dummy.quaternion.copy(layerQuat); }
       dummy.scale.setScalar(1);
       dummy.updateMatrix();
       bodies.current.setMatrixAt(i, dummy.matrix);
     });
     bodies.current.instanceMatrix.needsUpdate = true;
+    // The core's three axles reach out to the six centre pieces however far apart they fly.
+    for (let axis = 0; axis < 3; axis++) {
+      dummy.position.set(0, 0, 0);
+      dummy.rotation.set(axis === 2 ? Math.PI / 2 : 0, 0, axis === 0 ? Math.PI / 2 : 0);
+      dummy.scale.set(1, 2 * spacing, 1);
+      dummy.updateMatrix();
+      core.current.setMatrixAt(axis, dummy.matrix);
+    }
+    core.current.instanceMatrix.needsUpdate = true;
 
     TILES.forEach((tile, i) => {
       const flip = stickerFlip(tile, time, reducedMotion);
@@ -125,6 +168,7 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
       faceQuat.setFromEuler(euler.set(...tile.face.rotation));
       flipQuat.setFromAxisAngle(xAxis, flip.angle);
       dummy.quaternion.copy(faceQuat).multiply(flipQuat);
+      if (inTwistLayer(tile.position)) { dummy.position.applyQuaternion(layerQuat); dummy.quaternion.premultiply(layerQuat); }
       dummy.scale.setScalar(1);
       dummy.updateMatrix();
       stickers.current.setMatrixAt(i, dummy.matrix);
@@ -215,7 +259,6 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
     if (cameraRef.current?.view?.enabled) cameraRef.current.clearViewOffset();
   }, []);
 
-  const StickerMaterial = performanceMode ? 'meshStandardMaterial' : 'meshPhysicalMaterial';
   return (
     <group ref={root} scale={INTRO_SCALE}>
       <mesh ref={shadow} rotation-x={-Math.PI / 2} renderOrder={-10}>
@@ -224,14 +267,10 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
       </mesh>
       <IntroEnergy time={time} reducedMotion={reducedMotion} performanceMode={performanceMode} />
       <group ref={body}>
-        <instancedMesh ref={bodies} args={[assets.body, null, CELLS.length]} frustumCulled={false}>
-          {/* The light cream chassis: a white-plastic cube, so the glossy stickers
-              read as coloured tiles set into it rather than holes in a dark block. */}
-          <meshStandardMaterial color="#e8e0cb" emissive="#e8e0cb" emissiveIntensity={0.18} roughness={0.72} metalness={0} />
-        </instancedMesh>
-        <instancedMesh ref={stickers} args={[assets.sticker, null, TILES.length]} frustumCulled={false}>
-          <StickerMaterial roughness={0.24} metalness={0} clearcoat={1} clearcoatRoughness={0.12} />
-        </instancedMesh>
+        <instancedMesh ref={bodies} args={[assets.body, null, CELLS.length]} material={materials.plastic} frustumCulled={false} />
+        <instancedMesh ref={core} args={[assets.coreArm, null, 3]} material={materials.plastic} frustumCulled={false} />
+        <instancedMesh args={[assets.coreHub, null, 1]} material={materials.plastic} frustumCulled={false} />
+        <instancedMesh ref={stickers} args={[assets.sticker, null, TILES.length]} material={materials.sticker} frustumCulled={false} />
         <IntroTunnels time={time} reducedMotion={reducedMotion} />
         <instancedMesh ref={gates} args={[null, null, PAIRS.length * 2]} frustumCulled={false} renderOrder={3}>
           <torusGeometry args={[0.3, 0.04, 8, 28]} />

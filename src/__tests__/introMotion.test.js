@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { TILES, PAIRS } from '../components/intro/introTopology.js';
 import { INTRO_STICKERS } from '../components/intro/introStickers.js';
 import { INTRO_END } from '../components/intro/introChoreography.js';
-import { FULL_FLIP_START, FULL_FLIP_END, IMPLODE_START, IMPLODE_END, WORM_START } from '../components/intro/introTiming.js';
+import { FULL_FLIP_START, FULL_FLIP_END, IMPLODE_START, IMPLODE_END, WORM_START, DISSOLVE_START, DISSOLVE_END } from '../components/intro/introTiming.js';
 import {
   introDrop, introSquash, LAND_TIME, DROP_HEIGHT, stickerWave, stickerFlip, tunnelGrowth,
-  introConfetti, introShockwaves, introFloorY, introColor
+  introConfetti, introShockwaves, introFloorY, introColor, introLayerTurn, introFleck, FLECK_LIFE
 } from '../components/intro/introMotion.js';
 
 const STEP = 1 / 240;
@@ -28,6 +28,25 @@ describe('drop and squash', () => {
   });
   it('holds still for reduced motion', () => {
     for (let t = 0; t < INTRO_END; t += 0.1) { expect(introDrop(t, true)).toBe(0); expect(introSquash(t, true)).toBe(0); }
+  });
+});
+
+describe('top-layer twist', () => {
+  it('is thrown a quarter turn off solved and clacks home as the cube lands', () => {
+    expect(introLayerTurn(0)).toBeCloseTo(-Math.PI / 2, 10);
+    expect(introLayerTurn(LAND_TIME)).toBe(0);
+    let recoil = 0;
+    for (let t = LAND_TIME; t < LAND_TIME + 0.4; t += STEP) recoil = Math.max(recoil, Math.abs(introLayerTurn(t)));
+    expect(recoil).toBeGreaterThan(0.02); // the clack is visible…
+    expect(recoil).toBeLessThan(0.1); //  …but never looks like a second move
+  });
+  it('turns continuously and is exactly solved before the flip wave, so tunnels see a solved cube', () => {
+    for (let t = STEP; t < INTRO_END; t += STEP) expect(Math.abs(introLayerTurn(t) - introLayerTurn(t - STEP))).toBeLessThan(0.05);
+    for (let t = LAND_TIME + 0.36; t <= INTRO_END; t += 0.05) expect(introLayerTurn(t)).toBe(0);
+    expect(LAND_TIME + 0.36).toBeLessThan(FULL_FLIP_START);
+  });
+  it('holds still for reduced motion', () => {
+    for (let t = 0; t <= INTRO_END; t += 0.1) expect(introLayerTurn(t, true)).toBe(0);
   });
 });
 
@@ -81,6 +100,30 @@ describe('tunnels, confetti and shockwaves', () => {
     }
     expect(seen).toBeGreaterThan(0);
     for (let i = 0; i < 64; i++) expect(introConfetti(i, INTRO_END)).toBeNull();
+  });
+  it('sheds bounded flecks only while the cube dissolves, top first, and none for reduced motion', () => {
+    const born = [];
+    for (let i = 0; i < 54; i++) {
+      let first = null;
+      for (let t = 0; t <= INTRO_END; t += 0.02) {
+        expect(introFleck(i, t, true)).toBeNull();
+        const fleck = introFleck(i, t);
+        if (!fleck) continue;
+        first ??= { t, y: fleck.position[1] };
+        expect(t).toBeGreaterThan(DISSOLVE_START);
+        expect(t).toBeLessThan(DISSOLVE_END + FLECK_LIFE);
+        expect(fleck.position.every(Number.isFinite)).toBe(true);
+        expect(Math.hypot(...fleck.position)).toBeLessThan(6);
+        expect(fleck.scale).toBeGreaterThanOrEqual(0);
+        expect(fleck.scale).toBeLessThanOrEqual(0.1);
+      }
+      expect(first, `fleck ${i} never appears`).not.toBeNull();
+      born.push(first);
+      expect(introFleck(i, INTRO_END)).toBeNull();
+    }
+    // Top first: the upper half of the cube starts shedding sooner, on average.
+    const mean = list => list.reduce((sum, b) => sum + b.t, 0) / list.length;
+    expect(mean(born.filter(b => b.y > 0.5))).toBeLessThan(mean(born.filter(b => b.y < -0.5)));
   });
   it('spreads each shockwave once and clears them all', () => {
     for (let t = 0; t <= INTRO_END; t += 0.05) for (const wave of introShockwaves(t)) {
