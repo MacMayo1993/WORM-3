@@ -1,4 +1,6 @@
-/* The shared WebGL paper stays visible behind the cube and title cards. */
+/* The shared WebGL paper stays visible behind the cube and title cards.
+   This sheet ships in the initial CSS (bundle:check caps it): one rule per
+   selector, no overrides stacked on overrides. */
 .opening-edge {
   position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(180deg, #26372d0a, transparent 32%, transparent 78%, #26372d18);
@@ -23,107 +25,72 @@
   text-shadow: -1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111, 0 3px 0 #111, 0 6px 14px #0003;
 }
 .opening-copy .opening-poem-line {
-  font: 900 clamp(29px, 7.8vw, 64px)/1.13 var(--heading-font, system-ui);
-  letter-spacing: .035em; text-transform: uppercase; max-width: 22ch;
+  font: 900 clamp(32px, 9.4vw, 72px)/1.16 var(--heading-font, system-ui);
+  letter-spacing: .035em; text-transform: uppercase; max-width: 22ch; perspective: 700px;
 }
-/* Reserve words before revealing them so the title never re-centers. */
-.opening-poem-word { display: inline-block; }
+/* Words spring in from TextOverlay on the intro clock, so reduced motion and
+   scrubbing stay exact. Space is reserved first so the line never re-centers. */
+.opening-poem-word { display: inline-block; transform-origin: 50% 80%; }
 .opening-trailer-beat { animation: opening-trailer-push 3.5s ease-out both; }
 @keyframes opening-trailer-push { from { transform: scale(.96); } to { transform: scale(1); } }
-.opening-copy .opening-title { font: 400 clamp(58px, 15vw, 108px)/1.15 var(--display-font); letter-spacing: 0; }
-.opening-title sup { font-size: .45em; vertical-align: baseline; position: relative; top: -.7em; line-height: 0; }
+/* "FLIP" somersaults as it lands; "BOX," gets a box drawn round it. */
+.opening-word-flip > span { display: inline-block; }
+.opening-word-box { position: relative; padding: 0 .16em; }
+.opening-box { position: absolute; inset: -.1em 0 -.04em; width: 100%; height: calc(100% + .14em); overflow: visible; }
+/* "CUBE" sits on a Rubik's sticker: red, turning to its antipode, orange. */
+.opening-word-tile { perspective: 600px; margin-left: .06em; }
+.opening-tile { display: inline-grid; transform-style: preserve-3d; }
+.opening-tile-face {
+  grid-area: 1 / 1; padding: .04em .26em .1em; border: 3px solid #111; border-radius: .22em;
+  box-shadow: inset 0 .08em 0 #fff5, 0 .1em 0 #111; backface-visibility: hidden;
+}
+.opening-tile-back { transform: rotateX(180deg); }
+.opening-copy .opening-title { font: 400 clamp(76px, 22vw, 150px)/1.15 var(--display-font); transform-origin: 50% 60%; }
 .opening-tagline {
-  font: 800 clamp(16px, 4vw, 24px)/1.4 var(--heading-font, system-ui);
-  text-transform: uppercase; letter-spacing: .045em; max-width: 36ch; margin: 0;
+  font: 800 clamp(17px, 4.6vw, 28px)/1.3 var(--heading-font, system-ui);
+  text-transform: uppercase; letter-spacing: .045em; max-width: 26ch; margin: 0;
   -webkit-text-stroke-width: 2px;
 }
 .opening-skip, .opening-enter {
-  position: absolute; pointer-events: auto; min-height: 48px; cursor: pointer;
+  position: absolute; pointer-events: auto; cursor: pointer;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
 .opening-skip {
   top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right));
-  padding: 0 18px; border: 2px solid #354d3c; border-radius: 12px; background: #fffcf1;
+  min-height: 48px; padding: 0 18px; border: 2px solid #354d3c; border-radius: 12px; background: #fffcf1;
   color: #26372d; font: 750 12px var(--ui-font); box-shadow: 0 3px 0 #354d3c;
 }
+/* Play is WORM's key: the menu's green primary key, on the arcade ink ledge. */
 .opening-enter {
   bottom: max(30px, calc(env(safe-area-inset-bottom) + 20px)); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; justify-content: space-between; gap: 44px;
-  min-width: 200px; min-height: 56px; padding: 0 22px; border: 2px solid #354d3c;
-  border-radius: 14px 14px 14px 5px; background: #c3ed9f; color: #1e1612;
-  box-shadow: inset 0 2px 0 #ffffff80, 0 5px 0 #496139, 0 12px 28px #0002;
-  font: 400 20px var(--display-font); letter-spacing: .025em; white-space: nowrap;
+  min-width: 220px; min-height: 60px; padding: 0 22px; border: 3px solid #26372d;
+  border-radius: 16px 16px 16px 6px; background: #009b48; color: #fffdf2;
+  box-shadow: inset 0 3px 0 #fff5, 0 6px 0 #26372d, 0 14px 30px #26372d33;
+  font: 400 22px var(--display-font); letter-spacing: .025em; white-space: nowrap;
   transition: background .15s, box-shadow .15s;
 }
-.opening-enter span { font-family: var(--ui-font, system-ui); font-size: 25px; }
-.opening-enter:active { background: #a6d57f; box-shadow: inset 0 2px 0 #ffffff40, 0 2px 0 #496139; }
+.opening-enter span { font: 25px var(--ui-font, system-ui); }
+.opening-enter:active { background: #008a40; box-shadow: inset 0 2px 0 #fff4, 0 2px 0 #26372d; }
 .opening-skip:focus-visible, .opening-enter:focus-visible { outline: 3px solid #2774ad; outline-offset: 5px; }
 .opening-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: #26372d18; }
-.opening-progress span { display: block; height: 100%; background: linear-gradient(90deg, #ef4444, #f97316, #22c55e, #3b82f6); transform-origin: left; }
+.opening-progress span { display: block; height: 100%; background: linear-gradient(90deg, #c41e3a, #ff7a00, #ffd500, #009b48, #0051a2); transform-origin: left; }
 .opening-accessible { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+/* Short landscape: the cube fills the height, so the words take a column to its
+   left (IntroScene slides the picture right) and Play sits under them. */
 @media (orientation: landscape) and (max-height: 500px) {
   .opening-brand { top: 12px; left: 16px; font-size: 18px; padding: 7px 10px; }
-  .opening-copy { top: max(72px, calc(env(safe-area-inset-top) + 58px)); }
+  .opening-copy { top: 50%; left: max(20px, env(safe-area-inset-left)); right: auto; margin: 0; width: min(36vw, 340px); transform: translateY(-50%); }
   .opening-copy-beat { gap: 6px; }
-  .opening-copy .opening-title { font-size: min(12vh, 58px); }
-  .opening-copy .opening-poem-line { font-size: min(7vh, 30px); max-width: 34ch; }
-  .opening-tagline { font-size: 14px; max-width: 54ch; }
-  .opening-enter { bottom: max(14px, env(safe-area-inset-bottom)); min-height: 48px; min-width: 180px; font-size: 16px; }
+  .opening-copy .opening-title { font-size: min(15vh, 68px); }
+  .opening-copy .opening-poem-line { font-size: min(9vh, 36px); max-width: none; }
+  .opening-tagline { font-size: 14px; max-width: none; }
+  .opening-enter {
+    bottom: max(14px, env(safe-area-inset-bottom)); left: calc(max(20px, env(safe-area-inset-left)) + min(18vw, 170px));
+    min-height: 48px; min-width: 180px; font-size: 16px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .opening-enter { transition: none; }
   .opening-trailer-beat { animation: none; }
 }
-
-/* ── Kinetic trailer type ────────────────────────────────────────────────────
-   Words spring in from TextOverlay (transforms are driven by the intro clock,
-   so reduced motion and scrubbing stay exact). Three words get their own move. */
-.opening-copy .opening-poem-line { font-size: clamp(32px, 9.4vw, 72px); line-height: 1.16; perspective: 700px; }
-.opening-poem-word { transform-origin: 50% 80%; will-change: transform, opacity; }
-/* "FLIP" somersaults once as it lands. */
-.opening-word-flip > span { display: inline-block; transform-origin: 50% 55%; backface-visibility: visible; }
-/* "BOX," is drawn round with a box — outside the box. White line on a black
-   line, the same lettering treatment as the words. */
-.opening-word-box { position: relative; padding: 0 .16em; margin: 0 .04em; }
-.opening-box { position: absolute; inset: -.1em -.02em -.04em; width: calc(100% + .04em); height: calc(100% + .14em); overflow: visible; pointer-events: none; }
-.opening-box rect { fill: none; stroke-dasharray: 1; stroke-linejoin: round; stroke-linecap: round; }
-.opening-box-ink { stroke: #111; stroke-width: 9px; }
-.opening-box-line { stroke: #fff; stroke-width: 4px; }
-/* "CUBE" sits on a Rubik's sticker: red, turning to its antipode, orange. */
-.opening-word-tile { perspective: 600px; margin-left: .06em; }
-.opening-tile { position: relative; display: inline-grid; transform-style: preserve-3d; }
-.opening-tile-face {
-  grid-area: 1 / 1; padding: .04em .26em .1em; border: 3px solid #111; border-radius: .22em;
-  box-shadow: inset 0 .08em 0 #ffffff55, 0 .1em 0 #111; backface-visibility: hidden;
-}
-.opening-tile-back { transform: rotateX(180deg); }
-
-/* ── Title card ─────────────────────────────────────────────────────────── */
-.opening-copy .opening-title { font-size: clamp(76px, 22vw, 150px); transform-origin: 50% 60%; }
-.opening-tagline { font-size: clamp(17px, 4.6vw, 28px); max-width: 26ch; line-height: 1.3; }
-
-/* Play is WORM's key: the menu's green primary key, on the arcade ink ledge. */
-.opening-enter {
-  background: #009b48; color: #fffdf2; border: 3px solid #26372d; border-radius: 16px 16px 16px 6px;
-  box-shadow: inset 0 3px 0 #ffffff55, 0 6px 0 #26372d, 0 14px 30px #26372d33;
-  font-size: 22px; min-width: 220px; min-height: 60px;
-}
-.opening-enter:active { background: #008a40; box-shadow: inset 0 2px 0 #ffffff40, 0 2px 0 #26372d; }
-.opening-progress span { background: linear-gradient(90deg, #c41e3a, #ff7a00, #ffd500, #009b48, #0051a2); }
-
-/* Short landscape: the cube fills the height, so the words take a column to its
-   left instead of printing across it, and Play sits under them. */
-@media (orientation: landscape) and (max-height: 500px) {
-  .opening-copy {
-    top: 50%; left: max(20px, env(safe-area-inset-left)); right: auto; margin: 0;
-    width: min(36vw, 340px); transform: translateY(-50%);
-  }
-  .opening-copy .opening-poem-line { font-size: min(9vh, 36px); max-width: none; }
-  .opening-copy .opening-title { font-size: min(15vh, 68px); }
-  .opening-tagline { font-size: 14px; max-width: none; }
-  .opening-enter {
-    left: calc(max(20px, env(safe-area-inset-left)) + min(18vw, 170px));
-    min-height: 48px; min-width: 180px; font-size: 16px;
-  }
-}
-@media (prefers-reduced-motion: reduce) { .opening-poem-word { will-change: auto; } }
