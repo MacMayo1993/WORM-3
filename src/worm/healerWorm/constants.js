@@ -142,8 +142,9 @@ export const HEAL_PAUSE_DURATION = 0.85;
 // spins into view (the slice rotation is a GSAP tween, so it plays on through
 // the freeze), then the camera eases back and the worm resumes exactly where it
 // was. Long enough to cover the hazard turn (~1.4s, see CubeAssembly's isWormHazard
-// GSAP duration) plus a short hold so the hit reads and the WORM'D card plays.
-export const CUT_FOCUS_DURATION = 1.6;
+// GSAP duration) plus the swing out to the whole-cube slice shot and back (0.45s
+// in, 0.5s out, see sliceShot.js), leaving about a second held on the layer.
+export const CUT_FOCUS_DURATION = 2.0;
 
 // Render-only full-route trail history: how many tiles of the worm's path are retained for
 // painting the persistent "where I've been" trail (see useWormCrawler's pathHistory ring).

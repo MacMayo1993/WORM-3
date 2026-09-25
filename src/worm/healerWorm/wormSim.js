@@ -316,6 +316,7 @@ export function makeWormSim(size) {
         healFocusTile: null,      // the surrounded tile the camera pushes in on during that pause
         cutFocusT: 0,             // seconds remaining of the "WORM'D" body-cut camera beat
         cutFocusPos: null,        // world-space impact point the camera swings out to watch
+        cutFocusSlice: null,      // { axis, layer } that made the cut, so the camera frames it (null: a bomb)
         pendingOrbFlash: null,
         pendingSpecialFlash: null,
         // Queue of magnet attraction visuals awaiting a renderer; drained each frame.
@@ -431,6 +432,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.healFocusTile = null;
     sim.cutFocusT = 0;
     sim.cutFocusPos = null;
+    sim.cutFocusSlice = null;
     sim.pendingOrbFlash = null;
     sim.pendingSpecialFlash = null;
     sim.pendingOrbAttractions = [];
@@ -1958,7 +1960,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // delta first so a hitch can't skip most of the freeze.
     if (sim.cutFocusT > 0) {
         sim.cutFocusT = Math.max(0, sim.cutFocusT - Math.min(delta, MAX_TICK_DELTA));
-        if (sim.cutFocusT === 0) sim.cutFocusPos = null;
+        if (sim.cutFocusT === 0) { sim.cutFocusPos = null; sim.cutFocusSlice = null; }
         return;
     }
 
