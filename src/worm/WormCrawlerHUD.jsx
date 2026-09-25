@@ -564,6 +564,8 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
 const PAUSE_BTN_STYLE = {
     width: 48,
     height: 48,
+    // Full 48px target; it bleeds into the bar's padding so the rail stays short.
+    marginBlock: -3,
     borderRadius: 14,
     background: HUD_SURFACE_SOFT,
     border: `2px solid ${GAME_HUD.border}`,
