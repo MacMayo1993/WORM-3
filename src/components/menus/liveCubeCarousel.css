@@ -57,6 +57,13 @@
 @media (max-width:600px) {
   .live-carousel .mc-cube-window { width:calc(100% + 2 * max(16px,env(safe-area-inset-left))); margin-inline:calc(-1 * max(16px,env(safe-area-inset-left))); }
 }
+/* Portrait phones: the cube is fitted to its presented faces (fitCarouselCube)
+   and fills the stage, so the arrows step down beside the face dots instead of
+   covering it. The dots row is 44px tall and starts at the stage's bottom edge. */
+@media (max-width:600px) and (orientation:portrait) {
+  .lc-previous,.lc-next { top:auto; bottom:-46px; }
+  .lc-previous { left:max(8px,env(safe-area-inset-left)); }.lc-next { right:max(8px,env(safe-area-inset-right)); }
+}
 @media (max-height:680px) and (orientation:portrait) {
   .lc-heading { display:none; }
   .live-carousel .mc-cube-window { min-height:265px; flex-basis:265px; }
