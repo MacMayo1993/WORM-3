@@ -21,9 +21,9 @@ import { rotationClock } from './healerWorm/rotationClockBridge.js';
 const BAR_W = 132;
 // Calm while the turn is far off, hot once the telegraph starts — the same
 // reading as the rim on the cube, which brightens over the same window.
-const CALM = '#8ad9b0';
-const HOT = '#ffb648';
-const CRITICAL = '#ff5b4a';
+const CALM = '#1f8a4c';
+const HOT = '#c26a00';
+const CRITICAL = '#c41e3a';
 
 export default function RotationCountdownHUD() {
   const { wormHealerMode, wormGamePhase, wormAlive, wormPaused, wormPhase } = useGameStore(
@@ -100,7 +100,8 @@ export default function RotationCountdownHUD() {
         display: 'none',
         alignItems: 'center',
         gap: 9,
-        padding: '1px 3px 3px',
+        padding: '0 3px 1px',
+        lineHeight: 1,
         borderRadius: 999,
         background: 'transparent',
         border: 0,
@@ -123,14 +124,14 @@ export default function RotationCountdownHUD() {
         Turn in
       </span>
 
-      <div style={{ width: BAR_W, flex: '1 1 auto', minWidth: 0, height: 5, borderRadius: 999, background: 'rgba(255,245,220,0.14)', overflow: 'hidden' }}>
+      <div style={{ width: BAR_W, flex: '1 1 auto', minWidth: 0, height: 4, borderRadius: 999, background: '#26372d1f', overflow: 'hidden' }}>
         <div ref={fillRef} style={{ width: '100%', height: '100%', borderRadius: 999, background: CALM }} />
       </div>
 
       <span
         ref={secondsRef}
         style={{
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: 800,
           fontFamily: MONO_FONT,
           fontVariantNumeric: 'tabular-nums',

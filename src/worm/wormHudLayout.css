@@ -206,3 +206,16 @@
 .worm-tunnel-safety-copy small { color:var(--hud-muted); }
 .worm-tunnel-orb { border-color:#26372d55; }
 .worm-tunnel-glance[data-tunnel-danger=true] { border:2px solid #7a1520; color:#fff; background:#c41e3a; box-shadow:0 4px 0 #7a1520; }
+
+/* Compact top stack: the orb rail, turn clock and task header together stay
+   near an eighth of a phone screen, so the cube keeps the view. */
+.worm-instrument .worm-hud-bar { padding:3px 5px; }
+.worm-instrument .orb-slot { padding-block:3px; }
+.worm-story-tracker .worm-story-glance { min-height:40px; padding-block:4px; box-shadow:0 3px 0 var(--hud-border),0 6px 14px #26372d1a; }
+.worm-story-glance-level { display:flex; flex-direction:column; align-items:center; line-height:1.05; }
+.worm-story-glance-level>small { font-size:9px; color:var(--hud-muted); font-variant-numeric:tabular-nums; }
+.worm-story-glance.is-settling .worm-story-glance-progress>span:first-child { color:#8a5a00; }
+@media (max-width:600px) {
+  .worm-hud-top { gap:4px; top:calc(env(safe-area-inset-top,0px) + 4px); }
+  .worm-instrument .orb-sample { width:clamp(16px,4.5vw,20px); }
+}
