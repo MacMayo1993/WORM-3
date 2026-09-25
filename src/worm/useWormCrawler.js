@@ -804,6 +804,7 @@ export function useWormCrawler(size, cubies) {
             cutFocusT: f('cutFocusT'),
             jumpRescueHeld: f('jumpRescueHeld'),
             cutFocusPos: f('cutFocusPos'),
+            cutFocusSlice: f('cutFocusSlice'),
             elementalFocusT: f('elementalFocusT'),
             elementalT: f('elementalT'),
             elementalMaxT: f('elementalMaxT'),

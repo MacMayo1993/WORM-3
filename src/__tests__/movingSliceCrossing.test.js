@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, it, expect } from 'vitest';
-import { movingSliceCrossing } from '../worm/healerWorm/sliceCrossing.js';
+import { movingSliceCrossing, armTurnWatch, stepTurnWatch } from '../worm/healerWorm/sliceCrossing.js';
 import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 let sim;
 beforeEach(() => {
@@ -30,4 +30,43 @@ it('allows sufficiently high jumps, rockets, landing grace and co-rotating layer
   sim.rocketActive=false; sim.landingGraceT=0.1; expect(movingSliceCrossing(sim,0.49,0)).toBeNull();
   sim.landingGraceT=0; setLiveRotation('col',[0,1],[0.6,0.6],1,0.6);
   expect(movingSliceCrossing(sim,0.49,0)).toBeNull();
+});
+
+// A head mid-step when the hazard fires crosses in the turn's first frames,
+// where the live check lets aligned faces pass. The watch hands that crossing
+// back to the fire-time rules instead of leaving the body across a moving seam.
+const ref = current => ({ current });
+const wormAt = (fromX, toX, t) => ({
+  prevTile: ref({ x: fromX, y: 1, z: 4 }), pos: ref({ x: toX, y: 1, z: 4 }), interpT: ref(t),
+  isJumping: ref(false), jumpLift: () => 0, rocketActive: ref(false), landingGraceT: ref(0)
+});
+it('reports a head entering or leaving the turning layer before and early in the turn', () => {
+  const worm = wormAt(0, 1, 0.4);
+  const watch = armTurnWatch(worm, 'col', [1]);
+  expect(watch.headOn).toBe(false);
+  expect(stepTurnWatch(watch, worm)).toBeNull();
+  worm.interpT.current = 0.55; // crossed before the animation started
+  expect(stepTurnWatch(watch, worm)).toBe('crossed');
+  expect(watch.headOn).toBe(true);
+  expect(stepTurnWatch(watch, worm)).toBeNull(); // once per crossing
+  setLiveRotation('col', [1], [0.03], 1, 0.03);
+  worm.prevTile.current = { x: 1, y: 1, z: 4 }; worm.pos.current = { x: 2, y: 1, z: 4 }; worm.interpT.current = 0.6;
+  expect(stepTurnWatch(watch, worm)).toBe('crossed'); // leaving, at an aligned angle
+  resetLiveRotation();
+  expect(stepTurnWatch(watch, worm)).toBe('done');
+});
+it('leaves late crossings to the live check and end alignment, and honours jump, rocket and landing grace', () => {
+  const worm = wormAt(0, 1, 0.4);
+  let watch = armTurnWatch(worm, 'col', [1]);
+  setLiveRotation('col', [1], [1.2], 1, 1.2);
+  worm.interpT.current = 0.55;
+  expect(stepTurnWatch(watch, worm)).toBeNull();
+  for (const guard of [w => { w.isJumping.current = true; w.jumpLift = () => 0.7; }, w => { w.rocketActive.current = true; }, w => { w.landingGraceT.current = 0.1; }]) {
+    const w = wormAt(0, 1, 0.4); guard(w);
+    watch = armTurnWatch(w, 'col', [1]);
+    setLiveRotation('col', [1], [0.02], 1, 0.02);
+    w.interpT.current = 0.55;
+    expect(stepTurnWatch(watch, w)).toBeNull();
+    expect(watch.headOn).toBe(true); // tracked, so landing later is not a second crossing
+  }
 });
