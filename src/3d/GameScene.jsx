@@ -24,6 +24,7 @@ import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
 import InteractivePhotoBackground from './InteractivePhotoBackground.jsx';
 import BackgroundAmbience from './BackgroundAmbience.jsx';
+import TeachViewOffset from './TeachViewOffset.jsx';
 
 const HealerWormMode3DWrapper = React.lazy(() =>
   import('../worm/HealerWormMode.jsx').then((mod) => ({ default: mod.HealerWormMode3DWrapper }))
@@ -254,6 +255,7 @@ export default function GameScene({
 
         {/* Mini cubes and twin wormholes drifting far beyond the camera. */}
         <ErrorBoundary3D><BackgroundAmbience size={size} /></ErrorBoundary3D>
+        <TeachViewOffset />
 
         <WormholeWarpFX
           enabled={wormholePhaseActive}

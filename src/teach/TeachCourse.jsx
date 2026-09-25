@@ -3,7 +3,14 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { checkRubiksSolvedRotationInvariant } from '../game/winDetection.js';
 import { parseAlgorithm } from './algorithms.js';
 import { TEACH_LESSONS, FULL_SOLVE, COURSE_STORAGE_KEY, readCourseProgress, prepareLesson, courseSignature, courseHome, inspectCourseStage } from './course.js';
+import { arcadeModeVars } from '../utils/arcadeTheme.js';
 import './teachCourse.css';
+
+// Phones open lessons focused on the cube: the goal line and the turn keys stay,
+// the explanation is one tap away. A tall sheet hid the puzzle it was teaching.
+const NARROW = '(max-width: 640px)';
+const startsCompact = () => { try { return window.matchMedia(NARROW).matches; } catch { return false; } };
+const TEACH_VARS = arcadeModeVars('teach');
 
 const LESSONS = [...TEACH_LESSONS, FULL_SOLVE];
 const TOKENS = ['U', "U'", 'U2', 'R', "R'", 'R2', 'F', "F'", 'F2', 'L', "L'", 'L2', 'D', "D'", 'D2', 'B', "B'", 'B2'];
@@ -19,7 +26,7 @@ export default function TeachCourse({ onClose, onHighlight, onPuzzles }) {
   const [hint, setHint] = useState(false);
   const [message, setMessage] = useState('');
   const [finished, setFinished] = useState(false);
-  const [compact, setCompact] = useState(false);
+  const [compact, setCompact] = useState(startsCompact);
   const cube = useGameStore(s => s.cubies);
   const anim = useGameStore(s => s.animState);
   const lesson = LESSONS[index];
@@ -41,7 +48,7 @@ export default function TeachCourse({ onClose, onHighlight, onPuzzles }) {
     if (useGameStore.getState().animState) return;
     const p = prepareLesson(LESSONS[nextIndex]);
     setIndex(nextIndex); setMode(nextMode); setStep(0); setPlaying(false);
-    setHint(false); setFinished(false); setMessage(''); setMap(false); setCompact(false);
+    setHint(false); setFinished(false); setMessage(''); setMap(false); setCompact(startsCompact());
     expected.current = null; assisted.current = nextMode === 'watch';
     lastCube.current = p.frames[0];
     const s = useGameStore.getState();
@@ -125,8 +132,9 @@ export default function TeachCourse({ onClose, onHighlight, onPuzzles }) {
   };
   const exit = () => { setPlaying(false); useGameStore.getState().clearAnimation(); onHighlight(null); onClose(); };
 
-  return <section className={`teach-course ${map ? 'teach-course-map' : ''} ${compact ? 'teach-course-compact' : ''}`} aria-label="Teach mode">
+  return <section className={`teach-course ${map ? 'teach-course-map' : ''} ${compact ? 'teach-course-compact' : ''}`} style={TEACH_VARS} aria-label="Teach mode">
     <header><div><small>TEACH · 3×3</small><h1>{map ? 'Learn to solve a cube' : lesson.title}</h1></div>
+      {!map && <button className="teach-explain" aria-expanded={!compact} onClick={() => setCompact(!compact)}>Explain {compact ? '▾' : '▴'}</button>}
       <button aria-label="Exit Teach mode" onClick={exit}>×</button></header>
     {map ? <>
       <p>Learn a complete beginner method. Watch a prepared case, practice its turns, then solve independently.</p>
@@ -137,9 +145,7 @@ export default function TeachCourse({ onClose, onHighlight, onPuzzles }) {
       <button className="teach-primary" disabled={!!anim} onClick={() => load(index)}>Continue learning</button>
       <button disabled={!!anim} onClick={() => { exit(); onPuzzles(); }}>Cube puzzle campaigns</button>
     </> : <>
-      <nav><button disabled={!!anim} onClick={() => { setPlaying(false); setMap(true); }}>← Lessons</button>
-        <button onClick={() => setCompact(!compact)}>{compact ? 'Show explanation' : 'Focus on cube'}</button></nav>
-      <div className="teach-explanation"><small>{lesson.chapter}</small><p><strong>{lesson.goal}</strong></p><p>{lesson.notice}</p>
+      <div className="teach-explanation"><small>{lesson.chapter}</small><p className="teach-goal"><strong>{lesson.goal}</strong></p><p>{lesson.notice}</p>
         <details><summary>Why this works</summary><p>{lesson.why}</p></details>
         {free && <details><summary>Seven-stage reference · {inspectCourseStage(cube)}</summary>{TEACH_LESSONS.slice(2).map(l => <div key={l.id}><h3>{l.chapter} · {l.title}</h3><code>{l.notation}</code><p>{l.notice}</p></div>)}</details>}
         <p className="teach-grip">{free ? 'Keep yellow Up and white Down. Regrip changes which side is Front so you can work on another slot.' : 'Fixed grip: yellow Up · white Down · red Front.'} Orbiting the camera changes only your view. Letters follow the cube’s fixed axes.</p>
@@ -152,7 +158,8 @@ export default function TeachCourse({ onClose, onHighlight, onPuzzles }) {
       {mode === 'watch' ? <div className="teach-actions"><button disabled={finished} onClick={() => setPlaying(!playing)}>{playing ? 'Pause' : 'Play slowly'}</button><button disabled={!!anim || finished || playing} onClick={() => turn(move.notation, true)}>One move</button></div>
         : <div className="teach-turns" aria-label="Face turns">{TOKENS.map(token => <button key={token} disabled={!!anim || finished} onClick={() => turn(token)}>{token}</button>)}</div>}
       {free && mode === 'practice' && <div className="teach-actions"><button disabled={!!anim || finished} onClick={() => regrip(1)}>Regrip left</button><button disabled={!!anim || finished} onClick={() => regrip(-1)}>Regrip right</button></div>}
-      <div className="teach-actions"><button disabled={!!anim || finished} onClick={restore}>Restore this step</button>
+      <div className="teach-actions"><button disabled={!!anim} onClick={() => { setPlaying(false); setMap(true); }}>← Lessons</button>
+        <button disabled={!!anim || finished} onClick={restore}>Restore this step</button>
         {free && <button onClick={() => { setHint(!hint); assisted.current = true; setMessage('This is the prepared solution, not an adaptive hint. Restart the case before following it if you have taken a different path.'); }}> {hint ? 'Hide solution' : 'Show prepared solution'}</button>}</div>
       {finished && <button className="teach-primary" disabled={!!anim} onClick={() => mode === 'watch' ? load(index) : index < LESSONS.length - 1 ? load(index + 1) : setMap(true)}>{mode === 'watch' ? 'Try it yourself' : index < LESSONS.length - 1 ? 'Next lesson →' : 'Return to lessons'}</button>}
     </>}
