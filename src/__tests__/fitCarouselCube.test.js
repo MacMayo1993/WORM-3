@@ -30,8 +30,8 @@ it.each([
 // Portrait phones are fitted to the poses the carousel really shows: a face
 // parked toward the player (with its breathing wobble) and the slerp between
 // any two faces. Parked, the cube sits inside the stage. Mid-turn it eases back
-// (carouselTurnScale) so its wider silhouette stays on screen and covers the
-// heading or footer by no more than 40px.
+// (carouselTurnScale, from the pose itself) so its wider silhouette stays on
+// screen and covers the heading or footer by no more than 40px.
 const FACES = [[0, 0, 0], [0, Math.PI, 0], [0, -Math.PI / 2, 0], [0, Math.PI / 2, 0], [Math.PI / 2, 0, 0], [-Math.PI / 2, 0, 0]]
   .map(e => new Quaternion().setFromEuler(new Euler(...e)));
 it.each([
@@ -60,11 +60,22 @@ it.each([
     expect(parked.top).toBeGreaterThan(stage.top); expect(parked.bottom).toBeLessThan(stage.top + stage.height);
     // Bigger than the tumble fit left it: at least 70% of the screen width.
     expect(parked.right - parked.left).toBeGreaterThan(width * 0.7);
-    for (const other of FACES) for (let t = 0.125; t < 1; t += 0.125) {
+    for (const other of FACES) for (let t = 0.0625; t < 1; t += 0.0625) {
+      // The rendered scale is a function of the pose alone (nearest parked
+      // face), exactly as MainMenu applies it, so there is no easing lag to model.
       const q = pose(face).slerp(pose(other), t);
-      const turn = extent(q, carouselTurnScale(q.angleTo(pose(other)), fit.turnPullback));
+      const fromFace = Math.min(...FACES.map(f => q.angleTo(pose(f))));
+      const turn = extent(q, carouselTurnScale(fromFace, fit.turnPullback));
       expect(turn.left).toBeGreaterThan(0); expect(turn.right).toBeLessThan(width);
       expect(turn.top).toBeGreaterThan(stage.top - 40); expect(turn.bottom).toBeLessThan(stage.top + stage.height + 40);
     }
   }
+});
+
+it('shrinks in lockstep with the pose, with no pop at either end of a turn', () => {
+  expect(carouselTurnScale(0, 0.18)).toBe(1);
+  expect(carouselTurnScale(Math.PI / 4, 0.18)).toBeCloseTo(0.82);
+  expect(carouselTurnScale(Math.PI, 0.18)).toBeCloseTo(0.82);
+  expect(carouselTurnScale(0.01, 0.18)).toBeGreaterThan(0.99);
+  expect(carouselTurnScale(Math.PI / 4, 0)).toBe(1);
 });

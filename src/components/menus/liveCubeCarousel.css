@@ -63,6 +63,12 @@
 @media (max-width:600px) and (orientation:portrait) {
   .lc-previous,.lc-next { top:auto; bottom:-46px; }
   .lc-previous { left:max(8px,env(safe-area-inset-left)); }.lc-next { right:max(8px,env(safe-area-inset-right)); }
+  /* The dots keep clear of the arrows: the footer is inset 16px from the screen
+     and each arrow reaches 8 + 48px in, so 44px of row padding (4px of air) is
+     theirs. Below ~376px the six dots share what is left rather than sliding
+     under an arrow, keeping their full 44px height. */
+  .lc-face-map { padding-inline:44px; }
+  .lc-face-map button { flex:0 1 44px; min-width:0; padding-inline:2px; }
 }
 @media (max-height:680px) and (orientation:portrait) {
   .lc-heading { display:none; }
