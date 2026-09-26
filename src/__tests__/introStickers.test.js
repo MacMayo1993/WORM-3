@@ -1,5 +1,5 @@
 import { Object3D, PerspectiveCamera, Vector3 } from 'three';
-import { INTRO_SCALE, fitIntroFrame } from '../components/intro/introFraming.js';
+import { INTRO_SCALE, placeIntroFrame } from '../components/intro/introFraming.js';
 import { sampleIntro, introCameraDistance, INTRO_END } from '../components/intro/introChoreography.js';
 import { introEnergy } from '../components/intro/introEnergy.js';
 import { describe, expect, it, vi } from 'vitest';
@@ -52,7 +52,8 @@ it('keeps the 1.2x cube in frame across phone aspect ratios', () => {
       camera.lookAt(0, -0.55, 0);
       root.rotation.set(0.12 + 0.1 * pose.open, pose.turn, 0); root.position.y = 0.25;
       const extent = 1 + 1.5 * pose.open + 0.56;
-      fitIntroFrame(camera, root, extent);
+      camera.clearViewOffset();
+      placeIntroFrame(camera, root, extent, aspect * 800, 800);
       for (const x of [-extent, extent]) for (const y of [-extent, extent]) for (const z of [-extent, extent]) {
         corner.set(x, y, z).applyMatrix4(root.matrixWorld).project(camera);
         expect(Math.max(Math.abs(corner.x), Math.abs(corner.y))).toBeLessThanOrEqual(0.971);

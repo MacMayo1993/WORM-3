@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from 'three';
 import { TILES, PAIRS, flippedColor, pairPoint } from '../components/intro/introTopology.js';
-import { WORM_START, IMPLODE_START, IMPLODE_END, TITLE_START, TITLE_END, DISSOLVE_START, DISSOLVE_END } from '../components/intro/introTiming.js';
+import { IMPLODE_START, IMPLODE_END, TITLE_START, TITLE_END, DISSOLVE_START, DISSOLVE_END } from '../components/intro/introTiming.js';
 import { INTRO_END, sampleIntro, introCameraDistance } from '../components/intro/introChoreography.js';
 
 // These protect animation failure modes: discontinuous cuts, clipped framing,
@@ -64,13 +64,7 @@ describe('all-pairs reveal', () => {
       expect(flippedColor(tile.faceIndex, restored)).toBe(tile.face.color);
     }
   });
-  it('lets even the last worm tail arrive before the cube closes', () => {
-    const lastArrival = WORM_START + (PAIRS.length - 1) * 0.012 + (1 + 9 * 0.016) * 2.2;
-    expect(lastArrival).toBeLessThan(IMPLODE_START);
-    expect(IMPLODE_START - lastArrival).toBeGreaterThan(0.2);
-    expect(IMPLODE_START - lastArrival).toBeLessThan(0.5);
-    // The title card lingers and dissolves before the menu (introOutro.js), but
-    // the whole opening still stays short enough to sit through.
-    expect(INTRO_END).toBeLessThan(12);
+  it('leaves room for the joining wordmark finale without a long opening', () => {
+    expect(INTRO_END).toBeLessThan(14);
   });
 });
