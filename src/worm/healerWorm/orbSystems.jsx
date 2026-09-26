@@ -15,7 +15,8 @@ import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_F
 import { isViewPower } from './viewPowerups.js';
 import { getSpecialDef, isElementalType } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
-import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
+import ParityOrbs from '../ParityOrb.jsx';
+import OrbPickupBurst from './OrbPickupBurst.jsx';
 import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
@@ -460,7 +461,8 @@ export function SpecialFlashSystem({ worm }) {
         if (!pending) return;
         worm.pendingSpecialFlashRef.current = null;
         const look = getSpecialDef(pending.type);
-        setFlashes(prev => [...prev, { id: Date.now() + Math.random(), pos: pending.pos, type: pending.type, color: look.color }]);
+        setFlashes(prev => [...prev, { id: Date.now() + Math.random(), pos: pending.pos, type: pending.type, color: look.color,
+            normal: worm.currentNormal.current.toArray() }]);
     });
 
     if (flashes.length === 0) return null;
@@ -470,7 +472,7 @@ export function SpecialFlashSystem({ worm }) {
             {flashes.map(f => (
                 (isElementalType(f.type) || isViewPower(f.type))
                     ? <ElementalClaimBurst key={f.id} position={f.pos} type={f.type} onDone={() => drop(f.id)} />
-                    : <OrbCollectEffect key={f.id} position={f.pos} color={f.color} onDone={() => drop(f.id)} />
+                    : <OrbPickupBurst key={f.id} position={f.pos} normal={f.normal} color={f.color} pickup={false} onDone={() => drop(f.id)} />
             ))}
         </>
     );
@@ -490,23 +492,27 @@ export function OrbFlashSystem({ worm }) {
             return;
         }
         if (useGameStore.getState().wormPaused || !worm.pendingOrbFlashRef.current) return;
-        const { color, pos: fallback } = worm.pendingOrbFlashRef.current;
+        const { color, pos: fallback, combo = 0 } = worm.pendingOrbFlashRef.current;
         worm.pendingOrbFlashRef.current = null;
         const pos = wormSegments.count
             ? Array.from(wormSegments.positions.subarray(0, 3)) : fallback;
         const id = ++seq.current;
         // Magnet sweeps coalesce per frame; bound overlapping bursts as well.
-        setFlashes(prev => [...prev.slice(-3), { id, pos, color }]);
+        // Laid out on the face the head is on, so the rings run along the tile.
+        const normal = worm.currentNormal.current.toArray();
+        setFlashes(prev => [...prev.slice(-3), { id, pos, color, combo, normal }]);
     });
 
     if (flashes.length === 0) return null;
     return (
         <>
             {flashes.map(f => (
-                <OrbCollectEffect
+                <OrbPickupBurst
                     key={f.id}
                     position={f.pos}
+                    normal={f.normal}
                     color={f.color}
+                    combo={f.combo}
                     pickup
                     reducedMotion={reduced.current}
                     onDone={() => setFlashes(prev => prev.filter(x => x.id !== f.id))}

@@ -6,6 +6,7 @@ import { getStickerWorldPos } from '../../game/coordinates.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
 import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT } from './constants.js';
 import { shPush, ttPush } from '../circularBuffers.js';
+import { arcLift } from './jumpArc.js';
 
 export { WORM_PAD_HEIGHT };
 export const usesRaisedPlatforms = ctx => ctx.getTunnelEntry?.() === 'pad';
@@ -43,7 +44,7 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
     if (!aim) return false;
     const { target, moveDir, destination } = aim;
     const start = sim.headInterpPos.clone();
-    if (sim.isJumping) start.addScaledVector(sim.currentNormal, Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight);
+    if (sim.isJumping) start.addScaledVector(sim.currentNormal, arcLift(sim.jumpT, sim.jumpHeight, sim.jumpBase));
     const endNormal = FACE_NORMALS[target.dirKey].clone();
     const above = destination.clone().addScaledVector(endNormal, 0.35);
     const offset = start.clone().sub(destination).projectOnPlane(endNormal);
@@ -65,6 +66,7 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
     sim.isJumping = true;
     sim.jumpCount = 1;
     sim.jumpT = 0.001;
+    sim.jumpBase = 0;
     sim.pendingTunnelTrigger = null;
     ctx.feel('jump');
     return true;
@@ -109,6 +111,7 @@ export function tickPlatformJump(sim, delta) {
     sim.lastRecordedT = 1.02;
     sim.isJumping = false;
     sim.jumpT = 0;
+    sim.jumpBase = 0;
     sim.jumpCount = 0;
     sim.raisedRouteDistance = sim.stepHistory.distance;
     sim.onRaisedPlatform = true;

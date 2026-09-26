@@ -1,4 +1,4 @@
-import { COMBAT, combatKey, makeCombat, makeEnemy, stepCombat } from './portalCombat.js';
+import { COMBAT, combatKey, makeCombat, makeEnemy, stepCombat, stepEnemyDissolves } from './portalCombat.js';
 
 export const AMBIENT = Object.freeze({ grace: 12, cooldown: 24, retry: 3, warning: 1.5, lifetime: 20 });
 export function makeAmbientCombat(size) {
@@ -11,7 +11,9 @@ function retreat(c, keepBurst = false) {
   c.quiet = c.enemies.length === 0 && c.warning > 0 ? AMBIENT.retry : AMBIENT.cooldown;
   c.warning = 0; c.remaining = 0;
   c.enemies = []; c.shots = []; c.drops = []; c.arcs = []; c.muzzle = null;
-  if (!keepBurst) c.bursts = [];
+  // A kill keeps its burst and its crumble; any other retreat (a rotation, a heal,
+  // a lock) clears them, since their tiles may no longer be where they were drawn.
+  if (!keepBurst) { c.bursts = []; c.dying = []; }
   c.fireHeld = false; c.fireRequested = false; c.lockedId = null; c.aim = null;
 }
 export function cancelAmbientEncounter(c) {
@@ -45,6 +47,7 @@ export function stepAmbientCombat(c, delta, player, tunnels, onHit) {
     c.time += dt;
     for (const burst of c.bursts) burst.life -= dt;
     c.bursts = c.bursts.filter(b => b.life > 0);
+    stepEnemyDissolves(c, dt);
     c.quiet = Math.max(0,c.quiet-dt);
     if (c.quiet > 0 || player.hazardBusy || player.rotating) return;
     for (const hit of tunnels) {

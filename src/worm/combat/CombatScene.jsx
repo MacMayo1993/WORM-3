@@ -2,8 +2,10 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { ENEMIES, ELEMENTS, WAVES } from './combatDefs.js';
 import React, { useRef, useMemo, useLayoutEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { BackSide, Quaternion, Vector3 } from 'three';
+import { BackSide, Color, DoubleSide, Matrix4, Object3D, PlaneGeometry, Quaternion, Vector3 } from 'three';
 import { combatBridge, COMBAT, surfacePose } from './portalCombat.js';
+import { addFrameDissolve } from '../../components/intro/introDissolve.js';
+import { allocateEnemySlots, dissolveProgress, enemyFleck, ENEMY_FLECKS, ENEMY_FIELD_SCALE, ENEMY_FIELD_MID } from './enemyDissolve.js';
 
 const up = new Vector3(0,0,1), normal = new Vector3(), tangent = new Vector3(), inverse = new Quaternion();
 function place(group, actor, size, lift = 0.18) {
@@ -21,24 +23,84 @@ function EnemyOutline() {
     const group = ref.current;
     for (const mesh of group.children) mesh.geometry = group.parent.geometry;
   }, []);
-  return <group ref={ref}>
+  return <group ref={ref} name="enemy-outline">
     <mesh scale={enhanced ? 1.42 : 1.24}><meshBasicMaterial color="#ff1828" side={BackSide} transparent opacity={enhanced ? 0.5 : 0.2} depthWrite={false} toneMapped={false} /></mesh>
     <mesh scale={enhanced ? 1.16 : 1.1}><meshBasicMaterial color="#ff3038" side={BackSide} transparent opacity={0.95} depthWrite={false} toneMapped={false} /></mesh>
   </group>;
 }
-// Four pooled rigs; shells and joints animate in place without React state.
-function Crawler({ slot }) {
-  const ref = useRef(), rig = useRef(), body = useRef(), target = useRef(), shell = useRef();
+// Rig frame → the intro's cube-sized dissolve field (introDissolve.js): the
+// heading (+y, head first) becomes the field's top-to-base axis, centred and
+// scaled so the body spans the same sweep as the opening's cube at the same
+// relative grain (enemyDissolve.js explains why not the surface normal).
+const FIELD_MAP = new Matrix4().makeScale(ENEMY_FIELD_SCALE, ENEMY_FIELD_SCALE, ENEMY_FIELD_SCALE)
+  .setPosition(0, -ENEMY_FIELD_SCALE * ENEMY_FIELD_MID, 0);
+const FLECK_GEOMETRY = new PlaneGeometry(1, 0.62);
+const SHELL_FLECK = new Color('#201d32');
+const fleckDummy = new Object3D(), fleckColor = new Color();
+const prefersReducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+// Pooled rigs; shells and joints animate in place without React state. `slots`
+// maps each rig to one live or dissolving enemy by id (allocateEnemySlots), so a
+// defeated enemy crumbles in the rig it died in.
+function Crawler({ slot, slots }) {
+  const ref = useRef(), rig = useRef(), parts = useRef(), flecks = useRef(), body = useRef(), target = useRef(), shell = useRef();
   const accents = useRef(), armor = useRef(), status = useRef(), legs = useRef(), fins = useRef(), frost = useRef(), warning = useRef();
   const facing = useRef({ id: null, angle: 0 });
+  const dissolve = useMemo(() => ({ uDissolve: { value: 0 }, uDissolveFrame: { value: new Matrix4() } }), []);
+  const reduced = useMemo(() => prefersReducedMotion(), []);
+  // Every body part, outline shell and accent shares this crawler's front, so the
+  // creature goes as one object, exactly as the intro's plastic and stickers do.
+  // The red outline is a live-enemy readability aid, not part of the body: it
+  // would show through every hole in the crumble, so a dying enemy drops it.
+  const outlines = useRef([]);
+  useLayoutEffect(() => {
+    outlines.current = [];
+    parts.current.traverse(o => {
+      if (o.name === 'enemy-outline') outlines.current.push(o);
+      else if (o.isMesh && o.material) addFrameDissolve(o.material, dissolve);
+    });
+  }, [dissolve]);
   useFrame((_,delta) => {
-    const c = combatBridge.current, e = c?.enemies[slot];
+    const c = combatBridge.current, e = slots.current[slot];
     if (!ref.current) return;
     ref.current.visible = !!e;
     if (!e) return;
     place(ref.current,e,c.size,0.13);
-    const emerge = Math.max(0.05,1-Math.max(0,e.emerging)/0.8);
     const def = ENEMIES[e.type] || ENEMIES.crawler;
+    const dying = e.dissolveT != null;
+    if (dying) {
+      // Frozen where it fell: no gait, no reticle, no status rings — only the
+      // crumble front and the flecks it sheds.
+      const progress = dissolveProgress(e.dissolveT);
+      parts.current.visible = progress < 1;
+      for (const outline of outlines.current) outline.visible = false;
+      dissolve.uDissolve.value = Math.max(0.001, progress);
+      ref.current.scale.setScalar(def.scale);
+      ref.current.updateMatrixWorld(true);
+      dissolve.uDissolveFrame.value.copy(rig.current.matrixWorld).invert().premultiply(FIELD_MAP);
+      target.current.visible = false; warning.current.visible = false; status.current.visible = false; frost.current.visible = false;
+      let shed = 0;
+      for (let i = 0; i < ENEMY_FLECKS; i++) {
+        const fleck = enemyFleck(i, e.dissolveT, e.seed ?? e.id, reduced);
+        if (fleck) {
+          shed++;
+          fleckDummy.position.fromArray(fleck.position);
+          fleckDummy.rotation.set(...fleck.spin);
+          fleckDummy.scale.setScalar(fleck.scale);
+          flecks.current.setColorAt(i, fleck.shell ? SHELL_FLECK : fleckColor.set(def.color));
+        } else fleckDummy.scale.setScalar(0);
+        fleckDummy.updateMatrix();
+        flecks.current.setMatrixAt(i, fleckDummy.matrix);
+      }
+      flecks.current.visible = shed > 0;
+      flecks.current.instanceMatrix.needsUpdate = true;
+      if (flecks.current.instanceColor) flecks.current.instanceColor.needsUpdate = true;
+      return;
+    }
+    parts.current.visible = true;
+    for (const outline of outlines.current) outline.visible = true;
+    flecks.current.visible = false;
+    dissolve.uDissolve.value = 0;
+    const emerge = Math.max(0.05,1-Math.max(0,e.emerging)/0.8);
     ref.current.scale.setScalar(emerge*def.scale);
     if (facing.current.id !== e.id) facing.current = { id: e.id, angle: 0 };
     if (e.next) {
@@ -88,6 +150,10 @@ function Crawler({ slot }) {
   });
   return <group ref={ref} visible={false}>
     <group ref={rig}>
+      <instancedMesh ref={flecks} args={[FLECK_GEOMETRY, null, ENEMY_FLECKS]} visible={false} frustumCulled={false}>
+        <meshStandardMaterial side={DoubleSide} roughness={0.5} />
+      </instancedMesh>
+      <group ref={parts}>
       <group ref={legs}>{[-1,1].flatMap(side => [-1,0,1].map(row => <group key={`${side}:${row}`} position={[side*0.18,row*0.19,0.02]}>
         <mesh position={[side*0.1,0,0.015]} scale={[0.25,0.055,0.055]}><boxGeometry /><meshStandardMaterial color="#9e91aa" emissive="#ff2038" emissiveIntensity={0.5} metalness={0.65} roughness={0.38} /></mesh>
         <group position={[side*0.21,0,0]}>
@@ -111,6 +177,7 @@ function Crawler({ slot }) {
         </group>)}</group>
       </group>
       <group ref={warning} position={[0,0.67,0.015]}>{[-1,1].map(side => <mesh key={side} position={[side*0.085,0,0]} rotation={[0,0,side*Math.PI/4]} scale={[0.035,0.24,0.015]}><boxGeometry /><meshBasicMaterial color="#ffd18b" transparent opacity={0.85} depthWrite={false} toneMapped={false} /></mesh>)}</group>
+      </group>
     </group>
     <mesh ref={frost} position={[0,0,0.18]} scale={[0.39,0.49,0.3]}><icosahedronGeometry args={[1,1]} /><meshBasicMaterial color="#a0e7ff" wireframe transparent opacity={0.5} depthWrite={false} toneMapped={false} /></mesh>
     <mesh ref={status} position={[0,0,0.005]}><ringGeometry args={[0.42,0.46,6]} /><meshBasicMaterial transparent opacity={0.75} depthWrite={false} toneMapped={false} /></mesh>
@@ -249,8 +316,17 @@ function PortalBeacon() {
     <mesh><octahedronGeometry args={[0.13]} /><meshBasicMaterial color="#c29aff" toneMapped={false} /></mesh>
   </group>;
 }
+// Rigs beyond the live cap hold enemies that are still crumbling, so a kill never
+// has to vanish to make room for the next arrival.
+const DISSOLVE_SLOTS = 3;
 export default function CombatScene({ maxEnemies = COMBAT.maxEnemies }) {
-  return <group><PortalBeacon /><AimGuide /><MuzzleFlash />{Array.from({length:maxEnemies},(_,i)=><Crawler key={i} slot={i} />)}
+  const pool = maxEnemies + DISSOLVE_SLOTS;
+  const slots = useRef(null), assigned = useRef(new Map());
+  if (!slots.current || slots.current.length !== pool) slots.current = Array(pool).fill(null);
+  // Before the rigs read their slots this frame (lower priority runs first; a
+  // negative priority never takes over rendering).
+  useFrame(() => { allocateEnemySlots(combatBridge.current, assigned.current, slots.current); }, -1);
+  return <group><PortalBeacon /><AimGuide /><MuzzleFlash />{Array.from({length:pool},(_,i)=><Crawler key={i} slot={i} slots={slots} />)}
     {Array.from({length:8},(_,i)=><Shot key={i} slot={i} />)}
     {Array.from({length:6},(_,i)=><Drop key={i} slot={i} />)}
     {Array.from({length:8},(_,i)=><Burst key={i} slot={i} />)}

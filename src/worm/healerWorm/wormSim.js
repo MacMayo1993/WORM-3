@@ -13,6 +13,7 @@ import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureA
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState, inchGaitInto } from './inchGait.js';
+import { arcLift } from './jumpArc.js';
 // src/worm/healerWorm/wormSim.js
 //
 // Pure(-ish) worm simulation core, extracted from useWormCrawler.js (2026-07).
@@ -228,6 +229,9 @@ export function makeWormSim(size) {
         // rocket is "a jump with different numbers" instead of a parallel code path.
         jumpSpan: SURFACE_JUMP_TILE_SPAN,
         jumpHeight: SURFACE_JUMP_HEIGHT,
+        // Height the current arc started from: 0 for a grounded jump, the live lift
+        // for a double jump pressed in mid-air (see jumpArc.js).
+        jumpBase: 0,
 
         // ── Boost ──────────────────────────────────────────────────────────────
         signature: makeSignature(),
@@ -392,6 +396,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.jumpCount = 0;
     sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
+    sim.jumpBase = 0;
     sim.specials = [];
     sim.specialTimer = SPECIAL_SPAWN_INTERVAL;
     sim.explodeT = 0;
@@ -466,7 +471,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
 
 /** Jump offset height at current jumpT. */
 export const jumpLiftOf = (sim) => sim.isJumping && !sim.padFlight
-    ? Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight
+    ? arcLift(sim.jumpT, sim.jumpHeight, sim.jumpBase)
     : 0;
 
 export function startJump(sim, ctx, size, { allowDive = true } = {}) {
@@ -488,6 +493,9 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     // reset jumpT and cut the launch short.
     if (sim.rocketActive) return;
     if (sim.jumpCount >= MAX_JUMPS) return;
+    // A double jump climbs on from the current height; a grounded jump starts at 0.
+    // Read before jumpT restarts, or the lift reads as a new arc's first frame.
+    sim.jumpBase = jumpLiftOf(sim);
     sim.isJumping = true;
     sim.jumpT = 0.001;
     sim.jumpCount += 1;
@@ -913,7 +921,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         sim.lastOrbTime = sim.timeAlive;
         applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId, ORB_SEGMENT_GROWTH + refracted.bonus);
         if (sim.magnetT > 0 && puKey !== headKey) ctx.onStoryMechanic?.('magnetOrbs');
-        sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray() };
+        sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray(), combo: sim.orbCombo };
         // Reward is immediate. The renderer consumes a short gulp on the head
         // tile or a longer attraction for a remote magnet catch.
         if (sim.pendingOrbAttractions.length < MAX_ORB_ATTRACTION_FX) {
@@ -1632,7 +1640,9 @@ const PHASE_HANDLERS = {
                 const jumpTAtR = sim.isJumping
                     ? Math.max(0, Math.min(1, sim.jumpT - (sim.interpT - sim.lastRecordedT) / sim.jumpSpan))
                     : 0;
-                const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * sim.jumpHeight : 0;
+                // A lookback that reaches before a double jump's press clamps to its
+                // base, the height the body was already carrying there.
+                const ptJump = sim.isJumping ? arcLift(jumpTAtR, sim.jumpHeight, sim.jumpBase) : 0;
                 // Compute lifted pos into module-level scratch, then copy into the ring slot.
                 _evalLiftedPos.copy(_evalHPos).addScaledVector(ptNorm, WORM_LIFT + ptJump);
                 // Tag the point with the grid cell it occupies, derived from the pre-lift
@@ -2266,6 +2276,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.jumpT = 0;
             sim.isJumping = false;
             sim.jumpCount = 0;
+            sim.jumpBase = 0;
             sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
             sim.jumpHeight = SURFACE_JUMP_HEIGHT;
         }

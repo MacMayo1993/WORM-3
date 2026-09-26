@@ -41,7 +41,7 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
     sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lesson.id, id: `demo-${lesson.id}`, ttl: 9999, maxTtl: 9999 }];
   }
   const marked = ring || ['tunnel', 'heal'].includes(lesson.id) ? { ...target, ring } : null;
-  return { cubies, inventory, target: marked, sawJump: false, sawBoost: false, sawRocket: false, elementTime: 0 };
+  return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, elementTime: 0 };
 }
 
 // Reads actual outcomes after a physics tick. No input press alone completes a
@@ -56,6 +56,14 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
     case 'steer': done = !!state.demoWormSteered; break;
     case 'orbs': done = state.wormSessionOrbs >= 2; progress = `${Math.min(2, state.wormSessionOrbs)} / 2 orbs`; break;
     case 'jump': done = practice.sawJump && !sim.isJumping; break;
+    // Both presses must land in ONE flight: a single hop that lands resets the
+    // count, exactly as landing hands both jumps back in live play.
+    case 'double-jump':
+      if (sim.isJumping) practice.jumps = Math.max(practice.jumps, sim.jumpCount);
+      else if (practice.jumps < 2) practice.jumps = 0;
+      done = practice.jumps >= 2 && !sim.isJumping;
+      progress = `${practice.jumps} / 2 jumps`;
+      break;
     case 'boost': done = practice.sawBoost && sim.boostActiveT <= 0; break;
     case 'tunnel':
     case 'heal': done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && state.wormPhase === 'crawling' && sim.tunnelPassages.length === 0 && (lesson.id !== 'heal' || sim.healed > 0); break;
