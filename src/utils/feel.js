@@ -301,6 +301,15 @@ const SFX = {
     sweep(130, 52, 0.1, 0.14 + h * 0.06, 'sine');
   },
 
+  // The player's first strike: the sky answers the tile they picked. The biggest
+  // crack in the chaos set, then a long rolling rumble — a round starting.
+  chaosIgnite() {
+    burst(0.08, 0.34, 'highpass', 3000);
+    sweep(2400, 400, 0.12, 0.12, 'sawtooth');
+    burst(0.7, 0.26, 'lowpass', 180);
+    sweep(95, 38, 0.8, 0.22, 'sine', 0.05);
+  },
+
   // A wormhole opening under chaos: the surge zips down the new tunnel.
   chaosSurge() {
     sweep(260, 980, 0.16, 0.09, 'sawtooth');
@@ -428,6 +437,7 @@ const HAPTICS = {
   // priority, so it fills the gaps between flips' own patterns and never cuts
   // one short.
   chaosZap: 14,
+  chaosIgnite: [0, 70, 40, 110],
   chaosOverload: [0, 45, 30, 70],
   // Short enough to read as the key itself rather than as something happening.
   uiKey: 10,

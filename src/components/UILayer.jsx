@@ -55,6 +55,8 @@ const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectSc
 const WormEntryScreen = React.lazy(() => import('./screens/WormEntryScreen.jsx'));
 import MobiIntroScreen from './screens/MobiIntroScreen.jsx';
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
+// Lazy so the arcade stylesheet it carries stays out of the initial CSS budget.
+const ChaosIgnitionPrompt = React.lazy(() => import('../chaos/ChaosIgnitionPrompt.jsx'));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
 const DisparityBettingScreen = React.lazy(() => import('./screens/DisparityBettingScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
@@ -99,6 +101,7 @@ export default function UILayer({
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
     disparityCountdown,
+    ignitionPicking, onIgnitionConfirm, onIgnitionSurprise,
     showAntipodalPiP, onToggleAntipodalPiP,
     showComingSoon, onCloseComingSoon,
     showMobiusCubelet,
@@ -296,6 +299,11 @@ export default function UILayer({
         <TunnelTransitOverlay />
 
         <ChaosCountdown value={disparityCountdown} settings={settings} />
+        {ignitionPicking && (
+          <Suspense fallback={null}>
+            <ChaosIgnitionPrompt onConfirm={onIgnitionConfirm} onSurprise={onIgnitionSurprise} />
+          </Suspense>
+        )}
 
         {/* Disparity Betting Screen — intercepts before chaos starts */}
         <ScreenTransition show={showDisparityBetting}>

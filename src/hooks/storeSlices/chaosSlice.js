@@ -19,6 +19,12 @@ export const createChaosSlice = (set, _get) => ({
   flipPulse: null,
   cameraOrbitRequest: 0,  // epoch — increments each time the user requests a camera orbit
   cameraOrbitDir: null,   // 'cw' | 'ccw'
+  // The first strike: the tile the player picks for chaos to ignite on, as
+  // { x, y, z, dirKey, gridId } (see game/chaosIgnition.js). The sim resolves it by
+  // gridId, so the unshuffle turns that start at GO cannot move it off target.
+  chaosIgnition: null,
+  // True while the round waits for that pick — taps choose a tile instead of flipping.
+  chaosIgnitionPicking: false,
 
   triggerCameraOrbit: (dir) => set(state => ({ cameraOrbitDir: dir, cameraOrbitRequest: state.cameraOrbitRequest + 1 })),
   setChaosLevel: (chaosLevel) => set(typeof chaosLevel === 'function'
@@ -34,6 +40,8 @@ export const createChaosSlice = (set, _get) => ({
     : { rotationCountdown }),
   setBlackHolePulse: (blackHolePulse) => set({ blackHolePulse }),
   setFlipWaveOrigins: (flipWaveOrigins) => set({ flipWaveOrigins }),
+  setChaosIgnition: (chaosIgnition) => set({ chaosIgnition }),
+  setChaosIgnitionPicking: (chaosIgnitionPicking) => set({ chaosIgnitionPicking: !!chaosIgnitionPicking }),
 
   toggleChaos: () => set((state) => ({
     chaosLevel: state.chaosLevel === 0 ? 1 : 0

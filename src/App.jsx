@@ -566,10 +566,11 @@ export default function WORM3() {
   const {
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting, speedThresholdSec, disparityCountdown, chaosPreview, handleBetBack, handleChaosReplay,
+    ignitionPicking, confirmIgnition, surpriseIgnition,
     handleDisparitySetupComplete, handleBetPlaced, handleBetSkipped,
     cancelDisparityRun, startDisparityGame,
   } = useDisparityGame({
-    settings, setSettings, size, changeSize, reset,
+    settings, setSettings, changeSize, reset,
     cancelShuffle, startAnimatedShuffle,
     setChaosLevel, setVisualMode, setFlipMode, setShowTunnels,
     launchWithMobi, mobiLines: MOBI_LINES_CHAOS,
@@ -1510,6 +1511,7 @@ export default function WORM3() {
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityCountdown,
+              ignitionPicking, onIgnitionConfirm: confirmIgnition, onIgnitionSurprise: surpriseIgnition,
               showAntipodalPiP, onToggleAntipodalPiP: toggleAntipodalPiP,
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
               showMobiusCubelet,

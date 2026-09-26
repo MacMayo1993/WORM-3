@@ -30,7 +30,9 @@ short hop above it, and the gap carries the drama instead.
   same on every board size. `wormRaisedAmount(size)` turns that distance into an Explode
   fraction for the outer layer, and a corner moves 0.06 along each axis, as Explode would. A
   flipped piece's other faces stay ordinary floor, so `raisedPlatformPosition` returns only
-  live pads. Cube modes keep the full Explode pop.
+  live pads. Cube modes (Flip Cube and Chaos) now pop a hair too: `CUBE_PIECE_POP` (0.1)
+  via `cubeRaisedAmount(size)`, so the tunnel underneath shows only as a sliver. The full
+  Explode pop threw flipped pieces across the scene, worst on large boards.
 - **One landing height.** `WORM_PIECE_POP` and `WORM_PAD_HEIGHT` (0.3) live in
   `src/game/raisedCubie.js`. Together they feed the sim landing, portal visuals, the pad
   renderer (`PAD_PROFILES.worm`) and tunnel handoffs. The landing sits 0.36 above the surface
@@ -107,7 +109,8 @@ short hop above it, and the gap carries the drama instead.
 
 ### Implementation decisions
 
-- Whole cubies now rise to their full Explode position when any face has a live odd flip count.
+- Whole cubies now pop a hair out of the cube (`CUBE_PIECE_POP`, see above) when any face has a
+  live odd flip count. They first rose to their full Explode position, which was far too much.
   Unflipped faces travel with the body and remain ordinary platforms; tunnel eligibility is per face.
   Springs follow physical piece identity through layer turns. Manual Explode does not stack the lift.
   Whole-piece motion settles; only the small normal-offset pads bounce continuously.

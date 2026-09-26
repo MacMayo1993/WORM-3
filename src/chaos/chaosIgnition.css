@@ -1,0 +1,9 @@
+/* The first-strike prompt: a card docked over the bottom of the scene. The
+   wrapper passes taps through so the cube behind it stays pickable. */
+.chaos-ignition { position: fixed; inset: auto 0 0 0; display: flex; justify-content: center; padding: 0 16px max(16px, env(safe-area-inset-bottom)); pointer-events: none; font-family: var(--ui-font, system-ui); }
+.chaos-ignition-card { pointer-events: auto; width: min(100%, 440px); padding: 18px 18px 16px; display: grid; gap: 8px; animation: chaos-ignition-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+.chaos-ignition-card .arcade-title { font-size: clamp(22px, 6vw, 30px); }
+.chaos-ignition-card .arcade-blurb { margin: 0; }
+.chaos-ignition-keys { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin-top: 6px; }
+@keyframes chaos-ignition-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .chaos-ignition-card { animation: none; } }
