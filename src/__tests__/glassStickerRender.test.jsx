@@ -15,7 +15,8 @@ import { storyAppearance } from '../worm/story/worlds.js';
 vi.mock('../3d/BiomeGroundTextures.js', () => ({ BIOME_GROUND_TEXTURES: {} }));
 extend(THREE);
 
-it.each([14, 28])('keeps level %i glass on first paint, turns, remounts and both halves of a flip', async level => {
+it.each([14, 28].flatMap(level => [false, true].map(textured => ({ level, textured }))))(
+  'keeps level $level glass tinted through turns and flips (loaded texture: $textured)', async ({ level, textured }) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -23,7 +24,9 @@ it.each([14, 28])('keeps level %i glass on first paint, turns, remounts and both
   });
   const { default: StickerPlane } = await import('../3d/StickerPlane.jsx');
   const settings = { ...before.settings, ...storyAppearance(level), flipPads: 'off', soundEnabled: false, hapticsEnabled: false };
-  useGameStore.setState({ size: 3, wormHealerMode: true, chaosLevel: 0, faceTextures: {}, settings });
+  const texture = new THREE.Texture({ width: 2, height: 2, complete: true });
+  const faceTextures = textured ? Object.fromEntries([1, 2, 3, 4, 5, 6].map(id => [id, texture])) : {};
+  useGameStore.setState({ size: 3, wormHealerMode: true, chaosLevel: 0, faceTextures, settings });
   const colors = resolveColors(settings);
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
@@ -44,6 +47,11 @@ it.each([14, 28])('keeps level %i glass on first paint, turns, remounts and both
     expect(mesh.material.uniforms.baseColor.value.getHexString()).toBe(new THREE.Color(color).getHexString());
   };
   try {
+    if (textured) {
+      await render('classic');
+      expect(front().material.map).toBe(texture);
+      expect(front().material.color.getHexString()).toBe('ffffff');
+    }
     await render();
     const owned = front().material;
     checkGlass(front(), colors[meta.curr]);
@@ -62,10 +70,13 @@ it.each([14, 28])('keeps level %i glass on first paint, turns, remounts and both
     meta = { ...meta, curr: ANTIPODAL_COLOR[from], flips: 1 };
     await render();
     checkGlass(front(), colors[from]);
+    const allowedTints = [from, meta.curr].map(id => new THREE.Color(colors[id]).getHexString());
     for (let frame = 0; frame < 100; frame++) {
       await act(async () => runActiveStickers({ clock: { elapsedTime: time += 1 / 60 } }, 1 / 60));
       expect(front().material).toBe(owned);
       expect(front().material.transparent).toBe(true);
+      // Includes the midpoint: neither half may pick up the texture's white tint.
+      expect(allowedTints).toContain(front().material.uniforms.baseColor.value.getHexString());
     }
     checkGlass(front(), colors[meta.curr]);
     checkGlass(back(), colors[ANTIPODAL_COLOR[meta.curr]]);
@@ -78,12 +89,17 @@ it.each([14, 28])('keeps level %i glass on first paint, turns, remounts and both
     expect(disposeBack).toHaveBeenCalledOnce();
     expect(front().material.fragmentShader).not.toBe(getGlassMaterial('#888888').fragmentShader);
     expect(back().material.fragmentShader).not.toBe(glassBack.fragmentShader);
+    if (textured) {
+      expect(front().material.map).toBe(texture);
+      expect(front().material.color.getHexString()).toBe('ffffff');
+    }
     await render('glass', 'turned-piece');
     checkGlass(front(), colors[meta.curr]);
     checkGlass(back(), colors[ANTIPODAL_COLOR[meta.curr]]);
   } finally {
     await act(async () => root.unmount());
     useGameStore.setState(before, true);
+    texture.dispose();
     context.mockRestore(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }
 });
