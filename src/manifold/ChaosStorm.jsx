@@ -79,6 +79,11 @@ const STROKE_S = 0.1;
 const AFTER_S = 0.3;
 // How long the struck tile keeps crackling after the hit.
 const RESIDUE_S = 0.42;
+// The player's first strike comes out of the sky: the chosen tile charges up for
+// longer, the leader falls further, and everything about the hit is bigger.
+const HERO_CHARGE_S = 0.3;
+const HERO_LEADER_S = 0.28;
+const HERO_WIDTH = 1.6;
 
 // ── Channel thickness (world units, full ribbon width including the aura) ─────
 // Tiles are ~0.88 wide. The white core is ~a quarter of this, the coloured body
@@ -137,6 +142,7 @@ function makeBolt() {
     live: false, cascadeId: null, from: null, to: null, fromPos: null, toPos: null,
     crossFace: false, heat: 0, seed: 0, sub: 0, subAt: 0, age: 0, leader: LEADER_S,
     landed: false, sparked: false, restrikes: 0, born: 0, landedAge: 0,
+    hero: false, chargeS: CHARGE_S, fromN: new THREE.Vector3(0, 0, 1),
     A: new THREE.Vector3(), B: new THREE.Vector3(), nA: new THREE.Vector3(), nB: new THREE.Vector3(),
     path: new Float32Array(BOLT_POINTS * 3), color: new THREE.Color()
   };
@@ -172,7 +178,7 @@ function makeContext() {
     reduced: false, lowFx: false, showTunnels: false, levelHeat: 0,
     epoch: null, relocMap: null, complete: null,
     bolts: null, charges: null, rings: null, sparks: null, writer: null,
-    sound: { zap: -1e9, surge: -1e9, overload: -1e9 }
+    sound: { zap: -1e9, surge: -1e9, overload: -1e9, ignite: -1e9 }
   };
 }
 
@@ -424,7 +430,7 @@ function tileArcs(ctx, center, normal, color, count, alpha, width, seed, inward)
   }
 }
 
-const SOUND_EVENTS = { zap: 'chaosZap', surge: 'chaosSurge', overload: 'chaosOverload' };
+const SOUND_EVENTS = { zap: 'chaosZap', surge: 'chaosSurge', overload: 'chaosOverload', ignite: 'chaosIgnite' };
 /** Chaos fires many events a second; each voice keeps a minimum gap. */
 function sound(ctx, name, gapMs, opts) {
   if (ctx.nowMs - ctx.sound[name] < gapMs) return;
@@ -454,12 +460,27 @@ function ingestBolt(ctx, ev) {
     if (!x.live) { b = x; break; }
     if (x.born < oldest.born) oldest = x;
   }
+  const hero = ev.type === 'ignition';
+  // The first strike falls from the sky above the chosen tile: fix its launch
+  // point now, off the tile's live position and normal, with a seeded lean.
+  let sky = null;
+  if (hero) {
+    if (!resolveTile(ctx, ev.to, SURFACE_LIFT, _p, _n)) return;
+    const lean = (seededRand((ev.seed ?? 0) + 3.3) - 0.5) * 1.6;
+    perpBasis(_n, _bu, _bs);
+    sky = [
+      _p.x + _n.x * 3.4 + _bu.x * lean, _p.y + _n.y * 3.4 + 1.4 + _bu.y * lean, _p.z + _n.z * 3.4 + _bu.z * lean
+    ];
+  }
   if (!b) { b = oldest; retire(ctx, b); }
   b.live = true;
-  b.cascadeId = ev.cascadeId;
+  b.hero = hero;
+  b.chargeS = hero ? HERO_CHARGE_S : CHARGE_S;
+  if (hero) b.fromN.copy(_n).negate();
+  b.cascadeId = ev.cascadeId ?? null;
   b.from = ev.from ? { ...ev.from, epoch: ctx.epoch } : null;
   b.to = ev.to ? { ...ev.to, epoch: ctx.epoch } : null;
-  b.fromPos = ev.fromPos;
+  b.fromPos = sky ?? ev.fromPos;
   b.toPos = ev.toPos;
   b.crossFace = !!ev.crossFace;
   b.heat = ev.heat ?? 0;
@@ -467,13 +488,14 @@ function ingestBolt(ctx, ev) {
   b.sub = 0;
   b.subAt = ctx.nowMs;
   b.age = 0;
-  b.leader = b.crossFace ? LEADER_CROSS_S : LEADER_S;
+  b.leader = hero ? HERO_LEADER_S : b.crossFace ? LEADER_CROSS_S : LEADER_S;
   b.landed = false;
   b.landedAge = 0;
   b.sparked = false;
   b.restrikes = 0;
   b.born = ctx.nowMs;
-  b.color.copy(b.crossFace ? C_BOLT_CROSS : C_BOLT).lerp(C_HOT, Math.min(0.8, ctx.levelHeat * 0.45 + b.heat * 0.4));
+  if (hero) b.color.copy(C_BIRTH).lerp(C_WHITE, 0.25);
+  else b.color.copy(b.crossFace ? C_BOLT_CROSS : C_BOLT).lerp(C_HOT, Math.min(0.8, ctx.levelHeat * 0.45 + b.heat * 0.4));
 }
 
 function ingestCharge(ctx, ev) {
@@ -510,7 +532,7 @@ function ingestCharge(ctx, ev) {
 
 function updateBolt(ctx, b) {
   b.age += ctx.dt;
-  if (b.age >= CHARGE_S + b.leader + STROKE_S + AFTER_S) { retire(ctx, b); return; }
+  if (b.age >= b.chargeS + b.leader + STROKE_S + AFTER_S) { retire(ctx, b); return; }
 
   relocate(ctx, b.from);
   relocate(ctx, b.to);
@@ -518,7 +540,8 @@ function updateBolt(ctx, b) {
     if (!b.fromPos) { retire(ctx, b); return; }
     const n = FACE_N[b.from?.dirKey] ?? FACE_N.PZ;
     b.A.fromArray(b.fromPos);
-    b.nA.set(n[0], n[1], n[2]);
+    if (b.hero) b.nA.copy(b.fromN);
+    else b.nA.set(n[0], n[1], n[2]);
   }
   if (!resolveTile(ctx, b.to, SURFACE_LIFT + padLift(ctx, b.to), b.B, b.nB)) {
     if (!b.toPos) { retire(ctx, b); return; }
@@ -529,19 +552,24 @@ function updateBolt(ctx, b) {
 
   // Lightning never holds still: re-seed the jag while it charges and hunts, and
   // again on each re-strike. Reduced motion keeps one fixed shape.
-  const t = b.age - CHARGE_S; // time since the leader left the source
+  const t = b.age - b.chargeS; // time since the leader left the source
   if (!ctx.reduced && t < b.leader && ctx.nowMs - b.subAt > 34) { b.sub++; b.subAt = ctx.nowMs; }
 
   // ── Charge-up: arcs gather on the source tile, then it fires ──────────────
+  // The first strike charges the tile it is about to hit instead: the player
+  // watches their pick gather charge before the sky answers.
   if (t < 0) {
-    const u = b.age / CHARGE_S;
-    tileArcs(ctx, b.A, b.nA, b.color, 2, 0.35 + 0.65 * u, 0.1, b.seed + b.sub * 5, true);
+    const u = b.age / b.chargeS;
+    if (b.hero) tileArcs(ctx, b.B, b.nB, b.color, 3, 0.3 + 0.7 * u, 0.13, b.seed + b.sub * 5, true);
+    else tileArcs(ctx, b.A, b.nA, b.color, 2, 0.35 + 0.65 * u, 0.1, b.seed + b.sub * 5, true);
     return;
   }
   if (!b.sparked) {
     b.sparked = true;
-    burst(ctx, b.A, b.nA, b.color, 6, 1.8, b.seed + 5, 0.9);
-    flash(ctx, b.A, b.nA, b.color, 0.5, 0.08);
+    if (!b.hero) {
+      burst(ctx, b.A, b.nA, b.color, 6, 1.8, b.seed + 5, 0.9);
+      flash(ctx, b.A, b.nA, b.color, 0.5, 0.08);
+    }
   }
 
   const leading = t < b.leader;
@@ -558,13 +586,22 @@ function updateBolt(ctx, b) {
   if (!leading && !b.landed) {
     b.landed = true;
     b.landedAge = b.age;
-    const heavy = (b.crossFace ? 1.25 : 1) * (1 + b.heat * 0.35);
-    burst(ctx, b.B, b.nB, b.color, Math.round(14 * heavy), 2.8 + b.heat * 1.4, b.seed + 11, 1.15);
-    flash(ctx, b.B, b.nB, b.color, 1.25 * heavy, 0.15);
-    ring(ctx, b.B, b.nB, b.color, 0.35, 1.7 * heavy, 0.36, 1);
-    kickRipple(ctx, b.to, b.nB, 0.12 + b.heat * 0.06 + (b.crossFace ? 0.04 : 0));
-    shake(ctx, 0.03 + b.heat * 0.025 + (b.crossFace ? 0.015 : 0), 0.2);
-    sound(ctx, 'zap', 85, { combo: Math.round(b.heat * 6), priority: 0 });
+    if (b.hero) {
+      burst(ctx, b.B, b.nB, b.color, 28, 3.8, b.seed + 11, 1.4);
+      flash(ctx, b.B, b.nB, b.color, 2.2, 0.22);
+      ring(ctx, b.B, b.nB, b.color, 0.4, 2.8, 0.5, 1);
+      kickRipple(ctx, b.to, b.nB, 0.24);
+      shake(ctx, 0.11, 0.42);
+      sound(ctx, 'ignite', 0, { priority: 1 });
+    } else {
+      const heavy = (b.crossFace ? 1.25 : 1) * (1 + b.heat * 0.35);
+      burst(ctx, b.B, b.nB, b.color, Math.round(14 * heavy), 2.8 + b.heat * 1.4, b.seed + 11, 1.15);
+      flash(ctx, b.B, b.nB, b.color, 1.25 * heavy, 0.15);
+      ring(ctx, b.B, b.nB, b.color, 0.35, 1.7 * heavy, 0.36, 1);
+      kickRipple(ctx, b.to, b.nB, 0.12 + b.heat * 0.06 + (b.crossFace ? 0.04 : 0));
+      shake(ctx, 0.03 + b.heat * 0.025 + (b.crossFace ? 0.015 : 0), 0.2);
+      sound(ctx, 'zap', 85, { combo: Math.round(b.heat * 6), priority: 0 });
+    }
   }
 
   // ── Envelope ──────────────────────────────────────────────────────────────
@@ -590,7 +627,7 @@ function updateBolt(ctx, b) {
     width = AFTER_W * (0.6 + 0.4 * fade) + STROKE_W * 0.55 * restrike;
     core = 0.6 + 0.4 * Math.min(1, restrike);
   }
-  width *= (b.crossFace ? 1.15 : 1) * (1 + b.heat * 0.25);
+  width *= (b.hero ? HERO_WIDTH : b.crossFace ? 1.15 : 1) * (1 + b.heat * 0.25);
 
   // Main channel: source → head, resampled along the stable jagged path so the
   // shape holds while it grows. Thickness varies knot to knot, and swells toward
@@ -618,7 +655,7 @@ function updateBolt(ctx, b) {
 
   // Forks split off the channel from the return stroke on, and die with it.
   if (leading || ctx.lowFx || len < 0.2) return;
-  const forks = b.crossFace ? 2 : 1;
+  const forks = b.hero ? 3 : b.crossFace ? 2 : 1;
   for (let k = 0; k < forks; k++) {
     const fs = b.seed * 0.73 + k * 19.7 + b.sub * 3.3;
     const at = 0.3 + 0.45 * seededRand(fs + 1);
@@ -814,7 +851,7 @@ export default function ChaosStorm({ cubieRefs, size, onCascadeComplete }) {
     }
 
     drainChaosStormEvents(ctx.ingest ??= (ev) => {
-      if (ev.type === 'bolt') ingestBolt(ctx, ev);
+      if (ev.type === 'bolt' || ev.type === 'ignition') ingestBolt(ctx, ev);
       else if (ev.type === 'charge' || ev.type === 'overload') ingestCharge(ctx, ev);
     });
 

@@ -188,6 +188,24 @@ describe('ChaosStorm bolts', () => {
   });
 });
 
+describe('ChaosStorm first strike', () => {
+  it('charges the picked tile, then drops a heavy bolt out of the sky onto it', async () => {
+    const store = await mount();
+    const { events } = chaosStormEvents({ ignition: [1, 1, 2, 'PZ'] }, cubies, SIZE, map, 6);
+    pushChaosStormEvents(events);
+    step(store);
+    const geo = stripGeometry(store);
+    // The pick gathers charge first: three arcs on the tile, nothing from the sky yet.
+    expect(usedStrips(geo)).toBe(3);
+    expect(stripVertex(geo, 0, 0).distanceTo(new THREE.Vector3(0, 0, 1 + LIFT))).toBeLessThan(0.6);
+    for (let i = 0; i < 40; i++) step(store);
+    // The channel ends on the tile and starts well above it.
+    expect(stripVertex(geo, 0, 13).distanceTo(new THREE.Vector3(0, 0, 1 + LIFT))).toBeLessThan(1e-5);
+    expect(stripVertex(geo, 0, 0).distanceTo(new THREE.Vector3(0, 0, 1 + LIFT))).toBeGreaterThan(3);
+    expect(cubieKicks.get('1,1,2').amp).toBeGreaterThanOrEqual(0.2);
+  });
+});
+
 describe('ChaosStorm wormhole surges', () => {
   it('runs a flip down its wormhole to the twin, lights the tunnel, and ends', async () => {
     const store = await mount();

@@ -1,6 +1,6 @@
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
-import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount } from '../game/raisedCubie.js';
 import { advancePieceSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
@@ -432,7 +432,8 @@ const Cubie = React.forwardRef(function Cubie({
     else advancePieceSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
     // Overshoot on the way out is the bounce. Below zero the piece would sink into
     // its neighbours, so a returning piece lands and holds instead.
-    const amount = Math.max(0, spring.lift) * (wormPads ? wormRaisedAmount(size) : 1);
+    // Both modes pop the piece a hair, never to its full Explode position.
+    const amount = Math.max(0, spring.lift) * (wormPads ? wormRaisedAmount(size) : cubeRaisedAmount(size));
     publishRaisedCubie(spring, amount);
     const entry = state.cubiePops[popKey];
     const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;
