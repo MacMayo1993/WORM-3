@@ -12,18 +12,21 @@ const world = (name, palette, background, styles, route, view = {}) => ({
   styles: Object.fromEntries((styles.length === 3 ? [...styles, ...styles] : styles).map((style, i) => [i + 1, style])),
 });
 const BIOME_STYLES = Object.values(resolveBiomeManifoldStyles(null));
+// Keep the opening chapter visually consistent while players learn movement,
+// jumps, rotations and healing. Later chapters introduce decorative surfaces.
+const classicWorld = (name, background, route) => world(name, 'standard', background, ['solid', 'solid', 'solid'], route);
 
 export const STORY_WORLDS = {
-  1: world('Sunlit Garden', 'sakura', 'umbrella', ['wood', 'grass', 'matte', 'wood', 'grass', 'matte'], 'corners'),
-  2: world('Glasshouse', 'arctic', 'snow', ['stainedGlass', 'rainGlass', 'glossy', 'stainedGlass', 'rainGlass', 'glossy'], 'gates'),
-  3: world('Pop Playground', 'retro', 'stadium', ['comic', 'zigzag', 'polkaDots', 'comic', 'zigzag', 'polkaDots'], 'steps'),
-  4: world('Shifting Dunes', 'terracotta', 'desert', ['topographic', 'sand', 'hexGrid', 'topographic', 'sand', 'hexGrid'], 'diagonals'),
-  5: world('Prism Gallery', 'tropical', 'paris', ['prismBloom', 'opDiamondWave', 'stainedGlass', 'prismBloom', 'opDiamondWave', 'stainedGlass'], 'diamonds'),
-  6: world('Tidal Ruins', 'deepsea', 'cave', ['water', 'waveform', 'pond', 'water', 'waveform', 'pond'], 'channels'),
-  7: world('Neon Speedway', 'cyberpunk', 'shanghai', ['circuit', 'neonSign', 'hexGrid', 'circuit', 'neonSign', 'hexGrid'], 'lanes'),
-  8: world('Living Canopy', 'bioluminescence', 'forest', ['bioLattice', 'wood', 'grass', 'bioLattice', 'wood', 'grass'], 'branches'),
-  9: world('Ember Foundry', 'lava', 'fireplace', ['carbonFiber', 'metallic', 'lava', 'carbonFiber', 'metallic', 'lava'], 'bastions'),
-  10: world('Astral Crown', 'cosmic', 'nebula', ['galaxy', 'constellation', 'stellarLensing', 'galaxy', 'constellation', 'stellarLensing'], 'orbit'),
+  1: classicWorld('Sunlit Garden', 'umbrella', 'corners'),
+  2: classicWorld('Glasshouse', 'snow', 'gates'),
+  3: classicWorld('Pop Playground', 'stadium', 'steps'),
+  4: classicWorld('Shifting Dunes', 'desert', 'diagonals'),
+  5: classicWorld('Prism Gallery', 'paris', 'diamonds'),
+  6: classicWorld('Tidal Ruins', 'cave', 'channels'),
+  7: classicWorld('Neon Speedway', 'shanghai', 'lanes'),
+  8: classicWorld('Living Canopy', 'forest', 'branches'),
+  9: classicWorld('Ember Foundry', 'fireplace', 'bastions'),
+  10: classicWorld('Astral Crown', 'nebula', 'orbit'),
 
   // Chapter 2 · Every Size
   11: world('Pocket Meadow', 'pastel', 'forest', ['grass', 'polkaDots', 'matte'], 'corners'),

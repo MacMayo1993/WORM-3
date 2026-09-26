@@ -176,7 +176,7 @@ export const WORM_STORY_LEVELS = [
 // first level of a chapter opens when the last level of the one before is cleared.
 export const STORY_CHAPTER_SIZE = 10;
 export const WORM_STORY_CHAPTERS = [
-  { id: 1, title: 'Hatchling', blurb: 'Learn to crawl, jump, heal and fight.' },
+  { id: 1, title: 'Hatchling', blurb: 'Learn to crawl, jump, heal and fight on a classic six-color cube.' },
   { id: 2, title: 'Every Size', blurb: 'From the 2×2 pocket cube to 8×8, in grid, number, glass, chrome, gap and neon views.' },
   { id: 3, title: 'Strange Views', blurb: 'Hollow frames, bare wireframe, bricks, biomes, the far side and Random’s remix.' },
   { id: 4, title: 'Grand Crawl', blurb: 'Nine, ten and fifteen layers. Every view and power, on shorter clocks.' },
