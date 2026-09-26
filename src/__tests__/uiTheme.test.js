@@ -5,7 +5,7 @@ import {
   Z,
   TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_MD, TEXT_LG, TEXT_XL, TEXT_2XL, TEXT_DISPLAY,
   TEXT_XL_FLUID, TEXT_2XL_FLUID, TEXT_DISPLAY_FLUID,
-  UI_FONT, HEADING_FONT, DISPLAY_FONT, HAND_FONT, MONO_FONT, UI_CSS_VARS
+  UI_FONT, HEADING_FONT, DISPLAY_FONT, MONO_FONT, UI_CSS_VARS
 } from '../utils/uiTheme.js';
 
 // The layer scale exists so overlay stacking is decided in one place instead of
@@ -95,13 +95,13 @@ describe('type scale', () => {
   });
 });
 
-// The typography is four self-hosted faces with one job each. Every property
+// The typography is three self-hosted faces (plus system mono) with one job each. Every property
 // pinned here has already been broken once: a CDN <link> that fell back to a
 // serif offline, a `cursive` generic that rendered Dancing Script on Android
 // while the webfont downloaded, and a --ui-font in App.css that drifted away
 // from UI_FONT because the two were maintained by hand.
 describe('font tokens', () => {
-  const FAMILIES = { UI_FONT, HEADING_FONT, DISPLAY_FONT, HAND_FONT, MONO_FONT };
+  const FAMILIES = { UI_FONT, HEADING_FONT, DISPLAY_FONT, MONO_FONT };
 
   it('names a webfont first and always ends on a generic family', () => {
     for (const [name, stack] of Object.entries(FAMILIES)) {
@@ -125,9 +125,8 @@ describe('font tokens', () => {
 
   // On Android the generic `cursive` is Dancing Script, so a stack that reaches
   // it mid-download flashes text in a wildly different face and metric.
-  it('never falls back to the cursive generic outside Mobi\u2019s hand', () => {
+  it('never falls back to the cursive generic', () => {
     for (const [name, stack] of Object.entries(FAMILIES)) {
-      if (name === 'HAND_FONT') continue;
       expect(stack, `${name} must not reach the cursive generic`).not.toContain('cursive');
     }
   });

@@ -27,7 +27,6 @@
 //                           Nunito is soft and narrow, which is what makes a
 //                           heading read as a heading without a size jump.
 //   DISPLAY_FONT Bungee   — mode names, screen/result titles and the brand.
-//   HAND_FONT    Annie…   — Mobi's dialogue.
 //
 // Both new faces are variable (wght axis), so weight is a free axis: use 400
 // for body, 600 for emphasis, 700–800 for headings, rather than reaching for a
@@ -42,9 +41,6 @@ export const HEADING_FONT = "'Outfit Variable', 'Nunito Variable', -apple-system
 export const DISPLAY_FONT = "'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif";
 // Monospace is reserved for manifold grid IDs (M1-001) and algorithm notation.
 export const MONO_FONT = "'SF Mono', ui-monospace, 'Cascadia Code', Menlo, monospace";
-// Handwritten pencil font for Mobi's dialogue (self-hosted via
-// @fontsource/annie-use-your-telescope, imported in main.jsx).
-export const HAND_FONT = "'Annie Use Your Telescope', 'Bradley Hand', 'Segoe Print', cursive";
 
 // ─── PAPER family (light modal sheets) ────────────────────────────────────────
 export const PAPER_BACKDROP = 'rgba(160,152,140,0.60)';

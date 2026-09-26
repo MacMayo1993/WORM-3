@@ -12,19 +12,16 @@ import ReactDOM from 'react-dom/client'
 // entry points — see the note at the top of fonts.css.
 import './fonts.css'
 import '@fontsource/bungee'
-// Mobi's handwritten pencil dialogue face — same self-hosted rule as the rest.
-import '@fontsource/annie-use-your-telescope'
 import nunitoWoff2 from '@fontsource-variable/nunito/files/nunito-latin-wght-normal.woff2?url'
 import outfitWoff2 from '@fontsource-variable/outfit/files/outfit-latin-wght-normal.woff2?url'
 import bungeeWoff2 from '@fontsource/bungee/files/bungee-latin-400-normal.woff2?url'
-import annieWoff2 from '@fontsource/annie-use-your-telescope/files/annie-use-your-telescope-latin-400-normal.woff2?url'
 
 // Preload every webfont immediately — otherwise the browser only fetches a
 // font when the first styled element renders, and on slow networks the
 // fallback face is visible for seconds before swapping (ugly FOUT on the
-// title screen and Mobi dialogue). Nunito and Outfit come first: they carry
+// title screen). Nunito and Outfit come first: they carry
 // every label in the game, so they are the two whose absence is most visible.
-for (const href of [nunitoWoff2, outfitWoff2, bungeeWoff2, annieWoff2]) {
+for (const href of [nunitoWoff2, outfitWoff2, bungeeWoff2]) {
   const link = document.createElement('link')
   link.rel = 'preload'
   link.as = 'font'
