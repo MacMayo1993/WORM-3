@@ -66,7 +66,10 @@
   translate: 0 4px;
   box-shadow: 0 2px 0 var(--piece-ledge), 0 6px 12px rgba(0, 0, 0, 0.24);
 }
-.path-select .path-select-card > .piece-face { padding: 14px 16px; gap: 14px; border-radius: 17px; }
+/* display is restated: the Flip Cube picker keeps .cube-path-options (its test
+   hook), whose `.cube-path-options>button>span { display:block }` would
+   otherwise stack the art over the copy. */
+.path-select .path-select-card > .piece-face { display: flex; padding: 14px 16px; gap: 14px; border-radius: 17px; font-size: inherit; line-height: normal; }
 
 /* The illustration sits in an ivory window on the sticker. */
 .path-select-art {
@@ -82,7 +85,7 @@
   box-shadow: inset 0 0 0 2px #26372d33;
 }
 .path-select .path-select-art > * { width: 100%; height: 100%; max-height: none; margin: 0; }
-.path-select.path-select .path-select-art > .mode-artwork { color: #26372d; }
+.path-select.path-select .path-select-art > .mode-artwork { max-height: none; color: #26372d; }
 @media (min-width: 720px) {
   .path-select .path-select-card > .piece-face { flex-direction: column; align-items: stretch; padding: 16px; }
   .path-select-art { width: 100%; height: clamp(120px, 22vh, 190px); }
