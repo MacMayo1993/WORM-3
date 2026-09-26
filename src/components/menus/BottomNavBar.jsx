@@ -28,7 +28,7 @@ export default function BottomNavBar({ onUndo, canUndo, onReset, onShuffle, flip
   return <nav className="bottom-nav-bar instrument-dock" style={GAME_HUD_VARS} aria-label="Game controls">
     {spotlightTile === 'reset' ? <InstrumentKey label="Reset" onClick={onReset} spotlight />
       : spotlightTile === 'shuffle' && !chaosMode ? <InstrumentKey label="Shuffle" onClick={onShuffle} spotlight />
-      : <InstrumentKey label="Undo" onClick={onUndo} disabled={!canUndo} />}
+      : <InstrumentKey label="Undo" onClick={onUndo} disabled={!canUndo} spotlight={spotlightTile === 'undo'} />}
     <InstrumentKey label="Flip" onClick={onToggleFlip} primary active={flipMode} disabled={flipLocked} spotlight={spotlightTile === 'flip'} />
     <InstrumentKey label="Views" onClick={onToggleViews} active={viewsOpen || hasActiveView} spotlight={spotlightTile === 'views'} />
     <InstrumentKey label="More" onClick={onToggleMore} active={moreOpen} spotlight={spotlightTile === 'more'} />

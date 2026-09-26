@@ -18,6 +18,7 @@ import { PAIRS, pairPoint } from '../components/intro/introTopology.js';
 import { Vector3 } from 'three';
 import { makeCubies } from '../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../game/manifoldLogic.js';
+import { CONTROL_TOUR_KEYS } from '../components/screens/DemoFlowController.jsx';
 
 const callbacks = { setRotatedCubies: vi.fn(), cancelShuffle: vi.fn(), changeSize: vi.fn(), reset: vi.fn(),
   cancelDisparityRun: vi.fn(), startDisparityGame: vi.fn(), animatedShuffle: vi.fn(), handleOpenStore: vi.fn() };
@@ -84,6 +85,56 @@ describe('short demo and retry', () => {
     act(() => result.current.handleDemoExplore());
     expect(useGameStore.getState().demoStep).toBe('learn-to-solve');
     unmount();
+  });
+});
+describe('demo runs each mode on its live mechanics', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    useGameStore.setState({ demoMode: true, wormPauseMenuOpen: false, wormHealerMode: false });
+  });
+  afterEach(() => {
+    useGameStore.setState({ demoMode: false, chaosIgnitionPicking: false });
+    vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  });
+
+  it('holds the Undo beat until Undo itself is pressed', async () => {
+    useGameStore.setState({ demoStep: 'control-tour' });
+    const { result, unmount } = renderHook(() => useDemoMode({ ...callbacks, closeNavSheet: vi.fn() }));
+    try {
+      act(() => result.current.handleDemoStepContinue());
+      act(() => vi.advanceTimersByTime(1600));
+      const undoBeat = CONTROL_TOUR_KEYS.indexOf('undo');
+      for (const key of CONTROL_TOUR_KEYS.slice(0, undoBeat)) await act(async () => result.current.handleDemoNavTap(key));
+      expect(result.current.demoTourIndex).toBe(undoBeat);
+      await act(async () => result.current.handleDemoNavTap('flip'));
+      expect(result.current.demoTourIndex).toBe(undoBeat);
+      await act(async () => result.current.handleDemoNavTap('undo'));
+      expect(result.current.demoTourIndex).toBe(undoBeat + 1);
+    } finally { unmount(); }
+  });
+
+  it('launches the Chaos round through the live first-strike pick', () => {
+    const startDisparityGame = vi.fn();
+    useGameStore.setState({ demoStep: 'chaos-forecast' });
+    const { result, unmount } = renderHook(() => useDemoMode({ ...callbacks, startDisparityGame }));
+    try {
+      act(() => result.current.handleDemoForecastPick({ id: 'red-orange', faceIds: [1, 4] }));
+      expect(startDisparityGame).toHaveBeenCalledTimes(1);
+      expect(startDisparityGame).toHaveBeenCalledWith(expect.objectContaining({ flipMode: true }), { pickIgnition: true });
+    } finally { unmount(); }
+  });
+
+  it('cancels a Chaos launch still waiting on its first strike when the demo exits', () => {
+    const cancelDisparityRun = vi.fn();
+    useGameStore.setState({ demoStep: 'chaos-forecast', chaosIgnitionPicking: true });
+    const { result, unmount } = renderHook(() => useDemoMode({ ...callbacks, cancelDisparityRun, closeNavSheet: vi.fn() }));
+    try {
+      act(() => result.current.handleExitDemo());
+      expect(cancelDisparityRun).toHaveBeenCalled();
+      expect(useGameStore.getState().chaosIgnitionPicking).toBe(false);
+      expect(useGameStore.getState().demoMode).toBe(false);
+    } finally { unmount(); }
   });
 });
 describe('shared intro primitives', () => {

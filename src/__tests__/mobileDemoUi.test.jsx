@@ -5,7 +5,8 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import DemoDialog from '../components/screens/DemoDialog.jsx';
 import DemoEndScreen from '../components/screens/DemoEndScreen.jsx';
-import { DemoControlTour, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoCoach } from '../components/screens/DemoFlowController.jsx';
+import { DemoControlTour, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoCoach, CONTROL_TOUR_KEYS } from '../components/screens/DemoFlowController.jsx';
+import DemoForecastPicker from '../components/screens/DemoForecastPicker.jsx';
 import BottomNavBar from '../components/menus/BottomNavBar.jsx';
 import DisparityHUD from '../components/overlays/DisparityHUD.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -33,7 +34,7 @@ it('positions the Flip pointer at the measured button center, not a slot estimat
     if (this.dataset.demoControl === 'flip') return { left: 110, width: 80 };
     return { left: 20, width: 320 };
   });
-  render(<><BottomNavBar spotlightTile="flip" /><DemoControlTour index={2} /></>);
+  render(<><BottomNavBar spotlightTile="flip" /><DemoControlTour index={CONTROL_TOUR_KEYS.indexOf('flip')} /></>);
   expect(host.querySelector('.demo-tour-card').style.getPropertyValue('--tour-pointer')).toBe('130px');
 });
 it('makes background inert and restores it across overlapping dialog transitions', () => {
@@ -77,6 +78,33 @@ it('explains a bomb death and makes Retry the first focused action', () => {
   const retry = vi.fn(); render(<DemoWormControlHint onRetry={retry} />);
   expect(host.textContent).toContain('bomb blast'); expect(document.activeElement.textContent).toBe('Try again');
   act(() => document.activeElement.click()); expect(retry).toHaveBeenCalledTimes(1);
+});
+it('names the rule behind a self-collision or a collapsed tunnel instead of a generic line', () => {
+  useGameStore.setState({wormAlive:false, wormDeathDetails:{reason:'self-collision'}});
+  render(<DemoWormControlHint />);
+  expect(host.textContent).toContain('your own body');
+  act(() => useGameStore.setState({wormDeathDetails:{reason:'void-tunnel-exhausted'}}));
+  expect(host.textContent).toContain('three rides');
+});
+it('points the Undo beat at the Undo key and keeps it lit only while asked for', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    if (this.dataset.demoControl === 'undo') return { left: 30, width: 60 };
+    return { left: 20, width: 320 };
+  });
+  const undo = vi.fn();
+  render(<><BottomNavBar spotlightTile="undo" canUndo onUndo={undo} /><DemoControlTour index={CONTROL_TOUR_KEYS.indexOf('undo')} /></>);
+  expect(host.querySelector('.demo-tour-card').textContent).toContain('Undo');
+  expect(host.querySelector('.demo-tour-card').style.getPropertyValue('--tour-pointer')).toBe('40px');
+  act(() => host.querySelector('[aria-label="Undo"]').click());
+  expect(undo).toHaveBeenCalledTimes(1);
+});
+it('states the Chaos round rules before the round, since the HUD keeps them collapsed', () => {
+  render(<DemoForecastPicker onPick={() => {}} />);
+  const rules = host.querySelector('[aria-label="How the round works"]').textContent;
+  expect(host.textContent).toContain('first strike');
+  expect(rules).toContain('twin drop out together');
+  expect(rules).toContain('heal');
+  expect(rules).toContain('stake');
 });
 it('keeps Chaos demo guidance inside match details instead of covering the HUD', () => {
   useGameStore.setState({ demoMode: true, demoStep: 'chaos-forecast' });
