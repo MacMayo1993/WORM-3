@@ -16,6 +16,13 @@
 export const SEAM_HALF = 0.075;
 
 /**
+ * A JS number as a GLSL float literal. `${0}` interpolates as the INT literal 0,
+ * and GLSL ES refuses `float * int` — so every constant spliced into a shader goes
+ * through here.
+ */
+export const glf = (n) => (Number.isInteger(n) ? n.toFixed(1) : String(n));
+
+/**
  * Hashes and value noise. Value noise rather than anything fancier because it is
  * continuous in 3D — a skin wraps a cube, and a 2D field would have to pick two
  * axes and tear at every edge where the third took over.

@@ -43,7 +43,7 @@ import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { sparksForBudget } from './healerWorm/elementalQuality.js';
 import { attachCellAttributes } from './healerWorm/elementalCells.js';
-import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF } from './healerWorm/elementalGlsl.js';
+import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
 import { GLSL_WORM, uWormHead, uWormBody } from './healerWorm/elementalUniforms.js';
 
 // Quad kinds, in index-buffer order: the three layers are three geometry groups.
@@ -342,11 +342,11 @@ const fragmentShader = /* glsl */ `
     // The crack is the grout plus a ragged bite out of each sticker's border, as if
     // the edges had already burned away.
     float bite = 0.018 + 0.03 * flow + 0.012 * grain;
-    float seam = 1.0 - smoothstep(${SEAM_HALF} + bite - 0.03, ${SEAM_HALF} + bite, d);
+    float seam = 1.0 - smoothstep(${glf(SEAM_HALF)} + bite - 0.03, ${glf(SEAM_HALF)} + bite, d);
     // Where four stickers meet the crust is thinnest and burns white.
     float node = 1.0 - smoothstep(0.0, 0.2, length(0.5 - abs(st)));
     float pulse = 0.8 + 0.3 * sin(T * 2.2 + flow * 7.0);
-    float core = 1.0 - smoothstep(0.0, ${SEAM_HALF} * 0.7, d);   // the vein's centre line
+    float core = 1.0 - smoothstep(0.0, ${glf(SEAM_HALF)} * 0.7, d);   // the vein's centre line
     float heat = (seam * (0.35 + 0.55 * flow) + core * 0.35 + node * 0.5) * pulse * vHeat;
     heat *= 1.0 - uEnv.z * 0.8;                       // cools as the wash ends
     col = lava(heat);
@@ -355,7 +355,7 @@ const fragmentShader = /* glsl */ `
     // with a thin glowing line where it meets the unburnt tile — paper catching.
     // It stops well short of the centre so colours and marks stay clean.
     float ragged = fbm3(vWorld * 7.5 + vec3(T * 0.05));
-    float front = ${SEAM_HALF} + 0.045 + 0.05 * flow + 0.05 * ragged;
+    float front = ${glf(SEAM_HALF)} + 0.045 + 0.05 * flow + 0.05 * ragged;
     float charBand = (1.0 - seam) * (1.0 - smoothstep(front - 0.012, front, d));
     float burnLine = (1.0 - seam) * smoothstep(front - 0.02, front - 0.006, d) * (1.0 - smoothstep(front - 0.004, front + 0.006, d));
     col = mix(col, uCrust * (1.0 + 0.8 * grain), charBand);

@@ -1,506 +1,588 @@
 // src/worm/ElementalSurface.jsx
 //
-// A continuous element surface for the elemental-orb cube skin. The reused
-// per-sticker Living-style volumes read as discrete tiles — a 0.78-wide box per
-// sticker with grout gaps between them and an identical wave pattern on every
-// one, so a "water" cube looked like a grid of static blue squares. This is a
-// purpose-built replacement that fixes both problems:
+// The shell skins: water, ice and lightning. Each wraps the cube in one continuous
+// ROUNDED shell — flat over every face, a quarter-cylinder round every cube edge, a
+// sphere octant at every corner — and paints its element onto it.
 //
-//   • Full coverage. The quad is slightly larger than a cell (1.04) so adjacent
-//     tiles overlap and the grout disappears — the element covers the whole face.
-//   • Seamless motion. Every wave/caustic/facet is a function of WORLD position
-//     (a varying fed from modelMatrix), so the pattern is one continuous field
-//     across tile boundaries and around the cube instead of repeating per tile.
-//     `uTime` is sharedUniforms.time, which CubeAssembly already ticks every
-//     frame, so it flows on its own.
+// ── Why a shell ──────────────────────────────────────────────────────────────
+// These skins used to be one 1.04-wide quad per sticker, lifted off the face. The
+// quads overlapped their neighbours to hide the grout, but at the cube's edges that
+// overlap hung out into space, so the silhouette was fringed with loose flaps — the
+// water and ice read as crumpled plastic wrap. A body of water around a cube is an
+// offset surface: every point of the cube pushed out by the same depth, which rounds
+// the edges over. Each cover cell now carries that surface's patch for its part of
+// the face, and a cell on a cube edge also carries the wrap, out to the plane that
+// bisects the two faces — exactly where the neighbouring face's wrap ends. Both
+// sample the shell's depth at the same point on the edge line, so they meet without
+// a crack; three corner cells meet the same way on the octant.
 //
-// One shared geometry and one shared material per element back every tile, and the
-// skin draws all of them as a single InstancedMesh — the whole sheathed cube is ONE
-// draw call rather than the ~150 it used to cost. This covers the two flat-surface
-// elements, water and ice. Grass keeps its dedicated blade mesh, and fire is drawn
-// with the bombs' flame sprites (ElementalFireSkin) — it used to have a "lava"
-// branch here that painted molten runoff across each sticker and read as orange
-// squiggles.
+// ── The claim ────────────────────────────────────────────────────────────────
+// The shell floods outward from the claimed tile as a continuous front in world
+// space, not cell by cell: per-cell delays would make two faces disagree about the
+// depth along their shared edge and split the wrap open.
 //
-// ── Why the patterns are noise fields and not sines ──────────────────────────
-// The first version built both elements out of products of sines, and both were
-// broken in the same way. A product of sines spends almost all of its domain near
-// zero, so ice's "facets" (sin·sin·sin) evaluated to a flat constant and never
-// drew a single facet, while water's caustics (pow(max(0, sin·sin), 2)) were
-// almost entirely black. Worse, ice's "cracks" were a function of (x + z) ALONE,
-// and a 1-D function can only produce parallel stripes — the frozen cube was a
-// flat blue wash with diagonal streaks lying across it.
-//
-// Both now build on a real 3D value-noise field, which has structure everywhere:
-// water's caustics are ridged noise (thin bright web lines, the actual shape
-// light makes through a wavy surface) and ice is a domain-warped cell field with
-// per-plate normals, so it has genuine crystal facets that catch the light.
+// ── Cost ─────────────────────────────────────────────────────────────────────
+// One geometry and one material per element; the whole shell is a single
+// InstancedMesh draw. Each element's fragment program is compiled separately
+// (a define, not a runtime branch), so water never pays for ice's facets.
 
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
+import { attachCellAttributes } from './healerWorm/elementalCells.js';
+import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
+import { GLSL_WORM, uWormHead, uWormBody, uClaimOrigin, uCubeHalf } from './healerWorm/elementalUniforms.js';
 
-// Lightning rides the same instanced quad, geometry and attribute set as water and
-// ice — it is a third branch of this shader rather than a fourth renderer, so the
-// charged cube costs exactly what a wet one does: one draw call.
 export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2 };
-// wfield sums four sine waves. The trough must remain above the sticker even
-// when all four and the broad swell reach their minimum together.
-export const WATER_HEIGHT = { base: 0.12, ripple: 0.018, swell: 0.035 };
 
-const _geoCache = { geo: null };
-export function getElementalSurfaceGeo() {
-  if (!_geoCache.geo) {
-    // Slightly oversized so neighbouring tiles overlap (kills the grout), with
-    // enough subdivisions for the water ripple and the ice plate relief to read
-    // as displaced surfaces rather than as flat painted quads.
-    _geoCache.geo = new THREE.PlaneGeometry(1.04, 1.04, 18, 18);
-    // Lift off the sticker, baked in. The skin used to carry this as a child mesh
-    // offset inside each cell group; the cells are instances of ONE mesh now, so
-    // there is no child transform left to hold it. Baking it into the geometry
-    // keeps it inside the instance matrix's scale, exactly as the child offset was
-    // inside the group's, so the lift still shrinks with the claim/expiry ramp.
-    _geoCache.geo.translate(0, 0, 0.03);
+// Water depth above the stickers: a base, four ripple waves and one broad swell.
+// Even when every wave bottoms out together the trough stays above the tile, and
+// the crest stays under the worm's back.
+export const WATER_HEIGHT = { base: 0.105, ripple: 0.011, swell: 0.03 };
+// Shell depth for the other two: ice is a thick carved layer, lightning a skin of
+// charge lying on the tiles.
+const ICE_DEPTH = 0.075;
+const CHARGE_DEPTH = 0.016;
+
+// How far the flat part of an edge cell runs past its sticker lattice before the
+// wrap begins: the cell's origin sits SURFACE_OFFSET (0.52) off the cubie centre,
+// so the wrap's axis — shared by both faces — is 0.02 beyond the lattice edge.
+const EDGE_PAD = 0.02;
+// Seam borders fold exactly onto the border, so neighbouring patches meet edge to
+// edge. An overlap (tried first, to rule out hairline cracks) doubles the layer's
+// alpha in a strip along every seam, which reads as a ruled line across the water.
+const SEAM_OVERLAP = 0.0;
+// Size of the skirt ring in the geometry's parameter space. Arbitrary: the shader
+// maps skirt parameter 0..1 onto the wrap angle.
+const SKIRT = 0.25;
+
+// Tessellation per element: [interior segments, skirt segments]. Water needs the
+// most, because its waves and the wrap both have to read as curved.
+const RESOLUTION = { water: [14, 4], ice: [10, 3], lightning: [6, 2] };
+
+const _geoCache = new Map();
+/**
+ * The shell patch for one cover cell: a grid over parameter space, [0,1]² for the
+ * face plus a skirt ring the vertex shader either wraps over a cube edge or folds
+ * flat onto a seam.
+ */
+export function getShellGeometry(inner = 14, skirt = 4) {
+  const key = `${inner}:${skirt}`;
+  let geo = _geoCache.get(key);
+  if (geo) return geo;
+  const qs = [];
+  for (let i = skirt; i >= 1; i--) qs.push((-SKIRT * i) / skirt);
+  for (let i = 0; i <= inner; i++) qs.push(i / inner);
+  for (let i = 1; i <= skirt; i++) qs.push(1 + (SKIRT * i) / skirt);
+  const n = qs.length;
+  const position = new Float32Array(n * n * 3);
+  const uv = new Float32Array(n * n * 2);
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const v = j * n + i;
+      position[v * 3] = qs[i];
+      position[v * 3 + 1] = qs[j];
+      uv[v * 2] = qs[i];
+      uv[v * 2 + 1] = qs[j];
+    }
   }
-  return _geoCache.geo;
+  const index = [];
+  for (let j = 0; j < n - 1; j++) {
+    for (let i = 0; i < n - 1; i++) {
+      const a = j * n + i;
+      const b = a + 1;
+      const c = a + n;
+      const d = c + 1;
+      index.push(a, b, d, a, d, c);
+    }
+  }
+  geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(index);
+  _geoCache.set(key, geo);
+  return geo;
 }
 
-// Shared by both stages. Value noise rather than anything fancier because it is
-// continuous in 3D — the layer wraps a cube, so a 2D field would have to pick two
-// axes and would tear at every edge where the third took over.
-const NOISE = /* glsl */`
-  float hash13(vec3 p3) {
-    p3 = fract(p3 * 0.1031);
-    p3 += dot(p3, p3.zyx + 31.32);
-    return fract((p3.x + p3.y) * p3.z);
-  }
-  vec3 hash33(vec3 p3) {
-    p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));
-    p3 += dot(p3, p3.yxz + 33.33);
-    return fract((p3.xxy + p3.yxx) * p3.zyx);
-  }
-  float vnoise(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(mix(hash13(i + vec3(0.0, 0.0, 0.0)), hash13(i + vec3(1.0, 0.0, 0.0)), f.x),
-          mix(hash13(i + vec3(0.0, 1.0, 0.0)), hash13(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
-      mix(mix(hash13(i + vec3(0.0, 0.0, 1.0)), hash13(i + vec3(1.0, 0.0, 1.0)), f.x),
-          mix(hash13(i + vec3(0.0, 1.0, 1.0)), hash13(i + vec3(1.0, 1.0, 1.0)), f.x), f.y),
-      f.z);
-  }
-`;
+/** The water shell geometry — kept under its old name for callers and tests. */
+export function getElementalSurfaceGeo() {
+  return getShellGeometry(...RESOLUTION.water);
+}
 
-// Ice's crystal plates, needed in BOTH stages: the fragment stage shades each
-// plate, the vertex stage steps it up or down so the relief is real geometry and
-// catches the scene's light at its edges.
-//
-// A plain floor() grid would give obvious cubes, so the lookup point is
-// domain-warped by a low-frequency noise first — the cell walls buckle into
-// irregular polygons that read as a frozen surface rather than as graph paper.
-const ICE_CELLS = /* glsl */`
-  vec3 iceCell(vec3 p) {
-    float w1 = vnoise(p * 1.6);
-    float w2 = vnoise(p * 1.6 + 11.3);
-    // ~0.5 world units per plate, i.e. a couple of plates across a sticker. Finer
-    // than this and the facets stop reading as broken crystal and start reading as
-    // scratches on a pane.
-    return floor(p * 1.9 + vec3(w1, w2, w1 * w2 + 0.3) * 1.7);
-  }
-`;
-
-const vertexShader = /* glsl */`
+const vertexShader = /* glsl */ `
   uniform float uTime;
-  uniform int uMode;
-  // (intensity, claim, release, animate) — the shared elemental envelope, written
-  // once per frame by ElementalCubeSkin. See elementalLifecycle.js.
+  // (intensity, claim, release, animate) — the shared elemental envelope.
   uniform vec4 uEnv;
-  // Per cover cell: (rim, edge, corner, seed). Where the cell sits on the cube —
-  // rim 0 at a face centre → 1 at its border, edge/corner flags for the cells that
-  // meet another face. This is what lets one flat quad know it is part of a cube.
-  attribute vec4 aCell;
-  // Per cover cell: 0..1 share of the claim sweep before this cell is reached.
-  attribute float aSweep;
+  uniform vec4 uClaimOrigin;
+  uniform float uCubeHalf;
+  ${GLSL_CELL_ATTRIBUTES}
+  ${GLSL_WORM}
 
-  varying vec2 vUv;
   varying vec3 vWorld;
-  varying vec3 vView;
-  varying float vWave;
-  varying float vSwell;
-  varying vec3 vCellMask;   // (rim, edge, corner)
-  varying float vArrive;
-  varying vec3 vFaceNormal;
+  varying vec3 vNormal;    // shell normal, world space, waves included
+  varying vec3 vFaceN;     // the face's own normal
+  varying vec2 vLocal;     // cell-local position on the face, world units
+  varying vec2 vFaceUV;    // position projected on the face's axes — shared by every cell on it
+  varying float vRim;      // 0 on the flat → 1 where this face's wrap ends
+  varying float vArrive;   // the claim flood: 0 before the front, 1 behind it
+  varying float vDepth;    // shell depth above the stickers here
+  varying float vWave;     // water: normalised wave height, -1..1
+  varying float vWake;     // water: ripple rings around the worm, -1..1
 
-  ${NOISE}
-  ${ICE_CELLS}
+  #define QUARTER_PI 0.78539816
 
-  // Continuous world-space wave field — shared by every tile, so the surface is
-  // one body rather than a grid of identical squares.
-  float wfield(vec3 p, float t) {
-    return sin(p.x * 3.0 + t * 1.6)
-         + sin(p.z * 3.4 - t * 1.3)
-         + sin((p.x + p.z) * 2.2 + t * 0.9)
-         + sin(p.y * 3.1 + t * 1.1);
+  // A continuous front travelling out from the claimed tile. It must reach the far
+  // corner of the cube (≈2.45 half-extents away) by the end of the sweep.
+  float floodAt(vec3 p) {
+    if (uClaimOrigin.w < 0.5) return smoothstep(0.0, 1.0, uEnv.y);
+    float reach = uEnv.y * (uCubeHalf * 3.2 + 1.4);
+    return 1.0 - smoothstep(reach - 1.1, reach, length(p - uClaimOrigin.xyz));
   }
 
-  // The broad swell, deliberately NOT part of wfield: a single low-frequency plane
-  // wave travelling through world space. Because it is a function of world position
-  // it carries across a cube edge onto the next face on its own, which is what makes
-  // the six faces read as one body of water rather than six aquarium panes.
-  float swellField(vec3 p, float t) {
-    vec3 dir = normalize(vec3(1.0, 0.35, 0.8));
-    return sin(dot(p, dir) * 0.85 - t * 0.75);
+#if SURFACE_MODE == 0
+  // Travelling waves in world space: returns (height, gradient). World space is what
+  // carries a swell over a cube edge onto the next face as one body of water.
+  vec4 waterWaves(vec3 p, float t) {
+    vec4 acc = vec4(0.0);
+    vec3 d; float k; float ph;
+    d = normalize(vec3(1.0, 0.35, 0.8)); k = 0.85; ph = dot(p, d) * k - t * 0.75;
+    acc += vec4(sin(ph), cos(ph) * k * d) * ${glf(WATER_HEIGHT.swell)};
+    d = normalize(vec3(0.9, -0.2, 0.3)); k = 3.1; ph = dot(p, d) * k - t * 1.55;
+    acc += vec4(sin(ph), cos(ph) * k * d) * ${glf(WATER_HEIGHT.ripple)};
+    d = normalize(vec3(-0.35, 0.6, 0.9)); k = 3.6; ph = dot(p, d) * k - t * 1.3;
+    acc += vec4(sin(ph), cos(ph) * k * d) * ${glf(WATER_HEIGHT.ripple)};
+    d = normalize(vec3(0.2, 0.95, -0.55)); k = 2.5; ph = dot(p, d) * k + t * 1.05;
+    acc += vec4(sin(ph), cos(ph) * k * d) * ${glf(WATER_HEIGHT.ripple)};
+    d = normalize(vec3(-0.8, -0.3, 0.45)); k = 4.4; ph = dot(p, d) * k - t * 1.9;
+    acc += vec4(sin(ph), cos(ph) * k * d) * ${glf(WATER_HEIGHT.ripple)};
+    return acc;
   }
+#endif
 
   void main() {
-    vUv = uv;
-    vCellMask = aCell.xyz;
-    // Every cover cell is an INSTANCE of this one quad, so the cell's own
-    // position/orientation/scale arrives as instanceMatrix rather than as a parent
-    // group's modelMatrix. World position — which every pattern below is a function
-    // of, and which is what keeps the field continuous across cells — must be
-    // composed through it. Guarded so the material still works on a plain mesh.
-    #ifdef USE_INSTANCING
-      mat4 cellMatrix = modelMatrix * instanceMatrix;
-    #else
-      mat4 cellMatrix = modelMatrix;
-    #endif
+    ${GLSL_CELL_FRAME}
+    float T = uTime * uEnv.w;
+    vec2 q = position.xy;
 
-    vec4 wp = cellMatrix * vec4(position, 1.0);
-    vWorld = wp.xyz;
-    float w = wfield(wp.xyz, uTime * uEnv.w);
-    vWave = w;
-    vSwell = swellField(wp.xyz, uTime * uEnv.w);
-    // Local +Z is the outward face normal for every cell; in world space it is the
-    // instance matrix's Z column, which is how the surface knows which way is up on
-    // a cube whose faces all point somewhere different.
-    vFaceNormal = normalize((cellMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+    // Which skirt (if any) this vertex belongs to, and how far into it, 0..1.
+    float sx = q.x > 1.0 ? 1.0 : (q.x < 0.0 ? -1.0 : 0.0);
+    float sy = q.y > 1.0 ? 1.0 : (q.y < 0.0 ? -1.0 : 0.0);
+    float tx = sx > 0.0 ? (q.x - 1.0) / ${glf(SKIRT)} : (sx < 0.0 ? -q.x / ${glf(SKIRT)} : 0.0);
+    float ty = sy > 0.0 ? (q.y - 1.0) / ${glf(SKIRT)} : (sy < 0.0 ? -q.y / ${glf(SKIRT)} : 0.0);
+    // Is that border the cube's silhouette?
+    float ex = sx > 0.0 ? aEdge.y : aEdge.x;
+    float ey = sy > 0.0 ? aEdge.w : aEdge.z;
 
-    // Water rises together on every manifold. Per-cell delays made neighboring
-    // patches disagree in height and opacity, exposing a blocky tile grid.
-    // Ice and lightning retain their outward claim sweep.
-    vArrive = uMode == 0 ? smoothstep(0.0, 1.0, uEnv.y)
-                        : smoothstep(aSweep, aSweep + 0.35, uEnv.y);
+    // The flat patch. On an edge border it runs out to the wrap's axis.
+    vec2 lo = vec2(aExtent.x + aEdge.x * ${glf(EDGE_PAD)}, aExtent.z + aEdge.z * ${glf(EDGE_PAD)});
+    vec2 hi = vec2(aExtent.y + aEdge.y * ${glf(EDGE_PAD)}, aExtent.w + aEdge.w * ${glf(EDGE_PAD)});
+    vec2 cq = clamp(q, 0.0, 1.0);
+    vec2 base = vec2(mix(-lo.x, hi.x, cq.x), mix(-lo.y, hi.y, cq.y));
+    // On a seam border the skirt folds flat onto the border (zero-area triangles).
+    base.x += sx * (1.0 - ex) * tx * ${glf(SEAM_OVERLAP)};
+    base.y += sy * (1.0 - ey) * ty * ${glf(SEAM_OVERLAP)};
 
-    vec3 pos = position;
-    // Local +Z is the outward face normal for every cell, so displacement along
-    // it lifts the surface off the sticker on all six faces.
-    if (uMode == 0) {
-      // Keep troughs above the sticker: a signed displacement alone submerged
-      // portions of the mesh, leaving hard-edged holes as the waves moved.
-      pos.z += (${WATER_HEIGHT.base} + w * ${WATER_HEIGHT.ripple} + vSwell * ${WATER_HEIGHT.swell}) * vArrive;
-    } else if (uMode == 2) {
-      // Lightning is a charge crawling ON the surface, not a body sitting on it —
-      // it stays flat. Any displacement here would lift the veins off the tile and
-      // break the "the cube itself is conducting" read.
-    } else {
-      // Each crystal plate sits at its own height, so the frozen surface is
-      // genuinely faceted instead of a flat quad with facets painted on. The
-      // steps land between vertices and read as chipped, which is what ice does.
-      pos.z += pow(hash13(iceCell(wp.xyz)), 3.0) * 0.13 * vArrive;
-    }
-    // viewMatrix * cellMatrix, not modelViewMatrix: the latter folds in only the
-    // parent group, and under instancing that would leave every cell shaded as if
-    // it sat at the cube's centre facing +Z.
-    vec4 mv = viewMatrix * cellMatrix * vec4(pos, 1.0);
-    vView = -mv.xyz;
-    gl_Position = projectionMatrix * mv;
+    // The wrap: up to 45° round the edge, where the neighbouring face takes over.
+    vec3 dirL = normalize(vec3(sx * tan(ex * tx * QUARTER_PI), sy * tan(ey * ty * QUARTER_PI), 1.0));
+    vec3 C = cellOrigin + cellX * base.x + cellY * base.y;
+    vec3 dir = normalize(cellX * dirL.x + cellY * dirL.y + cellN * dirL.z);
+
+    float flood = floodAt(C);
+    float drain = 1.0 - smoothstep(0.0, 1.0, uEnv.z);
+    vec3 n = dir;
+    float depth;
+    vWave = 0.0;
+    vWake = 0.0;
+
+  #if SURFACE_MODE == 0
+    // ── Water: waves, plus rings spreading from the worm's head ────────────
+    vec4 w = waterWaves(C, T);
+    vec3 toHead = C - uWormHead.xyz;
+    float r = length(toHead);
+    float ringPh = r * 21.0 - T * 8.0;
+    float ringFall = exp(-r * 2.4) * uWormHead.w;
+    float ring = sin(ringPh) * ringFall * 0.011;
+    vec3 ringGrad = (cos(ringPh) * 21.0 - 2.4 * sin(ringPh)) * ringFall * 0.011 * (toHead / max(r, 1e-4));
+    w += vec4(ring, ringGrad);
+    depth = (${glf(WATER_HEIGHT.base)} + w.x) * flood * mix(0.25, 1.0, drain);
+    // Tilt the normal by the tangential slope. Scaled with the depth, so a thin film
+    // at the flood front or the drain is not rougher than open water.
+    vec3 slope = w.yzw - dir * dot(w.yzw, dir);
+    n = normalize(dir - slope * flood * drain);
+    vWave = w.x / (${glf(WATER_HEIGHT.swell)} + 2.0 * ${glf(WATER_HEIGHT.ripple)});
+    vWake = sin(ringPh) * exp(-r * 2.4) * uWormHead.w;
+  #elif SURFACE_MODE == 1
+    // ── Ice: a thick carved layer, stepped a little per plate ──────────────
+    depth = ${glf(ICE_DEPTH)} * flood * mix(0.15, 1.0, drain);
+  #else
+    // ── Lightning: charge lying on the tiles ───────────────────────────────
+    depth = ${glf(CHARGE_DEPTH)} * flood;
+  #endif
+
+    depth = max(depth, 0.002);
+    vec3 world = C + dir * depth;
+    vWorld = world;
+    vNormal = n;
+    vFaceN = cellN;
+    vLocal = base;
+    vFaceUV = vec2(dot(C, cellX), dot(C, cellY));
+    vRim = max(ex * tx, ey * ty);
+    vArrive = flood;
+    vDepth = depth;
+    gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
 `;
 
-const fragmentShader = /* glsl */`
-  precision highp float;
+const fragmentShader = /* glsl */ `
   uniform float uTime;
-  uniform int uMode;
+  uniform vec4 uEnv;
   uniform vec3 uColor;
   uniform vec3 uAccent;
-  uniform vec4 uEnv;
-  varying vec2 vUv;
-  varying vec3 vWorld;
-  varying vec3 vView;
-  varying float vWave;
-  varying float vSwell;
-  varying vec3 vCellMask;
-  varying float vArrive;
-  varying vec3 vFaceNormal;
+  uniform vec4 uClaimOrigin;
 
-  ${NOISE}
-  ${ICE_CELLS}
+  varying vec3 vWorld;
+  varying vec3 vNormal;
+  varying vec3 vFaceN;
+  varying vec2 vLocal;
+  varying vec2 vFaceUV;
+  varying float vRim;
+  varying float vArrive;
+  varying float vDepth;
+  varying float vWave;
+  varying float vWake;
+
+  ${GLSL_NOISE}
+
+  // Worley cell of p: (F1, F2, id). The id is a stable random per cell, for facets.
+  vec3 worleyCell(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    float d1 = 8.0;
+    float d2 = 8.0;
+    float id = 0.0;
+    for (int z = -1; z <= 1; z++)
+    for (int y = -1; y <= 1; y++)
+    for (int x = -1; x <= 1; x++) {
+      vec3 g = vec3(float(x), float(y), float(z));
+      vec3 o = hash33(i + g);
+      vec3 r = g + o - f;
+      float d = dot(r, r);
+      if (d < d1) { d2 = d1; d1 = d; id = hash13(i + g + 0.37); } else if (d < d2) { d2 = d; }
+    }
+    return vec3(sqrt(d1), sqrt(d2), id);
+  }
+
+  // Piecewise-LINEAR noise: straight segments meeting at sharp corners — the
+  // zigzag of a real discharge, where smooth value noise draws a lazy wave.
+  float jag(float x, float seed) {
+    float i = floor(x);
+    float a = hash12(vec2(i, seed));
+    float b = hash12(vec2(i + 1.0, seed));
+    return mix(a, b, fract(x)) - 0.5;
+  }
+
+  // Ridged noise: bright where the field crosses its midpoint — thin branching lines.
+  float ridge(float n, float sharp) { return pow(1.0 - abs(n * 2.0 - 1.0), sharp); }
+
+  // Perturb a normal by a scalar height field using its screen-space derivatives
+  // (the surface-gradient method): shading detail without a single extra vertex.
+  vec3 bumpNormal(vec3 n, vec3 p, float h, float strength) {
+    vec3 dpdx = dFdx(p);
+    vec3 dpdy = dFdy(p);
+    float dhdx = dFdx(h);
+    float dhdy = dFdy(h);
+    vec3 r1 = cross(dpdy, n);
+    vec3 r2 = cross(n, dpdx);
+    float det = dot(dpdx, r1);
+    vec3 grad = (r1 * dhdx + r2 * dhdy) * sign(det) / max(abs(det), 1e-7);
+    return normalize(n - grad * strength);
+  }
 
   void main() {
-    vec3 vd = normalize(vView);
-    float t = uTime * uEnv.w;
-    vec3 lightDir = normalize(vec3(0.4, 0.8, 0.5));
+    float T = uTime * uEnv.w;
+    vec3 v = normalize(cameraPosition - vWorld);
+    vec3 n = normalize(vNormal);
+    vec3 camUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+    vec3 keyL = normalize(vec3(0.45, 0.85, 0.35));
+    float ndv = clamp(dot(n, v), 0.0, 1.0);
+    // The sticker lattice under this point: 0 on a seam → 0.5 mid-sticker.
+    vec2 st = fract(vLocal + 0.5) - 0.5;
+    float seamD = 0.5 - max(abs(st.x), abs(st.y));
+    vec3 rgb;
+    float a;
 
-    // Distance from this cell's own centre, 0 → 1 at its border. Everything the
-    // player has to read — the sticker colour, heal state, bomb fuses, markings —
-    // sits in the middle of a tile, so the element is thinned there and its
-    // strongest cues are pushed out to the gaps between tiles.
-    float cellRim = clamp(max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0, 0.0, 1.0);
-    float readable = mix(0.38, 1.0, smoothstep(0.22, 0.88, cellRim));
-    // vView is in camera space; normals must be in that space too. Using a
-    // screen-facing (0,0,1) normal made every face catch the same highlight.
-    vec3 faceN = normalize(mat3(viewMatrix) * vFaceNormal);
-    vec3 tangent = normalize(cross(abs(faceN.y) > 0.95 ? vec3(1.0,0.0,0.0) : vec3(0.0,1.0,0.0), faceN));
-    vec3 bitangent = cross(faceN, tangent);
+  #if SURFACE_MODE == 0
+    // ── Water ─────────────────────────────────────────────────────────────
+    // Fine ripples for shading only, as a noise bump rather than plane waves: a
+    // plane wave's crests glint in long straight lines, which read as rules drawn
+    // across the water; noise glints in scattered, crawling sparkles.
+    float fine = vnoise3(vWorld * 5.0 + vec3(0.0, T * 0.8, T * 0.5)) * 0.65
+               + vnoise3(vWorld * 9.0 - vec3(T * 1.0, 0.0, T * 0.6)) * 0.35;
+    // Smooth toward grazing: foreshortened, the same ripples alias into static, and
+    // real water at a glancing angle reflects in long smooth sheets anyway.
+    float grazeFade = smoothstep(0.08, 0.55, clamp(dot(n, v), 0.0, 1.0));
+    vec3 wn = bumpNormal(n, vWorld, fine, 0.045 * grazeFade);
+    float ndvw = clamp(dot(wn, v), 0.0, 1.0);
 
-    vec3 col;
-    float alpha;
+    float fres = pow(1.0 - ndvw, 2.2);
+    // How much water the eye crosses: little head-on, lots at a glancing angle and
+    // round the rims, where the shell turns away.
+    float thick = clamp(fres * 1.15 + vRim * 0.55, 0.0, 1.0);
+    // Head-on the water only ABSORBS: a near-black teal that dims a tile without
+    // shifting its hue. Any real blue here is added to every sticker — red turns
+    // purple and orange drifts toward pink, which is a readability failure, not a
+    // look. The blue lives where the eye crosses more water: the grazing angles
+    // and the rounded rims.
+    vec3 shallow = vec3(0.0, 0.012, 0.03);
+    vec3 deep = uColor * vec3(0.03, 0.22, 0.55);
+    vec3 body = mix(shallow, deep, smoothstep(0.1, 0.9, thick));
+    float occ = mix(0.18, 0.86, thick);
 
-    if (uMode == 0) {
-      // ── Water ────────────────────────────────────────────────────────────
-      // Surface normal from the wave gradient (screen-space derivatives).
-      float dx = dFdx(vWave);
-      float dy = dFdy(vWave);
-      vec3 dpdx = dFdx(-vView), dpdy = dFdy(-vView);
-      vec3 r1 = cross(dpdy, faceN), r2 = cross(faceN, dpdx);
-      float det = dot(dpdx, r1);
-      vec3 gradient = (r1 * dx + r2 * dy) * sign(det) / max(abs(det), 0.00001);
-      vec3 n = normalize(faceN - gradient * 0.12);
-      float fres = pow(1.0 - clamp(abs(dot(n, vd)), 0.0, 1.0), 3.0);
+    // Caustics ON the tiles, seen through the surface: follow the refracted ray
+    // down to the sticker plane, so the light web sits under the water and swims
+    // as the waves bend it. Thin and cyan, so the tile keeps its own hue.
+    vec3 refr = refract(-v, wn, 0.75);
+    float down = max(0.25, -dot(refr, vFaceN));
+    vec3 floorP = vWorld + refr * (vDepth / down);
+    float c1 = vnoise3(floorP * 3.3 + vec3(0.0, T * 0.34, T * 0.19));
+    float c2 = vnoise3(floorP * 4.9 - vec3(T * 0.26, 0.0, T * 0.14));
+    float caustic = ridge(c1, 16.0) + 0.75 * ridge(c2, 16.0);
+    caustic *= 1.0 - thick;
+    vec3 causticCol = mix(uColor, vec3(0.85, 1.0, 1.0), 0.55);
 
-      // Depth tint: troughs hold the deep colour, crests lift toward the accent,
-      // so the swell reads as a body of water with volume rather than as a flat
-      // sheet with highlights on it. The broad swell is folded in at low frequency,
-      // which is what gives the cube whole-body motion instead of a uniform chop.
-      float h = clamp((vWave * 0.25 + vSwell * 0.55) * 0.5 + 0.5, 0.0, 1.0);
-      col = mix(uColor * 0.30, mix(uColor, uAccent, 0.35), h);
+    // Reflection: a soft sky keyed to the camera's up, brightest toward the horizon.
+    vec3 r = reflect(-v, wn);
+    float sky = smoothstep(-0.1, 0.8, dot(r, camUp));
+    vec3 skyCol = mix(vec3(0.01, 0.05, 0.13), vec3(0.72, 0.92, 1.0), sky);
+    // Sun: a hard sparkle on the ripple faces, and a broad sheen round the rims —
+    // the highlight that makes a rounded body of water read as one object.
+    vec3 h = normalize(keyL + v);
+    float nh = max(dot(wn, h), 0.0);
+    float glint = pow(nh, 320.0) * 3.5 * grazeFade;
+    float sheen = pow(max(dot(n, h), 0.0), 14.0) * (0.12 + 0.5 * vRim);
 
-      // Caustics. Ridged noise (1 - |2n-1|, raised to a high power) leaves thin
-      // bright filaments where the field crosses its midpoint — the branching web
-      // light actually makes through a wavy surface. Two layers drift against
-      // each other so the web crawls and re-forms instead of sliding rigidly.
-      float n1 = vnoise(vWorld * 3.4 + vec3(0.0, t * 0.30, t * 0.17));
-      float n2 = vnoise(vWorld * 4.7 + vec3(-t * 0.24, t * 0.11, 0.0));
-      float caustic = clamp(
-        pow(1.0 - abs(n1 * 2.0 - 1.0), 7.0) + 0.85 * pow(1.0 - abs(n2 * 2.0 - 1.0), 7.0),
-        0.0, 1.4);
-      col += uAccent * caustic * mix(0.28, 0.72, readable);
+    // Foam: patches, not lines — the crests only foam where a slow mask allows, and
+    // the rings round the worm froth where they break.
+    float foamN = vnoise3(vWorld * 10.0 + vec3(T * 0.5, 0.0, -T * 0.3));
+    float foamMask = smoothstep(0.55, 0.8, vnoise3(vWorld * 1.6 + vec3(T * 0.12)));
+    float crest = smoothstep(0.7, 0.95, vWave + (foamN - 0.5) * 0.6) * foamMask;
+    float wake = smoothstep(0.5, 0.88, vWake + (foamN - 0.5) * 0.45);
+    float foam = max(crest * 0.7, wake);
 
-      // Foam, but only on the crests and broken up by noise, so it collects along
-      // the tops of the swell the way real foam does instead of frosting evenly.
-      float crest = smoothstep(0.30, 1.0, vWave * 0.25 + vSwell * 0.45);
-      float foam = smoothstep(0.35, 0.85, crest * (0.45 + 0.9 * vnoise(vWorld * 10.0 + t * 0.5)));
+    // Split into what the water IS (body, foam — it occludes the tile) and what it
+    // gives off (reflections, caustics, glints — pure added light).
+    float surge = vArrive * (1.0 - vArrive) * 4.0;
+    vec3 bodyCol = mix(body, vec3(0.93, 0.99, 1.0), foam);
+    a = clamp(occ + foam * 0.55, 0.0, 1.0);
+    vec3 light = skyCol * fres * 0.7 + causticCol * caustic * 0.22 + vec3(1.0) * (glint + sheen) + uAccent * surge * 0.35;
+    float fade = smoothstep(0.02, 0.35, vArrive) * (1.0 - smoothstep(0.35, 1.0, uEnv.z));
+    rgb = vec3(0.0);
+  #define SPLIT_OUTPUT
 
-      // ── The waterline ────────────────────────────────────────────────────
-      // A meniscus riding the cube's silhouette. Surface tension piles water up
-      // where a body of it meets an edge, and without this the cube read as six
-      // wet squares that happened to be adjacent — there was nothing telling the
-      // eye it was ONE volume with an outside. It is strongest in the tile gaps of
-      // the cells that actually sit on a cube edge, and builds further at corners
-      // where two edges meet.
-      // The band rises toward the tile gap and then falls away again BEFORE the
-      // quad's outer limit. Cover quads are cut slightly oversized so neighbours
-      // overlap and the grout disappears, which means their last sliver hangs past
-      // the cube's silhouette into empty space — running the waterline all the way
-      // out to cellRim 1.0 painted bright foam on that overhang and fringed the
-      // cube with ragged white flaps.
-      float gapBand = smoothstep(0.45, 0.80, cellRim) * (1.0 - smoothstep(0.88, 1.0, cellRim));
-      float meniscus = vCellMask.y * gapBand * (0.55 + 0.45 * vCellMask.z);
-      // Broken up so the waterline crawls rather than sitting as a painted stripe.
-      meniscus *= 0.55 + 0.75 * vnoise(vWorld * 7.0 + vec3(0.0, t * 0.6, t * 0.35));
-      float tideFront = sin(vArrive * 3.141593);
-      float rimFoam = meniscus * (0.5 + 0.5 * crest) + tideFront * 0.6;
-      float ripple = pow(0.5 + 0.5 * sin(length(vWorld.xz) * 8.0 - t * 2.0 + vWorld.y), 12.0);
-      col += uAccent * ripple * 0.15 * (1.0 - uEnv.z);
+  #elif SURFACE_MODE == 1
+    // ── Ice ───────────────────────────────────────────────────────────────
+    // Plates: world-space Worley cells, each tilting the surface its own way, so
+    // the layer breaks into flat facets that catch the light one at a time.
+    vec3 wc = worleyCell(vWorld * 2.2);
+    vec3 tilt = hash33(vec3(wc.z * 97.0, wc.z * 31.0, wc.z * 7.0)) - 0.5;
+    vec3 fn = normalize(n + (tilt - n * dot(tilt, n)) * 0.75);
+    float plateEdge = 1.0 - smoothstep(0.0, 0.045, wc.y - wc.x);
+    float fres = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 2.0);
 
-      // Restrained: a waterline is a bright EDGE on a blue body. Pushed harder it
-      // stops reading as water piling up and starts reading as frost.
-      col = mix(col, vec3(1.0), clamp(foam * 0.8 + rimFoam * 0.32, 0.0, 1.0));
+    // Cracks deep inside the layer, found by following the refracted view ray in:
+    // parallax makes them sit under the surface rather than on it.
+    vec3 refr = refract(-v, n, 0.77);
+    vec3 inside = vWorld + refr * (vDepth * 1.8 + 0.03);
+  #ifdef ICE_HQ
+    vec2 deepC = worley3(inside * 1.4);
+    float crackDeep = 1.0 - smoothstep(0.0, 0.045, deepC.y - deepC.x);
+  #else
+    float crackDeep = ridge(vnoise3(inside * 2.6), 14.0);
+  #endif
 
-      float spec = pow(max(dot(reflect(-lightDir, n), vd), 0.0), 60.0);
-      col += vec3(1.0) * spec * 1.1;
-      col = mix(col, uAccent, fres * 0.4);
-      // Deep body, cyan caustics, white foam: the accent is pushed hardest exactly
-      // where the water is thickest, along the rims.
-      col += uAccent * meniscus * 0.30;
+    // The seams fill with glacial ice, and frost gathers on them in ragged patches —
+    // a continuous white line in every seam turned the cube into a white grid.
+    // Only on the flat: round the bevels the lattice coordinate is pinned to the
+    // border, so a seam test there would frost the whole rim solid.
+    float flatPart = 1.0 - smoothstep(0.0, 0.25, vRim);
+    float fr = fbm3(vWorld * 8.0);
+    float patchy = smoothstep(0.4, 0.66, fbm3(vWorld * 2.6 + 3.7));
+    float inSeam = (1.0 - smoothstep(${glf(SEAM_HALF)} - 0.015, ${glf(SEAM_HALF)} + 0.012, seamD)) * flatPart;
+    float seamFrost = (1.0 - smoothstep(${glf(SEAM_HALF)} - 0.02, ${glf(SEAM_HALF)} + 0.03 + 0.06 * fr, seamD)) * flatPart * patchy;
+    float rimFrost = vRim * smoothstep(0.5, 0.68, fr + patchy * 0.2);
+    float frost = clamp(max(seamFrost, rimFrost), 0.0, 1.0);
 
-      alpha = 0.5 + fres * 0.32 + caustic * 0.18 + foam * 0.35;
-      // Thin over tile centres so gameplay marks stay legible, and thicken along
-      // the gaps and the silhouette where the element should read strongest.
-      alpha *= readable;
-      alpha += meniscus * 0.16;
-    } else if (uMode == 2) {
-      // ── Lightning ────────────────────────────────────────────────────────
-      // Charge veins that crawl through the SEAMS. Branching current follows the
-      // path of least resistance, and on a cube that path is the grid of gaps
-      // between tiles — running the veins across tile faces instead made the cube
-      // look shrink-wrapped in a crackle texture with nothing to do with its shape.
-      //
-      // Ridged noise gives the branching filaments (the same trick water's caustics
-      // use); weighting it by the gap band is what pins them to the seams.
-      float n1 = vnoise(vWorld * 5.2 + vec3(0.0, t * 0.22, t * 0.10));
-      float n2 = vnoise(vWorld * 9.5 - vec3(t * 0.18, 0.0, t * 0.12));
-      float vein = clamp(pow(1.0 - abs(n1 * 2.0 - 1.0), 9.0) + 0.7 * pow(1.0 - abs(n2 * 2.0 - 1.0), 11.0), 0.0, 1.5);
-      float gapBand = smoothstep(0.30, 0.95, cellRim);
-      vein *= 0.25 + 1.05 * gapBand;
+    // Thickness: clear over the plates, glacial blue where the eye crosses more
+    // ice (grazing views, the rounded bevels and the ice packed into the seams).
+    float thick = clamp(fres * 1.1 + vRim * 0.7 + inSeam * 0.8, 0.0, 1.0);
+    vec3 clearTint = uColor * vec3(0.3, 0.55, 0.75);
+    vec3 glacial = uColor * vec3(0.05, 0.25, 0.62);
+    vec3 body = mix(clearTint, glacial, thick);
+    body = mix(body, glacial * 0.55, crackDeep * 0.8);
+    vec3 bodyCol = mix(body, vec3(0.92, 0.98, 1.0), frost);
+    // Clear ice barely hides the tile; frost, bevels and cracks do.
+    a = mix(0.14, 0.72, thick) + crackDeep * 0.28 + plateEdge * 0.1;
+    a = max(a, frost * 0.92);
 
-      // Cells discharge in short, non-simultaneous groups. The stagger comes from
-      // the cell's own seed, so neighbouring cells are never in phase and the cube
-      // crackles instead of strobing as one object.
-      float phase = fract(vCellMask.x * 0.37 + hash13(floor(vWorld * 1.7)) * 3.1);
-      float pulse = pow(0.5 + 0.5 * sin(t * 1.7 + phase * 6.2831853), 3.0);
+    // Light: facet glints (every plate flares at its own angle), a cold rim, and
+    // four-point star glitter twinkling on a jittered grid across each face.
+    vec3 h = normalize(keyL + v);
+    float spec = pow(max(dot(fn, h), 0.0), 70.0) * 1.3;
+    vec2 gp = vFaceUV * 6.0;
+    vec2 gi = floor(gp);
+    vec2 gseed = gi + vFaceN.xy * 13.0 + vFaceN.z * 7.0;
+    vec2 dd = fract(gp) - 0.5 - (hash22(gseed) - 0.5) * 0.6;
+    float tw = pow(0.5 + 0.5 * sin(T * 2.6 + hash12(gseed) * 40.0), 18.0) * step(0.45, hash12(gseed + 3.1));
+    float star = (exp(-abs(dd.x) * 70.0 - abs(dd.y) * 7.0) + exp(-abs(dd.y) * 70.0 - abs(dd.x) * 7.0)) * tw;
+    // A cold, thin highlight where the bevel turns away — the edge of a glass block.
+    float edgeLine = smoothstep(0.55, 0.95, vRim) * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 1.5);
+    vec3 light = vec3(0.88, 0.97, 1.0) * (spec + star * 1.6 + plateEdge * 0.18 * (1.0 - frost) + edgeLine * 0.6)
+               + vec3(0.7, 0.9, 1.0) * fres * 0.3;
 
-      // Charge rails: current gathers along the cube's own edges, brightest at the
-      // corners where three faces meet. This is the cube-scale read — from the
-      // overview camera the silhouette is traced in light.
-      float rail = vCellMask.y * smoothstep(0.55, 0.94, cellRim) * (0.6 + 0.4 * vCellMask.z);
-      rail *= 0.45 + 0.55 * pow(0.5 + 0.5 * sin(t * 1.1 - vWorld.y * 1.4), 3.0);
+    // Frost nucleates at the flood front as a bright crystalline growth line.
+    float front = vArrive * (1.0 - vArrive) * 4.0;
+    light += vec3(0.8, 0.95, 1.0) * front * 0.55;
+    // Melting: holes open through the layer as the wash ends.
+    float melt = step(fbm3(vWorld * 4.0) * 0.85 + 0.12, uEnv.z * 1.1);
+    float fade = smoothstep(0.02, 0.3, vArrive) * (1.0 - melt) * (1.0 - smoothstep(0.6, 1.0, uEnv.z));
+    rgb = vec3(0.0);
+  #define SPLIT_OUTPUT
 
-      // A dark conductive sheen, so the white-hot cores have contrast to be hot
-      // against. Nearly black at the tile centre, which also leaves the sticker
-      // and its markings readable straight through the charge.
-      float sheen = pow(clamp(dot(faceN, vd), 0.0, 1.0), 1.5);
-      col = mix(uColor * 0.10, uColor * 0.42, sheen * 0.7 + 0.3 * vCellMask.x);
-      col += uColor * vein * (0.35 + 0.75 * pulse);
-      col += uAccent * vein * pulse * 1.15;          // white-hot cores, only mid-burst
-      // A narrow current rides inside the broad rail, giving the silhouette
-      // a white core and violet shoulder without a full-face flash.
-      float core = pow(clamp(vein / 1.5, 0.0, 1.0), 3.0);
-      col += uAccent * (rail * 0.55 + core * (0.3 + 0.55 * pulse));
-      float fres = pow(1.0 - clamp(sheen, 0.0, 1.0), 2.0);
-      col = mix(col, uAccent, fres * 0.16);
+  #else
+    // ── Lightning ─────────────────────────────────────────────────────────
+    // Current runs in the seams — the path of least resistance on a cube is the
+    // grid of gaps between tiles. Each seam's line jitters and re-jitters, and
+    // bright pulses race along it.
+    // Everything that must agree on BOTH sides of a seam is taken from the face's
+    // own axes, which every cell on the face shares; a cell's local frame restarts
+    // at its own sticker and would break the line at every cell border.
+    bool vertical = abs(st.x) > abs(st.y);
+    float stA = vertical ? st.x : st.y;
+    float perp = 0.5 - abs(stA);
+    float along = vertical ? vFaceUV.y : vFaceUV.x;
+    float seamPos = (vertical ? vFaceUV.x : vFaceUV.y) + sign(stA) * 0.5 - stA;
+    float seamId = floor(seamPos * 2.0 + 0.5) + (vertical ? 0.0 : 101.0) + dot(vFaceN, vec3(211.0, 307.0, 401.0));
+    float jitterT = floor(T * 9.0);
+    // Signed offset of the current from the seam's centre line, in world units
+    // along the face axis; each side measures its distance to the same line.
+    float jseed = seamId * 3.1 + jitterT * 1.7;
+    float jit = jag(along * 9.0, jseed) * 0.06 + jag(along * 23.0, jseed + 5.3) * 0.02;
+    float dj = abs(perp + sign(stA) * jit);
+    float core = exp(-dj * dj / 0.00005);
+    float glow = exp(-dj * dj / 0.0035);
+    float runner = pow(0.5 + 0.5 * sin(along * 6.0 - T * 13.0 + hash12(vec2(seamId, 3.7)) * 6.2832), 10.0);
+    // Junctions where four stickers meet hold the charge and glow.
+    vec2 toNode = 0.5 - abs(st);
+    float node = exp(-dot(toNode, toNode) * 160.0);
+    float nodeHalo = exp(-dot(toNode, toNode) * 22.0);
+    // Now and then a short arc jumps straight across a sticker.
+    vec2 stickerId = floor((vFaceUV - st) * 2.0 + 0.5) + vFaceN.xy * 57.0 + vFaceN.z * 131.0;
+    float arcSeed = hash12(stickerId * 1.7 + floor(T * 3.0));
+    float arcOn = step(0.86, arcSeed);
+    float arcPath = st.y - jag(st.x * 8.0, arcSeed * 50.0) * 0.3 - jag(st.x * 21.0, arcSeed * 71.0) * 0.07;
+    float arcSpan = 1.0 - smoothstep(0.35, 0.5, abs(st.x));
+    float arc = arcOn * exp(-arcPath * arcPath / 0.0001) * arcSpan;
+    float arcGlow = arcOn * exp(-arcPath * arcPath / 0.004) * arcSpan;
+    // Rails: the cube's own edges carry the heaviest current, pulses racing round.
+    float railPulse = pow(0.5 + 0.5 * sin(dot(vWorld, vec3(1.0)) * 5.0 - T * 9.0), 6.0);
+    float rail = smoothstep(0.1, 0.9, vRim) * (0.55 + 0.45 * railPulse);
+    float fres = pow(1.0 - ndv, 2.5);
 
-      alpha = 0.30 + vein * 0.34 + pulse * vein * 0.28 + rail * 0.30 + fres * 0.14;
-      alpha *= readable;
-    } else {
-      // ── Ice ──────────────────────────────────────────────────────────────
-      // Every fragment belongs to a crystal plate; the plate's id drives both its
-      // tilt and its tint, so adjacent plates catch the light differently and the
-      // surface breaks up into facets.
-      vec3 cid = iceCell(vWorld);
-      float id = hash13(cid);
-      vec3 rnd = hash33(cid);
-      // Generous tilt range: the facets only read if neighbouring plates catch the
-      // light differently enough to separate from each other.
-      vec3 n = normalize(faceN + tangent * (rnd.x - 0.5) * 0.75 + bitangent * (rnd.y - 0.5) * 0.75);
-      float fres = pow(1.0 - clamp(abs(dot(n, vd)), 0.0, 1.0), 2.2);
-      float lam = clamp(dot(n, lightDir), 0.0, 1.0);
+    // White-hot where the current is, violet around it. Pure added light.
+    float current = core * (0.6 + 1.0 * runner) + node * 1.1 + arc * 1.2;
+    vec3 violet = uColor;
+    vec3 light = uAccent * current * 1.25
+               + violet * (glow * (0.45 + 0.6 * runner) + nodeHalo * 0.35 + arcGlow * 0.5 + rail * 0.9 + fres * 0.3);
+    // A thin storm-dark glaze so the white cores have something to be hot against:
+    // it dims the tile a little and never tints it.
+    vec3 bodyCol = vec3(0.012, 0.004, 0.03);
+    a = 0.14 + fres * 0.2 + rail * 0.25;
+    float fade = smoothstep(0.02, 0.4, vArrive) * (1.0 - smoothstep(0.1, 0.9, uEnv.z));
+    rgb = vec3(0.0);
+  #define SPLIT_OUTPUT
+  #endif
 
-      // Crack lines along the plate walls. The cell INDEX is piecewise constant, so
-      // its screen-space derivative is zero inside a plate and large exactly where
-      // one plate meets the next — walls at a consistent width whatever the
-      // surface's orientation, with no separate crack pattern needed.
-      //
-      // Deriving this from the cell index and not from a hash OF the index matters:
-      // neighbouring plates always differ by at least 1 in some component, but
-      // their hashes are random and land close together often enough that a
-      // hash-based edge test dropped whole stretches of wall and drew the cracks
-      // as dotted lines.
-      float crack = smoothstep(0.03, 0.45, fwidth(cid.x) + fwidth(cid.y) + fwidth(cid.z));
-
-      // Fine frost grain over the plates, and a sparse twinkle that re-rolls a few
-      // times a second so the surface glitters as the camera moves across it.
-      vec2 frostP = (vUv - 0.5) * 2.0;
-      float frostR = length(frostP);
-      float frostA = atan(frostP.y, frostP.x + 0.00001);
-      float arm = abs(sin(frostA * 3.0)) * frostR;
-      float branch = 1.0 - smoothstep(0.015, 0.055, arm);
-      float offshoot = (1.0 - smoothstep(0.02, 0.075, abs(sin(frostR * 23.0 + frostA * 6.0)))) * exp(-arm * 9.0);
-      float frostReach = smoothstep(frostR * 0.65, frostR * 0.65 + 0.2, vArrive);
-      float dendrite = max(branch, offshoot * 0.65) * frostReach;
-      float frost = vnoise(vWorld * 14.0) * 0.5 + vnoise(vWorld * 28.0) * 0.5;
-      float twinkle = pow(vnoise(vWorld * 26.0), 12.0) * pow(0.5 + 0.5 * sin(t * 1.3 + id * 31.0), 6.0) * 1.2;
-      // Per-plate glint. Broad enough that a facet flares as the camera swings past
-      // it, which is what sells the surface as hard and polished rather than matte.
-      float spec = pow(max(dot(reflect(-lightDir, n), vd), 0.0), 24.0);
-
-      // Kept blue and kept contrasty between plates. Washing the lit end all the
-      // way to white (and frosting the whole surface toward white on top of it)
-      // turned the frozen cube into a grey film with no ice colour left in it.
-      //
-      // The shadow end is deepened unevenly across the channels rather than by a
-      // flat multiply: uColor is a pale sky blue, and scaling it uniformly just
-      // gives pale grey. Pulling red down hardest keeps the dark end reading as
-      // cold and lets the plates have real tonal range instead of all sitting in
-      // the same narrow pastel band.
-      col = mix(uColor * vec3(0.30, 0.42, 0.62), mix(uColor, vec3(1.0), 0.5),
-                0.18 + 0.55 * lam + 0.30 * id);
-      col = mix(col, vec3(1.0), frost * 0.12);
-      col += vec3(1.0) * crack * 0.4;
-      col = mix(col, vec3(0.88, 0.97, 1.0), dendrite * 0.62 * (1.0 - uEnv.z));
-      col += vec3(0.85, 0.95, 1.0) * spec * 0.9;
-      col += vec3(0.90, 0.97, 1.0) * twinkle;
-      col = mix(col, uAccent, fres * 0.30);
-      // White frost carries the solid silhouette; the quieter inset keeps
-      // sticker colors and gameplay marks visible under the glacial layer.
-      float rimFrost = smoothstep(0.55, 0.94, cellRim) * (0.55 + frost * 0.45);
-      col = mix(col, vec3(0.86, 0.96, 1.0), rimFrost * 0.65);
-      alpha = mix(0.36, 0.88, smoothstep(0.25, 0.85, cellRim)) + fres * 0.08 + crack * 0.10;
-    }
-
-    // The cell has not been reached by the claim sweep yet, or the wash is
-    // dissolving. Both are the same statement about how much element is here.
-    alpha *= vArrive * (uMode == 2 ? 1.0 : 1.0 - uEnv.z);
-    gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
+    // Premultiplied: the element's body occludes the tile, its light adds to it.
+    //
+    // The body is encoded for the output BEFORE the premultiply — encoding after it
+    // (what colorspace_fragment does) lifts a dim tint through the sRGB curve and
+    // lands a "dark" glaze on the tile as a strong one.
+    //
+    // The light is added UN-encoded. With the AO composer the scene is linear and
+    // this is exact. Without it (phones) the blend happens on sRGB values, where an
+    // encoded 0.05 of light becomes +0.25 on the tile — eight times what the linear
+    // path adds to the same bright sticker — and washed every tile toward the
+    // element's hue. Adding it raw keeps the two paths within a hair on the tiles,
+    // where readability lives; they differ only over black, where the phone path is
+    // a little dimmer.
+  #ifdef SPLIT_OUTPUT
+    float af = clamp(a, 0.0, 1.0) * fade;
+    gl_FragColor = vec4(linearToOutputTexel(vec4(bodyCol, 1.0)).rgb * af + light * fade, af);
+  #else
+    gl_FragColor = vec4(rgb * fade, clamp(a, 0.0, 1.0) * fade);
+    #include <colorspace_fragment>
+  #endif
   }
 `;
 
-
 const _matCache = new Map();
-export function getElementalSurfaceMaterial(element, colorHex, accentHex) {
-  const key = `${element}_${colorHex}_${accentHex}`;
+/**
+ * One material per element. The colour and accent come from the element's
+ * definition; the envelope, the worm and the claim origin are shared uniform
+ * objects the skin's frame loop writes once per frame.
+ */
+export function getElementalSurfaceMaterial(element, colorHex, accentHex, highDetail = true) {
+  const mode = SURFACE_MODE[element] ?? 0;
+  const key = `${element}_${colorHex}_${accentHex}_${highDetail ? 'hq' : 'lq'}`;
   let mat = _matCache.get(key);
   if (!mat) {
     mat = new THREE.ShaderMaterial({
+      defines: { SURFACE_MODE: mode, ...(highDetail && mode === SURFACE_MODE.ice ? { ICE_HQ: '' } : {}) },
       uniforms: {
-        uTime: sharedUniforms.time,                 // ticked by CubeAssembly every frame
-        uMode: { value: SURFACE_MODE[element] ?? 0 },
+        uTime: sharedUniforms.time, // ticked by CubeAssembly every frame
+        uEnv: { value: new THREE.Vector4(1, 1, 0, 1) },
         uColor: { value: new THREE.Color(colorHex) },
         uAccent: { value: new THREE.Color(accentHex) },
-        // Written once per frame by the skin's transform loop, never per instance.
-        uEnv: { value: new THREE.Vector4(1, 1, 0, 1) }
+        uWormHead,
+        uWormBody,
+        uClaimOrigin,
+        uCubeHalf
       },
       vertexShader,
       fragmentShader,
       transparent: true,
+      premultipliedAlpha: true,
       depthWrite: false,
-      side: THREE.DoubleSide,
-      toneMapped: false,
-      extensions: { derivatives: true }
+      toneMapped: false
     });
+    mat.userData.elementalInstanced = true;
     _matCache.set(key, mat);
   }
   return mat;
 }
 
 /**
- * The water/ice skin for every cover cell at once — one InstancedMesh, one draw
- * call for the whole sheathed cube.
+ * The shell skin for every cover cell at once — one InstancedMesh, one draw call.
  *
- * The geometry is built per mount rather than shared from a module cache, because
- * it carries this wash's per-cell attributes (where each cell sits on the cube, and
- * its share of the claim sweep). The material stays cached: it holds no per-wash
- * state beyond uniforms the skin writes each frame.
- *
- * ElementalCubeSkin's single frame loop owns the instance matrices and `uEnv`;
- * nothing here runs per frame.
+ * The geometry is cloned per mount because it carries this wash's per-cell
+ * attributes; the material stays cached. ElementalCubeSkin's single frame loop owns
+ * the instance matrices and the envelope; nothing here runs per frame.
  */
-export function ElementalSurfaceSkin({ element, color, accent, count, cellData, meshRef }) {
-  const material = useMemo(() => getElementalSurfaceMaterial(element, color, accent), [element, color, accent]);
+export function ElementalSurfaceSkin({ element, color, accent, count, cellData, quality, meshRef }) {
+  const highDetail = quality?.accents !== false;
+  const material = useMemo(
+    () => getElementalSurfaceMaterial(element, color, accent, highDetail),
+    [element, color, accent, highDetail]
+  );
 
   const geometry = useMemo(() => {
-    const geo = getElementalSurfaceGeo().clone();
-    geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(cellData.cell, 4));
-    // Marked dynamic: the sweep is rewritten once when a claim origin arrives,
-    // which can be a frame or two after the mesh mounts.
-    const sweep = new THREE.InstancedBufferAttribute(cellData.sweep, 1);
-    sweep.setUsage(THREE.DynamicDrawUsage);
-    geo.setAttribute('aSweep', sweep);
-    return geo;
-  }, [cellData]);
+    const [inner, skirt] = RESOLUTION[element] ?? RESOLUTION.water;
+    return attachCellAttributes(getShellGeometry(inner, skirt).clone(), cellData);
+  }, [element, cellData]);
 
   // Ours to dispose — the clone is per mount. The cached source geometry and the
   // cached material outlive it and must not be touched.
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, count]}
-      frustumCulled={false}
-      raycast={() => null}
-    />
-  );
+  return <instancedMesh ref={meshRef} args={[geometry, material, count]} frustumCulled={false} raycast={() => null} />;
 }
