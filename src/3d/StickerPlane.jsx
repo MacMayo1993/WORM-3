@@ -1161,7 +1161,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.visible = true;
       } else if (!isInstancedRef.current && meshRef.current) {
         const mat = meshRef.current?.material;
-        if (mat?.color && flipFromColor.current) {
+        if (isGlass && mat?.uniforms?.baseColor && flipFromColor.current) {
+          mat.uniforms.baseColor.value.set(flipFromColor.current);
+        } else if (mat?.color && flipFromColor.current) {
           mat.map = flipFromTexture.current || null;
           mat.color.set(flipFromTexture.current ? '#ffffff' : flipFromColor.current);
           mat.needsUpdate = true;
@@ -1381,7 +1383,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         hitstopT.current = quietFlip ? 0 : 0.05; // ~3 frames
         // Swap the shader-style mesh to the antipodal (TO) style while it's squished
         // shut, so the style reveals with the expand rather than popping at frame 0.
-        if (!isInstancedRef.current && meshRef.current?.material?.uniforms?.baseColor
+        if (isGlass && meshRef.current?.material?.uniforms?.baseColor) {
+          meshRef.current.material.uniforms.baseColor.value.set(baseColorRef.current);
+        } else if (!isInstancedRef.current && meshRef.current?.material?.uniforms?.baseColor
             && tileStyleRef.current && tileStyleRef.current !== 'solid') {
           meshRef.current.material = getTileStyleMaterial(
             tileStyleRef.current, baseColorRef.current, false, null, antipodalHexRef.current);
@@ -1517,7 +1521,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           instanceColorRef.current.setStyle(baseColorRef.current);
         }
         const mat = meshRef.current?.material;
-        if (mat?.color) {
+        if (isGlass && mat?.uniforms?.baseColor) {
+          mat.uniforms.baseColor.value.set(baseColorRef.current);
+        } else if (mat?.color) {
           const finalTex = currTextureRef.current;
           mat.map = finalTex;
           mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
@@ -1763,48 +1769,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // caused disposed materials to linger on corner-sticker meshes when the cache
   // evicted entries, producing wrong colors after rotations.
   const useGlassStyle = isGlass && !isSudokube;
-  const glassMaterialRef = useRef(null);
-  // Create the material once on mount (or when glass mode turns on).
-  // Subsequent color changes update the uniform in-place — no object reallocation.
-  useEffect(() => {
-    if (!useGlassStyle) {
-      if (glassMaterialRef.current) {
-        glassMaterialRef.current.dispose();
-        glassMaterialRef.current = null;
-      }
-      return;
-    }
-    const colorHex = baseColor || '#888888';
-    if (!glassMaterialRef.current) {
-      try {
-        // Clone from the shared cache so we get a fresh instance instead of the
-        // shared one that might be evicted / mutated by other stickers.
-        const shared = getGlassMaterial(colorHex);
-        glassMaterialRef.current = shared.clone();
-      } catch (e) {
-        console.warn('Failed to create glass material:', e);
-      }
-    } else {
-      // Update the existing material's color uniform in-place.
-      try {
-        glassMaterialRef.current.uniforms.baseColor.value.set(baseColor || '#888888');
-      } catch (_e) { /* ignore */ }
-    }
-    return () => {
-      glassMaterialRef.current?.dispose();
-      glassMaterialRef.current = null;
-    };
-  }, [useGlassStyle]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: create once
-
-  // Sync glass material color when baseColor changes (separate from creation)
-  useEffect(() => {
-    if (!glassMaterialRef.current) return;
-    try {
-      glassMaterialRef.current.uniforms.baseColor.value.set(baseColor || '#888888');
-    } catch (_e) { /* ignore */ }
-  }, [baseColor]);
-
-  const glassMaterial = useGlassStyle ? glassMaterialRef.current : null;
+  // Available on the first render, including stickers remounted by a turn.
+  // The layout effect below sets its live color before paint; flips update only
+  // that uniform instead of replacing glass with the equipped opaque style.
+  const glassMaterial = useMemo(() => useGlassStyle ? getGlassMaterial('#888888').clone() : null, [useGlassStyle]);
+  useEffect(() => () => glassMaterial?.dispose(), [glassMaterial]);
 
   // Full-face GLBs (arch, volcano) cover the entire sticker — suppress shader + volumes beneath them.
   const glbFullFace = biomeEnabled && !!stableCity && isGLBFullFace(stableCity);
@@ -1834,14 +1803,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const backTileStyle = isDead ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
   const backMaterial = useMemo(() => {
     if (!antipodalHex) return null;
+    if (useGlassStyle) {
+      const material = getGlassMaterial(isDead ? '#555555' : antipodalHex).clone();
+      material.side = THREE.FrontSide;
+      return material;
+    }
     if (backTileStyle !== 'solid') return getTileStyleMaterial(backTileStyle, antipodalHex, false, null, baseColor);
     return new THREE.MeshStandardMaterial({ color: isDead ? '#555555' : antipodalHex, roughness: 0.45, metalness: 0.08 });
-  }, [backTileStyle, antipodalHex, baseColor, isDead]);
+  }, [backTileStyle, antipodalHex, baseColor, isDead, useGlassStyle]);
   useEffect(() => () => {
     // Shader styles belong to the shared tile cache; only the plain back owns
-    // its material. Disposing a cached shader here would damage other stickers.
-    if (backMaterial?.isMeshStandardMaterial) backMaterial.dispose();
-  }, [backMaterial]);
+    // its material, along with the glass clone. Never dispose a cached shader.
+    if (useGlassStyle || backMaterial?.isMeshStandardMaterial) backMaterial?.dispose();
+  }, [backMaterial, useGlassStyle]);
 
   // Set up UVs to show the correct portion of the face texture
   // Skip for hollow frame geometry (different UV layout, textures not applicable)
@@ -1874,7 +1848,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // effect body and its deps array — the ref write still lands in the commit phase.
   const nextCurr = meta?.curr ?? 0;
   const nextFlips = meta?.flips ?? 0;
-  const hasPendingFlipAnimation = nextFlips !== prevFlips.current
+  const hasPendingFlipAnimation = stickerGridId === prevGridIdRef.current
+    && nextFlips !== prevFlips.current
     && nextCurr !== prevCurr.current
     && ANTIPODAL_COLOR[prevCurr.current] === nextCurr;
   const isInstanceable = (
@@ -1923,7 +1898,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (meshRef.current && meshRef.current.material
         && ((preserveFlipStyle && isFlipPending) || (!isFlipping.current && spinT.current <= 0))) {
       const mat = meshRef.current.material;
-      if (isFlipPending) {
+      if (useGlassStyle && glassMaterial) {
+        meshRef.current.material = glassMaterial;
+        if (!isFlipPending) glassMaterial.uniforms.baseColor.value.set(baseColor);
+      } else if (isFlipPending) {
         // Paint the FROM color onto the mesh before the browser paints — closes the
         // commit→paint gap that would otherwise show one frame of the already-updated
         // TO color. The spinReveal is now an additive rim glow (not a full cover), so
@@ -1970,7 +1948,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       neonBorderMatRef.current.uniforms.uColor.value.set(antipodalHexRef.current ?? materialColor);
       neonBorderMatRef.current.uniforms.uFlipRatio.value = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
     }
-  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation]);
+  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
 
@@ -2038,7 +2016,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         )}
 
         {/* Main sticker quad — omitted when the InstancedMesh handles rendering */}
-        {!isInstanceable && <mesh ref={meshRef} key={hollow ? 'frame' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
+        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
           {hollow ? (
             <shapeGeometry args={[_stickerFrameShape]} />
           ) : faceRow != null ? (

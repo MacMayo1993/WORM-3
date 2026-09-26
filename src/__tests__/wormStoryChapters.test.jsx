@@ -193,7 +193,8 @@ describe('level views', () => {
   });
   const init = id => state().initWormMode(undefined, undefined, null, null, null, null, false, false, id);
 
-  it.each([[12, { visualMode: 'grid' }], [21, { hollowMode: true }], [22, { visualMode: 'wireframe' }], [26, { randomMode: true }],
+  it.each([[12, { visualMode: 'grid' }], [14, { visualMode: 'glass' }], [16, { visualMode: 'classic' }],
+    [21, { hollowMode: true }], [22, { visualMode: 'wireframe' }], [26, { randomMode: true }],
     [38, { visualMode: 'sudokube', showAntipodalPiP: true }], [1, { visualMode: 'classic', hollowMode: false }]])(
     'level %i applies its view and restores the player’s own on exit', (id, expected) => {
       init(id);
