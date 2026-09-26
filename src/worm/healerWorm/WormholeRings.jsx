@@ -1,7 +1,7 @@
 import TunnelSafetyMarkers from './TunnelSafetyMarkers.jsx';
+import RaisedCautionPerimeter from './RaisedCautionPerimeter.jsx';
 import { raisedPortalPosition } from '../raisedPortalPosition.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
-import { WORM_CAUTION_POLE_HEIGHT, WORM_CAUTION_TAPE_TOP } from '../../game/raisedCubie.js';
 import { wormExpansion } from '../wormExpansion.js';
 // src/worm/healerWorm/WormholeRings.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
@@ -135,6 +135,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     const voidFrameRef = useRef();  // bright square frame on fully voided tiles
 
     const cautionTexture = getCautionTexture();
+    const raisedPads = useGameStore(s => s.wormHealerMode && !s.demoMode);
 
     // Stable random seeds per (position × bubble) slot — no per-frame allocation
     const MAX_RINGS = 6 * size * size;
@@ -371,17 +372,16 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                 motes.setColorAt(moteIdx++, _moteColor);
             }
 
-            { // Keep the warning perimeter around the floor opening as the cubie rises.
-                const raisedPads = state.wormHealerMode && !state.demoMode;
+            _tapeRight.crossVectors(n, _voidArcAxisY);
+            if (_tapeRight.lengthSq() < 1e-4) _tapeRight.set(1, 0, 0);
+            _tapeRight.normalize();
+            _tapeForward.crossVectors(n, _tapeRight).normalize();
+            if (!raisedPads) { // Legacy demo portals retain their individual fences.
                 const floor = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, wormExpansion.amount);
-                const poleHeight = raisedPads ? WORM_CAUTION_POLE_HEIGHT : (dangerous ? 0.88 : 0.68);
+                const poleHeight = dangerous ? 0.88 : 0.68;
                 const tapeWidth = dangerous ? 0.14 : 0.12;
                 const poleCenter = poleHeight / 2 + 0.01;
-                const tapeLift = (raisedPads ? WORM_CAUTION_TAPE_TOP : poleHeight - 0.025) - tapeWidth / 2;
-                _tapeRight.crossVectors(n, _voidArcAxisY);
-                if (_tapeRight.lengthSq() < 1e-4) _tapeRight.set(1, 0, 0);
-                _tapeRight.normalize();
-                _tapeForward.crossVectors(n, _tapeRight).normalize();
+                const tapeLift = poleHeight - 0.025 - tapeWidth / 2;
                 
                 const corners = CAUTION_CORNERS;
 
@@ -435,7 +435,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
 
                     // The OUTWARD normal of the tape is 'outwardDir'
                     // We add flutter to it so the tape blows in the wind
-                    const flutter = reducedMotion || raisedPads ? 0 : Math.sin(loopT * 3 + e * 2.1) * 0.045;
+                    const flutter = reducedMotion ? 0 : Math.sin(loopT * 3 + e * 2.1) * 0.045;
                     _tapeNormal.copy(_tapeOutwardDir).addScaledVector(n, flutter).normalize();
 
                     // Re-derive the exact edge direction that is perpendicular to both UP and NORMAL
@@ -458,7 +458,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                     const tapeLength = 0.9;
                     
                     // Add slight downward sag in the middle of the tape
-                    const sag = raisedPads ? 0 : reducedMotion ? -0.015 : Math.sin(loopT * 2 + e + bubbleSeeds[si + 2] * Math.PI * 2) * 0.015 - 0.015;
+                    const sag = reducedMotion ? -0.015 : Math.sin(loopT * 2 + e + bubbleSeeds[si + 2] * Math.PI * 2) * 0.015 - 0.015;
                     _cautionDummy.position.set(
                         floor[0] + _tapeRight.x * mx + _tapeForward.x * my + n.x * (tapeLift + sag),
                         floor[1] + _tapeRight.y * mx + _tapeForward.y * my + n.y * (tapeLift + sag),
@@ -546,6 +546,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
 
     return (
         <group visible={!hidden}>
+            {raisedPads && <RaisedCautionPerimeter positions={allPositions} cubies={cubies} size={size} texture={cautionTexture} />}
             <TunnelSafetyMarkers positions={allPositions} size={size} worm={worm} cubies={cubies}
                 voidTunnelKeysRef={voidTunnelKeysRef} tunnelUseCountsRef={tunnelUseCountsRef} hidden={hidden} />
             {/* Live wormhole rings — bright neon pink, fast spin */}
@@ -579,13 +580,13 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             </instancedMesh>
 
             {/* Caution poles */}
-            <instancedMesh name="worm-caution-poles" ref={poleRef} args={[undefined, undefined, MAX_POLES]} frustumCulled={false}>
+            <instancedMesh name={raisedPads ? 'legacy-caution-poles' : 'worm-caution-poles'} ref={poleRef} args={[undefined, undefined, MAX_POLES]} frustumCulled={false}>
                 <cylinderGeometry args={[0.018, 0.018, 1, 6]} />
                 <meshBasicMaterial color="#111111" transparent opacity={0.98} depthWrite={false} />
             </instancedMesh>
 
             {/* Caution tape strips */}
-            <instancedMesh name="worm-caution-tape" ref={tapeRef} args={[undefined, undefined, MAX_TAPES]} frustumCulled={false}>
+            <instancedMesh name={raisedPads ? 'legacy-caution-tape' : 'worm-caution-tape'} ref={tapeRef} args={[undefined, undefined, MAX_TAPES]} frustumCulled={false}>
                 <planeGeometry args={[1, 1]} />
                 <meshBasicMaterial map={cautionTexture} color="#ffffff" side={THREE.DoubleSide} toneMapped={false} />
             </instancedMesh>

@@ -30,6 +30,9 @@ left on the cube surface to mark the opening below. The earlier 0.06 piece pop w
   with the lift using `max`, so it never stacks another explosion on top.
 - Ground-anchored WORM tape has a stable top edge, including critical/void warnings.
   Portal rings and signs follow the rising mouth; the perimeter never rises with it.
+- A raised corner's warning perimeter wraps the opening on all three exposed faces;
+  edge cubies use both faces. Shared face seams and neighboring openings have no
+  internal tape. Joined tape corners and posts stay on the unraised floor boundary.
 - Raised WORM shells are translucent and do not write depth, so the Möbius band is visible
   through the exposed sides. Band endpoints extend to the lifted tile, not its old slot.
 - Whole cubies ease out for two seconds. The Möbius ribbon and rails grow together from
