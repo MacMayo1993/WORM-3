@@ -4,27 +4,32 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { MenuPortalContext } from './menuPortalContext.js';
 import MenuWormParticle from './MenuWormParticle.jsx';
+import { createMenuWormTraffic, advanceMenuWormTraffic } from './menuWormTraffic.js';
+import { prefersReducedMotion } from '../../utils/device.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
 import { isCarouselActive } from './menuCarouselState.js';
 
 const waveGeometry = new THREE.RingGeometry(0.8, 1, 32);
 const portalGeometry = new THREE.RingGeometry(0.19, 0.23, 40);
 
-// One paused clock drives one antipodal pair, their portal pulses and tail completion.
+// One paused clock and one lock table drive every menu worm and portal.
 // There is deliberately no wall-clock timeout that can rotate a cube mid-worm.
 export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }) {
   const frames = useContext(MenuPortalContext);
   const mouths = useRef([]);
-  const phase = useMemo(() => Math.random() * Math.PI * 2, []);
+  const traffic = useMemo(() => createMenuWormTraffic(characterCycle), [characterCycle]);
   const elapsed = useRef(0);
   const root = useRef();
   const waves = useRef([]);
   const portals = useRef([]);
-  const completed = useRef(0);
   const finished = useRef(false);
   useFrame((_state, delta) => {
     if (root.current) root.current.visible = !isCarouselActive();
     if (isCarouselActive() || document.hidden) return;
     elapsed.current += Math.min(delta, 0.05);
+    const reduced = prefersReducedMotion() || useGameStore.getState().settings?.reducedMotion;
+    const done = advanceMenuWormTraffic(traffic, delta, frames, reduced);
+    if (done && !finished.current) { finished.current = true; onComplete?.(); }
     origins?.forEach((origin, i) => {
       const frame = frames?.find(item => item.dir === origin.dir);
       if (frame?.active && mouths.current[i]) mouths.current[i].matrix.copy(frame.matrix);
@@ -43,13 +48,6 @@ export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }
     });
   }, -0.1);
   if (!origins || origins.length < 2) return null;
-  const wormCompleted = () => {
-    completed.current += 1;
-    if (completed.current === 2 && !finished.current) {
-      finished.current = true;
-      onComplete?.();
-    }
-  };
   return <group ref={root}>
     {origins.map((origin, i) => <group key={i} ref={el => { mouths.current[i] = el; }} matrixAutoUpdate={false}>
       <mesh position={[0, 0, 0.012]} ref={el => { waves.current[i] = el; }} geometry={waveGeometry} scale={0.01}>
@@ -59,9 +57,8 @@ export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }
         <meshBasicMaterial color={origin.color} transparent opacity={0.38} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
     </group>)}
-    {[0, 1].map(i => <MenuWormParticle key={i}
-      start={origins[0].position} antipodal={i === 1}
-      character={menuCharacterPair(characterCycle)[i]} elapsed={elapsed} arcPhase={phase} onComplete={wormCompleted}
+    {traffic.routes.map((route, i) => <MenuWormParticle key={route.id}
+      route={route} character={menuCharacterPair(characterCycle + i)[0]} elapsed={elapsed}
     />)}
   </group>;
 }

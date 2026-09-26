@@ -255,15 +255,15 @@ const ShufflingCube = ({ onFlip }) => {
     // ── Pipeline state machine ────────────────────────────────────────────────
     if (pipelineRef.current === 'idle' && t >= nextSpawnAt.current) {
       const newCubies = flipMenuCenters(cubies);
-      const waves = MENU_FLIP_PAIRS.map(pair => ({
+      const waves = [{
         id: ++flipIdRef.current,
         startTime: t,
-        origins: pair.map(face => {
+        origins: MENU_FLIP_PAIRS.flat().map(face => {
           const [x, y, z] = face.cubie;
           return { dir: face.dir, position: face.pos, rotation: face.rot,
             color: shownHex(newCubies[x][y][z].stickers[face.dir].curr) };
         }),
-      }));
+      }];
 
       wormCompletedRef.current = 0;
       pipelineRef.current = 'worm';
@@ -272,7 +272,7 @@ const ShufflingCube = ({ onFlip }) => {
       onFlip?.();
     }
 
-    if (pipelineRef.current === 'worm' && wormCompletedRef.current === MENU_FLIP_PAIRS.length) {
+    if (pipelineRef.current === 'worm' && wormCompletedRef.current === 1) {
       // Worm fully retreated — start the middle-slice rotation
       wormCompletedRef.current = 0;
       pipelineRef.current = 'rotating';
