@@ -1,6 +1,6 @@
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
-import { cubieHasFlippedFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount } from '../game/raisedCubie.js';
 import { advancePieceSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
@@ -412,7 +412,7 @@ const Cubie = React.forwardRef(function Cubie({
   const liftSpring = useRaisedCubieSpring(`${size}:${origHomeX},${origHomeY},${origHomeZ}`);
   const poppedRef = useRef(false);
   const wormPads = wormMode && !useGameStore.getState().demoMode;
-  const raised = (!wormMode || (wormPads && WORM_RAISED_AMOUNT > 0)) && (wormPads || (!mirrorMode && settings?.flipPads !== 'off'))
+  const raised = (!wormMode || wormPads) && (wormPads || (!mirrorMode && settings?.flipPads !== 'off'))
     && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Mega normally omits individual bodies. Materialize a body for a raised
   // piece and keep it through its return; otherwise it would still be a sheet.
@@ -432,7 +432,7 @@ const Cubie = React.forwardRef(function Cubie({
     else advancePieceSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
     // Overshoot on the way out is the bounce. Below zero the piece would sink into
     // its neighbours, so a returning piece lands and holds instead.
-    const amount = Math.max(0, spring.lift) * (wormPads ? WORM_RAISED_AMOUNT : 1);
+    const amount = Math.max(0, spring.lift) * (wormPads ? wormRaisedAmount(size) : 1);
     publishRaisedCubie(spring, amount);
     const entry = state.cubiePops[popKey];
     const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;

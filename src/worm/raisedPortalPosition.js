@@ -10,7 +10,7 @@ export function raisedPortalPosition(x, y, z, face, size, state) {
   const cubie = state.cubies?.[x]?.[y]?.[z];
   const cap = selectEffectiveFlipCap(state);
   const raised = state.wormHealerMode && !state.demoMode && cubie && cubieHasFlippedFace(cubie, cap);
-  const point = getStickerWorldPos(x, y, z, face, size, raised ? raisedWormExpansion(wormExpansion.amount) : wormExpansion.amount);
+  const point = getStickerWorldPos(x, y, z, face, size, raised ? raisedWormExpansion(wormExpansion.amount, size) : wormExpansion.amount);
   if (raised && isLiveFlippedFace(cubie.stickers[face], cap)) {
     point[{ X: 0, Y: 1, Z: 2 }[face[1]]] += face[0] === 'P' ? WORM_PAD_HEIGHT : -WORM_PAD_HEIGHT;
   }

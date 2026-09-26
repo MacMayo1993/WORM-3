@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import { cubieHasFlippedFace, cubieFaceRole, padBackFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT, raisedWormExpansion, PIECE_OVERSHOOT_MAX } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, cubieFaceRole, padBackFace, selectiveCubieOffsetRatio, wormRaisedAmount, raisedWormExpansion, WORM_PIECE_POP, PIECE_OVERSHOOT_MAX } from '../game/raisedCubie.js';
 import { padEntryDecision } from '../worm/healerWorm/padEntry.js';
 import { publishRaisedCubie, removeRaisedCubie, raisedCubieExtent } from '../3d/raisedCubieMotion.js';
 
@@ -52,14 +52,16 @@ describe('whole-cubie flip platforms', () => {
   });
 });
 
-// WORM pieces stay in their slots: a flip lifts only the tile, never the piece.
-it.each([2, 3, 5, 7, 15])('keeps Worm pieces in their slots at size %i', size => {
-  expect(WORM_RAISED_AMOUNT).toBe(0);
+// WORM pops a flipped piece out barely, by the same distance on every board.
+it.each([2, 3, 5, 7, 15])('pops a Worm piece out barely and equally at size %i', size => {
+  const outer = (size - 1) / 2;
+  expect((cubeExpansionScale(size, wormRaisedAmount(size)) - 1) * outer).toBeCloseTo(WORM_PIECE_POP, 12);
+  expect(WORM_PIECE_POP).toBeLessThanOrEqual(0.1);
   for (const global of [0, .35, .8, 1]) {
-    expect(raisedWormExpansion(global)).toBe(global);
-    expect(selectiveCubieOffsetRatio(size, global, WORM_RAISED_AMOUNT)).toBe(0);
-    expect(cubeExpansionScale(size, global) * (1 + selectiveCubieOffsetRatio(size, global, WORM_RAISED_AMOUNT)))
-      .toBeCloseTo(cubeExpansionScale(size, raisedWormExpansion(global)), 10);
+    // Manual Explode never stacks on top of the pop.
+    expect(raisedWormExpansion(global, size)).toBe(Math.max(global, wormRaisedAmount(size)));
+    expect(cubeExpansionScale(size, global) * (1 + selectiveCubieOffsetRatio(size, global, wormRaisedAmount(size))))
+      .toBeCloseTo(cubeExpansionScale(size, raisedWormExpansion(global, size)), 10);
   }
 });
 

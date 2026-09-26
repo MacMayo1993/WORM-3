@@ -40,7 +40,7 @@ import { shPush, shAt, shReset, ttAt, ttReset, ttPush } from '../worm/circularBu
 import { getNextSurfacePosition, getWormholeHealRing } from '../worm/wormLogic.js';
 import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 import { raisedPlatformPosition } from '../worm/healerWorm/raisedPlatforms.js';
-import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
+import { WORM_PAD_HEIGHT, WORM_PIECE_POP, raisedWormExpansion } from '../game/raisedCubie.js';
 
 const SIZE = 3;
 
@@ -1421,11 +1421,11 @@ describe('raised WORM platforms', () => {
     expect(sim.headInterpPos.distanceTo(before)).toBeLessThan(0.2);
     for (let frame = 0; frame < hz && sim.padFlight; frame++) stepWormSim(sim, 1 / hz, SIZE, ctx);
     expect(sim.phase).toBe('windup');
-    // The piece stays in its slot; only the tile hovers, a short hop off the surface.
-    expect(sim.activeTunnel.padExpansion).toBe(0);
+    // The piece pops out barely and the tile hovers above it: a short hop up.
+    expect(sim.activeTunnel.padExpansion).toBe(raisedWormExpansion(0, SIZE));
     expect(sim.activeTunnel.padHeight).toBe(WORM_PAD_HEIGHT);
     expect(sim.onRaisedPlatform).toBe(true);
-    expect(sim.headInterpPos.z).toBeCloseTo(1.52 + WORM_PAD_HEIGHT + 0.08, 6);
+    expect(sim.headInterpPos.z).toBeCloseTo(1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT + 0.08, 6);
     expect(sim.stepHistory.count).toBeGreaterThan(64);
     expect(shAt(sim.stepHistory, 0).pos.distanceTo(sim.headInterpPos)).toBeLessThan(1e-6);
   });
@@ -1433,15 +1433,17 @@ describe('raised WORM platforms', () => {
     const sim = makeSim();
     sim.pos = { x: 2, y: 2, z: 2, dirKey: 'PZ' };
     const ctx = platformCtx(sim, 'PY');
-    // No piece rises in WORM, so the corner's unflipped front face is ordinary floor.
+    // The corner only pops out barely, so its unflipped front face stays floor.
     expect(raisedPlatformPosition(sim.pos, SIZE, ctx)).toBeNull();
-    expect(raisedPlatformPosition({ ...sim.pos, dirKey: 'PY' }, SIZE, ctx).toArray()).toEqual([1, 1.52 + WORM_PAD_HEIGHT, 1]);
+    const pad = raisedPlatformPosition({ ...sim.pos, dirKey: 'PY' }, SIZE, ctx).toArray();
+    // A corner explodes diagonally: the pop shows on all three axes.
+    [1 + WORM_PIECE_POP, 1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT, 1 + WORM_PIECE_POP].forEach((v, i) => expect(pad[i]).toBeCloseTo(v, 12));
     startJump(sim, ctx, SIZE, { allowDive: false });
     expect(sim.padFlight.target.dirKey).toBe('PY');
     for (let i = 0; i < 100 && sim.padFlight; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
     expect(sim.phase).toBe('crawling');
     expect(sim.onRaisedPlatform).toBe(true);
-    expect(sim.curWorldPos.y).toBeCloseTo(1.52 + WORM_PAD_HEIGHT, 6);
+    expect(sim.curWorldPos.y).toBeCloseTo(1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT, 6);
     expect(ctx.events.some(e => e.type === 'tunnelEnter')).toBe(false);
   });
   it('does not enter from a crawl and preserves the jump across pause', () => {
@@ -1481,8 +1483,9 @@ it.each([3, 7, 15])('captures a pad one cell ahead and lands a short hop up on a
   expect(sim.onRaisedPlatform).toBe(true);
   expect(sim.pos.x).toBe(size - 1);
   expect(sim.phase).toBe('crawling');
-  // The same height on every board size: the surface plus the pad's hover.
-  expect(sim.curWorldPos.z).toBeCloseTo((size - 1) / 2 + 0.52 + WORM_PAD_HEIGHT, 6);
+  // The same height on every board size: the surface, the barely-popped piece
+  // and the pad's hover.
+  expect(sim.curWorldPos.z).toBeCloseTo((size - 1) / 2 + 0.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT, 6);
 });
 
 it('keeps raised tunnel windout connected to subsequent crawl', () => {
@@ -1502,7 +1505,7 @@ it('keeps raised tunnel windout connected to subsequent crawl', () => {
   expect(sim.phase).toBe('crawling');
   // The exit pad hovers over its slot too.
   expect(sim.onRaisedPlatform).toBe(true);
-  expect(sim.headInterpPos.z).toBeCloseTo(-(1.52 + WORM_PAD_HEIGHT));
+  expect(sim.headInterpPos.z).toBeCloseTo(-(1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT));
   const exit = sim.headInterpPos.clone();
   stepWormSim(sim, 1 / 60, SIZE, ctx);
   expect(sim.headInterpPos.distanceTo(exit)).toBeLessThan(0.2);

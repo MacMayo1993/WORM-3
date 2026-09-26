@@ -1,15 +1,19 @@
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
-import { cubeExpansionScale } from './cubeWorldGeometry.js';
+import { cubeExpansionScale, cubeExpansionMultiplier } from './cubeWorldGeometry.js';
 
-// WORM keeps every piece in its slot: only the flipped tile lifts, hovering a
-// short hop above the surface, so the worm can reach it without leaving the cube.
-// (Cube modes still raise the whole piece to its Explode position.)
-export const WORM_RAISED_AMOUNT = 0;
-export const raisedWormExpansion = (globalExpansion = 0) => Math.max(WORM_RAISED_AMOUNT, globalExpansion);
+// WORM pops a flipped piece out of the cube barely: WORM_PIECE_POP along the face
+// normal on every board size. A fixed share of Explode grew with the board (half
+// of it was 0.9 units on 3×3 and 5.4 on 15×15), which put the tunnel out of reach.
+// The amount is that distance as an Explode fraction for the outer layer.
+// (Cube modes still raise the whole piece to its full Explode position.)
+export const WORM_PIECE_POP = 0.06;
+export const wormRaisedAmount = size => WORM_PIECE_POP / (Math.max(0.5, (size - 1) / 2) * cubeExpansionMultiplier(size));
+export const raisedWormExpansion = (globalExpansion, size) => Math.max(wormRaisedAmount(size), globalExpansion || 0);
 
-// How far a WORM flip pad hovers above its slot. The sim lands on it, the portal
-// rings sit on it and the pad renderer lifts the tile to it: all read this value.
-// It still clears the worm's head (0.08 lift + 0.092 radius ≈ 0.17) for the crawl under.
+// How far a WORM flip pad hovers above its popped piece. The sim lands on it, the
+// portal rings sit on it and the pad renderer lifts the tile to it: all read this.
+// The crawl under runs on the unpopped surface, where the tile's underside sits
+// WORM_PIECE_POP + WORM_PAD_HEIGHT up: clear of the head (≈ 0.17) and a hat (≈ 0.30).
 export const WORM_PAD_HEIGHT = 0.3;
 
 const DIRECTIONS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];

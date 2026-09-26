@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cubieHasFlippedFace, isLiveFlippedFace, raisedWormExpansion, WORM_RAISED_AMOUNT, WORM_PAD_HEIGHT } from '../../game/raisedCubie.js';
+import { isLiveFlippedFace, raisedWormExpansion, WORM_PAD_HEIGHT } from '../../game/raisedCubie.js';
 import { wormExpansion } from '../wormExpansion.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
@@ -11,13 +11,11 @@ export const usesRaisedPlatforms = ctx => ctx.getTunnelEntry?.() === 'pad';
 export function raisedPlatformPosition(tile, size, ctx) {
     const cubie = ctx.getCubies()?.[tile.x]?.[tile.y]?.[tile.z];
     const cap = ctx.getFlipCap?.() ?? 6;
-    if (!cubie || !cubieHasFlippedFace(cubie, cap)) return null;
-    const pad = isLiveFlippedFace(cubie.stickers[tile.dirKey], cap);
-    // A carried unflipped face is a platform only while its whole piece rises.
-    if (!pad && WORM_RAISED_AMOUNT <= 0) return null;
-    const point = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, raisedWormExpansion(wormExpansion.amount)));
-    if (pad) point.addScaledVector(FACE_NORMALS[tile.dirKey], WORM_PAD_HEIGHT);
-    return point;
+    // Only the flipped tile is a platform. Its piece pops out barely, so the
+    // piece's other faces stay ordinary floor.
+    if (!cubie || !isLiveFlippedFace(cubie.stickers[tile.dirKey], cap)) return null;
+    const point = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, raisedWormExpansion(wormExpansion.amount, size)));
+    return point.addScaledVector(FACE_NORMALS[tile.dirKey], WORM_PAD_HEIGHT);
 }
 
 // Share the same two-cell aim window with the chase camera. Prefer the nearest

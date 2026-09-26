@@ -5,8 +5,8 @@
 ## Implementation checkpoint — 2026-09-26
 
 Cube modes now raise whole flipped cubies, retain the small square pads and use full-back
-antipodal stalks. WORM keeps every piece in its slot (see the low-hover pass below) and takes a
-deliberate jump onto a pad underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
+antipodal stalks. WORM pops a flipped piece out only barely (see the low-hover pass below) and
+takes a deliberate jump onto a pad underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
 camera follows the same head. Nearby platforms receive portrait framing that includes both
 the worm and its jump destination. Portal rings, caution tape, signs and portal effects use
 the raised tile position, not the floor lattice. Mirror view and cosmetic pad settings cannot
@@ -23,17 +23,21 @@ launch beats, ghosting and cinematic choreography remain roadmap work.
 
 Playtest: the tunnel sat too high to reach believably. Half the Explode lift plus a 0.5 pad
 put a 3×3 landing about 1.4 units off the surface (about 2.0 on 5×5, 5.9 on 15×15), so the
-worm leapt clear of the cube to reach it. Now the tile hovers a short hop over its slot, and
-the gap carries the drama instead.
+worm leapt clear of the cube to reach it. Now the piece pops out barely, the tile hovers a
+short hop above it, and the gap carries the drama instead.
 
-- **Pieces stay in their slots in WORM.** `WORM_RAISED_AMOUNT` is 0. A flipped piece's other
-  faces are ordinary floor, so `raisedPlatformPosition` returns only live pads. Cube modes keep
-  the whole-piece Explode pop.
-- **One hover height.** `WORM_PAD_HEIGHT` (0.3) lives in `src/game/raisedCubie.js` and feeds the
-  sim landing, portal visuals, the pad renderer (`PAD_PROFILES.worm`) and tunnel handoffs. The
-  landing is the same on every board size.
-- **Exit fix.** Tunnel exits now test `padHeight`, since `padExpansion` is 0 without a piece
-  lift. A ride that starts on the floor (Mobi's Create Wormhole) still lands on the exit pad.
+- **Pieces pop out barely.** The piece moves `WORM_PIECE_POP` (0.06) along the face normal, the
+  same on every board size. `wormRaisedAmount(size)` turns that distance into an Explode
+  fraction for the outer layer, and a corner moves 0.06 along each axis, as Explode would. A
+  flipped piece's other faces stay ordinary floor, so `raisedPlatformPosition` returns only
+  live pads. Cube modes keep the full Explode pop.
+- **One landing height.** `WORM_PIECE_POP` and `WORM_PAD_HEIGHT` (0.3) live in
+  `src/game/raisedCubie.js`. Together they feed the sim landing, portal visuals, the pad
+  renderer (`PAD_PROFILES.worm`) and tunnel handoffs. The landing sits 0.36 above the surface
+  on every board size.
+- **Exit fix.** Tunnel exits now test `padHeight`, not the truthiness of `padExpansion` (which
+  was 0 while pieces stayed put). A ride that starts on the floor (Mobi's Create Wormhole)
+  still lands on the exit pad.
 - **The unstable wormhole** (`PadEnergy`, render only; cube modes unchanged):
   - the stalk becomes an additive energy column spanning only the gap, narrow in the slot and
     flaring to the tile, with twisting bands, climbing surges and a stepped flicker;
@@ -51,9 +55,10 @@ the gap carries the drama instead.
   - Tunnel signs shrink as the camera nears them: full size beyond 5 units, gone inside 2.6.
     The HUD card already reads out the pad ahead.
   - Pad fences are shortened by the hover, so their tape stays below the chase camera's eye.
-- **Trade-off.** 0.3 clears the bare head (≈ 0.17, Mobi ≈ 0.20) by at least a tenth of a
-  tile. A tall hat (≈ 0.30) can brush the tile's underside while crawling under it. Ghosting
-  (§4.3) is the planned answer.
+- **Clearance.** The crawl under a pad runs on the unpopped surface, and the tile's underside
+  sits 0.36 above it. That clears the bare head (≈ 0.17, Mobi ≈ 0.20) and a tall hat (≈ 0.30).
+  The cost: while crossing under, the worm's beads dip up to about 0.06 into the popped piece's
+  top.
 
 ### Bounce model upgrade — 2026-09-26
 
@@ -154,7 +159,7 @@ the gap carries the drama instead.
 8. A raised cubie’s unflipped faces are jumpable platforms, never tunnel entries. Classify the
    face actually landed on, not the whole cubie. The route must handle radial gaps, edge/corner
    offsets, turns and platform-to-platform jumps before enabling whole-cubie lift in WORM.
-   (Moot while `WORM_RAISED_AMOUNT` is 0: pieces stay in their slots and only pads are platforms.)
+   (Retired in WORM: pieces pop out only `WORM_PIECE_POP`, so only pads are platforms.)
 9. Story/demo may override entry mode. Switch the global default only after their prompts,
    authored routes, character/hat clearance and mobile chase-camera checks pass.
 
@@ -252,7 +257,7 @@ Starting profiles (to tune in playtest). These small pad lifts are along the til
 
 | Profile | $h_0$ | $A_0$ | $A_1$ | $f_0$ | Notes |
 |---|---|---|---|---|---|
-| WORM | 0.30 | 0.05 | 0.10 | 0.8 Hz | Fixed height, no bounce (the landing must hold still). Clears the bare head (≈ 0.17); a tall hat (≈ 0.30) can brush it. |
+| WORM | 0.30 | 0.05 | 0.10 | 0.8 Hz | Fixed height, no bounce (the landing must hold still). Sits over a piece popped 0.06, so its underside clears the head (≈ 0.17) and a hat (≈ 0.30). |
 | Cube / Story / Random | 0.30 | 0.04 | 0.12 | 0.9 Hz | |
 | Chaos | 0.14 | 0.02 | 0.10 | 1.0 Hz | Dense boards; the worn regime carries the betting read. |
 | Menu / intro | 0.35 | 0.06 | 0.10 | 0.7 Hz | Cinematic. |
@@ -330,7 +335,7 @@ Ship behind `tunnelEntry: 'crawl' | 'pad'`, a store setting with a story/level o
 
 ### 4.3 Crawling under pads (decided)
 
-- **Clearance.** The WORM pad hovers at `WORM_PAD_HEIGHT` (0.30; it was 0.45 or more before the low-hover pass). That clears the bare head (≈ 0.17) and MOBI's (radius 0.12, top ≈ 0.20). A tall hat (≈ 0.30) can brush the tile's underside, which ghosting below would cover.
+- **Clearance.** The WORM pad hovers `WORM_PAD_HEIGHT` (0.30) above a piece popped `WORM_PIECE_POP` (0.06), so its underside sits 0.36 over the crawl route. That clears the bare head (≈ 0.17), MOBI's (radius 0.12, top ≈ 0.20) and a tall hat (≈ 0.30).
 - **Ghosting.** While the grounded head is within one cell of a pad, the pad ghosts to ~35 % opacity. This handles chase-camera occlusion and signals "you can pass under". It turns solid again when the worm is airborne, so solid means landable.
 - **HUD.** `onFlippedTile` becomes `onPadAhead`, and the HUD shows "JUMP to ride" while a rideable pad is in assist range.
 

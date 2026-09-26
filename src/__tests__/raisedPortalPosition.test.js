@@ -15,7 +15,7 @@ it.each(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'])('puts %s warning visuals on the ra
   try {
     for (const amount of [0, 0.35, 1]) {
       wormExpansion.amount = amount;
-      const expected = getStickerWorldPos(...xyz, face, size, raisedWormExpansion(amount)); expected[axis] += sign * WORM_PAD_HEIGHT;
+      const expected = getStickerWorldPos(...xyz, face, size, raisedWormExpansion(amount, size)); expected[axis] += sign * WORM_PAD_HEIGHT;
       expect(raisedPortalPosition(...xyz, face, size, state)).toEqual(expected);
     }
     expect(raisedPortalPosition(...xyz, face, size, { ...state, demoMode: true }))
@@ -31,7 +31,7 @@ it('reads the flip cap in force, like the simulation', () => {
   wormExpansion.amount = 0;
   try {
     // With Chaos's cap of 8 in force, seven flips is a live pad, raised as the sim sees it.
-    const raised = getStickerWorldPos(...xyz, 'PZ', size, raisedWormExpansion(0));
+    const raised = getStickerWorldPos(...xyz, 'PZ', size, raisedWormExpansion(0, size));
     raised[2] += WORM_PAD_HEIGHT;
     expect(raisedPortalPosition(...xyz, 'PZ', size, { ...base, chaosLevel: 1, disparityFlipCap: 8 })).toEqual(raised);
     // Under the standard cap the same tile is spent, so its rings stay on the floor.
@@ -55,8 +55,9 @@ it("reports exactly the hover the portal visuals are raised by, in every mode", 
       [[0, 0, 2], pad, 0]
     ]) {
       expect(raisedPortalLift(...xyz, 'PZ', state)).toBe(lift);
-      // The same lift the portal position carries above the surface.
-      const surface = getStickerWorldPos(...xyz, 'PZ', size, 0)[2];
+      // The same lift the portal position carries above its (barely popped) piece.
+      const raised = lift > 0 ? raisedWormExpansion(0, size) : 0;
+      const surface = getStickerWorldPos(...xyz, 'PZ', size, raised)[2];
       expect(raisedPortalPosition(...xyz, 'PZ', size, state)[2] - surface).toBeCloseTo(lift, 12);
     }
   } finally { wormExpansion.amount = before; }
