@@ -100,8 +100,12 @@ const sampleK = (arr, k) => {
   return arr;
 };
 
-export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT = 0, animating = false, now = Date.now }) {
+export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT = 0, animating = false, ignition = null, now = Date.now }) {
   let state = cubies;
+  // The player's first strike (game/chaosIgnition.js), held by grid id until the
+  // first chain tick consumes it: the unshuffle turns start at GO and move the
+  // sticker, and the grid id is what finds it again.
+  let ignitionGridId = ignition?.gridId ?? null;
   let currentLevel = chaosLevel;
   let cap = flipCap;
   let explosion = explosionT;
@@ -442,6 +446,19 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
       : null;
   };
 
+  // Resolve the pending first strike to where its sticker sits now, once. A tile
+  // that is gone or already spent simply lets the round ignite as it always has.
+  const takeIgnition = () => {
+    if (!ignitionGridId) return null;
+    const gridId = ignitionGridId;
+    ignitionGridId = null;
+    if (deadTileSet.has(gridId)) return null;
+    const at = manifoldMapCache?.get(gridId);
+    const st = at ? state[at.x]?.[at.y]?.[at.z]?.stickers?.[at.dirKey] : null;
+    if (!st || (st.flips || 0) >= cap) return null;
+    return { x: at.x, y: at.y, z: at.z, dirKey: at.dirKey };
+  };
+
   // ─── Chain tick ─────────────────────────────────────────────────────────────
   // dtMs: real milliseconds elapsed since the previous tick (used for cooldown accumulation).
   const chainTick = (dtMs) => {
@@ -459,6 +476,22 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
     const eliminatedFaces = [];
     let producedDeaths = false;
     let opsEmitted = 0;
+
+    // The first strike lands where the player chose: chain 0 starts on that tile
+    // and flips it this tick. Every chain that starts afterwards is drawn to
+    // flipped tiles (findChainStart), so the storm radiates out of the pick and its
+    // antipodal twin — while every hop after it still rolls fresh randomness.
+    let ignitionTile = null;
+    const ignitionAt = takeIgnition();
+    if (ignitionAt && chains.length) {
+      const first = chains[0];
+      first.inCooldown = false;
+      first.cooldownAcc = 0;
+      first.tile = ignitionAt;
+      first.strength = 1;
+      first.visited = new Set([`${ignitionAt.x},${ignitionAt.y},${ignitionAt.z},${ignitionAt.dirKey}`]);
+      ignitionTile = [ignitionAt.x, ignitionAt.y, ignitionAt.z, ignitionAt.dirKey];
+    }
 
     for (const chain of chains) {
       // Budget gate: stop processing chains once we've emitted enough operations
@@ -621,6 +654,8 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
       finalState,
       metrics: withFlipPct(cachedMetrics),
       didWork,
+      // Where the player's first strike landed this tick, for the hero bolt.
+      ignition: ignitionTile,
     };
   };
 

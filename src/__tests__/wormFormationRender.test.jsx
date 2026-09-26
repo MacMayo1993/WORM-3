@@ -8,6 +8,8 @@ import MobiusTunnel from '../manifold/MobiusTunnel.jsx';
 import { makeCubies } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from '../worm/liveCubies.js';
+import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { WORM_PIECE_POP, WORM_PAD_HEIGHT, WORM_CAUTION_TAPE_TOP } from '../game/raisedCubie.js';
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
 import { makeWormSim, resetWormSim, startJump, stepWormSim } from '../worm/healerWorm/wormSim.js';
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
@@ -57,21 +59,30 @@ it('shows the real cubies rising, grows ribbon and rails together, and lands aft
     startJump(sim, ctx, 3, { allowDive: false });
     expect(sim.padFlight.duration).toBeGreaterThan(1.9);
     for (let i = 0; i < 59; i++) { frame(); stepWormSim(sim, 1 / 60, 3, ctx); }
-    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1.45, 5);
+    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1 + WORM_PIECE_POP / 2, 5);
     expect(materials[0].uniforms.uGrowT.value).toBeCloseTo(.5, 5);
     expect(sim.padFlight).toBeTruthy();
     const point = raisedPortalPosition(1, 1, 2, 'PZ', 3, useGameStore.getState());
-    expect(point[2]).toBeCloseTo(1.45 + .52 + .5, 5);
+    expect(point[2]).toBeCloseTo(1 + WORM_PIECE_POP / 2 + .52 + WORM_PAD_HEIGHT, 5);
     await act(async () => useGameStore.setState({ wormPaused: true }));
     for (let i = 0; i < 30; i++) frame();
-    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1.45, 5);
+    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1 + WORM_PIECE_POP / 2, 5);
     expect(materials[0].uniforms.uGrowT.value).toBeCloseTo(.5, 5);
     await act(async () => useGameStore.setState({ wormPaused: false }));
     for (let i = 0; i < 65; i++) { frame(); if (sim.padFlight) stepWormSim(sim, 1 / 60, 3, ctx); }
-    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1.9, 8);
+    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1 + WORM_PIECE_POP, 8);
     expect(materials[0].uniforms.uGrowT.value).toBe(1);
+    // The ribbon reaches the lifted tile, rather than stopping inside the body.
+    const ribbon = [];
+    store.getState().scene.traverse(o => { if (o.material === materials[0]) ribbon.push(o); });
+    const vertices = ribbon[0].geometry.attributes.position;
+    // The geometry cache rebuilds after 0.01 units of anchor movement.
+    expect(Math.abs(vertices.getZ(0) - (1 + WORM_PIECE_POP + TUNNEL_ANCHOR_OFFSET + WORM_PAD_HEIGHT))).toBeLessThan(0.01);
+    const shell = refs[0].children[0].children.find(o => o.isMesh);
+    expect(shell.material.depthWrite).toBe(false);
+    expect(shell.material.opacity).toBeLessThan(0.2);
     expect(sim.padFlight).toBeNull();
-    expect(sim.headInterpPos.z).toBeCloseTo(1.9 + .52 + .5, 6);
+    expect(sim.headInterpPos.z).toBeCloseTo(1.52 + WORM_CAUTION_TAPE_TOP, 6);
   } finally {
     await act(async () => root.unmount());
     useGameStore.setState(before, true); Object.assign(liveCubies, liveBefore);

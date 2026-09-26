@@ -18,7 +18,9 @@ import {
   tunnelFocus,
   publishTunnelFocus
 } from '../manifold/chaosStormBridge.js';
-import { cubieKicks, fireCubieKick, cubieKickAmount, clearCubieKicks, KICK_DURATION_MS } from '../3d/cubieKick.js';
+import { cubieKicks, fireCubieKick, cubieKickAmount, cubieKickRinging, clearCubieKicks, KICK_DURATION_MS } from '../3d/cubieKick.js';
+import { cameraShake, fireCameraShake, stepCameraShake } from '../3d/flipImpulse.js';
+import { Vector3 } from 'three';
 
 beforeEach(() => {
   clearChaosStorm();
@@ -130,15 +132,53 @@ describe('cubie kick', () => {
     expect(cubieKickAmount(-5, amp)).toBe(0);
   });
 
-  it('normalises the direction and merges a second hit into one heavy blow', () => {
+  it('normalises the direction; a weaker hit never cuts short a stronger one', () => {
     fireCubieKick('1,1,2', { x: 0, y: 0, z: 2 }, 0.1, 0);
     expect(cubieKicks.get('1,1,2')).toMatchObject({ x: 0, y: 0, z: 1, amp: 0.1, startMs: 0 });
-    fireCubieKick('1,1,2', { x: 0, y: 0, z: 1 }, 0.05, 100);
-    const merged = cubieKicks.get('1,1,2');
-    expect(merged.startMs).toBe(100);
-    expect(merged.amp).toBeGreaterThanOrEqual(0.05);
-    expect(merged.amp).toBeLessThanOrEqual(0.1);
+    // A neighbour's ripple arriving while the piece's own hit still rings.
+    fireCubieKick('1,1,2', { x: 0, y: 0, z: 1 }, 0.04, 100);
+    expect(cubieKicks.get('1,1,2')).toMatchObject({ amp: 0.1, startMs: 0 });
+    // A heavier strike takes over.
+    fireCubieKick('1,1,2', { x: 1, y: 0, z: 0 }, 0.2, 150);
+    expect(cubieKicks.get('1,1,2')).toMatchObject({ x: 1, amp: 0.2, startMs: 150 });
+    // Once the first has rung out, even a light hit lands.
+    fireCubieKick('1,1,2', { x: 0, y: 1, z: 0 }, 0.01, 150 + KICK_DURATION_MS);
+    expect(cubieKicks.get('1,1,2')).toMatchObject({ y: 1, amp: 0.01 });
     fireCubieKick('0,0,0', { x: 1, y: 0, z: 0 }, 0, 0);
     expect(cubieKicks.has('0,0,0')).toBe(false);
+  });
+
+  it('holds a delayed ripple at rest until its start, and rings down to nothing', () => {
+    fireCubieKick('0,1,2', { x: 0, y: 0, z: 1 }, 0.05, 1045);
+    const kick = cubieKicks.get('0,1,2');
+    expect(cubieKickAmount(1000 - kick.startMs, kick.amp)).toBe(0);
+    expect(cubieKickRinging(kick, 1045)).toBeCloseTo(0.05);
+    expect(cubieKickRinging(kick, 1045 + KICK_DURATION_MS)).toBe(0);
+  });
+});
+
+describe('camera shake', () => {
+  beforeEach(() => { cameraShake.t = 0; cameraShake.amp = 0; });
+
+  it('jolts on every axis within its amplitude and decays to rest', () => {
+    fireCameraShake(0.05, 0.2);
+    const out = new Vector3();
+    let peak = 0;
+    for (let i = 0; i < 12; i++) {
+      stepCameraShake(out, 1 / 60);
+      peak = Math.max(peak, out.length());
+      expect(Math.abs(out.x)).toBeLessThanOrEqual(0.05);
+    }
+    expect(peak).toBeGreaterThan(0);
+    for (let i = 0; i < 12; i++) stepCameraShake(out, 1 / 60);
+    expect(out.length()).toBe(0);
+    expect(cameraShake.t).toBe(0);
+  });
+
+  it('never lets a light tremor cut short a heavy one', () => {
+    fireCameraShake(0.09, 0.34);
+    fireCameraShake(0.02, 0.2);
+    expect(cameraShake.amp).toBe(0.09);
+    expect(cameraShake.dur).toBe(0.34);
   });
 });

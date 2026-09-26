@@ -1,13 +1,9 @@
-/* LoadingScreen.css — styles for the WORM³ loading cube.
+/* LoadingScreen.css — the loading cover's shell: paper, title card, status line.
  *
- * Design goals:
- *  - Pure CSS/GPU-composited. No WebGL context (would collide with the app's
- *    single R3F <Canvas>) and no requestAnimationFrame canvas loops — a loading
- *    screen must be CHEAP, because it runs while heavy chunks/EXR maps decode.
- *  - Face colors + antipodal layout mirror the real game (see utils/constants.js:
- *    Red↔Orange, Green↔Blue, White↔Yellow sit on opposite faces).
- *  - Fonts/panel come from uiTheme tokens, injected as CSS vars by the component.
- *  - Fully respects prefers-reduced-motion (freezes to a lit 3/4 pose).
+ * This sheet ships in the initial CSS (bundle:check caps it), so it holds only
+ * what the cover needs before its animated scene arrives: the layout that keeps
+ * the scene's space, the title and the status bar. The cube and wormhole styles
+ * live in LoadingScene.css, which loads with that lazy chunk.
  */
 
 .wl-root {
@@ -18,57 +14,39 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(18px, 4vh, 42px);
+  gap: clamp(14px, 3vh, 32px);
   overflow: hidden;
-  /* GLASS-family dark field so it fully hides whatever is decoding behind it. */
-  background: radial-gradient(ellipse at 50% 38%, #101a33 0%, #060a18 62%, #03050e 100%);
-  --wl-cube: clamp(120px, 30vmin, 190px);
-  --wl-half: calc(var(--wl-cube) / 2);
+  /* The paper's own base until the wormhole's canvases paint. */
+  background: #f8f4e8;
+  --wl-ink: #26372d;
+  --wl-cube: clamp(92px, 24vmin, 160px);
 }
 
-/* Transparent variant — used when the loader overlays a scene that should show
-   through (e.g. a soft cover during a background swap rather than a full boot). */
+/* Transparent variant — the scene shows faintly through the paper. */
 .wl-root.wl-transparent {
-  background: rgba(5, 8, 20, 0.72);
+  background: rgba(248, 244, 232, 0.5);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
 
-/* RP2 grid field — faint drifting lines that fade out toward the centre, echoing
-   the projective-plane paper background without a shader. mask keeps it subtle. */
-.wl-root::before {
-  content: '';
-  position: absolute;
-  inset: -20%;
-  background-image: repeating-linear-gradient(0deg, rgba(120, 160, 255, 0.06) 0 1px, transparent 1px 46px),
-    repeating-linear-gradient(90deg, rgba(120, 160, 255, 0.06) 0 1px, transparent 1px 46px);
-  -webkit-mask-image: radial-gradient(ellipse at 50% 46%, transparent 0%, transparent 24%, #000 78%);
-  mask-image: radial-gradient(ellipse at 50% 46%, transparent 0%, transparent 24%, #000 78%);
-  animation: wl-grid-drift 26s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes wl-grid-drift {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(46px, 46px); }
-}
-
-/* === Title card (mirrors the main-menu WORM³ mark) === */
+/* === Title card: the opening's ivory brand plate === */
 .wl-title-card {
   position: relative;
-  z-index: 2;
+  z-index: 1;
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
   text-align: center;
-  padding: 16px 30px 14px;
-  border-radius: 22px;
-  background: rgba(6, 10, 24, 0.72);
-  border: 1px solid rgba(120, 160, 255, 0.14);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(120, 160, 255, 0.1);
+  padding: 12px 26px;
+  border: 2px solid var(--wl-ink);
+  border-radius: 18px;
+  background: #fffcf1;
+  box-shadow: 0 5px 0 var(--wl-ink), 0 14px 30px rgba(38, 55, 45, 0.14);
 }
 
 .wl-title {
-  margin:0;
-  font-size:clamp(42px,11vw,82px);
-  line-height:1.1;
+  margin: 0;
+  font-size: clamp(40px, 10vw, 76px);
+  line-height: 1.1;
 }
 
 .wl-title-sub {
@@ -76,149 +54,64 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .wl-title-sub p {
   margin: 0;
   font-family: var(--wl-ui-font);
-  font-size: clamp(9px, 1.6vw, 12px);
-  letter-spacing: 0.26em;
+  font-size: clamp(10px, 1.6vw, 12px);
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  font-weight: 600;
-  color: rgba(200, 220, 255, 0.9);
-  text-shadow: 0 0 20px rgba(100, 160, 255, 0.5);
+  font-weight: 800;
+  color: #6a705e;
 }
 
 .wl-title-sub .wl-line {
-  width: 30px;
-  height: 1px;
-}
-.wl-title-sub .wl-line.left {
-  background: linear-gradient(to right, transparent, rgba(140, 180, 255, 0.55));
-}
-.wl-title-sub .wl-line.right {
-  background: linear-gradient(to left, transparent, rgba(140, 180, 255, 0.55));
+  width: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: #c6c5ac;
 }
 
-/* === Scene: cube levitating over the portal === */
+/* Phones: let the motto wrap without its rules; short screens: just the mark. */
+@media (max-width: 480px) {
+  .wl-title-sub .wl-line { display: none; }
+  .wl-title-sub p { letter-spacing: 0.14em; }
+}
+@media (max-height: 520px) {
+  .wl-title-card { padding: 4px 18px; }
+  .wl-title { font-size: 34px; }
+  .wl-title-sub { display: none; }
+}
+
+/* === Scene: the cube over the wormhole's mouth ===
+   The top margin is headroom for the hop. */
 .wl-scene {
   position: relative;
   z-index: 2;
+  margin-top: calc(var(--wl-cube) * 0.5);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-/* === Cube stage === */
 .wl-stage {
   position: relative;
   z-index: 2;
   width: var(--wl-cube);
   height: var(--wl-cube);
-  perspective: 900px;
-  animation: wl-levitate 4s ease-in-out infinite;
 }
 
-@keyframes wl-levitate {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-18px); }
-}
-
-/* Spinning black-hole portal (2D canvas, LoadingPortal.jsx) pulled up so the
-   cube levitates over its mouth. Behind the cube (z below the stage). */
-.wl-portal {
+/* === The mouth: where LoadingPortal draws the wormhole === */
+.wl-well {
   position: relative;
   z-index: 1;
-  display: block;
-  width: min(520px, 92vw);
-  height: auto;
-  margin-top: -30px;
+  width: min(calc(var(--wl-cube) * 2.6), 90vw);
+  aspect-ratio: 1 / 0.36;
+  margin-top: calc(var(--wl-cube) * 0.02);
   pointer-events: none;
 }
-
-.wl-cube {
-  position: absolute;
-  inset: 0;
-  transform-style: preserve-3d;
-  animation: wl-tumble 7s ease-in-out infinite;
-  will-change: transform;
-}
-
-/* Multi-axis tumble that reveals every antipodal pair over one cycle. */
-@keyframes wl-tumble {
-  0% { transform: rotateX(-20deg) rotateY(0deg) rotateZ(0deg); }
-  33% { transform: rotateX(18deg) rotateY(140deg) rotateZ(-10deg); }
-  66% { transform: rotateX(-26deg) rotateY(255deg) rotateZ(8deg); }
-  100% { transform: rotateX(-20deg) rotateY(360deg) rotateZ(0deg); }
-}
-
-.wl-face {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  gap: 4%;
-  padding: 6%;
-  border-radius: 12%;
-  /* Dark speedcube body — the gap/padding read as the plastic frame. */
-  background: #0a0b12;
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
-  /* Directional wash baked per face so the cube reads as lit, not flat. */
-  backface-visibility: hidden;
-}
-
-.wl-face::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 12%;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent 55%, rgba(0, 0, 0, 0.28));
-  pointer-events: none;
-}
-
-.wl-sticker {
-  position: relative;
-  border-radius: 16%;
-  /* Longhand (not the `background` shorthand) so an inline background-image — the
-     rendered tile-style texture — layers over the face colour without resetting
-     background-size. */
-  background-color: var(--wl-c);
-  background-size: cover;
-  background-position: center;
-  overflow: hidden;
-  /* Glossy bevel: bright inner top-left, dark inner bottom-right + drop. */
-  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.45), inset 0 -3px 4px rgba(0, 0, 0, 0.32),
-    0 1px 2px rgba(0, 0, 0, 0.4);
-}
-
-.wl-sticker::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 16%;
-  background: radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.5) 0%, transparent 46%);
-  pointer-events: none;
-}
-
-/* Face placement — opposite faces are antipodal twins (constants.js). half = cube/2. */
-.wl-face.f-red { transform: rotateY(0deg) translateZ(var(--wl-half)); }
-.wl-face.f-orange { transform: rotateY(180deg) translateZ(var(--wl-half)); }
-.wl-face.f-green { transform: rotateY(90deg) translateZ(var(--wl-half)); }
-.wl-face.f-blue { transform: rotateY(-90deg) translateZ(var(--wl-half)); }
-.wl-face.f-white { transform: rotateX(90deg) translateZ(var(--wl-half)); }
-.wl-face.f-yellow { transform: rotateX(-90deg) translateZ(var(--wl-half)); }
-
-/* Sticker colors — exact game palette (utils/constants.js COLORS). */
-.f-red .wl-sticker { --wl-c: #ef4444; }
-.f-orange .wl-sticker { --wl-c: #f97316; }
-.f-green .wl-sticker { --wl-c: #22c55e; }
-.f-blue .wl-sticker { --wl-c: #3b82f6; }
-.f-white .wl-sticker { --wl-c: #fafafa; }
-.f-yellow .wl-sticker { --wl-c: #FFD500; }
 
 /* === Status line (label + progress) === */
 .wl-status {
@@ -233,13 +126,12 @@
 
 .wl-label {
   margin: 0;
-  font-family: var(--wl-ui-font);
-  font-size: clamp(12px, 1.9vw, 15px);
-  letter-spacing: 0.18em;
+  font-family: var(--wl-heading-font);
+  font-size: clamp(13px, 1.9vw, 16px);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-weight: 600;
-  color: rgba(210, 226, 255, 0.92);
-  text-shadow: 0 0 18px rgba(90, 140, 255, 0.45);
+  font-weight: 800;
+  color: var(--wl-ink);
   display: inline-flex;
   align-items: baseline;
 }
@@ -259,19 +151,23 @@
   30% { opacity: 1; }
 }
 
-/* Progress bar — indeterminate by default, determinate when width is set. */
+/* Progress bar — an ivory key on an ink ledge, filled with the sticker colours
+   in the opening's progress order. Indeterminate by default. */
 .wl-bar {
-  width: min(240px, 56vw);
-  height: 4px;
+  width: min(240px, 60vw);
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--wl-ink);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: #fffcf1;
+  box-shadow: 0 3px 0 var(--wl-ink);
   overflow: hidden;
 }
 .wl-bar i {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #5a8cff, #9fdb7a);
+  background: linear-gradient(90deg, var(--wl-red), var(--wl-orange), var(--wl-yellow), var(--wl-green), var(--wl-blue));
 }
 .wl-bar.indeterminate i {
   width: 40%;
@@ -294,34 +190,13 @@
   pointer-events: none;
 }
 
-/* === Reduced motion: freeze to a lit 3/4 pose, kill every loop === */
 @media (prefers-reduced-motion: reduce) {
-  .wl-root::before,
-  .wl-stage,
-  .wl-title,
   .wl-dots i,
   .wl-bar.indeterminate i {
     animation: none;
-  }
-  .wl-cube {
-    animation: none;
-    transform: rotateX(-24deg) rotateY(-34deg);
   }
   .wl-bar.indeterminate i {
     width: 100%;
     opacity: 0.7;
   }
-}
-
-/* Centre pads share phase with their opposite face. Local Z is face-normal. */
-.wl-face { transform-style: preserve-3d; }
-.wl-flip-pad { animation: wl-pad-bounce 1.7s ease-in-out infinite; }
-.f-green .wl-flip-pad, .f-blue .wl-flip-pad { animation-delay: -0.55s; }
-.f-white .wl-flip-pad, .f-yellow .wl-flip-pad { animation-delay: -1.1s; }
-@keyframes wl-pad-bounce {
-  0%, 100% { transform: translateZ(6px); }
-  50% { transform: translateZ(12px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .wl-flip-pad { animation: none; transform: translateZ(6px); }
 }

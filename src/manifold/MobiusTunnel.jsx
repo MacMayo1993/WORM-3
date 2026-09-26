@@ -1,5 +1,6 @@
 import { PLATFORM_FORMATION_SECONDS, platformFormationHeld } from '../worm/platformFormation.js';
 import { prefersReducedMotion } from '../utils/device.js';
+import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -532,10 +533,12 @@ const MobiusTunnel = ({
     _faceNorm1.set(n1[0], n1[1], n1[2]).applyQuaternion(_wQuat1);
     _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat2);
 
+    const formationState = useGameStore.getState();
+    const mouthLift = formationState.wormHealerMode && !formationState.demoMode ? WORM_PAD_HEIGHT : 0;
     // Ribbon anchors: just inside each sticker tile's own surface, so the ribbon
     // reaches the tile the player flipped rather than the far side of its cubie.
-    _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET);
-    _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
+    _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET + mouthLift);
+    _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET + mouthLift);
 
     // Ride each tile's own flip animation — vibration into the anchors, squash
     // into the width. The anchors change every frame during a flip, so the
@@ -683,7 +686,6 @@ const MobiusTunnel = ({
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
     let whipAmp = 0;
     let whipPhase = 0;
-    const formationState = useGameStore.getState();
     if (formationState.wormHealerMode && !formationState.demoMode) {
       const reduced = formationState.settings?.reducedMotion || prefersReducedMotion();
       if (reduced) formationAge.current = PLATFORM_FORMATION_SECONDS;

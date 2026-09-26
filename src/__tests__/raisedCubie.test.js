@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import { cubieHasFlippedFace, cubieFaceRole, padBackFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT, raisedWormExpansion } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, cubieFaceRole, padBackFace, selectiveCubieOffsetRatio, wormRaisedAmount, raisedWormExpansion, WORM_PIECE_POP, WORM_PAD_HEIGHT, WORM_CAUTION_TAPE_TOP, PIECE_OVERSHOOT_MAX } from '../game/raisedCubie.js';
 import { padEntryDecision } from '../worm/healerWorm/padEntry.js';
 import { publishRaisedCubie, removeRaisedCubie, raisedCubieExtent } from '../3d/raisedCubieMotion.js';
 
@@ -52,12 +52,24 @@ describe('whole-cubie flip platforms', () => {
   });
 });
 
-// Displacement, rather than distance from the origin, is what gets halved.
-it.each([2, 3, 5, 7, 15])('halves Worm cubie displacement at size %i', size => {
-  expect(cubeExpansionScale(size, WORM_RAISED_AMOUNT) - 1)
-    .toBeCloseTo((cubeExpansionScale(size, 1) - 1) / 2, 10);
+// WORM exposes a visible piece and lands at the fixed tape height on every board.
+it.each([2, 3, 5, 7, 15])('raises the landing to caution-tape height at size %i', size => {
+  const outer = (size - 1) / 2;
+  expect((cubeExpansionScale(size, wormRaisedAmount(size)) - 1) * outer).toBeCloseTo(WORM_PIECE_POP, 12);
+  expect(WORM_PIECE_POP).toBeGreaterThan(0.3);
+  expect(WORM_PIECE_POP + WORM_PAD_HEIGHT).toBeCloseTo(WORM_CAUTION_TAPE_TOP, 12);
   for (const global of [0, .35, .8, 1]) {
-    expect(cubeExpansionScale(size, global) * (1 + selectiveCubieOffsetRatio(size, global, WORM_RAISED_AMOUNT)))
-      .toBeCloseTo(cubeExpansionScale(size, raisedWormExpansion(global)), 10);
+    // Manual Explode never stacks on top of the pop.
+    expect(raisedWormExpansion(global, size)).toBe(Math.max(global, wormRaisedAmount(size)));
+    expect(cubeExpansionScale(size, global) * (1 + selectiveCubieOffsetRatio(size, global, wormRaisedAmount(size))))
+      .toBeCloseTo(cubeExpansionScale(size, raisedWormExpansion(global, size)), 10);
   }
 });
+
+it.each([3, 7])('passes a springing overshoot through, bounded, at size %i', size => {
+  const rest = selectiveCubieOffsetRatio(size, 0, 1);
+  expect(selectiveCubieOffsetRatio(size, 0, 1.2)).toBeGreaterThan(rest);
+  expect(selectiveCubieOffsetRatio(size, 0, 99)).toBeCloseTo(selectiveCubieOffsetRatio(size, 0, PIECE_OVERSHOOT_MAX));
+  expect(selectiveCubieOffsetRatio(size, 0, -0.2)).toBe(0);
+});
+

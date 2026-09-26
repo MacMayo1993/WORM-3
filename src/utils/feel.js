@@ -289,13 +289,25 @@ const SFX = {
     sweep(320, 48, 0.42, 0.34, 'sawtooth');
   },
   // ── Chaos lightning ─────────────────────────────────────────────────────────
-  // A bolt landing on a tile. Chaos lands several a second, so this is a dry,
-  // bright snap that sits under the flip's own sound rather than over it; the
-  // storm also enforces a minimum gap between zaps. Hotter tiles crack brighter.
+  // A bolt landing on a tile: the crack of the channel, then the body of the hit
+  // — a short low thump, so a strike lands with weight instead of as a tick.
+  // Chaos lands several a second, so it stays short and sits under the flip's
+  // own sound; the storm also enforces a minimum gap. Hotter tiles hit harder.
   chaosZap(heat = 0) {
     const h = Math.min(6, Math.max(0, heat)) / 6;
-    burst(0.04, 0.1 + h * 0.06, 'highpass', 3600 + h * 1800);
+    burst(0.04, 0.12 + h * 0.07, 'highpass', 3600 + h * 1800);
     sweep(1900 + h * 500, 520, 0.05, 0.05, 'square');
+    burst(0.09, 0.16 + h * 0.08, 'lowpass', 220);
+    sweep(130, 52, 0.1, 0.14 + h * 0.06, 'sine');
+  },
+
+  // The player's first strike: the sky answers the tile they picked. The biggest
+  // crack in the chaos set, then a long rolling rumble — a round starting.
+  chaosIgnite() {
+    burst(0.08, 0.34, 'highpass', 3000);
+    sweep(2400, 400, 0.12, 0.12, 'sawtooth');
+    burst(0.7, 0.26, 'lowpass', 180);
+    sweep(95, 38, 0.8, 0.22, 'sine', 0.05);
   },
 
   // A wormhole opening under chaos: the surge zips down the new tunnel.
@@ -421,8 +433,11 @@ const HAPTICS = {
   // Grows with the flip count, mirroring the pitch climb.
   tunnelPulse: (flips = 0) => 10 + Math.min(flips, 6) * 4, // 10 → 34ms
   tunnelSnap: [0, 60, 35, 90],
-  // Chaos zaps and surges ride on the flip's own haptic, which already fires for
-  // every chaos flip; only the overload earns a pattern of its own.
+  // A bolt landing: one short, hard tick. The storm sends it at the lowest
+  // priority, so it fills the gaps between flips' own patterns and never cuts
+  // one short.
+  chaosZap: 14,
+  chaosIgnite: [0, 70, 40, 110],
   chaosOverload: [0, 45, 30, 70],
   // Short enough to read as the key itself rather than as something happening.
   uiKey: 10,

@@ -334,7 +334,7 @@ export function makeWormSim(size) {
 }
 
 const setCurWorldPosFromTile = (sim, size) => {
-    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, sim.onRaisedPlatform ? raisedWormExpansion(sim.expansionAmount) : sim.expansionAmount);
+    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, sim.onRaisedPlatform ? raisedWormExpansion(sim.expansionAmount, size) : sim.expansionAmount);
     sim._curWP.set(wp[0], wp[1], wp[2]);
     if (sim.onRaisedPlatform) sim._curWP.addScaledVector(FACE_NORMALS[sim.pos.dirKey], sim.raisedPadHeight ?? 0);
     sim.curWorldPos = sim._curWP;
@@ -813,7 +813,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 
     sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
     sim.headInterpPos.copy(sim.tunnelApproach);
-    sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: raisedWormExpansion(sim.expansionAmount), padHeight: WORM_PAD_HEIGHT } : tunnel;
+    sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: raisedWormExpansion(sim.expansionAmount, size), padHeight: WORM_PAD_HEIGHT } : tunnel;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
     // Remove the exit portal tile from the trail so the head landing on it after
@@ -1945,7 +1945,8 @@ const PHASE_HANDLERS = {
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
                 // Resume from the exit pose, never interpolate from the old entry tile.
-                if (sim.activeTunnel?.padExpansion) {
+                // padExpansion is 0 when no piece rises; the pad height marks a pad route.
+                if (sim.activeTunnel?.padHeight > 0) {
                     const exit = sim.activeTunnel.exit;
                     sim.curWorldPos.fromArray(getStickerWorldPos(exit.x, exit.y, exit.z, exit.dirKey, size, sim.activeTunnel.padExpansion))
                         .addScaledVector(FACE_NORMALS[exit.dirKey], WORM_PAD_HEIGHT);

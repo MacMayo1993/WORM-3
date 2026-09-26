@@ -112,8 +112,12 @@ const _seamLeakFrag = `
  *
  * colorHex    — current face color (matches the tile's displayed color)
  * antiColorHex — its antipodal partner's color (used for the double-helix second strand)
+ *
+ * The ref exposes setColors(colorHex, antiColorHex) for callers that change the
+ * tile's colour outside React — the menu cube's tap flip turns each sticker over
+ * mid-frame-loop, and its overlay has to turn with it.
  */
-const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
+const MenuTileOverlay = React.forwardRef(({ colorHex, antiColorHex }, ref) => {
   const wispyMatRef   = useRef();
   const crackMatRef   = useRef();
   const seamMatRef    = useRef();
@@ -141,10 +145,12 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
     uIntensity: { value: 1.25 },
   }));
 
-  React.useEffect(() => {
-    [wispyU, crackU, seamU, rimU].forEach(uniforms => uniforms.uColor.value.set(colorHex));
-    wispyU.uAntiColor.value.set(antiColorHex || '#888888');
-  }, [colorHex, antiColorHex, wispyU, crackU, seamU, rimU]);
+  const setColors = React.useCallback((hex, antiHex) => {
+    [wispyU, crackU, seamU, rimU].forEach(uniforms => uniforms.uColor.value.set(hex));
+    wispyU.uAntiColor.value.set(antiHex || '#888888');
+  }, [wispyU, crackU, seamU, rimU]);
+  React.useEffect(() => setColors(colorHex, antiColorHex), [colorHex, antiColorHex, setColors]);
+  React.useImperativeHandle(ref, () => ({ setColors }), [setColors]);
 
   const rootRef = React.useRef();
 
@@ -212,6 +218,7 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
       </mesh>
     </group>
   );
-};
+});
+MenuTileOverlay.displayName = 'MenuTileOverlay';
 
 export default MenuTileOverlay;

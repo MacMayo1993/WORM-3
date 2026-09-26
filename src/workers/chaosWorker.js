@@ -81,6 +81,7 @@ self.onmessage = (e) => {
         flipCap: payload.disparityFlipCap,
         explosionT: payload.explosionT ?? 0,
         animating: !!payload.animating,
+        ignition: payload.ignition ?? null,
       });
       tickAcc = 0;
       conwayAcc = 0;

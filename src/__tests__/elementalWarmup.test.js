@@ -27,10 +27,13 @@ const fakeRenderer = () => ({ compile: vi.fn() });
 const fakeCamera = {};
 
 // Three orb materials, one ambient particle material, plus the skin:
-//   surface → 1, flames → 2 (both detail tiers), blades → 2 (meadow and pickup leaves)
-const SKIN_MATERIALS = { surface: 1, flames: 2, blades: 2 };
-const expectedCount = Object.values(ELEMENTAL_DEFS).reduce(
-  (n, def) => n + 4 + (SKIN_MATERIALS[def.renderer] ?? 0),
+//   surface → 1, flames → 6 (bed, tongues and light, for both detail tiers),
+//   blades → 3 (moss bed, plants and the claim's burst of leaves)
+const SKIN_MATERIALS = { surface: 1, flames: 6, blades: 3 };
+// Ice alone carries a second, low-detail surface program for phones.
+const DETAIL_VARIANTS = { ice: 1 };
+const expectedCount = Object.entries(ELEMENTAL_DEFS).reduce(
+  (n, [element, def]) => n + 4 + (SKIN_MATERIALS[def.renderer] ?? 0) + (DETAIL_VARIANTS[element] ?? 0),
   0
 );
 

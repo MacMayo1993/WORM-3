@@ -55,6 +55,8 @@ const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectSc
 const WormEntryScreen = React.lazy(() => import('./screens/WormEntryScreen.jsx'));
 import MobiIntroScreen from './screens/MobiIntroScreen.jsx';
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
+// Lazy so the arcade stylesheet it carries stays out of the initial CSS budget.
+const ChaosIgnitionPrompt = React.lazy(() => import('../chaos/ChaosIgnitionPrompt.jsx'));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
 const DisparityBettingScreen = React.lazy(() => import('./screens/DisparityBettingScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
@@ -99,6 +101,7 @@ export default function UILayer({
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
     disparityCountdown,
+    ignitionPicking, onIgnitionConfirm, onIgnitionSurprise,
     showAntipodalPiP, onToggleAntipodalPiP,
     showComingSoon, onCloseComingSoon,
     showMobiusCubelet,
@@ -222,7 +225,11 @@ export default function UILayer({
     || showComingSoon || showMobiusCubelet || showMobiIntro || victory
     // Mobi's level briefing and the finale cutscene are blocking beats — clear
     // the game chrome (top bar, bottom nav, sheet) so nothing crowds him.
-    || showLevelTutorial || showCutscene;
+    || showLevelTutorial || showCutscene
+    // Aiming chaos's first strike: the prompt carries the only actions (aim,
+    // strike, surprise, leave). Shuffle or Undo here would change the board the
+    // round's scripted unshuffle is about to replay.
+    || ignitionPicking;
 
   const showGameHUD = !teachMode.courseActive && !wormHealerMode && !showMainMenu && !hasFullScreenOverlay;
 
@@ -296,6 +303,11 @@ export default function UILayer({
         <TunnelTransitOverlay />
 
         <ChaosCountdown value={disparityCountdown} settings={settings} />
+        {ignitionPicking && (
+          <Suspense fallback={null}>
+            <ChaosIgnitionPrompt onConfirm={onIgnitionConfirm} onSurprise={onIgnitionSurprise} onLeave={onBackToMainMenu} />
+          </Suspense>
+        )}
 
         {/* Disparity Betting Screen — intercepts before chaos starts */}
         <ScreenTransition show={showDisparityBetting}>
@@ -648,7 +660,7 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      {!teachMode.courseActive && isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
+      {!teachMode.courseActive && isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !ignitionPicking && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
         <MobileControls
           actionSlot={topBarActionSlot}
           onShowHelp={() => setShowHelp(true)}

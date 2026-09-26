@@ -29,7 +29,9 @@ const _meshNormP = new THREE.Vector3();
 // Read a tile's live world surface position + outward normal straight from its cubie mesh —
 // the SAME source the body trail uses (resolveTrailTile). Returns false if the mesh isn't
 // available. liveCubies.refs are CubeAssembly's per-cubie groups, indexed by grid cell.
-export function readLiveTile(tile, outPos, outNorm) {
+// `outQuat`, when given, receives the cubie's live rotation — the whole rigid turn, where
+// the normal alone cannot say how the tile has rolled about itself mid-slice.
+export function readLiveTile(tile, outPos, outNorm, outQuat) {
     const lc = liveCubies.refs;
     const lsz = liveCubies.size;
     if (!lc || lsz <= 0) return false;
@@ -38,6 +40,7 @@ export function readLiveTile(tile, outPos, outNorm) {
     if (!mesh || !localNorm) return false;
     outNorm.copy(localNorm).applyQuaternion(mesh.quaternion).normalize();
     outPos.copy(mesh.position).addScaledVector(outNorm, SURFACE_OFFSET);
+    if (outQuat) outQuat.copy(mesh.quaternion);
     return true;
 }
 

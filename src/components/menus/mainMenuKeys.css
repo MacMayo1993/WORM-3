@@ -1,0 +1,253 @@
+/* mainMenuKeys.css — the main menu's keys are pieces of the opening's cube.
+ *
+ * Each key is a cubie: a black-plastic bezel on a hard black ledge holding one
+ * glossy, domed sticker in a classic Rubik's colour (the finish the loading
+ * cube's stickers wear). Play is the one coloured sticker, WORM's green face,
+ * lettered like the opening's trailer words; the utilities and the XP plate are
+ * white stickers in deep-green ink. Sticker colours come from constants.js as
+ * --menu-* variables set on .worm-menu-actions. The mode carousel's Play key is
+ * the same piece in its mode's face colour (liveCubeCarousel.css).
+ *
+ * Loaded with the lazy menu chunk, so none of this weighs on the initial CSS.
+ */
+
+.worm-menu-actions,
+.menu-key {
+  --menu-plastic: #141416;
+  --menu-ledge: #050506;
+  --menu-ink: #26372d;
+  --menu-bezel: linear-gradient(180deg, #2c2c31, #141416 42%);
+  --menu-gloss: radial-gradient(120% 95% at 20% 10%, rgba(255, 255, 255, 0.55) 0 12%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(172deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, 0.14));
+  --menu-dome: inset 0 2px 1px rgba(255, 255, 255, 0.6), inset 0 -3px 4px rgba(0, 0, 0, 0.22);
+  --menu-drop: 0 6px 0 var(--menu-ledge), 0 14px 26px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.worm-menu-actions {
+  width: min(340px, calc(100vw - 40px));
+  display: grid;
+  gap: 14px;
+}
+
+.worm-menu-utilities {
+  display: flex;
+  gap: 10px;
+}
+
+/* === The cubie: plastic bezel and ledge === */
+.menu-key {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  min-width: 0;
+  padding: 5px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--menu-bezel);
+  box-shadow: var(--menu-drop);
+  color: var(--menu-ink);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  perspective: 420px;
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+/* === The sticker it holds === */
+.menu-key-face {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  border-radius: 15px;
+  background-color: var(--menu-white);
+  background-image: var(--menu-gloss);
+  box-shadow: var(--menu-dome);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1.4), filter 140ms ease;
+}
+
+@media (hover: hover) {
+  /* The sticker lifts a little in its bezel, as if about to flip. */
+  .menu-key:hover .menu-key-face {
+    transform: translateY(-2px);
+    filter: brightness(1.05);
+  }
+}
+
+.menu-key:enabled:active {
+  translate: 0 4px;
+  box-shadow: 0 2px 0 var(--menu-ledge), 0 6px 12px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.menu-key:enabled:active .menu-key-face {
+  transform: scale(0.985);
+}
+
+.menu-key:focus-visible {
+  outline: 3px solid var(--arcade-focus, #2774ad);
+  outline-offset: 5px;
+}
+
+/* === Play: WORM's green sticker, lettered like the opening === */
+.menu-key--play {
+  min-height: 74px;
+}
+
+.menu-key--play .menu-key-face {
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 20px 0 14px;
+  background-color: var(--menu-green);
+}
+
+.menu-key-emblem {
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
+}
+
+.menu-key-label,
+.menu-key-arrow {
+  color: #fff;
+  -webkit-text-stroke: 5px #111;
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 #111;
+}
+
+.menu-key-label {
+  flex: 1;
+  text-align: left;
+  font: 400 27px/1 var(--display-font, 'Bungee', 'Arial Black', sans-serif);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.menu-key-arrow {
+  font: 900 30px/1 var(--heading-font, system-ui);
+}
+
+/* Now and then light runs across the Play sticker's gloss. */
+.menu-key--play .menu-key-face::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: -40%;
+  width: 28%;
+  transform: skewX(-20deg);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0));
+  pointer-events: none;
+  animation: menu-key-glint 6s ease-in-out 1.6s infinite;
+}
+
+@keyframes menu-key-glint {
+  0%, 72% { translate: 0; }
+  90%, 100% { translate: 640%; }
+}
+
+/* Pressing Play flips its sticker the way the cube flips one: over to its
+   antipodal colour (green's is blue) and back while the cube shakes. */
+.menu-key--play.is-flipping .menu-key-face {
+  animation: menu-key-flip 0.52s cubic-bezier(0.3, 0.6, 0.35, 1) both;
+}
+
+.menu-key--play.is-flipping .menu-key-face > * {
+  animation: menu-key-flip-face 0.52s linear both;
+}
+
+@keyframes menu-key-flip {
+  0% { transform: rotateX(0deg); background-color: var(--menu-green); }
+  25% { transform: translateZ(14px) rotateX(90deg); background-color: var(--menu-green); }
+  25.1% { background-color: var(--menu-blue); }
+  75% { transform: translateZ(14px) rotateX(270deg); background-color: var(--menu-blue); }
+  75.1% { background-color: var(--menu-green); }
+  100% { transform: rotateX(360deg); background-color: var(--menu-green); }
+}
+
+/* The back of a sticker is plain colour: the lettering is only on its front. */
+@keyframes menu-key-flip-face {
+  0%, 25% { opacity: 1; }
+  25.1%, 75% { opacity: 0; }
+  75.1%, 100% { opacity: 1; }
+}
+
+/* === Demo and Feedback: white stickers === */
+.menu-key--small {
+  flex: 1;
+  min-height: 56px;
+  border-radius: 18px;
+}
+
+.menu-key--small .menu-key-face {
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 13px;
+  font: 800 13px/1.2 var(--heading-font, system-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.menu-key--small .menu-key-face > span {
+  font-size: 17px;
+  line-height: 1;
+}
+
+/* === The XP plate: a white sticker in the same bezel === */
+.worm-menu-actions .xp-menu-badge {
+  border: 5px solid var(--menu-plastic);
+  border-radius: 20px;
+  background-color: var(--menu-white);
+  background-image: var(--menu-gloss);
+  box-shadow: var(--menu-drop), var(--menu-dome);
+  color: var(--menu-ink);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+.worm-menu-actions .xp-menu-badge:active {
+  translate: 0 4px;
+  box-shadow: 0 2px 0 var(--menu-ledge), 0 6px 12px rgba(0, 0, 0, 0.28), var(--menu-dome);
+}
+
+.worm-menu-actions .xp-menu-badge:focus-visible {
+  outline: 3px solid var(--arcade-focus, #2774ad);
+  outline-offset: 5px;
+}
+
+.worm-menu-actions .xp-level-seal {
+  border-color: var(--menu-plastic);
+  background-color: var(--menu-yellow);
+  background-image: var(--menu-gloss);
+  box-shadow: 0 2px 0 var(--menu-plastic), var(--menu-dome);
+}
+
+/* Progress fills a strip of ten little stickers. */
+.worm-menu-actions .xp-meter {
+  height: 9px;
+  border-radius: 3px;
+  background: rgba(20, 20, 22, 0.14);
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
+  mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
+}
+
+.worm-menu-actions .xp-meter > span {
+  background: var(--menu-green);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-key,
+  .menu-key-face,
+  .worm-menu-actions .xp-menu-badge {
+    transition: none;
+    translate: none !important;
+  }
+  .menu-key--play .menu-key-face::after,
+  .menu-key--play.is-flipping .menu-key-face,
+  .menu-key--play.is-flipping .menu-key-face > * {
+    animation: none;
+  }
+}

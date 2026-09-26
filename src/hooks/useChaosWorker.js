@@ -193,7 +193,7 @@ export function useChaosWorker({
       // Drop flip batches from a superseded run — the cube was reset/shuffled/resized
       // after the worker computed this TICK, so applying it would dirty the new board.
       if (e.data.payload?.gen != null && e.data.payload.gen !== genRef.current) return;
-      const { flips, cascades, recoveries, deaths, eliminatedFaces, winner, finalState, metrics } = e.data.payload;
+      const { flips, cascades, recoveries, deaths, eliminatedFaces, winner, finalState, metrics, ignition } = e.data.payload;
 
       // Store ids for this tick's bolts, minted here so the storm can retire the
       // HUD's matching entry when its bolt finishes.
@@ -210,11 +210,11 @@ export function useChaosWorker({
       // each tile's pre-flip state (a first flip opens a wormhole) and the board
       // the worker computed against. Flips never move stickers, so a manifold map
       // from any earlier tick still locates every twin.
-      if (appendedCascades || flips?.length > 0 || recoveries?.length > 0 || deaths?.length > 0) {
+      if (appendedCascades || ignition || flips?.length > 0 || recoveries?.length > 0 || deaths?.length > 0) {
         const live = useGameStore.getState();
         if (!manifoldMapRef.current) manifoldMapRef.current = buildManifoldGridMap(live.cubies, size);
         const { events, nextSeed } = chaosStormEvents(
-          { cascades, flips, recoveries, deaths },
+          { cascades, flips, recoveries, deaths, ignition },
           live.cubies,
           size,
           manifoldMapRef.current,
@@ -345,6 +345,11 @@ export function useChaosWorker({
     if (chaosMode) {
       clearChaosStorm();
       manifoldMapRef.current = buildManifoldGridMap(cubies, size);
+      // The player's first strike, handed to the sim once. Consumed here so the
+      // pick marker leaves the tile and the next round starts without one.
+      const ignition = useGameStore.getState().chaosIgnition;
+      useGameStore.getState().setChaosIgnition(null);
+      useGameStore.getState().setChaosIgnitionPicking(false);
       useGameStore.getState().clearDisparityGame();
       useGameStore.getState().startChaosExperience();
       genRef.current += 1;
@@ -357,6 +362,7 @@ export function useChaosWorker({
           disparityFlipCap,
           explosionT,
           animating: !!animState,
+          ignition: ignition?.gridId ? { gridId: ignition.gridId } : null,
           gen: genRef.current,
         },
       });

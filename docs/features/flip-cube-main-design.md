@@ -1,27 +1,142 @@
 # Flip Cube — Main Design and Implementation Plan
 
-> **Status:** design plan, 2026-09-25. Six decisions were settled on 2026-09-26 (§13), and the FLIP CUBE rename has shipped (§7). Nothing else here changes gameplay until a phase in §10 is picked up; §13 also lists what is still open. This is the brief for refocusing WORM³ on **the Flip Cube** as its main object. Flipped tiles pop out and bounce according to their flip count. Their Möbius funnels pulse and spring with them. In WORM you jump onto a popped tile to ride its tunnel. Something rumbles under the tiles. Mobi explains all of it as a piece of his home world, WORM³.
+> **Status:** design plan, 2026-09-25. Six decisions were settled on 2026-09-26 (§13), and the FLIP CUBE rename has shipped (§7). Much of phases 1–4 (§10) has since shipped: the implementation checkpoint below records what is live, and §13 what is still open. This is the brief for refocusing WORM³ on **the Flip Cube** as its main object. Flipped tiles pop out and bounce according to their flip count. Their Möbius funnels pulse and spring with them. In WORM you jump onto a popped tile to ride its tunnel. Something rumbles under the tiles. Mobi explains all of it as a piece of his home world, WORM³.
 
 ## Implementation checkpoint — 2026-09-26
 
 Cube modes now raise whole flipped cubies, retain the small square pads and use full-back
-antipodal stalks. WORM now enables whole-cubie expansion and a deliberate jump to a raised
-face underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
+antipodal stalks. WORM raises the landing to the top of its ground-anchored caution tape and
+takes a deliberate jump onto a pad underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
 camera follows the same head. Nearby platforms receive portrait framing that includes both
-the worm and its jump destination. Portal rings, caution tape, signs and portal effects use
-the raised tile position, not the floor lattice. Mirror view and cosmetic pad settings cannot
-disable physical WORM lift. Flipped-face landings enter the tunnel; unflipped carried faces
-are platforms. Crawl does not enter raised mouths. Tunnel paths and exit handoffs use the
-expanded endpoints. Demo lessons retain the legacy route.
+the worm and its jump destination. Portal rings, signs and portal effects follow the raised tile. Caution tape and posts stay
+on the floor lattice around the opening. Mirror view and cosmetic pad settings cannot
+disable physical WORM lift. Flipped-face landings enter the tunnel. Crawl does not enter raised
+mouths. Tunnel paths and exit handoffs start from the pad's hover. Demo lessons retain the
+legacy route.
 
-WORM pads hold a fixed 0.5-unit landing height; cosmetic motion settings cannot remove the
-physical platform. Layer-turn scheduling holds during the captured 0.65-second jump. Rescue
+WORM pads hold a fixed landing height, `WORM_PAD_HEIGHT` (0.3 since the low-hover pass);
+cosmetic motion settings cannot remove the physical platform. Layer-turn scheduling holds during the captured jump (0.65 seconds normally; formation can extend it). Rescue
 jumps retain their no-ride provenance. The full Rumbler, animated landing compression and
 launch beats, ghosting and cinematic choreography remain roadmap work.
 
+### Tape-height WORM platforms — 2026-09-26 correction
+
+The user clarified that the landing should meet the top of the caution tape, with the tape
+left on the cube surface to mark the opening below. The earlier 0.06 piece pop was too small.
+
+- `WORM_CAUTION_POLE_HEIGHT = 0.68`; `WORM_CAUTION_TAPE_TOP = 0.655`.
+- `WORM_PIECE_POP = 0.355` plus `WORM_PAD_HEIGHT = 0.3` places the landing at that edge,
+  independent of board size. Cube-mode pops are unchanged. Global Explode still composes
+  with the lift using `max`, so it never stacks another explosion on top.
+- Ground-anchored WORM tape has a stable top edge, including critical/void warnings.
+  Portal rings and signs follow the rising mouth; the perimeter never rises with it.
+- Raised WORM shells are translucent and do not write depth, so the Möbius band is visible
+  through the exposed sides. Band endpoints extend to the lifted tile, not its old slot.
+- Whole cubies ease out for two seconds. The Möbius ribbon and rails grow together from
+  both mouths, even when tunnel view is Off/Hints. Pause holds progress, and reduced motion
+  presents the completed geometry immediately. Cosmetic pad settings cannot disable it.
+- Deliberate Jump captures the raised landing; it clears the ledge by 0.35 units and uses
+  the same sampled arc for head and tail. An early jump waits for the rise to complete.
+  Unflipped faces on the same cubie remain jumpable, without triggering a tunnel ride.
+- This is a platform/perimeter correction. The existing crawl and tunnel-collapse death
+  rules remain as documented below; it does not add a new fall-death trigger.
+
+### WORM low hover and unstable wormhole — earlier pass, superseded heights
+
+The following records the earlier low-hover pass. Its 0.06 piece movement, 0.36 landing,
+shortened moving fences, and floor treatment of carried faces are superseded above.
+
+
+Playtest: the tunnel sat too high to reach believably. Half the Explode lift plus a 0.5 pad
+put a 3×3 landing about 1.4 units off the surface (about 2.0 on 5×5, 5.9 on 15×15), so the
+worm leapt clear of the cube to reach it. Now the piece pops out barely, the tile hovers a
+short hop above it, and the gap carries the drama instead.
+
+- **Pieces pop out barely.** The piece moves `WORM_PIECE_POP` (0.06) along the face normal, the
+  same on every board size. `wormRaisedAmount(size)` turns that distance into an Explode
+  fraction for the outer layer, and a corner moves 0.06 along each axis, as Explode would. A
+  flipped piece's other faces stay ordinary floor, so `raisedPlatformPosition` returns only
+  live pads. Cube modes (Flip Cube and Chaos) now pop a hair too: `CUBE_PIECE_POP` (0.1)
+  via `cubeRaisedAmount(size)`, so the tunnel underneath shows only as a sliver. The full
+  Explode pop threw flipped pieces across the scene, worst on large boards.
+- **One landing height.** `WORM_PIECE_POP` and `WORM_PAD_HEIGHT` (0.3) live in
+  `src/game/raisedCubie.js`. Together they feed the sim landing, portal visuals, the pad
+  renderer (`PAD_PROFILES.worm`) and tunnel handoffs. The landing sits 0.36 above the surface
+  on every board size.
+- **Exit fix.** Tunnel exits now test `padHeight`, not the truthiness of `padExpansion` (which
+  was 0 while pieces stayed put). A ride that starts on the floor (Mobi's Create Wormhole)
+  still lands on the exit pad.
+- **The unstable wormhole** (`PadEnergy`, render only; cube modes unchanged):
+  - the stalk becomes an additive energy column spanning only the gap, narrow in the slot and
+    flaring to the tile, with twisting bands, climbing surges and a stepped flicker;
+  - the slot's mouth becomes a swirling vortex;
+  - three arcs per pad re-strike 9 times a second at a 62 % duty: two jump the gap and one
+    discharges to the surface just outside it;
+  - eleven sparks a second spit off the rim;
+  - the tile shudders a few millimetres (≤ 0.012 along the normal, ≤ 0.008 in-plane), with
+    twins in step (the $P_+$ rule, §9.2).
+
+  All of it is deterministic in (time, seed) with no `Math.random`, and nothing is written
+  back to the sim. Pause freezes it. Reduced motion keeps a steady glow with no arcs, sparks
+  or shudder.
+- **Readability at the new height.**
+  - Tunnel signs shrink as the camera nears them: full size beyond 5 units, gone inside 2.6.
+    The HUD card already reads out the pad ahead.
+  - Pad fences are shortened by the hover, so their tape stays below the chase camera's eye.
+- **Clearance.** The crawl under a pad runs on the unpopped surface, and the tile's underside
+  sits 0.36 above it. That clears the bare head (≈ 0.17, Mobi ≈ 0.20) and a tall hat (≈ 0.30).
+  The cost: while crossing under, the worm's beads dip up to about 0.06 into the popped piece's
+  top.
+
+### Bounce model upgrade — 2026-09-26
+
+- **Worn regime.** `padIsWorn(wear, livesLeft)` ($w \ge k^*$, or one life left) is now the one
+  predicate behind both `classifyPad` and `PadProvider`. The provider eases a worn weight
+  $r \in [0,1]$ at 1.5 per second instead of snapping it. With $\varphi$ the pair's integrated
+  phase, $\varepsilon = 0.06$, $G$ the golden ratio and $U_\pi(k) \in [0,1)$ a hash of the pair
+  seed and hop index $k$:
+  $$\beta = \varphi + r\varepsilon\left[\sin \pi\varphi + \sin \pi G\varphi\right], \qquad h = h_0 + A(w)\left[1 - 0.45\,r\,U_\pi(\lfloor\beta\rfloor)\right] b(\beta).$$
+  - Twins share $\varphi$ and the seed, so they stay identical (the $P_+$ rule, §9.2).
+  - $\partial_\varphi\beta \ge 1 - \varepsilon\pi(1+G) \approx 0.51$, so the beat never runs
+    backwards. The worst case during the ease is $0.51 \cdot 0.7 - 2\varepsilon \cdot 1.5 \approx 0.17$
+    cycles per second (menu profile, $f_0 = 0.7$ Hz), which is still positive.
+  - A hop's height changes only at touchdown, where $b = 0$, and only shrinks toward $h_0$, so
+    a worn pad never dips below its hover height.
+  - **Deviation from §3.2: no in-plane jitter or tilt.** Jitter would move tap targets under a
+    finger, and tilt would skew the tally marks. Uneven hops and beat drift carry the
+    irregular read instead.
+  - On every supported cap, $k^*$ alone decides which pads are worn. Cap 3 has no worn pad,
+    because its warning sits on the $n = 2$ home tile (§9.6).
+- **Whole pieces bounce out.** In cube modes, a flipped cubie now rides a lighter spring to
+  its Explode position: stiffness 210, damping 12.2, $\zeta \approx 0.42$. It passes that
+  position by about 22 % and springs back, and does so identically at 30, 60 and 144 fps
+  (fixed 1/120 s substeps).
+  - On the return, the lift is clamped at zero, so the piece lands instead of sinking into
+    its neighbours.
+  - `selectiveCubieOffsetRatio` passes the overshoot through, capped at 1.5.
+  - The overview camera's `raisedCubieExtent` still clamps at 1, so framing does not pump
+    with each bounce.
+  - Pads keep the press spring ($\zeta \approx 0.65$, about 5 % overshoot). WORM keeps its
+    fixed platform height, with no spring.
+- **Pair bookkeeping.** A twin that is not mounted is assumed to match (`pairFlips`) rather
+  than counted as zero, which had halved a lone-mounted pair's wear. The frame loop now
+  reuses one pose input and inverts the provider frame once per frame, not once per pad.
+- **One cap everywhere.** WORM portal placement and platform framing now read
+  `selectEffectiveFlipCap` and `WORM_PAD_HEIGHT`, the same sources the renderer uses. Before
+  this, they used a literal 6 and 0.5. Under a cap of 8, a 7-flip tile's cubie would have
+  been raised while its portal ring sat on the floor.
+- **One entry rule.** `tunnelEntryRule(state)` ('pad', or 'crawl' in demo lessons) feeds both
+  the crawler and the HUD. The pad route's danger copy says "don't jump on it" and "crawl
+  under it", and Mobi's WORM intro says to jump onto a flip pad.
+- **Not yet: lethal pits.** A voided pad still stands, and crawling under it is safe; only
+  landing on it kills. Decision #3 (§4.4) needs the pad to drop into its slot, crawling into
+  the mouth to kill, and the pit to stay visible with reduced motion or tunnels hidden. Until
+  then, the HUD describes what actually happens rather than the decision.
+
 ### Implementation decisions
 
-- Whole cubies now rise to their full Explode position when any face has a live odd flip count.
+- Whole cubies now pop a hair out of the cube (`CUBE_PIECE_POP`, see above) when any face has a
+  live odd flip count. They first rose to their full Explode position, which was far too much.
   Unflipped faces travel with the body and remain ordinary platforms; tunnel eligibility is per face.
   Springs follow physical piece identity through layer turns. Manual Explode does not stack the lift.
   Whole-piece motion settles; only the small normal-offset pads bounce continuously.
@@ -47,8 +162,8 @@ launch beats, ghosting and cinematic choreography remain roadmap work.
 - Reduced motion holds the pad at its static height and disables its idle pulse. Full/subtle/
   flat choices live in Settings → Scene. Chaos has its own low-height profile; big boards
   halve the moving amplitude. No random jitter or tilt ships in this foundation.
-- WORM uses the same expanded positions for rendering, captured jumps and tunnel handoffs.
-  Keep the physical pads independent of cosmetic motion settings.
+- WORM uses the same pad positions (slot plus `WORM_PAD_HEIGHT`) for rendering, captured
+  jumps and tunnel handoffs. Keep the physical pads independent of cosmetic motion settings.
 
 ### WORM integration contract for phase 4
 
@@ -158,22 +273,23 @@ For each pair $\pi$ with shared phase $\varphi_\pi$ (a hash of the same sorted-g
 - **Lift.** $h(t) = h_0 + A(w)\,b(\phi(t))$, where $b(x) = 1-(2\{x\}-1)^2$ is a bouncing-ball arc with the impact at $\{x\} = 0$, and $\phi(t) = f(w)\,t + \varphi_\pi$.
 - **Wear.** $A(w) = A_0 + A_1 w$ and $f(w) = f_0(1+w)$: more wear gives a bigger, faster bounce. This continues what today's tremor, blink reach and rim intensity already say.
 - **Impact squash.** Normal scale is $1-\sigma\iota$ and in-plane scale is $1+\tfrac{\sigma}{2}\iota$, with $\iota = e^{-(\{\phi\}/0.08)^2}$. The same impulse drives the rim glow and the funnel pulse (§3.3).
-- **Worn regime** ($w \ge k^*$, or one life left):
-  - Add a deterministic quasi-periodic term $\epsilon[\sin(2\pi f\tau_1 t)+\sin(2\pi f\tau_2 t)]$ with $\tau_2/\tau_1$ equal to the golden ratio.
-  - Add in-plane jitter ≤ 0.03 and tilt ≤ 6°, drawn from a seeded LCG keyed by the pair (never `Math.random`).
-  - The added incommensurate frequencies make the bounce less regular. This deterministic quasi-periodic signal has discrete spectral components; it is not, by itself, broadband noise.
-- **Events.** Events use the press-bridge spring (ζ ≈ 0.65). Pop-out overshoots to $h_0$. Flip-home and heal settle to 0 with one rebound.
+- **Worn regime** ($w \ge k^*$, or one life left). As shipped (see the bounce-model checkpoint above):
+  - The drift term $\epsilon[\sin \pi\varphi + \sin \pi G\varphi]$ is added to the integrated **phase**, not to time, so it keeps the pad's own tempo and cannot run the beat backwards. $G$ is the golden ratio.
+  - Each hop draws its height from a hash of the pair's seed and hop index (never `Math.random`), between 55 % and 100 % of the amplitude.
+  - The originally drafted in-plane jitter (≤ 0.03) and tilt (≤ 6°) were dropped: they moved tap targets and skewed tally marks.
+  - The incommensurate rates make the bounce less regular. This deterministic quasi-periodic signal has discrete spectral components; it is not, by itself, broadband noise.
+- **Events.** Pads use the press-bridge spring (ζ ≈ 0.65). Pop-out overshoots $h_0$ by about 5 %. Flip-home and heal settle to 0 with one rebound. The whole cubie under a pad uses a lighter spring (ζ ≈ 0.42). It passes its Explode position by about 22 %, then lands without sinking below zero.
 - **Reduced motion.** $A = 0$, with no jitter and no squash. Pads hold $h_0$, and wear shows as a static rim tint.
 
 Starting profiles (to tune in playtest). These small pad lifts are along the tile’s own outward normal, on top of the whole cubie’s radial extension.
 
 | Profile | $h_0$ | $A_0$ | $A_1$ | $f_0$ | Notes |
 |---|---|---|---|---|---|
-| WORM | 0.50 | 0.05 | 0.10 | 0.8 Hz | Lowest point ≥ 0.45. Head top is ≈ 0.17 plus hat and accents (≈ 0.30); verify every character. |
+| WORM | 0.30 | 0.05 | 0.10 | 0.8 Hz | Fixed height, no bounce (the landing must hold still). Sits over a piece popped 0.355; combined height 0.655 meets the ground-anchored tape. |
 | Cube / Story / Random | 0.30 | 0.04 | 0.12 | 0.9 Hz | |
 | Chaos | 0.14 | 0.02 | 0.10 | 1.0 Hz | Dense boards; the worn regime carries the betting read. |
 | Menu / intro | 0.35 | 0.06 | 0.10 | 0.7 Hz | Cinematic. |
-| Big boards (fxBudget `big`) | ×1 | ×0.5 | ×0.5 | ×1 | Worn jitter only near the camera. |
+| Big boards (fxBudget `big`) | ×1 | ×0.5 | ×0.5 | ×1 | Worn hop spread scales with the halved amplitude. |
 
 ```
         ┌──────────┐    ← flip pad: sticker face up, rides h(t)
@@ -247,7 +363,7 @@ Ship behind `tunnelEntry: 'crawl' | 'pad'`, a store setting with a story/level o
 
 ### 4.3 Crawling under pads (decided)
 
-- **Clearance.** The pad's lowest point is ≥ 0.45 in the WORM profile. Verify this against every character, including the Book head and MOBI's radius of 0.12, and every hat.
+- **Clearance.** The WORM pad hovers `WORM_PAD_HEIGHT` (0.30) above a piece popped `WORM_PIECE_POP` (0.06), so its underside sits 0.36 over the crawl route. That clears the bare head (≈ 0.17), MOBI's (radius 0.12, top ≈ 0.20) and a tall hat (≈ 0.30).
 - **Ghosting.** While the grounded head is within one cell of a pad, the pad ghosts to ~35 % opacity. This handles chase-camera occlusion and signals "you can pass under". It turns solid again when the worm is airborne, so solid means landable.
 - **HUD.** `onFlippedTile` becomes `onPadAhead`, and the HUD shows "JUMP to ride" while a rideable pad is in assist range.
 
@@ -494,7 +610,7 @@ For WORM and for $C \in \{6, 8\}$, the boundary lands exactly on the lethal-next
 
 That makes it a good *design* threshold, but it is an artifact of the lattice $n/C$, not an MDL result for this game. Before claiming more:
 
-- Add the fallback "or one life left", so every cap warns.
+- Add the fallback "or one life left", so every cap warns. *Shipped as `padIsWorn`.* With $w = n/C$ it adds a case only when $1 - 1/C < k^*$, i.e. $C \le 3$, where it marks the home tile $n = 2$.
 - Validate the boundary as a *perceptual* one with telemetry: do players stop riding or flipping pads above it?
 
 ### 9.7 Gaps in the request and the bridges they need
@@ -535,8 +651,9 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
 - `padPose.test.js`
   - Twin phases are equal.
   - In the WORM profile the lowest point is ≥ clearance.
-  - Jitter stays within the cell.
+  - Worn hops stay between hover and full amplitude, and the beat never runs backwards, including during the ease.
   - Regime switch, seeded determinism, and reduced motion = static.
+  - The whole-piece spring peaks within 1 % across 30, 60 and 144 fps and comes exactly to rest.
 - `padEntry.test.js`: the §4.1 table, row by row.
 - `rumbler.test.js`
   - A belt walk covers $4N$ cells.

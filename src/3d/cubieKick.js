@@ -17,24 +17,28 @@ export const KICK_DURATION_MS = 420;
 /** popKey → { startMs, x, y, z, amp } with (x, y, z) a unit direction in cube space. */
 export const cubieKicks = new Map();
 
+/** How hard a kick is still ringing `nowMs` in (its decaying envelope). */
+export function cubieKickRinging(kick, nowMs) {
+  if (!kick) return 0;
+  const u = (nowMs - kick.startMs) / KICK_DURATION_MS;
+  if (u >= 1) return 0;
+  return kick.amp * Math.pow(1 - Math.max(0, u), 1.6);
+}
+
 /**
  * Kick the cubie at `key` along `dir` (the struck face's outward normal — the
- * punch goes the opposite way, into the cube). A second hit while one is still
- * ringing restarts it at whichever amplitude is larger, so a burst of strikes on
- * one piece reads as one heavy blow instead of a jitter.
+ * punch goes the opposite way, into the cube). `startMs` may be in the future:
+ * a ripple lands on a neighbour a beat after the blow that caused it.
+ *
+ * A weaker hit never interrupts a stronger one that is still ringing — a burst
+ * of strikes on one piece reads as one heavy blow, and a neighbour's ripple can
+ * never cut short the piece's own hit. A stronger hit takes over.
  */
-export function fireCubieKick(key, dir, amp, nowMs) {
+export function fireCubieKick(key, dir, amp, startMs) {
   if (!key || !(amp > 0)) return;
+  if (amp <= cubieKickRinging(cubieKicks.get(key), startMs)) return;
   const len = Math.hypot(dir.x, dir.y, dir.z) || 1;
-  const prev = cubieKicks.get(key);
-  const live = prev && nowMs - prev.startMs < KICK_DURATION_MS;
-  cubieKicks.set(key, {
-    startMs: nowMs,
-    x: dir.x / len,
-    y: dir.y / len,
-    z: dir.z / len,
-    amp: live ? Math.max(amp, prev.amp * 0.6 + amp * 0.4) : amp
-  });
+  cubieKicks.set(key, { startMs, x: dir.x / len, y: dir.y / len, z: dir.z / len, amp });
 }
 
 /**

@@ -15,6 +15,9 @@ import CursorHighlight from '../components/overlays/CursorHighlight.jsx';
 import SolveHighlight from '../components/overlays/SolveHighlight.jsx';
 import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosStorm from '../manifold/ChaosStorm.jsx';
+import ChaosIgnitionMarker from '../manifold/ChaosIgnitionMarker.jsx';
+import { ignitionTileAt } from '../game/chaosIgnition.js';
+import { feel } from '../utils/feel.js';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
@@ -104,6 +107,7 @@ const CubeAssembly = React.memo(({
     rotationEpoch,
     settings,
     chaosLevel,
+    chaosIgnitionShown,
     cameraOrbitRequest,
     cameraOrbitDir,
   } = useGameStore(
@@ -124,6 +128,8 @@ const CubeAssembly = React.memo(({
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
       chaosLevel: s.chaosLevel,
+      // The first-strike pick: its marker is only mounted while the round waits.
+      chaosIgnitionShown: s.chaosLevel === 0 && (s.chaosIgnitionPicking || !!s.chaosIgnition),
       cameraOrbitRequest: s.cameraOrbitRequest,
       cameraOrbitDir: s.cameraOrbitDir,
     }))
@@ -376,6 +382,9 @@ const CubeAssembly = React.memo(({
           // never block rotation while a story level is active.
           const _cs = useGameStore.getState();
           if (_cs.chaosLevel > 0 && !_cs.currentLevelData) return;
+          // Aiming the first strike: a turn here would scramble the board out
+          // from under the round's scripted unshuffle. Taps still aim.
+          if (_cs.chaosIgnitionPicking) return;
         }
         if (gsapAnimRef.current) return;
         const m = mapSwipe(ds.n, dx, dy, ds.shiftKey);
@@ -553,7 +562,17 @@ const CubeAssembly = React.memo(({
       const { clientX, clientY } = getClientCoords(e);
       const dx = clientX - ds.screenX, dy = clientY - ds.screenY;
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD) {
-        if (flipModeRef.current) {
+        const pickStore = useGameStore.getState();
+        if (pickStore.chaosIgnitionPicking) {
+          // Choosing chaos's first strike: the tap aims it, whatever Flip is set
+          // to. Tapping another tile moves the aim; nothing flips until GO.
+          const { x, y, z } = ds.pos;
+          const tile = ignitionTileAt(pickStore.cubies, size, x, y, z, dirFromNormal(ds.n));
+          if (tile) {
+            pickStore.setChaosIgnition(tile);
+            feel('chaosZap', { combo: 3, priority: 1 });
+          }
+        } else if (flipModeRef.current) {
           const { x, y, z } = ds.pos;
           const dirKey = dirFromNormal(ds.n);
           const store = useGameStore.getState();
@@ -1232,6 +1251,7 @@ const CubeAssembly = React.memo(({
               ))}
             </>
           )}
+          {chaosIgnitionShown && <ChaosIgnitionMarker cubieRefs={cubieRefs.current} size={size} />}
           {/* Chaos lightning: bolts, wormhole surges and impacts, all aimed at
               live cubies so they follow pieces that rise, spring and turn. */}
           {!isBiomeMode && chaosLevel > 0 && (
