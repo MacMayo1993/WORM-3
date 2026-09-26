@@ -125,9 +125,11 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
   const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
   const stickersRef = useRef(cubie.stickers);
   stickersRef.current = cubie.stickers;
-  // Per face: the group a sticker turns in, and its mesh (whose material is its colour).
+  // Per face: the group a sticker turns in, its mesh (whose material is its
+  // colour), and the portal overlay riding on it, if a worm has been through.
   const turns = useRef({});
   const meshes = useRef({});
+  const overlays = useRef({});
   const settledFor = useRef(null);
 
   // The tap's flip wave. Idle frames return at once; each wave is played out
@@ -143,7 +145,11 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
       // The sticker is a two-sided slab, so a half turn lands it face up again.
       turn.rotation.x = p < 1 ? Math.PI * p : 0;
       turn.position.z = FLIP_LIFT * Math.sin(Math.PI * p);
-      mesh.material = STICKER_MATS[shownColor(sticker.curr, p >= 0.5 ? menuFlip.inverted : menuFlip.from)];
+      // The colour changes edge-on, halfway through the turn — sticker and
+      // portal glow together, since neither re-renders for a flip.
+      const shown = shownColor(sticker.curr, p >= 0.5 ? menuFlip.inverted : menuFlip.from);
+      mesh.material = STICKER_MATS[shown];
+      overlays.current[dir]?.setColors(RUBIKS_FACE_COLORS[shown], RUBIKS_FACE_COLORS[ANTIPODAL_COLOR[shown]]);
     }
     if (!running) settledFor.current = menuFlip.startT;
   });
@@ -167,7 +173,8 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
                 <mesh ref={el => { meshes.current[dir] = el; }} geometry={PIECE.sticker} material={STICKER_MATS[shown]} />
                 {isFlipped && (
                   <group position={[0, 0, 0.026]}>
-                    <MenuTileOverlay colorHex={RUBIKS_FACE_COLORS[shown]} antiColorHex={RUBIKS_FACE_COLORS[ANTIPODAL_COLOR[shown]]} />
+                    <MenuTileOverlay ref={el => { overlays.current[dir] = el; }}
+                      colorHex={RUBIKS_FACE_COLORS[shown]} antiColorHex={RUBIKS_FACE_COLORS[ANTIPODAL_COLOR[shown]]} />
                   </group>
                 )}
               </group>
