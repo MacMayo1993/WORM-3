@@ -118,6 +118,40 @@ describe('chaos launch', () => {
     expect(useGameStore.getState().chaosIgnition).toBeNull();
   });
 
+  it('leaving mid-pick drops the prompt and its aim, and a stale press launches nothing', async () => {
+    await launch();
+    await act(async () => calls.intro.post());
+    await act(async () => { vi.advanceTimersByTime(60); });
+    await act(async () => calls.shuffleDone());
+    await act(async () => useGameStore.getState().setChaosIgnition({ x: 0, y: 0, z: 4, dirKey: 'PZ', gridId: 'M1-001' }));
+    // Every Home path resets the session (handleBackToMainMenu); none of them has
+    // to know the pick exists for it to go away.
+    await act(async () => {
+      useGameStore.getState().resetGame();
+      useGameStore.getState().clearDisparityGame();
+    });
+    expect(out.current.ignitionPicking).toBe(false);
+    expect(useGameStore.getState().chaosIgnition).toBeNull();
+    await act(async () => out.current.surpriseIgnition());
+    await act(async () => out.current.confirmIgnition());
+    expect(out.current.disparityCountdown).toBeNull();
+    expect(useGameStore.getState().chaosIgnition).toBeNull();
+  });
+
+  it('while aiming, the board cannot be turned or shuffled from the keyboard', async () => {
+    const { selectCubeInputBlocked, BLOCKING_FLAGS, MODAL_SURFACES } = await import('../hooks/uiSurfaces.js');
+    // Nothing else owns the screen: the menu is closed and play is live.
+    useGameStore.setState({ ...Object.fromEntries([...BLOCKING_FLAGS, ...MODAL_SURFACES.map((m) => m.flag)].map((k) => [k, false])), victory: null });
+    await launch();
+    await act(async () => calls.intro.post());
+    await act(async () => { vi.advanceTimersByTime(60); });
+    expect(selectCubeInputBlocked(useGameStore.getState())).toBe(false);
+    await act(async () => calls.shuffleDone());
+    expect(selectCubeInputBlocked(useGameStore.getState())).toBe(true);
+    await act(async () => out.current.surpriseIgnition());
+    expect(selectCubeInputBlocked(useGameStore.getState())).toBe(false);
+  });
+
   it('the guided demo still goes straight to the countdown', async () => {
     await act(async () => out.current.startDisparityGame(WIZARD));
     await act(async () => { vi.advanceTimersByTime(60); });

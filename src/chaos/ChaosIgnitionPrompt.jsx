@@ -9,7 +9,9 @@ import './chaosIgnition.css';
 // Docked at the bottom and click-through everywhere but the card, so the cube
 // stays in view and every tile stays tappable — CubeAssembly routes the tap to
 // the pick while this is up, and ChaosIgnitionMarker shows where it landed.
-export default function ChaosIgnitionPrompt({ onConfirm, onSurprise }) {
+// The game HUD is hidden meanwhile (no Shuffle/Undo on the waiting board), so the
+// way home lives here.
+export default function ChaosIgnitionPrompt({ onConfirm, onSurprise, onLeave }) {
   const picked = useGameStore((s) => !!s.chaosIgnition);
   return (
     <div className="chaos-ignition" style={{ zIndex: Z.COUNTDOWN }}>
@@ -26,6 +28,7 @@ export default function ChaosIgnitionPrompt({ onConfirm, onSurprise }) {
           <button type="button" className="arcade-key" onClick={onSurprise}>Surprise me</button>
           <button type="button" className="arcade-primary" onClick={onConfirm} disabled={!picked}>Strike here ▶</button>
         </div>
+        {onLeave && <button type="button" className="chaos-ignition-leave" onClick={onLeave}>Leave to menu</button>}
       </section>
     </div>
   );

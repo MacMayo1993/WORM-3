@@ -49,6 +49,9 @@ export const BLOCKING_FLAGS = [
   'showCutscene',
   'showDisparityWinner',
   'showWormDeathMenu',
+  // Aiming chaos's first strike: taps choose a tile, but no key may turn, flip,
+  // shuffle or undo the board the round's scripted unshuffle is waiting on.
+  'chaosIgnitionPicking',
 ];
 
 /**
