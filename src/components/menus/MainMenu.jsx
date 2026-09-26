@@ -6,7 +6,6 @@ import './mainMenuKeys.css';
 import { fitCarouselCube, carouselTurnScale } from './fitCarouselCube.js';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
 import { MENU_FLIP_PAIRS, flipMenuCenters } from './menuCenterPortals.js';
-import { carouselPlateGeometry } from './carouselPlateGeometry.js';
 import CubeGlowWorm from './CubeGlowWorm.jsx';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -709,51 +708,64 @@ function makeContactShadowTexture() {
   return tex;
 }
 
-// Renders a beveled, glossy solid-color tile on every cube face, with a
-// centered display title. Fully opaque,
-// depth-writing tiles occlude the faces behind them, so only the words on
-// visible faces read — hidden faces are naturally masked by the front tile.
+// The six-faces selector's cube: the menu cube, solved. The same black-plastic
+// pieces and glossy stickers (rubiksPiece.js), each face's nine stickers in its
+// mode's colour, with the mode's name standing just off the face. The selected
+// face is at full colour and gloss; the others are toned down by mixing toward
+// grey rather than darkening, so orange and yellow stay orange and yellow.
+const CAROUSEL_PIECES = [];
+for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+  CAROUSEL_PIECES.push({ position: [x, y, z],
+    stickers: STICKER_CFG.filter(({ pos }) => pos.every((v, i) => !v || Math.sign(v) === [x, y, z][i] && [x, y, z][i] !== 0)) });
+}
+// One material per face, made on first use (CAROUSEL_MODES is declared further
+// down) and kept for the app's life like the menu cube's own.
+let carouselStickerMats = null;
+const getCarouselStickerMats = () => carouselStickerMats ??= Object.fromEntries(CAROUSEL_MODES.map(m =>
+  [m.face, new FINISH.Material({ ...FINISH.sticker, color: m.tileColor, envMapIntensity: 0.18 })]));
+const _faceGrey = new THREE.Color();
+function restingFaceColor(target, base) {
+  const lum = 0.2126 * base.r + 0.7152 * base.g + 0.0722 * base.b;
+  return target.copy(base).lerp(_faceGrey.setRGB(lum, lum, lum), 0.35).multiplyScalar(0.9);
+}
+
 const ModeFacePlates = React.forwardRef((_props, rootRef) => {
-  const enamelRefs = useRef({});
+  const stickerMats = getCarouselStickerMats();
   const faceColors = useMemo(() => Object.fromEntries(CAROUSEL_MODES.map(m => [m.face, new THREE.Color(m.tileColor)])), []);
   const targetColor = useMemo(() => new THREE.Color(), []);
   useFrame((_state, delta) => {
     if (!isCarouselActive()) return;
     const selected = getCarouselFace() || 'PZ';
-    for (const [face, material] of Object.entries(enamelRefs.current)) {
-      if (!material) continue;
-      targetColor.copy(faceColors[face]).multiplyScalar(face === selected ? 1 : 0.72);
+    for (const [face, material] of Object.entries(stickerMats)) {
+      const isSelected = face === selected;
+      if (isSelected) targetColor.copy(faceColors[face]);
+      else restingFaceColor(targetColor, faceColors[face]);
       material.color.lerp(targetColor, 1 - Math.exp(-8 * delta));
-      material.roughness = face === selected ? 0.3 : 0.55;
-      material.clearcoat = face === selected ? 1 : 0.25;
+      material.roughness = isSelected ? FINISH.sticker.roughness : 0.4;
+      if ('clearcoat' in material) material.clearcoat = isSelected ? 1 : 0.5;
     }
   });
   // Visibility is owned by RotatingBlackCube's frame loop (not React state, and
   // not a second useFrame here): the same frame that decides to present a mode
-  // face turns the plates on. Two independent readers of the carousel flag
-  // could disagree, and a frame with the plates up but the cube still in its
-  // free-spin pose is the glitch — labels sliced by neighbouring plates on a
-  // cube drifting off centre.
+  // face turns this cube on. Two independent readers of the carousel flag
+  // could disagree, and a frame with the selector cube up but the menu cube
+  // still in its free-spin pose is the glitch.
   return (
     <group ref={rootRef} visible={false}>
+      {CAROUSEL_PIECES.map(({ position, stickers }) => (
+        <group key={position.join()} position={position}>
+          <mesh geometry={PIECE.body} material={PLASTIC} />
+          {stickers.map(({ dir, pos, rot }) => (
+            <mesh key={dir} geometry={PIECE.sticker} material={stickerMats[dir]} position={pos} rotation={rot} />
+          ))}
+        </group>
+      ))}
       {CAROUSEL_MODES.map((m) => {
         const cfg = MODE_FACE_CFG[m.face];
         return (
           <group key={m.id} position={cfg.pos} rotation={cfg.rot}>
-            {/* Graphite chassis, a fine metal reveal, and a beveled enamel insert. */}
-            <mesh position={[0, 0, -0.045]} renderOrder={30}>
-              <boxGeometry args={[3.12, 3.12, 0.07]} />
-              <meshPhysicalMaterial color="#172030" metalness={0.65} roughness={0.32} clearcoat={0.45} envMapIntensity={0.35} />
-            </mesh>
-            <mesh geometry={carouselPlateGeometry} scale={[1.025, 1.025, 1]} position={[0, 0, -0.008]} renderOrder={30}>
-              <meshPhysicalMaterial color="#667389" metalness={0.8} roughness={0.26} envMapIntensity={0.45} />
-            </mesh>
-            <mesh geometry={carouselPlateGeometry} renderOrder={31}>
-              <meshPhysicalMaterial ref={material => { enamelRefs.current[m.face] = material; }} color={m.tileColor} metalness={0.08} roughness={0.3}
-                clearcoat={1} clearcoatRoughness={0.2} envMapIntensity={0.3} />
-            </mesh>
-            {/* Center the title on the plain face. Longer names step down in
-                size so every mode, including FLIP CUBE, fits on one line. */}
+            {/* The name stands just off the stickers' domes. Longer names step
+                down in size so every mode, including FLIP CUBE, fits on one line. */}
             <Text
               position={[0, 0, 0.055]}
               font={bungeeWoffUrl}
@@ -762,8 +774,8 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               color={m.textColor}
               anchorX="center"
               anchorY="middle"
-              outlineWidth={0.02}
-              outlineColor={m.textColor === '#fffdf2' ? '#162035' : '#f4f1e8'}
+              outlineWidth={0.03}
+              outlineColor={m.textColor === '#fffdf2' ? '#111111' : '#f4f1e8'}
               renderOrder={34}
             >
               {m.label}
