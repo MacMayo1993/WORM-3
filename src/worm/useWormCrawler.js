@@ -6,7 +6,7 @@ import { storyLevel, storyOutcome } from './story/levels.js';
 import { storyHudSnapshot } from './story/hudSnapshot.js';
 import { offerStoryPower, recordStoryMechanic } from './story/mastery.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
-import { stageStory, storyMetrics, replenishStoryTunnel } from './story/runtime.js';
+import { stageStory, storyMetrics, replenishStoryTunnel, replenishStoryOrbs } from './story/runtime.js';
 import { wormEventChanges } from './wormEventChanges.js';
 import { withPersistenceBatch } from '../utils/persistenceBatch.js';
 import { cancelAmbientEncounter, makeAmbientCombat, stepAmbientCombat } from './combat/ambientCombat.js';
@@ -585,6 +585,9 @@ export function useWormCrawler(size, cubies) {
             if (!sim.jumpRescueHeld && !live.animState && !liveRotation.active && sim.cutFocusT <= 0 && sim.healPauseT <= 0 &&
                 offerStoryPower(sim, storyPracticeRef.current, story, sizeRef.current, live.cubies)) {
                 useGameStore.setState({ wormSpecials: sim.specials.slice(), wormPowerups: sim.powerups.slice() });
+            }
+            if (!elementalRevealHeld && replenishStoryOrbs(sim, storyPracticeRef.current, live, sizeRef.current, delta)) {
+                useGameStore.setState({ wormPowerups: sim.powerups.slice() });
             }
             if (story.mechanics) {
                 const target = sim.specials[0] ?? null;

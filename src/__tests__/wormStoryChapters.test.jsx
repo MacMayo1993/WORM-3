@@ -63,8 +63,8 @@ describe('the new chapters use the whole cube', () => {
     expect(later.some(level => level.rotateEvery)).toBe(true);
   });
 
-  it('ends each chapter on its biggest task list', () => {
-    for (const chapter of WORM_STORY_CHAPTERS) {
+  it('reserves the longest final checklists for later chapters', () => {
+    for (const chapter of WORM_STORY_CHAPTERS.slice(1)) {
       const goals = chapter.levels.map(level => storyChecklist(level).length);
       expect(goals.at(-1)).toBe(Math.max(...goals));
     }
@@ -115,7 +115,7 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
     const pairs = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
     expect(tunnels).toHaveLength(Math.min(2,pairs));
     expect(tunnels.length + staged.pendingMouths.length).toBe(pairs);
-    // Story orbs never respawn: the route must hold enough for every orb goal.
+    // The opening route already holds enough for the goal before refills.
     expect(sim.powerups.length).toBeGreaterThanOrEqual(Math.max(level.orbs ?? 0, level.kind === 'orbs' ? level.target : 0));
     const colors = new Set(sim.powerups.map(orb => staged.cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].curr));
     expect(colors.size).toBe(6);

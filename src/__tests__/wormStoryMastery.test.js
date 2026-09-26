@@ -28,25 +28,25 @@ it.each([7, 8, 9, 10])('authors level %i with enough matching orbs and real heal
 });
 it('requires every final-level mechanic, a safe landing, tail clearance and settled rotation', () => {
   const level = storyLevel(10);
-  const won = { ...level.mechanics, alive: true, elapsed: 300, cuts: 0, orbs: 36, rotations: 8, healed: 6, remaining: 0, tailClear: true, landed: true, rotationSettled: true };
+  const won = { ...level.mechanics, alive: true, elapsed: 200, cuts: 0, orbs: 24, rotations: 4, healed: 3, remaining: 0, tailClear: true, landed: true, rotationSettled: true };
   expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
   for (const [key, target] of Object.entries(level.mechanics)) expect(storyOutcome(level, { ...won, [key]: target - 1 })).toBeNull();
   for (const key of ['alive', 'tailClear', 'landed', 'rotationSettled']) expect(storyOutcome(level, { ...won, [key]: false })).toBeNull();
   expect(storyOutcome(level, { ...won, elapsed: level.limit + 1 })).toBeNull();
 });
-it('stages the Stage 9 body on the 7x7 exterior and completes with one bomb and enemy', () => {
+it('stages the Stage 9 body on the 6x6 exterior and completes with one bomb and enemy', () => {
   const { sim, level, p } = setup(9);
-  expect(level.cubeSize).toBe(7);
-  expect(p.cubies).toHaveLength(7);
-  expect(sim.pos).toMatchObject({ x: 3, y: 0, z: 6, dirKey: 'PZ' });
-  const headZ = getStickerWorldPos(3, 0, 6, 'PZ', 7, 0)[2] + WORM_LIFT;
+  expect(level.cubeSize).toBe(6);
+  expect(p.cubies).toHaveLength(6);
+  expect(sim.pos).toMatchObject({ x: 3, y: 0, z: 5, dirKey: 'PZ' });
+  const headZ = getStickerWorldPos(3, 0, 5, 'PZ', 6, 0)[2] + WORM_LIFT;
   for (let i = 0; i < sim.stepHistory.count; i++) {
     const point = shAt(sim.stepHistory, i);
-    expect(point.tz).toBe(6);
+    expect(point.tz).toBe(5);
     expect(point.pos.z).toBeCloseTo(headZ, 8);
     if (i > 0) expect(point.pos.distanceTo(shAt(sim.stepHistory, i - 1).pos)).toBeCloseTo(0.02, 8);
   }
-  expect(ttAt(sim.tileTrail, 0)).toBe('3,0,6,PZ');
+  expect(ttAt(sim.tileTrail, 0)).toBe('3,0,5,PZ');
   const won = { alive: true, elapsed: 200, cuts: 0, orbs: 24, healed: 4, remaining: 0,
     tailClear: true, landed: true, rotationSettled: true, ringHeals: 1, signatures: 2, bombs: 1, kills: 1 };
   expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
@@ -76,11 +76,11 @@ it('does not count fatal landings or an Inch signature that only charged', () =>
   sim.alive = false; sim.isJumping = false; expect(read().doubleJumps).toBeUndefined();
 });
 it('checks all five elemental effects and reoffers a missed or expired power', () => {
-  const { sim, p, level, read } = setup(10);
-  p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 4;
-  sim.specials = []; p.powerDelay = 0; offerStoryPower(sim, p, level, 5, p.cubies);
+  const { sim, p, level, read } = setup(40);
+  p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 4; p.mechanics.explodes = 2;
+  sim.specials = []; p.powerDelay = 0; offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
-  sim.specials = []; p.powerDelay = 0; expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
+  sim.specials = []; p.powerDelay = 0; expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('water');
   for (const type of ['water', 'fire', 'grass', 'ice', 'lightning']) {
     sim.specials = []; sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0;
@@ -97,18 +97,18 @@ it('checks all five elemental effects and reoffers a missed or expired power', (
       sim.isJumping = false; read();
     }
     expect(p.elements.has(type)).toBe(true);
-    expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(false); // don't replace an active element
+    expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false); // don't replace an active element
   }
   expect(read().elements).toBe(5); expect(nextStoryPower(p, level)).toBeNull();
 });
 it('finishes level eight with two collected elements without waiting for mastery', () => {
   const { sim, p, level, read } = setup(8);
   expect(level.mechanics).toEqual({ elementPickups: 2 });
-  p.powerDelay = 0; offerStoryPower(sim, p, level, 5, p.cubies);
+  p.powerDelay = 0; offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
   p.powerDelay = 0;
   sim.specials = []; // missed offerings do not count and can be offered again
-  expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
+  expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
   expect(read().elementPickups).toBeUndefined();
   const won = { alive: true, elapsed: 80, cuts: 0, orbs: 24, healed: 3, remaining: 0,
     tailClear: true, landed: true, rotationSettled: true };
@@ -116,22 +116,22 @@ it('finishes level eight with two collected elements without waiting for mastery
   expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).toBeNull();
   expect(nextStoryPower(p, level)).toBe('fire');
   sim.specials = []; sim.elementalT = 10;
-  expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(false);
+  expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false);
   sim.elementalT = 0; p.powerDelay = 0;
-  expect(offerStoryPower(sim, p, level, 5, p.cubies)).toBe(true);
+  expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('fire');
   recordStoryMechanic(p, 'elementPickups');
   expect(p.elements.size).toBe(0);
   expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).not.toBeNull();
   expect(nextStoryPower(p, level)).toBeNull();
-  expect(stageStory(sim, 5, level).mechanics).toEqual({});
+  expect(stageStory(sim, level.cubeSize ?? 5, level).mechanics).toEqual({});
 });
 it('deduplicates disarms and resets every mastery counter on retry', () => {
   const { sim, p, level } = setup();
   recordStoryMechanic(p, 'bombs', 0); recordStoryMechanic(p, 'bombs', 0); recordStoryMechanic(p, 'bombs');
   recordStoryMechanic(p, 'ringHeals'); recordStoryMechanic(p, 'magnetOrbs');
   expect(p.mechanics).toEqual({ bombs: 1, ringHeals: 1, magnetOrbs: 1 });
-  const retry = stageStory(sim, 5, level);
+  const retry = stageStory(sim, level.cubeSize ?? 5, level);
   expect(retry.mechanics).toEqual({}); expect(retry.elements.size).toBe(0); expect(retry.bombIds.size).toBe(0);
 });
 it('keeps six-level saves and claims intact, resumes at seven, and carries chapter one into chapter two', () => {
@@ -173,7 +173,7 @@ it('holds warnings in a pause, avoids other hazards, and cancels stale encounter
 });
 
 it('offers one optional view in later Story levels without replacing required powers', () => {
-  const { sim, p, level } = setup(10);
+  const { sim, p, level } = setup(40);
   const size = level.cubeSize ?? 5;
   sim.specials = []; p.powerDelay = 0;
   expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(true);
