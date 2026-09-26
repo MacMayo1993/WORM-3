@@ -44,7 +44,7 @@ export const WORM_STORY_LEVELS = [
 
   // ── Chapter 2 · Every Size ───────────────────────────────────────────────
   // The same crawl on every board from the 2×2 pocket cube to 8×8, with the
-  // cube's alternate views (grid, numbers, glass, chrome, gap, neon) and the
+  // cube's alternate views (grid, numbers, glass, chrome, neon) and the
   // explode power introduced along the way.
   { id: 11, title: 'Pocket Crawl', subtitle: 'The smallest cube. Every tile is a corner.', cubeSize: 2,
     goal: 'Collect 10 orbs, including all 6 colors, on the 2×2 pocket cube.',
@@ -63,8 +63,8 @@ export const WORM_STORY_LEVELS = [
     goal: 'Collect all 6 colors and heal 4 tunnel pairs on a 6×6 chrome cube while layers turn. Clear your tail to finish.',
     kind: 'collector', target: 4, colors: 6, speed: 2.25, rotateEvery: 14, par: 180, limit: 285,
     reward: ['scheme_gemstone', 'scheme_noire'], rewardLabel: 'Choose a palette', fallback: 120 },
-  { id: 16, title: 'Mind the Gap', subtitle: 'Seven layers, and space between every piece.', cubeSize: 7,
-    goal: 'Heal 5 tunnel pairs, collect 24 orbs and survive 5 turns on a 7×7 cube in Gap view. Clear your tail to finish.',
+  { id: 16, title: 'Sea of Seven', subtitle: 'Seven layers of reef-colored routes.', cubeSize: 7,
+    goal: 'Heal 5 tunnel pairs, collect 24 orbs and survive 5 turns on a 7×7 cube. Clear your tail to finish.',
     kind: 'restore', target: 5, orbs: 24, rotations: 5, speed: 2.33, rotateEvery: 13, par: 245, limit: 395, points: 35 },
   { id: 17, title: 'Launch Pad', subtitle: 'Boost, bounce and fly on a tight board.', cubeSize: 4,
     goal: 'Finish 2 boosts, land 2 double jumps and 1 rocket flight, collect 14 orbs and heal 2 pairs on a 4×4 cube.',
@@ -177,7 +177,7 @@ export const WORM_STORY_LEVELS = [
 export const STORY_CHAPTER_SIZE = 10;
 export const WORM_STORY_CHAPTERS = [
   { id: 1, title: 'Hatchling', blurb: 'Learn to crawl, jump, heal and fight on a classic six-color cube.' },
-  { id: 2, title: 'Every Size', blurb: 'From the 2×2 pocket cube to 8×8, in grid, number, glass, chrome, gap and neon views.' },
+  { id: 2, title: 'Every Size', blurb: 'From the 2×2 pocket cube to 8×8, in grid, number, glass, chrome and neon views.' },
   { id: 3, title: 'Strange Views', blurb: 'Hollow frames, bare wireframe, bricks, biomes, the far side and Random’s remix.' },
   { id: 4, title: 'Grand Crawl', blurb: 'Nine, ten and fifteen layers. Every view and power, on shorter clocks.' },
 ].map(chapter => ({ ...chapter, levels: WORM_STORY_LEVELS.filter(level => storyChapterId(level.id) === chapter.id) }));
