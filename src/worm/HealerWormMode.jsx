@@ -194,8 +194,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Build a fresh scramble whenever a new run starts (or on first mount).
     useEffect(() => {
         const generateScramble = () => {
-            const story = storyLevel(useGameStore.getState().wormStoryLevel);
-            const seq = story ? [] : buildWormScramble(size, SCRAMBLE_STEPS);
+            const state = useGameStore.getState();
+            const story = storyLevel(state.wormStoryLevel);
+            const practice = wormDemoActive(state);
+            const seq = story || practice ? [] : buildWormScramble(size, SCRAMBLE_STEPS);
             scrambleSeqRef.current  = seq;
             // Reverse the sequence and every turn so the timed hazard solves the board.
             inverseQueueRef.current = story ? (story.rotateEvery ? storyRotationCycle(size) : []) : invertWormScramble(seq);
@@ -224,7 +226,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 spawnTimerRef.current    = 0;
                 useGameStore.setState({ wormGamePhase: 'spawning', wormCountdownStep: null });
             };
-            if (story) {
+            if (story || practice) {
                 // The authored board is staged by the next crawler tick. Its ready
                 // card starts play, without a second countdown on every short retry.
                 gameModePhaseRef.current = 'active';

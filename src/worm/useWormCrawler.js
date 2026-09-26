@@ -570,7 +570,9 @@ export function useWormCrawler(size, cubies) {
             const result = readWormPractice(sim, demoPracticeRef.current, lesson, useGameStore.getState(), sizeRef.current, delta);
             if (result.done || result.progress !== state.demoWormProgress) {
                 useGameStore.setState({ demoWormProgress: result.progress,
-                    ...(result.done ? { demoWormComplete: true, wormPaused: true,
+                    // Reaching a goal unlocks Next; it never interrupts the
+                    // live practice. Only the player pauses or leaves a lesson.
+                    ...(result.done ? { demoWormComplete: true,
                         demoWormCompleted: [...new Set([...state.demoWormCompleted, lesson.id])] } : {}) });
             }
         }

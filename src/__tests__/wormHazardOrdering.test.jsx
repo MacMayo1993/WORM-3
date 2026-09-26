@@ -67,6 +67,22 @@ afterEach(() => {
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
 
+it('opens the authored WORM demo board without a scramble or countdown', () => {
+  const shuffle = vi.fn();
+  act(() => {
+    useGameStore.setState({ demoMode: true, demoStep: 'worm-traversal', demoWormLessonIndex: 0 });
+    root.render(<Harness cubies={useGameStore.getState().cubies} size={3} onRotate={rotate} onAnimatedShuffle={shuffle} />);
+  });
+  expect(shuffle).not.toHaveBeenCalled();
+  expect(useGameStore.getState().wormGamePhase).toBe('active');
+  expect(useGameStore.getState().wormCountdownStep).toBeNull();
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  act(() => useGameStore.setState({ wormPaused: false }));
+  tick(300);
+  expect(rotate).not.toHaveBeenCalled();
+  expect(useGameStore.getState().wormGamePhase).toBe('active');
+});
+
 it('does not evaluate or dequeue a slice while another move awaits commit', () => {
   act(() => useGameStore.setState({ animState: { axis: 'row', sliceIndex: 1, dir: 1 } }));
   tick(150);

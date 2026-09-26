@@ -1,24 +1,22 @@
-.worm-demo-card { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid #a8bb9470; border-radius: 16px; background: #252c25fa; color: #fff9e9; pointer-events: auto; }
-.worm-demo-heading { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
-.worm-demo-heading span { flex-shrink: 0; color: #c4df91; font-variant-numeric: tabular-nums; }
-.worm-demo-card p { margin: 6px 0; font-size: 12px; line-height: 1.4; }
-.worm-demo-track { height: 3px; margin-top: 6px; border-radius: 3px; background: #ffffff24; overflow: hidden; }
-.worm-demo-track > div { height: 100%; background: #c4df91; }
-.worm-demo-detail { font-size: 11px; color: #c4df91; margin: 4px 0; }
-.worm-demo-actions { display: flex; gap: 6px; }
-.worm-demo-actions button { flex: 1; min-height: 44px; padding: 4px 6px; color: inherit; font: inherit; font-size: 11px; font-weight: 700; background: #ffffff0c; border: 1px solid #ffffff30; border-radius: 10px; cursor: pointer; }
-.worm-demo-actions .worm-demo-next { color: #202b19; background: #c4df91; }
-.worm-demo-actions button:focus-visible { outline: 3px solid #c4df91; outline-offset: 2px; }
+/* Same paper, ink and keys as the mode screens, sized for the live thumb tray. */
+.worm-demo-card { width: 100%; padding: 12px; border-radius: 20px; background-image: var(--arcade-grid); background-size: var(--arcade-grid-size); pointer-events: auto; font-family: var(--ui-font); }
+.worm-demo-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font: 800 17px/1.2 var(--heading-font); }
+.worm-demo-heading span { flex-shrink: 0; color: var(--arcade-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.worm-demo-card p { margin: 8px 0; font-size: 13px; line-height: 1.4; }
+.worm-demo-track { height: 4px; margin-top: 8px; border-radius: 4px; background: var(--arcade-line-soft); overflow: hidden; }
+.worm-demo-track > div { height: 100%; background: var(--arcade-accent); }
+.worm-demo-detail { font: 700 12px/1.35 var(--heading-font); color: var(--arcade-ink-strong); margin: 6px 0 10px; }
+.worm-demo-actions { display: flex; gap: 8px; padding-bottom: 3px; }
+.worm-demo-actions button { flex: 1; min-width: 0; min-height: 48px; padding: 6px; font-size: 11px; letter-spacing: .02em; border-radius: 12px; }
 .worm-instrument[data-lesson="jump"] .worm-jump,
 .worm-instrument[data-lesson="double-jump"] .worm-jump,
 .worm-instrument[data-lesson="grass"] .worm-jump,
 .worm-instrument[data-lesson="ice"] .worm-jump,
 .worm-instrument[data-lesson="boost"] .worm-boost,
-.worm-instrument[data-lesson="signature"] .worm-signature-control button { outline: 2px solid #c4df91; outline-offset: 3px; }
+.worm-instrument[data-lesson="signature"] .worm-signature-control button { outline: 2px solid var(--arcade-focus); outline-offset: 3px; }
 @media (max-height: 520px) and (min-width: 600px) {
   .worm-demo-card { display: grid; grid-template-columns: 1fr 230px; gap: 4px 12px; padding: 8px 10px; }
   .worm-demo-heading, .worm-demo-track, .worm-demo-card p, .worm-demo-detail { grid-column: 1; }
   .worm-demo-actions { grid-column: 2; grid-row: 1 / span 4; align-items: center; }
-  .worm-demo-card p { margin: 0; }
+  .worm-demo-card p, .worm-demo-detail { margin: 0; }
 }
-.worm-demo-actions button:disabled { opacity: .5; cursor: default; }
