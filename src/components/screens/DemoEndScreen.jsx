@@ -20,7 +20,7 @@ const MODES = [
     primary: true,
   },
   { id: 'story', name: 'Teach', blurb: 'Learn a complete beginner cube method.' },
-  { id: 'freeplay', name: 'Cube', blurb: 'Solve a cube at any size, no timer.' },
+  { id: 'freeplay', name: 'Flip Cube', blurb: 'Solve the Flip Cube at any size, no timer.' },
   { id: 'chaos', name: 'Chaos', blurb: 'Predict which color pair lasts longest.' },
   { id: 'random', name: 'Random', blurb: 'Solve while the colors and tile styles change.' },
   { id: 'store', name: 'Store', blurb: 'Spend Parity Points on palettes, styles, and worm gear.' },

@@ -19,7 +19,7 @@ import bungeeWoffUrl from '@fontsource/bungee/files/bungee-latin-400-normal.woff
 // Warm troika's glyph atlas for the mode labels at module load so the first
 // face's label renders instantly instead of popping in a frame late.
 preloadFont(
-  { font: bungeeWoffUrl, characters: 'WORMCUBETEACHOSRND' },
+  { font: bungeeWoffUrl, characters: 'WORMFLIPCUBETEACHOSRND' },
   () => {}
 );
 import { makeCubies } from '../../game/cubeState.js';
@@ -828,11 +828,14 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               <planeGeometry args={[2.35, 2.35]} />
               <meshBasicMaterial map={decals[m.id]} transparent depthWrite={false} toneMapped={false} />
             </mesh>}
-            {/* Keep the illustration and give each face a legible arcade title. */}
+            {/* Keep the illustration and give each face a legible arcade title.
+                FLIP CUBE is the one two-word title: at RANDOM's size it overruns
+                maxWidth and wraps up into the illustration, so it steps down again
+                to hold one line at the same width as the others. */}
             <Text
               position={[0, -0.86, 0.055]}
               font={bungeeWoffUrl}
-              fontSize={m.label.length > 5 ? 0.48 : 0.62}
+              fontSize={m.label.length > 6 ? 0.42 : m.label.length > 5 ? 0.48 : 0.62}
               maxWidth={2.5}
               color={m.textColor}
               anchorX="center"
@@ -1122,7 +1125,7 @@ const CAROUSEL_MODES = [
     cta: 'PLAY',
   },
   {
-    id: 'freeplay', label: 'CUBE', face: 'NY',
+    id: 'freeplay', label: 'FLIP CUBE', face: 'NY',
     how: 'Make each face one color.',
     chips: ['2×2 – 10×10', 'Relaxed'],
     cta: 'PLAY',

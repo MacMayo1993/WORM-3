@@ -588,7 +588,7 @@ export function WizardShell({
   const theme = modeTheme(mode);
   // The carousel's face colour for this mode drives the primary key and the
   // selection tint; the shell's own lines and ink are the arcade neutrals.
-  const modeVars = arcadeModeVars(theme.name.toLowerCase());
+  const modeVars = arcadeModeVars(mode);
   const cat = categories[active];
   const last = active === categories.length - 1;
   // Keep the cube above the setup selector and its style-family controls.
@@ -624,7 +624,7 @@ export function WizardShell({
         <div className="mode-wizard-scroll" ref={scrollRef}>
         <header className="mode-wizard-heading">
           <div><h1>{cat.hero ? cat.label : cat.title}</h1>{!cat.hero && cat.subtitle && <p>{cat.subtitle}</p>}</div>
-          <ModeArtwork mode={theme.name === 'CUBE' ? 'freeplay' : theme.name.toLowerCase()} />
+          <ModeArtwork mode={theme.art} />
         </header>
         {specimen}
         {isStyle && categoryBar}
