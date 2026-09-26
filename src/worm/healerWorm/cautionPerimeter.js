@@ -9,7 +9,7 @@ const FACES = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 // Build the boundary of the exposed floor opening, not a separate fence around
 // every portal sticker. A raised corner exposes three faces; their shared cube
 // edges are inside the opening and must not carry crossing strips of tape.
-export function buildCautionPerimeter(positions, cubies, size, cap) {
+export function buildCautionPerimeter(positions, cubies, size, cap, separateCubies = false) {
   const faces = new Map();
   const visited = new Set();
   const addFace = (tile, dirKey) => {
@@ -38,8 +38,11 @@ export function buildCautionPerimeter(positions, cubies, size, cap) {
     const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([du, dv]) => {
       const q = [face.x * 2, face.y * 2, face.z * 2];
       q[axis] += sign; q[u] += du; q[v] += dv;
-      const key = q.join(',');
-      if (!vertices.has(key)) vertices.set(key, { key, grid: q, normals: new Set(), up: new THREE.Vector3() });
+      const center = [face.x, face.y, face.z];
+      // Adjacent cubies share corners only while assembled. Explode separates
+      // their unit-sized openings, so each cubie then needs its own boundary.
+      const key = `${separateCubies ? center.join(',') + ':' : ''}${q.join(',')}`;
+      if (!vertices.has(key)) vertices.set(key, { key, grid: q, center, normals: new Set(), up: new THREE.Vector3() });
       return vertices.get(key);
     });
     if (sign < 0) corners.reverse();
@@ -68,10 +71,9 @@ export function buildCautionPerimeter(positions, cubies, size, cap) {
 export function cautionPointInto(out, vertex, size, expansion, height = 0) {
   const scale = cubeExpansionScale(size, expansion), k = (size - 1) / 2;
   for (let axis = 0; axis < 3; axis++) {
-    const q = vertex.grid[axis];
-    const value = q === -1 ? -k * scale - 0.5
-      : q === 2 * size - 1 ? k * scale + 0.5 : (q / 2 - k) * scale;
-    out.setComponent(axis, value);
+    const center = vertex.center[axis];
+    const cornerOffset = vertex.grid[axis] / 2 - center;
+    out.setComponent(axis, (center - k) * scale + cornerOffset);
   }
   return out.addScaledVector(vertex.up, SURFACE_OFFSET - 0.5 + height);
 }

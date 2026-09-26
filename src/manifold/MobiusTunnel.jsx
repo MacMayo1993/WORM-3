@@ -1,4 +1,4 @@
-import { fillTunnelRideGeometry } from '../utils/tunnelRide.js';
+import { fillTunnelRideGeometry, tunnelRideCoreArc } from '../utils/tunnelRide.js';
 import { PLATFORM_FORMATION_SECONDS, platformFormationHeld } from '../worm/platformFormation.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
@@ -115,6 +115,13 @@ const vertexShader = `
 // Each half is the solid color of its own tile — no cross-blending.
 // Scroll flows toward the centre from both ends so movement reads as "into the tunnel".
 // uScrollSpeed is modulated by tunnel progress so it accelerates at the Möbius midpoint.
+const rideColorShader = `
+  vec3 rideColor(float trip) {
+    // Two solid endpoint colors, with only pixel-width filtering at the core.
+    float aa = max(fwidth(trip), 0.00001);
+    return mix(uColorA, uColorB, smoothstep(uRideCore - aa, uRideCore + aa, trip));
+  }
+`;
 const fragmentShader = `
   uniform vec3  uColorA;
   uniform vec3  uColorB;
@@ -131,6 +138,7 @@ const fragmentShader = `
   uniform float uSolitonAmp;       // 0 when no pulse, sin-eased envelope while travelling
   varying vec2  vUv;
   varying vec3  vWorldPos;
+  ${rideColorShader}
 
   // Cheap hash for per-column parallax variation (streaks at different "radii").
   float hash(float n) { return fract(sin(n * 91.3458) * 47453.5453); }
@@ -144,7 +152,7 @@ const fragmentShader = `
     // WORM: an opaque, filtered track. No white-hot hash streaks, Fresnel
     // wash or transparent floor drawn over the body from the far side.
     if (uRideMode > 0.5) {
-      vec3 base = mix(uColorA, uColorB, smoothstep(uRideCore - 0.04, uRideCore + 0.04, vUv.y));
+      vec3 base = rideColor(vUv.y);
       float edge = 1.0 - smoothstep(0.035, 0.06, min(vUv.x, 1.0 - vUv.x));
       float phase = vUv.y * 10.0 - uTime * 0.18;
       float footprint = max(fwidth(phase), 0.002);
@@ -268,16 +276,20 @@ const bumperVertexShader = `
 // At the halfway point (vTripFrac ≈ 0.5) a bright glow marks the exact flip moment.
 const bumperFragmentShader = `
   uniform vec3  uColor;
+  uniform vec3  uColorA;
+  uniform vec3  uColorB;
+  uniform float uRideCore;
   uniform float uOpacity;
   uniform float uRideMode;
   uniform float uGrowT;
   varying float vHeightFrac;
   varying float vTripFrac;
+  ${rideColorShader}
 
   void main() {
     if (vTripFrac > uGrowT * 0.5 && vTripFrac < 1.0 - uGrowT * 0.5) discard;
     if (uRideMode > 0.5) {
-      gl_FragColor = vec4(uColor * 0.7 + vec3(0.06), 1.0);
+      gl_FragColor = vec4(rideColor(vTripFrac) * 0.7 + vec3(0.06), 1.0);
       #include <colorspace_fragment>
       return;
     }
@@ -512,7 +524,7 @@ const MobiusTunnel = ({
     uWhipPhase: { value: 0.0 },
   }), []);
 
-  // Keep uniform objects stable; the frame loop updates colours in place.
+  // Keep uniform objects stable; endpoint changes update colors in place.
   const uniforms = useMemo(() => ({
     uColorA:      { value: new THREE.Color(color1) },
     uColorB:      { value: new THREE.Color(color2) },
@@ -532,6 +544,9 @@ const MobiusTunnel = ({
 
   const bumperUniformsL = useMemo(() => ({
     uColor:   { value: new THREE.Color(color1) },
+    uColorA: uniforms.uColorA,
+    uColorB: uniforms.uColorB,
+    uRideCore: uniforms.uRideCore,
     uOpacity: { value: 0.93 },
     uRideMode: uniforms.uRideMode,
     uGrowT: uniforms.uGrowT,
@@ -540,11 +555,26 @@ const MobiusTunnel = ({
 
   const bumperUniformsR = useMemo(() => ({
     uColor:   { value: new THREE.Color(color2) },
+    uColorA: uniforms.uColorA,
+    uColorB: uniforms.uColorB,
+    uRideCore: uniforms.uRideCore,
     uOpacity: { value: 0.93 },
     uRideMode: uniforms.uRideMode,
     uGrowT: uniforms.uGrowT,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const dead = flips >= flipCap;
+    const cA = dead ? '#555555' : color1;
+    const cB = dead ? '#444444' : color2;
+    uniforms.uColorA.value.set(cA);
+    uniforms.uColorB.value.set(cB);
+    bumperUniformsL.uColor.value.set(cA);
+    bumperUniformsR.uColor.value.set(cB);
+    if (exitPortalMatRef.current) exitPortalMatRef.current.color.set(cB);
+    if (exitPortalGlowRef.current) exitPortalGlowRef.current.material.color.set(cB);
+  }, [color1, color2, flips, flipCap, uniforms, bumperUniformsL, bumperUniformsR]);
 
   useEffect(() => {
     lastStartRef.current.set(Infinity, Infinity, Infinity);
@@ -636,14 +666,6 @@ const MobiusTunnel = ({
       // with it rather than letting the band slip out from behind the sticker.
       setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
 
-      const dead = flips >= flipCap;
-      const cA = dead ? '#555555' : color1;
-      const cB = dead ? '#444444' : color2;
-      uniforms.uColorA.value.set(cA);
-      uniforms.uColorB.value.set(cB);
-      bumperUniformsL.uColor.value.set(cA);
-      bumperUniformsR.uColor.value.set(cB);
-
       // Exit portal group: place between VoidCore face and exit cubie, facing inward.
       if (exitPortalGroupRef.current) {
         _portalPos.copy(_midB).addScaledVector(_faceNorm2, 0.15);
@@ -653,13 +675,11 @@ const MobiusTunnel = ({
           _portalPos.y - _faceNorm2.y,
           _portalPos.z - _faceNorm2.z
         );
-        if (exitPortalMatRef.current) exitPortalMatRef.current.color.set(cB);
-        if (exitPortalGlowRef.current)  exitPortalGlowRef.current.material.color.set(cB);
       }
 
       if (wormMode) {
         fillTunnelRideGeometry(geo, leftGeo, rightGeo, _tunnelPath, segments);
-        uniforms.uRideCore.value = (_tunnelPath.armALen + _tunnelPath.legLen[2] * 0.5) / (_tunnelPath.total || 1);
+        uniforms.uRideCore.value = tunnelRideCoreArc(_tunnelPath) / (_tunnelPath.total || 1);
       } else {
         fillRibbon(
           geo.attributes.position.array,
@@ -830,12 +850,13 @@ const MobiusTunnel = ({
         />
       </mesh>
 
-      {/* Left guard rail — colorA; rotates to inverted at tile 2 via Möbius twist */}
+      {/* Both WORM rails follow the strip's endpoint colors through the core. */}
       <mesh geometry={leftGeo} frustumCulled={false}>
         <shaderMaterial
           uniforms={bumperUniformsL}
           vertexShader={bumperVertexShader}
           fragmentShader={bumperFragmentShader}
+          extensions={{ derivatives: true }}
           side={THREE.DoubleSide}
           transparent={!wormMode}
           depthWrite={wormMode}
@@ -843,12 +864,13 @@ const MobiusTunnel = ({
         />
       </mesh>
 
-      {/* Right guard rail — colorB; rotates to inverted at tile 2 via Möbius twist */}
+      {/* Right guard rail */}
       <mesh geometry={rightGeo} frustumCulled={false}>
         <shaderMaterial
           uniforms={bumperUniformsR}
           vertexShader={bumperVertexShader}
           fragmentShader={bumperFragmentShader}
+          extensions={{ derivatives: true }}
           side={THREE.DoubleSide}
           transparent={!wormMode}
           depthWrite={wormMode}

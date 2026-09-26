@@ -14,27 +14,33 @@ export default function RaisedCautionPerimeter({ positions, cubies, size, textur
   const poles = useRef();
   const lastExpansion = useRef(NaN);
   const cap = useGameStore(selectEffectiveFlipCap);
-  const perimeter = useMemo(() => buildCautionPerimeter(positions, cubies, size, cap), [positions, cubies, size, cap]);
+  const layouts = useMemo(() => [
+    buildCautionPerimeter(positions, cubies, size, cap),
+    buildCautionPerimeter(positions, cubies, size, cap, true),
+  ], [positions, cubies, size, cap]);
+  const capacity = Math.max(...layouts.map(p => p.edges.length));
+  const poleCapacity = Math.max(1, ...layouts.map(p => p.posts.length));
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
     const uv = [], indices = [];
-    for (let i = 0; i < perimeter.edges.length; i++) {
+    for (let i = 0; i < capacity; i++) {
       uv.push(0, 1, 0, 0, 1, 1, 1, 0);
       const j = i * 4;
       indices.push(j, j + 1, j + 2, j + 1, j + 3, j + 2);
     }
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(perimeter.edges.length * 12), 3));
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(capacity * 12), 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(indices);
-    lastExpansion.current = NaN;
     return g;
-  }, [perimeter]);
+  }, [capacity]);
+  useEffect(() => { lastExpansion.current = NaN; }, [layouts, geometry]);
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   useFrame(() => {
     const expansion = wormExpansion.amount;
     if (!poles.current || lastExpansion.current === expansion) return;
     lastExpansion.current = expansion;
+    const perimeter = layouts[expansion > 0 ? 1 : 0];
     perimeter.posts.forEach((vertex, index) => {
       cautionPointInto(dummy.position, vertex, size, expansion, 0.01 + WORM_CAUTION_POLE_HEIGHT / 2);
       poleUp.copy(vertex.up).normalize();
@@ -54,12 +60,13 @@ export default function RaisedCautionPerimeter({ positions, cubies, size, textur
         attribute.setXYZ(index * 4 + j, point.x, point.y, point.z);
       }
     });
+    geometry.setDrawRange(0, perimeter.edges.length * 6);
     attribute.needsUpdate = true;
   });
 
   return <group>
     <instancedMesh name="worm-caution-poles" ref={poles} count={0}
-      args={[undefined, undefined, Math.max(1, perimeter.posts.length)]} frustumCulled={false}>
+      args={[undefined, undefined, poleCapacity]} frustumCulled={false}>
       <cylinderGeometry args={[0.018, 0.018, 1, 6]} />
       <meshBasicMaterial color="#111111" />
     </instancedMesh>

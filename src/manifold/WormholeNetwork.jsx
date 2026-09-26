@@ -93,11 +93,16 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
             processed.add(gridId);
 
             const antipodalLoc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
-            if (!antipodalLoc || !antipodalLoc.sticker) continue;
+            if (!antipodalLoc) continue;
+            // The map caches physical locations across flips. Its embedded
+            // sticker can still show the unflipped color; read both endpoints
+            // from this same committed cube snapshot instead.
+            const partner = deferredCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
+            if (!partner) continue;
             // Also sever if the antipodal side is dead
-            if (antipodalLoc.sticker.flips >= flipCap) continue;
+            if (partner.flips >= flipCap) continue;
 
-            const antipodalGridId = getManifoldGridId(antipodalLoc.sticker, size);
+            const antipodalGridId = getManifoldGridId(partner, size);
             // Prevent the reverse-direction tunnel when the loop reaches the antipodal sticker.
             // Without this, each pair is rendered twice (once per endpoint), doubling draw calls.
             processed.add(antipodalGridId);
@@ -123,11 +128,11 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
               dirKey2: antipodalLoc.dirKey,
               flips: sticker.flips,
               active1: sticker.curr !== sticker.orig,
-              active2: antipodalLoc.sticker.curr !== antipodalLoc.sticker.orig,
+              active2: partner.curr !== partner.orig,
               isCenter,
               intensity: Math.min(sticker.flips / 10, 1),
               color1: fc[sticker.curr],
-              color2: fc[antipodalLoc.sticker.curr]
+              color2: fc[partner.curr]
             });
           }
         }

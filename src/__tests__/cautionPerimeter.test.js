@@ -65,6 +65,33 @@ describe('raised opening caution perimeter', () => {
     const positions = [raised(cubies, 2, 2, 5, 'PZ'), raised(cubies, 3, 2, 5, 'PZ')];
     const p = buildCautionPerimeter(positions, cubies, 6, 6);
     expect(p.edges).toHaveLength(6); expectClosed(p);
+    const separated = buildCautionPerimeter(positions, cubies, 6, 6, true);
+    expect(separated.edges).toHaveLength(8); expectClosed(separated);
+    for (const edge of separated.edges) {
+      const a = cautionPointInto(new THREE.Vector3(), edge.a, 6, 0.35);
+      const b = cautionPointInto(new THREE.Vector3(), edge.b, 6, 0.35);
+      expect(a.distanceTo(b)).toBeCloseTo(1, 10);
+    }
+  });
+
+  it.each([3, 6, 15])('keeps unit-size openings during Explode on every face of a %i cube', size => {
+    const mid = Math.floor(size / 2);
+    for (const dir of ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ']) {
+      const cubies = makeCubies(size), cell = [mid, mid, mid];
+      const axis = 'XYZ'.indexOf(dir[1]);
+      cell[axis] = dir[0] === 'P' ? size - 1 : 0;
+      const tile = raised(cubies, ...cell, dir);
+      const p = buildCautionPerimeter([tile], cubies, size, 6, true);
+      for (const expansion of [0, 0.1, 0.35, 0]) {
+        const points = p.posts.map(v => cautionPointInto(new THREE.Vector3(), v, size, expansion));
+        const floor = getStickerWorldPos(...cell, dir, size, expansion);
+        for (let dimension = 0; dimension < 3; dimension++) {
+          const values = points.map(point => point.getComponent(dimension));
+          expect((Math.max(...values) + Math.min(...values)) / 2).toBeCloseTo(floor[dimension], 10);
+          expect(Math.max(...values) - Math.min(...values)).toBeCloseTo(dimension === axis ? 0 : 1, 10);
+        }
+      }
+    }
   });
 
   it('keeps a closed/void warning on its actual face without inventing raised faces', () => {

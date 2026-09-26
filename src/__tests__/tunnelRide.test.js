@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeTunnelCenterline, buildTunnelCenterlineInto } from '../worm/wormLogic.js';
-import { makeTunnelRideFrame, tunnelRideFrameInto, TUNNEL_RIDE_CLEARANCE, fillTunnelRideGeometry } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, TUNNEL_RIDE_CLEARANCE, fillTunnelRideGeometry, tunnelRideCoreArc, tunnelRideTwistAt } from '../utils/tunnelRide.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 
 const tile = (dirKey, size, corner = false) => {
@@ -14,6 +14,19 @@ const tile = (dirKey, size, corner = false) => {
 const build = (entry, exit, size) => buildTunnelCenterlineInto(makeTunnelCenterline(), { entry, exit }, size);
 
 describe('Möbius surface riding', () => {
+  it('centers the half-twist on the core for unequal arms and reverse visits', () => {
+    const entry = tile('PZ', 7, true), exit = tile('NX', 7);
+    const path = build(entry, exit, 7), reverse = build(exit, entry, 7);
+    const core = tunnelRideCoreArc(path);
+    expect(Math.abs(core - path.total / 2)).toBeGreaterThan(0.1);
+    expect(tunnelRideTwistAt(path, core)).toBeCloseTo(0.5, 10);
+    expect(tunnelRideTwistAt(path, 0)).toBe(0);
+    expect(tunnelRideTwistAt(path, path.total)).toBe(1);
+    for (let i = 0; i <= 100; i++) {
+      const arc = path.total * i / 100;
+      expect(tunnelRideTwistAt(path, arc) + tunnelRideTwistAt(reverse, path.total - arc)).toBeCloseTo(1, 10);
+    }
+  });
   it('keeps the floor below the body and identical on reverse visits on every face pair', () => {
     const f = makeTunnelRideFrame(), r = makeTunnelRideFrame();
     for (const size of [2, 3, 7, 15]) for (const entryDir of Object.keys(FACE_NORMALS)) for (const exitDir of Object.keys(FACE_NORMALS)) {

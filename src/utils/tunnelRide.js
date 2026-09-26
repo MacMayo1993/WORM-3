@@ -10,6 +10,14 @@ const prev = new THREE.Vector3(), next = new THREE.Vector3();
 const rotation = new THREE.Quaternion();
 const clamp = (v, max) => Math.max(0, Math.min(max, v));
 
+export const tunnelRideCoreArc = path => path.armALen + path.legLen[2] * 0.5;
+
+export function tunnelRideTwistAt(path, arc) {
+  const core = tunnelRideCoreArc(path);
+  const halfSpan = Math.max(1e-6, Math.min(core, path.total - core) * 0.8);
+  return THREE.MathUtils.smoothstep(arc, core - halfSpan, core + halfSpan);
+}
+
 export function tunnelRidePointInto(out, path, arc) {
   const edge = Math.min(arc, path.total - arc);
   const window = 0.34 * clamp(edge / 0.6, 1);
@@ -85,7 +93,10 @@ export function tunnelRideFrameInto(out, path, arc) {
   out.normal.lerpVectors(cache.normals[index], cache.normals[index + 1], sample - index);
   out.normal.addScaledVector(out.tangent, -out.normal.dot(out.tangent)).normalize();
   next.copy(out.tangent).multiplyScalar(cache.forward ? 1 : -1);
-  out.normal.applyAxisAngle(next, u * Math.PI).normalize();
+  // The half-turn crosses 90° at the core, even when the two arms differ in
+  // length. This is also the color boundary of the strip and both rails.
+  const twist = tunnelRideTwistAt(path, s);
+  out.normal.applyAxisAngle(next, (cache.forward ? twist : 1 - twist) * Math.PI).normalize();
   out.right.crossVectors(out.tangent, out.normal).normalize();
   // Let the track grow out of the aperture without protruding over the tile.
   const mouth = THREE.MathUtils.smoothstep(Math.min(s, path.total - s), 0, 0.25);
