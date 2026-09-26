@@ -162,8 +162,11 @@ export default function ElementalCubeSkin({ size = 3 }) {
     // taken on and never mutates it, so an identity check is enough to notice a new
     // claim — this recomputes once per wash, not per frame.
     if (lastOriginRef.current !== wormBuffs.elementalOrigin) {
-      const origin = wormBuffs.elementalOrigin;
-      lastOriginRef.current = origin;
+      lastOriginRef.current = wormBuffs.elementalOrigin;
+      // Under reduced motion nothing travels across the cube: every cell arrives
+      // together, as one uniform fade and grow, instead of a front sweeping out
+      // from the claimed tile.
+      const origin = quality.animate ? wormBuffs.elementalOrigin : null;
       writeSweep(cells, cellData.sweep, origin);
       const attr = instRef.current?.geometry?.getAttribute?.('aSweep');
       if (attr) attr.needsUpdate = true;

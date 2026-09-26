@@ -254,16 +254,27 @@ const fragmentShader = /* glsl */ `
   ${GLSL_NOISE}
 
   // Worley cell of p: (F1, F2, id). The id is a stable random per cell, for facets.
+  // The full search visits all 27 neighbouring cells. The low tier visits only the
+  // 2×2×2 block on the side of the cell the point lies in — a third of the work,
+  // at the price of an occasional plate wall that is slightly misplaced.
   vec3 worleyCell(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
     float d1 = 8.0;
     float d2 = 8.0;
     float id = 0.0;
+  #ifdef ICE_HQ
     for (int z = -1; z <= 1; z++)
     for (int y = -1; y <= 1; y++)
     for (int x = -1; x <= 1; x++) {
       vec3 g = vec3(float(x), float(y), float(z));
+  #else
+    vec3 lo = step(0.5, f) - 1.0;
+    for (int z = 0; z <= 1; z++)
+    for (int y = 0; y <= 1; y++)
+    for (int x = 0; x <= 1; x++) {
+      vec3 g = lo + vec3(float(x), float(y), float(z));
+  #endif
       vec3 o = hash33(i + g);
       vec3 r = g + o - f;
       float d = dot(r, r);
@@ -406,7 +417,11 @@ const fragmentShader = /* glsl */ `
     // border, so a seam test there would frost the whole rim solid.
     float flatPart = 1.0 - smoothstep(0.0, 0.25, vRim);
     float fr = fbm3(vWorld * 8.0);
+  #ifdef ICE_HQ
     float patchy = smoothstep(0.4, 0.66, fbm3(vWorld * 2.6 + 3.7));
+  #else
+    float patchy = smoothstep(0.4, 0.66, vnoise3(vWorld * 2.6 + 3.7));
+  #endif
     float inSeam = (1.0 - smoothstep(${glf(SEAM_HALF)} - 0.015, ${glf(SEAM_HALF)} + 0.012, seamD)) * flatPart;
     float seamFrost = (1.0 - smoothstep(${glf(SEAM_HALF)} - 0.02, ${glf(SEAM_HALF)} + 0.03 + 0.06 * fr, seamD)) * flatPart * patchy;
     float rimFrost = vRim * smoothstep(0.5, 0.68, fr + patchy * 0.2);
@@ -443,7 +458,10 @@ const fragmentShader = /* glsl */ `
     float front = vArrive * (1.0 - vArrive) * 4.0;
     light += vec3(0.8, 0.95, 1.0) * front * 0.55;
     // Melting: holes open through the layer as the wash ends.
-    float melt = step(fbm3(vWorld * 4.0) * 0.85 + 0.12, uEnv.z * 1.1);
+    // A uniform branch: every fragment takes the same side, so the melt noise is
+    // only paid for during the dissolve.
+    float melt = 0.0;
+    if (uEnv.z > 0.0) melt = step(fbm3(vWorld * 4.0) * 0.85 + 0.12, uEnv.z * 1.1);
     float fade = smoothstep(0.02, 0.3, vArrive) * (1.0 - melt) * (1.0 - smoothstep(0.6, 1.0, uEnv.z));
     rgb = vec3(0.0);
   #define SPLIT_OUTPUT
@@ -533,11 +551,13 @@ const _matCache = new Map();
  */
 export function getElementalSurfaceMaterial(element, colorHex, accentHex, highDetail = true) {
   const mode = SURFACE_MODE[element] ?? 0;
-  const key = `${element}_${colorHex}_${accentHex}_${highDetail ? 'hq' : 'lq'}`;
+  // Only ice has a detail variant; water and lightning share one program per tier.
+  const hq = highDetail && mode === SURFACE_MODE.ice;
+  const key = `${element}_${colorHex}_${accentHex}_${hq ? 'hq' : 'lq'}`;
   let mat = _matCache.get(key);
   if (!mat) {
     mat = new THREE.ShaderMaterial({
-      defines: { SURFACE_MODE: mode, ...(highDetail && mode === SURFACE_MODE.ice ? { ICE_HQ: '' } : {}) },
+      defines: { SURFACE_MODE: mode, ...(hq ? { ICE_HQ: '' } : {}) },
       uniforms: {
         uTime: sharedUniforms.time, // ticked by CubeAssembly every frame
         uEnv: { value: new THREE.Vector4(1, 1, 0, 1) },
@@ -553,7 +573,10 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex, highDe
       transparent: true,
       premultipliedAlpha: true,
       depthWrite: false,
-      toneMapped: false
+      toneMapped: false,
+      // Water shades with screen-space derivatives. Core in WebGL2; three r159 can
+      // still fall back to WebGL1, where they are an extension.
+      extensions: { derivatives: true }
     });
     mat.userData.elementalInstanced = true;
     _matCache.set(key, mat);

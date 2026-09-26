@@ -312,7 +312,13 @@ const fragmentShader = /* glsl */ `
     vec2 st = fract(vLocal + 0.5) - 0.5;
     float d = 0.5 - max(abs(st.x), abs(st.y));       // 0 on a seam → 0.5 mid-sticker
     // Molten flow crawling along the cracks, continuous across cells and faces.
+    // The bed spans the whole cube, so the low tier trades the two-octave noise for
+    // one octave: same crawl, less grain.
+  #ifdef FIRE_HQ
     float flow = fbm3(vWorld * 2.4 + vec3(0.0, -T * 0.5, T * 0.28));
+  #else
+    float flow = vnoise3(vWorld * 2.4 + vec3(0.0, -T * 0.5, T * 0.28));
+  #endif
     float grain = vnoise3(vWorld * 9.0 + vec3(T * 0.2, 0.0, 0.0));
     // The crack is the grout plus a ragged bite out of each sticker's border, as if
     // the edges had already burned away.
@@ -329,7 +335,11 @@ const fragmentShader = /* glsl */ `
     // Char and its burning front: a sooty band inside every sticker border, edged
     // with a thin glowing line where it meets the unburnt tile — paper catching.
     // It stops well short of the centre so colours and marks stay clean.
+  #ifdef FIRE_HQ
     float ragged = fbm3(vWorld * 7.5 + vec3(T * 0.05));
+  #else
+    float ragged = vnoise3(vWorld * 7.5 + vec3(T * 0.05));
+  #endif
     float front = ${glf(SEAM_HALF)} + 0.045 + 0.05 * flow + 0.05 * ragged;
     float charBand = (1.0 - seam) * (1.0 - smoothstep(front - 0.012, front, d));
     float burnLine = (1.0 - seam) * smoothstep(front - 0.02, front - 0.006, d) * (1.0 - smoothstep(front - 0.004, front + 0.006, d));

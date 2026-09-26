@@ -46,9 +46,15 @@ function collectElementalMaterials() {
 
     // The wash that arrives when it is claimed.
     switch (def.renderer) {
-      case 'surface':
-        materials.push(getElementalSurfaceMaterial(element, def.color, def.accent));
+      case 'surface': {
+        // Both detail tiers. Water and lightning share one program across them and
+        // return the same material; ice has a low-detail variant for phones.
+        const hq = getElementalSurfaceMaterial(element, def.color, def.accent, true);
+        const lq = getElementalSurfaceMaterial(element, def.color, def.accent, false);
+        materials.push(hq);
+        if (lq !== hq) materials.push(lq);
         break;
+      }
       case 'flames':
         // Both detail tiers, all three layers (bed, tongues, light): quality is
         // resolved per device at claim time, and warming only one tier leaves half

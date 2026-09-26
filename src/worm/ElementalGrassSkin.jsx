@@ -230,6 +230,9 @@ const fragmentShader = /* glsl */ `
     // ── Moss: filling the grout, creeping over the sticker borders ──────────
     vec2 st = fract(vLocal + 0.5) - 0.5;
     float d = 0.5 - max(abs(st.x), abs(st.y));     // 0 on a seam → 0.5 mid-sticker
+    // The moss never reaches this far onto a sticker (its reach tops out near 0.17),
+    // so the middle of every tile skips the noise entirely.
+    if (d > 0.2) discard;
     float creep = fbm3(vWorld * 3.1 + 1.7);
     float fuzz = vnoise3(vWorld * 26.0);
     // The moss line wanders: it fills the grout, then reaches a little way onto the
