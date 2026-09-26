@@ -800,7 +800,8 @@ const DemoStepHint = ({ step }) => {
   ensureDemoShellStyle();
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const copy = TRY_COPY[step];
-  if (!copy || step === 'worm-traversal' || step === 'flip-gateway') return null;
+  // These lessons keep guidance inside their own HUD, leaving the cube exposed.
+  if (!copy || step === 'worm-traversal' || step === 'flip-gateway' || step === 'chaos-forecast') return null;
   return (
     <div
       className={`demo-step-hint${wormHealerMode ? ' demo-step-hint--worm' : ''}`}
