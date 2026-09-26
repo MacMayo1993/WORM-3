@@ -152,6 +152,42 @@ describe('chaos launch', () => {
     expect(selectCubeInputBlocked(useGameStore.getState())).toBe(false);
   });
 
+  it('leaving before GO refunds a wager already stamped for the round', async () => {
+    useGameStore.setState({ parityPoints: 1000, activeBet: null });
+    const bet = { type: 'PAIR', pick: 'RO', wager: 50, odds: 2 };
+    useGameStore.getState().spendCoins(bet.wager);
+    await act(async () => out.current.handleDisparitySetupComplete(WIZARD));
+    await act(async () => out.current.handleBetPlaced(bet));
+    await act(async () => calls.intro.post());
+    await act(async () => { vi.advanceTimersByTime(60); });
+    await act(async () => calls.shuffleDone());
+    // beginDisparityRound stamped it; the PP is gone while the round is armed.
+    expect(useGameStore.getState().activeBet.roundId).toBe(useGameStore.getState().disparityRoundId);
+    expect(useGameStore.getState().parityPoints).toBe(950);
+    // Leave → handleHomeFromGame → cancelDisparityRun.
+    await act(async () => out.current.cancelDisparityRun());
+    expect(useGameStore.getState().activeBet).toBeNull();
+    expect(useGameStore.getState().parityPoints).toBe(1000);
+    // Idempotent: a second exit path cannot pay it back twice.
+    await act(async () => out.current.cancelDisparityRun());
+    expect(useGameStore.getState().parityPoints).toBe(1000);
+  });
+
+  it('leaves a live round’s wager to the chaos worker’s own STOP refund', async () => {
+    useGameStore.setState({ parityPoints: 1000, activeBet: null });
+    const bet = { type: 'PAIR', pick: 'RO', wager: 50, odds: 2 };
+    useGameStore.getState().spendCoins(bet.wager);
+    await act(async () => out.current.handleDisparitySetupComplete(WIZARD));
+    await act(async () => out.current.handleBetPlaced(bet));
+    await act(async () => calls.intro.post());
+    await act(async () => { vi.advanceTimersByTime(60); });
+    // The round went live.
+    useGameStore.setState({ chaosLevel: 3 });
+    await act(async () => out.current.cancelDisparityRun());
+    expect(useGameStore.getState().activeBet).not.toBeNull();
+    expect(useGameStore.getState().parityPoints).toBe(950);
+  });
+
   it('the guided demo still goes straight to the countdown', async () => {
     await act(async () => out.current.startDisparityGame(WIZARD));
     await act(async () => { vi.advanceTimersByTime(60); });
