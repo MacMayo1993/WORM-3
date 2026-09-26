@@ -190,3 +190,14 @@ it('offers one optional view in later Story levels without replacing required po
   early.p.mechanics = { ...early.level.mechanics };
   expect(offerStoryPower(early.sim, early.p, early.level, early.level.cubeSize ?? 5, early.p.cubies)).toBe(false);
 });
+
+it('keeps optional view transformations out of the first two chapters after required powers are complete', () => {
+  for (let id = 1; id <= 20; id++) {
+    const { sim, p, level } = setup(id);
+    sim.powerups = []; sim.specials = []; p.powerDelay = 0;
+    p.mechanics = { ...level.mechanics };
+    expect(nextStoryPower(p, level)).toBeNull();
+    expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false);
+    expect(sim.specials).toHaveLength(0);
+  }
+});

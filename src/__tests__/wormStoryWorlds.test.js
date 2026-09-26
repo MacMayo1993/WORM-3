@@ -20,16 +20,24 @@ beforeEach(() => {
   });
 });
 
-it('gives every level in a chapter a distinct shipped palette and environment, and every level its own material set', () => {
+it('keeps Chapter 1 on plain six-color cubes and introduces varied materials in later chapters', () => {
   const worlds = Object.values(STORY_WORLDS);
   expect(worlds).toHaveLength(WORM_STORY_LEVELS.length);
   for (const chapter of WORM_STORY_CHAPTERS) {
     const own = chapter.levels.map(level => STORY_WORLDS[level.id]);
-    for (const key of ['palette', 'background']) expect(new Set(own.map(w => w[key])).size).toBe(own.length);
+    expect(new Set(own.map(w => w.background)).size).toBe(own.length);
+    if (chapter.id === 1) {
+      for (const look of own) {
+        expect(look.palette).toBe('standard');
+        expect(Object.values(look.styles)).toEqual(Array(6).fill('solid'));
+        expect(look.view).toEqual({});
+      }
+    } else expect(new Set(own.map(w => w.palette)).size).toBe(own.length);
   }
   // Chapter one keeps its original one-route-per-level layout.
   expect(new Set(WORM_STORY_CHAPTERS[0].levels.map(level => STORY_WORLDS[level.id].route)).size).toBe(10);
-  expect(new Set(worlds.map(w => JSON.stringify(w.styles))).size).toBe(worlds.length);
+  const later = WORM_STORY_LEVELS.filter(level => level.id > 10).map(level => STORY_WORLDS[level.id]);
+  expect(new Set(later.map(w => JSON.stringify(w.styles))).size).toBe(later.length);
   expect(new Set(worlds.map(w => w.name)).size).toBe(worlds.length);
   for (const level of WORM_STORY_LEVELS) {
     const world = STORY_WORLDS[level.id];
