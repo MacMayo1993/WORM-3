@@ -1,9 +1,10 @@
 import { clampWear } from '../game/flipPad.js';
+import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 
 export const PAD_PROFILES = {
   cube: { height: 0.30, amplitude: 0.04, wearAmplitude: 0.12, frequency: 0.9 },
   chaos: { height: 0.14, amplitude: 0.02, wearAmplitude: 0.10, frequency: 1 },
-  worm: { height: 0.50, amplitude: 0.05, wearAmplitude: 0.10, frequency: 0.8 },
+  worm: { height: WORM_PAD_HEIGHT, amplitude: 0.05, wearAmplitude: 0.10, frequency: 0.8 },
   menu: { height: 0.35, amplitude: 0.06, wearAmplitude: 0.10, frequency: 0.7 }
 };
 

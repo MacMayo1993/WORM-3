@@ -1,7 +1,6 @@
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { cubieHasFlippedFace, isLiveFlippedFace, raisedWormExpansion } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, isLiveFlippedFace, raisedWormExpansion, WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { selectEffectiveFlipCap } from '../hooks/useGameStore.js';
-import { WORM_PAD_HEIGHT } from './healerWorm/raisedPlatforms.js';
 import { wormExpansion } from './wormExpansion.js';
 
 // Only portal-owned visuals use this transform. Ordinary floor pickups and the
@@ -16,4 +15,11 @@ export function raisedPortalPosition(x, y, z, face, size, state) {
     point[{ X: 0, Y: 1, Z: 2 }[face[1]]] += face[0] === 'P' ? WORM_PAD_HEIGHT : -WORM_PAD_HEIGHT;
   }
   return point;
+}
+
+// How far a face's portal visuals sit above its slot: a live pad's hover, else 0.
+export function raisedPortalLift(x, y, z, face, state) {
+  const sticker = state.cubies?.[x]?.[y]?.[z]?.stickers?.[face];
+  if (!state.wormHealerMode || state.demoMode || !sticker) return 0;
+  return isLiveFlippedFace(sticker, selectEffectiveFlipCap(state)) ? WORM_PAD_HEIGHT : 0;
 }

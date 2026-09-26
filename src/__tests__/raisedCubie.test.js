@@ -52,11 +52,12 @@ describe('whole-cubie flip platforms', () => {
   });
 });
 
-// Displacement, rather than distance from the origin, is what gets halved.
-it.each([2, 3, 5, 7, 15])('halves Worm cubie displacement at size %i', size => {
-  expect(cubeExpansionScale(size, WORM_RAISED_AMOUNT) - 1)
-    .toBeCloseTo((cubeExpansionScale(size, 1) - 1) / 2, 10);
+// WORM pieces stay in their slots: a flip lifts only the tile, never the piece.
+it.each([2, 3, 5, 7, 15])('keeps Worm pieces in their slots at size %i', size => {
+  expect(WORM_RAISED_AMOUNT).toBe(0);
   for (const global of [0, .35, .8, 1]) {
+    expect(raisedWormExpansion(global)).toBe(global);
+    expect(selectiveCubieOffsetRatio(size, global, WORM_RAISED_AMOUNT)).toBe(0);
     expect(cubeExpansionScale(size, global) * (1 + selectiveCubieOffsetRatio(size, global, WORM_RAISED_AMOUNT)))
       .toBeCloseTo(cubeExpansionScale(size, raisedWormExpansion(global)), 10);
   }

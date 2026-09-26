@@ -11,6 +11,8 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { flipPadPair, pairFlips, padIsWorn } from '../game/flipPad.js';
 import { padPose, pairPhase, advancePadSpring, WORN_EASE } from './padPose.js';
 import { padMotion, removePadMotion } from './padMotionBridge.js';
+import { PadEnergy } from './PadEnergy.jsx';
+import { padTremble, createEnergyFrames, MAX_ENERGY_PADS } from './padEnergy.js';
 
 const PadContext = createContext(null);
 const MAX_PADS = 2048;
@@ -20,6 +22,10 @@ export function PadProvider({ children, profile: profileOverride = null }) {
   const entries = useMemo(() => new Set(), []);
   const pairs = useMemo(() => new Map(), []);
   const cubieSprings = useMemo(() => new Map(), []);
+  // WORM pads hover on an unstable wormhole; PadEnergy draws it from these records.
+  const energyOn = useGameStore(s => !profileOverride && !!s.wormHealerMode && !s.demoMode);
+  const frames = useMemo(() => createEnergyFrames(), []);
+  const energyClock = useRef(0);
   const stalkRef = useRef(), mouthRef = useRef();
   const resources = useMemo(() => ({
     stalk: createPadStalkGeometry(), mouth: new THREE.PlaneGeometry(0.76, 0.76),
@@ -28,7 +34,8 @@ export function PadProvider({ children, profile: profileOverride = null }) {
     matrix: new THREE.Matrix4(), slot: new THREE.Matrix4(), local: new THREE.Matrix4(), inverse: new THREE.Matrix4(),
     position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), color: new THREE.Color(),
     // One pose input reused for every pair, so the frame loop allocates nothing.
-    poseInput: { phase: 0, wear: 0, profile: 'cube', worn: 0, seed: 0, reducedMotion: false, subtle: false, big: false }
+    poseInput: { phase: 0, wear: 0, profile: 'cube', worn: 0, seed: 0, reducedMotion: false, subtle: false, big: false },
+    tremble: { n: 0, u: 0, v: 0 }
   }), []);
   const reduced = useRef(false);
   const paletteCache = useRef({ settings: null, colors: FACE_COLORS });
@@ -59,6 +66,9 @@ export function PadProvider({ children, profile: profileOverride = null }) {
     const wormMode = !profileOverride && state.wormHealerMode;
     const wormPads = wormMode && !state.demoMode;
     const motionOff = wormPads || reduced.current || state.settings?.reducedMotion;
+    // The WORM landing height stays fixed for the sim; only the look is unstable.
+    const energyMotion = wormPads && !reduced.current && !state.settings?.reducedMotion;
+    if (wormPads) energyClock.current += dt;
     for (const pair of pairs.values()) { pair.members.length = 0; }
     for (const entry of entries) {
       const d = entry.data.current;
@@ -118,12 +128,19 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       else if (motionOff) { entry.lift = target; entry.velocity = 0; }
       else advancePadSpring(entry, target, dt);
       group.position.copy(d.normal).multiplyScalar(entry.lift);
+      let lift = entry.lift;
+      if (wormPads && lifted && energyMotion) {
+        // Twins share the pair seed, so they shudder together.
+        const shake = padTremble(resources.tremble, energyClock.current, pair.seed);
+        group.position.addScaledVector(d.normal, shake.n).addScaledVector(d.right, shake.u).addScaledVector(d.up, shake.v);
+        lift += shake.n;
+      }
       entry.cycle = pair.pose.cycle;
       entry.impact = pair.pose.impact;
       entry.wear = pair.wear;
       entry.active = lifted;
 
-      if (entry.lift <= 0.001 || count >= MAX_PADS) continue;
+      if (entry.lift <= 0.001 || count >= (wormPads ? MAX_ENERGY_PADS : MAX_PADS)) continue;
       let visible = true;
       for (let parent = group; parent; parent = parent.parent) {
         if (!parent.visible) { visible = false; break; }
@@ -145,6 +162,18 @@ export function PadProvider({ children, profile: profileOverride = null }) {
         inverseReady = true;
       }
       resources.matrix.premultiply(resources.inverse);
+      resources.color.set(paletteCache.current.colors[padBackFace(d.meta)] ?? '#ffffff');
+      if (wormPads) {
+        resources.matrix.toArray(frames.matrix, count * 16);
+        frames.lift[count] = lift;
+        frames.color[count * 3] = resources.color.r;
+        frames.color[count * 3 + 1] = resources.color.g;
+        frames.color[count * 3 + 2] = resources.color.b;
+        // Per tile, so twins crackle differently while shuddering together.
+        frames.seed[count] = (pair.seed + Math.imul(d.meta.orig ?? 0, 0x9e3779b1)) | 0;
+        count++;
+        continue;
+      }
       mouthRef.current.setMatrixAt(count, resources.matrix);
       // Start behind the cubie's inner face and end against the entire tile
       // back. The fixed through-body section remains when the pad compresses.
@@ -153,12 +182,15 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       resources.scale.set(1, 1, PAD_STALK_DEPTH + Math.max(0, entry.lift) - PAD_BACK_CLEARANCE);
       resources.matrix.scale(resources.scale);
       stalkRef.current.setMatrixAt(count, resources.matrix);
-      resources.color.set(paletteCache.current.colors[padBackFace(d.meta)] ?? '#ffffff');
       stalkRef.current.setColorAt(count, resources.color);
       count++;
     }
+    frames.count = wormPads ? count : 0;
+    frames.time = energyClock.current;
+    frames.dt = dt;
+    frames.motion = energyMotion ? 1 : 0;
     for (const ref of [stalkRef, mouthRef]) {
-      ref.current.count = count;
+      ref.current.count = wormPads ? 0 : count;
       ref.current.instanceMatrix.needsUpdate = true;
     }
     if (stalkRef.current.instanceColor) stalkRef.current.instanceColor.needsUpdate = true;
@@ -168,6 +200,7 @@ export function PadProvider({ children, profile: profileOverride = null }) {
     <RaisedCubieContext.Provider value={cubieSprings}>{children}</RaisedCubieContext.Provider>
     <instancedMesh ref={stalkRef} args={[resources.stalk, resources.stalkMaterial, MAX_PADS]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
     <instancedMesh ref={mouthRef} args={[resources.mouth, resources.mouthMaterial, MAX_PADS]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
+    {energyOn && <PadEnergy frames={frames} />}
   </PadContext.Provider>;
 }
 
@@ -176,9 +209,12 @@ export function FlipPadOffset({ meta, size, pos, rot, children }) {
   const group = useRef();
   const rotation = useMemo(() => new THREE.Euler(...rot), [rot]);
   const normal = useMemo(() => new THREE.Vector3(0, 0, 1).applyEuler(rotation), [rotation]);
+  // The tile's own axes, for WORM's in-plane shudder.
+  const right = useMemo(() => new THREE.Vector3(1, 0, 0).applyEuler(rotation), [rotation]);
+  const up = useMemo(() => new THREE.Vector3(0, 1, 0).applyEuler(rotation), [rotation]);
   const pair = flipPadPair(meta, size);
   const data = useRef();
-  data.current = { meta, pos, normal, rotation, pair };
+  data.current = { meta, pos, normal, right, up, rotation, pair };
   const key = meta?.origPos ? `${meta.orig}:${meta.origDir}:${meta.origPos.x},${meta.origPos.y},${meta.origPos.z}` : null;
   // Only tiles with history participate; untouched Mega stickers have zero ticks.
   const history = useRef(false);

@@ -5,19 +5,55 @@
 ## Implementation checkpoint — 2026-09-26
 
 Cube modes now raise whole flipped cubies, retain the small square pads and use full-back
-antipodal stalks. WORM now enables whole-cubie expansion and a deliberate jump to a raised
-face underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
+antipodal stalks. WORM keeps every piece in its slot (see the low-hover pass below) and takes a
+deliberate jump onto a pad underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
 camera follows the same head. Nearby platforms receive portrait framing that includes both
 the worm and its jump destination. Portal rings, caution tape, signs and portal effects use
 the raised tile position, not the floor lattice. Mirror view and cosmetic pad settings cannot
-disable physical WORM lift. Flipped-face landings enter the tunnel; unflipped carried faces
-are platforms. Crawl does not enter raised mouths. Tunnel paths and exit handoffs use the
-expanded endpoints. Demo lessons retain the legacy route.
+disable physical WORM lift. Flipped-face landings enter the tunnel. Crawl does not enter raised
+mouths. Tunnel paths and exit handoffs start from the pad's hover. Demo lessons retain the
+legacy route.
 
-WORM pads hold a fixed 0.5-unit landing height; cosmetic motion settings cannot remove the
-physical platform. Layer-turn scheduling holds during the captured 0.65-second jump. Rescue
+WORM pads hold a fixed landing height, `WORM_PAD_HEIGHT` (0.3 since the low-hover pass);
+cosmetic motion settings cannot remove the physical platform. Layer-turn scheduling holds during the captured 0.65-second jump. Rescue
 jumps retain their no-ride provenance. The full Rumbler, animated landing compression and
 launch beats, ghosting and cinematic choreography remain roadmap work.
+
+### WORM low hover and unstable wormhole — 2026-09-26
+
+Playtest: the tunnel sat too high to reach believably. Half the Explode lift plus a 0.5 pad
+put a 3×3 landing about 1.4 units off the surface (about 2.0 on 5×5, 5.9 on 15×15), so the
+worm leapt clear of the cube to reach it. Now the tile hovers a short hop over its slot, and
+the gap carries the drama instead.
+
+- **Pieces stay in their slots in WORM.** `WORM_RAISED_AMOUNT` is 0. A flipped piece's other
+  faces are ordinary floor, so `raisedPlatformPosition` returns only live pads. Cube modes keep
+  the whole-piece Explode pop.
+- **One hover height.** `WORM_PAD_HEIGHT` (0.3) lives in `src/game/raisedCubie.js` and feeds the
+  sim landing, portal visuals, the pad renderer (`PAD_PROFILES.worm`) and tunnel handoffs. The
+  landing is the same on every board size.
+- **Exit fix.** Tunnel exits now test `padHeight`, since `padExpansion` is 0 without a piece
+  lift. A ride that starts on the floor (Mobi's Create Wormhole) still lands on the exit pad.
+- **The unstable wormhole** (`PadEnergy`, render only; cube modes unchanged):
+  - the stalk becomes an additive energy column spanning only the gap, narrow in the slot and
+    flaring to the tile, with twisting bands, climbing surges and a stepped flicker;
+  - the slot's mouth becomes a swirling vortex;
+  - three arcs per pad re-strike 9 times a second at a 62 % duty: two jump the gap and one
+    discharges to the surface just outside it;
+  - eleven sparks a second spit off the rim;
+  - the tile shudders a few millimetres (≤ 0.012 along the normal, ≤ 0.008 in-plane), with
+    twins in step (the $P_+$ rule, §9.2).
+
+  All of it is deterministic in (time, seed) with no `Math.random`, and nothing is written
+  back to the sim. Pause freezes it. Reduced motion keeps a steady glow with no arcs, sparks
+  or shudder.
+- **Readability at the new height.**
+  - Tunnel signs shrink as the camera nears them: full size beyond 5 units, gone inside 2.6.
+    The HUD card already reads out the pad ahead.
+  - Pad fences are shortened by the hover, so their tape stays below the chase camera's eye.
+- **Trade-off.** 0.3 clears the bare head (≈ 0.17, Mobi ≈ 0.20) by at least a tenth of a
+  tile. A tall hat (≈ 0.30) can brush the tile's underside while crawling under it. Ghosting
+  (§4.3) is the planned answer.
 
 ### Bounce model upgrade — 2026-09-26
 
@@ -92,8 +128,8 @@ launch beats, ghosting and cinematic choreography remain roadmap work.
 - Reduced motion holds the pad at its static height and disables its idle pulse. Full/subtle/
   flat choices live in Settings → Scene. Chaos has its own low-height profile; big boards
   halve the moving amplitude. No random jitter or tilt ships in this foundation.
-- WORM uses the same expanded positions for rendering, captured jumps and tunnel handoffs.
-  Keep the physical pads independent of cosmetic motion settings.
+- WORM uses the same pad positions (slot plus `WORM_PAD_HEIGHT`) for rendering, captured
+  jumps and tunnel handoffs. Keep the physical pads independent of cosmetic motion settings.
 
 ### WORM integration contract for phase 4
 
@@ -118,6 +154,7 @@ launch beats, ghosting and cinematic choreography remain roadmap work.
 8. A raised cubie’s unflipped faces are jumpable platforms, never tunnel entries. Classify the
    face actually landed on, not the whole cubie. The route must handle radial gaps, edge/corner
    offsets, turns and platform-to-platform jumps before enabling whole-cubie lift in WORM.
+   (Moot while `WORM_RAISED_AMOUNT` is 0: pieces stay in their slots and only pads are platforms.)
 9. Story/demo may override entry mode. Switch the global default only after their prompts,
    authored routes, character/hat clearance and mobile chase-camera checks pass.
 
@@ -215,7 +252,7 @@ Starting profiles (to tune in playtest). These small pad lifts are along the til
 
 | Profile | $h_0$ | $A_0$ | $A_1$ | $f_0$ | Notes |
 |---|---|---|---|---|---|
-| WORM | 0.50 | 0.05 | 0.10 | 0.8 Hz | Lowest point ≥ 0.45. Head top is ≈ 0.17 plus hat and accents (≈ 0.30); verify every character. |
+| WORM | 0.30 | 0.05 | 0.10 | 0.8 Hz | Fixed height, no bounce (the landing must hold still). Clears the bare head (≈ 0.17); a tall hat (≈ 0.30) can brush it. |
 | Cube / Story / Random | 0.30 | 0.04 | 0.12 | 0.9 Hz | |
 | Chaos | 0.14 | 0.02 | 0.10 | 1.0 Hz | Dense boards; the worn regime carries the betting read. |
 | Menu / intro | 0.35 | 0.06 | 0.10 | 0.7 Hz | Cinematic. |
@@ -293,7 +330,7 @@ Ship behind `tunnelEntry: 'crawl' | 'pad'`, a store setting with a story/level o
 
 ### 4.3 Crawling under pads (decided)
 
-- **Clearance.** The pad's lowest point is ≥ 0.45 in the WORM profile. Verify this against every character, including the Book head and MOBI's radius of 0.12, and every hat.
+- **Clearance.** The WORM pad hovers at `WORM_PAD_HEIGHT` (0.30; it was 0.45 or more before the low-hover pass). That clears the bare head (≈ 0.17) and MOBI's (radius 0.12, top ≈ 0.20). A tall hat (≈ 0.30) can brush the tile's underside, which ghosting below would cover.
 - **Ghosting.** While the grounded head is within one cell of a pad, the pad ghosts to ~35 % opacity. This handles chase-camera occlusion and signals "you can pass under". It turns solid again when the worm is airborne, so solid means landable.
 - **HUD.** `onFlippedTile` becomes `onPadAhead`, and the HUD shows "JUMP to ride" while a rideable pad is in assist range.
 

@@ -1,5 +1,5 @@
 import TunnelSafetyMarkers from './TunnelSafetyMarkers.jsx';
-import { raisedPortalPosition } from '../raisedPortalPosition.js';
+import { raisedPortalPosition, raisedPortalLift } from '../raisedPortalPosition.js';
 // src/worm/healerWorm/WormholeRings.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import React, { useRef } from 'react';
@@ -369,7 +369,10 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             }
 
             { // Every tunnel gets a raised perimeter; lethal mouths retain their void frame.
-                const poleHeight = dangerous ? 0.88 : 0.68;
+                // A hovering pad's fence starts on the pad, so shorten it by the hover:
+                // its tape stays at the floor tunnels' height, below the chase camera's eye.
+                const padLift = raisedPortalLift(tile.x, tile.y, tile.z, tile.dirKey, state);
+                const poleHeight = (dangerous ? 0.88 : 0.68) - padLift;
                 const tapeWidth = dangerous ? 0.14 : 0.12;
                 const poleCenter = poleHeight / 2 + 0.01;
                 const tapeLift = poleHeight - tapeWidth / 2 - 0.025;

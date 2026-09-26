@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { padPose, pairPhase, advancePadSpring, advancePieceSpring, PAD_PROFILES, WORN_EASE } from '../3d/padPose.js';
 import { padMotion, removePadMotion } from '../3d/padMotionBridge.js';
+import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
+import { WORM_LIFT } from '../worm/healerWorm/constants.js';
+import { BOOK_HEAD_RADIUS } from '../worm/wormBookFX.js';
 
 describe('pad motion', () => {
-  it('keeps WORM idle pads above the clearance floor at every wear level', () => {
+  it("hovers WORM pads low but still clear of the worm's head at every wear level", () => {
+    // A tenth of a tile of headroom over the head for the crawl underneath.
+    expect(WORM_PAD_HEIGHT).toBeGreaterThanOrEqual(WORM_LIFT + BOOK_HEAD_RADIUS + 0.1);
+    expect(WORM_PAD_HEIGHT).toBeLessThanOrEqual(0.35);
+    expect(PAD_PROFILES.worm.height).toBe(WORM_PAD_HEIGHT);
     for (let wear = 0; wear <= 1; wear += 0.25) {
       for (let phase = 0; phase < 25; phase += 0.01) {
-        expect(padPose({ profile: 'worm', wear, phase, worn: true }).lift).toBeGreaterThanOrEqual(0.45);
+        expect(padPose({ profile: 'worm', wear, phase, worn: true }).lift).toBeGreaterThanOrEqual(WORM_PAD_HEIGHT);
       }
     }
   });

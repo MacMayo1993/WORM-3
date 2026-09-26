@@ -1945,7 +1945,8 @@ const PHASE_HANDLERS = {
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
                 // Resume from the exit pose, never interpolate from the old entry tile.
-                if (sim.activeTunnel?.padExpansion) {
+                // padExpansion is 0 when no piece rises; the pad height marks a pad route.
+                if (sim.activeTunnel?.padHeight > 0) {
                     const exit = sim.activeTunnel.exit;
                     sim.curWorldPos.fromArray(getStickerWorldPos(exit.x, exit.y, exit.z, exit.dirKey, size, sim.activeTunnel.padExpansion))
                         .addScaledVector(FACE_NORMALS[exit.dirKey], WORM_PAD_HEIGHT);
