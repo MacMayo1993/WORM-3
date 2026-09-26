@@ -273,7 +273,7 @@ const ShufflingCube = ({ onFlip }) => {
     }
 
     if (pipelineRef.current === 'worm' && wormCompletedRef.current === 1) {
-      // Worm fully retreated — start the middle-slice rotation
+      // All six tails have retreated — start the middle-slice rotation
       wormCompletedRef.current = 0;
       pipelineRef.current = 'rotating';
       const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];

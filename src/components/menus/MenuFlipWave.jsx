@@ -1,4 +1,3 @@
-import { menuCharacterPair } from './menuCharacterRig.js';
 import React, { useRef, useMemo, useContext } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -57,8 +56,8 @@ export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }
         <meshBasicMaterial color={origin.color} transparent opacity={0.38} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
     </group>)}
-    {traffic.routes.map((route, i) => <MenuWormParticle key={route.id}
-      route={route} character={menuCharacterPair(characterCycle + i)[0]} elapsed={elapsed}
+    {traffic.routes.map(route => <MenuWormParticle key={route.id}
+      route={route} character={route.character} elapsed={elapsed}
     />)}
   </group>;
 }
