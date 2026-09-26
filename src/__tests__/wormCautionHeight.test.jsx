@@ -6,17 +6,19 @@ import { WormholeRings } from '../worm/healerWorm/WormholeRings.jsx';
 import { makeCubies } from '../game/cubeState.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
+import { buildCautionPerimeter } from '../worm/healerWorm/cautionPerimeter.js';
 import { WORM_CAUTION_TAPE_TOP } from '../game/raisedCubie.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getWormTunnelSnapshot } from '../worm/tunnelSnapshot.js';
 import { raisedPlatformPosition } from '../worm/healerWorm/raisedPlatforms.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { wormExpansion } from '../worm/wormExpansion.js';
+import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 
 vi.mock('../worm/healerWorm/TunnelSafetyMarkers.jsx', () => ({ default: () => null }));
 extend(THREE);
 
-it.each([3, 7, 15])('anchors actual warning posts to the floor and lands at tape height on all %i faces', async size => {
+it.each([3, 7, 15].flatMap(size => [{ size, corner: false }, { size, corner: true }]))('grounds the actual perimeter on size $size, corner=$corner', async ({ size, corner }) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState(), liveBefore = { ...liveCubies }, expansionBefore = wormExpansion.amount;
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -24,7 +26,8 @@ it.each([3, 7, 15])('anchors actual warning posts to the floor and lands at tape
   });
   let cubies = makeCubies(size);
   const mid = Math.floor(size / 2), edge = size - 1;
-  for (const [x, y, z, dir] of [[edge, mid, mid, 'PX'], [mid, edge, mid, 'PY'], [mid, mid, edge, 'PZ']]) {
+  const flips = corner ? [[edge, edge, edge, 'PZ']] : [[edge, mid, mid, 'PX'], [mid, edge, mid, 'PY'], [mid, mid, edge, 'PZ']];
+  for (const [x, y, z, dir] of flips) {
     cubies = flipStickerPair(cubies, size, x, y, z, dir, buildManifoldGridMap(cubies, size));
   }
   const refs = [], spring = { lift: 0 };
@@ -45,24 +48,32 @@ it.each([3, 7, 15])('anchors actual warning posts to the floor and lands at tape
     await act(async () => { store = root.render(<WormholeRings cubies={cubies} size={size} tunnelUseCountsRef={uses} voidTunnelKeysRef={voids} />); });
     const scene = store.getState().scene, matrix = new THREE.Matrix4();
     const poles = scene.getObjectByName('worm-caution-poles'), tape = scene.getObjectByName('worm-caution-tape');
-    expect(positions).toHaveLength(6);
+    expect(positions).toHaveLength(corner ? 2 : 6);
     let original;
     for (const [lift, danger] of [[0, false], [0.5, false], [1, false], [1, true]]) {
       spring.lift = lift;
       if (danger) for (const p of positions) voids.current.add(p.tunnelKey);
       time += 1 / 30; store.getState().advance(time);
-      expect(poles.count).toBe(24); expect(tape.count).toBe(24);
-      positions.forEach((tile, index) => {
+      expect(poles.count).toBe(corner ? 12 : 24);
+      expect(tape.geometry.attributes.position.count).toBe((corner ? 12 : 24) * 4);
+      const perimeter = buildCautionPerimeter(positions, cubies, size, 6);
+      perimeter.faces.forEach(face => {
+        const tile = { ...face, normal: FACE_NORMALS[face.dirKey] };
         const floor = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, 0));
-        const landing = raisedPlatformPosition(tile, size, { getCubies: () => cubies });
-        expect(landing.clone().sub(floor).dot(tile.normal)).toBeCloseTo(WORM_CAUTION_TAPE_TOP, 10);
-        for (let edge = 0; edge < 4; edge++) {
-          poles.getMatrixAt(index * 4 + edge, matrix);
+        const landing = floor.clone().addScaledVector(tile.normal, WORM_CAUTION_TAPE_TOP);
+        if (!corner) expect(raisedPlatformPosition(tile, size, { getCubies: () => cubies }).distanceTo(landing)).toBeLessThan(1e-8);
+        for (const [index, vertex] of perimeter.posts.entries()) {
+          if (!vertex.normals.has(tile.dirKey)) continue;
+          poles.getMatrixAt(index, matrix);
           const foot = new THREE.Vector3(0, -0.5, 0).applyMatrix4(matrix);
           expect(foot.sub(floor).dot(tile.normal)).toBeCloseTo(0.01, 6);
-          tape.getMatrixAt(index * 4 + edge, matrix);
-          const top = new THREE.Vector3(0, 0.5, 0).applyMatrix4(matrix);
-          expect(top.sub(landing).dot(tile.normal)).toBeCloseTo(0, 6);
+        }
+        for (const [index, edge] of perimeter.edges.entries()) {
+          if (edge.face.dirKey !== tile.dirKey) continue;
+          for (const corner of [0, 2]) {
+            const top = new THREE.Vector3().fromBufferAttribute(tape.geometry.attributes.position, index * 4 + corner);
+            expect(top.sub(landing).dot(tile.normal)).toBeCloseTo(0, 6);
+          }
         }
       });
       const matrices = poles.instanceMatrix.array.slice(0, poles.count * 16);
