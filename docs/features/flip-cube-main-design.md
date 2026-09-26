@@ -196,8 +196,9 @@ short hop above it, and the gap carries the drama instead.
 R1 and R2 are visual observers. Freeze their phase during pause, countdown, transit, rescue,
 focus, death and victory; resuming must not catch up through missed wall-clock time. R2 reads
 `rotationClock.axis`, **all** `sliceIndices`, and `warning`; it must not infer a threatened
-slice independently or change when that turn dispatches. Keep the existing safe lane and
-rim visible. Belts use wrapped distance `min(|s-s0|, L-|s-s0|)` for `L=4N`, so a crest crosses
+slice independently or change when that turn dispatches. Keep the rotation-preview rim
+visible; do not add a second safe-lane highlight. Belts use wrapped distance
+`min(|s-s0|, L-|s-s0|)` for `L=4N`, so a crest crosses
 the seam continuously. At a size/scene change clear its bounded tile-displacement bridge.
 The optional chaser needs a separate gameplay acceptance pass and stays out of R1/R2.
 
@@ -227,7 +228,7 @@ The codebase already contains most of the parts. This plan joins them into one b
 | Worm-weight springs (K 210, damping 19, ζ ≈ 0.65, ≤ 24 tiles) | `worm/tilePressBridge.js` | Same spring feel for pad events and Rumbler heave. |
 | Tunnels trigger automatically on crawl-in; jumping over avoids them; jumping while on dives in | `worm/healerWorm/wormSim.js` crawl step | Invert: jump on to ride. |
 | Active-tunnel cap halved to 10 because open tunnels "became terrain" | `worm/healerWorm/constants.js` | Pads remove the cause, so the cap can be re-tuned. |
-| Turn hazard: inverse-scramble queue every 10 s, gold rim and safe lane | `worm/HealerWormMode.jsx`, `SliceWarningLights.jsx` | The Rumbler becomes the warning inside the game world. |
+| Turn hazard: inverse-scramble queue every 10 s, rotation-preview rim | `worm/HealerWormMode.jsx`, `SliceWarningLights.jsx` | The Rumbler becomes the warning inside the game world. |
 | Mobi dialogue; MOBI character ("Multi Orientable Block Intelligence") whose ability opens a tunnel | `MobiIntroScreen.jsx`, `worm/wormCharacterData.js`, `healerWorm/signatures.js` | Mobi is the Flip Cube's native. |
 | Menu cube flips its face centres and sends worms through them | `MainMenu.jsx`, `menuCenterPortals.js`, `MenuFlipWave.jsx` | Those centre flips become real pads. |
 
@@ -394,7 +395,7 @@ Decided 2026-09-26: R1 and R2 are in scope now; R3 comes later, after the §5.3 
 - 2–4 tiles lift slightly at the crest, and a dark band runs through the grid channels.
 - Dust puffs from the seams, with low rumble audio and light haptics when a crest passes under the head.
 
-**R2 · Telegraph** — ship with R1, and keep the gold rim for accessibility. It adds no new rules: turn timing, the rim and the safe lane are unchanged.
+**R2 · Telegraph** — ship with R1, and keep the gold rim for accessibility. It adds no new rules: turn timing and the rotation-preview rim are unchanged; no separate safe-lane lighting.
 
 - When a turn is armed, the Rumbler moves to the threatened slice and circles its belt in the turn direction.
 - It gets faster and harder as `warningProgress` ramps.
