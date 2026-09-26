@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildNatureCellGeometry, NATURE_KIND, BLADE_ROWS } from '../worm/healerWorm/natureMeadow.js';
-import { getNatureMaterials, getMeadowMaterial, NATURE_BUDGET } from '../worm/ElementalGrassSkin.jsx';
+import { buildNatureCellGeometry, NATURE_KIND, BLADE_ROWS, NATURE_BUDGET } from '../worm/healerWorm/natureMeadow.js';
+import { getNatureMaterials } from '../worm/ElementalGrassSkin.jsx';
 import { resolveElementalRenderer } from '../worm/healerWorm/elementalRenderers.js';
 import { getElementalDef } from '../worm/healerWorm/elementalDefs.js';
 import { ELEMENTAL_TIERS } from '../worm/healerWorm/elementalQuality.js';
@@ -75,7 +75,7 @@ describe('Nature terrarium materials', () => {
     expect(resolveElementalRenderer('grass', getElementalDef).mode).toBe('instanced');
     const [moss, plants] = getNatureMaterials();
     expect(getNatureMaterials()[0]).toBe(moss);
-    expect(getMeadowMaterial()).toBe(plants);
+    expect(getNatureMaterials()[1]).toBe(plants);
     for (const m of [moss, plants]) expect(m.userData.elementalInstanced).toBe(true);
     // One write per frame reaches both layers.
     expect(moss.uniforms.uEnv).toBe(plants.uniforms.uEnv);

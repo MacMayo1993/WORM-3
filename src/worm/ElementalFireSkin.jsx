@@ -63,7 +63,7 @@ const QUAD_INDICES = [0, 1, 2, 0, 2, 3];
  * `position` carries the quad's corner purely so the bounds are sane; the shader
  * rebuilds every vertex from `uv`, `aKind` and `aIndex`.
  */
-export function buildFireCellGeometry(tongues, glows, sparks) {
+function buildFireCellGeometry(tongues, glows, sparks) {
   const layout = [
     [KIND_BED, 1],
     [KIND_TONGUE, tongues],

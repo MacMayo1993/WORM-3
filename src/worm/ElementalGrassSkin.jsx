@@ -31,18 +31,10 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
-import { buildNatureCellGeometry, BLADE_ROWS } from './healerWorm/natureMeadow.js';
+import { buildNatureCellGeometry, BLADE_ROWS, NATURE_BUDGET } from './healerWorm/natureMeadow.js';
 import { attachCellAttributes } from './healerWorm/elementalCells.js';
 import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, GLSL_SEAM, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
 import { GLSL_WORM, uWormHead, uWormBody } from './healerWorm/elementalUniforms.js';
-
-/** Blades / ivy leaves / flowers per cover cell, by quality tier. */
-export const NATURE_BUDGET = {
-  minimal: { blades: 30, leaves: 2, flowers: 1 },
-  low: { blades: 34, leaves: 2, flowers: 1 },
-  medium: { blades: 48, leaves: 3, flowers: 2 },
-  high: { blades: 60, leaves: 4, flowers: 2 }
-};
 
 const vertexShader = /* glsl */ `
   uniform float uTime;
@@ -364,9 +356,6 @@ export function getNatureMaterials() {
   ];
   return _materials;
 }
-
-/** Kept for the warm-up and older callers: the plant layer's material. */
-export const getMeadowMaterial = () => getNatureMaterials()[1];
 
 /**
  * The terrarium skin for every cover cell at once.

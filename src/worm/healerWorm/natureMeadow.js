@@ -19,6 +19,14 @@ export const NATURE_KIND = { moss: 0, blade: 1, leaf: 2, flower: 3 };
 /** Rows along a grass blade. Five gives a smooth curve at chase-camera distance. */
 export const BLADE_ROWS = 5;
 
+/** Blades / ivy leaves / flowers per cover cell, by quality tier. */
+export const NATURE_BUDGET = {
+  minimal: { blades: 30, leaves: 2, flowers: 1 },
+  low: { blades: 34, leaves: 2, flowers: 1 },
+  medium: { blades: 48, leaves: 3, flowers: 2 },
+  high: { blades: 60, leaves: 4, flowers: 2 }
+};
+
 /**
  * Build one cell's terrarium.
  *

@@ -66,7 +66,7 @@ const _geoCache = new Map();
  * face plus a skirt ring the vertex shader either wraps over a cube edge or folds
  * flat onto a seam.
  */
-export function getShellGeometry(inner = 14, skirt = 4) {
+function getShellGeometry(inner = 14, skirt = 4) {
   const key = `${inner}:${skirt}`;
   let geo = _geoCache.get(key);
   if (geo) return geo;
