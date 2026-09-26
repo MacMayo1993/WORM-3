@@ -1,5 +1,5 @@
-// Legacy membrane snap for gameplay outside Chaos. Chaos and the opening
-// cinematic share the bounded, closed-seam motion in chaosFlipPose.js.
+// Shared membrane snap for gameplay, including Chaos. The opening cinematic
+// uses the quieter, bounded motion in chaosFlipPose.js.
 export function flipPose(p, danger = 0) {
   const halfT = p < 0.5 ? p * 2 : (p - 0.5) * 2;
   const eased = halfT * halfT * (3 - 2 * halfT);

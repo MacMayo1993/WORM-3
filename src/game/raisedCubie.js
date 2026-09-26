@@ -7,11 +7,11 @@ export const WORM_CAUTION_POLE_HEIGHT = 0.68;
 export const WORM_CAUTION_TAPE_TOP = WORM_CAUTION_POLE_HEIGHT - 0.025;
 export const WORM_PAD_HEIGHT = 0.3;
 export const WORM_PIECE_POP = WORM_CAUTION_TAPE_TOP - WORM_PAD_HEIGHT;
-// FLIP CUBE exposes the whole piece and its connecting band, not just a sticker.
+// FLIP CUBE and Chaos expose the whole piece and its connecting band.
 export const CUBE_PIECE_POP = 0.55;
 export const LEGACY_PIECE_POP = 0.1;
 export const flipCubePadsEnabled = state => !state.wormHealerMode && !state.demoMode
-  && !(state.chaosLevel > 0) && !state.mirrorMode && state.settings?.flipPads !== 'off';
+  && !state.mirrorMode && state.settings?.flipPads !== 'off';
 const popAmount = (distance, size) => distance / (Math.max(0.5, (size - 1) / 2) * cubeExpansionMultiplier(size));
 export const wormRaisedAmount = size => popAmount(WORM_PIECE_POP, size);
 export const cubeRaisedAmount = (size, distance = CUBE_PIECE_POP) => popAmount(distance, size);

@@ -77,7 +77,7 @@ describe('chaos launch', () => {
     { cubeSize: 2, wager: true },
     { cubeSize: 3, wager: false },
     { cubeSize: 5, wager: false },
-    { cubeSize: 6, wager: true }
+    { cubeSize: 5, wager: true }
   ])('keeps the $cubeSize×$cubeSize board intact after Mobi and reaches GO (wager: $wager)', async ({ cubeSize, wager }) => {
     await act(async () => out.current.handleDisparitySetupComplete({ ...WIZARD, cubeSize }));
     await act(async () => {
@@ -104,6 +104,20 @@ describe('chaos launch', () => {
     expect(out.current.disparityCountdown).toBeNull();
     expect(useGameStore.getState().chaosLevel).toBe(WIZARD.disparityLevel);
     expect(useGameStore.getState().cubies).toHaveLength(cubeSize);
+  });
+
+
+  it('caps stale oversized setup and direct launches at 5×5 before Mobi or scramble', async () => {
+    await act(async () => out.current.handleDisparitySetupComplete({ ...WIZARD, cubeSize: 10 }));
+    expect(out.current.chaosPreview.cubeSize).toBe(5);
+    await act(async () => out.current.handleBetSkipped());
+    expect(calls.intro.size).toBe(5);
+    await act(async () => calls.intro.post());
+    expect(useGameStore.getState().cubies).toHaveLength(5);
+    await act(async () => out.current.cancelDisparityRun());
+    await act(async () => out.current.startDisparityGame({ ...WIZARD, cubeSize: 7 }));
+    expect(useGameStore.getState().size).toBe(5);
+    expect(useGameStore.getState().cubies).toHaveLength(5);
   });
 
   it('waits for the first-strike pick after the scramble, then counts down', async () => {
