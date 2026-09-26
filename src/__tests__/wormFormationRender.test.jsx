@@ -5,6 +5,7 @@ import { it, expect, vi } from 'vitest';
 import Cubie from '../3d/Cubie.jsx';
 import { PadProvider } from '../3d/PadSprings.jsx';
 import MobiusTunnel from '../manifold/MobiusTunnel.jsx';
+import DemoPracticeTargets from '../worm/healerWorm/DemoPracticeTargets.jsx';
 import { makeCubies } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from '../worm/liveCubies.js';
@@ -17,11 +18,13 @@ import { makeWormSim, resetWormSim, startJump, stepWormSim } from '../worm/heale
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
 extend(THREE);
 
-it('shows the real cubies rising, grows ribbon and rails together, and lands after formation', async () => {
+it.each([false, true])('raises real cubies, grows the band and lands after formation (demo=%s)', async demoMode => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState(), liveBefore = { ...liveCubies };
   const cubies = makeCubies(3), refs = [], indices = [14, 12], gridRefs = [];
-  useGameStore.setState({ size: 3, cubies, explosionT: 0, wormHealerMode: true, demoMode: false,
+  useGameStore.setState({ size: 3, cubies, explosionT: 0, wormHealerMode: true, demoMode,
+    demoStep: 'worm-traversal', demoWormFinished: false, demoWormComplete: false, wormStoryLevel: null,
+    wormPhase: 'crawling', demoWormTarget: { x: 1, y: 1, z: 2, dirKey: 'PZ' },
     wormPaused: false, wormPauseMenuOpen: false, mirrorMode: false, hollowMode: false, visualMode: 'solid',
     randomMode: false, chaosLevel: 0, cubiePops: {}, settings: { ...before.settings, flipPads: 'off', reducedMotion: false } });
   liveCubies.size = 3; liveCubies.refs = gridRefs;
@@ -30,6 +33,7 @@ it('shows the real cubies rising, grows ribbon and rails together, and lands aft
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
   const root = createRoot(canvas); root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
   const draw = raised => <PadProvider>
+    <DemoPracticeTargets size={3} />
     {[2, 0].map((z, i) => <Cubie key={i} ref={el => { refs[i] = el; gridRefs[indices[i]] = el; }}
       cubie={cubies[1][1][z]} position={[0, 0, z - 1]} size={3} wormMode />)}
     {raised && <MobiusTunnel meshIdx1={0} meshIdx2={1} dirKey1="PZ" dirKey2="NZ" cubieRefs={refs}
@@ -66,6 +70,9 @@ it('shows the real cubies rising, grows ribbon and rails together, and lands aft
     expect(sim.padFlight).toBeTruthy();
     const point = raisedPortalPosition(1, 1, 2, 'PZ', 3, useGameStore.getState());
     expect(point[2]).toBeCloseTo(1 + WORM_PIECE_POP / 2 + .52 + WORM_PAD_HEIGHT, 5);
+    const marker = store.getState().scene.getObjectByName('practice-target');
+    if (demoMode) expect(marker.position.z).toBeCloseTo(point[2] + .035, 5);
+    else expect(marker).toBeUndefined();
     await act(async () => useGameStore.setState({ wormPaused: true }));
     for (let i = 0; i < 30; i++) frame();
     expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1 + WORM_PIECE_POP / 2, 5);
@@ -100,6 +107,11 @@ it('shows the real cubies rising, grows ribbon and rails together, and lands aft
     expect(shell.material.opacity).toBeLessThan(0.2);
     expect(sim.padFlight).toBeNull();
     expect(sim.headInterpPos.z).toBeCloseTo(1.52 + WORM_CAUTION_TAPE_TOP, 6);
+    if (demoMode) {
+      expect(marker.position.z).toBeCloseTo(1.52 + WORM_CAUTION_TAPE_TOP + .035, 6);
+      await act(async () => useGameStore.setState({ demoWormComplete: true }));
+      expect(store.getState().scene.getObjectByName('practice-target')).toBeUndefined();
+    }
   } finally {
     await act(async () => root.unmount());
     useGameStore.setState(before, true); Object.assign(liveCubies, liveBefore);

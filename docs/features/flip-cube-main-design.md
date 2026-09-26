@@ -11,8 +11,8 @@ camera follows the same head. Nearby platforms receive portrait framing that inc
 the worm and its jump destination. Portal rings, signs and portal effects follow the raised tile. Caution tape and posts stay
 on the floor lattice around the opening. Mirror view and cosmetic pad settings cannot
 disable physical WORM lift. Flipped-face landings enter the tunnel. Crawl does not enter raised
-mouths. Tunnel paths and exit handoffs start from the pad's hover. Demo lessons retain the
-legacy route.
+mouths. Tunnel paths and exit handoffs start from the pad's hover. Demo lessons use the same raised platforms, deliberate jump entry, camera framing and
+portal anchors as live WORM runs.
 
 WORM pads hold a fixed landing height, `WORM_PAD_HEIGHT` (0.3 since the low-hover pass);
 cosmetic motion settings cannot remove the physical platform. Layer-turn scheduling holds during the captured jump (0.65 seconds normally; formation can extend it). Rescue

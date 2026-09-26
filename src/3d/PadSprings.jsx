@@ -24,7 +24,7 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
   const cubieSprings = useMemo(() => new Map(), []);
   // Raised pads hover on an unstable wormhole; PadEnergy draws these records.
   const menuPads = profileOverride === 'menu';
-  const energyOn = useGameStore(s => menuPads || (!profileOverride && ((!!s.wormHealerMode && !s.demoMode) || flipCubePadsEnabled(s))));
+  const energyOn = useGameStore(s => menuPads || (!profileOverride && (!!s.wormHealerMode || flipCubePadsEnabled(s))));
   const frames = useMemo(() => createEnergyFrames(MAX_PADS), []);
   const energyClock = useRef(0);
   const stalkRef = useRef(), mouthRef = useRef();
@@ -65,7 +65,7 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
     }
     const cap = profileOverride ? 6 : selectEffectiveFlipCap(state);
     const wormMode = !profileOverride && state.wormHealerMode;
-    const wormPads = wormMode && !state.demoMode;
+    const wormPads = wormMode;
     const flipPads = profileOverride ? state.settings?.flipPads : effectiveFlipPads(state);
     const energyPads = wormPads || menuPads || (!profileOverride && flipCubePadsEnabled(state));
     const motionOff = wormPads || reduced.current || state.settings?.reducedMotion;

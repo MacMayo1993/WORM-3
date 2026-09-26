@@ -59,6 +59,7 @@ it.each([7, 15])('captures an early queued jump two cells before a raised %i cub
   const { sim, ctx, target, cubies } = setup(size, 2);
   const worm = { pos: { current: sim.pos }, moveDir: { current: sim.moveDir } };
   const cameraTarget = nearbyPlatform(worm, size, { cubies, wormHealerMode: true, demoMode: false });
+  expect(nearbyPlatform(worm, size, { cubies, wormHealerMode: true, demoMode: true })).toEqual(cameraTarget);
   const origin = sim.headInterpPos.clone();
   queueTurn(sim, 'jump', ctx);
   stepWormSim(sim, 1 / 60, size, ctx);
@@ -70,7 +71,7 @@ it.each([7, 15])('captures an early queued jump two cells before a raised %i cub
   expect(sim.pos).toMatchObject(target);
 });
 
-it('retargets an airborne jump from its visible height and keeps rocket/demo jumps separate', () => {
+it('retargets an airborne jump from its visible height and keeps rocket and crawl-entry jumps separate', () => {
   const { sim, ctx } = setup(7, 1);
   sim.isJumping = true; sim.jumpT = .4; sim.jumpHeight = 1.3;
   const visible = sim.headInterpPos.clone().addScaledVector(sim.currentNormal, jumpLiftOf(sim));
@@ -78,8 +79,8 @@ it('retargets an airborne jump from its visible height and keeps rocket/demo jum
   expect(sim.padFlight.start.distanceTo(visible)).toBeLessThan(1e-8);
   const rocket = setup(7, 1); rocket.sim.rocketActive = true;
   startJump(rocket.sim, rocket.ctx, 7); expect(rocket.sim.padFlight).toBeNull();
-  const demo = setup(7, 1);
-  startJump(demo.sim, { ...demo.ctx, getTunnelEntry: () => 'crawl' }, 7);
-  expect(demo.sim.padFlight).toBeNull();
-  expect(demo.sim.jumpHeight).toBe(1.3);
+  const crawl = setup(7, 1);
+  startJump(crawl.sim, { ...crawl.ctx, getTunnelEntry: () => 'crawl' }, 7);
+  expect(crawl.sim.padFlight).toBeNull();
+  expect(crawl.sim.jumpHeight).toBe(1.3);
 });

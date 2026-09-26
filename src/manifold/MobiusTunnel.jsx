@@ -612,7 +612,7 @@ const MobiusTunnel = ({
     _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat2);
 
     const formationState = useGameStore.getState();
-    const mouthLift = formationState.wormHealerMode && !formationState.demoMode ? WORM_PAD_HEIGHT : 0;
+    const mouthLift = formationState.wormHealerMode ? WORM_PAD_HEIGHT : 0;
     const cubeLift = raisedPresentation ? Math.max(0, padMotion.get(tunnelId)?.lift ?? 0) : 0;
     // Ribbon anchors: just inside each sticker tile's own surface, so the ribbon
     // reaches the tile the player flipped rather than the far side of its cubie.
@@ -763,7 +763,7 @@ const MobiusTunnel = ({
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
     let whipAmp = 0;
     let whipPhase = 0;
-    if (formationState.wormHealerMode && !formationState.demoMode) {
+    if (formationState.wormHealerMode) {
       const reduced = formationState.settings?.reducedMotion || prefersReducedMotion();
       if (reduced) formationAge.current = PLATFORM_FORMATION_SECONDS;
       else if (!platformFormationHeld(formationState)) formationAge.current += Math.min(delta, .05);

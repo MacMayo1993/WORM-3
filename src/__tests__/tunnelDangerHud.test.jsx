@@ -48,15 +48,15 @@ it('explains automatic tail clearance in traversal lessons', () => {
   expect(host.textContent).not.toContain('orbs to heal');
 });
 
-it('keeps the crawl-in wording for demo lessons, which still enter by crawling', () => {
+it('uses the live pad danger wording in demo lessons', () => {
   useGameStore.setState({ demoMode: true });
   wormBuffs.tunnelNeeds = { uses: 3, ready: true, color: '#fff', pickupsNeeded: 0 };
   act(() => root.render(<TunnelNeedsCard />));
-  expect(host.textContent).toContain('Fatal tunnel · turn away');
-  expect(host.textContent).toContain('Entering this tunnel will kill you · take another route');
+  expect(host.textContent).toContain("Fatal pad · don't jump on it");
+  expect(host.textContent).toContain('Landing on it kills you · crawl under instead');
 });
 
-it.each([[false, 'Jump on to spend your carried orbs'], [true, 'Enter to spend your carried orbs']])('describes the route in force (demo=%s)', (demo, caption) => {
+it.each([[false, 'Jump on to spend your carried orbs'], [true, 'Jump on to spend your carried orbs']])('describes the route in force (demo=%s)', (demo, caption) => {
   useGameStore.setState({ demoMode: demo });
   wormBuffs.tunnelNeeds = { uses: 1, ready: true, color: '#fff', pickupsNeeded: 0 };
   act(() => root.render(<TunnelNeedsCard />));

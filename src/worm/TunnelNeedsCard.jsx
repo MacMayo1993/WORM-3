@@ -11,7 +11,7 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
   const alive = useGameStore(s => s.wormAlive);
   const phase = useGameStore(s => s.wormGamePhase);
   // Jump-to-ride runs only enter a tunnel by landing on its pad, so crawling
-  // under a fatal one is safe; demo lessons still enter by crawling in.
+  // under a fatal one is safe in both live runs and demo lessons.
   const padRoute = useGameStore(s => tunnelEntryRule(s) === 'pad');
   useEffect(() => {
     const id = setInterval(() => setNeed(wormBuffs.tunnelNeeds), 100);

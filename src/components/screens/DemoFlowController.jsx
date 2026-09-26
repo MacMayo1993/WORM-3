@@ -752,7 +752,7 @@ const TRY_COPY = {
   'twin-paradox': 'With Flip on, tap a tile. Its opposite twin moves with it.',
   'flip-gateway': 'Tap nine different pairs to send them across. Then tap the moved tiles to bring them back.',
   'make-it-yours': 'Try the <strong>Colors</strong>, <strong>Tiles</strong> and <strong>Scene</strong> tabs. Close Settings when you like what you see.',
-  'worm-traversal': 'Steer left or right. Collect orbs and enter tunnels to heal the cube.',
+  'worm-traversal': 'Steer left or right. Collect orbs, then jump onto raised flip pads to ride and heal their tunnels.',
   'chaos-forecast': 'Watch which color pair survives. Will it be your pick?',
   'random-showcase': 'Watch the rules and look change. Tap Skip lesson when you’re ready.',
 };

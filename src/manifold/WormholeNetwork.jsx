@@ -40,10 +40,9 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   // exactly as long as its tiles are still flippable.
   const flipCap = useGameStore(selectEffectiveFlipCap);
   const cubePads = useGameStore(flipCubePadsEnabled);
-  const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths, wormHealerMode, demoMode, chaosLevel } = useGameStore(
+  const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths, wormHealerMode, chaosLevel } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode,
-      demoMode: s.demoMode,
       chaosLevel: s.chaosLevel,
       cubies: s.cubies,
       size: s.size,
@@ -59,7 +58,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   );
   // Raised WORM and FLIP CUBE pieces expose their physical connections even
   // with Off/Hints selected; the stored view preference remains unchanged.
-  const wormBands = wormHealerMode && !demoMode;
+  const wormBands = wormHealerMode;
   const raisedBands = wormBands || cubePads;
   const visible = showTunnels || raisedBands;
   // Narrow deps: only the two settings fields that affect face-color resolution.
