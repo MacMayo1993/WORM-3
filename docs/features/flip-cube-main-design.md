@@ -18,6 +18,9 @@ claim the entire design has shipped.
   Unflipped faces travel with the body and remain ordinary platforms; tunnel eligibility is per face.
   Springs follow physical piece identity through layer turns. Manual Explode does not stack the lift.
   Whole-piece motion settles; only the small normal-offset pads bounce continuously.
+- Stalks cover the full 0.85-square tile back with a capped, half-twisted square funnel.
+  They extend through the raised cubie and emerge behind its inner face; instance transforms
+  animate the extension without rebuilding geometry.
 - Raised stalks use the selected palette’s antipodal color of the currently visible face
   (white → yellow, red → orange, blue → green), without a fixed green material tint.
 - Keep the remaining default choices in §13: bigger/faster wear, subtle Chaos profile,

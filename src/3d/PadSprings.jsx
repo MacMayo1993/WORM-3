@@ -1,3 +1,4 @@
+import { createPadStalkGeometry, PAD_STALK_DEPTH, PAD_BACK_CLEARANCE } from './padStalkGeometry.js';
 import { RaisedCubieContext } from './raisedCubieContext.js';
 import { removeRaisedCubie } from './raisedCubieMotion.js';
 import { padBackFace } from '../game/raisedCubie.js';
@@ -14,23 +15,6 @@ import { padMotion, removePadMotion } from './padMotionBridge.js';
 const PadContext = createContext(null);
 const MAX_PADS = 2048;
 
-function springGeometry() {
-  const points = [], indices = [];
-  for (let i = 0; i <= 16; i++) {
-    const t = i / 16, angle = t * Math.PI;
-    for (const side of [-1, 1]) points.push(side * 0.12 * Math.cos(angle), side * 0.12 * Math.sin(angle), t);
-    if (i < 16) {
-      const k = i * 2;
-      indices.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-  g.setIndex(indices);
-  g.computeVertexNormals();
-  return g;
-}
-
 // One scheduler and two instanced draws per scene, regardless of pad count.
 export function PadProvider({ children, profile: profileOverride = null }) {
   const entries = useMemo(() => new Set(), []);
@@ -38,7 +22,7 @@ export function PadProvider({ children, profile: profileOverride = null }) {
   const cubieSprings = useMemo(() => new Map(), []);
   const stalkRef = useRef(), mouthRef = useRef();
   const resources = useMemo(() => ({
-    stalk: springGeometry(), mouth: new THREE.PlaneGeometry(0.76, 0.76),
+    stalk: createPadStalkGeometry(), mouth: new THREE.PlaneGeometry(0.76, 0.76),
     stalkMaterial: new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#000000', emissiveIntensity: 0, side: THREE.DoubleSide }),
     mouthMaterial: new THREE.MeshBasicMaterial({ color: '#16161a', side: THREE.DoubleSide }),
     matrix: new THREE.Matrix4(), slot: new THREE.Matrix4(), local: new THREE.Matrix4(),
@@ -123,7 +107,8 @@ export function PadProvider({ children, profile: profileOverride = null }) {
         if (!parent.visible) { visible = false; break; }
       }
       if (!visible) continue;
-      // Parent contains live cubie/layer/explode transforms. Never drag anchors.
+      // Parent contains live cubie/layer/explode transforms. The small bounce
+      // changes only this instance, never the main tunnel geometry.
       group.parent.updateWorldMatrix(true, false);
       resources.position.fromArray(d.pos);
       resources.quaternion.setFromEuler(d.rotation);
@@ -135,7 +120,11 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       resources.local.copy(stalkRef.current.parent.matrixWorld).invert();
       resources.matrix.premultiply(resources.local);
       mouthRef.current.setMatrixAt(count, resources.matrix);
-      resources.scale.set(1, 1, Math.max(0.001, entry.lift));
+      // Start behind the cubie's inner face and end against the entire tile
+      // back. The fixed through-body section remains when the pad compresses.
+      resources.local.makeTranslation(0, 0, -PAD_STALK_DEPTH);
+      resources.matrix.multiply(resources.local);
+      resources.scale.set(1, 1, PAD_STALK_DEPTH + Math.max(0, entry.lift) - PAD_BACK_CLEARANCE);
       resources.matrix.scale(resources.scale);
       stalkRef.current.setMatrixAt(count, resources.matrix);
       resources.color.set(paletteCache.current.colors[padBackFace(d.meta)] ?? '#ffffff');
