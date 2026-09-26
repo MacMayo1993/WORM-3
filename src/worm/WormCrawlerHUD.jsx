@@ -1467,11 +1467,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                                     className={`worm-hud-key worm-action worm-jump${jumpRescue ? ' worm-jump-rescue' : isPortalReady ? ' worm-jump-ready' : ''}`}
                                     style={isPortalReady ? jumpReadyStyle : jumpIdleStyle}
-                                    aria-label={jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Dive through wormhole" : "Jump over body or vault an edge"}
+                                    aria-label={jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Jump onto the raised tunnel" : "Jump over body or vault an edge"}
                                     disabled={!controlsEnabled}
                                 >
                                     <JumpIcon size={19} />
-                                    {jumpRescue ? 'Jump now' : isPortalReady ? 'Dive' : 'Jump'}
+                                    {jumpRescue ? 'Jump now' : isPortalReady ? 'Jump to ride' : 'Jump'}
                                 </button>
                             </div>
                             <BoostButton wormAlive={controlsEnabled && !jumpRescue} />

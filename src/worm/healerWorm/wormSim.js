@@ -1,3 +1,5 @@
+import { padEntryDecision } from './padEntry.js';
+import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
 import { movingSliceCrossing } from './sliceCrossing.js';
 import { tickExpansion } from './expansion.js';
 import { EXPLODE_DURATION } from '../wormExpansion.js';
@@ -328,8 +330,9 @@ export function makeWormSim(size) {
 }
 
 const setCurWorldPosFromTile = (sim, size) => {
-    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, sim.expansionAmount);
+    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, sim.onRaisedPlatform ? 1 : sim.expansionAmount);
     sim._curWP.set(wp[0], wp[1], wp[2]);
+    if (sim.onRaisedPlatform) sim._curWP.addScaledVector(FACE_NORMALS[sim.pos.dirKey], sim.raisedPadHeight ?? 0);
     sim.curWorldPos = sim._curWP;
 };
 
@@ -372,11 +375,16 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.prevWorldPos = null;
     sim.rotationDeparture = null;
     sim.expansionAmount = 0;
+    sim.onRaisedPlatform = false;
+    sim.raisedDeparture = false;
+    sim.raisedRouteDistance = null;
     setCurWorldPosFromTile(sim, size);
     sim.headInterpPos.copy(sim.curWorldPos);
     sim.currentNormal.copy(FACE_NORMALS[startPos.dirKey] ?? FACE_NORMALS.PZ);
     sim.isJumping = false;
     sim.jumpT = 0;
+    sim.padFlight = null;
+    sim.raisedPadHeight = 0;
     sim.jumpCount = 0;
     sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
@@ -451,21 +459,22 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
 }
 
 /** Jump offset height at current jumpT. */
-export const jumpLiftOf = (sim) => sim.isJumping
+export const jumpLiftOf = (sim) => sim.isJumping && !sim.padFlight
     ? Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight
     : 0;
 
 export function startJump(sim, ctx, size, { allowDive = true } = {}) {
-    if (sim.signature.sweep) return;
+    if (sim.signature.sweep || sim.padFlight) return;
     if (sim.phase !== 'crawling' || (sim.signature.character === 'inch' && sim.signature.active > 0)) return;
+    if (!liveRotation.active && !sim.restRead && startPlatformJump(sim, size, ctx, allowDive)) return;
     const grounded = !sim.isJumping;
     // A deliberate dive reads only settled tile contents. Never resolve the
     // outgoing sticker while a layer is moving or a destination is rest-read.
-    if (allowDive && size && !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead) {
+    if ((!usesRaisedPlatforms(ctx) || sim.onRaisedPlatform) && allowDive && size && !sim.isJumping && !sim.rocketActive && !liveRotation.active && !sim.restRead) {
         const { x, y, z, dirKey } = sim.pos;
         const sticker = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         if (sticker && sticker.curr !== sticker.orig && !isParityLocked(sim, sim.pos, ctx) && ctx.resolveTunnel(x, y, z, dirKey)) {
-            beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
+            beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, false, true);
             return;
         }
     }
@@ -713,7 +722,11 @@ export function killWormSim(sim, ctx, details = null) {
     ctx.onDeath(details, Math.floor(sim.timeAlive));
 }
 
-function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = false) {
+function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = false, intentional = false) {
+    if (usesRaisedPlatforms(ctx) && !skipDeposit && padEntryDecision({
+        rule: 'pad', event: intentional ? 'land' : 'crawl', flipped: true, resolved: true,
+        turning: liveRotation.active || !!sim.restRead, rocket: sim.rocketActive, grace: sim.landingGraceT > 0,
+    }) !== 'ride') return;
     if (isParityLocked(sim, { x, y, z, dirKey }, ctx)) return;
     const resolved = ctx.resolveTunnel(x, y, z, dirKey);
     if (!resolved) return;
@@ -787,7 +800,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 
     sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
     sim.headInterpPos.copy(sim.tunnelApproach);
-    sim.activeTunnel = tunnel;
+    sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: 1, padHeight: WORM_PAD_HEIGHT } : tunnel;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
     // Remove the exit portal tile from the trail so the head landing on it after
@@ -1300,6 +1313,7 @@ export const CORNER_VERTEX_LIFT = 0.52;
 export const CORNER_STEP_LENGTH = 2 * CORNER_VERTEX_LIFT;
 
 export function evaluatePosAndNormal(sim, tValue, outPos) {
+    if (sim.padFlight) { outPos.copy(sim.headInterpPos); return sim.currentNormal; }
     let pWorld = sim.prevWorldPos;
     const cWorld = sim.curWorldPos;
     const liveDeparture = pWorld && hasLiveDeparture(sim);
@@ -1349,6 +1363,14 @@ export function evaluatePosAndNormal(sim, tValue, outPos) {
             }
         } else {
             outPos.copy(pWorld).lerp(cWorld, tValue);
+            if (sim.raisedDeparture) {
+                // Leave the top tangentially before descending. A straight ramp
+                // would take the head through the solid raised cubie immediately.
+                const down = THREE.MathUtils.smoothstep(tValue, 0.45, 1);
+                const heightDelta = (cWorld.x - pWorld.x) * cNorm.x
+                    + (cWorld.y - pWorld.y) * cNorm.y + (cWorld.z - pWorld.z) * cNorm.z;
+                outPos.addScaledVector(cNorm, (down - tValue) * heightDelta + 0.4 * Math.sin(Math.PI * tValue));
+            }
             if (departure) cNorm = _evalCornerNorm.lerpVectors(_departureNormal, cNorm, tValue).normalize();
         }
     }
@@ -1604,9 +1626,13 @@ const PHASE_HANDLERS = {
                 // Tag the point with the grid cell it occupies, derived from the pre-lift
                 // surface point (origin-centred coords → nearest lattice index). Used to ride
                 // a mid-rotation slice and to bake the turn into history at commit.
-                const _htx = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.x, size, sim.expansionAmount)));
-                const _hty = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.y, size, sim.expansionAmount)));
-                const _htz = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.z, size, sim.expansionAmount)));
+                let _htx = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.x, size, sim.expansionAmount)));
+                let _hty = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.y, size, sim.expansionAmount)));
+                let _htz = Math.min(size - 1, Math.max(0, cubeGridIndex(_evalHPos.z, size, sim.expansionAmount)));
+                if (sim.raisedDeparture || sim.onRaisedPlatform) {
+                    const owner = sim.lastRecordedT < 0.5 && sim.prevTile ? sim.prevTile : sim.pos;
+                    _htx = owner.x; _hty = owner.y; _htz = owner.z;
+                }
                 // Points recorded while rest-reading a mid-rotation slice already sit at
                 // their committed positions — the -1 sentinel opts them out of the body
                 // ride/bake, which would otherwise swing them along with the outgoing slice.
@@ -1728,6 +1754,8 @@ const PHASE_HANDLERS = {
                     sim.pendingSelfCollision = null;
                 }
 
+                sim.raisedDeparture = sim.onRaisedPlatform;
+                sim.onRaisedPlatform = false;
                 // Immediately update curWorldPos so the interpolation target is correct
                 setCurWorldPosFromTile(sim, size);
                 updateRotationDeparture(sim);
@@ -1758,7 +1786,7 @@ const PHASE_HANDLERS = {
                     ctx.onFlippedTile(sim.onFlippedTile);
                 }
 
-                if (isFlipped && !isParityLocked(sim, sim.pos, ctx) && !sim.rocketActive && sim.landingGraceT <= 0) {
+                if (!usesRaisedPlatforms(ctx) && isFlipped && !isParityLocked(sim, sim.pos, ctx) && !sim.rocketActive && sim.landingGraceT <= 0) {
                     sim.pendingTunnelTrigger = { x, y, z, dirKey };
                     // Swept-entry guard: if the step accumulator remainder indicates the worm
                     // has already spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on
@@ -1904,6 +1932,13 @@ const PHASE_HANDLERS = {
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
                 // Resume from the exit pose, never interpolate from the old entry tile.
+                if (sim.activeTunnel?.padExpansion) {
+                    const exit = sim.activeTunnel.exit;
+                    sim.curWorldPos.fromArray(getStickerWorldPos(exit.x, exit.y, exit.z, exit.dirKey, size, 1))
+                        .addScaledVector(FACE_NORMALS[exit.dirKey], WORM_PAD_HEIGHT);
+                    sim.onRaisedPlatform = true;
+                    sim.raisedPadHeight = WORM_PAD_HEIGHT;
+                }
                 sim.headInterpPos.copy(sim.curWorldPos);
                 sim.prevWorldPos = null;
                 sim.prevTile = null;
@@ -1942,6 +1977,21 @@ export function stepWormSim(sim, delta, size, ctx) {
         sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
     }
     if (paused) { sim.signatureRequested = false; return; }
+
+    if (usesRaisedPlatforms(ctx)) sim.pendingTunnelTrigger = null;
+    if (sim.padFlight) {
+        const landed = tickPlatformJump(sim, delta);
+        if (landed && !sim.selfCollisionGraceSteps && sim.landingGraceT <= 0 && !hasJumpClearance(sim)) {
+            killWormSim(sim, ctx, { reason: 'self', headTile: tileKey(sim.pos) });
+            return;
+        }
+        if (landed && landed.allowRide && !liveRotation.active && !sim.restRead) {
+            const { x, y, z, dirKey } = sim.pos;
+            const sticker = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+            if (sticker && sticker.curr !== sticker.orig) beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, false, true);
+        }
+        return;
+    }
 
     // Heal pause: freeze the whole crawl for a beat after a ring heal so the tile pops out
     // and heals in view. The pop/particle FX are store- and clock-driven, so they play on
@@ -2491,7 +2541,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
             sim.lastFlipped = sim.onFlippedTile;
             ctx.onFlippedTile(sim.onFlippedTile);
         }
-        if (landedFlipped && !isParityLocked(sim, sim.pos, ctx) && !sim.rocketActive && sim.landingGraceT <= 0) sim.pendingTunnelTrigger = { x, y, z, dirKey };
+        if (!usesRaisedPlatforms(ctx) && landedFlipped && !isParityLocked(sim, sim.pos, ctx) && !sim.rocketActive && sim.landingGraceT <= 0) sim.pendingTunnelTrigger = { x, y, z, dirKey };
         // The trail and head now share the committed coordinate frame with the
         // refreshed tunnel lookup, so the ring check skipped during traversal is safe.
         tryWormholeRingHeal(sim, size, ctx);

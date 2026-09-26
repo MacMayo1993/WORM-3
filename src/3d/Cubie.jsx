@@ -406,7 +406,8 @@ const Cubie = React.forwardRef(function Cubie({
   const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
   const liftSpring = useRaisedCubieSpring(`${size}:${origHomeX},${origHomeY},${origHomeZ}`);
   const poppedRef = useRef(false);
-  const raised = !wormMode && !mirrorMode && settings?.flipPads !== 'off'
+  const wormPads = wormMode && !useGameStore.getState().demoMode;
+  const raised = (!wormMode || wormPads) && !mirrorMode && (wormPads || settings?.flipPads !== 'off')
     && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Mega normally omits individual bodies. Materialize a body for a raised
   // piece and keep it through its return; otherwise it would still be a sheet.
@@ -419,7 +420,7 @@ const Cubie = React.forwardRef(function Cubie({
     if (!_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0) return;
     if (!popGroupRef.current || !pieceRef.current) return;
     const state = useGameStore.getState();
-    const reduced = settings?.reducedMotion || prefersReducedMotion();
+    const reduced = wormPads || settings?.reducedMotion || prefersReducedMotion();
     if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
     else advancePadSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
     const amount = Math.max(0, Math.min(1, spring.lift));

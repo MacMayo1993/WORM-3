@@ -55,7 +55,8 @@ export function PadProvider({ children, profile: profileOverride = null }) {
     }
     const cap = profileOverride ? 6 : selectEffectiveFlipCap(state);
     const wormMode = !profileOverride && state.wormHealerMode;
-    const motionOff = reduced.current || state.settings?.reducedMotion;
+    const wormPads = wormMode && !state.demoMode;
+    const motionOff = wormPads || reduced.current || state.settings?.reducedMotion;
     for (const pair of pairs.values()) { pair.members.length = 0; }
     for (const entry of entries) {
       const d = entry.data.current;
@@ -72,7 +73,7 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       padPose({ phase: pair.phase, wear: pair.wear, profile, worn: pair.wear >= K_STAR,
         reducedMotion: motionOff, subtle: state.settings?.flipPads === 'subtle', big: !profileOverride && state.size >= 7 }, pair.pose);
       pair.phase += dt * pair.pose.frequency;
-      pair.active = state.settings?.flipPads !== 'off' && !wormMode
+      pair.active = (wormPads || (state.settings?.flipPads !== 'off' && !wormMode))
         && pair.members.some(e => classifyPad({ flips: e.data.current.meta.flips, cap }).lifted);
       const target = pair.active ? pair.pose.lift : 0;
       if (motionOff) { pair.lift = target; pair.velocity = 0; }
@@ -88,8 +89,8 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       const d = entry.data.current, group = entry.group.current;
       if (!group) continue;
       const pair = pairs.get(d.pair);
-      // WORM stays on its proven surface route until the complete pad handoff ships.
-      const enabled = state.settings?.flipPads !== 'off' && !wormMode;
+      // WORM uses a fixed physical landing height; cube/menu pads keep their idle bounce.
+      const enabled = (wormPads || (state.settings?.flipPads !== 'off' && !wormMode));
       const pad = classifyPad({ flips: d.meta.flips, cap });
       const target = enabled && pad.lifted ? pair.pose.lift : 0;
       if (enabled && pad.lifted) { entry.lift = pair.lift; entry.velocity = pair.velocity; }

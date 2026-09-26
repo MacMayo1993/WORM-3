@@ -383,7 +383,7 @@ export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = wo
  */
 export const buildTunnelPathForTunnel = (path, tunnel, size, explosionFactor = wormExpansion.amount) => {
   const k = (size - 1) / 2;
-  const scale = cubeExpansionScale(size, explosionFactor);
+  const scale = cubeExpansionScale(size, tunnel.padExpansion ?? explosionFactor);
 
   // Cube-cell centers of the entry/exit tiles (scaled out during the explosion anim).
   _tunnelEntry.set(
@@ -512,9 +512,9 @@ const ZERO3 = [0, 0, 0];
 export const getWindWorldPosInto = (out, tunnel, side, s, size, explosionFactor = wormExpansion.amount) => {
   const tile = side === 'exit' ? tunnel.exit : tunnel.entry;
   const n = TUNNEL_FACE_NORMALS[tile.dirKey] || ZERO3;
-  const wp = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, explosionFactor);
+  const wp = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, tunnel.padExpansion ?? explosionFactor);
   const cl = Math.max(0, Math.min(1, s));
-  const lift = THREE.MathUtils.lerp(WORM_LIFT, TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, cl);
+  const lift = THREE.MathUtils.lerp(WORM_LIFT + (tunnel.padHeight ?? 0), TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, cl);
   return out.set(wp[0] + n[0] * lift, wp[1] + n[1] * lift, wp[2] + n[2] * lift);
 };
 // ============================================================================

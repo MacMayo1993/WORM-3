@@ -1398,3 +1398,101 @@ describe('crossing a moving slice after its initial hazard check', () => {
     resetLiveRotation();
   });
 });
+
+describe('raised WORM platforms', () => {
+  function platformCtx(sim, flippedFace = sim.pos.dirKey) {
+    const cubies = makeCubies(SIZE);
+    const c = cubies[sim.pos.x][sim.pos.y][sim.pos.z];
+    const s = c.stickers[flippedFace];
+    s.flips = 1; s.curr = s.orig === 1 ? 4 : 1;
+    const tunnel = { entry: { ...sim.pos }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' } };
+    return makeCtx({ getCubies: () => cubies, getTunnelEntry: () => 'pad',
+      resolveTunnel: () => ({ tunnel, tunnelKey: 'raised-test' }) });
+  }
+  it.each([30, 60, 120])('jumps to the raised mouth before entering at %s Hz', hz => {
+    const sim = makeSim(), ctx = platformCtx(sim);
+    const before = sim.headInterpPos.clone();
+    startJump(sim, ctx, SIZE);
+    expect(sim.phase).toBe('crawling');
+    expect(sim.padFlight).toBeTruthy();
+    stepWormSim(sim, 1 / hz, SIZE, ctx);
+    expect(sim.headInterpPos.distanceTo(before)).toBeLessThan(0.2);
+    for (let frame = 0; frame < hz && sim.padFlight; frame++) stepWormSim(sim, 1 / hz, SIZE, ctx);
+    expect(sim.phase).toBe('windup');
+    expect(sim.activeTunnel.padExpansion).toBe(1);
+    expect(sim.onRaisedPlatform).toBe(true);
+    expect(sim.headInterpPos.z).toBeCloseTo(3.32 + 0.5 + 0.08, 6);
+    expect(sim.stepHistory.count).toBeGreaterThan(64);
+    expect(shAt(sim.stepHistory, 0).pos.distanceTo(sim.headInterpPos)).toBeLessThan(1e-6);
+  });
+  it('lands on an unflipped corner face without entering its sibling face tunnel', () => {
+    const sim = makeSim();
+    sim.pos = { x: 2, y: 2, z: 2, dirKey: 'PZ' };
+    const ctx = platformCtx(sim, 'PY');
+    startJump(sim, ctx, SIZE);
+    for (let i = 0; i < 40; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
+    expect(sim.phase).toBe('crawling');
+    expect(sim.onRaisedPlatform).toBe(true);
+    expect(sim.curWorldPos.toArray()).toEqual([2.8, 2.8, 3.32]);
+    expect(ctx.events.some(e => e.type === 'tunnelEnter')).toBe(false);
+  });
+  it('does not enter from a crawl and preserves the jump across pause', () => {
+    const sim = makeSim(), ctx = platformCtx(sim);
+    sim.pendingTunnelTrigger = { ...sim.pos };
+    stepWormSim(sim, 1 / 60, SIZE, ctx);
+    expect(sim.phase).toBe('crawling');
+    startJump(sim, ctx, SIZE);
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    const pose = sim.headInterpPos.clone(), t = sim.padFlight.t;
+    stepWormSim(sim, 0.05, SIZE, { ...ctx, isPaused: () => true });
+    expect(sim.headInterpPos.equals(pose)).toBe(true);
+    expect(sim.padFlight.t).toBe(t);
+  });
+  it('rescue jumps can land on a pad without triggering a ride', () => {
+    const sim = makeSim(), ctx = platformCtx(sim);
+    startJump(sim, ctx, SIZE, { allowDive: false });
+    for (let i = 0; i < 40; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
+    expect(sim.phase).toBe('crawling');
+    expect(sim.onRaisedPlatform).toBe(true);
+  });
+});
+
+it.each([3, 7, 15])('captures an ordinary face one cell ahead on a raised %s cube', size => {
+  resetLiveRotation();
+  const sim = makeWormSim(size);
+  resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
+  sim.pos = { x: size - 2, y: size - 1, z: size - 1, dirKey: 'PZ' };
+  sim.moveDir = 'right';
+  const cubies = makeCubies(size);
+  const target = cubies[size - 1][size - 1][size - 1];
+  target.stickers.PY.flips = 1; target.stickers.PY.curr = 6;
+  const ctx = makeCtx({ getCubies: () => cubies, getTunnelEntry: () => 'pad' });
+  startJump(sim, ctx, size);
+  expect(sim.padFlight.target.x).toBe(size - 1);
+  while (sim.padFlight) stepWormSim(sim, 1 / 60, size, ctx);
+  expect(sim.onRaisedPlatform).toBe(true);
+  expect(sim.pos.x).toBe(size - 1);
+  expect(sim.phase).toBe('crawling');
+  expect(sim.curWorldPos.z).toBeGreaterThan(size / 2);
+});
+
+it('keeps raised tunnel windout connected to subsequent crawl', () => {
+  resetLiveRotation();
+  const sim = makeSim();
+  const cubies = makeCubies(SIZE);
+  for (const [z, d] of [[2, 'PZ'], [0, 'NZ']]) {
+    cubies[1][1][z].stickers[d].flips = 1;
+    cubies[1][1][z].stickers[d].curr = z === 2 ? 4 : 1;
+  }
+  const tunnel = { entry: { ...sim.pos }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' } };
+  const ctx = makeCtx({ getCubies: () => cubies, getTunnelEntry: () => 'pad',
+    resolveTunnel: () => ({ tunnel, tunnelKey: 'raised-exit' }) });
+  startJump(sim, ctx, SIZE);
+  while (sim.padFlight) stepWormSim(sim, 1 / 60, SIZE, ctx);
+  for (let i = 0; i < 1500 && sim.phase !== 'crawling'; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
+  expect(sim.phase).toBe('crawling');
+  expect(sim.headInterpPos.z).toBeCloseTo(-3.82);
+  const exit = sim.headInterpPos.clone();
+  stepWormSim(sim, 1 / 60, SIZE, ctx);
+  expect(sim.headInterpPos.distanceTo(exit)).toBeLessThan(0.2);
+});

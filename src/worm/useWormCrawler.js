@@ -29,7 +29,7 @@ import { liveRotation } from './liveRotation.js';
 // extraction. See wormSim.js for the ctx contract.
 
 import { useRef, useCallback, useEffect } from 'react';
-import { useGameStore } from '../hooks/useGameStore.js';
+import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
@@ -190,6 +190,8 @@ export function useWormCrawler(size, cubies) {
         ctxRef.current = {
             // ── reads ───────────────────────────────────────────────────────────
             getCubies: () => useGameStore.getState().cubies,
+            getFlipCap: () => selectEffectiveFlipCap(useGameStore.getState()),
+            getTunnelEntry: () => useGameStore.getState().demoMode ? 'crawl' : 'pad',
             getGamePhase: () => useGameStore.getState().wormGamePhase,
             isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
             isCombatMode: () => useGameStore.getState().wormCombatMode,
@@ -787,6 +789,7 @@ export function useWormCrawler(size, cubies) {
             specials: f('specials'),
             pendingSpecialFlashRef: f('pendingSpecialFlash'),
             headInterpPos: f('headInterpPos'),
+            padFlight: f('padFlight'),
             currentNormal: f('currentNormal'),
             tailLength: f('tailLength'),
             bodyGait: f('bodyGait'),
