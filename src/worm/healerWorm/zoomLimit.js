@@ -14,8 +14,9 @@ export function boundedWormZoom(size, baseBack, orbCount, burst) {
     return Math.min(limit, growth + Math.max(0, burst));
 }
 
-// Match a 10% closer view optically, preserving surface and tunnel clearance.
-// Perspective extent is distance * tan(FOV / 2); multiply that extent by 0.9.
+// Widen the standard surface view by 20% from its previous 0.9 framing.
+// Perspective extent is distance * tan(FOV / 2), so 0.9 × 1.2 = 1.08.
+// Adjusting the lens preserves the existing surface and tunnel clearance.
 export function wormSurfaceFov(baseFov) {
-    return 2 * Math.atan(Math.tan(baseFov * Math.PI / 360) * 0.9) * 180 / Math.PI;
+    return 2 * Math.atan(Math.tan(baseFov * Math.PI / 360) * 1.08) * 180 / Math.PI;
 }

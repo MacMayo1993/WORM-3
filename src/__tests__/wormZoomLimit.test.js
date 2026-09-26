@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { boundedWormZoom, wormZoomLimit, wormSurfaceFov } from '../worm/healerWorm/zoomLimit.js';
 
-it('frames the surface like a 10% closer camera at every portrait blend and growth distance', () => {
+it('widens the previous standard framing by 20% at every portrait blend and growth distance', () => {
     for (const baseFov of [70, 73, 76, 79, 82]) for (const distance of [3, 8, 15, 30]) {
-        const previousExtent = distance * Math.tan(baseFov * Math.PI / 360);
+        const previousExtent = distance * Math.tan(baseFov * Math.PI / 360) * 0.9;
         const nextExtent = distance * Math.tan(wormSurfaceFov(baseFov) * Math.PI / 360);
-        expect(nextExtent / previousExtent).toBeCloseTo(0.9, 12);
+        expect(nextExtent / previousExtent).toBeCloseTo(1.2, 12);
     }
 });
 

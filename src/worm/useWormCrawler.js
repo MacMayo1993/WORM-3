@@ -47,6 +47,7 @@ import {
     ORB_SEGMENT_GROWTH,
     DEFAULT_POWERUP_COUNT,
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
+    WORM_MOVEMENT_SPEED_SCALE,
 } from './healerWorm/constants.js';
 import {
     makeWormSim,
@@ -224,7 +225,7 @@ export function useWormCrawler(size, cubies) {
                 const s = useGameStore.getState();
                 return !s.demoMode && ['active', 'finalHealing'].includes(s.wormGamePhase);
             },
-            getSpeed: () => useGameStore.getState().wormSpeed ?? 2.0,
+            getSpeed: () => (useGameStore.getState().wormSpeed ?? 2.0) * WORM_MOVEMENT_SPEED_SCALE,
             getControlMode: () => useGameStore.getState().wormControlMode ?? 'non-oriented',
             getWormholeInterval: () => useGameStore.getState().wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL,
             getCharacter: () => useGameStore.getState().wormCharacter ?? 'classic',

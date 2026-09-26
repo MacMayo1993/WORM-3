@@ -156,6 +156,9 @@ export const SURFACE_JUMP_HEIGHT = 1.3;   // compact hop with room to clear a st
 export const SURFACE_JUMP_TILE_SPAN = 1.25; // distance stays consistent at every crawl speed
 
 // ─── Speed boost (HUD button beside JUMP) ─────────────────────────────────────
+// One movement scale for every cube size, Story pace, and speed preset.
+// Apply at the simulation input so saved preferences and boost ratios stay consistent.
+export const WORM_MOVEMENT_SPEED_SCALE = 0.8;
 export const WORM_SPEED_OPTIONS = [
   { value: 2.0, label: 'Slow' },
   { value: 2.75, label: 'Medium' },
