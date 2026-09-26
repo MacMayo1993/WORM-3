@@ -329,4 +329,4 @@ The brief for making the Flip Cube the game's hero object lives in `docs/feature
 - the Rumbler under the tiles;
 - Mobi's WORM³ lore.
 
-The implementation checkpoint at the top records what is live and what remains planned. Cube/menu pads use `PadProvider` and a separate normal-offset transform; persistent lift must never be published to tunnel anchors. WORM remains on its existing route until phase 4. Read the checkpoint and integration contracts before touching pad, tunnel-entry or rumble code.
+The implementation checkpoint at the top records what is live and what remains planned. Cube/menu pads use `PadProvider` and a separate normal-offset transform. In cube modes, any live flipped face also raises its whole cubie to its Explode position; carried unflipped faces are platforms, not tunnel entries. Large tunnel anchors follow this finite piece movement, never the small pad’s continuous bounce. Stalk colors use the visible tile’s antipodal back color. WORM remains on its existing route until phase 4. Read the checkpoint and integration contracts before touching pad, tunnel-entry or rumble code.

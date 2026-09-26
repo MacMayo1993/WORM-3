@@ -2,11 +2,12 @@ import { it, expect, vi } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 
 const rig = vi.hoisted(() => ({ state: {} }));
-vi.mock('react', async original => ({ ...await original(), useMemo: fn => fn(), useRef: value => ({ current: value }) }));
+vi.mock('react', async original => ({ ...await original(), useMemo: fn => fn(), useRef: value => ({ current: value }), useEffect: () => {}, useState: value => [value, () => {}], useImperativeHandle: () => {} }));
 vi.mock('@react-three/fiber', () => ({ useFrame: () => {} }));
 vi.mock('@react-three/drei', () => ({ RoundedBox: () => null }));
 vi.mock('zustand/react/shallow', () => ({ useShallow: fn => fn }));
-vi.mock('../hooks/useGameStore.js', () => ({ useGameStore: Object.assign(fn => fn(rig.state), { subscribe: () => () => {}, getState: () => rig.state }) }));
+vi.mock('../3d/raisedCubieContext.js', () => ({ useRaisedCubieSpring: () => ({ current: { lift: 0, velocity: 0 } }) }));
+vi.mock('../hooks/useGameStore.js', () => ({ selectEffectiveFlipCap: () => 5, useGameStore: Object.assign(fn => fn(rig.state), { subscribe: () => () => {}, getState: () => rig.state }) }));
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
 vi.mock('../3d/MergedLedEdges.jsx', () => ({ default: () => null }));
 import Cubie from '../3d/Cubie.jsx';

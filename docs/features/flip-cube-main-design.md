@@ -1,6 +1,6 @@
 # Flip Cube — Main Design and Implementation Plan
 
-> **Status:** design plan, 2026-09-25. Five decisions were settled on 2026-09-26 (§13), and the FLIP CUBE rename has shipped (§7). Nothing else here changes gameplay until a phase in §10 is picked up; §13 also lists what is still open. This is the brief for refocusing WORM³ on **the Flip Cube** as its main object. Flipped tiles pop out and bounce according to their flip count. Their Möbius funnels pulse and spring with them. In WORM you jump onto a popped tile to ride its tunnel. Something rumbles under the tiles. Mobi explains all of it as a piece of his home world, WORM³.
+> **Status:** design plan, 2026-09-25. Six decisions were settled on 2026-09-26 (§13), and the FLIP CUBE rename has shipped (§7). Nothing else here changes gameplay until a phase in §10 is picked up; §13 also lists what is still open. This is the brief for refocusing WORM³ on **the Flip Cube** as its main object. Flipped tiles pop out and bounce according to their flip count. Their Möbius funnels pulse and spring with them. In WORM you jump onto a popped tile to ride its tunnel. Something rumbles under the tiles. Mobi explains all of it as a piece of his home world, WORM³.
 
 ## Implementation checkpoint — 2026-09-26
 
@@ -14,13 +14,23 @@ claim the entire design has shipped.
 
 ### Implementation decisions
 
-- Keep the default choices in §13: tile-normal lift, bigger/faster wear, subtle Chaos profile,
+- Whole cubies now rise to their full Explode position when any face has a live odd flip count.
+  Unflipped faces travel with the body and remain ordinary platforms; tunnel eligibility is per face.
+  Springs follow physical piece identity through layer turns. Manual Explode does not stack the lift.
+  Whole-piece motion settles; only the small normal-offset pads bounce continuously.
+- Stalks cover the full 0.85-square tile back with a capped, half-twisted square funnel.
+  They extend through the raised cubie and emerge behind its inner face; instance transforms
+  animate the extension without rebuilding geometry.
+- Raised stalks use the selected palette’s antipodal color of the currently visible face
+  (white → yellow, red → orange, blue → green), without a fixed green material tint.
+- Keep the remaining default choices in §13: bigger/faster wear, subtle Chaos profile,
   cover topology for the eventual chaser, and the existing names.
 - Put pad displacement on a parent transform owned by `FlipPadOffset`. The existing sticker
   transform still owns its flip, death, shake and press effects. Normal lift composes with
   live layer rotations and Explode without competing position writes.
 - Use one scene-local `PadProvider`, shared pair clocks and two instanced draws: stalks and
-  slot mouths. No per-frame React state. The existing funnel anchors do not read pad lift.
+  slot mouths. No per-frame React state. Funnel anchors follow the finite whole-cubie movement,
+  but do not read the small pad’s continuous normal bounce.
 - Evaluate shared wear from the symmetric average of pair inputs, then evaluate the nonlinear
   pose. A lone pad's absent mate is still a home tile, not a second elevated pad.
 - Integrate phase (`phase += frequency * dt`) instead of evaluating `frequency(wear) * time`:
@@ -53,7 +63,10 @@ claim the entire design has shipped.
 7. At three used rides, show an explicit **NEXT RIDE COLLAPSES** warning before commitment;
    bounce intensity alone is insufficient. A voided mouth remains visibly a pit in reduced
    motion and with decorative tunnels switched off.
-8. Story/demo may override entry mode. Switch the global default only after their prompts,
+8. A raised cubie’s unflipped faces are jumpable platforms, never tunnel entries. Classify the
+   face actually landed on, not the whole cubie. The route must handle radial gaps, edge/corner
+   offsets, turns and platform-to-platform jumps before enabling whole-cubie lift in WORM.
+9. Story/demo may override entry mode. Switch the global default only after their prompts,
    authored routes, character/hat clearance and mobile chase-camera checks pass.
 
 ### Rumbler contract for phase 5
@@ -70,7 +83,7 @@ The optional chaser needs a separate gameplay acceptance pass and stays out of R
 
 - **One hero object.** The cube on every screen is *the Flip Cube*, a piece of Mobi's world WORM³. The intro, main menu, loading screen, every mode and the victory beat show the same object behaving the same way. The solve mode carries its name: CUBE is now **FLIP CUBE**.
 - **Flipped tiles become flip pads.** A tile with an odd flip count (it is showing its twin's colour) lifts out of its slot along its own outward normal, then bounces and pulses. The bounce reads the tile's wear: flips toward the cap in cube modes, rides toward collapse in WORM. Twins always move in phase because they are the same tile (§9.2–9.3).
-- **"Using the explode function".** The existing one-shot explode hop of both cubies (`cubiePops`) stays as the *impact* of a flip. The tile then *stays* out as a pad. The persistent state is a tile lift, not a whole-cubie explode (§9.7, item 2).
+- **"Using the explode function".** A live flipped face raises its entire cubie to the position shown in Explode, including its unflipped faces. The small square pad lift remains on top. The piece returns only when none of its faces has a live odd flip count (§9.7, item 2).
 - **The Möbius funnel activates, pulses and springs.** A short half-twisted stalk joins each pad to its slot and compresses like a coil. Every bounce sends a pulse from *both* twins into the Core. A ride sends one pulse from entry to exit.
 - **WORM: jump on the pad to ride.** Crawling under a pad no longer drops you into the tunnel. Landing on a pad, or hopping up while under it, does. The twin launches you back out with a spring hop. Tunnels stop being pits and become choices.
 - **Something lives under the tiles.** *The Rumbler* is a wave that runs along the rows and columns beneath the worm. It ships first as atmosphere and as the layer-turn warning, dragging the layer that is about to turn. A chaser version comes later.
@@ -117,7 +130,7 @@ Notation:
 
 | State | Condition | Look / motion |
 |---|---|---|
-| Home | $n$ even, $n < C$ | Flush. Worn home tiles keep their existing tally marks and health bar. |
+| Home | $n$ even, $n < C$ | Flush with its cubie, which can be raised by another face. Worn home tiles keep their existing tally marks and health bar. |
 | Pad | $n$ odd (shows its twin's colour) | Lifted to the mode's hover height, with a periodic bounce and an impact pulse. |
 | Worn pad | pad with wear $w \ge k^*$, or one life left | Same height; irregular bounce and a hotter rim (§3.2, §9.6). |
 | Lone pad | pad whose twin is home ($\Delta \ne 0$; only a heal can cause it) | Hovers; its funnel is torn (ends at the Core, no exit portal) and writhes. |
@@ -145,7 +158,7 @@ For each pair $\pi$ with shared phase $\varphi_\pi$ (a hash of the same sorted-g
 - **Events.** Events use the press-bridge spring (ζ ≈ 0.65). Pop-out overshoots to $h_0$. Flip-home and heal settle to 0 with one rebound.
 - **Reduced motion.** $A = 0$, with no jitter and no squash. Pads hold $h_0$, and wear shows as a static rim tint.
 
-Starting profiles (to tune in playtest). All lifts are along the tile's own outward normal, never radial.
+Starting profiles (to tune in playtest). These small pad lifts are along the tile’s own outward normal, on top of the whole cubie’s radial extension.
 
 | Profile | $h_0$ | $A_0$ | $A_1$ | $f_0$ | Notes |
 |---|---|---|---|---|---|
@@ -166,8 +179,8 @@ Starting profiles (to tune in playtest). All lifts are along the tile's own outw
 ### 3.3 The Möbius funnel: activate, pulse, spring
 
 - **Stalk.** A new `PadSprings` component is one InstancedMesh of a short half-twisted ribbon running from the slot to the pad's underside, scaled by the live lift. Squashing it shortens the twist pitch, so it reads as a coil. It costs one draw call for every pad on the board.
-- **Anchors stay at the slot.**
-  - The ribbon and cords keep anchoring at `TUNNEL_ANCHOR_OFFSET`, and only the stalk follows the pad.
+- **Anchors stay at the cubie’s slot.**
+  - The ribbon and cords keep anchoring at `TUNNEL_ANCHOR_OFFSET`, and only the stalk follows the small pad bounce. The slot and large funnel anchor move with the whole cubie during its finite rise/return.
   - `MobiusTunnel` rebuilds its geometry whenever an anchor moves more than 0.01, and the resting cords share one merged strand. If every bouncing pad dragged its anchor, the whole network would rebuild every frame.
 - **Idle pulses are symmetric.** On each impact, a soliton leaves *both* mouths and meets at the Core. The shader drives it from the pad clock, with no store writes. A ride is the only one-directional pulse: the existing entry → exit soliton. Symmetric pulses mean idle life; a directed pulse means travel.
 - **Spring.** During events (pop, land, launch), the ribbon's existing whip amplitude follows the pad's velocity. Lone pads whip continuously, in proportion to the asymmetry channel (§9.2).
@@ -483,7 +496,8 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
 2. **"Explode" is radial and moves whole cubies.**
    - `cubiePops` and Explode push whole cubies radially away from the cube's centre. For edge and corner cubies that direction is diagonal, and it drags unflipped stickers on other faces along.
    - In WORM it would also move the surface under the worm.
-   - So the persistent state is a lift along the tile normal, and the cubie pop stays as the impact beat.
+   - **User decision, 2026-09-26:** this whole-piece movement is intended. Keep the small normal pad too. Raise only cubies with at least one live flipped face. A carried unflipped face is a platform, not a tunnel.
+   - WORM rendering remains gated until its head, tail, landing and camera routes support these displaced surfaces; the cube-mode correction does not claim that physics is complete.
 3. **"Jump to ride" inverts the risk model.** The void rule, the tunnel cap, Story route tests and demo lessons all assume automatic entry; that is why the change ships behind a flag.
 4. **"Under the tiles" does not exist in RP².** $\mathbb{RP}^2$ is one-sided. An underside exists only on the double cover (the sphere is two-sided), which is why §5.3 is a real choice.
 5. **Rows and columns are belts, not face lines.** A wave that stops at a face edge breaks the illusion.
@@ -493,7 +507,7 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
 
 | Phase | Scope | Done when |
 |---|---|---|
-| 0 | Decide §13: five settled and the rename shipped (2026-09-26). Still to do: capture reference screenshots and frame times for 3×3, 5×5, 7×7 and Mega, in Classic, Chaos L5 and WORM. | Remaining §13 defaults confirmed or changed; reference captures stored. |
+| 0 | Decide §13: six settled and the rename shipped (2026-09-26). Still to do: capture reference screenshots and frame times for 3×3, 5×5, 7×7 and Mega, in Classic, Chaos L5 and WORM. | Remaining §13 defaults confirmed or changed; reference captures stored. |
 | 1 | `flipPad.js`, `padPose.js`, `padEntry.js` and their tests. | Truth table, regime table, twin-phase equality, bounds, determinism and reduced motion all pinned. |
 | 2 | Cube-mode pads, `PadSprings`, symmetric pulses, menu pads. | §3 holds in every cube mode; perf within budget; existing tunnel and flip tests green. |
 | 3 | Mobi and WORM³ copy pass (can run in parallel with 2). | Copy tests updated; `COPY_STYLE.md` updated. |
@@ -557,10 +571,10 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
 3. **Voided tunnels:** lethal pits (§4.4).
 4. **Rumbler scope:** R1 + R2 now, R3 later (§5.1).
 5. **Mode name:** CUBE is renamed FLIP CUBE. Shipped (§7).
+6. **Persistent state:** whole-cubie Explode position, plus the small square pad. Carried unflipped faces are ordinary platforms. Stalk color is the visible tile’s antipodal back color.
 
 ### Still open (the default stands until you say otherwise)
 
-1. Persistent state: **tile lift**, or a whole-cubie explode (§9.7, item 2)?
 2. Wear reads as **bigger and faster** (matches today's tremor), or as "tired and lower"?
 3. For R3, the **cover** topology or the quotient one (§5.3)? Needed before R3 starts.
 4. Names: keep "flip pad", "the Rumbler" and "the Core", or rename?

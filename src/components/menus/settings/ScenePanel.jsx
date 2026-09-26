@@ -8,7 +8,7 @@ export function ScenePanel({ settings, onSettingsChange }) {
   return (
     <section className="settings-section">
       <h3 className="settings-section-title">Flip pads</h3>
-      <p>Raised tiles show which twins have flipped. Choose how much they bounce.</p>
+      <p>A flipped tile raises its whole cubie. Choose how much the small pads bounce.</p>
       <div className="settings-radio-group">
         {[['full', 'Full bounce'], ['subtle', 'Subtle bounce'], ['off', 'Flat tiles']].map(([value, label]) => (
           <label key={value} className={`settings-radio${(settings.flipPads ?? 'full') === value ? ' active' : ''}`}>

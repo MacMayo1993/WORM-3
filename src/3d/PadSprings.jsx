@@ -1,3 +1,9 @@
+import { createPadStalkGeometry, PAD_STALK_DEPTH, PAD_BACK_CLEARANCE } from './padStalkGeometry.js';
+import { RaisedCubieContext } from './raisedCubieContext.js';
+import { removeRaisedCubie } from './raisedCubieMotion.js';
+import { padBackFace } from '../game/raisedCubie.js';
+import { resolveColors } from '../utils/colorSchemes.js';
+import { FACE_COLORS } from '../utils/constants.js';
 import React, { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -9,36 +15,21 @@ import { padMotion, removePadMotion } from './padMotionBridge.js';
 const PadContext = createContext(null);
 const MAX_PADS = 2048;
 
-function springGeometry() {
-  const points = [], indices = [];
-  for (let i = 0; i <= 16; i++) {
-    const t = i / 16, angle = t * Math.PI;
-    for (const side of [-1, 1]) points.push(side * 0.12 * Math.cos(angle), side * 0.12 * Math.sin(angle), t);
-    if (i < 16) {
-      const k = i * 2;
-      indices.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-  g.setIndex(indices);
-  g.computeVertexNormals();
-  return g;
-}
-
 // One scheduler and two instanced draws per scene, regardless of pad count.
 export function PadProvider({ children, profile: profileOverride = null }) {
   const entries = useMemo(() => new Set(), []);
   const pairs = useMemo(() => new Map(), []);
+  const cubieSprings = useMemo(() => new Map(), []);
   const stalkRef = useRef(), mouthRef = useRef();
   const resources = useMemo(() => ({
-    stalk: springGeometry(), mouth: new THREE.PlaneGeometry(0.76, 0.76),
-    stalkMaterial: new THREE.MeshStandardMaterial({ color: '#9addd4', emissive: '#17655a', emissiveIntensity: 0.4, side: THREE.DoubleSide }),
-    mouthMaterial: new THREE.MeshBasicMaterial({ color: '#102e32', side: THREE.DoubleSide }),
+    stalk: createPadStalkGeometry(), mouth: new THREE.PlaneGeometry(0.76, 0.76),
+    stalkMaterial: new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#000000', emissiveIntensity: 0, side: THREE.DoubleSide }),
+    mouthMaterial: new THREE.MeshBasicMaterial({ color: '#16161a', side: THREE.DoubleSide }),
     matrix: new THREE.Matrix4(), slot: new THREE.Matrix4(), local: new THREE.Matrix4(),
     position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), color: new THREE.Color()
   }), []);
   const reduced = useRef(false);
+  const paletteCache = useRef({ settings: null, colors: FACE_COLORS });
   useLayoutEffect(() => {
     const media = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
     const update = () => { reduced.current = media?.matches ?? false; };
@@ -51,11 +42,17 @@ export function PadProvider({ children, profile: profileOverride = null }) {
     resources.stalkMaterial.dispose(); resources.mouthMaterial.dispose();
     for (const [key, pair] of pairs) removePadMotion(key, pair);
     pairs.clear();
-  }, [resources, entries, pairs]);
+    for (const spring of cubieSprings.values()) removeRaisedCubie(spring);
+    cubieSprings.clear();
+  }, [resources, entries, pairs, cubieSprings]);
 
   useFrame((_state, delta) => {
     const state = useGameStore.getState();
     const dt = !profileOverride && state.wormPauseMenuOpen ? 0 : Math.min(delta, 0.05);
+    if (paletteCache.current.settings !== state.settings) {
+      paletteCache.current = { settings: state.settings,
+        colors: resolveColors(state.settings, state.settings?.biomeMode?.faceAssignment) ?? FACE_COLORS };
+    }
     const cap = profileOverride ? 6 : selectEffectiveFlipCap(state);
     const wormMode = !profileOverride && state.wormHealerMode;
     const motionOff = reduced.current || state.settings?.reducedMotion;
@@ -110,7 +107,8 @@ export function PadProvider({ children, profile: profileOverride = null }) {
         if (!parent.visible) { visible = false; break; }
       }
       if (!visible) continue;
-      // Parent contains live cubie/layer/explode transforms. Never drag anchors.
+      // Parent contains live cubie/layer/explode transforms. The small bounce
+      // changes only this instance, never the main tunnel geometry.
       group.parent.updateWorldMatrix(true, false);
       resources.position.fromArray(d.pos);
       resources.quaternion.setFromEuler(d.rotation);
@@ -122,10 +120,14 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       resources.local.copy(stalkRef.current.parent.matrixWorld).invert();
       resources.matrix.premultiply(resources.local);
       mouthRef.current.setMatrixAt(count, resources.matrix);
-      resources.scale.set(1, 1, Math.max(0.001, entry.lift));
+      // Start behind the cubie's inner face and end against the entire tile
+      // back. The fixed through-body section remains when the pad compresses.
+      resources.local.makeTranslation(0, 0, -PAD_STALK_DEPTH);
+      resources.matrix.multiply(resources.local);
+      resources.scale.set(1, 1, PAD_STALK_DEPTH + Math.max(0, entry.lift) - PAD_BACK_CLEARANCE);
       resources.matrix.scale(resources.scale);
       stalkRef.current.setMatrixAt(count, resources.matrix);
-      resources.color.set(pad.worn ? '#ff9b35' : '#7ae2d5');
+      resources.color.set(paletteCache.current.colors[padBackFace(d.meta)] ?? '#ffffff');
       stalkRef.current.setColorAt(count, resources.color);
       count++;
     }
@@ -137,7 +139,7 @@ export function PadProvider({ children, profile: profileOverride = null }) {
   }, -0.5);
 
   return <PadContext.Provider value={entries}>
-    {children}
+    <RaisedCubieContext.Provider value={cubieSprings}>{children}</RaisedCubieContext.Provider>
     <instancedMesh ref={stalkRef} args={[resources.stalk, resources.stalkMaterial, MAX_PADS]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
     <instancedMesh ref={mouthRef} args={[resources.mouth, resources.mouthMaterial, MAX_PADS]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
   </PadContext.Provider>;
