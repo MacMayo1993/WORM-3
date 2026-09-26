@@ -15,6 +15,7 @@ import React, { useState, useRef, useEffect, useCallback, useSyncExternalStore, 
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import SafeEnvironment from './3d/SafeEnvironment.jsx';
+import { CUBE_LIGHT_RIG } from './3d/cubeLighting.js';
 const SceneEffects = React.lazy(() => import('./3d/SceneEffects.jsx'));
 import './App.css';
 import CaptureChrome from './components/capture/CaptureChrome.jsx';
@@ -199,10 +200,11 @@ function MenuScene({ onCubeClick, background }) {
           warm field-guide controls stay readable regardless of the setting.
           SafeEnvironment keeps the solid backdrop if the HDRI cannot load. */}
       <color attach="background" args={['#38513d']} />
-      <ambientLight intensity={0.75} color="#ffffff" />
-      <directionalLight position={[4, 6, 8]} intensity={2.1} color="#fff8f0" />
-      <directionalLight position={[-5, 1, 4]} intensity={0.75} color="#d6e6ff" />
-      <directionalLight position={[2, 4, -6]} intensity={1.3} color="#e6edff" />
+      {/* The cube's studio rig, shared with the play scene (cubeLighting.js). */}
+      <ambientLight intensity={CUBE_LIGHT_RIG.ambient} color="#ffffff" />
+      <directionalLight position={CUBE_LIGHT_RIG.key.position} intensity={CUBE_LIGHT_RIG.key.intensity} color={CUBE_LIGHT_RIG.key.color} />
+      <directionalLight position={CUBE_LIGHT_RIG.fill.position} intensity={CUBE_LIGHT_RIG.fill.intensity} color={CUBE_LIGHT_RIG.fill.color} />
+      <directionalLight position={CUBE_LIGHT_RIG.rim.position} intensity={CUBE_LIGHT_RIG.rim.intensity} color={CUBE_LIGHT_RIG.rim.color} />
       <Suspense fallback={null}>
         <InteractivePhotoBackground
           visible={!carouselActive}
