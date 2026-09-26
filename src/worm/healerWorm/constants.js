@@ -91,13 +91,9 @@ export function selfCollisionGraceAfterRotation(size) {
 }
 
 // ─── Safe lane ────────────────────────────────────────────────────────────────
-// A pending turn only moves cells whose coordinate on its axis matches, so any
-// other slice on that axis is wholly safe — see safeLane.js for why that is the
-// useful framing. Small boards get it drawn for them, because that is where the
-// 1/N chance of being caught is punishing enough that "where do I go" needs an
-// answer on screen rather than in the player's head. Bigger boards have room to
-// read the gold rim and step off it, and do not need a second full-slice rim
-// competing with it.
+// Bias orb respawns toward an unthreatened slice on small boards, where a turn
+// catches a larger fraction of the surface. This lane is not highlighted:
+// rotation-preview lighting belongs only to the planes that will turn.
 export const SAFE_LANE_MAX_SIZE = 5;
 // Chance that an eaten orb respawns inside the current safe lane. Bias, not a
 // rule: orbs still appear on threatened ground, so running the lane is a choice

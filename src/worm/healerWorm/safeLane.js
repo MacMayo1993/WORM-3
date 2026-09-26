@@ -8,13 +8,12 @@
 // 50% on a 2x2, 33% on a 3x3. Subdividing the crawl grid does NOT change that
 // number: the exposed fraction depends on the slice count, not on how finely the
 // surface is tiled. The only honest fixes are to change which slice turns, or to
-// make the complement legible and worth running to. This module does the latter.
+// encourage movement into the complement. This module biases orb respawns there.
 //
 // The complement of the threatened slice is an awkward shape to draw, but it does
 // not need to be drawn whole: any slice on the SAME axis with a different index is
 // entirely safe, because the turn only moves cells whose coordinate on that axis
-// matches. So the "safe lane" is itself a slice, and LayerHighlight — which already
-// knows how to rim a slice — can render it with no new geometry.
+// matches. Orb respawns favor such a slice; it does not get a visual highlight.
 //
 // Everything here is a pure function of (size, move). No store, no refs, no clock.
 
@@ -44,7 +43,7 @@ export function sliceTileCount(size, sliceIndex) {
 }
 
 /**
- * Pick the slice to advertise as safe for a pending move, or null when the move
+ * Pick the slice to favor for orb respawns for a pending move, or null when the move
  * leaves no lane free (every index on the axis is turning — only reachable if a
  * future move ever turns the whole cube).
  *

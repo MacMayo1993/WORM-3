@@ -844,9 +844,8 @@ function applyOrbPickupGrowth(sim, ctx, color, faceId, segments = ORB_SEGMENT_GR
  * Where a freshly eaten orb comes back.
  *
  * On the small boards this is biased into the currently armed safe lane — the
- * slice the next turn cannot reach (see safeLane.js). That is the whole reward
- * half of the "run to the safe lane" loop: the lane is drawn for the player, and
- * over a run the food drifts into it, so leaving the threatened slice pays off
+ * slice the next turn cannot reach (see safeLane.js). Over a run the food
+ * drifts into this unlit lane, so leaving the highlighted threatened slice pays off
  * instead of merely costing tempo. It is a bias and not a rule, so the rest of the
  * board never goes barren, and it steers only where the NEXT orb lands — an orb
  * the player is already chasing is never moved.
