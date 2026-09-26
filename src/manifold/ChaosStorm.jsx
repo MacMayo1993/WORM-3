@@ -4,11 +4,13 @@
 //
 // What it shows, per chaos-worker tick (see game/chaosStormEvents.js):
 //
-//   bolt      a chain hop between two tiles. A thin stepped leader crackles from
-//             the source tile to the target, a fat white return stroke lands, and
-//             the channel re-strikes once or twice as it dies. The landing throws
-//             sparks off the tile, rings its surface, and punches the whole cubie
-//             into the cube (cubieKick) so the hit is felt, not just seen.
+//   bolt      a chain hop between two tiles. Arcs gather on the source tile, a
+//             thin stepped leader crackles to the target, then the return stroke
+//             slams a thick white-cored plasma channel open between them and it
+//             re-strikes once or twice as it dies. The landing throws sparks,
+//             rings the tile, punches the cubie in (cubieKick) with a softer
+//             ripple through its neighbours, jolts the camera, and leaves the tile
+//             crackling for a moment — the hit is felt, not just seen.
 //   charge    a flip. The struck tile's twin flips with it — they are one point —
 //             and the surge that links them runs down the pair's wormhole, through
 //             the core and out of the twin, lighting the tunnel as it goes. The
@@ -23,7 +25,7 @@
 // Cost is fixed: bolt, charge, strip, spark and ring pools are allocated once,
 // no React state changes per frame or per event, and the frame loop allocates
 // nothing. Reduced motion keeps the bolts and surges (they carry information)
-// but drops the flicker, re-strikes, crawl, and the physical kicks.
+// but drops the flicker, re-strikes, crawl, the physical kicks and the shake.
 
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -36,6 +38,7 @@ import { stormMeshIndex } from '../game/chaosStormEvents.js';
 import { makeTunnelPath, buildTunnelPathInto, tunnelPathArcPointInto, TUNNEL_MINI_FACE_R } from '../utils/tunnelPath.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { fireCubieKick } from '../3d/cubieKick.js';
+import { fireCameraShake } from '../3d/flipImpulse.js';
 import { feel } from '../utils/feel.js';
 import { seededRand } from './boltPath.js';
 import {
@@ -53,8 +56,9 @@ import { createSparkPool, createSparkMaterial, spawnSpark, stepSparks, clearSpar
 // ── Budgets ───────────────────────────────────────────────────────────────────
 const MAX_BOLTS = 8;
 const MAX_CHARGES = 8;
-// Up to 3 strips per bolt (channel + forks) and 4 per charge (sheath + arcs).
-const MAX_STRIPS = MAX_BOLTS * 3 + MAX_CHARGES * 4;
+// Up to 5 strips per bolt (channel, two forks, two crawling residue arcs) and 4
+// per charge (sheath + arcs).
+const MAX_STRIPS = MAX_BOLTS * 5 + MAX_CHARGES * 4;
 const MAX_SPARKS = 240;
 const MAX_RINGS = 14;
 
@@ -62,14 +66,31 @@ const BOLT_POINTS = 14;
 const FORK_POINTS = 5;
 const SHEATH_POINTS = STRIP_POINTS;
 const ARC_POINTS = 8;
+const CRAWL_POINTS = 6;
 
 // ── Bolt timeline (seconds) ───────────────────────────────────────────────────
-// Leader → stroke → after-glow with re-strikes. ~0.55 s end to end, close to the
-// old bolt, so the HUD's live-bolt count keeps the same rhythm.
-const LEADER_S = 0.19;
-const LEADER_CROSS_S = 0.26;
-const STROKE_S = 0.08;
-const AFTER_S = 0.27;
+// Charge-up → leader → return stroke → after-glow with re-strikes. The charge-up
+// is the anticipation beat: arcs gather on the source tile for a moment before it
+// fires, which is what gives the strike weight. ~0.65 s end to end.
+const CHARGE_S = 0.07;
+const LEADER_S = 0.16;
+const LEADER_CROSS_S = 0.22;
+const STROKE_S = 0.1;
+const AFTER_S = 0.3;
+// How long the struck tile keeps crackling after the hit.
+const RESIDUE_S = 0.42;
+
+// ── Channel thickness (world units, full ribbon width including the aura) ─────
+// Tiles are ~0.88 wide. The white core is ~a quarter of this, the coloured body
+// about half; the rest is soft aura.
+const LEADER_W = 0.15;
+const STROKE_W = 0.5;
+const AFTER_W = 0.2;
+
+// Neighbouring cubies in the struck face's plane, by the face's slot axes.
+const RIPPLE_AXES = { PX: [1, 2], NX: [1, 2], PY: [0, 2], NY: [0, 2], PZ: [0, 1], NZ: [0, 1] };
+const RIPPLE_DELAY_MS = 45;
+const RIPPLE_SHARE = 0.38;
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const C_BOLT = new THREE.Color('#4b8dff');
@@ -115,7 +136,7 @@ function makeBolt() {
   return {
     live: false, cascadeId: null, from: null, to: null, fromPos: null, toPos: null,
     crossFace: false, heat: 0, seed: 0, sub: 0, subAt: 0, age: 0, leader: LEADER_S,
-    landed: false, sparked: false, restrikes: 0, born: 0,
+    landed: false, sparked: false, restrikes: 0, born: 0, landedAge: 0,
     A: new THREE.Vector3(), B: new THREE.Vector3(), nA: new THREE.Vector3(), nB: new THREE.Vector3(),
     path: new Float32Array(BOLT_POINTS * 3), color: new THREE.Color()
   };
@@ -355,6 +376,54 @@ function kick(ctx, loc, normal, amp) {
   fireCubieKick(`${loc.x},${loc.y},${loc.z}`, _kickDir, amp, ctx.nowMs);
 }
 
+/**
+ * Kick the struck cubie hard and its in-face neighbours softly a beat later, so a
+ * hit shoves the surface around it the way a real blow would.
+ */
+function kickRipple(ctx, loc, normal, amp) {
+  kick(ctx, loc, normal, amp);
+  const axes = !ctx.reduced && loc ? RIPPLE_AXES[loc.dirKey] : null;
+  if (!axes) return;
+  for (const axis of axes) {
+    for (let d = -1; d <= 1; d += 2) {
+      const x = loc.x + (axis === 0 ? d : 0);
+      const y = loc.y + (axis === 1 ? d : 0);
+      const z = loc.z + (axis === 2 ? d : 0);
+      if (x < 0 || y < 0 || z < 0 || x >= ctx.size || y >= ctx.size || z >= ctx.size) continue;
+      fireCubieKick(`${x},${y},${z}`, _kickDir, amp * RIPPLE_SHARE, ctx.nowMs + RIPPLE_DELAY_MS);
+    }
+  }
+}
+
+function shake(ctx, amp, dur) {
+  if (!ctx.reduced) fireCameraShake(amp, dur);
+}
+
+/**
+ * Short arcs crawling over a tile's face: gathering toward its centre before it
+ * fires (inward), or skittering edge to edge after it has been struck.
+ */
+function tileArcs(ctx, center, normal, color, count, alpha, width, seed, inward) {
+  perpBasis(normal, _bu, _bs);
+  for (let k = 0; k < count; k++) {
+    const a = seededRand(seed + k * 7.7) * Math.PI * 2;
+    const b = a + Math.PI * (0.55 + 0.9 * seededRand(seed + k * 7.7 + 3.1));
+    const r0 = 0.42;
+    const r1 = inward ? 0.04 : 0.36;
+    for (let i = 0; i < CRAWL_POINTS; i++) {
+      const f = i / (CRAWL_POINTS - 1);
+      const ca = Math.cos(a) * r0 * (1 - f) + Math.cos(b) * r1 * f;
+      const sa = Math.sin(a) * r0 * (1 - f) + Math.sin(b) * r1 * f;
+      _pts[i * 3] = center.x + _bu.x * ca + _bs.x * sa + normal.x * 0.02;
+      _pts[i * 3 + 1] = center.y + _bu.y * ca + _bs.y * sa + normal.y * 0.02;
+      _pts[i * 3 + 2] = center.z + _bu.z * ca + _bs.z * sa + normal.z * 0.02;
+      _wid[i] = width * (0.55 + 0.45 * Math.sin(Math.PI * f));
+      _alp[i] = alpha;
+    }
+    emitStrip(ctx.writer, CRAWL_POINTS, 0.07, seed + k * 13, color, 1, 0);
+  }
+}
+
 const SOUND_EVENTS = { zap: 'chaosZap', surge: 'chaosSurge', overload: 'chaosOverload' };
 /** Chaos fires many events a second; each voice keeps a minimum gap. */
 function sound(ctx, name, gapMs, opts) {
@@ -364,10 +433,11 @@ function sound(ctx, name, gapMs, opts) {
 }
 
 function blast(ctx, loc, pos, normal, color, seed) {
-  burst(ctx, pos, normal, color, 18, 3, seed, 1.2);
-  flash(ctx, pos, normal, color, 1.4, 0.18);
-  ring(ctx, pos, normal, color, 0.4, 2.1, 0.45, 1);
-  kick(ctx, loc, normal, 0.16);
+  burst(ctx, pos, normal, color, 22, 3.4, seed, 1.3);
+  flash(ctx, pos, normal, color, 1.8, 0.2);
+  ring(ctx, pos, normal, color, 0.4, 2.3, 0.48, 1);
+  kickRipple(ctx, loc, normal, 0.2);
+  shake(ctx, 0.09, 0.34);
 }
 
 function retire(ctx, b) {
@@ -399,6 +469,7 @@ function ingestBolt(ctx, ev) {
   b.age = 0;
   b.leader = b.crossFace ? LEADER_CROSS_S : LEADER_S;
   b.landed = false;
+  b.landedAge = 0;
   b.sparked = false;
   b.restrikes = 0;
   b.born = ctx.nowMs;
@@ -439,7 +510,7 @@ function ingestCharge(ctx, ev) {
 
 function updateBolt(ctx, b) {
   b.age += ctx.dt;
-  if (b.age >= b.leader + STROKE_S + AFTER_S) { retire(ctx, b); return; }
+  if (b.age >= CHARGE_S + b.leader + STROKE_S + AFTER_S) { retire(ctx, b); return; }
 
   relocate(ctx, b.from);
   relocate(ctx, b.to);
@@ -456,20 +527,27 @@ function updateBolt(ctx, b) {
     b.nB.set(n[0], n[1], n[2]);
   }
 
-  // A small discharge where the leader leaves the source tile.
+  // Lightning never holds still: re-seed the jag while it charges and hunts, and
+  // again on each re-strike. Reduced motion keeps one fixed shape.
+  const t = b.age - CHARGE_S; // time since the leader left the source
+  if (!ctx.reduced && t < b.leader && ctx.nowMs - b.subAt > 34) { b.sub++; b.subAt = ctx.nowMs; }
+
+  // ── Charge-up: arcs gather on the source tile, then it fires ──────────────
+  if (t < 0) {
+    const u = b.age / CHARGE_S;
+    tileArcs(ctx, b.A, b.nA, b.color, 2, 0.35 + 0.65 * u, 0.1, b.seed + b.sub * 5, true);
+    return;
+  }
   if (!b.sparked) {
     b.sparked = true;
-    burst(ctx, b.A, b.nA, b.color, 4, 1.6, b.seed + 5, 0.8);
+    burst(ctx, b.A, b.nA, b.color, 6, 1.8, b.seed + 5, 0.9);
+    flash(ctx, b.A, b.nA, b.color, 0.5, 0.08);
   }
 
-  const leading = b.age < b.leader;
-  const stroking = !leading && b.age < b.leader + STROKE_S;
-  const afterU = leading || stroking ? 0 : (b.age - b.leader - STROKE_S) / AFTER_S;
-
-  // Lightning never holds still: re-seed the channel's jag while the leader
-  // hunts, and again on each re-strike. Reduced motion keeps one fixed shape.
+  const leading = t < b.leader;
+  const stroking = !leading && t < b.leader + STROKE_S;
+  const afterU = leading || stroking ? 0 : (t - b.leader - STROKE_S) / AFTER_S;
   if (!ctx.reduced) {
-    if (leading && ctx.nowMs - b.subAt > 34) { b.sub++; b.subAt = ctx.nowMs; }
     const restrikes = afterU > 0.62 ? 2 : afterU > 0.28 ? 1 : 0;
     if (restrikes > b.restrikes) b.sub++;
     b.restrikes = restrikes;
@@ -479,47 +557,64 @@ function updateBolt(ctx, b) {
   // ── Landing: the return stroke and the hit ────────────────────────────────
   if (!leading && !b.landed) {
     b.landed = true;
-    const heavy = b.crossFace ? 1.25 : 1;
-    burst(ctx, b.B, b.nB, b.color, Math.round(11 * heavy + b.heat * 6), 2.4 + b.heat * 1.2, b.seed + 11);
-    flash(ctx, b.B, b.nB, b.color, 0.9 * heavy + b.heat * 0.3, 0.13);
-    ring(ctx, b.B, b.nB, b.color, 0.35, 1.55 * heavy, 0.34, 0.95);
-    kick(ctx, b.to, b.nB, 0.085 + b.heat * 0.05 + (b.crossFace ? 0.03 : 0));
-    sound(ctx, 'zap', 85, { combo: Math.round(b.heat * 6), haptics: false, priority: 0 });
+    b.landedAge = b.age;
+    const heavy = (b.crossFace ? 1.25 : 1) * (1 + b.heat * 0.35);
+    burst(ctx, b.B, b.nB, b.color, Math.round(14 * heavy), 2.8 + b.heat * 1.4, b.seed + 11, 1.15);
+    flash(ctx, b.B, b.nB, b.color, 1.25 * heavy, 0.15);
+    ring(ctx, b.B, b.nB, b.color, 0.35, 1.7 * heavy, 0.36, 1);
+    kickRipple(ctx, b.to, b.nB, 0.12 + b.heat * 0.06 + (b.crossFace ? 0.04 : 0));
+    shake(ctx, 0.03 + b.heat * 0.025 + (b.crossFace ? 0.015 : 0), 0.2);
+    sound(ctx, 'zap', 85, { combo: Math.round(b.heat * 6), priority: 0 });
   }
 
   // ── Envelope ──────────────────────────────────────────────────────────────
   let head = 1, alpha, width, core;
   if (leading) {
-    const u = b.age / b.leader;
+    const u = t / b.leader;
     // Stepped leader: lurches forward in short hops rather than gliding.
     head = ctx.reduced ? smooth(u) : Math.min(1, (Math.floor(u * 7) + smooth((u * 7) % 1)) / 7);
-    alpha = 0.6;
-    width = 0.06;
-    core = 0.75;
+    alpha = 0.7;
+    width = LEADER_W;
+    core = 0.8;
   } else if (stroking) {
+    // The return stroke slams the channel open to full thickness, then eases.
+    const u = (t - b.leader) / STROKE_S;
+    const swell = u < 0.25 ? 0.55 + 0.45 * smooth(u / 0.25) : 1 - 0.2 * ((u - 0.25) / 0.75);
     alpha = 1;
-    width = 0.17 - 0.05 * ((b.age - b.leader) / STROKE_S);
+    width = STROKE_W * swell;
     core = 1;
   } else {
-    const fade = Math.pow(1 - afterU, 1.6);
-    const restrike = ctx.reduced ? 0 : 0.85 * gauss(afterU - 0.3, 0.06) + 0.55 * gauss(afterU - 0.64, 0.05);
-    alpha = Math.min(1, fade * 0.75 + restrike);
-    width = 0.06 + 0.08 * restrike + 0.03 * fade;
-    core = 0.55 + 0.45 * Math.min(1, restrike);
+    const fade = Math.pow(1 - afterU, 1.5);
+    const restrike = ctx.reduced ? 0 : 0.9 * gauss(afterU - 0.3, 0.06) + 0.6 * gauss(afterU - 0.64, 0.05);
+    alpha = Math.min(1, fade * 0.8 + restrike);
+    width = AFTER_W * (0.6 + 0.4 * fade) + STROKE_W * 0.55 * restrike;
+    core = 0.6 + 0.4 * Math.min(1, restrike);
   }
-  if (b.crossFace) width *= 1.15;
+  width *= (b.crossFace ? 1.15 : 1) * (1 + b.heat * 0.25);
 
   // Main channel: source → head, resampled along the stable jagged path so the
-  // shape holds while it grows.
+  // shape holds while it grows. Thickness varies knot to knot, and swells toward
+  // the impact, so it reads as a muscular channel rather than a ruled line.
   for (let i = 0; i < BOLT_POINTS; i++) {
     const f = i / (BOLT_POINTS - 1);
     polyAt(b.path, BOLT_POINTS, f * head, _p);
     _pts[i * 3] = _p.x; _pts[i * 3 + 1] = _p.y; _pts[i * 3 + 2] = _p.z;
     const tip = leading ? gauss(1 - f, 0.12) : 0;
-    _wid[i] = width * (0.75 + 0.25 * Math.sin(Math.PI * Math.min(1, f * head + 0.15))) * (1 + 1.8 * tip);
+    const knot = 0.8 + 0.4 * seededRand(b.seed * 0.37 + i * 4.7);
+    const ends = 0.7 + 0.3 * Math.sin(Math.PI * Math.min(1, f * head * 0.85 + 0.15));
+    _wid[i] = width * knot * ends * (0.85 + 0.3 * f) * (1 + 1.6 * tip);
     _alp[i] = Math.min(1, alpha * (1 + 0.8 * tip));
   }
   emitStrip(ctx.writer, BOLT_POINTS, 0, 0, b.color, core, 0);
+
+  // The struck tile keeps crackling for a moment after the hit.
+  if (b.landed) {
+    const r = (b.age - b.landedAge) / RESIDUE_S;
+    if (r < 1) {
+      const flicker = ctx.reduced ? 1 : 0.6 + 0.4 * seededRand(b.seed + b.sub * 3.9 + Math.floor(b.age * 30));
+      tileArcs(ctx, b.B, b.nB, b.color, ctx.lowFx ? 1 : 2, Math.pow(1 - r, 1.3) * flicker, 0.11, b.seed + 71 + Math.floor(b.age * 22), false);
+    }
+  }
 
   // Forks split off the channel from the return stroke on, and die with it.
   if (leading || ctx.lowFx || len < 0.2) return;
@@ -539,10 +634,10 @@ function updateBolt(ctx, b) {
       _pts[i * 3] = _q.x + _n.x * reach * f;
       _pts[i * 3 + 1] = _q.y + _n.y * reach * f;
       _pts[i * 3 + 2] = _q.z + _n.z * reach * f;
-      _wid[i] = width * 0.55 * (1 - 0.7 * f);
-      _alp[i] = alpha * 0.7 * (1 - 0.6 * f);
+      _wid[i] = width * 0.42 * (1 - 0.7 * f);
+      _alp[i] = alpha * 0.75 * (1 - 0.6 * f);
     }
-    emitStrip(ctx.writer, FORK_POINTS, reach * 0.18, fs + 7, b.color, core * 0.8, 0);
+    emitStrip(ctx.writer, FORK_POINTS, reach * 0.18, fs + 7, b.color, core * 0.85, 0);
   }
 }
 
@@ -609,7 +704,8 @@ function updateCharge(ctx, c) {
       burst(ctx, _p, _n, c.color, 7 + Math.round(c.heat * 5), 1.9, c.seed + 9, 0.9);
       flash(ctx, _p, _n, c.color, 0.65, 0.11);
       ring(ctx, _p, _n, c.color, 0.3, c.kind === 'birth' ? 1.5 : 1.15, 0.3, 0.8);
-      kick(ctx, c.to, _n, c.kind === 'birth' ? 0.08 : 0.06 + c.heat * 0.03);
+      kickRipple(ctx, c.to, _n, c.kind === 'birth' ? 0.1 : 0.07 + c.heat * 0.04);
+      shake(ctx, c.kind === 'birth' ? 0.03 : 0.015 + c.heat * 0.015, 0.16);
     }
   }
 
@@ -620,7 +716,7 @@ function updateCharge(ctx, c) {
 
   // Sheath: the wormhole itself, lit from the struck mouth up to the front and
   // hottest right at the front. Also drawn through the cube (x-ray), faintly.
-  const sheathW = (overload ? 0.14 : quiet ? 0.05 : 0.075) + c.heat * 0.035;
+  const sheathW = (overload ? 0.32 : quiet ? 0.1 : 0.17) + c.heat * 0.07;
   for (let i = 0; i < SHEATH_POINTS; i++) {
     const t = i / (SHEATH_POINTS - 1);
     chargePathAt(c, t, _p);
@@ -644,7 +740,7 @@ function updateCharge(ctx, c) {
       const f = i / (ARC_POINTS - 1);
       chargePathAt(c, t0 + (t1 - t0) * f, _p);
       _pts[i * 3] = _p.x; _pts[i * 3 + 1] = _p.y; _pts[i * 3 + 2] = _p.z;
-      _wid[i] = (overload ? 0.07 : 0.045) * (0.6 + 0.4 * Math.sin(Math.PI * f));
+      _wid[i] = (overload ? 0.18 : 0.11) * (0.6 + 0.4 * Math.sin(Math.PI * f));
       _alp[i] = glow * (0.5 + 0.5 * f);
     }
     emitStrip(ctx.writer, ARC_POINTS, ctx.reduced ? 0.02 : overload ? 0.13 : 0.075, c.seed + k * 29 + c.sub * 7, c.color, 1, 1);
@@ -739,7 +835,11 @@ export default function ChaosStorm({ cubieRefs, size, onCascadeComplete }) {
     stepSparks(ctx.sparks, ctx.dt);
     const cam = state.camera;
     const fov = cam?.isPerspectiveCamera ? cam.fov : 50;
-    res.sparkMat.uniforms.uScale.value = (state.size.height * state.viewport.dpr) / (2 * Math.tan((fov * Math.PI) / 360));
+    const pxPerUnit = (state.size.height * state.viewport.dpr) / (2 * Math.tan((fov * Math.PI) / 360));
+    res.sparkMat.uniforms.uScale.value = pxPerUnit;
+    res.stripMats.uniforms.uScale.value = pxPerUnit;
+    res.stripMats.uniforms.uMinPx.value = 3 * state.viewport.dpr;
+    res.stripMats.uniforms.uTime.value += ctx.dt;
   });
 
   return (
