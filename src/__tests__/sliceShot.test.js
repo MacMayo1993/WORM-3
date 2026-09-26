@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
-import { sliceShotInto } from '../worm/sliceShot.js';
+import { bombImpactShotInto, sliceShotInto } from '../worm/sliceShot.js';
 
 const out = () => ({ cam: new Vector3(), look: new Vector3(), up: new Vector3() });
 const project = (shot, fov, aspect, point) => {
@@ -11,7 +11,7 @@ const project = (shot, fov, aspect, point) => {
 
 describe('sliceShotInto', () => {
   const cases = [];
-  for (const size of [2, 3, 4, 5]) for (const axis of ['col', 'row', 'depth']) for (const layer of [0, size - 1])
+  for (const size of [2, 3, 4, 5, 7, 15]) for (const axis of ['col', 'row', 'depth']) for (const layer of [0, size - 1])
     for (const [fov, aspect] of [[70, 390 / 763], [60, 1], [55, 16 / 9]]) cases.push({ size, axis, layer, fov, aspect });
 
   it.each(cases)('holds the whole $size×$size cube, the $axis layer $layer and the hit at fov $fov, aspect $aspect', ({ size, axis, layer, fov, aspect }) => {
@@ -38,7 +38,7 @@ describe('sliceShotInto', () => {
 
   it('frames a hit with no slice (a bomb) from off its own face', () => {
     for (const impact of [[1.6, 0.4, 0.2], [0.2, -1.6, 0.4], [0.3, 0.2, -1.6]]) {
-      const shot = sliceShotInto(out(), impact, null, null, 3, { fov: 60, aspect: 0.5 });
+      const shot = bombImpactShotInto(out(), impact, 3);
       const hit = project(shot, 60, 0.5, new Vector3(...impact));
       expect(Math.abs(hit.x)).toBeLessThan(0.8); expect(Math.abs(hit.y)).toBeLessThan(0.8);
       // In front of the impact face, not behind the cube.

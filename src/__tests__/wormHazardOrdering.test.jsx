@@ -117,13 +117,28 @@ it('holds bombs and the rotation countdown through a rescue and its release fram
   expect(bomb.fuse).toBeCloseTo(0.2);
 });
 
+it('clears rotation framing metadata when a bomb severs the tail', () => {
+  sim.tailLength = 80;
+  sim.cutFocusSlice = { axis: 'row', layer: 1 };
+  checkBlastHitWorm.mockReturnValueOnce({ type: 'cut', cutTrailIdx: 1 });
+  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  props.bombsRef.current.push({ id: 4, tile: { ...sim.pos }, fuse: 0.001, maxFuse: 5 });
+  tick();
+  expect(useGameStore.getState().wormAlive).toBe(true);
+  expect(sim.cutFocusT).toBeGreaterThan(0);
+  expect(sim.cutFocusPos).not.toBeNull();
+  expect(sim.cutFocusSlice).toBeNull();
+});
+
 it('severs a fatal slice hit and stops the turn before it can drag the dead body apart', () => {
+  const impactPosition = [-1.58, 0, 0.5];
+  expect(sim.headInterpPos.toArray()).not.toEqual(impactPosition);
   resolveSliceHits.mockReturnValueOnce({ type: 'death', sliceIndex: 1,
     cutTrailIdx: 1, cutDistance: 0.2, keepCount: 2, historyIndex: 0, historyT: 0.5,
-    cutPosition: sim.headInterpPos.toArray() });
+    cutPosition: impactPosition });
   tick(110);
   expect(useGameStore.getState().wormAlive).toBe(false);
-  expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'slice-rotation', sliceIndex: 1 });
+  expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'slice-rotation', sliceIndex: 1, impactPosition });
   expect(sim.tailLength).toBe(2);
   expect(sim.stepHistory.count).toBe(1);
   expect(rotate).not.toHaveBeenCalled();

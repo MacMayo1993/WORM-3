@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { bodyPathHeadInto } from './healerWorm/sliceBodyPath.js';
-import { sliceShotInto } from './sliceShot.js';
+import { bombImpactShotInto, sliceShotInto } from './sliceShot.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
 import { rocketOrbitInto, rocketOrbitT, rocketFrameInto } from './healerWorm/rocketOrbit.js';
@@ -244,8 +244,8 @@ export default function WormChaseCamera({ worm, size }) {
                 _freezeStartCam.copy(camPosRef.current);
                 _freezeStartLook.copy(lookAtRef.current);
                 _freezeStartUp.copy(camUpRef.current);
-                // The sim has stopped, so the head interp holds the exact impact
-                // point unless the death recorded one (a live seam crossing).
+                // A fatal neck cut can be on another face from the head. Prefer
+                // the recorded severing point for both scheduled and live cuts.
                 const details = gameState.wormDeathDetails;
                 const impact = details.impactPosition ?? worm.headInterpPos.current.toArray();
                 sliceShotInto(_freezeShot, impact, details.axis ?? null, details.sliceIndex ?? null, size, {
@@ -619,7 +619,7 @@ export default function WormChaseCamera({ worm, size }) {
             // the framing out to the slice shot (sliceShot.js) — the whole cube,
             // level, aimed between the severing layer and the hit — while that layer
             // spins, then ease back to the chase as the beat expires ("he comes
-            // back") and the frozen worm resumes.
+            // back") and the frozen worm resumes. Bombs use a close impact shot.
             const cutFocusT = worm.cutFocusT?.current ?? 0;
             const cutPos = worm.cutFocusPos?.current;
             if (cutFocusT > 0 && cutPos) {
@@ -632,11 +632,15 @@ export default function WormChaseCamera({ worm, size }) {
                 if (cutBlend > 0.001) {
                     _cutFocusPos.fromArray(cutPos);
                     const cutSlice = worm.cutFocusSlice?.current;
-                    sliceShotInto(_sliceShot, _cutFocusPos, cutSlice?.axis ?? null, cutSlice?.layer ?? null, size, {
-                        scale: cubeExpansionScale(size, worm.expansionAmount?.current ?? 0),
-                        fov: camera.fov,
-                        aspect: camera.aspect
-                    });
+                    if (cutSlice) {
+                        sliceShotInto(_sliceShot, _cutFocusPos, cutSlice.axis, cutSlice.layer, size, {
+                            scale: cubeExpansionScale(size, worm.expansionAmount?.current ?? 0),
+                            fov: camera.fov,
+                            aspect: camera.aspect
+                        });
+                    } else {
+                        bombImpactShotInto(_sliceShot, _cutFocusPos, size);
+                    }
                     _camTargetCam.lerp(_sliceShot.cam, cutBlend);
                     _camTargetLook.lerp(_sliceShot.look, cutBlend);
                     _cutUp.copy(_sliceShot.up);
