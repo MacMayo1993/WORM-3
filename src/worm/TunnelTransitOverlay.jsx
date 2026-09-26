@@ -81,7 +81,7 @@ export default function TunnelTransitOverlay() {
           vignetteRef.current.style.opacity = String(amp * (reduced ? 0.06 : 0.08 + mid * 0.03));
         }
         if (fringeRef.current) {
-          fringeRef.current.style.opacity = String(amp * (reduced ? 0.15 : 0.22 + mid * 0.20));
+          fringeRef.current.style.opacity = String(amp * (reduced ? 0.15 : 0.10 + mid * 0.06));
         }
         if (seamRef.current) {
           // A brief bloom exactly at ½π — the identification moment.
@@ -91,7 +91,7 @@ export default function TunnelTransitOverlay() {
           // beat this overlay exists to sell, and until the camera actually did it
           // there was nothing at this point in the ride to mark.
           const punch = Math.max(0, 1 - Math.abs(t - 0.33) / 0.045);
-          seamRef.current.style.opacity = String(reduced ? 0 : amp * Math.max(seam, punch * punch * 0.65) * 0.32);
+          seamRef.current.style.opacity = String(reduced ? 0 : amp * Math.max(seam, punch * punch * 0.65) * 0.08);
         }
       }
       rafRef.current = requestAnimationFrame(animate);

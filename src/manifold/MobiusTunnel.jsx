@@ -1,3 +1,4 @@
+import { fillTunnelRideGeometry } from '../utils/tunnelRide.js';
 import { PLATFORM_FORMATION_SECONDS, platformFormationHeld } from '../worm/platformFormation.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
@@ -118,6 +119,8 @@ const fragmentShader = `
   uniform vec3  uColorA;
   uniform vec3  uColorB;
   uniform float uOpacity;
+  uniform float uRideMode;
+  uniform float uRideCore;
   uniform float uTime;
   uniform float uScrollSpeed;
   uniform float uGrowT;
@@ -137,6 +140,23 @@ const fragmentShader = `
     float leftFront  = uGrowT * 0.5;
     float rightFront = 1.0 - uGrowT * 0.5;
     if (vUv.y > leftFront && vUv.y < rightFront) discard;
+
+    // WORM: an opaque, filtered track. No white-hot hash streaks, Fresnel
+    // wash or transparent floor drawn over the body from the far side.
+    if (uRideMode > 0.5) {
+      vec3 base = mix(uColorA, uColorB, smoothstep(uRideCore - 0.04, uRideCore + 0.04, vUv.y));
+      float edge = 1.0 - smoothstep(0.035, 0.06, min(vUv.x, 1.0 - vUv.x));
+      float phase = vUv.y * 10.0 - uTime * 0.18;
+      float footprint = max(fwidth(phase), 0.002);
+      float dash = 1.0 - smoothstep(0.055, 0.055 + footprint, abs(fract(phase + 0.5) - 0.5));
+      dash *= 1.0 - smoothstep(0.12, 0.4, footprint);
+      float lane = smoothstep(0.28, 0.36, abs(vUv.x - 0.5));
+      vec3 color = mix(base * 0.65 + vec3(0.045), vec3(0.025, 0.035, 0.045), edge);
+      color += base * dash * lane * 0.22;
+      gl_FragColor = vec4(color, 1.0);
+      #include <colorspace_fragment>
+      return;
+    }
 
     // Each half shows its own tile's color …
     vec3 tileColor = vUv.y < 0.5 ? uColorA : uColorB;
@@ -249,12 +269,18 @@ const bumperVertexShader = `
 const bumperFragmentShader = `
   uniform vec3  uColor;
   uniform float uOpacity;
+  uniform float uRideMode;
   uniform float uGrowT;
   varying float vHeightFrac;
   varying float vTripFrac;
 
   void main() {
     if (vTripFrac > uGrowT * 0.5 && vTripFrac < 1.0 - uGrowT * 0.5) discard;
+    if (uRideMode > 0.5) {
+      gl_FragColor = vec4(uColor * 0.7 + vec3(0.06), 1.0);
+      #include <colorspace_fragment>
+      return;
+    }
     float topFade = 1.0 - smoothstep(0.6, 1.0, vHeightFrac);
 
     // Möbius flip highlight: glows white near the halfway point (t=0.5),
@@ -403,14 +429,14 @@ function fillBumpers(
   }
 }
 
-function createRibbonGeos(segs) {
+function createRibbonGeos(segs, continuous = false) {
   const vertCount = (segs + 1) * 2;
 
   // Shared quad-strip index pattern (skip the gap at segs/2 hidden by mini-cube body)
   const mainIndices = [];
   const bumpIndices = [];
   for (let i = 0; i < segs; i++) {
-    if (i === segs / 2) continue;
+    if (!continuous && i === segs / 2) continue;
     const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
     mainIndices.push(a, b, c, b, d, c);
     bumpIndices.push(a, b, c, b, d, c);
@@ -459,6 +485,9 @@ const MobiusTunnel = ({
   gridId1, gridId2, tunnelBirths, tunnelPulses,
 }) => {
   const flipCap          = useGameStore(selectEffectiveFlipCap);
+  const wormMode = useGameStore(s => s.wormHealerMode);
+  const groupRef = useRef();
+  const segments = wormMode ? 160 : RIBBON_SEGS;
   const meshRef          = useRef();
   const formationAge = useRef(0);
   const pulseT           = useRef(Math.random() * Math.PI * 2);
@@ -472,7 +501,7 @@ const MobiusTunnel = ({
   const exitPortalMatRef    = useRef();
   const exitPortalGlowRef   = useRef();
 
-  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(RIBBON_SEGS), []);
+  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(segments, wormMode), [segments, wormMode]);
 
   // Whip uniforms are created once and spread BY REFERENCE into the ribbon and
   // both bumper materials, so all three read the same {value} objects and stay
@@ -488,6 +517,8 @@ const MobiusTunnel = ({
     uColorA:      { value: new THREE.Color(color1) },
     uColorB:      { value: new THREE.Color(color2) },
     uOpacity:     { value: 0.92 },
+    uRideMode:    { value: 0 },
+    uRideCore:    { value: 0.5 },
     uTime:        { value: 0.0 },
     uScrollSpeed: { value: 1.0 },
     uGrowT:       { value: 1.0 },
@@ -502,6 +533,7 @@ const MobiusTunnel = ({
   const bumperUniformsL = useMemo(() => ({
     uColor:   { value: new THREE.Color(color1) },
     uOpacity: { value: 0.93 },
+    uRideMode: uniforms.uRideMode,
     uGrowT: uniforms.uGrowT,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -509,16 +541,24 @@ const MobiusTunnel = ({
   const bumperUniformsR = useMemo(() => ({
     uColor:   { value: new THREE.Color(color2) },
     uOpacity: { value: 0.93 },
+    uRideMode: uniforms.uRideMode,
     uGrowT: uniforms.uGrowT,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    lastStartRef.current.set(Infinity, Infinity, Infinity);
     const g = geo, lg = leftGeo, rg = rightGeo;
     return () => { g.dispose(); lg.dispose(); rg.dispose(); };
   }, [geo, leftGeo, rightGeo]);
 
   useFrame((_state, delta) => {
+    const state = useGameStore.getState();
+    const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
+    // Keep every tail-occupied track; unrelated ribbons cannot cross the ride.
+    if (groupRef.current) groupRef.current.visible = !wormMode || !tunnelState.active || occupied;
+    uniforms.uRideMode.value = wormMode ? 1 : 0;
+    if (wormMode && (state.wormPaused || !state.wormAlive || prefersReducedMotion())) delta = 0;
     const mesh1 = cubieRefs[meshIdx1];
     const mesh2 = cubieRefs[meshIdx2];
     if (!mesh1 || !mesh2 || !meshRef.current) return;
@@ -617,27 +657,31 @@ const MobiusTunnel = ({
         if (exitPortalGlowRef.current)  exitPortalGlowRef.current.material.color.set(cB);
       }
 
-      fillRibbon(
-        geo.attributes.position.array,
-        geo.attributes.uv.array,
-        _tunnelPath,
-        _axis, _perpBase,
-        RIBBON_SEGS, RIBBON_WIDTH, _tileGuard, flipP1, flipP2
-      );
+      if (wormMode) {
+        fillTunnelRideGeometry(geo, leftGeo, rightGeo, _tunnelPath, segments);
+        uniforms.uRideCore.value = (_tunnelPath.armALen + _tunnelPath.legLen[2] * 0.5) / (_tunnelPath.total || 1);
+      } else {
+        fillRibbon(
+          geo.attributes.position.array,
+          geo.attributes.uv.array,
+          _tunnelPath,
+          _axis, _perpBase,
+          RIBBON_SEGS, RIBBON_WIDTH, _tileGuard, flipP1, flipP2
+        );
+        fillBumpers(
+          leftGeo.attributes.position.array,
+          rightGeo.attributes.position.array,
+          leftGeo.attributes.aHeightFrac.array,
+          rightGeo.attributes.aHeightFrac.array,
+          leftGeo.attributes.aTripFrac.array,
+          rightGeo.attributes.aTripFrac.array,
+          _tunnelPath,
+          _axis, _perpBase,
+          RIBBON_SEGS, RIBBON_WIDTH, _tileGuard
+        );
+      }
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;
-
-      fillBumpers(
-        leftGeo.attributes.position.array,
-        rightGeo.attributes.position.array,
-        leftGeo.attributes.aHeightFrac.array,
-        rightGeo.attributes.aHeightFrac.array,
-        leftGeo.attributes.aTripFrac.array,
-        rightGeo.attributes.aTripFrac.array,
-        _tunnelPath,
-        _axis, _perpBase,
-        RIBBON_SEGS, RIBBON_WIDTH, _tileGuard
-      );
       leftGeo.attributes.position.needsUpdate    = true;
       leftGeo.attributes.aHeightFrac.needsUpdate  = true;
       leftGeo.attributes.aTripFrac.needsUpdate    = true;
@@ -763,12 +807,12 @@ const MobiusTunnel = ({
       ? Math.sin(Math.PI * pad.cycle) * 0.6 : 0;
 
     // Shared by reference with both bumper materials — write once.
-    whipUniforms.uWhipAmp.value = whipAmp;
+    whipUniforms.uWhipAmp.value = wormMode ? 0 : whipAmp;
     whipUniforms.uWhipPhase.value = whipPhase;
   });
 
   return (
-    <>
+    <group ref={groupRef}>
       {/* Main ribbon — racing stripes scroll toward the mini-cube, speed ramps at midpoint.
           frustumCulled is off on all three meshes here: vertex positions are written in world
           space into meshes parented at the origin, so the lazily-computed bounding sphere goes
@@ -779,8 +823,9 @@ const MobiusTunnel = ({
           vertexShader={vertexShader}
           fragmentShader={fragmentShader}
           side={THREE.DoubleSide}
-          transparent
-          depthWrite={false}
+          transparent={!wormMode}
+          depthWrite={wormMode}
+          toneMapped={!wormMode}
           extensions={{ derivatives: true }}
         />
       </mesh>
@@ -792,8 +837,9 @@ const MobiusTunnel = ({
           vertexShader={bumperVertexShader}
           fragmentShader={bumperFragmentShader}
           side={THREE.DoubleSide}
-          transparent
-          depthWrite={false}
+          transparent={!wormMode}
+          depthWrite={wormMode}
+          toneMapped={!wormMode}
         />
       </mesh>
 
@@ -804,13 +850,14 @@ const MobiusTunnel = ({
           vertexShader={bumperVertexShader}
           fragmentShader={bumperFragmentShader}
           side={THREE.DoubleSide}
-          transparent
-          depthWrite={false}
+          transparent={!wormMode}
+          depthWrite={wormMode}
+          toneMapped={!wormMode}
         />
       </mesh>
 
       {/* Exit portal group — positioned/oriented as one unit in useFrame */}
-      <group ref={exitPortalGroupRef}>
+      <group ref={exitPortalGroupRef} visible={!wormMode}>
         {/* Additive glow bloom behind the portal face — larger than the portal itself */}
         <mesh ref={exitPortalGlowRef} position={[0, 0, -0.01]}>
           <planeGeometry args={[0.90, 0.90]} />
@@ -843,7 +890,7 @@ const MobiusTunnel = ({
             The portal glow + face already read the tunnel mouth without the noise. */}
       </group>
 
-    </>
+    </group>
   );
 };
 

@@ -9,7 +9,9 @@ import { makeCubies } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
-import { WORM_PIECE_POP, WORM_PAD_HEIGHT, WORM_CAUTION_TAPE_TOP } from '../game/raisedCubie.js';
+import { WORM_PIECE_POP, WORM_PAD_HEIGHT, WORM_CAUTION_TAPE_TOP, wormRaisedAmount } from '../game/raisedCubie.js';
+import { makeTunnelCenterline, buildTunnelCenterlineInto, getWindWorldPosInto } from '../worm/wormLogic.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
 import { makeWormSim, resetWormSim, startJump, stepWormSim } from '../worm/healerWorm/wormSim.js';
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
@@ -78,6 +80,21 @@ it('shows the real cubies rising, grows ribbon and rails together, and lands aft
     const vertices = ribbon[0].geometry.attributes.position;
     // The geometry cache rebuilds after 0.01 units of anchor movement.
     expect(Math.abs(vertices.getZ(0) - (1 + WORM_PIECE_POP + TUNNEL_ANCHOR_OFFSET + WORM_PAD_HEIGHT))).toBeLessThan(0.01);
+    // The rendered raised ribbon, worm route, and mouth handoffs share anchors.
+    const tunnel = { entry: { x: 1, y: 1, z: 2, dirKey: 'PZ' }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' },
+      padExpansion: wormRaisedAmount(3), padHeight: WORM_PAD_HEIGHT };
+    const path = buildTunnelCenterlineInto(makeTunnelCenterline(), tunnel, 3);
+    const ride = makeTunnelRideFrame(), left = new THREE.Vector3(), right = new THREE.Vector3();
+    const segments = vertices.count / 2 - 1;
+    for (let i = 0; i <= segments; i += 10) {
+      tunnelRideFrameInto(ride, path, path.total * i / segments);
+      left.fromBufferAttribute(vertices, i * 2); right.fromBufferAttribute(vertices, i * 2 + 1);
+      expect(left.lerp(right, .5).distanceTo(ride.floor)).toBeLessThan(.01);
+    }
+    for (const [side, arc] of [['entry', 0], ['exit', path.total]]) {
+      tunnelRideFrameInto(ride, path, arc);
+      expect(getWindWorldPosInto(left, tunnel, side, 1, 3).distanceTo(ride.center)).toBeLessThan(1e-7);
+    }
     const shell = refs[0].children[0].children.find(o => o.isMesh);
     expect(shell.material.depthWrite).toBe(false);
     expect(shell.material.opacity).toBeLessThan(0.2);
