@@ -6,6 +6,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDisparityGame } from '../hooks/useDisparityGame.js';
+import { useCubeState } from '../hooks/useCubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 
@@ -14,7 +15,10 @@ let root, host, before, calls;
 const out = { current: null };
 
 function Harness(props) {
-  out.current = useDisparityGame(props);
+  // Use the actual cube callbacks: Mobi retains the launch callback from before
+  // the chosen size is installed, which a getState()-based reset stub hid.
+  const { changeSize, reset } = useCubeState();
+  out.current = useDisparityGame({ ...props, changeSize, reset });
   return null;
 }
 
@@ -32,11 +36,9 @@ beforeEach(async () => {
   const props = {
     settings: { ...before.settings, backgroundTheme: 'blackhole' },
     setSettings: (s) => { calls.settings = s; },
-    changeSize: (n) => useGameStore.getState().setSize(n),
-    reset: () => useGameStore.getState().setRotatedCubies(makeCubies(useGameStore.getState().size)),
     cancelShuffle: vi.fn(),
     startAnimatedShuffle: (_moves, done) => { calls.shuffleDone = done; },
-    setChaosLevel: vi.fn(),
+    setChaosLevel: useGameStore.getState().setChaosLevel,
     setVisualMode: (m) => { calls.visualMode = m; },
     setFlipMode: vi.fn(),
     setShowTunnels: (v) => { calls.tunnels = v; },
@@ -69,6 +71,39 @@ describe('chaos launch', () => {
     expect(calls.intro).toMatchObject({ size: 5, visualMode: 'neon', scene: 'forest' });
     expect(useGameStore.getState().cubies).toHaveLength(5);
     expect(calls.tunnels).toBe(true);
+  });
+
+  it.each([
+    { cubeSize: 2, wager: true },
+    { cubeSize: 3, wager: false },
+    { cubeSize: 5, wager: false },
+    { cubeSize: 6, wager: true }
+  ])('keeps the $cubeSize×$cubeSize board intact after Mobi and reaches GO (wager: $wager)', async ({ cubeSize, wager }) => {
+    await act(async () => out.current.handleDisparitySetupComplete({ ...WIZARD, cubeSize }));
+    await act(async () => {
+      if (wager) out.current.handleBetPlaced({ type: 'PAIR', pick: 'RO', wager: 50, odds: 2 });
+      else out.current.handleBetSkipped();
+    });
+    await act(async () => calls.intro.post());
+
+    // Check BEFORE the delayed scramble rebuild: the app must survive the
+    // render immediately after Mobi dismisses, including smaller/unchanged sizes.
+    const { size, cubies } = useGameStore.getState();
+    expect(size).toBe(cubeSize);
+    expect(cubies).toHaveLength(cubeSize);
+    expect(cubies.every(plane => plane.length === cubeSize && plane.every(row => row.length === cubeSize))).toBe(true);
+    expect(calls.shuffleDone).toBeNull();
+
+    await act(async () => { vi.advanceTimersByTime(60); });
+    await act(async () => calls.shuffleDone());
+    expect(out.current.ignitionPicking).toBe(true);
+    await act(async () => out.current.surpriseIgnition());
+    for (const delay of [900, 900, 900, 600]) {
+      await act(async () => { vi.advanceTimersByTime(delay); });
+    }
+    expect(out.current.disparityCountdown).toBeNull();
+    expect(useGameStore.getState().chaosLevel).toBe(WIZARD.disparityLevel);
+    expect(useGameStore.getState().cubies).toHaveLength(cubeSize);
   });
 
   it('waits for the first-strike pick after the scramble, then counts down', async () => {

@@ -361,12 +361,15 @@ export function useCubeState() {
 
   // Reset to solved state
   const reset = useCallback(() => {
-    setRotatedCubies(makeCubies(size));
+    // Deferred launches (e.g. Mobi's Chaos intro) can retain this callback from
+    // before setup changes the size. Rebuild the live board, never that old size:
+    // mismatched size/cubies crash the next render before the scramble starts.
+    setRotatedCubies(makeCubies(useGameStore.getState().size));
     resetGame();
     clearHistory();
     clearRefractory();
     feel('cubeReset');
-  }, [size, setRotatedCubies, resetGame, clearHistory]);
+  }, [setRotatedCubies, resetGame, clearHistory]);
 
   // Change cube size
   const changeSize = useCallback((newSize) => {
