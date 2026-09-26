@@ -6,7 +6,7 @@
 // compile — the same ~200 ms stall that scripts/../TileStyleMaterials.jsx warms
 // away for tile styles and that HealerBombs' <WarmUp> warms away for bombs. The
 // elemental skins had no equivalent: their materials are built lazily inside
-// getElementalSurfaceMaterial / getFlameMaterial / getGrassBladeMaterial, which
+// getElementalSurfaceMaterial / getFireMaterials / getMeadowMaterial, which
 // run for the first time in the frame ElementalAtmosphere mounts — i.e. exactly
 // when the player claims a power-up. The wash was landing on top of a compile.
 //
@@ -20,7 +20,7 @@ import * as THREE from 'three';
 import { getElementalParticleMaterial } from './elementalParticleMaterial.js';
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
 import { getElementalSurfaceMaterial } from '../ElementalSurface.jsx';
-import { getFlameMaterial } from '../ElementalFireSkin.jsx';
+import { getFireMaterials } from '../ElementalFireSkin.jsx';
 import { getMeadowMaterial } from '../ElementalGrassSkin.jsx';
 import { getNatureLeafMaterial } from './NatureClaimLeaves.jsx';
 import { getElementalOrbMaterials } from './elementalOrbShader.js';
@@ -50,9 +50,10 @@ function collectElementalMaterials() {
         materials.push(getElementalSurfaceMaterial(element, def.color, def.accent));
         break;
       case 'flames':
-        // Both detail tiers: quality is resolved per device at claim time, and
-        // warming only one leaves half the fleet paying the compile.
-        materials.push(getFlameMaterial(true), getFlameMaterial(false));
+        // Both detail tiers, all three layers (bed, tongues, light): quality is
+        // resolved per device at claim time, and warming only one tier leaves half
+        // the fleet paying the compile.
+        materials.push(...getFireMaterials(true), ...getFireMaterials(false));
         break;
       case 'blades':
         materials.push(getMeadowMaterial(), getNatureLeafMaterial());

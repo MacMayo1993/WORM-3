@@ -1,139 +1,77 @@
 // src/worm/ElementalCubeSkin.jsx
 //
-// The real elemental-orb effect: a semi-transparent layer of the element laid
-// directly ON TOP of the cube, over whatever tile styles the faces already carry.
-// When the worm claims a water orb the whole cube is sheathed in water and the
-// worm reads as swimming through it; a grass orb sprouts blades from every face;
-// fire licks up off every sticker; ice sheathes it in frost.
-//
-// Each element brings its own layer, all of them rendered in a cell's local +Z
-// frame (the outward face normal, the tile roughly filling local XY): water and
-// ice are a continuous animated surface (ElementalSurface), nature grows a
-// folded meadow (ElementalGrassSkin), and fire burns with the bombs' own flame sprites
-// (ElementalFireSkin). Surface washes remain translucent; the meadow uses short,
-// opaque leaves with space between them to preserve tile and hazard readability.
+// The real elemental-orb effect: the element laid directly ON the cube, over
+// whatever tile styles the faces already carry. Claim water and the cube sits inside
+// a rounded shell of moving water; fire burns out of every seam and crowns the
+// edges; nature grows a terrarium through the grout; ice encases the cube in a
+// carved glacier shell; lightning turns the seams into live circuitry.
 //
 // ── What this file owns ──────────────────────────────────────────────────────
 // One thing: driving every cover cell's transform, once per frame, for whichever
-// element is active. Three decisions it used to make inline now come from shared
-// modules, so adding an element does not add another branch here:
+// element is active. The rest is looked up, so adding an element adds no branch:
 //
-//   • WHICH renderer draws it → elementalRenderers.js (a lookup, not an if/set)
+//   • WHICH renderer draws it → elementalRenderers.js + the SKINS table below
 //   • HOW MUCH to draw        → elementalQuality.js (grid density, flame counts)
 //   • HOW FAR through the wash → elementalLifecycle.js (the one fade envelope,
-//     shared with the fill light and the particle field so they can no longer
-//     disagree about when the element arrives and leaves)
+//     shared with the fill light and the particle field)
+//   • WHERE each cell ends    → elementalCells.js (exact world-unit extents)
 //
 // ── Density and cost ─────────────────────────────────────────────────────────
-// Density is capped, not the effect: up to a grid×grid grid of cover cells per
-// face, where grid comes from the quality tier (5 on desktop — unchanged — down to
-// 3 on phones and under reduced motion). For cubes at or below that size that is
-// exactly one volume per sticker (cellScale 1). For the bigger advertised modes
-// (6×6, 7×7, 15×15) it coarsens to the same bounded ~6·grid² volumes, each scaled
-// up to cover its cell so the whole cube is still sheathed — an optimized
-// face-level fallback rather than dropping the effect. Cost is constant in cube
-// size.
+// Up to a grid×grid set of cover cells per face, where grid comes from the quality
+// tier. At or below that size it is one cell per sticker; for the big boards a cell
+// stands in for a patch of stickers, and its shader redraws the per-sticker seams
+// inside it from the world-unit lattice. Cost is constant in cube size, and every
+// skin draws the whole cube as one InstancedMesh (one draw call per material layer).
 //
-// Beyond that, the cells of an instanced renderer are one InstancedMesh: water,
-// ice and fire each draw the entire sheathed cube in a SINGLE draw call, where fire
-// alone used to cost ~900 (six sprites per cell) plus a per-cell frame callback.
-// The loop below is the only per-frame CPU work any element does.
+// ── The transform ────────────────────────────────────────────────────────────
+// Each cell rides its representative sticker's LIVE cubie: position, normal AND
+// roll. The roll matters now that skins anchor detail to specific seams and cube
+// edges — a frame rebuilt from the normal alone (a shortest-arc rotation) twists
+// about the normal during some slice turns, which would spin a cell's edge crown or
+// seam flames round its middle while the slice moved. Composing the cubie's own
+// rotation with the rest orientation turns the whole frame rigidly with the slice.
 //
-// The layer colour is uniform across faces and the sampled cells are fixed for a
-// given size, so the geometry itself never churns on a move (memoised on
-// size+element). Each cell's transform is driven every frame from its live cubie
-// mesh, so the layer rides a turning slice with the tiles instead of hanging on
-// the stationary rest grid; it falls back to the rest grid before the meshes
-// exist. The claim/expiry fade is a uniform scale ramp (coverage + thickness),
-// since scaling thickness alone would leave the top plane at full size and alpha.
+// The matrix is always unit scale. Cell size arrives as world-unit extents (an
+// instanced attribute), and every claim/expiry ramp happens in the shaders off the
+// shared envelope — squashing the matrix to fade a layer used to open square holes
+// between cells, and could not express a sweep that travels across the cube.
 
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
-import { FACE_NORMALS } from './healerWorm/constants.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { resolveElementalRenderer } from './healerWorm/elementalRenderers.js';
 import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
 import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
 import { cellEdgeMask, cellSeed, cellSweepDelay, resolveSweepOrigin } from './healerWorm/elementalSeeds.js';
+import { buildElementalCells } from './healerWorm/elementalCells.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
+import { publishWormUniforms, uClaimOrigin, uCubeHalf } from './healerWorm/elementalUniforms.js';
+import { getWormStickerWorldPos } from './wormExpansion.js';
 import ElementalGrassSkin from './ElementalGrassSkin.jsx';
-import { wormSegments } from './wormSegments.js';
 import ElementalFireSkin from './ElementalFireSkin.jsx';
 import { ElementalSurfaceSkin } from './ElementalSurface.jsx';
 
-// Per-face definition: the fixed axis pinned to the outer layer, plus the two
-// in-plane axes the grid varies over.
-const FACES = [
-  { dk: 'PX', fixed: 'x', outer: (n) => n - 1, a: 'y', b: 'z' },
-  { dk: 'NX', fixed: 'x', outer: () => 0, a: 'y', b: 'z' },
-  { dk: 'PY', fixed: 'y', outer: (n) => n - 1, a: 'x', b: 'z' },
-  { dk: 'NY', fixed: 'y', outer: () => 0, a: 'x', b: 'z' },
-  { dk: 'PZ', fixed: 'z', outer: (n) => n - 1, a: 'x', b: 'y' },
-  { dk: 'NZ', fixed: 'z', outer: () => 0, a: 'x', b: 'y' }
-];
+// Renderer key → component. A lookup, like the registry it mirrors.
+const SKINS = {
+  surface: ElementalSurfaceSkin,
+  flames: ElementalFireSkin,
+  blades: ElementalGrassSkin
+};
+
 const _zAxis = new THREE.Vector3(0, 0, 1);
+const _unit = new THREE.Vector3(1, 1, 1);
 // Frame-loop scratch — no per-frame allocation.
 const _livePos = new THREE.Vector3();
 const _liveNorm = new THREE.Vector3();
+const _liveQuat = new THREE.Quaternion();
 const _quat = new THREE.Quaternion();
-const _scale = new THREE.Vector3();
+const _fix = new THREE.Quaternion();
+const _zWorld = new THREE.Vector3();
 const _matrix = new THREE.Matrix4();
-
-// Sampled cover cells for the element layer. Returns a gridN×gridN grid per face
-// (gridN = min(size, quality grid cap)); each entry names a representative sticker
-// in its cell (x/y/z/dirKey — used to read that cubie's LIVE transform each frame),
-// a resting world position + orientation for before the meshes exist, and `cell`
-// = how many stickers wide the cell is, so the volume can be scaled to cover it.
-function surfaceStickers(size, maxGrid) {
-  const gridN = Math.min(size, maxGrid);
-  const sample = (j) => Math.min(size - 1, Math.floor((j + 0.5) * size / gridN));
-  // The sampled sticker index for each grid line, plus the width (in sticker
-  // units) each coarse cell must span to reach the midpoints toward its
-  // neighbours. floor() sampling clusters unevenly for sizes that do not divide
-  // by gridN (6–9), so a single fixed size/gridN width leaves whole rows bare —
-  // e.g. on a 7×7 it samples {0,2,3,4,6} at width 1.4, and rows 1 and 5 fall in
-  // the gaps. Sizing each cell from its own neighbour spacing tiles the face with
-  // no gaps; the resulting overlaps are thin and harmless (the surface layer is
-  // depthWrite:false and world-sampled, grass just reads denser). At/below the
-  // cap every span is 1, exactly one volume per sticker, unchanged.
-  const idx = [];
-  for (let j = 0; j < gridN; j++) idx.push(sample(j));
-  const span = idx.map((p, j) => {
-    const halfLeft = j === 0 ? p + 0.5 : (p - idx[j - 1]) / 2;
-    const halfRight = j === gridN - 1 ? (size - 1 - p) + 0.5 : (idx[j + 1] - p) / 2;
-    return 2 * Math.max(halfLeft, halfRight);
-  });
-  const out = [];
-  for (const f of FACES) {
-    for (let j = 0; j < gridN; j++) {
-      for (let k = 0; k < gridN; k++) {
-        const coord = { x: 0, y: 0, z: 0 };
-        coord[f.fixed] = f.outer(size);
-        coord[f.a] = idx[j];
-        coord[f.b] = idx[k];
-        const wp = getStickerWorldPos(coord.x, coord.y, coord.z, f.dk, size, 0);
-        const n = FACE_NORMALS[f.dk] ?? FACE_NORMALS.PZ;
-        const restQuat = new THREE.Quaternion().setFromUnitVectors(_zAxis, n);
-        // Uniform per-cell scale (the larger of the two in-plane spans): the
-        // z→normal quaternion carries an arbitrary in-plane roll, so a single
-        // scale that covers the wider axis stays gap-free however local X/Y land.
-        const cell = Math.max(span[j], span[k]);
-        out.push({
-          key: `${f.dk}-${j}-${k}`,
-          faceKey: f.dk, j, k, gridN,
-          x: coord.x, y: coord.y, z: coord.z, dirKey: f.dk,
-          restPos: [wp[0], wp[1], wp[2]], restQuat, cell
-        });
-      }
-    }
-  }
-  return out;
-}
 
 /**
  * Fill each cell's share of the claim sweep, so the element travels outward from
@@ -145,7 +83,7 @@ function surfaceStickers(size, maxGrid) {
  * under the worm on a 15×15.
  *
  * With no origin — a wash restored mid-session, or a claim the sim never recorded —
- * every delay is 0 and the whole cube arrives together, which is the old behaviour.
+ * every delay is 0 and the whole cube arrives together.
  */
 function writeSweep(cells, out, origin) {
   if (!origin) {
@@ -158,12 +96,36 @@ function writeSweep(cells, out, origin) {
   }
 }
 
+/**
+ * Per-instance data the shaders read: where each cell sits on its face (rim, edge,
+ * corner, seed), exactly how far it reaches (extent), which of its borders are the
+ * cube's silhouette (edge), and its share of the claim sweep.
+ */
+function buildCellData(cells) {
+  const n = cells.length;
+  const cell = new Float32Array(n * 4);
+  const extent = new Float32Array(n * 4);
+  const edges = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    const c = cells[i];
+    const m = cellEdgeMask(c.j, c.k, c.gridN);
+    cell[i * 4] = m.rim;
+    cell[i * 4 + 1] = m.edge;
+    cell[i * 4 + 2] = m.corner;
+    cell[i * 4 + 3] = cellSeed(c.faceKey, c.j, c.k, c.gridN);
+    extent.set(c.extent, i * 4);
+    edges.set(c.edge, i * 4);
+  }
+  return { cell, extent, edges, sweep: new Float32Array(n) };
+}
+
 export default function ElementalCubeSkin({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
   const def = element ? getElementalDef(element) : null;
-  // A lookup, not a branch. An unknown element resolves to null and the skin draws
-  // nothing rather than silently borrowing another element's look.
+  // An unknown element resolves to null and the skin draws nothing rather than
+  // silently borrowing another element's look.
   const renderer = useMemo(() => resolveElementalRenderer(element, getElementalDef), [element]);
+  const Skin = renderer ? SKINS[renderer.key] ?? null : null;
 
   // Device budget. Read once per mount: the tier only depends on facts that do not
   // change mid-session, and re-resolving it per frame would churn the cell memo.
@@ -172,30 +134,8 @@ export default function ElementalCubeSkin({ size = 3 }) {
     [size]
   );
 
-  const isSurface = renderer?.key === 'surface';
-  const isFire = renderer?.key === 'flames';
-
-  const cells = useMemo(
-    () => (renderer ? surfaceStickers(size, quality.skinGrid) : []),
-    [renderer, size, quality.skinGrid]
-  );
-
-  // Per-instance cube-scale data, the thing that lets one flat quad know it is part
-  // of a cube: where the cell sits (rim / edge / corner), its stable seed, and its
-  // share of the claim sweep. `cell` is fixed for a given board; `sweep` is rewritten
-  // once per claim, when the origin tile arrives.
-  const cellData = useMemo(() => {
-    const cell = new Float32Array(cells.length * 4);
-    for (let i = 0; i < cells.length; i++) {
-      const c = cells[i];
-      const m = cellEdgeMask(c.j, c.k, c.gridN);
-      cell[i * 4] = m.rim;
-      cell[i * 4 + 1] = m.edge;
-      cell[i * 4 + 2] = m.corner;
-      cell[i * 4 + 3] = cellSeed(c.faceKey, c.j, c.k, c.gridN);
-    }
-    return { cell, sweep: new Float32Array(cells.length) };
-  }, [cells]);
+  const cells = useMemo(() => (Skin ? buildElementalCells(size, quality.skinGrid) : []), [Skin, size, quality.skinGrid]);
+  const cellData = useMemo(() => buildCellData(cells), [cells]);
 
   // Every skin writes one matrix per cover cell into its single instanced mesh.
   const instRef = useRef(null);
@@ -210,27 +150,32 @@ export default function ElementalCubeSkin({ size = 3 }) {
   }
 
   useFrame((_, delta) => {
-    if (!renderer) return;
+    if (!Skin) return;
     if (useGameStore.getState().wormPaused) return;
     if (lastOriginRef.current !== wormBuffs.elementalOrigin) elapsedRef.current = 0;
     elapsedRef.current += Math.min(delta, 0.1);
     // One envelope, shared with the fill light and the particles. wormBuffs mirrors
     // the sim clock, so it freezes on pause and during tunnel transit.
     const env = elementalEnvelope({ element, elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
-    // Water keeps full coverage throughout its fade; shrinking every patch in XY
-    // opens square holes. Its shader fades opacity while grow controls thickness.
-    const g = env.grow;
 
     // The claim sweep's starting point. The sim snapshots the tile the orb was
     // taken on and never mutates it, so an identity check is enough to notice a new
     // claim — this recomputes once per wash, not per frame.
     if (lastOriginRef.current !== wormBuffs.elementalOrigin) {
-      lastOriginRef.current = wormBuffs.elementalOrigin;
-      writeSweep(cells, cellData.sweep, wormBuffs.elementalOrigin);
-      const geo = instRef.current?.geometry;
-      const attr = geo?.getAttribute?.('aSweep');
+      const origin = wormBuffs.elementalOrigin;
+      lastOriginRef.current = origin;
+      writeSweep(cells, cellData.sweep, origin);
+      const attr = instRef.current?.geometry?.getAttribute?.('aSweep');
       if (attr) attr.needsUpdate = true;
+      // The same origin as a world point, for the shell skins' continuous flood.
+      if (origin) {
+        const wp = getWormStickerWorldPos(origin.x, origin.y, origin.z, origin.dirKey, size, 0);
+        uClaimOrigin.value.set(wp[0], wp[1], wp[2], 1);
+      } else {
+        uClaimOrigin.value.set(0, 0, 0, 0);
+      }
     }
+    uCubeHalf.value = size / 2;
 
     // An InstancedMesh's capacity is fixed at construction. During the frame an
     // element swap or a size change commits, the ref can still hold the outgoing
@@ -240,83 +185,57 @@ export default function ElementalCubeSkin({ size = 3 }) {
     if (!inst) return;
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i];
-      // Follow the live cubie transform (rides a turning slice); fall back to the
-      // rest grid before the meshes exist.
-      if (readLiveTile(c, _livePos, _liveNorm)) {
-        _quat.setFromUnitVectors(_zAxis, _liveNorm);
+      if (readLiveTile(c, _livePos, _liveNorm, _liveQuat)) {
+        // The cubie's rigid turn applied to the rest frame: the cell rolls exactly
+        // as its slice does.
+        _quat.copy(_liveQuat).multiply(c.restQuat);
+        // Keep +Z pinned to the live normal. They agree whenever the mesh is the
+        // source of both, so this is normally a no-op; it only corrects a reading
+        // that disagrees (a mesh mid-update), by the smallest rotation that does.
+        _zWorld.copy(_zAxis).applyQuaternion(_quat);
+        if (_zWorld.dot(_liveNorm) < 0.99999) {
+          _fix.setFromUnitVectors(_zWorld, _liveNorm);
+          _quat.premultiply(_fix);
+        }
       } else {
+        // Before the meshes exist: the stationary rest grid.
         _livePos.fromArray(c.restPos);
         _quat.copy(c.restQuat);
       }
-      // Billboarded renderers take their on-screen size from world scale, so the
-      // surface layers' squashed (cell, cell, grow) scale would distort them; they
-      // get a uniform scale that still carries both cell size and the ramp.
-      const cellGrow = g; // Instanced shaders own the per-cell sprouting/sweep.
-      if (renderer.uniformScale) _scale.setScalar(c.cell * Math.max(0.001, cellGrow));
-      else if (element === 'water') _scale.set(c.cell, c.cell, Math.max(0.001, cellGrow));
-      else _scale.set(c.cell * g, c.cell * g, Math.max(0.001, cellGrow));
-
-      _matrix.compose(_livePos, _quat, _scale);
+      _matrix.compose(_livePos, _quat, _unit);
       inst.setMatrixAt(i, _matrix);
     }
-    if (inst) {
-      inst.instanceMatrix.needsUpdate = true;
-      // One uniform write per frame carries the whole envelope to both shaders —
-      // they read it to gate the sweep and the dissolve, so no per-instance work is
-      // needed for either.
-      const u = inst.material?.uniforms?.uEnv;
-      if (u) u.value.set(env.intensity, env.claim, env.release, quality.animate ? 1 : 0);
-      if (renderer.key === 'blades' && inst.material.uniforms?.uWorm) {
-        const uniforms = inst.material.uniforms;
-        uniforms.uTime.value = quality.animate ? elapsedRef.current : 0;
-        const p = wormSegments.positions;
-        // Use the rendered head, including face transitions and slice rides.
-        uniforms.uWorm.value.set(p[0], p[1], p[2], wormSegments.count > 0 && quality.animate ? 1 : 0);
-      }
+    inst.instanceMatrix.needsUpdate = true;
+
+    // One set of uniform writes carries the envelope, the worm and the wash clock
+    // to every layer of the skin; no per-instance work is needed for any of them.
+    // The worm uniforms are shared objects, so one publish reaches every material;
+    // reduced motion switches every proximity response off with them.
+    publishWormUniforms(quality.animate);
+    const mats = Array.isArray(inst.material) ? inst.material : [inst.material];
+    for (let m = 0; m < mats.length; m++) {
+      const u = mats[m]?.uniforms;
+      if (!u) continue;
+      if (u.uEnv) u.uEnv.value.set(env.intensity, env.claim, env.release, quality.animate ? 1 : 0);
+      if (u.uElapsed) u.uElapsed.value = quality.animate ? elapsedRef.current : 0;
     }
   });
 
-  if (!renderer || cells.length === 0) return null;
-
-  if (isSurface) {
-    return (
-      // Keyed on the instance count: an InstancedMesh's capacity is fixed at
-      // construction, so a size change has to build a new one rather than resize.
-      <ElementalSurfaceSkin
-        key={`${element}-${cells.length}`}
-        meshRef={instRef}
-        element={element}
-        color={def.color}
-        accent={def.accent}
-        count={cells.length}
-        cellData={cellData}
-      />
-    );
-  }
-
-  if (isFire) {
-    return (
-      <ElementalFireSkin
-        key={`fire-${cells.length}-${quality.flamesPerCell}-${quality.animate ? 1 : 0}`}
-        meshRef={instRef}
-        count={cells.length}
-        flamesPerCell={quality.flamesPerCell}
-        // Reduced motion holds the fire on one frame and drops the ember sparks;
-        // the lower tiers drop the second turbulence octave in the flame shader.
-        animate={quality.animate}
-        highDetail={quality.accents}
-        cellData={cellData}
-      />
-    );
-  }
+  if (!Skin || cells.length === 0) return null;
 
   return (
-    <ElementalGrassSkin
-      key={`grass-${cells.length}-${quality.accents ? 88 : 56}`}
+    <Skin
+      // Keyed on everything that changes the instance count or the geometry: an
+      // InstancedMesh's capacity is fixed at construction, so a size change has to
+      // build a new one rather than resize.
+      key={`${element}-${cells.length}-${quality.tier}-${quality.animate ? 1 : 0}`}
       meshRef={instRef}
+      element={element}
+      color={def.color}
+      accent={def.accent}
       count={cells.length}
-      bladesPerCell={quality.accents ? 88 : 56}
       cellData={cellData}
+      quality={quality}
     />
   );
 }
