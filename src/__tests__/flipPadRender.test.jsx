@@ -14,7 +14,7 @@ extend(THREE);
 it('renders twin lifts along their normals, keeps slots fixed, and clears on heal/unmount', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
-  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode: false, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
+  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode: false, demoMode: true, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };

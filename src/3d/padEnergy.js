@@ -17,16 +17,16 @@ const HALF = PAD_BACK_WIDTH / 2;
 // PadProvider writes one record per lifted WORM pad, in its local frame; the
 // energy renderer reads them. WORM caps active pairs well below this.
 export const MAX_ENERGY_PADS = 64;
-export function createEnergyFrames() {
+export function createEnergyFrames(capacity = MAX_ENERGY_PADS) {
   return {
     count: 0,
     time: 0,
     dt: 0,
     motion: 1,
-    matrix: new Float32Array(MAX_ENERGY_PADS * 16),
-    lift: new Float32Array(MAX_ENERGY_PADS),
-    color: new Float32Array(MAX_ENERGY_PADS * 3),
-    seed: new Int32Array(MAX_ENERGY_PADS)
+    matrix: new Float32Array(capacity * 16),
+    lift: new Float32Array(capacity),
+    color: new Float32Array(capacity * 3),
+    seed: new Int32Array(capacity)
   };
 }
 

@@ -494,10 +494,11 @@ function createRibbonGeos(segs, continuous = false) {
  */
 const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
-  gridId1, gridId2, tunnelBirths, tunnelPulses,
+  gridId1, gridId2, tunnelBirths, tunnelPulses, raisedPresentation = false, active1 = true, active2 = true,
 }) => {
   const flipCap          = useGameStore(selectEffectiveFlipCap);
   const wormMode = useGameStore(s => s.wormHealerMode);
+  const ribbonMode = wormMode || raisedPresentation;
   const groupRef = useRef();
   const segments = wormMode ? 160 : RIBBON_SEGS;
   const meshRef          = useRef();
@@ -513,7 +514,7 @@ const MobiusTunnel = ({
   const exitPortalMatRef    = useRef();
   const exitPortalGlowRef   = useRef();
 
-  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(segments, wormMode), [segments, wormMode]);
+  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(segments, ribbonMode), [segments, ribbonMode]);
 
   // Whip uniforms are created once and spread BY REFERENCE into the ribbon and
   // both bumper materials, so all three read the same {value} objects and stay
@@ -587,7 +588,8 @@ const MobiusTunnel = ({
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
     // Keep every tail-occupied track; unrelated ribbons cannot cross the ride.
     if (groupRef.current) groupRef.current.visible = !wormMode || !tunnelState.active || occupied;
-    uniforms.uRideMode.value = wormMode ? 1 : 0;
+    uniforms.uRideMode.value = ribbonMode ? 1 : 0;
+    if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
     if (wormMode && (state.wormPaused || !state.wormAlive || prefersReducedMotion())) delta = 0;
     const mesh1 = cubieRefs[meshIdx1];
     const mesh2 = cubieRefs[meshIdx2];
@@ -605,10 +607,11 @@ const MobiusTunnel = ({
 
     const formationState = useGameStore.getState();
     const mouthLift = formationState.wormHealerMode && !formationState.demoMode ? WORM_PAD_HEIGHT : 0;
+    const cubeLift = raisedPresentation ? Math.max(0, padMotion.get(tunnelId)?.lift ?? 0) : 0;
     // Ribbon anchors: just inside each sticker tile's own surface, so the ribbon
     // reaches the tile the player flipped rather than the far side of its cubie.
-    _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET + mouthLift);
-    _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET + mouthLift);
+    _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET + mouthLift + (active1 ? cubeLift : 0));
+    _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET + mouthLift + (active2 ? cubeLift : 0));
 
     // Ride each tile's own flip animation — vibration into the anchors, squash
     // into the width. The anchors change every frame during a flip, so the
@@ -677,7 +680,7 @@ const MobiusTunnel = ({
         );
       }
 
-      if (wormMode) {
+      if (ribbonMode) {
         fillTunnelRideGeometry(geo, leftGeo, rightGeo, _tunnelPath, segments);
         uniforms.uRideCore.value = tunnelRideCoreArc(_tunnelPath) / (_tunnelPath.total || 1);
       } else {
@@ -827,7 +830,7 @@ const MobiusTunnel = ({
       ? Math.sin(Math.PI * pad.cycle) * 0.6 : 0;
 
     // Shared by reference with both bumper materials — write once.
-    whipUniforms.uWhipAmp.value = wormMode ? 0 : whipAmp;
+    whipUniforms.uWhipAmp.value = ribbonMode ? 0 : whipAmp;
     whipUniforms.uWhipPhase.value = whipPhase;
   });
 
@@ -843,9 +846,9 @@ const MobiusTunnel = ({
           vertexShader={vertexShader}
           fragmentShader={fragmentShader}
           side={THREE.DoubleSide}
-          transparent={!wormMode}
-          depthWrite={wormMode}
-          toneMapped={!wormMode}
+          transparent={!ribbonMode}
+          depthWrite={ribbonMode}
+          toneMapped={!ribbonMode}
           extensions={{ derivatives: true }}
         />
       </mesh>
@@ -858,9 +861,9 @@ const MobiusTunnel = ({
           fragmentShader={bumperFragmentShader}
           extensions={{ derivatives: true }}
           side={THREE.DoubleSide}
-          transparent={!wormMode}
-          depthWrite={wormMode}
-          toneMapped={!wormMode}
+          transparent={!ribbonMode}
+          depthWrite={ribbonMode}
+          toneMapped={!ribbonMode}
         />
       </mesh>
 
@@ -872,14 +875,14 @@ const MobiusTunnel = ({
           fragmentShader={bumperFragmentShader}
           extensions={{ derivatives: true }}
           side={THREE.DoubleSide}
-          transparent={!wormMode}
-          depthWrite={wormMode}
-          toneMapped={!wormMode}
+          transparent={!ribbonMode}
+          depthWrite={ribbonMode}
+          toneMapped={!ribbonMode}
         />
       </mesh>
 
       {/* Exit portal group — positioned/oriented as one unit in useFrame */}
-      <group ref={exitPortalGroupRef} visible={!wormMode}>
+      <group ref={exitPortalGroupRef} visible={!ribbonMode}>
         {/* Additive glow bloom behind the portal face — larger than the portal itself */}
         <mesh ref={exitPortalGlowRef} position={[0, 0, -0.01]}>
           <planeGeometry args={[0.90, 0.90]} />

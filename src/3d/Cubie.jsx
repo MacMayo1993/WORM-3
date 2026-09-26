@@ -1,7 +1,7 @@
 import { advancePlatformFormation, platformFormationHeld } from '../worm/platformFormation.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
-import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount, flipCubePadsEnabled, LEGACY_PIECE_POP } from '../game/raisedCubie.js';
 import { advancePieceSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
@@ -131,8 +131,9 @@ const Cubie = React.forwardRef(function Cubie({
     }))
   );
   const enableShadows = !perfReducedFX;
+  const cubePads = useGameStore(flipCubePadsEnabled) && !wormMode;
   const wormPads = wormMode && !useGameStore.getState().demoMode;
-  const wormWindow = wormPads && cubieHasFlippedFace(cubie, effectiveFlipCap);
+  const raisedWindow = (wormPads || cubePads) && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Hollow's 12-beam-per-cubie representation would create more than 14,000
   // meshes on a 15×15 shell. Mega disables that view and keeps its optimized chassis.
   const powerView = wormMode ? getViewPowerDef(wormViewPower)?.view : null;
@@ -149,16 +150,16 @@ const Cubie = React.forwardRef(function Cubie({
   const origHomeY = _firstStickerOrigPos?.y ?? cubie.y;
   const origHomeZ = _firstStickerOrigPos?.z ?? cubie.z;
 
-  // Worm mode: pieces carrying a flipped (wormhole) sticker wear the neon view style —
+  // WORM and FLIP CUBE: pieces carrying a flipped sticker wear the neon view style —
   // dark emissive body + pulsing LED edge frame — isolated to just those tiles so the
   // antipodal flip reads instantly against the rest of the cube. wormFlipKey encodes
   // per-face flip state as a primitive string, so the memos below only recompute when a
   // flip actually lands or heals; the LED frame itself is gated to the flipped faces.
   const isFaceFlipped = (dirKey) => {
     const s = cubie.stickers[dirKey];
-    return !!(s && s.flips > 0 && s.curr !== s.orig);
+    return !!(s && s.flips > 0 && s.curr !== s.orig && (!cubePads || s.flips < effectiveFlipCap));
   };
-  const wormFlipKey = wormMode
+  const wormFlipKey = (wormMode || cubePads)
     ? _DIRS.reduce((acc, d) => acc + (isFaceFlipped(d) ? '1' : '0'), '')
     : '';
   const wormNeon = wormFlipKey.indexOf('1') !== -1;
@@ -184,10 +185,10 @@ const Cubie = React.forwardRef(function Cubie({
     roughness: _bmp.roughness,
     metalness: _bmp.metalness,
     envMapIntensity: _bmp.envMapIntensity,
-    transparent: !!_bmp.transparent || wormMode,
-    opacity: wormWindow ? 0.16 : _bmp.opacity ?? (wormMode ? 0.8 : 1.0),
+    transparent: !!_bmp.transparent || wormMode || raisedWindow,
+    opacity: raisedWindow ? 0.16 : _bmp.opacity ?? (wormMode ? 0.8 : 1.0),
     // A dark depth-writing shell hid the entire band behind the raised tile.
-    depthWrite: !wormWindow,
+    depthWrite: !raisedWindow,
     side: wormMode ? THREE.DoubleSide : THREE.FrontSide,
     ...(_bmp.emissive ? { emissive: _bmp.emissive, emissiveIntensity: _bmp.emissiveIntensity ?? 1 } : {})
   };
@@ -438,8 +439,9 @@ const Cubie = React.forwardRef(function Cubie({
     } else if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
     else advancePieceSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
     if (!wormPads) delete pieceRef.current.userData.wormPlatformFormation;
-    // WORM eases to tape height; cube modes retain their small springing pop.
-    const amount = Math.max(0, spring.lift) * (wormPads ? wormRaisedAmount(size) : cubeRaisedAmount(size));
+    // WORM keeps its jump height; FLIP CUBE exposes a larger, readable gap.
+    const amount = Math.max(0, spring.lift) * (wormPads ? wormRaisedAmount(size)
+      : cubeRaisedAmount(size, cubePads ? undefined : LEGACY_PIECE_POP));
     publishRaisedCubie(spring, amount);
     const entry = state.cubiePops[popKey];
     const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;
@@ -475,7 +477,7 @@ const Cubie = React.forwardRef(function Cubie({
         <mesh onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
           <boxGeometry args={mirrorDims} />
           <meshStandardMaterial color="#c8c8c8" roughness={0.08} metalness={0.92} envMapIntensity={1.2}
-            transparent={wormWindow} opacity={wormWindow ? 0.16 : 1} depthWrite={!wormWindow} />
+            transparent={raisedWindow} opacity={raisedWindow ? 0.16 : 1} depthWrite={!raisedWindow} />
         </mesh>
       ) : effectiveHollowMode ? (
         <>

@@ -9,17 +9,17 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { raisedCubieExtent } from '../3d/raisedCubieMotion.js';
 import { WORM_PIECE_POP, CUBE_PIECE_POP, wormRaisedAmount } from '../game/raisedCubie.js';
 
-// Cube modes pop a flipped piece a hair along each axis, never to full Explode.
+// Cube modes pop a flipped piece clearly along each axis, never to full Explode.
 const POP = 1 + CUBE_PIECE_POP;
 
 // Mark every face so the assertions inspect actual descendant world positions.
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: ({ currentDir, pos }) => <group name={currentDir} position={pos} /> }));
 extend(THREE);
-it('pops the body and unflipped faces a hair out of the cube, follows turns, and comes home', async () => {
+it('pops the body and unflipped faces clear out of the cube, follows turns, and comes home', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   useGameStore.setState({ size: 3, explosionT: 0, mirrorMode: false, hollowMode: false, visualMode: 'solid', chaosLevel: 0,
-    randomMode: false, wormHealerMode: false, cubiePops: {}, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
+    randomMode: false, wormHealerMode: false, demoMode: false, cubiePops: {}, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };

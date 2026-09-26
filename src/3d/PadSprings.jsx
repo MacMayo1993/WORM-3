@@ -1,7 +1,7 @@
 import { createPadStalkGeometry, PAD_STALK_DEPTH, PAD_BACK_CLEARANCE } from './padStalkGeometry.js';
 import { RaisedCubieContext } from './raisedCubieContext.js';
 import { removeRaisedCubie } from './raisedCubieMotion.js';
-import { isLiveFlippedFace, padBackFace } from '../game/raisedCubie.js';
+import { isLiveFlippedFace, padBackFace, flipCubePadsEnabled } from '../game/raisedCubie.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { FACE_COLORS, RUBIKS_FACE_COLORS } from '../utils/constants.js';
 import React, { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
@@ -12,7 +12,7 @@ import { flipPadPair, pairFlips, padIsWorn } from '../game/flipPad.js';
 import { padPose, pairPhase, advancePadSpring, WORN_EASE } from './padPose.js';
 import { padMotion, removePadMotion } from './padMotionBridge.js';
 import { PadEnergy } from './PadEnergy.jsx';
-import { padTremble, createEnergyFrames, MAX_ENERGY_PADS } from './padEnergy.js';
+import { padTremble, createEnergyFrames } from './padEnergy.js';
 
 const PadContext = createContext(null);
 const MAX_PADS = 2048;
@@ -22,10 +22,10 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
   const entries = useMemo(() => new Set(), []);
   const pairs = useMemo(() => new Map(), []);
   const cubieSprings = useMemo(() => new Map(), []);
-  // WORM pads hover on an unstable wormhole; PadEnergy draws it from these records.
+  // Raised pads hover on an unstable wormhole; PadEnergy draws these records.
   const menuPads = profileOverride === 'menu';
-  const energyOn = useGameStore(s => menuPads || (!profileOverride && !!s.wormHealerMode && !s.demoMode));
-  const frames = useMemo(() => createEnergyFrames(), []);
+  const energyOn = useGameStore(s => menuPads || (!profileOverride && ((!!s.wormHealerMode && !s.demoMode) || flipCubePadsEnabled(s))));
+  const frames = useMemo(() => createEnergyFrames(MAX_PADS), []);
   const energyClock = useRef(0);
   const stalkRef = useRef(), mouthRef = useRef();
   const resources = useMemo(() => ({
@@ -66,7 +66,7 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
     const cap = profileOverride ? 6 : selectEffectiveFlipCap(state);
     const wormMode = !profileOverride && state.wormHealerMode;
     const wormPads = wormMode && !state.demoMode;
-    const energyPads = wormPads || menuPads;
+    const energyPads = wormPads || menuPads || (!profileOverride && flipCubePadsEnabled(state));
     const motionOff = wormPads || reduced.current || state.settings?.reducedMotion;
     // The WORM landing height stays fixed for the sim; only the look is unstable.
     const energyMotion = energyPads && !reduced.current && !state.settings?.reducedMotion;
@@ -142,14 +142,14 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
       entry.wear = pair.wear;
       entry.active = lifted;
 
-      if (entry.lift <= 0.001 || count >= (energyPads ? MAX_ENERGY_PADS : MAX_PADS)) continue;
+      if (entry.lift <= 0.001 || count >= MAX_PADS) continue;
       let visible = true;
       for (let parent = group; parent; parent = parent.parent) {
         if (!parent.visible) { visible = false; break; }
       }
       if (!visible) continue;
-      // Parent contains live cubie/layer/explode transforms. The small bounce
-      // changes only this instance, never the main tunnel geometry.
+      // Parent contains live cubie/layer/explode transforms. The energy column
+      // and FLIP CUBE tunnel mouths follow the same live pad spring.
       group.parent.updateWorldMatrix(true, false);
       resources.position.fromArray(d.pos);
       resources.quaternion.setFromEuler(d.rotation);

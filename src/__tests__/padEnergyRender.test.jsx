@@ -6,13 +6,14 @@ import { PadProvider, FlipPadOffset } from '../3d/PadSprings.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
+import { PAD_PROFILES } from '../3d/padPose.js';
 import { TREMBLE_NORMAL, TREMBLE_PLANE } from '../3d/padEnergy.js';
 
 extend(THREE);
-it('hovers WORM pads low on a crackling, shuddering wormhole that pause freezes and reduced motion calms', async () => {
+it.each([true, false])('renders energy pads with pause, healing and reduced motion (WORM=%s)', async wormHealerMode => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
-  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode: true, demoMode: false, wormPauseMenuOpen: false,
+  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode, mirrorMode: false, demoMode: false, wormPauseMenuOpen: false,
     settings: { ...before.settings, flipPads: 'full', reducedMotion: false } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
@@ -43,11 +44,20 @@ it('hovers WORM pads low on a crackling, shuddering wormhole that pause freezes 
       const f = front.current.parent.position.length(), k = back.current.parent.position.length();
       // Twins shudder as one, a few millimetres around the fixed landing height.
       expect(f).toBeCloseTo(k, 12);
-      expect(Math.abs(f - WORM_PAD_HEIGHT)).toBeLessThanOrEqual(bound);
+      if (wormHealerMode) expect(Math.abs(f - WORM_PAD_HEIGHT)).toBeLessThanOrEqual(bound);
+      else {
+        expect(f).toBeGreaterThan(0);
+        expect(f).toBeLessThan(PAD_PROFILES.cube.height + PAD_PROFILES.cube.amplitude + PAD_PROFILES.cube.wearAmplitude);
+      }
       shook ||= Math.abs(f - WORM_PAD_HEIGHT) > TREMBLE_NORMAL / 4;
       if (arcs.geometry.drawRange.count > 0) lit++;
     }
     expect(shook).toBe(true);
+    const columns = find(o => o.isInstancedMesh && o.material.fragmentShader?.includes('vLocal.z'));
+    expect(columns.count).toBe(2);
+    expect(columns.material.transparent).toBe(true);
+    expect(columns.material.depthWrite).toBe(false);
+    expect(find(o => o.isInstancedMesh && o.material.isMeshStandardMaterial).count).toBe(0);
     expect(lit).toBeGreaterThan(60);
     expect(liveSparks()).toBeGreaterThan(0);
 
@@ -63,7 +73,7 @@ it('hovers WORM pads low on a crackling, shuddering wormhole that pause freezes 
     // Reduced motion: a steady glow at exactly the landing height, no arcs or sparks.
     useGameStore.setState({ wormPauseMenuOpen: false, settings: { ...useGameStore.getState().settings, reducedMotion: true } });
     for (let i = 0; i < 5; i++) store.getState().advance(frame++ / 60);
-    expect(front.current.parent.position.length()).toBeCloseTo(WORM_PAD_HEIGHT, 12);
+    expect(front.current.parent.position.length()).toBeCloseTo(wormHealerMode ? WORM_PAD_HEIGHT : PAD_PROFILES.cube.height, 12);
     expect(arcs.geometry.drawRange.count).toBe(0);
     expect(liveSparks()).toBe(0);
 
@@ -71,9 +81,9 @@ it('hovers WORM pads low on a crackling, shuddering wormhole that pause freezes 
     await act(async () => root.render(draw(2)));
     store.getState().advance(frame++ / 60);
     expect(front.current.parent.position.length()).toBe(0);
-    const columns = [];
-    scene.traverse(o => { if (o.isInstancedMesh) columns.push(o.count); });
-    expect(columns.every(count => count === 0)).toBe(true);
+    const counts = [];
+    scene.traverse(o => { if (o.isInstancedMesh) counts.push(o.count); });
+    expect(counts.every(count => count === 0)).toBe(true);
   } finally {
     await act(async () => root.unmount());
     useGameStore.setState(before, true);
