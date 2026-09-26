@@ -1,21 +1,11 @@
+import { tunnelState } from '../tunnelProgressBridge.js';
 import { wormExpansion } from '../wormExpansion.js';
 // src/worm/healerWorm/TunnelTube.jsx
 //
-// The wormhole made into an actual enclosure.
-//
-// Before this, riding a wormhole meant flying along a thin Möbius ribbon inside
-// the large empty volume of the cube, with all six interior walls filling the
-// frame at full saturation. The composition read as "I am in a red room", not
-// "I am in a tunnel" — the ribbon was a floor, and nothing enclosed the camera.
-//
-// TunnelTube sweeps a tube around the exact centerline the ribbon and the worm
-// already follow (getTunnelWorldPosInto). The Möbius ribbon stays visible within
-// it as the track being ridden; the tube is the shaft around it.
-//
-// The cross-section frame is parallel-transported along the path rather than
-// rebuilt from a fixed up-vector: the centerline turns a corner at the core
-// (entry arm → exit arm), and a naive frame flips there, which would twist the
-// whole tube in one frame.
+// Sparse, filtered depth arches around the occupied route. The opaque Möbius
+// track supplies the floor; these accents leave the worm, core and inner tiles
+// visible. Keep the shaft for as long as any recorded tail passage occupies it.
+// Cross-section frames are parallel-transported through the core bends.
 
 import { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -125,8 +115,11 @@ const fragmentShader = `
     // dip or white wash hiding the worm during the camera's orientation change.
     float seam = 1.0 - smoothstep(0.0, 0.14, coreDistance);
     col += hot * seam * railHalo * 0.08;
-    float wall = 0.38 + panel * 0.05 + hoop * 0.12 + rail * 0.10;
-    gl_FragColor = vec4(col, min(0.68, wall * mouth * uOpacity));
+    float coreWindow = smoothstep(0.10, 0.24, coreDistance);
+    float wall = (hoop * 0.12 + rail * 0.06) * coreWindow;
+    float alpha = wall * mouth * uOpacity;
+    if (alpha < 0.008) discard;
+    gl_FragColor = vec4(col, alpha);
     #include <colorspace_fragment>
   }
 `;
@@ -151,8 +144,13 @@ function createTubeGeometry() {
 export function TunnelTube({ worm, size }) {
   const pool = useMemo(() => makeTunnelTubePool(), []);
   const [slots, setSlots] = useState([]);
+  useEffect(() => () => tunnelState.occupiedTunnelIds.clear(), []);
   useFrame(() => {
     const occupied = syncTunnelTubePool(pool, worm.activeTunnel.current, worm.tunnelPassages?.current ?? []);
+    tunnelState.occupiedTunnelIds.clear();
+    for (const slot of occupied) {
+      if ((slot.activeTunnel || slot.tailOccupied) && slot.tunnel?.pairId) tunnelState.occupiedTunnelIds.add(slot.tunnel.pairId);
+    }
     // Mount only when capacity grows. Occupancy and reverse visits update refs;
     // completed slots fade and can be reused without rebuilding the React tree.
     if (occupied.length !== slots.length) setSlots(occupied.slice());

@@ -55,7 +55,7 @@ it('requires cross-face routing for 18 orbs and all six colors, then resets on r
   const initialLength = state().wormBodyTiles; expect(initialLength).toBe(0);
   while (!state().wormStoryResult) {
     const orb = state().wormPowerups[0]; expect(orb).toBeTruthy();
-    seek(orb, () => !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
+    seek(orb, () => !!state().wormStoryResult || !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
   }
   expect(state()).toMatchObject({ wormPaused: true, wormAlive: true });
   expect(state().wormBodyTiles).toBe(initialLength + state().wormSessionOrbs);
@@ -142,6 +142,28 @@ it('holds objective time and run state while paused or hidden', () => {
   expect(worm.timeAliveRef.current).toBe(before); expect(state().wormStoryResult).toBeNull();
   act(() => useGameStore.setState({ wormPaused: false })); vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
   for(let i=0;i<50;i++) frame(); expect(worm.timeAliveRef.current).toBe(before);
+});
+it('publishes replenished orbs after the collection quota and holds refills while paused or hidden', () => {
+  const metricsSpy = vi.spyOn(storyRuntime, 'storyMetrics');
+  begin(6); frame();
+  const [sim, practice] = metricsSpy.mock.calls.at(-1);
+  sim.powerups = [];
+  act(() => useGameStore.setState({ wormPowerups: [], wormSessionOrbs: 30, wormPaused: true }));
+  const delay = practice.orbRefillDelay;
+  for (let i = 0; i < 100; i++) frame();
+  expect(practice.orbRefillDelay).toBe(delay);
+  expect(state().wormPowerups).toHaveLength(0);
+  act(() => useGameStore.setState({ wormPaused: false }));
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  for (let i = 0; i < 100; i++) frame();
+  expect(practice.orbRefillDelay).toBe(delay);
+  expect(state().wormPowerups).toHaveLength(0);
+  hidden.mockReturnValue(false);
+  until(() => state().wormPowerups.length > 0, 100);
+  expect(state().wormPowerups).toHaveLength(6);
+  expect(state().wormStoryResult).toBeNull(); // healing and turns still need resources
+  begin(6);
+  expect(state().wormPowerups).toHaveLength(36);
 });
 it('cannot win Moving Ground by waiting out six turns without collecting the orbs', () => {
   begin(4); frame();
@@ -244,7 +266,7 @@ function travelUntil(done) {
 it.each([2, 5, 6])('can collect the resources and heal every authored pair for level %i through real movement', id => {
   begin(id);
   // Scheduler assertions live in wormHazardOrdering; this exercises the actual
-  // routes, deposits, transit and finite supply without substituting heal calls.
+  // routes, deposits, transit and replenishing supply without substituting heal calls.
   for (let pair = 0; pair < storyLevel(id).target; pair++) {
     const tunnel = getActiveTunnels(state().cubies, state().size)[0], mouth = tunnel.entry;
     const color = state().cubies[mouth.x][mouth.y][mouth.z].stickers[mouth.dirKey].curr;
@@ -280,8 +302,8 @@ it('offers a magnet after the opening, then a rocket after the magnet recovery w
   expect(state().wormStoryResult).toBeNull();
 });
 it('enables Story enemies independently of the Free Play option and rejects stale bomb events', () => {
-  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i+1, 1])), claimed: {} } } }));
-  begin(10); frame();
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: 39 }, (_, i) => [i+1, 1])), claimed: {} } } }));
+  begin(40); frame();
   expect(state()).toMatchObject({ wormEnemiesEnabled: true, wormCombatMode: false, xpRun: null, wormMission: null });
   expect(worm.storyBombsNeeded()).toBe(true);
   act(() => worm.recordStoryBomb(1)); expect(worm.storyBombsNeeded()).toBe(true);
@@ -290,13 +312,13 @@ it('enables Story enemies independently of the Free Play option and rejects stal
   act(() => worm.recordStoryBomb(2)); expect(worm.storyBombsNeeded()).toBe(true);
   act(() => useGameStore.setState({ wormPaused: false }));
   act(() => worm.recordStoryBomb(2)); expect(worm.storyBombsNeeded()).toBe(false);
-  begin(10); expect(worm.storyBombsNeeded()).toBe(true);
+  begin(40); expect(worm.storyBombsNeeded()).toBe(true);
 });
 
 it('keeps deposited tunnels open until the ring and signature objectives are met', () => {
   act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: 8 }, (_, i) => [i+1, 1])), claimed: {} } } }));
   begin(9);
-  expect(state().size).toBe(7);
+  expect(state().size).toBe(6);
   expect(worm.storyBombsNeeded()).toBe(true);
   act(() => worm.recordStoryBomb(1));
   expect(worm.storyBombsNeeded()).toBe(false);
@@ -329,11 +351,11 @@ it('Classic adds 50 percent more Story orbs without changing the authored tunnel
   }
 });
 
-it('Classic can complete level 10’s two-use ability task through real queued activations', () => {
+it('Classic can complete level 9’s two-use ability task through real queued activations', () => {
   act(() => useGameStore.setState({ wormCharacter: 'classic', playerProgress: {
     ...state().playerProgress, wormStory: { stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])), claimed: {} },
   } }));
-  begin(10); frame();
+  begin(9); frame();
   const goal = () => state().wormStoryChecklist.goals.find(g => g.key === 'signatures');
   expect(goal()).toMatchObject({ value: 0, target: 2, done: false });
   act(() => { worm.queueTurn('signature'); worm.queueTurn('signature'); }); frame();

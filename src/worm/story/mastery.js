@@ -99,10 +99,10 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
 // overwrite an unfinished flight or spring jump. Quest magnet orbs replenish
 // only while remote catches are still outstanding.
 export function offerStoryPower(sim, p, level, size, cubies) {
-  // Required lesson powers always take priority. Later levels can offer one
-  // optional cube transformation after those objectives have been served.
+  // Required lesson powers always take priority. Optional transformations wait
+  // until Chapter 2 has taught the alternate views in their authored levels.
   let type = nextStoryPower(p, level);
-  const canOfferView = !type && level.id >= 9 && !p.viewOffered;
+  const canOfferView = !type && level.id >= 21 && !p.viewOffered;
   const displayedType = sim.specials[0]?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
     : sim.viewPowerT > 0 ? sim.viewPower : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : null);
   const hint = offered => level.mechanics?.elementPickups && STORY_ELEMENTS.includes(offered)

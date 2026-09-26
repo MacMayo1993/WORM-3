@@ -391,7 +391,7 @@ export default function WormChaseCamera({ worm, size }) {
             : phase === 'exiting' ? 1 - diveEase((_enterP - 0.5) / 0.5)
             : 0;
         const rocketLift = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
-        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 16, tunnelMix) + rocketLift * 2;
+        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 6, tunnelMix) + rocketLift * 2;
         const fovAlpha = 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {

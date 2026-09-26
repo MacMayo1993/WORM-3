@@ -1,4 +1,4 @@
-// Render-only pose data; never fed back into cube state or tunnel geometry.
+// Render-only pose data for effects and raised tunnel mouths; never fed to the simulation.
 export const padMotion = new Map();
 
 export function removePadMotion(key, owner) {

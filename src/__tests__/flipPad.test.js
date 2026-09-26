@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
-import { classifyPad, flipPadPair, padWear, projectPair, asymmetricEnergy } from '../game/flipPad.js';
+import { K_STAR, classifyPad, flipPadPair, padWear, padIsWorn, pairFlips, projectPair, asymmetricEnergy } from '../game/flipPad.js';
 
 describe('flip pad state and identity', () => {
   it.each([2, 3, 7, 15])('gives both endpoints exactly the same key on size %s', size => {
@@ -32,5 +32,24 @@ describe('flip pad state and identity', () => {
     expect(asymmetricEnergy([[0, 0]])).toBe(0);
     expect(asymmetricEnergy([[1, 1], [1, 0]])).toBeCloseTo(1 / 6);
     expect(asymmetricEnergy([[1, 0]])).toBe(0.5);
+  });
+  it('marks the last life as worn even below K_STAR', () => {
+    expect(padIsWorn(0.5, 1)).toBe(true);
+    expect(padIsWorn(0.5, 2)).toBe(false);
+    expect(padIsWorn(K_STAR, 3)).toBe(true);
+  });
+  it.each([3, 6, 8, 13, 20])('lets K_STAR alone decide every lifted pad on cap %s', cap => {
+    for (let n = 1; n < cap; n += 2) expect(padIsWorn(n / cap, cap - n)).toBe(n / cap >= K_STAR);
+  });
+  it('gives cap 3 no worn pad; its worn tile is the last home tile', () => {
+    expect(classifyPad({ flips: 1, cap: 3 })).toMatchObject({ state: 'pad', worn: false });
+    expect(classifyPad({ flips: 2, cap: 3 })).toMatchObject({ state: 'home', worn: true });
+  });
+  it("keeps a pair's wear when its twin is not mounted, but averages a home twin", () => {
+    expect(pairFlips(5, null)).toBe(5);
+    expect(pairFlips(5, undefined)).toBe(5);
+    expect(pairFlips(5, 5)).toBe(5);
+    expect(pairFlips(1, 0)).toBe(0.5); // a lone pad: its home twin still counts (P+)
+    expect(pairFlips(3, 1)).toBe(2); // heal history leaves both twins on the symmetric part
   });
 });

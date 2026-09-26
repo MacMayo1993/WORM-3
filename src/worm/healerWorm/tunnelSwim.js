@@ -28,7 +28,7 @@ export function tunnelSwimInto(out, index, count, time, weight, reducedMotion = 
     }
     const phase = time * 4.8 - index * 0.62;
     out.side = Math.sin(phase) * 0.07 * strength;
-    out.lift = Math.sin(phase + 0.8) * 0.028 * strength;
+    out.lift = (0.5 + 0.5 * Math.sin(phase + 0.8)) * 0.014 * strength;
     out.scale = 1 + Math.cos(phase) * 0.065 * strength;
     out.bank = Math.cos(phase) * 0.18 * strength;
     return out;

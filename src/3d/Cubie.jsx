@@ -1,7 +1,8 @@
+import { advancePlatformFormation, platformFormationHeld } from '../worm/platformFormation.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
-import { cubieHasFlippedFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT } from '../game/raisedCubie.js';
-import { advancePadSpring } from './padPose.js';
+import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount, flipCubePadsEnabled, LEGACY_PIECE_POP } from '../game/raisedCubie.js';
+import { advancePieceSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
 import { prefersReducedMotion } from '../utils/device.js';
@@ -130,6 +131,9 @@ const Cubie = React.forwardRef(function Cubie({
     }))
   );
   const enableShadows = !perfReducedFX;
+  const cubePads = useGameStore(flipCubePadsEnabled) && !wormMode;
+  const wormPads = wormMode && !useGameStore.getState().demoMode;
+  const raisedWindow = (wormPads || cubePads) && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Hollow's 12-beam-per-cubie representation would create more than 14,000
   // meshes on a 15×15 shell. Mega disables that view and keeps its optimized chassis.
   const powerView = wormMode ? getViewPowerDef(wormViewPower)?.view : null;
@@ -146,16 +150,16 @@ const Cubie = React.forwardRef(function Cubie({
   const origHomeY = _firstStickerOrigPos?.y ?? cubie.y;
   const origHomeZ = _firstStickerOrigPos?.z ?? cubie.z;
 
-  // Worm mode: pieces carrying a flipped (wormhole) sticker wear the neon view style —
+  // WORM and FLIP CUBE: pieces carrying a flipped sticker wear the neon view style —
   // dark emissive body + pulsing LED edge frame — isolated to just those tiles so the
   // antipodal flip reads instantly against the rest of the cube. wormFlipKey encodes
   // per-face flip state as a primitive string, so the memos below only recompute when a
   // flip actually lands or heals; the LED frame itself is gated to the flipped faces.
   const isFaceFlipped = (dirKey) => {
     const s = cubie.stickers[dirKey];
-    return !!(s && s.flips > 0 && s.curr !== s.orig);
+    return !!(s && s.flips > 0 && s.curr !== s.orig && (!cubePads || s.flips < effectiveFlipCap));
   };
-  const wormFlipKey = wormMode
+  const wormFlipKey = (wormMode || cubePads)
     ? _DIRS.reduce((acc, d) => acc + (isFaceFlipped(d) ? '1' : '0'), '')
     : '';
   const wormNeon = wormFlipKey.indexOf('1') !== -1;
@@ -181,8 +185,10 @@ const Cubie = React.forwardRef(function Cubie({
     roughness: _bmp.roughness,
     metalness: _bmp.metalness,
     envMapIntensity: _bmp.envMapIntensity,
-    transparent: !!_bmp.transparent || wormMode,
-    opacity: _bmp.opacity ?? (wormMode ? 0.8 : 1.0),
+    transparent: !!_bmp.transparent || wormMode || raisedWindow,
+    opacity: raisedWindow ? 0.16 : _bmp.opacity ?? (wormMode ? 0.8 : 1.0),
+    // A dark depth-writing shell hid the entire band behind the raised tile.
+    depthWrite: !raisedWindow,
     side: wormMode ? THREE.DoubleSide : THREE.FrontSide,
     ...(_bmp.emissive ? { emissive: _bmp.emissive, emissiveIntensity: _bmp.emissiveIntensity ?? 1 } : {})
   };
@@ -411,7 +417,6 @@ const Cubie = React.forwardRef(function Cubie({
   const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
   const liftSpring = useRaisedCubieSpring(`${size}:${origHomeX},${origHomeY},${origHomeZ}`);
   const poppedRef = useRef(false);
-  const wormPads = wormMode && !useGameStore.getState().demoMode;
   const raised = (!wormMode || wormPads) && (wormPads || (!mirrorMode && settings?.flipPads !== 'off'))
     && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Mega normally omits individual bodies. Materialize a body for a raised
@@ -427,14 +432,20 @@ const Cubie = React.forwardRef(function Cubie({
     if (!kick && !_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0) return;
     if (!popGroupRef.current || !pieceRef.current) return;
     const state = useGameStore.getState();
-    const reduced = wormPads || settings?.reducedMotion || prefersReducedMotion();
-    if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
-    else advancePadSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
-    const amount = Math.max(0, Math.min(1, spring.lift)) * (wormPads ? WORM_RAISED_AMOUNT : 1);
+    const reduced = settings?.reducedMotion || prefersReducedMotion();
+    if (wormPads) {
+      advancePlatformFormation(spring, raised, platformFormationHeld(state) ? 0 : delta, reduced);
+      pieceRef.current.userData.wormPlatformFormation = spring;
+    } else if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
+    else advancePieceSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
+    if (!wormPads) delete pieceRef.current.userData.wormPlatformFormation;
+    // WORM keeps its jump height; FLIP CUBE exposes a larger, readable gap.
+    const amount = Math.max(0, spring.lift) * (wormPads ? wormRaisedAmount(size)
+      : cubeRaisedAmount(size, cubePads ? undefined : LEGACY_PIECE_POP));
     publishRaisedCubie(spring, amount);
     const entry = state.cubiePops[popKey];
     const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;
-    const impact = !reduced && entry && rawT >= 0 && rawT < 1 ? Math.sin(rawT * Math.PI) * 1.5 : 0;
+    const impact = !wormPads && !reduced && entry && rawT >= 0 && rawT < 1 ? Math.sin(rawT * Math.PI) * 1.5 : 0;
     const center = pieceRef.current.position;
     const ratio = selectiveCubieOffsetRatio(size, state.explosionT, amount);
     // Preserve the original impact hop, but do not add a second full explosion.
@@ -465,7 +476,8 @@ const Cubie = React.forwardRef(function Cubie({
       {mirrorMode ? (
         <mesh onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
           <boxGeometry args={mirrorDims} />
-          <meshStandardMaterial color="#c8c8c8" roughness={0.08} metalness={0.92} envMapIntensity={1.2} />
+          <meshStandardMaterial color="#c8c8c8" roughness={0.08} metalness={0.92} envMapIntensity={1.2}
+            transparent={raisedWindow} opacity={raisedWindow ? 0.16 : 1} depthWrite={!raisedWindow} />
         </mesh>
       ) : effectiveHollowMode ? (
         <>
@@ -486,7 +498,15 @@ const Cubie = React.forwardRef(function Cubie({
           <boxGeometry args={[0.98, 0.98, 0.98]} />
         </mesh>
       ) : (
-        <RoundedBox args={wormMode ? [0.92, 0.92, 0.92] : [0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
+        // In worm mode the body is a see-through shell, so it sorts with the other
+        // transparent objects — by origin, back to front. A layer laid over the whole
+        // cube (the elemental skins, patches) has its origin at the cube's centre, so
+        // the nearer bodies drew AFTER it and painted their 0.8-opacity faces over it
+        // wherever no opaque sticker sat in front: every seam turned into a black
+        // bar across the water, the moss and the fire's lava cracks. Drawing bodies
+        // first fixes that. Raised WORM pieces keep a translucent shell without
+        // writing depth, revealing the band underneath their lifted tile.
+        <RoundedBox args={wormMode ? [0.92, 0.92, 0.92] : [0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows} renderOrder={wormMode ? -1 : 0}>
           <meshStandardMaterial {...bodyMatProps} />
         </RoundedBox>
       )}

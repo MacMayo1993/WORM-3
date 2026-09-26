@@ -20,7 +20,7 @@ import * as THREE from 'three';
 export const STRIP_POINTS = 16;
 const VERTS_PER_STRIP = STRIP_POINTS * 2;
 const INDICES_PER_STRIP = (STRIP_POINTS - 1) * 6;
-const DYNAMIC_ATTRS = ['position', 'aTangent', 'aColor', 'aWidth', 'aAlpha', 'aCore', 'aXray'];
+const DYNAMIC_ATTRS = ['position', 'aTangent', 'aColor', 'aWidth', 'aAlpha', 'aCore', 'aXray', 'aAlong'];
 
 const vertexShader = `
   attribute float aSide;
@@ -30,18 +30,23 @@ const vertexShader = `
   attribute float aAlpha;
   attribute float aCore;
   attribute float aXray;
+  attribute float aAlong;
 
   uniform float uXrayPass;
+  uniform float uScale;   // pixels per world unit at depth 1
+  uniform float uMinPx;   // thinnest a live strip may ever draw, in pixels
 
   varying float vSide;
   varying vec3  vColor;
   varying float vAlpha;
   varying float vCore;
+  varying float vAlong;
 
   void main() {
     vSide  = aSide;
     vColor = aColor;
     vCore  = aCore;
+    vAlong = aAlong;
     vAlpha = uXrayPass > 0.5 ? aAlpha * aXray : aAlpha;
 
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
@@ -53,7 +58,11 @@ const vertexShader = `
     vec3  c  = cross(tv, vec3(0.0, 0.0, 1.0));
     float cl = length(c);
     vec3  perp = cl > 1e-4 ? c / cl : vec3(1.0, 0.0, 0.0);
-    mv.xyz += perp * (aSide * aWidth * 0.5);
+    // A bolt is thick in the world, but never thinner than a few pixels on
+    // screen: a zoomed-out camera or a small phone still sees a heavy channel.
+    float w = aWidth;
+    if (w > 0.0) w = max(w, uMinPx * max(0.05, -mv.z) / uScale);
+    mv.xyz += perp * (aSide * w * 0.5);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -61,19 +70,25 @@ const vertexShader = `
 const fragmentShader = `
   uniform float uXrayPass;
   uniform float uXrayAlpha;
+  uniform float uTime;
 
   varying float vSide;
   varying vec3  vColor;
   varying float vAlpha;
   varying float vCore;
+  varying float vAlong;
 
   void main() {
-    // 0 on the centreline, 1 at the ribbon's edge.
+    // 0 on the centreline, 1 at the ribbon's edge. Three layers read as one thick
+    // plasma channel: a white-hot core, a saturated body, and a soft aura.
     float u    = abs(vSide);
-    float halo = (1.0 - u) * (1.0 - u);
-    float core = (1.0 - smoothstep(0.0, 0.32, u)) * vCore;
-    vec3  col  = vColor * halo * 1.35 + vec3(1.0) * core;
-    float a    = vAlpha * max(halo, core);
+    float core = exp(-(u * u) / 0.02) * vCore;
+    float body = exp(-(u * u) / 0.15);
+    float aura = (1.0 - u) * (1.0 - u) * 0.45;
+    // Current surging down the channel: bright knots racing source → tip.
+    float flow = 0.78 + 0.22 * sin(vAlong * 42.0 - uTime * 75.0);
+    vec3  col  = vColor * (body * 1.3 * flow + aura) + vec3(1.0) * core;
+    float a    = vAlpha * min(1.0, core + body * 0.8 * flow + aura);
     if (uXrayPass > 0.5) a *= uXrayAlpha;
     if (a < 0.003) discard;
     gl_FragColor = vec4(col, a);
@@ -96,6 +111,7 @@ export function createStripGeometry(maxStrips) {
   geo.setAttribute('aAlpha', attr(verts, 1));
   geo.setAttribute('aCore', attr(verts, 1));
   geo.setAttribute('aXray', attr(verts, 1));
+  geo.setAttribute('aAlong', attr(verts, 1));
 
   const side = geo.attributes.aSide.array;
   for (let v = 0; v < verts; v++) side[v] = v % 2 === 0 ? -1 : 1;
@@ -123,8 +139,10 @@ export function createStripGeometry(maxStrips) {
  * and reappear from another with nothing in between.
  */
 export function createStripMaterials() {
+  // uTime and uScale are shared by reference, so the storm updates them once.
+  const shared = { uTime: { value: 0 }, uScale: { value: 600 }, uMinPx: { value: 3 } };
   const make = (xray) => new THREE.ShaderMaterial({
-    uniforms: { uXrayPass: { value: xray ? 1 : 0 }, uXrayAlpha: { value: 0.3 } },
+    uniforms: { ...shared, uXrayPass: { value: xray ? 1 : 0 }, uXrayAlpha: { value: 0.3 } },
     vertexShader,
     fragmentShader,
     transparent: true,
@@ -134,7 +152,7 @@ export function createStripMaterials() {
     side: THREE.DoubleSide,
     toneMapped: false
   });
-  return { lit: make(false), xray: make(true) };
+  return { lit: make(false), xray: make(true), uniforms: shared };
 }
 
 /**
@@ -154,6 +172,7 @@ export function createStripWriter(geo, maxStrips) {
   const alp = geo.attributes.aAlpha.array;
   const cor = geo.attributes.aCore.array;
   const xr = geo.attributes.aXray.array;
+  const along = geo.attributes.aAlong.array;
   let used = 0;
   let lastUsed = 0;
 
@@ -180,6 +199,9 @@ export function createStripWriter(geo, maxStrips) {
       const n = Math.max(1, Math.min(STRIP_POINTS, count));
       const base = s * VERTS_PER_STRIP;
       for (let i = 0; i < n; i++) {
+        const f = n > 1 ? i / (n - 1) : 0;
+        along[base + i * 2] = f;
+        along[base + i * 2 + 1] = f;
         const a = Math.max(0, i - 1);
         const b = Math.min(n - 1, i + 1);
         const pa = (base + a * 2) * 3;

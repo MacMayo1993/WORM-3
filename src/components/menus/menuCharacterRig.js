@@ -7,13 +7,11 @@ import { finishWormEyes, wormBodyTaper } from '../../worm/wormCharacterFinish.js
 import { layoutWormFace, FACE_LAYOUT } from '../../worm/wormFaceLayout.js';
 import { animateWormFace } from '../../worm/wormFaceExpression.js';
 import { prefersReducedMotion } from '../../utils/device.js';
-import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import { makeWormHaloSprite } from '../../worm/wormGlowHalo.js';
 import { SPINE_GEO_ARGS, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_GEO_ARGS, PAGE_COLORS, createBookPageGeometry, createBookPaperMaterial, pageHingeAngles } from '../../worm/wormBookFX.js';
 import { MENU_WORM_RADIUS, MENU_WORM_SEGMENTS } from './menuTunnelWormPath.js';
 
-export const menuCharacterPair = cycle => [0, 1].map(i => WORM_CHARACTERS[((cycle * 2 + i) % WORM_CHARACTERS.length + WORM_CHARACTERS.length) % WORM_CHARACTERS.length].id);
 const SKINS = { classic: 'slime', book: 'royal', inch: 'moss', glow: 'ice', wiggle: 'bubble', prism: 'royal', mobi: 'royal' };
 
 // Menu rigs borrow the playable characters' geometry, paper, faces and MOBI assets.
@@ -27,11 +25,10 @@ export function createMenuCharacterRig(character) {
   const geometry = own(createCharacterGeometry(character));
   const spine = character === 'book' ? own(new THREE.BoxGeometry(...SPINE_GEO_ARGS)) : null;
   const pageGeometries = character === 'book' ? [own(createBookPageGeometry(1)), own(createBookPageGeometry(-1))] : null;
-  const accents = createCharacterAccents(character); group.add(accents.group);
+  const accents = createCharacterAccents(character);
   const mobi = character === 'mobi' ? createMobiModel() : null;
   const mobiAssets = mobi ? createMobiSegmentAssets() : null;
   const mobiTails = [];
-  if (mobi) group.add(mobi.group);
   const segments = Array.from({ length: MENU_WORM_SEGMENTS }, (_, i) => {
     const holder = new THREE.Group(); group.add(holder);
     if (mobi) {
@@ -82,30 +79,40 @@ export function createMenuCharacterRig(character) {
   }
   const disposeEyes = finishWormEyes(face.eyes, face.pupils, character, face.mouth);
   const faceParts = [...face.eyes, ...face.pupils, face.mouth, ...face.glasses].filter(Boolean);
-  group.add(...faceParts);
+  // Head features share the animated holder so its squash/stretch cannot leave
+  // the eyes, mouth, accessories or MOBI shell floating at the old pose.
+  segments[0].holder.add(...faceParts, accents.group);
+  if (mobi) segments[0].holder.add(mobi.group);
   const side = new THREE.Vector3(), back = new THREE.Vector3(), basis = new THREE.Matrix4();
+  const origin = new THREE.Vector3(), localUp = new THREE.Vector3(0, 1, 0), localForward = new THREE.Vector3(0, 0, -1);
   return {
     group, segments,
-    pose(i, position, normal, forward, visible, time) {
+    pose(i, position, normal, forward, visible, time, motion = null, reducedMotion = prefersReducedMotion()) {
       const segment = segments[i]; segment.holder.visible = visible;
       segment.holder.position.copy(position);
       back.copy(forward).negate(); side.crossVectors(normal, back).normalize();
       basis.makeBasis(side, normal, back); segment.holder.quaternion.setFromRotationMatrix(basis);
+      segment.holder.scale.set(motion?.width ?? 1, motion?.width ?? 1, motion?.stretch ?? 1);
+      if (motion) {
+        segment.holder.position.addScaledVector(normal, motion.lift).addScaledVector(side, motion.sway);
+        segment.holder.rotateZ(motion.roll);
+      }
       if (segment.material) {
         updateWormSkinMaterialTime(segment.material, time);
         if (character === 'prism') prismColor(segment.material.color, i, time);
-        const hinges = pageHingeAngles(0, prefersReducedMotion() ? 0 : time);
+        const hinges = pageHingeAngles(motion?.pulse ?? 0, reducedMotion ? 0 : time);
         segment.hinges.forEach((hinge, index) => { hinge.rotation.z = index ? hinges.right : hinges.left; });
       }
       if (i === 0) {
         faceParts.forEach(part => { part.visible = visible && !mobi; });
         accents.group.visible = visible && !mobi;
-        layoutWormFace(position, forward, normal, MENU_WORM_RADIUS, face);
-        animateWormFace(face, character, time, { reducedMotion: prefersReducedMotion() });
-        poseCharacterAccents(accents.group, position, forward, normal, MENU_WORM_RADIUS);
+        layoutWormFace(origin, localForward, localUp, MENU_WORM_RADIUS, face);
+        animateWormFace(face, character, time, { reducedMotion, pulse: motion?.pulse ?? 0, transit: motion?.transit ?? false });
+        poseCharacterAccents(accents.group, origin, localForward, localUp, MENU_WORM_RADIUS);
         if (mobi) {
-          mobi.group.visible = visible; mobi.group.position.copy(position); mobi.group.scale.setScalar(MENU_WORM_RADIUS);
-          orientMobi(mobi.group, forward, normal); animateMobi(mobi, time);
+          mobi.group.visible = visible; mobi.group.position.copy(origin); mobi.group.scale.setScalar(MENU_WORM_RADIUS);
+          orientMobi(mobi.group, localForward, localUp);
+          animateMobi(mobi, reducedMotion ? 0 : time, { pulse: motion?.pulse ?? 0, transit: motion?.transit ?? false });
           for (const tail of mobiTails) {
             tail.core.material.uniforms.uTime.value = time;
             tail.gas.material.uniforms.uTime.value = time;

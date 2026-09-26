@@ -39,6 +39,8 @@ import { inchCrawlAdvance, advanceInchGaitState } from '../worm/healerWorm/inchG
 import { shPush, shAt, shReset, ttAt, ttReset, ttPush } from '../worm/circularBuffers.js';
 import { getNextSurfacePosition, getWormholeHealRing } from '../worm/wormLogic.js';
 import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
+import { raisedPlatformPosition } from '../worm/healerWorm/raisedPlatforms.js';
+import { WORM_PAD_HEIGHT, WORM_PIECE_POP, raisedWormExpansion } from '../game/raisedCubie.js';
 
 const SIZE = 3;
 
@@ -1419,21 +1421,30 @@ describe('raised WORM platforms', () => {
     expect(sim.headInterpPos.distanceTo(before)).toBeLessThan(0.2);
     for (let frame = 0; frame < hz && sim.padFlight; frame++) stepWormSim(sim, 1 / hz, SIZE, ctx);
     expect(sim.phase).toBe('windup');
-    expect(sim.activeTunnel.padExpansion).toBe(0.5);
+    // The piece rises and the pad landing meets the ground-anchored tape.
+    expect(sim.activeTunnel.padExpansion).toBe(raisedWormExpansion(0, SIZE));
+    expect(sim.activeTunnel.padHeight).toBe(WORM_PAD_HEIGHT);
     expect(sim.onRaisedPlatform).toBe(true);
-    expect(sim.headInterpPos.z).toBeCloseTo(2.42 + 0.5 + 0.08, 6);
+    expect(sim.headInterpPos.z).toBeCloseTo(1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT + 0.08, 6);
     expect(sim.stepHistory.count).toBeGreaterThan(64);
     expect(shAt(sim.stepHistory, 0).pos.distanceTo(sim.headInterpPos)).toBeLessThan(1e-6);
   });
-  it('lands on an unflipped corner face without entering its sibling face tunnel', () => {
+  it("lands on a raised unflipped face without entering a tunnel", () => {
     const sim = makeSim();
     sim.pos = { x: 2, y: 2, z: 2, dirKey: 'PZ' };
     const ctx = platformCtx(sim, 'PY');
-    startJump(sim, ctx, SIZE);
+    // The whole corner moves, including its unflipped front face.
+    const ordinary = raisedPlatformPosition(sim.pos, SIZE, ctx);
+    expect(ordinary.z).toBeCloseTo(1.52 + WORM_PIECE_POP, 12);
+    const pad = raisedPlatformPosition({ ...sim.pos, dirKey: 'PY' }, SIZE, ctx).toArray();
+    // A corner explodes diagonally: the pop shows on all three axes.
+    [1 + WORM_PIECE_POP, 1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT, 1 + WORM_PIECE_POP].forEach((v, i) => expect(pad[i]).toBeCloseTo(v, 12));
+    startJump(sim, ctx, SIZE, { allowDive: false });
+    expect(sim.padFlight.target.dirKey).toBe('PZ');
     for (let i = 0; i < 100 && sim.padFlight; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
     expect(sim.phase).toBe('crawling');
     expect(sim.onRaisedPlatform).toBe(true);
-    expect(sim.curWorldPos.toArray()).toEqual([1.9, 1.9, 2.42]);
+    expect(sim.curWorldPos.z).toBeCloseTo(1.52 + WORM_PIECE_POP, 6);
     expect(ctx.events.some(e => e.type === 'tunnelEnter')).toBe(false);
   });
   it('does not enter from a crawl and preserves the jump across pause', () => {
@@ -1457,7 +1468,7 @@ describe('raised WORM platforms', () => {
   });
 });
 
-it.each([3, 7, 15])('captures an ordinary face one cell ahead on a raised %s cube', size => {
+it.each([3, 7, 15])('captures a pad one cell ahead and lands a short hop up on a %s cube', size => {
   resetLiveRotation();
   const sim = makeWormSim(size);
   resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
@@ -1465,15 +1476,17 @@ it.each([3, 7, 15])('captures an ordinary face one cell ahead on a raised %s cub
   sim.moveDir = 'right';
   const cubies = makeCubies(size);
   const target = cubies[size - 1][size - 1][size - 1];
-  target.stickers.PY.flips = 1; target.stickers.PY.curr = 6;
+  target.stickers.PZ.flips = 1; target.stickers.PZ.curr = 4;
   const ctx = makeCtx({ getCubies: () => cubies, getTunnelEntry: () => 'pad' });
-  startJump(sim, ctx, size);
+  startJump(sim, ctx, size, { allowDive: false });
   expect(sim.padFlight.target.x).toBe(size - 1);
   while (sim.padFlight) stepWormSim(sim, 1 / 60, size, ctx);
   expect(sim.onRaisedPlatform).toBe(true);
   expect(sim.pos.x).toBe(size - 1);
   expect(sim.phase).toBe('crawling');
-  expect(sim.curWorldPos.z).toBeGreaterThan(size / 2);
+  // The same tape height on every board size: the surface, the raised piece
+  // and the pad's hover.
+  expect(sim.curWorldPos.z).toBeCloseTo((size - 1) / 2 + 0.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT, 6);
 });
 
 it('keeps raised tunnel windout connected to subsequent crawl', () => {
@@ -1491,12 +1504,28 @@ it('keeps raised tunnel windout connected to subsequent crawl', () => {
   while (sim.padFlight) stepWormSim(sim, 1 / 60, SIZE, ctx);
   for (let i = 0; i < 1500 && sim.phase !== 'crawling'; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
   expect(sim.phase).toBe('crawling');
-  expect(sim.headInterpPos.z).toBeCloseTo(-2.92);
+  // The exit pad hovers over its slot too.
+  expect(sim.onRaisedPlatform).toBe(true);
+  expect(sim.headInterpPos.z).toBeCloseTo(-(1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT));
   const exit = sim.headInterpPos.clone();
   stepWormSim(sim, 1 / 60, SIZE, ctx);
   expect(sim.headInterpPos.distanceTo(exit)).toBeLessThan(0.2);
 });
 
+
+it('puts a ride that started on the floor onto the exit pad, although no piece rises', () => {
+  const sim = makeSim();
+  const tunnel = { entry: { ...sim.pos }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' }, padExpansion: 0, padHeight: WORM_PAD_HEIGHT };
+  sim.phase = 'windout'; sim.activeTunnel = tunnel; sim.tunnelProgress = 0;
+  sim.pos = { ...tunnel.exit };
+  // MOBI's elevator ride begins from the floor, so nothing else marks the pad.
+  sim.onRaisedPlatform = false;
+  const ctx = makeCtx({ isStoryMode: () => true });
+  for (let i = 0; i < 200 && sim.phase === 'windout'; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
+  expect(sim.phase).toBe('crawling');
+  expect(sim.onRaisedPlatform).toBe(true);
+  expect(sim.curWorldPos.z).toBeCloseTo(-(1.52 + WORM_PAD_HEIGHT), 6);
+});
 
 it('holds a raised tunnel open throughout the reverse orbit, including a short tail', () => {
   const sim = makeSim();

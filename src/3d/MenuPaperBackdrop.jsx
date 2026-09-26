@@ -1,5 +1,31 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { PAPER_GRID as P, glslFloat as f, glslVec3 } from '../utils/paperGrid.js';
+
+// The paper's numbers live in PAPER_GRID, which the loading screen also draws its
+// 2D-canvas copy of this sheet from: tune them there and both stay one paper.
+const fragmentShader = `varying vec2 paperUv;
+        uniform float aspect;
+        uniform float time;
+        uniform float motion;
+        void main() {
+          vec2 gridUv = paperUv * vec2(aspect, 1.0) * ${f(P.rows)};
+          // Broad waves bend the grid by just over half a square, cycling
+          // every 14–17 seconds so the motion reads within a glance on phones.
+          // Opposing phases create a breathing-paper illusion, with
+          // a single antialiased grid to avoid moire or flickering overlaps.
+          vec2 wave = vec2(
+            sin(gridUv.y * ${f(P.bendFreqY)} + time * ${f(P.bendSpeedY)}),
+            sin(gridUv.x * ${f(P.bendFreqX)} - time * ${f(P.bendSpeedX)})
+          );
+          gridUv += motion * (wave * ${f(P.bend)} + vec2(
+            sin(time * ${f(P.driftSpeedX)}), cos(time * ${f(P.driftSpeedY)})
+          ) * ${f(P.drift)});
+          vec2 line = abs(fract(gridUv - 0.5) - 0.5) / fwidth(gridUv);
+          float grid = 1.0 - min(min(line.x, line.y), 1.0);
+          vec3 paper = mix(${glslVec3(P.paperEdge)}, ${glslVec3(P.paperCentre)}, 1.0 - distance(paperUv, vec2(${P.highlight.map(f).join(', ')})));
+          gl_FragColor = vec4(mix(paper, ${glslVec3(P.line)}, grid * ${f(P.lineMix)}), 1.0);
+        }`;
 
 // A screen-aligned backdrop INSIDE the existing WebGL scene. The transparent
 // carousel overlay never paints over the live cube. Grid density uses the
@@ -38,28 +64,7 @@ export default function MenuPaperBackdrop() {
     <shaderMaterial depthWrite={false} toneMapped={false} uniforms={uniforms}
       vertexShader={`varying vec2 paperUv;
         void main() { paperUv = uv; gl_Position = vec4(position.xy, 0.999999, 1.0); }`}
-      fragmentShader={`varying vec2 paperUv;
-        uniform float aspect;
-        uniform float time;
-        uniform float motion;
-        void main() {
-          vec2 gridUv = paperUv * vec2(aspect, 1.0) * 26.0;
-          // Broad waves bend the grid by just over half a square, cycling
-          // every 14–17 seconds so the motion reads within a glance on phones.
-          // Opposing phases create a breathing-paper illusion, with
-          // a single antialiased grid to avoid moire or flickering overlaps.
-          vec2 wave = vec2(
-            sin(gridUv.y * 0.32 + time * 0.45),
-            sin(gridUv.x * 0.30 - time * 0.38)
-          );
-          gridUv += motion * (wave * 0.55 + vec2(
-            sin(time * 0.18), cos(time * 0.16)
-          ) * 0.24);
-          vec2 line = abs(fract(gridUv - 0.5) - 0.5) / fwidth(gridUv);
-          float grid = 1.0 - min(min(line.x, line.y), 1.0);
-          vec3 paper = mix(vec3(0.94, 0.92, 0.86), vec3(0.98, 0.97, 0.92), 1.0 - distance(paperUv, vec2(0.5, 0.55)));
-          gl_FragColor = vec4(mix(paper, vec3(0.64, 0.68, 0.61), grid * 0.40), 1.0);
-        }`}
+      fragmentShader={fragmentShader}
       extensions={{ derivatives: true }} />
   </mesh>;
 }

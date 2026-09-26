@@ -13,6 +13,16 @@ export function healingNeed({ deposited = 0, inventory = {}, faceId, tailLength,
   return { saved, remaining, payable, missing, pickupsNeeded: Math.ceil(missing / ORB_SEGMENT_GROWTH),
     ready: missing === 0, savedFraction: saved / HEAL_COST, payableFraction: payable / HEAL_COST };
 }
+// A tunnel's sign floats above its pad. Pads hover a short hop off the cube, so
+// a sign near the chase camera sits at its eye level and would wall off the view
+// ahead, where the HUD card already reads out that pad. Shrink signs as the camera
+// nears them: full size beyond SIGN_FULL_DISTANCE, gone inside SIGN_HIDE_DISTANCE.
+export const SIGN_HIDE_DISTANCE = 2.6;
+export const SIGN_FULL_DISTANCE = 5;
+export function nearSignScale(distance) {
+  const u = Math.max(0, Math.min(1, (distance - SIGN_HIDE_DISTANCE) / (SIGN_FULL_DISTANCE - SIGN_HIDE_DISTANCE)));
+  return u * u * (3 - 2 * u);
+}
 export function tunnelDanger(need) {
   if (need.voided) return 'collapsed';
   if (need.inTransit) return need.collapsing ? 'collapsing' : null;

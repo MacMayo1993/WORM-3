@@ -3,13 +3,17 @@ import { Vector3 } from 'three';
 import { makeMenuTunnelWormPath, sampleMenuTunnelWorm, MENU_WORM_RADIUS, MENU_WORM_TAIL, MENU_WORM_SPEED, MENU_WORM_SPACING } from '../components/menus/menuTunnelWormPath.js';
 
 const p = new Vector3(), n = new Vector3(), f = new Vector3();
-describe('menu surface and antipodal tunnel trail', () => {
-  for (const axis of [[1.501, 0, 0], [0, 1.501, 0], [0, 0, 1.501]]) {
-    it(`crawls on both faces and crosses the center for ${axis}`, () => {
+describe('dedicated menu face trails', () => {
+  for (const axis of [[1.501, 0, 0], [-1.501, 0, 0], [0, 1.501, 0], [0, -1.501, 0], [0, 0, 1.501], [0, 0, -1.501]]) {
+    it(`crawls on its own face and returns to its assigned mouth for ${axis}`, () => {
       const path = makeMenuTunnelWormPath(axis, 0.73);
-      expect(path.portals.source.distanceTo(path.portals.entry)).toBeGreaterThan(2);
-      expect(path.portals.exit.distanceTo(path.portals.destination)).toBeGreaterThan(2);
-      expect(path.portals.entry.clone().add(path.portals.exit).length()).toBeLessThan(1e-8);
+      expect(path.portals.source.equals(path.portals.destination)).toBe(true);
+      expect(path.beats.map(beat => beat.kind)).toEqual(['exit', 'enter']);
+      for (const beat of path.beats) {
+        sampleMenuTunnelWorm(path, beat.distance, p, n, f);
+        expect(p.distanceTo(path.portals.source)).toBeLessThan(1e-6);
+        expect(f.dot(path.normal)).toBeCloseTo(beat.kind === 'exit' ? 1 : -1);
+      }
       for (const portal of Object.values(path.portals)) {
         expect(portal.toArray().filter(v => Math.abs(v) > 1e-8)).toHaveLength(1);
         expect(portal.length()).toBeCloseTo(1.501);
@@ -20,7 +24,13 @@ describe('menu surface and antipodal tunnel trail', () => {
           expect(clearance).toBeCloseTo(MENU_WORM_RADIUS * 0.86, 6);
         }
       }
-      expect(path.points.some(point => point.length() < 0.01)).toBe(true);
+      // The entire route stays in this face's hemisphere, including the
+      // buried throat. It cannot meet an opposite worm inside the cube.
+      expect(path.points.every(point => point.dot(path.normal) > 0.7)).toBe(true);
+      for (const point of path.points) {
+        const radial = point.clone().addScaledVector(path.normal, -point.dot(path.normal));
+        expect(Math.max(...radial.toArray().map(Math.abs))).toBeLessThan(1.3);
+      }
     });
   }
   it('keeps following beads on the same continuous arc-length trail after head exit', () => {

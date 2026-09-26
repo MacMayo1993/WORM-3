@@ -17,9 +17,8 @@ import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 // During wormhole traversal shows the coloured back-sides of every sticker on
 // all 6 faces so the camera looks like it is inside the cube.
 
-// Keep the antipodal tiles visible through the bore. The tube's smooth lighting
-// now supplies its own contrast, so the room needs only a light tint.
-const DIM_STRENGTH = 0.28;
+// Keep the patterned antipodal walls readable behind the bright track and core.
+const DIM_STRENGTH = 0.48;
 
 // Maps each face direction to its antipodal (opposite) face direction.
 
@@ -44,7 +43,6 @@ const _FACE_DEFS = [
 ];
 
 export function TunnelInteriorView({ worm, size }) {
-    const wireMatRef = useRef();
     const backingMatRef = useRef();
     const dimMatRef = useRef();
     const stickerMeshesRef = useRef([]);
@@ -77,30 +75,6 @@ export function TunnelInteriorView({ worm, size }) {
         return layout;
     }, [size, expansion]);
 
-    // One merged BufferGeometry of 12-edge outlines for every cubie.
-    const edgeGeo = useMemo(() => {
-        const k = (size - 1) / 2;
-        const hs = 0.46;
-        const pts = new Float32Array(size ** 3 * 72);
-        let i = 0;
-        const ln = (ax, ay, az, bx, by, bz) => {
-            pts[i++]=ax; pts[i++]=ay; pts[i++]=az;
-            pts[i++]=bx; pts[i++]=by; pts[i++]=bz;
-        };
-        for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) {
-            const cx=(x-k)*scale, cy=(y-k)*scale, cz=(z-k)*scale;
-            ln(cx-hs,cy-hs,cz-hs, cx+hs,cy-hs,cz-hs); ln(cx-hs,cy+hs,cz-hs, cx+hs,cy+hs,cz-hs);
-            ln(cx-hs,cy-hs,cz+hs, cx+hs,cy-hs,cz+hs); ln(cx-hs,cy+hs,cz+hs, cx+hs,cy+hs,cz+hs);
-            ln(cx-hs,cy-hs,cz-hs, cx-hs,cy+hs,cz-hs); ln(cx+hs,cy-hs,cz-hs, cx+hs,cy+hs,cz-hs);
-            ln(cx-hs,cy-hs,cz+hs, cx-hs,cy+hs,cz+hs); ln(cx+hs,cy-hs,cz+hs, cx+hs,cy+hs,cz+hs);
-            ln(cx-hs,cy-hs,cz-hs, cx-hs,cy-hs,cz+hs); ln(cx+hs,cy-hs,cz-hs, cx+hs,cy-hs,cz+hs);
-            ln(cx-hs,cy+hs,cz-hs, cx-hs,cy+hs,cz+hs); ln(cx+hs,cy+hs,cz-hs, cx+hs,cy+hs,cz+hs);
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
-        return geo;
-    }, [size, scale]);
-
     const planeGeo = useMemo(() => new THREE.PlaneGeometry(0.88, 0.88), []);
 
     // Solid black backing box, seen from inside (BackSide) — sits just beyond the sticker
@@ -122,6 +96,7 @@ export function TunnelInteriorView({ worm, size }) {
 
     // Set static positions/rotations after mount (or size change).
     useEffect(() => {
+        stickerMatsAssigned.current = false;
         stickerLayout.forEach(({ px, py, pz, rx, ry, rz }, i) => {
             const m = stickerMeshesRef.current[i];
             if (!m) return;
@@ -131,8 +106,8 @@ export function TunnelInteriorView({ worm, size }) {
     }, [stickerLayout]);
 
     useEffect(() => () => {
-        edgeGeo.dispose(); backingGeo.dispose(); dimGeo.dispose();
-    }, [edgeGeo, backingGeo, dimGeo]);
+        backingGeo.dispose(); dimGeo.dispose();
+    }, [backingGeo, dimGeo]);
     useEffect(() => () => planeGeo.dispose(), [planeGeo]);
 
     useFrame((_state, delta) => {
@@ -145,12 +120,13 @@ export function TunnelInteriorView({ worm, size }) {
         // sticker materials get assigned. These have to be separate: keying the
         // assignment's lifetime off `active` cleared it one frame after it was set,
         // so the stickers were never revealed and the cube read as solid black.
-        const inTraversal = phase !== 'crawling';
+        const inTraversal = ['windup', 'entering', 'tunnel', 'exiting', 'windout'].includes(phase);
 
-        // Batch-assign sticker materials ONCE on tunnel entry (opacity still ~0, so no visible pop).
+        // Assign once on any first observed transit frame. A large board or a
+        // remounted scene can miss windup→entering; it still needs its interior.
         // Avoids 54+ per-frame GPU state changes that caused hitching on the first visible frame.
         // Partner sticker is resolved via the manifold map so scrambled/rotated states are correct.
-        if (prevPhase === 'windup' && phase === 'entering') {
+        if (inTraversal && !stickerMatsAssigned.current) {
             const st = useGameStore.getState();
             const { cubies, settings } = st;
             const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
@@ -183,7 +159,6 @@ export function TunnelInteriorView({ worm, size }) {
         opacityRef.current += ((active ? 1 : 0) - opacityRef.current) * Math.min(1, delta * (active ? 10 : 5));
         const opacity = opacityRef.current;
 
-        if (wireMatRef.current) wireMatRef.current.opacity = opacity * 0.45;
         if (backingMatRef.current) backingMatRef.current.opacity = opacity;
         if (dimMatRef.current) dimMatRef.current.opacity = opacity * DIM_STRENGTH;
 
@@ -212,10 +187,6 @@ export function TunnelInteriorView({ worm, size }) {
             <mesh geometry={dimGeo} frustumCulled={false} renderOrder={1}>
                 <meshBasicMaterial ref={dimMatRef} color="#05060c" side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
             </mesh>
-            {/* Black plastic skeleton — all cubie edges in one draw call */}
-            <lineSegments geometry={edgeGeo} frustumCulled={false}>
-                <lineBasicMaterial ref={wireMatRef} color="#222222" transparent opacity={0} depthWrite={false} />
-            </lineSegments>
             {/* All 6 faces × size² sticker planes, coloured imperatively */}
             {stickerLayout.map((_, i) => (
                 <mesh

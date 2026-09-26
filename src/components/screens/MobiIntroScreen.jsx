@@ -36,7 +36,7 @@ export const MOBI_LINES_DEMO_INTRO = [
 // steer, collect, heal, survive.
 export const MOBI_LINES_WORM = [
   "Tap Left or Right to steer. Collect orbs to heal wormholes.",
-  "Enter a wormhole to spend your collected orbs on healing.",
+  "Jump onto a flip pad to ride its tunnel and spend your orbs on healing.",
   "Jump over your body or steer around it.",
 ];
 

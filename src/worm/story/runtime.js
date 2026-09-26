@@ -1,9 +1,9 @@
 import { characterOrbCount } from '../characterAbilities.js';
-import { randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
+import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import { updateMastery, STORY_POWER_OPENING_DELAY } from './mastery.js';
 import * as THREE from 'three';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
-import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
+import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { shReset, shPush, ttReset, ttPush, ttAt } from '../circularBuffers.js';
 import { BASE_TAIL_LENGTH, BODY_BALL_SPACING, WORM_LIFT } from '../healerWorm/constants.js';
@@ -18,6 +18,7 @@ const MOUTHS = [[1,2,4,'PZ'], [4,2,1,'PX'], [1,4,2,'PY'], [3,2,4,'PZ'], [4,2,3,'
 // Smallest board the authored 5×5 templates fit. Below it, trails, mouths and
 // routes are generated to the face instead of shifted off its edge.
 const TEMPLATE_SIZE = 5;
+export const STORY_ORB_REFILL_INTERVAL = 1.5;
 
 // Face-local (u, v) on PZ, in board coordinates. The head spawns at (c, 0)
 // heading up column c (see stageWormPractice); every trail keeps that column
@@ -151,10 +152,65 @@ export function stageStory(sim, size, level, character) {
     sim.powerups.push({ ...tile, type: 'apple' });
   }
   sim.specials = [];
-  const practice = { ...base, pendingMouths, elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null,
+  // Preserve the staged density (including Classic's bonus) by sticker color,
+  // so a layer turn cannot strand a depleted healing color on another face.
+  const orbTargets = {};
+  for (const orb of sim.powerups) {
+    const color = base.cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].orig;
+    orbTargets[color] = (orbTargets[color] ?? 0) + 1;
+  }
+  const practice = { ...base, pendingMouths, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
+    elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), elementTime: 0, powerSeq: 0, bombIds: new Set() };
   return practice;
+}
+
+// Restore at most one orb of each missing color per pulse, throughout the run.
+// No fallback onto occupied tiles: a crowded face retries on the next pulse.
+export function replenishStoryOrbs(sim, practice, state, size, delta) {
+  if (!sim.alive || state.wormPaused || sim.phase !== 'crawling' || sim.tunnelPassages.length ||
+      sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.jumpRescueHeld || sim.elementalFocusT > 0 ||
+      state.animState || liveRotation.active) return false;
+  practice.orbRefillDelay -= Math.min(Math.max(delta, 0), 0.1);
+  if (practice.orbRefillDelay > 0) return false;
+  practice.orbRefillDelay = STORY_ORB_REFILL_INTERVAL;
+
+  const { cubies } = state;
+  const counts = {};
+  const occupied = new Set([...sim.powerups, ...sim.specials].map(tileKey));
+  occupied.add(tileKey(sim.pos));
+  if (sim.prevTile) occupied.add(tileKey(sim.prevTile));
+  for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
+  for (const orb of sim.powerups) {
+    const color = cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].orig;
+    counts[color] = (counts[color] ?? 0) + 1;
+  }
+  // Reserve both ends of future tunnels at their current, rotated locations.
+  if (practice.pendingMouths.length) {
+    const map = buildManifoldGridMap(cubies, size);
+    for (const key of practice.pendingMouths) {
+      const mouth = findStickerByStableKey(cubies, size, key, map);
+      if (!mouth) continue;
+      occupied.add(tileKey(mouth));
+      const twin = findAntipodalStickerByGrid(map, cubies[mouth.x][mouth.y][mouth.z].stickers[mouth.dirKey], size);
+      if (twin) occupied.add(tileKey(twin));
+    }
+  }
+  const candidates = {};
+  for (const tile of getAllSurfaceTiles(size)) {
+    const sticker = cubies[tile.x][tile.y][tile.z].stickers[tile.dirKey];
+    if (sticker.curr !== sticker.orig || occupied.has(tileKey(tile)) ||
+        (counts[sticker.orig] ?? 0) >= practice.orbTargets[sticker.orig]) continue;
+    (candidates[sticker.orig] ??= []).push(tile);
+  }
+  let added = false;
+  for (const tiles of Object.values(candidates)) {
+    const tile = tiles[Math.floor(sim.rand() * tiles.length)];
+    sim.powerups.push({ ...tile, type: 'apple' });
+    added = true;
+  }
+  return added;
 }
 
 export function storyMetrics(sim, practice, level, state, activeTunnels, delta) {

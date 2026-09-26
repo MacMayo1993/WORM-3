@@ -87,6 +87,10 @@ export function chaosStormEvents(payload, cubies, size, manifoldMap, cap, { seed
   const nextSeed = () => stormSeed(n++);
   const safeCap = Math.max(1, cap || 1);
 
+  // ── The first strike: the tile the player picked takes a bolt out of the sky ─
+  const ignition = fromTuple(cubies, size, payload?.ignition);
+  if (ignition) events.push({ type: 'ignition', to: ignition, heat: 0, seed: nextSeed() });
+
   // ── Bolts: one per chain hop between different cubies ──────────────────────
   const cascades = payload?.cascades ?? [];
   let bolts = 0;

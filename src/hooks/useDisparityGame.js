@@ -13,11 +13,11 @@ import { makeCubies } from '../game/cubeState.js';
 import { vibrate } from '../utils/audio.js';
 import { chaosSetupSettings } from '../utils/chaosSetup.js';
 import { resolveWizardTileStyles } from '../utils/wizardTileStyles.js';
+import { randomIgnitionTile } from '../game/chaosIgnition.js';
 
 export function useDisparityGame({
   settings,
   setSettings,
-  size,
   changeSize,
   reset,
   cancelShuffle,
@@ -36,6 +36,11 @@ export function useDisparityGame({
   const [chaosPreview, setChaosPreview] = useState(null);
   // null | 3 | 2 | 1 | 'GO!'
   const [disparityCountdown, setDisparityCountdown] = useState(null);
+  // True between the scramble and the countdown while the player picks the tile
+  // chaos ignites on. Read from the store, not held here: every session reset
+  // (Home, reset, a mode switch) clears the store flag, so the prompt can never
+  // outlive the round it belongs to.
+  const ignitionPicking = useGameStore((s) => s.chaosIgnitionPicking);
 
   const pendingDisparityLevelRef = useRef(3);
   const pendingWizardSettingsRef = useRef(null);
@@ -199,9 +204,39 @@ export function useDisparityGame({
     }
   }, [disparityCountdown, setChaosLevel, startSolveSequence]);
 
+  // Puts the cube the player chose on screen: palette, tile styles, scene, view,
+  // tunnels, Flip, and size. Runs BEFORE Mobi's intro as well as at launch, so
+  // the intro plays over the player's own cube rather than whatever the last mode
+  // left behind (the intro used to show the previous size and look, and the pick
+  // only arrived once the scramble began). `resetCube` rebuilds a solved cube when
+  // the size is unchanged.
+  const applyChaosSetup = useCallback((wizardSettings, resetCube) => {
+    const manifoldStyles = resolveWizardTileStyles(wizardSettings);
+    setSettings({
+      ...chaosSetupSettings(settings, wizardSettings),
+      backgroundTheme: wizardSettings.backgroundTheme || settings.backgroundTheme,
+      manifoldStyles,
+      biomeMode: { enabled: false, faceAssignment: null },
+    });
+    if (wizardSettings.visualMode) setVisualMode(wizardSettings.visualMode);
+    setFlipMode(wizardSettings.flipMode ?? true);
+    if (wizardSettings.showTunnels !== undefined) setShowTunnels(wizardSettings.showTunnels);
+    setChaosLevel(0);
+    // Read the live size: this runs from callbacks captured before a re-render.
+    const liveSize = useGameStore.getState().size;
+    const targetSize = wizardSettings.cubeSize || liveSize;
+    if (targetSize !== liveSize) changeSize(targetSize);
+    else resetCube();
+  }, [settings, setSettings, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, changeSize]);
+
+  const stopIgnitionPick = useCallback(() => {
+    useGameStore.getState().setChaosIgnitionPicking(false);
+  }, []);
+
   // Applies wizard settings, scrambles the cube N times, then starts the
-  // 3-2-1-GO countdown before the cube unshuffles itself.
-  const startDisparityGame = useCallback((wizardSettings) => {
+  // 3-2-1-GO countdown before the cube unshuffles itself. With `pickIgnition`
+  // the round first waits for the player to choose the tile chaos strikes first.
+  const startDisparityGame = useCallback((wizardSettings, { pickIgnition = false } = {}) => {
     useGameStore.getState().clearLastBetResult();
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
@@ -210,30 +245,12 @@ export function useDisparityGame({
     useGameStore.getState().beginDisparityRound();
     if (wizardSettings.flipCap != null) useGameStore.getState().setDisparityFlipCap(wizardSettings.flipCap);
     if (wizardSettings.gameLength != null) useGameStore.getState().setDisparityGameLength(wizardSettings.gameLength);
-
-    const manifoldStyles = resolveWizardTileStyles(wizardSettings);
-
-    const newSettings = {
-      ...chaosSetupSettings(settings, wizardSettings),
-      backgroundTheme: wizardSettings.backgroundTheme || settings.backgroundTheme,
-      manifoldStyles,
-      biomeMode: { enabled: false, faceAssignment: null },
-    };
-    setSettings(newSettings);
-
-    if (wizardSettings.visualMode) setVisualMode(wizardSettings.visualMode);
-    setFlipMode(wizardSettings.flipMode ?? true);
-    if (wizardSettings.showTunnels !== undefined) setShowTunnels(wizardSettings.showTunnels);
+    // A pick left over from an abandoned round must never aim this one.
+    useGameStore.getState().setChaosIgnition(null);
+    stopIgnitionPick();
 
     pendingDisparityLevelRef.current = wizardSettings.disparityLevel;
-    setChaosLevel(0);
-
-    const targetSize = wizardSettings.cubeSize || size;
-    if (targetSize !== size) {
-      changeSize(targetSize);
-    } else {
-      reset();
-    }
+    applyChaosSetup(wizardSettings, reset);
 
     // Generate forward scramble moves, then compute the exact reverse sequence.
     // Use getState().size so we read the freshly-set size after changeSize().
@@ -256,11 +273,35 @@ export function useDisparityGame({
       cancelShuffle();
       useGameStore.getState().setRotatedCubies(makeCubies(freshSize));
       startAnimatedShuffle(forwardMoves, () => {
-        // Scramble finished — start 3-2-1-GO countdown
-        if (launchGeneration === launchGenerationRef.current) setDisparityCountdown(3);
+        if (launchGeneration !== launchGenerationRef.current) return;
+        // Scramble finished — the player aims the first strike, or the
+        // 3-2-1-GO countdown starts straight away.
+        if (pickIgnition) {
+          useGameStore.getState().setChaosIgnitionPicking(true);
+        } else {
+          setDisparityCountdown(3);
+        }
       });
     }, 50);
-  }, [size, settings, setSettings, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset, cancelShuffle, startAnimatedShuffle]);
+  }, [applyChaosSetup, stopIgnitionPick, reset, cancelShuffle, startAnimatedShuffle]);
+
+  // "Strike here": lock the aimed tile in and count down. Both keys act only while
+  // a pick is actually open — a stale press after leaving must not launch a round.
+  const confirmIgnition = useCallback(() => {
+    const s = useGameStore.getState();
+    if (!s.chaosIgnitionPicking || !s.chaosIgnition) return;
+    stopIgnitionPick();
+    setDisparityCountdown(3);
+  }, [stopIgnitionPick]);
+
+  // "Surprise me": the storm picks, and the countdown starts at once.
+  const surpriseIgnition = useCallback(() => {
+    const s = useGameStore.getState();
+    if (!s.chaosIgnitionPicking) return;
+    s.setChaosIgnition(randomIgnitionTile(s.cubies, s.size, s.disparityFlipCap));
+    stopIgnitionPick();
+    setDisparityCountdown(3);
+  }, [stopIgnitionPick]);
 
   const handleDisparitySetupComplete = useCallback((wizardSettings) => {
     setShowDisparityWizard(false);
@@ -277,13 +318,19 @@ export function useDisparityGame({
   }, [settings]);
 
   const launchRound = useCallback(() => {
-    useGameStore.getState().setRotatedCubies(makeCubies(size));
+    const setup = pendingWizardSettingsRef.current;
+    // Show the cube the player just built under Mobi's intro, not the last one.
+    if (setup) {
+      applyChaosSetup(setup, () => useGameStore.getState().setRotatedCubies(makeCubies(useGameStore.getState().size)));
+    } else {
+      useGameStore.getState().setRotatedCubies(makeCubies(useGameStore.getState().size));
+    }
     useGameStore.getState().resetGame();
     launchWithMobi(mobiLines, 'DISPARITY MODE', () => {
       vibrate([50, 30, 100]);
-      startDisparityGame(pendingWizardSettingsRef.current);
+      startDisparityGame(pendingWizardSettingsRef.current, { pickIgnition: true });
     });
-  }, [size, launchWithMobi, mobiLines, startDisparityGame]);
+  }, [applyChaosSetup, launchWithMobi, mobiLines, startDisparityGame]);
 
   const handleBetPlaced = useCallback((bet) => {
     useGameStore.getState().setActiveBet(bet);
@@ -318,18 +365,32 @@ export function useDisparityGame({
     if (launchTimerRef.current) clearTimeout(launchTimerRef.current);
     launchTimerRef.current = null;
     setDisparityCountdown(null);
+    stopIgnitionPick();
+    useGameStore.getState().setChaosIgnition(null);
+    // A wager stamped for a round that never went live was never at stake. A live
+    // round's bet is refunded by the chaos worker's STOP transition, but a round
+    // abandoned before GO (Leave on the first-strike prompt, Home, reset, a mode
+    // switch) never gets there, so without this the PP stayed locked until the
+    // next Disparity setup. Resolved rounds have already cleared their bet, and a
+    // bet not yet stamped for a round is the betting screen's to manage.
+    const s = useGameStore.getState();
+    const bet = s.activeBet;
+    if (bet && bet.roundId != null && bet.roundId === s.disparityRoundId && s.chaosLevel <= 0 && !s.disparityWinner) {
+      s.refundActiveBet();
+    }
     disparitySolveActiveRef.current = false;
     if (disparitySolveIntervalRef.current) {
       clearTimeout(disparitySolveIntervalRef.current);
       disparitySolveIntervalRef.current = null;
     }
-  }, []);
+  }, [stopIgnitionPick]);
 
   useEffect(() => () => {
     launchGenerationRef.current++;
     clearTimeout(launchTimerRef.current);
     clearTimeout(disparitySolveIntervalRef.current);
     disparitySolveActiveRef.current = false;
+    useGameStore.getState().setChaosIgnitionPicking(false);
   }, []);
 
   return {
@@ -339,6 +400,9 @@ export function useDisparityGame({
     speedThresholdSec,
     chaosPreview, handleBetBack, handleChaosReplay,
     disparityCountdown,
+    ignitionPicking,
+    confirmIgnition,
+    surpriseIgnition,
     handleDisparitySetupComplete,
     handleBetPlaced,
     handleBetSkipped,

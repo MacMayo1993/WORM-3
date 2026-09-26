@@ -18,16 +18,16 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); state().clearDisparityGame(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
 const show = props => act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={cancel} initialSettings={{ colorScheme: 'classic', manifoldStyles: {1:'grass'}, wormSpeed: 3 }} {...props} />));
-it('launches Stage 9 on 7x7 and returns other chapters to 5x5', () => {
+it('launches the Chapter 1 siege and finale on 6x6', () => {
   useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
     stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])), claimed: {}
   } } });
   show({ initialPage: 'story' });
   click('Under Siege'); click('Play again');
-  expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 9, cubeSize: 7, megaMode: false });
+  expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 9, cubeSize: 6, megaMode: false });
   expect(host.querySelector('[aria-label="Selected level"]').textContent).toContain('defeat one enemy');
   click('Worm Ascendant'); click('Play level');
-  expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 10, cubeSize: 5 });
+  expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 10, cubeSize: 6 });
 });
 it('opens with Story on the left and Free Play on the right, without launching either', async () => {
   show(); const cards = [...host.querySelector('.worm-path-split').children];
@@ -37,7 +37,7 @@ it('opens with Story on the left and Free Play on the right, without launching e
   expect(complete).not.toHaveBeenCalled();
   click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
-  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 5, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
+  click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 6, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
     colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));
   click('Back'); await act(async () => { click('Free Play'); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(host.querySelector('[aria-label="Free Play setup"]')).not.toBeNull();

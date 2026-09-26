@@ -6,25 +6,8 @@ The existing face selection, swipe/arrow controls, saved mode, animated launch d
 
 Keyboard Enter respects disclosure summaries. Launch is blocked during the 150 ms selection transition. Cancelling WORM restores the mode selector for both Back and Escape.
 
-## Live preview
+## Text-only faces
 
-Captured at 390×844 from the running app with the WebGL cube visible.
+Each colored face shows only its centered mode title: WORM, FLIP CUBE, TEACH, CHAOS, RANDOM or STORE. Longer names use smaller type to fit on one line. The carousel does not create illustration textures or request the mode pictures.
 
-![Live cube carousel on a phone](live-cube-carousel-mobile.png)
-
-## Artwork
-
-Six distinct character/object illustrations are applied as transparent decals to the existing live cube. They use rounded toy forms and a shared colorful palette. None depicts a six-faced puzzle cube or a sticker configuration.
-
-| Mode | Image |
-| --- | --- |
-| WORM | Green worm curling through a turquoise portal |
-| CUBE | Shallow 3×3 tile puzzle with one tile lifted from its slot |
-| TEACH | Bookworm teacher with glasses and an open book |
-| CHAOS | Red and blue orbs with a golden lightning bolt |
-| RANDOM | Purple magician's hat with colored tiles and shuffle arrows |
-| STORE | Teal treasure chest with a hat, star and colorful orbs |
-
-Generated with the built-in image generator, one new transparent image per mode. Exact prompts are recorded in `carousel-art-prompts.json`. Original outputs were fitted without cropping to 768×768 RGBA canvases and encoded as WebP at quality 92. The application only loads these six static assets; no generation runs in the client.
-
-The earlier reproducible geometric scenes remain in `scripts/carousel-art/model.js` as an authoring alternative, with tests for their legal cube moves. They do not describe or validate the current illustrations. `scripts/render-carousel-art.mjs` exports those scenes to `output/carousel-geometry/`, so running it cannot overwrite the current decals.
+The previous artwork assets, prompts in `carousel-art-prompts.json`, and `live-cube-carousel-mobile.png` are retained as historical references. The screenshot predates the text-only layout. The geometric artwork authoring tools remain in `scripts/carousel-art/` and `scripts/render-carousel-art.mjs`.

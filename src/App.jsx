@@ -566,10 +566,11 @@ export default function WORM3() {
   const {
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting, speedThresholdSec, disparityCountdown, chaosPreview, handleBetBack, handleChaosReplay,
+    ignitionPicking, confirmIgnition, surpriseIgnition,
     handleDisparitySetupComplete, handleBetPlaced, handleBetSkipped,
     cancelDisparityRun, startDisparityGame,
   } = useDisparityGame({
-    settings, setSettings, size, changeSize, reset,
+    settings, setSettings, changeSize, reset,
     cancelShuffle, startAnimatedShuffle,
     setChaosLevel, setVisualMode, setFlipMode, setShowTunnels,
     launchWithMobi, mobiLines: MOBI_LINES_CHAOS,
@@ -628,12 +629,15 @@ export default function WORM3() {
   // (neon / desert / topographic) stayed on the device.
   const handleHomeFromGame = useCallback(() => {
     if (useGameStore.getState().demoMode) handleExitDemo();
+    // Stop a chaos launch in flight — the scramble, the first-strike pick, or the
+    // countdown — so none of it can carry on behind the menu.
+    cancelDisparityRun();
     // Mega Mode forces reduced effects up front; returning home must release
     // that override even if PerformanceMonitor is already at its max factor and
     // therefore never emits a later onIncline callback.
     if (useGameStore.getState().wormHealerMode) clearMegaReducedFXOverride();
     handleBackToMainMenu();
-  }, [handleExitDemo, handleBackToMainMenu, clearMegaReducedFXOverride]);
+  }, [handleExitDemo, handleBackToMainMenu, clearMegaReducedFXOverride, cancelDisparityRun]);
 
   // Warm lazy chunks, Mobi's portrait, and environment maps while the opening
   // animation plays, so nothing pops in late on slow connections. Delayed a
@@ -1510,6 +1514,7 @@ export default function WORM3() {
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityCountdown,
+              ignitionPicking, onIgnitionConfirm: confirmIgnition, onIgnitionSurprise: surpriseIgnition,
               showAntipodalPiP, onToggleAntipodalPiP: toggleAntipodalPiP,
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
               showMobiusCubelet,

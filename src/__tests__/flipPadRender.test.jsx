@@ -6,7 +6,7 @@ import { PadProvider, FlipPadOffset } from '../3d/PadSprings.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { padBackFace } from '../game/raisedCubie.js';
+import { padBackFace, WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { PAD_BACK_CLEARANCE } from '../3d/padStalkGeometry.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 
@@ -14,7 +14,7 @@ extend(THREE);
 it('renders twin lifts along their normals, keeps slots fixed, and clears on heal/unmount', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
-  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode: false, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
+  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode: false, demoMode: true, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
@@ -84,11 +84,20 @@ it('renders twin lifts along their normals, keeps slots fixed, and clears on hea
     await act(async () => root.render(draw(1)));
     store.getState().advance(4);
     expect(padMotion.size).toBe(1);
-    useGameStore.setState({ wormHealerMode: true, demoMode: false,
-      settings: { ...useGameStore.getState().settings, flipPads: 'off' } });
+    await act(async () => useGameStore.setState({ wormHealerMode: true, demoMode: false,
+      settings: { ...useGameStore.getState().settings, flipPads: 'off' } }));
     store.getState().advance(5);
-    expect(front.current.parent.position.length()).toBeCloseTo(0.5);
-    expect(meshes[0].count).toBe(2);
+    // WORM pads hover a short hop over the slot, on an energy column rather
+    // than the solid stalk, which cosmetic settings cannot switch off.
+    expect(front.current.parent.position.length()).toBeCloseTo(WORM_PAD_HEIGHT);
+    expect(meshes.map(m => m.count)).toEqual([0, 0]);
+    const energy = [];
+    store.getState().scene.traverse(o => { if (o.isInstancedMesh && !meshes.includes(o)) energy.push(o); });
+    expect(energy.map(m => m.count)).toEqual([2, 2]);
+    // The column fills only the gap: from the slot to just under the tile.
+    const column = new THREE.Matrix4(); energy[0].getMatrixAt(0, column);
+    expect(new THREE.Vector3(0, 0, 0).applyMatrix4(column).z).toBeCloseTo(0.51);
+    expect(new THREE.Vector3(0, 0, 1).applyMatrix4(column).z).toBeCloseTo(0.51 + WORM_PAD_HEIGHT - PAD_BACK_CLEARANCE);
   } finally {
     await act(async () => root.unmount());
     expect(padMotion.size).toBe(0);

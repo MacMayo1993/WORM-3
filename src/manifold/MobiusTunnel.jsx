@@ -1,3 +1,7 @@
+import { fillTunnelRideGeometry, tunnelRideCoreArc } from '../utils/tunnelRide.js';
+import { PLATFORM_FORMATION_SECONDS, platformFormationHeld } from '../worm/platformFormation.js';
+import { prefersReducedMotion } from '../utils/device.js';
+import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -111,10 +115,19 @@ const vertexShader = `
 // Each half is the solid color of its own tile — no cross-blending.
 // Scroll flows toward the centre from both ends so movement reads as "into the tunnel".
 // uScrollSpeed is modulated by tunnel progress so it accelerates at the Möbius midpoint.
+const rideColorShader = `
+  vec3 rideColor(float trip) {
+    // Two solid endpoint colors, with only pixel-width filtering at the core.
+    float aa = max(fwidth(trip), 0.00001);
+    return mix(uColorA, uColorB, smoothstep(uRideCore - aa, uRideCore + aa, trip));
+  }
+`;
 const fragmentShader = `
   uniform vec3  uColorA;
   uniform vec3  uColorB;
   uniform float uOpacity;
+  uniform float uRideMode;
+  uniform float uRideCore;
   uniform float uTime;
   uniform float uScrollSpeed;
   uniform float uGrowT;
@@ -125,6 +138,7 @@ const fragmentShader = `
   uniform float uSolitonAmp;       // 0 when no pulse, sin-eased envelope while travelling
   varying vec2  vUv;
   varying vec3  vWorldPos;
+  ${rideColorShader}
 
   // Cheap hash for per-column parallax variation (streaks at different "radii").
   float hash(float n) { return fract(sin(n * 91.3458) * 47453.5453); }
@@ -134,6 +148,23 @@ const fragmentShader = `
     float leftFront  = uGrowT * 0.5;
     float rightFront = 1.0 - uGrowT * 0.5;
     if (vUv.y > leftFront && vUv.y < rightFront) discard;
+
+    // WORM: an opaque, filtered track. No white-hot hash streaks, Fresnel
+    // wash or transparent floor drawn over the body from the far side.
+    if (uRideMode > 0.5) {
+      vec3 base = rideColor(vUv.y);
+      float edge = 1.0 - smoothstep(0.035, 0.06, min(vUv.x, 1.0 - vUv.x));
+      float phase = vUv.y * 10.0 - uTime * 0.18;
+      float footprint = max(fwidth(phase), 0.002);
+      float dash = 1.0 - smoothstep(0.055, 0.055 + footprint, abs(fract(phase + 0.5) - 0.5));
+      dash *= 1.0 - smoothstep(0.12, 0.4, footprint);
+      float lane = smoothstep(0.28, 0.36, abs(vUv.x - 0.5));
+      vec3 color = mix(base * 0.65 + vec3(0.045), vec3(0.025, 0.035, 0.045), edge);
+      color += base * dash * lane * 0.22;
+      gl_FragColor = vec4(color, 1.0);
+      #include <colorspace_fragment>
+      return;
+    }
 
     // Each half shows its own tile's color …
     vec3 tileColor = vUv.y < 0.5 ? uColorA : uColorB;
@@ -190,7 +221,10 @@ const fragmentShader = `
     intensity += fres * 0.9;    // rim glow
     intensity += sol * 1.6;     // travelling pulse
 
-    vec3 col = tileColor * intensity;
+    // A restrained bright leading edge makes the two growing halves legible.
+    float frontDistance = min(abs(vUv.y - leftFront), abs(vUv.y - rightFront));
+    float birthFront = (1.0 - smoothstep(0.0, 0.035, frontDistance)) * (1.0 - step(1.0, uGrowT));
+    vec3 col = tileColor * (intensity + birthFront * 0.8);
     col = mix(col, vec3(1.0), clamp(sol, 0.0, 0.85)); // soliton core reads white-hot
 
     float edgeFade     = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
@@ -242,11 +276,23 @@ const bumperVertexShader = `
 // At the halfway point (vTripFrac ≈ 0.5) a bright glow marks the exact flip moment.
 const bumperFragmentShader = `
   uniform vec3  uColor;
+  uniform vec3  uColorA;
+  uniform vec3  uColorB;
+  uniform float uRideCore;
   uniform float uOpacity;
+  uniform float uRideMode;
+  uniform float uGrowT;
   varying float vHeightFrac;
   varying float vTripFrac;
+  ${rideColorShader}
 
   void main() {
+    if (vTripFrac > uGrowT * 0.5 && vTripFrac < 1.0 - uGrowT * 0.5) discard;
+    if (uRideMode > 0.5) {
+      gl_FragColor = vec4(rideColor(vTripFrac) * 0.7 + vec3(0.06), 1.0);
+      #include <colorspace_fragment>
+      return;
+    }
     float topFade = 1.0 - smoothstep(0.6, 1.0, vHeightFrac);
 
     // Möbius flip highlight: glows white near the halfway point (t=0.5),
@@ -395,14 +441,14 @@ function fillBumpers(
   }
 }
 
-function createRibbonGeos(segs) {
+function createRibbonGeos(segs, continuous = false) {
   const vertCount = (segs + 1) * 2;
 
   // Shared quad-strip index pattern (skip the gap at segs/2 hidden by mini-cube body)
   const mainIndices = [];
   const bumpIndices = [];
   for (let i = 0; i < segs; i++) {
-    if (i === segs / 2) continue;
+    if (!continuous && i === segs / 2) continue;
     const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
     mainIndices.push(a, b, c, b, d, c);
     bumpIndices.push(a, b, c, b, d, c);
@@ -448,10 +494,15 @@ function createRibbonGeos(segs) {
  */
 const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
-  gridId1, gridId2, tunnelBirths, tunnelPulses,
+  gridId1, gridId2, tunnelBirths, tunnelPulses, raisedPresentation = false, active1 = true, active2 = true,
 }) => {
   const flipCap          = useGameStore(selectEffectiveFlipCap);
+  const wormMode = useGameStore(s => s.wormHealerMode);
+  const ribbonMode = wormMode || raisedPresentation;
+  const groupRef = useRef();
+  const segments = wormMode ? 160 : RIBBON_SEGS;
   const meshRef          = useRef();
+  const formationAge = useRef(0);
   const pulseT           = useRef(Math.random() * Math.PI * 2);
   const portalPulseT     = useRef(Math.random() * Math.PI * 2);
   const dimRef           = useRef(WORM_IDLE_OPACITY);
@@ -463,7 +514,7 @@ const MobiusTunnel = ({
   const exitPortalMatRef    = useRef();
   const exitPortalGlowRef   = useRef();
 
-  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(RIBBON_SEGS), []);
+  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(segments, ribbonMode), [segments, ribbonMode]);
 
   // Whip uniforms are created once and spread BY REFERENCE into the ribbon and
   // both bumper materials, so all three read the same {value} objects and stay
@@ -474,11 +525,13 @@ const MobiusTunnel = ({
     uWhipPhase: { value: 0.0 },
   }), []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Keep uniform objects stable; endpoint changes update colors in place.
   const uniforms = useMemo(() => ({
     uColorA:      { value: new THREE.Color(color1) },
     uColorB:      { value: new THREE.Color(color2) },
     uOpacity:     { value: 0.92 },
+    uRideMode:    { value: 0 },
+    uRideCore:    { value: 0.5 },
     uTime:        { value: 0.0 },
     uScrollSpeed: { value: 1.0 },
     uGrowT:       { value: 1.0 },
@@ -488,28 +541,56 @@ const MobiusTunnel = ({
     uSolitonProgress: { value: -1.0 },
     uSolitonAmp:      { value: 0.0 },
     ...whipUniforms,
-  }), []);
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const bumperUniformsL = useMemo(() => ({
     uColor:   { value: new THREE.Color(color1) },
+    uColorA: uniforms.uColorA,
+    uColorB: uniforms.uColorB,
+    uRideCore: uniforms.uRideCore,
     uOpacity: { value: 0.93 },
+    uRideMode: uniforms.uRideMode,
+    uGrowT: uniforms.uGrowT,
     ...whipUniforms,
-  }), []);
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const bumperUniformsR = useMemo(() => ({
     uColor:   { value: new THREE.Color(color2) },
+    uColorA: uniforms.uColorA,
+    uColorB: uniforms.uColorB,
+    uRideCore: uniforms.uRideCore,
     uOpacity: { value: 0.93 },
+    uRideMode: uniforms.uRideMode,
+    uGrowT: uniforms.uGrowT,
     ...whipUniforms,
-  }), []);
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    const dead = flips >= flipCap;
+    const cA = dead ? '#555555' : color1;
+    const cB = dead ? '#444444' : color2;
+    uniforms.uColorA.value.set(cA);
+    uniforms.uColorB.value.set(cB);
+    bumperUniformsL.uColor.value.set(cA);
+    bumperUniformsR.uColor.value.set(cB);
+    if (exitPortalMatRef.current) exitPortalMatRef.current.color.set(cB);
+    if (exitPortalGlowRef.current) exitPortalGlowRef.current.material.color.set(cB);
+  }, [color1, color2, flips, flipCap, uniforms, bumperUniformsL, bumperUniformsR]);
+
+  useEffect(() => {
+    lastStartRef.current.set(Infinity, Infinity, Infinity);
     const g = geo, lg = leftGeo, rg = rightGeo;
     return () => { g.dispose(); lg.dispose(); rg.dispose(); };
   }, [geo, leftGeo, rightGeo]);
 
   useFrame((_state, delta) => {
+    const state = useGameStore.getState();
+    const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
+    // Keep every tail-occupied track; unrelated ribbons cannot cross the ride.
+    if (groupRef.current) groupRef.current.visible = !wormMode || !tunnelState.active || occupied;
+    uniforms.uRideMode.value = ribbonMode ? 1 : 0;
+    if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
+    if (wormMode && (state.wormPaused || !state.wormAlive || prefersReducedMotion())) delta = 0;
     const mesh1 = cubieRefs[meshIdx1];
     const mesh2 = cubieRefs[meshIdx2];
     if (!mesh1 || !mesh2 || !meshRef.current) return;
@@ -524,10 +605,13 @@ const MobiusTunnel = ({
     _faceNorm1.set(n1[0], n1[1], n1[2]).applyQuaternion(_wQuat1);
     _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat2);
 
+    const formationState = useGameStore.getState();
+    const mouthLift = formationState.wormHealerMode && !formationState.demoMode ? WORM_PAD_HEIGHT : 0;
+    const cubeLift = raisedPresentation ? Math.max(0, padMotion.get(tunnelId)?.lift ?? 0) : 0;
     // Ribbon anchors: just inside each sticker tile's own surface, so the ribbon
     // reaches the tile the player flipped rather than the far side of its cubie.
-    _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET);
-    _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
+    _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET + mouthLift + (active1 ? cubeLift : 0));
+    _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET + mouthLift + (active2 ? cubeLift : 0));
 
     // Ride each tile's own flip animation — vibration into the anchors, squash
     // into the width. The anchors change every frame during a flip, so the
@@ -585,14 +669,6 @@ const MobiusTunnel = ({
       // with it rather than letting the band slip out from behind the sticker.
       setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
 
-      const dead = flips >= flipCap;
-      const cA = dead ? '#555555' : color1;
-      const cB = dead ? '#444444' : color2;
-      uniforms.uColorA.value.set(cA);
-      uniforms.uColorB.value.set(cB);
-      bumperUniformsL.uColor.value.set(cA);
-      bumperUniformsR.uColor.value.set(cB);
-
       // Exit portal group: place between VoidCore face and exit cubie, facing inward.
       if (exitPortalGroupRef.current) {
         _portalPos.copy(_midB).addScaledVector(_faceNorm2, 0.15);
@@ -602,31 +678,33 @@ const MobiusTunnel = ({
           _portalPos.y - _faceNorm2.y,
           _portalPos.z - _faceNorm2.z
         );
-        if (exitPortalMatRef.current) exitPortalMatRef.current.color.set(cB);
-        if (exitPortalGlowRef.current)  exitPortalGlowRef.current.material.color.set(cB);
       }
 
-      fillRibbon(
-        geo.attributes.position.array,
-        geo.attributes.uv.array,
-        _tunnelPath,
-        _axis, _perpBase,
-        RIBBON_SEGS, RIBBON_WIDTH, _tileGuard, flipP1, flipP2
-      );
+      if (ribbonMode) {
+        fillTunnelRideGeometry(geo, leftGeo, rightGeo, _tunnelPath, segments);
+        uniforms.uRideCore.value = tunnelRideCoreArc(_tunnelPath) / (_tunnelPath.total || 1);
+      } else {
+        fillRibbon(
+          geo.attributes.position.array,
+          geo.attributes.uv.array,
+          _tunnelPath,
+          _axis, _perpBase,
+          RIBBON_SEGS, RIBBON_WIDTH, _tileGuard, flipP1, flipP2
+        );
+        fillBumpers(
+          leftGeo.attributes.position.array,
+          rightGeo.attributes.position.array,
+          leftGeo.attributes.aHeightFrac.array,
+          rightGeo.attributes.aHeightFrac.array,
+          leftGeo.attributes.aTripFrac.array,
+          rightGeo.attributes.aTripFrac.array,
+          _tunnelPath,
+          _axis, _perpBase,
+          RIBBON_SEGS, RIBBON_WIDTH, _tileGuard
+        );
+      }
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;
-
-      fillBumpers(
-        leftGeo.attributes.position.array,
-        rightGeo.attributes.position.array,
-        leftGeo.attributes.aHeightFrac.array,
-        rightGeo.attributes.aHeightFrac.array,
-        leftGeo.attributes.aTripFrac.array,
-        rightGeo.attributes.aTripFrac.array,
-        _tunnelPath,
-        _axis, _perpBase,
-        RIBBON_SEGS, RIBBON_WIDTH, _tileGuard
-      );
       leftGeo.attributes.position.needsUpdate    = true;
       leftGeo.attributes.aHeightFrac.needsUpdate  = true;
       leftGeo.attributes.aTripFrac.needsUpdate    = true;
@@ -675,7 +753,20 @@ const MobiusTunnel = ({
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
     let whipAmp = 0;
     let whipPhase = 0;
-    if (birth) {
+    if (formationState.wormHealerMode && !formationState.demoMode) {
+      const reduced = formationState.settings?.reducedMotion || prefersReducedMotion();
+      if (reduced) formationAge.current = PLATFORM_FORMATION_SECONDS;
+      else if (!platformFormationHeld(formationState)) formationAge.current += Math.min(delta, .05);
+      const progress = Math.min(1, formationAge.current / PLATFORM_FORMATION_SECONDS);
+      const a = mesh1.userData.wormPlatformFormation;
+      const b = mesh2.userData.wormPlatformFormation;
+      uniforms.uGrowT.value = reduced ? 1 : Math.min(progress,
+        a?.formationTarget === 1 ? a.formationProgress : 1,
+        b?.formationTarget === 1 ? b.formationProgress : 1);
+      // The portal appears with its emerging ribbon, not as a complete floating ring.
+      const portalScale = THREE.MathUtils.smoothstep(uniforms.uGrowT.value, 0, .22);
+      if (exitPortalGroupRef.current) exitPortalGroupRef.current.scale.multiplyScalar(portalScale);
+    } else if (birth) {
       const rawT = (performance.now() - birth.startMs) / birth.durationMs;
       uniforms.uGrowT.value = Math.min(1, Math.max(0, rawT));
       // A pair's first identification snaps hardest — this happens at most once
@@ -739,12 +830,12 @@ const MobiusTunnel = ({
       ? Math.sin(Math.PI * pad.cycle) * 0.6 : 0;
 
     // Shared by reference with both bumper materials — write once.
-    whipUniforms.uWhipAmp.value = whipAmp;
+    whipUniforms.uWhipAmp.value = ribbonMode ? 0 : whipAmp;
     whipUniforms.uWhipPhase.value = whipPhase;
   });
 
   return (
-    <>
+    <group ref={groupRef}>
       {/* Main ribbon — racing stripes scroll toward the mini-cube, speed ramps at midpoint.
           frustumCulled is off on all three meshes here: vertex positions are written in world
           space into meshes parented at the origin, so the lazily-computed bounding sphere goes
@@ -755,38 +846,43 @@ const MobiusTunnel = ({
           vertexShader={vertexShader}
           fragmentShader={fragmentShader}
           side={THREE.DoubleSide}
-          transparent
-          depthWrite={false}
+          transparent={!ribbonMode}
+          depthWrite={ribbonMode}
+          toneMapped={!ribbonMode}
           extensions={{ derivatives: true }}
         />
       </mesh>
 
-      {/* Left guard rail — colorA; rotates to inverted at tile 2 via Möbius twist */}
+      {/* Both WORM rails follow the strip's endpoint colors through the core. */}
       <mesh geometry={leftGeo} frustumCulled={false}>
         <shaderMaterial
           uniforms={bumperUniformsL}
           vertexShader={bumperVertexShader}
           fragmentShader={bumperFragmentShader}
+          extensions={{ derivatives: true }}
           side={THREE.DoubleSide}
-          transparent
-          depthWrite={false}
+          transparent={!ribbonMode}
+          depthWrite={ribbonMode}
+          toneMapped={!ribbonMode}
         />
       </mesh>
 
-      {/* Right guard rail — colorB; rotates to inverted at tile 2 via Möbius twist */}
+      {/* Right guard rail */}
       <mesh geometry={rightGeo} frustumCulled={false}>
         <shaderMaterial
           uniforms={bumperUniformsR}
           vertexShader={bumperVertexShader}
           fragmentShader={bumperFragmentShader}
+          extensions={{ derivatives: true }}
           side={THREE.DoubleSide}
-          transparent
-          depthWrite={false}
+          transparent={!ribbonMode}
+          depthWrite={ribbonMode}
+          toneMapped={!ribbonMode}
         />
       </mesh>
 
       {/* Exit portal group — positioned/oriented as one unit in useFrame */}
-      <group ref={exitPortalGroupRef}>
+      <group ref={exitPortalGroupRef} visible={!ribbonMode}>
         {/* Additive glow bloom behind the portal face — larger than the portal itself */}
         <mesh ref={exitPortalGlowRef} position={[0, 0, -0.01]}>
           <planeGeometry args={[0.90, 0.90]} />
@@ -819,7 +915,7 @@ const MobiusTunnel = ({
             The portal glow + face already read the tunnel mouth without the noise. */}
       </group>
 
-    </>
+    </group>
   );
 };
 

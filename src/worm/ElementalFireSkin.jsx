@@ -1,535 +1,489 @@
 // src/worm/ElementalFireSkin.jsx
 //
-// The FIRE element's cube skin: the cube is actually on fire, using the exact
-// flame the bombs use.
+// The FIRE element's cube skin: the cube is a banked furnace.
 //
-// It replaces a shader "lava" surface that drew molten runoff across each sticker.
-// On a flat, brightly-patterned tile that read as orange squiggles — you could not
-// tell it was meant to be lava at all. Fire is legible for the same reason the
-// bomb detonations are: teardrop flame sprites, white-hot at the base, flickering
-// and licking off the surface.
+// Three layers, one InstancedMesh (one draw per layer for the whole cube):
+//
+//   bed      The grout between stickers becomes a crust of lava cracks — dark,
+//            molten along the seams, white-hot where four stickers meet — and the
+//            sticker borders scorch. Sticker centres are left alone, so colours,
+//            marks and hazards read straight through. This is what the fire looks
+//            like head-on, where standing flames have no silhouette to show.
+//   tongues  Cel-banded flames rooted IN the seams: a crimson ink edge, red and
+//            orange bodies, a yellow band and a pale core, each outline eroded by
+//            rising turbulence so the tips split and lick. Crown flames on the cube
+//            edges run taller and lean out over the silhouette, so the burning cube
+//            has an outline from any angle.
+//   light    Additive halos around the flames and embers that streak off the
+//            seams — the glow that bleeds into the space around the cube.
+//
+// ── What changed, and why ────────────────────────────────────────────────────
+// The previous skin scattered teardrop SPRITES across every sticker and blended
+// them additively. Additive fire over a white or yellow sticker saturates to white,
+// and a teardrop seen down its own axis is a round blob, so from the overview
+// camera the cube read as confetti — "blobs of orange and red". The tongues are now
+// procedural shapes cut out with alpha-to-coverage and written to depth: opaque
+// colour bands read the same over any sticker colour, overlapping flames occlude
+// each other correctly, and a flame seen end-on fades out while the bed carries
+// that view instead.
 //
 // ── Which way is up ──────────────────────────────────────────────────────────
-// Off the face normal, not off the screen. The tongues used to be full camera
-// billboards — quad extruded along the view's own up axis — so every face's fire
-// climbed up-screen no matter which way that face pointed, and the whole cube read
-// as one flat decal of identical flames. Each face now burns OUTWARD along its own
-// normal: +Y burns up, -Y burns down, ±X burn sideways, ±Z burn at the viewer and
-// away. The tongues keep facing the camera by spinning about that normal (an
-// axis-locked billboard), so they stay broadside without ever leaving their axis.
-// The ember bed lies flat in the tile plane, because a crust is part of the surface
-// rather than something standing off it.
+// Off the face normal. The chase camera's horizon is the worm's face, so for the
+// player the face normal IS up; each face burns outward along its own axis. The
+// tongues stay broadside by spinning about that axis (an axis-locked billboard).
 //
-// ── Why this is one mesh and not 900 sprites ─────────────────────────────────
-// The first version mounted this component once per cover cell, and each copy owned
-// FLAMES_PER_CELL <sprite> objects, an ember sprite, and its own useFrame callback.
-// On a full board that is ~150 React subtrees, ~900 sprites — every one of them a
-// separate draw call — and 150 per-frame callbacks doing the flicker arithmetic on
-// the CPU. Fire was several times the cost of every other element and it showed on
-// anything but a desktop GPU.
-//
-// It is now a single InstancedMesh. The geometry holds one quad per flame plus the
-// ember bed and a couple of ember sparks (so a whole cell is a few dozen vertices),
-// the instance matrix carries the cell's live transform, and a per-instance seed
-// drives the same jitter the CPU used to compute. Billboarding, flicker, sway,
-// curl, lift and the spark cycle all happen in the vertex shader, so the burning
-// cube costs ONE draw call and zero per-frame CPU work beyond the transform loop
-// the skin already runs for every element.
-//
-// The jitter hash is reproduced from elementalSeeds.hashSeed verbatim, so a given
-// cell burns the same way it did when the numbers were computed in JS.
+// ── Cost ─────────────────────────────────────────────────────────────────────
+// One geometry per quality tier holds a cell's bed, tongues, halos and embers;
+// every position, flicker and life cycle is rebuilt in the vertex shader from the
+// instance's seed, so the burning cube costs three draw calls and no per-frame CPU
+// work beyond the transform loop every skin already shares.
 
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { FLAME_TEX } from './healerWorm/HealerBombs.jsx';
-import { getSoftGlowTexture } from './healerWorm/elementalBadge.jsx';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { sparksForBudget } from './healerWorm/elementalQuality.js';
+import { attachCellAttributes } from './healerWorm/elementalCells.js';
+import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, GLSL_SEAM, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
+import { GLSL_WORM, uWormHead, uWormBody } from './healerWorm/elementalUniforms.js';
 
-// Flame footprint inside a 1×1 cell. Several small tongues per cell read as a
-// burning surface; two big ones read as a candle sitting on the sticker.
-// Wider tongues so each one covers more of its cell — a big cover cell on a mega
-// board was left mostly bare between a few narrow licks.
-const FLAME_W = 0.4;
-// Tongue height in cell units. Density (flame count/width) carries the "on fire"
-// read now, so height is kept short: tongues lick the surface and stay mostly
-// under one cell, instead of throwing spikes a tile or more above the cube's top
-// edge. With the length spread and gentle silhouette boost this peaks near ~0.9
-// cells at the very hottest up-facing corner and sits ~0.45 across the rest.
-const FLAME_H = 0.46;
-// The quad grows away from its anchor rather than being centred on it, and the
-// anchor sits just below the surface, so the base of every tongue is buried in the
-// tile instead of floating a hair above it.
-const FLAME_CENTER_Y = 0.08;
-
-// Quad kinds. Kept as an attribute rather than three separate draws so the whole
-// cube — crust, tongues and sparks — stays one instanced mesh.
+// Quad kinds, in index-buffer order: the three layers are three geometry groups.
 const KIND_BED = 0;
 const KIND_TONGUE = 1;
-const KIND_SPARK = 2;
+const KIND_GLOW = 2;
+const KIND_SPARK = 3;
 
 // Per-vertex corner offsets for one quad, and the two triangles over them.
 const QUAD_CORNERS = [[0, 0], [1, 0], [1, 1], [0, 1]];
 const QUAD_INDICES = [0, 1, 2, 0, 2, 3];
 
 /**
- * Geometry for ONE cell: a wide ember bed, `flamesPerCell` tongue quads, and
- * `sparksPerCell` ember sparks.
+ * One cell's worth of fire: a bed, `tongues` flames, `glows` halos and `sparks`
+ * embers. Grouped by layer so a material array can draw each with its own blend.
  *
- * `position` carries the corner in local cell space purely so the bounding box is
- * sane; the shader rebuilds every vertex from `uv`, `aKind` and `aIndex` anyway.
+ * `position` carries the quad's corner purely so the bounds are sane; the shader
+ * rebuilds every vertex from `uv`, `aKind` and `aIndex`.
  */
-function buildFlameCellGeometry(flamesPerCell, sparksPerCell) {
-  const quads = 1 + flamesPerCell + sparksPerCell;
-  const verts = quads * 4;
-  const position = new Float32Array(verts * 3);
-  const uv = new Float32Array(verts * 2);
-  const aKind = new Float32Array(verts);
-  const aIndex = new Float32Array(verts);
+function buildFireCellGeometry(tongues, glows, sparks) {
+  const layout = [
+    [KIND_BED, 1],
+    [KIND_TONGUE, tongues],
+    [KIND_GLOW, glows],
+    [KIND_SPARK, sparks]
+  ];
+  const quads = layout.reduce((n, [, c]) => n + c, 0);
+  const position = new Float32Array(quads * 12);
+  const uv = new Float32Array(quads * 8);
+  const aKind = new Float32Array(quads * 4);
+  const aIndex = new Float32Array(quads * 4);
   const index = new Uint16Array(quads * 6);
-
-  for (let q = 0; q < quads; q++) {
-    // Quad 0 is the ember bed, then the tongues, then the sparks.
-    let kind = KIND_BED;
-    let slot = 0;
-    if (q > 0 && q <= flamesPerCell) {
-      kind = KIND_TONGUE;
-      slot = q - 1;
-    } else if (q > flamesPerCell) {
-      kind = KIND_SPARK;
-      slot = q - flamesPerCell - 1;
+  let q = 0;
+  for (const [kind, n] of layout) {
+    for (let slot = 0; slot < n; slot++, q++) {
+      for (let c = 0; c < 4; c++) {
+        const v = q * 4 + c;
+        const [cx, cy] = QUAD_CORNERS[c];
+        position[v * 3] = cx - 0.5;
+        position[v * 3 + 1] = cy - 0.5;
+        position[v * 3 + 2] = 0;
+        uv[v * 2] = cx;
+        uv[v * 2 + 1] = cy;
+        aKind[v] = kind;
+        aIndex[v] = slot;
+      }
+      for (let t = 0; t < 6; t++) index[q * 6 + t] = q * 4 + QUAD_INDICES[t];
     }
-    for (let c = 0; c < 4; c++) {
-      const v = q * 4 + c;
-      const [cx, cy] = QUAD_CORNERS[c];
-      position[v * 3] = cx - 0.5;
-      position[v * 3 + 1] = cy - 0.5;
-      position[v * 3 + 2] = 0.12;
-      uv[v * 2] = cx;
-      uv[v * 2 + 1] = cy;
-      aKind[v] = kind;
-      aIndex[v] = slot;
-    }
-    for (let t = 0; t < 6; t++) index[q * 6 + t] = q * 4 + QUAD_INDICES[t];
   }
-
-  const geo = new THREE.InstancedBufferGeometry();
+  const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setAttribute('aKind', new THREE.BufferAttribute(aKind, 1));
   geo.setAttribute('aIndex', new THREE.BufferAttribute(aIndex, 1));
   geo.setIndex(new THREE.BufferAttribute(index, 1));
+  // Layer 0: bed. Layer 1: tongues. Layer 2: halos and embers (both additive).
+  geo.addGroup(0, 6, 0);
+  geo.addGroup(6, tongues * 6, 1);
+  geo.addGroup(6 + tongues * 6, (glows + sparks) * 6, 2);
   return geo;
 }
 
-const vertexShader = /* glsl */`
+const vertexShader = /* glsl */ `
   uniform float uTime;
-  // 0 freezes every animated term (reduced motion) — the fire still burns, it just
-  // holds one frame of it.
-  uniform float uAnim;
-  // (intensity, claim, release, unused) — the shared elemental envelope.
+  // (intensity, claim, release, animate) — the shared elemental envelope.
   uniform vec4 uEnv;
-  attribute float aKind;    // per-vertex: 0 ember bed, 1 tongue, 2 spark
-  attribute float aIndex;   // per-vertex: which tongue/spark within the cell
-  attribute float aSeed;    // per-instance: the cover cell's stable identity
-  attribute vec4 aCell;     // per-instance: (rim, edge, corner, seed) on the cube
-  attribute float aSweep;   // per-instance: share of the claim sweep before arrival
-  varying vec2 vUv;
-  varying float vKind;
-  varying float vHeat;      // 0..1 how hot this quad is burning right now
-  varying float vSeed;      // per-quad, for de-correlating the fragment turbulence
-  varying float vAlpha;     // claim/expiry gate, and the spark's own life curve
+  attribute float aKind;
+  attribute float aIndex;
+  ${GLSL_CELL_ATTRIBUTES}
 
-  // elementalSeeds.hashSeed / hashSeed2, verbatim.
-  float h1(float s, float i) { return fract(sin((s + 1.0) * 12.9898 + i * 78.233) * 43758.5453); }
-  float h2(float s, float i) { return fract(sin((s + 1.0) * 39.3468 + i * 11.135) * 24634.6345); }
+  varying vec2 vUv;
+  varying vec2 vLocal;     // bed: cell-local position, world units
+  varying vec3 vWorld;
+  varying float vHeat;     // how hot this quad burns right now, 0..1+
+  varying float vSeed;
+  varying float vAlpha;    // arrival / expiry / facing gate
+  varying float vLife;     // embers: 0 at birth → 1 at death
+
+  ${GLSL_NOISE}
+  ${GLSL_WORM}
+
+  ${GLSL_SEAM}
 
   void main() {
     vUv = uv;
-    vKind = aKind;
-    vSeed = aSeed * 0.37 + aIndex * 3.17;
+    vLife = 0.0;
+    ${GLSL_CELL_FRAME}
 
-    float T = uTime * uAnim;
+    float T = uTime * uEnv.w;
+    // The claim sweep: each cell catches only when the sweep reaches it, flares as
+    // it ignites, then settles. The release tail stops embers first. The start is
+    // compressed so the far faces finish igniting before the sweep does — offset by
+    // the raw share, the last cells were still at a third of their height when the
+    // sweep ended, and stayed there for the whole wash.
+    float ignStart = sweepStart(0.28);
+    float arrive = smoothstep(ignStart, ignStart + 0.28, uEnv.y);
+    float ignite = clamp(arrive * (1.0 - arrive) * 4.0, 0.0, 1.0);
+    float burn = arrive * (1.0 - smoothstep(0.05, 0.9, uEnv.z));
+    float tail = 1.0 - smoothstep(0.0, 0.4, uEnv.z);
 
-    #ifdef USE_INSTANCING
-      mat4 cellMatrix = modelMatrix * instanceMatrix;
-    #else
-      mat4 cellMatrix = modelMatrix;
-    #endif
-
-    // The cell's own frame: +Z is the face normal (the direction this patch of cube
-    // faces), X and Y span the tile. Every offset below is expressed in this frame,
-    // which is what makes each face burn along its own outward axis.
-    vec3 cellWorld = cellMatrix[3].xyz;
-    vec3 nrm  = normalize((cellMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
-    vec3 tanX = normalize((cellMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz);
-    vec3 tanY = normalize((cellMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
-    // A sprite takes its on-screen size from world scale, so the cell's uniform
-    // scale (which carries the claim/expiry ramp) has to multiply every offset.
-    float cellScale = length(cellMatrix[0].xyz);
-
-    // ── Gust bands ───────────────────────────────────────────────────────────
-    // A slow plane wave through world space, so neighbouring cells rise and fall
-    // TOGETHER and the fire moves across the cube in bands. Every cell flickering
-    // on its own timer is what made the first version read as a grid of identical
-    // campfires rather than as one burning object.
-    float gust = 0.5 + 0.5 * sin(dot(cellWorld, vec3(0.62, 0.31, 0.47)) * 1.15 - T * 1.35);
-
-    // Fire shows most where the surface ends. Tongues run taller on the cells that
-    // sit on a cube edge, taller again at the corners, and taller still on faces
-    // pointing skyward — which gives the burning cube a silhouette instead of an
-    // even fur of flame. Real fire also climbs, so an up-facing normal throws
-    // furthest even though every face still burns along its own axis.
-    float upFacing = max(0.0, dot(nrm, vec3(0.0, 1.0, 0.0)));
-    // Silhouette boost, kept small: edges and corners burn only a touch taller so
-    // the cube keeps a flame outline without the top/up-facing row spiking above
-    // everything else — those tall spikes over the top edge were this term. (Was
-    // 0.32/0.24/0.30, then 0.18/0.14/0.18.)
-    float tall = 1.0 + 0.10 * aCell.y + 0.08 * aCell.z + 0.10 * upFacing;
-
-    // The claim sweep: each cell catches only when the sweep reaches it. The tail
-    // (uEnv.z) stops the accents first, before the skin itself dissolves.
-    float arrive = smoothstep(aSweep, aSweep + 0.30, uEnv.y);
-    float tail = 1.0 - smoothstep(0.0, 0.45, uEnv.z);
+    // Gust bands: a slow plane wave through world space, so neighbouring flames
+    // rise and fall TOGETHER and the fire moves across the cube in bands.
+    float gust = 0.5 + 0.5 * sin(dot(cellOrigin, vec3(0.62, 0.31, 0.47)) * 1.3 - T * 1.45);
+    float upFacing = max(0.0, cellN.y);
+    // Buoyancy, in VIEW space. Fire rises toward the top of the screen: in the chase
+    // view the camera's up IS the worm's face normal, so the face underfoot burns
+    // straight up and the faces past the horizon rise like a wall; from the overview
+    // the side faces burn upward like a real burning box instead of bristling
+    // sideways. Added to the normal (never replacing it), so a face whose normal
+    // points down-screen keeps its flames outside the cube.
+    vec3 camUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
 
     vec3 world;
+    vHeat = 1.0;
+    vSeed = 0.0;
+    vAlpha = 1.0;
 
     if (aKind < 0.5) {
-      // ── Ember bed: flat on the tile ────────────────────────────────────────
-      // Laid out in the tile plane rather than billboarded, so the crust belongs to
-      // the surface. Without it each cell reads as a few discrete flames sitting ON
-      // a tile; with it the tile itself looks like it is burning.
-      float pulse = 0.88 + 0.12 * sin(T * 2.6 + aSeed * 1.7);
-      vec2 size = vec2(0.99, 0.99) * pulse * arrive;
-      vec2 off = (uv - 0.5) * size * cellScale;
-      vec3 anchor = (cellMatrix * vec4(0.0, 0.0, 0.03, 1.0)).xyz;
-      world = anchor + tanX * off.x + tanY * off.y;
-      vHeat = 0.35 + 0.40 * gust;
-      // A face turned toward the camera loses its tongues (see below) and has only
-      // the crust left to carry it, so the crust burns hotter exactly there. Across
-      // the whole cube the two hand off: silhouette faces throw flame, the face you
-      // are looking straight at glows.
-      float head = abs(dot(nrm, normalize(cameraPosition - cellWorld)));
-      vAlpha = arrive * (0.70 + 0.75 * head * head);
+      // ── Bed: flat in the tile plane, covering exactly this cell ────────────
+      vec2 l = cellLocal(uv);
+      vLocal = l;
+      world = cellOrigin + cellX * l.x + cellY * l.y + cellN * 0.012;
+      vHeat = 0.55 + 0.45 * gust + 0.5 * ignite;
+      vAlpha = arrive * (1.0 - smoothstep(0.35, 1.0, uEnv.z));
 
     } else if (aKind < 1.5) {
-      // ── Tongues: axis-locked billboards climbing the face normal ───────────
-      float r1 = h1(aSeed, aIndex);
-      float r2 = h2(aSeed, aIndex);
-      float r3 = h1(aSeed * 1.7 + 3.0, aIndex * 2.3 + 1.0);
-      float phase = (r1 + r2) * 6.2831853;
-      float rate = 2.8 + r2 * 3.0;
-      // Length spread: a few taller leaders over a bed of short stubs layers the
-      // fire. Spread tightened so the tallest leaders stay close to the pack rather
-      // than shooting off the top edge as lone spikes.
-      float scl = 0.44 + r2 * 0.48;
-      // Two beats, not one: a fast lick over a slower breath, so no two tongues
-      // ever quite repeat and none of them pulses like a metronome.
-      float flick = 0.70 + 0.42 * sin(T * rate + phase) + 0.18 * sin(T * rate * 1.93 + phase * 1.7);
-      // The gust rides ON the per-tongue flicker rather than replacing it: the
-      // tongue keeps its own life, the band decides how far it gets to throw.
-      float band = (0.70 + 0.52 * gust) * tall * arrive * (1.0 - smoothstep(0.0, 0.75, uEnv.z));
-      vHeat = clamp(0.28 + 0.22 * sin(arrive * 3.141593) + 0.55 * gust + 0.32 * (aCell.y * 0.5 + upFacing * 0.5), 0.0, 1.0);
+      // ── Tongues: axis-locked billboards rooted in the seams ────────────────
+      vec2 id = slotId(0.0);
+      float r1 = hash12(id);
+      float r2 = hash12(id + 17.3);
+      float r3 = hash12(id + 41.9);
+      float r4 = hash12(id + 63.1);
+      float r5 = hash12(id + 88.7);
+      vec4 sp = seamPoint(r1, r2, r3, (r5 - 0.5) * 0.06);
+      float crown = sp.z;
+      vec3 outward = (step(0.5, r1) < 0.5 ? cellX : cellY) * sp.w;
+      vec3 anchor = cellOrigin + cellX * sp.x + cellY * sp.y - cellN * 0.02;
 
-      vec2 size = vec2(${FLAME_W} * scl * (0.85 + 0.25 * flick),
-                       ${FLAME_H} * scl * (0.78 + 0.48 * flick) * band);
+      // The worm parts the fire: flames beside its body lie down and lean away, so
+      // the crawler — and whatever it is about to hit — stays in plain sight.
+      float wd = wormDist(anchor);
+      float clear = smoothstep(0.16, 0.62, wd);
 
-      // Root the tongue somewhere inside the tile, in the tile's own plane.
-      vec3 anchor = (cellMatrix * vec4(cos(phase) * (0.24 + 0.16 * r1), sin(phase) * (0.24 + 0.16 * r1), 0.02, 1.0)).xyz;
+      float flick = 0.84 + 0.16 * sin(T * (6.5 + 5.0 * r1) + r2 * 6.2832);
+      // Hot spots drifting along the seams: flames bunch into ridges with quieter
+      // stretches between, instead of standing evenly spaced like bristles.
+      float hot = vnoise3(anchor * 1.9 + vec3(0.0, T * 0.35, -T * 0.2));
+      float height = (0.21 + 0.14 * r4) * (0.6 + 0.6 * hot) * (0.82 + 0.36 * gust) * flick
+                   * (1.0 + 0.55 * crown) * (1.0 + 0.2 * upFacing)
+                   * (1.0 + 0.6 * ignite) * mix(0.2, 1.0, clear) * burn;
+      float width = (0.19 + 0.09 * r5) * (0.85 + 0.3 * hot) * (1.0 + 0.2 * crown) * (0.9 + 0.2 * flick);
 
-      // Splay: each tongue leaves along its own axis, tilted a little off the face
-      // normal. Still outward — the axis never falls below the surface — but the
-      // fan stops looking like a starburst of parallel petals.
-      vec3 axis = normalize(nrm + (tanX * (r1 - 0.5) + tanY * (r3 - 0.5)) * 0.42);
-
-      // Spin the quad about that axis to face the camera. Broadside from any angle,
-      // but never tipped off the axis — which is the whole difference between fire
-      // that climbs off the face and fire that climbs off the screen.
+      // Each tongue leaves along its own axis, a little off the normal; crowns
+      // lean out over the edge they stand on, and flames by the worm lean off it.
+      vec3 away = wormAway(anchor);
+      away -= cellN * dot(away, cellN);
+      vec3 axis = normalize(cellN + camUp * 0.7 + outward * crown * 0.35 + (cellX * (r4 - 0.5) + cellY * (r5 - 0.5)) * 0.3
+                            + away * (1.0 - clear) * 0.9);
       vec3 toCam = normalize(cameraPosition - anchor);
       vec3 side = cross(axis, toCam);
       float sideLen = length(side);
-      side = sideLen > 1e-4 ? side / sideLen : tanX;
-      // sideLen is the sine of the angle between the flame axis and the view. Near
-      // zero the camera is looking straight down the axis, where an axis-locked
-      // quad degenerates into a blob pointed at the lens — so the tongue fades out
-      // before it can get there rather than smearing across the tile.
-      float facing = smoothstep(0.16, 0.52, sideLen);
+      side = sideLen > 1e-4 ? side / sideLen : cellX;
+      // sideLen is the sine of the angle between the flame axis and the view. Down
+      // the axis the flame has no silhouette, so it fades before it can collapse
+      // into a blob; the bed carries that view.
+      float facing = smoothstep(0.28, 0.62, sideLen);
 
-      vec2 off = (uv - vec2(0.5, ${FLAME_CENTER_Y})) * size * cellScale;
-      // Taper: full width at the root, pinched toward the tip, so the silhouette is
-      // a flame rather than a rectangle wearing a flame texture. Gentle, and eased —
-      // a hard linear pinch turned every tongue into a dart.
-      off.x *= 1.0 - 0.34 * smoothstep(0.15, 1.0, uv.y);
-      // Curl: the tip leans and drifts while the root stays planted.
-      float lean = (sin(T * rate * 0.45 + phase) * 0.55 + (r1 - 0.5) * 0.7) * 0.34;
-      float curl = lean * uv.y * uv.y * scl * cellScale;
+      // The tip leans and drifts while the root stays planted.
+      float lean = (sin(T * 2.3 + r1 * 6.2832) * 0.6 + (r2 - 0.5) * 0.8) * 0.28 * height;
+      vec2 off = vec2((uv.x - 0.5) * width, uv.y * height);
+      world = anchor + side * (off.x + lean * uv.y * uv.y) + axis * off.y;
 
-      world = anchor + side * (off.x + curl) + axis * off.y;
-      vAlpha = arrive * facing;
+      vSeed = r1 * 17.0 + r2 * 5.0;
+      vHeat = clamp(0.8 + 0.22 * gust + 0.2 * crown + 0.3 * ignite, 0.0, 1.35);
+      vAlpha = facing * step(0.004, height);
+
+    } else if (aKind < 2.5) {
+      // ── Halos: soft light around the flames, strongest on the crowns ───────
+      vec2 id = slotId(5.0);
+      float r1 = hash12(id);
+      float r2 = hash12(id + 23.1);
+      float r3 = hash12(id + 51.7);
+      // The first halo prefers a cube edge when the cell has one.
+      float hasEdge = max(max(aEdge.x, aEdge.y), max(aEdge.z, aEdge.w));
+      vec4 sp = seamPoint(r1, r2, r3, 0.0);
+      vec3 anchor = cellOrigin + cellX * sp.x + cellY * sp.y + cellN * (0.16 + 0.1 * sp.z);
+      vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+      vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+      float size = (0.46 + 0.3 * sp.z + 0.1 * hasEdge) * (0.85 + 0.3 * gust);
+      vec2 off = (uv - 0.5) * size;
+      world = anchor + right * off.x + up * off.y;
+      vHeat = 0.6 + 0.4 * gust;
+      vAlpha = burn * (0.25 + 0.75 * sp.z);
 
     } else {
-      // ── Sparks: embers thrown off the face, along the face's own normal ────
-      float r1 = h1(aSeed + 7.0, aIndex);
-      float r2 = h2(aSeed + 7.0, aIndex);
-      float life = 1.15 + r2 * 0.95;
-      float age = fract((T + r1 * 7.0) / life);
-      float rise = age * (0.72 + r2 * 0.62) * tall;
-      float sz = (0.10 + r1 * 0.07) * (1.0 - 0.45 * age);
-
-      vec3 anchor = (cellMatrix * vec4((r1 - 0.5) * 0.7, (r2 - 0.5) * 0.7, 0.05, 1.0)).xyz;
-      // Wander as it climbs — an ember caught in the draught, not a tracer round.
-      vec3 drift = tanX * sin(T * 1.7 + r1 * 9.0) * 0.11 * age
-                 + tanY * cos(T * 1.4 + r2 * 9.0) * 0.11 * age;
-      vec3 base = anchor + (drift + nrm * rise) * cellScale;
-
-      // Sparks are round, so they take a full camera billboard.
-      vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-      vec3 up    = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-      vec2 off = (uv - 0.5) * sz * cellScale;
-      world = base + right * off.x + up * off.y;
-
+      // ── Embers: streaks thrown off the seams, curling as they climb ────────
+      vec2 id = slotId(9.0);
+      float r1 = hash12(id);
+      float r2 = hash12(id + 13.7);
+      float r3 = hash12(id + 29.3);
+      float life = 1.2 + r2 * 1.1;
+      float age = fract((T + r1 * 11.0) / life);
+      // A fresh launch point each cycle, so embers do not trace one fixed path.
+      float cycle = floor((T + r1 * 11.0) / life);
+      vec4 sp = seamPoint(hash12(id + cycle * 3.1), hash12(id + cycle * 7.7), r3, 0.0);
+      vec3 anchor = cellOrigin + cellX * sp.x + cellY * sp.y;
+      float rise = age * (0.55 + 0.5 * r2) * (1.0 + 0.6 * sp.z);
+      vec3 swirl = cellX * sin(T * 2.1 + r1 * 9.0) * 0.12 * age + cellY * cos(T * 1.7 + r2 * 9.0) * 0.12 * age;
+      vec3 climb = normalize(cellN + camUp * 0.9);
+      vec3 pos = anchor + cellN * 0.05 + climb * rise + swirl;
+      // Velocity-aligned streak: the ember's recent path, not a round dot.
+      vec3 vel = normalize(climb * (0.55 + 0.5 * r2) + cellX * cos(T * 2.1 + r1 * 9.0) * 0.25 + cellY * -sin(T * 1.7 + r2 * 9.0) * 0.2);
+      vec3 toCam = normalize(cameraPosition - pos);
+      vec3 across = cross(vel, toCam);
+      float al = length(across);
+      across = al > 1e-4 ? across / al : cellX;
+      float len = 0.07 + 0.05 * r3;
+      float thick = 0.022 * (1.0 - 0.5 * age);
+      world = pos + across * (uv.x - 0.5) * thick + vel * (uv.y - 0.5) * len;
+      vLife = age;
       vHeat = 1.0 - age;
-      // Fade in and out over the ember's own life so none of them pop.
-      vAlpha = arrive * tail * uAnim * sin(age * 3.14159265) * (0.55 + 0.45 * gust);
+      vAlpha = burn * tail * uEnv.w * sin(age * 3.14159265);
     }
 
+    vWorld = world;
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
 `;
 
-const fragmentShader = /* glsl */`
-  // No precision qualifier here on purpose: three's default prologue gives both
-  // stages the same one, and pinning the fragment to mediump made uTime's
-  // precision disagree between the two — which fails program validation outright.
-  uniform sampler2D uFlameTex;
-  uniform sampler2D uGlowTex;
-  uniform vec3 uFlameColor;
-  uniform vec3 uEmberColor;
-  uniform vec3 uCrustColor;
-  uniform vec3 uCoreColor;
-  uniform vec3 uMidColor;   // bright yellow cel band between orange body and core
+const fragmentShader = /* glsl */ `
   uniform float uTime;
-  uniform float uAnim;
+  uniform vec4 uEnv;
+  uniform vec3 uInk;      // crimson outline band
+  uniform vec3 uRed;
+  uniform vec3 uOrange;
+  uniform vec3 uYellow;
+  uniform vec3 uCore;
+  uniform vec3 uCrust;    // banked-over grout
+  uniform vec3 uEmber;    // cooling lava
+
   varying vec2 vUv;
-  varying float vKind;
+  varying vec2 vLocal;
+  varying vec3 vWorld;
   varying float vHeat;
   varying float vSeed;
   varying float vAlpha;
+  varying float vLife;
 
-  // Cheap value noise. The teardrop sprite alone gives every tongue the identical
-  // smooth outline; eroding it with a scrolling turbulence field is what turns a
-  // row of decals into fire with structure inside it.
-  float hashN(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-  float vnoise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    float a = hashN(i);
-    float b = hashN(i + vec2(1.0, 0.0));
-    float c = hashN(i + vec2(0.0, 1.0));
-    float d = hashN(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-  }
-  float turbulence(vec2 p) {
-    #ifdef FIRE_HQ
-      return vnoise(p) * 0.66 + vnoise(p * 2.3 + 11.0) * 0.34;
-    #else
-      return vnoise(p);
-    #endif
+  ${GLSL_NOISE}
+
+  // Lava ramp: crust → ember → orange → yellow → core as heat climbs.
+  vec3 lava(float h) {
+    vec3 c = mix(uCrust, uEmber, smoothstep(0.0, 0.3, h));
+    c = mix(c, uOrange, smoothstep(0.25, 0.6, h));
+    c = mix(c, uYellow, smoothstep(0.55, 0.85, h));
+    return mix(c, uCore, smoothstep(0.85, 1.05, h));
   }
 
   void main() {
-    float T = uTime * uAnim;
-
-    // Turbulence, scrolling down the quad so the pattern appears to rise through the
-    // flame. Coarser than a realistic fire on purpose: bigger, slower cells so the
-    // silhouette breaks into a few bold cartoon lobes rather than a fine photoreal
-    // boil. A wide slow field leans the whole tongue under a chunkier detail field.
-    float n = turbulence(vec2(vUv.x * 1.7 + vSeed, vUv.y * 2.7 - T * 1.85 + vSeed)) * 0.62
-            + turbulence(vec2(vUv.x * 0.9 - vSeed, vUv.y * 1.2 - T * 0.70)) * 0.38;
-
-    // The flame sprite is a hard-edged fill, so eroding its alpha does nothing —
-    // the alpha steps 0 → 1 within a pixel and every tongue keeps the same smooth
-    // teardrop outline. Displacing the LOOKUP is what makes the silhouette move:
-    // the edge wanders with the turbulence, more the higher up the tongue it is.
-    vec2 warp = vec2((n - 0.5) * 0.30 * smoothstep(0.05, 1.0, vUv.y), 0.0);
-
-    // Every fetch is unconditional: a fetch inside divergent flow has undefined
-    // derivatives, and three cheap fetches beat branching around them.
-    vec4 flameTex = texture2D(uFlameTex, vUv + warp);
-    vec4 flameFlat = texture2D(uFlameTex, vUv);
-    vec4 glowTex = texture2D(uGlowTex, vUv);
-
+    float T = uTime * uEnv.w;
     vec3 col;
     float a;
 
-    if (vKind < 0.5) {
-      // ── The ember bed: crust, not campfire ─────────────────────────────────
-      // Near-black red where the surface is banked over, opening to hot orange in
-      // the gaps between tiles and along a few noise fissures — so the cube reads
-      // as something burning from within rather than as a glow decal per sticker.
-      // Keeping the centre dark is also what leaves the tile's own colour and
-      // markings legible.
-      // Chebyshev distance to the cell border, broken up by the noise so the seam
-      // light is an uneven crack rather than a neat square outline drawn round every
-      // sticker. The ramp is wide and pushed outward, so the heat is concentrated in
-      // the last of the tile and falls off gently toward the middle.
-      float rim = max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0;
-      float gap = smoothstep(0.48, 1.02, rim + (n - 0.5) * 0.42);
-      float fissure = smoothstep(0.52, 0.90, n) * smoothstep(0.35, 0.85, rim);
-      col = mix(uCrustColor, uEmberColor, clamp(gap * (0.45 + 0.55 * vHeat) + fissure * 0.5 * vHeat, 0.0, 1.0));
-      col = mix(col, uCoreColor, fissure * gap * 0.30 * vHeat);
-      // Shaped by the gaps and the fissures, NOT by a radial glow sprite: the glow
-      // is brightest at the middle of the cell and zero at its border, which is the
-      // exact inverse of where a crust should be hot, and it cancelled the seam
-      // light entirely — the bed may as well not have been drawn.
-      a = (0.07 + 0.26 * gap + 0.24 * fissure * (0.4 + 0.6 * vHeat)) * vAlpha;
+  #if FIRE_LAYER == 0
+    // ── Bed: lava cracks in the grout, a burning front on the sticker borders ─
+    vec2 st = fract(vLocal + 0.5) - 0.5;
+    float d = 0.5 - max(abs(st.x), abs(st.y));       // 0 on a seam → 0.5 mid-sticker
+    // Molten flow crawling along the cracks, continuous across cells and faces.
+    // The bed spans the whole cube, so the low tier trades the two-octave noise for
+    // one octave: same crawl, less grain.
+  #ifdef FIRE_HQ
+    float flow = fbm3(vWorld * 2.4 + vec3(0.0, -T * 0.5, T * 0.28));
+  #else
+    float flow = vnoise3(vWorld * 2.4 + vec3(0.0, -T * 0.5, T * 0.28));
+  #endif
+    float grain = vnoise3(vWorld * 9.0 + vec3(T * 0.2, 0.0, 0.0));
+    // The crack is the grout plus a ragged bite out of each sticker's border, as if
+    // the edges had already burned away.
+    float bite = 0.018 + 0.03 * flow + 0.012 * grain;
+    float seam = 1.0 - smoothstep(${glf(SEAM_HALF)} + bite - 0.03, ${glf(SEAM_HALF)} + bite, d);
+    // Where four stickers meet the crust is thinnest and burns white.
+    float node = 1.0 - smoothstep(0.0, 0.2, length(0.5 - abs(st)));
+    float pulse = 0.8 + 0.3 * sin(T * 2.2 + flow * 7.0);
+    float core = 1.0 - smoothstep(0.0, ${glf(SEAM_HALF)} * 0.7, d);   // the vein's centre line
+    float heat = (seam * (0.35 + 0.55 * flow) + core * 0.35 + node * 0.5) * pulse * vHeat;
+    heat *= 1.0 - uEnv.z * 0.8;                       // cools as the wash ends
+    col = lava(heat);
 
-    } else if (vKind < 1.5) {
-      // ── The tongues: cel-shaded cartoon flame, layered in flat colour bands ──
-      // The silhouette (mask) and the colour (heat) are computed separately: the
-      // mask is a ragged flame outline, and inside it the colour steps through hard
-      // onion-layers — deep red rim, orange body, bright yellow, white-hot core —
-      // the way a hand-drawn flame is painted, instead of one smooth gradient.
-      float mask = flameTex.a;
-      // Ragged, lobed tip — the chunky noise makes it end in a couple of rounded
-      // cartoon fingers that detach and re-form rather than one smooth teardrop.
-      mask *= 1.0 - smoothstep(0.40, 1.0, vUv.y + (n - 0.5) * 0.85);
-      // Feather the sides so the taper never leaves a hard vertical cut.
-      mask *= smoothstep(0.0, 0.12, 1.0 - abs(vUv.x - 0.5) * 2.0);
+    // Char and its burning front: a sooty band inside every sticker border, edged
+    // with a thin glowing line where it meets the unburnt tile — paper catching.
+    // It stops well short of the centre so colours and marks stay clean.
+  #ifdef FIRE_HQ
+    float ragged = fbm3(vWorld * 7.5 + vec3(T * 0.05));
+  #else
+    float ragged = vnoise3(vWorld * 7.5 + vec3(T * 0.05));
+  #endif
+    float front = ${glf(SEAM_HALF)} + 0.045 + 0.05 * flow + 0.05 * ragged;
+    float charBand = (1.0 - seam) * (1.0 - smoothstep(front - 0.012, front, d));
+    float burnLine = (1.0 - seam) * smoothstep(front - 0.02, front - 0.006, d) * (1.0 - smoothstep(front - 0.004, front + 0.006, d));
+    col = mix(col, uCrust * (1.0 + 0.8 * grain), charBand);
+    col = mix(col, mix(uOrange, uYellow, flow), burnLine);
+    // Ember specks smouldering in the char.
+    float speck = step(0.93, grain) * charBand * (0.6 + 0.4 * sin(T * 5.0 + flow * 20.0));
+    col = mix(col, uYellow, speck);
+    // The fire's light spilling onto the unburnt tile beyond the front.
+    float spill = (1.0 - seam) * (1.0 - charBand) * (1.0 - smoothstep(front, front + 0.2, d)) * (0.5 + 0.5 * flow);
+    col = mix(col, uOrange, spill * 0.9);
+    a = seam * 0.95 + charBand * 0.78 + burnLine * 0.9 + spill * 0.2;
+    a *= vAlpha;
+    gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
 
-      // Heat field: hottest at the base and along the tongue's spine, cooling as it
-      // climbs and spreads. The chunky noise shoves the bands around so the layers
-      // wobble like real cartoon flame rather than sitting in neat stripes.
-      float spine = 1.0 - abs(vUv.x - 0.5) * 2.0;
-      float heat = (1.0 - vUv.y) * 0.82 + spine * 0.30 + (n - 0.5) * 0.70;
-      heat = clamp(heat * (0.72 + 0.5 * vHeat), 0.0, 1.0);
-
-      // Posterize into four flat cel bands with crisp edges (step, not mix).
-      float band = floor(heat * 4.0);
-      col = uEmberColor;                          // 0: red rim / outer tip
-      col = mix(col, uFlameColor, step(0.5, band)); // 1: orange body
-      col = mix(col, uMidColor,   step(1.5, band)); // 2: bright yellow
-      col = mix(col, uCoreColor,  step(2.5, band)); // 3: white-hot core
-
-      // Bright edge highlight — a cartoon flame's ink outline, done as a light rim
-      // because the blend is additive (it can brighten a silhouette, not darken it).
-      float edge = smoothstep(0.02, 0.16, mask) * (1.0 - smoothstep(0.16, 0.40, mask));
-      col += uMidColor * edge * 0.55;
-      // Narrow pale cores inside the warm cel bands keep neighbouring tongues
-      // distinct instead of merging into a flat yellow sheet.
-      float inner = pow(max(0.0, spine), 4.0) * (1.0 - smoothstep(0.18, 0.64, vUv.y));
-      col = mix(col, uCoreColor, inner * 0.55);
-      col *= 0.78 + 0.26 * vHeat;
-
-      // The blend is additive, so a cooling tip has to lose light, not gain black.
-      a = mask * (0.52 + 0.32 * vHeat) * (1.0 - 0.38 * smoothstep(0.58, 1.0, vUv.y)) * vAlpha;
-
-    } else {
-      // ── The sparks: gold at birth, cooling to ember red ────────────────────
-      col = mix(uEmberColor, uCoreColor, vHeat * vHeat);
-      a = glowTex.a * vAlpha * 0.9;
-    }
-
+  #elif FIRE_LAYER == 1
+    // ── Tongue: cel-banded flame cut out of rising turbulence ───────────────
+    vec2 p = vec2(vUv.x * 2.0 - 1.0, vUv.y);
+    // A sideways lick that grows toward the tip.
+    float lick = vnoise2(vec2(vUv.y * 2.6 - T * 3.2, vSeed));
+    p.x += (lick - 0.5) * 0.7 * p.y;
+    // Teardrop profile: a round bulb low down, swept up into a curling tip.
+    float prof = pow(clamp(1.0 - p.y, 0.0, 1.0), 0.55) * smoothstep(-0.12, 0.26, p.y) * 1.08;
+    float body = 1.0 - abs(p.x) / max(prof, 0.001);
+    // Turbulence rising through the flame erodes the outline: tips split, licks
+    // detach and re-form.
+    // Low frequency on purpose: a few big rounded lobes, not a fringe of jaggies.
+    vec2 np = vec2(vUv.x * 1.6 + vSeed, vUv.y * 1.9 - T * 2.4);
+  #ifdef FIRE_HQ
+    float n = vnoise2(np) * 0.78 + vnoise2(np * 2.3 + 7.1) * 0.22;
+  #else
+    float n = vnoise2(np);
+  #endif
+    float heat = (body * (1.05 - 0.35 * p.y) + (n - 0.5) * (0.25 + 0.95 * p.y) - p.y * 0.3) * vHeat;
+    if (heat < 0.07 || vAlpha < 0.01) discard;
+    // Four flat bands with crisp edges, plus the dark ink edge outside them.
+    col = uInk;
+    col = mix(col, uRed, step(0.15, heat));
+    col = mix(col, uOrange, step(0.3, heat));
+    col = mix(col, uYellow, step(0.5, heat));
+    col = mix(col, uCore, step(0.74, heat));
+    // Alpha-to-coverage turns the fade into a clean dither at the silhouette.
+    a = vAlpha * smoothstep(0.07, 0.11, heat);
     gl_FragColor = vec4(col, a);
+
+  #else
+    // ── Halos and embers: additive light ────────────────────────────────────
+    if (vLife > 0.0) {
+      // Ember streak: bright head, trailing tail, gold at birth cooling to red.
+      float across = 1.0 - abs(vUv.x - 0.5) * 2.0;
+      float along = smoothstep(0.0, 0.7, vUv.y) * (1.0 - smoothstep(0.85, 1.0, vUv.y));
+      col = mix(uEmber, mix(uYellow, uCore, 0.4), vHeat * vHeat);
+      a = across * across * along * vAlpha * 1.4;
+    } else {
+      vec2 q = vUv - 0.5;
+      float r2 = dot(q, q) * 4.0;
+      float fall = exp(-r2 * 3.4) - 0.035;
+      col = mix(uRed, uOrange, 0.55 + 0.3 * vHeat);
+      a = max(fall, 0.0) * 0.22 * vAlpha;
+    }
+    gl_FragColor = vec4(col * a, a);
+  #endif
+
+    #include <colorspace_fragment>
   }
 `;
 
-// Shared materials, one per detail level. Module-scoped and never disposed by a
-// mounting component — the transient geometry is per-mount, but these outlive it,
-// exactly like the surface elements' cached material.
-// Exported so the elemental warm-up can pre-compile both detail levels during the
-// frozen scramble phase rather than at the moment a FIRE orb is claimed.
+// Shared materials, one set per detail tier. Module-scoped and never disposed by a
+// mounting component — the geometry is per mount, these outlive it. The three
+// layers share their uniform objects, so the skin's one write per frame reaches all.
 const _fireMats = new Map();
-export function getFlameMaterial(highDetail) {
+export function getFireMaterials(highDetail) {
   const key = highDetail ? 'hq' : 'lq';
-  let mat = _fireMats.get(key);
-  if (!mat) {
-    mat = new THREE.ShaderMaterial({
-      defines: highDetail ? { FIRE_HQ: '' } : {},
-      uniforms: {
-        uTime: sharedUniforms.time, // ticked by CubeAssembly every frame
-        uAnim: { value: 1 },
-        uFlameTex: { value: FLAME_TEX },
-        uGlowTex: { value: getSoftGlowTexture() },
-        // Punchy, saturated cartoon palette: the cel bands read as distinct flat
-        // colours, so each one is pushed toward its purest hue.
-        uFlameColor: { value: new THREE.Color('#ff6a12') }, // orange body
-        uEmberColor: { value: new THREE.Color('#f23205') }, // deep red rim / tip
-        uMidColor: { value: new THREE.Color('#ffcf29') },   // bright yellow band
-        // Near-black red crust → orange body → bright yellow → white-hot core.
-        uCrustColor: { value: new THREE.Color('#2e0703') },
-        uCoreColor: { value: new THREE.Color('#fff3c8') },
-        uEnv: { value: new THREE.Vector4(1, 1, 0, 0) }
-      },
+  let mats = _fireMats.get(key);
+  if (mats) return mats;
+  const color = (hex) => ({ value: new THREE.Color(hex) });
+  const shared = {
+    uTime: sharedUniforms.time, // ticked by CubeAssembly every frame
+    uEnv: { value: new THREE.Vector4(1, 1, 0, 1) },
+    uWormHead,
+    uWormBody,
+    // Crimson ink → red → orange → yellow → pale gold: saturated, flat bands.
+    uInk: color('#8a1307'),
+    uRed: color('#d8260c'),
+    uOrange: color('#ff6d12'),
+    uYellow: color('#ffc12e'),
+    uCore: color('#fff3c4'),
+    uCrust: color('#1a0503'),
+    uEmber: color('#8c1605')
+  };
+  const make = (layer, extra) => {
+    const m = new THREE.ShaderMaterial({
+      defines: { FIRE_LAYER: layer, ...(highDetail ? { FIRE_HQ: '' } : {}) },
+      uniforms: shared,
       vertexShader,
       fragmentShader,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      toneMapped: false
+      toneMapped: false,
+      ...extra
     });
-    _fireMats.set(key, mat);
-  }
-  return mat;
+    m.userData.elementalInstanced = true;
+    return m;
+  };
+  mats = [
+    // Bed: alpha-blended so the scorch can darken, depth-tested so flames cover it.
+    make(0, { transparent: true, depthWrite: false }),
+    // Tongues: opaque cut-outs. Alpha-to-coverage smooths the silhouette under MSAA
+    // and they write depth, so overlapping flames sort themselves.
+    make(1, { transparent: false, alphaToCoverage: true, side: THREE.DoubleSide }),
+    // Halos and embers: pure light.
+    make(2, { transparent: true, depthWrite: false, blending: THREE.CustomBlending,
+      blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendEquation: THREE.AddEquation })
+  ];
+  _fireMats.set(key, mats);
+  return mats;
 }
 
 /**
  * The burning skin for every cover cell at once.
  *
- * The caller owns the instance matrices: ElementalCubeSkin's single frame loop
- * writes each cell's live transform straight into `instanceMatrix`, the same loop
- * that drives every other element. Nothing here runs per frame on the CPU.
+ * The caller owns the instance matrices and the shared uniforms: ElementalCubeSkin's
+ * single frame loop writes each cell's live transform straight into
+ * `instanceMatrix`, the same loop that drives every other element.
  *
- * @param {number}  count          number of cover cells
- * @param {number}  flamesPerCell  from the quality budget
- * @param {boolean} animate        false under reduced motion: the fire holds still
- * @param {boolean} highDetail     second turbulence octave (desktop tiers)
- * @param {object}  cellData       per-cell masks and sweep shares from the skin
- * @param {object}  meshRef        ref the skin writes instance matrices through
+ * @param {number} count     number of cover cells
+ * @param {object} cellData  per-cell masks, extents, edges and sweep shares
+ * @param {object} quality   the resolved elemental quality budget
+ * @param {object} meshRef   ref the skin writes instance matrices through
  */
-export default function ElementalFireSkin({
-  count,
-  flamesPerCell = 5,
-  animate = true,
-  highDetail = true,
-  cellData,
-  meshRef
-}) {
-  const sparksPerCell = sparksForBudget(flamesPerCell, animate);
+export default function ElementalFireSkin({ count, cellData, quality, meshRef }) {
+  const tongues = quality?.flamesPerCell ?? 6;
+  const animate = quality?.animate !== false;
+  const sparks = sparksForBudget(tongues, animate);
+  const glows = quality?.accents ? 2 : 1;
+  const highDetail = !!quality?.accents;
 
-  const geometry = useMemo(() => {
-    const geo = buildFlameCellGeometry(flamesPerCell, sparksPerCell);
-    // Per-instance seed: the cover cell's index, matching the seed the per-cell
-    // component was handed before, so a given cell burns the way it always has.
-    const seeds = new Float32Array(count);
-    for (let i = 0; i < count; i++) seeds[i] = i;
-    geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
-    geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(cellData.cell, 4));
-    // Dynamic: the sweep is rewritten once when a claim origin arrives, which can
-    // be a frame or two after the mesh mounts.
-    const sweep = new THREE.InstancedBufferAttribute(cellData.sweep, 1);
-    sweep.setUsage(THREE.DynamicDrawUsage);
-    geo.setAttribute('aSweep', sweep);
-    return geo;
-  }, [flamesPerCell, sparksPerCell, count, cellData]);
+  const geometry = useMemo(
+    () => attachCellAttributes(buildFireCellGeometry(tongues, glows, sparks), cellData),
+    [tongues, glows, sparks, cellData]
+  );
+  const materials = getFireMaterials(highDetail);
 
-  const material = getFlameMaterial(highDetail);
-
-  useEffect(() => {
-    material.uniforms.uAnim.value = animate ? 1 : 0;
-  }, [material, animate]);
-
-  // The geometry is built per mount (its vertex count depends on the quality tier),
-  // so it is ours to dispose. The material and both textures are shared and stay.
+  // The geometry is built per mount (its layout depends on the quality tier), so
+  // it is ours to dispose. The materials are shared and stay.
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, count]}
-      frustumCulled={false}
-      raycast={() => null}
-    />
-  );
+  return <instancedMesh ref={meshRef} args={[geometry, materials, count]} frustumCulled={false} raycast={() => null} />;
 }

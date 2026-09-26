@@ -1,0 +1,132 @@
+import React, { act } from 'react';
+import { createRoot, extend } from '@react-three/fiber';
+import * as THREE from 'three';
+import { expect, it, vi } from 'vitest';
+import { WormholeRings } from '../worm/healerWorm/WormholeRings.jsx';
+import { makeCubies } from '../game/cubeState.js';
+import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+import { getStickerWorldPos } from '../game/coordinates.js';
+import { buildCautionPerimeter } from '../worm/healerWorm/cautionPerimeter.js';
+import { WORM_CAUTION_TAPE_TOP } from '../game/raisedCubie.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { getWormTunnelSnapshot } from '../worm/tunnelSnapshot.js';
+import { raisedPlatformPosition } from '../worm/healerWorm/raisedPlatforms.js';
+import { liveCubies } from '../worm/liveCubies.js';
+import { wormExpansion } from '../worm/wormExpansion.js';
+import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
+import RaisedCautionPerimeter from '../worm/healerWorm/RaisedCautionPerimeter.jsx';
+
+vi.mock('../worm/healerWorm/TunnelSafetyMarkers.jsx', () => ({ default: () => null }));
+extend(THREE);
+
+it.each([3, 7, 15].flatMap(size => [{ size, corner: false }, { size, corner: true }]))('grounds the actual perimeter on size $size, corner=$corner', async ({ size, corner }) => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const before = useGameStore.getState(), liveBefore = { ...liveCubies }, expansionBefore = wormExpansion.amount;
+  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    fillRect() {}, fillText() {}, beginPath() {}, moveTo() {}, lineTo() {}, fill() {}
+  });
+  let cubies = makeCubies(size);
+  const mid = Math.floor(size / 2), edge = size - 1;
+  const flips = corner ? [[edge, edge, edge, 'PZ']] : [[edge, mid, mid, 'PX'], [mid, edge, mid, 'PY'], [mid, mid, edge, 'PZ']];
+  for (const [x, y, z, dir] of flips) {
+    cubies = flipStickerPair(cubies, size, x, y, z, dir, buildManifoldGridMap(cubies, size));
+  }
+  const refs = [], spring = { lift: 0 };
+  liveCubies.size = size; liveCubies.refs = refs;
+  wormExpansion.amount = 0;
+  useGameStore.setState({ cubies, size, rotationEpoch: 0, wormHealerMode: true, demoMode: false, chaosLevel: 0,
+    settings: { ...before.settings, reducedMotion: true, flipPads: 'off' } });
+  const positions = getWormTunnelSnapshot(cubies, size, 0).positions;
+  for (const p of positions) refs[(p.x * size + p.y) * size + p.z] = { userData: { wormPlatformFormation: spring } };
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas);
+  root.configure({ gl, frameloop: 'never', size: { width: 390, height: 844 } });
+  const uses = { current: new Map() }, voids = { current: new Set() };
+  try {
+    let store, time = 0;
+    await act(async () => { store = root.render(<WormholeRings cubies={cubies} size={size} tunnelUseCountsRef={uses} voidTunnelKeysRef={voids} />); });
+    const scene = store.getState().scene, matrix = new THREE.Matrix4();
+    const poles = scene.getObjectByName('worm-caution-poles'), tape = scene.getObjectByName('worm-caution-tape');
+    expect(positions).toHaveLength(corner ? 2 : 6);
+    let original;
+    for (const [lift, danger] of [[0, false], [0.5, false], [1, false], [1, true]]) {
+      spring.lift = lift;
+      if (danger) for (const p of positions) voids.current.add(p.tunnelKey);
+      time += 1 / 30; store.getState().advance(time);
+      expect(poles.count).toBe(corner ? 12 : 24);
+      expect(tape.geometry.attributes.position.count).toBe((corner ? 12 : 24) * 4);
+      const perimeter = buildCautionPerimeter(positions, cubies, size, 6);
+      perimeter.faces.forEach(face => {
+        const tile = { ...face, normal: FACE_NORMALS[face.dirKey] };
+        const floor = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, 0));
+        const landing = floor.clone().addScaledVector(tile.normal, WORM_CAUTION_TAPE_TOP);
+        if (!corner) expect(raisedPlatformPosition(tile, size, { getCubies: () => cubies }).distanceTo(landing)).toBeLessThan(1e-8);
+        for (const [index, vertex] of perimeter.posts.entries()) {
+          if (!vertex.normals.has(tile.dirKey)) continue;
+          poles.getMatrixAt(index, matrix);
+          const foot = new THREE.Vector3(0, -0.5, 0).applyMatrix4(matrix);
+          expect(foot.sub(floor).dot(tile.normal)).toBeCloseTo(0.01, 6);
+        }
+        for (const [index, edge] of perimeter.edges.entries()) {
+          if (edge.face.dirKey !== tile.dirKey) continue;
+          for (const corner of [0, 2]) {
+            const top = new THREE.Vector3().fromBufferAttribute(tape.geometry.attributes.position, index * 4 + corner);
+            expect(top.sub(landing).dot(tile.normal)).toBeCloseTo(0, 6);
+          }
+        }
+      });
+      const matrices = poles.instanceMatrix.array.slice(0, poles.count * 16);
+      if (!original) original = matrices;
+      else expect(matrices).toEqual(original); // Formation and danger never lift the posts.
+    }
+  } finally {
+    await act(async () => root.unmount());
+    useGameStore.setState(before, true); Object.assign(liveCubies, liveBefore); wormExpansion.amount = expansionBefore;
+    context.mockRestore(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});
+
+it('separates adjacent fences during Explode, keeps their tile widths, and rejoins them afterwards', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const before = useGameStore.getState(), expansionBefore = wormExpansion.amount;
+  const size = 5, cubies = makeCubies(size);
+  const positions = [{ x: 2, y: 2, z: 4, dirKey: 'PZ' }, { x: 3, y: 2, z: 4, dirKey: 'PZ' }];
+  wormExpansion.amount = 0;
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas); root.configure({ gl, frameloop: 'never', size: { width: 390, height: 844 } });
+  try {
+    let store, time = 0;
+    await act(async () => { store = root.render(<RaisedCautionPerimeter positions={positions} cubies={cubies} size={size} />); });
+    const scene = store.getState().scene;
+    const poles = scene.getObjectByName('worm-caution-poles'), tape = scene.getObjectByName('worm-caution-tape');
+    for (const expansion of [0, .1, .35, 0]) {
+      wormExpansion.amount = expansion;
+      time += 1 / 60; store.getState().advance(time);
+      expect(poles.count).toBe(expansion ? 8 : 6);
+      expect(tape.geometry.drawRange.count).toBe((expansion ? 8 : 6) * 6);
+      const vertices = tape.geometry.attributes.position;
+      const a = new THREE.Vector3(), b = new THREE.Vector3();
+      for (let edge = 0; edge < tape.geometry.drawRange.count / 6; edge++) {
+        a.fromBufferAttribute(vertices, edge * 4); b.fromBufferAttribute(vertices, edge * 4 + 2);
+        expect(a.distanceTo(b)).toBeCloseTo(1, 6);
+      }
+      if (expansion) for (let tile = 0; tile < 2; tile++) {
+        const bounds = new THREE.Box3();
+        for (let vertex = tile * 16; vertex < (tile + 1) * 16; vertex++) bounds.expandByPoint(a.fromBufferAttribute(vertices, vertex));
+        const center = getStickerWorldPos(positions[tile].x, 2, 4, 'PZ', size, expansion);
+        expect(bounds.max.x - bounds.min.x).toBeCloseTo(1, 6);
+        expect(bounds.max.y - bounds.min.y).toBeCloseTo(1, 6);
+        expect((bounds.max.x + bounds.min.x) / 2).toBeCloseTo(center[0], 6);
+        expect((bounds.max.y + bounds.min.y) / 2).toBeCloseTo(center[1], 6);
+        expect(bounds.max.z).toBeCloseTo(center[2] + WORM_CAUTION_TAPE_TOP, 6);
+      }
+    }
+  } finally {
+    await act(async () => root.unmount()); useGameStore.setState(before, true); wormExpansion.amount = expansionBefore;
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});

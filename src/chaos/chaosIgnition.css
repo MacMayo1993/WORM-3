@@ -1,0 +1,11 @@
+/* The first-strike prompt: a card docked over the bottom of the scene. The
+   wrapper passes taps through so the cube behind it stays pickable. */
+.chaos-ignition { position: fixed; inset: auto 0 0 0; display: flex; justify-content: center; padding: 0 16px max(16px, env(safe-area-inset-bottom)); pointer-events: none; font-family: var(--ui-font, system-ui); }
+.chaos-ignition-card { pointer-events: auto; width: min(100%, 440px); padding: 18px 18px 16px; display: grid; gap: 8px; animation: chaos-ignition-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+.chaos-ignition-card .arcade-title { font-size: clamp(22px, 6vw, 30px); }
+.chaos-ignition-card .arcade-blurb { margin: 0; }
+.chaos-ignition-keys { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin-top: 6px; }
+@keyframes chaos-ignition-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .chaos-ignition-card { animation: none; } }
+.chaos-ignition-leave { justify-self: center; margin-top: 2px; padding: 6px 10px; border: 0; background: none; color: var(--arcade-muted); font: 800 11px/1.3 var(--heading-font, system-ui); letter-spacing: .08em; text-transform: uppercase; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.chaos-ignition-leave:focus-visible { outline: 3px solid var(--arcade-focus); outline-offset: 2px; }

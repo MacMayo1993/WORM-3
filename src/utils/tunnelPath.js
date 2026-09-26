@@ -75,8 +75,8 @@ export const ARM_B_START = 0.6;
 // Kept deliberately snug: anything wider fills the frame and swallows both the
 // ribbon and the cube around it.
 export const BORE_MOUTH = 0.29;  // where the tunnel meets its tile (sticker is ~0.88 wide)
-export const BORE_THROAT = 0.49; // at the core crossing — the wall fades out across it
-export const BORE_CORE = 0.70;   // widest point, over the middle of each arm
+export const BORE_THROAT = 0.67; // at the core crossing — the wall fades out across it
+export const BORE_CORE = 0.85;   // widest point, over the middle of each arm
 
 /**
  * Bore radius at traversal parameter t.

@@ -1,3 +1,4 @@
+import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
 // src/worm/tunnelCameraRails.js
 //
 // The pose of the wormhole camera as a pure function of how far along the
@@ -26,7 +27,7 @@ import { makeTunnelPath, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from
 // filled a third of the frame, which reads as the camera being inside the worm
 // rather than following it. It has to stay under the bore's radius, though, or
 // the lens ends up outside the shaft looking back through its wall.
-export const TUNNEL_CAM_UP = 0.42;
+export const TUNNEL_CAM_UP = 0.62;
 
 // The exterior framing used to watch a mouth from outside the cube — shared by
 // windup, the start of the dive, and windout, so the dive provably begins from
@@ -67,7 +68,7 @@ export function cameraUpForHead(tHead) {
   // there, and the shot of the worm bursting out wants to be straight up the exit
   // tile's axis rather than nudged off to one side of it.
   return TUNNEL_CAM_UP
-    * THREE.MathUtils.smoothstep(tHead, 0.38, 0.52)
+    * THREE.MathUtils.smoothstep(tHead, 0.33, 0.43)
     * (1 - THREE.MathUtils.smoothstep(tHead, 0.80, 0.95));
 }
 
@@ -150,27 +151,7 @@ function cameraArcPointInto(out, path, arc) {
 }
 
 const _lead = new THREE.Vector3();
-const _framePrev = new THREE.Vector3();
-const _frameNext = new THREE.Vector3();
-const _frameTurn = new THREE.Quaternion();
-
-// Parallel-transport the entry frame around the bends. Re-selecting world-up
-// from a tangent threshold caused a discontinuous roll on top/bottom tunnels.
-function routeUpInto(out, path, arc, tangent, roll) {
-  _framePrev.copy(path.nStart).negate();
-  out.set(Math.abs(_framePrev.y) > 0.9 ? 1 : 0, Math.abs(_framePrev.y) > 0.9 ? 0 : 1, 0);
-  out.addScaledVector(_framePrev, -out.dot(_framePrev)).normalize();
-  for (let i = 0; i < path.legLen.length; i++) {
-    if (path.legArc0[i] >= arc) break;
-    if (path.legLen[i] < 1e-8) continue;
-    _frameNext.subVectors(path.legB[i], path.legA[i]).normalize();
-    if (path.legArc0[i] + path.legLen[i] >= arc) break;
-    out.applyQuaternion(_frameTurn.setFromUnitVectors(_framePrev, _frameNext));
-    _framePrev.copy(_frameNext);
-  }
-  out.applyQuaternion(_frameTurn.setFromUnitVectors(_framePrev, tangent));
-  return out.normalize().applyAxisAngle(tangent, roll);
-}
+const _rideFrame = makeTunnelRideFrame();
 
 /**
  * Write the on-rails camera pose at `tHead` into `out`.
@@ -204,15 +185,11 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   if (out.tangent.lengthSq() < 1e-12) out.tangent.copy(_camPath.nStart).negate();
   out.tangent.normalize();
 
-  // ── Möbius roll ──────────────────────────────────────────────────────────
-  // The band's cross-section rotates π across the traversal (see fillRibbon:
-  // perpCurrent.applyAxisAngle(axis, t * PI)). Pinning the camera to world-up
-  // meant the player watched that half-twist happen to the geometry instead of
-  // having it happen to them, which throws away the one thing that makes this a
-  // wormhole through RP2 rather than a pipe. Rolling the up-vector by the same
-  // angle inverts the world by the time you reach the far tile — the
-  // non-orientability, felt rather than observed.
-  routeUpInto(out.up, _camPath, camArc, out.tangent, tHead * Math.PI);
+  // Bank with the physical ribbon under the lens. Canonical frame transport
+  // keeps reverse visits on the same side as an already-recorded tail.
+  tunnelRideFrameInto(_rideFrame, _camPath, camArc);
+  out.up.copy(_rideFrame.normal);
+  if (camArc >= 0 && camArc <= _camPath.total) out.tangent.copy(_rideFrame.tangent);
 
   // Aim: mostly straight down the direction of travel, leaned toward where the
   // route goes next. Aiming *only* at the route point ahead swings the shot into a
@@ -221,9 +198,7 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   // in the way a headlight does, and on a straight run the two agree exactly, so
   // nothing is disturbed on the tunnels that do not bend.
   //
-  // Measured from the camera's position ON the route, before the riding height is
-  // applied below — so the offset lens looks parallel down the shaft rather than
-  // converging back onto the centerline.
+  // Establish the forward lead before adding the elevated riding view below.
   tunnelPathArcPointExtendedInto(_lead, _camPath, camArc + LOOK_AHEAD_ARC);
   _lead.sub(out.cam);
   if (_lead.lengthSq() < 1e-12) _lead.copy(out.tangent);
@@ -233,11 +208,12 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
     .normalize()
     .multiplyScalar(LOOK_AHEAD_ARC);
 
-  // Riding height comes on only once the lens is well clear of the mouth — see
-  // cameraUpForHead. Both the lens and its aim move together, so the shot keeps
-  // pointing down the tunnel instead of tipping toward the centerline.
-  out.cam.addScaledVector(out.up, cameraUpForHead(tHead));
-  out.look.add(out.cam);
+  // Clear the worm's back once inside, then look slightly down at the track.
+  // A parallel raised aim left the core and worm at the bottom of a phone view.
+  const mouthClearance = THREE.MathUtils.smoothstep(Math.min(camArc, _camPath.total - camArc), 0.1, 0.55);
+  const rideHeight = cameraUpForHead(tHead) * mouthClearance;
+  out.cam.addScaledVector(out.up, rideHeight);
+  out.look.add(out.cam).addScaledVector(out.up, -rideHeight * 0.75);
   return out;
 }
 
@@ -323,7 +299,8 @@ export function tunnelExitPoseInto(out, tunnel, progress, size) {
   const sideBlend = diveEase((arc - _camPath.total - 0.35) / (outsideDistance - 0.35));
   _poseDir.subVectors(out.look, out.cam);
   cameraArcPointInto(out.cam, _camPath, arc);
-  out.cam.addScaledVector(_exitRail.up, cameraUpForHead(tHead) * (1 - blend))
+  const mouthClearance = THREE.MathUtils.smoothstep(Math.min(arc, _camPath.total - arc), 0.1, 0.55);
+  out.cam.addScaledVector(_exitRail.up, cameraUpForHead(tHead) * mouthClearance * (1 - blend))
     .addScaledVector(_exitSideRail, (1.2 + size * 0.22) * sideBlend);
   out.look.copy(out.cam).add(_poseDir);
   return out;
