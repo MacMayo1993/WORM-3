@@ -1,5 +1,6 @@
+import { livePlatformFormation } from './platformFormation.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { cubieHasFlippedFace, isLiveFlippedFace, raisedWormExpansion, WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, isLiveFlippedFace, wormRaisedAmount, WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { wormExpansion } from './wormExpansion.js';
 
@@ -10,7 +11,8 @@ export function raisedPortalPosition(x, y, z, face, size, state) {
   const cubie = state.cubies?.[x]?.[y]?.[z];
   const cap = selectEffectiveFlipCap(state);
   const raised = state.wormHealerMode && !state.demoMode && cubie && cubieHasFlippedFace(cubie, cap);
-  const point = getStickerWorldPos(x, y, z, face, size, raised ? raisedWormExpansion(wormExpansion.amount, size) : wormExpansion.amount);
+  const lift = raised ? livePlatformFormation({ x, y, z }, size)?.lift ?? 1 : 0;
+  const point = getStickerWorldPos(x, y, z, face, size, Math.max(wormExpansion.amount, wormRaisedAmount(size) * lift));
   if (raised && isLiveFlippedFace(cubie.stickers[face], cap)) {
     point[{ X: 0, Y: 1, Z: 2 }[face[1]]] += face[0] === 'P' ? WORM_PAD_HEIGHT : -WORM_PAD_HEIGHT;
   }

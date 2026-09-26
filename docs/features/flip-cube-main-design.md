@@ -5,21 +5,47 @@
 ## Implementation checkpoint — 2026-09-26
 
 Cube modes now raise whole flipped cubies, retain the small square pads and use full-back
-antipodal stalks. WORM pops a flipped piece out only barely (see the low-hover pass below) and
+antipodal stalks. WORM raises the landing to the top of its ground-anchored caution tape and
 takes a deliberate jump onto a pad underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
 camera follows the same head. Nearby platforms receive portrait framing that includes both
-the worm and its jump destination. Portal rings, caution tape, signs and portal effects use
-the raised tile position, not the floor lattice. Mirror view and cosmetic pad settings cannot
+the worm and its jump destination. Portal rings, signs and portal effects follow the raised tile. Caution tape and posts stay
+on the floor lattice around the opening. Mirror view and cosmetic pad settings cannot
 disable physical WORM lift. Flipped-face landings enter the tunnel. Crawl does not enter raised
 mouths. Tunnel paths and exit handoffs start from the pad's hover. Demo lessons retain the
 legacy route.
 
 WORM pads hold a fixed landing height, `WORM_PAD_HEIGHT` (0.3 since the low-hover pass);
-cosmetic motion settings cannot remove the physical platform. Layer-turn scheduling holds during the captured 0.65-second jump. Rescue
+cosmetic motion settings cannot remove the physical platform. Layer-turn scheduling holds during the captured jump (0.65 seconds normally; formation can extend it). Rescue
 jumps retain their no-ride provenance. The full Rumbler, animated landing compression and
 launch beats, ghosting and cinematic choreography remain roadmap work.
 
-### WORM low hover and unstable wormhole — 2026-09-26
+### Tape-height WORM platforms — 2026-09-26 correction
+
+The user clarified that the landing should meet the top of the caution tape, with the tape
+left on the cube surface to mark the opening below. The earlier 0.06 piece pop was too small.
+
+- `WORM_CAUTION_POLE_HEIGHT = 0.68`; `WORM_CAUTION_TAPE_TOP = 0.655`.
+- `WORM_PIECE_POP = 0.355` plus `WORM_PAD_HEIGHT = 0.3` places the landing at that edge,
+  independent of board size. Cube-mode pops are unchanged. Global Explode still composes
+  with the lift using `max`, so it never stacks another explosion on top.
+- Ground-anchored WORM tape has a stable top edge, including critical/void warnings.
+  Portal rings and signs follow the rising mouth; the perimeter never rises with it.
+- Raised WORM shells are translucent and do not write depth, so the Möbius band is visible
+  through the exposed sides. Band endpoints extend to the lifted tile, not its old slot.
+- Whole cubies ease out for two seconds. The Möbius ribbon and rails grow together from
+  both mouths, even when tunnel view is Off/Hints. Pause holds progress, and reduced motion
+  presents the completed geometry immediately. Cosmetic pad settings cannot disable it.
+- Deliberate Jump captures the raised landing; it clears the ledge by 0.35 units and uses
+  the same sampled arc for head and tail. An early jump waits for the rise to complete.
+  Unflipped faces on the same cubie remain jumpable, without triggering a tunnel ride.
+- This is a platform/perimeter correction. The existing crawl and tunnel-collapse death
+  rules remain as documented below; it does not add a new fall-death trigger.
+
+### WORM low hover and unstable wormhole — earlier pass, superseded heights
+
+The following records the earlier low-hover pass. Its 0.06 piece movement, 0.36 landing,
+shortened moving fences, and floor treatment of carried faces are superseded above.
+
 
 Playtest: the tunnel sat too high to reach believably. Half the Explode lift plus a 0.5 pad
 put a 3×3 landing about 1.4 units off the surface (about 2.0 on 5×5, 5.9 on 15×15), so the
@@ -162,7 +188,6 @@ short hop above it, and the gap carries the drama instead.
 8. A raised cubie’s unflipped faces are jumpable platforms, never tunnel entries. Classify the
    face actually landed on, not the whole cubie. The route must handle radial gaps, edge/corner
    offsets, turns and platform-to-platform jumps before enabling whole-cubie lift in WORM.
-   (Retired in WORM: pieces pop out only `WORM_PIECE_POP`, so only pads are platforms.)
 9. Story/demo may override entry mode. Switch the global default only after their prompts,
    authored routes, character/hat clearance and mobile chase-camera checks pass.
 
@@ -260,7 +285,7 @@ Starting profiles (to tune in playtest). These small pad lifts are along the til
 
 | Profile | $h_0$ | $A_0$ | $A_1$ | $f_0$ | Notes |
 |---|---|---|---|---|---|
-| WORM | 0.30 | 0.05 | 0.10 | 0.8 Hz | Fixed height, no bounce (the landing must hold still). Sits over a piece popped 0.06, so its underside clears the head (≈ 0.17) and a hat (≈ 0.30). |
+| WORM | 0.30 | 0.05 | 0.10 | 0.8 Hz | Fixed height, no bounce (the landing must hold still). Sits over a piece popped 0.355; combined height 0.655 meets the ground-anchored tape. |
 | Cube / Story / Random | 0.30 | 0.04 | 0.12 | 0.9 Hz | |
 | Chaos | 0.14 | 0.02 | 0.10 | 1.0 Hz | Dense boards; the worn regime carries the betting read. |
 | Menu / intro | 0.35 | 0.06 | 0.10 | 0.7 Hz | Cinematic. |

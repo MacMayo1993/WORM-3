@@ -1421,7 +1421,7 @@ describe('raised WORM platforms', () => {
     expect(sim.headInterpPos.distanceTo(before)).toBeLessThan(0.2);
     for (let frame = 0; frame < hz && sim.padFlight; frame++) stepWormSim(sim, 1 / hz, SIZE, ctx);
     expect(sim.phase).toBe('windup');
-    // The piece pops out barely and the tile hovers above it: a short hop up.
+    // The piece rises and the pad landing meets the ground-anchored tape.
     expect(sim.activeTunnel.padExpansion).toBe(raisedWormExpansion(0, SIZE));
     expect(sim.activeTunnel.padHeight).toBe(WORM_PAD_HEIGHT);
     expect(sim.onRaisedPlatform).toBe(true);
@@ -1429,21 +1429,22 @@ describe('raised WORM platforms', () => {
     expect(sim.stepHistory.count).toBeGreaterThan(64);
     expect(shAt(sim.stepHistory, 0).pos.distanceTo(sim.headInterpPos)).toBeLessThan(1e-6);
   });
-  it("treats a flipped piece's other faces as floor and aims at its pad", () => {
+  it("lands on a raised unflipped face without entering a tunnel", () => {
     const sim = makeSim();
     sim.pos = { x: 2, y: 2, z: 2, dirKey: 'PZ' };
     const ctx = platformCtx(sim, 'PY');
-    // The corner only pops out barely, so its unflipped front face stays floor.
-    expect(raisedPlatformPosition(sim.pos, SIZE, ctx)).toBeNull();
+    // The whole corner moves, including its unflipped front face.
+    const ordinary = raisedPlatformPosition(sim.pos, SIZE, ctx);
+    expect(ordinary.z).toBeCloseTo(1.52 + WORM_PIECE_POP, 12);
     const pad = raisedPlatformPosition({ ...sim.pos, dirKey: 'PY' }, SIZE, ctx).toArray();
     // A corner explodes diagonally: the pop shows on all three axes.
     [1 + WORM_PIECE_POP, 1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT, 1 + WORM_PIECE_POP].forEach((v, i) => expect(pad[i]).toBeCloseTo(v, 12));
     startJump(sim, ctx, SIZE, { allowDive: false });
-    expect(sim.padFlight.target.dirKey).toBe('PY');
+    expect(sim.padFlight.target.dirKey).toBe('PZ');
     for (let i = 0; i < 100 && sim.padFlight; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
     expect(sim.phase).toBe('crawling');
     expect(sim.onRaisedPlatform).toBe(true);
-    expect(sim.curWorldPos.y).toBeCloseTo(1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT, 6);
+    expect(sim.curWorldPos.z).toBeCloseTo(1.52 + WORM_PIECE_POP, 6);
     expect(ctx.events.some(e => e.type === 'tunnelEnter')).toBe(false);
   });
   it('does not enter from a crawl and preserves the jump across pause', () => {
@@ -1483,7 +1484,7 @@ it.each([3, 7, 15])('captures a pad one cell ahead and lands a short hop up on a
   expect(sim.onRaisedPlatform).toBe(true);
   expect(sim.pos.x).toBe(size - 1);
   expect(sim.phase).toBe('crawling');
-  // The same height on every board size: the surface, the barely-popped piece
+  // The same tape height on every board size: the surface, the raised piece
   // and the pad's hover.
   expect(sim.curWorldPos.z).toBeCloseTo((size - 1) / 2 + 0.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT, 6);
 });

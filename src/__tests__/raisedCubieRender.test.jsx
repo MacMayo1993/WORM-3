@@ -52,12 +52,16 @@ it('pops the body and unflipped faces a hair out of the cube, follows turns, and
     store.getState().advance(3 / 60);
     expect(raised.current.parent.position.length()).toBe(0);
     expect(raisedCubieExtent()).toBe(0);
-    // WORM pops the piece out barely, whatever the cosmetic settings: a corner
+    // WORM raises the piece to the tape-height landing, whatever the cosmetic settings: a corner
     // moves WORM_PIECE_POP along each axis, so the worm can still reach its pad.
     await act(async () => { useGameStore.setState({ mirrorMode: true, settings: { ...useGameStore.getState().settings, flipPads: 'off' } }); root.render(draw(1, true)); });
     store.getState().advance(4 / 60);
     expect(raised.current.parent.position.length()).toBeCloseTo(Math.sqrt(3) * WORM_PIECE_POP, 10);
     expect(raisedCubieExtent()).toBeCloseTo(wormRaisedAmount(3), 10);
+    const windowBody = raised.current.children[0].children.find(o => o.isMesh);
+    expect(windowBody.material.transparent).toBe(true);
+    expect(windowBody.material.depthWrite).toBe(false);
+    expect(windowBody.material.opacity).toBeLessThan(0.2);
     await act(async () => { useGameStore.setState({ mirrorMode: false }); root.render(draw(0)); });
     store.getState().advance(4.5 / 60);
     // Slot components survive a committed rotation; the physical piece's spring
