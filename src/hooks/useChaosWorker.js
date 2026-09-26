@@ -2,8 +2,37 @@ import { useEffect, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
+import { chaosStormEvents, stormMeshIndex } from '../game/chaosStormEvents.js';
+import { pushChaosStormEvents, clearChaosStorm } from '../manifold/chaosStormBridge.js';
+import { clearCubieKicks } from '../3d/cubieKick.js';
+import { resolveColors } from '../utils/colorSchemes.js';
+import { pruneExpiredFx } from '../utils/transientFx.js';
 
 const MAX_CASCADES = 4;
+
+// A chaos kill severs its wormhole. Manual flips have always handed TunnelSnap
+// the pair's endpoints so the cord visibly breaks; chaos kills now do the same
+// instead of the cord blinking out on the next render.
+function chaosTunnelDeaths(events, size, prevDeaths, now) {
+  const overloads = events.filter((ev) => ev.type === 'overload' && ev.to);
+  if (!overloads.length) return null;
+  const settings = useGameStore.getState().settings;
+  const palette = resolveColors(settings, settings?.biomeMode?.faceAssignment) || {};
+  const next = { ...pruneExpiredFx(prevDeaths, now) };
+  for (const ev of overloads) {
+    next[ev.pairId] = {
+      startMs: now,
+      durationMs: 900,
+      meshIdx1: stormMeshIndex(ev.from, size),
+      meshIdx2: stormMeshIndex(ev.to, size),
+      dirKey1: ev.from.dirKey,
+      dirKey2: ev.to.dirKey,
+      color1: palette[ANTIPODAL_COLOR[ev.from.curr]] ?? '#ffffff',
+      color2: palette[ANTIPODAL_COLOR[ev.to.curr]] ?? '#ffffff',
+    };
+  }
+  return next;
+}
 
 function makeCowWriter(state) {
   let next = state;
@@ -120,6 +149,8 @@ export function useChaosWorker({
   // batches computed from a superseded cube (in flight when the player resets) are
   // dropped instead of dirtying the freshly-reset board.
   const genRef = useRef(0);
+  // Running seed for the storm's render events (bolt shapes, spark scatter).
+  const stormSeedRef = useRef(0);
 
   useEffect(() => {
     disparityFlipCapRef.current = disparityFlipCap;
@@ -164,6 +195,40 @@ export function useChaosWorker({
       if (e.data.payload?.gen != null && e.data.payload.gen !== genRef.current) return;
       const { flips, cascades, recoveries, deaths, eliminatedFaces, winner, finalState, metrics } = e.data.payload;
 
+      // Store ids for this tick's bolts, minted here so the storm can retire the
+      // HUD's matching entry when its bolt finishes.
+      const tickNow = Date.now();
+      const appendedCascades = cascades?.length > 0
+        ? cascades.map((c, i) => ({
+          ...c,
+          id: tickNow + i + Math.random(),
+          key: `${c.from?.join(',')}→${c.to?.join(',')}`,
+        }))
+        : null;
+
+      // Describe the tick to the storm BEFORE its flips land: the events need
+      // each tile's pre-flip state (a first flip opens a wormhole) and the board
+      // the worker computed against. Flips never move stickers, so a manifold map
+      // from any earlier tick still locates every twin.
+      if (appendedCascades || flips?.length > 0 || recoveries?.length > 0 || deaths?.length > 0) {
+        const live = useGameStore.getState();
+        if (!manifoldMapRef.current) manifoldMapRef.current = buildManifoldGridMap(live.cubies, size);
+        const { events, nextSeed } = chaosStormEvents(
+          { cascades, flips, recoveries, deaths },
+          live.cubies,
+          size,
+          manifoldMapRef.current,
+          disparityFlipCapRef.current,
+          { seed: stormSeedRef.current, cascadeIds: appendedCascades?.map((c) => c.id) ?? [] }
+        );
+        stormSeedRef.current = nextSeed;
+        pushChaosStormEvents(events);
+        if (live.showTunnels) {
+          const tunnelDeaths = chaosTunnelDeaths(events, size, live.tunnelDeaths, performance.now());
+          if (tunnelDeaths) useGameStore.setState({ tunnelDeaths });
+        }
+      }
+
       if (flips?.length > 0 || recoveries?.length > 0) {
         // Compose against the LATEST store state via the functional updater —
         // NOT cubiesRef.current. The ref only catches up on a React re-render,
@@ -193,15 +258,9 @@ export function useChaosWorker({
         });
       }
 
-      if (cascades?.length > 0) {
+      if (appendedCascades) {
         setCascades((prev) => {
-          const now = Date.now();
-          const append = cascades.map((c, i) => ({
-            ...c,
-            id: now + i + Math.random(),
-            key: `${c.from.join(',')}→${c.to.join(',')}`,
-          }));
-          const merged = [...prev, ...append];
+          const merged = [...prev, ...appendedCascades];
           // Drop oldest entries when over the cap — skip entries with missing coords
           // to avoid passing malformed data into ChaosWave's geometry creation.
           const valid = merged.filter(c => c?.from && c?.to);
@@ -229,6 +288,7 @@ export function useChaosWorker({
       if (winner?.length) {
         // Flush any lingering bolt visuals when the winner pair is finalized.
         setCascades([]);
+        clearChaosStorm();
         const finalWinner = winner;
         useGameStore.getState().setDisparityWinner({ pair: finalWinner });
         const winnerState = useGameStore.getState().disparityWinner;
@@ -283,6 +343,7 @@ export function useChaosWorker({
     if (!worker) return;
 
     if (chaosMode) {
+      clearChaosStorm();
       manifoldMapRef.current = buildManifoldGridMap(cubies, size);
       useGameStore.getState().clearDisparityGame();
       useGameStore.getState().startChaosExperience();
@@ -304,6 +365,8 @@ export function useChaosWorker({
 
     worker.postMessage({ type: 'STOP' });
     setCascades([]);
+    clearChaosStorm();
+    clearCubieKicks();
     if (winnerTimeoutRef.current) {
       clearTimeout(winnerTimeoutRef.current);
       winnerTimeoutRef.current = null;

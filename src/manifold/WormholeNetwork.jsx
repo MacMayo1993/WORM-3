@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useDeferredValue } from 'react';
+import React, { useEffect, useMemo, useState, useDeferredValue } from 'react';
 import { useFrame } from '@react-three/fiber';
 import MobiusTunnel from './MobiusTunnel.jsx';
 import RestingCords from './RestingCords.jsx';
@@ -10,6 +10,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import { publishTunnelFocus } from './chaosStormBridge.js';
 
 // B2: Cap the number of rendered tunnels.
 // At peak 5×5 chaos there can be ~75 active antipodal pairs; each renders
@@ -186,6 +187,10 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     }
     return ids;
   }, [visible, raisedBands, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData]);
+
+  // Chaos surges trace whichever route the player sees for a pair: the throated
+  // ribbon when it is in focus, the straight cord otherwise.
+  useEffect(() => publishTunnelFocus(focusIds), [focusIds]);
 
   const focusTunnels = useMemo(
     () => (focusIds.size ? tunnelData.filter((t) => focusIds.has(t.pairId)) : []),
