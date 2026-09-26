@@ -16,6 +16,8 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { flipPose } from '../utils/flipPose.js';
 import { PAIRS, pairPoint } from '../components/intro/introTopology.js';
 import { Vector3 } from 'three';
+import { makeCubies } from '../game/cubeState.js';
+import { flipStickerPair, buildManifoldGridMap } from '../game/manifoldLogic.js';
 
 const callbacks = { setRotatedCubies: vi.fn(), cancelShuffle: vi.fn(), changeSize: vi.fn(), reset: vi.fn(),
   cancelDisparityRun: vi.fn(), startDisparityGame: vi.fn(), animatedShuffle: vi.fn(), handleOpenStore: vi.fn() };
@@ -45,6 +47,29 @@ describe('short demo and retry', () => {
     expect(useGameStore.getState().wormRunId).toBe(previousRun + 1);
     expect(useGameStore.getState().wormAlive).toBe(true);
     unmount();
+  });
+  it('hands nine sent pairs straight to the home counter without reopening Mobi', () => {
+    useGameStore.setState({ demoStep: 'flip-gateway', size: 3, cubies: makeCubies(3), wormHealerMode: false });
+    const { result, unmount } = renderHook(() => useDemoMode({ ...callbacks,
+      setRotatedCubies: cubies => useGameStore.getState().setRotatedCubies(cubies) }));
+    try {
+      act(() => result.current.handleDemoStepContinue());
+      act(() => vi.advanceTimersByTime(1000));
+      const flip = (x, y) => act(() => {
+        const { cubies } = useGameStore.getState();
+        useGameStore.getState().setRotatedCubies(flipStickerPair(cubies, 3, x, y, 2, 'PZ', buildManifoldGridMap(cubies, 3)));
+      });
+      expect(result.current.demoFlipProgress).toEqual({ phase: 'flip-all', done: 0, total: 9 });
+      for (let x = 0; x < 3; x++) for (let y = 0; y < 3; y++) flip(x, y);
+      expect(result.current.demoFlipProgress).toEqual({ phase: 'unflip-all', done: 0, total: 9 });
+      expect(result.current.demoCoachCopy).toBeNull();
+      expect(result.current.demoTryVisible).toBe(true);
+      flip(0, 0);
+      expect(result.current.demoFlipProgress).toEqual({ phase: 'unflip-all', done: 1, total: 9 });
+      for (let x = 0; x < 3; x++) for (let y = 0; y < 3; y++) if (x || y) flip(x, y);
+      expect(result.current.demoFlipProgress).toBeNull();
+      expect(result.current.demoCelebrationStep).toBe('flip-gateway');
+    } finally { unmount(); }
   });
   it('keeps practicing after emergence and offers optional lessons only when practice ends', () => {
     const { result, unmount } = renderHook(() => useDemoMode(callbacks));

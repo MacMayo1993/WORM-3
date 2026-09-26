@@ -10,11 +10,11 @@ export const WORM_PIECE_POP = WORM_CAUTION_TAPE_TOP - WORM_PAD_HEIGHT;
 // FLIP CUBE and Chaos expose the whole piece and its connecting band.
 export const CUBE_PIECE_POP = 0.55;
 export const LEGACY_PIECE_POP = 0.1;
-// Chaos needs visible raised tunnels, but must never persist its presentation
-// over the player's ordinary-mode bounce preference. Reduced motion is separate.
-export const effectiveFlipPads = state => state.chaosLevel > 0 && !state.wormHealerMode
-  && !state.demoMode && !state.mirrorMode ? 'full' : state.settings?.flipPads;
-export const flipCubePadsEnabled = state => !state.wormHealerMode && !state.demoMode
+// Chaos and cube demos need visible raised tunnels without overwriting the
+// player's ordinary-mode bounce preference. Reduced motion is separate.
+export const effectiveFlipPads = state => (state.chaosLevel > 0 || state.demoMode) && !state.wormHealerMode
+  && !state.mirrorMode ? 'full' : state.settings?.flipPads;
+export const flipCubePadsEnabled = state => !state.wormHealerMode
   && !state.mirrorMode && effectiveFlipPads(state) !== 'off';
 const popAmount = (distance, size) => distance / (Math.max(0.5, (size - 1) / 2) * cubeExpansionMultiplier(size));
 export const wormRaisedAmount = size => popAmount(WORM_PIECE_POP, size);

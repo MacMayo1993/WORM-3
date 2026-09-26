@@ -11,10 +11,10 @@ import { PAD_BACK_CLEARANCE } from '../3d/padStalkGeometry.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 
 extend(THREE);
-it('renders twin lifts along their normals, keeps slots fixed, and clears on heal/unmount', async () => {
+it('keeps legacy Mirror twin lifts aligned and switches to energy columns in WORM', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
-  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode: false, demoMode: true, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
+  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode: false, demoMode: false, mirrorMode: true, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
@@ -84,7 +84,7 @@ it('renders twin lifts along their normals, keeps slots fixed, and clears on hea
     await act(async () => root.render(draw(1)));
     store.getState().advance(4);
     expect(padMotion.size).toBe(1);
-    await act(async () => useGameStore.setState({ wormHealerMode: true, demoMode: false,
+    await act(async () => useGameStore.setState({ wormHealerMode: true, mirrorMode: false,
       settings: { ...useGameStore.getState().settings, flipPads: 'off' } }));
     store.getState().advance(5);
     // WORM pads hover a short hop over the slot, on an energy column rather

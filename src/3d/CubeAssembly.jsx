@@ -110,6 +110,7 @@ const CubeAssembly = React.memo(({
     chaosIgnitionShown,
     cameraOrbitRequest,
     cameraOrbitDir,
+    demoStep,
   } = useGameStore(
     useShallow(s => ({
       explosionFactor: s.explosionT,
@@ -132,6 +133,7 @@ const CubeAssembly = React.memo(({
       chaosIgnitionShown: s.chaosLevel === 0 && (s.chaosIgnitionPicking || !!s.chaosIgnition),
       cameraOrbitRequest: s.cameraOrbitRequest,
       cameraOrbitDir: s.cameraOrbitDir,
+      demoStep: s.demoMode ? s.demoStep : null,
     }))
   );
   const powerView = wormHealerMode ? getViewPowerDef(wormViewPower)?.view : null;
@@ -716,6 +718,14 @@ const CubeAssembly = React.memo(({
   const wasExploding = useRef(false);
   const prevEfRef2 = useRef(0);
   const reframeTime = useRef(0);
+  useLayoutEffect(() => {
+    // Each lesson gets its own camera framing. A still-settling pad from the
+    // previous lesson must not restore its old close-up over CameraManager.
+    preExplodeDist.current = 0;
+    wasExploding.current = false;
+    prevEfRef2.current = 0;
+    reframeTime.current = 0;
+  }, [demoStep]);
 
   // Spin-energy tracking for reactive tile styles (orbChamber): derive the
   // rotation's angular speed from liveRotation.angle frame-to-frame, feed it to

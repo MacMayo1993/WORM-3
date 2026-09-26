@@ -10,10 +10,10 @@ import { PAD_PROFILES } from '../3d/padPose.js';
 import { TREMBLE_NORMAL, TREMBLE_PLANE } from '../3d/padEnergy.js';
 
 extend(THREE);
-it.each([[true, 0, 'full'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'subtle']])('renders energy pads with pause, healing and reduced motion (WORM=%s, chaos=%i, saved=%s)', async (wormHealerMode, chaosLevel, flipPads) => {
+it.each([[true, 0, 'full'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'subtle'], [false, 0, 'off', true], [false, 0, 'subtle', true]])('renders energy pads with pause, healing and reduced motion (WORM=%s, chaos=%i, saved=%s)', async (wormHealerMode, chaosLevel, flipPads, demoMode = false) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
-  useGameStore.setState({ size: 3, chaosLevel, wormHealerMode, mirrorMode: false, demoMode: false, wormPauseMenuOpen: false,
+  useGameStore.setState({ size: 3, chaosLevel, wormHealerMode, mirrorMode: false, demoMode, wormPauseMenuOpen: false,
     settings: { ...before.settings, flipPads, reducedMotion: false } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
@@ -84,9 +84,9 @@ it.each([[true, 0, 'full'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 's
     const counts = [];
     scene.traverse(o => { if (o.isInstancedMesh) counts.push(o.count); });
     expect(counts.every(count => count === 0)).toBe(true);
-    if (chaosLevel > 0) {
-      // Exiting Chaos immediately restores the saved pad behavior on the same scene.
-      await act(async () => useGameStore.setState({ chaosLevel: 0 }));
+    if (chaosLevel > 0 || demoMode) {
+      // Exiting Chaos or the demo restores the saved pad behavior on the same scene.
+      await act(async () => useGameStore.setState({ chaosLevel: 0, demoMode: false }));
       await act(async () => root.render(draw(1)));
       store.getState().advance(frame++ / 60);
       expect(front.current.parent.position.length()).toBeCloseTo(flipPads === 'off' ? 0 : PAD_PROFILES.cube.height, 12);

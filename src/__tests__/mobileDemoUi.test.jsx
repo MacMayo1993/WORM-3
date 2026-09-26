@@ -5,7 +5,7 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import DemoDialog from '../components/screens/DemoDialog.jsx';
 import DemoEndScreen from '../components/screens/DemoEndScreen.jsx';
-import { DemoControlTour, DemoProgressBar } from '../components/screens/DemoFlowController.jsx';
+import { DemoControlTour, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoCoach } from '../components/screens/DemoFlowController.jsx';
 import BottomNavBar from '../components/menus/BottomNavBar.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { demoTimer } from '../utils/demoTimer.js';
@@ -56,6 +56,20 @@ it('groups the worm instruction, progress and skip into a single dock', () => {
   expect(host.querySelectorAll('.worm-demo-card')).toHaveLength(1);
   expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('0');
   act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'End practice').click()); expect(skip).toHaveBeenCalledTimes(1);
+});
+it('keeps the flip instruction and live pair counter together across the phase change', () => {
+  const draw = phase => <>
+    <DemoStepHint step="flip-gateway" />
+    <DemoFlipProgress progress={{ phase, done: 0, total: 9 }} />
+    <DemoCoach step="flip-gateway" />
+  </>;
+  render(draw('flip-all'));
+  expect(host.querySelectorAll('[role="status"]')).toHaveLength(1);
+  expect(host.querySelector('.demo-flip-task').textContent).toContain('Tap nine different pairs');
+  render(draw('unflip-all'));
+  expect(host.querySelector('.demo-flip-task').textContent).toContain('Home0 / 9');
+  expect(host.querySelector('.demo-flip-task').textContent).toContain('Tap the raised tiles');
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
 });
 it('explains a bomb death and makes Retry the first focused action', () => {
   useGameStore.setState({wormAlive:false, wormDeathDetails:{cause:'bomb'}});

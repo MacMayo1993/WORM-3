@@ -1340,10 +1340,13 @@ export default function WORM3() {
   // Size 15 is installed before the Mobi overlay opens, so this distance also
   // has to frame Mega Mode during its intro rather than falling back to the 3×3
   // camera position. Mobile needs extra room for its narrower portrait viewport.
-  const cameraZ = (isMobile
+  // Step three needs room for nine raised pairs plus its task card. A distinct
+  // distance also resets any close zoom carried over from Meet the Twins.
+  const demoFlipZoom = demoMode && demoStep === 'flip-gateway' ? 1.3 : 1;
+  const cameraZ = ((isMobile
     ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54, 8: 62, 9: 70, 10: 78, 15: 116 }
     : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44, 8: 50, 9: 57, 10: 63, 15: 94 }
-  )[size] || 11;
+  )[size] || 11) * demoFlipZoom;
   const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const introPerformanceMode = isMobile || prefersReducedMotion;
 
@@ -1645,12 +1648,12 @@ export default function WORM3() {
       {/* Per-step gesture hint — stays up for the whole hands-on phase so the
           instruction is still there after the intro panel has gone. */}
       {demoMode && demoHintStep && demoHintStep === demoStep && !demoChromeQuiet && !demoColdOpenVisible &&
-        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && !demoViewSpotlight && !demoFlipSpotlight && (
+        !demoStepIntroVisible && !demoCoachCopy && !demoLaunchStep && !demoCelebrationStep && !demoViewSpotlight && !demoFlipSpotlight && (
         <DemoStepHint step={demoHintStep} />
       )}
-      {/* Flip-gateway progress — bounded front-face flip/restore counter. */}
+      {/* Flip-gateway instruction and pair counter share one dock. */}
       {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible && !demoChromeQuiet &&
-        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
+        !demoStepIntroVisible && !demoCoachCopy && !demoLaunchStep && !demoCelebrationStep && (
         <DemoFlipProgress progress={demoFlipProgress} />
       )}
       {/* Learn-to-solve cameo — mounts the live Kociemba guide (gold layer
