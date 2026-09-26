@@ -15,6 +15,8 @@ import WormProfile from './WormProfile.jsx';
 import { wormMenuFeedback } from './wormMenuFeedback.js';
 import './modeWizard.css';
 import './wormStory.css';
+import '../ui/pieceKey.css';
+import '../ui/pathSelect.css';
 const FreePlaySetup = React.lazy(() => import('./WormModeSetupWizard.jsx'));
 
 export default function WormEntryScreen({ onComplete, onCancel, initialSettings, initialPage = 'choice' }) {
@@ -48,23 +50,57 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   const openChapter = next => { wormMenuFeedback(); setSelected((next.levels.find(item => storyUnlocked(progress, item.id) && !storyStars(progress, item.id)) ?? next.levels[0]).id); };
   const launch = () => { wormMenuFeedback(); onComplete({ ...initialSettings, ...storyAppearance(level.id), perFaceStyles: STORY_WORLDS[level.id].styles,
     wormColor: getSkin(wormSkin).body, ...storyLaunchSettings(level) }); };
-  return <div ref={root} className={`mode-wizard worm-entry${page === 'choice' ? ' worm-entry-choice' : ''}`} role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
+  if (page === 'choice') {
+    // Where the player's campaign stands, so Levels says where it will take them.
+    const next = nextStoryLevel(progress);
+    const nextChapter = storyChapter(next.id);
+    const allLevels = WORM_STORY_CHAPTERS.flatMap(item => item.levels);
+    const allStars = allLevels.reduce((n, item) => n + storyStars(progress, item.id), 0);
+    return <div ref={root} className="mode-wizard worm-entry path-select" role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
+      style={{ '--mode-accent': MODE_THEMES.worm.accent, '--mode-ink': MODE_THEMES.worm.shadow, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
+      <div className="path-select-page">
+        <header className="path-select-head">
+          <button className="piece-icon" onClick={back} aria-label="Back to modes"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+          <span className="path-select-brand" aria-hidden="true"><WormWordmark /></span>
+          <span className="path-select-spacer" aria-hidden="true" />
+        </header>
+        <h1 id="worm-entry-title" className="path-select-title">Choose how to play</h1>
+        <div className="worm-path-split path-select-cards">
+          <button className="worm-path-card worm-path-story path-select-card piece piece--glint" style={{ '--piece-color': MODE_THEMES.worm.accent }}
+            aria-label="Levels" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
+            <span className="piece-face">
+              <span className="path-select-art"><WormPathArtwork levels /></span>
+              <span className="path-select-copy">
+                <span className="worm-path-cta path-select-cta piece-trailer">Levels <b aria-hidden="true">→</b></span>
+                <span className="path-select-note">Chapter {nextChapter.id} · {nextChapter.title}</span>
+                <span className="path-select-meta"><span aria-label={`${allStars} of ${allLevels.length * 3} stars`}>★ {allStars}/{allLevels.length * 3}</span>
+                  <span>Next: {next.title}</span></span>
+              </span>
+            </span>
+          </button>
+          <button className="worm-path-card worm-path-free path-select-card piece" style={{ '--piece-color': MODE_THEMES.cube.accent }}
+            aria-label="Free Play" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
+            <span className="piece-face">
+              <span className="path-select-art"><WormPathArtwork /></span>
+              <span className="path-select-copy">
+                <span className="worm-path-cta path-select-cta piece-trailer">Free Play <b aria-hidden="true">→</b></span>
+                <span className="path-select-note">Your cube, your rules</span>
+                <span className="path-select-meta"><span>Pick the size, scene and speed</span></span>
+              </span>
+            </span>
+          </button>
+        </div>
+        <WormProfile />
+      </div>
+    </div>;
+  }
+  return <div ref={root} className="mode-wizard worm-entry worm-levels" role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
     style={{ '--mode-accent': MODE_THEMES.worm.accent, '--mode-ink': MODE_THEMES.worm.shadow, '--story-display': HEADING_FONT, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
     <div className="worm-entry-sheet" style={wizardPaperBackground}>
-      <nav className="worm-entry-nav"><button onClick={back} aria-label={page === 'choice' ? 'Back to modes' : 'Back to WORM choices'}>← Back</button><span><WormWordmark inline /></span></nav>
+      <nav className="worm-entry-nav"><button className="piece-icon" onClick={back} aria-label="Back to WORM choices"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg></button><span><WormWordmark inline /></span></nav>
       <div className="worm-entry-scroll">
-        {page === 'choice' ? <h1 id="worm-entry-title" className="worm-choice-title">WORM</h1> : <header className="worm-entry-heading"><h1 id="worm-entry-title">Levels</h1></header>}
-        {page === 'choice' ? <>
-          <div className="worm-path-split">
-            <button className="worm-path-card worm-path-story" aria-label="Levels" onClick={() => { wormMenuFeedback(); setPage('story'); }}>
-              <WormPathArtwork levels /><span className="worm-path-cta">Levels <b aria-hidden="true">→</b></span>
-            </button>
-            <button className="worm-path-card worm-path-free" aria-label="Free Play" onClick={() => { wormMenuFeedback(); setPage('free'); }}>
-              <WormPathArtwork /><span className="worm-path-cta">Free Play <b aria-hidden="true">→</b></span>
-            </button>
-          </div>
-          <WormProfile />
-        </> : <>
+        <header className="worm-entry-heading"><h1 id="worm-entry-title">Levels</h1></header>
+        <>
           <div className="worm-chapter-tabs" role="group" aria-label="Chapters">{WORM_STORY_CHAPTERS.map(item => {
             const open = storyUnlocked(progress, item.levels[0].id);
             const stars = item.levels.reduce((n, l) => n + storyStars(progress, l.id), 0);
@@ -93,10 +129,12 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
             <div className="worm-level-reward"><span>First Win</span><strong>{level.rewardLabel || `${level.points} Parity Points`} + 50 XP</strong></div>
             <StoryRewardChoices level={level} />
             <div className="worm-level-profile"><WormProfile /></div>
-            <button className="worm-story-primary" onClick={launch}>{storyStars(progress, level.id) ? "Play again" : 'Play level'} <span>→</span></button>
+            <button className="worm-story-primary piece piece--bar piece--glint" style={{ '--piece-color': MODE_THEMES.worm.accent }} onClick={launch}>
+              <span className="piece-face"><span className="piece-trailer">{storyStars(progress, level.id) ? 'Play again' : 'Play level'}</span>{' '}<b className="piece-trailer" aria-hidden="true">→</b></span>
+            </button>
 
           </section>
-        </>}
+        </>
       </div>
     </div>
   </div>;

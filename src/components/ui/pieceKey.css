@@ -1,0 +1,123 @@
+/* pieceKey.css — the setup screens' keys are pieces of the opening's cube, the
+ * same as the main menu's (menus/mainMenuKeys.css): a black-plastic bezel on a
+ * hard black ledge holding one glossy, domed sticker. The sticker is the mode's
+ * face colour (--piece-color, from MODE_THEMES) and is lettered like the
+ * opening's trailer words; white stickers carry deep-green ink instead.
+ *
+ * Imported by the lazy setup screens only, never by the initial route.
+ *
+ *   <button class="piece" style="--piece-color: …">
+ *     <span class="piece-face"><span class="piece-trailer">Next</span><b class="piece-trailer">→</b></span>
+ *   </button>
+ */
+.piece {
+  --piece-color: #f4f1e6;
+  --piece-bezel: linear-gradient(180deg, #2c2c31, #141416 42%);
+  --piece-ledge: #050506;
+  --piece-gloss: radial-gradient(120% 95% at 20% 10%, rgba(255, 255, 255, 0.55) 0 12%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(172deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, 0.14));
+  --piece-dome: inset 0 2px 1px rgba(255, 255, 255, 0.6), inset 0 -3px 4px rgba(0, 0, 0, 0.22);
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  min-width: 0;
+  padding: 5px;
+  border: 0 !important;
+  border-radius: 20px;
+  background: var(--piece-bezel);
+  box-shadow: 0 6px 0 var(--piece-ledge), 0 14px 26px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #26372d;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+.piece-face {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 15px;
+  background-color: var(--piece-color);
+  background-image: var(--piece-gloss);
+  box-shadow: var(--piece-dome);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1.4), filter 140ms ease;
+}
+@media (hover: hover) {
+  /* The sticker lifts a little in its bezel, as if about to flip. */
+  .piece:enabled:hover .piece-face { transform: translateY(-2px); filter: brightness(1.05); }
+}
+.piece:enabled:active {
+  translate: 0 4px;
+  box-shadow: 0 2px 0 var(--piece-ledge), 0 6px 12px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.piece:enabled:active .piece-face { transform: scale(0.985); }
+.piece:disabled { cursor: default; filter: grayscale(0.7) brightness(0.92); }
+.piece:focus-visible { outline: 3px solid var(--arcade-focus, #2774ad); outline-offset: 5px; }
+
+/* Trailer lettering: white fill on a black outline, as on the opening's words. */
+.piece-trailer {
+  color: #fff;
+  -webkit-text-stroke: 5px #111;
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 #111;
+  font: 400 clamp(19px, 5vw, 25px)/1 var(--display-font, 'Bungee', 'Arial Black', sans-serif);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+b.piece-trailer { font: 900 clamp(22px, 5.4vw, 28px)/1 var(--heading-font, system-ui); }
+
+/* The long key at the foot of a setup screen: label left, arrow right. */
+.piece--bar { width: 100%; min-height: 68px; }
+.piece--bar > .piece-face { justify-content: space-between; padding: 0 20px 0 18px; }
+
+/* A bar that shares its row or carries a long label. */
+.piece--compact { min-height: 58px; }
+.piece--compact > .piece-face { padding: 0 12px; gap: 8px; }
+.piece--compact .piece-trailer { font-size: clamp(13px, 3.6vw, 18px); -webkit-text-stroke-width: 4px; text-shadow: 0 2px 0 #111; }
+
+/* Now and then light runs across the sticker's gloss. */
+.piece--glint > .piece-face::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: -40%;
+  width: 28%;
+  transform: skewX(-20deg);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
+  pointer-events: none;
+  animation: piece-glint 6s ease-in-out 1.6s infinite;
+}
+@keyframes piece-glint { 0%, 72% { translate: 0; } 90%, 100% { translate: 640%; } }
+
+/* A round ivory icon key (back, settings), the carousel's header buttons. */
+.piece-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid #c6c5ac !important;
+  border-radius: 16px;
+  background: #fffcf1;
+  color: #354d3c;
+  box-shadow: 0 4px 0 #c6c5ac, inset 0 2px 0 #fff;
+  font: 400 30px/1 var(--heading-font, system-ui);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.piece-icon:active { translate: 0 3px; box-shadow: 0 1px 0 #c6c5ac, inset 0 2px 0 #fff; }
+.piece-icon:focus-visible { outline: 3px solid var(--arcade-focus, #2774ad); outline-offset: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .piece, .piece-face { transition: none; translate: none !important; }
+  .piece--glint > .piece-face::after { animation: none; }
+}

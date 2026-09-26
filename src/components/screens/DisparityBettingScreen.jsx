@@ -1,6 +1,7 @@
 import { wizardPaperBackground } from './WizardChrome.jsx';
 import { chaosSetupSettings } from '../../utils/chaosSetup.js';
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
+import { MODE_THEMES } from '../../utils/modeThemes.js';
 import React, { useState, useMemo, useRef } from 'react';
 import { useDialogBehavior } from '../ui/Panel.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -10,6 +11,7 @@ import { Z } from '../../utils/uiTheme.js';
 import { ChaosGlyph, ChaosEmblem } from '../../chaos/ChaosArt.jsx';
 import '../../chaos/chaos.css';
 import '../../chaos/chaosSetup.css';
+import '../ui/pieceKey.css';
 
 const WAGER_PRESETS = [10, 25, 50, 100, 250, 500];
 const StepLabel = ({ n, done, label }) => <div className="chaos-step-label">
@@ -135,7 +137,9 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null,
         <footer className="chaos-forecast-footer">
           {hint && <p className="chaos-footer-hint" role="status">{hint}</p>}
           <div className="chaos-forecast-buttons">
-            <button className="chaos-button chaos-button-primary" onClick={handlePlace} disabled={!canPlace}>{canPlace ? `Bet ${wager} PP & Start` : 'Place Bet & Start'}<span aria-hidden="true">↗</span></button>
+            <button className="chaos-bet-start piece piece--bar piece--compact piece--glint" style={{ '--piece-color': MODE_THEMES.chaos.accent }} onClick={handlePlace} disabled={!canPlace}>
+              <span className="piece-face"><span className="piece-trailer">{canPlace ? `Bet ${wager} PP & Start` : 'Place Bet & Start'}</span><b className="piece-trailer" aria-hidden="true">→</b></span>
+            </button>
             <button className="chaos-button" onClick={() => { if (!placedRef.current) { placedRef.current = true; onSkip(); } }}>Skip & Start</button>
           </div>
           {onBack && <button className="chaos-back" onClick={onBack}>← Back to setup</button>}
