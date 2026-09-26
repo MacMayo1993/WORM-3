@@ -33,9 +33,6 @@
 .opening-poem-word { display: inline-block; transform-origin: 50% 80%; }
 .opening-trailer-beat { animation: opening-trailer-push 3.5s ease-out both; }
 @keyframes opening-trailer-push { from { transform: scale(.96); } to { transform: scale(1); } }
-/* "BOX," gets a box drawn round it. */
-.opening-word-box { position: relative; padding: 0 .16em; }
-.opening-box { position: absolute; inset: -.1em 0 -.04em; width: 100%; height: calc(100% + .14em); overflow: visible; }
 /* "FLIP" and "CUBE" sit on Rubik's stickers that turn to their antipodes. */
 .opening-word-tile { perspective: 600px; margin-left: .06em; }
 .opening-tile { display: inline-grid; transform-style: preserve-3d; }
