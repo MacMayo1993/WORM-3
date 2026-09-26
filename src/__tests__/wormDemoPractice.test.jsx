@@ -6,6 +6,8 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useWormCrawler } from '../worm/useWormCrawler.js';
 import { WORM_DEMO_LESSONS, newWormDemo } from '../game/wormDemoLessons.js';
+import { DEMO_LEVEL_CONFIGS } from '../components/screens/DemoFlowController.jsx';
+import { WORM_DIFFICULTIES } from '../worm/wormDifficulty.js';
 import { makeCubies } from '../game/cubeState.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
@@ -34,19 +36,30 @@ beforeEach(() => {
   useGameStore.setState({ ...newWormDemo(), cubies: makeCubies(5), size: 5,
     demoMode: true, demoStep: 'worm-traversal', wormHealerMode: true, wormRunId: 100,
     wormCharacter: 'glow', wormAlive: true, wormPaused: false, wormPauseMenuOpen: false,
-    wormGamePhase: 'active', wormOrbCount: 0, wormholeInterval: 30, wormSpeed: 1, rotationEpoch: 0 });
+    wormGamePhase: 'active', wormOrbCount: 0, wormholeInterval: 30, wormSpeed: DEMO_LEVEL_CONFIGS['worm-traversal'].wormSpeed, rotationEpoch: 0 });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   act(() => root.render(<Harness />)); frame(); frame(); act(() => state().startWormDemoLesson());
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
-it('only completes steering when the production movement accepts a turn', () => {
+it('uses Easy speed and keeps moving and accepting controls after steering succeeds', () => {
+  expect(state().wormSpeed).toBe(WORM_DIFFICULTIES[0].settings.wormSpeed);
   frames(5); expect(state().demoWormComplete).toBe(false);
   input('turnLeft'); until(() => state().demoWormComplete);
-  expect(state().demoWormCompleted).toEqual(['steer']); expect(state().wormPaused).toBe(true);
+  expect(state().demoWormCompleted).toEqual(['steer']); expect(state().wormPaused).toBe(false);
+  expect(host.querySelector('.worm-jump').disabled).toBe(false);
+  const pos = { ...worm.pos.current }; frames(20); expect(worm.pos.current).not.toEqual(pos);
+  input('jump'); until(() => worm.isJumping.current);
+  expect(state().demoWormLessonIndex).toBe(0);
+  expect(state().demoWormCompleted).toEqual(['steer']);
+  expect(host.textContent).toContain('Keep practicing');
 });
 it('collects two staged orbs through the production pickup path and gives six charges', () => {
   lesson('orbs'); until(() => state().demoWormComplete);
   expect(state().wormSessionOrbs).toBe(2); expect(state().wormBodyTiles).toBe(2); expect(Object.values(state().wormOrbInventory).reduce((a, b) => a + b, 0)).toBe(6);
+  const pos = { ...worm.pos.current }; frames(20);
+  expect(state().wormPaused).toBe(false); expect(worm.pos.current).not.toEqual(pos);
+  expect(state().wormPowerups).toHaveLength(2);
+  expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('orbs');
 });
 it.each(['jump', 'double-jump'])('requires a real landing for %s', id => {
   lesson(id); input('jump'); until(() => worm.isJumping.current);
@@ -107,7 +120,7 @@ it('covers the ring with the current body and heals through the real ring logic'
   expect(state().wormHealedCount).toBe(1);
   expect(state().wormBodyTiles).toBe(0);
 });
-it('waits for Try it and keeps a paused or completed exercise frozen', () => {
+it('waits for Try it, honors manual pause after success, and changes lessons only on Next', () => {
   act(() => state().restartWormDemoLesson());
   act(() => state().startWormDemoLesson());
   expect(state().demoWormStarted).toBe(false);
@@ -119,7 +132,16 @@ it('waits for Try it and keeps a paused or completed exercise frozen', () => {
   expect(state().wormPaused).toBe(true);
   act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'Try it').click());
   input('turnRight'); until(() => state().demoWormComplete);
-  const donePos = { ...worm.pos.current }; frames(40); expect(worm.pos.current).toEqual(donePos);
+  const donePos = { ...worm.pos.current }; frames(20); expect(worm.pos.current).not.toEqual(donePos);
+  act(() => host.querySelector('[aria-label="Pause"]').click());
+  const pausedPos = { ...worm.pos.current }; frames(40); expect(worm.pos.current).toEqual(pausedPos);
+  act(() => host.querySelector('.worm-pause-resume').click());
+  expect(state().wormPaused).toBe(false);
+  frames(20); expect(worm.pos.current).not.toEqual(pausedPos);
+  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'Next').click());
+  expect(state().demoWormLessonIndex).toBe(1); expect(state().demoWormComplete).toBe(false);
+  expect(state().wormPaused).toBe(true); expect(state().demoWormStarted).toBe(false);
+  frame(); const nextPos = { ...worm.pos.current }; frames(20); expect(worm.pos.current).toEqual(nextPos);
 });
 it('does not finish the chapter after a tunnel and awards no real XP or coins for practice', () => {
   const points = state().parityPoints, xp = state().playerProgress.xp;

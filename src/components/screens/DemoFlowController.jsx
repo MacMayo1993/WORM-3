@@ -1,5 +1,6 @@
 import DemoDialog from './DemoDialog.jsx';
 import { WORM_DEMO_LESSON_COUNT } from '../../game/wormDemoState.js';
+import { WORM_DIFFICULTIES } from '../../worm/wormDifficulty.js';
 import { useDemoTarget } from './useDemoTarget.js';
 import React from 'react';
 import { UI_FONT, HEADING_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../../utils/uiTheme.js';
@@ -713,7 +714,7 @@ const DEMO_LEVEL_CONFIGS = {
   'worm-traversal': {
     type: 'worm',
     cubeSize: 5,
-    wormSpeed: 1,
+    wormSpeed: WORM_DIFFICULTIES[0].settings.wormSpeed,
     wormOrbCount: 2,
     wormholeInterval: 30,
     wormColor: '#33ff66',

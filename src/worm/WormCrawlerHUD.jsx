@@ -1309,7 +1309,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const runId = useGameStore(s => s.wormRunId);
     const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
     const lessonIndex = useGameStore(s => s.demoWormLessonIndex);
-    const practiceRunning = useGameStore(s => s.demoWormStarted && !s.demoWormComplete);
+    const practiceRunning = useGameStore(s => s.demoWormStarted && !s.demoWormFinished);
     const storyId = useGameStore(s => s.wormStoryLevel);
     const storyStarted = useGameStore(s => s.wormStoryStarted);
     const controlsEnabled = wormAlive && (!demoLesson || practiceRunning) && (!storyId || storyStarted);
@@ -1393,7 +1393,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const handleResume = useCallback(() => {
         resumeFeel(); feel('uiKey');
         setIsPaused(false);
-        setWormPaused((storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormComplete)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
+        setWormPaused((storyId && !useGameStore.getState().wormStoryStarted) || (demoLesson && (!useGameStore.getState().demoWormStarted || useGameStore.getState().demoWormFinished)) || (combatMode && (!combatBridge.current?.started || combatBridge.current.won)));
     }, [setWormPaused, demoLesson, combatMode, storyId]);
 
     useEffect(() => {
