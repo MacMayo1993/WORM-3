@@ -37,19 +37,6 @@ function Word({ word, index, dissolve }) {
       <Tile text={word.text} faces={word.faces} turn={word.move} />
     </span>;
   }
-  if (word.accent === 'box') {
-    return <span className="opening-poem-word opening-word-box" style={style}>
-      {word.text}
-      {/* White line on a black line, like the lettering. Styled here, not in CSS:
-          the intro sheet ships in the size-capped initial bundle. */}
-      <svg className="opening-box" aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 100 100" fill="none"
-        strokeLinejoin="round" strokeLinecap="round" strokeDasharray="1">
-        {[['#111', 9], ['#fff', 4]].map(([stroke, width]) => <rect key={stroke} stroke={stroke} strokeWidth={width}
-          x="3" y="3" width="94" height="94" rx="9" pathLength="1" vectorEffect="non-scaling-stroke"
-          strokeDashoffset={1 - word.move} />)}
-      </svg>
-    </span>;
-  }
   return <span className="opening-poem-word" style={style}>{word.text}</span>;
 }
 

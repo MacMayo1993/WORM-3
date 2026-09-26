@@ -16,11 +16,10 @@ export const WORD_POP = 0.34; // the spring that lands each word, overshoot incl
 /**
  * Words that get their own move, keyed by the word itself (punctuation and case
  * ignored), so the script can be reworded without re-indexing:
- *   box  — an outlined box draws itself around the word: outside the box;
  *   flip, cube — the word sits on a Rubik's sticker that flips to its antipodal
  *          colour, the move the cube behind them makes.
  */
-export const INTRO_ACCENTS = { box: 'box', flip: 'tile', cube: 'tile' };
+export const INTRO_ACCENTS = { flip: 'tile', cube: 'tile' };
 /** Each sticker word's [front, back] face ids, an antipodal pair: FLIP blue → green, CUBE red → orange. */
 export const TILE_FACES = { flip: [5, 2], cube: [1, 4] };
 const wordKey = text => text.toLowerCase().replace(/[^a-z]/g, '');
@@ -48,9 +47,8 @@ export function introCopyFrame(time) {
       text, accent, faces: tileFacesOf(text),
       opacity: ramp(time, start, start + WORD_FADE) * (1 - dissolve),
       reveal: ramp(time, start, start + WORD_POP),
-      // 0→1: the box outline drawing, or the sticker's turn.
-      move: accent === 'box' ? ramp(time, start + 0.12, start + 0.62)
-        : accent === 'tile' ? ramp(time, turnAt, turnAt + TILE_FLIP) : 0
+      // 0→1: the sticker's turn.
+      move: accent === 'tile' ? ramp(time, turnAt, turnAt + TILE_FLIP) : 0
     };
   }) };
 }

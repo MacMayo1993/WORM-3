@@ -63,8 +63,8 @@ describe('the opening script', () => {
   });
 });
 
-// Three words carry their own move (a box drawn round "box", a sticker flip
-// under "flip" and "cube"). Each must be found in the script and finish before
+// Two words carry their own move (a sticker flip under "flip" and "cube").
+// Each must be found in the script and finish before
 // its line starts to dissolve, or the move is cut off mid-air.
 describe('accent words', () => {
   it('finds every accent in the script and completes its move while the line is fully on screen', () => {
