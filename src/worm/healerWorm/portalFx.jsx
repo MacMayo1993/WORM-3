@@ -3,9 +3,11 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
+import { raisedPortalPosition } from '../raisedPortalPosition.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { FACE_NORMALS } from './constants.js';
+
+const getStickerWorldPos = (x, y, z, face, size) => raisedPortalPosition(x, y, z, face, size, useGameStore.getState());
 
 // Pre-allocated scratch vector for PortalGlow
 const _glowPos = new THREE.Vector3();

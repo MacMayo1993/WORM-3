@@ -1,3 +1,5 @@
+import { makeCubies } from '../game/cubeState.js';
+import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -215,4 +217,28 @@ it.each([3, 7, 15])('keeps a full collection close and centered on a %s cube', s
     expect(scene.camera.position.distanceTo(head)).toBeLessThan(startingDistance * 1.5);
     expectCentered(worm, size);
   }
+});
+
+
+it.each([3, 7, 15])('frames the head and a raised cubie together on a portrait size-%i board', size => {
+  const before = useGameStore.getState();
+  const cubies = makeCubies(size);
+  const worm = makeWorm(size);
+  const tile = worm.pos.current;
+  cubies[tile.x][tile.y][tile.z].stickers[tile.dirKey].flips = 1;
+  cubies[tile.x][tile.y][tile.z].stickers[tile.dirKey].curr = 4;
+  useGameStore.setState({ cubies, size, wormHealerMode: true, demoMode: false, explosionT: 0,
+    wormGamePhase: 'active', settings: { ...before.settings, flipPads: 'off' } });
+  try {
+    render(worm, size);
+    for (let i = 0; i < 180; i++) tick();
+    const raised = new Vector3().fromArray(raisedPortalPosition(tile.x, tile.y, tile.z, tile.dirKey, size, useGameStore.getState()));
+    for (const point of [worm.headInterpPos.current.clone(), raised]) {
+      const screen = point.project(scene.camera);
+      expect(Math.abs(screen.x)).toBeLessThan(0.85);
+      expect(Math.abs(screen.y)).toBeLessThan(0.85);
+      expect(screen.z).toBeGreaterThan(-1);
+      expect(screen.z).toBeLessThan(1);
+    }
+  } finally { useGameStore.setState(before, true); }
 });

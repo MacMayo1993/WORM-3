@@ -1,5 +1,5 @@
 import TunnelSafetyMarkers from './TunnelSafetyMarkers.jsx';
-import { getWormStickerWorldPos } from '../wormExpansion.js';
+import { raisedPortalPosition } from '../raisedPortalPosition.js';
 // src/worm/healerWorm/WormholeRings.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import React, { useRef } from 'react';
@@ -244,7 +244,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         for (let i = 0; i < allPositions.length; i++) {
             const tile = allPositions[i];
             const { tunnelKey, normal: n, faceId } = tile;
-            const wp = getWormStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size);
+            const wp = raisedPortalPosition(tile.x, tile.y, tile.z, tile.dirKey, size, useGameStore.getState());
             const isVoid = !!(tunnelKey && voidKeys.has(tunnelKey));
             const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
             const isCritical = !isVoid && traversals >= WORMHOLE_MAX_TRAVERSALS;
