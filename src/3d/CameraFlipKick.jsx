@@ -7,10 +7,11 @@
 import { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { flipImpulse } from './flipImpulse.js';
+import { flipImpulse, cameraShake, stepCameraShake } from './flipImpulse.js';
 
 const _target = new THREE.Vector3();
 const _dO = new THREE.Vector3();
+const _shake = new THREE.Vector3();
 
 export default function CameraFlipKick({ controlsRef, enabled = true }) {
   const { camera } = useThree();
@@ -23,6 +24,7 @@ export default function CameraFlipKick({ controlsRef, enabled = true }) {
     if (!enabled) {
       applied.current.set(0, 0, 0);
       flipImpulse.t = 0;
+      cameraShake.t = 0;
       return;
     }
     _target.set(0, 0, 0);
@@ -32,6 +34,8 @@ export default function CameraFlipKick({ controlsRef, enabled = true }) {
       const env = Math.sin(u * Math.PI) * flipImpulse.strength; // smooth out-and-back
       _target.copy(flipImpulse.dir).multiplyScalar(env);
     }
+    // Lightning strikes add a decaying three-axis rumble on top of the recoil.
+    if (cameraShake.t > 0) _target.add(stepCameraShake(_shake, delta));
     // Apply only the change vs last frame, to BOTH camera and target → rigid pan.
     _dO.copy(_target).sub(applied.current);
     if (_dO.lengthSq() > 1e-12) {

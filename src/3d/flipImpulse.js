@@ -18,3 +18,28 @@ export function fireFlipImpulse(dir, strength = 0.08) {
   flipImpulse.t = flipImpulse.dur;
   flipImpulse.strength = strength;
 }
+
+// A short rumble for heavy hits — chaos lightning landing on a tile. The recoil
+// above pushes the view along one normal; this jitters it on all three axes and
+// decays, so a strike lands as a jolt through the whole frame. A weaker hit never
+// cuts short a stronger one that is still ringing.
+export const cameraShake = { t: 0, dur: 0.2, amp: 0, phase: 0 };
+
+export function fireCameraShake(amp, dur = 0.2) {
+  const live = cameraShake.t > 0 ? cameraShake.amp * (cameraShake.t / cameraShake.dur) ** 2 : 0;
+  if (!(amp > live)) return;
+  cameraShake.amp = amp;
+  cameraShake.dur = dur;
+  cameraShake.t = dur;
+}
+
+/** Advance the rumble by `dt` seconds and write this frame's offset into `out`. */
+export function stepCameraShake(out, dt) {
+  if (cameraShake.t <= 0) return out.set(0, 0, 0);
+  cameraShake.t = Math.max(0, cameraShake.t - dt);
+  cameraShake.phase += dt;
+  const k = cameraShake.t / cameraShake.dur;
+  const env = cameraShake.amp * k * k;
+  const p = cameraShake.phase;
+  return out.set(Math.sin(p * 83) * env, Math.sin(p * 97 + 1.7) * env, Math.sin(p * 71 + 3.1) * env * 0.6);
+}

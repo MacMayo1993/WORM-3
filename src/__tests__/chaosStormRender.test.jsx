@@ -22,6 +22,8 @@ extend(THREE);
 
 const SIZE = 3;
 const LIFT = SURFACE_OFFSET + 0.03;
+// The main channel is the first strip written each frame: its vertex widths.
+const BOLT_WIDTH_SPAN = 14 * 2;
 
 let root, frame, now, before, refs, cubies, map;
 
@@ -95,8 +97,8 @@ describe('ChaosStorm bolts', () => {
   it('land on the live cubie, and keep following it when it rises mid-flight', async () => {
     const store = await mount();
     pushChaosStormEvents(boltEvent());
-    // Run the leader all the way to the target.
-    for (let i = 0; i < 14; i++) step(store);
+    // Through the charge-up and the leader, all the way to the target.
+    for (let i = 0; i < 16; i++) step(store);
     const geo = stripGeometry(store);
     expect(usedStrips(geo)).toBeGreaterThanOrEqual(1);
     const source = stripVertex(geo, 0, 0);
@@ -117,7 +119,31 @@ describe('ChaosStorm bolts', () => {
     expect(stripVertex(geo, 0, 13).distanceTo(new THREE.Vector3(1 + LIFT, 0, 1))).toBeLessThan(1e-5);
   });
 
-  it('punches the struck cubie on landing and retires its HUD entry exactly once', async () => {
+  it('charges up on the source tile before the channel fires', async () => {
+    const store = await mount();
+    pushChaosStormEvents(boltEvent());
+    step(store);
+    const geo = stripGeometry(store);
+    // Only the gathering arcs so far — no channel, no hit.
+    expect(usedStrips(geo)).toBe(2);
+    expect(stripVertex(geo, 0, 0).distanceTo(new THREE.Vector3(0, 0, 1 + LIFT))).toBeLessThan(0.6);
+    expect(cubieKicks.size).toBe(0);
+  });
+
+  it('opens a thick channel on the return stroke', async () => {
+    const store = await mount();
+    pushChaosStormEvents(boltEvent());
+    for (let i = 0; i < 12; i++) step(store);
+    const geo = stripGeometry(store);
+    const leaderWidth = Math.max(...geo.attributes.aWidth.array.slice(0, BOLT_WIDTH_SPAN));
+    for (let i = 0; i < 4; i++) step(store);
+    const strokeWidth = Math.max(...geo.attributes.aWidth.array.slice(0, BOLT_WIDTH_SPAN));
+    expect(strokeWidth).toBeGreaterThan(leaderWidth * 1.5);
+    // Thick against a ~0.88 tile: a real channel, not a hairline.
+    expect(strokeWidth).toBeGreaterThan(0.3);
+  });
+
+  it('punches the struck cubie on landing, ripples its neighbours, and retires its HUD entry once', async () => {
     const done = vi.fn();
     const store = await mount(done);
     pushChaosStormEvents(boltEvent(99));
@@ -125,6 +151,13 @@ describe('ChaosStorm bolts', () => {
     const kick = cubieKicks.get('2,1,2');
     expect(kick).toBeTruthy();
     expect([kick.x, kick.y, kick.z]).toEqual([0, 0, 1]);
+    // In-face neighbours of (2,1,2) on +Z are (1,1,2), (2,0,2) and (2,2,2):
+    // softer, and a beat later.
+    for (const key of ['1,1,2', '2,0,2', '2,2,2']) {
+      expect(cubieKicks.get(key).amp).toBeLessThan(kick.amp);
+      expect(cubieKicks.get(key).startMs).toBeGreaterThan(kick.startMs);
+    }
+    expect(cubieKicks.has('2,1,1')).toBe(false);
     expect(done).not.toHaveBeenCalled();
     for (let i = 0; i < 40; i++) step(store);
     expect(done).toHaveBeenCalledTimes(1);
