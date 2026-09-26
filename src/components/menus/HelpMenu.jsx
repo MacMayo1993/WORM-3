@@ -84,7 +84,7 @@ const HelpMenu = ({ onClose }) => (
 
         <Section title="Game modes">
           <Row label="Teach" desc="Learn notation, practice the beginner method, then solve a 3×3 independently" />
-          <Row label="Cube" desc="Free play: any size from 2×2 to 10×10, your colors, no timer" />
+          <Row label="Flip Cube" desc="Free play: any size from 2×2 to 10×10, your colors, no timer" />
           <Row label="Worm" desc="Steer a worm across the cube, collect orbs, and heal flipped tiles" />
           <Row label="Chaos" desc="Tiles flip on their own. Predict which color pair lasts longest" />
           <Row label="Random" desc="The colors and tile styles change every 10 seconds while you solve" />

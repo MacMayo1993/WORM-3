@@ -158,7 +158,7 @@ export const CUBE_CAMPAIGN_LEVELS = [
       tip: 'When stuck, isolate one face, then use flips to reason about the opposite face instead of guessing.',
     },
     winCondition: WIN_CONDITIONS.CLASSIC,
-    winMessage: 'CUBE Campaign complete. You are ready for Rubik\'s freeplay.',
+    winMessage: 'CUBE Campaign complete. You are ready for Flip Cube free play.',
     difficulty: DIFFICULTY.MEDIUM,
     tags: cubeTags,
     requirements: { previousLevel: 105, stars: 0, achievements: [] },

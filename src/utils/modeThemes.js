@@ -5,18 +5,21 @@
 import { RUBIKS_FACE_COLORS, DIR_TO_COLOR, readableInk } from './constants.js';
 
 const INK_STRONG = '#354d3c';
-const face = (name, dir) => {
+// `art` is the mode's MODE_ARTWORK key. Those keys are the carousel's older mode
+// ids — 'freeplay' is the Flip Cube's picture and 'cube' is Teach's — so screens
+// look the picture up here instead of guessing it from the display name.
+const face = (name, dir, art) => {
   const accent = RUBIKS_FACE_COLORS[DIR_TO_COLOR[dir]];
-  return { name, face: dir, accent, ink: readableInk(accent), shadow: INK_STRONG };
+  return { name, face: dir, art, accent, ink: readableInk(accent), shadow: INK_STRONG };
 };
 
 export const MODE_THEMES = {
-  worm: face('WORM', 'NX'),     // green
-  cube: face('Cube', 'NY'),     // yellow
-  teach: face('Teach', 'PX'),   // blue
-  chaos: face('Chaos', 'NZ'),   // orange
-  random: face('Random', 'PZ'), // red
-  store: face('Store', 'PY'),   // white
+  worm: face('WORM', 'NX', 'worm'),          // green
+  cube: face('Flip Cube', 'NY', 'freeplay'), // yellow
+  teach: face('Teach', 'PX', 'cube'),        // blue
+  chaos: face('Chaos', 'NZ', 'chaos'),       // orange
+  random: face('Random', 'PZ', 'random'),    // red
+  store: face('Store', 'PY', 'store'),       // white
 };
 
 export function modeTheme(mode) {
