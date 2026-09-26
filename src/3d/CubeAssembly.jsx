@@ -567,7 +567,9 @@ const CubeAssembly = React.memo(({
           // Choosing chaos's first strike: the tap aims it, whatever Flip is set
           // to. Tapping another tile moves the aim; nothing flips until GO.
           const { x, y, z } = ds.pos;
-          const tile = ignitionTileAt(pickStore.cubies, size, x, y, z, dirFromNormal(ds.n));
+          // This listener is installed once, before the wizard changes size.
+          // Grid IDs must use the same live board as the tap and target marker.
+          const tile = ignitionTileAt(pickStore.cubies, pickStore.size, x, y, z, dirFromNormal(ds.n));
           if (tile) {
             pickStore.setChaosIgnition(tile);
             feel('chaosZap', { combo: 3, priority: 1 });
@@ -582,6 +584,7 @@ const CubeAssembly = React.memo(({
           // on the same face. Each wave heals + pops its cubies outward.
           if (store.chaosLevel > 0) {
             if (store.disparityWinner) return;
+            const size = store.size;
             const healRoundId = store.disparityRoundId;
             const healExperience = store.chaosExperience;
             const liveCubs = store.cubies;
@@ -600,7 +603,7 @@ const CubeAssembly = React.memo(({
                 const fire = () => {
                   const now = performance.now();
                   const live = useGameStore.getState();
-                  if (live.chaosLevel <= 0 || live.disparityWinner || live.disparityRoundId !== healRoundId || live.chaosExperience?.startedAt !== healExperience?.startedAt) return;
+                  if (live.chaosLevel <= 0 || live.size !== size || live.disparityWinner || live.disparityRoundId !== healRoundId || live.chaosExperience?.startedAt !== healExperience?.startedAt) return;
                   const cap = selectEffectiveFlipCap(live);
                   let updated = live.cubies;
                   const pops = {};

@@ -11,7 +11,7 @@ import { resolveBet, calcPayout, speedThresholdFor } from '../utils/disparityBet
 import { DISPARITY_GAME_LENGTHS } from '../utils/economyConstants.js';
 import { makeCubies } from '../game/cubeState.js';
 import { vibrate } from '../utils/audio.js';
-import { chaosSetupSettings } from '../utils/chaosSetup.js';
+import { chaosSetupSettings, normalizeChaosSize } from '../utils/chaosSetup.js';
 import { resolveWizardTileStyles } from '../utils/wizardTileStyles.js';
 import { randomIgnitionTile } from '../game/chaosIgnition.js';
 
@@ -224,7 +224,7 @@ export function useDisparityGame({
     setChaosLevel(0);
     // Read the live size: this runs from callbacks captured before a re-render.
     const liveSize = useGameStore.getState().size;
-    const targetSize = wizardSettings.cubeSize || liveSize;
+    const targetSize = normalizeChaosSize(wizardSettings.cubeSize ?? liveSize);
     if (targetSize !== liveSize) changeSize(targetSize);
     else resetCube();
   }, [settings, setSettings, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, changeSize]);

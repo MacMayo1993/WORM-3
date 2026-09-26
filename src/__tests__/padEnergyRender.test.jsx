@@ -10,10 +10,10 @@ import { PAD_PROFILES } from '../3d/padPose.js';
 import { TREMBLE_NORMAL, TREMBLE_PLANE } from '../3d/padEnergy.js';
 
 extend(THREE);
-it.each([true, false])('renders energy pads with pause, healing and reduced motion (WORM=%s)', async wormHealerMode => {
+it.each([[true, 0], [false, 0], [false, 3]])('renders energy pads with pause, healing and reduced motion (WORM=%s, chaos=%i)', async (wormHealerMode, chaosLevel) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
-  useGameStore.setState({ size: 3, chaosLevel: 0, wormHealerMode, mirrorMode: false, demoMode: false, wormPauseMenuOpen: false,
+  useGameStore.setState({ size: 3, chaosLevel, wormHealerMode, mirrorMode: false, demoMode: false, wormPauseMenuOpen: false,
     settings: { ...before.settings, flipPads: 'full', reducedMotion: false } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
