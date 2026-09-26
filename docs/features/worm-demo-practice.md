@@ -1,6 +1,6 @@
 # Guided WORM practice
 
-The WORM chapter now contains 18 independent exercises. It no longer finishes
+The WORM chapter now contains 17 independent exercises. It no longer finishes
 when the first tunnel is entered or exited. Players can start, retry, skip an
 exercise, or end practice. Each fresh board waits for **Try it**; completed
 exercises pause until **Next**. Retrying preserves earlier completion records.
@@ -10,7 +10,6 @@ exercises pause until **Next**. Retrying preserves earlier completion records.
 | Steering | Simulation accepts a direction change |
 | Orbs | Two real pickups (six healing charges) |
 | Jump | Takeoff and landing |
-| Double jump | Two jumps in one flight, then landing |
 | Boost | Actual burst runs to its end |
 | Tunnel | Exit and tail clearance, with no deposit |
 | Heal | Matching charges deposited; both ends heal and tail clears |

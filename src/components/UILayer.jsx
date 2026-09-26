@@ -353,12 +353,13 @@ export default function UILayer({
         {/* Bottom Navigation Bar — hidden while a demo dialogue is presenting */}
         {showGameHUD && !demoDialogueVisible && (
           <BottomNavBar
-            onUndo={undo}
-            canUndo={canUndo}
             // Every tile reports its press to the demo (onDemoNavTap) AFTER
             // running its real action, so the control tour can advance on the
             // press that actually did the thing. Outside the demo the callback
-            // is absent and these are ordinary buttons.
+            // is absent and these are ordinary buttons. Undo is disabled until
+            // canUndo, so its press always has a move to take back.
+            onUndo={() => { undo(); onDemoNavTap?.('undo'); }}
+            canUndo={canUndo}
             onReset={() => { onReset(); onDemoNavTap?.('reset'); }}
             onShuffle={() => { (currentLevelData ? onShuffleForLevel : onShuffle)(); onDemoNavTap?.('shuffle'); }}
             chaosMode={chaosMode}

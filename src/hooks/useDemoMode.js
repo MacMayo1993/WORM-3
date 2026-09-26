@@ -48,7 +48,7 @@ const COACH_DELAY_MS = {
   chaos: 5000,      // the winner-call is quick to grasp
   worm: 10000,      // let the worm actually get moving first
   settings: 12000,  // give them a beat to open a tab before offering the exit
-  random: 12000,    // a full reroll cycle is ~15s; offer out just before one lands
+  random: 12000,    // remixes land every 10s (useRandomMode); offer out once one has been seen
 };
 
 export function useDemoMode({
@@ -718,7 +718,10 @@ export function useDemoMode({
       store.clearDisparityGame();
       cancelDisparityRun();
     }
-    if (store.disparityRunning) {
+    // A Chaos round in any stage — scramble, first-strike pick, countdown or
+    // live storm. (This used to test `disparityRunning`, a field the store has
+    // never had, so an exit mid-round left the launch running.)
+    if (store.demoStep === 'chaos-forecast' || store.chaosLevel > 0 || store.chaosIgnitionPicking) {
       store.clearDisparityGame();
       cancelDisparityRun();
     }
@@ -809,7 +812,10 @@ export function useDemoMode({
     };
     useGameStore.getState().setRotatedCubies(makeCubies(useGameStore.getState().size));
     useGameStore.getState().resetGame();
-    startDisparityGame(wizardSettings);
+    // Same launch as a live round, first-strike pick included: the player aims
+    // where the storm hits first (ChaosIgnitionPrompt), then the countdown runs.
+    // Skipping, exiting or Home all clear the pick with the rest of the session.
+    startDisparityGame(wizardSettings, { pickIgnition: true });
   }, [startDisparityGame]);
 
   // The spotlighted Views button was tapped — start the view sequence.

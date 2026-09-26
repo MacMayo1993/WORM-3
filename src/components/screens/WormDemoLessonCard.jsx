@@ -17,8 +17,12 @@ export default function WormDemoLessonCard({ onRetry, onSkip }) {
   if (s.paused || s.finished || !['active', 'finalHealing'].includes(s.phase ?? 'active')) return null;
   const dead = s.alive === false;
   const cause = s.details?.cause || s.details?.reason;
+  // One line per way a run can end (killWormSim reasons), each naming the rule
+  // that ended it and the move that avoids it.
   const advice = cause === 'bomb' ? 'A bomb blast hit you. Keep clear of the marked blast tiles.'
     : cause === 'slice-rotation' || cause === 'rotation' ? 'The turning layer caught you. Move clear of its lights.'
+    : cause === 'self-collision' || cause === 'self' ? 'You ran into your own body. Steer around it, or press JUMP to hop over it.'
+    : cause === 'voided' || cause === 'void-tunnel-exhausted' ? 'That tunnel collapsed. An open tunnel holds for three rides; heal it before then.'
     : 'Your run ended. Try this exercise again with a fresh practice board.';
   return <section className="arcade-card arcade-paper worm-demo-card" style={arcadeModeVars('worm')} aria-label="WORM practice">
     <div className="worm-demo-heading"><strong>{lesson.title}</strong><span>{(s.demoWormLessonIndex ?? 0) + 1}/{WORM_DEMO_LESSONS.length}</span></div>

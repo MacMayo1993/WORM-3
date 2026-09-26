@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEMO_STEPS, DEMO_LEVEL_CONFIGS, TRY_COPY, STEP_COMPLETE_NOTE, CONTROL_TOUR_SEQUENCE, CONTROL_TOUR_KEYS,
+  VIEW_SHOWCASE_SEQUENCE,
 } from '../components/screens/DemoFlowController.jsx';
 import { STEP_COPY } from '../utils/demoStepCopy.js';
+import { FLIP_CAP } from '../utils/constants.js';
+import { WORM_DEMO_LESSONS } from '../game/wormDemoLessons.js';
+import { WORMHOLE_MAX_TRAVERSALS as WORM_MAX_RIDES } from '../worm/healerWorm/constants.js';
+import { classifyTraversal } from '../worm/healerWorm/economy.js';
 
 // Mirrors advanceDemoStep in useDemoMode.js: next id, or 'end' past the last.
 const IDS = DEMO_STEPS.map((s) => s.id);
@@ -104,15 +109,17 @@ describe('demo flow state machine', () => {
 // for a press of that specific tile, so the sequence has to name every tile
 // exactly once, in bar order, with no gaps.
 describe('control tour', () => {
-  const BAR_ORDER = ['reset', 'shuffle', 'flip', 'views', 'more'];
+  // Reset, Shuffle and Undo share the first slot: the tour swaps the first two
+  // in for Undo while it teaches them, then hands the slot back to Undo.
+  const BAR_ORDER = ['reset', 'shuffle', 'undo', 'flip', 'views', 'more'];
 
   it('covers every bottom-bar button, in bar order, once each', () => {
     expect(CONTROL_TOUR_KEYS).toEqual(BAR_ORDER);
     expect(new Set(CONTROL_TOUR_KEYS).size).toBe(CONTROL_TOUR_KEYS.length);
   });
 
-  it('maps Reset and Shuffle to the same first slot in the four-button dock', () => {
-    expect(CONTROL_TOUR_SEQUENCE.map((b) => b.slot)).toEqual([1, 1, 2, 3, 4]);
+  it('maps Reset, Shuffle and Undo to the same first slot in the four-button dock', () => {
+    expect(CONTROL_TOUR_SEQUENCE.map((b) => b.slot)).toEqual([1, 1, 1, 2, 3, 4]);
   });
 
   it('gives every beat a title and copy that asks for the press', () => {
@@ -179,5 +186,83 @@ describe('demo copy stays in plain language', () => {
 
   it('the learn-to-solve completion note points at the full lesson by its menu name', () => {
     expect(STEP_COMPLETE_NOTE['learn-to-solve'].toLowerCase()).toContain('learn to solve');
+  });
+});
+
+// The demo is the only tutorial most players see, so each rule a mode runs on
+// has to be stated somewhere in it — and stated the way the code enforces it.
+// These pin the copy to the constants behind it, so a tuning change that makes
+// the demo wrong fails here instead of shipping.
+describe('demo explains every mode’s rules accurately', () => {
+  it('Flip Cube: the first step names its finish line — every face one color', () => {
+    expect(STEP_COPY['baby-cube'].toLowerCase()).toContain('every face is one color');
+    expect(TRY_COPY['baby-cube'].toLowerCase()).toContain('every face is one color');
+  });
+
+  it('Flip Cube: tile life matches FLIP_CAP, and Undo is named as the free take-back', () => {
+    const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    const note = STEP_COMPLETE_NOTE['flip-gateway'].toLowerCase();
+    expect(note).toContain(`${words[FLIP_CAP]} times`);
+    expect(note).toContain('undo');
+  });
+
+  it('Flip Cube: the control tour teaches Undo, the key that holds the first slot after it', () => {
+    expect(CONTROL_TOUR_KEYS).toContain('undo');
+    const undo = CONTROL_TOUR_SEQUENCE.find((b) => b.key === 'undo');
+    // Shuffle empties the history, so the beat has to ask for a move first.
+    expect(undo.copy.toLowerCase()).toMatch(/twist .* then tap undo/);
+    expect(CONTROL_TOUR_KEYS.indexOf('undo')).toBeGreaterThan(CONTROL_TOUR_KEYS.indexOf('shuffle'));
+  });
+
+  it('Teach: the solve cameo is named as the Solve guide, and Teach as the full course', () => {
+    const note = STEP_COMPLETE_NOTE['learn-to-solve'].toLowerCase();
+    expect(note).toContain('solve guide');
+    expect(note).toContain('more');
+    expect(note).toContain('teach');
+    expect(note).not.toContain('that was teach');
+  });
+
+  it('Chaos: the setup line covers the first strike, tile wear in twin pairs, and healing', () => {
+    const line = STEP_COPY['chaos-forecast'].toLowerCase();
+    expect(line).toContain('strikes first');
+    expect(line).toContain('twins drop out together');
+    expect(line).toContain('heal');
+  });
+
+  it('Random: says only the look changes, never the rules, on the real ten-second cycle', () => {
+    for (const line of [STEP_COPY['random-showcase'], TRY_COPY['random-showcase']]) {
+      expect(line.toLowerCase()).not.toMatch(/\brules\b/);
+      expect(line.toLowerCase()).toContain('ten seconds');
+    }
+  });
+
+  it('Store: names what it sells and where points come from', () => {
+    const line = STEP_COPY['cosmetic-reward'].toLowerCase();
+    for (const word of ['worms', 'signature', 'palettes', 'tiles', 'earn']) expect(line).toContain(word);
+  });
+
+  it('WORM: the chapter note explains how a full run is won and introduces portal enemies', () => {
+    const note = STEP_COMPLETE_NOTE['worm-traversal'].toLowerCase();
+    expect(note).toContain('scramble');
+    expect(note).toContain('heal every tunnel to win');
+    expect(note).toContain('enemies');
+    expect(note).toContain('fire');
+  });
+
+  it('WORM: tunnel wear matches the traversal limit, and orb color matching is spelled out', () => {
+    const words = ['zero', 'one', 'two', 'three', 'four', 'five'];
+    const lesson = (id) => WORM_DEMO_LESSONS.find((l) => l.id === id);
+    expect(lesson('tunnel').success).toContain(`${words[WORM_MAX_RIDES]} rides`);
+    expect(classifyTraversal(WORM_MAX_RIDES)).toBe('safe');
+    expect(classifyTraversal(WORM_MAX_RIDES + 1)).toBe('void-arm');
+    expect(lesson('orbs').success.toLowerCase()).toContain('color');
+    expect(lesson('rotation').instruction.toLowerCase()).toContain('head');
+    expect(lesson('rotation').instruction.toLowerCase()).toContain('tail');
+  });
+
+  it('Views: Grid is described as tile addresses, which is what it renders', () => {
+    const grid = VIEW_SHOWCASE_SEQUENCE.find((v) => v.key === 'grid');
+    expect(grid.copy.toLowerCase()).toContain('address');
+    expect(grid.copy.toLowerCase()).not.toContain('grid lines');
   });
 });

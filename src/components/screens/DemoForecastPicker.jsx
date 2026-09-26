@@ -12,6 +12,14 @@ const PAIRS = [
   { id: 'white-yellow', label: 'White ↔ Yellow', note: 'top and bottom', colors: ['#ffffff', '#FFD500'], faceIds: [3, 6] },
 ];
 
+// The Chaos rules the demo round runs on (chaosHeal.js, the pair-death check,
+// disparityBetting.js), in the order the player meets them.
+const FORECAST_RULES = [
+  'Every flip wears a tile down. At the flip limit, a tile and its twin drop out together.',
+  'Tap a damaged tile to heal it. Healing can change which pair survives.',
+  'The last pair standing wins. This forecast is free; in Chaos mode you can stake Parity Points on four kinds of prediction.',
+];
+
 export default function DemoForecastPicker({ onPick, onSkip }) {
   const [selected, setSelected] = useState(null);
 
@@ -37,10 +45,19 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
         Which pair survives?
       </h2>
       <p style={{
-        color: 'rgba(255,253,242,0.86)', fontSize: 14, margin: '0 0 28px', maxWidth: 320,
+        color: 'rgba(255,253,242,0.86)', fontSize: 14, margin: '0 0 12px', maxWidth: 320,
       }}>
-        Choose the color pair you think will survive. Then tap Confirm pick to start.
+        Choose the color pair you think will survive, then tap Confirm pick. Next, tap any tile to aim the storm’s first strike.
       </p>
+      {/* The live round's HUD keeps these rules behind "Inspect match", so the
+          picker is where the demo states them. One line per rule the player can
+          see or act on; the last names what the real mode adds. */}
+      <ul aria-label="How the round works" style={{
+        color: 'rgba(255,253,242,0.78)', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left',
+        margin: '0 0 22px', padding: '0 0 0 18px', maxWidth: 300,
+      }}>
+        {FORECAST_RULES.map((rule) => <li key={rule} style={{ marginBottom: 4 }}>{rule}</li>)}
+      </ul>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 280, flexShrink: 0 }}>
         {PAIRS.map((pair) => (

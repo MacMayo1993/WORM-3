@@ -30,12 +30,22 @@ const DEMO_STEPS = [
   { id: 'end', label: 'Complete', num: 12 },
 ];
 
-// Extra line held under a step's STEP COMPLETE stamp. Only the twin step has
-// one: now that the player has felt two tiles move together, naming the formal
-// concept costs nothing and rewards the curious.
+// Extra line held under a step's STEP COMPLETE stamp: the rule the player just
+// brushed against but the hands-on phase had no room to spell out. The twin
+// step's is the one place the formal name appears; now that the player has felt
+// two tiles move together, naming it costs nothing and rewards the curious.
 const STEP_COMPLETE_NOTE = {
-  'learn-to-solve': 'That was Teach Mode. Choose Learn to Solve from the menu for the full lesson.',
+  // The cameo runs the Solve guide from the More sheet (the live Kociemba
+  // solver), not Teach — Teach is a fixed twelve-lesson course and explicitly
+  // not an adaptive solver. Name both so neither is mistaken for the other.
+  'learn-to-solve': 'That was the Solve guide from More. For a full beginner course, pick Learn to solve on the Teach face: twelve lessons from notation to a solo solve.',
   'twin-paradox': TWIN_ASIDE,
+  // Tile life is the Flip Cube rule the flip steps spend without naming: FLIP_CAP
+  // flips per pair, re-flipping spends another, Undo hands one back.
+  'flip-gateway': 'Each pair can flip six times before it wears out and turns grey. Tapping a pair home spends a flip; Undo takes one back for free.',
+  // Practice isolates each mechanic, so it never shows how a full run is put
+  // together — or the enemies that live runs send through the portals.
+  'worm-traversal': 'Full runs start scrambled. Warned layer turns undo the scramble while new tunnels open on a timer; after the last turn, heal every tunnel to win. Enemies can also come through portals: steer to aim, hold Fire.',
 };
 
 export const DEMO_STEP_IDS = DEMO_STEPS.map(s => s.id);
@@ -747,14 +757,16 @@ const DEMO_LEVEL_CONFIGS = {
 // theory, and keep it to one breath — this pill has to read at a glance while
 // the player's thumb is already on the cube.
 const TRY_COPY = {
-  'baby-cube': 'Drag a row or column to twist it. Drag outside the cube to change your view. Find <strong>Reset</strong> in More.',
+  'baby-cube': 'Twist rows and columns until every face is one color. Drag outside the cube to turn your view. Stuck? <strong>Reset</strong> is in More.',
   'learn-to-solve': 'Follow the <strong>gold ring</strong> — drag the glowing layer the way the light sweeps. It always knows the way home.',
   'twin-paradox': 'With Flip on, tap a tile. Its opposite twin moves with it.',
   'flip-gateway': 'Tap nine different pairs to send them across. Then tap the moved tiles to bring them back.',
   'make-it-yours': 'Try the <strong>Colors</strong>, <strong>Tiles</strong> and <strong>Scene</strong> tabs. Close Settings when you like what you see.',
   'worm-traversal': 'Steer left or right. Collect orbs, then jump onto raised flip pads to ride and heal their tunnels.',
-  'chaos-forecast': 'Watch which color pair survives. Will it be your pick?',
-  'random-showcase': 'Watch the rules and look change. Tap Skip lesson when you’re ready.',
+  'chaos-forecast': 'Tap a damaged tile to send a healing wave through the damaged tiles joined to it. Healing can change which pair survives.',
+  // Random remixes presentation only (useRandomMode): palette, tile styles and
+  // per-cubelet looks. The rules never change, so the copy must not say they do.
+  'random-showcase': 'Every ten seconds the colors and tile looks remix. Each face still solves the same way. Tap Skip lesson when you’re ready.',
 };
 
 // Coach: the guidance already played inside the step-intro dialogue and the hint
@@ -840,6 +852,15 @@ const CONTROL_TOUR_SEQUENCE = [
     title: 'Shuffle',
     copy: 'Tap Shuffle to mix up the cube. It also lives in More.',
   },
+  // Undo is the key that normally holds this slot, and the only bar button the
+  // tour used to skip. Shuffle clears the move history, so the beat asks for a
+  // twist first — the Undo key stays disabled until there is a move to take back.
+  {
+    key: 'undo',
+    slot: 1,
+    title: 'Undo',
+    copy: 'Twist any row or column, then tap Undo to take it back. This key stays here after the tour, and it undoes flips too.',
+  },
   {
     key: 'flip',
     slot: 2,
@@ -908,14 +929,16 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'grid',
     title: 'Grid',
-    copy: 'Grid lines make rows and columns easier to follow.',
+    // Grid prints each tile's address (getManifoldGridId). Twins share the
+    // index, so the labels themselves show the pairing.
+    copy: 'Grid labels every tile with its address. Twins share a number, like M1-003 and M4-003.',
     apply: (s) => s.setVisualMode('grid'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'sudokube',
     title: 'Sudoku',
-    copy: 'Numbered tiles give you another way to recognize each face.',
+    copy: 'Each tile shows a number that travels with it, so you can track pieces without their colors.',
     apply: (s) => s.setVisualMode('sudokube'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
@@ -1181,8 +1204,10 @@ const DemoFlipProgress = ({ progress }) => {
         </div>
         <span className="demo-flip-progress-count">{done} / {total}</span>
       </div>
+      {/* A pair rests REFRACTORY_MS (3s) after it moves, and the ninth send is
+          the likeliest tile to be re-tapped inside that window. */}
       <p>{phase === 'unflip-all'
-        ? 'All nine pairs are across. Tap the raised tiles to bring them home.'
+        ? 'All nine pairs are across. Tap the raised tiles to bring them home. A pair rests for three seconds after it moves.'
         : 'Tap nine different pairs to send them through the cube.'}</p>
     </div>
   );
