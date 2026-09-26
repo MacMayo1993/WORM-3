@@ -11,7 +11,9 @@ export function chaosSetupSettings(current = {}, selection = {}) {
   return {
     ...merged,
     cubeSize: normalizeChaosSize(selection.cubeSize ?? current.cubeSize ?? 3),
-    flipPads: 'full',
+    // Old round snapshots may include flipPads. Chaos's raised presentation is
+    // a runtime override, so setup must retain the player's saved preference.
+    flipPads: current.flipPads,
     colorScheme: selection.colorScheme || current.colorScheme || 'standard',
     customColors: merged.customColors ? { ...merged.customColors } : null,
     biomeMode: { enabled: false, faceAssignment: null },

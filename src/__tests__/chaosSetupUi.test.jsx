@@ -37,9 +37,9 @@ it.each([undefined, { cubeSize: 7 }])('limits inherited and replayed setups to t
   expect(onStart.mock.calls[0][0].cubeSize).toBe(5);
 });
 
-it('normalizes the preview and enables the shared raised flip presentation without losing cosmetics', () => {
-  const current = { colorScheme: 'custom', customColors: { 1: '#123456' }, flipPads: 'off' };
-  expect(chaosSetupSettings(current, { cubeSize: 15, tileStyle: 'circuit' }))
-    .toMatchObject({ cubeSize: 5, flipPads: 'full', tileStyle: 'circuit', colorScheme: 'custom', customColors: current.customColors });
-  expect(current.flipPads).toBe('off');
+it.each(['off', 'subtle', 'full'])('preserves the saved %s preference even with an old full-bounce round snapshot', flipPads => {
+  const current = { colorScheme: 'custom', customColors: { 1: '#123456' }, flipPads };
+  expect(chaosSetupSettings(current, { cubeSize: 15, tileStyle: 'circuit', flipPads: 'full' }))
+    .toMatchObject({ cubeSize: 5, flipPads, tileStyle: 'circuit', colorScheme: 'custom', customColors: current.customColors });
+  expect(current.flipPads).toBe(flipPads);
 });
