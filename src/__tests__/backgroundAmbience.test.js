@@ -1,42 +1,69 @@
 import { describe, expect, it } from 'vitest';
-import { ambienceLayout, ambienceRadius, cubePositionAt, TWIN_FACE_PAIRS, AMBIENCE_QUALITY } from '../3d/backgroundAmbience.js';
+import { ambienceLayout, ambienceRadius, cubePositionAt, AMBIENCE_QUALITY, AMBIENCE_STYLES } from '../3d/backgroundAmbience.js';
+import { ambienceCubeGeometry } from '../3d/ambienceCubeMaterial.js';
+import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
+import { Color } from 'three';
 import { MAX_DISTANCE_BY_SIZE } from '../3d/cameraLimits.js';
 
 const SIZES = Object.keys(MAX_DISTANCE_BY_SIZE).map(Number);
 const length = v => Math.hypot(...v);
 
-describe('background ambience layout', () => {
-  it.each(SIZES)('keeps every cube and portal beyond the farthest %i×%i camera', size => {
+describe('background cube field', () => {
+  it.each(SIZES)('keeps every cube beyond the farthest %i camera and apart throughout its drift', size => {
     const maxCamera = MAX_DISTANCE_BY_SIZE[size];
-    const layout = ambienceLayout(size);
-    for (const cube of layout.cubes) {
-      for (const t of [0, 13, 97, 600]) {
-        // Nearest point of the tumbling cube (half its diagonal) still clears the camera.
-        expect(length(cubePositionAt(cube, t)) - cube.scale * Math.sqrt(3) / 2).toBeGreaterThan(maxCamera);
+    for (const seed of [1, 42, 0x57a3]) {
+      const layout = ambienceLayout(size, 'full', seed);
+      for (const t of [0, 13, 97, 600, 3600]) {
+        const points = layout.cubes.map(cube => cubePositionAt(cube, t));
+        layout.cubes.forEach((cube, i) => {
+          const bound = cube.scale * Math.sqrt(3) / 2;
+          expect(length(points[i]) - bound).toBeGreaterThan(maxCamera);
+          for (let j = 0; j < i; j++) {
+            const separation = length(points[i].map((v, axis) => v - points[j][axis]));
+            expect(separation).toBeGreaterThan(bound + layout.cubes[j].scale * Math.sqrt(3) / 2);
+          }
+        });
+      }
+      expect(ambienceRadius(size)).toBeGreaterThan(maxCamera);
+      expect(layout).not.toHaveProperty('wormholes');
+    }
+  });
+
+  it('assigns one style and palette to each cube with no duplicate combinations', () => {
+    for (const seed of [1, 42, 500]) {
+      const cubes = ambienceLayout(5, 'full', seed).cubes;
+      expect(new Set(cubes.map(c => `${c.style}:${c.palette}`)).size).toBe(cubes.length);
+      expect(new Set(cubes.map(c => c.style)).size).toBe(AMBIENCE_STYLES.length);
+      expect(new Set(cubes.map(c => c.palette)).size).toBeGreaterThan(20);
+      for (const cube of cubes) {
+        expect(AMBIENCE_STYLES).toContain(cube.style);
+        expect(COLOR_SCHEMES[cube.palette]).toBeTruthy();
       }
     }
-    for (const portal of layout.wormholes) expect(length(portal.position) - portal.ring * 1.1).toBeGreaterThan(maxCamera);
-    expect(ambienceRadius(size)).toBeGreaterThan(maxCamera);
   });
 
-  it('places wormholes in antipodal twin pairs with twin colours', () => {
-    const { wormholes } = ambienceLayout(5);
-    for (let i = 0; i < wormholes.length; i += 2) {
-      const [a, b] = [wormholes[i], wormholes[i + 1]];
-      a.position.forEach((x, k) => expect(b.position[k]).toBeCloseTo(-x, 9));
-      expect(TWIN_FACE_PAIRS.some(([p, q]) => (p === a.face && q === b.face) || (q === a.face && p === b.face))).toBe(true);
-      expect([a.twin, b.twin]).toEqual([b.face, a.face]);
-    }
+  it('randomizes between scenes but holds identities steady across quality changes', () => {
+    const full = ambienceLayout(4, 'full', 42), reduced = ambienceLayout(4, 'reduced', 42);
+    expect(full).toEqual(ambienceLayout(4, 'full', 42));
+    expect(full).not.toEqual(ambienceLayout(4, 'full', 43));
+    expect(reduced.cubes).toEqual(full.cubes.slice(0, AMBIENCE_QUALITY.reduced.cubes));
+    expect(full.cubes).toHaveLength(AMBIENCE_QUALITY.full.cubes);
+    for (const cube of full.cubes) expect(Math.abs(cube.speed) * 10).toBeLessThan(Math.PI * 2 / 10);
   });
 
-  it('is deterministic and scales down in the reduced-effects tier', () => {
-    expect(ambienceLayout(4)).toEqual(ambienceLayout(4));
-    expect(ambienceLayout(4, 'reduced').cubes).toHaveLength(AMBIENCE_QUALITY.reduced.cubes);
-    expect(ambienceLayout(4, 'reduced').wormholes).toHaveLength(AMBIENCE_QUALITY.reduced.wormholePairs * 2);
-    expect(ambienceLayout(4).cubes).toHaveLength(AMBIENCE_QUALITY.full.cubes);
-  });
-
-  it('drifts slowly: under a tenth of a turn per ten seconds', () => {
-    for (const cube of ambienceLayout(3).cubes) expect(Math.abs(cube.speed) * 10).toBeLessThan(Math.PI * 2 / 10);
+  it('renders each cube with its own six palette colours and a single shared face style', () => {
+    const cubes = ambienceLayout(3).cubes, geometry = ambienceCubeGeometry(cubes);
+    try {
+      cubes.forEach((cube, i) => {
+        expect(geometry.getAttribute('cubeStyle').getX(i)).toBe(AMBIENCE_STYLES.indexOf(cube.style));
+        [5, 2, 3, 6, 1, 4].forEach((face, index) => {
+          const attr = geometry.getAttribute(`palette${index}`), expected = new Color(COLOR_SCHEMES[cube.palette][face]);
+          expect(attr.getX(i)).toBeCloseTo(expected.r, 6);
+          expect(attr.getY(i)).toBeCloseTo(expected.g, 6);
+          expect(attr.getZ(i)).toBeCloseTo(expected.b, 6);
+          expect(attr.isInstancedBufferAttribute).toBe(true);
+        });
+      });
+    } finally { geometry.dispose(); }
   });
 });
