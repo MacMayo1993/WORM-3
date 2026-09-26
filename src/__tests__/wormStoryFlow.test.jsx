@@ -4,6 +4,8 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useWormCrawler } from '../worm/useWormCrawler.js';
 import { makeCubies } from '../game/cubeState.js';
+import * as storyRuntime from '../worm/story/runtime.js';
+import { ELEMENTAL_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
 import { storyLevel } from '../worm/story/levels.js';
 import { newProgress } from '../progression/model.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
@@ -146,6 +148,39 @@ it('cannot win Moving Ground by waiting out six turns without collecting the orb
   act(() => useGameStore.setState({ rotationEpoch: state().rotationEpoch + 6, animState: null }));
   frame(); expect(state().wormStoryResult).toBeNull(); expect(state().wormStoryProgress).toContain('6/6 turns');
 });
+it.each(['view-glass', 'fire'])('holds Story time through the entire %s pickup reveal, including its final frame', type => {
+  const metricsSpy = vi.spyOn(storyRuntime, 'storyMetrics');
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(10);
+  const target = getNextSurfacePosition(worm.pos.current, worm.moveDir.current, state().size);
+  worm.specials.current = [{ ...target, type, id: 'reveal-clock-regression', ttl: 20, maxTtl: 20 }];
+  seek(target, () => worm.elementalFocusT.current > 0);
+  expect(worm.elementalFocusT.current).toBe(ELEMENTAL_FOCUS_DURATION);
+  expect(type === 'fire' ? state().wormElementalTheme : state().wormViewPower).toBe(type);
+  // Put the deadline just ahead: charging even one held frame would kill the run.
+  const practice = metricsSpy.mock.calls.at(-1)[1];
+  const elapsed = storyLevel(10).limit - 0.03;
+  practice.elapsed = elapsed;
+  const playTime = worm.timeAliveRef.current;
+  let frames = 0;
+  while (worm.elementalFocusT.current > 0 && frames++ < 150) {
+    frame(0.037); // deliberately overshoots the last fractional reveal frame
+    expect(metricsSpy.mock.results.at(-1).value.elapsed).toBe(elapsed);
+    expect(worm.timeAliveRef.current).toBe(playTime);
+    expect(state().wormAlive).toBe(true);
+  }
+  expect(worm.elementalFocusT.current).toBe(0);
+  expect(frames).toBeGreaterThan(100);
+  expect(state().wormStoryChecklist.seconds).toBe(1);
+  frame(0.01);
+  expect(practice.elapsed).toBeCloseTo(elapsed + 0.01, 10);
+  expect(state().wormAlive).toBe(true);
+  frame(0.05);
+  expect(state().wormDeathDetails).toMatchObject({ reason: 'story-timeout' });
+});
+
 it('expires with a clear cause and resets the deadline on retry', () => {
   begin(1);
   for (let i = 0; i < 6500 && state().wormAlive; i++) frame();
