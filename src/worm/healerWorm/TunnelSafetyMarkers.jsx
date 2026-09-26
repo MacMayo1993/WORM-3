@@ -1,7 +1,8 @@
+import { useGameStore } from '../../hooks/useGameStore.js';
 import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getWormStickerWorldPos } from '../wormExpansion.js';
+import { raisedPortalPosition } from '../raisedPortalPosition.js';
 import { isParityLocked } from './signatures.js';
 import { WORMHOLE_MAX_TRAVERSALS } from './constants.js';
 
@@ -66,7 +67,7 @@ export default function TunnelSafetyMarkers({ positions, size, worm, cubies, voi
     camera.getWorldPosition(cameraPosition);
     camera.getWorldQuaternion(cameraQuaternion);
     for (const tile of positions) {
-      const wp = getWormStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size);
+      const wp = raisedPortalPosition(tile.x, tile.y, tile.z, tile.dirKey, size, useGameStore.getState());
       const n = tile.normal;
       // Do not let a raised sign peek around a face turned away from the camera.
       if ((cameraPosition.x - wp[0]) * n.x + (cameraPosition.y - wp[1]) * n.y + (cameraPosition.z - wp[2]) * n.z <= 0) continue;

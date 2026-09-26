@@ -7,7 +7,10 @@
 Cube modes now raise whole flipped cubies, retain the small square pads and use full-back
 antipodal stalks. WORM now enables whole-cubie expansion and a deliberate jump to a raised
 face underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
-camera follows the same head. Flipped-face landings enter the tunnel; unflipped carried faces
+camera follows the same head. Nearby platforms receive portrait framing that includes both
+the worm and its jump destination. Portal rings, caution tape, signs and portal effects use
+the raised tile position, not the floor lattice. Mirror view and cosmetic pad settings cannot
+disable physical WORM lift. Flipped-face landings enter the tunnel; unflipped carried faces
 are platforms. Crawl does not enter raised mouths. Tunnel paths and exit handoffs use the
 expanded endpoints. Demo lessons retain the legacy route.
 

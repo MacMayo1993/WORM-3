@@ -1,3 +1,4 @@
+import { nearbyPlatform, makePlatformFrame, framePlatform } from './platformFraming.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov } from './healerWorm/zoomLimit.js';
 import React, { useEffect, useRef } from 'react';
@@ -172,6 +173,7 @@ export function frameSurfaceCamera(camera, portraitFactor, head = null) {
 export default function WormChaseCamera({ worm, size }) {
     const { camera, size: viewportSize } = useThree();
     const mobile = useIsMobile();
+    const platformFrame = useRef(makePlatformFrame());
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
     const lookAtRef = useRef(new THREE.Vector3(0, 0, 0));
     const camUpRef = useRef(new THREE.Vector3(0, 1, 0));  // smoothed up — prevents instant snap
@@ -672,6 +674,17 @@ export default function WormChaseCamera({ worm, size }) {
                 lookAtRef.current.copy(_mobileHeadWorld);
             } else if (!mobile && !rocketLift && !(worm.healPauseT?.current > 0) && !cutBeat) {
                 frameSurfaceCamera(camera, portraitFactor);
+            }
+            if (!cutBeat && !(worm.healPauseT?.current > 0)) {
+                bodyPathHeadInto(_mobileHeadWorld, worm, false);
+                framePlatform(camera, platformFrame.current, nearbyPlatform(worm, size, gameState),
+                    _mobileHeadWorld, _camNormal, _camForward, delta);
+                if (platformFrame.current.weight > 0.001) {
+                    camPosRef.current.copy(camera.position);
+                    camera.getWorldDirection(platformFrame.current.direction);
+                    lookAtRef.current.copy(camera.position).addScaledVector(platformFrame.current.direction,
+                        camera.position.distanceTo(_mobileHeadWorld));
+                }
             }
             camUpRef.current.copy(camera.up);
         } else if (phase === 'windup' || phase === 'entering') {
