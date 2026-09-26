@@ -37,8 +37,10 @@ export function useDisparityGame({
   // null | 3 | 2 | 1 | 'GO!'
   const [disparityCountdown, setDisparityCountdown] = useState(null);
   // True between the scramble and the countdown while the player picks the tile
-  // chaos ignites on (mirrored to the store's chaosIgnitionPicking for the taps).
-  const [ignitionPicking, setIgnitionPicking] = useState(false);
+  // chaos ignites on. Read from the store, not held here: every session reset
+  // (Home, reset, a mode switch) clears the store flag, so the prompt can never
+  // outlive the round it belongs to.
+  const ignitionPicking = useGameStore((s) => s.chaosIgnitionPicking);
 
   const pendingDisparityLevelRef = useRef(3);
   const pendingWizardSettingsRef = useRef(null);
@@ -228,7 +230,6 @@ export function useDisparityGame({
   }, [settings, setSettings, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, changeSize]);
 
   const stopIgnitionPick = useCallback(() => {
-    setIgnitionPicking(false);
     useGameStore.getState().setChaosIgnitionPicking(false);
   }, []);
 
@@ -276,7 +277,6 @@ export function useDisparityGame({
         // Scramble finished — the player aims the first strike, or the
         // 3-2-1-GO countdown starts straight away.
         if (pickIgnition) {
-          setIgnitionPicking(true);
           useGameStore.getState().setChaosIgnitionPicking(true);
         } else {
           setDisparityCountdown(3);
@@ -285,9 +285,11 @@ export function useDisparityGame({
     }, 50);
   }, [applyChaosSetup, stopIgnitionPick, reset, cancelShuffle, startAnimatedShuffle]);
 
-  // "Strike here": lock the aimed tile in and count down.
+  // "Strike here": lock the aimed tile in and count down. Both keys act only while
+  // a pick is actually open — a stale press after leaving must not launch a round.
   const confirmIgnition = useCallback(() => {
-    if (!useGameStore.getState().chaosIgnition) return;
+    const s = useGameStore.getState();
+    if (!s.chaosIgnitionPicking || !s.chaosIgnition) return;
     stopIgnitionPick();
     setDisparityCountdown(3);
   }, [stopIgnitionPick]);
@@ -295,6 +297,7 @@ export function useDisparityGame({
   // "Surprise me": the storm picks, and the countdown starts at once.
   const surpriseIgnition = useCallback(() => {
     const s = useGameStore.getState();
+    if (!s.chaosIgnitionPicking) return;
     s.setChaosIgnition(randomIgnitionTile(s.cubies, s.size, s.disparityFlipCap));
     stopIgnitionPick();
     setDisparityCountdown(3);

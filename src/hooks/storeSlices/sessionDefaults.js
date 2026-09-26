@@ -34,6 +34,11 @@ export const makeDisparityRuntimeDefaults = () => ({
   tunnelBirths: {},
   tunnelPulses: {},
   tunnelDeaths: {},
+  // The first-strike pick. Session state, not setup: every exit that resets the
+  // session (Home, reset, a mode switch) must also drop the prompt and its aim,
+  // or the prompt outlives the round and can launch chaos behind the menu.
+  chaosIgnition: null,
+  chaosIgnitionPicking: false,
 });
 
 // Worm session fields reset on each worm run.

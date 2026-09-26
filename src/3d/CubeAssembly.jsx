@@ -382,6 +382,9 @@ const CubeAssembly = React.memo(({
           // never block rotation while a story level is active.
           const _cs = useGameStore.getState();
           if (_cs.chaosLevel > 0 && !_cs.currentLevelData) return;
+          // Aiming the first strike: a turn here would scramble the board out
+          // from under the round's scripted unshuffle. Taps still aim.
+          if (_cs.chaosIgnitionPicking) return;
         }
         if (gsapAnimRef.current) return;
         const m = mapSwipe(ds.n, dx, dy, ds.shiftKey);
