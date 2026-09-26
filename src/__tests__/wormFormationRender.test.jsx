@@ -106,3 +106,43 @@ it('shows the real cubies rising, grows ribbon and rails together, and lands aft
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }
 });
+
+it('updates both endpoint colors and rails without moving or rebuilding the band', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const before = useGameStore.getState();
+  useGameStore.setState({ wormHealerMode: true, demoMode: false,
+    settings: { ...before.settings, reducedMotion: true } });
+  const refs = [new THREE.Object3D(), new THREE.Object3D()];
+  refs[0].position.set(-2, 0, 0); refs[1].position.set(2, 0, 0);
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas); root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
+  const draw = (color1, color2) => <MobiusTunnel meshIdx1={0} meshIdx2={1} dirKey1="NX" dirKey2="PX"
+    cubieRefs={refs} flips={1} color1={color1} color2={color2} gridId1="a" gridId2="b" tunnelId="a|b" />;
+  try {
+    let store;
+    await act(async () => { store = root.render(draw('#3973e8', '#38c875')); });
+    store.getState().advance(1 / 60);
+    const meshes = [];
+    store.getState().scene.traverse(o => { if (o.material?.uniforms?.uRideCore) meshes.push(o); });
+    expect(meshes).toHaveLength(3);
+    const uniforms = meshes[0].material.uniforms;
+    const versions = meshes.map(o => o.geometry.attributes.position.version);
+    for (const mesh of meshes) {
+      expect(mesh.material.uniforms.uColorA).toBe(uniforms.uColorA);
+      expect(mesh.material.uniforms.uColorB).toBe(uniforms.uColorB);
+      expect(mesh.material.uniforms.uRideCore).toBe(uniforms.uRideCore);
+    }
+    expect(uniforms.uColorA.value.getHexString()).toBe('3973e8');
+    expect(uniforms.uColorB.value.getHexString()).toBe('38c875');
+    await act(async () => root.render(draw('#0051a2', '#009b48')));
+    store.getState().advance(2 / 60);
+    expect(uniforms.uColorA.value.getHexString()).toBe('0051a2');
+    expect(uniforms.uColorB.value.getHexString()).toBe('009b48');
+    expect(meshes.map(o => o.geometry.attributes.position.version)).toEqual(versions);
+  } finally {
+    await act(async () => root.unmount()); useGameStore.setState(before, true);
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});
