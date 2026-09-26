@@ -1,7 +1,8 @@
 import { menuCharacterPair } from './menuCharacterRig.js';
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useContext } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { MenuPortalContext } from './menuPortalContext.js';
 import MenuWormParticle from './MenuWormParticle.jsx';
 import { isCarouselActive } from './menuCarouselState.js';
 
@@ -11,6 +12,8 @@ const portalGeometry = new THREE.RingGeometry(0.19, 0.23, 40);
 // One paused clock drives one antipodal pair, their portal pulses and tail completion.
 // There is deliberately no wall-clock timeout that can rotate a cube mid-worm.
 export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }) {
+  const frames = useContext(MenuPortalContext);
+  const mouths = useRef([]);
   const phase = useMemo(() => Math.random() * Math.PI * 2, []);
   const elapsed = useRef(0);
   const root = useRef();
@@ -22,6 +25,10 @@ export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }
     if (root.current) root.current.visible = !isCarouselActive();
     if (isCarouselActive() || document.hidden) return;
     elapsed.current += Math.min(delta, 0.05);
+    origins?.forEach((origin, i) => {
+      const frame = frames?.find(item => item.dir === origin.dir);
+      if (frame?.active && mouths.current[i]) mouths.current[i].matrix.copy(frame.matrix);
+    });
     const p = Math.min(1, elapsed.current / 0.8);
     const eased = 1 - (1 - p) ** 3;
     waves.current.forEach(ring => {
@@ -34,7 +41,7 @@ export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }
       ring.scale.setScalar(1 + Math.sin(elapsed.current * 3) * 0.06);
       ring.material.opacity = 0.38 + Math.sin(elapsed.current * 3) * 0.12;
     });
-  });
+  }, -0.1);
   if (!origins || origins.length < 2) return null;
   const wormCompleted = () => {
     completed.current += 1;
@@ -44,7 +51,7 @@ export default function MenuFlipWave({ origins, onComplete, characterCycle = 0 }
     }
   };
   return <group ref={root}>
-    {origins.map((origin, i) => <group key={i} position={origin.position} rotation={origin.rotation}>
+    {origins.map((origin, i) => <group key={i} ref={el => { mouths.current[i] = el; }} matrixAutoUpdate={false}>
       <mesh position={[0, 0, 0.012]} ref={el => { waves.current[i] = el; }} geometry={waveGeometry} scale={0.01}>
         <meshBasicMaterial color={origin.color} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>

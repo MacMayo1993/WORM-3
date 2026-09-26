@@ -3,7 +3,7 @@ import { RaisedCubieContext } from './raisedCubieContext.js';
 import { removeRaisedCubie } from './raisedCubieMotion.js';
 import { isLiveFlippedFace, padBackFace } from '../game/raisedCubie.js';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { FACE_COLORS } from '../utils/constants.js';
+import { FACE_COLORS, RUBIKS_FACE_COLORS } from '../utils/constants.js';
 import React, { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -18,12 +18,13 @@ const PadContext = createContext(null);
 const MAX_PADS = 2048;
 
 // One scheduler and two instanced draws per scene, regardless of pad count.
-export function PadProvider({ children, profile: profileOverride = null }) {
+export function PadProvider({ children, profile: profileOverride = null, paused = false }) {
   const entries = useMemo(() => new Set(), []);
   const pairs = useMemo(() => new Map(), []);
   const cubieSprings = useMemo(() => new Map(), []);
   // WORM pads hover on an unstable wormhole; PadEnergy draws it from these records.
-  const energyOn = useGameStore(s => !profileOverride && !!s.wormHealerMode && !s.demoMode);
+  const menuPads = profileOverride === 'menu';
+  const energyOn = useGameStore(s => menuPads || (!profileOverride && !!s.wormHealerMode && !s.demoMode));
   const frames = useMemo(() => createEnergyFrames(), []);
   const energyClock = useRef(0);
   const stalkRef = useRef(), mouthRef = useRef();
@@ -57,7 +58,7 @@ export function PadProvider({ children, profile: profileOverride = null }) {
 
   useFrame((_state, delta) => {
     const state = useGameStore.getState();
-    const dt = !profileOverride && state.wormPauseMenuOpen ? 0 : Math.min(delta, 0.05);
+    const dt = paused || (!profileOverride && state.wormPauseMenuOpen) ? 0 : Math.min(delta, 0.05);
     if (paletteCache.current.settings !== state.settings) {
       paletteCache.current = { settings: state.settings,
         colors: resolveColors(state.settings, state.settings?.biomeMode?.faceAssignment) ?? FACE_COLORS };
@@ -65,10 +66,11 @@ export function PadProvider({ children, profile: profileOverride = null }) {
     const cap = profileOverride ? 6 : selectEffectiveFlipCap(state);
     const wormMode = !profileOverride && state.wormHealerMode;
     const wormPads = wormMode && !state.demoMode;
+    const energyPads = wormPads || menuPads;
     const motionOff = wormPads || reduced.current || state.settings?.reducedMotion;
     // The WORM landing height stays fixed for the sim; only the look is unstable.
-    const energyMotion = wormPads && !reduced.current && !state.settings?.reducedMotion;
-    if (wormPads) energyClock.current += dt;
+    const energyMotion = energyPads && !reduced.current && !state.settings?.reducedMotion;
+    if (energyPads) energyClock.current += dt;
     for (const pair of pairs.values()) { pair.members.length = 0; }
     for (const entry of entries) {
       const d = entry.data.current;
@@ -104,7 +106,7 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       for (const member of pair.members) {
         if (isLiveFlippedFace(member.data.current.meta, cap)) { lifted = true; break; }
       }
-      pair.active = (wormPads || (state.settings?.flipPads !== 'off' && !wormMode)) && lifted;
+      pair.active = (menuPads || wormPads || (state.settings?.flipPads !== 'off' && !wormMode)) && lifted;
       const target = pair.active ? pair.pose.lift : 0;
       if (motionOff) { pair.lift = target; pair.velocity = 0; }
       else advancePadSpring(pair, target, dt);
@@ -121,7 +123,7 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       if (!group) continue;
       const pair = pairs.get(d.pair);
       // WORM uses a fixed physical landing height; cube/menu pads keep their idle bounce.
-      const enabled = (wormPads || (state.settings?.flipPads !== 'off' && !wormMode));
+      const enabled = (menuPads || wormPads || (state.settings?.flipPads !== 'off' && !wormMode));
       const lifted = enabled && isLiveFlippedFace(d.meta, cap);
       const target = lifted ? pair.pose.lift : 0;
       if (lifted) { entry.lift = pair.lift; entry.velocity = pair.velocity; }
@@ -140,7 +142,7 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       entry.wear = pair.wear;
       entry.active = lifted;
 
-      if (entry.lift <= 0.001 || count >= (wormPads ? MAX_ENERGY_PADS : MAX_PADS)) continue;
+      if (entry.lift <= 0.001 || count >= (energyPads ? MAX_ENERGY_PADS : MAX_PADS)) continue;
       let visible = true;
       for (let parent = group; parent; parent = parent.parent) {
         if (!parent.visible) { visible = false; break; }
@@ -162,8 +164,8 @@ export function PadProvider({ children, profile: profileOverride = null }) {
         inverseReady = true;
       }
       resources.matrix.premultiply(resources.inverse);
-      resources.color.set(paletteCache.current.colors[padBackFace(d.meta)] ?? '#ffffff');
-      if (wormPads) {
+      resources.color.set((menuPads ? RUBIKS_FACE_COLORS : paletteCache.current.colors)[padBackFace(d.meta)] ?? '#ffffff');
+      if (energyPads) {
         resources.matrix.toArray(frames.matrix, count * 16);
         frames.lift[count] = lift;
         frames.color[count * 3] = resources.color.r;
@@ -185,12 +187,12 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       stalkRef.current.setColorAt(count, resources.color);
       count++;
     }
-    frames.count = wormPads ? count : 0;
+    frames.count = energyPads ? count : 0;
     frames.time = energyClock.current;
     frames.dt = dt;
     frames.motion = energyMotion ? 1 : 0;
     for (const ref of [stalkRef, mouthRef]) {
-      ref.current.count = wormPads ? 0 : count;
+      ref.current.count = energyPads ? 0 : count;
       ref.current.instanceMatrix.needsUpdate = true;
     }
     if (stalkRef.current.instanceColor) stalkRef.current.instanceColor.needsUpdate = true;

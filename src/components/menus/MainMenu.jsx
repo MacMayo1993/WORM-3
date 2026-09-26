@@ -31,6 +31,7 @@ import { STICKER_OFFSET, createCubieGeometry, createStickerGeometry, rubiksFinis
 import { isMobile, prefersReducedMotion } from '../../utils/device.js';
 import { vibrate } from '../../utils/audio.js';
 import { warmDemoAssets } from '../../utils/preloadAssets.js';
+import { MenuPortalScene, MenuPortalAnchor } from './MenuPortalScene.jsx';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_CLASSIC, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
@@ -117,7 +118,7 @@ const easeIO = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
 // Antipodal center-sticker pairs used for the sporadic menu flips.
 // Positions are in ShufflingCube local space (cubies centred at –1/0/+1,
-// sticker planes sit 0.501 beyond that, so surface ≈ ±1.501).
+// mouths use the shared domed-sticker offset in menuCenterPortals.js).
 
 const INITIAL_WORM_DELAY = 2.5; // seconds before the very first worm spawns
 
@@ -152,7 +153,7 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
       overlays.current[dir]?.setColors(RUBIKS_FACE_COLORS[shown], RUBIKS_FACE_COLORS[ANTIPODAL_COLOR[shown]]);
     }
     if (!running) settledFor.current = menuFlip.startT;
-  });
+  }, -0.35);
 
   return (
     <group position={[cx, cy, cz]}>
@@ -172,10 +173,10 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
               <group ref={el => { turns.current[dir] = el; }}>
                 <mesh ref={el => { meshes.current[dir] = el; }} geometry={PIECE.sticker} material={STICKER_MATS[shown]} />
                 {isFlipped && (
-                  <group position={[0, 0, 0.026]}>
+                  <MenuPortalAnchor dir={dir}>
                     <MenuTileOverlay ref={el => { overlays.current[dir] = el; }}
                       colorHex={RUBIKS_FACE_COLORS[shown]} antiColorHex={RUBIKS_FACE_COLORS[ANTIPODAL_COLOR[shown]]} />
-                  </group>
+                  </MenuPortalAnchor>
                 )}
               </group>
             </group>
@@ -259,7 +260,7 @@ const ShufflingCube = ({ onFlip }) => {
         startTime: t,
         origins: pair.map(face => {
           const [x, y, z] = face.cubie;
-          return { position: face.pos, rotation: face.rot,
+          return { dir: face.dir, position: face.pos, rotation: face.rot,
             color: shownHex(newCubies[x][y][z].stickers[face.dir].curr) };
         }),
       }));
@@ -288,7 +289,8 @@ const ShufflingCube = ({ onFlip }) => {
   const sliceCubies  = rotating ? flatCubies.filter(c => c[axProp] === rotating.sl) : [];
 
   return (
-    <PadProvider profile="menu">
+    <MenuPortalScene>
+    <PadProvider profile="menu" paused={hideStickers}>
       {staticCubies.map(c => (
         <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} hideStickers={hideStickers} />
       ))}
@@ -307,6 +309,7 @@ const ShufflingCube = ({ onFlip }) => {
         />
       ))}
     </PadProvider>
+    </MenuPortalScene>
   );
 };
 

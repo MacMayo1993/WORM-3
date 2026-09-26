@@ -18,15 +18,21 @@ export function makeMenuTunnelWormPath(start, phase = 0) {
   const half = new Vector3(...start).length();
   const clearance = MENU_WORM_RADIUS * 0.86;
   const h = half + clearance, buried = h - 0.75;
-  const surface = [[0.45, 0, h], [1.3, 0, h], [h, 0, 1.3], [h, 0, 0.45]];
+  const surface = [[0.72, 0, h], [1.3, 0, h], [h, 0, 1.3], [h, 0, 0.72]];
   const legs = [
-    { curve: [[0, 0, buried], [0, 0, h], [0.15, 0, h], [0.45, 0, h]], face: [0, 0, 1] },
+    // Cross each mouth axially before bending onto the raised tile. This keeps
+    // the full worm radius clear of the rim on both entry and exit.
+    { curve: [[0, 0, buried], [0, 0, half], [0, 0, half], [0, 0, h]], face: [0, 0, 1] },
+    { curve: [[0, 0, h], [0, 0, h + 0.2], [0.22, 0, h], [0.72, 0, h]], face: [0, 0, 1] },
     { curve: surface, surface: true },
-    { curve: [[h, 0, 0.45], [h, 0, 0.15], [h, 0, 0], [buried, 0, 0]], face: [1, 0, 0] },
+    { curve: [[h, 0, 0.72], [h, 0, 0.22], [h + 0.2, 0, 0], [h, 0, 0]], face: [1, 0, 0] },
+    { curve: [[h, 0, 0], [half, 0, 0], [half, 0, 0], [buried, 0, 0]], face: [1, 0, 0] },
     { curve: [[buried, 0, 0], [buried / 3, 0, 0], [-buried / 3, 0, 0], [-buried, 0, 0]], face: [0, 1, 0] },
-    { curve: [[-buried, 0, 0], [-h, 0, 0], [-h, 0, -0.15], [-h, 0, -0.45]], face: [-1, 0, 0] },
+    { curve: [[-buried, 0, 0], [-half, 0, 0], [-half, 0, 0], [-h, 0, 0]], face: [-1, 0, 0] },
+    { curve: [[-h, 0, 0], [-h - 0.2, 0, 0], [-h, 0, -0.22], [-h, 0, -0.72]], face: [-1, 0, 0] },
     { curve: [...surface].reverse().map(p => p.map(v => -v)), surface: true },
-    { curve: [[-0.45, 0, -h], [-0.15, 0, -h], [0, 0, -h], [0, 0, -buried]], face: [0, 0, -1] },
+    { curve: [[-0.72, 0, -h], [-0.22, 0, -h], [0, 0, -h - 0.2], [0, 0, -h]], face: [0, 0, -1] },
+    { curve: [[0, 0, -h], [0, 0, -half], [0, 0, -half], [0, 0, -buried]], face: [0, 0, -1] },
   ];
   const points = [], normals = [], lengths = [], surfaceRanges = [];
   let length = 0;
@@ -80,6 +86,13 @@ export function sampleMenuTunnelWorm(path, distance, position, normal, forward) 
   // A stable perpendicular face frame inside the throat (where travel is axial).
   normal.addScaledVector(forward, -normal.dot(forward));
   if (normal.lengthSq() < 0.001) normal.copy(path.up).addScaledVector(forward, -path.up.dot(forward));
+  // A live menu tile can turn edge-on until path.up is axial too. Pick the
+  // least-aligned world axis rather than giving the character a zero frame.
+  if (normal.lengthSq() < 0.001) {
+    const x = Math.abs(forward.x), y = Math.abs(forward.y), z = Math.abs(forward.z);
+    normal.set(x <= y && x <= z ? 1 : 0, y < x && y <= z ? 1 : 0, z < x && z < y ? 1 : 0);
+    normal.addScaledVector(forward, -normal.dot(forward));
+  }
   normal.normalize();
   return distance >= 0 && distance <= path.length;
 }
