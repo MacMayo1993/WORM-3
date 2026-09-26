@@ -1,6 +1,70 @@
-# Flip Cube — Main Design Plan (Design Only)
+# Flip Cube — Main Design and Implementation Plan
 
 > **Status:** design plan, 2026-09-25. Five decisions were settled on 2026-09-26 (§13), and the FLIP CUBE rename has shipped (§7). Nothing else here changes gameplay until a phase in §10 is picked up; §13 also lists what is still open. This is the brief for refocusing WORM³ on **the Flip Cube** as its main object. Flipped tiles pop out and bounce according to their flip count. Their Möbius funnels pulse and spring with them. In WORM you jump onto a popped tile to ride its tunnel. Something rumbles under the tiles. Mobi explains all of it as a piece of his home world, WORM³.
+
+## Implementation checkpoint — 2026-09-26
+
+This branch implements the cube-mode pad foundation, menu pads, focused-tunnel idle pulses,
+loading-screen centre pads, and the first Mobi premise pass. WORM still uses its existing
+crawl-entry route and flat mouths. The pure pad-entry truth table is implemented and tested,
+but is **not yet connected to the simulation**; storing `tunnelEntry: 'pad'` does not enable it.
+The Rumbler, raised WORM handoffs, landing assist, ghosting, lone-pad funnel severing,
+intro choreography and victory cascade remain roadmap work. This checkpoint does not
+claim the entire design has shipped.
+
+### Implementation decisions
+
+- Keep the default choices in §13: tile-normal lift, bigger/faster wear, subtle Chaos profile,
+  cover topology for the eventual chaser, and the existing names.
+- Put pad displacement on a parent transform owned by `FlipPadOffset`. The existing sticker
+  transform still owns its flip, death, shake and press effects. Normal lift composes with
+  live layer rotations and Explode without competing position writes.
+- Use one scene-local `PadProvider`, shared pair clocks and two instanced draws: stalks and
+  slot mouths. No per-frame React state. The existing funnel anchors do not read pad lift.
+- Evaluate shared wear from the symmetric average of pair inputs, then evaluate the nonlinear
+  pose. A lone pad's absent mate is still a home tile, not a second elevated pad.
+- Integrate phase (`phase += frequency * dt`) instead of evaluating `frequency(wear) * time`:
+  changing wear must change speed continuously, not teleport the bounce to another phase.
+- Use the press spring constants with bounded substeps. Pair phase survives a slice remount
+  within the scene; cleanup is owner-checked so old scenes cannot clear replacement data.
+- Reduced motion holds the pad at its static height and disables its idle pulse. Full/subtle/
+  flat choices live in Settings → Scene. Chaos has its own low-height profile; big boards
+  halve the moving amplitude. No random jitter or tilt ships in this foundation.
+- Preserve WORM's complete current behavior until the remaining route contract below passes.
+  Do not raise a physical landing surface before the head, body and camera agree on it.
+
+### WORM integration contract for phase 4
+
+1. Route crawl triggers, jump presses, natural landings, lag-frame swept entry and rotation
+   commits through `padEntryDecision`. A pending candidate alone must never grant self-hit
+   immunity when its entry decision is `pass`.
+2. Track jump provenance for the whole arc: a rescue or exit-launch hop must remain protected
+   at landing, not merely on its first frame. Rocket grace and MOBI lock retain precedence.
+3. Evaluate the landing event against the tile actually reached that tick. Avoid checking
+   the next cell after consuming a large step remainder. Arm/consume it exactly once.
+4. Pad ride count is keyed by canonical tunnel identity, not by the transient surface slot.
+   Publish ride wear, void state and pad events through a render bridge; never mirror frame
+   clocks into Zustand. Heals/reset must remove both twins' stale events.
+5. The route sampler owns the head's hop-up, compression, plunge and launch. Body history and
+   camera sample that same route; the renderer follows its pad event. Test continuity at each
+   phase boundary and across 30/60/120 Hz, including a turning layer and a long tail.
+6. Pad assist only captures a forward pad in the agreed 0–1 tile window. Steering away cancels
+   capture. It must not turn a jump intended to clear a pit into a lethal assisted landing.
+7. At three used rides, show an explicit **NEXT RIDE COLLAPSES** warning before commitment;
+   bounce intensity alone is insufficient. A voided mouth remains visibly a pit in reduced
+   motion and with decorative tunnels switched off.
+8. Story/demo may override entry mode. Switch the global default only after their prompts,
+   authored routes, character/hat clearance and mobile chase-camera checks pass.
+
+### Rumbler contract for phase 5
+
+R1 and R2 are visual observers. Freeze their phase during pause, countdown, transit, rescue,
+focus, death and victory; resuming must not catch up through missed wall-clock time. R2 reads
+`rotationClock.axis`, **all** `sliceIndices`, and `warning`; it must not infer a threatened
+slice independently or change when that turn dispatches. Keep the existing safe lane and
+rim visible. Belts use wrapped distance `min(|s-s0|, L-|s-s0|)` for `L=4N`, so a crest crosses
+the seam continuously. At a size/scene change clear its bounded tile-displacement bridge.
+The optional chaser needs a separate gameplay acceptance pass and stays out of R1/R2.
 
 ## 0. Summary
 
@@ -77,7 +141,7 @@ For each pair $\pi$ with shared phase $\varphi_\pi$ (a hash of the same sorted-g
 - **Worn regime** ($w \ge k^*$, or one life left):
   - Add a deterministic quasi-periodic term $\epsilon[\sin(2\pi f\tau_1 t)+\sin(2\pi f\tau_2 t)]$ with $\tau_2/\tau_1$ equal to the golden ratio.
   - Add in-plane jitter ≤ 0.03 and tilt ≤ 6°, drawn from a seeded LCG keyed by the pair (never `Math.random`).
-  - The bounce's spectrum goes from one line to broadband at the boundary, so "about to die" reads as a change in kind rather than more of the same.
+  - The added incommensurate frequencies make the bounce less regular. This deterministic quasi-periodic signal has discrete spectral components; it is not, by itself, broadband noise.
 - **Events.** Events use the press-bridge spring (ζ ≈ 0.65). Pop-out overshoots to $h_0$. Flip-home and heal settle to 0 with one rebound.
 - **Reduced motion.** $A = 0$, with no jitter and no squash. Pads hold $h_0$, and wear shows as a static rim tint.
 
@@ -358,14 +422,14 @@ Hence a tile is a pad $\iff f(s)=1 \iff n(s)$ is odd. By Corollary 1, ordinary p
 Let $\beta^*$ act on per-sticker fields $h \in \mathbb{R}^S$ by $(\beta^*h)(s) = h(\beta s)$. It is an orthogonal involution, so $P_\pm = \tfrac12(I \pm \beta^*)$ are complementary orthogonal projectors.
 
 - **Rule.** Build every pad quantity (lift, phase, wear) from pair data, that is, from $P_+$ of the per-tile inputs.
-- **Why it is safe.** Any pose operator $V$ with $[V,\beta^*]=0$ preserves the eigenspaces. The symmetric block (motion) and the antisymmetric block (asymmetry) are therefore independent and can be rendered separately.
+- **Why it is safe.** Any **linear** pose operator $V$ with $[V,\beta^*]=0$ preserves both eigenspaces. A nonlinear equivariant operator preserves the symmetric fixed-point space but does not generally preserve the antisymmetric space; reduce the inputs with $P_+$ before evaluating nonlinear motion. The symmetric block (motion) and the antisymmetric block (asymmetry) are therefore independent and can be rendered separately.
 - **Lone pads.** The lone-pad whip is driven by $P_-$ alone.
 
 For the binary field $h = f$, with $b$ symmetric dirty pairs and $a = \mathrm{wt}(\Delta f)$ lone pads:
 
 $$\alpha_- = \frac{\|P_-f\|^2}{\|f\|^2} = \frac{a/2}{2b+a} = \frac{\mathrm{wt}(\Delta f)}{2\,\mathrm{wt}(f)} \in \left[0, \tfrac12\right].$$
 
-The asymmetric energy fraction is exactly the minimal heal count of Theorem 3.4, normalised by the size of the dirty set. $\alpha_- = 0$ throughout ordinary play, and $\alpha_+ = 1 - \alpha_- \ge \tfrac12$ always.
+At $f=0$ the displayed ratio is undefined; the implementation uses the explicit UI convention $\alpha_-=0$ for the solved board. For $f\ne0$, the asymmetric energy fraction is exactly the minimal heal count of Theorem 3.4, normalised by the size of the dirty set. $\alpha_- = 0$ throughout ordinary play, and $\alpha_+ = 1 - \alpha_- \ge \tfrac12$ always.
 
 ### 9.3 Outward bounce is the equivariant motion
 
@@ -374,13 +438,13 @@ Let $A(p) = -p$, with outward normals $\nu(-p) = -\nu(p)$. Act on displacement f
 - **In phase.** $v(p) = h(t)\,\nu(p)$ gives $(Sv)(p) = -h\,\nu(-p) = v(p)$. This is the $+1$ eigenspace, so it commutes with the deck transformation and descends to $\mathbb{RP}^2$.
 - **Anti-phase.** Twins moving in anti-phase give $Sv = -v$. That field is not the motion of a single point of $\mathbb{RP}^2$.
 
-So in-phase twins are forced by the mathematics, not a style choice.
+In-phase normal displacement is required **if the animation is to descend through this antipodal identification**. Choosing to impose that quotient interpretation is the design assumption.
 
 ### 9.4 Why the funnel has a half-twist, and what it cannot be
 
 - **The ride is the generator.** Treat a ride as the identification $p \sim -p$. Any surface path from $p$ to $-p$ projects to the generator of $\pi_1(\mathbb{RP}^2) \cong \mathbb{Z}/2$, because its lift is open. The tunnel is the game's shortcut for that path.
 - **One ride mirrors, two restore.** $A$ has degree $-1$ on $S^2$, so the orientation character $w_1$ is non-trivial on that loop. One ride mirrors the rider's handedness relative to the outward normal, and two rides restore it. The existing control modes decide whether the player feels this.
-- **The half-twist is forced.** The normal bundle of a projective line in $\mathbb{RP}^2$ is the tautological (Möbius) bundle, so the ribbon's half-twist is required, not decorative.
+- **The half-twist is forced.** The normal bundle of a projective line in $\mathbb{RP}^2$ is the tautological (Möbius) bundle, so a ribbon representing that normal bundle has a half-twist. A decorative ribbon along a diameter inside the cube is not automatically that bundle; the game deliberately uses it as a visual representation.
 - **Its handedness is not.** For the idealised straight diameter:
   - $A$ reverses orientation on $\mathbb{R}^3$ ($\det(-I) = -1$) and so negates twist.
   - An $A$-invariant strip would therefore need $\mathrm{Tw} = -\mathrm{Tw} = 0$.

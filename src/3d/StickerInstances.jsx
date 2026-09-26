@@ -1,3 +1,4 @@
+import { PadProvider } from './PadSprings.jsx';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
 // StickerInstances.jsx
 // Batches simple (solid-colour) sticker planes into a single THREE.InstancedMesh,
@@ -278,7 +279,7 @@ export function StickerInstanceProvider({ children }) {
 
   return (
     <StickerInstanceContext.Provider value={ctx}>
-      {children}
+      <PadProvider>{children}</PadProvider>
     </StickerInstanceContext.Provider>
   );
 }

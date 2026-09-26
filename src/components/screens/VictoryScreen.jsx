@@ -148,7 +148,7 @@ const VictoryScreen = ({
     rubiks: {
       title: 'Cube solved',
       subtitle: 'Classic Victory',
-      description: 'All six faces, back in place.',
+      description: 'The Flip Cube is whole again.',
     },
     worm: {
       title: 'Wormhole solve',

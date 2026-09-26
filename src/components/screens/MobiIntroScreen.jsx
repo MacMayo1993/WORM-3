@@ -20,7 +20,10 @@ import { UI_FONT, HAND_FONT, PAPER_BACKDROP_BLUR, Z } from '../../utils/uiTheme.
 // instead of at the theory. The formal name shows up once, later, as an aside
 // (TWIN_ASIDE in demoStepCopy.js).
 export const MOBI_LINES_DEMO_INTRO = [
-  "Each tile has an opposite twin. Flip one and both move together.",
+  "Aloha! I'm Mobi. I'm from a world called WORM³.",
+  "This is a Flip Cube. It slipped out of my world and landed here scrambled.",
+  "Every tile has a twin straight through the middle. Flip one and its twin flips too.",
+  "Help me heal it, and my way home stays open.",
   "Try the controls one step at a time. You can skip any step.",
 ];
 
@@ -36,7 +39,7 @@ export const MOBI_LINES_WORM = [
 ];
 
 export const MOBI_LINES_FREEPLAY = [
-  "Turn the cube until each face is one color.",
+  "Turn the Flip Cube until each face is one color.",
   "Enable Flip Mode to move paired tiles through the cube.",
 ];
 

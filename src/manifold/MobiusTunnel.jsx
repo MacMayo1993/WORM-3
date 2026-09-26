@@ -1,3 +1,4 @@
+import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -117,6 +118,8 @@ const fragmentShader = `
   uniform float uGrowT;
   uniform float uPulseBoost;
   uniform float uSolitonProgress;  // 0→1 position of the flip pulse along the ribbon
+  uniform float uIdlePadProgress;
+  uniform float uIdlePadAmp;
   uniform float uSolitonAmp;       // 0 when no pulse, sin-eased envelope while travelling
   varying vec2  vUv;
   varying vec3  vWorldPos;
@@ -175,6 +178,10 @@ const fragmentShader = `
     // Travelling light-soliton: a flip fires a bright pulse from the entry tile,
     // through the centre, out to its antipodal partner — the identification event. (#5)
     float sol = exp(-pow((vUv.y - uSolitonProgress) / 0.055, 2.0)) * uSolitonAmp;
+    // Idle impacts enter from both mouths and meet at the Core; travel retains
+    // the existing one-way soliton. This changes uniforms, never anchor geometry.
+    float idleDistance = min(abs(vUv.y - uIdlePadProgress), abs(vUv.y - (1.0 - uIdlePadProgress)));
+    sol += exp(-pow(idleDistance / 0.055, 2.0)) * uIdlePadAmp;
 
     float intensity = (0.75 + spark + farStreak * depthFade + uPulseBoost * 0.3) * shading * depthFade;
     intensity += seam * 0.85;   // plasma bridge blooms
@@ -474,6 +481,8 @@ const MobiusTunnel = ({
     uScrollSpeed: { value: 1.0 },
     uGrowT:       { value: 1.0 },
     uPulseBoost:  { value: 0.0 },
+    uIdlePadProgress: { value: 0 },
+    uIdlePadAmp: { value: 0 },
     uSolitonProgress: { value: -1.0 },
     uSolitonAmp:      { value: 0.0 },
     ...whipUniforms,
@@ -702,6 +711,11 @@ const MobiusTunnel = ({
       uniforms.uPulseBoost.value = 0;
       uniforms.uSolitonAmp.value = 0;
     }
+
+    const pad = padMotion.get(tunnelId);
+    uniforms.uIdlePadProgress.value = (pad?.cycle ?? 0) * 0.5;
+    uniforms.uIdlePadAmp.value = pad?.active && pad.animated && !isActive
+      ? Math.sin(Math.PI * pad.cycle) * 0.6 : 0;
 
     // Shared by reference with both bumper materials — write once.
     whipUniforms.uWhipAmp.value = whipAmp;
