@@ -521,6 +521,9 @@ export function useWormCrawler(size, cubies) {
             sim.tunnelPassages.length > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 ||
             sim.elementalFocusT > 0 || sim.signature.charge > 0 || !!sim.signature.sweep || sim.rocketActive || liveRotation.active ||
             state.wormGamePhase !== 'active';
+        // Snapshot before stepping: the reveal's final tick reaches zero but
+        // still returns without advancing gameplay, so Story must hold it too.
+        const elementalRevealHeld = sim.elementalFocusT > 0;
         withPersistenceBatch(() => stepWormSim(sim, delta, sizeRef.current, ctxRef.current));
         feedbackRef.current.tunnel(sim.phase, sim.tunnelProgress, sim.alive);
         if (sim.combat) {
@@ -574,8 +577,9 @@ export function useWormCrawler(size, cubies) {
             const replenished = replenishStoryTunnel(sim, storyPracticeRef.current, live, sizeRef.current, activeTunnelsRef.current.length);
             if (replenished) { useGameStore.setState({ cubies: replenished }); return; }
             // Observe a landing even if it immediately triggers the next rescue.
-            // The rescue holds the deadline and completion until play resumes.
-            const metrics = storyMetrics(sim, storyPracticeRef.current, story, live, activeTunnelsRef.current, sim.jumpRescueHeld ? 0 : delta);
+            // Rescue and pickup reveals hold the deadline/par clock until play resumes.
+            const metrics = storyMetrics(sim, storyPracticeRef.current, story, live, activeTunnelsRef.current,
+                sim.jumpRescueHeld || elementalRevealHeld ? 0 : delta);
             if (!sim.jumpRescueHeld && !live.animState && !liveRotation.active && sim.cutFocusT <= 0 && sim.healPauseT <= 0 &&
                 offerStoryPower(sim, storyPracticeRef.current, story, sizeRef.current, live.cubies)) {
                 useGameStore.setState({ wormSpecials: sim.specials.slice(), wormPowerups: sim.powerups.slice() });
