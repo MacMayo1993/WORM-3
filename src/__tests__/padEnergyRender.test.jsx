@@ -10,11 +10,11 @@ import { PAD_PROFILES } from '../3d/padPose.js';
 import { TREMBLE_NORMAL, TREMBLE_PLANE } from '../3d/padEnergy.js';
 
 extend(THREE);
-it.each([[true, 0], [false, 0], [false, 3]])('renders energy pads with pause, healing and reduced motion (WORM=%s, chaos=%i)', async (wormHealerMode, chaosLevel) => {
+it.each([[true, 0, 'full'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'subtle']])('renders energy pads with pause, healing and reduced motion (WORM=%s, chaos=%i, saved=%s)', async (wormHealerMode, chaosLevel, flipPads) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   useGameStore.setState({ size: 3, chaosLevel, wormHealerMode, mirrorMode: false, demoMode: false, wormPauseMenuOpen: false,
-    settings: { ...before.settings, flipPads: 'full', reducedMotion: false } });
+    settings: { ...before.settings, flipPads, reducedMotion: false } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
@@ -84,6 +84,14 @@ it.each([[true, 0], [false, 0], [false, 3]])('renders energy pads with pause, he
     const counts = [];
     scene.traverse(o => { if (o.isInstancedMesh) counts.push(o.count); });
     expect(counts.every(count => count === 0)).toBe(true);
+    if (chaosLevel > 0) {
+      // Exiting Chaos immediately restores the saved pad behavior on the same scene.
+      await act(async () => useGameStore.setState({ chaosLevel: 0 }));
+      await act(async () => root.render(draw(1)));
+      store.getState().advance(frame++ / 60);
+      expect(front.current.parent.position.length()).toBeCloseTo(flipPads === 'off' ? 0 : PAD_PROFILES.cube.height, 12);
+      expect(useGameStore.getState().settings.flipPads).toBe(flipPads);
+    }
   } finally {
     await act(async () => root.unmount());
     useGameStore.setState(before, true);

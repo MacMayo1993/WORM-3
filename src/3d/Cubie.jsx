@@ -1,7 +1,7 @@
 import { advancePlatformFormation, platformFormationHeld } from '../worm/platformFormation.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
-import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount, flipCubePadsEnabled, LEGACY_PIECE_POP } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount, flipCubePadsEnabled, effectiveFlipPads, LEGACY_PIECE_POP } from '../game/raisedCubie.js';
 import { advancePieceSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
@@ -116,7 +116,7 @@ function LegoStud({ dir, color, enableShadows = true }) {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, omitBody = false, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode: storedMirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX, wormViewPower, effectiveFlipCap } = useGameStore(
+  const { hollowMode, mirrorMode: storedMirrorMode, visualMode, explosionFactor, settings, flipPads, randomMode, randomStyleTick, perfReducedFX, wormViewPower, effectiveFlipCap } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
@@ -124,6 +124,7 @@ const Cubie = React.forwardRef(function Cubie({
       wormViewPower: s.wormViewPower,
       explosionFactor: s.explosionT,
       settings: s.settings,
+      flipPads: effectiveFlipPads(s),
       randomMode: s.randomMode,
       randomStyleTick: s.randomStyleTick,
       perfReducedFX: s.perfReducedFX,
@@ -417,7 +418,7 @@ const Cubie = React.forwardRef(function Cubie({
   const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
   const liftSpring = useRaisedCubieSpring(`${size}:${origHomeX},${origHomeY},${origHomeZ}`);
   const poppedRef = useRef(false);
-  const raised = (!wormMode || wormPads) && (wormPads || (!mirrorMode && settings?.flipPads !== 'off'))
+  const raised = (!wormMode || wormPads) && (wormPads || (!mirrorMode && flipPads !== 'off'))
     && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Mega normally omits individual bodies. Materialize a body for a raised
   // piece and keep it through its return; otherwise it would still be a sheet.

@@ -15,11 +15,11 @@ const POP = 1 + CUBE_PIECE_POP;
 // Mark every face so the assertions inspect actual descendant world positions.
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: ({ currentDir, pos }) => <group name={currentDir} position={pos} /> }));
 extend(THREE);
-it.each([0, 3])('pops the whole piece with a transparent tunnel window and returns home (chaos level %i)', async chaosLevel => {
+it.each([[0, 'full'], [3, 'off'], [3, 'subtle']])('pops the whole piece with a transparent tunnel window and returns home (chaos level %i, saved=%s)', async (chaosLevel, flipPads) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   useGameStore.setState({ size: 3, explosionT: 0, mirrorMode: false, hollowMode: false, visualMode: 'solid', chaosLevel,
-    randomMode: false, wormHealerMode: false, demoMode: false, cubiePops: {}, settings: { ...before.settings, flipPads: 'full', reducedMotion: true } });
+    randomMode: false, wormHealerMode: false, demoMode: false, cubiePops: {}, settings: { ...before.settings, flipPads, reducedMotion: true } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
@@ -45,6 +45,7 @@ it.each([0, 3])('pops the whole piece with a transparent tunnel window and retur
     expect(body.material.transparent).toBe(true);
     expect(body.material.depthWrite).toBe(false);
     expect(body.material.opacity).toBeLessThan(0.2);
+    expect(useGameStore.getState().settings.flipPads).toBe(flipPads);
     expect(body.getWorldPosition(new THREE.Vector3()).distanceTo(center)).toBeLessThan(1e-8);
     // Simulate CubeAssembly's live layer transform. The radial offset follows it.
     raised.current.position.set(-1, 1, 1);

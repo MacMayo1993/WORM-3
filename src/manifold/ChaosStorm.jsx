@@ -35,6 +35,7 @@ import { prefersReducedMotion } from '../utils/device.js';
 import { SURFACE_OFFSET, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import { buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { stormMeshIndex } from '../game/chaosStormEvents.js';
+import { effectiveFlipPads } from '../game/raisedCubie.js';
 import { makeTunnelPath, buildTunnelPathInto, tunnelPathArcPointInto, TUNNEL_MINI_FACE_R } from '../utils/tunnelPath.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { fireCubieKick } from '../3d/cubieKick.js';
@@ -831,7 +832,7 @@ export default function ChaosStorm({ cubieRefs, size, onCascadeComplete }) {
     ctx.nowMs = performance.now();
     ctx.cubies = store.cubies;
     ctx.cap = selectEffectiveFlipCap(store);
-    ctx.padsOn = store.settings?.flipPads !== 'off' && !store.wormHealerMode;
+    ctx.padsOn = effectiveFlipPads(store) !== 'off' && !store.wormHealerMode;
     ctx.lowFx = !!store.perfReducedFX;
     ctx.showTunnels = !!store.showTunnels;
     ctx.levelHeat = (Math.max(1, Math.min(5, store.chaosLevel || 1)) - 1) / 4;
