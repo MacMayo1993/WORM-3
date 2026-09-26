@@ -10,6 +10,7 @@ import ErrorBoundary3D from './ErrorBoundary3D.jsx';
 import { useThree } from '@react-three/fiber';
 import { FogExp2 } from 'three';
 import SafeEnvironment from './SafeEnvironment.jsx';
+import { CUBE_LIGHT_RIG, usesCubeLightRig, needsCubeReflections } from './cubeLighting.js';
 const SceneEffects = React.lazy(() => import('./SceneEffects.jsx'));
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -172,17 +173,25 @@ export default function GameScene({
     return true; // falls through to the black-hole default
   }, [currentLevelData, settings.backgroundTheme, bgConfig, storyEnvFile]);
 
+  const menuRig = usesCubeLightRig(visualMode);
+  const reflections = needsCubeReflections({
+    inLevel: !!currentLevelData, storyEnvFile, backgroundFile: bgConfig?.file ?? null,
+    photoPreset: PHOTO_PRESETS.has(settings.backgroundTheme)
+  });
+
   return (
     <>
       {/* Exp² depth fog over the dark space background. Density is low so the assembled
           cube stays crisp, but reads clearly once cubies spread apart in the explosion
           and during worm-tunnel travel, adding atmospheric depth at zero pipeline cost. */}
       <SceneFog enabled={fogEnabled} />
-      {/* Lights — intensity varies by visualMode */}
-      <ambientLight intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.8} />
+      {/* Lights. Every look built from the menu cube's parts takes the menu's
+          studio rig (cubeLighting.js); wireframe and glass keep their own. */}
+      <ambientLight intensity={menuRig ? CUBE_LIGHT_RIG.ambient : visualMode === 'wireframe' ? 0.2 : 0.5} />
       <directionalLight
-        position={[5, 8, 5]}
-        intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.6 : 1.2}
+        position={menuRig ? CUBE_LIGHT_RIG.key.position : [5, 8, 5]}
+        color={menuRig ? CUBE_LIGHT_RIG.key.color : '#ffffff'}
+        intensity={menuRig ? CUBE_LIGHT_RIG.key.intensity : visualMode === 'wireframe' ? 0.3 : 1.6}
         castShadow={shadowsOn}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
@@ -197,8 +206,17 @@ export default function GameScene({
         shadow-camera-top={9}
         shadow-camera-bottom={-9}
       />
-      <pointLight position={[10, 10, 10]} intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.0 : 0.8} />
-      <pointLight position={[-10, -10, -10]} intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.6} />
+      {menuRig ? (
+        <>
+          <directionalLight position={CUBE_LIGHT_RIG.fill.position} intensity={CUBE_LIGHT_RIG.fill.intensity} color={CUBE_LIGHT_RIG.fill.color} />
+          <directionalLight position={CUBE_LIGHT_RIG.rim.position} intensity={CUBE_LIGHT_RIG.rim.intensity} color={CUBE_LIGHT_RIG.rim.color} />
+        </>
+      ) : (
+        <>
+          <pointLight position={[10, 10, 10]} intensity={visualMode === 'wireframe' ? 0.3 : 1.0} />
+          <pointLight position={[-10, -10, -10]} intensity={visualMode === 'wireframe' ? 0.2 : 0.5} />
+        </>
+      )}
       {visualMode === 'wireframe' && (
         <>
           <pointLight position={[0, 0, 0]} intensity={0.5} color="#fefae0" distance={15} decay={2} />
@@ -250,8 +268,10 @@ export default function GameScene({
           (settings.backgroundTheme === 'blackhole' || !bgConfig) && (
           <BlackHoleEnvironment flipTrigger={blackHolePulse} />
         )}
-        {/* Default lighting env for levels without a custom background */}
-        {currentLevelData && !currentLevelData.background && <SafeEnvironment preset="city" />}
+        {/* Reflections for scenes without a photo panorama (space scenes and
+            levels without a background): the stickers' gloss needs something
+            to catch. The environment lights only, never the backdrop. */}
+        {reflections && <SafeEnvironment preset="city" />}
 
         {/* Mini cubes and twin wormholes drifting far beyond the camera. */}
         <ErrorBoundary3D><BackgroundAmbience size={size} /></ErrorBoundary3D>
