@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { cubieHasFlippedFace, isLiveFlippedFace } from '../../game/raisedCubie.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
-import { FACE_NORMALS, WORM_LIFT } from './constants.js';
+import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT } from './constants.js';
 import { shPush, ttPush } from '../circularBuffers.js';
 
 export const WORM_PAD_HEIGHT = 0.5;
@@ -16,23 +16,46 @@ export function raisedPlatformPosition(tile, size, ctx) {
     return point;
 }
 
-// Capture a platform only underfoot or one cell ahead. This is an intentional
-// jump, not a crawl teleport. The same sampled arc drives the head and tail.
-export function startPlatformJump(sim, size, ctx, allowRide) {
-    if (!usesRaisedPlatforms(ctx) || sim.isJumping || sim.rocketActive || sim.landingGraceT > 0) return false;
-    let target = sim.pos, moveDir = sim.moveDir;
-    let destination = sim.onRaisedPlatform ? null : raisedPlatformPosition(target, size, ctx);
-    if (!destination) {
-        const next = getNextSurfacePosition(sim.pos, sim.moveDir, size);
-        if (!next) return false;
+// Share the same two-cell aim window with the chase camera. Prefer the nearest
+// platform and follow surface topology through an edge, never arbitrary neighbours.
+export const PLATFORM_AIM_CELLS = 2;
+export function findRaisedPlatform(pos, moveDir, size, ctx, onPlatform = false) {
+    let target = pos, heading = moveDir;
+    for (let ahead = 0; ahead <= PLATFORM_AIM_CELLS; ahead++) {
+        const destination = ahead === 0 && onPlatform ? null : raisedPlatformPosition(target, size, ctx);
+        if (destination) return { target, moveDir: heading, destination };
+        const next = getNextSurfacePosition(target, heading, size);
+        if (!next) break;
         target = next.pos ?? next;
-        moveDir = next.moveDir ?? moveDir;
-        destination = raisedPlatformPosition(target, size, ctx);
+        heading = next.moveDir ?? heading;
     }
-    if (!destination) return false;
-    sim.padFlight = { t: 0, sample: 0, start: sim.headInterpPos.clone(), end: destination, padHeight: isLiveFlippedFace(ctx.getCubies()[target.x][target.y][target.z].stickers[target.dirKey], ctx.getFlipCap?.() ?? 6) ? WORM_PAD_HEIGHT : 0,
-        startNormal: sim.currentNormal.clone(), endNormal: FACE_NORMALS[target.dirKey].clone(),
-        target: { ...target }, moveDir, allowRide, duration: 0.65 };
+    return null;
+}
+
+// Launch to the actual expanded surface, not a fixed-height surface hop. An
+// airborne second press can still catch the ledge without snapping to the floor.
+export function startPlatformJump(sim, size, ctx, allowRide) {
+    if (!usesRaisedPlatforms(ctx) || sim.padFlight || sim.rocketActive || sim.landingGraceT > 0) return false;
+    const aim = findRaisedPlatform(sim.pos, sim.moveDir, size, ctx, sim.onRaisedPlatform);
+    if (!aim) return false;
+    const { target, moveDir, destination } = aim;
+    const start = sim.headInterpPos.clone();
+    if (sim.isJumping) start.addScaledVector(sim.currentNormal, Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight);
+    const endNormal = FACE_NORMALS[target.dirKey].clone();
+    const above = destination.clone().addScaledVector(endNormal, 0.85);
+    const offset = start.clone().sub(destination).projectOnPlane(endNormal);
+    const launch = start.clone();
+    // When directly underneath, move outside the cubie before rising. Otherwise
+    // even a high enough jump passes straight through its solid underside.
+    if (offset.length() < 1.05) {
+        if (offset.lengthSq() < 1e-6) offset.fromArray(DIR_FORWARD[target.dirKey][moveDir]).negate();
+        offset.normalize().multiplyScalar(1.05).add(destination);
+        launch.copy(offset).addScaledVector(endNormal, start.clone().sub(destination).dot(endNormal));
+    }
+    sim.padFlight = { t: 0, sample: 0, start, launch, above, end: destination,
+        padHeight: isLiveFlippedFace(ctx.getCubies()[target.x][target.y][target.z].stickers[target.dirKey], ctx.getFlipCap?.() ?? 6) ? WORM_PAD_HEIGHT : 0,
+        startNormal: sim.currentNormal.clone(), endNormal,
+        target: { ...target }, moveDir, allowRide, duration: Math.min(1.25, 0.65 + Math.max(0, start.distanceTo(destination) - 3) * 0.035) };
     sim.isJumping = true;
     sim.jumpCount = 1;
     sim.jumpT = 0.001;
@@ -40,6 +63,19 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
     ctx.feel('jump');
     return true;
 }
+const smooth = t => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
+export function samplePlatformArc(flight, t, out) {
+    const { start, launch, above, end, endNormal } = flight;
+    if (t < 0.2) return out.lerpVectors(start, launch, smooth(t / 0.2));
+    if (t >= 0.78) return out.lerpVectors(above, end, smooth((t - 0.78) / 0.22));
+    const travel = (t - 0.2) / 0.58, across = smooth(travel), rise = smooth(travel / 0.45);
+    out.lerpVectors(launch, above, across);
+    // Reach clearance height before crossing over the ledge, then settle onto
+    // its top. This scales to the 10.71-unit lift of a 15×15 outer cubie.
+    const height = (above.x - launch.x) * endNormal.x + (above.y - launch.y) * endNormal.y + (above.z - launch.z) * endNormal.z;
+    return out.addScaledVector(endNormal, Math.max(0, height) * (rise - across));
+}
+
 const p = new THREE.Vector3(), n = new THREE.Vector3(), q = new THREE.Quaternion(), turn = new THREE.Quaternion(), body = new THREE.Vector3();
 export function tickPlatformJump(sim, delta) {
     const flight = sim.padFlight;
@@ -48,8 +84,7 @@ export function tickPlatformJump(sim, delta) {
     q.setFromUnitVectors(flight.startNormal, flight.endNormal);
     const sample = (t, record) => {
         n.copy(flight.startNormal).applyQuaternion(turn.identity().slerp(q, t));
-        const ease = t * t * (3 - 2 * t);
-        p.lerpVectors(flight.start, flight.end, ease).addScaledVector(n, Math.sin(Math.PI * t) * 0.7);
+        samplePlatformArc(flight, t, p);
         if (record) shPush(sim.stepHistory, body.copy(p).addScaledVector(n, WORM_LIFT), n, -1, -1, -1);
         else { sim.headInterpPos.copy(p); sim.currentNormal.copy(n); }
     };

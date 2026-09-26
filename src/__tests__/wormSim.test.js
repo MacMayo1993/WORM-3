@@ -1430,7 +1430,7 @@ describe('raised WORM platforms', () => {
     sim.pos = { x: 2, y: 2, z: 2, dirKey: 'PZ' };
     const ctx = platformCtx(sim, 'PY');
     startJump(sim, ctx, SIZE);
-    for (let i = 0; i < 40; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
+    for (let i = 0; i < 100 && sim.padFlight; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
     expect(sim.phase).toBe('crawling');
     expect(sim.onRaisedPlatform).toBe(true);
     expect(sim.curWorldPos.toArray()).toEqual([2.8, 2.8, 3.32]);

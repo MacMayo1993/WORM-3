@@ -1494,7 +1494,7 @@ const PHASE_HANDLERS = {
                         }
                     } else if (t === 'jump') {
                         startJump(sim, ctx, size);
-                        if (sim.phase !== 'crawling') return true;
+                        if (sim.phase !== 'crawling' || sim.padFlight) return true;
                     } else if (relativeTurn) {
                         sim.moveDir = turnWorm(sim.moveDir, relativeTurn);
                         sim.lastTurnDir = relativeTurn;

@@ -1,16 +1,12 @@
 import * as THREE from 'three';
-import { getNextSurfacePosition } from './wormLogic.js';
-import { cubieHasFlippedFace } from '../game/raisedCubie.js';
-import { raisedPortalPosition } from './raisedPortalPosition.js';
+import { findRaisedPlatform } from './healerWorm/raisedPlatforms.js';
 
 export function nearbyPlatform(worm, size, state) {
   if (!state.wormHealerMode || state.demoMode || worm.rocketActive?.current) return null;
   if (worm.padFlight?.current) return worm.padFlight.current.end.toArray();
-  for (const tile of [worm.pos.current, getNextSurfacePosition(worm.pos.current, worm.moveDir.current, size)]) {
-    const cubie = tile && state.cubies?.[tile.x]?.[tile.y]?.[tile.z];
-    if (cubie && cubieHasFlippedFace(cubie, 6)) return raisedPortalPosition(tile.x, tile.y, tile.z, tile.dirKey, size, state);
-  }
-  return null;
+  const aim = findRaisedPlatform(worm.pos.current, worm.moveDir.current, size,
+    { getCubies: () => state.cubies, getFlipCap: () => 6 }, worm.onRaisedPlatform?.current);
+  return aim?.destination.toArray() ?? null;
 }
 export function makePlatformFrame() {
   return { weight: 0, probe: new THREE.Vector3(), target: new THREE.Vector3(), center: new THREE.Vector3(), cam: new THREE.Vector3(), direction: new THREE.Vector3(), rotation: new THREE.Quaternion() };

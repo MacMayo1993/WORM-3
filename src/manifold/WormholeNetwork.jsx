@@ -36,8 +36,10 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   // Sever pairs at the cap the session actually grants, so a tunnel stays lit for
   // exactly as long as its tiles are still flippable.
   const flipCap = useGameStore(selectEffectiveFlipCap);
-  const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths } = useGameStore(
+  const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths, wormHealerMode, demoMode } = useGameStore(
     useShallow(s => ({
+      wormHealerMode: s.wormHealerMode,
+      demoMode: s.demoMode,
       cubies: s.cubies,
       size: s.size,
       showTunnels: s.showTunnels,
@@ -50,6 +52,10 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       tunnelDeaths: s.tunnelDeaths,
     }))
   );
+  // Raised WORM platforms expose physical connections even when the cosmetic
+  // view toggle is Off/Hints. Leave the player's setting untouched for other modes.
+  const raisedBands = wormHealerMode && !demoMode;
+  const visible = showTunnels || raisedBands;
   // Narrow deps: only the two settings fields that affect face-color resolution.
   // Avoids re-running the lookup on every unrelated settings change (e.g. background theme).
   const fc = useMemo(
@@ -64,7 +70,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   const deferredCubies = useDeferredValue(cubies);
 
   const tunnelData = useMemo(() => {
-    if (!showTunnels) return [];
+    if (!visible) return [];
     // Guard against size/cubies mismatch during size transitions
     if (deferredCubies.length !== size) return [];
 
@@ -79,7 +85,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
           for (let i = 0; i < DIRS.length; i++) {
             const dirKey = DIRS[i];
             const sticker = cubie.stickers[dirKey];
-            if (!sticker || sticker.flips === 0 || sticker.flips >= flipCap) continue;
+            if (!sticker || sticker.flips === 0 || sticker.flips >= flipCap || (raisedBands && sticker.flips % 2 === 0)) continue;
 
             const gridId = getManifoldGridId(sticker, size);
             if (processed.has(gridId)) continue;
@@ -130,7 +136,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     // Most-active pairs stay visible; low-activity tail is dropped silently.
     connections.sort((a, b) => b.flips - a.flips);
     return connections.slice(0, MAX_TUNNELS);
-  }, [deferredCubies, size, showTunnels, manifoldMap, fc, flipCap]);
+  }, [deferredCubies, size, visible, raisedBands, manifoldMap, fc, flipCap]);
 
   // The worm's current tunnel lives in mutable module state (written by
   // WormChaseCamera on the Three.js RAF, not through the store). Poll it and
@@ -157,9 +163,15 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   // worth looking at.
   const focusIds = useMemo(() => {
     const ids = new Set();
-    if (!showTunnels) return ids;
+    if (!visible) return ids;
 
     if (wormTunnelId) ids.add(wormTunnelId);
+    // WORM caps active pairs at ten, so every raised connection can show the
+    // actual Möbius ribbon rather than leaving most as hairline resting cords.
+    if (raisedBands) {
+      for (const tunnel of tunnelData) ids.add(tunnel.pairId);
+      return ids;
+    }
 
     if (tunnelDetail === 'full') {
       const events = [];
@@ -173,14 +185,14 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       for (let i = 0; i < tunnelData.length && ids.size < FOCUS_BUDGET; i++) ids.add(tunnelData[i].pairId);
     }
     return ids;
-  }, [showTunnels, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData]);
+  }, [visible, raisedBands, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData]);
 
   const focusTunnels = useMemo(
     () => (focusIds.size ? tunnelData.filter((t) => focusIds.has(t.pairId)) : []),
     [tunnelData, focusIds]
   );
 
-  if (!showTunnels) return null;
+  if (!visible) return null;
 
   return (
     <group>
