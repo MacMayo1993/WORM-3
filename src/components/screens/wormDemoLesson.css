@@ -9,7 +9,6 @@
 .worm-demo-actions { display: flex; gap: 8px; padding-bottom: 3px; }
 .worm-demo-actions button { flex: 1; min-width: 0; min-height: 48px; padding: 6px; font-size: 11px; letter-spacing: .02em; border-radius: 12px; }
 .worm-instrument[data-lesson="jump"] .worm-jump,
-.worm-instrument[data-lesson="double-jump"] .worm-jump,
 .worm-instrument[data-lesson="grass"] .worm-jump,
 .worm-instrument[data-lesson="ice"] .worm-jump,
 .worm-instrument[data-lesson="boost"] .worm-boost,

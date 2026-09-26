@@ -9,6 +9,8 @@ import { WORM_DEMO_LESSONS, newWormDemo } from '../game/wormDemoLessons.js';
 import { DEMO_LEVEL_CONFIGS } from '../components/screens/DemoFlowController.jsx';
 import { WORM_DIFFICULTIES } from '../worm/wormDifficulty.js';
 import { makeCubies } from '../game/cubeState.js';
+import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
+import { resolveColors } from '../utils/colorSchemes.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
@@ -61,10 +63,9 @@ it('collects two staged orbs through the production pickup path and gives six ch
   expect(state().wormPowerups).toHaveLength(2);
   expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('orbs');
 });
-it.each(['jump', 'double-jump'])('requires a real landing for %s', id => {
-  lesson(id); input('jump'); until(() => worm.isJumping.current);
+it('requires a real landing for the single-jump lesson', () => {
+  lesson('jump'); input('jump'); until(() => worm.isJumping.current);
   expect(state().demoWormComplete).toBe(false);
-  if (id === 'double-jump') { input('jump'); until(() => state().demoWormProgress === '2 / 2 jumps'); }
   until(() => state().demoWormComplete); expect(worm.isJumping.current).toBe(false);
 });
 it('waits for a boost burst and freezes lessons during pause', () => {
@@ -74,12 +75,29 @@ it('waits for a boost burst and freezes lessons during pause', () => {
   act(() => state().setWormPaused(false)); until(() => state().demoWormComplete);
 });
 it.each(['tunnel', 'heal'])('finishes %s only after the tail exits and preserves the correct deposit outcome', id => {
-  lesson(id); until(() => state().wormTunnelCount > 0);
+  lesson(id);
+  if (id === 'heal') {
+    const face = +Object.keys(state().wormOrbInventory).find(face => state().wormOrbInventory[face] > 0);
+    expect(worm.orbPickupColorsRef.current).toEqual(Array(2).fill(resolveColors(state().settings)[face]));
+  }
+  input('jump'); until(() => worm.padFlight.current);
+  expect(worm.padFlight.current.padHeight).toBe(WORM_PAD_HEIGHT);
+  until(() => state().wormTunnelCount > 0);
+  expect(worm.activeTunnel.current.padHeight).toBe(WORM_PAD_HEIGHT);
+  expect(worm.activeTunnel.current.padExpansion).toBe(wormRaisedAmount(5));
   expect(state().demoWormComplete).toBe(false);
   until(() => state().demoWormComplete, 1600);
   expect(state().wormPhase).toBe('crawling');
   expect(state().wormHealedCount).toBe(id === 'heal' ? 1 : 0);
   if (id === 'heal') expect(Object.values(state().wormOrbInventory).reduce((a, b) => a + b, 0)).toBe(2);
+});
+it('walks under a raised tunnel without entering and can retry the jump route', () => {
+  lesson('tunnel'); frames(90);
+  expect(state().wormTunnelCount).toBe(0); expect(state().demoWormComplete).toBe(false);
+  act(() => state().restartWormDemoLesson()); frame(); frame();
+  act(() => state().startWormDemoLesson()); input('jump');
+  until(() => state().wormTunnelCount > 0);
+  expect(worm.activeTunnel.current.padHeight).toBe(WORM_PAD_HEIGHT);
 });
 it.each(['rocket', 'magnet', 'water', 'fire', 'lightning'])('stages and completes the actual %s pickup effect', id => {
   lesson(id); expect(state().wormSpecials[0].type).toBe(id);
@@ -95,11 +113,13 @@ it('teaches ice jumping and a real nature spring consumption', () => {
   expect(state().demoWormComplete).toBe(false);
   input('jump'); until(() => state().demoWormComplete); expect(worm.jumpSpan.current).toBeGreaterThan(2);
 });
-it('allows Beacon only in the signature lesson, through the real button bridge', () => {
+it('teaches the real Light Trail and waits until it paints behind the tail', () => {
   input('signature'); frames(3); expect(worm.signature.current.seq).toBe(0);
   lesson('signature'); frames(2);
   act(() => host.querySelector('[aria-label="Light Trail"]').click());
+  frame(); expect(state().demoWormComplete).toBe(false);
   until(() => state().demoWormComplete); expect(worm.signature.current.seq).toBe(1);
+  expect(worm.signature.current.glowTrail.path.count).toBeGreaterThanOrEqual(2);
 });
 it('retries only the current exercise; skipping gives no completion credit and clears old buffs', () => {
   lesson('magnet'); until(() => state().demoWormComplete);
@@ -145,7 +165,7 @@ it('waits for Try it, honors manual pause after success, and changes lessons onl
 });
 it('does not finish the chapter after a tunnel and awards no real XP or coins for practice', () => {
   const points = state().parityPoints, xp = state().playerProgress.xp;
-  lesson('heal'); until(() => state().demoWormComplete, 1600);
+  lesson('heal'); input('jump'); until(() => state().demoWormComplete, 1600);
   expect(state().demoWormFinished).toBe(false);
   expect(state().parityPoints).toBe(points); expect(state().playerProgress.xp).toBe(xp);
   act(() => state().exitDemo());
@@ -154,5 +174,7 @@ it('does not finish the chapter after a tunnel and awards no real XP or coins fo
 
 it('covers every elemental orb and keeps the store lesson count in sync', () => {
   expect(WORM_DEMO_LESSONS).toHaveLength(WORM_DEMO_LESSON_COUNT);
+  expect(WORM_DEMO_LESSONS.some(l => l.id === 'double-jump')).toBe(false);
+  expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'jump') + 1].id).toBe('boost');
   for (const id of ELEMENTAL_TYPES) expect(WORM_DEMO_LESSONS.some(l => l.id === id)).toBe(true);
 });

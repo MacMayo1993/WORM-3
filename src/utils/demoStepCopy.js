@@ -21,7 +21,7 @@ export const STEP_COPY = {
   'flip-gateway': 'Send nine tile pairs through the middle, then bring them back. Start with the face in front of you.',
   'view-showcase': 'Let’s look at the same cube in a few different ways. Use Next to explore each view.',
   'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings. Your choices stay saved.',
-  'worm-traversal': 'Steer, collect orbs, and heal the cube through tunnels. WORM practice also covers jumps, power-ups, elements, and hazards.',
+  'worm-traversal': 'Steer, collect orbs, and jump onto raised flip pads to ride their tunnels. Practice also covers power-ups, elements, and hazards.',
   'chaos-forecast': 'Which color pair will last? Pick one, then watch the cube flip until a pair survives.',
   'random-showcase': 'Feeling curious? Random mixes the rules and the look. Watch a remix, then move on whenever you like.',
   'cosmetic-reward': 'Let’s visit the Store. Browse the looks and spend Parity Points on a favorite—or save them for later.'

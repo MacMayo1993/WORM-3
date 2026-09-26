@@ -135,7 +135,7 @@ const Cubie = React.forwardRef(function Cubie({
   );
   const enableShadows = !perfReducedFX;
   const cubePads = useGameStore(flipCubePadsEnabled) && !wormMode;
-  const wormPads = wormMode && !useGameStore.getState().demoMode;
+  const wormPads = wormMode;
   const raisedWindow = (wormPads || cubePads) && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Hollow's 12-beam-per-cubie representation would create more than 14,000
   // meshes on a 15×15 shell. Mega disables that view and keeps its optimized chassis.

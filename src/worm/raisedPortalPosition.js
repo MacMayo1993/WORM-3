@@ -10,7 +10,7 @@ import { wormExpansion } from './wormExpansion.js';
 export function raisedPortalPosition(x, y, z, face, size, state) {
   const cubie = state.cubies?.[x]?.[y]?.[z];
   const cap = selectEffectiveFlipCap(state);
-  const raised = state.wormHealerMode && !state.demoMode && cubie && cubieHasFlippedFace(cubie, cap);
+  const raised = state.wormHealerMode && cubie && cubieHasFlippedFace(cubie, cap);
   const lift = raised ? livePlatformFormation({ x, y, z }, size)?.lift ?? 1 : 0;
   const point = getStickerWorldPos(x, y, z, face, size, Math.max(wormExpansion.amount, wormRaisedAmount(size) * lift));
   if (raised && isLiveFlippedFace(cubie.stickers[face], cap)) {
@@ -22,6 +22,6 @@ export function raisedPortalPosition(x, y, z, face, size, state) {
 // How far a face's portal visuals sit above its slot: a live pad's hover, else 0.
 export function raisedPortalLift(x, y, z, face, state) {
   const sticker = state.cubies?.[x]?.[y]?.[z]?.stickers?.[face];
-  if (!state.wormHealerMode || state.demoMode || !sticker) return 0;
+  if (!state.wormHealerMode || !sticker) return 0;
   return isLiveFlippedFace(sticker, selectEffectiveFlipCap(state)) ? WORM_PAD_HEIGHT : 0;
 }

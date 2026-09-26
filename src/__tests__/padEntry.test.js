@@ -22,9 +22,8 @@ describe('pad entry truth table', () => {
   });
 });
 
-it('keeps demo lessons on the crawl route and every other run on pads', () => {
-  expect(tunnelEntryRule({ demoMode: true })).toBe('crawl');
+it('uses deliberate pad entry for demo lessons and every other WORM run', () => {
+  expect(tunnelEntryRule({ demoMode: true })).toBe('pad');
   expect(tunnelEntryRule({ demoMode: false })).toBe('pad');
   expect(tunnelEntryRule(undefined)).toBe('pad');
 });
-

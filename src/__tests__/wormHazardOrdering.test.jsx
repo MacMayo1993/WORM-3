@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { makeWormSim, resetWormSim, killWormSim } from '../worm/healerWorm/wormSim.js';
 import { makeCubies } from '../game/cubeState.js';
+import { stageWormPractice, readWormPractice } from '../worm/healerWorm/demoPractice.js';
+import { WORM_DEMO_LESSONS, newWormDemo } from '../game/wormDemoLessons.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
 import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
@@ -271,4 +273,45 @@ it('forgets the turn at its commit, so crossing the old layer on an idle cube is
   tick(5);
   expect(resolveSliceHits).toHaveBeenCalledTimes(1);
   expect(useGameStore.getState().wormAlive).toBe(true);
+});
+
+function startHazardLesson(id) {
+  const index = WORM_DEMO_LESSONS.findIndex(l => l.id === id), lesson = WORM_DEMO_LESSONS[index];
+  const practice = { ...stageWormPractice(sim, 3, lesson), rotationEpoch: 0 };
+  act(() => useGameStore.setState({ ...newWormDemo(), demoMode: true, demoStep: 'worm-traversal',
+    demoWormLessonIndex: index, demoWormTarget: practice.target, cubies: practice.cubies, rotationEpoch: 0 }));
+  act(() => useGameStore.setState({ wormPaused: false }));
+  return { practice, lesson, result: () => readWormPractice(sim, practice, lesson, useGameStore.getState(), 3, 0.1) };
+}
+
+it('requires the live bomb ring to disarm and complete the demo lesson without rewards', async () => {
+  const { isBombDisarmed: actualDisarm, bombDisarmRing } = await vi.importActual('../worm/healerWorm/bombs.js');
+  const { ttReset, ttPush } = await import('../worm/circularBuffers.js');
+  isBombDisarmed.mockImplementation(actualDisarm);
+  const { result } = startHazardLesson('bomb');
+  tick();
+  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  expect(props.bombsRef.current).toHaveLength(1);
+  const bomb = props.bombsRef.current[0], ring = [...bombDisarmRing(bomb, 3)];
+  expect(bomb.maxFuse).toBe(25);
+  ttReset(sim.tileTrail, ring[0]); for (const key of ring.slice(1, -1)) ttPush(sim.tileTrail, key);
+  const coins = useGameStore.getState().parityPoints;
+  tick(); expect(result().done).toBe(false);
+  ttPush(sim.tileTrail, ring.at(-1)); tick();
+  expect(result().done).toBe(true); expect(props.bombsRef.current).toHaveLength(0);
+  expect(useGameStore.getState().parityPoints).toBe(coins);
+  expect(rotate).not.toHaveBeenCalled();
+});
+
+it('completes the demo rotation only after the warned live layer has committed', () => {
+  const { result } = startHazardLesson('rotation');
+  tick(50);
+  expect(rotationClock.axis).toBe('col'); expect(rotationClock.sliceIndex).toBe(0);
+  expect(result().done).toBe(false); expect(rotate).not.toHaveBeenCalled();
+  tick(55);
+  expect(rotate).toHaveBeenCalledExactlyOnceWith('col', 1, 0, false, undefined, undefined);
+  expect(result().done).toBe(false);
+  act(() => useGameStore.setState({ rotationEpoch: 1 }));
+  expect(result().done).toBe(true);
+  tick(200); expect(rotate).toHaveBeenCalledTimes(1);
 });

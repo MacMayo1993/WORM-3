@@ -224,7 +224,7 @@ export function useWormCrawler(size, cubies) {
             isPaused: () => !!useGameStore.getState().wormPaused || document.hidden,
             isJumpRescueEnabled: () => {
                 const s = useGameStore.getState();
-                return !s.demoMode && ['active', 'finalHealing'].includes(s.wormGamePhase);
+                return ['active', 'finalHealing'].includes(s.wormGamePhase);
             },
             getSpeed: () => (useGameStore.getState().wormSpeed ?? 2.0) * WORM_MOVEMENT_SPEED_SCALE,
             getControlMode: () => useGameStore.getState().wormControlMode ?? 'non-oriented',
@@ -490,7 +490,7 @@ export function useWormCrawler(size, cubies) {
         const attempt = `${state.wormRunId}:${state.demoWormLessonIndex}:${state.demoWormAttempt}`;
         if (demo && ['active', 'finalHealing'].includes(state.wormGamePhase) && !state.wormPauseMenuOpen && !liveRotation.active && demoPracticeRef.current?.attempt !== attempt) {
             if (deathMenuTimer.current) { clearTimeout(deathMenuTimer.current); deathMenuTimer.current = null; }
-            const practice = stageWormPractice(sim, sizeRef.current, lesson);
+            const practice = stageWormPractice(sim, sizeRef.current, lesson, ctxRef.current.getOrbColor);
             demoPracticeRef.current = { ...practice, attempt, rotationEpoch: state.rotationEpoch };
             resetWormBuffs(); resetWormSegments(); resetWormPress();
             useGameStore.setState({ cubies: practice.cubies, wormPowerups: sim.powerups, wormSpecials: sim.specials,

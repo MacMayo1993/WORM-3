@@ -13,7 +13,7 @@ vi.mock('../manifold/RestingCords.jsx', () => ({ default: () => null }));
 vi.mock('../manifold/TunnelSnap.jsx', () => ({ default: () => null }));
 extend(THREE);
 
-it.each([[true, 0, 'off'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'subtle'], [false, 0, 'off', true], [false, 0, 'subtle', true]])('shows raised bands with Off/Hints, drops healed pairs, and preserves budgets (WORM=%s, chaos=%i, saved=%s)', async (wormHealerMode, chaosLevel, flipPads, demoMode = false) => {
+it.each([[true, 0, 'off', true], [true, 0, 'off'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'subtle'], [false, 0, 'off', true], [false, 0, 'subtle', true]])('shows raised bands with Off/Hints, drops healed pairs, and preserves budgets (WORM=%s, chaos=%i, saved=%s)', async (wormHealerMode, chaosLevel, flipPads, demoMode = false) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState(), size = 7;
   let cubies = makeCubies(size);
@@ -58,7 +58,7 @@ it.each([[true, 0, 'off'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'su
     await act(async () => useGameStore.setState({ chaosLevel: 0, wormHealerMode: false, demoMode: false, showTunnels: false, settings: { ...useGameStore.getState().settings, flipPads: 'off' } }));
     expect(bands()).toHaveLength(0);
     await act(async () => useGameStore.setState({ wormHealerMode: true, demoMode: true }));
-    expect(bands()).toHaveLength(0);
+    expect(bands()).toHaveLength(4);
     await act(async () => useGameStore.setState({ wormHealerMode: false, demoMode: false, showTunnels: true, tunnelDetail: 'full' }));
     expect(bands()).toHaveLength(3); // Preserve the ordinary view's detail budget.
   } finally {

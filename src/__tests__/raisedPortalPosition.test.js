@@ -17,9 +17,8 @@ it.each(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'])('puts %s warning visuals on the ra
       wormExpansion.amount = amount;
       const expected = getStickerWorldPos(...xyz, face, size, raisedWormExpansion(amount, size)); expected[axis] += sign * WORM_PAD_HEIGHT;
       expect(raisedPortalPosition(...xyz, face, size, state)).toEqual(expected);
+      expect(raisedPortalPosition(...xyz, face, size, { ...state, demoMode: true })).toEqual(expected);
     }
-    expect(raisedPortalPosition(...xyz, face, size, { ...state, demoMode: true }))
-      .toEqual(getStickerWorldPos(...xyz, face, size, 1));
   } finally { wormExpansion.amount = before; }
 });
 
@@ -49,7 +48,7 @@ it("reports exactly the hover the portal visuals are raised by, in every mode", 
   try {
     for (const [xyz, state, lift] of [
       [[1, 1, 2], pad, WORM_PAD_HEIGHT],
-      [[1, 1, 2], { ...pad, demoMode: true }, 0],
+      [[1, 1, 2], { ...pad, demoMode: true }, WORM_PAD_HEIGHT],
       [[1, 1, 2], { ...pad, wormHealerMode: false }, 0],
       [[1, 2, 2], pad, 0],
       [[0, 0, 2], pad, 0]

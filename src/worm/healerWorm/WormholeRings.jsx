@@ -135,7 +135,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     const voidFrameRef = useRef();  // bright square frame on fully voided tiles
 
     const cautionTexture = getCautionTexture();
-    const raisedPads = useGameStore(s => s.wormHealerMode && !s.demoMode);
+    const raisedPads = useGameStore(s => s.wormHealerMode);
 
     // Stable random seeds per (position × bubble) slot — no per-frame allocation
     const MAX_RINGS = 6 * size * size;
