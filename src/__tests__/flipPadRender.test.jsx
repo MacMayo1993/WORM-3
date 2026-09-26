@@ -84,6 +84,11 @@ it('renders twin lifts along their normals, keeps slots fixed, and clears on hea
     await act(async () => root.render(draw(1)));
     store.getState().advance(4);
     expect(padMotion.size).toBe(1);
+    useGameStore.setState({ wormHealerMode: true, demoMode: false,
+      settings: { ...useGameStore.getState().settings, flipPads: 'off' } });
+    store.getState().advance(5);
+    expect(front.current.parent.position.length()).toBeCloseTo(0.5);
+    expect(meshes[0].count).toBe(2);
   } finally {
     await act(async () => root.unmount());
     expect(padMotion.size).toBe(0);

@@ -51,6 +51,7 @@ it('freezes combat when paused and does not resume a ready arena through the pau
 it('seals the real tunnel, waits for the tail and finishes without permanent rewards',()=>{
   const points=state().parityPoints,xp=state().playerProgress.xp;
   act(()=>worm.queueTurn('combat-start'));act(()=>worm.queueTurn('turnLeft'));
+  until(()=>state().wormOnFlippedTile);act(()=>worm.queueTurn('jump'));
   until(()=>state().wormTunnelCount>0);expect(combatBridge.current.won).toBe(false);
   until(()=>combatBridge.current.won,1800);
   expect(state().wormHealedCount).toBe(1);expect(state().wormPhase).toBe('crawling');expect(state().wormPaused).toBe(true);

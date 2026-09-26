@@ -160,6 +160,11 @@ function seek(target, done) {
   let steered = '';
   for (let n = 0; n < 10000 && !done() && state().wormAlive; n++) {
     const here = tileKey(worm.pos.current);
+    if (here === tileKey(target) && worm.phase.current === 'crawling' && !worm.isJumping.current) {
+      const { x, y, z, dirKey } = target;
+      const face = state().cubies[x][y][z].stickers[dirKey];
+      if (face.curr !== face.orig) act(() => worm.queueTurn('jump'));
+    }
     if (worm.phase.current === 'crawling' && here !== tileKey(target) && steered !== here) {
       const blocked = new Set();
       for (const tunnel of getActiveTunnels(state().cubies, state().size)) for (const mouth of [tunnel.entry, tunnel.exit]) {

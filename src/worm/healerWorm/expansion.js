@@ -1,3 +1,4 @@
+import { tunnelTailReach } from './tunnelTrail.js';
 import { shAt } from '../circularBuffers.js';
 import { liveRotation } from '../liveRotation.js';
 import { EXPLODE_AMOUNT, EXPLODE_TRANSITION, remapExpansionPoint } from '../wormExpansion.js';
@@ -7,6 +8,10 @@ export function tickExpansion(sim, size, delta, ctx) {
   // Keep a tunnel's complete head-and-tail route fixed until everyone is out.
   // Opening/closing also waits for a slice turn or jump to finish.
   if (sim.phase !== 'crawling' || sim.tunnelPassages.length || liveRotation.active || sim.isJumping || sim.signature?.sweep) return;
+  // A captured pad route already uses the fully exploded lattice. Do not
+  // dilate it a second time while any visible part of the worm still occupies it.
+  if (sim.onRaisedPlatform || sim.raisedDeparture || (sim.raisedRouteDistance != null &&
+      sim.stepHistory.distance - sim.raisedRouteDistance < tunnelTailReach(sim.tailLength))) return;
   const before = sim.expansionAmount;
   if (sim.explodeT > 0) {
     sim.explodeT = Math.max(0, sim.explodeT - delta);

@@ -4,13 +4,17 @@
 
 ## Implementation checkpoint — 2026-09-26
 
-This branch implements the cube-mode pad foundation, menu pads, focused-tunnel idle pulses,
-loading-screen centre pads, and the first Mobi premise pass. WORM still uses its existing
-crawl-entry route and flat mouths. The pure pad-entry truth table is implemented and tested,
-but is **not yet connected to the simulation**; storing `tunnelEntry: 'pad'` does not enable it.
-The Rumbler, raised WORM handoffs, landing assist, ghosting, lone-pad funnel severing,
-intro choreography and victory cascade remain roadmap work. This checkpoint does not
-claim the entire design has shipped.
+Cube modes now raise whole flipped cubies, retain the small square pads and use full-back
+antipodal stalks. WORM now enables whole-cubie expansion and a deliberate jump to a raised
+face underfoot or one tile ahead. The sampled jump carries head and tail together; the chase
+camera follows the same head. Flipped-face landings enter the tunnel; unflipped carried faces
+are platforms. Crawl does not enter raised mouths. Tunnel paths and exit handoffs use the
+expanded endpoints. Demo lessons retain the legacy route.
+
+WORM pads hold a fixed 0.5-unit landing height; cosmetic motion settings cannot remove the
+physical platform. Layer-turn scheduling holds during the captured 0.65-second jump. Rescue
+jumps retain their no-ride provenance. The full Rumbler, animated landing compression and
+launch beats, ghosting and cinematic choreography remain roadmap work.
 
 ### Implementation decisions
 
@@ -40,8 +44,8 @@ claim the entire design has shipped.
 - Reduced motion holds the pad at its static height and disables its idle pulse. Full/subtle/
   flat choices live in Settings → Scene. Chaos has its own low-height profile; big boards
   halve the moving amplitude. No random jitter or tilt ships in this foundation.
-- Preserve WORM's complete current behavior until the remaining route contract below passes.
-  Do not raise a physical landing surface before the head, body and camera agree on it.
+- WORM uses the same expanded positions for rendering, captured jumps and tunnel handoffs.
+  Keep the physical pads independent of cosmetic motion settings.
 
 ### WORM integration contract for phase 4
 
@@ -497,7 +501,7 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
    - `cubiePops` and Explode push whole cubies radially away from the cube's centre. For edge and corner cubies that direction is diagonal, and it drags unflipped stickers on other faces along.
    - In WORM it would also move the surface under the worm.
    - **User decision, 2026-09-26:** this whole-piece movement is intended. Keep the small normal pad too. Raise only cubies with at least one live flipped face. A carried unflipped face is a platform, not a tunnel.
-   - WORM rendering remains gated until its head, tail, landing and camera routes support these displaced surfaces; the cube-mode correction does not claim that physics is complete.
+   - WORM rendering is enabled with sampled platform jumps and expanded tunnel handoffs. Idle pad bounce stays disabled in WORM so the physical landing surface is stable.
 3. **"Jump to ride" inverts the risk model.** The void rule, the tunnel cap, Story route tests and demo lessons all assume automatic entry; that is why the change ships behind a flag.
 4. **"Under the tiles" does not exist in RP².** $\mathbb{RP}^2$ is one-sided. An underside exists only on the double cover (the sphere is two-sided), which is why §5.3 is a real choice.
 5. **Rows and columns are belts, not face lines.** A wave that stops at a face edge breaks the illusion.

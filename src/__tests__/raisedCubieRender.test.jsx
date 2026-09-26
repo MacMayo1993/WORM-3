@@ -48,13 +48,15 @@ it('carries the body and unflipped faces to the Explode position, follows turns,
     store.getState().advance(3 / 60);
     expect(raised.current.parent.position.length()).toBe(0);
     expect(raisedCubieExtent()).toBe(0);
-    // Traversal still uses its existing route until raised-platform physics ships.
-    await act(async () => root.render(draw(1, true)));
+    // WORM also raises the entire piece, even with cosmetic pads switched off.
+    await act(async () => { useGameStore.setState({ settings: { ...useGameStore.getState().settings, flipPads: 'off' } }); root.render(draw(1, true)); });
     store.getState().advance(4 / 60);
-    expect(raised.current.parent.position.length()).toBe(0);
+    expect(raised.current.parent.position.length()).toBeCloseTo(Math.sqrt(3) * 1.8);
+    await act(async () => root.render(draw(0)));
+    store.getState().advance(4.5 / 60);
     // Slot components survive a committed rotation; the physical piece's spring
     // must move to its new slot without restarting or raising the replacement.
-    useGameStore.setState({ settings: { ...useGameStore.getState().settings, reducedMotion: false } });
+    useGameStore.setState({ settings: { ...useGameStore.getState().settings, reducedMotion: false, flipPads: 'full' } });
     await act(async () => root.render(draw(1)));
     store.getState().advance(5 / 60);
     const partial = raised.current.parent.position.length();
