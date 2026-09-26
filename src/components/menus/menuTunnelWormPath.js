@@ -6,6 +6,13 @@ export const MENU_WORM_SPACING = 0.105;
 export const MENU_WORM_SPEED = 1.65;
 export const MENU_WORM_TAIL = (MENU_WORM_SEGMENTS - 1) * MENU_WORM_SPACING;
 
+// Both mouths belong to ONE physical tunnel, regardless of travel direction.
+export function menuTunnelKey(point) {
+  const p = point.toArray ? point.toArray() : point;
+  const axis = p.map(Math.abs).indexOf(Math.max(...p.map(Math.abs)));
+  return ['X', 'Y', 'Z'][axis];
+}
+
 // Each surface leg connects DIFFERENT center portals. Only the interior leg
 // crosses the cube; all following segments share this distance-indexed trail.
 export function makeMenuTunnelWormPath(start, phase = 0) {
@@ -34,7 +41,7 @@ export function makeMenuTunnelWormPath(start, phase = 0) {
     { curve: [[-0.72, 0, -h], [-0.22, 0, -h], [0, 0, -h - 0.2], [0, 0, -h]], face: [0, 0, -1] },
     { curve: [[0, 0, -h], [0, 0, -half], [0, 0, -half], [0, 0, -buried]], face: [0, 0, -1] },
   ];
-  const points = [], normals = [], lengths = [], surfaceRanges = [];
+  const points = [], normals = [], lengths = [], surfaceRanges = [], legEnds = [];
   let length = 0;
   const clamp = v => Math.max(-half, Math.min(half, v));
   const world = p => right.clone().multiplyScalar(p.x).addScaledVector(up, p.y).addScaledVector(normal, p.z);
@@ -65,10 +72,27 @@ export function makeMenuTunnelWormPath(start, phase = 0) {
       points.push(position); normals.push(world(n)); lengths.push(length);
     }
     if (leg.surface) surfaceRanges.push([from, points.length]);
+    legEnds.push(length);
   });
+  const portals = { source: new Vector3(...start), entry: right.clone().multiplyScalar(half),
+    exit: right.clone().multiplyScalar(-half), destination: new Vector3(...start).negate() };
+  const beats = [['source', 'exit', 0], ['entry', 'enter', 4], ['exit', 'exit', 6], ['destination', 'enter', 10]].map(([name, kind, leg]) => {
+    const axis = portals[name].clone().normalize();
+    for (let i = leg * 160 + 1; i <= (leg + 1) * 160; i++) {
+      const a = points[i - 1].dot(axis) - half, b = points[i].dot(axis) - half;
+      if (a * b <= 0 && a !== b) return { kind, distance: lengths[i - 1] + (lengths[i] - lengths[i - 1]) * -a / (b - a) };
+    }
+    throw new Error(`Menu worm route does not cross its ${name} mouth`);
+  });
+  // Reserve from approach until the LAST body segment has cleared the exit
+  // bend. The initial emergence and final dive also use the same pair lock.
+  const tunnelSpans = [
+    { key: menuTunnelKey(portals.source), start: 0, end: legEnds[1] },
+    { key: menuTunnelKey(portals.entry), start: legEnds[2], end: legEnds[7] },
+    { key: menuTunnelKey(portals.destination), start: legEnds[8], end: length },
+  ];
   return { points, normals, lengths, length, normal, up, surfaceRanges,
-    portals: { source: new Vector3(...start), entry: right.clone().multiplyScalar(half),
-      exit: right.clone().multiplyScalar(-half), destination: new Vector3(...start).negate() },
+    portals, beats, tunnelSpans,
     duration: (length + MENU_WORM_TAIL) / MENU_WORM_SPEED };
 }
 
