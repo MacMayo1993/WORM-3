@@ -14,6 +14,16 @@ export const tunnelRideCoreArc = path => path.armALen + path.legLen[2] * 0.5;
 
 export function tunnelRideTwistAt(path, arc) {
   const core = tunnelRideCoreArc(path);
+  // Complete the half-turn inside the solid center cube, leaving both exposed
+  // arms untwisted. The body uses this exact frame, including reverse visits.
+  const halfSpan = Math.max(1e-6, path.legLen[2] * 0.35);
+  return THREE.MathUtils.smoothstep(arc, core - halfSpan, core + halfSpan);
+}
+
+export function tunnelCameraTwistAt(path, arc) {
+  const core = tunnelRideCoreArc(path);
+  // The lens banks gradually around the junction instead of copying the
+  // concealed, tight body turn and snapping through 180 degrees.
   const halfSpan = Math.max(1e-6, Math.min(core, path.total - core) * 0.8);
   return THREE.MathUtils.smoothstep(arc, core - halfSpan, core + halfSpan);
 }
@@ -83,7 +93,7 @@ function rideFrames(path) {
   }
   return cache;
 }
-export function tunnelRideFrameInto(out, path, arc) {
+export function tunnelRideFrameInto(out, path, arc, twist = tunnelRideTwistAt(path, arc)) {
   const s = clamp(arc, path.total);
   tunnelRidePointInto(out.center, path, s);
   const cache = rideFrames(path);
@@ -95,7 +105,6 @@ export function tunnelRideFrameInto(out, path, arc) {
   next.copy(out.tangent).multiplyScalar(cache.forward ? 1 : -1);
   // The half-turn crosses 90° at the core, even when the two arms differ in
   // length. This is also the color boundary of the strip and both rails.
-  const twist = tunnelRideTwistAt(path, s);
   out.normal.applyAxisAngle(next, (cache.forward ? twist : 1 - twist) * Math.PI).normalize();
   out.right.crossVectors(out.tangent, out.normal).normalize();
   // Let the track grow out of the aperture without protruding over the tile.

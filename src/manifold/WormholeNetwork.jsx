@@ -136,7 +136,9 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
               isCenter,
               intensity: Math.min(sticker.flips / 10, 1),
               color1: fc[sticker.curr],
-              color2: fc[partner.curr]
+              color2: fc[partner.curr],
+              style1: settings?.manifoldStyles?.[sticker.curr] || 'solid',
+              style2: settings?.manifoldStyles?.[partner.curr] || 'solid',
             });
           }
         }
@@ -146,7 +148,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     // Most-active pairs stay visible; low-activity tail is dropped silently.
     connections.sort((a, b) => b.flips - a.flips);
     return connections.slice(0, MAX_TUNNELS);
-  }, [deferredCubies, size, visible, raisedBands, manifoldMap, fc, flipCap]);
+  }, [deferredCubies, size, visible, raisedBands, manifoldMap, fc, flipCap, settings?.manifoldStyles]);
 
   // The worm's current tunnel lives in mutable module state (written by
   // WormChaseCamera on the Three.js RAF, not through the store). Poll it and
@@ -241,6 +243,8 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
           raisedPresentation={cubePads}
           active1={t.active1}
           active2={t.active2}
+          style1={t.style1}
+          style2={t.style2}
           tunnelBirths={tunnelBirths}
           tunnelPulses={tunnelPulses}
         />

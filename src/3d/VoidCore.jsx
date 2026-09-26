@@ -26,15 +26,6 @@ const MINI_S = 0.25;    // sticker offset from centre (just past body face at 0.
 const MINI_ST = 0.40;   // sticker plane size (~0.83 of face, matching game cubie ratio)
 const minicubeBodyGeo = new THREE.BoxGeometry(MINI_BODY, MINI_BODY, MINI_BODY);
 const minicubeStickerGeo = new THREE.PlaneGeometry(MINI_ST, MINI_ST);
-const minicubeEdges = new THREE.EdgesGeometry(minicubeBodyGeo);
-const frameShape = new THREE.Shape();
-frameShape.moveTo(-0.245, -0.245); frameShape.lineTo(0.245, -0.245);
-frameShape.lineTo(0.245, 0.245); frameShape.lineTo(-0.245, 0.245); frameShape.closePath();
-const aperture = new THREE.Path();
-aperture.moveTo(-0.205, -0.205); aperture.lineTo(-0.205, 0.205);
-aperture.lineTo(0.205, 0.205); aperture.lineTo(0.205, -0.205); aperture.closePath();
-frameShape.holes.push(aperture);
-const minicubeFrameGeo = new THREE.ShapeGeometry(frameShape);
 
 
 // Face definitions — id matches FACE_COLORS in constants.js (1=PZ Red … 6=NY Yellow)
@@ -57,8 +48,8 @@ const MINI_FACES = [
  * antipodal tunnel straight through the mini cube and out the antipodal-coloured
  * face on the opposite side.
  *
- * The body and stickers are kept highly transparent so the tunnels — and the
- * cube behind the void — remain visible through the centre.
+ * WORM uses an opaque junction that conceals the turn. Other modes retain the
+ * transparent mini-cube so their tunnel network stays visible through it.
  */
 function AntipodalMinicube({ settings, riding }) {
   // Recompute only when colour scheme or biome face assignment changes.
@@ -69,15 +60,15 @@ function AntipodalMinicube({ settings, riding }) {
   );
 
   if (riding) return (
-    <group>
-      {/* An open cube gateway: real, depth-tested edges and coloured face frames.
-          The centre stays open for the worm and its track. */}
-      <lineSegments geometry={minicubeEdges}>
-        <lineBasicMaterial color="#132330" toneMapped={false} />
-      </lineSegments>
+    <group name="worm-solid-core">
+      {/* An opaque junction conceals the half-turn. The head and then the tail
+          enter its face and emerge onto the other arm, with real occlusion. */}
+      <mesh name="worm-core-body" geometry={minicubeBodyGeo} dispose={null}>
+        <meshBasicMaterial color="#132330" toneMapped={false} />
+      </mesh>
       {MINI_FACES.map(({ id, pos, rot }) => (
-        <mesh key={id} geometry={minicubeFrameGeo} position={pos} rotation={rot}>
-          <meshBasicMaterial color={fc[id] || '#888888'} side={THREE.DoubleSide} toneMapped={false} />
+        <mesh key={id} name={`worm-core-face-${id}`} geometry={minicubeStickerGeo} position={pos} rotation={rot} dispose={null}>
+          <meshBasicMaterial color={fc[id] || '#888888'} toneMapped={false} />
         </mesh>
       ))}
     </group>

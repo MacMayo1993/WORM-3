@@ -1,4 +1,4 @@
-import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelCameraTwistAt } from '../utils/tunnelRide.js';
 import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
@@ -308,7 +308,7 @@ describe('tunnelCamPoseInto', () => {
     }
   });
 
-  it('banks with the band under the lens, including a reversed visit', () => {
+  it('banks gradually around the concealed turn, including a reversed visit', () => {
     for (const size of [2, 3, 7, 15]) {
       for (const route of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {
         for (const tunnel of [route, { entry: route.exit, exit: route.entry }]) {
@@ -316,9 +316,24 @@ describe('tunnelCamPoseInto', () => {
           const frame = makeTunnelRideFrame(), pose = makeTunnelCamPose();
           for (let t = 0; t <= 1; t += 0.01) {
             tunnelCamPoseInto(pose, tunnel, t, size);
-            tunnelRideFrameInto(frame, path, tunnelTToArc(path, t) - backForHead(t, size));
+            const arc = tunnelTToArc(path, t) - backForHead(t, size);
+            tunnelRideFrameInto(frame, path, arc, tunnelCameraTwistAt(path, arc));
             expect(pose.up.distanceTo(frame.normal)).toBeLessThan(1e-8);
           }
+        }
+      }
+    }
+  });
+
+  it('keeps the lens outside the solid core without a sudden roll', () => {
+    for (const size of [3, 7, 15]) for (const route of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {
+      for (const tunnel of [route, { entry: route.exit, exit: route.entry }]) {
+        const pose = makeTunnelCamPose(), previousUp = new THREE.Vector3();
+        for (let i = 0; i <= 1000; i++) {
+          tunnelCamPoseInto(pose, tunnel, i / 1000, size);
+          expect(Math.max(...pose.cam.toArray().map(Math.abs))).toBeGreaterThan(0.27);
+          if (i) expect(previousUp.dot(pose.up)).toBeGreaterThan(0.99);
+          previousUp.copy(pose.up);
         }
       }
     }
