@@ -44,7 +44,7 @@ const BUDGETS = {
     // it needs more tongues to fill that footprint instead of a few sparse licks.
     skinGrid: 4,
     particleCount: 0,
-    flamesPerCell: 6,
+    flamesPerCell: 7,
     // Cube-scale adornments (edge flow, corner crowns, icicles, charge rails).
     adornments: 0,
     animate: false,
@@ -53,7 +53,7 @@ const BUDGETS = {
   low: {
     skinGrid: 3,
     particleCount: 60,
-    flamesPerCell: 6,
+    flamesPerCell: 8,
     adornments: 12,
     animate: true,
     accents: false
@@ -64,7 +64,7 @@ const BUDGETS = {
     // in the particle and adornment counts, not the skin coverage.
     skinGrid: 5,
     particleCount: 90,
-    flamesPerCell: 7,
+    flamesPerCell: 9,
     adornments: 24,
     animate: true,
     accents: true
@@ -73,7 +73,7 @@ const BUDGETS = {
     // Desktop at the advertised sizes.
     skinGrid: 5,
     particleCount: 130,
-    flamesPerCell: 7,
+    flamesPerCell: 10,
     adornments: 48,
     animate: true,
     accents: true

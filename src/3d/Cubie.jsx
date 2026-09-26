@@ -488,7 +488,15 @@ const Cubie = React.forwardRef(function Cubie({
           <boxGeometry args={[0.98, 0.98, 0.98]} />
         </mesh>
       ) : (
-        <RoundedBox args={wormMode ? [0.92, 0.92, 0.92] : [0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
+        // In worm mode the body is a see-through shell, so it sorts with the other
+        // transparent objects — by origin, back to front. A layer laid over the whole
+        // cube (the elemental skins, patches) has its origin at the cube's centre, so
+        // the nearer bodies drew AFTER it and painted their 0.8-opacity faces over it
+        // wherever no opaque sticker sat in front: every seam turned into a black
+        // bar across the water, the moss and the fire's lava cracks. Drawing bodies
+        // first fixes that; they still write depth, so anything behind them stays
+        // hidden exactly as before.
+        <RoundedBox args={wormMode ? [0.92, 0.92, 0.92] : [0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows} renderOrder={wormMode ? -1 : 0}>
           <meshStandardMaterial {...bodyMatProps} />
         </RoundedBox>
       )}
