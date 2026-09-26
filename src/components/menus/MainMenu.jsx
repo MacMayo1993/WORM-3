@@ -1,6 +1,5 @@
 import { PadProvider, FlipPadOffset } from '../../3d/PadSprings.jsx';
 import WormWordmark from '../branding/WormWordmark.jsx';
-import { createModePlateArtwork } from '../../3d/modePlateArtwork.js';
 import '../ui/screenDesign.css';
 import './liveCubeCarousel.css';
 import './mainMenuKeys.css';
@@ -710,14 +709,12 @@ function makeContactShadowTexture() {
   return tex;
 }
 
-// Renders a beveled, glossy solid-color tile on every cube face, with the
-// illustrated mode scene and a bold display title on each face. Fully opaque,
+// Renders a beveled, glossy solid-color tile on every cube face, with a
+// centered display title. Fully opaque,
 // depth-writing tiles occlude the faces behind them, so only the words on
 // visible faces read — hidden faces are naturally masked by the front tile.
 const ModeFacePlates = React.forwardRef((_props, rootRef) => {
   const enamelRefs = useRef({});
-  const decals = useMemo(() => Object.fromEntries(CAROUSEL_MODES.map(m => [m.id, createModePlateArtwork(m.id, m.textColor)])), []);
-  useEffect(() => () => Object.values(decals).forEach(texture => texture?.dispose()), [decals]);
   const faceColors = useMemo(() => Object.fromEntries(CAROUSEL_MODES.map(m => [m.face, new THREE.Color(m.tileColor)])), []);
   const targetColor = useMemo(() => new THREE.Color(), []);
   useFrame((_state, delta) => {
@@ -755,16 +752,10 @@ const ModeFacePlates = React.forwardRef((_props, rootRef) => {
               <meshPhysicalMaterial ref={material => { enamelRefs.current[m.face] = material; }} color={m.tileColor} metalness={0.08} roughness={0.3}
                 clearcoat={1} clearcoatRoughness={0.2} envMapIntensity={0.3} />
             </mesh>
-            {decals[m.id] && <mesh position={[0, 0.36, 0.045]} renderOrder={33}>
-              <planeGeometry args={[2.35, 2.35]} />
-              <meshBasicMaterial map={decals[m.id]} transparent depthWrite={false} toneMapped={false} />
-            </mesh>}
-            {/* Keep the illustration and give each face a legible arcade title.
-                FLIP CUBE is the one two-word title: at RANDOM's size it overruns
-                maxWidth and wraps up into the illustration, so it steps down again
-                to hold one line at the same width as the others. */}
+            {/* Center the title on the plain face. Longer names step down in
+                size so every mode, including FLIP CUBE, fits on one line. */}
             <Text
-              position={[0, -0.86, 0.055]}
+              position={[0, 0, 0.055]}
               font={bungeeWoffUrl}
               fontSize={m.label.length > 6 ? 0.42 : m.label.length > 5 ? 0.48 : 0.62}
               maxWidth={2.5}
