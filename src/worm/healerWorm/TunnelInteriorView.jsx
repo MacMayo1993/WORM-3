@@ -5,10 +5,8 @@ import { tunnelCameraInside } from '../tunnelVisibility.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useGameStore } from '../../hooks/useGameStore.js';
+import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
-import { getManifoldMap } from '../../game/manifoldMapStore.js';
-import { findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
 import { ANTIPODAL_COLOR, FACE_COLORS, SURFACE_OFFSET } from '../../utils/constants.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
@@ -49,11 +47,11 @@ export function TunnelInteriorView({ worm, size }) {
     const opacityRef = useRef(0);
     const prevPhaseRef = useRef('crawling');
     const stickerMatsAssigned = useRef(false);
+    const materialSnapshot = useRef({ cubies: null, settings: null, cap: null });
 
     // Precompute every surface sticker's world position and rotation (size-dependent only).
-    // Antipodal partner resolution is deferred to tunnel-entry time so it always reflects
-    // the current manifold map rather than the geometric (n-sx, n-sy, n-sz) position that
-    // becomes wrong after any slice rotation or scramble.
+    // Materials read each tile's live outward color, then its antipodal back,
+    // exactly as StickerPlane does, including after flips and slice rotations.
     const expansion = useGameStore(s => s.wormPhase === 'crawling' ? 0 : s.explosionT);
     const scale = cubeExpansionScale(size, expansion);
     const stickerLayout = useMemo(() => {
@@ -76,6 +74,7 @@ export function TunnelInteriorView({ worm, size }) {
     }, [size, expansion]);
 
     const planeGeo = useMemo(() => new THREE.PlaneGeometry(0.88, 0.88), []);
+    const placeholder = useMemo(() => new THREE.MeshBasicMaterial({ color: '#1a1a1a', transparent: true, opacity: 0, depthWrite: false }), []);
 
     // Solid black backing box, seen from inside (BackSide) — sits just beyond the sticker
     // planes so it shows through the gaps between tiles instead of background/exterior cube.
@@ -109,6 +108,7 @@ export function TunnelInteriorView({ worm, size }) {
         backingGeo.dispose(); dimGeo.dispose();
     }, [backingGeo, dimGeo]);
     useEffect(() => () => planeGeo.dispose(), [planeGeo]);
+    useEffect(() => () => placeholder.dispose(), [placeholder]);
 
     useFrame((_state, delta) => {
         const phase = worm.phase.current;
@@ -122,32 +122,32 @@ export function TunnelInteriorView({ worm, size }) {
         // so the stickers were never revealed and the cube read as solid black.
         const inTraversal = ['windup', 'entering', 'tunnel', 'exiting', 'windout'].includes(phase);
 
-        // Assign once on any first observed transit frame. A large board or a
-        // remounted scene can miss windup→entering; it still needs its interior.
-        // Avoids 54+ per-frame GPU state changes that caused hitching on the first visible frame.
-        // Partner sticker is resolved via the manifold map so scrambled/rotated states are correct.
-        if (inTraversal && !stickerMatsAssigned.current) {
-            const st = useGameStore.getState();
+        // Assign on the first observed transit frame and on actual cube/style
+        // changes. Avoids 54+ per-frame GPU state changes while still refreshing
+        // backs when a pair heals or the player changes the equipped styles.
+        const st = useGameStore.getState(), cap = selectEffectiveFlipCap(st);
+        const changed = materialSnapshot.current.cubies !== st.cubies || materialSnapshot.current.settings !== st.settings || materialSnapshot.current.cap !== cap;
+        if (inTraversal && (!stickerMatsAssigned.current || changed)) {
             const { cubies, settings } = st;
             const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
             const manifoldStyles = settings?.manifoldStyles ?? {};
-            const manifoldMap = getManifoldMap(cubies, size, st.rotationEpoch);
             for (let i = 0; i < stickerLayout.length; i++) {
                 const { sx, sy, sz, dirKey } = stickerLayout[i];
                 const mesh = stickerMeshesRef.current[i];
                 if (!mesh) continue;
                 const sticker = cubies?.[sx]?.[sy]?.[sz]?.stickers?.[dirKey];
                 if (!sticker) { mesh.visible = false; continue; }
-                const antipodalLoc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
-                const antipodalFaceId = antipodalLoc?.sticker?.curr;
+                const antipodalFaceId = ANTIPODAL_COLOR[sticker.curr];
                 if (!antipodalFaceId) { mesh.visible = false; continue; }
-                const colorHex = fc[antipodalFaceId] ?? '#444';
-                const style = manifoldStyles[antipodalFaceId] ?? 'solid';
+                const dead = sticker.flips >= cap;
+                const colorHex = dead ? '#555555' : (fc[antipodalFaceId] ?? '#444');
+                const style = dead ? 'solid' : (manifoldStyles[antipodalFaceId] ?? 'solid');
                 const antiColorHex = fc[ANTIPODAL_COLOR[antipodalFaceId]] ?? '#ffffff';
                 mesh.material = getTileStyleMaterial(style, colorHex, false, null, antiColorHex);
                 mesh.visible = false; // revealed gradually by opacity ramp
             }
             stickerMatsAssigned.current = true;
+            materialSnapshot.current = { cubies, settings, cap };
         }
         // Clear assignment flag once the whole traversal is over, so the next transit
         // gets fresh sticker colours. Gated on inTraversal, not active — 'entering' is
@@ -188,15 +188,17 @@ export function TunnelInteriorView({ worm, size }) {
                 <meshBasicMaterial ref={dimMatRef} color="#05060c" side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
             </mesh>
             {/* All 6 faces × size² sticker planes, coloured imperatively */}
-            {stickerLayout.map((_, i) => (
+            {stickerLayout.map(({ sx, sy, sz, dirKey }, i) => (
                 <mesh
                     key={i}
+                    name={`tunnel-interior-${sx}-${sy}-${sz}-${dirKey}`}
+                    dispose={null}
+                    material={placeholder}
                     ref={el => { stickerMeshesRef.current[i] = el; }}
                     visible={false}
                     frustumCulled={false}
                 >
                     <primitive object={planeGeo} attach="geometry" />
-                    <meshBasicMaterial color="#1a1a1a" transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
                 </mesh>
             ))}
         </>

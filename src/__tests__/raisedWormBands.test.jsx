@@ -21,7 +21,7 @@ it.each([true, false])('shows live raised bands with Off/Hints, drops healed pai
   for (let z = 1; z <= 5; z++) cubies = flipStickerPair(cubies, size, 0, 3, z, 'NX', manifoldMap);
   useGameStore.setState({ cubies, size, wormHealerMode, chaosLevel: 0, mirrorMode: false, demoMode: false, showTunnels: false,
     tunnelDetail: 'hints', tunnelBirths: {}, tunnelPulses: {}, tunnelDeaths: {},
-    settings: { ...before.settings, flipPads: wormHealerMode ? 'off' : 'full' } });
+    settings: { ...before.settings, flipPads: wormHealerMode ? 'off' : 'full', manifoldStyles: { 5: 'checkerboard', 2: 'circuit' } } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
@@ -36,6 +36,7 @@ it.each([true, false])('shows live raised bands with Off/Hints, drops healed pai
     const colors = resolveColors(useGameStore.getState().settings);
     for (const { userData: band } of bands()) {
       expect([band.color1, band.color2]).toEqual([colors[5], colors[2]]); // Outward blue to antipodal green after the flip.
+      expect([band.style1, band.style2]).toEqual(['checkerboard', 'circuit']);
       expect(band.color1).not.toBe(band.color2);
       for (const side of [1, 2]) {
         const index = band[`meshIdx${side}`];
@@ -44,6 +45,8 @@ it.each([true, false])('shows live raised bands with Off/Hints, drops healed pai
       }
     }
     expect(new Set(bands().map(b => b.userData.tunnelId)).size).toBe(5);
+    await act(async () => useGameStore.setState({ settings: { ...useGameStore.getState().settings, manifoldStyles: { 5: 'wood', 2: 'solid' } } }));
+    expect(bands().every(b => b.userData.style1 === 'wood' && b.userData.style2 === 'solid')).toBe(true);
     expect(useGameStore.getState().showTunnels).toBe(false);
     await act(async () => useGameStore.setState({ showTunnels: true }));
     expect(bands()).toHaveLength(5); // Hints must not demote the raised connections.

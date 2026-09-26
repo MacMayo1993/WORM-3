@@ -1,4 +1,4 @@
-import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelCameraTwistAt } from '../utils/tunnelRide.js';
 // src/worm/tunnelCameraRails.js
 //
 // The pose of the wormhole camera as a pure function of how far along the
@@ -185,9 +185,9 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   if (out.tangent.lengthSq() < 1e-12) out.tangent.copy(_camPath.nStart).negate();
   out.tangent.normalize();
 
-  // Bank with the physical ribbon under the lens. Canonical frame transport
-  // keeps reverse visits on the same side as an already-recorded tail.
-  tunnelRideFrameInto(_rideFrame, _camPath, camArc);
+  // Follow the same transported frame, spreading the concealed half-turn over
+  // the approach and departure so the camera circles the solid core smoothly.
+  tunnelRideFrameInto(_rideFrame, _camPath, camArc, tunnelCameraTwistAt(_camPath, camArc));
   out.up.copy(_rideFrame.normal);
   if (camArc >= 0 && camArc <= _camPath.total) out.tangent.copy(_rideFrame.tangent);
 
@@ -211,7 +211,15 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   // Clear the worm's back once inside, then look slightly down at the track.
   // A parallel raised aim left the core and worm at the bottom of a phone view.
   const mouthClearance = THREE.MathUtils.smoothstep(Math.min(camArc, _camPath.total - camArc), 0.1, 0.55);
-  const rideHeight = cameraUpForHead(tHead) * mouthClearance;
+  let rideHeight = cameraUpForHead(tHead) * mouthClearance;
+  // On a small cube the head can approach its exit while the trailing lens is
+  // still at the core. Keep the lens outside the cube's circumscribed sphere
+  // even after the ordinary exit-height ramp has begun, avoiding a black frame.
+  const coreClearance = 0.48;
+  const projection = out.cam.dot(out.up), distanceSq = out.cam.lengthSq();
+  if (distanceSq + 2 * projection * rideHeight + rideHeight * rideHeight < coreClearance * coreClearance) {
+    rideHeight = -projection + Math.sqrt(projection * projection + coreClearance * coreClearance - distanceSq);
+  }
   out.cam.addScaledVector(out.up, rideHeight);
   out.look.add(out.cam).addScaledVector(out.up, -rideHeight * 0.75);
   return out;

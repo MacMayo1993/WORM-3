@@ -1,4 +1,5 @@
-import { fillTunnelRideGeometry, tunnelRideCoreArc } from '../utils/tunnelRide.js';
+import { fillTunnelRideGeometry, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
+import TunnelTileSurface from './TunnelTileSurface.jsx';
 import { PLATFORM_FORMATION_SECONDS, platformFormationHeld } from '../worm/platformFormation.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
@@ -495,10 +496,12 @@ function createRibbonGeos(segs, continuous = false) {
 const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
   gridId1, gridId2, tunnelBirths, tunnelPulses, raisedPresentation = false, active1 = true, active2 = true,
+  style1 = 'solid', style2 = 'solid',
 }) => {
   const flipCap          = useGameStore(selectEffectiveFlipCap);
   const wormMode = useGameStore(s => s.wormHealerMode);
   const ribbonMode = wormMode || raisedPresentation;
+  const styled = style1 !== 'solid' || style2 !== 'solid';
   const groupRef = useRef();
   const segments = wormMode ? 160 : RIBBON_SEGS;
   const meshRef          = useRef();
@@ -532,6 +535,9 @@ const MobiusTunnel = ({
     uOpacity:     { value: 0.92 },
     uRideMode:    { value: 0 },
     uRideCore:    { value: 0.5 },
+    uPatternRepeats: { value: 1 },
+    uTileCenterA: { value: new THREE.Vector3() },
+    uTileCenterB: { value: new THREE.Vector3() },
     uTime:        { value: 0.0 },
     uScrollSpeed: { value: 1.0 },
     uGrowT:       { value: 1.0 },
@@ -648,6 +654,9 @@ const MobiusTunnel = ({
       // The route itself — throats along each tile's own world normal, docks on the
       // colour-correct mini-cube faces. Everything below sweeps this.
       buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _dockNorm1, _dockNorm2);
+      uniforms.uPatternRepeats.value = _tunnelPath.total / (ribbonMode ? TUNNEL_RIDE_WIDTH : RIBBON_WIDTH);
+      uniforms.uTileCenterA.value.copy(_wPos1);
+      uniforms.uTileCenterB.value.copy(_wPos2);
 
       // Twist axis: overall start-to-end direction
       _axis.subVectors(_vEnd, _vStart).normalize();
@@ -705,6 +714,7 @@ const MobiusTunnel = ({
       }
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;
+      geo.computeVertexNormals();
       leftGeo.attributes.position.needsUpdate    = true;
       leftGeo.attributes.aHeightFrac.needsUpdate  = true;
       leftGeo.attributes.aTripFrac.needsUpdate    = true;
@@ -840,7 +850,7 @@ const MobiusTunnel = ({
           frustumCulled is off on all three meshes here: vertex positions are written in world
           space into meshes parented at the origin, so the lazily-computed bounding sphere goes
           stale on the first rebuild and culling against it pops the ribbon in and out. */}
-      <mesh ref={meshRef} geometry={geo} frustumCulled={false}>
+      <mesh ref={meshRef} geometry={geo} frustumCulled={false} visible={!styled}>
         <shaderMaterial
           uniforms={uniforms}
           vertexShader={vertexShader}
@@ -852,6 +862,10 @@ const MobiusTunnel = ({
           extensions={{ derivatives: true }}
         />
       </mesh>
+      {styled && <>
+        <TunnelTileSurface geometry={geo} style={style1} color={color1} antiColor={color2} uniforms={uniforms} side={0} rideMode={ribbonMode} />
+        <TunnelTileSurface geometry={geo} style={style2} color={color2} antiColor={color1} uniforms={uniforms} side={1} rideMode={ribbonMode} />
+      </>}
 
       {/* Both WORM rails follow the strip's endpoint colors through the core. */}
       <mesh geometry={leftGeo} frustumCulled={false}>

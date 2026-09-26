@@ -22,6 +22,16 @@ describe('Möbius surface riding', () => {
     expect(tunnelRideTwistAt(path, core)).toBeCloseTo(0.5, 10);
     expect(tunnelRideTwistAt(path, 0)).toBe(0);
     expect(tunnelRideTwistAt(path, path.total)).toBe(1);
+    expect(tunnelRideTwistAt(path, path.armALen)).toBe(0);
+    expect(tunnelRideTwistAt(path, path.armALen + path.legLen[2])).toBe(1);
+    // The exposed arms stay level; the physical turn is concealed in the cube.
+    for (let i = 1; i < 100; i++) {
+      const arc = path.total * i / 100, twist = tunnelRideTwistAt(path, arc);
+      if (twist > 0 && twist < 1) {
+        expect(arc).toBeGreaterThan(path.armALen);
+        expect(arc).toBeLessThan(path.armALen + path.legLen[2]);
+      }
+    }
     for (let i = 0; i <= 100; i++) {
       const arc = path.total * i / 100;
       expect(tunnelRideTwistAt(path, arc) + tunnelRideTwistAt(reverse, path.total - arc)).toBeCloseTo(1, 10);
