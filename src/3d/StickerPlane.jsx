@@ -1743,9 +1743,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     : (biomeEnabled && stableCity && isGLBFullFace(stableCity)) ? (CITY_CONFIG[stableCity]?.bgColor ?? '#0d0d0d')
       : baseColor;
 
-  // Store baseColor in ref for access in useFrame animation callbacks
-  const baseColorRef = useRef(materialColor);
-  baseColorRef.current = materialColor;
+  // Glass ignores loaded textures, including their neutral white material tint.
+  // Flip callbacks must retain the current face color at the seam and completion.
+  const animationColor = isGlass ? baseColor : materialColor;
+  const baseColorRef = useRef(animationColor);
+  baseColorRef.current = animationColor;
 
   // Hex color of the antipodal face — used by antipodal-pattern tile styles.
   // Kept in a ref so imperative flip/layout-effect callbacks can read the live value.
