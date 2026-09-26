@@ -1,3 +1,4 @@
+import { raisedCubieExtent } from './raisedCubieMotion.js';
 import { cubeExpansionMultiplier, cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -687,6 +688,7 @@ const CubeAssembly = React.memo(({
   const preExplodeDist = useRef(0);
   const wasExploding = useRef(false);
   const prevEfRef2 = useRef(0);
+  const reframeTime = useRef(0);
 
   // Spin-energy tracking for reactive tile styles (orbChamber): derive the
   // rotation's angular speed from liveRotation.angle frame-to-frame, feed it to
@@ -720,33 +722,37 @@ const CubeAssembly = React.memo(({
   }, [size]);
 
 
-  useFrame(() => {
-    const ef = explosionFactorRef.current;
+  useFrame((_state, delta) => {
+    const ef = Math.max(explosionFactorRef.current, wormHealerMode ? 0 : raisedCubieExtent());
     const isExploding = ef > 0;
 
     // Capture camera distance the frame explosion starts
-    if (isExploding && !wasExploding.current) {
+    if (isExploding && !wasExploding.current && preExplodeDist.current === 0) {
       preExplodeDist.current = camera.position.length();
     }
     wasExploding.current = isExploding;
 
-    // Only override the camera while ef is actively animating (changing > 0.001 per frame).
-    // When ef is stable (fully open or fully closed), hands off — user controls zoom freely.
+    // Reframe during expansion and briefly finish the interpolation afterward.
+    // This also handles reduced motion, where expansion changes in a single frame.
     const efAnimating = Math.abs(ef - prevEfRef2.current) > 0.001;
     prevEfRef2.current = ef;
 
-    if (!wormHealerMode && preExplodeDist.current > 0 && efAnimating) {
+    if (efAnimating) reframeTime.current = 0.4;
+    if (!wormHealerMode && preExplodeDist.current > 0 && reframeTime.current > 0) {
+      reframeTime.current = Math.max(0, reframeTime.current - Math.min(delta, 0.05));
       const explosionMultiplier = cubeExpansionMultiplier(size);
       const zoomFactor = 1 + ef * explosionMultiplier * 0.55;
       const targetDist = preExplodeDist.current * zoomFactor;
       const currentDist = camera.position.length();
 
       if (Math.abs(currentDist - targetDist) > 0.05) {
-        camera.position.setLength(currentDist + (targetDist - currentDist) * 0.1);
+        camera.position.setLength(currentDist + (targetDist - currentDist) * (1 - Math.exp(-12 * Math.min(delta, 0.05))));
       }
 
+      if (reframeTime.current === 0) camera.position.setLength(targetDist);
+
       // Done collapsing — clear saved distance so we stop nudging the camera
-      if (ef === 0 && Math.abs(currentDist - preExplodeDist.current) < 0.1) {
+      if (ef === 0 && (reframeTime.current === 0 || Math.abs(currentDist - preExplodeDist.current) < 0.1)) {
         camera.position.setLength(preExplodeDist.current);
         preExplodeDist.current = 0;
       }
@@ -1261,7 +1267,7 @@ const CubeAssembly = React.memo(({
                   // a thousand transparent draw calls and R3F geometry nodes. The
                   // stickers remain the complete surface; the chassis (and its
                   // spinning band box during a turn) supplies the black backing, so
-                  // no cubie ever needs its own body. Keying this to size alone —
+                  // only a selectively raised cubie restores its own body. Keying this to size alone —
                   // rather than restoring bodies for the rotating slice every turn —
                   // stops ~170 RoundedBox mounts/unmounts per rotation, which was the
                   // main source of the mid-turn stutter.

@@ -1,11 +1,16 @@
+import { useRaisedCubieSpring } from './raisedCubieContext.js';
+import { cubieHasFlippedFace, selectiveCubieOffsetRatio } from '../game/raisedCubie.js';
+import { advancePadSpring } from './padPose.js';
+import { publishRaisedCubie } from './raisedCubieMotion.js';
+import { prefersReducedMotion } from '../utils/device.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { COLORS, FACE_COLORS } from '../utils/constants.js';
 import { getEdgeFlags } from '../game/cubeUtils.js';
-import { useGameStore } from '../hooks/useGameStore.js';
+import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import StickerPlane from './StickerPlane.jsx';
 import MergedLedEdges from './MergedLedEdges.jsx';
@@ -108,7 +113,7 @@ function LegoStud({ dir, color, enableShadows = true }) {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, omitBody = false, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX } = useGameStore(
+  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX, effectiveFlipCap } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
@@ -118,6 +123,7 @@ const Cubie = React.forwardRef(function Cubie({
       randomMode: s.randomMode,
       randomStyleTick: s.randomStyleTick,
       perfReducedFX: s.perfReducedFX,
+      effectiveFlipCap: selectEffectiveFlipCap(s),
     }))
   );
   const enableShadows = !perfReducedFX;
@@ -189,7 +195,7 @@ const Cubie = React.forwardRef(function Cubie({
 
   const handleDown = (e) => {
     e.stopPropagation();
-    onPointerDown({ pos: { x: cubie.x, y: cubie.y, z: cubie.z }, worldPos: new THREE.Vector3(...position), event: e });
+    onPointerDown({ pos: { x: cubie.x, y: cubie.y, z: cubie.z }, worldPos: e.point?.clone() ?? new THREE.Vector3(...position), event: e });
   };
 
   const meta = (d) => cubie.stickers[d] || null;
@@ -391,46 +397,48 @@ const Cubie = React.forwardRef(function Cubie({
     return getMirrorDimensions(origHomeX, origHomeY, origHomeZ, size);
   }, [mirrorMode, origHomeX, origHomeY, origHomeZ, size]);
 
-  // Outer group for the cubie-pop burst animation (does not affect cubieRefs tracking).
+  // CubeAssembly owns the inner group's grid position and live slice rotation.
+  // Offset the entire piece in a separate parent, along that LIVE centre vector:
+  // a corner's three faces move together, and the displacement rotates with it.
   const popGroupRef = useRef();
+  const pieceRef = useRef();
+  useImperativeHandle(ref, () => pieceRef.current, []);
   const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
-  // True while this cubie's pop group is displaced from the origin. Lets idle cubies
-  // (the common case — pops only fire on disparity heal taps) early-out without writing
-  // position every frame. Every visible cubie runs this useFrame, so without the gate the
-  // whole shell paid a store read + a position.set(0,0,0) per frame in every mode.
+  const liftSpring = useRaisedCubieSpring(`${size}:${origHomeX},${origHomeY},${origHomeZ}`);
   const poppedRef = useRef(false);
+  const raised = !wormMode && !mirrorMode && settings?.flipPads !== 'off'
+    && cubieHasFlippedFace(cubie, effectiveFlipCap);
+  // Mega normally omits individual bodies. Materialize a body for a raised
+  // piece and keep it through its return; otherwise it would still be a sheet.
+  const [returningBody, setReturningBody] = useState(false);
+  useEffect(() => { if (raised && omitBody) setReturningBody(true); }, [raised, omitBody]);
 
-  useFrame(() => {
-    // Fast path: no pops anywhere and this cubie is already home — the common
-    // case, and the *only* case in Worm/Mega mode. Bail before any store read.
-    if (!_anyCubiePops && !poppedRef.current) return;
-    if (!popGroupRef.current) return;
-    // Read imperatively — avoids re-rendering all cubies whenever cubiePops changes.
-    const entry = useGameStore.getState().cubiePops[popKey];
+
+  useFrame((_state, delta) => {
+    const spring = liftSpring.current;
+    if (!_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0) return;
+    if (!popGroupRef.current || !pieceRef.current) return;
+    const state = useGameStore.getState();
+    const reduced = settings?.reducedMotion || prefersReducedMotion();
+    if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
+    else advancePadSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
+    const amount = Math.max(0, Math.min(1, spring.lift));
+    publishRaisedCubie(spring, amount);
+    const entry = state.cubiePops[popKey];
     const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;
-    if (!entry || rawT >= 1) {
-      // Pop finished or never started: snap back to origin exactly once, then stay idle.
-      if (poppedRef.current) {
-        popGroupRef.current.position.set(0, 0, 0);
-        poppedRef.current = false;
-      }
-      return;
-    }
-    // Smooth sine bell: peaks at t=0.5, fully symmetric, no oscillation.
-    const popFactor = Math.sin(rawT * Math.PI) * 1.5;
-    const [px, py, pz] = explodedPos;
-    const len = Math.sqrt(px * px + py * py + pz * pz) || 1;
-    popGroupRef.current.position.set(
-      (px / len) * popFactor,
-      (py / len) * popFactor,
-      (pz / len) * popFactor
-    );
-    poppedRef.current = true;
-  });
+    const impact = !reduced && entry && rawT >= 0 && rawT < 1 ? Math.sin(rawT * Math.PI) * 1.5 : 0;
+    const center = pieceRef.current.position;
+    const ratio = selectiveCubieOffsetRatio(size, state.explosionT, amount);
+    // Preserve the original impact hop, but do not add a second full explosion.
+    const distance = Math.max(center.length() * ratio, impact);
+    popGroupRef.current.position.copy(center).normalize().multiplyScalar(distance);
+    poppedRef.current = distance > 0 || spring.lift !== 0;
+    if (!raised && spring.lift === 0 && returningBody) setReturningBody(false);
+  }, -0.75); // after CubeAssembly (-1), before pad stalks (-0.5) and tunnel anchors
 
   return (
     <group ref={popGroupRef}>
-    <group position={explodedPos} ref={ref}>
+    <group position={explodedPos} ref={pieceRef}>
     <group scale={contentScale}>
       {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}
       {mirrorMode ? (
@@ -449,7 +457,7 @@ const Cubie = React.forwardRef(function Cubie({
           <mesh castShadow={enableShadows} receiveShadow={enableShadows} dispose={null}
             geometry={hollowFrameGeometry} material={getHollowBeamMaterial(effectiveVisualMode)} />
         </>
-      ) : omitBody ? null : hideBody ? (
+      ) : omitBody && !raised && !returningBody ? null : hideBody ? (
         // Exit-arm ride: camera is inside the cube and the solid body would occlude the
         // antipodal back-face stickers, so swap it for an invisible hit box (pointer
         // interaction stays intact, but nothing opaque sits between camera and stickers).
