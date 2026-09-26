@@ -1,6 +1,6 @@
 # Demo mechanics audit — September 26, 2026
 
-The core tour, optional Explore tour, and every WORM practice lesson were checked against the current game paths. WORM now has **17 lessons**. The dedicated double-jump lesson is removed; this does not change the live game's jump controls or Story objectives.
+The core tour, optional Explore tour, and every WORM practice lesson were checked against the current game paths. WORM now has **18 lessons**: the double-jump lesson was removed in this pass and restored in the second pass below, after the mid-air arc was fixed.
 
 ## Shared mechanisms
 
@@ -14,7 +14,8 @@ Tunnel exercises start within the production two-tile jump aim window. Their tar
 | --- | --- |
 | Steering | Real turn input; practice continues after success. |
 | Orbs | Production pickups; two orbs give six charges. |
-| Jump | One surface jump must land. No double-jump task. |
+| Jump | One surface jump must land. |
+| Double jump | Two presses in one flight, then a landing (restored in the second pass). |
 | Boost | Actual timed burst must finish. |
 | Tunnel | JUMP captures the raised platform; completion waits for the tail to exit. No charges means the pair stays open. |
 | Healing | Same jump route; four matching charges seal both ends after tail clearance, leaving two. |
@@ -94,7 +95,7 @@ explains the rule. **Fixed** marks copy or flow changed in this pass;
 | Net | Help screen; deliberately omitted from the showcase | Unchanged |
 | Colors / Tiles / Scene tabs | Settings step | OK |
 
-### WORM (WORM Practice, 17 lessons)
+### WORM (WORM Practice, 18 lessons)
 
 | Rule (source) | Where | Status |
 | --- | --- | --- |
@@ -107,7 +108,7 @@ explains the rule. **Fixed** marks copy or flow changed in this pass;
 | Death advice for self-collision and collapsed tunnels | Practice card (was a generic line for both) | Fixed |
 | Each character has its own signature | Signature lesson success; Store setup line | Fixed |
 | Steer, jump, boost, pad entry, heal on exit, surround, rocket, magnet, five elements, bomb disarm | Their lessons, unchanged | OK |
-| Double jump (`MAX_JUMPS = 2`) | Not taught; the dedicated lesson was removed earlier today on purpose | Deferred (product call) |
+| Double jump (`MAX_JUMPS = 2`); Story levels require "double jumps landed" | New Double jump lesson after Jump. The mid-air press used to restart the arc at `jumpT = 0.001`, dropping the worm from ~1.24 units to the floor in one frame; `jumpArc.js` now starts the second arc from the current height, used by the head, the baked body lift and pad launches alike | Fixed (lesson + arc bug) |
 | Explode orb, 20-second cube-look orbs (`specialDefs`, `viewPowerups`) | Not taught; practice suppresses random specials | Deferred |
 | Missions card, Story levels | Self-describing cards outside practice | Not in demo |
 

@@ -129,7 +129,7 @@ export function tickSignature(sim, delta, size, ctx) {
     sig.target = { ...available.target };
     sig.cooldown = SIGNATURES.inch.cooldown;
     sig.active = 1;
-    sim.isJumping = true; sim.jumpT = 0.001; sim.jumpCount = 1;
+    sim.isJumping = true; sim.jumpT = 0.001; sim.jumpCount = 1; sim.jumpBase = 0;
     sim.jumpSpan = SPRING_SPAN; sim.jumpHeight = SPRING_HEIGHT;
     sim.pendingTunnelTrigger = null;
     ctx.feel('jump');

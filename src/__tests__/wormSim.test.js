@@ -31,6 +31,7 @@ import {
   windoutHeadS,
   activeTunnelCap,
   MAX_ACTIVE_TUNNEL_PAIRS,
+  SURFACE_JUMP_HEIGHT,
 } from '../worm/healerWorm/constants.js';
 import { makeCubies } from '../game/cubeState.js';
 import * as THREE from 'three';
@@ -522,6 +523,27 @@ describe('jump and boost', () => {
     run(sim, ctx, 2.5);
     expect(sim.isJumping).toBe(false);
     expect(sim.jumpCount).toBe(0);
+  });
+
+  it('climbs on from the current height when a second jump is pressed mid-air', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    queueTurn(sim, 'jump');
+    run(sim, ctx, 0.1);
+    for (let i = 0; i < 20 && jumpLiftOf(sim) < 0.8; i++) run(sim, ctx, 1 / 60, 1 / 60);
+    const before = jumpLiftOf(sim);
+    expect(before).toBeGreaterThan(0.8);
+    queueTurn(sim, 'jump');
+    run(sim, ctx, 1 / 60, 1 / 60);
+    expect(sim.jumpCount).toBe(2);
+    // No drop to the floor: the new arc starts where the worm already was…
+    expect(jumpLiftOf(sim)).toBeGreaterThan(before - 0.05);
+    let peak = 0;
+    while (sim.isJumping) { run(sim, ctx, 1 / 60, 1 / 60); peak = Math.max(peak, jumpLiftOf(sim)); }
+    // …rises above a single jump's apex, and still lands.
+    expect(peak).toBeGreaterThan(SURFACE_JUMP_HEIGHT);
+    expect(jumpLiftOf(sim)).toBe(0);
+    expect(sim.jumpBase).toBe(0);
   });
 
   it('runs the boost lifecycle: active → cooldown → ready', () => {

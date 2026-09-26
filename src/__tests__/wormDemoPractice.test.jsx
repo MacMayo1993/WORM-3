@@ -68,6 +68,19 @@ it('requires a real landing for the single-jump lesson', () => {
   expect(state().demoWormComplete).toBe(false);
   until(() => state().demoWormComplete); expect(worm.isJumping.current).toBe(false);
 });
+it('counts a double jump only when both presses land in one flight', () => {
+  lesson('double-jump'); input('jump'); until(() => worm.isJumping.current);
+  // A single hop that lands does not count toward the pair.
+  until(() => !worm.isJumping.current);
+  expect(state().demoWormComplete).toBe(false); expect(state().demoWormProgress).toBe('0 / 2 jumps');
+  input('jump'); until(() => worm.isJumping.current); frames(6);
+  const lift = worm.jumpLift();
+  input('jump'); until(() => state().demoWormProgress === '2 / 2 jumps');
+  // The second arc climbs on from where the first one was, never from the floor.
+  expect(worm.jumpLift()).toBeGreaterThanOrEqual(lift * 0.9);
+  expect(state().demoWormComplete).toBe(false);
+  until(() => state().demoWormComplete); expect(worm.isJumping.current).toBe(false);
+});
 it('waits for a boost burst and freezes lessons during pause', () => {
   lesson('boost'); input('boost'); until(() => state().wormBoostState === 'active');
   act(() => state().setWormPaused(true)); const pos = { ...worm.pos.current };
@@ -174,7 +187,8 @@ it('does not finish the chapter after a tunnel and awards no real XP or coins fo
 
 it('covers every elemental orb and keeps the store lesson count in sync', () => {
   expect(WORM_DEMO_LESSONS).toHaveLength(WORM_DEMO_LESSON_COUNT);
-  expect(WORM_DEMO_LESSONS.some(l => l.id === 'double-jump')).toBe(false);
-  expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'jump') + 1].id).toBe('boost');
+  // Double jump follows the single jump it builds on; Story levels count it.
+  expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'jump') + 1].id).toBe('double-jump');
+  expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'double-jump') + 1].id).toBe('boost');
   for (const id of ELEMENTAL_TYPES) expect(WORM_DEMO_LESSONS.some(l => l.id === id)).toBe(true);
 });

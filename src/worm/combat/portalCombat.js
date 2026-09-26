@@ -3,6 +3,7 @@ import { DIR_FORWARD } from '../healerWorm/constants.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
 import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
+import { ENEMY_DISSOLVE_HOLD, MAX_DISSOLVING } from './enemyDissolve.js';
 
 export const COMBAT = Object.freeze({ magazine: 3, recharge: 1.4, fireInterval: 0.32,
   health: 3, maxEnemies: 4, warning: 2.5, spawnInterval: 6, enemySpeed: 0.425,
@@ -65,7 +66,7 @@ export function makeCombat(size, portal) {
     element: null, elementT: 0, score: 0, combo: 0, bestCombo: 0, lastKill: -Infinity,
     killsByType: { crawler: 0, scout: 0, brute: 0 }, damageTaken: 0, fireHeld: false,
     kills: 0, shotsFired: 0, shotsHit: 0, dropsCollected: 0, seq: 0,
-    enemies: [], shots: [], bursts: [], drops: [], arcs: [], spawnTimer: COMBAT.warning,
+    enemies: [], dying: [], shots: [], bursts: [], drops: [], arcs: [], spawnTimer: COMBAT.warning,
     muzzle: null, portalOpen: true, lockedId: null, aim: null, aimHeld: false, fireRequested: false, held: false };
 }
 // Aim and projectiles share a face plane. No route-finding or homing can turn a
@@ -136,7 +137,12 @@ function damageEnemy(c, enemy, amount) {
   c.combo = c.time-c.lastKill <= 5 ? Math.min(5,c.combo+1) : 1;
   c.lastKill = c.time; c.bestCombo = Math.max(c.bestCombo,c.combo);
   c.score += ENEMIES[type].points * c.combo;
-  burst(c,enemy.tile,'kill');
+  // The body stays on its tile and crumbles away like the opening's cube
+  // (enemyDissolve.js). Same object, same id: the renderer keeps it in the slot
+  // it already had, so it dissolves exactly where and how it fell.
+  enemy.dissolveT = 0; enemy.seed = c.kills;
+  c.dying.push(enemy);
+  if (c.dying.length > MAX_DISSOLVING) c.dying.shift();
   if (c.ambient) return;
   const element = c.kills % 2 === 1 ? ELEMENT_ORDER[Math.floor(c.kills/2) % ELEMENT_ORDER.length] : null;
   c.drops.push({ id: ++c.seq, tile: { ...enemy.tile }, life: 20, element });
@@ -170,6 +176,12 @@ function hitEnemy(c, shot, enemy, player) {
     }
   }
 }
+/** Advance every defeated enemy's crumble; drop it once its last fleck lands. */
+export function stepEnemyDissolves(c, dt) {
+  if (!c?.dying?.length) return;
+  for (const e of c.dying) e.dissolveT += dt;
+  c.dying = c.dying.filter(e => e.dissolveT < ENEMY_DISSOLVE_HOLD);
+}
 function finishCombat(c, reason) {
   c.won = true; c.endReason = reason; c.enemies = []; c.shots = []; c.muzzle = null;
   c.fireRequested = false; c.fireHeld = false; c.lockedId = null; c.aim = null;
@@ -177,6 +189,9 @@ function finishCombat(c, reason) {
 // No wall-clock timers: pause, tunnel travel, claim beats and rotations hold all
 // combat clocks together. Requests made while held are discarded, never buffered.
 export function stepCombat(c, delta, player, onHit = () => {}) {
+  // Held with everything else, but not ended by the round: the kill that wins it
+  // still finishes dissolving behind the results.
+  if (c && !player.blocked) stepEnemyDissolves(c, Math.max(0, Math.min(0.05, delta)));
   if (!c || !c.started || c.won || c.health <= 0 || player.blocked) { if (c) { c.fireRequested = false; c.fireHeld = false; c.lockedId = null; c.aim = null; } return; }
   const dt = Math.max(0, Math.min(0.05, delta));
   c.held = false; c.time += dt;
