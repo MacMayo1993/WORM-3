@@ -10,6 +10,7 @@
 
 import { collectManifoldRing } from '../wormLogic.js';
 import { DIR_FORWARD } from './constants.js';
+import { drawViewPower } from './viewPowerups.js';
 import { BUFF_TYPES } from './specialDefs.js';
 
 export const tileKeyOf = (t) => `${t.x},${t.y},${t.z},${t.dirKey}`;
@@ -19,7 +20,7 @@ export const tileKeyOf = (t) => `${t.x},${t.y},${t.z},${t.dirKey}`;
 // one-in-sixteen event, and players read that as broken. A shuffle bag holding one
 // of each type instead spreads the draws evenly.
 //
-// Each bag holds the three pickups (explode + rocket + magnet). Elemental orbs are NOT drawn
+// Each bag holds explode, rocket, magnet, and one cube-view pickup. Elemental orbs are NOT drawn
 // here — they spawn on their own offering track (see spawnElementalOffering in
 // wormSim), so this bag only balances how the protective buffs come up. The longest
 // possible run of a type is two (tail of one bag, head of the next) and even that is
@@ -28,7 +29,7 @@ export const tileKeyOf = (t) => `${t.x},${t.y},${t.z},${t.dirKey}`;
 export const makeSpecialPicker = () => ({ bag: [], lastType: null, streak: 0 });
 
 const refillBag = (picker, rand) => {
-    const bag = BUFF_TYPES.slice();
+    const bag = [...BUFF_TYPES, 'view'];
     // Fisher-Yates with the injected RNG.
     for (let i = bag.length - 1; i > 0; i--) {
         const j = Math.floor(rand() * (i + 1));
@@ -71,7 +72,7 @@ export function drawSpecialType(picker, { magnetUseful = true, rand = Math.rando
     const [type] = picker.bag.splice(idx, 1);
     picker.streak = type === picker.lastType ? picker.streak + 1 : 1;
     picker.lastType = type;
-    return type;
+    return type === 'view' ? drawViewPower(picker, rand) : type;
 }
 
 /** How many parity orbs sit within `radius` manifold steps of a tile. */

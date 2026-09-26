@@ -1,3 +1,5 @@
+import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
+import { bodyMaterialProps } from './cubeViewStyles.js';
 import { raisedCubieExtent } from './raisedCubieMotion.js';
 import { cubeExpansionMultiplier, cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
@@ -97,6 +99,7 @@ const CubeAssembly = React.memo(({
     flipMode,
     flipWaveOrigins,
     wormHealerMode,
+    wormViewPower,
     wormTunnelActive,
     isBiomeMode,
     rotationEpoch,
@@ -113,6 +116,7 @@ const CubeAssembly = React.memo(({
       flipMode: s.flipMode,
       flipWaveOrigins: s.flipWaveOrigins,
       wormHealerMode: s.wormHealerMode,
+      wormViewPower: s.wormViewPower,
       // Keep puzzle controls disabled through the tunnel ride. Exterior visibility
       // is handled per frame from the lens position below.
       wormTunnelActive: s.wormHealerMode && s.wormPhase === 'tunnel',
@@ -124,6 +128,7 @@ const CubeAssembly = React.memo(({
       cameraOrbitDir: s.cameraOrbitDir,
     }))
   );
+  const powerView = wormHealerMode ? getViewPowerDef(wormViewPower)?.view : null;
   const exteriorRef = useRef(null);
   useFrame(({ camera }) => {
     const state = useGameStore.getState();
@@ -1190,6 +1195,7 @@ const CubeAssembly = React.memo(({
               castShadow={false}
               receiveShadow={false}
               onPointerDown={onMegaChassisPointerDown}
+              visible={powerView !== 'gap'}
             >
               {/* The sticker face begins 0.51 units from its cubie centre and its
                   footprint can sink 0.03584 units at maximum spring overshoot. Keep
@@ -1200,7 +1206,7 @@ const CubeAssembly = React.memo(({
                   visible in the grid channels, not another shaded face. Ambient
                   light and background bleed made the previous transparent standard
                   material read gray and erased the black cubie perimeter. */}
-              <meshBasicMaterial color="#000000" />
+              <MegaViewMaterial view={powerView} />
             </mesh>
           )}
           {megaChassis && !megaChassis.rest && (
@@ -1211,16 +1217,16 @@ const CubeAssembly = React.memo(({
                cube interior, never a hole to the background. */
             <>
               {megaChassis.slabs.map((s, si) => (
-                <mesh key={`slab-${si}`} castShadow={false} receiveShadow={false} position={s.pos}>
+                <mesh key={`slab-${si}`} visible={powerView !== 'gap'} castShadow={false} receiveShadow={false} position={s.pos}>
                   <boxGeometry args={s.args} />
-                  <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
+                  <MegaViewMaterial view={powerView} />
                 </mesh>
               ))}
               {megaChassis.bands.map((b, bi) => (
                 <group key={`band-${bi}`} ref={(el) => { megaBandRefs.current[bi] = el; }} position={b.pos}>
-                  <mesh castShadow={false} receiveShadow={false}>
+                  <mesh visible={powerView !== 'gap'} castShadow={false} receiveShadow={false}>
                     <boxGeometry args={b.args} />
-                    <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
+                    <MegaViewMaterial view={powerView} />
                   </mesh>
                 </group>
               ))}
@@ -1308,3 +1314,9 @@ const CubeAssembly = React.memo(({
 });
 
 export default CubeAssembly;
+
+// Preserve the one-draw Mega chassis while letting temporary materials reach it.
+function MegaViewMaterial({ view }) {
+  return view ? <meshStandardMaterial {...bodyMaterialProps(view)} side={THREE.DoubleSide} />
+    : <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />;
+}

@@ -18,6 +18,7 @@
 // worm). Keeping them in one map is why nothing in the spawn/HUD path needs a
 // special case for elements.
 
+import { VIEW_POWER_DEFS } from './viewPowerups.js';
 import { ELEMENTAL_DEFS, ELEMENTAL_TYPES, isElementalType } from './elementalDefs.js';
 
 const BASE_SPECIAL_DEFS = {
@@ -56,7 +57,7 @@ const BASE_SPECIAL_DEFS = {
  * Elements are appended after rocket/magnet so the shuffle bag (specialSpawn.js)
  * spreads them evenly alongside the buffs.
  */
-export const SPECIAL_DEFS = { ...BASE_SPECIAL_DEFS, ...ELEMENTAL_DEFS };
+export const SPECIAL_DEFS = { ...BASE_SPECIAL_DEFS, ...ELEMENTAL_DEFS, ...VIEW_POWER_DEFS };
 
 /** Canonical list of supported special types (buffs + elements). */
 export const SPECIAL_TYPES = Object.keys(SPECIAL_DEFS);

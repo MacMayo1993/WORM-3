@@ -1,3 +1,4 @@
+import { getViewPowerDef, VIEW_POWER_DURATION } from './healerWorm/viewPowerups.js';
 import { EXPLODE_DURATION } from './wormExpansion.js';
 import { ScreenHeading } from '../components/ui/ModeArtwork.jsx';
 import { storyLevel, storyChapterId, storyChapterIndex, STORY_CHAPTER_SIZE } from './story/levels.js';
@@ -895,6 +896,21 @@ function SpecialIcon({ type, size = 14 }) {
 
 function BuffStrip({ detailed = false, onInspect }) {
     const explodeActive = useGameStore(s => s.wormExplodeActive ?? false);
+    const viewPower = useGameStore(s => s.wormViewPower);
+    const viewDef = getViewPowerDef(viewPower);
+    const viewSeconds = useRef(null);
+    const viewFill = useRef(null);
+    useEffect(() => {
+        if (!viewPower) return;
+        let raf;
+        const paint = () => {
+            if (viewSeconds.current) viewSeconds.current.textContent = `${Math.ceil(wormBuffs.viewPowerT)}s`;
+            if (viewFill.current) viewFill.current.style.width = `${100 * wormBuffs.viewPowerT / VIEW_POWER_DURATION}%`;
+            raf = requestAnimationFrame(paint);
+        };
+        paint();
+        return () => cancelAnimationFrame(raf);
+    }, [viewPower, detailed]);
     const explodeSeconds = useRef(null);
     const explodeFill = useRef(null);
     const rocketActive = useGameStore(s => s.wormRocketActive ?? false);
@@ -956,13 +972,22 @@ function BuffStrip({ detailed = false, onInspect }) {
         paint();
         return () => cancelAnimationFrame(raf);
     }, [explodeActive]);
-    if (!rocketActive && !magnetActive && !elementalTheme && !explodeActive) return null;
+    if (!viewDef && !rocketActive && !magnetActive && !elementalTheme && !explodeActive) return null;
 
     const rocketDef = getSpecialDef('rocket');
     const magnetDef = getSpecialDef('magnet');
     const elemDef = elementalTheme ? getElementalDef(elementalTheme) : null;
 
     return <div className={`worm-buffs${detailed ? ' worm-buffs-detailed' : ''}`} aria-label="Active powers">
+        {viewDef && <div className="worm-buff-item">
+            <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
+                style={{ '--power-color': viewDef.color }} aria-label={`${viewDef.label} active`} aria-haspopup={detailed ? undefined : 'dialog'}>
+                <span ref={viewFill} className="worm-buff-meter" aria-hidden="true" style={{ width: '100%' }} />
+                <SpecialIcon type={viewPower} /><span className="worm-buff-name">{viewDef.label}</span>
+                <span ref={viewSeconds} aria-hidden="true" />
+            </button>
+            {detailed && <p>{viewDef.description}</p>}
+        </div>}
         {explodeActive && <div className="worm-buff-item">
             <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
                 style={{ '--power-color': getSpecialDef('explode').color }} aria-label="Explode active" aria-haspopup={detailed ? undefined : 'dialog'}>
@@ -1256,7 +1281,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
 }
 
 function HudContext({ surface, demo, onInspect }) {
-    const hasBuff = useGameStore(s => s.wormExplodeActive || s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme);
+    const hasBuff = useGameStore(s => s.wormExplodeActive || s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme || !!s.wormViewPower);
     const [hasTunnel, setHasTunnel] = useState(!!wormBuffs.tunnelNeeds);
     useEffect(() => {
         const id = setInterval(() => setHasTunnel(!!wormBuffs.tunnelNeeds), 100);

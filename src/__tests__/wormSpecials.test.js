@@ -1,3 +1,4 @@
+import { isViewPower, VIEW_POWER_TYPES, VIEW_POWER_DURATION } from '../worm/healerWorm/viewPowerups.js';
 import { EXPLODE_DURATION, EXPLODE_AMOUNT } from '../worm/wormExpansion.js';
 import { tickExpansion } from '../worm/healerWorm/expansion.js';
 // Deterministic tests for the special power-ups (rocket / magnet).
@@ -103,6 +104,7 @@ function makeCtx(overrides = {}) {
     onSpecialSpawned: log('specialSpawned'),
     onSpecialExpired: log('specialExpired'),
     onElementalTheme: log('elemental'),
+    onViewPower: log('viewPower'),
     onStoryMechanic: log('storyMechanic'),
     ...overrides,
   };
@@ -734,16 +736,11 @@ describe('special type chooser', () => {
     return () => values[i++ % values.length];
   };
 
-  it('produces both buffs in each bag', () => {
+  it('balances three gameplay powers with one view power in each bag', () => {
     const picker = makeSpecialPicker();
-    const rand = seqRand([0.1, 0.9]);
-    // A bag is just rocket + magnet now, so two draws empty exactly one bag.
-    const drawn = [
-      drawSpecialType(picker, { rand }),
-      drawSpecialType(picker, { rand }),
-    ];
-    expect(drawn).toContain('rocket');
-    expect(drawn).toContain('magnet');
+    const drawn = Array.from({ length: 4 }, () => drawSpecialType(picker, { rand: () => 0.4 }));
+    expect(drawn).toEqual(expect.arrayContaining(['rocket', 'magnet', 'explode']));
+    expect(drawn.filter(isViewPower)).toHaveLength(1);
   });
 
   it('never draws an element from the buff bag — elements are their own track', () => {
@@ -1292,13 +1289,14 @@ it.each(['remote', 'head', 'glow'])('credits Story magnet catches for remote mag
 
 
 describe('Explode pickup', () => {
-  it('offers Explode as the first ambient pickup, then uses all three types', () => {
+  it('offers Explode as the first ambient pickup, then balances all four power categories', () => {
     const sim = makeSim(), ctx = makeCtx();
     sim.specialTimer = 0;
     stepWormSim(sim, 0.05, SIZE, ctx);
     expect(sim.specials.find(s => !isElementalType(s.type))?.type).toBe('explode');
-    const types = new Set(Array.from({ length: 3 }, () => drawSpecialType(sim.specialPicker)));
-    expect(types).toEqual(new Set(['explode', 'rocket', 'magnet']));
+    const types = Array.from({ length: 4 }, () => drawSpecialType(sim.specialPicker));
+    expect(types).toEqual(expect.arrayContaining(['explode', 'rocket', 'magnet']));
+    expect(types.filter(isViewPower)).toHaveLength(1);
   });
 
   it('requires contact at the tile center, even while magnet is active', () => {
@@ -1355,5 +1353,54 @@ describe('Explode pickup', () => {
     resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
     expect(sim.expansionAmount).toBe(0);
     expect(sim.explodeT).toBe(0);
+  });
+});
+
+
+describe('temporary cube views', () => {
+  it('offers every supported view before repeating, without crowding out other powers', () => {
+    const picker = makeSpecialPicker();
+    const draws = Array.from({ length: VIEW_POWER_TYPES.length * 4 }, () => drawSpecialType(picker, { rand: () => 0.3 }));
+    expect(new Set(draws.filter(isViewPower))).toEqual(new Set(VIEW_POWER_TYPES));
+    expect(draws.filter(t => t === 'rocket')).toHaveLength(VIEW_POWER_TYPES.length);
+  });
+  it.each(VIEW_POWER_TYPES)('activates %s, holds its full timer for the reveal, and restores on expiry', type => {
+    const sim = makeSim(), ctx = makeCtx({ isDemoLesson: () => true });
+    activateSpecial(sim, ctx, type);
+    expect(sim.viewPower).toBe(type);
+    const pos = sim.headInterpPos.clone();
+    run(sim, ctx, 1);
+    expect(sim.headInterpPos.distanceTo(pos)).toBeLessThan(1e-8);
+    expect(sim.viewPowerT).toBe(VIEW_POWER_DURATION);
+    sim.elementalFocusT = 0;
+    run(sim, makeCtx({ isPaused: () => true }), 1);
+    expect(sim.viewPowerT).toBe(VIEW_POWER_DURATION);
+    sim.viewPowerT = 0.04;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.viewPower).toBeNull();
+    expect(sim.viewPowerT).toBe(0);
+    expect(eventsOf(ctx, 'viewPower').at(-1).args).toEqual([null, 0]);
+  });
+  it('requires centered contact even under magnet assistance and uses the claim burst', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    sim.specials = [special(2, 3, 4, 'PZ', 'view-glass')];
+    sim.magnetT = 8;
+    stepUntilCommit(sim, ctx);
+    expect(sim.viewPower).toBeNull();
+    run(sim, ctx, 1);
+    expect(sim.viewPower).toBe('view-glass');
+    expect(sim.pendingSpecialFlash.type).toBe('view-glass');
+    expect(eventsOf(ctx, 'storyMechanic')).toEqual([]);
+  });
+  it('refreshes or replaces the view without extending durations, then clears on reset', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    activateSpecial(sim, ctx, 'view-glass');
+    sim.viewPowerT = 2;
+    activateSpecial(sim, ctx, 'view-neon');
+    expect(sim.viewPower).toBe('view-neon');
+    expect(sim.viewPowerT).toBe(VIEW_POWER_DURATION);
+    resetWormSim(sim, SIZE, { orbCount: 0 });
+    expect(sim.viewPower).toBeNull();
+    expect(sim.viewPowerT).toBe(0);
   });
 });

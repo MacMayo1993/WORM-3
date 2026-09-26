@@ -77,6 +77,7 @@ import {
     tileKeyOf,
 } from './specialSpawn.js';
 import { SURVIVAL_TICK_INTERVAL } from '../../utils/economyConstants.js';
+import { isViewPower, VIEW_POWER_DURATION } from './viewPowerups.js';
 import { isElementalType, ELEMENTAL_TYPES } from './specialDefs.js';
 import {
     WORM_LIFT,
@@ -247,6 +248,8 @@ export function makeWormSim(size) {
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalPatches: new Map(),
         waterMomentum: 0,
+        viewPower: null,
+        viewPowerT: 0,
         elementalType: null,      // active elemental wash ('water'|'fire'|'grass'|'ice'|null)
         elementalT: 0,            // seconds of elemental wash remaining
         elementalMaxT: 0,         // duration of the active wash, for the HUD's fill
@@ -396,6 +399,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.magnetMaxT = 0;
     sim.elementalPatches.clear();
     sim.waterMomentum = 0;
+    sim.viewPower = null;
+    sim.viewPowerT = 0;
     sim.elementalType = null;
     sim.elementalT = 0;
     sim.elementalMaxT = 0;
@@ -617,6 +622,13 @@ export function activateSpecial(sim, ctx, type) {
         sim.explodeT = EXPLODE_DURATION;
         ctx.onExplodeState?.(true);
         ctx.feel('specialSpawn');
+    }
+    else if (isViewPower(type)) {
+        sim.viewPower = type;
+        sim.viewPowerT = VIEW_POWER_DURATION;
+        sim.elementalFocusT = ELEMENTAL_FOCUS_DURATION;
+        ctx.onViewPower?.(type, VIEW_POWER_DURATION);
+        ctx.feel('orb');
     }
     else if (isElementalType(type)) startElemental(sim, ctx, type);
 }
@@ -1027,7 +1039,7 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = fals
     const idx = sim.specials.findIndex(s => {
         const key = `${s.x},${s.y},${s.z},${s.dirKey}`;
         if (s.type === 'explode') return key === headKey && sim.interpT >= 1 && !sim.isJumping;
-        if (isElementalType(s.type)) return key === headKey && sim.interpT >= 1;
+        if (isElementalType(s.type) || isViewPower(s.type)) return key === headKey && sim.interpT >= 1;
         return !elementsOnly && (reach ? reach.has(key) : key === headKey);
     });
     if (idx === -1) return;
@@ -2047,6 +2059,14 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.magnetT = 0;
             sim.magnetMaxT = 0;
             ctx.onMagnetState(0, 0);
+        }
+    }
+
+    if (sim.phase === 'crawling' && sim.viewPowerT > 0) {
+        sim.viewPowerT = Math.max(0, sim.viewPowerT - delta);
+        if (sim.viewPowerT === 0) {
+            sim.viewPower = null;
+            ctx.onViewPower?.(null, 0);
         }
     }
 
