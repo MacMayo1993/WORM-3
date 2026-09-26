@@ -134,3 +134,47 @@ export const GLSL_CELL_FRAME = /* glsl */ `
   vec3 cellY = normalize(cellMatrix[1].xyz);
   vec3 cellN = normalize(cellMatrix[2].xyz);
 `;
+
+/**
+ * Seam anchoring, for skins whose detail grows OUT of the grout (fire's tongues,
+ * nature's grass). Requires GLSL_CELL_ATTRIBUTES and GLSL_NOISE.
+ *
+ *   slotId(salt)   a stable identity for this instance and geometry slot. The cell
+ *                  seed can run into the hundreds of thousands, which a hash on the
+ *                  GPU cannot resolve, so it is split into small parts.
+ *   seamPoint(..)  a point on the sticker grid's seams inside this cell, picked by
+ *                  three randoms. Seams sit half a unit off every sticker centre,
+ *                  and every cell is centred on a sticker, so the candidate lines
+ *                  are the half-integers inside the cell's extent. Returns the local
+ *                  point (xy), whether it lies on a cube edge (z) and which way that
+ *                  edge faces along the chosen axis (w, ±1).
+ *   sweepStart(d)  where in the claim sweep this cell starts, compressed so even
+ *                  the last cell (aSweep ≈ 0.9) finishes its ramp of width d before
+ *                  the sweep does.
+ */
+export const GLSL_SEAM = /* glsl */ `
+  vec2 slotId(float salt) {
+    return vec2(mod(aCell.w, 251.0), floor(aCell.w / 251.0)) + vec2(aIndex * 7.13 + salt, aIndex * 3.71 - salt * 0.7);
+  }
+
+  vec4 seamPoint(float r1, float r2, float r3, float straddle) {
+    float alongX = step(0.5, r1);           // 0: a seam running along Y (constant x)
+    float eNeg = mix(aExtent.x, aExtent.z, alongX);
+    float ePos = mix(aExtent.y, aExtent.w, alongX);
+    float lo = ceil(-eNeg - 0.5 - 0.001);
+    float hi = floor(ePos - 0.5 + 0.001);
+    float m = lo + min(floor(r2 * (hi - lo + 1.0)), hi - lo);
+    float line = m + 0.5;
+    float onPos = step(abs(line - ePos), 0.02) * mix(aEdge.y, aEdge.w, alongX);
+    float onNeg = step(abs(line + eNeg), 0.02) * mix(aEdge.x, aEdge.z, alongX);
+    float aNeg = mix(aExtent.z, aExtent.x, alongX);
+    float aPos = mix(aExtent.w, aExtent.y, alongX);
+    float along = mix(-aNeg + 0.06, aPos - 0.06, r3);
+    // Anything rooted on a cube edge sits just inside it, so it stays on the cube.
+    line += straddle - (onPos - onNeg) * 0.04;
+    vec2 l = alongX < 0.5 ? vec2(line, along) : vec2(along, line);
+    return vec4(l, max(onPos, onNeg), onPos - onNeg);
+  }
+
+  float sweepStart(float width) { return aSweep * (1.0 - width) / 0.92; }
+`;

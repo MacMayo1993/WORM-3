@@ -1,52 +1,89 @@
 import { describe, expect, it } from 'vitest';
-import { Vector3 } from 'three';
-import { buildMeadowGeometry, meadowBlade, MEADOW_SEGMENTS } from '../worm/healerWorm/natureMeadow.js';
-import { getMeadowMaterial } from '../worm/ElementalGrassSkin.jsx';
+import { buildNatureCellGeometry, NATURE_KIND, BLADE_ROWS } from '../worm/healerWorm/natureMeadow.js';
+import { getNatureMaterials, getMeadowMaterial, NATURE_BUDGET } from '../worm/ElementalGrassSkin.jsx';
 import { resolveElementalRenderer } from '../worm/healerWorm/elementalRenderers.js';
 import { getElementalDef } from '../worm/healerWorm/elementalDefs.js';
+import { ELEMENTAL_TIERS } from '../worm/healerWorm/elementalQuality.js';
 
-describe('Nature meadow geometry', () => {
-  for (const count of [56, 88]) {
-    it(`anchors ${count} folded blades, tapers tips, and stays within the geometry budget`, () => {
-      const geo = buildMeadowGeometry(count);
-      const p = geo.attributes.position, n = geo.attributes.normal;
-      const stride = (MEADOW_SEGMENTS + 1) * 3;
-      expect(p.count).toBe(count * stride);
-      expect(geo.index.count / 3).toBe(count * MEADOW_SEGMENTS * 4);
-      expect(Array.from(p.array).every(Number.isFinite)).toBe(true);
-      expect(Array.from(n.array).every(Number.isFinite)).toBe(true);
-      for (let i = 0; i < count; i++) {
-        const blade = meadowBlade(i, count);
-        const root = new Vector3().fromBufferAttribute(p, i * stride + 1);
-        expect(root.x).toBeCloseTo(blade.x);
-        expect(root.y).toBeCloseTo(blade.y);
-        expect(root.z).toBeCloseTo(0.004);
-        const tip = i * stride + MEADOW_SEGMENTS * 3;
-        const a = new Vector3().fromBufferAttribute(p, tip);
-        const b = new Vector3().fromBufferAttribute(p, tip + 2);
-        expect(a.distanceTo(b)).toBeLessThan(0.00001);
-        expect(a.z).toBeGreaterThan(root.z);
-        expect(a.z).toBeLessThan(0.33);
+const bladeVerts = (BLADE_ROWS + 1) * 3;
+const bladeTris = BLADE_ROWS * 4;
+
+describe('Nature terrarium geometry', () => {
+  for (const tier of ELEMENTAL_TIERS) {
+    const { blades, leaves, flowers } = NATURE_BUDGET[tier];
+    it(`builds exactly the ${tier} budget: one moss bed, ${blades} blades, ${leaves} leaves, ${flowers} flowers`, () => {
+      const geo = buildNatureCellGeometry(blades, leaves, flowers);
+      const quads = 1 + leaves + flowers;
+      expect(geo.attributes.position.count).toBe(quads * 4 + blades * bladeVerts);
+      expect(geo.index.count / 3).toBe(quads * 2 + blades * bladeTris);
+      for (const name of ['position', 'uv', 'aKind', 'aIndex']) {
+        expect(Array.from(geo.attributes[name].array).every(Number.isFinite), name).toBe(true);
       }
+      // Two draw groups: the moss bed alone, then every plant.
+      expect(geo.groups).toEqual([
+        { start: 0, count: 6, materialIndex: 0 },
+        { start: 6, count: geo.index.count - 6, materialIndex: 1 }
+      ]);
+      const kinds = Array.from(geo.attributes.aKind.array);
+      expect(kinds.filter((k) => k === NATURE_KIND.moss)).toHaveLength(4);
+      expect(kinds.filter((k) => k === NATURE_KIND.blade)).toHaveLength(blades * bladeVerts);
+      expect(kinds.filter((k) => k === NATURE_KIND.leaf)).toHaveLength(leaves * 4);
+      expect(kinds.filter((k) => k === NATURE_KIND.flower)).toHaveLength(flowers * 4);
       geo.dispose();
     });
-    it(`fills the centre and rim without identical heights at the ${count}-blade tier`, () => {
-      const blades = Array.from({ length: count }, (_, i) => meadowBlade(i, count));
-      expect(blades.some(b => Math.hypot(b.x, b.y) < 0.14)).toBe(true);
-      expect(blades.some(b => Math.hypot(b.x, b.y) > 0.32)).toBe(true);
-      expect(blades.every(b => Math.abs(b.x) < 0.43 && Math.abs(b.y) < 0.43)).toBe(true);
-      expect(new Set(blades.map(b => b.height.toFixed(3))).size).toBeGreaterThan(20);
-      expect(blades.some(b => b.broad)).toBe(true);
-      expect(meadowBlade(5, count)).toEqual(meadowBlade(5, count));
-    });
   }
-  it('renders the whole meadow as one batch and primes its instanced program', () => {
+
+  it('numbers each plant slot within its kind, so the shader can seed it', () => {
+    const geo = buildNatureCellGeometry(6, 2, 2);
+    const kinds = geo.attributes.aKind.array;
+    const slots = geo.attributes.aIndex.array;
+    const seen = { [NATURE_KIND.blade]: new Set(), [NATURE_KIND.leaf]: new Set(), [NATURE_KIND.flower]: new Set() };
+    for (let i = 0; i < kinds.length; i++) if (seen[kinds[i]]) seen[kinds[i]].add(slots[i]);
+    expect([...seen[NATURE_KIND.blade]].sort()).toEqual([0, 1, 2, 3, 4, 5]);
+    expect([...seen[NATURE_KIND.leaf]].sort()).toEqual([0, 1]);
+    expect([...seen[NATURE_KIND.flower]].sort()).toEqual([0, 1]);
+    geo.dispose();
+  });
+
+  it('keeps blade parameters in range: uv spans the blade root to tip', () => {
+    const geo = buildNatureCellGeometry(3, 0, 0);
+    const uv = geo.attributes.uv.array;
+    const kinds = geo.attributes.aKind.array;
+    for (let i = 0; i < kinds.length; i++) {
+      if (kinds[i] !== NATURE_KIND.blade) continue;
+      expect(uv[i * 2]).toBeGreaterThanOrEqual(0);
+      expect(uv[i * 2]).toBeLessThanOrEqual(1);
+      expect(uv[i * 2 + 1]).toBeGreaterThanOrEqual(0);
+      expect(uv[i * 2 + 1]).toBeLessThanOrEqual(1);
+    }
+    geo.dispose();
+  });
+
+  it('shrinks with the quality tier and never scales with the board', () => {
+    const size = (t) => {
+      const b = NATURE_BUDGET[t];
+      return b.blades * bladeVerts + (1 + b.leaves + b.flowers) * 4;
+    };
+    expect(size('minimal')).toBeLessThanOrEqual(size('low'));
+    expect(size('low')).toBeLessThanOrEqual(size('medium'));
+    expect(size('medium')).toBeLessThanOrEqual(size('high'));
+  });
+});
+
+describe('Nature terrarium materials', () => {
+  it('renders the whole terrarium in two batches and primes its instanced programs', () => {
     expect(resolveElementalRenderer('grass', getElementalDef).mode).toBe('instanced');
-    const mat = getMeadowMaterial();
-    expect(mat).toBe(getMeadowMaterial());
-    expect(mat.userData.elementalInstanced).toBe(true);
-    expect(mat.uniforms.uEnv.value.x).toBe(0);
-    expect(mat.depthTest).toBe(true);
-    expect(mat.depthWrite).toBe(true);
+    const [moss, plants] = getNatureMaterials();
+    expect(getNatureMaterials()[0]).toBe(moss);
+    expect(getMeadowMaterial()).toBe(plants);
+    for (const m of [moss, plants]) expect(m.userData.elementalInstanced).toBe(true);
+    // One write per frame reaches both layers.
+    expect(moss.uniforms.uEnv).toBe(plants.uniforms.uEnv);
+    expect(plants.uniforms.uEnv.value.x).toBe(0);
+    // Plants are solid and sort themselves; the moss lies over the tiles.
+    expect(plants.depthTest).toBe(true);
+    expect(plants.depthWrite).toBe(true);
+    expect(moss.transparent).toBe(true);
+    expect(moss.depthWrite).toBe(false);
   });
 });

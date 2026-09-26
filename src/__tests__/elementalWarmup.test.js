@@ -28,8 +28,8 @@ const fakeCamera = {};
 
 // Three orb materials, one ambient particle material, plus the skin:
 //   surface → 1, flames → 6 (bed, tongues and light, for both detail tiers),
-//   blades → 2 (meadow and pickup leaves)
-const SKIN_MATERIALS = { surface: 1, flames: 6, blades: 2 };
+//   blades → 3 (moss bed, plants and the claim's burst of leaves)
+const SKIN_MATERIALS = { surface: 1, flames: 6, blades: 3 };
 const expectedCount = Object.values(ELEMENTAL_DEFS).reduce(
   (n, def) => n + 4 + (SKIN_MATERIALS[def.renderer] ?? 0),
   0

@@ -43,7 +43,7 @@ import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { sparksForBudget } from './healerWorm/elementalQuality.js';
 import { attachCellAttributes } from './healerWorm/elementalCells.js';
-import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
+import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, GLSL_SEAM, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
 import { GLSL_WORM, uWormHead, uWormBody } from './healerWorm/elementalUniforms.js';
 
 // Quad kinds, in index-buffer order: the three layers are three geometry groups.
@@ -125,36 +125,7 @@ const vertexShader = /* glsl */ `
   ${GLSL_NOISE}
   ${GLSL_WORM}
 
-  // A stable identity for this instance and slot. The cell seed can run into the
-  // hundreds of thousands, which a sin() hash on the GPU cannot resolve; splitting
-  // it keeps the hash inputs small.
-  vec2 slotId(float salt) {
-    return vec2(mod(aCell.w, 251.0), floor(aCell.w / 251.0)) + vec2(aIndex * 7.13 + salt, aIndex * 3.71 - salt * 0.7);
-  }
-
-  // A point on the sticker grid's seams inside this cell, picked by three randoms.
-  // Seams sit half a unit off every sticker centre, and every cell is centred on a
-  // sticker, so the candidate lines are the half-integers inside the cell's extent.
-  // Returns the local point (xy), whether it lies on a cube edge (z) and the side
-  // of that edge (w, ±1) — the crown flames lean out over it.
-  vec4 seamPoint(float r1, float r2, float r3, float straddle) {
-    float alongX = step(0.5, r1);           // 0: a seam running along Y (constant x)
-    float eNeg = mix(aExtent.x, aExtent.z, alongX);
-    float ePos = mix(aExtent.y, aExtent.w, alongX);
-    float lo = ceil(-eNeg - 0.5 - 0.001);
-    float hi = floor(ePos - 0.5 + 0.001);
-    float m = lo + min(floor(r2 * (hi - lo + 1.0)), hi - lo);
-    float line = m + 0.5;
-    float onPos = step(abs(line - ePos), 0.02) * mix(aEdge.y, aEdge.w, alongX);
-    float onNeg = step(abs(line + eNeg), 0.02) * mix(aEdge.x, aEdge.z, alongX);
-    float aNeg = mix(aExtent.z, aExtent.x, alongX);
-    float aPos = mix(aExtent.w, aExtent.y, alongX);
-    float along = mix(-aNeg + 0.06, aPos - 0.06, r3);
-    // Crowns sit just inside the edge so their roots stay on the cube.
-    line += straddle - (onPos - onNeg) * 0.04;
-    vec2 l = alongX < 0.5 ? vec2(line, along) : vec2(along, line);
-    return vec4(l, max(onPos, onNeg), onPos - onNeg);
-  }
+  ${GLSL_SEAM}
 
   void main() {
     vUv = uv;
@@ -163,8 +134,12 @@ const vertexShader = /* glsl */ `
 
     float T = uTime * uEnv.w;
     // The claim sweep: each cell catches only when the sweep reaches it, flares as
-    // it ignites, then settles. The release tail stops embers first.
-    float arrive = smoothstep(aSweep, aSweep + 0.28, uEnv.y);
+    // it ignites, then settles. The release tail stops embers first. The start is
+    // compressed so the far faces finish igniting before the sweep does — offset by
+    // the raw share, the last cells were still at a third of their height when the
+    // sweep ended, and stayed there for the whole wash.
+    float ignStart = sweepStart(0.28);
+    float arrive = smoothstep(ignStart, ignStart + 0.28, uEnv.y);
     float ignite = clamp(arrive * (1.0 - arrive) * 4.0, 0.0, 1.0);
     float burn = arrive * (1.0 - smoothstep(0.05, 0.9, uEnv.z));
     float tail = 1.0 - smoothstep(0.0, 0.4, uEnv.z);

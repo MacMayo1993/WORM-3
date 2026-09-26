@@ -191,6 +191,17 @@ import { COLORS, ANTIPODAL_COLOR, DIR_VECTORS } from './utils/constants.js';
 
 This section is the implementation brief for a future Claude Code pass. It is intentionally a plan, not an instruction to change gameplay while doing unrelated work.
 
+**Implementation checkpoint (skins live):** every element's cube skin has been rebuilt on a shared contract. Read these before touching a skin:
+
+- **Cells** (`healerWorm/elementalCells.js`): each cover cell carries exact world-unit extents to its four borders and a cube-edge flag per border; cells tile each face exactly with no overhang. Instance matrices are unit scale and follow the cubie's full live rotation (roll included); every claim/expiry ramp lives in the shaders off the shared envelope. Cells are centred on stickers, so shaders recover the seam lattice with `fract(local + 0.5)` at any board size.
+- **Shared GLSL/uniforms** (`elementalGlsl.js`, `elementalUniforms.js`): noise, the cell frame, `seamPoint`/`sweepStart` for seam-rooted detail, and shared worm-body / claim-origin uniforms published once per frame. Splice JS numbers into GLSL through `glf()` — `${0}` is an int literal and GLSL ES rejects `float * int`.
+- **Fire** (`ElementalFireSkin.jsx`): lava-crack bed in the grout, opaque cel-banded tongues rooted in the seams (alpha-to-coverage, depth-written), crowns on edges, additive halos/embers. Flames rise toward the camera's up and part around the worm's body.
+- **Water / ice / lightning** (`ElementalSurface.jsx`): one rounded offset shell (edges and corners wrapped, flooding from the claim tile in world space), one compiled program per element. Shell light is added un-encoded and the body only absorbs head-on, so sticker hues survive.
+- **Nature** (`ElementalGrassSkin.jsx`, `natureMeadow.js`): moss in the grout, grass rooted in the seams and clumped (lusher on edges, clear over sticker centres), ivy over the edges, sparse flowers; grows moss → grass → flowers and wilts on release.
+- **Draw order:** in worm mode cubie bodies are transparent and render at `renderOrder -1` (`Cubie.jsx`); without that, the nearer bodies drew over any cube-wide transparent layer and turned every seam into a black bar.
+
+Still planned from the brief below: dedicated reduced-flash tuning for lightning strikes, water droplets/streams, icicles, and matched perf profiling on mobile.
+
 ### Product intent and current-state reading
 
 Elemental orbs are a temporary **presentation state** in Healer Worm mode, not a cube mutation or combat buff. Claiming an orb sets `sim.elementalType`, freezes the simulation for the short focus shot, then runs a ten-second wash while crawling. That key is mirrored into `wormElementalTheme`; `ElementalAtmosphere` composes the cube skin, particles, and fill light; the HUD shows the same definition; expiry clears the theme. Preserve that single source of truth and pause/tunnel clock behavior.

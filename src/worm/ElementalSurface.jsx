@@ -358,8 +358,8 @@ const fragmentShader = /* glsl */ `
     // the highlight that makes a rounded body of water read as one object.
     vec3 h = normalize(keyL + v);
     float nh = max(dot(wn, h), 0.0);
-    float glint = pow(nh, 320.0) * 3.5 * grazeFade;
-    float sheen = pow(max(dot(n, h), 0.0), 14.0) * (0.12 + 0.5 * vRim);
+    float glint = pow(nh, 320.0) * 2.2 * grazeFade;
+    float sheen = pow(max(dot(n, h), 0.0), 14.0) * (0.08 + 0.45 * vRim);
 
     // Foam: patches, not lines — the crests only foam where a slow mask allows, and
     // the rings round the worm froth where they break.
