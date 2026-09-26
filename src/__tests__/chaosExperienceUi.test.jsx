@@ -12,7 +12,7 @@ import { useDisparityGame } from '../hooks/useDisparityGame.js';
 vi.mock('../utils/feel.js', () => ({ feel: vi.fn() }));
 let root, host;
 const state = () => useGameStore.getState();
-const click = text => act(() => [...host.querySelectorAll('button')].find(b => b.textContent.includes(text)).click());
+const click = text => act(() => [...host.querySelectorAll('button')].find(b => b.textContent.includes(text) || b.getAttribute('aria-label') === text).click());
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
@@ -58,6 +58,12 @@ it('updates standings, highlights a color family, and replaces completed objecti
   expect(host.querySelector('.chaos-objective')).toBeNull();
   expect(host.querySelector('.chaos-live-event')).toBeNull();
   expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('54');
+  click('Inspect match');
+  const pair = host.querySelector('[aria-label^="Highlight Red"]');
+  pair.focus();
+  act(() => pair.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(host.querySelector('[aria-label="Color pair standings"]')).toBeNull();
+  expect(document.activeElement.getAttribute('aria-label')).toBe('Inspect match');
   act(() => useGameStore.setState({ showDisparityWinner: true }));
   expect(host.textContent).toBe('');
 });

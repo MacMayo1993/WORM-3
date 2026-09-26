@@ -12,8 +12,10 @@ export default function DisparityHUD() {
   const s = useGameStore(useShallow(state => ({ cubies: state.cubies, size: state.size, settings: state.settings,
     cap: selectEffectiveFlipCap(state), run: state.chaosExperience, winner: state.disparityWinner,
     showWinner: state.showDisparityWinner, focus: state.chaosFocusFaces,
-    activeBet: state.activeBet, score: state.disparityParityScore, eliminated: state.disparityEliminatedFaces })));
+    activeBet: state.activeBet, score: state.disparityParityScore, eliminated: state.disparityEliminatedFaces,
+    demoForecast: state.demoMode && state.demoStep === 'chaos-forecast' })));
   const [details, setDetails] = useState(false);
+  const detailsButton = useRef(null);
   useEffect(() => { setDetails(false); }, [s.run?.startedAt]);
   const [notice, setNotice] = useState(null);
   const [faceNotice, setFaceNotice] = useState(null);
@@ -56,20 +58,30 @@ export default function DisparityHUD() {
       <h2>Last pair standing</h2>
       <p>{s.winner.pair?.join(' ↔ ')}</p>
     </div>}
-    <section className="chaos-hud" style={{ zIndex: Z.HUD_RAISED }} aria-label="Chaos match">
+    <section className="chaos-hud" style={{ zIndex: Z.HUD_RAISED }} aria-label="Chaos match"
+      onKeyDown={event => {
+        if (event.key === 'Escape' && details) {
+          event.stopPropagation();
+          setDetails(false);
+          detailsButton.current?.focus();
+        }
+      }}>
       <div className="chaos-match" data-finale={board.alive <= 6}>
-        <div className="chaos-scoreline">
-          <div><div className="chaos-kicker"><i className="chaos-status-dot" /> Chaos · {s.cap} flip limit</div><h2 aria-live="polite">{stage}</h2></div>
-          <div className="chaos-count">{board.alive}<small> / {board.total} tiles</small></div>
-        </div>
+        <button className="chaos-detail-button" ref={detailsButton} onClick={() => setDetails(v => !v)}
+          aria-label={details ? 'Hide match details' : 'Inspect match'} aria-describedby="chaos-match-summary"
+          aria-expanded={details} aria-controls="chaos-match-details">
+          <span className="chaos-summary-stage"><span className="chaos-kicker"><i className="chaos-status-dot" /> Chaos</span><span aria-live="polite">{stage}</span></span>
+          <span className="chaos-count" aria-label={`${board.alive} of ${board.total} tiles alive`}>{board.alive}<small>/{board.total}</small></span>
+          <strong className="chaos-summary-points">+{s.score} PP</strong>
+          <svg className="chaos-summary-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 12 5-5 5 5" /></svg>
+        </button>
+        <span id="chaos-match-summary" hidden>{stage}. {board.alive} of {board.total} tiles alive. +{s.score} PP earned.</span>
         <div className="chaos-survival" role="progressbar" aria-label="Surviving tiles" aria-valuenow={board.alive} aria-valuemin={0} aria-valuemax={board.total}>
           {board.pairs.map(pair => <span key={pair.id} style={{ width: `${board.total ? 100 * pair.alive / board.total : 0}%`, background: `linear-gradient(90deg, ${faceInfo[pair.faces[0]].hex}, ${faceInfo[pair.faces[1]].hex})` }} />)}
         </div>
-        <div className="chaos-compact-call"><span>{bet ? predictionLabel(bet, s.settings) : 'Tap damaged tiles to heal'}</span><strong>+{s.score} PP</strong></div>
-        <button className="chaos-detail-button" onClick={() => setDetails(v => !v)} aria-expanded={details} aria-controls="chaos-match-details">
-          {details ? 'Hide match details' : 'Inspect match'} <span aria-hidden="true">{details ? '−' : '+'}</span>
-        </button>
         {details && <div className="chaos-expanded" id="chaos-match-details">
+          <div className="chaos-expanded-heading"><h2>{stage}</h2><span>{s.cap} flip limit</span></div>
+          {s.demoForecast && <p className="chaos-note chaos-demo-hint">Watch which color pair survives. Will it be your pick?</p>}
           {(faceNotice != null || notice) && !s.winner && <div className="chaos-live-event" key={faceNotice ?? notice?.at}>
             <ChaosGlyph />{faceNotice != null ? `${faceInfo[faceNotice]?.name} eliminated — every tile has fallen` : `${notice.tiles.length} tiles fell · ${notice.source === 'conway' ? 'Surface surge' : 'Chain spread'}`}
           </div>}

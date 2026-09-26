@@ -7,6 +7,7 @@ import DemoDialog from '../components/screens/DemoDialog.jsx';
 import DemoEndScreen from '../components/screens/DemoEndScreen.jsx';
 import { DemoControlTour, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoCoach } from '../components/screens/DemoFlowController.jsx';
 import BottomNavBar from '../components/menus/BottomNavBar.jsx';
+import DisparityHUD from '../components/overlays/DisparityHUD.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { demoTimer } from '../utils/demoTimer.js';
 let host, root;
@@ -76,6 +77,14 @@ it('explains a bomb death and makes Retry the first focused action', () => {
   const retry = vi.fn(); render(<DemoWormControlHint onRetry={retry} />);
   expect(host.textContent).toContain('bomb blast'); expect(document.activeElement.textContent).toBe('Try again');
   act(() => document.activeElement.click()); expect(retry).toHaveBeenCalledTimes(1);
+});
+it('keeps Chaos demo guidance inside match details instead of covering the HUD', () => {
+  useGameStore.setState({ demoMode: true, demoStep: 'chaos-forecast' });
+  render(<><DisparityHUD /><DemoStepHint step="chaos-forecast" /></>);
+  expect(host.querySelector('.demo-step-hint')).toBeNull();
+  expect(host.textContent).not.toContain('Will it be your pick?');
+  act(() => host.querySelector('[aria-label="Inspect match"]').click());
+  expect(host.querySelector('#chaos-match-details').textContent).toContain('Will it be your pick?');
 });
 it('finishes Explore as 7/7 and removes its already-completed invitation', () => {
   useGameStore.setState({demoExploring:true, demoExploreComplete:true});
