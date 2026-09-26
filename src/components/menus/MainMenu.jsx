@@ -3,6 +3,7 @@ import WormWordmark from '../branding/WormWordmark.jsx';
 import { createModePlateArtwork } from '../../3d/modePlateArtwork.js';
 import '../ui/screenDesign.css';
 import './liveCubeCarousel.css';
+import './mainMenuKeys.css';
 import { fitCarouselCube, carouselTurnScale } from './fitCarouselCube.js';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
 import { MENU_FLIP_PAIRS, flipMenuCenters } from './menuCenterPortals.js';
@@ -10,7 +11,7 @@ import { carouselPlateGeometry } from './carouselPlateGeometry.js';
 import CubeGlowWorm from './CubeGlowWorm.jsx';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Edges, Text } from '@react-three/drei';
+import { Text } from '@react-three/drei';
 import { preloadFont } from 'troika-three-text';
 import * as THREE from 'three';
 // Bundled Bungee for the 3D face-plate labels. Troika (drei's Text) parses
@@ -24,50 +25,53 @@ preloadFont(
   () => {}
 );
 import { makeCubies } from '../../game/cubeState.js';
-import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
-import { ALL_TILE_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
-import { bodyMaterialProps, pickCubeletViewStyle, LED_EDGE_MODES, PER_CUBELET_VIEW_STYLES } from '../../3d/cubeViewStyles.js';
-import { updateSharedTime, getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
+import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
+import { STICKER_OFFSET, createCubieGeometry, createStickerGeometry, rubiksFinish } from '../../3d/rubiksPiece.js';
+import { isMobile, prefersReducedMotion } from '../../utils/device.js';
 import { vibrate } from '../../utils/audio.js';
 import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
-import MenuGridGlow from './MenuGridGlow.jsx';
-import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
+import { ANTIPODAL_COLOR, DIR_TO_COLOR, RUBIKS_CLASSIC, RUBIKS_FACE_COLORS, readableInk } from '../../utils/constants.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 
-// ─── Randomizable style state — re-picked every time the user taps the cube ──
-// biome is now included so its face palette appears in the rotation.
-const _SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'custom');
-const _TILE_KEYS   = ALL_TILE_STYLE_KEYS;
+// ─── The opening's cube ────────────────────────────────────────────────────────
+// The menu cube is the one that lands in the opening (IntroScene): black plastic
+// cubies and glossy stickers in the classic colours, built from the same parts
+// (rubiksPiece.js). One body geometry, one sticker geometry and a material per
+// colour serve all 27 cubies; they live as long as the app does.
+const PIECE = { body: createCubieGeometry(), sticker: createStickerGeometry() };
+// The menu lights the cube with its photo panorama, and a bright street scene
+// in full would wash the gloss out of it; damped, the colours stay the opening's.
+const FINISH = rubiksFinish(isMobile);
+const PLASTIC = new FINISH.Material({ ...FINISH.plastic, envMapIntensity: 0.25 });
+const STICKER_MATS = Object.fromEntries(Object.entries(RUBIKS_FACE_COLORS)
+  .map(([id, hex]) => [id, new FINISH.Material({ ...FINISH.sticker, color: hex, envMapIntensity: 0.18 })]));
 
-// Mutable state — rerandomizeMenuStyle() reassigns all three.
-let _menuSchemeKey  = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
-let _menuFaceStyles = {};
-for (let f = 1; f <= 6; f++) {
-  _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
+// ─── Tap to flip ──────────────────────────────────────────────────────────────
+// Tapping the cube flips every sticker over to its antipodal colour in a wave —
+// the move the opening's cube makes after it lands — and the next tap turns them
+// back. Timing matches the opening's flip (introMotion.js). Purely visual: the
+// cubies' own colours, and so the worm portals, are untouched.
+const FLIP_TIME = 0.42; // one sticker's turn, seconds
+const FLIP_SPREAD = 0.9; // how long the wave takes to cross the cube
+const FLIP_LIFT = 0.32; // how far a sticker pops off its face mid-turn
+const menuFlip = { inverted: false, from: false, startT: -Infinity };
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const smooth01 = v => { const p = clamp01(v); return p * p * (3 - 2 * p); };
+/** The face colour a sticker shows: its own, or its antipode while the cube is flipped. */
+const shownColor = (id, inverted = menuFlip.inverted) => (inverted ? ANTIPODAL_COLOR[id] : id);
+const shownHex = id => RUBIKS_FACE_COLORS[shownColor(id)] ?? '#888888';
+/** When the wave reaches a sticker: 0 at the cube's top-left, 1 at its bottom-right. */
+const flipWaveOrder = (x, y, z) => clamp01(((1.5 - y) / 3) * 0.7 + ((x + z * 0.5 + 1.5) / 3) * 0.3);
+function startMenuFlip(now) {
+  menuFlip.from = menuFlip.inverted;
+  menuFlip.inverted = !menuFlip.inverted;
+  // Reduced motion: the colours change in place, with no wave.
+  menuFlip.startT = prefersReducedMotion() ? now - FLIP_SPREAD - FLIP_TIME : now;
 }
-let MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic']; // { 1: hex, 2: hex, ... }
-// Seed for the per-cubelet whole-cube view styles (chrome, neon, gap, lego, …),
-// mirroring Random Mode. Re-rolled on every cube tap so the styles reshuffle each time.
-let _menuViewEpoch = Math.floor(Math.random() * 1e9);
-
-// Called by RotatingBlackCube after a direct cube-tap shake.
-// Also available externally so tests / storybook can reset state.
-function rerandomizeMenuStyle() {
-  _menuSchemeKey  = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
-  MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic'];
-  for (let f = 1; f <= 6; f++) {
-    _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
-  }
-  _menuViewEpoch = Math.floor(Math.random() * 1e9);
-}
-
-// Callback set by ShufflingCube so RotatingBlackCube can trigger a re-scramble
-// + re-render without prop drilling through multiple layers.
-let _triggerStyleRefresh = null;
 
 import {
   setCarouselActive,
@@ -94,13 +98,14 @@ let _externalShakeNeeded = false;
 let _onShakeComplete = null;
 
 // ─── Shuffling cube — live Rubik's slice animation ────────────────────────────
+const O = STICKER_OFFSET;
 const STICKER_CFG = [
-  { dir: 'PX', pos: [0.501, 0, 0],   rot: [0,  Math.PI / 2, 0] },
-  { dir: 'NX', pos: [-0.501, 0, 0],  rot: [0, -Math.PI / 2, 0] },
-  { dir: 'PY', pos: [0,  0.501, 0],  rot: [-Math.PI / 2, 0, 0] },
-  { dir: 'NY', pos: [0, -0.501, 0],  rot: [ Math.PI / 2, 0, 0] },
-  { dir: 'PZ', pos: [0, 0,  0.501],  rot: [0, 0, 0] },
-  { dir: 'NZ', pos: [0, 0, -0.501],  rot: [0, Math.PI, 0] },
+  { dir: 'PX', pos: [O, 0, 0],  rot: [0,  Math.PI / 2, 0] },
+  { dir: 'NX', pos: [-O, 0, 0], rot: [0, -Math.PI / 2, 0] },
+  { dir: 'PY', pos: [0,  O, 0], rot: [-Math.PI / 2, 0, 0] },
+  { dir: 'NY', pos: [0, -O, 0], rot: [ Math.PI / 2, 0, 0] },
+  { dir: 'PZ', pos: [0, 0,  O], rot: [0, 0, 0] },
+  { dir: 'NZ', pos: [0, 0, -O], rot: [0, Math.PI, 0] },
 ];
 // Only middle-slice moves (sl=1) — worms always go through center face tiles
 const MIDDLE_MOVES = ['col', 'row', 'depth'].flatMap(ax => [1, -1].map(d => ({ ax, sl: 1, d })));
@@ -116,107 +121,60 @@ const easeIO = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
 const INITIAL_WORM_DELAY = 2.5; // seconds before the very first worm spawns
 
-// ─── Menu cube view-style geometry (mirrors Random Mode's per-cubelet styles) ──
-const MENU_VIEW_STYLES = PER_CUBELET_VIEW_STYLES;
-
-// Lego: one detailed stud per face — tapered body, embossed ring, center pip.
-// The face group's +Y axis is rotated to the outward normal; the stud builds up +Y.
-const MENU_STUD_BODY_GEO = [0.17, 0.18, 0.13, 22];
-const MENU_STUD_RING_GEO = [0.12, 0.019, 8, 24];
-const MENU_STUD_PIP_GEO = [0.046, 0.046, 0.045, 16];
-const MENU_LEGO_FACE = {
-  PZ: { pos: [0, 0, 0.47], rot: [Math.PI / 2, 0, 0] },
-  NZ: { pos: [0, 0, -0.47], rot: [-Math.PI / 2, 0, 0] },
-  PX: { pos: [0.47, 0, 0], rot: [0, 0, -Math.PI / 2] },
-  NX: { pos: [-0.47, 0, 0], rot: [0, 0, Math.PI / 2] },
-  PY: { pos: [0, 0.47, 0], rot: [0, 0, 0] },
-  NY: { pos: [0, -0.47, 0], rot: [Math.PI, 0, 0] }
-};
-function MenuLegoStud({ dir, color }) {
-  const t = MENU_LEGO_FACE[dir];
-  if (!t) return null;
-  return (
-    <group position={t.pos} rotation={t.rot}>
-      <mesh position={[0, 0.065, 0]}>
-        <cylinderGeometry args={MENU_STUD_BODY_GEO} />
-        <meshStandardMaterial color={color} roughness={0.35} metalness={0} />
-      </mesh>
-      <mesh position={[0, 0.132, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={MENU_STUD_RING_GEO} />
-        <meshStandardMaterial color={color} roughness={0.28} metalness={0} />
-      </mesh>
-      <mesh position={[0, 0.143, 0]}>
-        <cylinderGeometry args={MENU_STUD_PIP_GEO} />
-        <meshStandardMaterial color={color} roughness={0.3} metalness={0} />
-      </mesh>
-    </group>
-  );
-}
-
 const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
   const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
-  // Each cubelet wears its own whole-cube view style, same as Random Mode.
-  const vmode = pickCubeletViewStyle(cubie.x, cubie.y, cubie.z, _menuViewEpoch, MENU_VIEW_STYLES);
-  // While the six-faces selector presents its mode plates, drop the stickers,
-  // overlays, and studs: some tile styles draw discs that render in the
-  // transparent pass and bleed through the plates as stray dots. The bare dark
-  // cubie boxes stay so the cube keeps its silhouette behind the plates.
-  const isWire = vmode === 'wireframe' || hideStickers;
-  const isLego = vmode === 'lego';
-  const showEdges = LED_EDGE_MODES.has(vmode);
-  const contentScale = vmode === 'gap' ? 0.82 : 1;
-  const bmp = bodyMaterialProps(vmode);
-  const edgeColor = MENU_FACE_COLORS[1] ?? '#7df9ff';
+  const stickersRef = useRef(cubie.stickers);
+  stickersRef.current = cubie.stickers;
+  // Per face: the group a sticker turns in, and its mesh (whose material is its colour).
+  const turns = useRef({});
+  const meshes = useRef({});
+  const settledFor = useRef(null);
+
+  // The tap's flip wave. Idle frames return at once; each wave is played out
+  // here and then settled exactly once.
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime - menuFlip.startT;
+    const running = t >= 0 && t < FLIP_SPREAD + FLIP_TIME;
+    if (!running && settledFor.current === menuFlip.startT) return;
+    for (const { dir, pos } of STICKER_CFG) {
+      const turn = turns.current[dir], mesh = meshes.current[dir], sticker = stickersRef.current?.[dir];
+      if (!turn || !mesh || !sticker) continue;
+      const p = running ? smooth01((t - flipWaveOrder(cx + pos[0], cy + pos[1], cz + pos[2]) * FLIP_SPREAD) / FLIP_TIME) : 1;
+      // The sticker is a two-sided slab, so a half turn lands it face up again.
+      turn.rotation.x = p < 1 ? Math.PI * p : 0;
+      turn.position.z = FLIP_LIFT * Math.sin(Math.PI * p);
+      mesh.material = STICKER_MATS[shownColor(sticker.curr, p >= 0.5 ? menuFlip.inverted : menuFlip.from)];
+    }
+    if (!running) settledFor.current = menuFlip.startT;
+  });
+
   return (
     <group position={[cx, cy, cz]}>
-      <group scale={contentScale}>
-        <mesh>
-          <boxGeometry args={[0.93, 0.93, 0.93]} />
-          <meshStandardMaterial
-            color={bmp.color}
-            roughness={bmp.roughness}
-            metalness={bmp.metalness}
-            envMapIntensity={bmp.envMapIntensity}
-            transparent={!!bmp.transparent}
-            opacity={bmp.opacity ?? 1}
-            emissive={bmp.emissive ?? '#000000'}
-            emissiveIntensity={bmp.emissiveIntensity ?? 0}
-          />
-          {showEdges && <Edges color={edgeColor} />}
-        </mesh>
-
-        {/* Keep portal centers visible even on wireframe cubies. */}
-        {!hideStickers && STICKER_CFG.map(({ dir, pos, rot }) => {
-          const sticker = cubie.stickers?.[dir];
-          if (!sticker || (isWire && sticker.curr === sticker.orig)) return null;
-          const colorHex      = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
-          const antiColorHex  = MENU_FACE_COLORS[ANTIPODAL_COLOR[sticker.curr]] ?? '#888888';
-          // Show the full tile overlay stack on stickers that a worm has passed through.
-          // curr !== orig means this sticker has been flipped an odd number of times.
-          const isFlipped = sticker.curr !== sticker.orig;
-          return (
-            <FlipPadOffset key={dir} meta={sticker} size={3} pos={pos} rot={rot}>
+      <mesh geometry={PIECE.body} material={PLASTIC} />
+      {/* While the six-faces selector presents its mode plates the stickers go,
+          so nothing draws over the plates; the black cubies keep the silhouette. */}
+      {!hideStickers && STICKER_CFG.map(({ dir, pos, rot }) => {
+        const sticker = cubie.stickers?.[dir];
+        if (!sticker) return null;
+        const shown = shownColor(sticker.curr);
+        // A worm has passed through this sticker (flipped an odd number of times):
+        // it wears the portal overlay, just above the sticker's dome.
+        const isFlipped = sticker.curr !== sticker.orig;
+        return (
+          <FlipPadOffset key={dir} meta={sticker} size={3} pos={pos} rot={rot}>
             <group position={pos} rotation={rot}>
-              <mesh renderOrder={10}>
-                <planeGeometry args={[0.80, 0.80]} />
-                <primitive attach="material" object={getTileStyleMaterial(_menuFaceStyles[sticker.curr] || 'solid', colorHex)} />
-              </mesh>
-              {isFlipped && (
-                <MenuTileOverlay colorHex={colorHex} antiColorHex={antiColorHex} />
-              )}
+              <group ref={el => { turns.current[dir] = el; }}>
+                <mesh ref={el => { meshes.current[dir] = el; }} geometry={PIECE.sticker} material={STICKER_MATS[shown]} />
+                {isFlipped && (
+                  <group position={[0, 0, 0.026]}>
+                    <MenuTileOverlay colorHex={RUBIKS_FACE_COLORS[shown]} antiColorHex={RUBIKS_FACE_COLORS[ANTIPODAL_COLOR[shown]]} />
+                  </group>
+                )}
+              </group>
             </group>
-            </FlipPadOffset>
-          );
-        })}
-
-        {/* Lego stud on each face */}
-        {isLego && !hideStickers && STICKER_CFG.map(({ dir }) => {
-          const sticker = cubie.stickers?.[dir];
-          if (!sticker) return null;
-          const colorHex = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
-          return <MenuLegoStud key={`stud-${dir}`} dir={dir} color={colorHex} />;
-        })}
-      </group>
+          </FlipPadOffset>
+        );
+      })}
     </group>
   );
 });
@@ -234,9 +192,8 @@ const ShufflingCube = ({ onFlip }) => {
   });
 
   const [flipWaves, setFlipWaves] = useState([]);
-  const [styleVersion, setStyleVersion] = useState(0);
   // Drop the cube's stickers/overlays while the six-faces selector presents
-  // its mode plates (prevents disc-drawing tile styles bleeding through them).
+  // its mode plates, so nothing draws over them.
   const [hideStickers, setHideStickers] = useState(isCarouselActive());
   useEffect(() => subscribeCarouselActive(setHideStickers), []);
   const cubeStateRef = useRef(cubeState);
@@ -260,25 +217,6 @@ const ShufflingCube = ({ onFlip }) => {
   const handleWormComplete = useCallback(() => {
     wormCompletedRef.current += 1;
   }, []);
-
-  // Register the style-refresh callback so RotatingBlackCube can trigger a full
-  // re-scramble + re-render after the user taps the cube directly.
-  useEffect(() => {
-    _triggerStyleRefresh = () => {
-      // Re-scramble cubies so newly picked colors look intentional, not leftover.
-      let cubies = makeCubies(3);
-      for (let i = 0; i < 12; i++) {
-        const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
-        cubies = rotateSliceCubies(cubies, 3, m.ax, m.sl, m.d);
-      }
-      setCubeState({ cubies: flipMenuCenters(cubies), rotating: null });
-      setFlipWaves([]);
-      pipelineRef.current = 'idle';
-      nextSpawnAt.current = null;
-      setStyleVersion(v => v + 1);
-    };
-    return () => { _triggerStyleRefresh = null; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame(({ clock }) => {
     if (isCarouselActive()) return;
@@ -315,7 +253,7 @@ const ShufflingCube = ({ onFlip }) => {
         origins: pair.map(face => {
           const [x, y, z] = face.cubie;
           return { position: face.pos, rotation: face.rot,
-            color: MENU_FACE_COLORS[newCubies[x][y][z].stickers[face.dir].curr] };
+            color: shownHex(newCubies[x][y][z].stickers[face.dir].curr) };
         }),
       }));
 
@@ -342,35 +280,15 @@ const ShufflingCube = ({ onFlip }) => {
   const staticCubies = rotating ? flatCubies.filter(c => c[axProp] !== rotating.sl) : flatCubies;
   const sliceCubies  = rotating ? flatCubies.filter(c => c[axProp] === rotating.sl) : [];
 
-  // The grid glow is split the same way the cubies are, so the light on a
-  // turning slice rides with it inside sliceGroupRef instead of staying behind
-  // on the rest frame. `rotating` is one object for the length of a turn, so
-  // these rebuild once per turn rather than per frame.
-  const staticGlowFilter = useMemo(() => {
-    if (!rotating) return undefined; // whole cube
-    const prop = AX_PROP[rotating.ax], sl = rotating.sl;
-    return (x, y, z) => ({ x, y, z })[prop] !== sl;
-  }, [rotating]);
-  const sliceGlowFilter = useMemo(() => {
-    if (!rotating) return null;
-    const prop = AX_PROP[rotating.ax], sl = rotating.sl;
-    return (x, y, z) => ({ x, y, z })[prop] === sl;
-  }, [rotating]);
-
   return (
     <PadProvider profile="menu">
       {staticCubies.map(c => (
-        <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} hideStickers={hideStickers} />
+        <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} hideStickers={hideStickers} />
       ))}
-      {/* The teaching rim, standing still — see MenuGridGlow. Off while the
-          carousel presents its mode plates, for the same reason the stickers
-          are: nothing should draw over the plates. */}
-      {!hideStickers && <MenuGridGlow size={3} includeCubie={staticGlowFilter} />}
       <group ref={sliceGroupRef}>
         {sliceCubies.map(c => (
-          <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} hideStickers={hideStickers} />
+          <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} hideStickers={hideStickers} />
         ))}
-        {!hideStickers && sliceGlowFilter && <MenuGridGlow size={3} includeCubie={sliceGlowFilter} />}
       </group>
       {flipWaves.map(wave => (
         <MenuFlipWave
@@ -1024,8 +942,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
           _onShakeComplete?.();
         } else {
           vibrate(20);
-          rerandomizeMenuStyle();
-          _triggerStyleRefresh?.();
+          startMenuFlip(elapsedTime);
         }
       } else {
         const intensity = 0.10 * (1 - elapsed / 540);
@@ -1411,8 +1328,12 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
               {statItems.length > 0 && <div className="lc-history">{statItems.map(stat => <div key={stat.label}><strong>{stat.value}</strong><small>{stat.label}</small></div>)}</div>}
             </details>
           </article>
-          <button type="button" className="lc-play" onClick={handlePlay} disabled={!show || diving}>
-            <span aria-hidden="true"><MenuCubeGlyph /></span><span>{actionLabel}</span><span aria-hidden="true">→</span>
+          <button type="button" className="lc-play menu-key" onClick={handlePlay} disabled={!show || diving}>
+            <span className="menu-key-face">
+              <span className="menu-key-emblem" aria-hidden="true"><MenuCubeGlyph /></span>
+              <span className="menu-key-label">{actionLabel}</span>
+              <span className="menu-key-arrow" aria-hidden="true">→</span>
+            </span>
           </button>
         </div>
       </div>
@@ -1423,24 +1344,34 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 // ─── Start button ─────────────────────────────────────────────────────────────
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScYKKOXc6c3vdqpmWWv0J3lMd90-GOfp0TxxxHelxjIjMdrvw/viewform';
 
-// Three visible faces, each with nine stickers and dark plastic seams.
+// The opening's cube in miniature: three visible faces (white top, red front,
+// blue right), nine stickers each, on black plastic.
 const MenuCubeGlyph = () => (
-  <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
-    <path d="M16 2 29 9.5v13L16 30 3 22.5v-13Z" fill="#182328" stroke="#182328" strokeWidth="1.2" strokeLinejoin="round" />
+  <svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
+    <path d="M16 2 29 9.5v13L16 30 3 22.5v-13Z" fill="#141416" stroke="#141416" strokeWidth="1.2" strokeLinejoin="round" />
     {[
-      { transform: 'matrix(1.444 .833 -1.444 .833 16 2)', color: '#fff5d8' },
-      { transform: 'matrix(1.444 .833 0 1.444 3 9.5)', color: '#f05249' },
-      { transform: 'matrix(1.444 -.833 0 1.444 16 17)', color: '#46b6ed' },
+      { transform: 'matrix(1.444 .833 -1.444 .833 16 2)', color: RUBIKS_CLASSIC.white },
+      { transform: 'matrix(1.444 .833 0 1.444 3 9.5)', color: RUBIKS_CLASSIC.red },
+      { transform: 'matrix(1.444 -.833 0 1.444 16 17)', color: RUBIKS_CLASSIC.blue },
     ].map(face => (
       <g key={face.color} transform={face.transform} fill={face.color}>
         {Array.from({ length: 9 }, (_, i) => (
           <rect key={i} x={(i % 3) * 3 + 0.23} y={Math.floor(i / 3) * 3 + 0.23}
-            width="2.54" height="2.54" rx="0.16" />
+            width="2.54" height="2.54" rx="0.36" />
         ))}
       </g>
     ))}
   </svg>
 );
+
+// The keys' sticker colours, straight from the cube's palette (mainMenuKeys.css).
+const MENU_KEY_COLORS = {
+  '--menu-green': RUBIKS_CLASSIC.green,
+  '--menu-blue': RUBIKS_CLASSIC.blue,
+  '--menu-yellow': RUBIKS_CLASSIC.yellow,
+  '--menu-white': RUBIKS_CLASSIC.white,
+};
+const PLAY_FLIP_MS = 520;
 
 const MenuStartButton = ({ visible, onClick, onDemo }) => {
   // Lift the action cluster while retaining portrait/desktop and safe-area spacing.
@@ -1459,6 +1390,16 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
   const padBottom = portrait
     ? 'max(40px, env(safe-area-inset-bottom, 40px))'
     : 'max(120px, env(safe-area-inset-bottom, 120px))';
+  // Play's sticker flips over while the cube shakes before the mode selector opens.
+  const [playFlipping, setPlayFlipping] = React.useState(false);
+  const flipTimer = React.useRef(null);
+  React.useEffect(() => () => clearTimeout(flipTimer.current), []);
+  const handlePlay = () => {
+    setPlayFlipping(true);
+    clearTimeout(flipTimer.current);
+    flipTimer.current = setTimeout(() => setPlayFlipping(false), PLAY_FLIP_MS);
+    onClick?.();
+  };
   return (
   <div style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -1471,27 +1412,31 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
     transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
     pointerEvents: visible ? 'auto' : 'none',
   }} inert={visible ? undefined : ''}>
-    <div className="worm-menu-actions">
+    <div className="worm-menu-actions" style={MENU_KEY_COLORS}>
     <PlayerLevelBadge />
     <button
       type="button"
-      className="worm-tactile-btn"
-      onClick={onClick}
+      className={`menu-key menu-key--play${playFlipping ? ' is-flipping' : ''}`}
+      onClick={handlePlay}
     >
-      <span className="worm-cta-emblem"><MenuCubeGlyph /></span>
-      <span className="worm-cta-label">Play</span>
-      <span className="worm-cta-glyph" aria-hidden="true">→</span>
+      <span className="menu-key-face">
+        <span className="menu-key-emblem"><MenuCubeGlyph /></span>
+        <span className="menu-key-label">Play</span>
+        <span className="menu-key-arrow" aria-hidden="true">→</span>
+      </span>
     </button>
     <div className="worm-menu-utilities">
       {onDemo && <button type="button" onClick={onDemo}
         onPointerEnter={warmDemoAssets} onPointerDown={warmDemoAssets}
-        className="worm-menu-cta-secondary">
-        <span aria-hidden="true">▷</span>Demo
+        className="menu-key menu-key--small">
+        <span className="menu-key-face"><span aria-hidden="true">▷</span>Demo</span>
       </button>}
-      <button type="button" className="worm-menu-cta-secondary"
+      <button type="button" className="menu-key menu-key--small"
         onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v12H10l-6 4V4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-        Feedback
+        <span className="menu-key-face">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v12H10l-6 4V4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
+          Feedback
+        </span>
       </button>
     </div>
     </div>

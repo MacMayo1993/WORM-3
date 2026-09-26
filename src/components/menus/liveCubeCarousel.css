@@ -21,10 +21,12 @@
 .lc-info details>p { font-size:14px; line-height:1.5; margin:0 0 12px; }
 .lc-history { display:flex; justify-content:center; gap:28px; margin:12px 0 18px; }
 .lc-history strong,.lc-history small { display:block; }.lc-history small { color:#6a705e; font-size:11px; margin-top:3px; }
-.lc-play { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:64px; padding:12px 18px; margin-top:10px; border:2px solid #354d3c; border-radius:18px; background:var(--mode-accent); color:var(--mode-ink); box-shadow:0 6px 0 #354d3c,0 10px 18px #354d3c20,inset 0 3px 0 #ffffff70; font:400 clamp(16px,4.5vw,21px)/1.25 var(--display-font); text-transform:uppercase; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
-.lc-play>span:first-child { display:flex; }.lc-play>span:last-child { font:700 26px/1 var(--heading-font); }
+/* Play is a piece of the cube (mainMenuKeys.css): a sticker in the mode's face colour. */
+.lc-play { width:100%; min-height:64px; margin-top:10px; }
+.lc-play .menu-key-face { justify-content:space-between; gap:12px; padding:0 18px 0 12px; background-color:var(--mode-accent); }
+.lc-play .menu-key-label { flex:1; text-align:center; font-size:clamp(17px,4.6vw,22px); }
 .live-carousel button:disabled { cursor:default; }.lc-play:disabled { opacity:.65; }
-.lc-play:enabled:active,.lc-icon-button:enabled:active { translate:0 3px; box-shadow:0 1px 0 #354d3c,inset 0 2px 0 #ffffff50; }
+.lc-icon-button:enabled:active { translate:0 3px; box-shadow:0 1px 0 #354d3c,inset 0 2px 0 #ffffff50; }
 .live-carousel button:focus-visible,.live-carousel summary:focus-visible { outline:3px solid #2774ad; outline-offset:5px; }
 .lc-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
 @media (max-height:680px) and (orientation:portrait) {
