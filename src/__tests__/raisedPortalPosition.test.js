@@ -4,7 +4,7 @@ import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { wormExpansion } from '../worm/wormExpansion.js';
 
-it.each(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'])('puts %s warning visuals on the raised pad, independent of global Explode', face => {
+it.each(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'])('puts %s warning visuals on the raised pad, composed with global Explode', face => {
   const size = 7, cubies = makeCubies(size), xyz = [3, 3, 3];
   const axis = { X: 0, Y: 1, Z: 2 }[face[1]], sign = face[0] === 'P' ? 1 : -1;
   xyz[axis] = sign > 0 ? 6 : 0;
@@ -14,7 +14,7 @@ it.each(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'])('puts %s warning visuals on the ra
   try {
     for (const amount of [0, 0.35, 1]) {
       wormExpansion.amount = amount;
-      const expected = getStickerWorldPos(...xyz, face, size, 1); expected[axis] += sign * 0.5;
+      const expected = getStickerWorldPos(...xyz, face, size, Math.max(0.5, amount)); expected[axis] += sign * 0.5;
       expect(raisedPortalPosition(...xyz, face, size, state)).toEqual(expected);
     }
     expect(raisedPortalPosition(...xyz, face, size, { ...state, demoMode: true }))

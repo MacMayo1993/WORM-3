@@ -36,7 +36,7 @@ import {
     ORB_SEGMENT_GROWTH,
     HEAL_PAUSE_DURATION,
     CUT_FOCUS_DURATION,
-    TUNNEL_HANDOFF_SECONDS,
+    tunnelHandoffSeconds,
 } from './healerWorm/constants.js';
 import { makeElementalRevealOrbit, sampleElementalRevealOrbit } from './elementalRevealOrbit.js';
 
@@ -692,7 +692,7 @@ export default function WormChaseCamera({ worm, size }) {
             const tp = THREE.MathUtils.clamp(worm.tunnelProgress.current, 0, 1);
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
             _entryTileCenter.fromArray(getStickerWorldPos(
-                tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0
+                tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, tunnel.padExpansion ?? 0
             ));
             tunnelState.active = true;
             tunnelState.t = phase === 'entering' ? tp * ENTER_END_T : 0;
@@ -705,7 +705,7 @@ export default function WormChaseCamera({ worm, size }) {
                 // The head's short aperture handoff must not compress the
                 // entire camera move into 180 ms. Entering continues this blend.
                 blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails,
-                    diveEase(tp * TUNNEL_HANDOFF_SECONDS / 0.7));
+                    diveEase(tp * tunnelHandoffSeconds(tunnel) / 0.7));
             } else {
                 tunnelEntryPoseInto(transitionPose.current, tunnel, tp, size, phaseStartPose.current);
             }
@@ -745,7 +745,7 @@ export default function WormChaseCamera({ worm, size }) {
             // Start at the actual exit pose; the existing post-tunnel crawl
             // easing completes the camera move after control has returned.
             blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails,
-                diveEase(tp * TUNNEL_HANDOFF_SECONDS / 0.7));
+                diveEase(tp * tunnelHandoffSeconds(tunnel) / 0.7));
             applyTunnelPose(transitionPose.current);
             if (mobile) {
                 frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);

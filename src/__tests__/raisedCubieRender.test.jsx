@@ -51,7 +51,8 @@ it('carries the body and unflipped faces to the Explode position, follows turns,
     // WORM also raises the entire piece, even with cosmetic pads switched off.
     await act(async () => { useGameStore.setState({ mirrorMode: true, settings: { ...useGameStore.getState().settings, flipPads: 'off' } }); root.render(draw(1, true)); });
     store.getState().advance(4 / 60);
-    expect(raised.current.parent.position.length()).toBeCloseTo(Math.sqrt(3) * 1.8);
+    expect(raised.current.parent.position.length()).toBeCloseTo(Math.sqrt(3) * 0.9);
+    expect(raisedCubieExtent()).toBe(0.5);
     await act(async () => { useGameStore.setState({ mirrorMode: false }); root.render(draw(0)); });
     store.getState().advance(4.5 / 60);
     // Slot components survive a committed rotation; the physical piece's spring

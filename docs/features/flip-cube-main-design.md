@@ -504,7 +504,7 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
    - `cubiePops` and Explode push whole cubies radially away from the cube's centre. For edge and corner cubies that direction is diagonal, and it drags unflipped stickers on other faces along.
    - In WORM it would also move the surface under the worm.
    - **User decision, 2026-09-26:** this whole-piece movement is intended. Keep the small normal pad too. Raise only cubies with at least one live flipped face. A carried unflipped face is a platform, not a tunnel.
-   - WORM rendering is enabled with sampled platform jumps and expanded tunnel handoffs. Idle pad bounce stays disabled in WORM so the physical landing surface is stable.
+   - WORM rendering is enabled with sampled platform jumps and expanded tunnel handoffs. Idle pad bounce stays disabled in WORM so the physical landing surface is stable. Platform jumps target the actual expanded height, clear the underside and ledge, and share their two-cell aim window with the camera. Raised WORM pairs automatically show the full Möbius bands regardless of the cosmetic tunnel-view toggle.
 3. **"Jump to ride" inverts the risk model.** The void rule, the tunnel cap, Story route tests and demo lessons all assume automatic entry; that is why the change ships behind a flag.
 4. **"Under the tiles" does not exist in RP².** $\mathbb{RP}^2$ is one-sided. An underside exists only on the double cover (the sphere is two-sided), which is why §5.3 is a real choice.
 5. **Rows and columns are belts, not face lines.** A wave that stops at a face edge breaks the illusion.
@@ -585,5 +585,5 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
 2. Wear reads as **bigger and faster** (matches today's tremor), or as "tired and lower"?
 3. For R3, the **cover** topology or the quotient one (§5.3)? Needed before R3 starts.
 4. Names: keep "flip pad", "the Rumbler" and "the Core", or rename?
-5. Landing-assist window: **pad 0–1 tiles ahead**?
+5. Landing-assist window: **pad 0–2 tiles ahead** (implemented; includes an airborne correction press).
 6. Chaos pads: **subtle**, or full height?
