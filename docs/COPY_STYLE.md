@@ -12,3 +12,11 @@ Use an arcade hierarchy: bold mode names and outcome titles, decisive controls, 
 - Explain unavailable actions with a short reason. Reserve signature for code identifiers; use ability in instructions.
 - Apply typography by semantic role through `gameTypography.css` and shared components. Do not uppercase paragraphs, shrink body text, or add a glow to every label.
 - Keep 44–48px controls, short landscape layouts, focus visibility, safe areas, and reduced-motion behavior intact.
+
+## Flip Cube vocabulary
+
+- **Flip Cube** names the object; **FLIP CUBE** names the solve mode on its title plate.
+- **flip pad** means a raised, flipped tile. Say **twin** and **straight through the middle**.
+- **WORM³** is the game and Mobi's home world. The lost cube premise ties healing to keeping his way home open.
+- Describe a control only once it is active in that mode. WORM keeps its current entry instructions until the new route is enabled.
+- Wear warnings must include a legible static cue; movement and colour are supporting cues.

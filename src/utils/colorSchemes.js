@@ -243,6 +243,7 @@ export const TILE_STYLES = {
 };
 
 export const DEFAULT_SETTINGS = {
+  flipPads: 'full',
   colorScheme: 'standard',
   customColors: null,
   backgroundTheme: 'blackhole',

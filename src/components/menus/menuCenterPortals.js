@@ -21,6 +21,6 @@ export function flipMenuCenters(cubies) {
     const face = MENU_FLIP_PAIRS.flat().find(f => f.cubie[0] === x && f.cubie[1] === y && f.cubie[2] === z);
     if (!face) return cubie;
     const sticker = cubie.stickers[face.dir];
-    return { ...cubie, stickers: { ...cubie.stickers, [face.dir]: { ...sticker, curr: ANTIPODAL_COLOR[sticker.orig] } } };
+    return { ...cubie, stickers: { ...cubie.stickers, [face.dir]: { ...sticker, curr: ANTIPODAL_COLOR[sticker.orig], flips: 1 } } };
   })));
 }

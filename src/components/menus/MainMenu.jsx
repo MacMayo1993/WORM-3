@@ -1,3 +1,4 @@
+import { PadProvider, FlipPadOffset } from '../../3d/PadSprings.jsx';
 import WormWordmark from '../branding/WormWordmark.jsx';
 import { createModePlateArtwork } from '../../3d/modePlateArtwork.js';
 import '../ui/screenDesign.css';
@@ -194,7 +195,8 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
           // curr !== orig means this sticker has been flipped an odd number of times.
           const isFlipped = sticker.curr !== sticker.orig;
           return (
-            <group key={dir} position={pos} rotation={rot}>
+            <FlipPadOffset key={dir} meta={sticker} size={3} pos={pos} rot={rot}>
+            <group position={pos} rotation={rot}>
               <mesh renderOrder={10}>
                 <planeGeometry args={[0.80, 0.80]} />
                 <primitive attach="material" object={getTileStyleMaterial(_menuFaceStyles[sticker.curr] || 'solid', colorHex)} />
@@ -203,6 +205,7 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
                 <MenuTileOverlay colorHex={colorHex} antiColorHex={antiColorHex} />
               )}
             </group>
+            </FlipPadOffset>
           );
         })}
 
@@ -331,7 +334,7 @@ const ShufflingCube = ({ onFlip }) => {
       setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));
       setFlipWaves([]);
     }
-  });
+  }, -1);
 
   const { cubies, rotating } = cubeState;
   const flatCubies = cubies.flat(2);
@@ -355,7 +358,7 @@ const ShufflingCube = ({ onFlip }) => {
   }, [rotating]);
 
   return (
-    <>
+    <PadProvider profile="menu">
       {staticCubies.map(c => (
         <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} hideStickers={hideStickers} />
       ))}
@@ -378,7 +381,7 @@ const ShufflingCube = ({ onFlip }) => {
           onComplete={handleWormComplete}
         />
       ))}
-    </>
+    </PadProvider>
   );
 };
 

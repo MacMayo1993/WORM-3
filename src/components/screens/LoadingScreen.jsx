@@ -54,7 +54,7 @@ function Face({ cls, tex }) {
   return (
     <div className={`wl-face ${cls}`}>
       {Array.from({ length: 9 }, (_, i) => (
-        <div key={i} className="wl-sticker" style={stickerStyle} />
+        <div key={i} className={`wl-sticker${i === 4 ? ' wl-flip-pad' : ''}`} style={stickerStyle} />
       ))}
     </div>
   );

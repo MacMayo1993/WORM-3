@@ -320,7 +320,7 @@ Instead, refactor the visual primitive without changing Chaos behavior:
 - Do not replace the existing orb/badge/HUD language with unrelated assets; extend it consistently.
 - Do not solve cross-face continuity with one monolithic mesh that breaks during live slice rotations.
 
-## Flip Cube Main Design (Design Only)
+## Flip Cube Main Design and Implementation
 
 The brief for making the Flip Cube the game's hero object lives in `docs/features/flip-cube-main-design.md`. It covers:
 
@@ -329,4 +329,4 @@ The brief for making the Flip Cube the game's hero object lives in `docs/feature
 - the Rumbler under the tiles;
 - Mobi's WORM³ lore.
 
-Like the elemental plan above, it is a plan with open decisions (§13 there), not an instruction to change gameplay while doing unrelated work. Read it before touching pad, tunnel-entry or rumble code.
+The implementation checkpoint at the top records what is live and what remains planned. Cube/menu pads use `PadProvider` and a separate normal-offset transform; persistent lift must never be published to tunnel anchors. WORM remains on its existing route until phase 4. Read the checkpoint and integration contracts before touching pad, tunnel-entry or rumble code.

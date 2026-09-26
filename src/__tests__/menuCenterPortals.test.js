@@ -22,6 +22,7 @@ it('keeps each center flipped after middle-slice turns without toggling off', ()
       const [x, y, z] = face.cubie;
       const sticker = cube[x][y][z].stickers[face.dir];
       expect(sticker.curr).toBe(ANTIPODAL_COLOR[sticker.orig]);
+      expect(sticker.flips).toBe(1);
     }
   }
 });

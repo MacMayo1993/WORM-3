@@ -1,3 +1,4 @@
+import { FlipPadOffset } from './PadSprings.jsx';
 import { flipPose } from '../utils/flipPose.js';
 import { chaosFlipPose, CHAOS_FLIP_DURATION } from './chaosFlipPose.js';
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
@@ -1649,11 +1650,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
     }
 
+    // Switching from the legacy tremor must not leave its last random-looking
+    // offset under the pair-symmetric pad transform. Transient flips still own it.
+    if (!wormHealerMode && settings?.flipPads !== 'off' && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
+      groupRef.current.position.set(...pos);
+    }
+
     // Persistent tremor for flipped tiles — the parity violation makes the tile unstable.
     // Sub-sampled to every other frame (30 Hz effective) — the vibration frequencies are
     // 6–41 Hz which are indistinguishable at 30 Hz vs 60 Hz updates.
     _tremorFrame++;
-    if (showWormholeHazardFx && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0 && (_tremorFrame & 1) === 0) {
+    if ((wormHealerMode || settings?.flipPads === 'off') && showWormholeHazardFx && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0 && (_tremorFrame & 1) === 0) {
       const t = state.clock.elapsedTime;
       const flips = Math.min(meta?.flips ?? 1, 5);
       const tremIntensity = 0.004 + flips * 0.003;
@@ -1964,6 +1971,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const _antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
 
   return (
+    <FlipPadOffset meta={meta} size={faceSize} pos={pos} rot={rot}>
     <group position={pos} rotation={rot} ref={groupRef}>
       {/* A static surface marking stays legible when bloom and moving portal
           effects wash out. Raised hazard fences still identify deadly portals. */}
@@ -2449,6 +2457,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       )}
 
     </group>
+    </FlipPadOffset>
   );
 };
 
