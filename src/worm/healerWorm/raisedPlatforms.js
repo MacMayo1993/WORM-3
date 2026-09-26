@@ -1,3 +1,4 @@
+import { livePlatformFormation } from '../platformFormation.js';
 import * as THREE from 'three';
 import { cubieHasFlippedFace, isLiveFlippedFace, raisedWormExpansion } from '../../game/raisedCubie.js';
 import { wormExpansion } from '../wormExpansion.js';
@@ -56,7 +57,10 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
     sim.padFlight = { t: 0, sample: 0, start, launch, above, end: destination,
         padHeight: isLiveFlippedFace(ctx.getCubies()[target.x][target.y][target.z].stickers[target.dirKey], ctx.getFlipCap?.() ?? 6) ? WORM_PAD_HEIGHT : 0,
         startNormal: sim.currentNormal.clone(), endNormal,
-        target: { ...target }, moveDir, allowRide, duration: Math.min(1.25, 0.65 + Math.max(0, start.distanceTo(destination) - 3) * 0.035) };
+        target: { ...target }, moveDir, allowRide, // Time the landing for the end of the lift if the player jumps during
+        // construction; the destination remains the same half-height platform.
+        duration: Math.max((livePlatformFormation(target, size)?.formationRemaining ?? 0) + 1 / 60,
+            Math.min(1.25, 0.65 + Math.max(0, start.distanceTo(destination) - 3) * 0.035)) };
     sim.isJumping = true;
     sim.jumpCount = 1;
     sim.jumpT = 0.001;

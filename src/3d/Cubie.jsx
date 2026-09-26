@@ -1,3 +1,4 @@
+import { advancePlatformFormation, platformFormationHeld } from '../worm/platformFormation.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
 import { cubieHasFlippedFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT } from '../game/raisedCubie.js';
@@ -427,14 +428,18 @@ const Cubie = React.forwardRef(function Cubie({
     if (!kick && !_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0) return;
     if (!popGroupRef.current || !pieceRef.current) return;
     const state = useGameStore.getState();
-    const reduced = wormPads || settings?.reducedMotion || prefersReducedMotion();
-    if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
+    const reduced = settings?.reducedMotion || prefersReducedMotion();
+    if (wormPads) {
+      advancePlatformFormation(spring, raised, platformFormationHeld(state) ? 0 : delta, reduced);
+      pieceRef.current.userData.wormPlatformFormation = spring;
+    } else if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
     else advancePadSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
+    if (!wormPads) delete pieceRef.current.userData.wormPlatformFormation;
     const amount = Math.max(0, Math.min(1, spring.lift)) * (wormPads ? WORM_RAISED_AMOUNT : 1);
     publishRaisedCubie(spring, amount);
     const entry = state.cubiePops[popKey];
     const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;
-    const impact = !reduced && entry && rawT >= 0 && rawT < 1 ? Math.sin(rawT * Math.PI) * 1.5 : 0;
+    const impact = !wormPads && !reduced && entry && rawT >= 0 && rawT < 1 ? Math.sin(rawT * Math.PI) * 1.5 : 0;
     const center = pieceRef.current.position;
     const ratio = selectiveCubieOffsetRatio(size, state.explosionT, amount);
     // Preserve the original impact hop, but do not add a second full explosion.

@@ -1,3 +1,5 @@
+import { PLATFORM_FORMATION_SECONDS, platformFormationHeld } from '../worm/platformFormation.js';
+import { prefersReducedMotion } from '../utils/device.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -190,7 +192,10 @@ const fragmentShader = `
     intensity += fres * 0.9;    // rim glow
     intensity += sol * 1.6;     // travelling pulse
 
-    vec3 col = tileColor * intensity;
+    // A restrained bright leading edge makes the two growing halves legible.
+    float frontDistance = min(abs(vUv.y - leftFront), abs(vUv.y - rightFront));
+    float birthFront = (1.0 - smoothstep(0.0, 0.035, frontDistance)) * (1.0 - step(1.0, uGrowT));
+    vec3 col = tileColor * (intensity + birthFront * 0.8);
     col = mix(col, vec3(1.0), clamp(sol, 0.0, 0.85)); // soliton core reads white-hot
 
     float edgeFade     = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
@@ -243,10 +248,12 @@ const bumperVertexShader = `
 const bumperFragmentShader = `
   uniform vec3  uColor;
   uniform float uOpacity;
+  uniform float uGrowT;
   varying float vHeightFrac;
   varying float vTripFrac;
 
   void main() {
+    if (vTripFrac > uGrowT * 0.5 && vTripFrac < 1.0 - uGrowT * 0.5) discard;
     float topFade = 1.0 - smoothstep(0.6, 1.0, vHeightFrac);
 
     // Möbius flip highlight: glows white near the halfway point (t=0.5),
@@ -452,6 +459,7 @@ const MobiusTunnel = ({
 }) => {
   const flipCap          = useGameStore(selectEffectiveFlipCap);
   const meshRef          = useRef();
+  const formationAge = useRef(0);
   const pulseT           = useRef(Math.random() * Math.PI * 2);
   const portalPulseT     = useRef(Math.random() * Math.PI * 2);
   const dimRef           = useRef(WORM_IDLE_OPACITY);
@@ -474,7 +482,7 @@ const MobiusTunnel = ({
     uWhipPhase: { value: 0.0 },
   }), []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Keep uniform objects stable; the frame loop updates colours in place.
   const uniforms = useMemo(() => ({
     uColorA:      { value: new THREE.Color(color1) },
     uColorB:      { value: new THREE.Color(color2) },
@@ -488,21 +496,21 @@ const MobiusTunnel = ({
     uSolitonProgress: { value: -1.0 },
     uSolitonAmp:      { value: 0.0 },
     ...whipUniforms,
-  }), []);
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const bumperUniformsL = useMemo(() => ({
     uColor:   { value: new THREE.Color(color1) },
     uOpacity: { value: 0.93 },
+    uGrowT: uniforms.uGrowT,
     ...whipUniforms,
-  }), []);
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const bumperUniformsR = useMemo(() => ({
     uColor:   { value: new THREE.Color(color2) },
     uOpacity: { value: 0.93 },
+    uGrowT: uniforms.uGrowT,
     ...whipUniforms,
-  }), []);
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const g = geo, lg = leftGeo, rg = rightGeo;
@@ -675,7 +683,21 @@ const MobiusTunnel = ({
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
     let whipAmp = 0;
     let whipPhase = 0;
-    if (birth) {
+    const formationState = useGameStore.getState();
+    if (formationState.wormHealerMode && !formationState.demoMode) {
+      const reduced = formationState.settings?.reducedMotion || prefersReducedMotion();
+      if (reduced) formationAge.current = PLATFORM_FORMATION_SECONDS;
+      else if (!platformFormationHeld(formationState)) formationAge.current += Math.min(delta, .05);
+      const progress = Math.min(1, formationAge.current / PLATFORM_FORMATION_SECONDS);
+      const a = mesh1.userData.wormPlatformFormation;
+      const b = mesh2.userData.wormPlatformFormation;
+      uniforms.uGrowT.value = reduced ? 1 : Math.min(progress,
+        a?.formationTarget === 1 ? a.formationProgress : 1,
+        b?.formationTarget === 1 ? b.formationProgress : 1);
+      // The portal appears with its emerging ribbon, not as a complete floating ring.
+      const portalScale = THREE.MathUtils.smoothstep(uniforms.uGrowT.value, 0, .22);
+      if (exitPortalGroupRef.current) exitPortalGroupRef.current.scale.multiplyScalar(portalScale);
+    } else if (birth) {
       const rawT = (performance.now() - birth.startMs) / birth.durationMs;
       uniforms.uGrowT.value = Math.min(1, Math.max(0, rawT));
       // A pair's first identification snaps hardest — this happens at most once
