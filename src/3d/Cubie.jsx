@@ -5,7 +5,7 @@ import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeR
 import { advancePieceSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
-import { prefersReducedMotion } from '../utils/device.js';
+import { prefersReducedMotion, isMobile } from '../utils/device.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef, useEffect, useState, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -20,7 +20,9 @@ import MergedLedEdges from './MergedLedEdges.jsx';
 import { hollowFrameGeometry } from './hollowFrameGeometry.js';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps } from './cubeViewStyles.js';
+import {
+  PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps, CLASSIC_BODY_MODES, CLASSIC_BODY_SIZE, CLASSIC_BODY_COAT
+} from './cubeViewStyles.js';
 // Canonical Sudokube number (matches win detection in winDetection.js).
 import { faceValue as sudokuValue, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
 
@@ -193,6 +195,10 @@ const Cubie = React.forwardRef(function Cubie({
     side: wormMode ? THREE.DoubleSide : THREE.FrontSide,
     ...(_bmp.emissive ? { emissive: _bmp.emissive, emissiveIntensity: _bmp.emissiveIntensity ?? 1 } : {})
   };
+  // Classic looks wear the menu cube's piece: 0.96 black plastic, clear-coated off mobile.
+  const classicBody = CLASSIC_BODY_MODES.has(effectiveVisualMode) && !wormMode;
+  const bodySize = wormMode ? 0.92 : classicBody ? CLASSIC_BODY_SIZE : 0.98;
+  const coatBody = classicBody && !isMobile;
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
 
   const explodedPos = useMemo(() => {
@@ -507,8 +513,8 @@ const Cubie = React.forwardRef(function Cubie({
         // bar across the water, the moss and the fire's lava cracks. Drawing bodies
         // first fixes that. Raised WORM pieces keep a translucent shell without
         // writing depth, revealing the band underneath their lifted tile.
-        <RoundedBox args={wormMode ? [0.92, 0.92, 0.92] : [0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows} renderOrder={wormMode ? -1 : 0}>
-          <meshStandardMaterial {...bodyMatProps} />
+        <RoundedBox args={[bodySize, bodySize, bodySize]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows} renderOrder={wormMode ? -1 : 0}>
+          {coatBody ? <meshPhysicalMaterial {...bodyMatProps} {...CLASSIC_BODY_COAT} /> : <meshStandardMaterial {...bodyMatProps} />}
         </RoundedBox>
       )}
 

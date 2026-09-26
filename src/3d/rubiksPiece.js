@@ -17,18 +17,45 @@ export const createCubieGeometry = () => new RoundedBoxGeometry(0.96, 0.96, 0.96
  * catches the key light as it turns. Faces +Z, centred on the origin.
  */
 export function createStickerGeometry() {
-  const size = 0.84, r = 0.14, h = size / 2;
+  const geometry = new THREE.ExtrudeGeometry(roundedSquare(0.84, 0.14), {
+    depth: 0.02, bevelEnabled: true, bevelThickness: 0.014, bevelSize: 0.014, bevelSegments: 2, curveSegments: 5
+  });
+  geometry.translate(0, 0, -0.01);
+  return geometry;
+}
+
+/** Thickness of the in-game sticker, front face to back. */
+export const PLAY_STICKER_DEPTH = 0.016;
+
+/**
+ * The same sticker for the play cube, where it stands in for the old flat
+ * 0.85 quad: the same rounded outline and bevelled rim, but thin, with its
+ * front face at z = 0 so the tile marks, flip glow and seals that sit a few
+ * thousandths in front of the sticker stay in front of it, and its back well
+ * clear of the cubie face 0.02 behind. UVs are 0–1 across the front, as on a
+ * PlaneGeometry, so textured stickers map exactly as they did.
+ */
+export function createPlayStickerGeometry(size = 0.85) {
+  const bevel = 0.008;
+  const geometry = new THREE.ExtrudeGeometry(roundedSquare(size - 2 * bevel, 0.13), {
+    depth: PLAY_STICKER_DEPTH - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 5
+  });
+  geometry.translate(0, 0, -(PLAY_STICKER_DEPTH - bevel));
+  const pos = geometry.attributes.position, uv = geometry.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / size + 0.5, pos.getY(i) / size + 0.5);
+  uv.needsUpdate = true;
+  return geometry;
+}
+
+function roundedSquare(size, r) {
+  const h = size / 2;
   const shape = new THREE.Shape();
   shape.moveTo(-h + r, -h);
   shape.lineTo(h - r, -h); shape.quadraticCurveTo(h, -h, h, -h + r);
   shape.lineTo(h, h - r); shape.quadraticCurveTo(h, h, h - r, h);
   shape.lineTo(-h + r, h); shape.quadraticCurveTo(-h, h, -h, h - r);
   shape.lineTo(-h, -h + r); shape.quadraticCurveTo(-h, -h, -h + r, -h);
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.02, bevelEnabled: true, bevelThickness: 0.014, bevelSize: 0.014, bevelSegments: 2, curveSegments: 5
-  });
-  geometry.translate(0, 0, -0.01);
-  return geometry;
+  return shape;
 }
 
 /**

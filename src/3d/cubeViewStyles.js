@@ -36,7 +36,15 @@ export function bodyMaterialProps(mode) {
       return { color: '#08080c', roughness: 0.3, metalness: 0.35, envMapIntensity: 0.5, emissive: '#0a0014', emissiveIntensity: 0.4 };
     case 'lego': // glossy ABS plastic
       return { color: '#15151a', roughness: 0.35, metalness: 0.0, envMapIntensity: 0.6 };
-    default: // classic, grid, sudokube, gap
-      return { color: '#0a0a0a', roughness: 0.25, metalness: 0.15, envMapIntensity: 0.4 };
+    default: // classic, grid, sudokube, gap: the menu cube's black plastic (rubiksPiece.js)
+      return { color: '#141416', roughness: 0.34, metalness: 0, envMapIntensity: 0.25 };
   }
 }
+
+// The classic looks are built like the menu cube: a 0.96 piece, so a groove shows
+// between neighbours, with a light clearcoat on the plastic. The coat is kept out
+// of bodyMaterialProps because the Mega chassis spreads those into a
+// MeshStandardMaterial, which has no clearcoat.
+export const CLASSIC_BODY_MODES = new Set(['classic', 'grid', 'sudokube']);
+export const CLASSIC_BODY_SIZE = 0.96;
+export const CLASSIC_BODY_COAT = { clearcoat: 0.4, clearcoatRoughness: 0.35 };

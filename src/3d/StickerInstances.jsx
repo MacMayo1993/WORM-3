@@ -1,5 +1,7 @@
 import { PadProvider } from './PadSprings.jsx';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
+import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
+import { isMobile } from '../utils/device.js';
 // StickerInstances.jsx
 // Batches simple (solid-colour) sticker planes into a single THREE.InstancedMesh,
 // collapsing up to 150 individual draw calls (5×5 cube) to one.
@@ -61,12 +63,11 @@ export function StickerInstanceProvider({ children }) {
   //   StickerInstanceProvider.useLayoutEffect → scene.add(mesh)
   //   browser paint → R3F first useFrame → WebGL render  (everything ready)
   const instanceMesh = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(0.85, 0.85);
-    const mat = new THREE.MeshStandardMaterial({
-      roughness: 0.3,
-      metalness: 0.05,
-      envMapIntensity: 0.3,
-    });
+    // The menu cube's sticker (rubiksPiece.js): rounded, bevelled and clear-coated,
+    // still one draw call for every plain sticker on the cube.
+    const geo = createPlayStickerGeometry();
+    const { Material, sticker } = rubiksFinish(isMobile);
+    const mat = new Material({ ...sticker, envMapIntensity: 0.3 });
     const mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES);
     // Render all MAX_INSTANCES slots; unused ones are zeroed out (invisible).
     mesh.count = MAX_INSTANCES;

@@ -6,6 +6,8 @@ import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 're
 import { useFrame } from '@react-three/fiber';
 import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
+import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
+import { isMobile } from '../utils/device.js';
 import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { feel } from '../utils/feel.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
@@ -45,6 +47,10 @@ import TileBoundary from './TileBoundary.jsx';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
+// Plain solid tiles wear the menu cube's sticker: the same rounded, bevelled
+// outline and glossy coat (rubiksPiece.js), thin enough to keep every overlay in front.
+const _playStickerGeo = createPlayStickerGeometry();
+const _playFinish = rubiksFinish(isMobile).sticker;
 // Tessellated plane for styles whose vertex shader displaces the surface — the
 // eyeball bulge needs interior vertices to bend (a 1×1-segment plane stays flat).
 const _bulgeStickerGeo = new THREE.PlaneGeometry(0.85, 0.85, 24, 24);
@@ -1793,6 +1799,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Use shader material for non-solid styles (when no texture is applied)
   const useShaderStyle = !isGlass && tileStyle !== 'solid' && !currTexture && !isSudokube && !glbFullFace;
+  // A plain coloured tile gets the rounded, glossy sticker; textured, styled and glass tiles keep the flat quad.
+  const plainSticker = !hollow && !useGlassStyle && !useShaderStyle && !isSudokube && !renderTexture;
   const styleMaterial = useMemo(() => {
     if (!useShaderStyle) return null;
     // Ensure we have a valid color string
@@ -1995,9 +2003,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       )}
 
       {/* Antipodal back face — visible from inside the cube; shows the RP² partner tile
-          at 80% scale so the interior reads as distinct from the front face. */}
+          at 80% scale so the interior reads as distinct from the front face. It sits
+          just behind the solid sticker's 0.016 thickness, or the sticker's back would hide it. */}
       {antipodalHex && (
-        <mesh name="sticker-antipodal-back" material={backMaterial} position={[0, 0, -0.012]} rotation={[0, Math.PI, 0]} scale={[0.8, 0.8, 1]} dispose={null}>
+        <mesh name="sticker-antipodal-back" material={backMaterial} position={[0, 0, -0.018]} rotation={[0, Math.PI, 0]} scale={[0.8, 0.8, 1]} dispose={null}>
           <primitive object={_sharedStickerGeo} attach="geometry" />
         </mesh>
       )}
@@ -2020,10 +2029,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           </mesh>
         )}
 
-        {/* Main sticker quad — omitted when the InstancedMesh handles rendering */}
-        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
+        {/* Main sticker — omitted when the InstancedMesh handles rendering */}
+        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : plainSticker ? 'sticker' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
           {hollow ? (
             <shapeGeometry args={[_stickerFrameShape]} />
+          ) : plainSticker ? (
+            <primitive object={_playStickerGeo} attach="geometry" />
           ) : faceRow != null ? (
             // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
             <planeGeometry ref={geoRef} args={[0.85, 0.85]} />
@@ -2038,6 +2049,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <primitive object={glassMaterial} attach="material" />
           ) : useShaderStyle && styleMaterial ? (
             <primitive object={styleMaterial} attach="material" />
+          ) : plainSticker ? (
+            isMobile
+              ? <meshStandardMaterial color={materialColor} {..._playFinish} envMapIntensity={0.3} />
+              : <meshPhysicalMaterial color={materialColor} {..._playFinish} envMapIntensity={0.3} />
           ) : (
             <meshStandardMaterial
               color={materialColor}
