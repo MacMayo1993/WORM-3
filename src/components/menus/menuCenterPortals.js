@@ -1,17 +1,22 @@
+import { STICKER_OFFSET } from '../../3d/rubiksPiece.js';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+
+// The overlay sits above the domed sticker; navigation uses this same mouth.
+export const MENU_PORTAL_OVERLAY_Z = 0.026;
+export const MENU_SURFACE_HALF = 1 + STICKER_OFFSET + MENU_PORTAL_OVERLAY_Z;
 
 export const MENU_FLIP_PAIRS = [
   [
-    { dir: 'PZ', cubie: [1, 1, 2], pos: [0, 0,  1.501], rot: [0, 0, 0] },
-    { dir: 'NZ', cubie: [1, 1, 0], pos: [0, 0, -1.501], rot: [0, Math.PI, 0] },
+    { dir: 'PZ', cubie: [1, 1, 2], pos: [0, 0,  MENU_SURFACE_HALF], rot: [0, 0, 0] },
+    { dir: 'NZ', cubie: [1, 1, 0], pos: [0, 0, -MENU_SURFACE_HALF], rot: [0, Math.PI, 0] },
   ],
   [
-    { dir: 'PX', cubie: [2, 1, 1], pos: [ 1.501, 0, 0], rot: [0,  Math.PI / 2, 0] },
-    { dir: 'NX', cubie: [0, 1, 1], pos: [-1.501, 0, 0], rot: [0, -Math.PI / 2, 0] },
+    { dir: 'PX', cubie: [2, 1, 1], pos: [ MENU_SURFACE_HALF, 0, 0], rot: [0,  Math.PI / 2, 0] },
+    { dir: 'NX', cubie: [0, 1, 1], pos: [-MENU_SURFACE_HALF, 0, 0], rot: [0, -Math.PI / 2, 0] },
   ],
   [
-    { dir: 'PY', cubie: [1, 2, 1], pos: [0,  1.501, 0], rot: [-Math.PI / 2, 0, 0] },
-    { dir: 'NY', cubie: [1, 0, 1], pos: [0, -1.501, 0], rot: [ Math.PI / 2, 0, 0] },
+    { dir: 'PY', cubie: [1, 2, 1], pos: [0,  MENU_SURFACE_HALF, 0], rot: [-Math.PI / 2, 0, 0] },
+    { dir: 'NY', cubie: [1, 0, 1], pos: [0, -MENU_SURFACE_HALF, 0], rot: [ Math.PI / 2, 0, 0] },
   ],
 ];
 

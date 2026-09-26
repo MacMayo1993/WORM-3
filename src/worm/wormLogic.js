@@ -402,8 +402,9 @@ export const buildTunnelPathForTunnel = (path, tunnel, size, explosionFactor = w
   const xn = TUNNEL_FACE_NORMALS[tunnel.exit.dirKey] || ZERO3;
   _tunEntryNormal.set(en[0], en[1], en[2]);
   _tunExitNormal.set(xn[0], xn[1], xn[2]);
-  _tunVStart.copy(_tunnelEntry).addScaledVector(_tunEntryNormal, TUNNEL_ANCHOR_OFFSET);
-  _tunVEnd.copy(_tunnelExit).addScaledVector(_tunExitNormal, TUNNEL_ANCHOR_OFFSET);
+  const mouthOffset = TUNNEL_ANCHOR_OFFSET + (tunnel.padHeight ?? 0);
+  _tunVStart.copy(_tunnelEntry).addScaledVector(_tunEntryNormal, mouthOffset);
+  _tunVEnd.copy(_tunnelExit).addScaledVector(_tunExitNormal, mouthOffset);
 
   // The docking points near the core stay put regardless of the explosion scale —
   // buildTunnelPathInto derives them from the normals alone.
@@ -486,7 +487,7 @@ export const getWindWorldPosInto = (out, tunnel, side, s, size, explosionFactor 
   const cl = Math.max(0, Math.min(1, s));
   const orbit = tunnel.padHeight > 0;
   const dive = orbit ? THREE.MathUtils.smoothstep(cl, 0.82, 1) : cl;
-  const lift = THREE.MathUtils.lerp(WORM_LIFT + (tunnel.padHeight ?? 0), TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, dive);
+  const lift = (tunnel.padHeight ?? 0) + THREE.MathUtils.lerp(WORM_LIFT, TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, dive);
   out.set(wp[0] + n[0] * lift, wp[1] + n[1] * lift, wp[2] + n[2] * lift);
   if (orbit) {
     const radius = 0.38 * THREE.MathUtils.smoothstep(cl, 0, 0.12)

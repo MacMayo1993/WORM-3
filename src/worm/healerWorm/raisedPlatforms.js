@@ -1,5 +1,6 @@
+import { livePlatformFormation } from '../platformFormation.js';
 import * as THREE from 'three';
-import { isLiveFlippedFace, raisedWormExpansion, WORM_PAD_HEIGHT } from '../../game/raisedCubie.js';
+import { cubieHasFlippedFace, isLiveFlippedFace, raisedWormExpansion, WORM_PAD_HEIGHT } from '../../game/raisedCubie.js';
 import { wormExpansion } from '../wormExpansion.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
@@ -11,11 +12,11 @@ export const usesRaisedPlatforms = ctx => ctx.getTunnelEntry?.() === 'pad';
 export function raisedPlatformPosition(tile, size, ctx) {
     const cubie = ctx.getCubies()?.[tile.x]?.[tile.y]?.[tile.z];
     const cap = ctx.getFlipCap?.() ?? 6;
-    // Only the flipped tile is a platform. Its piece pops out barely, so the
-    // piece's other faces stay ordinary floor.
-    if (!cubie || !isLiveFlippedFace(cubie.stickers[tile.dirKey], cap)) return null;
+    // All faces travel with the whole piece. Only the flipped face is a tunnel.
+    if (!cubie?.stickers[tile.dirKey] || !cubieHasFlippedFace(cubie, cap)) return null;
     const point = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, raisedWormExpansion(wormExpansion.amount, size)));
-    return point.addScaledVector(FACE_NORMALS[tile.dirKey], WORM_PAD_HEIGHT);
+    return isLiveFlippedFace(cubie.stickers[tile.dirKey], cap)
+        ? point.addScaledVector(FACE_NORMALS[tile.dirKey], WORM_PAD_HEIGHT) : point;
 }
 
 // Share the same two-cell aim window with the chase camera. Prefer the nearest
@@ -44,7 +45,7 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
     const start = sim.headInterpPos.clone();
     if (sim.isJumping) start.addScaledVector(sim.currentNormal, Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight);
     const endNormal = FACE_NORMALS[target.dirKey].clone();
-    const above = destination.clone().addScaledVector(endNormal, 0.85);
+    const above = destination.clone().addScaledVector(endNormal, 0.35);
     const offset = start.clone().sub(destination).projectOnPlane(endNormal);
     const launch = start.clone();
     // When directly underneath, move outside the cubie before rising. Otherwise
@@ -57,7 +58,10 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
     sim.padFlight = { t: 0, sample: 0, start, launch, above, end: destination,
         padHeight: isLiveFlippedFace(ctx.getCubies()[target.x][target.y][target.z].stickers[target.dirKey], ctx.getFlipCap?.() ?? 6) ? WORM_PAD_HEIGHT : 0,
         startNormal: sim.currentNormal.clone(), endNormal,
-        target: { ...target }, moveDir, allowRide, duration: Math.min(1.25, 0.65 + Math.max(0, start.distanceTo(destination) - 3) * 0.035) };
+        target: { ...target }, moveDir, allowRide, // Time the landing for the end of the lift if the player jumps during
+        // construction; the destination remains fixed at the tape-height platform.
+        duration: Math.max((livePlatformFormation(target, size)?.formationRemaining ?? 0) + 1 / 60,
+            Math.min(1.25, 0.65 + Math.max(0, start.distanceTo(destination) - 3) * 0.035)) };
     sim.isJumping = true;
     sim.jumpCount = 1;
     sim.jumpT = 0.001;
@@ -73,7 +77,7 @@ export function samplePlatformArc(flight, t, out) {
     const travel = (t - 0.2) / 0.58, across = smooth(travel), rise = smooth(travel / 0.45);
     out.lerpVectors(launch, above, across);
     // Reach clearance height before crossing over the ledge, then settle onto
-    // its top. This scales to the 10.71-unit lift of a 15×15 outer cubie.
+    // its top. The ordinary landing stays at tape height on every board size.
     const height = (above.x - launch.x) * endNormal.x + (above.y - launch.y) * endNormal.y + (above.z - launch.z) * endNormal.z;
     return out.addScaledVector(endNormal, Math.max(0, height) * (rise - across));
 }
