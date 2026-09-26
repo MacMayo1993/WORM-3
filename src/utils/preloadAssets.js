@@ -27,6 +27,8 @@ export function preloadAppAssets() {
     import('../components/screens/ParityStoreScreen.jsx'),
     import('../components/screens/DemoEndScreen.jsx'),
     import('../components/screens/DemoForecastPicker.jsx'),
+    // The loading cover's cube and wormhole, so the first cover shows them at once.
+    import('../components/screens/LoadingScene.jsx'),
   ];
   chunks.forEach((p) => p.catch(() => { }));
 
