@@ -106,7 +106,6 @@
 .mode-wizard-step-track i { height: 4px; background: var(--arcade-line-soft); }
 .mode-wizard-step-track i[data-reached="true"] { background: var(--arcade-ink-strong); }
 .mode-wizard nav button[aria-current="true"] { background: color-mix(in srgb, var(--mode-accent) 14%, transparent) !important; }
-.mode-wizard .mode-wizard-primary:active { translate: 0 3px; box-shadow: 0 1px 0 var(--arcade-ink-strong), inset 0 2px 0 #ffffff50 !important; }
 .mode-wizard button:focus-visible, .mode-wizard input:focus-visible, .mode-wizard summary:focus-visible,
 .cube-path-screen button:focus-visible { outline: 3px solid var(--arcade-focus); outline-offset: 4px; }
 .mode-wizard .mode-wizard-sheet > div:last-child > button:first-of-type { font-size: clamp(15px, 4.5vw, 20px) !important; }

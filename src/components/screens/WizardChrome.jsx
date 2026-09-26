@@ -11,6 +11,7 @@ import { ARCADE_PAPER, ARCADE_CARD, ARCADE_INK, ARCADE_INK_STRONG, ARCADE_MUTED,
   ARCADE_GRID_SIZE, ARCADE_KEY_SHADOW, ARCADE_PRIMARY_SHADOW, ARCADE_CARD_SHADOW, DISPLAY_FONT, HEADING_FONT } from '../../utils/uiTheme.js';
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import './modeWizard.css';
+import '../ui/pieceKey.css';
 import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
 
@@ -287,30 +288,6 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       flexShrink: 0,
       borderTop: `2px solid ${ARCADE_LINE_SOFT}`,
       background: WIZARD_FOOTER_BG
-    },
-
-    // One wide action. A wizard has exactly one thing to do next, and on a phone
-    // it belongs across the thumb rather than in a corner.
-    btnPrimary: {
-      width: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      background: 'var(--arcade-accent)',
-      border: `2px solid ${ARCADE_INK_STRONG}`,
-      font: `400 clamp(15px, 4.5vw, 20px)/1.25 ${DISPLAY_FONT}`,
-      textTransform: 'uppercase',
-      color: 'var(--arcade-accent-ink)',
-      cursor: 'pointer',
-      minHeight: 60,
-      padding: '12px 18px',
-      marginBottom: 6,
-      borderRadius: 18,
-      fontFamily: DISPLAY_FONT,
-      WebkitTapHighlightColor: 'transparent',
-      touchAction: 'manipulation',
-      boxShadow: ARCADE_PRIMARY_SHADOW
     },
 
     btnSecondary: {
@@ -646,15 +623,17 @@ export function WizardShell({
         </div>
         <div style={styles.footer}>
           <div className="mode-wizard-step-track" aria-hidden="true">{categories.map((item, i) => <i key={item.key} data-reached={i <= active} />)}</div>
+          {/* The one way forward is a piece of the cube in the mode's face colour, like the menu's keys. */}
           <button
             type="button"
-            style={styles.btnPrimary}
+            style={{ '--piece-color': modeVars['--arcade-accent'], marginBottom: 6 }}
             onClick={() => { wormMenuFeedback(); onPrimary(); }}
-            className="mode-wizard-primary"
-            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.06)'; }}
-            onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
+            className="mode-wizard-primary piece piece--bar piece--glint"
           >
-            {last ? finishLabel : (cat.primaryLabel || 'Next')} <span aria-hidden="true">→</span>
+            <span className="piece-face">
+              <span className="piece-trailer">{last ? finishLabel : (cat.primaryLabel || 'Next')}</span>{' '}
+              <b className="piece-trailer" aria-hidden="true">→</b>
+            </span>
           </button>
 
           {secondary && (

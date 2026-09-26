@@ -1,0 +1,137 @@
+/* pathSelect.css — the "pick a path" pages (WORM: Levels / Free Play; Flip
+ * Cube: Flip Cube / Chaos) in the menu's look: full-screen cream graph paper,
+ * the WORM³ wordmark, a Bungee title and one cube-piece card per path
+ * (ui/pieceKey.css). Imported by those lazy screens only.
+ *
+ * The WORM page still carries its older class names (worm-path-*, which tests
+ * and wormStory.css use), and some of those legacy rules are !important or
+ * three classes deep, so rules that must win repeat the root class. */
+
+.path-select {
+  position: fixed;
+  inset: 0;
+  display: block;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background-color: var(--arcade-paper, #f8f4e8);
+  background-image: linear-gradient(#cfcdbf66 1px, transparent 1px), linear-gradient(90deg, #cfcdbf66 1px, transparent 1px);
+  background-size: 30px 30px;
+  color: #26372d;
+}
+.path-select-page {
+  box-sizing: border-box;
+  width: min(100%, 880px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2.6vh, 24px);
+}
+.path-select-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.path-select-spacer { width: 48px; flex: none; }
+.path-select-brand { flex: 1; display: flex; justify-content: center; min-width: 0; }
+.path-select-brand > .worm-wordmark { font-size: clamp(34px, 9vw, 52px); }
+.path-select.path-select .path-select-title {
+  margin: 0;
+  text-align: center;
+  font: 400 clamp(24px, 6.4vw, 40px)/1.05 var(--display-font, 'Bungee', sans-serif);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #26372d;
+}
+
+/* One sticker card per path: stacked on phones, side by side from tablet width. */
+.path-select.path-select .path-select-cards { display: grid; grid-template-columns: 1fr; gap: 20px; width: 100%; margin: 0; }
+@media (min-width: 720px) {
+  .path-select.path-select .path-select-cards { grid-template-columns: 1fr 1fr; }
+}
+.path-select.path-select .path-select-card {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 5px;
+  border: 0 !important;
+  border-radius: 22px;
+  background: var(--piece-bezel);
+  box-shadow: 0 6px 0 var(--piece-ledge), 0 14px 26px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #10231a;
+  text-align: left;
+  transform: none;
+}
+.path-select.path-select .path-select-card:enabled:active {
+  translate: 0 4px;
+  box-shadow: 0 2px 0 var(--piece-ledge), 0 6px 12px rgba(0, 0, 0, 0.24);
+}
+.path-select .path-select-card > .piece-face { padding: 14px 16px; gap: 14px; border-radius: 17px; }
+
+/* The illustration sits in an ivory window on the sticker. */
+.path-select-art {
+  flex: none;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: clamp(92px, 26vw, 128px);
+  height: clamp(92px, 26vw, 128px);
+  padding: 6px;
+  border-radius: 14px;
+  background: #fffdf2d9;
+  box-shadow: inset 0 0 0 2px #26372d33;
+}
+.path-select .path-select-art > * { width: 100%; height: 100%; max-height: none; margin: 0; }
+.path-select.path-select .path-select-art > .mode-artwork { color: #26372d; }
+@media (min-width: 720px) {
+  .path-select .path-select-card > .piece-face { flex-direction: column; align-items: stretch; padding: 16px; }
+  .path-select-art { width: 100%; height: clamp(120px, 22vh, 190px); }
+}
+
+.path-select-copy { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.path-select.path-select .path-select-cta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  background: none;
+  box-shadow: none;
+  color: #fff;
+  font: 400 clamp(22px, 6vw, 30px)/1 var(--display-font, 'Bungee', sans-serif);
+}
+.path-select.path-select .path-select-cta b { color: #fff; font: 900 clamp(24px, 6vw, 30px)/1 var(--heading-font, system-ui); }
+.path-select-note { font: 800 clamp(14px, 3.6vw, 16px)/1.25 var(--heading-font, system-ui); color: #10231a; }
+.path-select-meta { display: flex; flex-wrap: wrap; gap: 6px; font: 700 12px/1.2 var(--heading-font, system-ui); color: #10231a; }
+.path-select-meta > span { padding: 5px 9px; border-radius: 999px; background: #fffdf2d9; box-shadow: inset 0 0 0 1.5px #26372d40; }
+
+/* WORM's profile on a white sticker in a black bezel, like the cards. */
+.path-select.path-select .worm-profile {
+  border: 5px solid #19191c !important;
+  border-radius: 22px;
+  background: #fffdf2;
+  color: #26372d;
+  box-shadow: 0 6px 0 #050506, 0 14px 26px rgba(0, 0, 0, 0.2), inset 0 2px 1px #fff;
+}
+
+/* WORM's Levels page header and play key, in the same pieces. */
+.worm-entry.worm-levels .worm-entry-nav { padding: 10px 16px; justify-content: flex-start; gap: 14px; }
+.worm-entry.worm-levels .worm-entry-nav > span:last-child { display: inline-flex; font-size: 28px; }
+.worm-entry.worm-levels .worm-entry-nav .piece-icon { min-height: 48px; padding: 0; color: #354d3c; background: #fffcf1; }
+.worm-entry.worm-levels .worm-story-primary.piece {
+  min-height: 68px;
+  padding: 5px;
+  border: 0 !important;
+  border-radius: 20px;
+  background: var(--piece-bezel);
+  box-shadow: 0 6px 0 var(--piece-ledge), 0 14px 26px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.worm-entry.worm-levels .worm-story-primary.piece:enabled:active {
+  transform: none;
+  translate: 0 4px;
+  box-shadow: 0 2px 0 var(--piece-ledge), 0 6px 12px rgba(0, 0, 0, 0.28);
+}
