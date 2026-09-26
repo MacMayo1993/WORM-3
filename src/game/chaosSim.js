@@ -416,7 +416,15 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
           if (infectedNeighbor && !(infectedNeighbor.x === x && infectedNeighbor.y === y && infectedNeighbor.z === z)) {
             const from = getStickerWorldPos(infectedNeighbor.x, infectedNeighbor.y, infectedNeighbor.z, infectedNeighbor.dirKey, size, explosion);
             const to = getStickerWorldPos(x, y, z, dirKey, size, explosion);
-            cascades.push({ from, to, crossFace: infectedNeighbor.dirKey !== dirKey });
+            cascades.push({
+              from,
+              to,
+              crossFace: infectedNeighbor.dirKey !== dirKey,
+              // Which tiles, not just where they were: the renderer re-resolves
+              // these against the live cubies so a bolt follows a rising piece.
+              fromTile: [infectedNeighbor.x, infectedNeighbor.y, infectedNeighbor.z, infectedNeighbor.dirKey],
+              toTile: [x, y, z, dirKey],
+            });
           }
         }
       }
@@ -556,7 +564,13 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
           if (!sameCubie && cascades.length < 3) {
             const from = getStickerWorldPos(current.x, current.y, current.z, current.dirKey, size, explosion);
             const to = getStickerWorldPos(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, size, explosion);
-            cascades.push({ from, to, crossFace: neighbor.crossFace });
+            cascades.push({
+              from,
+              to,
+              crossFace: neighbor.crossFace,
+              fromTile: [current.x, current.y, current.z, current.dirKey],
+              toTile: [neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey],
+            });
             opsEmitted++;
           }
           chain.tile = { x: neighbor.x, y: neighbor.y, z: neighbor.z, dirKey: neighbor.dirKey };

@@ -14,7 +14,7 @@ import VoidCore from './VoidCore.jsx';
 import CursorHighlight from '../components/overlays/CursorHighlight.jsx';
 import SolveHighlight from '../components/overlays/SolveHighlight.jsx';
 import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
-import ChaosWave from '../manifold/ChaosWave.jsx';
+import ChaosStorm from '../manifold/ChaosStorm.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
@@ -93,7 +93,6 @@ const CubeAssembly = React.memo(({
   // ── State from store (batched with useShallow to reduce subscription count) ──
   const {
     explosionFactor,
-    cascades,
     cursor,
     showCursor,
     flipMode,
@@ -104,13 +103,14 @@ const CubeAssembly = React.memo(({
     isBiomeMode,
     rotationEpoch,
     settings,
-    _chaosLevel,
+    chaosLevel,
     cameraOrbitRequest,
     cameraOrbitDir,
   } = useGameStore(
     useShallow(s => ({
       explosionFactor: s.explosionT,
-      cascades: s.cascades,
+      // Chaos bolts are NOT subscribed here: ChaosStorm reads them from its own
+      // render-only channel, so a bolt no longer re-renders the whole assembly.
       cursor: s.cursor,
       showCursor: s.showCursor,
       flipMode: s.flipMode,
@@ -123,7 +123,7 @@ const CubeAssembly = React.memo(({
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
-      _chaosLevel: s.chaosLevel,
+      chaosLevel: s.chaosLevel,
       cameraOrbitRequest: s.cameraOrbitRequest,
       cameraOrbitDir: s.cameraOrbitDir,
     }))
@@ -1232,16 +1232,14 @@ const CubeAssembly = React.memo(({
               ))}
             </>
           )}
-          {!isBiomeMode && cascades.map(c =>
-            c?.from && c?.to ? (
-              <ChaosWave
-                key={c.id}
-                from={c.from}
-                to={c.to}
-                crossFace={c.crossFace}
-                onComplete={() => onCascadeComplete(c.id)}
-              />
-            ) : null
+          {/* Chaos lightning: bolts, wormhole surges and impacts, all aimed at
+              live cubies so they follow pieces that rise, spring and turn. */}
+          {!isBiomeMode && chaosLevel > 0 && (
+            <ChaosStorm
+              cubieRefs={cubieRefs.current}
+              size={size}
+              onCascadeComplete={onCascadeComplete}
+            />
           )}
           {flipWaveOrigins && flipWaveOrigins.length > 0 && (
             <FlipPropagationWave

@@ -288,6 +288,29 @@ const SFX = {
     burst(0.18, 0.5, 'highpass', 3000);
     sweep(320, 48, 0.42, 0.34, 'sawtooth');
   },
+  // ── Chaos lightning ─────────────────────────────────────────────────────────
+  // A bolt landing on a tile. Chaos lands several a second, so this is a dry,
+  // bright snap that sits under the flip's own sound rather than over it; the
+  // storm also enforces a minimum gap between zaps. Hotter tiles crack brighter.
+  chaosZap(heat = 0) {
+    const h = Math.min(6, Math.max(0, heat)) / 6;
+    burst(0.04, 0.1 + h * 0.06, 'highpass', 3600 + h * 1800);
+    sweep(1900 + h * 500, 520, 0.05, 0.05, 'square');
+  },
+
+  // A wormhole opening under chaos: the surge zips down the new tunnel.
+  chaosSurge() {
+    sweep(260, 980, 0.16, 0.09, 'sawtooth');
+    burst(0.12, 0.05, 'bandpass', 2600, 2);
+  },
+
+  // A pair blown over its cap by the storm — a heavy arc-flash, then the drop.
+  chaosOverload() {
+    burst(0.2, 0.32, 'highpass', 2400);
+    sweep(900, 55, 0.4, 0.24, 'sawtooth');
+    burst(0.3, 0.18, 'lowpass', 260);
+  },
+
   // The touch tray's keys. Dry and short — the sound of a switch bottoming out,
   // not an event in the game. It fires on every press, so it has to sit under the
   // game's own vocabulary rather than compete with it.
@@ -398,6 +421,9 @@ const HAPTICS = {
   // Grows with the flip count, mirroring the pitch climb.
   tunnelPulse: (flips = 0) => 10 + Math.min(flips, 6) * 4, // 10 → 34ms
   tunnelSnap: [0, 60, 35, 90],
+  // Chaos zaps and surges ride on the flip's own haptic, which already fires for
+  // every chaos flip; only the overload earns a pattern of its own.
+  chaosOverload: [0, 45, 30, 70],
   // Short enough to read as the key itself rather than as something happening.
   uiKey: 10,
   storyTask: [10, 35, 15],

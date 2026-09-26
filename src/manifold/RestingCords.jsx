@@ -6,6 +6,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
+import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 
 /**
  * RestingCords — the whole wormhole network as ONE draw call.
@@ -89,6 +90,7 @@ const _midA      = new THREE.Vector3();
 const _midB      = new THREE.Vector3();
 const _colorA    = new THREE.Color();
 const _colorB    = new THREE.Color();
+const _charge    = { active: false, front: 0, glow: 0, arrived: false };
 // Half-space pair keeping each cord behind the two stickers it hangs off.
 const _tileGuard = makeTileGuard();
 
@@ -99,17 +101,23 @@ const vertexShader = `
   attribute float aWidth;     // world-space strip width for this vertex
   attribute vec3  aColor;
   attribute float aHeat;      // flips / effective flip cap
+  attribute float aCharge;    // chaos surge brightness; sign = which end it entered
+  attribute float aFront;     // how far the surge has run, 0 → 1 from its entry end
 
   varying float vSide;
   varying float vT;
   varying vec3  vColor;
   varying float vHeat;
+  varying float vCharge;
+  varying float vFront;
 
   void main() {
-    vSide  = aSide;
-    vT     = aT;
-    vColor = aColor;
-    vHeat  = aHeat;
+    vSide   = aSide;
+    vT      = aT;
+    vColor  = aColor;
+    vHeat   = aHeat;
+    vCharge = aCharge;
+    vFront  = aFront;
 
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
 
@@ -136,8 +144,14 @@ const fragmentShader = `
   varying float vT;
   varying vec3  vColor;
   varying float vHeat;
+  varying float vCharge;
+  varying float vFront;
 
   void main() {
+    // A chaos surge running through this cord. It crosses the core intact —
+    // the crossing is the point of the surge — so it relaxes the core fade.
+    float glow = abs(vCharge);
+
     // Fade out before the core. This is what kills the starburst: the middle
     // ~30% of every resting cord is never rasterised, so the one point all 27
     // strands share stops accumulating alpha.
@@ -146,7 +160,7 @@ const fragmentShader = `
     // prevent, and the crossing is the whole point of the mechanic — so the
     // cord is drawn intact and only starts hollowing out as the network fills.
     float d       = abs(vT - 0.5);
-    float midFade = mix(1.0, smoothstep(0.14, 0.34, d), uMidFade);
+    float midFade = mix(1.0, smoothstep(0.14, 0.34, d), uMidFade * (1.0 - glow));
     if (midFade <= 0.001) discard;
 
     // Soft edges across the width so a thin cord reads as a filament rather
@@ -176,6 +190,19 @@ const fragmentShader = `
     col *= intensity;
 
     float alpha = (0.42 + vHeat * 0.38) * midFade * edgeFade * uOpacity;
+
+    // Electrified span: everything behind the surge front crackles blue-white,
+    // and the front itself burns white as it travels tile → core → twin.
+    if (glow > 0.001) {
+      float along   = vCharge > 0.0 ? vT : 1.0 - vT;
+      float lit     = 1.0 - smoothstep(vFront - 0.03, vFront + 0.03, along);
+      float head    = exp(-pow((along - vFront) / 0.07, 2.0));
+      float arc     = 0.62 + 0.38 * sin(uTime * 57.0 + vT * 93.0 + vSide * 3.0);
+      vec3  electric = mix(vec3(0.42, 0.78, 1.0), vec3(1.0), head);
+      float amount  = glow * max(lit * arc * 0.85, head);
+      col   = mix(col, electric * 1.7, clamp(amount, 0.0, 1.0));
+      alpha = max(alpha, glow * (lit * 0.7 * arc + head) * edgeFade * uOpacity);
+    }
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -199,6 +226,8 @@ function createCordGeometry(maxStrands) {
   geo.setAttribute('aT',       new THREE.BufferAttribute(new Float32Array(vertCount),     1));
   geo.setAttribute('aWidth',   new THREE.BufferAttribute(new Float32Array(vertCount),     1));
   geo.setAttribute('aHeat',    new THREE.BufferAttribute(new Float32Array(vertCount),     1));
+  geo.setAttribute('aCharge',  new THREE.BufferAttribute(new Float32Array(vertCount),     1));
+  geo.setAttribute('aFront',   new THREE.BufferAttribute(new Float32Array(vertCount),     1));
 
   const indices = new Uint32Array(maxStrands * INDICES_PER_STRAND);
   let w = 0;
@@ -223,8 +252,8 @@ function createCordGeometry(maxStrands) {
  * midB → endPos (second arm), with the same TAPER_MIN narrowing toward the
  * core. Tangents are piecewise constant, so each arm needs one normalize.
  */
-function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0) {
-  const { pos, tan, col, side, tt, wid, heatArr } = attrs;
+function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0, charge = 0, front = 0) {
+  const { pos, tan, col, side, tt, wid, heatArr, chargeArr, frontArr } = attrs;
   const halfSegs = CORD_SEGS / 2;
   const base = slot * VERTS_PER_STRAND;
 
@@ -239,6 +268,11 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA
     // Swell at whichever end is mid-flip, so the cord pulses with the tile
     // rather than only being dragged around by it.
     let w       = width * taper * flipWidthPulse(t, flipP1, flipP2);
+    // A charged cord swells with the surge, most where the front is right now.
+    if (charge !== 0) {
+      const along = charge > 0 ? t : 1 - t;
+      w *= 1 + Math.abs(charge) * (0.35 + 0.9 * Math.exp(-(((along - front) / 0.1) ** 2)));
+    }
 
     let cx, cy, cz, nx, ny, nz;
     if (i <= halfSegs) {
@@ -276,6 +310,8 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA
       tt[vi]      = t;
       wid[vi]     = w;
       heatArr[vi] = heat;
+      chargeArr[vi] = charge;
+      frontArr[vi]  = front;
     }
   }
 }
@@ -299,7 +335,12 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
     tt:      geo.attributes.aT.array,
     wid:     geo.attributes.aWidth.array,
     heatArr: geo.attributes.aHeat.array,
+    chargeArr: geo.attributes.aCharge.array,
+    frontArr: geo.attributes.aFront.array,
   }), [geo]);
+  // Last surge value written per slot, so a cord is rewritten on the frame its
+  // charge ends as well as while it runs.
+  const chargeCacheRef = useRef(new Float32Array(maxStrands));
 
   const uniforms = useMemo(() => ({
     uTime:    { value: 0 },
@@ -328,6 +369,9 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
     const cache = lastEndpointsRef.current;
     let moved = forceRebuildRef.current;
     let slot  = 0;
+    const nowMs = tunnelCharges.size ? performance.now() : 0;
+    if (chargeCacheRef.current.length < maxStrands) chargeCacheRef.current = new Float32Array(maxStrands);
+    const chargeCache = chargeCacheRef.current;
 
     for (let i = 0; i < tunnels.length && slot < maxStrands; i++) {
       const t = tunnels[i];
@@ -357,6 +401,19 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
       const flipP2 = applyTileFlipMotion(_vEnd, _faceNorm2, t.gridId2);
       if (flipP1 > 0 || flipP2 > 0) moved = true;
 
+      // Chaos surge through this pair (ChaosStorm owns the clock). The sign says
+      // which end it entered by: + from this cord's first tile, − from its twin.
+      let charge = 0;
+      let front = 0;
+      const surge = nowMs ? tunnelCharges.get(t.pairId) : undefined;
+      if (surge && tunnelChargeState(surge, nowMs, _charge).active) {
+        charge = _charge.glow * (surge.fromGridId === t.gridId2 ? -1 : 1);
+        front = _charge.front;
+        if (charge === 0) charge = 1e-4;
+      }
+      if (charge !== 0 || chargeCache[slot] !== 0) moved = true;
+      chargeCache[slot] = charge;
+
       // Dock on the mini-cube face in LOCAL colour direction, matching the ribbon.
       _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
       _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
@@ -381,7 +438,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
         _colorB.set(t.color2);
         // Anchors after flip motion, so a shaking tile carries its guard plane.
         setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
-        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, _colorA, _colorB, heat, _tileGuard, flipP1, flipP2);
+        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, _colorA, _colorB, heat, _tileGuard, flipP1, flipP2, charge, front);
       }
       slot++;
     }
@@ -394,6 +451,8 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
       geo.attributes.aT.needsUpdate       = true;
       geo.attributes.aWidth.needsUpdate   = true;
       geo.attributes.aHeat.needsUpdate    = true;
+      geo.attributes.aCharge.needsUpdate  = true;
+      geo.attributes.aFront.needsUpdate   = true;
       forceRebuildRef.current = false;
     }
 

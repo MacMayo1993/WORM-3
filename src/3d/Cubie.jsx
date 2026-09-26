@@ -3,6 +3,7 @@ import { useRaisedCubieSpring } from './raisedCubieContext.js';
 import { cubieHasFlippedFace, selectiveCubieOffsetRatio } from '../game/raisedCubie.js';
 import { advancePadSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
+import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef, useEffect, useState, useImperativeHandle } from 'react';
@@ -421,7 +422,9 @@ const Cubie = React.forwardRef(function Cubie({
 
   useFrame((_state, delta) => {
     const spring = liftSpring.current;
-    if (!_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0) return;
+    // Chaos lightning jolts: an empty map costs one size check per idle cubie.
+    const kick = cubieKicks.size ? cubieKicks.get(popKey) : undefined;
+    if (!kick && !_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0) return;
     if (!popGroupRef.current || !pieceRef.current) return;
     const state = useGameStore.getState();
     const reduced = wormPads || settings?.reducedMotion || prefersReducedMotion();
@@ -437,7 +440,20 @@ const Cubie = React.forwardRef(function Cubie({
     // Preserve the original impact hop, but do not add a second full explosion.
     const distance = Math.max(center.length() * ratio, impact);
     popGroupRef.current.position.copy(center).normalize().multiplyScalar(distance);
-    poppedRef.current = distance > 0 || spring.lift !== 0;
+    if (kick) {
+      // The strike punches the whole piece in along the struck face's normal and
+      // lets it rebound — on top of the lift, so a raised piece takes the hit too.
+      const elapsed = performance.now() - kick.startMs;
+      if (elapsed >= KICK_DURATION_MS) {
+        if (cubieKicks.get(popKey) === kick) cubieKicks.delete(popKey);
+      } else {
+        const k = cubieKickAmount(elapsed, kick.amp);
+        popGroupRef.current.position.x += kick.x * k;
+        popGroupRef.current.position.y += kick.y * k;
+        popGroupRef.current.position.z += kick.z * k;
+      }
+    }
+    poppedRef.current = distance > 0 || spring.lift !== 0 || !!kick;
     if (!raised && spring.lift === 0 && returningBody) setReturningBody(false);
   }, -0.75); // after CubeAssembly (-1), before pad stalks (-0.5) and tunnel anchors
 

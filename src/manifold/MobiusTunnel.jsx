@@ -14,6 +14,7 @@ import {
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
+import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 
 // Opacity multiplier when the worm is traversing a different tunnel.
 // While a traversal is underway, tunnels the worm is NOT in recede to this
@@ -69,6 +70,7 @@ const _tileGuard     = makeTileGuard();
 // The shared centerline this tunnel's band is swept along. One per module is enough:
 // every rebuild fills it and consumes it synchronously inside the same useFrame.
 const _tunnelPath    = makeTunnelPath();
+const _surge         = { active: false, front: 0, glow: 0, arrived: false };
 
 // Vertex shader: pass UV + world position through to fragment.
 // vWorldPos feeds the fresnel silhouette glow (needs a view direction).
@@ -710,6 +712,25 @@ const MobiusTunnel = ({
     } else {
       uniforms.uPulseBoost.value = 0;
       uniforms.uSolitonAmp.value = 0;
+    }
+
+    // Chaos surge (ChaosStorm owns the clock): the same soliton, run from
+    // whichever tile the storm struck, with the ribbon crackling bright and
+    // snapping as the charge passes through its twist.
+    const surge = tunnelId && tunnelCharges.size ? tunnelCharges.get(tunnelId) : undefined;
+    if (surge) {
+      const nowMs = performance.now();
+      if (tunnelChargeState(surge, nowMs, _surge).active) {
+        const env = _surge.glow;
+        uniforms.uSolitonProgress.value = surge.fromGridId === gridId2 ? 1 - _surge.front : _surge.front;
+        uniforms.uSolitonAmp.value = Math.max(uniforms.uSolitonAmp.value, env);
+        uniforms.uPulseBoost.value = Math.max(uniforms.uPulseBoost.value, env * (0.75 + 0.25 * Math.sin(nowMs * 0.06)));
+        const surgeWhip = env * env * 0.12;
+        if (surgeWhip > whipAmp) {
+          whipAmp = surgeWhip;
+          whipPhase = _surge.front * 22.0;
+        }
+      }
     }
 
     const pad = padMotion.get(tunnelId);
