@@ -14,6 +14,7 @@ import { makeCombat, stepCombat, combatBridge } from './combat/portalCombat.js';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import { stageWormPractice, readWormPractice } from './healerWorm/demoPractice.js';
 import { tunnelReadout } from './healerWorm/tunnelReadout.js';
+import { tunnelEntryRule } from './healerWorm/padEntry.js';
 import { signatureReadout } from './healerWorm/signatures.js';
 import { liveRotation } from './liveRotation.js';
 // src/worm/useWormCrawler.js
@@ -192,7 +193,7 @@ export function useWormCrawler(size, cubies) {
             // ── reads ───────────────────────────────────────────────────────────
             getCubies: () => useGameStore.getState().cubies,
             getFlipCap: () => selectEffectiveFlipCap(useGameStore.getState()),
-            getTunnelEntry: () => useGameStore.getState().demoMode ? 'crawl' : 'pad',
+            getTunnelEntry: () => tunnelEntryRule(useGameStore.getState()),
             getGamePhase: () => useGameStore.getState().wormGamePhase,
             isDemoLesson: () => { const s = useGameStore.getState(); return s.demoMode && s.demoStep === 'worm-traversal'; },
             isCombatMode: () => useGameStore.getState().wormCombatMode,

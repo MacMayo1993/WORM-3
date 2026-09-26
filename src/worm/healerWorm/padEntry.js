@@ -11,3 +11,8 @@ export function padEntryDecision({ rule = 'crawl', event = 'crawl', flipped = fa
   if (!allowDive) return 'pass';
   return rule === 'pad' && event === 'crawl' ? 'pass' : 'ride';
 }
+
+// Which entry rule a WORM run uses. Demo lessons keep the legacy crawl route;
+// every other run rides by jumping onto raised pads. The sim and any copy that
+// describes the route read this one definition, so they cannot disagree.
+export const tunnelEntryRule = state => (state?.demoMode ? 'crawl' : 'pad');

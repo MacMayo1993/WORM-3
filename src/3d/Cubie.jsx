@@ -1,7 +1,7 @@
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
-import { cubieHasFlippedFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT } from '../game/raisedCubie.js';
-import { advancePadSpring } from './padPose.js';
+import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount } from '../game/raisedCubie.js';
+import { advancePieceSpring } from './padPose.js';
 import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
 import { prefersReducedMotion } from '../utils/device.js';
@@ -429,8 +429,10 @@ const Cubie = React.forwardRef(function Cubie({
     const state = useGameStore.getState();
     const reduced = wormPads || settings?.reducedMotion || prefersReducedMotion();
     if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
-    else advancePadSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
-    const amount = Math.max(0, Math.min(1, spring.lift)) * (wormPads ? WORM_RAISED_AMOUNT : 1);
+    else advancePieceSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
+    // Overshoot on the way out is the bounce. Below zero the piece would sink into
+    // its neighbours, so a returning piece lands and holds instead.
+    const amount = Math.max(0, spring.lift) * (wormPads ? wormRaisedAmount(size) : 1);
     publishRaisedCubie(spring, amount);
     const entry = state.cubiePops[popKey];
     const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;

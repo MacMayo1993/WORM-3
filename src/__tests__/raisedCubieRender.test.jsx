@@ -7,6 +7,7 @@ import { PadProvider } from '../3d/PadSprings.jsx';
 import { makeCubies } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { raisedCubieExtent } from '../3d/raisedCubieMotion.js';
+import { WORM_PIECE_POP, wormRaisedAmount } from '../game/raisedCubie.js';
 
 // Mark every face so the assertions inspect actual descendant world positions.
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: ({ currentDir, pos }) => <group name={currentDir} position={pos} /> }));
@@ -48,11 +49,12 @@ it('carries the body and unflipped faces to the Explode position, follows turns,
     store.getState().advance(3 / 60);
     expect(raised.current.parent.position.length()).toBe(0);
     expect(raisedCubieExtent()).toBe(0);
-    // WORM also raises the entire piece, even with cosmetic pads switched off.
+    // WORM pops the piece out barely, whatever the cosmetic settings: a corner
+    // moves WORM_PIECE_POP along each axis, so the worm can still reach its pad.
     await act(async () => { useGameStore.setState({ mirrorMode: true, settings: { ...useGameStore.getState().settings, flipPads: 'off' } }); root.render(draw(1, true)); });
     store.getState().advance(4 / 60);
-    expect(raised.current.parent.position.length()).toBeCloseTo(Math.sqrt(3) * 0.9);
-    expect(raisedCubieExtent()).toBe(0.5);
+    expect(raised.current.parent.position.length()).toBeCloseTo(Math.sqrt(3) * WORM_PIECE_POP, 10);
+    expect(raisedCubieExtent()).toBeCloseTo(wormRaisedAmount(3), 10);
     await act(async () => { useGameStore.setState({ mirrorMode: false }); root.render(draw(0)); });
     store.getState().advance(4.5 / 60);
     // Slot components survive a committed rotation; the physical piece's spring

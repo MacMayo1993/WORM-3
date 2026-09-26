@@ -1,4 +1,5 @@
 import { tunnelDanger } from './healerWorm/tunnelReadout.js';
+import { tunnelEntryRule } from './healerWorm/padEntry.js';
 import { WORMHOLE_MAX_TRAVERSALS } from './healerWorm/constants.js';
 import { useEffect, useState } from 'react';
 import { wormBuffs } from './wormBuffs.js';
@@ -9,16 +10,21 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
   const [need, setNeed] = useState(wormBuffs.tunnelNeeds);
   const alive = useGameStore(s => s.wormAlive);
   const phase = useGameStore(s => s.wormGamePhase);
+  // Jump-to-ride runs only enter a tunnel by landing on its pad, so crawling
+  // under a fatal one is safe; demo lessons still enter by crawling in.
+  const padRoute = useGameStore(s => tunnelEntryRule(s) === 'pad');
   useEffect(() => {
     const id = setInterval(() => setNeed(wormBuffs.tunnelNeeds), 100);
     return () => clearInterval(id);
   }, []);
   if (!need || !alive || !['active', 'finalHealing'].includes(phase)) return null;
   const danger = tunnelDanger(need);
-  const warning = danger === 'collapsing' ? 'Tunnel collapsing' : danger === 'collapsed' ? 'Collapsed · do not enter' : 'Fatal tunnel · turn away';
+  const warning = danger === 'collapsing' ? 'Tunnel collapsing'
+    : padRoute ? (danger === 'collapsed' ? "Collapsed · don't jump on it" : "Fatal pad · don't jump on it")
+    : danger === 'collapsed' ? 'Collapsed · do not enter' : 'Fatal tunnel · turn away';
   const title = danger ? warning : need.ready ? (need.inTransit ? 'Heals when you exit' : 'Ready to heal') : `Collect ${need.pickupsNeeded} more ${need.pickupsNeeded === 1 ? 'orb' : 'orbs'}`;
   const location = need.inTransit ? 'This tunnel' : need.distance === 0 ? 'Tunnel here' : need.aroundCorner ? 'Around the corner' : 'Tunnel ahead';
-  const caption = danger ? (danger === 'collapsing' ? 'Traversal limit exceeded · collapse ahead' : 'Entering this tunnel will kill you · take another route') : need.locked ? `Re-entry in ${need.lockSeconds}s · heal before creating another` : need.uses >= WORMHOLE_MAX_TRAVERSALS ? 'Final safe trip · do not re-enter without healing' : need.ready ? (need.inTransit ? 'Let your tail clear the exit' : 'Enter to spend your carried orbs') : need.isPrism ? 'Any color counts · carried orbs included' : need.saved > 0 ? 'Progress saved · match this color' : 'Match this color · carried orbs included';
+  const caption = danger ? (danger === 'collapsing' ? 'Traversal limit exceeded · collapse ahead' : padRoute ? 'Landing on it kills you · crawl under instead' : 'Entering this tunnel will kill you · take another route') : need.locked ? `Re-entry in ${need.lockSeconds}s · heal before creating another` : need.uses >= WORMHOLE_MAX_TRAVERSALS ? 'Final safe trip · do not re-enter without healing' : need.ready ? (need.inTransit ? 'Let your tail clear the exit' : padRoute ? 'Jump on to spend your carried orbs' : 'Enter to spend your carried orbs') : need.isPrism ? 'Any color counts · carried orbs included' : need.saved > 0 ? 'Progress saved · match this color' : 'Match this color · carried orbs included';
   const funded = need.ready && !danger;
   const passes = Math.max(0, WORMHOLE_MAX_TRAVERSALS - (need.uses ?? 0));
   const safety = danger ? warning : need.locked ? `Locked ${need.lockSeconds}s` : need.inTransit
@@ -31,7 +37,7 @@ export default function TunnelNeedsCard({ compact = false, onInspect }) {
     data-heal-ready={funded} data-tunnel-danger={!!danger} aria-label={`${safety}. ${danger ? caption : healing}. Pause for details.`} aria-haspopup="dialog">
     <span className="worm-tunnel-safety-symbol" aria-hidden="true">{danger ? '⊘' : need.locked ? '—' : '✓'}</span>
     <span className="worm-tunnel-safety-copy"><strong>{safety}</strong>
-      <small>{danger ? (need.inTransit ? 'Collapse ahead' : 'Choose another route') : healing}</small>
+      <small>{danger ? (need.inTransit ? 'Collapse ahead' : padRoute ? 'Crawl under it' : 'Choose another route') : healing}</small>
     </span>
   </button>;
   return <aside className="worm-tunnel-needs" data-heal-ready={funded} data-tunnel-danger={!!danger} aria-label="Tunnel healing requirements" style={{ color: GAME_HUD.text, background: funded ? 'rgba(22,65,39,0.94)' : 'rgba(76,27,32,0.94)', border: `1px solid ${funded ? '#8ee5a6' : '#f08d91'}`, borderRadius: 16, padding: '8px 10px', width: '100%', boxSizing: 'border-box', pointerEvents: 'none', boxShadow: '0 6px 20px #0005' }}>

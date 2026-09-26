@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { raisedPortalPosition } from '../raisedPortalPosition.js';
 import { isParityLocked } from './signatures.js';
 import { WORMHOLE_MAX_TRAVERSALS } from './constants.js';
+import { nearSignScale } from './tunnelReadout.js';
 
 // Texture signs remain readable without bloom, particles, color vision or motion.
 // Six batched draws for the whole board, with ordinary depth testing: far-side
@@ -77,8 +78,10 @@ export default function TunnelSafetyMarkers({ positions, size, worm, cubies, voi
       const mesh = meshes.current[index];
       if (!mesh) continue;
       dummy.position.set(...wp).addScaledVector(n, 1.05);
+      const scale = nearSignScale(cameraPosition.distanceTo(dummy.position));
+      if (scale < 0.02) continue;
       dummy.quaternion.copy(cameraQuaternion);
-      dummy.scale.set(1.05, 0.44, 1);
+      dummy.scale.set(1.05 * scale, 0.44 * scale, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(counts.current[index]++, dummy.matrix);
     }

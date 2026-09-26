@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { findRaisedPlatform } from './healerWorm/raisedPlatforms.js';
+import { selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 
 export function nearbyPlatform(worm, size, state) {
   if (!state.wormHealerMode || state.demoMode || worm.rocketActive?.current) return null;
   if (worm.padFlight?.current) return worm.padFlight.current.end.toArray();
   const aim = findRaisedPlatform(worm.pos.current, worm.moveDir.current, size,
-    { getCubies: () => state.cubies, getFlipCap: () => 6 }, worm.onRaisedPlatform?.current);
+    { getCubies: () => state.cubies, getFlipCap: () => selectEffectiveFlipCap(state) }, worm.onRaisedPlatform?.current);
   return aim?.destination.toArray() ?? null;
 }
 export function makePlatformFrame() {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { healingNeed, tunnelDanger } from '../worm/healerWorm/tunnelReadout.js';
+import { healingNeed, tunnelDanger, nearSignScale, SIGN_HIDE_DISTANCE, SIGN_FULL_DISTANCE } from '../worm/healerWorm/tunnelReadout.js';
 
 describe('tunnel requirement units', () => {
   it('reports two pickups for four missing segments', () => {
@@ -28,4 +28,20 @@ it('distinguishes the third safe trip from fatal re-entry, even when heal-ready'
   expect(tunnelDanger({ uses: 4, inTransit: true, collapsing: true })).toBe('collapsing');
   expect(tunnelDanger({ uses: 3, locked: true })).toBeNull();
   expect(tunnelDanger({ voided: true, ready: true })).toBe('collapsed');
+});
+
+it('shrinks a tunnel sign away as the camera nears it, and keeps far signs whole', () => {
+  expect(nearSignScale(0)).toBe(0);
+  expect(nearSignScale(SIGN_HIDE_DISTANCE)).toBe(0);
+  expect(nearSignScale(SIGN_FULL_DISTANCE)).toBe(1);
+  expect(nearSignScale(40)).toBe(1);
+  let last = 0;
+  for (let d = SIGN_HIDE_DISTANCE; d <= SIGN_FULL_DISTANCE; d += 0.05) {
+    const s = nearSignScale(d);
+    expect(s).toBeGreaterThanOrEqual(last);
+    last = s;
+  }
+  // The pad one tile ahead of the default chase camera (about 3.4 units away)
+  // gets a small sign; its HUD card carries the full readout.
+  expect(nearSignScale(3.4)).toBeLessThan(0.3);
 });
