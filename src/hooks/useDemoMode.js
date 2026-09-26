@@ -78,6 +78,7 @@ export function useDemoMode({
   const cubies = useGameStore((s) => s.cubies);
   const size = useGameStore((s) => s.size);
   const victory = useGameStore((s) => s.victory);
+  const disparityWinner = useGameStore((s) => s.disparityWinner);
 
   const [demoColdOpenVisible, setDemoColdOpenVisible] = useState(false);
   const [demoStepIntroVisible, setDemoStepIntroVisible] = useState(false);
@@ -89,6 +90,10 @@ export function useDemoMode({
   const [demoCelebrationStep, setDemoCelebrationStep] = useState(null);
   const [demoLaunchStep, setDemoLaunchStep] = useState(null);
   const [demoRewardStamp, setDemoRewardStamp] = useState(null);
+  // Keep the gameplay chrome down from the authoritative result through the
+  // payout, even after clearDisparityGame removes the winner from the store.
+  const demoChaosComplete = demoMode && demoStep === 'chaos-forecast'
+    && (!!disparityWinner || !!demoRewardStamp);
   const [demoFlipProgress, setDemoFlipProgress] = useState(null);
   const [demoFlipSpotlight, setDemoFlipSpotlight] = useState(false);
   const [demoHintStep, setDemoHintStep] = useState(null);
@@ -861,7 +866,13 @@ export function useDemoMode({
     // Continue) from re-granting PP. The pending ref is the idempotency lock.
     if (demoRewardPendingRef.current) return;
     const store = useGameStore.getState();
+    if (!store.demoMode || store.demoStep !== 'chaos-forecast') return;
     demoRewardPendingRef.current = true;
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
+    setDemoHintStep(null);
+    setDemoCoachCopy(null);
+    closeNavSheet?.();
     setDemoForecastVisible(false);
     setDemoRewardStamp({ amount: reward, correct });
     store.earnCoins(reward);
@@ -875,7 +886,7 @@ export function useDemoMode({
       demoRewardPendingRef.current = false;
       advanceDemoStepRef.current?.('chaos-forecast');
     }, 2600));
-  }, [cancelDisparityRun]);
+  }, [cancelDisparityRun, clearDemoWatchTimers, closeNavSheet]);
 
   const handleDemoChaosSkip = useCallback(() => {
     finishChaosWithReward(50, false);
@@ -900,6 +911,20 @@ export function useDemoMode({
   }, [demoMode, demoStep, finishChaosWithReward]);
 
   // ── Effects ──────────────────────────────────────────────────────────────
+
+  // The round has ended before the worker's delayed results reveal. Retire
+  // the coach/skip timer and all live controls immediately; only Continue owns
+  // the result. Cancel pending launch/solve work without discarding the winner.
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'chaos-forecast' || !disparityWinner) return;
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
+    setDemoHintStep(null);
+    setDemoCoachCopy(null);
+    closeNavSheet?.();
+    useGameStore.getState().setAutoRotateEnabled(false);
+    cancelDisparityRun();
+  }, [demoMode, demoStep, disparityWinner, clearDemoWatchTimers, closeNavSheet, cancelDisparityRun]);
 
   // Suppress victory screen during demo — advancement is explicit.
   useEffect(() => {
@@ -1111,6 +1136,7 @@ export function useDemoMode({
     dismissDemoCelebration,
     demoLaunchStep,
     demoRewardStamp,
+    demoChaosComplete,
     demoFlipProgress,
     demoViewSpotlight,
     handleDemoViewSpotlightClick,
