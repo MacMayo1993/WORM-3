@@ -71,17 +71,17 @@
   .orb-slot-count { font-size: 11px; }
 }
 
-/* Arcade plastic (see ARCADE_* in uiTheme.js): 2px outlines, hard ledges, and
-   Flip as the cube mode's one primary key in the Cube face colour. */
+/* Arcade plastic (see ARCADE_* in uiTheme.js): 2px outlines and hard ledges.
+   Flip is white when off and yellow when on, regardless of game mode. */
 .top-app-bar.instrument-hud, .instrument-menu-panel, .bottom-nav-bar.instrument-dock { border-width: 2px; box-shadow: 0 5px 0 var(--hud-border), 0 10px 24px #26372d1f; }
 .instrument-hud .top-bar-title { font: 800 12px/1.2 var(--heading-font); letter-spacing: .06em; text-transform: uppercase; }
 .instrument-hud .top-bar-progress { font: 400 20px/1 var(--display-font); }
 .instrument-tag { padding: 4px 8px; border: 1px solid var(--hud-border); border-radius: 8px; background: var(--hud-raised); color: var(--hud-text); font: 800 10px/1.2 var(--heading-font); }
 .instrument-dock .instrument-key, .instrument-menu-panel > button { border: 2px solid var(--hud-border); border-radius: 16px; box-shadow: 0 4px 0 var(--hud-border), inset 0 2px 0 #fff; font-family: var(--heading-font); font-weight: 800; }
 .instrument-key .cube-tile-label { font: 800 10px/1.2 var(--heading-font); letter-spacing: .06em; text-transform: uppercase; }
-.instrument-dock .instrument-key-primary { border-color: var(--hud-ink); background: var(--mode-accent, #FFD500); color: var(--mode-accent-ink, #1a1410); box-shadow: 0 4px 0 var(--hud-ink), inset 0 2px 0 #ffffff80; }
+.instrument-dock .instrument-key-primary { border-color: var(--hud-ink); background: #ffffff; color: #1a1410; box-shadow: 0 4px 0 var(--hud-ink), inset 0 2px 0 #ffffff80; }
 .instrument-dock .instrument-key[aria-pressed="true"] { background: var(--hud-active); color: var(--hud-text); border-color: var(--hud-ink); box-shadow: 0 2px 0 var(--hud-ink); transform: translateY(2px); }
-.instrument-dock .instrument-key-primary[aria-pressed="true"] { background: var(--mode-accent, #FFD500); color: var(--mode-accent-ink, #1a1410); }
+.instrument-dock .instrument-key-primary[aria-pressed="true"] { background: #FFD500; color: #1a1410; }
 .instrument-dock .instrument-key:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--hud-border); }
 .orb-slot { border-width: 2px; background: var(--hud-raised); }
 .orb-sample { border-color: #26372d55; }

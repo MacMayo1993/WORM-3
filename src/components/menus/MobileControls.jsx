@@ -35,6 +35,9 @@ const activeSmallButtonStyle = {
   borderColor: 'rgba(96, 165, 250, 0.55)'
 };
 
+const flipOffButtonStyle = { ...smallButtonStyle, background: '#ffffff', color: '#1a1410' };
+const flipOnButtonStyle = { ...flipOffButtonStyle, background: '#FFD500' };
+
 const orbitButtonStyle = {
   ...smallButtonStyle,
   background: 'rgba(251, 191, 36, 0.15)',
@@ -277,8 +280,9 @@ const MobileControls = React.memo(({
             {/* Flip toggle */}
             <button
               onClick={onToggleFlip}
-              style={flipMode ? activeSmallButtonStyle : smallButtonStyle}
+              style={flipMode ? flipOnButtonStyle : flipOffButtonStyle}
               aria-label="Toggle flip mode"
+              aria-pressed={flipMode}
             >
               <span style={flipLabelStyle}>Flip</span>
             </button>
