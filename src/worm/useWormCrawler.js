@@ -256,7 +256,7 @@ export function useWormCrawler(size, cubies) {
                 // screen — clear both the live readout and the store transitions.
                 resetWormBuffs();
                 resetWormSegments();
-                useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null });
+                useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null, wormViewPower: null });
                 if (deathMenuTimer.current) {
                     clearTimeout(deathMenuTimer.current);
                     deathMenuTimer.current = null;
@@ -413,6 +413,10 @@ export function useWormCrawler(size, cubies) {
             // none), enough for the atmosphere overlay to mount/unmount and the HUD to
             // show a pill. The remaining seconds ride the wormBuffs bridge like the
             // magnet's, so the countdown freezes with the simulation.
+            onViewPower: (type, seconds) => {
+                wormBuffs.viewPowerT = seconds;
+                useGameStore.setState({ wormViewPower: type });
+            },
             onElementalTheme: (type, maxSeconds) => {
                 const state = useGameStore.getState();
                 state.recordWormXp('element', 0, type ?? null, state.wormRunId);
@@ -489,7 +493,7 @@ export function useWormCrawler(size, cubies) {
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
                 wormSessionOrbs: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
                 wormPhase: 'crawling', wormAlive: true, wormPaused: true, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
-                wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormSpecialNotice: null,
+                wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormViewPower: null, wormSpecialNotice: null,
                 wormBoostState: 'ready', wormOrbFlash: null, demoWormSteered: false, demoWormTarget: practice.target,
                 demoWormProgress: '', demoWormHazardCleared: null });
             return; // Let the shared tunnel snapshot observe the staged board first.
@@ -610,6 +614,7 @@ export function useWormCrawler(size, cubies) {
         wormBuffs.magnetT = sim.magnetT;
         wormBuffs.magnetMaxT = sim.magnetMaxT;
         wormBuffs.rocketActive = sim.rocketActive;
+        wormBuffs.viewPowerT = sim.viewPowerT;
         wormBuffs.elementalT = sim.elementalT;
         wormBuffs.elementalMaxT = sim.elementalMaxT;
         // Reference-copied, not cloned: the sim snapshots a fresh object per claim
@@ -665,7 +670,7 @@ export function useWormCrawler(size, cubies) {
             wormMagnetActive: false,
             wormMagnetSeq: 0,
             wormSpecialNotice: null,
-            wormElementalTheme: null,
+            wormElementalTheme: null, wormViewPower: null,
             wormOrbFlash: null,
             wormBodyTiles: 0,
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
@@ -699,7 +704,7 @@ export function useWormCrawler(size, cubies) {
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
-        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false });
+        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormViewPower: null, wormJumpRescueActive: false });
     }, []);
 
     // When a cube rotation commits, transform the whole sim (worm, powerups, trails,

@@ -25,7 +25,7 @@
 
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { getElementalDef } from './elementalDefs.js';
+import { getSpecialDef } from './specialDefs.js';
 
 // Faceted octagon medal (radialSegments 8), sized to read at a 15×15 tile.
 const _badgeGeos = {
@@ -127,7 +127,7 @@ function getRayTexture() {
 const _emblemTexCache = {};
 function getEmblemTexture(type) {
   if (_emblemTexCache[type] !== undefined) return _emblemTexCache[type];
-  const def = getElementalDef(type);
+  const def = getSpecialDef(type);
   if (!def || typeof document === 'undefined') {
     _emblemTexCache[type] = null;
     return null;
@@ -187,7 +187,7 @@ const bo = (v) => (m) => {
 // baseOpacity) still has a single writer per material.
 const _badgeMatCache = new Map();
 function getBadgeMaterials(type, color) {
-  const def = getElementalDef(type);
+  const def = getSpecialDef(type);
   const accent = def?.accent || '#ffffff';
   const key = `${type}_${color}`;
   const hit = _badgeMatCache.get(key);

@@ -221,3 +221,16 @@ it('resumes a user pause when starting capture and restores the HUD afterward', 
   act(() => useGameStore.getState().setCaptureMode(false));
   expect(host.querySelector('[aria-label="Pause"]')).not.toBeNull();
 });
+
+it('shows the cube view and sim-driven countdown, then removes it on expiry', () => {
+  useGameStore.setState({ wormViewPower: 'view-glass' });
+  wormBuffs.viewPowerT = 20;
+  renderPhase('crawling');
+  expect(host.textContent).toContain('Glass Cube');
+  expect(host.querySelector('[aria-label="Glass Cube active"]').textContent).toContain('20s');
+  wormBuffs.viewPowerT = 7;
+  act(() => vi.advanceTimersByTime(100));
+  expect(host.querySelector('[aria-label="Glass Cube active"]').textContent).toContain('7s');
+  act(() => useGameStore.setState({ wormViewPower: null }));
+  expect(host.querySelector('[aria-label="Glass Cube active"]')).toBeNull();
+});

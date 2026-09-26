@@ -171,3 +171,22 @@ it('holds warnings in a pause, avoids other hazards, and cancels stale encounter
   c.quiet = 0; tickCombat(c, p, 1);
   tickCombat(c, { ...p, alive: false }, 1); expect(c.encounter).toBe(false); expect(c.kills).toBe(0);
 });
+
+it('offers one optional view in later Story levels without replacing required powers', () => {
+  const { sim, p, level } = setup(10);
+  const size = level.cubeSize ?? 5;
+  sim.specials = []; p.powerDelay = 0;
+  expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(true);
+  expect(sim.specials[0].type).toBe('magnet');
+  sim.specials = [];
+  p.mechanics = { ...level.mechanics };
+  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning']);
+  p.powerDelay = 0;
+  expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(true);
+  expect(sim.specials[0].type).toMatch(/^view-/);
+  sim.specials = []; p.powerDelay = 0;
+  expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(false);
+  const early = setup(7); early.sim.specials = []; early.p.powerDelay = 0;
+  early.p.mechanics = { ...early.level.mechanics };
+  expect(offerStoryPower(early.sim, early.p, early.level, early.level.cubeSize ?? 5, early.p.cubies)).toBe(false);
+});

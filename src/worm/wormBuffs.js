@@ -14,6 +14,7 @@
 // or mid-tunnel, the displayed countdown freezes exactly when gameplay does. That is
 // the property a wall-clock (Date.now) countdown could never get right.
 export const wormBuffs = {
+  viewPowerT: 0,
   explodeT: 0,
   jumpRescueT: 0,
   signature: null,
@@ -55,6 +56,7 @@ export function buffReadout(buffs = wormBuffs) {
 
 /** Zero the readout — run reset, death, and mode unmount all go through here. */
 export function resetWormBuffs() {
+  wormBuffs.viewPowerT = 0;
   wormBuffs.explodeT = 0;
   wormBuffs.jumpRescueT = 0;
   wormBuffs.signature = null;

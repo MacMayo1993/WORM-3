@@ -1,3 +1,4 @@
+import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -108,11 +109,12 @@ function LegoStud({ dir, color, enableShadows = true }) {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, omitBody = false, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX } = useGameStore(
+  const { hollowMode, mirrorMode: storedMirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX, wormViewPower } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
       visualMode: s.visualMode,
+      wormViewPower: s.wormViewPower,
       explosionFactor: s.explosionT,
       settings: s.settings,
       randomMode: s.randomMode,
@@ -123,7 +125,9 @@ const Cubie = React.forwardRef(function Cubie({
   const enableShadows = !perfReducedFX;
   // Hollow's 12-beam-per-cubie representation would create more than 14,000
   // meshes on a 15×15 shell. Mega disables that view and keeps its optimized chassis.
-  const effectiveHollowMode = hollowMode && size < 15;
+  const powerView = wormMode ? getViewPowerDef(wormViewPower)?.view : null;
+  const mirrorMode = !powerView && storedMirrorMode;
+  const effectiveHollowMode = !powerView && hollowMode && size < 15;
   // faceColors needed locally for wireframe edge coloring
   const faceColors = useMemo(() => resolveColors(settings, settings?.biomeMode?.faceAssignment), [settings]);
 
@@ -154,8 +158,8 @@ const Cubie = React.forwardRef(function Cubie({
   // physical cubelet through rotations rather than flickering. Outside Random Mode the
   // global View-tab visualMode applies to the whole cube exactly as before.
   const effectiveVisualMode = useMemo(
-    () => (wormNeon ? 'neon' : randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick) : visualMode),
-    [wormNeon, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ]
+    () => (powerView ?? (wormNeon ? 'neon' : randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick) : visualMode)),
+    [powerView, wormNeon, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ]
   );
 
   // Derived per-style render switches.
@@ -171,7 +175,7 @@ const Cubie = React.forwardRef(function Cubie({
     metalness: _bmp.metalness,
     envMapIntensity: _bmp.envMapIntensity,
     transparent: !!_bmp.transparent || wormMode,
-    opacity: wormMode ? 0.8 : (_bmp.opacity ?? 1.0),
+    opacity: _bmp.opacity ?? (wormMode ? 0.8 : 1.0),
     side: wormMode ? THREE.DoubleSide : THREE.FrontSide,
     ...(_bmp.emissive ? { emissive: _bmp.emissive, emissiveIntensity: _bmp.emissiveIntensity ?? 1 } : {})
   };
@@ -298,7 +302,7 @@ const Cubie = React.forwardRef(function Cubie({
 
     // Worm-neon isolation: the LED frame outlines the flipped (wormhole) faces only,
     // so the glow traces the tile itself rather than every exposed face of the piece.
-    const faceGlows = (onEdge, dirKey) => onEdge && (!wormNeon || isFaceFlipped(dirKey));
+    const faceGlows = (onEdge, dirKey) => onEdge && (powerView || !wormNeon || isFaceFlipped(dirKey));
 
     // Front face (PZ) - 4 edges
     if (faceGlows(isOnEdge.pz, 'PZ')) {
@@ -379,7 +383,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     return edgeList;
-  }, [effectiveVisualMode, isOnEdge, size, faceColors, stickerColorKey, wormNeon, wormFlipKey]);
+  }, [effectiveVisualMode, isOnEdge, size, faceColors, stickerColorKey, powerView, wormNeon, wormFlipKey]);
 
   // Mirror mode: derive this piece's intrinsic box dimensions from its *original*
   // home position (origHomeX/Y/Z above), not its current grid slot. rotateSliceCubies

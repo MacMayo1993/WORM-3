@@ -1,3 +1,4 @@
+import { drawViewPower, getViewPowerDef } from '../healerWorm/viewPowerups.js';
 import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { tileKey } from '../healerWorm/wormSim.js';
 import { ttAt } from '../circularBuffers.js';
@@ -28,7 +29,7 @@ export function updateMastery(sim, p, level, delta) {
   // This clock runs only through active story metrics, so ready cards, pauses
   // and rescue holds cannot consume the opening window or recovery time.
   const powerBusy = sim.specials.length > 0 || sim.rocketActive || sim.magnetT > 0 ||
-    sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0;
+    sim.viewPowerT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0;
   p.powerDelay = powerBusy ? STORY_POWER_COOLDOWN
     : Math.max(0, (p.powerDelay ?? STORY_POWER_OPENING_DELAY) - Math.min(Math.max(delta, 0), 0.1));
   const safe = sim.phase === 'crawling' && !sim.isJumping && !sim.rocketActive;
@@ -98,13 +99,16 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
 // overwrite an unfinished flight or spring jump. Quest magnet orbs replenish
 // only while remote catches are still outstanding.
 export function offerStoryPower(sim, p, level, size, cubies) {
-  const type = nextStoryPower(p, level);
+  // Required lesson powers always take priority. Later levels can offer one
+  // optional cube transformation after those objectives have been served.
+  let type = nextStoryPower(p, level);
+  const canOfferView = !type && level.id >= 9 && !p.viewOffered;
   const displayedType = sim.specials[0]?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
-    : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : null);
+    : sim.viewPowerT > 0 ? sim.viewPower : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : null);
   const hint = offered => level.mechanics?.elementPickups && STORY_ELEMENTS.includes(offered)
-    ? 'Steer onto the marked elemental orb to collect it' : HINTS[offered];
+    ? 'Steer onto the marked elemental orb to collect it' : getViewPowerDef(offered)?.description ?? HINTS[offered];
   p.powerHint = displayedType ? hint(displayedType) : null;
-  if (!type || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
+  if ((!type && !canOfferView) || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
   if ((p.powerDelay ?? STORY_POWER_OPENING_DELAY) > 0) return false;
   const occupied = new Set(sim.powerups.map(tileKey));
   occupied.add(tileKey(sim.pos));
@@ -119,6 +123,7 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
   const tile = storySurfaceTile(sim, size, cubies, occupied);
   if (!tile) return false;
+  if (canOfferView) { type = drawViewPower(sim.specialPicker, sim.rand); p.viewOffered = true; }
   sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: 20, maxTtl: 20 }];
   p.powerDelay = STORY_POWER_COOLDOWN;
   p.powerHint = hint(type);

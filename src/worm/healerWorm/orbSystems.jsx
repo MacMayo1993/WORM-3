@@ -12,6 +12,7 @@ import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.j
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { getAntipodalOrbColor, getOrbColor, readLiveTile } from '../wormHelpers.js';
 import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX, ORB_HOVER_HEIGHT, ORB_ELEVATED_HOVER_HEIGHT } from './constants.js';
+import { isViewPower } from './viewPowerups.js';
 import { getSpecialDef, isElementalType } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
@@ -288,7 +289,7 @@ export function SpecialOrbs({ size, hidden = false }) {
     return (
         <group visible={!hidden}>
             {specials.map(sp => (
-                isElementalType(sp.type)
+                (isElementalType(sp.type) || isViewPower(sp.type))
                     ? <ElementalOrb key={sp.id} special={sp} size={size} />
                     : <SpecialOrb key={sp.id} special={sp} size={size} />
             ))}
@@ -467,7 +468,7 @@ export function SpecialFlashSystem({ worm }) {
     return (
         <>
             {flashes.map(f => (
-                isElementalType(f.type)
+                (isElementalType(f.type) || isViewPower(f.type))
                     ? <ElementalClaimBurst key={f.id} position={f.pos} type={f.type} onDone={() => drop(f.id)} />
                     : <OrbCollectEffect key={f.id} position={f.pos} color={f.color} onDone={() => drop(f.id)} />
             ))}

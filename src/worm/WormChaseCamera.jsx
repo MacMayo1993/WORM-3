@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov } from './healerWorm/zoomLimit.js';
 import React, { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -270,14 +271,16 @@ export default function WormChaseCamera({ worm, size }) {
         // Left the freeze (retry/reset) — re-arm so the next slice death re-snaps.
         if (sliceFreezeActiveRef.current) sliceFreezeActiveRef.current = false;
 
-        // Capture once, orbit at the existing radius/FOV, and return exactly to
+        // Capture once, pull out far enough to frame the full cube, and return exactly to
         // the captured view before handing control back to normal chase smoothing.
         const focusRemaining = worm.elementalFocusT?.current ?? 0;
         if (phase !== 'crawling' || gamePhase === 'scrambling' || gameState.wormAlive === false) {
             elementalOrbitRef.current = null;
         } else if (focusRemaining > 0 || elementalOrbitRef.current) {
             if (!elementalOrbitRef.current) {
-                elementalOrbitRef.current = makeElementalRevealOrbit(camera, lookAtRef.current);
+                elementalOrbitRef.current = makeElementalRevealOrbit(camera, lookAtRef.current, {
+                    size, expansion: gameState.explosionT ?? 0, reducedMotion: prefersReducedMotion(),
+                });
                 elementalOrbitRef.current.duration = focusRemaining;
             }
             const orbit = elementalOrbitRef.current;

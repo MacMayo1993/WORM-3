@@ -33,7 +33,7 @@ import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.j
 import { readLiveTile } from '../wormHelpers.js';
 import { prefersReducedMotion, isMobile } from '../../utils/device.js';
 import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME } from './constants.js';
-import { getElementalDef } from './elementalDefs.js';
+import { getSpecialDef } from './specialDefs.js';
 import { ElementalBadge, getSoftGlowTexture } from './elementalBadge.jsx';
 import { getElementalOrbMaterials } from './elementalOrbShader.js';
 
@@ -136,7 +136,7 @@ const easeOutBack = (t) => {
 };
 
 export default function ElementalOrb({ special, size }) {
-  const def = getElementalDef(special.type);
+  const def = getSpecialDef(special.type);
 
   const groupRef = useRef();
   const bodyRef = useRef();
@@ -435,7 +435,7 @@ const _burstGeos = {
 const _burstBillboard = new THREE.Quaternion();
 
 export function ElementalClaimBurst({ position, type, onDone }) {
-  const def = getElementalDef(type);
+  const def = getSpecialDef(type);
   const shellRef = useRef();
   const ringRef = useRef();
   const flashRef = useRef();
