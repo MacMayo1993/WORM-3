@@ -367,6 +367,17 @@ export function useDisparityGame({
     setDisparityCountdown(null);
     stopIgnitionPick();
     useGameStore.getState().setChaosIgnition(null);
+    // A wager stamped for a round that never went live was never at stake. A live
+    // round's bet is refunded by the chaos worker's STOP transition, but a round
+    // abandoned before GO (Leave on the first-strike prompt, Home, reset, a mode
+    // switch) never gets there, so without this the PP stayed locked until the
+    // next Disparity setup. Resolved rounds have already cleared their bet, and a
+    // bet not yet stamped for a round is the betting screen's to manage.
+    const s = useGameStore.getState();
+    const bet = s.activeBet;
+    if (bet && bet.roundId != null && bet.roundId === s.disparityRoundId && s.chaosLevel <= 0 && !s.disparityWinner) {
+      s.refundActiveBet();
+    }
     disparitySolveActiveRef.current = false;
     if (disparitySolveIntervalRef.current) {
       clearTimeout(disparitySolveIntervalRef.current);
