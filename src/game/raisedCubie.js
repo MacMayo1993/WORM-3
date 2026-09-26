@@ -1,6 +1,10 @@
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { cubeExpansionScale } from './cubeWorldGeometry.js';
 
+// Worm platforms use half the full Explode displacement on every board size.
+export const WORM_RAISED_AMOUNT = 0.5;
+export const raisedWormExpansion = (globalExpansion = 0) => Math.max(WORM_RAISED_AMOUNT, globalExpansion);
+
 const DIRECTIONS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 
 export function isLiveFlippedFace(sticker, cap) {

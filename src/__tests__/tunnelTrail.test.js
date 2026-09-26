@@ -167,3 +167,47 @@ describe('continuous worm tunnel trail', () => {
         expect(tunnelTailCleared(passage, history, 10)).toBe(true);
     });
 });
+
+
+describe('raised-pad mouth loops', () => {
+    it.each([3, 7, 15])('loops once above every face and reverses exactly on exit at size %i', size => {
+        for (const [dirKey, normal] of Object.entries(FACE_NORMALS)) {
+            const mid = Math.floor(size / 2), entry = { x: mid, y: mid, z: mid, dirKey };
+            entry[normal.x ? 'x' : normal.y ? 'y' : 'z'] = normal.x + normal.y + normal.z > 0 ? size - 1 : 0;
+            const route = { entry, exit: { ...entry }, padExpansion: .5, padHeight: .5 };
+            const surface = getWindWorldPosInto(new THREE.Vector3(), route, 'entry', 0, size);
+            const mouth = getTunnelWorldPosInto(new THREE.Vector3(), route, 0, size);
+            let previous = surface, lateralMax = 0;
+            const forward = [], reverse = [];
+            const a = makeSim(route, size), b = makeSim(route, size);
+            for (let i = 0; i <= 120; i++) {
+                const progress = i / 120;
+                const point = getWindWorldPosInto(new THREE.Vector3(), route, 'entry', progress, size);
+                expect(point.distanceTo(previous)).toBeLessThan(.12);
+                const relative = point.clone().sub(surface), lateral = relative.clone().projectOnPlane(normal).length();
+                lateralMax = Math.max(lateralMax, lateral);
+                if (lateral > .001) expect(relative.dot(normal)).toBeGreaterThanOrEqual(0);
+                advanceTunnelHead(a, 'windup', progress, size); a.tunnelProgress = progress;
+                advanceTunnelHead(b, 'windout', progress, size); b.tunnelProgress = progress;
+                forward.push(a.headInterpPos.clone()); reverse.push(b.headInterpPos.clone());
+                previous = point;
+            }
+            expect(lateralMax).toBeCloseTo(.38, 4);
+            expect(previous.distanceTo(mouth)).toBeLessThan(1e-10);
+            for (let i = 0; i <= 120; i++) expect(forward[i].distanceTo(reverse[120 - i])).toBeLessThan(1e-8);
+        }
+    });
+
+    it('records the same raised orbit for the entire body at 30/60/120 Hz', () => {
+        const route = { ...tunnel, padExpansion: .5, padHeight: .5 };
+        const simulations = [30, 60, 120].map(frames => {
+            const sim = makeSim(route);
+            for (const name of ['windup', ...phases]) phase(sim, name, 1, frames);
+            return sim;
+        });
+        for (let i = 0; i < 100; i++) {
+            const point = bodyPoint(simulations[0], i * .09);
+            for (const sim of simulations.slice(1)) expect(bodyPoint(sim, i * .09).distanceTo(point)).toBeLessThan(1e-6);
+        }
+    });
+});

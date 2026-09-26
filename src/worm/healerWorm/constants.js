@@ -127,6 +127,8 @@ export const MAX_TAIL = 1200;
 
 // Short handoff at each aperture; body extrusion follows distance, not this timer.
 export const TUNNEL_HANDOFF_SECONDS = 0.18;
+export const TUNNEL_ORBIT_SECONDS = 1.4;
+export const tunnelHandoffSeconds = tunnel => tunnel?.padHeight > 0 ? TUNNEL_ORBIT_SECONDS : TUNNEL_HANDOFF_SECONDS;
 // Preserve the phase parameter for camera/face consumers: surface=0, mouth=1.
 export const windoutHeadS = (progress) => 1 - Math.min(1, Math.max(0, progress));
 export const HEAL_COST = 4; // worm segments (balls) required to fully heal one tunnel

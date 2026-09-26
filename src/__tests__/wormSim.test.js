@@ -1419,9 +1419,9 @@ describe('raised WORM platforms', () => {
     expect(sim.headInterpPos.distanceTo(before)).toBeLessThan(0.2);
     for (let frame = 0; frame < hz && sim.padFlight; frame++) stepWormSim(sim, 1 / hz, SIZE, ctx);
     expect(sim.phase).toBe('windup');
-    expect(sim.activeTunnel.padExpansion).toBe(1);
+    expect(sim.activeTunnel.padExpansion).toBe(0.5);
     expect(sim.onRaisedPlatform).toBe(true);
-    expect(sim.headInterpPos.z).toBeCloseTo(3.32 + 0.5 + 0.08, 6);
+    expect(sim.headInterpPos.z).toBeCloseTo(2.42 + 0.5 + 0.08, 6);
     expect(sim.stepHistory.count).toBeGreaterThan(64);
     expect(shAt(sim.stepHistory, 0).pos.distanceTo(sim.headInterpPos)).toBeLessThan(1e-6);
   });
@@ -1430,10 +1430,10 @@ describe('raised WORM platforms', () => {
     sim.pos = { x: 2, y: 2, z: 2, dirKey: 'PZ' };
     const ctx = platformCtx(sim, 'PY');
     startJump(sim, ctx, SIZE);
-    for (let i = 0; i < 40; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
+    for (let i = 0; i < 100 && sim.padFlight; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
     expect(sim.phase).toBe('crawling');
     expect(sim.onRaisedPlatform).toBe(true);
-    expect(sim.curWorldPos.toArray()).toEqual([2.8, 2.8, 3.32]);
+    expect(sim.curWorldPos.toArray()).toEqual([1.9, 1.9, 2.42]);
     expect(ctx.events.some(e => e.type === 'tunnelEnter')).toBe(false);
   });
   it('does not enter from a crawl and preserves the jump across pause', () => {
@@ -1491,8 +1491,28 @@ it('keeps raised tunnel windout connected to subsequent crawl', () => {
   while (sim.padFlight) stepWormSim(sim, 1 / 60, SIZE, ctx);
   for (let i = 0; i < 1500 && sim.phase !== 'crawling'; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
   expect(sim.phase).toBe('crawling');
-  expect(sim.headInterpPos.z).toBeCloseTo(-3.82);
+  expect(sim.headInterpPos.z).toBeCloseTo(-2.92);
   const exit = sim.headInterpPos.clone();
   stepWormSim(sim, 1 / 60, SIZE, ctx);
   expect(sim.headInterpPos.distanceTo(exit)).toBeLessThan(0.2);
+});
+
+
+it('holds a raised tunnel open throughout the reverse orbit, including a short tail', () => {
+  const sim = makeSim();
+  const tunnel = { entry: { ...sim.pos }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' }, padExpansion: .5, padHeight: .5 };
+  sim.phase = 'windout'; sim.activeTunnel = tunnel; sim.tunnelProgress = 0;
+  sim.tailLength = 4;
+  sim.tunnelPassages.push({ tunnel, tunnelKey: 'orbit', exitDistance: sim.stepHistory.distance,
+    heal: { tunnel, stableKey: 'orbit', tunnelKey: 'orbit' }, clearFrame: false });
+  const ctx = makeCtx({ isStoryMode: () => true });
+  let frames = 0;
+  while (sim.phase === 'windout' && frames++ < 100) {
+    stepWormSim(sim, 1 / 60, SIZE, ctx);
+    expect(ctx.events.some(e => e.type === 'heal')).toBe(false);
+  }
+  expect(frames / 60).toBeCloseTo(1.4, 1);
+  expect(sim.phase).toBe('crawling');
+  stepWormSim(sim, 1 / 60, SIZE, ctx);
+  expect(ctx.events.filter(e => e.type === 'heal')).toHaveLength(1);
 });

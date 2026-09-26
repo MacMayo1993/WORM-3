@@ -1,3 +1,4 @@
+import { raisedWormExpansion } from '../../game/raisedCubie.js';
 import { padEntryDecision } from './padEntry.js';
 import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
 import { movingSliceCrossing } from './sliceCrossing.js';
@@ -85,7 +86,7 @@ import {
     WORM_LIFT,
     TUNNEL_SPEED_SCALE,
     TUNNEL_INTERIOR_SPEED_SCALE,
-    TUNNEL_HANDOFF_SECONDS,
+    tunnelHandoffSeconds,
     FACE_NORMALS,
     INITIAL_DIR,
     INITIAL_POS,
@@ -333,7 +334,7 @@ export function makeWormSim(size) {
 }
 
 const setCurWorldPosFromTile = (sim, size) => {
-    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, sim.onRaisedPlatform ? 1 : sim.expansionAmount);
+    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, sim.onRaisedPlatform ? raisedWormExpansion(sim.expansionAmount) : sim.expansionAmount);
     sim._curWP.set(wp[0], wp[1], wp[2]);
     if (sim.onRaisedPlatform) sim._curWP.addScaledVector(FACE_NORMALS[sim.pos.dirKey], sim.raisedPadHeight ?? 0);
     sim.curWorldPos = sim._curWP;
@@ -812,7 +813,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 
     sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
     sim.headInterpPos.copy(sim.tunnelApproach);
-    sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: 1, padHeight: WORM_PAD_HEIGHT } : tunnel;
+    sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: raisedWormExpansion(sim.expansionAmount), padHeight: WORM_PAD_HEIGHT } : tunnel;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
     // Remove the exit portal tile from the trail so the head landing on it after
@@ -820,7 +821,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     const exitTileKey = tileKey(tunnel.exit);
     ttFilterInPlace(sim.tileTrail, k => k !== exitTileKey);
     sim.tunnelProgress = 0;
-    // Align with the aperture before the axial dive. Keep the existing history.
+    // Raised landings loop around the rim before diving; keep the existing history.
     sim.phase = 'windup';
     ctx.feel('dive');
     sim.onFlippedTile = false;
@@ -1494,7 +1495,7 @@ const PHASE_HANDLERS = {
                         }
                     } else if (t === 'jump') {
                         startJump(sim, ctx, size);
-                        if (sim.phase !== 'crawling') return true;
+                        if (sim.phase !== 'crawling' || sim.padFlight) return true;
                     } else if (relativeTurn) {
                         sim.moveDir = turnWorm(sim.moveDir, relativeTurn);
                         sim.lastTurnDir = relativeTurn;
@@ -1817,11 +1818,11 @@ const PHASE_HANDLERS = {
         },
     },
 
-    // Wind-up: align at crawl height, then enter the mouth. beginTunnelTransition
+    // Wind-up: raised pads orbit the rim, then dive. beginTunnelTransition
     // publishes wormPhase:'windup' via ctx.onTunnelEnter, so no enter() here.
     windup: {
         update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta / TUNNEL_HANDOFF_SECONDS;
+            const nextProgress = sim.tunnelProgress + delta / tunnelHandoffSeconds(sim.activeTunnel);
             advanceTunnelHead(sim, 'windup', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
@@ -1924,29 +1925,29 @@ const PHASE_HANDLERS = {
                 });
                 sim.pendingTunnelHeal = null;
 
-                // Only the head has reached the mouth. A short axial handoff
-                // restores crawl height; the retained history feeds the body out.
+                // Only the head has reached the mouth. Reverse the entry path;
+                // retained history feeds every body segment out behind it.
                 sim.phase = 'windout';
             }
             return false;
         },
     },
 
-    // Wind-out: lift the head just past the aperture, then return control while
+    // Wind-out: reverse the mouth loop, then return control while
     // every trailing segment continues along its own position in the history.
     windout: {
         enter(_sim, _size, ctx) {
             ctx.onPhase('windout');
         },
         update(sim, size, ctx, delta, STEP_SEC) {
-            const nextProgress = sim.tunnelProgress + delta / TUNNEL_HANDOFF_SECONDS;
+            const nextProgress = sim.tunnelProgress + delta / tunnelHandoffSeconds(sim.activeTunnel);
             advanceTunnelHead(sim, 'windout', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
                 // Resume from the exit pose, never interpolate from the old entry tile.
                 if (sim.activeTunnel?.padExpansion) {
                     const exit = sim.activeTunnel.exit;
-                    sim.curWorldPos.fromArray(getStickerWorldPos(exit.x, exit.y, exit.z, exit.dirKey, size, 1))
+                    sim.curWorldPos.fromArray(getStickerWorldPos(exit.x, exit.y, exit.z, exit.dirKey, size, sim.activeTunnel.padExpansion))
                         .addScaledVector(FACE_NORMALS[exit.dirKey], WORM_PAD_HEIGHT);
                     sim.onRaisedPlatform = true;
                     sim.raisedPadHeight = WORM_PAD_HEIGHT;
@@ -2295,7 +2296,9 @@ export function stepWormSim(sim, delta, size, ctx) {
         const reused = passage.heal && (sim.currentTunnelKey === passage.tunnelKey ||
             sim.tunnelPassages.some(other => other !== passage && other.tunnelKey === passage.tunnelKey &&
                 !tunnelTailCleared(other, sim.stepHistory, sim.tailLength)));
-        if (reused || !tunnelTailCleared(passage, sim.stepHistory, sim.tailLength)) {
+        // Keep the landing tile intact until its reverse orbit has finished.
+        const orbitingExit = sim.phase === 'windout' && sim.activeTunnel === passage.tunnel;
+        if (reused || orbitingExit || !tunnelTailCleared(passage, sim.stepHistory, sim.tailLength)) {
             passage.clearFrame = false;
             continue;
         }

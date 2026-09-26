@@ -31,7 +31,7 @@ export function advanceTunnelHead(sim, phase, nextProgress, size) {
     const sample = (p, record) => {
         if (wind) {
             const exiting = phase === 'windout';
-            if (!exiting && sim.tunnelApproach) {
+            if (!exiting && sim.tunnelApproach && !tunnel.padHeight) {
                 // First reach the mouth's centre at crawl height, then descend
                 // axially. A diagonal dive from the still-approaching head can
                 // cross the solid tile beside the aperture.

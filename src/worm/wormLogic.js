@@ -496,26 +496,33 @@ const ZERO3 = [0, 0, 0];
 // is how the anchor drifted onto the wrong side of the cubie in the first place.
 
 // ── Surface / tunnel mouth handoff ───────────────────────────────────────────
-// s = 0 is the ordinary lifted crawl position; s = 1 is the aperture centre.
-// This short axial path is recorded as real travel. The former orbit added
-// 5.38 units of route at exit, pulling ~60 body beads out while the head stayed
-// over the hole. Only actual departure should draw the remaining tail through.
-
-/**
- * Write the axial handoff between the crawl surface and the aperture.
- * @param {THREE.Vector3} out
- * @param {Object} tunnel
- * @param {'entry'|'exit'} side - which mouth to orbit
- * @param {number} s - 0 = lifted crawl position, 1 = aperture centre
- * @param {number} size - cube size
- */
+// s = 0 is the lifted landing position; s = 1 is the aperture centre.
+// Raised pads get one complete loop above the rim before the axial dive. Exit
+// samples this exact curve backwards. Ordinary crawl-entry tunnels stay axial.
+const _windForward = new THREE.Vector3();
+const _windSide = new THREE.Vector3();
+const _windNormal = new THREE.Vector3();
 export const getWindWorldPosInto = (out, tunnel, side, s, size, explosionFactor = wormExpansion.amount) => {
   const tile = side === 'exit' ? tunnel.exit : tunnel.entry;
   const n = TUNNEL_FACE_NORMALS[tile.dirKey] || ZERO3;
   const wp = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, tunnel.padExpansion ?? explosionFactor);
   const cl = Math.max(0, Math.min(1, s));
-  const lift = THREE.MathUtils.lerp(WORM_LIFT + (tunnel.padHeight ?? 0), TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, cl);
-  return out.set(wp[0] + n[0] * lift, wp[1] + n[1] * lift, wp[2] + n[2] * lift);
+  const orbit = tunnel.padHeight > 0;
+  const dive = orbit ? THREE.MathUtils.smoothstep(cl, 0.82, 1) : cl;
+  const lift = THREE.MathUtils.lerp(WORM_LIFT + (tunnel.padHeight ?? 0), TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, dive);
+  out.set(wp[0] + n[0] * lift, wp[1] + n[1] * lift, wp[2] + n[2] * lift);
+  if (orbit) {
+    const radius = 0.38 * THREE.MathUtils.smoothstep(cl, 0, 0.12)
+      * (1 - THREE.MathUtils.smoothstep(cl, 0.70, 0.82));
+    const angle = Math.PI * 2 * THREE.MathUtils.smoothstep(cl, 0.12, 0.70);
+    _windNormal.fromArray(n);
+    _windForward.fromArray(DIR_FORWARD[tile.dirKey]?.up ?? [0, 1, 0]);
+    _windSide.crossVectors(_windForward, _windNormal);
+    out.addScaledVector(_windForward, radius * Math.cos(angle))
+      .addScaledVector(_windSide, radius * Math.sin(angle))
+      .addScaledVector(_windNormal, radius * 0.3);
+  }
+  return out;
 };
 // ============================================================================
 // SURFACE NAVIGATION - Grid stepping on the cube surface (used by the crawler)

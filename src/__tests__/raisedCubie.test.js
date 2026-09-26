@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import { cubieHasFlippedFace, cubieFaceRole, padBackFace, selectiveCubieOffsetRatio } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, cubieFaceRole, padBackFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT, raisedWormExpansion } from '../game/raisedCubie.js';
 import { padEntryDecision } from '../worm/healerWorm/padEntry.js';
 import { publishRaisedCubie, removeRaisedCubie, raisedCubieExtent } from '../3d/raisedCubieMotion.js';
 
@@ -50,4 +50,14 @@ describe('whole-cubie flip platforms', () => {
     publishRaisedCubie(a, 0);
     expect(raisedCubieExtent()).toBe(0);
   });
+});
+
+// Displacement, rather than distance from the origin, is what gets halved.
+it.each([2, 3, 5, 7, 15])('halves Worm cubie displacement at size %i', size => {
+  expect(cubeExpansionScale(size, WORM_RAISED_AMOUNT) - 1)
+    .toBeCloseTo((cubeExpansionScale(size, 1) - 1) / 2, 10);
+  for (const global of [0, .35, .8, 1]) {
+    expect(cubeExpansionScale(size, global) * (1 + selectiveCubieOffsetRatio(size, global, WORM_RAISED_AMOUNT)))
+      .toBeCloseTo(cubeExpansionScale(size, raisedWormExpansion(global)), 10);
+  }
 });
