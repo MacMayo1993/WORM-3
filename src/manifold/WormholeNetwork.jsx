@@ -40,10 +40,11 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   // exactly as long as its tiles are still flippable.
   const flipCap = useGameStore(selectEffectiveFlipCap);
   const cubePads = useGameStore(flipCubePadsEnabled);
-  const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths, wormHealerMode, demoMode } = useGameStore(
+  const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths, wormHealerMode, demoMode, chaosLevel } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode,
       demoMode: s.demoMode,
+      chaosLevel: s.chaosLevel,
       cubies: s.cubies,
       size: s.size,
       showTunnels: s.showTunnels,
@@ -186,7 +187,9 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     }
 
     if (cubePads || tunnelDetail === 'full') {
-      const budget = cubePads ? RAISED_CUBE_FOCUS_BUDGET : FOCUS_BUDGET;
+      // Chaos uses the same raised bands, with its existing small detail budget:
+      // a 5×5 storm can have 75 pairs, so keep the rest in the merged cord draw.
+      const budget = cubePads && chaosLevel === 0 ? RAISED_CUBE_FOCUS_BUDGET : FOCUS_BUDGET;
       const events = [];
       for (const k in tunnelBirths) events.push([k, tunnelBirths[k].startMs + 1e9]); // births outrank pulses
       for (const k in tunnelPulses) events.push([k, tunnelPulses[k].startMs]);
@@ -201,7 +204,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       for (let i = 0; i < tunnelData.length && ids.size < budget; i++) ids.add(tunnelData[i].pairId);
     }
     return ids;
-  }, [visible, wormBands, cubePads, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData]);
+  }, [visible, wormBands, cubePads, chaosLevel, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData]);
 
   // Chaos surges trace whichever route the player sees for a pair: the throated
   // ribbon when it is in focus, the straight cord otherwise.

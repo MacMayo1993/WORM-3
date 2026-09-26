@@ -17,16 +17,23 @@ import FreeplaySetupWizard from '../components/screens/FreeplaySetupWizard.jsx';
 import RandomModeSetupWizard from '../components/screens/RandomModeSetupWizard.jsx';
 import DisparitySetupWizard from '../components/screens/DisparitySetupWizard.jsx';
 
-for (const [name, Wizard, category] of [
-  ['Worm', WormModeSetupWizard, 'Gameplay'], ['Cube', FreeplaySetupWizard, 'Size'],
-  ['Random', RandomModeSetupWizard, 'Size'], ['Chaos', DisparitySetupWizard, 'Size']
+// Larger boards remain available in the other modes; Chaos is capped at 5×5.
+for (const [name, Wizard, category, sizes] of [
+  ['Worm', WormModeSetupWizard, 'Gameplay', [8, 9, 10]],
+  ['Cube', FreeplaySetupWizard, 'Size', [8, 9, 10]],
+  ['Random', RandomModeSetupWizard, 'Size', [8, 9, 10]],
+  ['Chaos', DisparitySetupWizard, 'Size', [2, 3, 4, 5]]
 ]) {
-  it.each([8, 9, 10])(`${name} launches the selected size-%i board`, size => {
+  it.each(sizes)(`${name} launches the selected size-%i board`, size => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     const host = document.createElement('div'); document.body.appendChild(host);
     const root = createRoot(host), launch = vi.fn();
-    const click = label => act(() => [...host.querySelectorAll('button')]
-      .find(b => b.textContent === label || b.getAttribute('aria-label') === label).click());
+    const click = label => act(() => {
+      const button = [...host.querySelectorAll('button')]
+        .find(b => b.textContent === label || b.getAttribute('aria-label') === label);
+      expect(button, `${name} setup should offer "${label}"`).toBeDefined();
+      button.click();
+    });
     try {
       act(() => root.render(<Wizard onComplete={launch} onStart={launch} />));
       click(category); click(`${size} by ${size}`);

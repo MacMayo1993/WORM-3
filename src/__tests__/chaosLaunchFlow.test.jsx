@@ -9,6 +9,7 @@ import { useDisparityGame } from '../hooks/useDisparityGame.js';
 import { useCubeState } from '../hooks/useCubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
+import { effectiveFlipPads } from '../game/raisedCubie.js';
 
 let root, host, before, calls;
 // The hook's latest return value, published by the harness each render.
@@ -18,7 +19,8 @@ function Harness(props) {
   // Use the actual cube callbacks: Mobi retains the launch callback from before
   // the chosen size is installed, which a getState()-based reset stub hid.
   const { changeSize, reset } = useCubeState();
-  out.current = useDisparityGame({ ...props, changeSize, reset });
+  const settings = useGameStore(s => s.settings);
+  out.current = useDisparityGame({ ...props, settings, changeSize, reset });
   return null;
 }
 
@@ -31,11 +33,12 @@ beforeEach(async () => {
   vi.useFakeTimers();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   before = useGameStore.getState();
-  useGameStore.setState({ size: 3, cubies: makeCubies(3), chaosIgnition: null, chaosIgnitionPicking: false, activeBet: null });
+  useGameStore.setState({ size: 3, cubies: makeCubies(3), chaosIgnition: null, chaosIgnitionPicking: false, activeBet: null,
+    chaosLevel: 0, wormHealerMode: false, demoMode: false, mirrorMode: false,
+    settings: { ...before.settings, backgroundTheme: 'blackhole' } });
   calls = { intro: null, shuffleDone: null, visualMode: null, settings: null, tunnels: null };
   const props = {
-    settings: { ...before.settings, backgroundTheme: 'blackhole' },
-    setSettings: (s) => { calls.settings = s; },
+    setSettings: (s) => { calls.settings = s; useGameStore.getState().setSettings(s); },
     cancelShuffle: vi.fn(),
     startAnimatedShuffle: (_moves, done) => { calls.shuffleDone = done; },
     setChaosLevel: useGameStore.getState().setChaosLevel,
@@ -66,6 +69,38 @@ const launch = async () => {
 };
 
 describe('chaos launch', () => {
+  it.each(['off', 'subtle'])('keeps %s saved through preview, launch and exit while Chaos renders full pads', async flipPads => {
+    await act(async () => useGameStore.getState().setSettings({ ...useGameStore.getState().settings, flipPads }));
+    const expectSaved = () => {
+      expect(useGameStore.getState().settings.flipPads).toBe(flipPads);
+      expect(JSON.parse(localStorage.getItem('worm3_settings')).flipPads).toBe(flipPads);
+    };
+    // A replay can contain the old forced-full preference; it must not win.
+    await act(async () => out.current.handleDisparitySetupComplete({ ...WIZARD, flipPads: 'full' }));
+    expect(out.current.chaosPreview.flipPads).toBe(flipPads);
+    expectSaved();
+    await act(async () => out.current.handleBetSkipped());
+    expectSaved();
+    await act(async () => calls.intro.post());
+    expectSaved();
+    await act(async () => { vi.advanceTimersByTime(60); });
+    await act(async () => calls.shuffleDone());
+    await act(async () => out.current.surpriseIgnition());
+    for (const delay of [900, 900, 900, 600]) {
+      await act(async () => { vi.advanceTimersByTime(delay); });
+    }
+    expect(useGameStore.getState().chaosLevel).toBe(WIZARD.disparityLevel);
+    expect(effectiveFlipPads(useGameStore.getState())).toBe('full');
+    expectSaved();
+    await act(async () => {
+      out.current.cancelDisparityRun();
+      useGameStore.getState().resetGame();
+      useGameStore.getState().clearDisparityGame();
+    });
+    expect(effectiveFlipPads(useGameStore.getState())).toBe(flipPads);
+    expectSaved();
+  });
+
   it('builds the chosen cube before Mobi’s intro plays', async () => {
     await launch();
     expect(calls.intro).toMatchObject({ size: 5, visualMode: 'neon', scene: 'forest' });
@@ -77,7 +112,7 @@ describe('chaos launch', () => {
     { cubeSize: 2, wager: true },
     { cubeSize: 3, wager: false },
     { cubeSize: 5, wager: false },
-    { cubeSize: 6, wager: true }
+    { cubeSize: 5, wager: true }
   ])('keeps the $cubeSize×$cubeSize board intact after Mobi and reaches GO (wager: $wager)', async ({ cubeSize, wager }) => {
     await act(async () => out.current.handleDisparitySetupComplete({ ...WIZARD, cubeSize }));
     await act(async () => {
@@ -104,6 +139,20 @@ describe('chaos launch', () => {
     expect(out.current.disparityCountdown).toBeNull();
     expect(useGameStore.getState().chaosLevel).toBe(WIZARD.disparityLevel);
     expect(useGameStore.getState().cubies).toHaveLength(cubeSize);
+  });
+
+
+  it('caps stale oversized setup and direct launches at 5×5 before Mobi or scramble', async () => {
+    await act(async () => out.current.handleDisparitySetupComplete({ ...WIZARD, cubeSize: 10 }));
+    expect(out.current.chaosPreview.cubeSize).toBe(5);
+    await act(async () => out.current.handleBetSkipped());
+    expect(calls.intro.size).toBe(5);
+    await act(async () => calls.intro.post());
+    expect(useGameStore.getState().cubies).toHaveLength(5);
+    await act(async () => out.current.cancelDisparityRun());
+    await act(async () => out.current.startDisparityGame({ ...WIZARD, cubeSize: 7 }));
+    expect(useGameStore.getState().size).toBe(5);
+    expect(useGameStore.getState().cubies).toHaveLength(5);
   });
 
   it('waits for the first-strike pick after the scramble, then counts down', async () => {

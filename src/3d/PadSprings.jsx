@@ -1,7 +1,7 @@
 import { createPadStalkGeometry, PAD_STALK_DEPTH, PAD_BACK_CLEARANCE } from './padStalkGeometry.js';
 import { RaisedCubieContext } from './raisedCubieContext.js';
 import { removeRaisedCubie } from './raisedCubieMotion.js';
-import { isLiveFlippedFace, padBackFace, flipCubePadsEnabled } from '../game/raisedCubie.js';
+import { isLiveFlippedFace, padBackFace, flipCubePadsEnabled, effectiveFlipPads } from '../game/raisedCubie.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { FACE_COLORS, RUBIKS_FACE_COLORS } from '../utils/constants.js';
 import React, { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
@@ -66,6 +66,7 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
     const cap = profileOverride ? 6 : selectEffectiveFlipCap(state);
     const wormMode = !profileOverride && state.wormHealerMode;
     const wormPads = wormMode && !state.demoMode;
+    const flipPads = profileOverride ? state.settings?.flipPads : effectiveFlipPads(state);
     const energyPads = wormPads || menuPads || (!profileOverride && flipCubePadsEnabled(state));
     const motionOff = wormPads || reduced.current || state.settings?.reducedMotion;
     // The WORM landing height stays fixed for the sim; only the look is unstable.
@@ -94,11 +95,11 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
       pair.worn += Math.max(-dt * WORN_EASE, Math.min(dt * WORN_EASE, wornTarget - pair.worn));
       input.phase = pair.phase;
       input.wear = pair.wear;
-      input.profile = profileOverride ?? (wormMode ? 'worm' : state.chaosLevel > 0 ? 'chaos' : 'cube');
+      input.profile = profileOverride ?? (wormMode ? 'worm' : 'cube');
       input.worn = pair.worn;
       input.seed = pair.seed;
       input.reducedMotion = motionOff;
-      input.subtle = state.settings?.flipPads === 'subtle';
+      input.subtle = flipPads === 'subtle';
       input.big = !profileOverride && state.size >= 7;
       padPose(input, pair.pose);
       pair.phase += dt * pair.pose.frequency;
@@ -106,7 +107,7 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
       for (const member of pair.members) {
         if (isLiveFlippedFace(member.data.current.meta, cap)) { lifted = true; break; }
       }
-      pair.active = (menuPads || wormPads || (state.settings?.flipPads !== 'off' && !wormMode)) && lifted;
+      pair.active = (menuPads || wormPads || (flipPads !== 'off' && !wormMode)) && lifted;
       const target = pair.active ? pair.pose.lift : 0;
       if (motionOff) { pair.lift = target; pair.velocity = 0; }
       else advancePadSpring(pair, target, dt);
@@ -123,7 +124,7 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
       if (!group) continue;
       const pair = pairs.get(d.pair);
       // WORM uses a fixed physical landing height; cube/menu pads keep their idle bounce.
-      const enabled = (menuPads || wormPads || (state.settings?.flipPads !== 'off' && !wormMode));
+      const enabled = (menuPads || wormPads || (flipPads !== 'off' && !wormMode));
       const lifted = enabled && isLiveFlippedFace(d.meta, cap);
       const target = lifted ? pair.pose.lift : 0;
       if (lifted) { entry.lift = pair.lift; entry.velocity = pair.velocity; }

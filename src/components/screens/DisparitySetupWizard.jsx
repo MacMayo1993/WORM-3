@@ -2,6 +2,8 @@ import { MODE_THEMES } from '../../utils/modeThemes.js';
 import React, { useState, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import '../../chaos/chaosSetup.css';
+import { MAX_CHAOS_SIZE, normalizeChaosSize } from '../../utils/chaosSetup.js';
+import { SIZE_TIERS } from './wizardSteps/shared.jsx';
 import { useIsMobile } from '../../hooks/index.js';
 import { wizardLayout, WizardShell, WIZ_BORDER_SOFT, WIZ_TEXT, WIZ_TEXT_MUTED } from './WizardChrome.jsx';
 import {
@@ -12,6 +14,7 @@ import {
 
 const ACCENT = MODE_THEMES.chaos.accent;
 const ACCENT_SHADOW = MODE_THEMES.chaos.shadow;
+const CHAOS_SIZE_TIERS = SIZE_TIERS.filter(tier => tier.n <= MAX_CHAOS_SIZE);
 
 const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
 
@@ -64,7 +67,7 @@ const DisparitySetupWizard = ({ onStart, onCancel, initialSettings }) => {
   const isMobile = useIsMobile();
   const S = useMemo(() => wizardLayout(ACCENT, ACCENT_SHADOW, isMobile), [isMobile]);
   const cos = useWizardCosmetics({
-    initialSettings: { ...currentSettings, ...initialSettings, size: initialSettings?.cubeSize || currentSize },
+    initialSettings: { ...currentSettings, ...initialSettings, size: normalizeChaosSize(initialSettings?.cubeSize ?? currentSize) },
     accent: ACCENT,
     accentShadow: ACCENT_SHADOW,
     extra: {
@@ -147,8 +150,8 @@ const DisparitySetupWizard = ({ onStart, onCancel, initialSettings }) => {
       title: "Cube size",
       subtitle: '',
       summary: sizeLabel(cos.cubeSize),
-      hero: <SizeStep cos={cos} slot="hero" />,
-      content: <SizeStep cos={cos} slot="body" />
+      hero: <SizeStep cos={cos} tiers={CHAOS_SIZE_TIERS} slot="hero" />,
+      content: <SizeStep cos={cos} tiers={CHAOS_SIZE_TIERS} slot="body" />
     }
   ];
 

@@ -1,4 +1,5 @@
 import { FlipPadOffset } from './PadSprings.jsx';
+import { effectiveFlipPads } from '../game/raisedCubie.js';
 import { flipPose } from '../utils/flipPose.js';
 import { chaosFlipPose, CHAOS_FLIP_DURATION } from './chaosFlipPose.js';
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
@@ -695,6 +696,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       chaosLevel: s.chaosLevel,
       disparityFlipCap: s.disparityFlipCap,
       settings: s.settings,
+      flipPads: effectiveFlipPads(s),
       faceTextures: s.faceTextures,
       wormHealerMode: s.wormHealerMode ?? false,
       perfReducedFX: s.perfReducedFX ?? false,
@@ -702,15 +704,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   );
   // Cinematics render real stickers with local styling, never changing saved settings.
   const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, wormHealerMode, perfReducedFX } = presentation?.config ?? gameConfig;
+  const flipPads = presentation ? settings?.flipPads : gameConfig.flipPads;
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
     [settings]
   );
-  // Cinematics can reuse Chaos's opaque, closed-seam color swap without
-  // enabling Chaos gameplay or changing the player's saved mode/settings.
-  const cleanChaosFlip = presentation
-    ? presentation.flipAnimation === 'chaos'
-    : chaosLevel > 0 && !wormHealerMode;
+  // Chaos keeps the shared gameplay snap and crossing effects. Only the
+  // cinematic opts into the quieter pose; both preserve the actual styled
+  // surface through the seam instead of painting flat color over the tile.
+  const quietFlip = presentation?.flipAnimation === 'chaos';
+  const chaosFlip = !presentation && chaosLevel > 0 && !wormHealerMode;
+  const preserveFlipStyle = quietFlip || chaosFlip;
   const manifoldStyles = settings?.manifoldStyles;
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   // Same decision as selectEffectiveFlipCap, kept local because both inputs are
@@ -1092,7 +1096,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       activateSticker(stickerGridIdRef.current);
       // Store the colors for the flip animation
       // flipToColor is the ANTIPODAL color (what we're flipping TO)
-      const fromFaceId = cleanChaosFlip ? displayedFaceRef.current : prevVal;
+      const fromFaceId = preserveFlipStyle ? displayedFaceRef.current : prevVal;
       flipFromColor.current = fc[fromFaceId];
       flipToColor.current = fc[curr];
       // Texture follows city identity — use biome ground textures in biome mode
@@ -1113,7 +1117,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       spinT.current = 1;
       hitstopT.current = 0;
-      if (cleanChaosFlip) {
+      if (preserveFlipStyle) {
         shockT.current = 1;
         innerShockZ.current = 0;
         flipShockwaveRef.current?.setProgress(1);
@@ -1128,8 +1132,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // stretched to fit them: the first blink keeps its normal length, the extra
       // ones are quicker. Normal flips stay a single 0.5 s beat exactly as before.
       // A busy Chaos board needs one readable crossing, not up to five replayed blinks.
-      blinkCountRef.current = cleanChaosFlip ? 1 : blinkCountForFlips(flips, isDisparityFlipRef.current);
-      spinRateRef.current = cleanChaosFlip ? 1 / CHAOS_FLIP_DURATION : blinkFlipRate(blinkCountRef.current);
+      blinkCountRef.current = preserveFlipStyle ? 1 : blinkCountForFlips(flips, isDisparityFlipRef.current);
+      spinRateRef.current = quietFlip ? 1 / CHAOS_FLIP_DURATION : blinkFlipRate(blinkCountRef.current);
       blinkBounceRef.current = 0;
       if (spinRevealRef.current) spinRevealRef.current.visible = false;
       if (eyelidOverlayRef.current) eyelidOverlayRef.current.visible = false;
@@ -1137,8 +1141,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // Outside Chaos, the overlay shows TO color at 0.5 alpha (NormalBlending) over the FROM mesh.
         // Both colors simultaneously visible = superposition blend.
         if (eyelidOverlayRef.current && eyelidMatRef.current && flipToColor.current) {
-          eyelidMatRef.current.uniforms.uClean.value = cleanChaosFlip ? 1 : 0;
-          eyelidMatRef.current.uniforms.uColorTo.value.set(cleanChaosFlip ? flipFromColor.current : flipToColor.current);
+          eyelidMatRef.current.uniforms.uClean.value = preserveFlipStyle ? 1 : 0;
+          eyelidMatRef.current.uniforms.uColorTo.value.set(preserveFlipStyle ? flipFromColor.current : flipToColor.current);
           eyelidMatRef.current.uniforms.uProgress.value = 1.0;
           eyelidMatRef.current.uniforms.uTime.value = 0.0;
           eyelidOverlayRef.current.visible = true;
@@ -1153,14 +1157,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       // Restore the correct FROM texture now that flipFromTexture is known, and ensure the
       // mesh is visible so living/patterned styles show through the additive rim glow.
-      if (cleanChaosFlip && !biomeEnabled && !isGlass && !isSudokube && meshRef.current) {
+      if (preserveFlipStyle && !biomeEnabled && !isGlass && !isSudokube && meshRef.current) {
         meshRef.current.material = getTileStyleMaterial(
           manifoldStyles?.[fromFaceId] || 'solid', flipFromColor.current,
           !!flipFromTexture.current, flipFromTexture.current, fc[ANTIPODAL_COLOR[fromFaceId]]);
         meshRef.current.visible = true;
       } else if (!isInstancedRef.current && meshRef.current) {
         const mat = meshRef.current?.material;
-        if (mat?.color && flipFromColor.current) {
+        if (isGlass && mat?.uniforms?.baseColor && flipFromColor.current) {
+          mat.uniforms.baseColor.value.set(flipFromColor.current);
+        } else if (mat?.color && flipFromColor.current) {
           mat.map = flipFromTexture.current || null;
           mat.color.set(flipFromTexture.current ? '#ffffff' : flipFromColor.current);
           mat.needsUpdate = true;
@@ -1183,7 +1189,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       if (isInstancedRef.current && flipFromColor.current) {
         instanceColorRef.current.setStyle(flipFromColor.current);
       }
-      if (!cleanChaosFlip) {
+      if (!preserveFlipStyle) {
         flipParticlesRef.current?.trigger(fc[curr]);
         flipShockwaveRef.current?.trigger(fc[curr]);
         shockT.current = 0;
@@ -1335,7 +1341,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       hitstopT.current = Math.max(0, hitstopT.current - delta);
     } else if (spinT.current > 0 && groupRef.current) {
       // Preserve the closed seam even after a slow frame/background-tab resume.
-      const frameDelta = cleanChaosFlip ? Math.min(delta, 0.035) : delta;
+      const frameDelta = preserveFlipStyle ? Math.min(delta, 0.035) : delta;
       const dt = Math.min(frameDelta * spinRateRef.current, spinT.current);
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
@@ -1356,7 +1362,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         flipFlashRef.current?.trigger();
       }
       if (atCrossing && blinkIdx === 0) {
-        if (cleanChaosFlip) {
+        if (preserveFlipStyle) {
           flipParticlesRef.current?.trigger(flipToColor.current);
           flipShockwaveRef.current?.trigger(flipToColor.current);
           shockT.current = 0;
@@ -1377,10 +1383,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             eyelidMatRef.current.uniforms.uColorTo.value.set(flipToColor.current);
           }
         }
-        hitstopT.current = cleanChaosFlip ? 0 : 0.05; // ~3 frames
+        hitstopT.current = quietFlip ? 0 : 0.05; // ~3 frames
         // Swap the shader-style mesh to the antipodal (TO) style while it's squished
         // shut, so the style reveals with the expand rather than popping at frame 0.
-        if (!isInstancedRef.current && meshRef.current?.material?.uniforms?.baseColor
+        if (isGlass && meshRef.current?.material?.uniforms?.baseColor) {
+          meshRef.current.material.uniforms.baseColor.value.set(baseColorRef.current);
+        } else if (!isInstancedRef.current && meshRef.current?.material?.uniforms?.baseColor
             && tileStyleRef.current && tileStyleRef.current !== 'solid') {
           meshRef.current.material = getTileStyleMaterial(
             tileStyleRef.current, baseColorRef.current, false, null, antipodalHexRef.current);
@@ -1391,7 +1399,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Eyelid (disparity) → squish scale.y (vertical, top+bottom converge to center).
       // Normal flip → squish scale.x (horizontal card rotation).
       const danger = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
-      const pose = cleanChaosFlip ? chaosFlipPose(p) : flipPose(p, danger);
+      const pose = quietFlip ? chaosFlipPose(p) : flipPose(p, danger);
       const { flipSquish, mainScale, crossScale } = pose;
       const squash = Math.min(1, mainScale);
       if (isDisparityFlipRef.current) {
@@ -1407,14 +1415,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       // Vibration: tile strains against the manifold crossing, peaks at midpoint.
       const vibEnv = Math.sin(p * Math.PI);
-      const jX = cleanChaosFlip ? 0 : Math.sin(p * Math.PI * 18) * 0.022 * vibEnv;
-      const jY = cleanChaosFlip ? 0 : Math.cos(p * Math.PI * 13) * 0.014 * vibEnv;
+      const jX = quietFlip ? 0 : Math.sin(p * Math.PI * 18) * 0.022 * vibEnv;
+      const jY = quietFlip ? 0 : Math.cos(p * Math.PI * 13) * 0.014 * vibEnv;
 
       // Blink bounce: the tile physically shoves out of the cube along its own
       // outward normal as the eyelid shuts, peaking with the lids closed and
       // settling back as they open — the sine bell a manual flip pops the cubie
       // with. Reach grows with the flip count and eases off over a blink burst.
-      if (cleanChaosFlip) {
+      if (quietFlip) {
         blinkBounceRef.current = pose.bounce;
       } else if (isDisparityFlipRef.current) {
         blinkBounceRef.current = blinkBounce(p, meta?.flips ?? 1, blinkIdx);
@@ -1502,7 +1510,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         {
           const dangerT = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
           shakeDurationRef.current = 0.4 + dangerT * 0.35;
-          shakeT.current = cleanChaosFlip ? 0 : shakeDurationRef.current;
+          shakeT.current = quietFlip ? 0 : shakeDurationRef.current;
         }
         flipFromColor.current = null;
         flipToColor.current = null;
@@ -1516,7 +1524,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           instanceColorRef.current.setStyle(baseColorRef.current);
         }
         const mat = meshRef.current?.material;
-        if (mat?.color) {
+        if (isGlass && mat?.uniforms?.baseColor) {
+          mat.uniforms.baseColor.value.set(baseColorRef.current);
+        } else if (mat?.color) {
           const finalTex = currTextureRef.current;
           mat.map = finalTex;
           mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
@@ -1582,7 +1592,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // on innerGroupRef so it never collides with the squish/shake/tremor writers
       // on groupRef. Settles to exactly 0.
       const u = shockT.current;
-      innerShockZ.current = cleanChaosFlip || u >= 1 ? 0 : -0.07 * Math.exp(-4.5 * u) * Math.sin(u * Math.PI * 3.0);
+      innerShockZ.current = quietFlip || u >= 1 ? 0 : -0.07 * Math.exp(-4.5 * u) * Math.sin(u * Math.PI * 3.0);
       applyInnerZ();
     }
 
@@ -1652,7 +1662,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
     // Switching from the legacy tremor must not leave its last random-looking
     // offset under the pair-symmetric pad transform. Transient flips still own it.
-    if (!wormHealerMode && settings?.flipPads !== 'off' && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
+    if (!wormHealerMode && flipPads !== 'off' && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
       groupRef.current.position.set(...pos);
     }
 
@@ -1660,7 +1670,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Sub-sampled to every other frame (30 Hz effective) — the vibration frequencies are
     // 6–41 Hz which are indistinguishable at 30 Hz vs 60 Hz updates.
     _tremorFrame++;
-    if ((wormHealerMode || settings?.flipPads === 'off') && showWormholeHazardFx && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0 && (_tremorFrame & 1) === 0) {
+    if ((wormHealerMode || flipPads === 'off') && showWormholeHazardFx && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0 && (_tremorFrame & 1) === 0) {
       const t = state.clock.elapsedTime;
       const flips = Math.min(meta?.flips ?? 1, 5);
       const tremIntensity = 0.004 + flips * 0.003;
@@ -1762,48 +1772,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // caused disposed materials to linger on corner-sticker meshes when the cache
   // evicted entries, producing wrong colors after rotations.
   const useGlassStyle = isGlass && !isSudokube;
-  const glassMaterialRef = useRef(null);
-  // Create the material once on mount (or when glass mode turns on).
-  // Subsequent color changes update the uniform in-place — no object reallocation.
-  useEffect(() => {
-    if (!useGlassStyle) {
-      if (glassMaterialRef.current) {
-        glassMaterialRef.current.dispose();
-        glassMaterialRef.current = null;
-      }
-      return;
-    }
-    const colorHex = baseColor || '#888888';
-    if (!glassMaterialRef.current) {
-      try {
-        // Clone from the shared cache so we get a fresh instance instead of the
-        // shared one that might be evicted / mutated by other stickers.
-        const shared = getGlassMaterial(colorHex);
-        glassMaterialRef.current = shared.clone();
-      } catch (e) {
-        console.warn('Failed to create glass material:', e);
-      }
-    } else {
-      // Update the existing material's color uniform in-place.
-      try {
-        glassMaterialRef.current.uniforms.baseColor.value.set(baseColor || '#888888');
-      } catch (_e) { /* ignore */ }
-    }
-    return () => {
-      glassMaterialRef.current?.dispose();
-      glassMaterialRef.current = null;
-    };
-  }, [useGlassStyle]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: create once
-
-  // Sync glass material color when baseColor changes (separate from creation)
-  useEffect(() => {
-    if (!glassMaterialRef.current) return;
-    try {
-      glassMaterialRef.current.uniforms.baseColor.value.set(baseColor || '#888888');
-    } catch (_e) { /* ignore */ }
-  }, [baseColor]);
-
-  const glassMaterial = useGlassStyle ? glassMaterialRef.current : null;
+  // Available on the first render, including stickers remounted by a turn.
+  // The layout effect below sets its live color before paint; flips update only
+  // that uniform instead of replacing glass with the equipped opaque style.
+  const glassMaterial = useMemo(() => useGlassStyle ? getGlassMaterial('#888888').clone() : null, [useGlassStyle]);
+  useEffect(() => () => glassMaterial?.dispose(), [glassMaterial]);
 
   // Full-face GLBs (arch, volcano) cover the entire sticker — suppress shader + volumes beneath them.
   const glbFullFace = biomeEnabled && !!stableCity && isGLBFullFace(stableCity);
@@ -1833,14 +1806,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const backTileStyle = isDead ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
   const backMaterial = useMemo(() => {
     if (!antipodalHex) return null;
+    if (useGlassStyle) {
+      const material = getGlassMaterial(isDead ? '#555555' : antipodalHex).clone();
+      material.side = THREE.FrontSide;
+      return material;
+    }
     if (backTileStyle !== 'solid') return getTileStyleMaterial(backTileStyle, antipodalHex, false, null, baseColor);
     return new THREE.MeshStandardMaterial({ color: isDead ? '#555555' : antipodalHex, roughness: 0.45, metalness: 0.08 });
-  }, [backTileStyle, antipodalHex, baseColor, isDead]);
+  }, [backTileStyle, antipodalHex, baseColor, isDead, useGlassStyle]);
   useEffect(() => () => {
     // Shader styles belong to the shared tile cache; only the plain back owns
-    // its material. Disposing a cached shader here would damage other stickers.
-    if (backMaterial?.isMeshStandardMaterial) backMaterial.dispose();
-  }, [backMaterial]);
+    // its material, along with the glass clone. Never dispose a cached shader.
+    if (useGlassStyle || backMaterial?.isMeshStandardMaterial) backMaterial?.dispose();
+  }, [backMaterial, useGlassStyle]);
 
   // Set up UVs to show the correct portion of the face texture
   // Skip for hollow frame geometry (different UV layout, textures not applicable)
@@ -1873,7 +1851,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // effect body and its deps array — the ref write still lands in the commit phase.
   const nextCurr = meta?.curr ?? 0;
   const nextFlips = meta?.flips ?? 0;
-  const hasPendingFlipAnimation = nextFlips !== prevFlips.current
+  const hasPendingFlipAnimation = stickerGridId === prevGridIdRef.current
+    && nextFlips !== prevFlips.current
     && nextCurr !== prevCurr.current
     && ANTIPODAL_COLOR[prevCurr.current] === nextCurr;
   const isInstanceable = (
@@ -1920,16 +1899,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       instanceColorRef.current.setStyle(materialColor);
     }
     if (meshRef.current && meshRef.current.material
-        && ((cleanChaosFlip && isFlipPending) || (!isFlipping.current && spinT.current <= 0))) {
+        && ((preserveFlipStyle && isFlipPending) || (!isFlipping.current && spinT.current <= 0))) {
       const mat = meshRef.current.material;
-      if (isFlipPending) {
+      if (useGlassStyle && glassMaterial) {
+        meshRef.current.material = glassMaterial;
+        if (!isFlipPending) glassMaterial.uniforms.baseColor.value.set(baseColor);
+      } else if (isFlipPending) {
         // Paint the FROM color onto the mesh before the browser paints — closes the
         // commit→paint gap that would otherwise show one frame of the already-updated
         // TO color. The spinReveal is now an additive rim glow (not a full cover), so
         // the mesh must hold the correct color itself.
-        const fromFaceId = cleanChaosFlip ? displayedFaceRef.current : prevCurr.current;
+        const fromFaceId = preserveFlipStyle ? displayedFaceRef.current : prevCurr.current;
         const fromColor = fc[fromFaceId];
-        if (cleanChaosFlip && !biomeEnabled && !isGlass && !isSudokube && fromColor) {
+        if (preserveFlipStyle && !biomeEnabled && !isGlass && !isSudokube && fromColor) {
           const texture = faceTextures?.[fromFaceId] || null;
           meshRef.current.material = getTileStyleMaterial(
             manifoldStyles?.[fromFaceId] || 'solid', fromColor,
@@ -1969,7 +1951,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       neonBorderMatRef.current.uniforms.uColor.value.set(antipodalHexRef.current ?? materialColor);
       neonBorderMatRef.current.uniforms.uFlipRatio.value = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
     }
-  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation]);
+  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
 
@@ -1996,7 +1978,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           already compiled lazily on first use — gating changes node count, not
           compile timing. hasFlipHistory latches true on the flip that mounts them,
           the same commit whose flip-start effect then wires their refs. */}
-      {hasFlipHistory && !presentation?.suppressFlipBursts && (
+      {hasFlipHistory && !chaosFlip && !presentation?.suppressFlipBursts && (
         <mesh ref={spiderPlaneRef} position={[0, 0, -1.01]} rotation={[0, Math.PI, 0]} visible={false}>
           <planeGeometry args={[0.92, 0.92]} />
           <shaderMaterial
@@ -2037,7 +2019,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         )}
 
         {/* Main sticker quad — omitted when the InstancedMesh handles rendering */}
-        {!isInstanceable && <mesh ref={meshRef} key={hollow ? 'frame' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
+        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
           {hollow ? (
             <shapeGeometry args={[_stickerFrameShape]} />
           ) : faceRow != null ? (
@@ -2320,7 +2302,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <>
           {/* Parity breakthrough — original color trying to push through.
               LOD: skip at flips === 1 (6–8 blended meshes saved for the very first wormhole frame). */}
-          {isWormhole && (meta?.flips ?? 1) >= 2 && <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />}
+          {isWormhole && !chaosFlip && (meta?.flips ?? 1) >= 2 && <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />}
 
           {isWormhole && <mesh position={[0, 0, 0.018]} renderOrder={2}>
             <primitive object={_sharedStickerGeo} attach="geometry" />
@@ -2418,10 +2400,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           <FlipShockwave ref={flipShockwaveRef} />
 
           {/* Crossing bloom + chromatic flash — fires at the midpoint hitstop. */}
-          {!cleanChaosFlip && <FlipFlash ref={flipFlashRef} />}
+          {!quietFlip && <FlipFlash ref={flipFlashRef} />}
 
           {/* Antipodal glow fill — edge ring collapses in as the core fills out. */}
-          {!cleanChaosFlip && <AntipodalGlowFill ref={glowFillRef} />}
+          {!preserveFlipStyle && <AntipodalGlowFill ref={glowFillRef} />}
         </>
       )}
 

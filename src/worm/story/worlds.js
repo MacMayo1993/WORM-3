@@ -34,7 +34,7 @@ export const STORY_WORLDS = {
   13: world('Number Garden', 'saffron', 'lounge', ['dice', 'cornerAccent', 'innerDisc'], 'steps', { visualMode: 'sudokube' }),
   14: world('Glass Carousel', 'gemstone', 'stadium', ['holographic', 'stainedGlass', 'glossy'], 'diagonals', { visualMode: 'glass' }),
   15: world('Chrome Works', 'noire', 'shanghai', ['metallic', 'liquidChrome', 'carbonFiber'], 'diamonds', { visualMode: 'chrome' }),
-  16: world('Sea of Seven', 'reef', 'cave', ['coralPolyps', 'water', 'ribbonEstuary'], 'lanes', { visualMode: 'gap' }),
+  16: world('Sea of Seven', 'reef', 'cave', ['coralPolyps', 'water', 'ribbonEstuary'], 'lanes'),
   17: world('Launch Pad', 'sunset', 'desert', ['solar', 'sundial', 'sand'], 'channels'),
   18: world('Blast Yard', 'halloween', 'fireplace', ['shockwave', 'emberstorm', 'lava'], 'branches'),
   19: world('Neon Arcade', 'neon', 'paris', ['neonSign', 'pulse', 'quantumScanlines'], 'bastions', { visualMode: 'neon' }),
