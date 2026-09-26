@@ -39,7 +39,8 @@ describe('Mobi dialogue interaction', () => {
   it('cancels pending completion when a different screen unmounts Mobi', () => {
     const complete = vi.fn();
     show({ lines: ['Ready.'], onComplete: complete });
-    act(() => buttons()[1].click());
+    act(() => buttons()[1].click()); // finishes the line
+    act(() => buttons()[1].click()); // launches
     act(() => root.render(null));
     act(() => vi.runAllTimers());
     expect(complete).not.toHaveBeenCalled();
@@ -61,5 +62,20 @@ describe('Mobi dialogue interaction', () => {
     show({ lines: [], onComplete: complete });
     expect(complete).toHaveBeenCalledTimes(1);
     expect(host.textContent).toBe('');
+  });
+
+  // The line is spoken onto the page; Next finishes it before moving on, so no
+  // one skips words they never saw. Screen readers get the whole line at once.
+  it('speaks each line, finishing it on the first Next and advancing on the second', () => {
+    show();
+    const spoken = () => host.querySelector('p > [aria-hidden="true"]').firstChild?.textContent ?? '';
+    expect(host.textContent).toContain('First instruction.');
+    expect(spoken().length).toBeLessThan('First instruction.'.length);
+    act(() => buttons()[1].click());
+    expect(spoken()).toBe('First instruction.');
+    act(() => buttons()[1].click());
+    expect(host.textContent).toContain('Second instruction.');
+    expect(host.querySelector('p > [aria-hidden="true"]').textContent).toBe('Second instruction.');
+    expect(buttons()[1].textContent).toContain('Launch');
   });
 });

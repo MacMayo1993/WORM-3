@@ -2,11 +2,13 @@ import DemoDialog from './DemoDialog.jsx';
 // src/components/screens/MobiIntroScreen.jsx
 /**
  * MobiIntroScreen — Civ 6-style dialogue: full-width panel at bottom,
- * character portrait on the left peaking above, nameplate tab on top-left edge.
+ * character portrait on the left peaking above, nameplate on the top-left edge.
+ * The look and the spoken-line reveal live in MobiStage.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { UI_FONT, HAND_FONT, PAPER_BACKDROP_BLUR, Z } from '../../utils/uiTheme.js';
+import { PAPER_BACKDROP_BLUR, Z } from '../../utils/uiTheme.js';
+import MobiStage, { MobiKey, useMobiSpeech } from './MobiStage.jsx';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
@@ -75,48 +77,6 @@ export const MOBI_LINES_RANDOM = [
   "Your chosen size and background stay fixed.",
 ];
 
-// ── CSS ───────────────────────────────────────────────────────────────────────
-const _STYLE_ID = 'mobi-hud-keyframes';
-if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
-  const s = document.createElement('style');
-  s.id = _STYLE_ID;
-  s.textContent = `
-    @keyframes mobiSlideIn {
-      from { transform: translateX(-30px); opacity: 0; }
-      to   { transform: translateX(0);     opacity: 1; }
-    }
-    @keyframes mobiDissolveOut {
-      from { opacity: 1; transform: translateX(0) scale(1); }
-      to   { opacity: 0; transform: translateX(-22px) scale(0.95); }
-    }
-    @keyframes panelRise {
-      from { opacity: 0; transform: translateY(12px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes panelFadeDown {
-      from { opacity: 1; transform: translateY(0); }
-      to   { opacity: 0; transform: translateY(10px); }
-    }
-    @keyframes textFadeIn {
-      from { opacity: 0; transform: translateY(2px); filter: blur(0.4px); }
-      to   { opacity: 1; transform: translateY(0); filter: blur(0); }
-    }
-    @keyframes cursorBlink {
-      0%,100% { opacity: 1; }
-      50%      { opacity: 0; }
-    }
-    @keyframes pencilCursorWiggle {
-      0%, 100% { transform: translateY(0) rotate(-7deg); }
-      50% { transform: translateY(-1px) rotate(-3deg); }
-    }
-    @keyframes paperSettle {
-      from { transform: translateY(16px) rotate(-0.4deg); opacity: 0; }
-      to { transform: translateY(0) rotate(0deg); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(s);
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 // Optional props for reuse beyond mode intros (demo step dialogues):
@@ -134,7 +94,7 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
   const isLast = index === lines.length - 1;
   const dismissTimer = useRef(null);
   const dismissed = useRef(false);
-  const primaryRef = useRef(null);
+  const speech = useMobiSpeech(lines[index] ?? '');
   useEffect(() => {
     return () => clearTimeout(dismissTimer.current);
   }, []);
@@ -144,10 +104,6 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
       onComplete();
     }
   }, [lines.length, onComplete]);
-
-  // webp is ~10x smaller than the source png; fall back to png on decode error.
-  const mobiImgSrc = `${import.meta.env.BASE_URL}Mobi.webp`;
-  const mobiImgFallback = `${import.meta.env.BASE_URL}Mobi.png`;
 
   // One cancellable completion: rapid taps and a parent unmount cannot launch
   // the next step twice or fire an old step’s callback over a newer screen.
@@ -161,32 +117,16 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
   const dismiss = useCallback(() => finish(onComplete), [finish, onComplete]);
   const skip = useCallback(() => finish(onSkip || onComplete), [finish, onSkip, onComplete]);
 
+  // Next while Mobi is still talking finishes the line first, so nobody skips
+  // words they never saw; the next press moves on.
   const advance = useCallback(() => {
     if (isDismissing) return;
+    if (speech.finish()) return;
     if (isLast) dismiss();
     else setIndex(i => i + 1);
-  }, [isDismissing, isLast, dismiss]);
-
-
+  }, [isDismissing, isLast, dismiss, speech]);
 
   if (!lines.length) return null;
-
-  const accent      = 'rgba(98, 132, 164, 0.78)';
-  const accentSolid = '#486f95';
-  const pencilLead  = '#35404a';
-  const paperBase   = '#fbf7e9';
-  const graphLine   = 'rgba(80, 142, 190, 0.20)';
-  const graphMajor  = 'rgba(80, 142, 190, 0.32)';
-  const PANEL_H     = 'clamp(166px, 24vh, 230px)';
-  const NAMEPLATE_H = 34;
-
-  const mobiAnim = isDismissing
-    ? 'mobiDissolveOut 0.25s ease forwards'
-    : 'mobiSlideIn 0.45s cubic-bezier(0.16,1,0.3,1) forwards';
-
-  const uiAnim = isDismissing
-    ? 'panelFadeDown 0.25s ease forwards'
-    : 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards';
 
   return (
     <DemoDialog
@@ -203,7 +143,7 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
         // Above all in-game chrome (nav bar, HUD, mobile controls) — a Mobi
         // dialogue is a blocking beat; only demo shell overlays sit higher.
         zIndex: Z.INTRO,
-        background: 'linear-gradient(to top, rgba(34, 31, 25, 0.38) 0%, rgba(34, 31, 25, 0.10) 42%, transparent 68%)',
+        background: 'linear-gradient(to top, rgba(38, 55, 45, 0.30) 0%, rgba(38, 55, 45, 0.08) 42%, transparent 68%)',
         pointerEvents: isDismissing ? 'none' : 'auto',
         cursor: 'default',
       }}
@@ -218,217 +158,24 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
         WebkitBackdropFilter: isDismissing ? 'none' : PAPER_BACKDROP_BLUR,
         transition: 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease',
       }} />
-      {/* ── Mobi portrait — bottom-left, behind panel (local z:1 < panel z:2).
-          The root establishes its own stacking context at Z.INTRO, so these are
-          local sibling-ordering values, not points on the global Z scale. ── */}
-      <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        zIndex: 1,
-        pointerEvents: 'none',
-        lineHeight: 0,
-        animation: mobiAnim,
-      }}>
-        <img
-          src={mobiImgSrc}
-          alt="Mobi"
-          style={{ display: 'block', height: 'min(62dvh, 560px)', width: 'auto' }}
-          onError={e => {
-            if (e.currentTarget.src !== mobiImgFallback) e.currentTarget.src = mobiImgFallback;
-            else e.currentTarget.style.display = 'none';
-          }}
-        />
-      </div>
-
-      {/* ── Dialogue panel — full screen width, anchored at bottom ──
-          The nameplate tab is rendered INSIDE this element (below), pinned to
-          its top edge. It used to be a sibling positioned `bottom: PANEL_H`,
-          which assumed the panel was exactly that tall — a long line wraps to
-          more rows, the panel grows past PANEL_H, and the tab ended up sitting
-          on top of the first line of dialogue. */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          minHeight: `min(${PANEL_H}, 65dvh)`,
-          maxHeight: 'calc(100dvh - 100px)',
-          backgroundColor: paperBase,
-          backgroundImage: `
-            linear-gradient(${graphLine} 1px, transparent 1px),
-            linear-gradient(90deg, ${graphLine} 1px, transparent 1px),
-            linear-gradient(${graphMajor} 1px, transparent 1px),
-            linear-gradient(90deg, ${graphMajor} 1px, transparent 1px),
-            radial-gradient(circle at 18% 24%, rgba(255,255,255,0.64), transparent 28%),
-            linear-gradient(115deg, rgba(255,255,255,0.34), rgba(219,205,176,0.20))
-          `,
-          backgroundSize: '18px 18px, 18px 18px, 90px 90px, 90px 90px, 100% 100%, 100% 100%',
-          backgroundPosition: '0 0, 0 0, -1px -1px, -1px -1px, 0 0, 0 0',
-          borderTop: `2px solid ${accent}`,
-          boxShadow: '0 -14px 42px rgba(48, 39, 28, 0.22), inset 0 1px 0 rgba(255,255,255,0.72)',
-          zIndex: 2,
-          pointerEvents: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          paddingTop:    'clamp(12px, 2vh, 18px)',
-          paddingLeft:   'clamp(16px, 3vw, 32px)',
-          paddingRight:  'clamp(16px, 3vw, 32px)',
-          paddingBottom: 'max(clamp(20px, 3.5vh, 30px), env(safe-area-inset-bottom, 0px))',
-          boxSizing: 'border-box',
-          animation: uiAnim,
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Nameplate tab — pinned to this panel's top edge, whatever its height */}
-        <div style={{
-          position: 'absolute',
-          top: -(NAMEPLATE_H + 4),
-          left: 0,
-          pointerEvents: 'none',
-          animation: isDismissing ? uiAnim : 'paperSettle 0.48s cubic-bezier(0.16,1,0.3,1) forwards',
-        }}>
-          {/* Outer layer = border color */}
-          <div style={{
-            background: accent,
-            clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)',
-            padding: '2px',
-            display: 'inline-block',
-          }}>
-            {/* Inner layer = fill */}
-            <div style={{
-              background: paperBase,
-              height: NAMEPLATE_H,
-              padding: '0 22px 0 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              boxShadow: 'inset 0 0 0 1px rgba(91, 72, 45, 0.10)',
-            }}>
-              <span style={{
-                fontFamily: UI_FONT,
-                fontSize: 14,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: pencilLead,
-              }}>
-                MOBI
-              </span>
-              <span style={{
-                fontFamily: UI_FONT,
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: '0.15em',
-                textTransform: 'uppercase',
-                color: accentSolid,
-                opacity: 0.78,
-              }}>
-                {modeName || 'WORM MODE'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Dialogue text */}
-        <div
-          key={index}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            overscrollBehavior: 'contain',
-            animation: 'textFadeIn 0.2s ease forwards',
-          }}
-        >
-          <p style={{
-            margin: 0,
-            fontFamily: HAND_FONT,
-            fontSize: 'clamp(24px, 5.5vw, 34px)',
-            fontWeight: '400',
-            color: pencilLead,
-            lineHeight: 1.45,
-            letterSpacing: '0.02em',
-            textShadow: '0.35px 0.35px 0 rgba(53,64,74,0.22), -0.25px 0 rgba(53,64,74,0.12)',
-          }}>
-            {lines[index]}
-
-          </p>
-        </div>
-
-        {/* Footer: dots + buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-            {lines.map((_, i) => (
-              <div key={i} style={{
-                width: i === index ? '16px' : '5px',
-                height: '5px',
-                borderRadius: '3px',
-                background: i === index ? accentSolid : 'rgba(72,111,149,0.24)',
-                transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
-              }} />
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button
-              type="button"
-              disabled={isDismissing}
-              onClick={(e) => { e.stopPropagation(); skip(); }}
-              style={{
-                background: 'none',
-                border: '1px solid rgba(53,64,74,0.22)',
-                color: pencilLead,
-                fontSize: '11px',
-                fontWeight: '500',
-                minHeight: 48,
-                touchAction: 'manipulation',
-                padding: '8px 14px',
-                borderRadius: '999px',
-                cursor: 'pointer',
-                fontFamily: UI_FONT,
-                letterSpacing: '0.06em',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.42)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
-            >
-              {skipLabel || 'Skip'}
-            </button>
-
-            <button
-              type="button"
-              ref={primaryRef}
-              data-demo-autofocus
-              disabled={isDismissing}
-              onClick={(e) => { e.stopPropagation(); advance(); }}
-              style={{
-                background: isLast ? pencilLead : 'rgba(251,247,233,0.72)',
-                border: `1px solid ${accentSolid}`,
-                color: isLast ? '#fbf7e9' : accentSolid,
-                fontSize: '12px',
-                fontWeight: '700',
-                minHeight: 48,
-                touchAction: 'manipulation',
-                padding: '8px 20px',
-                borderRadius: '999px',
-                cursor: 'pointer',
-                fontFamily: UI_FONT,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                boxShadow: isLast ? '0 6px 14px rgba(53,64,74,0.20)' : '0 3px 8px rgba(53,64,74,0.08)',
-                transition: 'all 0.18s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 7px 16px rgba(53,64,74,0.24)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = isLast ? '0 6px 14px rgba(53,64,74,0.20)' : '0 3px 8px rgba(53,64,74,0.08)'; e.currentTarget.style.transform = 'none'; }}
-            >
-              {isLast ? (primaryLabel || 'Launch ▶') : 'Next ▶'}
-            </button>
-          </div>
-        </div>
-      </div>
+      <MobiStage
+        line={lines[index]}
+        lineKey={index}
+        index={index}
+        count={lines.length}
+        tag={modeName || 'WORM MODE'}
+        dismissing={isDismissing}
+        speech={speech}
+        actions={<>
+          <MobiKey disabled={isDismissing} onClick={(e) => { e.stopPropagation(); skip(); }}>
+            {skipLabel || 'Skip'}
+          </MobiKey>
+          <MobiKey primary={isLast} data-demo-autofocus disabled={isDismissing}
+            onClick={(e) => { e.stopPropagation(); advance(); }}>
+            {isLast ? (primaryLabel || 'Launch ▶') : 'Next ▶'}
+          </MobiKey>
+        </>}
+      />
     </DemoDialog>
   );
 };
