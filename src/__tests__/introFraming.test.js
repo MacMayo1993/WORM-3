@@ -3,7 +3,7 @@ import { Group, PerspectiveCamera, Vector3 } from 'three';
 import { INTRO_SCALE, introPictureBounds, placeIntroFrame } from '../components/intro/introFraming.js';
 import { sampleIntro, introCameraDistance } from '../components/intro/introChoreography.js';
 
-it('keeps the lowered cube inside its copy- and button-free rectangle', () => {
+it('keeps the raised cube inside its fitted picture rectangle', () => {
   for (const [width, height] of [[320, 568], [390, 664], [412, 804], [768, 1024], [1280, 800], [844, 390]]) {
     for (const time of [1, 2.8, 4.4, 7.2, 8.5]) {
       const pose = sampleIntro(time), spacing = 1 + 1.5 * pose.open, extent = spacing + .56;
