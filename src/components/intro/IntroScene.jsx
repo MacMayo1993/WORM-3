@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { STICKER_OFFSET, createCubieGeometry, createStickerGeometry, rubiksFinish } from '../../3d/rubiksPiece.js';
 import { INTRO_STICKERS } from './introStickers.js';
 import { INTRO_SCALE, placeIntroFrame } from './introFraming.js';
 import IntroTunnels from './IntroTunnels.jsx';
@@ -16,23 +16,6 @@ import { introOutro } from './introOutro.js';
 import { addIntroDissolve } from './introDissolve.js';
 
 const [ORIGINAL, FLIPPED] = INTRO_STICKERS;
-
-// A glossy, slightly domed sticker: a rounded square with a bevelled edge that
-// catches the key light as it turns.
-function stickerGeometry() {
-  const size = 0.84, r = 0.14, h = size / 2;
-  const shape = new THREE.Shape();
-  shape.moveTo(-h + r, -h);
-  shape.lineTo(h - r, -h); shape.quadraticCurveTo(h, -h, h, -h + r);
-  shape.lineTo(h, h - r); shape.quadraticCurveTo(h, h, h - r, h);
-  shape.lineTo(-h + r, h); shape.quadraticCurveTo(-h, h, -h, h - r);
-  shape.lineTo(-h, -h + r); shape.quadraticCurveTo(-h, -h, -h + r, -h);
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.02, bevelEnabled: true, bevelThickness: 0.014, bevelSize: 0.014, bevelSegments: 2, curveSegments: 5
-  });
-  geometry.translate(0, 0, -0.01);
-  return geometry;
-}
 
 // A soft round contact shadow for the paper.
 function shadowTexture() {
@@ -53,13 +36,10 @@ function shadowTexture() {
 // sticker, and (seen only when it bursts open) the core its centres turn on.
 // The plastic and stickers dissolve together at the end (introDissolve.js).
 function introMaterials(performanceMode, dissolve) {
-  const Material = performanceMode ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
-  const gloss = coat => performanceMode ? {} : coat;
+  const { Material, plastic, sticker } = rubiksFinish(performanceMode);
   return {
-    plastic: addIntroDissolve(new Material({ color: '#141416', roughness: 0.34, metalness: 0,
-      ...gloss({ clearcoat: 0.4, clearcoatRoughness: 0.35 }) }), dissolve),
-    sticker: addIntroDissolve(new Material({ roughness: 0.24, metalness: 0,
-      ...gloss({ clearcoat: 1, clearcoatRoughness: 0.12 }) }), dissolve)
+    plastic: addIntroDissolve(new Material(plastic), dissolve),
+    sticker: addIntroDissolve(new Material(sticker), dissolve)
   };
 }
 const inTwistLayer = position => position[TWIST_LAYER.axis] === TWIST_LAYER.index;
@@ -78,10 +58,10 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
     const colors = {};
     for (let id = 1; id <= 6; id++) colors[id] = new THREE.Color(introColor(id));
     return {
-      body: new RoundedBoxGeometry(0.96, 0.96, 0.96, 3, 0.08),
+      body: createCubieGeometry(),
       coreArm: new THREE.CylinderGeometry(0.1, 0.1, 1, 14),
       coreHub: new THREE.SphereGeometry(0.34, 20, 14),
-      sticker: stickerGeometry(),
+      sticker: createStickerGeometry(),
       shadow: shadowTexture(),
       dissolve: { value: 0 },
       layerQuat: new THREE.Quaternion(), yAxis: new THREE.Vector3(0, 1, 0),
@@ -152,7 +132,7 @@ export default function IntroScene({ time, onComplete, reducedMotion = false, pe
       const flip = stickerFlip(tile, time, reducedMotion);
       normal.set(0, 0, 0).setComponent(tile.face.axis, tile.face.sign);
       dummy.position.set(tile.position[0] * spacing, tile.position[1] * spacing, tile.position[2] * spacing)
-        .addScaledVector(normal, 0.5 + 0.012 + flip.lift);
+        .addScaledVector(normal, STICKER_OFFSET + flip.lift);
       faceQuat.setFromEuler(euler.set(...tile.face.rotation));
       flipQuat.setFromAxisAngle(xAxis, flip.angle);
       dummy.quaternion.copy(faceQuat).multiply(flipQuat);
