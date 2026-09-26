@@ -1000,11 +1000,12 @@ export function useDemoMode({
     const total = size * size;
     const away = displacedPairCount(cubies);
     if (phase === 'flip-all') {
-      setDemoFlipProgress({ phase, done: Math.min(away, total), total });
       if (away >= total) {
         demoFlipPhaseRef.current = 'unflip-all';
-        setDemoCoachCopy('Nine pairs are across! Tap the moved tiles again until the counter shows they’re all home.');
-      }
+        // Hand off immediately in the same compact task card. Reopening Mobi
+        // here covered the cube and collided with the still-visible task HUD.
+        setDemoFlipProgress({ phase: 'unflip-all', done: 0, total });
+      } else setDemoFlipProgress({ phase, done: away, total });
     } else if (phase === 'unflip-all') {
       setDemoFlipProgress({ phase, done: Math.max(0, total - away), total });
       if (away === 0) {

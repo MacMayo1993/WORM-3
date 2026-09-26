@@ -13,13 +13,13 @@ vi.mock('../manifold/RestingCords.jsx', () => ({ default: () => null }));
 vi.mock('../manifold/TunnelSnap.jsx', () => ({ default: () => null }));
 extend(THREE);
 
-it.each([[true, 0, 'off'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'subtle']])('shows raised bands with Off/Hints, drops healed pairs, and preserves budgets (WORM=%s, chaos=%i, saved=%s)', async (wormHealerMode, chaosLevel, flipPads) => {
+it.each([[true, 0, 'off'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'subtle'], [false, 0, 'off', true], [false, 0, 'subtle', true]])('shows raised bands with Off/Hints, drops healed pairs, and preserves budgets (WORM=%s, chaos=%i, saved=%s)', async (wormHealerMode, chaosLevel, flipPads, demoMode = false) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState(), size = 7;
   let cubies = makeCubies(size);
   const manifoldMap = buildManifoldGridMap(cubies, size);
   for (let z = 1; z <= 5; z++) cubies = flipStickerPair(cubies, size, 0, 3, z, 'NX', manifoldMap);
-  useGameStore.setState({ cubies, size, wormHealerMode, chaosLevel, mirrorMode: false, demoMode: false, showTunnels: false,
+  useGameStore.setState({ cubies, size, wormHealerMode, chaosLevel, mirrorMode: false, demoMode, showTunnels: false,
     tunnelDetail: 'hints', tunnelBirths: {}, tunnelPulses: {}, tunnelDeaths: {},
     settings: { ...before.settings, flipPads, manifoldStyles: { 5: 'checkerboard', 2: 'circuit' } } });
   const canvas = document.createElement('canvas');
@@ -55,7 +55,7 @@ it.each([[true, 0, 'off'], [false, 0, 'full'], [false, 3, 'off'], [false, 3, 'su
     await act(async () => useGameStore.setState({ cubies })); await draw();
     expect(bands()).toHaveLength(chaosLevel > 0 ? 3 : 4);
     expect(useGameStore.getState().settings.flipPads).toBe(flipPads);
-    await act(async () => useGameStore.setState({ chaosLevel: 0, wormHealerMode: false, showTunnels: false, settings: { ...useGameStore.getState().settings, flipPads: 'off' } }));
+    await act(async () => useGameStore.setState({ chaosLevel: 0, wormHealerMode: false, demoMode: false, showTunnels: false, settings: { ...useGameStore.getState().settings, flipPads: 'off' } }));
     expect(bands()).toHaveLength(0);
     await act(async () => useGameStore.setState({ wormHealerMode: true, demoMode: true }));
     expect(bands()).toHaveLength(0);

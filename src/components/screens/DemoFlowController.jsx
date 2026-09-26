@@ -537,27 +537,14 @@ const ensureDemoShellStyle = () => {
       bottom: calc(env(safe-area-inset-bottom, 0px) + 196px);
     }
 
-    /* Flip-gateway progress pill — bottom-center, stacked above the step hint so
-       both read at once. Shows how many front-face tiles are flipped (or
-       restored) so the loop feels bounded. */
+    /* Step three keeps its counter and current instruction in one task dock. */
     .demo-flip-progress {
-      position: fixed;
-      left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 148px);
-      transform: translateX(-50%);
-      z-index: 11000;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 10px;
-      padding: 8px 15px;
-      border-radius: 999px;
-      background: rgba(250, 247, 238, 0.94);
-      border: 1px solid rgba(111, 126, 86, 0.25);
-      box-shadow: 0 10px 26px rgba(40, 48, 32, 0.22);
+      padding-bottom: 8px;
       color: #27351f;
-      font-family: ${UI_FONT};
-      pointer-events: none;
-      animation: demo-worm-hint-in 0.4s ease both;
     }
 
     .demo-flip-progress-label {
@@ -566,6 +553,7 @@ const ensureDemoShellStyle = () => {
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: #657156;
+      white-space: nowrap;
     }
 
     .demo-flip-progress-track {
@@ -589,6 +577,8 @@ const ensureDemoShellStyle = () => {
       color: #35452a;
       white-space: nowrap;
     }
+
+    .demo-flip-task p { margin: 0; }
   `;
   document.head.appendChild(style);
 };
@@ -768,8 +758,7 @@ const TRY_COPY = {
 
 // Coach: the guidance already played inside the step-intro dialogue and the hint
 // pill names the gesture, so the default coach is just a compact "Next ▶" pill.
-// Only a copy OVERRIDE (flip-gateway's second phase) brings Mobi back — that
-// line is new info. Dismissing the override clears it in the hook (onCopySeen)
+// An explicit copy override brings Mobi back. Dismissing it clears the hook (onCopySeen)
 // rather than in local state, so the parent knows the blocking panel is gone and
 // can put the bottom nav back.
 const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => {
@@ -810,7 +799,7 @@ const DemoStepHint = ({ step }) => {
   ensureDemoShellStyle();
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const copy = TRY_COPY[step];
-  if (!copy || step === 'worm-traversal') return null;
+  if (!copy || step === 'worm-traversal' || step === 'flip-gateway') return null;
   return (
     <div
       className={`demo-step-hint${wormHealerMode ? ' demo-step-hint--worm' : ''}`}
@@ -1182,12 +1171,17 @@ const DemoFlipProgress = ({ progress }) => {
   const label = phase === 'unflip-all' ? 'Home' : 'Sent Through';
   const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
   return (
-    <div className="demo-flip-progress" role="status" aria-live="polite">
-      <span className="demo-flip-progress-label">{label}</span>
-      <div className="demo-flip-progress-track">
-        <div className="demo-flip-progress-fill" style={{ width: `${pct}%` }} />
+    <div className="demo-step-hint demo-flip-task" role="status" aria-live="polite">
+      <div className="demo-flip-progress">
+        <span className="demo-flip-progress-label">{label}</span>
+        <div className="demo-flip-progress-track">
+          <div className="demo-flip-progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="demo-flip-progress-count">{done} / {total}</span>
       </div>
-      <span className="demo-flip-progress-count">{done} / {total}</span>
+      <p>{phase === 'unflip-all'
+        ? 'All nine pairs are across. Tap the raised tiles to bring them home.'
+        : 'Tap nine different pairs to send them through the cube.'}</p>
     </div>
   );
 };
