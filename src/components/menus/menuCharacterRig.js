@@ -7,13 +7,11 @@ import { finishWormEyes, wormBodyTaper } from '../../worm/wormCharacterFinish.js
 import { layoutWormFace, FACE_LAYOUT } from '../../worm/wormFaceLayout.js';
 import { animateWormFace } from '../../worm/wormFaceExpression.js';
 import { prefersReducedMotion } from '../../utils/device.js';
-import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import { makeWormHaloSprite } from '../../worm/wormGlowHalo.js';
 import { SPINE_GEO_ARGS, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_GEO_ARGS, PAGE_COLORS, createBookPageGeometry, createBookPaperMaterial, pageHingeAngles } from '../../worm/wormBookFX.js';
 import { MENU_WORM_RADIUS, MENU_WORM_SEGMENTS } from './menuTunnelWormPath.js';
 
-export const menuCharacterPair = cycle => [0, 1].map(i => WORM_CHARACTERS[((cycle * 2 + i) % WORM_CHARACTERS.length + WORM_CHARACTERS.length) % WORM_CHARACTERS.length].id);
 const SKINS = { classic: 'slime', book: 'royal', inch: 'moss', glow: 'ice', wiggle: 'bubble', prism: 'royal', mobi: 'royal' };
 
 // Menu rigs borrow the playable characters' geometry, paper, faces and MOBI assets.

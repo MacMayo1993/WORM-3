@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Matrix4, Vector3 } from 'three';
-import { createMenuWormTraffic, advanceMenuWormTraffic } from '../components/menus/menuWormTraffic.js';
+import { createMenuWormTraffic, advanceMenuWormTraffic, MENU_WORM_CHARACTERS } from '../components/menus/menuWormTraffic.js';
 import { createMenuPortalFrames, raisedMenuDistance } from '../components/menus/menuPortalFrames.js';
-import { MENU_WORM_TAIL, menuTunnelKey } from '../components/menus/menuTunnelWormPath.js';
+import { MENU_WORM_TAIL, sampleMenuTunnelWorm } from '../components/menus/menuTunnelWormPath.js';
+import { MENU_FLIP_PAIRS } from '../components/menus/menuCenterPortals.js';
 
 const move = new Matrix4(), spin = new Matrix4(), offset = new Vector3();
 function animateFrames(frames, time) {
@@ -20,72 +21,75 @@ function animateFrames(frames, time) {
 }
 
 function assertExclusive(traffic) {
-  const occupied = new Map();
+  const occupied = new Set();
   for (const route of traffic.routes) {
-    if (route.done) continue;
-    const tail = raisedMenuDistance(route.trail, route.distance) - MENU_WORM_TAIL;
-    for (const span of route.path.tunnelSpans) {
-      if (route.distance <= span.start + 1e-9 || tail > raisedMenuDistance(route.trail, span.end)) continue;
-      expect(occupied.has(span.key), `two worms in ${span.key}`).toBe(false);
-      occupied.set(span.key, route.id);
-      expect(traffic.locks.get(span.key)?.owner).toBe(route.id);
+    if (route.done) {
+      expect(traffic.locks.has(route.portal)).toBe(false);
+      continue;
     }
+    expect(occupied.has(route.portal), `two worms in ${route.portal}`).toBe(false);
+    occupied.add(route.portal);
+    expect(traffic.locks.get(route.portal)).toBe(route.id);
   }
 }
 
-describe('one worm per physical menu tunnel', () => {
-  it.each([0, 1, 2, 3, 4, 5])('uses exactly three distinct starting and crossing tunnels in cycle %s', cycle => {
+describe('six worms with six dedicated menu wormholes', () => {
+  it.each([0, 1, 2, 3, 4, 5])('shows the full six-worm cast in separate portals in cycle %s', cycle => {
     const traffic = createMenuWormTraffic(cycle);
-    expect(traffic.routes).toHaveLength(3);
-    expect(traffic.locks.size).toBe(3);
-    for (const role of ['source', 'entry']) expect(new Set(traffic.routes.map(r => menuTunnelKey(r.path.portals[role]))).size).toBe(3);
+    expect(traffic.routes).toHaveLength(6);
+    expect(traffic.locks.size).toBe(6);
+    expect(traffic.routes.map(route => route.character)).toEqual(['classic', 'inch', 'glow', 'book', 'wiggle', 'prism']);
+    expect(traffic.routes.map(route => route.character)).toEqual(MENU_WORM_CHARACTERS);
+    expect(new Set(traffic.routes.map(route => route.portal)).size).toBe(6);
     for (const route of traffic.routes) {
-      expect(menuTunnelKey(route.path.portals.entry)).toBe(menuTunnelKey(route.path.portals.exit));
-      expect(menuTunnelKey(route.path.portals.entry)).not.toBe(menuTunnelKey(route.path.portals.source));
+      const face = MENU_FLIP_PAIRS.flat().find(face => face.dir === route.portal);
+      expect(route.path.portals.source.toArray()).toEqual(face.pos);
+      expect(route.path.portals.destination.toArray()).toEqual(face.pos);
     }
   });
 
-  it.each([30, 60, 144])('never shares a tunnel and finishes with bouncing/turning mouths at %s fps', fps => {
-    const traffic = createMenuWormTraffic(fps % 2), frames = createMenuPortalFrames();
-    let done = false;
-    for (let step = 0; step < fps * 35 && !done; step++) {
+  it.each([30, 60, 144])('animates all six together with exclusive bouncing/turning mouths at %s fps', fps => {
+    const traffic = createMenuWormTraffic(), frames = createMenuPortalFrames();
+    const p = new Vector3(), n = new Vector3(), f = new Vector3();
+    let done = false, allSixOutside = false;
+    for (let step = 0; step < fps * 25 && !done; step++) {
       animateFrames(frames, step / fps);
       done = advanceMenuWormTraffic(traffic, 1 / fps, frames);
       assertExclusive(traffic);
+      if (traffic.routes.every(route => {
+        const head = raisedMenuDistance(route.trail, route.distance);
+        return !route.done && head - MENU_WORM_TAIL > route.beats[0].distance && head < route.beats[1].distance;
+      })) allSixOutside = true;
+      for (const route of traffic.routes) {
+        const frame = frames.find(frame => frame.dir === route.portal);
+        for (const beat of route.beats) {
+          sampleMenuTunnelWorm(route.trail, beat.distance, p, n, f);
+          expect(p.distanceTo(new Vector3().setFromMatrixPosition(frame.matrix))).toBeLessThan(1e-6);
+        }
+      }
     }
+    expect(allSixOutside).toBe(true);
     expect(done).toBe(true);
     expect(traffic.locks.size).toBe(0);
   });
 
-  it('queues an arriving worm until the previous tail clears, including across pause and long frame gaps', () => {
+  it.each([false, true])('holds every assignment through pause, frame gaps, and the last tail (reduced motion: %s)', reduced => {
     const traffic = createMenuWormTraffic(), frames = createMenuPortalFrames();
     animateFrames(frames, 0);
-    const arriving = traffic.routes[0];
-    const span = arriving.path.tunnelSpans[1];
-    // Advance one head to the next approach while the other worm is still
-    // emerging there. Its own starting tail has already cleared.
-    arriving.distance = span.start - 0.005;
-    advanceMenuWormTraffic(traffic, 0.1, frames);
-    expect(arriving.waiting).toBe(true);
-    expect(arriving.distance).toBe(span.start);
-    const owner = traffic.locks.get(span.key).owner;
-    expect(owner).not.toBe(arriving.id);
-    const frozen = traffic.routes.map(r => r.distance), held = [...traffic.locks];
-    for (let i = 0; i < 5; i++) advanceMenuWormTraffic(traffic, 0, frames);
-    expect(traffic.routes.map(r => r.distance)).toEqual(frozen);
+    advanceMenuWormTraffic(traffic, 0.05, frames, reduced);
+    const frozen = traffic.routes.map(route => route.distance), held = [...traffic.locks];
+    for (let i = 0; i < 5; i++) advanceMenuWormTraffic(traffic, 0, frames, reduced);
+    expect(traffic.routes.map(route => route.distance)).toEqual(frozen);
     expect([...traffic.locks]).toEqual(held);
-    let acquired = false, done = false;
-    for (let i = 0; i < 1400 && !done; i++) {
-      done = advanceMenuWormTraffic(traffic, [0.008, 0.016, 0.09][i % 3], frames);
+    let done = false;
+    for (let i = 0; i < 1000 && !done; i++) {
+      done = advanceMenuWormTraffic(traffic, [0.008, 0.016, 0.09][i % 3], frames, reduced);
       assertExclusive(traffic);
-      if (traffic.locks.get(span.key)?.owner === arriving.id) {
-        acquired = true;
-        const previous = traffic.routes[owner];
-        expect(raisedMenuDistance(previous.trail, previous.distance) - MENU_WORM_TAIL)
-          .toBeGreaterThan(raisedMenuDistance(previous.trail, previous.path.tunnelSpans[0].end));
+      for (const route of traffic.routes) {
+        const tail = raisedMenuDistance(route.trail, route.distance) - MENU_WORM_TAIL;
+        expect(route.done).toBe(tail > route.trail.length);
       }
     }
-    expect(acquired).toBe(true);
     expect(done).toBe(true);
   });
 });

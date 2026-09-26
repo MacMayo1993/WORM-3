@@ -24,7 +24,7 @@ export default function MenuWormParticle({ route, character = 'classic', elapsed
     model.segments.forEach((_, i) => {
       const segmentDistance = distance - i * MENU_WORM_SPACING;
       const visible = sampleMenuTunnelWorm(trail, segmentDistance, pose.position, pose.normal, pose.forward);
-      menuWormTransitPose(route.beats, segmentDistance, i, time, motion, reduced, route.waiting);
+      menuWormTransitPose(route.beats, segmentDistance, i, time, motion, reduced);
       model.pose(i, pose.position, pose.normal, pose.forward, visible, time, motion, reduced);
     });
   });

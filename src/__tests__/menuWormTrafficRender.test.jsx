@@ -8,7 +8,7 @@ import MenuFlipWave from '../components/menus/MenuFlipWave.jsx';
 import { setCarouselActive } from '../components/menus/menuCarouselState.js';
 
 extend(THREE);
-it('renders three worms from one coordinator, pauses together, and completes once after all tails disappear', async () => {
+it('renders all six worm characters from one coordinator, pauses together, and completes once after all tails disappear', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ createRadialGradient: () => ({ addColorStop() {} }), fillRect() {} });
@@ -29,7 +29,9 @@ it('renders three worms from one coordinator, pauses together, and completes onc
     </MenuPortalScene>); });
     const rigs = [];
     store.getState().scene.traverse(node => { if (node.name.startsWith('menu-character-')) rigs.push(node); });
-    expect(rigs).toHaveLength(3);
+    expect(rigs.map(rig => rig.name).sort()).toEqual(
+      ['classic', 'inch', 'glow', 'book', 'wiggle', 'prism'].map(id => `menu-character-${id}`).sort()
+    );
     let frame = 1;
     for (; frame < 90; frame++) store.getState().advance(frame / 60);
     expect(complete).not.toHaveBeenCalled();

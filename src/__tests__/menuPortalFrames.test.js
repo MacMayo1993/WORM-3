@@ -43,7 +43,7 @@ describe('rendered menu portal coordinates', () => {
     }
   });
 
-  it.each([0, Math.PI / 2, Math.PI * 0.8])('samples both worms through all four actual mouths at angle %s, without reusing the opposite lift', angle => {
+  it.each([0, Math.PI / 2, Math.PI * 0.8])('samples entry and exit through each actual mouth at angle %s, without reusing the opposite lift', angle => {
     const { frames } = fixture(angle);
     const p = new Vector3(), n = new Vector3(), f = new Vector3();
     for (const pair of MENU_FLIP_PAIRS) {
@@ -52,12 +52,13 @@ describe('rendered menu portal coordinates', () => {
         for (const antipodal of [false, true]) {
           const trail = createRaisedMenuTrail(path);
           updateRaisedMenuTrail(path, trail, frames, antipodal);
-          for (const portal of Object.values(path.portals)) {
+          for (const [beatIndex, portal] of Object.values(path.portals).entries()) {
             // Find the exact distance where the canonical trail crosses this
             // portal plane. The axial throat must cross at its center.
             const axis = portal.clone().normalize();
             let distance = null;
-            for (let i = 1; i < path.points.length; i++) {
+            const startIndex = beatIndex === 0 ? 1 : path.points.length - 160;
+            for (let i = startIndex; i < path.points.length; i++) {
               const a = path.points[i - 1].dot(axis) - MENU_SURFACE_HALF;
               const b = path.points[i].dot(axis) - MENU_SURFACE_HALF;
               if (a * b > 0 || a === b) continue;
