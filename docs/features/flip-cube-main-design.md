@@ -1,16 +1,16 @@
 # Flip Cube — Main Design Plan (Design Only)
 
-> **Status:** proposal for discussion, 2026-09-25. Nothing here changes gameplay until a phase in §10 is picked up, and §13 lists the decisions still open. This is the brief for refocusing WORM³ on **the Flip Cube** as its main object. Flipped tiles pop out and bounce according to their flip count. Their Möbius funnels pulse and spring with them. In WORM you jump onto a popped tile to ride its tunnel. Something rumbles under the tiles. Mobi explains all of it as a piece of his home world, WORM³.
+> **Status:** design plan, 2026-09-25. Five decisions were settled on 2026-09-26 (§13), and the FLIP CUBE rename has shipped (§7). Nothing else here changes gameplay until a phase in §10 is picked up; §13 also lists what is still open. This is the brief for refocusing WORM³ on **the Flip Cube** as its main object. Flipped tiles pop out and bounce according to their flip count. Their Möbius funnels pulse and spring with them. In WORM you jump onto a popped tile to ride its tunnel. Something rumbles under the tiles. Mobi explains all of it as a piece of his home world, WORM³.
 
 ## 0. Summary
 
-- **One hero object.** The cube on every screen is *the Flip Cube*, a piece of Mobi's world WORM³. The intro, main menu, loading screen, every mode and the victory beat show the same object behaving the same way.
+- **One hero object.** The cube on every screen is *the Flip Cube*, a piece of Mobi's world WORM³. The intro, main menu, loading screen, every mode and the victory beat show the same object behaving the same way. The solve mode carries its name: CUBE is now **FLIP CUBE**.
 - **Flipped tiles become flip pads.** A tile with an odd flip count (it is showing its twin's colour) lifts out of its slot along its own outward normal, then bounces and pulses. The bounce reads the tile's wear: flips toward the cap in cube modes, rides toward collapse in WORM. Twins always move in phase because they are the same tile (§9.2–9.3).
 - **"Using the explode function".** The existing one-shot explode hop of both cubies (`cubiePops`) stays as the *impact* of a flip. The tile then *stays* out as a pad. The persistent state is a tile lift, not a whole-cubie explode (§9.7, item 2).
 - **The Möbius funnel activates, pulses and springs.** A short half-twisted stalk joins each pad to its slot and compresses like a coil. Every bounce sends a pulse from *both* twins into the Core. A ride sends one pulse from entry to exit.
 - **WORM: jump on the pad to ride.** Crawling under a pad no longer drops you into the tunnel. Landing on a pad, or hopping up while under it, does. The twin launches you back out with a spring hop. Tunnels stop being pits and become choices.
-- **Something lives under the tiles.** *The Rumbler* is a wave that runs along the rows and columns beneath the worm. It starts as atmosphere. It then becomes the layer-turn warning by dragging the layer about to turn. Later, as an option, it becomes a chaser.
-- **Mobi says why, in plain words.** WORM³ is a world where every spot has a twin straight through the middle. The Flip Cube came from there. On-screen copy stays jargon-free (house style). The mathematics lives in §9.
+- **Something lives under the tiles.** *The Rumbler* is a wave that runs along the rows and columns beneath the worm. It ships first as atmosphere and as the layer-turn warning, dragging the layer that is about to turn. A chaser version comes later.
+- **Mobi says why, in plain words.** WORM³ is a world where every spot has a twin straight through the middle. The Flip Cube slipped out of it and landed here scrambled, and the Rumbler came along. Healing the Flip Cube keeps Mobi's way home open. On-screen copy stays jargon-free (house style). The mathematics lives in §9.
 
 ## 1. Why this refocus fits now
 
@@ -161,7 +161,7 @@ Ship behind `tunnelEntry: 'crawl' | 'pad'`, a store setting with a story/level o
   - Grace means a launch can never land straight into another ride.
 - **Perfect spring (optional).** Landing while the pad is in the bottom 20 % of its bounce earns a small reward, such as ride speed or bonus XP. There is no fail state: bounce phase can only help, never hurt.
 
-### 4.3 Crawling under pads
+### 4.3 Crawling under pads (decided)
 
 - **Clearance.** The pad's lowest point is ≥ 0.45 in the WORM profile. Verify this against every character, including the Book head and MOBI's radius of 0.12, and every hat.
 - **Ghosting.** While the grounded head is within one cell of a pad, the pad ghosts to ~35 % opacity. This handles chase-camera occlusion and signals "you can pass under". It turns solid again when the worm is airborne, so solid means landable.
@@ -169,7 +169,7 @@ Ship behind `tunnelEntry: 'crawl' | 'pad'`, a store setting with a story/level o
 
 ### 4.4 Knock-on rules
 
-- **Void.** The thresholds are unchanged: 3 safe rides, and the 4th collapses mid-ride. The worn regime starts at $u = 3$, which is exactly $w = 3/4 \ge k^*$, so a pad warns you on precisely the ride that would kill you (§9.6). Pits keep the old contact lethality honest: a collapsed tunnel is a hole.
+- **Void.** The thresholds are unchanged: 3 safe rides, and the 4th collapses mid-ride. The worn regime starts at $u = 3$, which is exactly $w = 3/4 \ge k^*$, so a pad warns you on precisely the ride that would kill you (§9.6). Pits (decided) keep the old contact lethality honest: a collapsed tunnel is a hole.
 - **Active-tunnel cap.** Open pads no longer block crossings. `MAX_ACTIVE_TUNNEL_PAIRS` was halved to 10 because open holes "became terrain" that the player could not cross without falling in, so re-tune it upward after playtest.
 - **Heals.** Economics are unchanged. On a heal, both pads settle home in a spring cascade, alongside the existing `cubiePops` burst.
 - **Rotations.** Pads ride their layer. A cell whose contents are still turning into place is not enterable until the turn commits (existing rest-read rules).
@@ -185,6 +185,8 @@ Ship behind `tunnelEntry: 'crawl' | 'pad'`, a store setting with a story/level o
 ## 5. The Rumbler: something under the tiles
 
 ### 5.1 Scope tiers
+
+Decided 2026-09-26: R1 and R2 are in scope now; R3 comes later, after the §5.3 topology choice.
 
 **R1 · Ambience** — ship first. No gameplay effect.
 
@@ -231,18 +233,27 @@ The gates copy `strikeScheduler.js`:
 
 ## 6. Mobi, WORM³ and the Flip Cube
 
-### 6.1 Premise (pick one)
+### 6.1 Premise: the lost cube (decided)
 
-- **A. The visitor.** Mobi brought the Flip Cube from WORM³ to show you how his world works. Low stakes, and it matches today's tutorial tone.
-- **B. The lost cube (recommended).** The Flip Cube slipped out of WORM³ and landed here scrambled, and something from its underside, the Rumbler, came with it. Healing the Flip Cube keeps the way home open. This gives healing, the Rumbler and the story chapters one shared reason.
+The Flip Cube slipped out of WORM³ and landed here scrambled, and something from its underside, the Rumbler, came along. Healing the Flip Cube keeps Mobi's way home open. That one reason ties together the heal loop in every mode, the Rumbler, and the story chapters. The alternative, Mobi as a visitor showing off his world, was set aside.
+
+Beats the premise needs:
+
+- **First run.** Mobi introduces himself, the Flip Cube, and the ask: help heal it.
+- **Heals.** Each heal is a small step toward home. Mobi can react to one now and then, never to every heal.
+- **Chapters.** Openers escalate toward the finale, in which the way home opens.
+- **Solves and victories.** "The Flip Cube is whole again."
+- **The Rumbler** is a stowaway, not a villain with a backstory. It is felt more than explained.
+
+Recommended: in the finale, the way home stays *open*, and Mobi doesn't leave. That way the free modes keep their guide after the story ends.
 
 ### 6.2 Canon (player-facing words only)
 
 - **WORM³.** Mobi's world. Every spot there has a twin straight through the middle, and the twins are the same place.
-- **The Flip Cube.** A piece of WORM³ whose tiles are doors. Flip one and it pops up as a *flip pad*, and its tunnel runs straight through the middle to its twin.
+- **The Flip Cube.** A piece of WORM³ whose tiles are doors. Flip one and it pops up as a *flip pad*, and its tunnel runs straight through the middle to its twin. It slipped out of WORM³ and landed here scrambled; healing it keeps Mobi's way home open.
 - **The Core.** The middle of the Flip Cube, the only spot that is its own twin. Every tunnel passes through it.
 - **Worms.** WORM³ natives who ride tunnels.
-- **The Rumbler.** Lives under the tiles and can't get through the Core (cover choice).
+- **The Rumbler.** Came along with the Flip Cube. Lives under the tiles and can't get through the Core (cover choice).
 - **Mobi.** Multi Orientable Block Intelligence: a little block from WORM³ who can open doors (Create Wormhole).
 
 ### 6.3 Where Mobi says it (draft lines, house style)
@@ -252,21 +263,23 @@ Rules for these drafts:
 - Short sentences.
 - No "antipodal", "manifold", "parity" or "RP²"; the single existing `TWIN_ASIDE` stays the only exception.
 - At most five cards per dialogue.
+- **A line ships with the mechanic it describes, never before it.** Premise lines (who Mobi is, where the Flip Cube came from, healing it to keep the way home open) are true today and can ship in the copy pass at any time. Lines about popping pads, jumping to ride or the Rumbler wait for their phase. Until then, a line like "Flip one and they pop up together" becomes "Flip one and its twin flips too."
 
 | Surface | File | Draft |
 |---|---|---|
-| First-run cold open | `MobiIntroScreen.jsx` `MOBI_LINES_DEMO_INTRO` | "Aloha! I'm Mobi. I'm from a world called WORM³." / "This is a Flip Cube. It's a little piece of my world." / "Every tile has a twin straight through the middle. Flip one and they pop up together." / "Try the controls one step at a time. You can skip any step." |
+| First-run cold open | `MobiIntroScreen.jsx` `MOBI_LINES_DEMO_INTRO` | "Aloha! I'm Mobi. I'm from a world called WORM³." / "This is a Flip Cube. It slipped out of my world and landed here scrambled." / "Every tile has a twin straight through the middle. Flip one and they pop up together." / "Help me heal it, and my way home stays open." / "Try the controls one step at a time. You can skip any step." |
 | WORM intro | `MOBI_LINES_WORM` | "Flipped tiles pop up as flip pads. Jump onto one to ride its tunnel." / "Carry orbs into a tunnel to heal it." / "Feel that rumble? Something's under the tiles. Keep moving!" |
-| Freeplay | `MOBI_LINES_FREEPLAY` | "Turn the Flip Cube until each face is one color." / "Turn on Flip to pop tiles through to their twins." |
+| FLIP CUBE mode | `MOBI_LINES_FREEPLAY` | "Turn the Flip Cube until each face is one color." / "Turn on Flip to pop tiles through to their twins." |
 | Chaos | `MOBI_LINES_CHAOS` | "The Flip Cube gets restless. Tiles pop and flip on their own." / "Wild bouncing means a tile is nearly worn out. Pick the pair you think will last." |
-| Story openers | `worm/story` cards, `levels/data/story-descent.js` | Ch.1 "The Flip Cube landed scrambled. Let's heal it." · Ch.2 "In WORM³, Flip Cubes come in every size." · Ch.3 "WORM³ looks strange from the inside. Stay close." · Ch.4 "The Rumbler knows we're almost done." |
+| Story openers | `worm/story` cards, `levels/data/story-descent.js` | Ch.1 "The Flip Cube landed scrambled. Let's heal it." · Ch.2 "In WORM³, Flip Cubes come in every size." · Ch.3 "WORM³ looks strange from the inside. Stay close." · Ch.4 "Almost home. The Rumbler knows it." |
 | Loading tips | `LoadingScreen.jsx` | "Twins always bounce together. They're the same tile." · "A tile bouncing wildly is almost worn out." · "The Rumbler can't follow you through the Core." |
 | Store | `ParityStoreScreen.jsx` | "Everything here was made in WORM³. Mostly." |
-| Victory | `VictoryScreen.jsx` | "The Flip Cube is whole again. My world says thanks!" |
+| Victory | `VictoryScreen.jsx` | "The Flip Cube is whole again. My way home is open!" |
 
 ### 6.4 Additions to `docs/COPY_STYLE.md`
 
 - "Flip Cube" (Title Case) names the object everywhere.
+- FLIP CUBE is also the solve mode's name: uppercase Bungee on its carousel plate and keys, "Flip Cube" in sentences. The shared name is deliberate. The mode is the Flip Cube on its own, while every other mode adds something to it.
 - "flip pad" is a popped tile.
 - "WORM³" is both the game and Mobi's world.
 - "Twin" and "straight through the middle" remain the only words for the pairing.
@@ -278,7 +291,7 @@ Rules for these drafts:
 | Intro | "flip through the cube" lands on a real pad pop. The title card holds on a bouncing pad while its funnel spins up. |
 | Main menu | The carousel cube *is* the Flip Cube. Idle centre flips become pads with worms riding their funnels (`MenuFlipWave`, `MenuWormParticle`). Tapping the cube pops a pad, and PLAY dives through the active face's centre pad. |
 | Loading | The levitating cube bounces one pad per load beat. |
-| Mode cards | The mode name stays "CUBE" (§13.8) and its card says "Solve the Flip Cube". |
+| Mode name | **Shipped 2026-09-26.** CUBE is renamed FLIP CUBE on the carousel plate and Play key, the setup wizard, the help menu, the demo-end card and the "Solve or survive?" chooser. The two-word plate title steps down one font size to stay on one line. Internal ids (`freeplay`, `MODE_THEMES.cube`) are unchanged, so saves and play stats carry over. The same change fixed the setup wizard, which had been showing Teach's artwork for this mode. The Cube Academy lesson titles ("CUBE 1–6") name the course, not the mode, and stay. |
 | In game | The same pad language in every mode (§3). |
 | Victory | All pads settle home in a spring cascade, followed by one last symmetric pulse through the Core. |
 | Store | Tile styles and palettes are presented as Flip Cube skins. |
@@ -416,7 +429,7 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
 
 | Phase | Scope | Done when |
 |---|---|---|
-| 0 | Decide §13. Capture reference screenshots and frame times: 3×3, 5×5, 7×7, Mega; Classic, Chaos L5, WORM. | Decisions recorded in this document. |
+| 0 | Decide §13: five settled and the rename shipped (2026-09-26). Still to do: capture reference screenshots and frame times for 3×3, 5×5, 7×7 and Mega, in Classic, Chaos L5 and WORM. | Remaining §13 defaults confirmed or changed; reference captures stored. |
 | 1 | `flipPad.js`, `padPose.js`, `padEntry.js` and their tests. | Truth table, regime table, twin-phase equality, bounds, determinism and reduced motion all pinned. |
 | 2 | Cube-mode pads, `PadSprings`, symmetric pulses, menu pads. | §3 holds in every cube mode; perf within budget; existing tunnel and flip tests green. |
 | 3 | Mobi and WORM³ copy pass (can run in parallel with 2). | Copy tests updated; `COPY_STYLE.md` updated. |
@@ -471,17 +484,21 @@ That makes it a good *design* threshold, but it is an artifact of the lattice $n
 - **The intro bundle ceiling**, which recent commits had to fight. Keep pad code out of the intro chunk, or reuse only the pure pose.
 - **Wireframe and mirror views draw no stickers.** Pads have nothing to lift there and fall back to today's edge and colour cues.
 
-## 13. Decisions for you
+## 13. Decisions
 
-Recommended defaults are in **bold**.
+### Decided (2026-09-26)
 
-1. Premise: A (visitor) or **B (lost cube)**?
-2. Persistent state: a **tile lift** or a whole-cubie explode?
-3. Crawling into a pad's cell: **pass under**, or blocked and bounced back?
-4. Voided tunnels: **lethal pits**, or merely unenterable?
-5. Wear reads as **bigger and faster** (matches today's tremor), or as "tired and lower"?
-6. Rumbler: **R1 + R2 now and R3 later**? For R3, the **cover** topology or the quotient one?
-7. Names: keep "flip pad", "the Rumbler" and "the Core", or rename?
-8. Keep the mode name **CUBE** and call the object the Flip Cube, or rename the mode FLIP CUBE?
-9. Landing-assist window: **pad 0–1 tiles ahead**?
-10. Chaos pads: **subtle**, or full height?
+1. **Premise:** B, the lost cube (§6.1).
+2. **Crawling into a pad's cell:** the worm passes under it (§4.3).
+3. **Voided tunnels:** lethal pits (§4.4).
+4. **Rumbler scope:** R1 + R2 now, R3 later (§5.1).
+5. **Mode name:** CUBE is renamed FLIP CUBE. Shipped (§7).
+
+### Still open (the default stands until you say otherwise)
+
+1. Persistent state: **tile lift**, or a whole-cubie explode (§9.7, item 2)?
+2. Wear reads as **bigger and faster** (matches today's tremor), or as "tired and lower"?
+3. For R3, the **cover** topology or the quotient one (§5.3)? Needed before R3 starts.
+4. Names: keep "flip pad", "the Rumbler" and "the Core", or rename?
+5. Landing-assist window: **pad 0–1 tiles ahead**?
+6. Chaos pads: **subtle**, or full height?
