@@ -1,3 +1,4 @@
+import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -316,7 +317,7 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA
   }
 }
 
-const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
+const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresentation = false }) => {
   const flipCap = useGameStore(selectEffectiveFlipCap);
   const meshRef = useRef();
   const dimRef  = useRef(IDLE_OPACITY);
@@ -391,8 +392,9 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
       _faceNorm1.set(n1[0], n1[1], n1[2]).applyQuaternion(_wQuat1);
       _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat2);
 
-      _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET);
-      _vEnd.copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
+      const lift = raisedPresentation ? Math.max(0, padMotion.get(t.pairId)?.lift ?? 0) : 0;
+      _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET + (t.active1 ? lift : 0));
+      _vEnd.copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET + (t.active2 ? lift : 0));
 
       // Ride the tiles' own flip animation. The anchors move every frame while a
       // flip runs, so the movement check below sees them and rebuilds — the cord

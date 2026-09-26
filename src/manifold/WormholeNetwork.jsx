@@ -11,6 +11,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { publishTunnelFocus } from './chaosStormBridge.js';
+import { flipCubePadsEnabled } from '../game/raisedCubie.js';
 
 // B2: Cap the number of rendered tunnels.
 // At peak 5×5 chaos there can be ~75 active antipodal pairs; each renders
@@ -28,6 +29,7 @@ const MAX_TUNNELS = 150;
 // tunnels — the one the worm is in, plus the most recent flip events — get
 // ribbons, bumpers and portals.
 const FOCUS_BUDGET = 3;
+const RAISED_CUBE_FOCUS_BUDGET = 12;
 
 // Static direction list — avoids Object.entries() allocating a new array of
 // arrays on every iteration of the O(N³) loop (GC pressure in chaos mode).
@@ -37,6 +39,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   // Sever pairs at the cap the session actually grants, so a tunnel stays lit for
   // exactly as long as its tiles are still flippable.
   const flipCap = useGameStore(selectEffectiveFlipCap);
+  const cubePads = useGameStore(flipCubePadsEnabled);
   const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths, wormHealerMode, demoMode } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode,
@@ -53,9 +56,10 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       tunnelDeaths: s.tunnelDeaths,
     }))
   );
-  // Raised WORM platforms expose physical connections even when the cosmetic
-  // view toggle is Off/Hints. Leave the player's setting untouched for other modes.
-  const raisedBands = wormHealerMode && !demoMode;
+  // Raised WORM and FLIP CUBE pieces expose their physical connections even
+  // with Off/Hints selected; the stored view preference remains unchanged.
+  const wormBands = wormHealerMode && !demoMode;
+  const raisedBands = wormBands || cubePads;
   const visible = showTunnels || raisedBands;
   // Narrow deps: only the two settings fields that affect face-color resolution.
   // Avoids re-running the lookup on every unrelated settings change (e.g. background theme).
@@ -174,24 +178,28 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     if (wormTunnelId) ids.add(wormTunnelId);
     // WORM caps active pairs at ten, so every raised connection can show the
     // actual Möbius ribbon rather than leaving most as hairline resting cords.
-    if (raisedBands) {
+    if (wormBands) {
       for (const tunnel of tunnelData) ids.add(tunnel.pairId);
       return ids;
     }
 
-    if (tunnelDetail === 'full') {
+    if (cubePads || tunnelDetail === 'full') {
+      const budget = cubePads ? RAISED_CUBE_FOCUS_BUDGET : FOCUS_BUDGET;
       const events = [];
       for (const k in tunnelBirths) events.push([k, tunnelBirths[k].startMs + 1e9]); // births outrank pulses
       for (const k in tunnelPulses) events.push([k, tunnelPulses[k].startMs]);
       events.sort((a, b) => b[1] - a[1]);
-      for (let i = 0; i < events.length && ids.size < FOCUS_BUDGET; i++) ids.add(events[i][0]);
+      const liveIds = new Set(tunnelData.map(t => t.pairId));
+      for (let i = 0; i < events.length && ids.size < budget; i++) {
+        if (liveIds.has(events[i][0])) ids.add(events[i][0]);
+      }
 
       // tunnelData is already sorted by flips descending, so the front of the
       // list is the hottest pairs.
-      for (let i = 0; i < tunnelData.length && ids.size < FOCUS_BUDGET; i++) ids.add(tunnelData[i].pairId);
+      for (let i = 0; i < tunnelData.length && ids.size < budget; i++) ids.add(tunnelData[i].pairId);
     }
     return ids;
-  }, [visible, raisedBands, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData]);
+  }, [visible, wormBands, cubePads, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData]);
 
   // Chaos surges trace whichever route the player sees for a pair: the throated
   // ribbon when it is in focus, the straight cord otherwise.
@@ -212,9 +220,10 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
         cubieRefs={cubieRefs}
         focusIds={focusIds}
         maxStrands={MAX_TUNNELS}
+        raisedPresentation={cubePads}
       />
 
-      {/* Focus tier — full ribbon, bumpers and portal, capped at FOCUS_BUDGET. */}
+      {/* Focus tier — detailed bands within the current mode's budget. */}
       {focusTunnels.map((t) => (
         <MobiusTunnel
           key={t.id}
@@ -229,6 +238,9 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
           flips={t.flips}
           color1={t.color1}
           color2={t.color2}
+          raisedPresentation={cubePads}
+          active1={t.active1}
+          active2={t.active2}
           tunnelBirths={tunnelBirths}
           tunnelPulses={tunnelPulses}
         />

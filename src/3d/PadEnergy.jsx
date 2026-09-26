@@ -1,6 +1,6 @@
 // src/3d/PadEnergy.jsx
 //
-// WORM's flip pads hover a short hop off the cube on an unstable wormhole: a
+// Raised flip pads hover a short hop off the cube on an unstable wormhole: a
 // twisting energy column fills the gap, a vortex swirls in the slot, arcs crackle
 // across and sparks spit off the rim. PadProvider owns where every pad is and
 // writes one record per lifted pad; this draws the storm from those records in
@@ -86,8 +86,8 @@ const vortexFragment = `
   }
 `;
 
-function seededGeometry(geometry) {
-  geometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(new Float32Array(MAX_ENERGY_PADS), 1));
+function seededGeometry(geometry, capacity) {
+  geometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1));
   return geometry;
 }
 
@@ -102,6 +102,7 @@ const _pts = new Float32Array(ARC_POINTS * 3);
 const _spark = { px: 0, py: 0, pz: 0, vx: 0, vy: 0, vz: 0, life: 0, size: 0 };
 
 export function PadEnergy({ frames }) {
+  const capacity = frames.lift.length;
   const columnRef = useRef(), vortexRef = useRef();
   const res = useMemo(() => {
     const uniforms = { uTime: { value: 0 }, uMotion: { value: 1 } };
@@ -109,8 +110,8 @@ export function PadEnergy({ frames }) {
     const sparks = createSparkPool(MAX_SPARKS);
     return {
       uniforms,
-      columnGeo: seededGeometry(createPadStalkGeometry()),
-      vortexGeo: seededGeometry(new THREE.PlaneGeometry(0.76, 0.76)),
+      columnGeo: seededGeometry(createPadStalkGeometry(), capacity),
+      vortexGeo: seededGeometry(new THREE.PlaneGeometry(0.76, 0.76), capacity),
       columnMat: new THREE.ShaderMaterial({ uniforms, vertexShader: instancedVertex, fragmentShader: columnFragment,
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
       vortexMat: new THREE.ShaderMaterial({ uniforms, vertexShader: instancedVertex, fragmentShader: vortexFragment,
@@ -122,7 +123,7 @@ export function PadEnergy({ frames }) {
       sparkMat: createSparkMaterial(),
       sparkClock: { acc: 0, n: 0 }
     };
-  }, []);
+  }, [capacity]);
 
   useEffect(() => () => {
     for (const k of ['columnGeo', 'vortexGeo', 'columnMat', 'vortexMat', 'stripGeo', 'sparkMat']) res[k].dispose();
@@ -134,7 +135,7 @@ export function PadEnergy({ frames }) {
   useFrame((state) => {
     const column = columnRef.current, vortex = vortexRef.current;
     if (!column || !vortex) return;
-    const n = Math.min(frames.count, MAX_ENERGY_PADS);
+    const n = Math.min(frames.count, capacity);
     const motion = frames.motion > 0;
     res.uniforms.uTime.value = frames.time;
     res.uniforms.uMotion.value = motion ? 1 : 0;
@@ -151,7 +152,8 @@ export function PadEnergy({ frames }) {
       vortex.setMatrixAt(i, _m);
       vortex.setColorAt(i, _color);
       columnSeeds[i] = vortexSeeds[i] = energyHash(seed, 7);
-      if (!motion) continue;
+      // Every pad gets a column, while the expensive arcs keep a fixed budget.
+      if (!motion || i >= MAX_ENERGY_PADS) continue;
       for (let a = 0; a < ARCS_PER_PAD; a++) {
         const glow = padArc(_pts, a, frames.time, seed, lift);
         if (glow <= 0) continue;
@@ -198,8 +200,8 @@ export function PadEnergy({ frames }) {
   }, -0.45);
 
   return <group>
-    <instancedMesh ref={columnRef} args={[res.columnGeo, res.columnMat, MAX_ENERGY_PADS]} count={0} frustumCulled={false} raycast={() => null} dispose={null} renderOrder={4} />
-    <instancedMesh ref={vortexRef} args={[res.vortexGeo, res.vortexMat, MAX_ENERGY_PADS]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
+    <instancedMesh ref={columnRef} args={[res.columnGeo, res.columnMat, capacity]} count={0} frustumCulled={false} raycast={() => null} dispose={null} renderOrder={4} />
+    <instancedMesh ref={vortexRef} args={[res.vortexGeo, res.vortexMat, capacity]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
     <mesh geometry={res.stripGeo} material={res.stripMats.lit} frustumCulled={false} renderOrder={5} raycast={() => null} dispose={null} />
     <points geometry={res.sparks.geo} material={res.sparkMat} frustumCulled={false} renderOrder={6} raycast={() => null} dispose={null} />
   </group>;

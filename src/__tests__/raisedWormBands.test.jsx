@@ -13,15 +13,15 @@ vi.mock('../manifold/RestingCords.jsx', () => ({ default: () => null }));
 vi.mock('../manifold/TunnelSnap.jsx', () => ({ default: () => null }));
 extend(THREE);
 
-it('shows all live raised WORM bands with Off/Hints, drops healed pairs, and restores other-mode settings', async () => {
+it.each([true, false])('shows live raised bands with Off/Hints, drops healed pairs, and restores other-mode settings (WORM=%s)', async wormHealerMode => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState(), size = 7;
   let cubies = makeCubies(size);
   const manifoldMap = buildManifoldGridMap(cubies, size);
   for (let z = 1; z <= 5; z++) cubies = flipStickerPair(cubies, size, 0, 3, z, 'NX', manifoldMap);
-  useGameStore.setState({ cubies, size, wormHealerMode: true, demoMode: false, showTunnels: false,
+  useGameStore.setState({ cubies, size, wormHealerMode, chaosLevel: 0, mirrorMode: false, demoMode: false, showTunnels: false,
     tunnelDetail: 'hints', tunnelBirths: {}, tunnelPulses: {}, tunnelDeaths: {},
-    settings: { ...before.settings, flipPads: 'off' } });
+    settings: { ...before.settings, flipPads: wormHealerMode ? 'off' : 'full' } });
   const canvas = document.createElement('canvas');
   const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
@@ -50,7 +50,7 @@ it('shows all live raised WORM bands with Off/Hints, drops healed pairs, and res
     cubies = flipStickerPair(cubies, size, 0, 3, 1, 'NX', manifoldMap);
     await act(async () => useGameStore.setState({ cubies })); await draw();
     expect(bands()).toHaveLength(4);
-    await act(async () => useGameStore.setState({ wormHealerMode: false, showTunnels: false }));
+    await act(async () => useGameStore.setState({ wormHealerMode: false, showTunnels: false, settings: { ...useGameStore.getState().settings, flipPads: 'off' } }));
     expect(bands()).toHaveLength(0);
     await act(async () => useGameStore.setState({ wormHealerMode: true, demoMode: true }));
     expect(bands()).toHaveLength(0);
