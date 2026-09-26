@@ -20,4 +20,4 @@ export const TITLE_END = 7.5;
 // (see introOutro.js); that phrase takes the last beat before the menu.
 export const DISSOLVE_START = 8.8;
 export const DISSOLVE_END = 10.4;
-export const INTRO_FINISH = 11.8;
+export const INTRO_FINISH = 13.5;

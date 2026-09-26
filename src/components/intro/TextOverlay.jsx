@@ -3,7 +3,7 @@ import React, { useLayoutEffect, useRef } from 'react';
 import { INTRO_END, ramp } from './introChoreography.js';
 import './intro.css';
 import { TITLE_START, TITLE_END, DISSOLVE_START } from './introTiming.js';
-import { INTRO_COPY, introCopyFrame, accentOf, tileFacesOf } from './introCopy.js';
+import { INTRO_COPY, introCopyFrame, tileFacesOf } from './introCopy.js';
 import { introOutro, outroWordFade } from './introOutro.js';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 
@@ -13,7 +13,9 @@ const backOut = r => { const c = 1.9; return 1 + (c + 1) * (r - 1) ** 3 + c * (r
 // The tagline is the script again: a first clause that dissolves at the end, and
 // the phrase that survives it.
 const LEAD = INTRO_COPY[0].text.split(' ');
-const PHRASE = INTRO_COPY.at(-1).text.split(' ');
+const [FLIP, ...REST] = INTRO_COPY.at(-1).text.split(' ');
+const CUBE = REST.at(-1);
+const THROUGH = REST.slice(0, -1).join(' ');
 
 /** A word on a Rubik's sticker, turning (0→1) to its antipode: FLIP blue → green, CUBE red → orange. */
 function Tile({ text, faces, turn }) {
@@ -69,7 +71,7 @@ function measureGlide(element) {
   const { innerWidth: width, innerHeight: height } = window;
   return {
     x: width / 2 - (rect.left + rect.width / 2),
-    y: height * 0.46 - (rect.top + rect.height / 2),
+    y: height * 0.53 - (rect.top + rect.height / 2),
     scale: Math.max(1, Math.min(1.6, (width * 0.86) / rect.width))
   };
 }
@@ -90,14 +92,16 @@ export default function TextOverlay({ time, reducedMotion = false }) {
   const outro = introOutro(time, reducedMotion);
   const phrase = useRef(null);
   const glide = useRef(null);
+  const middle = useRef(null);
+  const middleWidth = useRef(0);
   useLayoutEffect(() => {
+    if (middle.current && outro.join === 0) middleWidth.current = middle.current.offsetWidth;
     if (time < DISSOLVE_START || reducedMotion) glide.current = null;
     else if (!glide.current && phrase.current) glide.current = measureGlide(phrase.current);
   });
   // The phrase pushes through into the menu as it leaves.
-  const phraseMove = phraseTransform(outro.glide > 0 ? glide.current : null, outro.glide, reducedMotion ? 1 : 1 + 0.25 * outro.exit);
+  const phraseMove = phraseTransform(outro.glide > 0 ? glide.current : null, outro.glide, reducedMotion ? 1 : (1 + 0.6 * outro.join) * (1 + 0.25 * outro.exit));
   const chrome = outro.chrome > 0 ? { opacity: 1 - outro.chrome } : undefined;
-  let tiles = 0;
   return (
     <>
       <div className="opening-edge" aria-hidden="true" style={chrome} />
@@ -122,14 +126,18 @@ export default function TextOverlay({ time, reducedMotion = false }) {
               {index > 0 ? ' ' : null}
               <span className="opening-poem-word" style={dissolving(outroWordFade(time, index), reducedMotion)}>{text}</span>
             </React.Fragment>)}</span>
-            {/* The one line that survives the ending, and its stickers flip once more. */}
-            <span ref={phrase} style={{ display: 'inline-block', opacity: 1 - outro.exit, transform: phraseMove }}>
-              {PHRASE.map((text, index) => <React.Fragment key={index}>
-                {index > 0 ? ' ' : null}
-                {accentOf(text) === 'tile' ? <span className="opening-poem-word opening-word-tile">
-                  <Tile text={text} faces={tileFacesOf(text)} turn={outro.turns[tiles++] ?? 0} />
-                </span> : text}
-              </React.Fragment>)}
+            {/* The last line descends, loses its middle, then its two stickers
+                meet edge to edge and turn together for the final colour swap. */}
+            <span ref={phrase} className="opening-final-phrase" style={{ opacity: 1 - outro.exit, transform: phraseMove }}>
+              <span className="opening-poem-word opening-word-tile">
+                <Tile text={FLIP} faces={tileFacesOf(FLIP)} turn={outro.turns[0]} />
+              </span>
+              <span className="opening-through" style={{
+                width: outro.join > 0 ? middleWidth.current * (1 - outro.join) : undefined
+              }}><span ref={middle} style={dissolving(outro.through, reducedMotion, 14)}>{THROUGH}</span></span>
+              <span className="opening-poem-word opening-word-tile">
+                <Tile text={CUBE} faces={tileFacesOf(CUBE)} turn={outro.turns[1]} />
+              </span>
             </span>
           </p>
         </div>}

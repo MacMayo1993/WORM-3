@@ -50,6 +50,10 @@
   text-transform: uppercase; letter-spacing: .045em; max-width: 26ch; margin: 0;
   -webkit-text-stroke-width: 2px;
 }
+.opening-final-phrase { display: inline-flex; align-items: center; white-space: nowrap; }
+.opening-final-phrase .opening-word-tile { margin: 0; }
+.opening-through { display: inline-flex; justify-content: center; overflow: clip; }
+.opening-through > span { display: inline-block; padding: .3em .24em; }
 .opening-skip, .opening-enter {
   position: absolute; pointer-events: auto; cursor: pointer;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;

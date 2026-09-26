@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { introOutro, outroWordFade, GLIDE_START, GLIDE_END, OUTRO_TURNS, OUTRO_TURN_TIME, OUTRO_EXIT } from '../components/intro/introOutro.js';
+import { introOutro, outroWordFade, GLIDE_START, GLIDE_END, OUTRO_TURNS, OUTRO_TURN_TIME, OUTRO_EXIT, THROUGH_FADE, JOIN_WORDS, FINAL_TURN } from '../components/intro/introOutro.js';
 import { INTRO_COPY } from '../components/intro/introCopy.js';
 import { INTRO_END } from '../components/intro/introChoreography.js';
 import { TITLE_END, DISSOLVE_START, DISSOLVE_END } from '../components/intro/introTiming.js';
@@ -42,13 +42,24 @@ describe('the lingering, dissolving ending', () => {
     expect(OUTRO_TURNS[1]).toBeGreaterThan(OUTRO_TURNS[0]);
     expect(INTRO_END - OUTRO_EXIT - (OUTRO_TURNS.at(-1) + OUTRO_TURN_TIME)).toBeGreaterThanOrEqual(0.3);
     expect(introOutro(GLIDE_START).turns).toEqual([0, 0]);
-    expect(introOutro(INTRO_END - OUTRO_EXIT).turns).toEqual([1, 1]);
+    expect(introOutro(INTRO_END - OUTRO_EXIT).turns).toEqual([2, 2]);
+  });
+
+  it('dissolves THROUGH THE, joins the stickers, then flips both together again', () => {
+    expect(THROUGH_FADE[0]).toBeGreaterThan(GLIDE_END);
+    expect(introOutro(THROUGH_FADE[0]).through).toBe(0);
+    expect(introOutro(THROUGH_FADE[1]).through).toBe(1);
+    expect(introOutro(JOIN_WORDS[1]).join).toBe(1);
+    expect(FINAL_TURN).toBeGreaterThan(JOIN_WORDS[1]);
+    expect(introOutro(FINAL_TURN).turns).toEqual([1, 1]);
+    expect(introOutro(FINAL_TURN + OUTRO_TURN_TIME / 2).turns).toEqual([1.5, 1.5]);
+    expect(INTRO_END - OUTRO_EXIT - FINAL_TURN - OUTRO_TURN_TIME).toBeGreaterThan(.4);
   });
 
   it('moves continuously', () => {
     for (let t = STEP; t <= INTRO_END; t += STEP) {
       const [a, b] = [introOutro(t - STEP), introOutro(t)];
-      for (const key of ['cube', 'chrome', 'title', 'glide', 'exit']) expect(Math.abs(b[key] - a[key]), key).toBeLessThan(0.05);
+      for (const key of ['cube', 'chrome', 'title', 'glide', 'through', 'join', 'exit']) expect(Math.abs(b[key] - a[key]), key).toBeLessThan(0.05);
     }
   });
 
