@@ -12,7 +12,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
-import { getTunnelWorldPosInto, getWindWorldPosInto } from '../wormLogic.js';
+import { getTunnelWorldPosSmoothInto, getWindWorldPosInto } from '../wormLogic.js';
 import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
@@ -90,7 +90,7 @@ export function WormFace({ worm, size }) {
 
         let normal;
         if (inTransit) {
-            // During entering/tunnel/exiting/windout the head is driven by getTunnelWorldPosInto
+            // During entering/tunnel/exiting/windout the head is driven by getTunnelWorldPosSmoothInto
             // or getWindWorldPosInto. Read headInterpPos/currentNormal which are always current.
             _faceHeadPos.copy(worm.headInterpPos.current);
             normal = worm.currentNormal.current;
@@ -108,7 +108,7 @@ export function WormFace({ worm, size }) {
                 const tp = worm.tunnelProgress.current;
                 const t = phase === 'entering' ? tp * 0.33 : phase === 'tunnel' ? 0.33 + tp * 0.34 : 0.67 + tp * 0.33;
                 const tAhead = Math.min(t + 0.02, 1.0);
-                getTunnelWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, tAhead, size);
+                getTunnelWorldPosSmoothInto(_faceTunnelAhead, worm.activeTunnel.current, tAhead, size);
                 _faceForward.copy(_faceTunnelAhead).sub(_faceHeadPos);
                 if (_faceForward.lengthSq() < 0.0001) _faceForward.set(0, 0, 1);
                 _faceForward.normalize();

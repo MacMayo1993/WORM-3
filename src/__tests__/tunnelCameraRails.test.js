@@ -1,3 +1,5 @@
+import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
+import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
@@ -306,16 +308,20 @@ describe('tunnelCamPoseInto', () => {
     }
   });
 
-  it('rolls the up-vector through a half turn across the traversal', () => {
-    const size = 3;
-    const tunnel = straightTunnel(size);
-    const start = makeTunnelCamPose();
-    const end = makeTunnelCamPose();
-    tunnelCamPoseInto(start, tunnel, 0, size);
-    tunnelCamPoseInto(end, tunnel, 1, size);
-    // π of roll about a tangent that is itself constant on this straight path:
-    // the camera comes out inverted, which is the Möbius identification.
-    expect(start.up.angleTo(end.up)).toBeCloseTo(Math.PI, 2);
+  it('banks with the band under the lens, including a reversed visit', () => {
+    for (const size of [2, 3, 7, 15]) {
+      for (const route of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {
+        for (const tunnel of [route, { entry: route.exit, exit: route.entry }]) {
+          const path = buildTunnelCenterlineInto(makeTunnelCenterline(), tunnel, size);
+          const frame = makeTunnelRideFrame(), pose = makeTunnelCamPose();
+          for (let t = 0; t <= 1; t += 0.01) {
+            tunnelCamPoseInto(pose, tunnel, t, size);
+            tunnelRideFrameInto(frame, path, tunnelTToArc(path, t) - backForHead(t, size));
+            expect(pose.up.distanceTo(frame.normal)).toBeLessThan(1e-8);
+          }
+        }
+      }
+    }
   });
 
   it('keeps the up-vector perpendicular to the direction of travel', () => {
@@ -343,12 +349,13 @@ describe('tunnelCamPoseInto', () => {
       view.subVectors(pose.look, pose.cam).normalize();
       expect(view.dot(pose.tangent)).toBeGreaterThan(0.5);
     }
-    // Straight route through the middle of two faces: nothing to lead into, so
-    // the aim lies exactly down the direction of travel.
+    // Straight route: mostly forward with a slight downward aim, keeping the
+    // track and core in frame under the elevated lens.
     for (let t = 0; t <= 1.0001; t += 0.05) {
       tunnelCamPoseInto(pose, straightTunnel(size), Math.min(1, t), size);
       view.subVectors(pose.look, pose.cam).normalize();
-      expect(view.dot(pose.tangent)).toBeGreaterThan(0.999);
+      expect(view.dot(pose.tangent)).toBeGreaterThan(0.93);
+      expect(view.dot(pose.up)).toBeLessThanOrEqual(1e-8);
     }
   });
 });

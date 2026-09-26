@@ -26,6 +26,16 @@ const MINI_S = 0.25;    // sticker offset from centre (just past body face at 0.
 const MINI_ST = 0.40;   // sticker plane size (~0.83 of face, matching game cubie ratio)
 const minicubeBodyGeo = new THREE.BoxGeometry(MINI_BODY, MINI_BODY, MINI_BODY);
 const minicubeStickerGeo = new THREE.PlaneGeometry(MINI_ST, MINI_ST);
+const minicubeEdges = new THREE.EdgesGeometry(minicubeBodyGeo);
+const frameShape = new THREE.Shape();
+frameShape.moveTo(-0.245, -0.245); frameShape.lineTo(0.245, -0.245);
+frameShape.lineTo(0.245, 0.245); frameShape.lineTo(-0.245, 0.245); frameShape.closePath();
+const aperture = new THREE.Path();
+aperture.moveTo(-0.205, -0.205); aperture.lineTo(-0.205, 0.205);
+aperture.lineTo(0.205, 0.205); aperture.lineTo(0.205, -0.205); aperture.closePath();
+frameShape.holes.push(aperture);
+const minicubeFrameGeo = new THREE.ShapeGeometry(frameShape);
+
 
 // Face definitions — id matches FACE_COLORS in constants.js (1=PZ Red … 6=NY Yellow)
 const MINI_FACES = [
@@ -50,12 +60,27 @@ const MINI_FACES = [
  * The body and stickers are kept highly transparent so the tunnels — and the
  * cube behind the void — remain visible through the centre.
  */
-function AntipodalMinicube({ settings }) {
+function AntipodalMinicube({ settings, riding }) {
   // Recompute only when colour scheme or biome face assignment changes.
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [settings?.colorScheme, settings?.biomeMode?.faceAssignment]
+  );
+
+  if (riding) return (
+    <group>
+      {/* An open cube gateway: real, depth-tested edges and coloured face frames.
+          The centre stays open for the worm and its track. */}
+      <lineSegments geometry={minicubeEdges}>
+        <lineBasicMaterial color="#132330" toneMapped={false} />
+      </lineSegments>
+      {MINI_FACES.map(({ id, pos, rot }) => (
+        <mesh key={id} geometry={minicubeFrameGeo} position={pos} rotation={rot}>
+          <meshBasicMaterial color={fc[id] || '#888888'} side={THREE.DoubleSide} toneMapped={false} />
+        </mesh>
+      ))}
+    </group>
   );
 
   return (
@@ -144,6 +169,7 @@ const coreFragmentShader = `
 
 function VoidCore() {
   const cubies = useGameStore(s => s.cubies);
+  const wormMode = useGameStore(s => s.wormHealerMode);
   const settings = useGameStore(s => s.settings);
 
   const innerCoreRef = useRef();
@@ -210,6 +236,7 @@ function VoidCore() {
   const _dummy = useMemo(() => new THREE.Object3D(), []);
 
   useFrame((_, dt) => {
+    if (wormMode) return; // the readable WORM gateway has no plasma/spark layer
     tRef.current += dt;
     const t = tRef.current;
 
@@ -262,9 +289,9 @@ function VoidCore() {
 
   return (
     <group>
-      <AntipodalMinicube settings={settings} />
+      <AntipodalMinicube settings={settings} riding={wormMode} />
 
-      <mesh ref={innerCoreRef} geometry={innerGeo}>
+      <mesh ref={innerCoreRef} geometry={innerGeo} visible={!wormMode}>
         <shaderMaterial
           ref={innerMatRef}
           vertexShader={coreVertexShader}
@@ -278,6 +305,7 @@ function VoidCore() {
 
       <instancedMesh
         ref={sparksRef}
+        visible={!wormMode}
         args={[sparkGeo, null, SPARK_COUNT]}
       >
         <meshBasicMaterial
