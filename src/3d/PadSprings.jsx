@@ -1,15 +1,15 @@
 import { createPadStalkGeometry, PAD_STALK_DEPTH, PAD_BACK_CLEARANCE } from './padStalkGeometry.js';
 import { RaisedCubieContext } from './raisedCubieContext.js';
 import { removeRaisedCubie } from './raisedCubieMotion.js';
-import { padBackFace } from '../game/raisedCubie.js';
+import { isLiveFlippedFace, padBackFace } from '../game/raisedCubie.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { FACE_COLORS } from '../utils/constants.js';
 import React, { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
-import { K_STAR, classifyPad, flipPadPair, projectPair } from '../game/flipPad.js';
-import { padPose, pairPhase, advancePadSpring } from './padPose.js';
+import { flipPadPair, pairFlips, padIsWorn } from '../game/flipPad.js';
+import { padPose, pairPhase, advancePadSpring, WORN_EASE } from './padPose.js';
 import { padMotion, removePadMotion } from './padMotionBridge.js';
 
 const PadContext = createContext(null);
@@ -25,8 +25,10 @@ export function PadProvider({ children, profile: profileOverride = null }) {
     stalk: createPadStalkGeometry(), mouth: new THREE.PlaneGeometry(0.76, 0.76),
     stalkMaterial: new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#000000', emissiveIntensity: 0, side: THREE.DoubleSide }),
     mouthMaterial: new THREE.MeshBasicMaterial({ color: '#16161a', side: THREE.DoubleSide }),
-    matrix: new THREE.Matrix4(), slot: new THREE.Matrix4(), local: new THREE.Matrix4(),
-    position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), color: new THREE.Color()
+    matrix: new THREE.Matrix4(), slot: new THREE.Matrix4(), local: new THREE.Matrix4(), inverse: new THREE.Matrix4(),
+    position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), color: new THREE.Color(),
+    // One pose input reused for every pair, so the frame loop allocates nothing.
+    poseInput: { phase: 0, wear: 0, profile: 'cube', worn: 0, seed: 0, reducedMotion: false, subtle: false, big: false }
   }), []);
   const reduced = useRef(false);
   const paletteCache = useRef({ settings: null, colors: FACE_COLORS });
@@ -61,20 +63,38 @@ export function PadProvider({ children, profile: profileOverride = null }) {
     for (const entry of entries) {
       const d = entry.data.current;
       let pair = pairs.get(d.pair);
-      if (!pair) { pair = { phase: pairPhase(d.pair), members: [], pose: {}, lift: 0, velocity: 0 }; pairs.set(d.pair, pair); }
+      if (!pair) {
+        const phase = pairPhase(d.pair);
+        pair = { phase, seed: Math.floor(phase * 4294967296), worn: 0, members: [], pose: {}, lift: 0, velocity: 0 };
+        pairs.set(d.pair, pair);
+      }
       pair.members.push(entry);
     }
+    const input = resources.poseInput;
     for (const [key, pair] of pairs) {
       if (!pair.members.length) { removePadMotion(key, pair); pairs.delete(key); continue; }
       const a = pair.members[0].data.current;
       const b = pair.members[1]?.data.current;
-      pair.wear = projectPair(a.meta.flips ?? 0, b?.meta.flips ?? 0).symmetric / cap;
-      const profile = profileOverride ?? (wormMode ? 'worm' : state.chaosLevel > 0 ? 'chaos' : 'cube');
-      padPose({ phase: pair.phase, wear: pair.wear, profile, worn: pair.wear >= K_STAR,
-        reducedMotion: motionOff, subtle: state.settings?.flipPads === 'subtle', big: !profileOverride && state.size >= 7 }, pair.pose);
+      const flips = pairFlips(a.meta.flips ?? 0, b ? b.meta.flips ?? 0 : null);
+      pair.wear = flips / cap;
+      // Ease across the worn threshold rather than snapping the rhythm.
+      const wornTarget = padIsWorn(pair.wear, cap - flips) ? 1 : 0;
+      pair.worn += Math.max(-dt * WORN_EASE, Math.min(dt * WORN_EASE, wornTarget - pair.worn));
+      input.phase = pair.phase;
+      input.wear = pair.wear;
+      input.profile = profileOverride ?? (wormMode ? 'worm' : state.chaosLevel > 0 ? 'chaos' : 'cube');
+      input.worn = pair.worn;
+      input.seed = pair.seed;
+      input.reducedMotion = motionOff;
+      input.subtle = state.settings?.flipPads === 'subtle';
+      input.big = !profileOverride && state.size >= 7;
+      padPose(input, pair.pose);
       pair.phase += dt * pair.pose.frequency;
-      pair.active = (wormPads || (state.settings?.flipPads !== 'off' && !wormMode))
-        && pair.members.some(e => classifyPad({ flips: e.data.current.meta.flips, cap }).lifted);
+      let lifted = false;
+      for (const member of pair.members) {
+        if (isLiveFlippedFace(member.data.current.meta, cap)) { lifted = true; break; }
+      }
+      pair.active = (wormPads || (state.settings?.flipPads !== 'off' && !wormMode)) && lifted;
       const target = pair.active ? pair.pose.lift : 0;
       if (motionOff) { pair.lift = target; pair.velocity = 0; }
       else advancePadSpring(pair, target, dt);
@@ -85,22 +105,23 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       else removePadMotion(key, pair);
     }
     let count = 0;
+    let inverseReady = false;
     for (const entry of entries) {
       const d = entry.data.current, group = entry.group.current;
       if (!group) continue;
       const pair = pairs.get(d.pair);
       // WORM uses a fixed physical landing height; cube/menu pads keep their idle bounce.
       const enabled = (wormPads || (state.settings?.flipPads !== 'off' && !wormMode));
-      const pad = classifyPad({ flips: d.meta.flips, cap });
-      const target = enabled && pad.lifted ? pair.pose.lift : 0;
-      if (enabled && pad.lifted) { entry.lift = pair.lift; entry.velocity = pair.velocity; }
+      const lifted = enabled && isLiveFlippedFace(d.meta, cap);
+      const target = lifted ? pair.pose.lift : 0;
+      if (lifted) { entry.lift = pair.lift; entry.velocity = pair.velocity; }
       else if (motionOff) { entry.lift = target; entry.velocity = 0; }
       else advancePadSpring(entry, target, dt);
       group.position.copy(d.normal).multiplyScalar(entry.lift);
       entry.cycle = pair.pose.cycle;
       entry.impact = pair.pose.impact;
       entry.wear = pair.wear;
-      entry.active = enabled && pad.lifted;
+      entry.active = lifted;
 
       if (entry.lift <= 0.001 || count >= MAX_PADS) continue;
       let visible = true;
@@ -116,10 +137,14 @@ export function PadProvider({ children, profile: profileOverride = null }) {
       resources.scale.set(1, 1, 1);
       resources.slot.compose(resources.position, resources.quaternion, resources.scale);
       resources.matrix.multiplyMatrices(group.parent.matrixWorld, resources.slot);
-      // The instances live at the provider's local origin, not necessarily scene root.
-      stalkRef.current.parent.updateWorldMatrix(true, false);
-      resources.local.copy(stalkRef.current.parent.matrixWorld).invert();
-      resources.matrix.premultiply(resources.local);
+      // The instances live at the provider's local origin, not necessarily scene
+      // root. That frame is the same for every pad, so invert it once per frame.
+      if (!inverseReady) {
+        stalkRef.current.parent.updateWorldMatrix(true, false);
+        resources.inverse.copy(stalkRef.current.parent.matrixWorld).invert();
+        inverseReady = true;
+      }
+      resources.matrix.premultiply(resources.inverse);
       mouthRef.current.setMatrixAt(count, resources.matrix);
       // Start behind the cubie's inner face and end against the entire tile
       // back. The fixed through-body section remains when the pad compresses.

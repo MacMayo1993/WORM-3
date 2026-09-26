@@ -25,12 +25,16 @@ export function cubieFaceRole(cubie, dir, cap) {
 // Colour is opposite the face currently visible, not opposite its home colour.
 export const padBackFace = sticker => ANTIPODAL_COLOR[sticker?.curr] ?? sticker?.orig;
 
-// Compose selective expansion with the global Explode view. The target is the
-// SAME position as full Explode, never full Explode plus a second explosion.
+// A springing piece may pass its Explode position on the way out (the bounce).
+// Bound it so a hitch can never fling a piece across the scene.
+export const PIECE_OVERSHOOT_MAX = 1.5;
+
+// Compose selective expansion with the global Explode view. The resting target is
+// the SAME position as full Explode, never full Explode plus a second explosion.
 // Multiply the cubie's live (possibly slice-rotated) centre by this extra ratio.
 export function selectiveCubieOffsetRatio(size, globalExpansion, raisedAmount) {
   const global = Math.max(0, globalExpansion);
-  const amount = Math.max(0, Math.min(1, raisedAmount));
+  const amount = Math.max(0, Math.min(PIECE_OVERSHOOT_MAX, raisedAmount));
   const combined = Math.max(global, amount);
   return cubeExpansionScale(size, combined) / cubeExpansionScale(size, global) - 1;
 }

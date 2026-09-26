@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { padEntryDecision } from '../worm/healerWorm/padEntry.js';
+import { padEntryDecision, tunnelEntryRule } from '../worm/healerWorm/padEntry.js';
 const pad = { rule: 'pad', flipped: true, resolved: true };
 describe('pad entry truth table', () => {
   it.each([
@@ -21,3 +21,10 @@ describe('pad entry truth table', () => {
     expect(padEntryDecision({ ...pad, ...input })).toBe(expected);
   });
 });
+
+it('keeps demo lessons on the crawl route and every other run on pads', () => {
+  expect(tunnelEntryRule({ demoMode: true })).toBe('crawl');
+  expect(tunnelEntryRule({ demoMode: false })).toBe('pad');
+  expect(tunnelEntryRule(undefined)).toBe('pad');
+});
+

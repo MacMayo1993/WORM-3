@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import { cubieHasFlippedFace, cubieFaceRole, padBackFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT, raisedWormExpansion } from '../game/raisedCubie.js';
+import { cubieHasFlippedFace, cubieFaceRole, padBackFace, selectiveCubieOffsetRatio, WORM_RAISED_AMOUNT, raisedWormExpansion, PIECE_OVERSHOOT_MAX } from '../game/raisedCubie.js';
 import { padEntryDecision } from '../worm/healerWorm/padEntry.js';
 import { publishRaisedCubie, removeRaisedCubie, raisedCubieExtent } from '../3d/raisedCubieMotion.js';
 
@@ -61,3 +61,11 @@ it.each([2, 3, 5, 7, 15])('halves Worm cubie displacement at size %i', size => {
       .toBeCloseTo(cubeExpansionScale(size, raisedWormExpansion(global)), 10);
   }
 });
+
+it.each([3, 7])('passes a springing overshoot through, bounded, at size %i', size => {
+  const rest = selectiveCubieOffsetRatio(size, 0, 1);
+  expect(selectiveCubieOffsetRatio(size, 0, 1.2)).toBeGreaterThan(rest);
+  expect(selectiveCubieOffsetRatio(size, 0, 99)).toBeCloseTo(selectiveCubieOffsetRatio(size, 0, PIECE_OVERSHOOT_MAX));
+  expect(selectiveCubieOffsetRatio(size, 0, -0.2)).toBe(0);
+});
+

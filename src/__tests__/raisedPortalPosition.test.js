@@ -3,6 +3,7 @@ import { makeCubies } from '../game/cubeState.js';
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { wormExpansion } from '../worm/wormExpansion.js';
+import { WORM_PAD_HEIGHT } from '../worm/healerWorm/raisedPlatforms.js';
 
 it.each(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'])('puts %s warning visuals on the raised pad, composed with global Explode', face => {
   const size = 7, cubies = makeCubies(size), xyz = [3, 3, 3];
@@ -21,3 +22,20 @@ it.each(['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'])('puts %s warning visuals on the ra
       .toEqual(getStickerWorldPos(...xyz, face, size, 1));
   } finally { wormExpansion.amount = before; }
 });
+
+it('reads the flip cap in force, like the simulation', () => {
+  const size = 5, cubies = makeCubies(size), xyz = [2, 2, 4];
+  cubies[2][2][4].stickers.PZ.flips = 7;
+  const base = { cubies, wormHealerMode: true, demoMode: false };
+  const before = wormExpansion.amount;
+  wormExpansion.amount = 0;
+  try {
+    // With Chaos's cap of 8 in force, seven flips is a live pad, raised as the sim sees it.
+    const raised = getStickerWorldPos(...xyz, 'PZ', size, 0.5);
+    raised[2] += WORM_PAD_HEIGHT;
+    expect(raisedPortalPosition(...xyz, 'PZ', size, { ...base, chaosLevel: 1, disparityFlipCap: 8 })).toEqual(raised);
+    // Under the standard cap the same tile is spent, so its rings stay on the floor.
+    expect(raisedPortalPosition(...xyz, 'PZ', size, base)).toEqual(getStickerWorldPos(...xyz, 'PZ', size, 0));
+  } finally { wormExpansion.amount = before; }
+});
+
