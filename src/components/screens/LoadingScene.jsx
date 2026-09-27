@@ -75,7 +75,7 @@ const Airflow = React.memo(function Airflow() {
   </div>;
 });
 
-// Everything between the two portals' near edges; see shaftClipPath.
+// From the upper portal's far edge to the floor portal's near edge.
 const SHAFT_STYLE = { clipPath: shaftClipPath() };
 
 export default function LoadingScene({ translucent = false }) {

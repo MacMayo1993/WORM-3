@@ -17,7 +17,7 @@
  * through the bottom mouth as its twin's comes out of the top one — `lead`
  * cubes into each fall.
  */
-export const FALL = { period: 1.5, drop: 2.8, lead: 0.7 };
+export const FALL = { period: 1.5, drop: 2.8, lead: 1.4 };
 /** Seconds into each fall at which the cube passes through the portals. */
 export const PASS_AT = (FALL.period * FALL.lead) / FALL.drop;
 
@@ -26,10 +26,11 @@ const fmt = (v) => +v.toFixed(4);
 /**
  * The CSS clip-path for the shaft the cube falls down, which is exactly as wide
  * as the portals and runs from the top of the one above to the bottom of the one
- * on the paper. The cube is in the open only between the two portals' near
- * edges — below the front arc of the top portal, above the front arc of the
- * bottom one — and inside a portal (out of sight) beyond them. `rim` is the CSS
- * length of a portal's half-height.
+ * on the paper. The upper portal faces down: the cube emerges across its mouth
+ * from the far (upper) arc, then passes IN FRONT of its lower rim. The floor
+ * portal faces up: the cube sinks behind its near (lower) arc. Clipping both
+ * at their near arcs makes the upper portal look like an opaque lid.
+ * `rim` is the CSS length of a portal's half-height.
  */
 export function shaftClipPath(rim = 'var(--wl-wb)', steps = 12) {
   const arc = (centre, from, to) =>
@@ -37,9 +38,9 @@ export function shaftClipPath(rim = 'var(--wl-wb)', steps = 12) {
       const angle = from + ((to - from) * i) / steps;
       return `${fmt(50 + 50 * Math.cos(angle))}% calc(${centre} + ${rim} * ${fmt(Math.sin(angle))})`;
     });
-  // Left to right along the top portal's near edge, then back right to left
-  // along the bottom portal's.
-  return `polygon(${[...arc(rim, Math.PI, 0), ...arc(`100% - ${rim}`, 0, Math.PI)].join(', ')})`;
+  // Left to right along the ceiling's far edge, then right to left along the
+  // floor's near edge. The rim canvas covers these two cut lines.
+  return `polygon(${[...arc(rim, Math.PI, Math.PI * 2), ...arc(`100% - ${rim}`, 0, Math.PI)].join(', ')})`;
 }
 
 export const THROAT = 0.17; // throat radius, as a fraction of the mouth
