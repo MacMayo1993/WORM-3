@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
+import { tunnelFinishGLSL } from './tunnelFinish.js';
 
 const vertexShader = `
   uniform vec3 uTileCenter;
@@ -59,9 +60,11 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
       uniform float uGrowT;
       uniform float uOpacity;
       uniform float uPatternRepeats;
+      uniform float uTime, uLength;
       varying vec2 vUv;
       vec2 tileUv;
       ${tileShader}
+      ${tunnelFinishGLSL}
       void main() {
         float core = uRideMode > 0.5 ? uRideCore : 0.5;
         if (uTileSide < 0.5 ? vUv.y >= core : vUv.y < core) discard;
@@ -71,8 +74,10 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
         tileMain();
         // Keep the track opaque in WORM, including translucent tile styles.
         gl_FragColor.a = uRideMode > 0.5 ? 1.0 : gl_FragColor.a * uOpacity;
-        float edge = 1.0 - smoothstep(0.02, 0.04, min(vUv.x, 1.0 - vUv.x));
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.025, 0.035, 0.045), edge);
+        float edge = 1.0 - smoothstep(0.018, 0.05, min(vUv.x, 1.0 - vUv.x));
+        vec3 pearl = mix(baseColor, vec3(0.9, 0.96, 1.0), 0.38);
+        float spiral = tunnelLine(vUv.y * uLength * 1.1 - vUv.x * 0.7 - uTime * 0.16, 0.06);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb + pearl * spiral * 0.05, pearl * 0.8, edge * 0.8);
       }
     `,
     side: THREE.DoubleSide,

@@ -1,4 +1,5 @@
 import { tunnelState } from '../tunnelProgressBridge.js';
+import { tunnelFinishGLSL } from '../../manifold/tunnelFinish.js';
 import { wormExpansion } from '../wormExpansion.js';
 // src/worm/healerWorm/TunnelTube.jsx
 //
@@ -70,15 +71,7 @@ const fragmentShader = `
   uniform float uOpacity;
   uniform float uHead;
   varying vec2 vUv;
-
-  // Distance to a repeated band, with a footprint wide enough for phone pixels.
-  // Fade sub-pixel detail instead of letting distant hoops sparkle as we move.
-  float band(float phase, float width) {
-    float footprint = max(fwidth(phase), 0.002);
-    float distance = abs(fract(phase + 0.5) - 0.5);
-    float line = 1.0 - smoothstep(width, width + footprint, distance);
-    return line * (1.0 - smoothstep(0.12, 0.45, footprint));
-  }
+  ${tunnelFinishGLSL}
 
   void main() {
     float y = vUv.y;
@@ -90,7 +83,7 @@ const fragmentShader = `
     // Broad, softly lit panels give the shaft shape without cloudy grain or
     // random pinpricks. A neutral floor keeps dark palette pairs readable too.
     vec3 base = mix(uColorA, uColorB, smoothstep(0.40, 0.60, y));
-    base = mix(base, vec3(0.64, 0.72, 0.82), 0.30);
+    base = mix(base, vec3(0.64, 0.72, 0.82), 0.10);
     vec3 laneColor = mix(uColorA, uColorB, 0.5 + 0.5 * sin(twist));
     vec3 hot = mix(laneColor, vec3(0.94, 0.98, 1.0), 0.65);
     float panel = 0.5 + 0.5 * cos(twist * 2.0);
@@ -98,8 +91,9 @@ const fragmentShader = `
 
     // Eight slow depth stations and two continuous guide rails. All sharp
     // features are filtered in screen space, including the twisting rails.
-    float hoop = band(y * 8.0 - uTime * 0.08, 0.035);
-    float rail = band(twist / 3.14159265, 0.035);
+    float hoop = tunnelLine(y * 8.0, 0.03);
+    float rail = tunnelLine(twist / 3.14159265, 0.025);
+    float spiral = tunnelLine(vUv.x * 2.0 - y * 3.0 + uTime * 0.16, 0.02);
     float railHalo = 0.5 + 0.5 * cos(twist * 2.0);
     railHalo *= railHalo;
     float nearHead = exp(-pow((y - uHead) / 0.22, 2.0));
@@ -110,13 +104,14 @@ const fragmentShader = `
     col += hot * rail * (0.36 + flow * 0.10);
     col += laneColor * railHalo * 0.08;
     col += hot * arrival * hoop * 0.20;
+    col += hot * spiral * 0.22;
 
     // Keep illumination continuous through the half-twist; no dark midpoint
     // dip or white wash hiding the worm during the camera's orientation change.
     float seam = 1.0 - smoothstep(0.0, 0.14, coreDistance);
     col += hot * seam * railHalo * 0.08;
     float coreWindow = smoothstep(0.10, 0.24, coreDistance);
-    float wall = (hoop * 0.12 + rail * 0.06) * coreWindow;
+    float wall = (hoop * 0.10 + rail * 0.035 + spiral * 0.05) * coreWindow;
     float alpha = wall * mouth * uOpacity;
     if (alpha < 0.008) discard;
     gl_FragColor = vec4(col, alpha);

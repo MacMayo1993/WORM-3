@@ -6,6 +6,8 @@ import {
   tunnelPathArcTangentInto, tunnelPathPointInto, tunnelPathRibbonInto, tunnelRibbonSampleU, tunnelCorePoseInto
 } from '../utils/tunnelPath.js';
 import { fillTunnelRideGeometry, tunnelRideSampleArc } from '../utils/tunnelRide.js';
+import { makeTunnelVeil, fillTunnelVeil } from '../manifold/tunnelRibbonVeil.js';
+import { makeTileGuard, setTileGuard } from '../manifold/tunnelTileGuard.js';
 
 const V = () => new THREE.Vector3();
 const geometry = segments => {
@@ -24,6 +26,50 @@ function route(size, dir) {
 }
 
 describe('bands seated on antipodal core stickers', () => {
+  it('welds the open curls to the strip without moving its floor or covering either core dock', () => {
+    const segments = 160, geo = geometry(segments), left = geometry(segments), right = geometry(segments);
+    const veil = makeTunnelVeil(segments, true), p = V(), q = V();
+    const stride = veil.attributes.position.count / (segments + 1), sideVerts = stride / 2;
+    for (const size of [3, 15]) for (const dir of Object.keys(CORE_DIRS)) {
+      const { n, dock, start } = route(size, dir), end = start.clone().negate(), exitN = n.clone().negate();
+      const path = buildTunnelPathInto(makeTunnelPath(), start, n, end, exitN, dock, dock.clone().negate());
+      fillTunnelRideGeometry(geo, left, right, path, segments, 0.36, tunnelDockWidth(size));
+      const fixed = geo.attributes.position.array.slice();
+      const guard = setTileGuard(makeTileGuard(), start, n, end, exitN);
+      fillTunnelVeil(veil, geo, left, path, segments, true, guard);
+      expect(geo.attributes.position.array).toEqual(fixed);
+      for (let i = 0; i <= segments; i++) {
+        const arc = tunnelRideSampleArc(path, i, segments);
+        const seated = i === 0 || i === segments || Math.abs(arc - path.armALen) < 1e-10
+          || Math.abs(arc - (path.total - path.armBLen)) < 1e-10;
+        for (const side of [0, 1]) {
+          q.fromBufferAttribute(geo.attributes.position, i * 2 + side);
+          p.fromBufferAttribute(veil.attributes.position, i * stride + side * sideVerts);
+          expect(p.distanceTo(q)).toBeLessThan(1e-7);
+          for (let j = 0; j < sideVerts; j++) {
+            const index = i * stride + side * sideVerts + j;
+            p.fromBufferAttribute(veil.attributes.position, index);
+            expect(Number.isFinite(p.length())).toBe(true);
+            expect(p.dot(n) - guard.d1).toBeLessThan(1e-6);
+            expect(p.dot(exitN) - guard.d2).toBeLessThan(1e-6);
+            if (seated) {
+              expect(p.distanceTo(q)).toBeLessThan(1e-7);
+              expect(veil.attributes.aEnvelope.getX(index)).toBeLessThan(1e-7);
+            }
+          }
+        }
+      }
+    }
+    // No triangle closes the top by joining the two curled sides.
+    const indices = veil.index.array;
+    for (let i = 0; i < indices.length; i += 3) {
+      const side = v => Math.floor((v % stride) / sideVerts);
+      expect(side(indices[i])).toBe(side(indices[i + 1]));
+      expect(side(indices[i])).toBe(side(indices[i + 2]));
+    }
+    [geo, left, right, veil].forEach(g => g.dispose());
+  });
+
   it('seats both rendered ribbon edges and rails flush on every face, including Mega', () => {
     const segments = 160, geo = geometry(segments), left = geometry(segments), right = geometry(segments);
     const p = V(), q = V(), tangent = V();

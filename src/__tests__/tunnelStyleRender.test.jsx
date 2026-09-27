@@ -95,6 +95,21 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     expect(raised.material.transparent).toBe(false);
     expect(raised.material.depthWrite).toBe(true);
     expect(raised.material.uniforms.uRideMode.value).toBe(1); // FLIP CUBE keeps its raised, opaque bands too.
+    const veil = scene.getObjectByName('tunnel-open-veil');
+    expect(veil.material.transparent).toBe(true);
+    expect(veil.material.depthWrite).toBe(false);
+    expect(veil.material.uniforms.uTime).toBe(raised.material.uniforms.uTime);
+    await act(async () => useGameStore.setState({ settings: { ...useGameStore.getState().settings, reducedMotion: true } }));
+    const frozen = veil.material.uniforms.uTime.value;
+    frame(); frame();
+    expect(veil.material.uniforms.uTime.value).toBe(frozen);
+    const disposedVeil = vi.spyOn(veil.geometry, 'dispose');
+    await act(async () => useGameStore.setState({ perfReducedFX: true })); frame();
+    expect(scene.getObjectByName('tunnel-open-veil')).toBeUndefined();
+    expect(disposedVeil).toHaveBeenCalledOnce();
+    expect(scene.getObjectByName('tunnel-styled-half-0').geometry).toBe(raised.geometry);
+    await act(async () => useGameStore.setState({ perfReducedFX: false })); frame();
+    expect(scene.getObjectByName('tunnel-open-veil').geometry.attributes.position.array.some(v => v !== 0)).toBe(true);
   } finally {
     await act(async () => root.unmount()); useGameStore.setState(before, true);
     context.mockRestore(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
