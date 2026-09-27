@@ -18,6 +18,7 @@ import * as THREE from 'three';
 // Face basis, quad sizing, gold palette, noise and the merged-quad builder are
 // shared with the menu's ambient grid glow — see teach/layerGlow.js.
 import { EDGE_UV, GOLD_DEEP, GOLD_CORE, NOISE_GLSL, getSliceRimGeometry } from './layerGlow.js';
+import { updateLiveLayerRim } from './liveLayerRim.js';
 
 // ─── 1. Layer rim ─────────────────────────────────────────────────────────────
 
@@ -273,9 +274,16 @@ const STREAMERS = 3;
  *                    44 motes, orbiting a belt that is itself size-scaled — and on
  *                    a 15×15 it costs more than the frame has. The information is
  *                    in the rim, so the rim is what a big cube keeps.
+ * @param surfaceOnly exterior-facing rims without the orbiting decoration
+ * @param cubieTransforms live piece registry for exploded/raised/rotating rims
+ * @param expansionRef fallback lattice expansion while pieces are mounting
  */
-const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1, opacityRef = null, gain = 1, lite = false }) => {
+const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1, opacityRef = null, gain = 1, lite = false,
+  surfaceOnly = false, cubieTransforms = null, expansionRef = null }) => {
   const spinnerRef = useRef();
+  const rimRef = useRef();
+  const worldToRim = useMemo(() => new THREE.Matrix4(), []);
+  const rimOnly = lite || surfaceOnly;
   const turn = dir === 1 ? 1 : -1;
 
   // Shared clock + direction, so every material animates off one source.
@@ -308,7 +316,16 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
   // rims are asked for over and over (the worm's hazard arms a new one every ten
   // seconds), and rebuilding one walks size³ cubies for a geometry identical to the
   // one just thrown away.
-  const rimGeometry = useMemo(() => getSliceRimGeometry(size, axis, sliceIndex), [axis, sliceIndex, size]);
+  const rimTemplate = useMemo(() => getSliceRimGeometry(size, axis, sliceIndex), [axis, sliceIndex, size]);
+  const rimGeometry = useMemo(() => {
+    if (!cubieTransforms) return rimTemplate;
+    const geometry = rimTemplate.clone();
+    geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
+    return geometry;
+  }, [rimTemplate, cubieTransforms]);
+  React.useEffect(() => () => {
+    if (rimGeometry !== rimTemplate) rimGeometry.dispose();
+  }, [rimGeometry, rimTemplate]);
 
   const rimFragment = useMemo(() => rimFragmentShader(lite), [lite]);
 
@@ -337,7 +354,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
 
   // Streamer body, the haze around it, and a flare at each leading tip.
   const streamers = useMemo(() => {
-    if (lite) return null;
+    if (rimOnly) return null;
     const thickness = 0.13 + size * 0.03;
     const { geo, tip } = buildWisp(belt.radius, 1.5, turn, thickness);
     const { geo: aura } = buildWisp(belt.radius, 1.5, turn, thickness * 2.4);
@@ -354,7 +371,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
     flare.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     flare.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
     return { geo, aura, flare };
-  }, [belt.radius, turn, size, lite]);
+  }, [belt.radius, turn, size, rimOnly]);
 
   React.useEffect(() => () => {
     streamers?.geo.dispose();
@@ -364,7 +381,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
 
   // Loose motes scattered around the belt, always outside the cube.
   const motes = useMemo(() => {
-    if (lite) return null;
+    if (rimOnly) return null;
     const COUNT = 44;
     const pts = [];
     const seeds = [];
@@ -380,7 +397,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
     geo.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
     geo.setAttribute('aAngle', new THREE.Float32BufferAttribute(angles, 1));
     return geo;
-  }, [belt.radius, lite]);
+  }, [belt.radius, rimOnly]);
 
   React.useEffect(() => () => motes?.dispose(), [motes]);
 
@@ -390,6 +407,12 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
   const moteUniforms = useMemo(() => ({ ...palette, uTime, uDir, uOpacity, uSize: { value: 0.075 } }), [palette, uTime, uDir, uOpacity]);
 
   useFrame((state, delta) => {
+    const rim = rimRef.current;
+    if (cubieTransforms && rim) {
+      rim.updateWorldMatrix(true, false);
+      worldToRim.copy(rim.matrixWorld).invert();
+      updateLiveLayerRim(rimGeometry, rimTemplate, cubieTransforms, size, expansionRef?.current ?? 0, worldToRim);
+    }
     uTime.value = state.clock.elapsedTime;
     // A caller driving the intensity per frame owns it outright — this is the
     // one write, so nothing re-renders to make the hint brighten.
@@ -401,19 +424,22 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1
   return (
     <group>
       {/* Gold rim on the layer's own tiles, sweeping in the turn direction */}
-      <mesh geometry={rimGeometry} raycast={() => null}>
+      <mesh ref={rimRef} name="layer-warning-rim"
+        frustumCulled={!cubieTransforms} raycast={() => null}>
+        {/* Cache owns the template; the effect above owns its animated copy. */}
+        <primitive object={rimGeometry} attach="geometry" />
         <shaderMaterial
           vertexShader={rimVertexShader}
           fragmentShader={rimFragment}
           uniforms={rimUniforms}
           transparent
-          side={THREE.DoubleSide}
+          side={surfaceOnly ? THREE.FrontSide : THREE.DoubleSide}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
 
-      {!lite && (
+      {!rimOnly && (
       <group quaternion={belt.quaternion} position={belt.position}>
         {/* Streamers orbiting the layer, tips leading the way round */}
         <group ref={spinnerRef}>

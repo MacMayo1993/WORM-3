@@ -87,6 +87,7 @@ export function buildRimGeometry(size, { includeCubie, phaseOf } = {}) {
   const uvs = [];
   const phases = [];
   const indices = [];
+  const faces = [];
   let vBase = 0;
 
   // uv corners of the quad: (0,0) (1,0) (1,1) (0,1)
@@ -111,6 +112,7 @@ export function buildRimGeometry(size, { includeCubie, phaseOf } = {}) {
           const fy = cy + n[1] * FACE_OFFSET;
           const fz = cz + n[2] * FACE_OFFSET;
           const phase = phaseOf ? phaseOf({ x, y, z, dirKey, fx, fy, fz }) : 0;
+          faces.push({ x, y, z, cx, cy, cz, dirKey });
 
           for (const [su, sv, tu, tv] of corners) {
             positions.push(
@@ -121,7 +123,13 @@ export function buildRimGeometry(size, { includeCubie, phaseOf } = {}) {
             uvs.push(tu, tv);
             phases.push(phase);
           }
-          indices.push(vBase, vBase + 1, vBase + 2, vBase, vBase + 2, vBase + 3);
+          // All quads face outwards. Consumers that only show exterior rims can
+          // now cull their backs instead of exposing glowing sheets inside.
+          const outward = (u[1] * v[2] - u[2] * v[1]) * n[0]
+            + (u[2] * v[0] - u[0] * v[2]) * n[1]
+            + (u[0] * v[1] - u[1] * v[0]) * n[2] > 0;
+          if (outward) indices.push(vBase, vBase + 1, vBase + 2, vBase, vBase + 2, vBase + 3);
+          else indices.push(vBase, vBase + 2, vBase + 1, vBase, vBase + 3, vBase + 2);
           vBase += 4;
         }
       }
@@ -133,6 +141,7 @@ export function buildRimGeometry(size, { includeCubie, phaseOf } = {}) {
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1));
   geo.setIndex(indices);
+  geo.userData.rimFaces = faces;
   return geo;
 }
 

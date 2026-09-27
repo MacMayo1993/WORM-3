@@ -6,9 +6,9 @@
 // and six strobing point lights. That read as UI bolted onto the scene.
 //
 // It now uses the same in-world guidance the Kociemba solver draws — LayerHighlight's
-// gold rim on the threatened slice's own tiles, with comet streamers orbiting it in
-// the direction the layer will turn. Same visual language across the game: gold light
-// on a layer means "this layer, this way".
+// rim on the threatened slice's own tiles. WORM keeps just the surface rims,
+// with a travelling sweep in the direction the layer will turn. They follow the
+// actual pieces through Explode and raised platforms, and stay outside the ride.
 //
 // The layer is lit for the whole cycle, not just the last few seconds: the mode
 // arms the next move the moment the previous one commits (see HealerWormMode), so
@@ -24,6 +24,9 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { getSkin } from '../wormCosmeticsData.js';
 import { fxBudget } from './fxBudget.js';
 import { rotationClock } from './rotationClockBridge.js';
+import { liveCubies } from '../liveCubies.js';
+
+const TRANSIT_PHASES = new Set(['windup', 'entering', 'tunnel', 'exiting', 'windout']);
 
 // Which tier this board's warning runs at is the fx budget's call, not this
 // file's — see fxBudget.js for why Mega gives the spectacle up.
@@ -40,7 +43,8 @@ const PEAK_ALPHA = 1.9;
 const RIM_GAIN = 2.1;
 const RIM_GAIN_LITE = 2.6;
 
-export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) {
+export function SliceWarningLights({ pendingRotRef, warningProgressRef, size, worm }) {
+    const groupRef = useRef();
     // Tint the turn warning with the worm the player is actually looking at — its body
     // colour comes from the equipped skin (getSkin(...).body), the same source WormBody
     // and the tile-press use. Reading the store's wormColor pinned it to a default green
@@ -56,6 +60,9 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
 
     useFrame(() => {
         const p = pendingRotRef.current;
+        // Read the simulation directly, so entry/exit cannot leave one stale
+        // React frame of exterior glow across the tunnel. Keep resources mounted.
+        if (groupRef.current) groupRef.current.visible = !!p && !TRANSIT_PHASES.has(worm?.phase.current);
         // The mode arms this ref with one stable move object per warning (and nulls
         // it on reset), so identity is an exact change test. It used to build a
         // composite key string — two array allocations, two joins and a template
@@ -81,7 +88,7 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
 
     if (!pending) return null;
 
-    // One gold rim per threatened plane, each streaming in the direction that plane
+    // One rim per threatened plane, each streaming in the direction that plane
     // will turn (the two hazard planes turn opposite ways).
     const indices = pending.sliceIndices?.length ? pending.sliceIndices : [pending.sliceIndex];
     const dirs = pending.sliceDirs?.length ? pending.sliceDirs : indices.map(() => pending.dir);
@@ -89,7 +96,7 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
     // Only upcoming rotation planes are lit. A second cyan "safe lane" looked
     // like an unrelated moving selection and obscured which layer would turn.
     return (
-        <>
+        <group ref={groupRef} name="worm-slice-warning" visible={!TRANSIT_PHASES.has(worm?.phase.current)}>
             {indices.map((sliceIndex, i) => (
                 <LayerHighlight
                     key={sliceIndex}
@@ -101,8 +108,11 @@ export function SliceWarningLights({ pendingRotRef, warningProgressRef, size }) 
                     opacityRef={alphaRef}
                     gain={lite ? RIM_GAIN_LITE : RIM_GAIN}
                     lite={lite}
+                    surfaceOnly
+                    cubieTransforms={liveCubies}
+                    expansionRef={worm?.expansionAmount}
                 />
             ))}
-        </>
+        </group>
     );
 }
