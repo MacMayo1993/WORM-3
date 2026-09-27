@@ -84,10 +84,18 @@ export function createWormSkinMaterial(options = {}) {
     shader.uniforms.uSpeed = { value: 1 };
     shader.uniforms.uStyle = { value: 0 };
     shader.uniforms.uSeed = { value: material.userData.seed ?? 0 };
+    shader.uniforms.uEmissiveTint = { value: material.userData.emissiveTint ?? 1 };
 
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${NOISE_GLSL}\nuniform float uTime;\nuniform float uAmp;\nuniform float uFreq;\nuniform float uSpeed;\nuniform float uStyle;\nuniform float uSeed;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${DISPLACE_GLSL}`);
+    // The body's self-light takes the bead's own colour (instance or segment
+    // colour included). A plain white emissive lifted every skin toward the
+    // same pastel; tinted, Slime stays slime-green and Lava stays hot. The Glow
+    // Worm untints it: its emissive is its bioluminescence colour.
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uEmissiveTint;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= mix(vec3(1.0), diffuseColor.rgb, uEmissiveTint);');
 
     material.userData.shader = shader;
   };
@@ -174,6 +182,9 @@ export function updateWormSkinMaterialTime(material, elapsed) {
  */
 export function applyBioluminescence(material, glowHex, isGlow) {
   if (!material) return;
+  material.userData.emissiveTint = isGlow ? 0 : 1;
+  const uniform = material.userData.shader?.uniforms.uEmissiveTint;
+  if (uniform) uniform.value = material.userData.emissiveTint;
   if (!isGlow) {
     // Put the tint back. applySkinMaterialProfile restores emissiveIntensity but
     // not the emissive COLOUR, and the preview reuses one rig across every

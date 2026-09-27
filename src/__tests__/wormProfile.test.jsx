@@ -152,3 +152,18 @@ it('shows equipment in the category rail and returns focus when finishing custom
   expect(document.activeElement).toBe(button('Customize ✎'));
   expect(preview()).toBe('classic/royal/none');
 });
+
+it('shuffles into owned pieces only, with one cue, and shows stats as sticker strips', () => {
+  act(() => useGameStore.setState({ wormAccessories: { face: 'none', neck: 'none', body: 'none', tail: 'none' }, demoMode: false,
+    ownedItems: ['character_classic', 'character_book', 'skin_slime', 'skin_royal', 'hat_crown', 'accessory_seedSatchel'] }));
+  act(() => root.render(<WormProfile defaultExpanded />));
+  expect(host.querySelector('.worm-profile-stats dd').getAttribute('aria-label')).toBe('3 of 5');
+  expect(host.querySelectorAll('.worm-profile-stats dd i[data-lit="true"]')).toHaveLength(3 + 3 + 3 + 1);
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+  vi.clearAllMocks(); click('Shuffle ⚄');
+  random.mockRestore();
+  expect(feel).toHaveBeenCalledExactlyOnceWith('uiKey');
+  expect(state()).toMatchObject({ wormCharacter: 'book', wormSkin: 'royal', wormHat: 'crown' });
+  expect(state().wormAccessories).toEqual({ face: 'none', neck: 'none', body: 'seedSatchel', tail: 'none' });
+  expect(host.querySelector('.worm-profile-type').textContent).toBe('Sage');
+});

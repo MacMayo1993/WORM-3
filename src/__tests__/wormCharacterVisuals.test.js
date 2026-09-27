@@ -1,7 +1,8 @@
 import { HANDMADE_HATS, WORM_ACCESSORIES, accessoryFraming } from '../worm/handmadeAccessoriesData.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { createCharacterGeometry, applyCharacterFinish, poseCharacterAccents } from '../worm/wormCharacterVisuals.js';
+import { createCharacterGeometry, applyCharacterFinish, poseCharacterAccents, createCharacterAccents, characterSegmentPattern } from '../worm/wormCharacterVisuals.js';
+import { getSkin } from '../worm/wormCosmeticsData.js';
 import { createWormSkinMaterial, applySkinMaterialProfile } from '../worm/wormSkinMaterial.js';
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { wormBodyTaper } from '../worm/wormCharacterFinish.js';
@@ -43,6 +44,37 @@ describe('character visual safety', () => {
       expect(group.quaternion.length()).toBeCloseTo(1);
       expect(group.position.distanceTo(center)).toBe(0);
     }
+  });
+});
+
+describe('character identity', () => {
+  it.each(['classic', 'wiggle', 'glow', 'book', 'inch', 'prism'])('gives %s its own head feature, and frees it', character => {
+    const accents = createCharacterAccents(character);
+    expect(accents.group.children.length).toBeGreaterThan(0);
+    accents.setSkin(getSkin('lava')); accents.update(1.3); accents.update(0);
+    accents.group.traverse(o => { if (o.isMesh) expect([...o.geometry.attributes.position.array].every(Number.isFinite)).toBe(true); });
+    accents.dispose();
+  });
+
+  it("lights the Scout's lure in the skin's glow colour", () => {
+    const accents = createCharacterAccents('glow');
+    accents.setSkin(getSkin('royal'));
+    const lit = accents.group.children.filter(o => o.material.emissive?.getHexString() === getSkin('royal').glow.slice(1));
+    expect(lit).toHaveLength(1);
+    accents.dispose();
+  });
+
+  it('bands the body by character and never the head', () => {
+    const skin = getSkin('royal'), scratch = new THREE.Color();
+    const colour = (character, i) => characterSegmentPattern(new THREE.Color(skin.body), character, skin, i, scratch).getHexString();
+    const base = skin.body.slice(1);
+    for (const character of ['classic', 'wiggle', 'inch', 'glow', 'book']) expect(colour(character, 0)).toBe(base);
+    expect(colour('wiggle', 1)).not.toBe(base);
+    expect(colour('wiggle', 2)).toBe(base);
+    expect(colour('inch', 3)).not.toBe(colour('wiggle', 3));
+    expect(colour('classic', 2)).not.toBe(base);
+    expect(colour('classic', 3)).toBe(base);
+    expect(colour('glow', 1)).toBe(base);
   });
 });
 

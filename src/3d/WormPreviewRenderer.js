@@ -20,10 +20,12 @@ import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormP
 //     unregisterWormPreview (see WormPreviewCanvas.jsx).
 
 import { prefersReducedMotion } from '../utils/device.js';
-import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents } from '../worm/wormCharacterVisuals.js';
+import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents, characterSegmentPattern } from '../worm/wormCharacterVisuals.js';
 import { animateWormFace } from '../worm/wormFaceExpression.js';
 import { finishWormEyes, wormBodyTaper } from '../worm/wormCharacterFinish.js';
 import * as THREE from 'three';
+import { createCubieGeometry, createStickerGeometry, rubiksFinish } from './rubiksPiece.js';
+import { RUBIKS_CLASSIC } from '../utils/constants.js';
 import { stepMenuWorm, menuWormSegment } from './menuWormMotion.js';
 import { createMobiSegmentAssets, createMobiSegment, MOBI_SEGMENT_RADIUS } from '../worm/mobiSegments.js';
 import { createMobiModel, animateMobi, orientMobi, MOBI_RADIUS } from '../worm/mobiModel.js';
@@ -64,8 +66,8 @@ const RIGHT = new THREE.Vector3(0, 0, 1);
 
 let renderer = null;
 let _usingShared = false;
-const _targets = new Map();   // size → WebGLRenderTarget
-const _buffers = new Map();   // size → { pixels: Uint8Array, image: ImageData }
+const _targets = new Map();   // 'w×h' → { scene, out } render targets
+const _buffers = new Map();   // 'w×h' → { pixels: Uint8Array, image: ImageData }
 
 let scene = null;
 let characterStage = null;
@@ -89,8 +91,10 @@ function requestHatParts() {
 
 const _color = new THREE.Color();
 const _accentColor = new THREE.Color();
-const _tailPreviewCenter = new THREE.Vector3();
-const _tailPreviewOffset = new THREE.Vector3(-0.48, 0.38, 0.62);
+const _tailPreviewOffset = new THREE.Vector3(-0.48, 0.38, 0.62).normalize();
+const _tailBox = new THREE.Box3();
+const _tailBeadBox = new THREE.Box3();
+const _tailBead = new THREE.Sphere();
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
@@ -101,7 +105,7 @@ function _buildRig() {
   // uses white + per-instance colour because it draws one instanced mesh).
   const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
   const characterGeometries = { inch: createCharacterGeometry('inch'), prism: createCharacterGeometry('prism'), default: sphereGeo };
-  const accents = Object.fromEntries(['book', 'inch', 'prism'].map(id => [id, createCharacterAccents(id)]));
+  const accents = Object.fromEntries(['classic', 'wiggle', 'glow', 'book', 'inch', 'prism'].map(id => [id, createCharacterAccents(id)]));
   Object.values(accents).forEach(a => group.add(a.group));
   // Thin spine/binding — the pages (below) are the visible body now, not a
   // flat square slab the pages ride on top of.
@@ -204,6 +208,8 @@ function _buildRig() {
 // crown and was being cut off by the top of the frame.
 const FRAMING = {
   character: { pos: [0.12, 1.0, 1.82], look: [-0.30, 0.06, 0], yaw: 0 },
+  // The selector's wide stage (see _frameCamera): centred on the roaming oval.
+  stage: { pos: [-0.30, 0.84, 1.34], look: [-0.30, -0.05, 0.02], yaw: 0 },
   // Level runway: travel along X projects horizontally onto the menu's floor.
   runway: { pos: [-0.36, 0.62, 1.68], look: [-0.36, 0.02, 0], yaw: 0 },
   tail: { pos: [-1.08, .40, .58], look: [-.63, .02, 0], yaw: 0 },
@@ -212,11 +218,13 @@ const FRAMING = {
   portrait: { pos: [0.34, 0.52, 0.68], look: [0.0, 0.10, -0.02], yaw: -0.55 },
 };
 
-function _frameCamera(framing, characterId) {
-  const f = FRAMING[framing] || FRAMING.body;
+function _frameCamera(framing, characterId, aspect = 1) {
+  // A wide canvas takes the stage's own shot, which the roaming oval fills.
+  const f = (framing === 'character' && aspect > 1.2 ? FRAMING.stage : FRAMING[framing]) || FRAMING.body;
   camera.position.set(f.pos[0], f.pos[1], f.pos[2]);
   camera.lookAt(f.look[0], f.look[1], f.look[2]);
   camera.zoom = characterId === 'mobi' && (framing === 'head' || framing === 'portrait') ? 0.68 : 1;
+  camera.aspect = aspect;
   camera.updateProjectionMatrix();
   // Yaw the worm rather than orbit the camera: the face reads best turned a
   // little towards the lens, and turning the worm keeps the shallow elevation
@@ -245,41 +253,150 @@ function _initScene() {
     scene.add(shadow); return shadow;
   });
 
-  // A miniature tile surface gives the selector the same visual vocabulary
-  // as the cube. Built once, reused by every character, hidden in thumbnails.
-  characterStage = new THREE.Group();
-  const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.07, 0.66),
-    new THREE.MeshStandardMaterial({ color: '#23372e', roughness: 0.85 }));
-  plinth.position.set(-0.30, -0.16, 0);
-  characterStage.add(plinth);
-  const tileGeo = new THREE.BoxGeometry(0.198, 0.025, 0.198);
-  const tileMats = ['#729487', '#a8b79b', '#557970', '#b5a281'].map(color =>
-    new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.08 }));
-  for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 5; col++) {
-      const tile = new THREE.Mesh(tileGeo, tileMats[(col + row * 2) % tileMats.length]);
-      tile.position.set(-0.30 + (col - 2) * 0.212, -0.112, (row - 1) * 0.212);
-      characterStage.add(tile);
-    }
-  }
+  // The selector's stage is a face of the game's Rubik's cube: the opening's
+  // black-plastic cubies with glossy stickers (rubiksPiece.js), so the worm is
+  // shown on the surface it plays on. Built once, reused by every character,
+  // hidden in thumbnails. Two instanced draws.
+  characterStage = _buildCubeFaceStage();
   characterStage.visible = false;
   scene.add(characterStage);
 
-  // Warm key + cool fill, enough to show the clearcoat highlight rolling over
-  // the beads without an environment map.
-  scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-  const key = new THREE.DirectionalLight(0xfff6e2, 2.6);
-  key.position.set(0.6, 1.1, 0.8);
+  // Studio light in the cube rig's pattern (cubeLighting.js): warm key from
+  // above and in front, cool fill, cool rim for the silhouette. Kept low: the
+  // studio reflection map (_ensureEnvironment) carries most of the light.
+  const key = new THREE.DirectionalLight(0xfff4e0, 1.5);
+  key.position.set(0.6, 1.2, 0.9);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xbfd8ff, 1.1);
-  fill.position.set(-0.8, 0.3, -0.6);
+  const fill = new THREE.DirectionalLight(0xcfe0ff, 0.25);
+  fill.position.set(-0.9, 0.35, 0.5);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffffff, 1.4);
-  rim.position.set(-0.2, 0.6, -1);
+  const rim = new THREE.DirectionalLight(0xe8efff, 1.4);
+  rim.position.set(-0.3, 0.7, -1);
   scene.add(rim);
 
   rig = _buildRig();
   scene.add(rig.group);
+}
+
+// The stage: a 5×3 patch of scrambled cube face, centred under the worm's
+// roaming oval (wormPreviewMotion.js). Mostly white, so every skin reads
+// against it, with a few classic colours so it is unmistakably the cube.
+const STAGE = { cx: -0.30, cols: 5, rows: 3, pitch: 0.212, top: -0.092, depth: 0.1 };
+const STAGE_STICKERS = [
+  'white', 'red', 'white', 'yellow', 'white',
+  'blue', 'white', 'orange', 'white', 'white',
+  'white', 'yellow', 'white', 'white', 'red',
+];
+
+function _buildCubeFaceStage() {
+  const stage = new THREE.Group();
+  const finish = rubiksFinish(false);
+  const count = STAGE.cols * STAGE.rows;
+  const bodies = new THREE.InstancedMesh(createCubieGeometry(), new finish.Material(finish.plastic), count);
+  // The camera looks along the softbox's mirror line, so full reflections
+  // bleached the stickers to white; the floor keeps a hint of gloss only.
+  const stickers = new THREE.InstancedMesh(createStickerGeometry(), new finish.Material({ ...finish.sticker, color: '#ffffff', envMapIntensity: 0.3 }), count);
+  bodies.material.envMapIntensity = 0.5;
+  const tint = new THREE.Color();
+  const dummy = new THREE.Object3D();
+  let i = 0;
+  for (let row = 0; row < STAGE.rows; row++) {
+    for (let col = 0; col < STAGE.cols; col++, i++) {
+      const x = STAGE.cx + (col - (STAGE.cols - 1) / 2) * STAGE.pitch;
+      const z = (row - (STAGE.rows - 1) / 2) * STAGE.pitch;
+      dummy.position.set(x, STAGE.top - 0.006 - STAGE.depth / 2, z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(STAGE.pitch, STAGE.depth / 0.96, STAGE.pitch);
+      dummy.updateMatrix();
+      bodies.setMatrixAt(i, dummy.matrix);
+      dummy.position.set(x, STAGE.top - 0.005, z);
+      dummy.rotation.set(-Math.PI / 2, 0, 0);
+      dummy.scale.setScalar(STAGE.pitch);
+      dummy.updateMatrix();
+      stickers.setMatrixAt(i, dummy.matrix);
+      // Stage white sits a shade under the cube's, so the key light doesn't clip it.
+      stickers.setColorAt(i, STAGE_STICKERS[i] === 'white' ? tint.set('#e4e0d6') : tint.set(RUBIKS_CLASSIC[STAGE_STICKERS[i]]));
+    }
+  }
+  stage.add(bodies, stickers);
+  return stage;
+}
+
+// A soft studio for the clearcoat to reflect: warm paper-white above, a dark
+// floor below, one big softbox over the camera's shoulder and a strip light
+// behind. The beads, stickers, hats and metal trims all read as objects once
+// they have something to catch. Made once from the shared renderer, and only
+// on a real one (tests pass a stub).
+function _studioScene() {
+  const studio = new THREE.Scene();
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(4, 32, 16), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `varying vec3 vDir;
+      void main() {
+        vec3 floorC = vec3(0.045, 0.05, 0.045), horizon = vec3(0.55, 0.52, 0.46), sky = vec3(0.78, 0.76, 0.72);
+        float y = vDir.y;
+        vec3 c = y < 0.0 ? mix(horizon * 0.5, floorC, smoothstep(0.0, 0.45, -y)) : mix(horizon, sky, smoothstep(0.0, 0.7, y));
+        gl_FragColor = vec4(c, 1.0);
+      }`
+  }));
+  studio.add(dome);
+  const panel = (w, h, intensity, pos, look) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.97, 0.92).multiplyScalar(intensity), side: THREE.DoubleSide }));
+    mesh.position.set(...pos); mesh.lookAt(...look);
+    studio.add(mesh);
+  };
+  panel(2.4, 1.6, 3.2, [1.2, 2.4, 2.2], [0, 0, 0]);   // key softbox, above and in front
+  panel(0.5, 2.6, 2.2, [-2.4, 1.2, -1.6], [0, 0, 0]); // rim strip, behind left
+  panel(1.4, 0.9, 1.1, [-2.2, 0.6, 1.8], [0, 0, 0]);  // fill card, front left
+  return studio;
+}
+
+let _envTried = false;
+function _ensureEnvironment() {
+  if (_envTried || !renderer?.extensions || !renderer.getContext?.()) return;
+  _envTried = true;
+  let pmrem = null;
+  try {
+    pmrem = new THREE.PMREMGenerator(renderer);
+    const studio = _studioScene();
+    scene.environment = pmrem.fromScene(studio, 0.02).texture;
+    studio.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); });
+  } catch (error) {
+    console.warn('Worm preview reflections unavailable', error);
+  } finally {
+    pmrem?.dispose();
+  }
+}
+
+// Thumbnails are drawn off screen, and a render target always holds linear
+// colour, so the pixels read back are not what the screen would show: every
+// skin came out oversaturated with hard, dark shading, and edges against the
+// clear carried a black fringe. The scene is drawn into a linear (half-float
+// where supported) target, then one full-screen pass un-premultiplies it,
+// encodes it to sRGB and flips it top-down, straight into the pixels a 2D
+// canvas expects.
+let _encode = null;
+function _encoder() {
+  if (_encode) return _encode;
+  const material = new THREE.ShaderMaterial({
+    uniforms: { tMap: { value: null } },
+    depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = vec2(uv.x, 1.0 - uv.y); gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: `uniform sampler2D tMap; varying vec2 vUv;
+      vec3 toSRGB(vec3 c) { c = clamp(c, 0.0, 1.0); return mix(c * 12.92, 1.055 * pow(c, vec3(0.41666)) - 0.055, step(0.0031308, c)); }
+      void main() {
+        vec4 t = texture2D(tMap, vUv);
+        float a = clamp(t.a, 0.0, 1.0);
+        gl_FragColor = vec4(a > 0.002 ? toSRGB(t.rgb / a) : vec3(0.0), a);
+      }`
+  });
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+  quad.frustumCulled = false;
+  const encodeScene = new THREE.Scene();
+  encodeScene.add(quad);
+  _encode = { scene: encodeScene, camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), material };
+  return _encode;
 }
 
 /** Called by TilePreviewHost (inside the R3F Canvas) to inject the main renderer. */
@@ -299,25 +416,36 @@ function ensureOwnRenderer() {
   _initScene();
 }
 
-function _targetFor(size) {
-  let target = _targets.get(size);
+function _linearType() {
+  const ext = renderer?.extensions;
+  return ext?.has?.('EXT_color_buffer_half_float') || ext?.has?.('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType;
+}
+
+function _targetFor(width, height) {
+  const key = `${width}x${height}`;
+  let target = _targets.get(key);
   if (!target) {
-    target = new THREE.WebGLRenderTarget(size, size, {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-      samples: 4,          // MSAA — the beads are round, jaggies read as cheap
-    });
-    _targets.set(size, target);
+    target = {
+      scene: new THREE.WebGLRenderTarget(width, height, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: _linearType(),
+        samples: 4,          // MSAA — the beads are round, jaggies read as cheap
+      }),
+      out: new THREE.WebGLRenderTarget(width, height, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat }),
+    };
+    _targets.set(key, target);
   }
   return target;
 }
 
-function _bufferFor(size, ctx) {
-  let buf = _buffers.get(size);
+function _bufferFor(width, height, ctx) {
+  const key = `${width}x${height}`;
+  let buf = _buffers.get(key);
   if (!buf) {
-    buf = { pixels: new Uint8Array(size * size * 4), image: ctx.createImageData(size, size) };
-    _buffers.set(size, buf);
+    buf = { pixels: new Uint8Array(width * height * 4), image: ctx.createImageData(width, height) };
+    _buffers.set(key, buf);
   }
   return buf;
 }
@@ -434,7 +562,7 @@ function _poseWorm(opts, time) {
     contactShadows[i].visible = !!opts.companion || opts.framing === 'character';
     if (opts.framing === 'character') {
       contactShadows[i].position.copy(_off).applyAxisAngle(UP, FRAMING.character.yaw);
-      contactShadows[i].position.y = -0.11;
+      contactShadows[i].position.y = STAGE.top + 0.002;
     }
     if (opts.companion) contactShadows[i].position.set(_off.x, 0.001, _off.z);
     const bead = rig.beads[i];
@@ -493,11 +621,8 @@ function _poseWorm(opts, time) {
     if (isPrism) {
       // Identical spectrum spacing and speed in gameplay and the picker.
       prismColor(_color, i, time);
-    } else if (isInch) {
-      _color.set(skin.body);
-      if (i % 2 !== 0) _color.lerp(_accentColor.set(skin.belly), 0.28);
     } else {
-      _color.set(skin.body);
+      characterSegmentPattern(_color.set(skin.body), characterId, skin, i, _accentColor);
     }
     body.material.color.copy(_color);
     const mobiTail = rig.mobiTails[i];
@@ -621,7 +746,11 @@ function _poseWorm(opts, time) {
 
   for (const [id, accent] of Object.entries(rig.accents)) {
     accent.group.visible = id === characterId;
-    if (accent.group.visible) poseCharacterAccents(accent.group, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD, UP, HEAD_SCALE);
+    if (accent.group.visible) {
+      poseCharacterAccents(accent.group, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD, UP, HEAD_SCALE);
+      accent.setSkin(skin);
+      accent.update(time);
+    }
   }
 
   animateWormFace(_faceParts, characterId, time, { reducedMotion: prefersReducedMotion() });
@@ -676,10 +805,16 @@ function _poseWorm(opts, time) {
   if(opts.framing === 'tail') {
     const tail = rig.accessories.entries.find(entry => entry.slot === 'tail');
     if(tail?.group.visible) {
-      tail.group.getWorldPosition(_tailPreviewCenter);
-      _tailPreviewCenter.x -= .06;
-      camera.position.copy(_tailPreviewCenter).add(_tailPreviewOffset);
-      camera.lookAt(_tailPreviewCenter);
+      // Frame the piece itself, with the last bead it hangs from, whatever its
+      // size: a pinwheel stands tall, a key sticks out behind, MOBI is bigger.
+      rig.group.updateMatrixWorld(true);
+      _tailBox.setFromObject(tail.group);
+      _tailBead.set(rig.accessories.tailCenter, rig.accessories.tailRadius).applyMatrix4(rig.group.matrixWorld);
+      _tailBox.union(_tailBead.getBoundingBox(_tailBeadBox));
+      _tailBox.getBoundingSphere(_tailBead);
+      const distance = _tailBead.radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.3;
+      camera.position.copy(_tailBead.center).addScaledVector(_tailPreviewOffset, distance);
+      camera.lookAt(_tailBead.center);
     }
   }
 }
@@ -708,9 +843,10 @@ function renderToCanvas(opts, time, targetCanvas) {
     if (!renderer) return;
   }
 
-  const size = targetCanvas.width;
-  if (!size) return;
-  _frameCamera(opts.framing, opts.characterId);
+  const width = targetCanvas.width, height = targetCanvas.height;
+  if (!width || !height) return;
+  _ensureEnvironment();
+  _frameCamera(opts.framing, opts.characterId, width / height);
   characterStage.visible = opts.framing === 'character';
   _poseWorm(opts, prefersReducedMotion() ? 0 : time);
   const renderCamera = opts.companion ? companionCamera : camera;
@@ -718,35 +854,33 @@ function renderToCanvas(opts, time, targetCanvas) {
   const ctx = targetCanvas.getContext('2d');
 
   if (_usingShared) {
-    const target = _targetFor(size);
-    const buf = _bufferFor(size, ctx);
+    const target = _targetFor(width, height);
+    const buf = _bufferFor(width, height, ctx);
 
     // The main pipeline's state is borrowed, not owned — put it all back.
     const prevTarget = renderer.getRenderTarget();
     const prevAlpha = renderer.getClearAlpha();
     const prevAutoClear = renderer.autoClear;
-    renderer.setRenderTarget(target);
+    renderer.setRenderTarget(target.scene);
     renderer.setClearAlpha(0);
     renderer.clear();
     renderer.render(scene, renderCamera);
-    renderer.readRenderTargetPixels(target, 0, 0, size, size, buf.pixels);
+    const encode = _encoder();
+    encode.material.uniforms.tMap.value = target.scene.texture;
+    renderer.setRenderTarget(target.out);
+    renderer.render(encode.scene, encode.camera);
+    renderer.readRenderTargetPixels(target.out, 0, 0, width, height, buf.pixels);
     renderer.setRenderTarget(prevTarget);
     renderer.setClearAlpha(prevAlpha);
     renderer.autoClear = prevAutoClear;
-
-    // WebGL reads bottom-up, canvas draws top-down — flip by whole rows.
-    const rowBytes = size * 4;
-    for (let y = 0; y < size; y++) {
-      const src = (size - 1 - y) * rowBytes;
-      buf.image.data.set(buf.pixels.subarray(src, src + rowBytes), y * rowBytes);
-    }
+    buf.image.data.set(buf.pixels);
     ctx.putImageData(buf.image, 0, 0);
   } else {
-    renderer.setSize(size, size, false);
+    renderer.setSize(width, height, false);
     renderer.setClearAlpha(0);
     renderer.render(scene, renderCamera);
-    ctx.clearRect(0, 0, size, size);
-    ctx.drawImage(renderer.domElement, 0, 0, size, size);
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(renderer.domElement, 0, 0, width, height);
   }
 }
 
@@ -757,6 +891,7 @@ const _directScissor = new THREE.Vector4();
 const _directClear = new THREE.Color();
 export function drawDirectWormPreview(gl, opts, time) {
   if (!scene) setWormSharedRenderer(gl);
+  _ensureEnvironment();
   _frameCamera(opts.framing, opts.characterId);
   characterStage.visible = opts.framing === 'character';
   _poseWorm(opts, prefersReducedMotion() ? 0 : time);

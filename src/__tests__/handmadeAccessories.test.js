@@ -6,6 +6,7 @@ import { HANDMADE_HATS, WORM_ACCESSORIES, safeAccessories, EMPTY_ACCESSORIES } f
 import { STORE_ITEMS, getStoreItem } from '../utils/storeCatalog.js';
 import { chestItemTier } from '../economy/chests.js';
 import { createAccessoryRig, buildCraftModel, poseHeadAccessories, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody } from '../worm/wormAccessories.js';
+import { layoutWormFace } from '../worm/wormFaceLayout.js';
 
 const initial = useGameStore.getState();
 afterEach(() => { useGameStore.setState(initial); localStorage.removeItem('worm3_accessories'); });
@@ -67,4 +68,24 @@ it('keeps a full outfit attached and finite on all surface frames, including deg
   beginAccessoryBody(rig);finishAccessoryBody(rig,0,false);
   expect(rig.entries.filter(e=>e.slot==='body'||e.slot==='tail').every(e=>!e.group.visible)).toBe(true);
   rig.dispose(); expect(rig.root.children).toHaveLength(0);
+});
+
+it('centres glasses and goggles on the eyes the face layout draws', () => {
+  const center=new THREE.Vector3(0,0,0), forward=new THREE.Vector3(1,0,0), up=new THREE.Vector3(0,1,0);
+  const eyes=[new THREE.Object3D(),new THREE.Object3D()];
+  layoutWormFace(center,forward,up,1,{eyes});
+  for(const id of ['bottlecapGlasses','buttonGoggles']) {
+    const rig=createAccessoryRig({face:id});
+    poseHeadAccessories(rig,center,forward,up,1,0,false,'classic');
+    rig.root.updateMatrixWorld(true);
+    // Each lens pane is its own clear disc; one sits over each eye, a little out from it.
+    const panes=rig.root.getObjectsByProperty('isMesh',true).filter(m=>m.material.transparent);
+    expect(panes).toHaveLength(1);
+    const middle=new THREE.Box3().setFromObject(panes[0]).getCenter(new THREE.Vector3());
+    // Where the pair should sit: between the eyes, stood a little out along the face.
+    const faceDir=up.clone().multiplyScalar(.62).addScaledVector(forward,.79).normalize();
+    const expected=eyes[0].position.clone().add(eyes[1].position).multiplyScalar(.5).addScaledVector(faceDir,.17);
+    expect(middle.distanceTo(expected),`${id}: lenses centred on the eyes`).toBeLessThan(.08);
+    rig.dispose();
+  }
 });
