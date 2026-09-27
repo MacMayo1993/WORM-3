@@ -4,11 +4,13 @@ import { LIVING_SURFACE_STYLES } from './livingSurfaceCatalog.js';
 // High contrast within each pair is essential — the manifold flip reveals the opposite face
 
 import { CITY_CONFIG, FACE_CITIES } from '../modes/CityBiomeMode.js';
+import { FACE_COLORS } from './constants.js';
 
 export const COLOR_SCHEMES = {
 
   // Six face IDs stay stable; opposite faces are 1/4, 2/5 and 3/6.
-  standard: { 1: '#DC3154', 2: '#38C875', 3: '#FFFFFF', 4: '#E98D06', 5: '#3973E8', 6: '#FFE600' },
+  // 'standard' is the saved key; players see it as Classic, the Rubik's cube's own colours.
+  standard: { ...FACE_COLORS },
   neon: { 1: '#FF477E', 2: '#37DD69', 3: '#9B79FF', 4: '#3EDBFF', 5: '#FEF138', 6: '#FF9C43' },
   pastel: { 1: '#FC4467', 2: '#2DC15B', 3: '#3692FD', 4: '#F4C263', 5: '#64D6F1', 6: '#CF91DD' },
   sunset: { 1: '#E85B76', 2: '#D29D17', 3: '#DFA3FC', 4: '#4CB6B0', 5: '#697EE1', 6: '#F6DBB7' },
@@ -50,7 +52,7 @@ export const COLOR_SCHEMES = {
 // ── LABELS ───────────────────────────────────────────────────────────────────
 
 export const SCHEME_LABELS = {
-  standard:   'Standard',
+  standard:   'Classic',
   neon:       'Neon',
   pastel:     'Pastel',
   sunset:     'Sunset',
@@ -84,7 +86,7 @@ export const SCHEME_LABELS = {
 // Browsing groups preserve palette IDs used by saved games and purchases.
 export const PALETTE_GROUPS = ['All', 'Essentials', 'Electric', 'Soft', 'Jewel', 'Studio'];
 export const PALETTE_INFO = {
-  standard: { group: 'Essentials', description: 'Clean primaries' },
+  standard: { group: 'Essentials', description: "The Rubik's cube" },
   neon: { group: 'Electric', description: 'Arcade brights' },
   pastel: { group: 'Soft', description: 'Candy colors' },
   sunset: { group: 'Jewel', description: 'Golden hour' },

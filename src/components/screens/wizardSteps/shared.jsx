@@ -65,7 +65,7 @@ export const sizeTier = (n, tiers = SIZE_TIERS) => tiers.find(t => t.n === n) ||
 export const sceneLabel = settings => bgOptionFor(settings.backgroundTheme)?.label || 'Scene';
 
 export const paletteLabel = settings =>
-  (settings.colorScheme === 'custom' ? 'Your Photo' : SCHEME_LABELS[settings.colorScheme] || 'Standard');
+  (settings.colorScheme === 'custom' ? 'Your Photo' : SCHEME_LABELS[settings.colorScheme] || 'Classic');
 
 /**
  * The one style all six faces are wearing, or null when they disagree. Faces

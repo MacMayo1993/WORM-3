@@ -10,6 +10,7 @@ import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+import { FACE_COLORS } from '../utils/constants.js';
 vi.mock('../3d/BiomeGroundTextures.js', () => ({ BIOME_GROUND_TEXTURES: {} }));
 
 extend(THREE);
@@ -57,7 +58,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     expect(halves[0].material.uniforms.uPatternRepeats.value).toBeGreaterThan(5);
     expect(halves[0].material.uniforms.baseColor.value.getHexString()).toBe('3973e8');
     expect(halves[1].material.uniforms.baseColor.value.getHexString()).toBe('38c875');
-    const cached = getTileStyleMaterial('circuit', '#38C875', false, null, '#3973E8');
+    const cached = getTileStyleMaterial('circuit', FACE_COLORS[2], false, null, FACE_COLORS[5]);
     expect(cached.side).toBe(THREE.FrontSide); // Band customization must not mutate tiles.
     const back = scene.getObjectByName('sticker-antipodal-back');
     const inner = scene.getObjectByName('tunnel-interior-0-1-1-NX');
@@ -78,13 +79,13 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     }); frame();
     expect(disposed).toHaveBeenCalledOnce();
     expect(halves[0].geometry.attributes.position.version).toBe(version);
-    expect(back.material).toBe(getTileStyleMaterial('wood', '#38C875', false, null, '#3973E8'));
+    expect(back.material).toBe(getTileStyleMaterial('wood', FACE_COLORS[2], false, null, FACE_COLORS[5]));
     expect(inner.material).toBe(back.material);
     expect(scene.getObjectByName('tunnel-styled-half-0').material.name).toBe('tunnel-tile-0-polkaDots');
 
     cubies = flipStickerPair(cubies, 3, 0, 1, 1, 'NX', buildManifoldGridMap(cubies, 3));
     await act(async () => { useGameStore.setState({ cubies }); root.render(draw('wood', 'polkaDots')); }); frame();
-    expect(back.material.uniforms.baseColor.value.getHexString()).toBe('3973e8');
+    expect(back.material.uniforms.baseColor.value.getHexString()).toBe(FACE_COLORS[5].slice(1).toLowerCase());
     expect(inner.material).toBe(back.material); // Healing refreshes the current back during transit too.
 
     await act(async () => {
