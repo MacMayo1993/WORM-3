@@ -360,7 +360,7 @@ Settings, equipped cosmetics, wallet/ownership, XP, campaign records, mission pr
 | **Net** | An unfolded face layout alongside the 3D cube. |
 | **Tunnels: Off / Hints / Full** | Hide routes, show thin connections, or render the fuller treatment. |
 | **Far-side window** | Picture-in-picture inspection of the opposite side. |
-| **Live portal windows** | A moving view from the linked exit inside the most visible live wormhole mouths. Toggle in Settings → Scene. |
+| **Live portal windows** | Optional live view through one nearby wormhole; off by default and falls back to the animated portal effect when play slows down. Enable in Settings → Scene. |
 | **Cutaway lens** | A draggable, resizable window through the exterior to the actual interior routes and worm. Open from the magnifier, Settings → Scene, or WORM's Pause menu. |
 | **Flip pads** | Full, subtle, or flat small-pad bounce settings; raised-cubie geometry has its own gameplay role. |
 

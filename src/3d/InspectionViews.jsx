@@ -1,10 +1,10 @@
-import { useLayoutEffect, useRef } from 'react';
+import { createElement, useLayoutEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
-import { inspectionBudget, inspectionSurfaces, inspectionSuspended, lensRect } from './inspectionBridge.js';
+import { createPortalPerformanceGuard, inspectionBudget, inspectionSurfaces, inspectionSuspended, lensRect } from './inspectionBridge.js';
 import { PORTAL_OFFSET, PORTAL_RADIUS, framePortalCamera, livePortalPairs } from './portalViewMath.js';
 import { createInspectionTarget, renderInspectionPass } from './inspectionPass.js';
 
@@ -43,7 +43,13 @@ function belongsTo(object, root) {
 }
 
 /** Auxiliary captures only: R3F, AO and PiP retain ownership of the main frame. */
-export default function InspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
+export default function InspectionViews(props) {
+  const enabled = useGameStore(s => s.showCutawayLens || s.settings?.livePortalViews === true);
+  // No scene hook, candidate scans, frame subscription, or targets in normal play.
+  return enabled ? createElement(ActiveInspectionViews, props) : null;
+}
+
+function ActiveInspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
   const { gl, scene, camera, size: viewport } = useThree();
   const frame = useRef(0), context = useRef();
   context.current = { viewport, manifoldMap };
@@ -53,8 +59,8 @@ export default function InspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
     const root = new THREE.Group();
     root.name = 'LivePortalViews';
     const quad = new THREE.PlaneGeometry(PORTAL_RADIUS * 2, PORTAL_RADIUS * 2);
-    const slots = Array.from({ length: 2 }, () => {
-      const target = createInspectionTarget(256);
+    const slots = Array.from({ length: 1 }, () => {
+      const target = createInspectionTarget(192);
       const material = new THREE.ShaderMaterial({
         uniforms: { tView: { value: target.texture }, rim: { value: new THREE.Color('#f5df96') } },
         vertexShader: portalVertex, fragmentShader: portalFragment,
@@ -87,10 +93,12 @@ export default function InspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
     guide.matrixAutoUpdate = false; guide.visible = false; guide.raycast = () => {};
     scene.add(root, guide);
 
-    const position = new THREE.Vector3(), normal = new THREE.Vector3(), toEye = new THREE.Vector3(), projected = new THREE.Vector3();
+    const position = new THREE.Vector3(), normal = new THREE.Vector3(), toEye = new THREE.Vector3(), projected = new THREE.Vector3(), edge = new THREE.Vector3();
     const offset = new THREE.Matrix4().makeTranslation(0, 0, PORTAL_OFFSET), scale = new THREE.Matrix4();
     let lastFrame = -1, lastCapture = -Infinity, busy = false, failed = false, previousMode = '';
     let cachedCubies, cachedMap, cachedCap, pairs = [];
+    const performanceGuard = createPortalPerformanceGuard();
+    let capturedLastFrame = false, lastMainRender = 0;
     const original = scene.onBeforeRender;
     const onBeforeRender = function(renderer, renderedScene, renderCamera, target) {
       original.call(this, renderer, renderedScene, renderCamera, target);
@@ -98,9 +106,9 @@ export default function InspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
       lastFrame = frame.current;
       const state = useGameStore.getState();
       root.visible = !failed && !inspectionSuspended(state);
-      if (!root.visible) return;
+      if (!root.visible) { capturedLastFrame = false; return; }
       const lensOn = state.showCutawayLens;
-      const portalsOn = state.settings?.livePortalViews !== false && !lensOn;
+      const portalsOn = state.settings?.livePortalViews === true && !lensOn;
       const mode = lensOn ? 'lens' : portalsOn ? 'portals' : 'off';
       if (mode !== previousMode) { lastCapture = -Infinity; previousMode = mode; }
       lensMesh.visible = false;
@@ -109,7 +117,17 @@ export default function InspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
       if (!cubeRef.current || !exteriorRef.current || gl.getContext().isContextLost()) return;
       const budget = inspectionBudget({ mobile: isMobile, reduced: state.perfReducedFX, size: state.size });
       const now = performance.now() / 1000;
-      const due = now - lastCapture >= 1 / budget.fps;
+      // The shared simulation clock is read/advanced by other frame callbacks.
+      // Use wall time between main renders to measure the player's actual FPS.
+      const frameDelta = now - lastMainRender;
+      lastMainRender = now;
+      const due = now - lastCapture >= 1 / budget.lensFps;
+      if (portalsOn && !performanceGuard.allowFrame(frameDelta, capturedLastFrame, budget.portals === 0)) {
+        root.visible = false;
+        capturedLastFrame = false;
+        return;
+      }
+      capturedLastFrame = false;
       busy = true;
       try {
         if (lensOn) {
@@ -139,7 +157,7 @@ export default function InspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
         }
         const surfaces = new Map();
         for (const [object, id] of inspectionSurfaces) if (belongsTo(object, cubeRef.current)) surfaces.set(id, object);
-        const candidates = [];
+        let candidate = null;
         for (const pair of pairs) {
           for (const [id, other, color] of [[pair.a, pair.b, pair.colorB], [pair.b, pair.a, pair.colorA]]) {
             const source = surfaces.get(id), destination = surfaces.get(other);
@@ -150,27 +168,29 @@ export default function InspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
             const facing = normal.dot(toEye);
             projected.copy(position).project(camera);
             if (facing <= 0.06 || projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1.15 || Math.abs(projected.y) > 1.15) continue;
-            candidates.push({ id, source, destination, color, score: facing / Math.max(0.01, toEye.lengthSq() ** 1.5) });
+            // Tiny distant mouths cannot show useful detail. Do not render the
+            // whole world into an image only a few screen pixels across.
+            edge.set(PORTAL_RADIUS, 0, 0).applyMatrix4(source.matrixWorld).project(camera);
+            const { width, height } = context.current.viewport;
+            if (Math.hypot((edge.x - projected.x) * width, (edge.y - projected.y) * height) < 12) continue;
+            const score = facing / Math.max(0.01, toEye.lengthSq() ** 1.5) * (slots[0].id === id ? 1.2 : 1);
+            if (!candidate || score > candidate.score) candidate = { id, source, destination, color, score };
           }
         }
-        candidates.sort((a, b) => b.score - a.score);
         const colors = resolveColors(state.settings, state.settings?.biomeMode?.faceAssignment);
-        for (let i = 0; i < slots.length; i++) {
-          const slot = slots[i], candidate = i < budget.portals ? candidates[i] : null;
+        for (const slot of slots) {
           slot.mesh.visible = false;
           if (!candidate) { slot.id = null; continue; }
           slot.mesh.matrix.copy(candidate.source.matrixWorld).multiply(offset);
           slot.mesh.matrixWorldNeedsUpdate = true;
-          if (due || slot.id !== candidate.id) {
-            if (!framePortalCamera(slot.camera, camera, candidate.source.matrixWorld, candidate.destination.matrixWorld)) continue;
-            slot.target.setSize(budget.portalSize, budget.portalSize);
-            renderInspectionPass(gl, scene, slot.camera, slot.target, [root]);
-            slot.id = candidate.id;
-            slot.material.uniforms.rim.value.set(colors[candidate.color] ?? '#f5df96');
-          }
+          if (!framePortalCamera(slot.camera, camera, candidate.source.matrixWorld, candidate.destination.matrixWorld)) continue;
+          slot.target.setSize(budget.portalSize, budget.portalSize);
+          renderInspectionPass(gl, scene, slot.camera, slot.target, [root]);
+          capturedLastFrame = true;
+          slot.id = candidate.id;
+          slot.material.uniforms.rim.value.set(colors[candidate.color] ?? '#f5df96');
           slot.mesh.visible = true;
         }
-        if (due) lastCapture = now;
       } catch (error) {
         // A driver failure must leave the ordinary portal treatment and the
         // main renderer usable. Each capture restores borrowed state in finally.
@@ -181,7 +201,7 @@ export default function InspectionViews({ cubeRef, exteriorRef, manifoldMap }) {
       }
     };
     scene.onBeforeRender = onBeforeRender;
-    const restored = () => { failed = false; lastCapture = -Infinity; slots.forEach(slot => { slot.id = null; }); };
+    const restored = () => { failed = false; lastCapture = -Infinity; capturedLastFrame = false; performanceGuard.reset(); slots.forEach(slot => { slot.id = null; }); };
     gl.domElement.addEventListener('webglcontextrestored', restored);
     return () => {
       if (scene.onBeforeRender === onBeforeRender) scene.onBeforeRender = original;

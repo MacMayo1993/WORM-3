@@ -77,7 +77,8 @@ it('uses universally filterable single-sample targets and bounded mobile budgets
   expect(target.texture.generateMipmaps).toBe(false);
   expect(target.samples).toBe(0);
   expect(inspectionBudget({ mobile: true }).portals).toBe(1);
-  expect(inspectionBudget({ size: 15 }).fps).toBeLessThan(inspectionBudget().fps);
+  expect(inspectionBudget({ size: 15 }).portals).toBe(0);
+  expect(inspectionBudget({ reduced: true }).portals).toBe(0);
   target.dispose();
 });
 

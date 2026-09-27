@@ -11,16 +11,17 @@ export function ScenePanel({ settings, onSettingsChange }) {
   return (
     <section className="settings-section">
       <h3 className="settings-section-title">Portal windows</h3>
-      <p>See the destination through nearby flipped tiles.</p>
+      <p>Optional live view through one nearby portal. Uses extra graphics power; off by default.</p>
       <div className="settings-radio-group">
         {[[true, 'Live views'], [false, 'Off']].map(([value, label]) => (
-          <label key={label} className={`settings-radio${(settings.livePortalViews !== false) === value ? ' active' : ''}`}>
-            <input type="radio" name="livePortalViews" checked={(settings.livePortalViews !== false) === value}
+          <label key={label} className={`settings-radio${(settings.livePortalViews === true) === value ? ' active' : ''}`}>
+            <input type="radio" name="livePortalViews" checked={(settings.livePortalViews === true) === value}
               onChange={() => update('livePortalViews', value)} />
             <span className="settings-radio-label">{label}</span>
           </label>
         ))}
       </div>
+      <p>If play slows down, the normal animated portal effect takes over. Toggle live views off and on to retry.</p>
       <h3 className="settings-section-title">Inside the cube</h3>
       <p>Move a cutaway lens over the cube to follow its tunnels and the worm inside.</p>
       <button type="button" className="settings-radio" disabled={!canInspect}
