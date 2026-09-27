@@ -229,7 +229,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             };
             if (story || practice) {
                 // The authored board is staged by the next crawler tick. Its ready
-                // card starts play, without a second countdown on every short retry.
+                // card requests the countdown; demo lessons retain their quick start.
                 gameModePhaseRef.current = 'active';
                 useGameStore.setState({ wormGamePhase: 'active', wormPaused: true, wormCountdownStep: null });
             }
@@ -244,8 +244,23 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         return unsub;
     }, [size, onAnimatedShuffle]);
 
+    const beginCountdown = () => {
+        gameModePhaseRef.current = 'countdown';
+        countdownTimerRef.current = 0;
+        countdownStepRef.current = 0;
+        useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true });
+        feel('countdownBeat');
+    };
+
     useFrame((_, delta) => {
-        const story = storyLevel(useGameStore.getState().wormStoryLevel);
+        const startState = useGameStore.getState();
+        const story = storyLevel(startState.wormStoryLevel);
+        // Story starts with an authored body/board already staged behind its
+        // briefing. Enter directly, without scrambling or reseeding that body.
+        if (story && startState.wormGamePhase === 'countdown' && gameModePhaseRef.current === 'active') {
+            beginCountdown();
+            return;
+        }
         const rotationInterval = story?.rotateEvery || ACTIVE_ROTATE_INTERVAL;
         worm.tick(delta, { busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
             autoTimerRef.current >= rotationInterval - AUTO_ROTATE_WARNING - 0.2 });
@@ -317,11 +332,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     shPush(worm.stepHistory.current, _seedPos, _seedNorm, x, y, z);
                 }
 
-                gameModePhaseRef.current  = 'countdown';
-                countdownTimerRef.current = 0;
-                countdownStepRef.current  = -1;
-                useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3 });
-                countdownStepRef.current  = 0;
+                beginCountdown();
             }
             return;
         }
@@ -347,7 +358,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     useGameStore.setState({ wormCountdownStep: 'go' });
                     feel('countdownGo');
                 } else if (step === 4) {
-                    // Hold phase — "WORM" stays visible for one extra beat
+                    // The final beat pulls WORM into the portal and closes it.
+                    // Its staggered CSS exit fits entirely inside this beat.
                     useGameStore.setState({ wormCountdownStep: 'hold' });
                 } else if (step >= 5) {
                     // Countdown done — release the worm

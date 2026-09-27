@@ -33,6 +33,13 @@ function begin(id) {
   frame();
   expect(state()).toMatchObject({ wormStoryReady: true, wormPaused: true, wormStoryStarted: false });
   act(() => state().startWormStory());
+  expect(state()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true });
+  const before = { position: { ...worm.pos.current }, time: worm.timeAliveRef.current };
+  frame(4);
+  expect(worm.pos.current).toEqual(before.position);
+  expect(worm.timeAliveRef.current).toBe(before.time);
+  // This crawler-only harness skips the renderer's countdown phase driver.
+  act(() => useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false }));
 }
 function until(predicate, max = 2000) {
   for (let i = 0; i < max && !predicate(); i++) frame();

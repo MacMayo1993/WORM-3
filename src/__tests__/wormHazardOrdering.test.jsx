@@ -8,6 +8,10 @@ import { WORM_DEMO_LESSONS, newWormDemo } from '../game/wormDemoLessons.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
 import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
+import { COUNTDOWN_STEP_DURATION } from '../worm/healerWorm/constants.js';
+import { stageStory } from '../worm/story/runtime.js';
+import { storyLevel } from '../worm/story/levels.js';
+import { feel } from '../utils/feel.js';
 
 let frameCb, worm, tree;
 const scene = {};
@@ -83,6 +87,55 @@ it('opens the authored WORM demo board without a scramble or countdown', () => {
   tick(300);
   expect(rotate).not.toHaveBeenCalled();
   expect(useGameStore.getState().wormGamePhase).toBe('active');
+});
+
+it('plays every countdown beat in Free Play and releases only after the word exits', () => {
+  act(() => useGameStore.getState().initWormMode());
+  tick(1, 1); // spawn
+  expect(useGameStore.getState()).toMatchObject({ wormCountdownStep: 3, wormPaused: true });
+  for (const step of [2, 1, 'go', 'hold']) {
+    tick(1, COUNTDOWN_STEP_DURATION + .001);
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: step, wormPaused: true });
+  }
+  tick(1, COUNTDOWN_STEP_DURATION - .01);
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  tick(1, .02);
+  expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
+});
+
+it('counts down after Start level and on retry without scrambling or replacing the staged body', () => {
+  const shuffle = vi.fn();
+  act(() => root.render(<Harness cubies={useGameStore.getState().cubies} size={3} onRotate={rotate} onAnimatedShuffle={shuffle} />));
+  shuffle.mockClear();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    act(() => useGameStore.getState().initWormMode(undefined, undefined, null, null, null, null, false, false, 1));
+    const staged = stageStory(sim, 3, storyLevel(1));
+    act(() => useGameStore.setState({ cubies: staged.cubies, wormStoryReady: true }));
+    const history = sim.stepHistory.buf.map(point => point.pos.clone());
+    const head = { ...sim.pos };
+    tick(10, 1); // briefing waits indefinitely
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormPaused: true, wormStoryStarted: false });
+    vi.mocked(feel).mockClear();
+    act(() => useGameStore.getState().startWormStory());
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true });
+    tick(1, .01); // phase driver accepts the request
+    for (const step of [2, 1, 'go', 'hold']) {
+      tick(1, COUNTDOWN_STEP_DURATION + .001);
+      expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'countdown', wormCountdownStep: step, wormPaused: true });
+      act(() => useGameStore.getState().startWormStory()); // repeated click cannot restart/release
+      expect(useGameStore.getState().wormCountdownStep).toBe(step);
+    }
+    expect(sim.pos).toEqual(head);
+    expect(sim.stepHistory.buf.map(point => point.pos)).toEqual(history);
+    expect(useGameStore.getState().cubies).toBe(staged.cubies);
+    expect(feel.mock.calls.map(([event]) => event)).toEqual(['countdownBeat', 'countdownBeat', 'countdownBeat', 'countdownGo']);
+    tick(1, COUNTDOWN_STEP_DURATION);
+    expect(useGameStore.getState()).toMatchObject({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
+    tick(2);
+    expect(useGameStore.getState().wormGamePhase).toBe('active');
+  }
+  expect(shuffle).not.toHaveBeenCalled();
+  expect(rotate).not.toHaveBeenCalled();
 });
 
 it('does not evaluate or dequeue a slice while another move awaits commit', () => {

@@ -9,6 +9,7 @@ import WormDemoLessonCard from '../components/screens/WormDemoLessonCard.jsx';
 import { wormDemoLesson } from '../game/wormDemoLessons.js';
 import './wormHudLayout.css';
 import RotationCountdownHUD from './RotationCountdownHUD.jsx';
+import WormCountdownOverlay from './WormCountdownOverlay.jsx';
 import TunnelNeedsCard from './TunnelNeedsCard.jsx';
 import SignatureButton from './SignatureButton.jsx';
 import { SIGNATURES } from './healerWorm/signatures.js';
@@ -48,152 +49,6 @@ import { arcadeModeVars } from '../utils/arcadeTheme.js';
 import { useDialogBehavior } from '../components/ui/Panel.jsx';
 import { UI_FONT, DISPLAY_FONT, HEADING_FONT, UI_MOSS_LIGHT, UI_GOLD, NIGHT_SHEET, NIGHT_TEXT_MUTED, GAME_HUD, GAME_HUD_VARS, Z,
     ARCADE_INK, ARCADE_INK_STRONG, ARCADE_MUTED, ARCADE_LINE_SOFT } from '../utils/uiTheme.js';
-
-// ─── Worm Countdown Overlay ─────────────────────────────────────────────────
-const WORM_COUNTDOWN_STYLE_ID = 'worm3-countdown-style';
-
-const ensureCountdownStyle = () => {
-    if (typeof document === 'undefined' || document.getElementById(WORM_COUNTDOWN_STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = WORM_COUNTDOWN_STYLE_ID;
-    style.textContent = `
-        @keyframes wormCountBeatIn {
-            0% { transform: scale(2.5); opacity: 0; filter: blur(16px); }
-            30% { transform: scale(0.9); opacity: 1; filter: blur(0); }
-            50% { transform: scale(1.08); }
-            100% { transform: scale(1); }
-        }
-        @keyframes wormCountPulse {
-            0%, 100% { text-shadow: 0 0 40px rgba(139,92,246,0.9), 0 0 80px rgba(99,102,241,0.6), 0 4px 30px rgba(0,0,0,0.7); }
-            50% { text-shadow: 0 0 60px rgba(139,92,246,1), 0 0 120px rgba(99,102,241,0.8), 0 0 180px rgba(59,130,246,0.4), 0 4px 30px rgba(0,0,0,0.7); }
-        }
-        @keyframes wormCountRingPulse {
-            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.7; border-width: 4px; }
-            100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; border-width: 1px; }
-        }
-        @keyframes wormTitleSlam {
-            0% { transform: scale(3) translateY(-20px); opacity: 0; filter: blur(12px); }
-            25% { transform: scale(0.92) translateY(4px); opacity: 1; filter: blur(0); }
-            40% { transform: scale(1.06) translateY(-2px); }
-            100% { transform: scale(1) translateY(0); }
-        }
-        @keyframes wormLetterGlow {
-            0%, 100% { filter: brightness(1) drop-shadow(0 0 8px currentColor); }
-            50% { filter: brightness(1.3) drop-shadow(0 0 20px currentColor); }
-        }
-        @keyframes wormLetterDissipate {
-            0% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
-            40% { transform: translateY(-30px) scale(1.15); opacity: 0.7; filter: blur(2px); }
-            100% { transform: translateY(-80px) scale(0.6); opacity: 0; filter: blur(12px); }
-        }
-        .worm-countdown-ring {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            border: 4px solid rgba(139,92,246,0.6);
-            pointer-events: none;
-            animation: wormCountRingPulse 0.85s ease-out forwards;
-        }
-        .worm-countdown-number {
-            font-family: ${DISPLAY_FONT};
-            font-size: clamp(120px, 28vw, 220px);
-            font-weight: 900;
-            line-height: 1;
-            color: #fff;
-            user-select: none;
-            animation: wormCountBeatIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
-                       wormCountPulse 0.85s ease-in-out infinite 0.5s;
-            text-shadow: 0 0 40px rgba(139,92,246,0.9), 0 0 80px rgba(99,102,241,0.6), 0 4px 30px rgba(0,0,0,0.7);
-            -webkit-text-stroke: 2px rgba(139,92,246,0.5);
-        }
-        .worm-title-slam {
-            display: flex;
-            align-items: flex-start;
-            justify-content: center;
-            animation: wormTitleSlam 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        .worm-title-slam .worm-cd-letter {
-            font-family: ${DISPLAY_FONT};
-            font-size: clamp(72px, 18vw, 140px);
-            font-weight: 900;
-            line-height: 1;
-            display: inline-block;
-            animation: wormLetterGlow 1.2s ease-in-out infinite;
-        }
-        .worm-title-dissipate .worm-cd-letter {
-            font-family: ${DISPLAY_FONT};
-            font-size: clamp(72px, 18vw, 140px);
-            font-weight: 900;
-            line-height: 1;
-            display: inline-block;
-            animation: wormLetterDissipate 0.8s ease-in forwards;
-        }
-    `;
-    document.head.appendChild(style);
-};
-
-const WORM_LETTERS = [
-    { ch: 'W', color: '#ef4444', delay: '0s' },
-    { ch: 'O', color: '#f97316', delay: '0.08s' },
-    { ch: 'R', color: '#22c55e', delay: '0.16s' },
-    { ch: 'M', color: '#3b82f6', delay: '0.24s' },
-];
-
-const WormCountdownOverlay = ({ step }) => {
-    ensureCountdownStyle();
-    const isNumber = typeof step === 'number';
-    const isGo = step === 'go';
-    const isHold = step === 'hold';
-
-    return (
-        <div style={COUNTDOWN_OVERLAY_STYLE}>
-            {/* Radial vignette */}
-            <div style={{
-                position: 'absolute', inset: 0,
-                background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.5) 100%)',
-                pointerEvents: 'none',
-            }} />
-
-            {isNumber && (
-                <>
-                    <div key={`ring-${step}`} className="worm-countdown-ring" />
-                    <div key={`num-${step}`} className="worm-countdown-number">{step}</div>
-                </>
-            )}
-
-            {isGo && (
-                <div className="worm-title-slam">
-                    {WORM_LETTERS.map(({ ch, color, delay }) => (
-                        <span
-                            key={ch}
-                            className="worm-cd-letter"
-                            style={{ color, animationDelay: delay }}
-                        >
-                            {ch}
-                        </span>
-                    ))}
-                </div>
-            )}
-
-            {isHold && (
-                <div className="worm-title-dissipate" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-                    {WORM_LETTERS.map(({ ch, color, delay }) => (
-                        <span
-                            key={ch}
-                            className="worm-cd-letter"
-                            style={{ color, animationDelay: delay }}
-                        >
-                            {ch}
-                        </span>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
 
 // The standard scheme, straight from constants.js — this was a verbatim
 // copy of FACE_COLORS and would have silently disagreed if that ever moved.
@@ -652,13 +507,6 @@ const EXAMINE_RESTORE_BTN_STYLE = {
     touchAction: 'manipulation',
     WebkitTapHighlightColor: 'transparent',
 };
-
-const COUNTDOWN_OVERLAY_STYLE = {
-    position: 'absolute', inset: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    pointerEvents: 'none', zIndex: 20,
-};
-
 
 // ─── Winner screen styles ────────────────────────────────────────────────────
 
