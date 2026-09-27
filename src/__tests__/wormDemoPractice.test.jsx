@@ -12,6 +12,8 @@ import { makeCubies } from '../game/cubeState.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
+import { wormExpansion, EXPLODE_AMOUNT } from '../worm/wormExpansion.js';
+import { wormBuffs } from '../worm/wormBuffs.js';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import { setWormTurnCallback } from '../worm/wormTurnBridge.js';
 vi.mock('../utils/feel.js', async original => ({ ...(await original()), feel: vi.fn(), stopFeel: vi.fn(), resumeFeel: vi.fn(), setFeelEnabled: vi.fn() }));
@@ -62,6 +64,49 @@ it('collects two staged orbs through the production pickup path and gives six ch
   expect(state().wormPaused).toBe(false); expect(worm.pos.current).not.toEqual(pos);
   expect(state().wormPowerups).toHaveLength(2);
   expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('orbs');
+});
+
+function collectExplodeOrb() {
+  // A heal reward can introduce Explode even though ambient spawns are disabled
+  // in the demo. Pick one up through the same contact path as normal gameplay.
+  lesson('jump');
+  const orb = { x: 2, y: 1, z: 4, dirKey: 'PZ', type: 'explode', id: 'demo-reward', ttl: 999, maxTtl: 999 };
+  worm.specials.current = [orb];
+  act(() => useGameStore.setState({ wormSpecials: [orb] }));
+  until(() => state().wormExplodeActive);
+  until(() => worm.expansionAmount.current === EXPLODE_AMOUNT);
+  expect(state().explosionT).toBe(EXPLODE_AMOUNT);
+  expect(wormExpansion.amount).toBe(EXPLODE_AMOUNT);
+}
+
+it.each(['restart', 'next'])('clears the exploded renderer and traversal geometry when practice moves to %s', action => {
+  collectExplodeOrb();
+  act(() => action === 'restart' ? state().restartWormDemoLesson() : state().nextWormDemoLesson());
+  frame();
+  expect(worm.expansionAmount.current).toBe(0);
+  expect(wormExpansion.amount).toBe(0);
+  expect(state().explosionT).toBe(0);
+  expect(state().exploded).toBe(false);
+  expect(state().wormExplodeActive).toBe(false);
+  expect(wormBuffs.explodeT).toBe(0);
+  act(() => state().startWormDemoLesson());
+  frames(40);
+  expect(state().explosionT).toBe(0);
+  expect(worm.headInterpPos.current.toArray().every(Number.isFinite)).toBe(true);
+});
+
+it('finishes an Explode pickup in ongoing demo play and preserves its timer through pause', () => {
+  collectExplodeOrb();
+  const left = wormBuffs.explodeT;
+  act(() => state().setWormPaused(true));
+  frames(50);
+  expect(wormBuffs.explodeT).toBe(left);
+  expect(state().explosionT).toBe(EXPLODE_AMOUNT);
+  act(() => state().setWormPaused(false));
+  until(() => !state().wormExplodeActive && worm.expansionAmount.current === 0, 400);
+  expect(state().explosionT).toBe(0);
+  expect(wormExpansion.amount).toBe(0);
+  expect(state().wormAlive).toBe(true);
 });
 it('requires a real landing for the single-jump lesson', () => {
   lesson('jump'); input('jump'); until(() => worm.isJumping.current);
