@@ -13,9 +13,9 @@
  * an exposed core sits in a dark antiverse with a bowed lattice and ± light
  * pairs. The more of the network is alive, the brighter that field. Once the cube is
  * opened (Explode, glass, gap, hollow) the core also lights the pieces around
- * it. It is opaque in every mode, so it hides the worm's crossing. Riding a
- * WORM tunnel, the core swells as the lens closes on it, anchored on the tile
- * the worm is diving into, then relaxes once the rider is through.
+ * it. Its shell stays opaque, with real openings along the occupied WORM
+ * passage. The core swells as the lens closes on it, anchored on the entry
+ * tile, while the cutouts stay on the rider's simulation route.
  *
  * For odd-sized cubes (3×3, 5×5) the centre cubie is skipped in CubeAssembly
  * so the core fills that space. For even sizes the origin is a gap between
@@ -32,6 +32,9 @@ import { tunnelDockForCellInto, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { createPlayStickerGeometry } from './rubiksPiece.js';
 import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
 import { createCoreTileStyle } from './coreTileStyle.js';
+import { withPortalCutout } from './portalCutout.js';
+import { makeCorePassage, updateCorePassage, corePassageGLSL } from './corePassage.js';
+import { wormExpansion } from '../worm/wormExpansion.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { createAntiverse, antiverseVisibility } from './antiverse.js';
@@ -89,12 +92,13 @@ function VoidCore({ cubieRefs = null }) {
   const charge = useMemo(() => networkCharge(countFlippedStickers(cubies)), [cubies]);
 
   const glow = useMemo(() => ({ value: 0.08 }), []);
+  const passage = useMemo(() => makeCorePassage(), []);
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
-    bodyMaterial: createCoreBodyMaterial(isMobile, mode),
-    stickerMaterial: createCoreStickerMaterial(glow, isMobile)
-  }), [glow, mode]);
+    bodyMaterial: withPortalCutout(createCoreBodyMaterial(isMobile, mode), passage.uniforms, corePassageGLSL, 'core', true),
+    stickerMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile), passage.uniforms, corePassageGLSL, 'core', true)
+  }), [glow, mode, passage]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
   const antiverse = useMemo(() => createAntiverse(size), [size]);
   useEffect(() => () => antiverse.dispose(), [antiverse]);
@@ -113,11 +117,12 @@ function VoidCore({ cubieRefs = null }) {
       byColor.set(id, {
         key, id, style,
         geometry: new THREE.PlaneGeometry(CORE_STICKER, CORE_STICKER, style === 'eyeball' ? 12 : 1, style === 'eyeball' ? 12 : 1),
-        material: createCoreTileStyle(style, faceColors[id], faceColors[ANTIPODAL_COLOR[id]], tunnelCoreScale(size))
+        material: withPortalCutout(createCoreTileStyle(style, faceColors[id], faceColors[ANTIPODAL_COLOR[id]], tunnelCoreScale(size)),
+          passage.uniforms, corePassageGLSL, 'core', true)
       });
     }
     return byColor;
-  }, [settings, mode, faceColors, size]);
+  }, [settings, mode, faceColors, size, passage]);
   useEffect(() => () => appearances.forEach(b => { b.geometry.dispose(); b.material.dispose(); }), [appearances]);
   const styled = useMemo(() => {
     const groups = new Map(), slots = new Set();
@@ -179,6 +184,10 @@ function VoidCore({ cubieRefs = null }) {
     const still = !!(state.settings?.reducedMotion || motionQuery?.matches);
     const bodies = bodiesRef.current, stickers = stickersRef.current;
     if (!bodies || !stickers) return;
+    // World-space cuts follow the simulation, not the cosmetic core zoom. Both
+    // entry and exit remain clear as the enlarged core moves across the route.
+    updateCorePassage(passage, wormMode ? tunnelState.portalTunnel ?? (tunnelState.active ? tunnelState.tunnel : null) : null,
+      size, wormExpansion.amount);
 
     // Follow the play cube's meshes while any slice moves (and just after, when
     // they snap back to rest); otherwise the core holds still for free.

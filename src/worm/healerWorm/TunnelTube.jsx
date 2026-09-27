@@ -139,9 +139,10 @@ function createTubeGeometry() {
 export function TunnelTube({ worm, size }) {
   const pool = useMemo(() => makeTunnelTubePool(), []);
   const [slots, setSlots] = useState([]);
-  useEffect(() => () => tunnelState.occupiedTunnelIds.clear(), []);
+  useEffect(() => () => { tunnelState.occupiedTunnelIds.clear(); tunnelState.portalTunnel = null; }, []);
   useFrame(() => {
     const occupied = syncTunnelTubePool(pool, worm.activeTunnel.current, worm.tunnelPassages?.current ?? []);
+    tunnelState.portalTunnel = worm.activeTunnel.current ?? worm.tunnelPassages?.current?.at(-1)?.tunnel ?? null;
     tunnelState.occupiedTunnelIds.clear();
     for (const slot of occupied) {
       if ((slot.activeTunnel || slot.tailOccupied) && slot.tunnel?.pairId) tunnelState.occupiedTunnelIds.add(slot.tunnel.pairId);
@@ -149,7 +150,7 @@ export function TunnelTube({ worm, size }) {
     // Mount only when capacity grows. Occupancy and reverse visits update refs;
     // completed slots fade and can be reused without rebuilding the React tree.
     if (occupied.length !== slots.length) setSlots(occupied.slice());
-  });
+  }, -0.4); // after simulation, before the core cuts the current passage
   return slots.map(slot => <TunnelTubeSlot key={slot.id} slot={slot} worm={worm} size={size} />);
 }
 

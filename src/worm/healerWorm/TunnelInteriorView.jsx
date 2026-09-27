@@ -10,6 +10,9 @@ import { getStickerWorldPos } from '../../game/coordinates.js';
 import { ANTIPODAL_COLOR, FACE_COLORS, SURFACE_OFFSET } from '../../utils/constants.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
+import { withPortalCutout } from '../../3d/portalCutout.js';
+import { makeInteriorPortals, syncInteriorPortals, interiorPortalGLSL } from './interiorPortals.js';
+import { prefersReducedMotion } from '../../utils/device.js';
 
 // ─── Tunnel Interior View — all 6 inner faces of the Rubik's cube ────────────
 // During wormhole traversal shows the coloured back-sides of every sticker on
@@ -41,6 +44,7 @@ const _FACE_DEFS = [
 ];
 
 export function TunnelInteriorView({ worm, size }) {
+    const groupRef = useRef();
     const backingMatRef = useRef();
     const dimMatRef = useRef();
     const stickerMeshesRef = useRef([]);
@@ -48,6 +52,16 @@ export function TunnelInteriorView({ worm, size }) {
     const prevPhaseRef = useRef('crawling');
     const stickerMatsAssigned = useRef(false);
     const materialSnapshot = useRef({ cubies: null, settings: null, cap: null });
+    const portalColorSnapshot = useRef({});
+    const portals = useMemo(() => makeInteriorPortals(), []);
+    const ownedMaterials = useMemo(() => new Map(), []);
+    useEffect(() => () => {
+        portals.dispose();
+        ownedMaterials.forEach(material => material.dispose());
+    }, [portals, ownedMaterials]);
+    const clipBacking = useMemo(() => material => {
+        withPortalCutout(material, portals.uniforms, interiorPortalGLSL, 'interior');
+    }, [portals]);
 
     // Precompute every surface sticker's world position and rotation (size-dependent only).
     // Materials read each tile's live outward color, then its antipodal back,
@@ -121,16 +135,31 @@ export function TunnelInteriorView({ worm, size }) {
         // assignment's lifetime off `active` cleared it one frame after it was set,
         // so the stickers were never revealed and the cube read as solid black.
         const inTraversal = ['windup', 'entering', 'tunnel', 'exiting', 'windout'].includes(phase);
+        const tunnel = worm.activeTunnel?.current ?? worm.tunnelPassages?.current?.at(-1)?.tunnel ?? null;
+        syncInteriorPortals(portals, tunnel, size, expansion);
 
         // Assign on the first observed transit frame and on actual cube/style
         // changes. Avoids 54+ per-frame GPU state changes while still refreshing
         // backs when a pair heals or the player changes the equipped styles.
         const st = useGameStore.getState(), cap = selectEffectiveFlipCap(st);
-        const changed = materialSnapshot.current.cubies !== st.cubies || materialSnapshot.current.settings !== st.settings || materialSnapshot.current.cap !== cap;
+        const changed = materialSnapshot.current.cubies !== st.cubies || materialSnapshot.current.settings !== st.settings || materialSnapshot.current.cap !== cap
+            || materialSnapshot.current.portals !== !!tunnel;
+        if (!st.wormPaused && !st.settings?.reducedMotion && !prefersReducedMotion()) portals.time.value += Math.min(delta, 0.05);
+        const portalColors = portalColorSnapshot.current;
+        if (tunnel && (portalColors.tunnel !== tunnel || portalColors.cubies !== st.cubies || portalColors.settings !== st.settings)) {
+            const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+            for (let side = 0; side < 2; side++) {
+                const cell = side === 0 ? tunnel.entry : tunnel.exit;
+                const sticker = st.cubies?.[cell.x]?.[cell.y]?.[cell.z]?.stickers?.[cell.dirKey];
+                portals.mouths[side].material.uniforms.uColor.value.set(fc[ANTIPODAL_COLOR[sticker?.curr]] ?? '#88ccff');
+            }
+            portalColorSnapshot.current = { tunnel, cubies: st.cubies, settings: st.settings };
+        }
         if (inTraversal && (!stickerMatsAssigned.current || changed)) {
             const { cubies, settings } = st;
             const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
             const manifoldStyles = settings?.manifoldStyles ?? {};
+            const usedMaterials = new Set();
             for (let i = 0; i < stickerLayout.length; i++) {
                 const { sx, sy, sz, dirKey } = stickerLayout[i];
                 const mesh = stickerMeshesRef.current[i];
@@ -143,11 +172,24 @@ export function TunnelInteriorView({ worm, size }) {
                 const colorHex = dead ? '#555555' : (fc[antipodalFaceId] ?? '#444');
                 const style = dead ? 'solid' : (manifoldStyles[antipodalFaceId] ?? 'solid');
                 const antiColorHex = fc[ANTIPODAL_COLOR[antipodalFaceId]] ?? '#ffffff';
-                mesh.material = getTileStyleMaterial(style, colorHex, false, null, antiColorHex);
+                const source = getTileStyleMaterial(style, colorHex, false, null, antiColorHex);
+                if (tunnel) {
+                    usedMaterials.add(source);
+                    if (!ownedMaterials.has(source)) {
+                        const material = source.clone();
+                        // Keep the tile cache's animation clock; customize only this interior.
+                        material.uniforms = { ...source.uniforms };
+                        ownedMaterials.set(source, withPortalCutout(material, portals.uniforms, interiorPortalGLSL, 'interior'));
+                    }
+                    mesh.material = ownedMaterials.get(source);
+                } else mesh.material = source;
                 mesh.visible = false; // revealed gradually by opacity ramp
             }
             stickerMatsAssigned.current = true;
-            materialSnapshot.current = { cubies, settings, cap };
+            materialSnapshot.current = { cubies, settings, cap, portals: !!tunnel };
+            ownedMaterials.forEach((material, source) => {
+                if (!usedMaterials.has(source)) { material.dispose(); ownedMaterials.delete(source); }
+            });
         }
         // Clear assignment flag once the whole traversal is over, so the next transit
         // gets fresh sticker colours. Gated on inTraversal, not active — 'entering' is
@@ -158,6 +200,7 @@ export function TunnelInteriorView({ worm, size }) {
 
         opacityRef.current += ((active ? 1 : 0) - opacityRef.current) * Math.min(1, delta * (active ? 10 : 5));
         const opacity = opacityRef.current;
+        if (groupRef.current) groupRef.current.visible = active && opacity >= 0.01;
 
         if (backingMatRef.current) backingMatRef.current.opacity = opacity;
         if (dimMatRef.current) dimMatRef.current.opacity = opacity * DIM_STRENGTH;
@@ -176,16 +219,16 @@ export function TunnelInteriorView({ worm, size }) {
     });
 
     return (
-        <>
+        <group ref={groupRef} name="tunnel-interior" visible={false}>
             {/* Solid black backing — fills the gaps between tiles like real Rubik's plastic */}
             <mesh geometry={backingGeo} frustumCulled={false}>
-                <meshBasicMaterial ref={backingMatRef} color="#000000" side={THREE.BackSide} transparent opacity={0} depthWrite={true} />
+                <meshBasicMaterial ref={backingMatRef} onUpdate={clipBacking} color="#000000" side={THREE.BackSide} transparent opacity={0} depthWrite={true} />
             </mesh>
             {/* Interior dimmer. renderOrder 1 puts it after the sticker planes (0) so it
                 tints them, and before TunnelTube (2) so the shaft still reads at full
                 strength against a darkened room. */}
             <mesh geometry={dimGeo} frustumCulled={false} renderOrder={1}>
-                <meshBasicMaterial ref={dimMatRef} color="#05060c" side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
+                <meshBasicMaterial ref={dimMatRef} onUpdate={clipBacking} color="#05060c" side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
             </mesh>
             {/* All 6 faces × size² sticker planes, coloured imperatively */}
             {stickerLayout.map(({ sx, sy, sz, dirKey }, i) => (
@@ -201,6 +244,7 @@ export function TunnelInteriorView({ worm, size }) {
                     <primitive object={planeGeo} attach="geometry" />
                 </mesh>
             ))}
-        </>
+            {portals.mouths.map(mouth => <primitive key={mouth.name} object={mouth} dispose={null} />)}
+        </group>
     );
 }
