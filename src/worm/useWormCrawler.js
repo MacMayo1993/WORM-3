@@ -29,7 +29,7 @@ import { liveRotation } from './liveRotation.js';
 // getter/setter alias onto the sim object, so consumers are unaffected by the
 // extraction. See wormSim.js for the ctx contract.
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getManifoldGridId } from '../game/coordinates.js';
@@ -681,8 +681,11 @@ export function useWormCrawler(size, cubies) {
     const jumpLift = useCallback(() => jumpLiftOf(simRef.current), []);
 
     // ── Run reset (retry / new setup / size change) ─────────────────────────────
-    useEffect(() => {
+    // Reset and stage before paint: the camera/body must never render the previous
+    // run between initWormMode and the first simulation tick.
+    useLayoutEffect(() => {
         const sim = simRef.current;
+        if (deathMenuTimer.current) { clearTimeout(deathMenuTimer.current); deathMenuTimer.current = null; }
         demoPracticeRef.current = null;
         storyPracticeRef.current = null;
         combatRunRef.current = null; sim.combat = null; combatBridge.current = null;
@@ -694,6 +697,15 @@ export function useWormCrawler(size, cubies) {
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
+        const state = useGameStore.getState();
+        const story = storyLevel(state.wormStoryLevel);
+        let storyStart = null;
+        if (story && !liveRotation.active) {
+            const practice = stageStory(sim, size, story, state.wormCharacter);
+            storyPracticeRef.current = { ...practice, runId: state.wormRunId, rotationEpoch: state.rotationEpoch };
+            storyStart = { cubies: practice.cubies, wormOrbInventory: practice.inventory,
+                wormStoryTarget: practice.target, wormStoryReady: true, wormPaused: true };
+        }
         useGameStore.getState().setWormBoostState('ready');
         useGameStore.setState({
             wormPowerups: sim.powerups,
@@ -719,6 +731,7 @@ export function useWormCrawler(size, cubies) {
             // releases it to false after the countdown finishes.
             wormTimeAlive: 0,
             wormTunnelCount: 0,
+            ...storyStart,
         });
         wormClock.countdown = wormholeInterval;
     }, [size, wormRunId, wormOrbCount, wormholeInterval]);

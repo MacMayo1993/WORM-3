@@ -193,6 +193,8 @@ export default function WormChaseCamera({ worm, size }) {
     const transitionPose = useRef(makeTunnelCamPose());
     const elementalOrbitRef = useRef(null);
     const revealTRef = useRef(1);               // countdown reveal dolly progress (0 = fully pulled back)
+    const revealActiveRef = useRef(false);
+    const cameraRunRef = useRef(null);
 
     // This camera is the app's shared one, and the chase view leaves it wide
     // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
@@ -214,6 +216,23 @@ export default function WormChaseCamera({ worm, size }) {
         delta = Math.min(Math.max(0, delta), MAX_TICK_DELTA);
         const gameState = useGameStore.getState();
         const gamePhase = gameState.wormGamePhase ?? 'active';
+        const newRun = cameraRunRef.current !== gameState.wormRunId;
+        cameraRunRef.current = gameState.wormRunId;
+        if (newRun) {
+            // Retry can reuse this camera while the old run ended on another
+            // face, in a tunnel, or in a death/elemental shot.
+            postTunnelEaseRef.current = 0;
+            elementalOrbitRef.current = null;
+            sliceFreezeActiveRef.current = false;
+            prevDirKeyRef.current = null;
+            faceTransT.current = 0;
+        }
+        const awaitingStory = !!gameState.wormStoryLevel && gamePhase === 'active' &&
+            !gameState.wormStoryStarted && !gameState.wormStoryResult;
+        const storyBriefing = awaitingStory && gameState.wormStoryReady;
+        const inReveal = gamePhase === 'spawning' || gamePhase === 'countdown' || storyBriefing;
+        const enteredReveal = inReveal && (newRun || !revealActiveRef.current);
+        revealActiveRef.current = inReveal;
         // Read per frame rather than through a subscription: this callback already
         // reads the store, and a re-render of the camera on a settings change would
         // reset the smoothing refs mid-crawl.
@@ -276,7 +295,7 @@ export default function WormChaseCamera({ worm, size }) {
         // Capture once, pull out far enough to frame the full cube, and return exactly to
         // the captured view before handing control back to normal chase smoothing.
         const focusRemaining = worm.elementalFocusT?.current ?? 0;
-        if (phase !== 'crawling' || gamePhase === 'scrambling' || gameState.wormAlive === false) {
+        if (phase !== 'crawling' || gamePhase === 'scrambling' || awaitingStory || gameState.wormAlive === false) {
             elementalOrbitRef.current = null;
         } else if (focusRemaining > 0 || elementalOrbitRef.current) {
             if (!elementalOrbitRef.current) {
@@ -316,7 +335,7 @@ export default function WormChaseCamera({ worm, size }) {
         // from the previous run — falling through to the normal chase-cam branch with
         // leftover position/up-vector data (the intermittent "starts inside the cube /
         // upside down" glitch).
-        if (gamePhase === 'scrambling') {
+        if (gamePhase === 'scrambling' || (awaitingStory && !gameState.wormStoryReady)) {
             const dist = 5 + size * 4.0;
             _camTargetCam.set(0.6, 1.1, 1).normalize().multiplyScalar(dist);
             _camTargetLook.set(0, 0, 0);
@@ -326,7 +345,7 @@ export default function WormChaseCamera({ worm, size }) {
             // up-side down) and lerping from it produced a brief but visible swoop through
             // the cube that differed run to run. Snapping makes the opening shot identical
             // on every iteration.
-            if (prevGamePhaseRef.current !== 'scrambling') {
+            if (newRun || prevGamePhaseRef.current !== 'scrambling') {
                 camPosRef.current.copy(_camTargetCam);
                 lookAtRef.current.copy(_camTargetLook);
                 prevDirKeyRef.current = null;
@@ -371,10 +390,6 @@ export default function WormChaseCamera({ worm, size }) {
             prevGamePhaseRef.current = gamePhase;
             return;
         }
-        // Countdown-reveal entry test, taken BEFORE prevGamePhaseRef is refreshed.
-        const inReveal = gamePhase === 'spawning' || gamePhase === 'countdown';
-        const enteredReveal = inReveal &&
-            prevGamePhaseRef.current !== 'spawning' && prevGamePhaseRef.current !== 'countdown';
         prevGamePhaseRef.current = gamePhase;
 
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
@@ -392,7 +407,7 @@ export default function WormChaseCamera({ worm, size }) {
             : 0;
         const rocketLift = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
         const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), baseFov + 6, tunnelMix) + rocketLift * 2;
-        const fovAlpha = 1 - Math.exp(-6 * delta);
+        const fovAlpha = enteredReveal ? 1 : 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
             camera.fov = nextFov;
@@ -433,7 +448,9 @@ export default function WormChaseCamera({ worm, size }) {
             _camWormWorld.copy(worm.headInterpPos.current);
 
             if (enteredReveal) revealTRef.current = 0;
-            revealTRef.current = Math.min(1, revealTRef.current + delta / REVEAL_DURATION);
+            // The briefing already shows the new run's opening shot. Hold it
+            // there until Start, then continue the same dolly into 3-2-1.
+            if (!storyBriefing) revealTRef.current = Math.min(1, revealTRef.current + delta / REVEAL_DURATION);
             const rt = revealTRef.current;
             const pull = 1 - rt * rt * (3 - 2 * rt); // smoothstep-eased, 1 → 0
 

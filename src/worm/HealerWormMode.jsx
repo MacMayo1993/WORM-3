@@ -228,8 +228,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 useGameStore.setState({ wormGamePhase: 'spawning', wormCountdownStep: null });
             };
             if (story || practice) {
-                // The authored board is staged by the next crawler tick. Its ready
-                // card requests the countdown; demo lessons retain their quick start.
+                // Story reset stages its authored board before paint. Its ready
+                // card requests the countdown; demo lessons stage on their next tick.
                 gameModePhaseRef.current = 'active';
                 useGameStore.setState({ wormGamePhase: 'active', wormPaused: true, wormCountdownStep: null });
             }

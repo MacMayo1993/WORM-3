@@ -63,7 +63,8 @@ beforeEach(() => {
   scene.size = { width: 412, height: 915 };
   scene.camera = new PerspectiveCamera(70, 412 / 915, 0.1, 200);
   useGameStore.setState({ wormGamePhase: 'countdown', wormAlive: true, wormCameraHorizon: 'face',
-    wormDeathDetails: null, wormStoryLevel: null, wormCombatMode: false, demoMode: false });
+    wormDeathDetails: null, wormStoryLevel: null, wormStoryStarted: false, wormStoryReady: false,
+    wormStoryResult: null, wormCombatMode: false, demoMode: false });
 });
 afterEach(() => {
   act(() => root.unmount()); host.remove();
@@ -72,7 +73,7 @@ afterEach(() => {
 
 it.each([
   ['small free play', 2, {}], ['free play', 3, {}],
-  ['story', 5, { wormStoryLevel: 8 }], ['large free play', 7, {}],
+  ['story', 5, { wormStoryLevel: 8, wormStoryStarted: true, wormStoryReady: true }], ['large free play', 7, {}],
   ['8x8 free play', 8, {}], ['9x9 free play', 9, {}], ['10x10 free play', 10, {}],
   ['Mega', 15, {}], ['combat', 5, { wormCombatMode: true }],
   ['practice', 3, { demoMode: true }]
@@ -98,6 +99,48 @@ it.each([
     scene.size = { width: 412, height: 915 };
     scene.camera.aspect = 412 / 915; scene.camera.updateProjectionMatrix();
   }
+});
+
+it.each([true, false])('holds the fresh briefing shot and continues into countdown without a jump (mobile=%s)', mobile => {
+  scene.mobile = mobile;
+  if (!mobile) {
+    scene.size = { width: 1280, height: 800 };
+    scene.camera.aspect = 1.6;
+  }
+  const size = 6, worm = makeWorm(size);
+  useGameStore.setState({ wormStoryLevel: 1, wormGamePhase: 'active', wormStoryReady: true, wormStoryStarted: false });
+  render(worm, size); tick();
+  const opening = scene.camera.position.clone(), orientation = scene.camera.quaternion.clone(), fov = scene.camera.fov;
+  for (let i = 0; i < 300; i++) tick(); // reading the briefing must not spend the dolly
+  expect(scene.camera.position.distanceTo(opening)).toBeLessThan(1e-8);
+  expect(scene.camera.quaternion.angleTo(orientation)).toBeLessThan(1e-6);
+  useGameStore.setState({ wormGamePhase: 'countdown', wormStoryStarted: true });
+  tick();
+  expect(scene.camera.position.distanceTo(opening)).toBeLessThan(.02);
+  expect(scene.camera.quaternion.angleTo(orientation)).toBeLessThan(.01);
+  expect(scene.camera.fov).toBe(fov);
+  for (let i = 0; i < 240; i++) tick();
+  expect(scene.camera.position.distanceTo(opening)).toBeGreaterThan(1);
+  // Retry without remounting the camera, even after crawling on the far face.
+  Object.assign(worm, makeWorm(size, 'NZ'));
+  useGameStore.setState({ wormGamePhase: 'active' });
+  for (let i = 0; i < 90; i++) tick();
+  Object.assign(worm, makeWorm(size));
+  useGameStore.setState(s => ({ wormRunId: s.wormRunId + 1, wormStoryStarted: false }));
+  tick();
+  expect(scene.camera.position.distanceTo(opening)).toBeLessThan(1e-8);
+  expect(scene.camera.quaternion.angleTo(orientation)).toBeLessThan(1e-6);
+});
+
+it('uses a clean overview while a fresh Story board is still waiting to be staged', () => {
+  const size = 6, worm = makeWorm(size, 'NZ');
+  worm.elementalFocusT = ref(1.5);
+  worm.headInterpPos.current.set(99, -40, 12);
+  scene.camera.position.set(2, -3, 1);
+  useGameStore.setState({ wormGamePhase: 'active', wormStoryLevel: 1, wormStoryReady: false });
+  render(worm, size); tick();
+  const overview = new Vector3(.6, 1.1, 1).normalize().multiplyScalar(5 + size * 4);
+  expect(scene.camera.position.distanceTo(overview)).toBeLessThan(1e-8);
 });
 
 it('tracks rendered jump and rocket height through turns', () => {
