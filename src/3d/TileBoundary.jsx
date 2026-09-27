@@ -43,13 +43,17 @@ void main() {
 });
 const flippedMaterial = new THREE.ShaderMaterial({
     vertexShader,
+    extensions: { derivatives: true },
     fragmentShader: `
 varying vec2 tilePosition;
 void main() {
     float edge = max(abs(tilePosition.x), abs(tilePosition.y));
     float phase = (tilePosition.x + tilePosition.y) * 9.0;
     float wave = sin(phase * 6.2831853);
-    float aa = max(fwidth(wave), 0.01);
+    float aa = 0.01;
+    #if defined(GL_OES_standard_derivatives) || __VERSION__ >= 300
+        aa = max(fwidth(wave), aa);
+    #endif
     float stripe = smoothstep(-aa, aa, wave);
     vec3 color = mix(vec3(0.025), vec3(1.0, 0.76, 0.055), stripe);
     // Dark keylines retain the boundary against yellow tiles and bright effects.

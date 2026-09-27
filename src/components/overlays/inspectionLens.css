@@ -1,0 +1,25 @@
+.inspection-lens {
+  position: fixed; transform: translate(-50%, -50%); z-index: 65;
+  pointer-events: none; color: #173b2d; font-family: var(--ui-font);
+}
+.inspection-lens-drag {
+  position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%;
+  border: 2px solid rgba(245, 229, 181, .8); background: transparent;
+  pointer-events: auto; touch-action: none; cursor: grab;
+}
+.inspection-lens-drag:active { cursor: grabbing; }
+.inspection-lens-drag:focus-visible { outline: 3px dashed #f1c94f; outline-offset: 4px; }
+.inspection-lens-caption, .inspection-lens-tools {
+  position: absolute; left: 50%; transform: translateX(-50%); pointer-events: auto;
+  background: #fff6df; border: 2px solid #173b2d; border-radius: 12px;
+  box-shadow: 0 3px 0 #173b2d;
+}
+.inspection-lens-caption { bottom: calc(100% + 8px); display: flex; align-items: center; padding-left: 14px; gap: 8px; font-weight: 900; }
+.inspection-lens-caption button {
+  width: 44px; height: 44px; border: 0; border-left: 1px solid #173b2d;
+  background: transparent; color: inherit; font-size: 24px; cursor: pointer; border-radius: 0 10px 10px 0;
+}
+.inspection-lens-tools { top: calc(100% + 8px); width: 206px; padding: 5px 10px; font-size: 11px; text-align: center; }
+.inspection-lens-tools label { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 800; }
+.inspection-lens-tools input { width: 134px; height: 28px; accent-color: #277953; }
+.inspection-lens-caption button:focus-visible, .inspection-lens-tools input:focus-visible { outline: 3px solid #277953; outline-offset: 2px; }

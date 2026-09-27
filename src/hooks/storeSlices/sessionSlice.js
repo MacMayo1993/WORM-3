@@ -38,6 +38,7 @@ export const createSessionSlice = (set, get) => ({
 
   incrementMoves: () => set((state) => ({ moves: state.moves + 1 })),
   resetGame: () => set({
+    showCutawayLens: false,
     xpRun: null,
     moves: 0,
     gameTime: 0,

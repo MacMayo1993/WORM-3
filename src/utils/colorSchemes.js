@@ -243,6 +243,7 @@ export const TILE_STYLES = {
 };
 
 export const DEFAULT_SETTINGS = {
+  livePortalViews: true,
   flipPads: 'full',
   colorScheme: 'standard',
   customColors: null,

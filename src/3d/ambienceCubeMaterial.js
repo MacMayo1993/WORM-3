@@ -23,6 +23,7 @@ export function ambienceCubeGeometry(cubes) {
 export function ambienceCubeMaterial() {
   return new THREE.ShaderMaterial({
     toneMapped: false,
+    extensions: { derivatives: true },
     vertexShader: /* glsl */`
       attribute float faceIndex;
       attribute float cubeStyle;
@@ -44,7 +45,10 @@ export function ambienceCubeMaterial() {
       void main() {
         vec2 p = fract(vUv * 3.) - .5;
         float edge = max(abs(p.x), abs(p.y));
-        float aa = max(fwidth(edge), .006);
+        float aa = .006;
+        #if defined(GL_OES_standard_derivatives) || __VERSION__ >= 300
+          aa = max(fwidth(edge), aa);
+        #endif
         float gap = vStyle > 6.5 ? .34 : .435;
         float tile = 1. - smoothstep(gap - aa, gap + aa, edge);
         float bevel = smoothstep(.29, .43, edge);

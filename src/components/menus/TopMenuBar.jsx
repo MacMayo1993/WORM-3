@@ -3,6 +3,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.j
 import ParityWallet from '../overlays/ParityWallet.jsx';
 import { GAME_HUD, GAME_HUD_VARS } from '../../utils/uiTheme.js';
 import './instrumentHud.css';
+import { InspectionToggle } from '../overlays/InspectionLens.jsx';
 
 // Must match MAX_CASCADES in useChaosMode.js — keeps the bolt display accurate
 const MAX_CASCADES = 6;
@@ -121,6 +122,7 @@ const TopMenuBar = ({
         {flipMode && <span className="instrument-tag">Flip</span>}
       </div>
       <div className="top-bar-right">
+        <InspectionToggle />
         {onToggleAntipodalPiP && <button type="button" className="top-bar-icon-btn"
           aria-label="Far-side view" aria-pressed={showAntipodalPiP} onClick={onToggleAntipodalPiP}>
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">

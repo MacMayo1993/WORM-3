@@ -40,6 +40,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   // exactly as long as its tiles are still flippable.
   const flipCap = useGameStore(selectEffectiveFlipCap);
   const cubePads = useGameStore(flipCubePadsEnabled);
+  const showCutawayLens = useGameStore(s => s.showCutawayLens);
   const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths, wormHealerMode, chaosLevel } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode,
@@ -60,7 +61,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   // with Off/Hints selected; the stored view preference remains unchanged.
   const wormBands = wormHealerMode;
   const raisedBands = wormBands || cubePads;
-  const visible = showTunnels || raisedBands;
+  const visible = showTunnels || raisedBands || showCutawayLens;
   // Narrow deps: only the two settings fields that affect face-color resolution.
   // Avoids re-running the lookup on every unrelated settings change (e.g. background theme).
   const fc = useMemo(
@@ -185,7 +186,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       return ids;
     }
 
-    if (cubePads || tunnelDetail === 'full') {
+    if (cubePads || tunnelDetail === 'full' || showCutawayLens) {
       // Chaos uses the same raised bands, with its existing small detail budget:
       // a 5×5 storm can have 75 pairs, so keep the rest in the merged cord draw.
       const budget = cubePads && chaosLevel === 0 ? RAISED_CUBE_FOCUS_BUDGET : FOCUS_BUDGET;
@@ -203,7 +204,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       for (let i = 0; i < tunnelData.length && ids.size < budget; i++) ids.add(tunnelData[i].pairId);
     }
     return ids;
-  }, [visible, wormBands, cubePads, chaosLevel, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData]);
+  }, [visible, wormBands, cubePads, chaosLevel, tunnelDetail, wormTunnelId, tunnelBirths, tunnelPulses, tunnelData, showCutawayLens]);
 
   // Chaos surges trace whichever route the player sees for a pair: the throated
   // ribbon when it is in focus, the straight cord otherwise.
