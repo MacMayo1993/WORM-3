@@ -1,5 +1,7 @@
+import { STICKER_FINISH_VARYINGS, stickerFinishVertex } from './stickerFinish.js';
+
 // Shared vertex shader used by all tile styles
-export const baseVertexShader = `
+export const baseVertexShader = `${STICKER_FINISH_VARYINGS}
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vViewPosition;
@@ -19,7 +21,7 @@ export const baseVertexShader = `
     vTileCenter = modelMatrix[3].xyz;
     vWorldNormal = normalize(mat3(modelMatrix) * normal);
     vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPos = worldPos.xyz;
+    vWorldPos = worldPos.xyz;${stickerFinishVertex()}
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     vViewPosition = -mvPosition.xyz;
     gl_Position = projectionMatrix * mvPosition;
@@ -32,7 +34,7 @@ export const baseVertexShader = `
 // flesh mound, both falling to zero before the tile edge so seams stay flush.
 // Requires a subdivided plane (StickerPlane swaps in one for the eyeball style);
 // on a 1×1-segment plane the corner vertices sit past the profile and it stays flat.
-export const eyeballBulgeVertexShader = `
+export const eyeballBulgeVertexShader = `${STICKER_FINISH_VARYINGS}
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vViewPosition;
@@ -50,7 +52,7 @@ export const eyeballBulgeVertexShader = `
     float mound = 1.0 - smoothstep(0.16, 0.44, du);
     vec3 displaced = position + normal * (ball * 0.055 + mound * 0.045);
     vec4 worldPos = modelMatrix * vec4(displaced, 1.0);
-    vWorldPos = worldPos.xyz;
+    vWorldPos = worldPos.xyz;${stickerFinishVertex('displaced')}
     vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
     vViewPosition = -mvPosition.xyz;
     gl_Position = projectionMatrix * mvPosition;

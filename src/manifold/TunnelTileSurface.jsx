@@ -40,7 +40,7 @@ const vertexShader = `
 // containing every style, and never mutates the cached sticker material.
 function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMode) {
   const tile = getTileStyleMaterial(style, color, false, null, antiColor);
-  const tileShader = tile.fragmentShader
+  const tileShader = (tile.userData.styleFragmentShader ?? tile.fragmentShader)
     .replace(/varying\s+vec2\s+vUv\s*;/g, '')
     .replace(/\bvUv\b/g, 'tileUv')
     .replace(/void\s+main\s*\(\s*\)/, 'void tileMain()');
