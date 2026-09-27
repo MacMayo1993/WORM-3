@@ -20,9 +20,10 @@ describe('demo settings overrides', () => {
   it('rewrites only the demo-controlled fields', () => {
     const before = playerSettings();
     const after = applyDemoOverrides(before);
-    expect(after.colorScheme).toBe('neon');
+    // The game's own look: the Classic palette on plain stickers.
+    expect(after.colorScheme).toBe('standard');
     expect(after.backgroundTheme).toBe('desert');
-    expect(Object.values(after.manifoldStyles)).toEqual(Array(6).fill('topographic'));
+    expect(Object.values(after.manifoldStyles)).toEqual(Array(6).fill('solid'));
     // Untouched settings pass straight through.
     expect(after.sfx).toBe(false);
     expect(after.haptics).toBe(true);
@@ -37,24 +38,40 @@ describe('demo settings overrides', () => {
   });
 });
 
+// Devices tainted before the pre-demo snapshot existed hold the look older demo
+// builds staged: the neon palette on topographic tiles, over the desert.
+const legacyDemoSettings = (backgroundTheme = 'desert') => ({
+  ...playerSettings(),
+  colorScheme: 'neon',
+  backgroundTheme,
+  manifoldStyles: { 1: 'topographic', 2: 'topographic', 3: 'topographic', 4: 'topographic', 5: 'topographic', 6: 'topographic' },
+});
+
 describe('unclean-exit detection', () => {
-  it('recognises settings the demo left behind', () => {
-    expect(looksLikeDemoSettings(applyDemoOverrides(playerSettings()))).toBe(true);
+  it('recognises settings an older demo build left behind', () => {
+    expect(looksLikeDemoSettings(legacyDemoSettings())).toBe(true);
   });
 
   it('recognises a crash during the worm step, which swaps in the Shanghai sky', () => {
-    const tainted = { ...applyDemoOverrides(playerSettings()), backgroundTheme: 'shanghai' };
-    expect(looksLikeDemoSettings(tainted)).toBe(true);
+    expect(looksLikeDemoSettings(legacyDemoSettings('shanghai'))).toBe(true);
+  });
+
+  // The current demo look is the game's default palette and tiles. A player who
+  // picks it with the desert chose it; reading it as a leftover would reset
+  // their scene on every launch. The snapshot heals every current demo run.
+  it('never mistakes the current demo look, which is the game default, for a leftover', () => {
+    expect(looksLikeDemoSettings(applyDemoOverrides(playerSettings()))).toBe(false);
+    expect(looksLikeDemoSettings({ ...applyDemoOverrides(playerSettings()), backgroundTheme: 'shanghai' })).toBe(false);
   });
 
   // Regression: the signature check used to hard-code 'pastel' while the demo
   // applied 'neon', so it silently matched nothing and tainted devices were
-  // never healed. Both now come from the same module.
+  // never healed.
   it('does not match a player theme that only half-resembles the demo', () => {
     expect(looksLikeDemoSettings({ ...playerSettings(), colorScheme: 'neon' })).toBe(false);
-    expect(looksLikeDemoSettings({ ...applyDemoOverrides(playerSettings()), colorScheme: 'pastel' })).toBe(false);
+    expect(looksLikeDemoSettings({ ...legacyDemoSettings(), colorScheme: 'pastel' })).toBe(false);
     expect(looksLikeDemoSettings({
-      ...applyDemoOverrides(playerSettings()),
+      ...legacyDemoSettings(),
       manifoldStyles: { 1: 'topographic', 2: 'topographic', 3: 'topographic', 4: 'topographic', 5: 'topographic', 6: 'lava' },
     })).toBe(false);
     expect(looksLikeDemoSettings(null)).toBe(false);

@@ -8,7 +8,10 @@ import './antipodalCoreKey.css';
 const PAIRS = [[1, 4], [2, 5], [3, 6]];
 
 export default function AntipodalCoreKey() {
+  // The demo's view tour holds its own card at the top of the screen, whose
+  // copy names the centre cube, so the key stands down for it.
   const visible = useGameStore(s => !s.captureMode && !inspectionSuspended(s) &&
+    !(s.demoMode && s.demoStep === 'view-showcase') &&
     (s.showCutawayLens || s.explosionT > 0.15 || s.hollowMode || ['glass', 'gap', 'wireframe'].includes(s.visualMode)));
   const settings = useGameStore(s => s.settings);
   if (!visible) return null;

@@ -6,6 +6,7 @@ import React from 'react';
 import { UI_FONT, HEADING_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
+import { inspectionLens } from '../../3d/inspectionBridge.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useKociembaSolver } from '../../teach/useKociembaSolver.js';
 import { STEP_COPY, TWIN_ASIDE } from '../../utils/demoStepCopy.js';
@@ -731,7 +732,7 @@ const DEMO_LEVEL_CONFIGS = {
     wormCharacter: 'glow',
     wormSkin: 'lava',
     // The worm demo swaps in a Shanghai skybox; tiles keep the demo-wide
-    // topographic look. applyDemoStepConfig's worm branch layers this over
+    // Classic stickers. applyDemoStepConfig's worm branch layers this over
     // applyDemoSettings.
     backgroundTheme: 'shanghai',
   },
@@ -925,6 +926,8 @@ const DemoControlTour = ({ index, onSkip }) => {
 // ── View Showcase sequence ────────────────────────────────────────────────────
 // Each entry describes one beat of the view-showcase demo step.
 // `apply` is called with the store to activate the view; `cleanup` reverses it.
+// Where the player's cutaway lens sat before the Cutaway beat moved it.
+let cutawayLensHome = null;
 const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'grid',
@@ -952,7 +955,8 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'glass',
     title: 'Glass',
-    copy: 'Glass makes the tiles transparent.',
+    // The body turns see-through, which puts the antipodal core on show.
+    copy: 'Glass makes the cube see-through. The small cube at the centre shows every tile’s twin.',
     apply: (s) => s.setVisualMode('glass'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
@@ -994,7 +998,9 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'tunnels',
     title: 'Tunnels',
-    copy: 'Watch the tunnel connect a tile to its opposite twin. Explode makes the connection easier to see.',
+    // Every tunnel docks on the core tile beneath its mouth and crosses through
+    // the centre (tunnelPath.js), so that is the route the copy names.
+    copy: 'Watch the tunnel run from a tile, through the small cube at the centre, out to its twin. Explode opens the cube so you can see it.',
     // Keep the previous beat's exploded view (the tunnel is invisible inside a
     // closed cube) and flip the front-face center tile so exactly one
     // antipodal tunnel lights up.
@@ -1013,6 +1019,35 @@ const VIEW_SHOWCASE_SEQUENCE = [
     // the flipped tile away from where apply() put it.
     cleanup: (s) => {
       s.setExploded(false);
+      s.setShowTunnels(false);
+      s.setTunnelDetail('hints');
+      s.setRotatedCubies(makeCubies(s.size));
+    },
+  },
+  {
+    key: 'cutaway',
+    title: 'Cutaway',
+    copy: 'The cutaway lens looks inside the closed cube: the tunnel docks on the small cube at the centre. Drag the lens to look around.',
+    // The closed-cube counterpart of the Tunnels beat: the same single pair,
+    // seen through the lens instead of by blowing the cube apart. The lens
+    // opens a little low so its caption clears this card at the top of the
+    // screen, and goes back to wherever the player keeps it afterwards.
+    apply: (s) => {
+      cutawayLensHome = { x: inspectionLens.x, y: inspectionLens.y };
+      inspectionLens.x = 0.5;
+      inspectionLens.y = 0.58;
+      s.setExploded(false);
+      s.setShowTunnels(true);
+      s.setTunnelDetail('full');
+      const mid = Math.floor(s.size / 2);
+      const map = buildManifoldGridMap(s.cubies, s.size);
+      s.setRotatedCubies(flipStickerPair(s.cubies, s.size, mid, mid, s.size - 1, 'PZ', map));
+      s.setShowCutawayLens(true);
+    },
+    cleanup: (s) => {
+      if (cutawayLensHome) Object.assign(inspectionLens, cutawayLensHome);
+      cutawayLensHome = null;
+      s.setShowCutawayLens(false);
       s.setShowTunnels(false);
       s.setTunnelDetail('hints');
       s.setRotatedCubies(makeCubies(s.size));
