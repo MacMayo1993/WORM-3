@@ -10,7 +10,8 @@
  * slice turn turns the same slice of the core.
  *
  * Flips flash the two core tiles their tunnel runs between and tint the glow;
- * the more of the network is alive, the brighter the corona. Once the cube is
+ * an exposed core sits in a dark antiverse with a bowed lattice and ± light
+ * pairs. The more of the network is alive, the brighter that field. Once the cube is
  * opened (Explode, glass, gap, hollow) the core also lights the pieces around
  * it. It is opaque in every mode, so it hides the worm's crossing. Riding a
  * WORM tunnel, the core swells as the lens closes on it, anchored on the tile
@@ -33,6 +34,7 @@ import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
 import { createCoreTileStyle } from './coreTileStyle.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
+import { createAntiverse, antiverseVisibility } from './antiverse.js';
 import { liveRotation } from '../worm/liveRotation.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import {
@@ -40,10 +42,10 @@ import {
   coreLayout, coreCubieMatrixInto, corePartnerColorId,
   coreZoomLimit, coreZoomAt,
   countFlippedStickers, networkCharge, interiorExposure,
-  createCoreStickerMaterial, createCoreBodyMaterial, createCoreHaloMaterial
+  createCoreStickerMaterial, createCoreBodyMaterial
 } from './antipodalCore.js';
 
-const LIGHT_WARM = new THREE.Color('#ffe7c2');
+const LIGHT_BASE = new THREE.Color('#9aacc8');
 const WHITE = new THREE.Color(1, 1, 1);
 const _tint = new THREE.Color();
 const _color = new THREE.Color();
@@ -90,12 +92,15 @@ function VoidCore({ cubieRefs = null }) {
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
-    halo: new THREE.PlaneGeometry(1, 1),
     bodyMaterial: createCoreBodyMaterial(isMobile, mode),
-    stickerMaterial: createCoreStickerMaterial(glow, isMobile),
-    haloMaterial: createCoreHaloMaterial()
+    stickerMaterial: createCoreStickerMaterial(glow, isMobile)
   }), [glow, mode]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
+  const antiverse = useMemo(() => createAntiverse(size), [size]);
+  useEffect(() => () => antiverse.dispose(), [antiverse]);
+  useLayoutEffect(() => {
+    antiverse.uniforms.uPalette.value.forEach((color, i) => color.set(faceColors[i + 1]));
+  }, [antiverse, faceColors]);
 
   // At most six style batches, never one mesh per inner tile. Plain stickers
   // keep the original single draw; patterned faces use the equipped shader.
@@ -144,7 +149,7 @@ function VoidCore({ cubieRefs = null }) {
   const fx = useRef(null);
   if (!fx.current) {
     fx.current = {
-      layoutDirty: true, flash: 0, flashTiles: [], tint: LIGHT_WARM.clone(), tintMix: 0,
+      layoutDirty: true, flash: 0, flashTiles: [], tint: LIGHT_BASE.clone(), tintMix: 0,
       seenPulse: useGameStore.getState().flipPulse?.at ?? null,
       zoom: 1, rideId: null, through: false, limit: 1,
       dock: new THREE.Vector3(), normal: new THREE.Vector3()
@@ -167,7 +172,7 @@ function VoidCore({ cubieRefs = null }) {
 
   const motionQuery = useMemo(() => (typeof window === 'undefined' ? null : window.matchMedia?.('(prefers-reduced-motion: reduce)')), []);
 
-  useFrame(({ camera }, rawDt) => {
+  useFrame(({ camera, gl }, rawDt) => {
     const f = fx.current;
     const state = useGameStore.getState();
     const dt = Math.min(rawDt, 0.05);
@@ -263,11 +268,17 @@ function VoidCore({ cubieRefs = null }) {
     }
 
     const energy = 0.35 + 0.65 * charge;
-    _tint.copy(LIGHT_WARM).lerp(f.tint, 0.65 * f.tintMix);
-    const halo = parts.haloMaterial.uniforms;
-    halo.uColor.value.copy(_tint);
-    halo.uSize.value = (1.0 + 0.8 * charge + 0.3 * f.flash) * f.zoom;
-    halo.uIntensity.value = wormMode ? 0 : (0.18 + 0.35 * energy) * (1 + f.flash * 1.5);
+    _tint.copy(LIGHT_BASE).lerp(f.tint, 0.65 * f.tintMix);
+    const universe = antiverse.uniforms;
+    const opacity = antiverseVisibility(state, f.zoom);
+    antiverse.group.visible = opacity > 0;
+    antiverse.points.visible = !state.perfReducedFX;
+    if (opacity > 0) {
+      if (!still && !state.perfReducedFX) universe.uTime.value += dt;
+      universe.uOpacity.value = opacity;
+      universe.uEnergy.value = 0.8 + 0.4 * charge + (still ? 0 : f.flash * 0.3);
+      universe.uPixelRatio.value = Math.min(2, gl.getPixelRatio?.() || 1);
+    }
 
     const light = lightRef.current;
     if (light) {
@@ -299,8 +310,8 @@ function VoidCore({ cubieRefs = null }) {
           name={`antipodal-core-style-${batch.key}`} frustumCulled={false}
           ref={mesh => { if (mesh) styledRefs.current.set(batch.key, mesh); else styledRefs.current.delete(batch.key); }}
           args={[batch.geometry, batch.material, batch.indices.length]} />)}
-        {!wormMode && <mesh name="antipodal-core-halo" geometry={parts.halo} material={parts.haloMaterial} frustumCulled={false} />}
       </group>
+      <primitive object={antiverse.group} dispose={null} />
       {/* Mounted in every mode (dark in WORM) so switching modes never changes
           the scene's light count and recompiles every lit material. No distance
           decay: the core sits a hair from the pieces around its own slot, and a

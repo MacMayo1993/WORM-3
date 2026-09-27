@@ -26,7 +26,8 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
   // A pulse left over from earlier play must not fire when the core mounts.
   useGameStore.setState({
     cubies, size: 3, wormHealerMode: false, wormPaused: false, explosionT: 0, visualMode: 'classic', animState: null,
-    hollowMode: false, perfReducedFX: false, moveHistory: [], flipPulse: { at: 1, color: '#ffffff', danger: 0 },
+    hollowMode: false, perfReducedFX: false, showCutawayLens: false, captureMode: false,
+    moveHistory: [], flipPulse: { at: 1, color: '#ffffff', danger: 0 },
     settings: { ...before.settings, colorScheme: 'standard', reducedMotion: false, biomeMode: { enabled: false } }
   });
   // Stand-ins for CubeAssembly's cubie meshes, at their x-major indices.
@@ -59,6 +60,9 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     // Closed cube: the core must not light the groove walls between pieces.
     expect(light).toBeInstanceOf(THREE.PointLight);
     expect(light.intensity).toBe(0);
+    const antiverse = scene.getObjectByName('antiverse');
+    const universe = scene.getObjectByName('antiverse-space').material.uniforms;
+    expect(antiverse.visible).toBe(false);
 
     // A flip flashes the two core tiles its tunnel runs between, and nothing else.
     await act(async () => useGameStore.setState({
@@ -87,6 +91,7 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     expect(pattern.material).not.toBe(source);
     expect(source.vertexShader).not.toContain('coreModel');
     expect(new THREE.Color().fromArray(pattern.instanceColor.array).getHexString()).toBe('b24bde');
+    expect(universe.uPalette.value[4].getHexString()).toBe('b24bde');
     const dock = tunnelDockForCellInto(new THREE.Vector3(), 2, 1, 1, 'PX', 3);
     const batchPosition = new THREE.Vector3(), batchMatrix = new THREE.Matrix4();
     const batchIndex = layout.stickers.slice(0, own).filter(s => {
@@ -131,6 +136,16 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
 
     await act(async () => useGameStore.setState({ explosionT: 1 })); frame();
     expect(light.intensity).toBeGreaterThan(0);
+    expect(antiverse.visible).toBe(true);
+    const initialTime = universe.uTime.value; frame();
+    expect(universe.uTime.value).toBeGreaterThan(initialTime);
+    await act(async () => useGameStore.setState({ settings: { ...useGameStore.getState().settings, reducedMotion: true } }));
+    const heldTime = universe.uTime.value; frame(); frame();
+    expect(universe.uTime.value).toBe(heldTime);
+    await act(async () => useGameStore.setState({ perfReducedFX: true })); frame();
+    expect(scene.getObjectByName('antiverse-pairs').visible).toBe(false);
+    await act(async () => useGameStore.setState({ perfReducedFX: false,
+      settings: { ...useGameStore.getState().settings, reducedMotion: false } })); frame();
 
     // WORM: the core is solid (it hides the worm's crossing) and the light stays
     // mounted, dark, so the scene's light count never changes.
