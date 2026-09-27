@@ -48,9 +48,10 @@ describe('tunnel arc-length sampling', () => {
     expect(tunnelTToArc(cl, 0)).toBeCloseTo(0);
     expect(tunnelTToArc(cl, 1)).toBeCloseTo(cl.total);
     // The arm/core landmarks are still where they always were — the entry arm is
-    // just subdivided into throat + run-to-the-core now (see utils/tunnelPath).
+    // just subdivided into throat + run-to-the-core now, and the crossing into its
+    // two halves either side of the centre (see utils/tunnelPath).
     expect(tunnelTToArc(cl, ARM_A_END)).toBeCloseTo(cl.armALen);
-    expect(tunnelTToArc(cl, ARM_B_START)).toBeCloseTo(cl.armALen + cl.legLen[2]);
+    expect(tunnelTToArc(cl, ARM_B_START)).toBeCloseTo(cl.armALen + cl.legLen[2] + cl.legLen[3]);
     // Strictly increasing
     let prev = -1;
     for (let t = 0; t <= 1.0001; t += 0.1) {

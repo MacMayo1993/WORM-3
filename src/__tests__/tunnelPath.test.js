@@ -87,13 +87,21 @@ describe('buildTunnelPathInto', () => {
     expect(path.midB.toArray()).toEqual([0, -TUNNEL_MINI_FACE_R, 0]);
   });
 
-  it('accepts a dock direction that differs from the throat direction', () => {
-    // A tile mid-flip has a world normal that no longer matches its colour's face:
-    // the throat must follow the tile, the dock the colour.
+  it('docks on the given core tiles and crosses through the centre', () => {
+    // The throat follows the tile the worm falls through; the docks are the core's
+    // own tiles, wherever the caller puts them.
     const path = makeTunnelPath();
-    buildTunnelPathInto(path, V(0, 2, 0), V(0, 1, 0), V(0, -2, 0), V(0, -1, 0), V(1, 0, 0), V(-1, 0, 0));
+    buildTunnelPathInto(path, V(0, 2, 0), V(0, 1, 0), V(0, -2, 0), V(0, -1, 0), V(0.1, 0.25, 0), V(-0.25, 0, 0.1));
     expect(path.throatA.x).toBe(0);            // straight down the tile's own normal
-    expect(path.midA.x).toBe(TUNNEL_MINI_FACE_R); // docked on the colour's face
+    expect(path.midA.toArray()).toEqual([0.1, 0.25, 0]);
+    expect(path.midB.toArray()).toEqual([-0.25, 0, 0.1]);
+    const p = new THREE.Vector3();
+    const tCore = path.legT0[3];
+    expect(tCore).toBeGreaterThan(ARM_A_END);
+    expect(tCore).toBeLessThan(ARM_B_START);
+    expect(tunnelPathPointInto(p, path, tCore).length()).toBeLessThan(1e-12);
+    // The crossing's span is shared by length, so the pace through the core is even.
+    expect(path.legLen[2] / path.legT[2]).toBeCloseTo(path.legLen[3] / path.legT[3], 10);
   });
 });
 
@@ -117,7 +125,7 @@ describe('the entry run stays on the tile axis', () => {
     const path = buildTop(5, 0, 0);
     const p = new THREE.Vector3();
     const exitLateral = (v) => Math.hypot(v.x - path.vEnd.x, v.z - path.vEnd.z);
-    for (let t = 1; t >= 1 - path.legT[4] - 1e-9; t -= path.legT[4] / 20) {
+    for (let t = 1; t >= 1 - path.legT[5] - 1e-9; t -= path.legT[5] / 20) {
       tunnelPathPointInto(p, path, t);
       expect(exitLateral(p)).toBeLessThan(1e-9);
     }

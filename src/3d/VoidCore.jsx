@@ -1,312 +1,247 @@
 /**
  * VoidCore
  *
- * Animated wormhole-color core at the cube's center void.
- * Renders the antipodal mini-cube, a glowing plasma core, and orbiting
- * electric sparks colored from the active tunnel palette (stickers that
- * have been flipped at least once).
+ * The antipodal cube at the centre of the puzzle: a miniature of the play cube,
+ * the same N×N, in which every tile shows its antipodal partner (see
+ * antipodalCore.js). Tunnels dock on it tile by tile (tunnelDockInto): each one
+ * dives into the core tile beneath its mouth, which shows where it leads,
+ * crosses the centre and comes out of the core tile beneath its partner, which
+ * shows where it came from. The miniature follows the live cubie meshes, so a
+ * slice turn turns the same slice of the core.
  *
- * Visible on all cube sizes. For odd-sized cubes (3×3, 5×5) the center
- * cubie is skipped in CubeAssembly so VoidCore fills that space. For
- * even-sized cubes (2×2, 4×4) the origin is a natural gap between cubies.
+ * Flips flash the two core tiles their tunnel runs between and tint the glow;
+ * the more of the network is alive, the brighter the corona. Once the cube is
+ * opened (Explode, glass, gap, hollow) the core also lights the pieces around
+ * it. It is opaque in every mode, so it hides the worm's crossing. Riding a
+ * WORM tunnel, the core swells as the lens closes on it, anchored on the tile
+ * the worm is diving into, then relaxes once the rider is through.
+ *
+ * For odd-sized cubes (3×3, 5×5) the centre cubie is skipped in CubeAssembly
+ * so the core fills that space. For even sizes the origin is a gap between
+ * cubies.
  */
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { resolveColors } from '../utils/colorSchemes.js';
+import { isMobile } from '../utils/device.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { tunnelDockForCellInto } from '../utils/tunnelPath.js';
+import { createPlayStickerGeometry } from './rubiksPiece.js';
+import { liveRotation } from '../worm/liveRotation.js';
+import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import {
+  CORE_DIRS, CORE_STICKER, CORE_STICKER_LOCAL,
+  coreLayout, coreCubieMatrixInto, corePartnerColorId,
+  coreZoomLimit, coreZoomAt,
+  countFlippedStickers, networkCharge, interiorExposure,
+  createCoreStickerMaterial, createCoreBodyMaterial, createCoreHaloMaterial
+} from './antipodalCore.js';
 
-// Shared geometries to avoid reallocation
-const innerGeo = new THREE.SphereGeometry(0.28, 32, 32);
-const sparkGeo = new THREE.SphereGeometry(0.015, 6, 6);
+const LIGHT_WARM = new THREE.Color('#ffe7c2');
+const WHITE = new THREE.Color(1, 1, 1);
+const _tint = new THREE.Color();
+const _color = new THREE.Color();
+const _cubie = new THREE.Matrix4();
+const _sticker = new THREE.Matrix4();
+const _lens = new THREE.Vector3();
 
-// Mini cube geometry — shared across all mounts
-const MINI_BODY = 0.48;
-const MINI_S = 0.25;    // sticker offset from centre (just past body face at 0.24)
-const MINI_ST = 0.40;   // sticker plane size (~0.83 of face, matching game cubie ratio)
-const minicubeBodyGeo = new THREE.BoxGeometry(MINI_BODY, MINI_BODY, MINI_BODY);
-const minicubeStickerGeo = new THREE.PlaneGeometry(MINI_ST, MINI_ST);
-
-
-// Face definitions — id matches FACE_COLORS in constants.js (1=PZ Red … 6=NY Yellow)
-const MINI_FACES = [
-  { id: 1, pos: [0, 0,        MINI_S],  rot: [0, 0, 0] },
-  { id: 4, pos: [0, 0,       -MINI_S],  rot: [0, Math.PI, 0] },
-  { id: 2, pos: [-MINI_S, 0,  0],       rot: [0, -Math.PI / 2, 0] },
-  { id: 5, pos: [MINI_S,  0,  0],       rot: [0,  Math.PI / 2, 0] },
-  { id: 3, pos: [0,  MINI_S,  0],       rot: [-Math.PI / 2, 0, 0] },
-  { id: 6, pos: [0, -MINI_S,  0],       rot: [ Math.PI / 2, 0, 0] },
-];
-
-/**
- * A tiny 1×1 cube at the void centre whose six sticker faces show the
- * antipodal face-colour assignments (Red↔Orange, Green↔Blue, White↔Yellow).
- *
- * It is deliberately axis-aligned (NOT rotated): each face points in the same
- * direction as the matching centre tile of the real cube (MINI_FACES mirrors
- * Cubie.jsx STICKER_POS / DIR_TO_COLOR), so every middle tile shoots its
- * antipodal tunnel straight through the mini cube and out the antipodal-coloured
- * face on the opposite side.
- *
- * WORM uses an opaque junction that conceals the turn. Other modes retain the
- * transparent mini-cube so their tunnel network stays visible through it.
- */
-function AntipodalMinicube({ settings, riding }) {
-  // Recompute only when colour scheme or biome face assignment changes.
-  const fc = useMemo(
-    () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings?.colorScheme, settings?.biomeMode?.faceAssignment]
-  );
-
-  if (riding) return (
-    <group name="worm-solid-core">
-      {/* An opaque junction conceals the half-turn. The head and then the tail
-          enter its face and emerge onto the other arm, with real occlusion. */}
-      <mesh name="worm-core-body" geometry={minicubeBodyGeo} dispose={null}>
-        <meshBasicMaterial color="#132330" toneMapped={false} />
-      </mesh>
-      {MINI_FACES.map(({ id, pos, rot }) => (
-        <mesh key={id} name={`worm-core-face-${id}`} geometry={minicubeStickerGeo} position={pos} rotation={rot} dispose={null}>
-          <meshBasicMaterial color={fc[id] || '#888888'} toneMapped={false} />
-        </mesh>
-      ))}
-    </group>
-  );
-
-  return (
-    <group>
-      <mesh geometry={minicubeBodyGeo}>
-        <meshStandardMaterial
-          color="#111111"
-          roughness={0.3}
-          metalness={0.4}
-          transparent
-          opacity={0.18}
-          depthWrite={false}
-        />
-      </mesh>
-      {MINI_FACES.map(({ id, pos, rot }) => (
-        <mesh key={id} geometry={minicubeStickerGeo} position={pos} rotation={rot}>
-          <meshStandardMaterial
-            color={fc[id] || '#888888'}
-            emissive={fc[id] || '#888888'}
-            emissiveIntensity={0.45}
-            roughness={0.2}
-            metalness={0.05}
-            transparent
-            opacity={0.55}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-const SPARK_COUNT = 40;
-
-const coreVertexShader = `
-  varying vec2 vUv;
-  varying vec3 vNormal;
-  varying vec3 vViewPosition;
-  uniform float uTime;
-
-  void main() {
-    vUv = uv;
-    vNormal = normalize(normalMatrix * normal);
-    
-    // Electric pulse displacement on the surface
-    float pulse = sin(position.y * 15.0 + uTime * 10.0) * cos(position.x * 15.0 - uTime * 8.0) * 0.015;
-    vec3 pos = position + normal * pulse;
-    
-    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-    vViewPosition = -mvPosition.xyz;
-    gl_Position = projectionMatrix * mvPosition;
-  }
-`;
-
-const coreFragmentShader = `
-  uniform vec3 uColor1;
-  uniform vec3 uColor2;
-  uniform float uTime;
-  uniform float uOpacity;
-
-  varying vec2 vUv;
-  varying vec3 vNormal;
-  varying vec3 vViewPosition;
-
-  void main() {
-    vec3 normal = normalize(vNormal);
-    vec3 viewDir = normalize(vViewPosition);
-    
-    // Strong Fresnel rim lighting for an energetic glowing orb look
-    float rim = 1.0 - max(dot(viewDir, normal), 0.0);
-    rim = smoothstep(0.5, 1.0, rim);
-
-    // High-frequency swirling plasma waves
-    float plasma = sin(vUv.x * 30.0 + uTime * 5.0) * cos(vUv.y * 30.0 - uTime * 4.0);
-    plasma = plasma * 0.5 + 0.5;
-
-    // Mix two active colors from the palette for the raw energy
-    vec3 baseColor = mix(uColor1, uColor2, plasma);
-    
-    // Core is glowing but doesn't blow out the HDR bloom
-    vec3 finalColor = baseColor * (0.8 + rim * 0.5) + (mix(uColor1, uColor2, 0.5) * rim * 1.0);
-
-    gl_FragColor = vec4(finalColor, uOpacity);
-  }
-`;
-
-function VoidCore() {
+function VoidCore({ cubieRefs = null }) {
   const cubies = useGameStore(s => s.cubies);
+  const size = useGameStore(s => s.size);
   const wormMode = useGameStore(s => s.wormHealerMode);
   const settings = useGameStore(s => s.settings);
 
-  const innerCoreRef = useRef();
-  const innerMatRef = useRef();
-  const sparksRef = useRef();
-  const tRef = useRef(0);
+  const faceColors = useMemo(
+    () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings?.colorScheme, settings?.biomeMode?.faceAssignment, settings?.customColors]
+  );
+  const layout = useMemo(() => coreLayout(size), [size]);
+  const stickerAt = useMemo(
+    () => new Map(layout.stickers.map((c, i) => [`${c.x},${c.y},${c.z},${c.dirKey}`, i])),
+    [layout]
+  );
 
-  const [uniforms] = React.useState(() => ({
-    uColor1: { value: new THREE.Color() },
-    uColor2: { value: new THREE.Color() },
-    uTime: { value: 0 },
-    uOpacity: { value: 0 }
-  }));
+  // Each core tile's partner colour, from a map of this very cube snapshot.
+  const colors = useMemo(() => {
+    const ready = cubies.length === size;
+    const map = ready ? buildManifoldGridMap(cubies, size) : null;
+    const rgb = new Float32Array(layout.stickers.length * 3);
+    layout.stickers.forEach((cell, i) => {
+      const id = ready ? corePartnerColorId(cubies, map, size, cell, findAntipodalStickerByGrid) : null;
+      _color.set(faceColors[id] || '#888888').toArray(rgb, i * 3);
+    });
+    return { rgb, map };
+  }, [cubies, size, layout, faceColors]);
+  const charge = useMemo(() => networkCharge(countFlippedStickers(cubies)), [cubies]);
 
-  // Spark state: [theta, phi, speed, radiusOffset, phase]
-  const sparks = useMemo(() => {
-    const arr = [];
-    for (let i = 0; i < SPARK_COUNT; i++) {
-      arr.push({
-        theta: Math.random() * Math.PI * 2,
-        phi: Math.acos(2 * Math.random() - 1),
-        speed: 2.0 + Math.random() * 4.0, // fast sparks
-        rOffset: (Math.random() - 0.5) * 0.1,
-        phase: Math.random() * Math.PI * 2,
+  const glow = useMemo(() => ({ value: 0.22 }), []);
+  const parts = useMemo(() => ({
+    body: new THREE.BoxGeometry(1, 1, 1),
+    sticker: createPlayStickerGeometry(CORE_STICKER),
+    halo: new THREE.PlaneGeometry(1, 1),
+    bodyMaterial: createCoreBodyMaterial(isMobile),
+    stickerMaterial: createCoreStickerMaterial(glow, isMobile),
+    haloMaterial: createCoreHaloMaterial()
+  }), [glow]);
+  useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
+
+  const rootRef = useRef();
+  const zoomRef = useRef();
+  const bodiesRef = useRef();
+  const stickersRef = useRef();
+  const lightRef = useRef();
+  const fx = useRef(null);
+  if (!fx.current) {
+    fx.current = {
+      layoutDirty: true, flash: 0, flashTiles: [], tint: LIGHT_WARM.clone(), tintMix: 0,
+      seenPulse: useGameStore.getState().flipPulse?.at ?? null,
+      zoom: 1, rideId: null, through: false, limit: 1,
+      dock: new THREE.Vector3(), normal: new THREE.Vector3()
+    };
+  }
+
+  // Colours land with the cube state they belong to; the next frame re-lays
+  // the matrices too, since a committed turn snaps the meshes back to rest.
+  useLayoutEffect(() => {
+    const mesh = stickersRef.current;
+    if (!mesh) return;
+    if (!mesh.instanceColor || mesh.instanceColor.count !== layout.stickers.length) {
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(layout.stickers.length * 3), 3);
+    }
+    mesh.instanceColor.array.set(colors.rgb);
+    mesh.instanceColor.needsUpdate = true;
+    fx.current.layoutDirty = true;
+  }, [colors, layout]);
+
+  const motionQuery = useMemo(() => (typeof window === 'undefined' ? null : window.matchMedia?.('(prefers-reduced-motion: reduce)')), []);
+
+  useFrame(({ camera }, rawDt) => {
+    const f = fx.current;
+    const state = useGameStore.getState();
+    const dt = Math.min(rawDt, 0.05);
+    const still = !!(state.settings?.reducedMotion || motionQuery?.matches);
+    const bodies = bodiesRef.current, stickers = stickersRef.current;
+    if (!bodies || !stickers) return;
+
+    // Follow the play cube's meshes while any slice moves (and just after, when
+    // they snap back to rest); otherwise the core holds still for free.
+    if (f.layoutDirty || liveRotation.active || state.animState) {
+      f.layoutDirty = !!(liveRotation.active || state.animState); // one more pass after it ends
+      layout.cells.forEach((cell, i) => {
+        coreCubieMatrixInto(_cubie, cell.x, cell.y, cell.z, size, cubieRefs?.[cell.idx]?.quaternion);
+        bodies.setMatrixAt(i, _cubie);
       });
+      layout.stickers.forEach((s, i) => {
+        bodies.getMatrixAt(s.cell, _cubie);
+        stickers.setMatrixAt(i, _sticker.multiplyMatrices(_cubie, CORE_STICKER_LOCAL[s.dirKey]));
+      });
+      bodies.instanceMatrix.needsUpdate = true;
+      stickers.instanceMatrix.needsUpdate = true;
     }
-    return arr;
-  }, []);
 
-  // Collect unique face colors from all flipped stickers
-  const palette = useMemo(() => {
-    const fc = resolveColors(settings, settings.biomeMode?.faceAssignment);
-    const hexSet = new Set();
-    for (const L of cubies)
-      for (const R of L)
-        for (const c of R)
-          for (const k of Object.keys(c.stickers)) {
-            const s = c.stickers[k];
-            if ((s.flips || 0) > 0) {
-              if (fc[s.orig]) hexSet.add(fc[s.orig]);
-              if (fc[s.curr]) hexSet.add(fc[s.curr]);
-            }
-          }
-    const cols = [...hexSet].map(h => new THREE.Color(h));
-    return cols.length > 0 ? cols : [new THREE.Color('#444444'), new THREE.Color('#888888')]; // fallback
-  }, [cubies, settings]);
-
-  // Initialize colors
-  useEffect(() => {
-    if (!palette || palette.length < 1) return;
-    uniforms.uColor1.value.copy(palette[0]);
-    uniforms.uColor2.value.copy(palette[palette.length > 1 ? 1 : 0]);
-
-    // Also color sparks
-    const mesh = sparksRef.current;
-    if (mesh) {
-      for (let i = 0; i < SPARK_COUNT; i++) {
-        mesh.setColorAt(i, palette[i % palette.length]);
+    // A new flip lights the two core tiles its tunnel runs between.
+    const pulse = state.flipPulse;
+    if (pulse && pulse.at !== f.seenPulse) {
+      f.seenPulse = pulse.at;
+      const last = state.moveHistory?.[state.moveHistory.length - 1];
+      f.flashTiles = [];
+      if (last?.type === 'flip' && last.timestamp === pulse.at && last.pos) {
+        const { x, y, z } = last.pos;
+        const own = stickerAt.get(`${x},${y},${z},${last.dirKey}`);
+        if (own !== undefined) f.flashTiles.push(own);
+        const sticker = cubies[x]?.[y]?.[z]?.stickers?.[last.dirKey];
+        const loc = sticker && colors.map ? findAntipodalStickerByGrid(colors.map, sticker, size) : null;
+        const other = loc ? stickerAt.get(`${loc.x},${loc.y},${loc.z},${loc.dirKey}`) : undefined;
+        if (other !== undefined) f.flashTiles.push(other);
       }
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      f.flash = 1;
+      if (pulse.color) { f.tint.set(pulse.color); f.tintMix = 1; }
     }
-  }, [palette, uniforms]);
+    if (f.flash > 0) {
+      f.flash = f.flash < 0.004 ? 0 : f.flash * Math.exp(-dt * 2.2);
+      const rgb = stickers.instanceColor?.array;
+      if (rgb) {
+        for (const i of f.flashTiles) {
+          _color.fromArray(colors.rgb, i * 3).lerp(WHITE, 0.75 * f.flash).toArray(rgb, i * 3);
+        }
+        stickers.instanceColor.needsUpdate = true;
+      }
+    }
+    f.tintMix *= Math.exp(-dt * 1.2);
+    glow.value = (wormMode ? 0.3 : 0.22) + f.flash * 0.25;
 
-  const _dummy = useMemo(() => new THREE.Object3D(), []);
-
-  useFrame((_, dt) => {
-    if (wormMode) return; // the readable WORM gateway has no plasma/spark layer
-    tRef.current += dt;
-    const t = tRef.current;
-
-    // Check if the network is "active" (i.e. we have actual flipped colors)
-    const active = palette && palette.length > 0 && !(palette.length === 2 && palette[0].getHexString() === '444444');
-
-    // Fade in/out logic
-    if (active) {
-      uniforms.uOpacity.value = Math.min(1.0, uniforms.uOpacity.value + dt * 2.0);
+    // The approach zoom: while a WORM ride closes on the core, grow it about the
+    // tile the worm is diving into, then let it go once the rider is through.
+    let zoomTarget = 1;
+    const ride = tunnelState.tunnel;
+    if (wormMode && !still && tunnelState.active && ride?.entry && rootRef.current) {
+      if (f.rideId !== tunnelState.activeTunnelId) {
+        const { entry } = ride;
+        f.rideId = tunnelState.activeTunnelId;
+        f.through = false;
+        tunnelDockForCellInto(f.dock, entry.x, entry.y, entry.z, entry.dirKey, size);
+        f.normal.fromArray(CORE_DIRS[entry.dirKey] || CORE_DIRS.PY);
+        f.limit = coreZoomLimit(f.dock, size);
+      }
+      rootRef.current.worldToLocal(_lens.copy(camera.position));
+      const height = _lens.sub(f.dock).dot(f.normal);
+      if (height <= 0) f.through = true;
+      const release = THREE.MathUtils.smoothstep(tunnelState.t, 0.62, 0.8);
+      zoomTarget = coreZoomAt(f.through ? 0 : height, f.limit, size, release);
     } else {
-      uniforms.uOpacity.value = Math.max(0.0, uniforms.uOpacity.value - dt * 2.0);
+      f.rideId = null;
+    }
+    f.zoom += (zoomTarget - f.zoom) * (1 - Math.exp(-dt * 10));
+    if (Math.abs(f.zoom - 1) < 1e-4 && zoomTarget === 1) f.zoom = 1;
+    tunnelState.coreZoom = wormMode ? f.zoom : 1;
+    if (zoomRef.current) {
+      zoomRef.current.scale.setScalar(f.zoom);
+      zoomRef.current.position.copy(f.dock).multiplyScalar(1 - f.zoom);
     }
 
-    uniforms.uTime.value = t;
+    const energy = 0.35 + 0.65 * charge;
+    _tint.copy(LIGHT_WARM).lerp(f.tint, 0.65 * f.tintMix);
+    const halo = parts.haloMaterial.uniforms;
+    halo.uColor.value.copy(_tint);
+    halo.uSize.value = (1.0 + 0.8 * charge + 0.3 * f.flash) * f.zoom;
+    halo.uIntensity.value = wormMode ? 0 : (0.18 + 0.35 * energy) * (1 + f.flash * 1.5);
 
-    // Vibrate & rotate the inner core
-    if (innerCoreRef.current) {
-      innerCoreRef.current.rotation.y = t * 0.5;
-      innerCoreRef.current.rotation.z = t * 0.3;
-      const scale = 1.0 + Math.sin(t * 15.0) * 0.02;
-      innerCoreRef.current.scale.setScalar(scale);
-    }
-
-    // Animate the electric sparks
-    const mesh = sparksRef.current;
-    if (mesh && active) {
-      mesh.material.opacity = uniforms.uOpacity.value * 0.9;
-      for (let i = 0; i < SPARK_COUNT; i++) {
-        const p = sparks[i];
-        p.theta += p.speed * dt;
-        p.phi += (Math.sin(t * 2.0 + p.phase)) * dt;
-
-        // Sparks orbit tightly around the outer cage
-        const r = 0.38 + p.rOffset + Math.abs(Math.sin(t * 8.0 + p.phase)) * 0.05;
-
-        _dummy.position.setFromSphericalCoords(r, p.phi, p.theta);
-
-        // Random scale flickering
-        const scale = 0.5 + Math.random() * 1.5;
-        _dummy.scale.setScalar(scale);
-
-        _dummy.updateMatrix();
-        mesh.setMatrixAt(i, _dummy.matrix);
-      }
-      mesh.instanceMatrix.needsUpdate = true;
-    } else if (mesh) {
-      mesh.material.opacity = 0;
+    const light = lightRef.current;
+    if (light) {
+      const exposure = wormMode || state.perfReducedFX ? 0 : interiorExposure(state);
+      light.color.copy(_tint);
+      light.intensity = exposure * (0.5 + 1.1 * energy) * (1 + f.flash * 1.5);
     }
   });
 
   return (
-    <group>
-      <AntipodalMinicube settings={settings} riding={wormMode} />
-
-      <mesh ref={innerCoreRef} geometry={innerGeo} visible={!wormMode}>
-        <shaderMaterial
-          ref={innerMatRef}
-          vertexShader={coreVertexShader}
-          fragmentShader={coreFragmentShader}
-          uniforms={uniforms}
-          transparent={true}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
+    <group ref={rootRef} name="antipodal-core">
+      <group ref={zoomRef}>
+        <instancedMesh
+          key={`bodies-${size}`}
+          name="antipodal-core-body"
+          frustumCulled={false}
+          ref={bodiesRef}
+          args={[parts.body, parts.bodyMaterial, layout.cells.length]}
         />
-      </mesh>
-
-      <instancedMesh
-        ref={sparksRef}
-        visible={!wormMode}
-        args={[sparkGeo, null, SPARK_COUNT]}
-      >
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent={true}
-          opacity={0}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
+        <instancedMesh
+          key={`stickers-${size}`}
+          name="antipodal-core-stickers"
+          frustumCulled={false}
+          ref={stickersRef}
+          args={[parts.sticker, parts.stickerMaterial, layout.stickers.length]}
         />
-      </instancedMesh>
+        {!wormMode && <mesh name="antipodal-core-halo" geometry={parts.halo} material={parts.haloMaterial} frustumCulled={false} />}
+      </group>
+      {/* Mounted in every mode (dark in WORM) so switching modes never changes
+          the scene's light count and recompiles every lit material. No distance
+          decay: the core sits a hair from the pieces around its own slot, and a
+          physical 1/d² falloff would blow those out while barely reaching the
+          rest. This lights them evenly, then fades at the edge. */}
+      {!isMobile && <pointLight name="antipodal-core-light" ref={lightRef} intensity={0} distance={4.5} decay={0} />}
     </group>
   );
 }

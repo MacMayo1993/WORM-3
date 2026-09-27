@@ -47,7 +47,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const frame = () => store.getState().advance(time += 1 / 60);
     frame();
     const scene = store.getState().scene;
-    const body = scene.getObjectByName('worm-core-body');
+    const body = scene.getObjectByName('antipodal-core-body');
     expect(body.material.transparent).toBe(false);
     expect(body.material.depthWrite).toBe(true);
     const halves = [0, 1].map(i => scene.getObjectByName(`tunnel-styled-half-${i}`));

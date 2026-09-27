@@ -2,13 +2,11 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeTileGuard, setTileGuard, tileRoom } from '../manifold/tunnelTileGuard.js';
 import { SURFACE_OFFSET, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { tunnelDockInto, tunnelDockWidth, tunnelMouthWidth, tunnelGaugeAt } from '../utils/tunnelPath.js';
 
-// Ribbon geometry constants, mirrored from MobiusTunnel so the budget these
-// tests check is the one the renderer actually spends.
-const RIBBON_WIDTH = 0.85;
-const BUMPER_HEIGHT = 0.30;
-const TAPER_MIN = 0.15;
-const MINI_FACE_R = 0.25;
+// Ribbon geometry, taken from the shared gauge MobiusTunnel draws with, and its
+// rail ratio, so the budget these tests check is the one the renderer spends.
+const RAIL_RATIO = 0.25;
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -58,12 +56,13 @@ describe('tunnel geometry stays behind its own stickers', () => {
   const SEGS = 40;
 
   /** Replays MobiusTunnel's centreline and clamps, returning the worst breach. */
-  function worstBreach(size, endA, endB, { clamp = true, pulse = 1 } = {}) {
+  function worstBreach(size, endA, endB, { clamp = true, pulse = 1, scale = 1 } = {}) {
     const g = makeTileGuard();
     setTileGuard(g, endA.anchor, endA.n, endB.anchor, endB.n);
 
-    const midA = endA.n.clone().multiplyScalar(MINI_FACE_R);
-    const midB = endB.n.clone().multiplyScalar(MINI_FACE_R);
+    // Each end docks on the antipodal core's tile beneath it.
+    const midA = tunnelDockInto(new THREE.Vector3(), endA.centre, endA.n, size);
+    const midB = tunnelDockInto(new THREE.Vector3(), endB.centre, endB.n, size);
     const axis = endB.anchor.clone().sub(endA.anchor).normalize();
 
     const perpBase = new THREE.Vector3().crossVectors(axis, endA.n);
@@ -85,9 +84,9 @@ describe('tunnel geometry stays behind its own stickers', () => {
     const half = SEGS / 2;
     for (let i = 0; i <= SEGS; i++) {
       const t = i / SEGS;
-      const taper = TAPER_MIN + (1 - TAPER_MIN) * Math.abs(2 * t - 1);
-      let w = (RIBBON_WIDTH / 2) * taper * pulse;
-      let bh = BUMPER_HEIGHT * taper;
+      const gauge = scale * tunnelGaugeAt(Math.abs(2 * t - 1), tunnelMouthWidth(size), tunnelDockWidth(size));
+      let w = (gauge / 2) * pulse;
+      let bh = RAIL_RATIO * gauge;
 
       const c = i <= half
         ? endA.anchor.clone().lerp(midA, i / half)
@@ -177,8 +176,8 @@ describe('tunnel geometry stays behind its own stickers', () => {
     const A = mouth(3, 'PY', 0, 0);
     const B = mouth(3, 'NX', 2, 2);
     setTileGuard(g, A.anchor, A.n, B.anchor, B.n);
-    const midA = A.n.clone().multiplyScalar(MINI_FACE_R);
+    const midA = tunnelDockInto(new THREE.Vector3(), A.centre, A.n, 3);
     const quarter = A.anchor.clone().lerp(midA, 0.5);
-    expect(tileRoom(g, quarter.x, quarter.y, quarter.z)).toBeGreaterThan(RIBBON_WIDTH / 2);
+    expect(tileRoom(g, quarter.x, quarter.y, quarter.z)).toBeGreaterThan(tunnelMouthWidth(3) / 2);
   });
 });

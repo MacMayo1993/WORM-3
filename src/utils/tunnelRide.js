@@ -1,22 +1,25 @@
 import * as THREE from 'three';
-import { tunnelPathArcPointInto } from './tunnelPath.js';
+import { tunnelPathArcPointInto, tunnelArmFractionAt, tunnelGaugeAt } from './tunnelPath.js';
 
 // One swept surface for the track, recorded body and camera. The body centre
 // keeps its existing route; the floor is one bead radius underneath it.
 export const TUNNEL_RIDE_CLEARANCE = 0.115;
-export const TUNNEL_RIDE_WIDTH = 0.64;
+// The worm's floor at its widest, where the ride leaves a tile: room for the
+// body (a bead is TUNNEL_RIDE_CLEARANCE across its radius) and a little more.
+export const TUNNEL_RIDE_WIDTH = 0.36;
 const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
 const prev = new THREE.Vector3(), next = new THREE.Vector3();
 const rotation = new THREE.Quaternion();
 const clamp = (v, max) => Math.max(0, Math.min(max, v));
 
-export const tunnelRideCoreArc = path => path.armALen + path.legLen[2] * 0.5;
+// Arc-length at the centre of the cube, where every crossing turns.
+export const tunnelRideCoreArc = path => path.legArc0[3];
 
 export function tunnelRideTwistAt(path, arc) {
   const core = tunnelRideCoreArc(path);
   // Complete the half-turn inside the solid center cube, leaving both exposed
   // arms untwisted. The body uses this exact frame, including reverse visits.
-  const halfSpan = Math.max(1e-6, path.legLen[2] * 0.35);
+  const halfSpan = Math.max(1e-6, (path.legLen[2] + path.legLen[3]) * 0.35);
   return THREE.MathUtils.smoothstep(arc, core - halfSpan, core + halfSpan);
 }
 
@@ -70,15 +73,16 @@ function tangentInto(out, path, arc) {
   return out.normalize();
 }
 function rideFrames(path) {
+  const legs = path.legA.length;
   let cache = path.rideFrames;
   let unchanged = !!cache;
-  for (let i = 0; unchanged && i < 6; i++) unchanged = (i < 5 ? path.legA[i] : path.vEnd).equals(cache.controls[i]);
+  for (let i = 0; unchanged && i <= legs; i++) unchanged = (i < legs ? path.legA[i] : path.vEnd).equals(cache.controls[i]);
   if (unchanged) return cache;
   if (!cache) cache = path.rideFrames = {
-    controls: Array.from({ length: 6 }, () => new THREE.Vector3()),
+    controls: Array.from({ length: legs + 1 }, () => new THREE.Vector3()),
     normals: Array.from({ length: FRAME_STEPS + 1 }, () => new THREE.Vector3()),
   };
-  for (let i = 0; i < 6; i++) cache.controls[i].copy(i < 5 ? path.legA[i] : path.vEnd);
+  for (let i = 0; i <= legs; i++) cache.controls[i].copy(i < legs ? path.legA[i] : path.vEnd);
   cache.forward = forwardPath(path);
   const sign = cache.forward ? 1 : -1;
   for (let i = 0; i <= FRAME_STEPS; i++) {
@@ -115,13 +119,14 @@ export function tunnelRideFrameInto(out, path, arc, twist = tunnelRideTwistAt(pa
 
 const frame = makeTunnelRideFrame();
 // Writes the existing ribbon and bumper buffers; no new per-frame objects.
-export function fillTunnelRideGeometry(geo, left, right, path, segments) {
+// The band is `mouthWidth` where it leaves each tile and narrows to `dockWidth`
+// where it plugs into the core (see tunnelGaugeAt).
+export function fillTunnelRideGeometry(geo, left, right, path, segments, mouthWidth = TUNNEL_RIDE_WIDTH, dockWidth = TUNNEL_RIDE_WIDTH) {
   for (let i = 0; i <= segments; i++) {
     const u = i / segments, arc = u * path.total;
     tunnelRideFrameInto(frame, path, arc);
     const mouth = THREE.MathUtils.smoothstep(Math.min(arc, path.total - arc), 0, 0.3);
-    const core = THREE.MathUtils.smoothstep(frame.center.length(), 0.35, 0.9);
-    const width = THREE.MathUtils.lerp(0.19, TUNNEL_RIDE_WIDTH * 0.5, core) * mouth;
+    const width = 0.5 * tunnelGaugeAt(tunnelArmFractionAt(path, arc), mouthWidth, dockWidth) * mouth;
     for (let side = 0; side < 2; side++) {
       const sign = side === 0 ? -1 : 1;
       const vi = i * 2 + side;

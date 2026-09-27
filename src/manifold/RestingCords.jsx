@@ -8,6 +8,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
+import { tunnelDockForMeshInto, tunnelDockWidth, tunnelGaugeAt } from '../utils/tunnelPath.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 
 /**
@@ -42,12 +43,9 @@ const CORD_SEGS = 12;
 const VERTS_PER_STRAND   = (CORD_SEGS + 1) * 2;
 const INDICES_PER_STRAND = (CORD_SEGS - 1) * 6;
 
-// Geometry constants — must match MobiusTunnel.jsx so a cord and the full
-// ribbon for the same pair trace the same centerline (no jump on promotion).
-const MINI_FACE_R = 0.25;
-// Narrowing toward the core reads as "diving in", but 0.15 took the cord to
-// sub-pixel width exactly where it crosses the middle of the screen.
-const TAPER_MIN   = 0.35;
+// A cord narrows toward the core the way the full ribbon does, to the width of
+// the core tile it docks on (tunnelGaugeAt), which reads as "diving in" without
+// the old fixed taper taking it to sub-pixel width in the middle of the screen.
 
 // Width ramp by flip count. A resting cord stays quiet; a pair one flip from
 // FLIP_CAP is visibly fat and hot. This is the visual rank the old render
@@ -251,10 +249,10 @@ function createCordGeometry(maxStrands) {
  * Write one strand into slot `slot`.
  *
  * Path matches MobiusTunnel.fillRibbon: startPos → midA (first arm), gap,
- * midB → endPos (second arm), with the same TAPER_MIN narrowing toward the
- * core. Tangents are piecewise constant, so each arm needs one normalize.
+ * midB → endPos (second arm), narrowing to `dockWidth` (the core tile's width)
+ * where it plugs in. Tangents are piecewise constant, so each arm needs one normalize.
  */
-function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0, charge = 0, front = 0) {
+function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWidth, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0, charge = 0, front = 0) {
   const { pos, tan, col, side, tt, wid, heatArr, chargeArr, frontArr } = attrs;
   const halfSegs = CORD_SEGS / 2;
   const base = slot * VERTS_PER_STRAND;
@@ -266,10 +264,9 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA
 
   for (let i = 0; i <= CORD_SEGS; i++) {
     const t     = i / CORD_SEGS;
-    const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
     // Swell at whichever end is mid-flip, so the cord pulses with the tile
     // rather than only being dragged around by it.
-    let w       = width * taper * flipWidthPulse(t, flipP1, flipP2);
+    let w       = tunnelGaugeAt(Math.abs(2.0 * t - 1.0), width, Math.min(width, dockWidth)) * flipWidthPulse(t, flipP1, flipP2);
     // A charged cord swells with the surge, most where the front is right now.
     if (charge !== 0) {
       const along = charge > 0 ? t : 1 - t;
@@ -372,6 +369,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
     let moved = forceRebuildRef.current;
     let slot  = 0;
     const nowMs = tunnelCharges.size ? performance.now() : 0;
+    const size = useGameStore.getState().size;
     if (chargeCacheRef.current.length < maxStrands) chargeCacheRef.current = new Float32Array(maxStrands);
     const chargeCache = chargeCacheRef.current;
 
@@ -421,9 +419,9 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
       if (charge !== 0 || chargeCache[slot] !== 0) moved = true;
       chargeCache[slot] = charge;
 
-      // Dock on the mini-cube face in LOCAL colour direction, matching the ribbon.
-      _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
-      _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
+      // Dock on the antipodal core's tiles beneath each mouth, matching the ribbon.
+      tunnelDockForMeshInto(_midA, t.meshIdx1, t.dirKey1, size, mesh1);
+      tunnelDockForMeshInto(_midB, t.meshIdx2, t.dirKey2, size, mesh2);
 
       const c = slot * 6;
       if (!moved) {
@@ -445,7 +443,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
         _colorB.set(t.color2);
         // Anchors after flip motion, so a shaking tile carries its guard plane.
         setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
-        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, _colorA, _colorB, heat, _tileGuard, flipP1, flipP2, charge, front);
+        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, tunnelDockWidth(size), _colorA, _colorB, heat, _tileGuard, flipP1, flipP2, charge, front);
       }
       slot++;
     }

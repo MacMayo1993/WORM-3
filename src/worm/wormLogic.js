@@ -16,6 +16,7 @@ import { TUNNEL_ANCHOR_OFFSET, SURFACE_OFFSET } from '../utils/constants.js';
 import {
   makeTunnelPath,
   buildTunnelPathInto,
+  tunnelDockForCellInto,
   tunnelPathPointInto,
   tunnelPathTToArc,
   tunnelPathArcPointInto
@@ -406,9 +407,12 @@ export const buildTunnelPathForTunnel = (path, tunnel, size, explosionFactor = w
   _tunVStart.copy(_tunnelEntry).addScaledVector(_tunEntryNormal, mouthOffset);
   _tunVEnd.copy(_tunnelExit).addScaledVector(_tunExitNormal, mouthOffset);
 
-  // The docking points near the core stay put regardless of the explosion scale —
-  // buildTunnelPathInto derives them from the normals alone.
-  return buildTunnelPathInto(path, _tunVStart, _tunEntryNormal, _tunVEnd, _tunExitNormal);
+  // Dock on the antipodal core's tiles beneath each mouth — the same docks the
+  // ribbon uses, and unmoved by the explosion (the core does not explode).
+  const { entry, exit } = tunnel;
+  tunnelDockForCellInto(_tunDockA, entry.x, entry.y, entry.z, entry.dirKey, size);
+  tunnelDockForCellInto(_tunDockB, exit.x, exit.y, exit.z, exit.dirKey, size);
+  return buildTunnelPathInto(path, _tunVStart, _tunEntryNormal, _tunVEnd, _tunExitNormal, _tunDockA, _tunDockB);
 };
 
 // ── Arc-length-aware tunnel sampling ──────────────────────────────────────────
@@ -458,6 +462,8 @@ const _tunVStart = new THREE.Vector3();
 const _tunVEnd = new THREE.Vector3();
 const _tunEntryNormal = new THREE.Vector3();
 const _tunExitNormal = new THREE.Vector3();
+const _tunDockA = new THREE.Vector3();
+const _tunDockB = new THREE.Vector3();
 // One-shot path used by the single-sample getTunnelWorldPosInto. Callers that
 // sample repeatedly should build their own path once per frame instead.
 const _scratchPath = makeTunnelPath();
