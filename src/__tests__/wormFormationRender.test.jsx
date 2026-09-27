@@ -53,9 +53,8 @@ it.each([false, true])('raises real cubies, grows the band and lands after forma
     expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeLessThan(1.001);
     const materials = [];
     store.getState().scene.traverse(o => { if (o.material?.uniforms?.uGrowT) materials.push(o.material); });
-    expect(materials).toHaveLength(3);
-    expect(materials[1].uniforms.uGrowT).toBe(materials[0].uniforms.uGrowT);
-    expect(materials[2].uniforms.uGrowT).toBe(materials[0].uniforms.uGrowT);
+    expect(materials).toHaveLength(4); // Spine, two lips, and one open veil.
+    for (const material of materials) expect(material.uniforms.uGrowT).toBe(materials[0].uniforms.uGrowT);
     expect(materials[0].uniforms.uGrowT.value).toBeLessThan(.02);
     const sim = makeWormSim(3); resetWormSim(sim, 3, { orbCount: 0, wormholeInterval: 9999 });
     sim.pos = { x: 1, y: 1, z: 2, dirKey: 'PZ' }; sim.headInterpPos.set(0, 0, 1.52);
@@ -138,7 +137,7 @@ it('updates both endpoint colors and rails without moving or rebuilding the band
     store.getState().advance(1 / 60);
     const meshes = [];
     store.getState().scene.traverse(o => { if (o.material?.uniforms?.uRideCore) meshes.push(o); });
-    expect(meshes).toHaveLength(3);
+    expect(meshes).toHaveLength(4); // The veil shares live colors without a geometry rebuild too.
     const uniforms = meshes[0].material.uniforms;
     const versions = meshes.map(o => o.geometry.attributes.position.version);
     for (const mesh of meshes) {
