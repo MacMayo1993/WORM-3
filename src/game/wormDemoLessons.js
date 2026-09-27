@@ -20,5 +20,10 @@ export const WORM_DEMO_LESSONS = [
   { id: 'bomb', title: 'Disarm a bomb', instruction: 'Surround the bomb using the marked ring before its fuse runs out. Your practice worm is already long enough.', success: 'A complete ring disarms the bomb. In real runs, keep clear of its blast lanes: a blast that catches your head on the ground ends the run, and one that catches your body burns off your tail. Jumping protects your head.' },
   { id: 'rotation', title: 'Watch the turning layer', instruction: 'Watch the lit layer and countdown. Get off it before it turns: a turn that catches your head ends the run, and one that catches your body cuts off your tail.', success: 'You cleared the turning layer. You have finished WORM practice.' },
 ];
+// The last exercise of the WORM loop itself: steer, grow, jump, ride, heal. The
+// practice is the demo's final step, so here the card offers Finish first and
+// the rest (power-ups, elements, hazards) as an opt-in, the same way the end
+// screen offers its extra lessons; nothing is dropped, and Next still walks on.
+export const WORM_DEMO_CHECKPOINT = 'heal';
 export { wormDemoActive, newWormDemo } from './wormDemoState.js';
 export const wormDemoLesson = s => WORM_DEMO_LESSONS[s.demoWormLessonIndex ?? 0] ?? WORM_DEMO_LESSONS[0];

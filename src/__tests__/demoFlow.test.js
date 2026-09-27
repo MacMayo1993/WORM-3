@@ -8,6 +8,9 @@ import { FLIP_CAP } from '../utils/constants.js';
 import { WORM_DEMO_LESSONS } from '../game/wormDemoLessons.js';
 import { WORMHOLE_MAX_TRAVERSALS as WORM_MAX_RIDES } from '../worm/healerWorm/constants.js';
 import { classifyTraversal } from '../worm/healerWorm/economy.js';
+import { makeCubies } from '../game/cubeState.js';
+import { totalFlippedCount } from '../game/demoProgress.js';
+import { inspectionLens } from '../3d/inspectionBridge.js';
 
 // Mirrors advanceDemoStep in useDemoMode.js: next id, or 'end' past the last.
 const IDS = DEMO_STEPS.map((s) => s.id);
@@ -258,6 +261,40 @@ describe('demo explains every mode’s rules accurately', () => {
     expect(lesson('orbs').success.toLowerCase()).toContain('color');
     expect(lesson('rotation').instruction.toLowerCase()).toContain('head');
     expect(lesson('rotation').instruction.toLowerCase()).toContain('tail');
+  });
+
+  // Every tunnel docks on the antipodal core and crosses the centre, so the
+  // beats that show the cube's inside name that small cube, not a bare line.
+  it('Views: Glass, Tunnels and Cutaway name the small cube at the centre', () => {
+    for (const key of ['glass', 'tunnels', 'cutaway']) {
+      expect(VIEW_SHOWCASE_SEQUENCE.find((v) => v.key === key).copy.toLowerCase()).toContain('small cube at the centre');
+    }
+  });
+
+  it('Views: Cutaway opens the lens on one flipped pair in a closed cube, and cleanup puts it all back', () => {
+    const beats = VIEW_SHOWCASE_SEQUENCE.map((v) => v.key);
+    // Right after Tunnels (same pair, seen without exploding), before the Far
+    // Side window, which the lens yields to.
+    expect(beats.indexOf('cutaway')).toBe(beats.indexOf('tunnels') + 1);
+    expect(beats.indexOf('mirror')).toBeGreaterThan(beats.indexOf('cutaway'));
+    const s = {
+      size: 3, cubies: makeCubies(3), exploded: true, showTunnels: false, tunnelDetail: 'hints', showCutawayLens: false,
+      setExploded(v) { this.exploded = v; }, setShowTunnels(v) { this.showTunnels = v; },
+      setTunnelDetail(v) { this.tunnelDetail = v; }, setShowCutawayLens(v) { this.showCutawayLens = v; },
+      setRotatedCubies(c) { this.cubies = c; },
+    };
+    const cutaway = VIEW_SHOWCASE_SEQUENCE.find((v) => v.key === 'cutaway');
+    Object.assign(inspectionLens, { x: 0.3, y: 0.3 }); // wherever the player left it
+    cutaway.apply(s);
+    expect(s).toMatchObject({ exploded: false, showTunnels: true, tunnelDetail: 'full', showCutawayLens: true });
+    expect(totalFlippedCount(s.cubies)).toBe(2);
+    // Opens low, so its caption clears the tour card at the top of the screen.
+    expect(inspectionLens.y).toBeGreaterThan(0.5);
+    cutaway.cleanup(s);
+    expect(s).toMatchObject({ showTunnels: false, tunnelDetail: 'hints', showCutawayLens: false });
+    expect(totalFlippedCount(s.cubies)).toBe(0);
+    expect(inspectionLens).toMatchObject({ x: 0.3, y: 0.3 });
+    Object.assign(inspectionLens, { x: 0.5, y: 0.45 });
   });
 
   it('Views: Grid is described as tile addresses, which is what it renders', () => {

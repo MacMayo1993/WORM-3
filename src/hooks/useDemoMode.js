@@ -10,17 +10,17 @@ import { clearRefractory } from '../game/refractoryMap.js';
 import { displacedPairCount, totalFlippedCount } from '../game/demoProgress.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import {
-  applyDemoOverrides, looksLikeDemoSettings, mergeDemoSettings, demoLookChanged, DEMO_CONTROLLED_KEYS,
+  applyDemoOverrides, looksLikeDemoSettings, mergeDemoSettings, demoLookChanged, DEMO_CONTROLLED_KEYS, DEMO_SETTINGS_OVERRIDES,
 } from '../utils/demoSettings.js';
 import {
   DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE, CONTROL_TOUR_SEQUENCE,
 } from '../components/screens/DemoFlowController.jsx';
 
-// The demo temporarily overwrites the player's persisted settings (neon,
-// desert, topographic tiles — see utils/demoSettings.js). This key holds the
-// pre-demo snapshot so an unclean exit (refresh / tab close mid-demo) can be
-// healed on next launch — otherwise the shader-heavy demo look sticks to the
-// device forever.
+// The demo temporarily overwrites the player's persisted settings (the Classic
+// palette on plain stickers over the desert — see utils/demoSettings.js). This
+// key holds the pre-demo snapshot so an unclean exit (refresh / tab close
+// mid-demo) can be healed on next launch — otherwise the demo's look sticks to
+// the device forever.
 const PRE_DEMO_SETTINGS_KEY = 'worm3_predemo_settings';
 
 // How long the twin step waits for the player to press Flip themselves before
@@ -222,8 +222,8 @@ export function useDemoMode({
       // The worm demo swaps in a Shanghai skybox, layered on top of the
       // background applyDemoSettings() applied above. Read the settings fresh
       // (the `store` snapshot predates that call) so we extend the demo
-      // settings rather than clobber them. Tiles keep the demo-wide topographic
-      // style. Every other step re-runs applyDemoSettings() on entry, so this
+      // settings rather than clobber them. Tiles keep the demo-wide Classic
+      // stickers. Every other step re-runs applyDemoSettings() on entry, so this
       // override never leaks past the worm step.
       //
       // Skipped once the player has picked their own look — their background
@@ -577,6 +577,7 @@ export function useDemoMode({
       store.setHollowMode(false);
       store.setShowNetPanel(false);
       store.setShowAntipodalPiP(false);
+      store.setShowCutawayLens(false);
       setDemoShowcaseSubStep(-1);
       setDemoViewSpotlight(false);
     }
@@ -709,6 +710,7 @@ export function useDemoMode({
     store.setHollowMode(false);
     store.setShowNetPanel(false);
     store.setShowAntipodalPiP(false);
+    store.setShowCutawayLens(false);
     store.setFlipMode(false);
     store.setShowTunnels(false);
     store.setFirstFlipHighlightPair(null);
@@ -770,7 +772,7 @@ export function useDemoMode({
         return;
       }
       // Devices tainted before the snapshot existed: if the persisted settings
-      // still carry the demo's signature look, the demo left them behind —
+      // still carry the old demo's signature look, the demo left them behind —
       // reset the demo-controlled fields to their defaults. The signature test
       // lives beside the apply path (utils/demoSettings.js) precisely so this
       // check can't drift out of date the way it silently did before.
@@ -808,7 +810,7 @@ export function useDemoMode({
           colorScheme: useGameStore.getState().settings.colorScheme,
           perFaceStyles: useGameStore.getState().settings.manifoldStyles,
         }
-        : { colorScheme: 'neon', tileStyle: 'topographic' }),
+        : { colorScheme: DEMO_SETTINGS_OVERRIDES.colorScheme, tileStyle: DEMO_SETTINGS_OVERRIDES.tileStyle }),
     };
     useGameStore.getState().setRotatedCubies(makeCubies(useGameStore.getState().size));
     useGameStore.getState().resetGame();
