@@ -22,7 +22,7 @@ export const STEP_COPY = {
   'twin-paradox': 'Every tile has a twin on the opposite side. Turn on Flip, then tap a tile to move the pair together.',
   'flip-gateway': 'Send nine tile pairs through the middle, then bring them back. Start with the face in front of you.',
   'view-showcase': 'Let’s look at the same cube in a few different ways. Use Next to explore each view.',
-  'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings. Your choices stay saved.',
+  'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings to preview your look. Choose Continue to Chaos when you’re ready. Your choices stay saved.',
   'worm-traversal': 'Steer, collect orbs, and jump onto raised flip pads to ride their tunnels. Practice also covers power-ups, elements, and hazards.',
   // The round's live HUD keeps its rules behind "Inspect match", so the setup
   // line carries the three the player acts on: aim the first strike, flips wear
@@ -31,6 +31,24 @@ export const STEP_COPY = {
   // Random remixes the look only (useRandomMode); the rules never change.
   'random-showcase': 'Feeling curious? Random remixes the colors and tile looks every ten seconds while you solve. Only the look changes; the puzzle stays the same.',
   'cosmetic-reward': 'Let’s visit the Store. Spend Parity Points on new worms with their own signature moves, trails, hats, palettes, and tiles—or save them. WORM runs, Chaos rounds, and first solves earn more.'
+};
+
+// These modes need a briefing before their timers or launch controls begin.
+// Each page explains one part of the mode and waits for the player's Next tap.
+export const STEP_INTRO_LINES = {
+  'chaos-forecast': [
+    'Chaos is a survival round. A storm flips tiles and spreads across the cube. The last surviving twin pair wins; you can watch the storm or help your favorites survive.',
+    'Each tile has a twin on the opposite side. Every flip uses some of their life. At the flip limit, worn-out twins drop out together. Watch the live counters to see which colors are still in the round.',
+    'First, choose the color pair you think will win. This demo prediction is free. After confirming your pick, tap a tile to choose where the storm strikes first; the countdown then starts the round.',
+    'During the storm, tap a damaged tile to heal it and send a healing wave through connected damaged tiles. Lost tiles cannot return. Healing can change the winner, so act before your pair disappears!',
+    'When one twin pair remains, the results show who survived and award your demo points. Full Chaos mode also lets you predict the last color, the winning pair, the first color out, or how quickly the cube collapses.',
+  ],
+  'random-showcase': [
+    'Random is a cube puzzle with a changing look. Solve it while the palette and tile styles remix every ten seconds. Your goal is still to make every face one color.',
+    'Individual cubelets can switch between solid, glass, wireframe, numbered, and grid looks. The cube’s size and background stay fixed, so you can focus on following the pieces through each new look.',
+    'A remix does not scramble the cube again or undo your moves. Matching pieces still belong together when their colors change. Keep making the same twists you learned earlier; only their appearance changes.',
+    'This practice starts with a scrambled 3×3. Try a few turns and watch a remix, or solve the whole cube. Choose Skip lesson whenever you’re ready to move on; the look you chose in Settings returns afterward.',
+  ],
 };
 
 // The one place the demo names the math. Shown as an aside after the player has
