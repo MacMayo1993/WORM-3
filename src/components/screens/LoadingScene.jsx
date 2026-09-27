@@ -54,6 +54,27 @@ const Cube = React.memo(function Cube() {
   );
 });
 
+// A small, fixed set of compositor-animated streaks. They travel with each
+// cube's fall, so the existing shaft clip also hides them inside the portals.
+const AIR_STREAMS = [
+  { x: '-30%', length: '80%', delay: '-0.08s', drift: '-14px' },
+  { x: '-15%', length: '56%', delay: '-0.28s', drift: '-8px' },
+  { x: '4%', length: '42%', delay: '-0.16s', drift: '-4px' },
+  { x: '96%', length: '46%', delay: '-0.36s', drift: '4px' },
+  { x: '115%', length: '68%', delay: '-0.05s', drift: '8px' },
+  { x: '132%', length: '84%', delay: '-0.23s', drift: '14px' }
+];
+
+const Airflow = React.memo(function Airflow() {
+  return <div className="wl-airflow" aria-hidden="true">
+    {AIR_STREAMS.map((stream, i) => <i key={i} className="wl-air-streak" style={{
+      left: stream.x, height: stream.length, animationDelay: stream.delay, '--wl-air-drift': stream.drift
+    }} />)}
+    <i className="wl-air-wake wl-air-wake-left" />
+    <i className="wl-air-wake wl-air-wake-right" />
+  </div>;
+});
+
 // Everything between the two portals' near edges; see shaftClipPath.
 const SHAFT_STYLE = { clipPath: shaftClipPath() };
 
@@ -77,9 +98,11 @@ export default function LoadingScene({ translucent = false }) {
         <div className="wl-shaft" style={SHAFT_STYLE}>
           <div className="wl-fall">
             <div className="wl-view">
+              <Airflow />
               <Cube />
             </div>
             <div className="wl-view wl-twin">
+              <Airflow />
               <Cube />
             </div>
           </div>

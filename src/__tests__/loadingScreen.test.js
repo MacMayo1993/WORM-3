@@ -85,7 +85,9 @@ describe('loading screen timing', () => {
   it('ripples the paper as the cube passes through, when the vortex kicks', () => {
     const passPercent = (PASS_AT / FALL.period) * 100;
     expect(passPercent).toBeCloseTo(25, 6);
-    expect(keyframes('wl-shock')).toMatch(new RegExp(`0%, ${passPercent}% \\{[^}]*opacity: 0; \\}`));
+    const cssPassPercent = keyframes('wl-shock').match(/0%, ([\d.]+)% \{[^}]*opacity: 0; \}/);
+    expect(cssPassPercent).not.toBeNull();
+    expect(Number(cssPassPercent[1])).toBeCloseTo(passPercent, 6);
   });
 
   it('pulses as the cube passes through the portals and not before', () => {

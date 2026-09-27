@@ -7,6 +7,7 @@
 // middle layer a black plastic cap that shows where the twisting top uncovers it.
 
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+import { FALL } from './loadingWormhole.js';
 
 // Face ids follow constants.js: front PZ red, left NX green, top PY white,
 // back NZ orange, right PX blue, bottom NY yellow.
@@ -26,7 +27,7 @@ export const RING = ['front', 'right', 'back', 'left'];
 export const CUBE_YAW = -36;
 
 /** How long the sticker flip wave takes to cross the cube, in seconds. */
-export const WAVE_SPREAD = 0.8;
+export const WAVE_SPREAD = FALL.period / 3;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 

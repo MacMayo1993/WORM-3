@@ -32,8 +32,8 @@
   --wl-c: calc(var(--wl-cube) / 3);
   --wl-half: calc(var(--wl-cube) / 2);
   --wl-wb: calc(var(--wl-well-w) * 0.18);
-  --wl-beat: 2.4s;
-  --wl-cycle: 9.6s;
+  --wl-beat: 1.5s;
+  --wl-cycle: 6s;
 }
 
 .wl-backdrop {
@@ -81,6 +81,51 @@
   position: absolute;
   inset: 0;
   perspective: calc(var(--wl-cube) * 4.2);
+}
+
+/* Air runs upward past the falling cube. Only transform and opacity animate;
+   no additional canvas, render pass, blur filter, or per-frame React updates. */
+.wl-airflow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.wl-air-streak {
+  position: absolute;
+  top: 18%;
+  width: 2px;
+  border-radius: 100%;
+  background: linear-gradient(to bottom, transparent, rgba(56, 105, 91, 0.65) 30%, #fffdf2 72%, rgba(38, 77, 65, 0.9));
+  box-shadow: 1px 0 rgba(255, 253, 242, 0.7);
+  opacity: 0;
+  animation: wl-air-stream 0.44s linear infinite;
+}
+
+@keyframes wl-air-stream {
+  0% { transform: translate(0, 48%); opacity: 0; }
+  18% { opacity: 0.85; }
+  70% { opacity: 0.6; }
+  100% { transform: translate(var(--wl-air-drift), -210%); opacity: 0; }
+}
+
+.wl-air-wake {
+  position: absolute;
+  top: -45%;
+  width: 44%;
+  height: 110%;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  opacity: 0;
+  animation: wl-air-wake 0.72s ease-in-out infinite;
+}
+
+.wl-air-wake-left { left: -42%; border-left-color: rgba(38, 77, 65, 0.65); }
+.wl-air-wake-right { right: -42%; border-right-color: rgba(38, 77, 65, 0.65); animation-delay: -0.36s; }
+
+@keyframes wl-air-wake {
+  0%, 100% { transform: translateY(6%) scaleX(0.85); opacity: 0; }
+  45% { transform: translateY(-6%) scaleX(1); opacity: 0.6; }
 }
 
 /* The twin waits out the first fall, so the cube's first entrance is out of
@@ -272,6 +317,8 @@
 
 /* === Reduced motion: the cube still, in the open between the portals === */
 @media (prefers-reduced-motion: reduce) {
+  .wl-airflow { display: none; }
+  .wl-air-streak, .wl-air-wake { animation: none; }
   .wl-fall,
   .wl-cube,
   .wl-layer-top,
