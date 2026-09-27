@@ -17,7 +17,7 @@
  * through the bottom mouth as its twin's comes out of the top one — `lead`
  * cubes into each fall.
  */
-export const FALL = { period: 2.4, drop: 2.8, lead: 0.7 };
+export const FALL = { period: 1.5, drop: 2.8, lead: 0.7 };
 /** Seconds into each fall at which the cube passes through the portals. */
 export const PASS_AT = (FALL.period * FALL.lead) / FALL.drop;
 
@@ -72,7 +72,10 @@ export const passes = (t) => (t < PASS_AT ? 0 : Math.floor((t - PASS_AT) / FALL.
  */
 export function spinAngle(t) {
   const since = sincePass(t);
-  const kicks = since === null ? 0 : passes(t) - Math.exp(-since / 0.5);
+  // Sum the remaining ease-out of every pass. At the faster cadence the last
+  // kick is still settling when the next starts; dropping it causes a jump.
+  const decay = Math.exp(-FALL.period / 0.5);
+  const kicks = since === null ? 0 : passes(t) - Math.exp(-since / 0.5) * (1 - decay ** passes(t)) / (1 - decay);
   return SPIN * t + KICK * kicks;
 }
 
