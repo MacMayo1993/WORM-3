@@ -160,6 +160,7 @@ export function antiverseVisibility(state, zoom = 1) {
   const openView = state.showCutawayLens || state.settings?.livePortalViews || state.hollowMode ||
     ['glass', 'gap', 'wireframe'].includes(state.visualMode);
   const exposure = openView ? 1 : Math.min(1, Math.max(0, state.explosionT || 0) * 1.5);
-  if (state.captureMode || (state.wormHealerMode && state.wormPhase === 'tunnel')) return 0;
+  // Capture Mode hides UI chrome, not the running 3D scene.
+  if (state.wormHealerMode && state.wormPhase === 'tunnel') return 0;
   return exposure * Math.max(0, Math.min(1, 1 - (zoom - 1) / 0.35));
 }

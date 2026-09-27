@@ -40,7 +40,18 @@ describe('the antiverse', () => {
       expect(antiverseVisibility(view)).toBe(1);
       expect(antiverseVisibility(view, 1.35)).toBeCloseTo(0);
     }
-    expect(antiverseVisibility({ showCutawayLens: true, captureMode: true })).toBe(0);
     expect(antiverseVisibility({ showCutawayLens: true, wormHealerMode: true, wormPhase: 'tunnel' })).toBe(0);
+  });
+
+  it.each([
+    ['exploded', { explosionT: 1 }],
+    ['partially exploded', { explosionT: 0.2 }],
+    ['glass', { visualMode: 'glass' }],
+    ['hollow', { hollowMode: true }],
+    ['cutaway', { showCutawayLens: true }]
+  ])('preserves the %s antiverse in Capture Mode', (_name, view) => {
+    const visible = antiverseVisibility(view);
+    expect(visible).toBeGreaterThan(0);
+    expect(antiverseVisibility({ ...view, captureMode: true })).toBe(visible);
   });
 });
