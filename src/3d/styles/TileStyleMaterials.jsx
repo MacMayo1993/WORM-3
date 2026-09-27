@@ -5,6 +5,7 @@ import { LIVING_SURFACE_KEYS } from '../../utils/livingSurfaceCatalog.js';
 
 import * as THREE from 'three';
 import { baseVertexShader, eyeballBulgeVertexShader } from './shaders/shaderBase.js';
+import { withStickerFinish } from './shaders/stickerFinish.js';
 import { basicShaders } from './shaders/basicShaders.js';
 import { techShaders } from './shaders/techShaders.js';
 import { natureShaders } from './shaders/natureShaders.js';
@@ -276,7 +277,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   const cached = _matCacheGet(cacheKey);
   if (cached) return cached;
 
-  const fragmentShader = fragmentShaders[safeStyle] || fragmentShaders.solid;
+  const styleShader = fragmentShaders[safeStyle] || fragmentShaders.solid;
 
   let color;
   try {
@@ -316,7 +317,8 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     uniforms,
     // Eyeball tiles displace a tessellated plane so the eye bulges off the face
     vertexShader: safeStyle === 'eyeball' ? eyeballBulgeVertexShader : baseVertexShader,
-    fragmentShader: fragmentShader,
+    // Every style but glass wears the menu cube's sticker finish (stickerFinish.js).
+    fragmentShader: isGlass ? styleShader : withStickerFinish(styleShader),
     side: isGlass ? THREE.DoubleSide : THREE.FrontSide,
     transparent: isGlass,
     depthWrite: !isGlass,
@@ -326,6 +328,9 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     // shader compiling on WebGL1 too. It's inert for shaders that don't use them.
     extensions: { derivatives: true },
   });
+
+  // The bare style, for surfaces that bring their own vertex shader (tunnel bands).
+  material.userData.styleFragmentShader = styleShader;
 
   _matCachePut(cacheKey, material);
   return material;

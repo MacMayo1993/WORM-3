@@ -1809,8 +1809,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Use shader material for non-solid styles (when no texture is applied)
   const useShaderStyle = !isGlass && tileStyle !== 'solid' && !currTexture && !isSudokube && !glbFullFace;
-  // A plain coloured tile gets the rounded, glossy sticker; textured, styled and glass tiles keep the flat quad.
+  // A plain coloured tile gets the rounded, glossy sticker; textured and glass tiles keep the flat quad.
   const plainSticker = !hollow && !useGlassStyle && !useShaderStyle && !isSudokube && !renderTexture;
+  // Every shader style but the eyeball (which domes a tessellated plane) sits on the play
+  // sticker. Styles never take a face texture, so they need no per-tile UV slice either.
+  const roundedStyle = !hollow && !useGlassStyle && useShaderStyle && tileStyle !== 'eyeball';
   const styleMaterial = useMemo(() => {
     if (!useShaderStyle) return null;
     // Ensure we have a valid color string
@@ -2040,10 +2043,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         )}
 
         {/* Main sticker — omitted when the InstancedMesh handles rendering */}
-        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : plainSticker ? 'sticker' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
+        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : plainSticker ? 'sticker' : roundedStyle ? 'styled' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
           {hollow ? (
             <shapeGeometry args={[_stickerFrameShape]} />
           ) : plainSticker ? (
+            <primitive object={_playStickerGeo} attach="geometry" />
+          ) : roundedStyle ? (
+            // Styled tiles wear the same rounded, bevelled sticker as plain ones;
+            // the style shader adds the matching finish (stickerFinish.js).
             <primitive object={_playStickerGeo} attach="geometry" />
           ) : faceRow != null ? (
             // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
