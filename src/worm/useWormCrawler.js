@@ -504,7 +504,12 @@ export function useWormCrawler(size, cubies) {
             const practice = stageWormPractice(sim, sizeRef.current, lesson, ctxRef.current.getOrbColor);
             demoPracticeRef.current = { ...practice, attempt, rotationEpoch: state.rotationEpoch };
             resetWormBuffs(); resetWormSegments(); resetWormPress();
+            // A lesson/retry resets the sim without remounting this hook. Clear
+            // the same expansion used by cubies, pickups and tunnel anchors too;
+            // the reset sim has no remaining timer to close the old visual pose.
+            wormExpansion.amount = 0;
             useGameStore.setState({ cubies: practice.cubies, wormPowerups: sim.powerups, wormSpecials: sim.specials,
+                exploded: false, explosionT: 0,
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
                 wormSessionOrbs: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
                 wormPhase: 'crawling', wormAlive: true, wormPaused: true, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
