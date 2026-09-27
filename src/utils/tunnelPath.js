@@ -32,7 +32,7 @@
 import * as THREE from 'three';
 
 /** Half-width of the antipodal core cube at the centre (VoidCore.jsx). */
-export const TUNNEL_MINI_FACE_R = 0.25;
+export const TUNNEL_MINI_FACE_R = 0.2125;
 
 // ── The antipodal core and its docks ─────────────────────────────────────────
 // The centre holds a miniature of the cube, TUNNEL_MINI_FACE_R·2 wide at every

@@ -20,15 +20,19 @@
  * so the core fills that space. For even sizes the origin is a gap between
  * cubies.
  */
-import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
-import { tunnelDockForCellInto } from '../utils/tunnelPath.js';
+import { tunnelDockForCellInto, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { createPlayStickerGeometry } from './rubiksPiece.js';
+import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
+import { createCoreTileStyle } from './coreTileStyle.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
+import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { liveRotation } from '../worm/liveRotation.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import {
@@ -46,17 +50,20 @@ const _color = new THREE.Color();
 const _cubie = new THREE.Matrix4();
 const _sticker = new THREE.Matrix4();
 const _lens = new THREE.Vector3();
+const HIDDEN_STICKER = new THREE.Matrix4().makeScale(0, 0, 0);
 
 function VoidCore({ cubieRefs = null }) {
   const cubies = useGameStore(s => s.cubies);
   const size = useGameStore(s => s.size);
   const wormMode = useGameStore(s => s.wormHealerMode);
   const settings = useGameStore(s => s.settings);
+  const visualMode = useGameStore(s => s.visualMode);
+  const wormViewPower = useGameStore(s => s.wormViewPower);
+  const mode = (wormMode ? getViewPowerDef(wormViewPower)?.view : null) ?? visualMode;
 
   const faceColors = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings?.colorScheme, settings?.biomeMode?.faceAssignment, settings?.customColors]
+    [settings]
   );
   const layout = useMemo(() => coreLayout(size), [size]);
   const stickerAt = useMemo(
@@ -69,24 +76,65 @@ function VoidCore({ cubieRefs = null }) {
     const ready = cubies.length === size;
     const map = ready ? buildManifoldGridMap(cubies, size) : null;
     const rgb = new Float32Array(layout.stickers.length * 3);
+    const ids = [];
     layout.stickers.forEach((cell, i) => {
       const id = ready ? corePartnerColorId(cubies, map, size, cell, findAntipodalStickerByGrid) : null;
+      ids.push(id);
       _color.set(faceColors[id] || '#888888').toArray(rgb, i * 3);
     });
-    return { rgb, map };
+    return { rgb, map, ids };
   }, [cubies, size, layout, faceColors]);
   const charge = useMemo(() => networkCharge(countFlippedStickers(cubies)), [cubies]);
 
-  const glow = useMemo(() => ({ value: 0.22 }), []);
+  const glow = useMemo(() => ({ value: 0.08 }), []);
   const parts = useMemo(() => ({
-    body: new THREE.BoxGeometry(1, 1, 1),
+    body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
     halo: new THREE.PlaneGeometry(1, 1),
-    bodyMaterial: createCoreBodyMaterial(isMobile),
+    bodyMaterial: createCoreBodyMaterial(isMobile, mode),
     stickerMaterial: createCoreStickerMaterial(glow, isMobile),
     haloMaterial: createCoreHaloMaterial()
-  }), [glow]);
+  }), [glow, mode]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
+
+  // At most six style batches, never one mesh per inner tile. Plain stickers
+  // keep the original single draw; patterned faces use the equipped shader.
+  const appearances = useMemo(() => {
+    const byColor = new Map();
+    for (let id = 1; id <= 6; id++) {
+      const style = mode === 'glass' ? 'glass' : settings?.manifoldStyles?.[id] || 'solid';
+      if (style === 'solid') continue;
+      const key = `${id}-${style}`;
+      byColor.set(id, {
+        key, id, style,
+        geometry: new THREE.PlaneGeometry(CORE_STICKER, CORE_STICKER, style === 'eyeball' ? 12 : 1, style === 'eyeball' ? 12 : 1),
+        material: createCoreTileStyle(style, faceColors[id], faceColors[ANTIPODAL_COLOR[id]], tunnelCoreScale(size))
+      });
+    }
+    return byColor;
+  }, [settings, mode, faceColors, size]);
+  useEffect(() => () => appearances.forEach(b => { b.geometry.dispose(); b.material.dispose(); }), [appearances]);
+  const styled = useMemo(() => {
+    const groups = new Map(), slots = new Set();
+    colors.ids.forEach((id, i) => {
+      const appearance = appearances.get(id);
+      if (!appearance) return;
+      if (!groups.has(id)) groups.set(id, { ...appearance, indices: [] });
+      groups.get(id).indices.push(i); slots.add(i);
+    });
+    return { batches: [...groups.values()], slots };
+  }, [colors, appearances]);
+  const styledRefs = useRef(new Map());
+  const syncStyledColors = useCallback(() => {
+    const rgb = stickersRef.current?.instanceColor?.array;
+    if (!rgb) return;
+    for (const batch of styled.batches) {
+      const mesh = styledRefs.current.get(batch.key);
+      if (!mesh) continue;
+      batch.indices.forEach((index, slot) => mesh.setColorAt(slot, _color.fromArray(rgb, index * 3)));
+      mesh.instanceColor.needsUpdate = true;
+    }
+  }, [styled]);
 
   const rootRef = useRef();
   const zoomRef = useRef();
@@ -113,8 +161,9 @@ function VoidCore({ cubieRefs = null }) {
     }
     mesh.instanceColor.array.set(colors.rgb);
     mesh.instanceColor.needsUpdate = true;
+    syncStyledColors();
     fx.current.layoutDirty = true;
-  }, [colors, layout]);
+  }, [colors, layout, syncStyledColors]);
 
   const motionQuery = useMemo(() => (typeof window === 'undefined' ? null : window.matchMedia?.('(prefers-reduced-motion: reduce)')), []);
 
@@ -136,8 +185,18 @@ function VoidCore({ cubieRefs = null }) {
       });
       layout.stickers.forEach((s, i) => {
         bodies.getMatrixAt(s.cell, _cubie);
-        stickers.setMatrixAt(i, _sticker.multiplyMatrices(_cubie, CORE_STICKER_LOCAL[s.dirKey]));
+        stickers.setMatrixAt(i, styled.slots.has(i) ? HIDDEN_STICKER : _sticker.multiplyMatrices(_cubie, CORE_STICKER_LOCAL[s.dirKey]));
       });
+      for (const batch of styled.batches) {
+        const mesh = styledRefs.current.get(batch.key);
+        if (!mesh) continue;
+        batch.indices.forEach((index, slot) => {
+          const s = layout.stickers[index];
+          bodies.getMatrixAt(s.cell, _cubie);
+          mesh.setMatrixAt(slot, _sticker.multiplyMatrices(_cubie, CORE_STICKER_LOCAL[s.dirKey]));
+        });
+        mesh.instanceMatrix.needsUpdate = true;
+      }
       bodies.instanceMatrix.needsUpdate = true;
       stickers.instanceMatrix.needsUpdate = true;
     }
@@ -168,10 +227,11 @@ function VoidCore({ cubieRefs = null }) {
           _color.fromArray(colors.rgb, i * 3).lerp(WHITE, 0.75 * f.flash).toArray(rgb, i * 3);
         }
         stickers.instanceColor.needsUpdate = true;
+        syncStyledColors();
       }
     }
     f.tintMix *= Math.exp(-dt * 1.2);
-    glow.value = (wormMode ? 0.3 : 0.22) + f.flash * 0.25;
+    glow.value = (wormMode ? 0.12 : 0.08) + f.flash * 0.25;
 
     // The approach zoom: while a WORM ride closes on the core, grow it about the
     // tile the worm is diving into, then let it go once the rider is through.
@@ -230,10 +290,15 @@ function VoidCore({ cubieRefs = null }) {
         <instancedMesh
           key={`stickers-${size}`}
           name="antipodal-core-stickers"
+          visible={styled.slots.size < layout.stickers.length}
           frustumCulled={false}
           ref={stickersRef}
           args={[parts.sticker, parts.stickerMaterial, layout.stickers.length]}
         />
+        {styled.batches.map(batch => <instancedMesh key={`${size}-${batch.key}`}
+          name={`antipodal-core-style-${batch.key}`} frustumCulled={false}
+          ref={mesh => { if (mesh) styledRefs.current.set(batch.key, mesh); else styledRefs.current.delete(batch.key); }}
+          args={[batch.geometry, batch.material, batch.indices.length]} />)}
         {!wormMode && <mesh name="antipodal-core-halo" geometry={parts.halo} material={parts.haloMaterial} frustumCulled={false} />}
       </group>
       {/* Mounted in every mode (dark in WORM) so switching modes never changes
