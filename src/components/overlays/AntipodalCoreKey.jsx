@@ -15,7 +15,7 @@ export default function AntipodalCoreKey() {
   const colors = resolveColors(settings, settings?.biomeMode?.faceAssignment);
   return <aside className="antipodal-core-key" aria-label="Antipodal core guide"
     style={{ '--core-paper': ARCADE_PAPER, '--core-ink': ARCADE_INK, fontFamily: UI_FONT }}>
-    <strong style={{ fontFamily: HEADING_FONT }}>Antipodal core <span aria-hidden="true">A ↔ A′</span></strong>
+    <strong style={{ fontFamily: HEADING_FONT }}>Antiverse <span aria-hidden="true">A ↔ A′</span></strong>
     <div className="antipodal-core-pairs" aria-label="Three linked color pairs">
       {PAIRS.map(([a, b]) => <span key={a} aria-label={`Face ${a} is paired with face ${b}`}>
         <i style={{ background: colors[a] }} aria-hidden="true" />

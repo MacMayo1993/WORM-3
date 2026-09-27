@@ -203,39 +203,3 @@ export function createCoreBodyMaterial(performanceMode = false, mode = 'classic'
     transparent: false, opacity: 1, depthWrite: true
   });
 }
-
-const HALO_VERTEX = /* glsl */ `
-  uniform float uSize;
-  varying vec2 vLocal;
-  void main() {
-    vLocal = uv * 2.0 - 1.0;
-    // Billboard: always faces the camera, centred on the core.
-    vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-    mv.xy += position.xy * uSize;
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const HALO_FRAGMENT = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uIntensity;
-  varying vec2 vLocal;
-  void main() {
-    float r2 = dot(vLocal, vLocal);
-    float g = (exp(-r2 * 7.0) * 0.8 + exp(-r2 * 28.0) * 0.6) * (1.0 - smoothstep(0.6, 1.0, r2));
-    gl_FragColor = vec4(uColor * g * uIntensity, 1.0);
-    #include <colorspace_fragment>
-  }
-`;
-
-/** A soft corona round the core, depth-tested at its centre so the cube silhouettes against it. */
-export function createCoreHaloMaterial() {
-  return new THREE.ShaderMaterial({
-    uniforms: { uSize: { value: 0.9 }, uColor: { value: new THREE.Color('#ffe7c2') }, uIntensity: { value: 0 } },
-    vertexShader: HALO_VERTEX,
-    fragmentShader: HALO_FRAGMENT,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
-  });
-}
