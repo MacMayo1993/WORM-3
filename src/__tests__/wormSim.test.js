@@ -569,15 +569,16 @@ describe('jump and boost', () => {
 });
 
 describe('wormhole spawn clock', () => {
-  it('asks ctx to spawn a pair when the timer elapses', () => {
+  it('starts one visible burrow when the timer elapses, without instantly flipping or stacking pending spawns', () => {
     const sim = makeWormSim(SIZE);
     resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 0.5 });
     const cubies = makeCubies(SIZE);
     const ctx = makeCtx({ getCubies: () => cubies, getWormholeInterval: () => 0.5 });
     run(sim, ctx, 1.2);
-    expect(eventsOf(ctx, 'spawn').length).toBeGreaterThanOrEqual(2);
-    const tile = eventsOf(ctx, 'spawn')[0].args[0];
-    expect(tile).toHaveProperty('dirKey');
+    expect(eventsOf(ctx, 'spawn')).toHaveLength(0);
+    expect(sim.burrows.pairs.size).toBe(1);
+    expect([...sim.burrows.pairs.values()][0].phase).toBe('burrowing');
+    expect(sim.burrows.wake.size).toBeGreaterThan(0);
   });
 
   it('stops spawning and zeroes the countdown in finalHealing', () => {
@@ -648,7 +649,7 @@ describe('active tunnel pair cap', () => {
     const sim = makeWormSim(SIZE);
     resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 0.5 });
     const cubies = makeCubies(SIZE);
-    // Report the board as already at its cap (5 pairs at SIZE 3).
+    // Report the board as already at its size-dependent cap.
     let activeCount = activeTunnelCap(SIZE);
     const ctx = makeCtx({
       getCubies: () => cubies,
@@ -657,11 +658,14 @@ describe('active tunnel pair cap', () => {
     });
     run(sim, ctx, 1.2);
     expect(eventsOf(ctx, 'spawn')).toHaveLength(0);
+    expect(sim.burrows.pairs.size).toBe(0);
 
-    // A heal drops the count below the cap — the next interval refills the slot.
+    // A heal drops the count below the cap — the next interval reserves one
+    // approaching pair, which must finish its warning before either tile flips.
     activeCount = activeTunnelCap(SIZE) - 1;
     run(sim, ctx, 1.2);
-    expect(eventsOf(ctx, 'spawn').length).toBeGreaterThanOrEqual(1);
+    expect(eventsOf(ctx, 'spawn')).toHaveLength(0);
+    expect(sim.burrows.pairs.size).toBe(1);
   });
 });
 

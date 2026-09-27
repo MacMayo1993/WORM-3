@@ -1,3 +1,4 @@
+import { burrowPair } from '../worm/burrowBridge.js';
 import { createPadStalkGeometry, PAD_STALK_DEPTH, PAD_BACK_CLEARANCE } from './padStalkGeometry.js';
 import { RaisedCubieContext } from './raisedCubieContext.js';
 import { removeRaisedCubie } from './raisedCubieMotion.js';
@@ -108,7 +109,8 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
         if (isLiveFlippedFace(member.data.current.meta, cap)) { lifted = true; break; }
       }
       pair.active = (menuPads || wormPads || (flipPads !== 'off' && !wormMode)) && lifted;
-      const target = pair.active ? pair.pose.lift : 0;
+      const openness = wormPads ? (burrowPair(key)?.openness ?? 1) : 1;
+      const target = pair.active ? pair.pose.lift * openness : 0;
       if (motionOff) { pair.lift = target; pair.velocity = 0; }
       else advancePadSpring(pair, target, dt);
       pair.animated = !motionOff;
@@ -126,17 +128,18 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
       // WORM uses a fixed physical landing height; cube/menu pads keep their idle bounce.
       const enabled = (menuPads || wormPads || (flipPads !== 'off' && !wormMode));
       const lifted = enabled && isLiveFlippedFace(d.meta, cap);
-      const target = lifted ? pair.pose.lift : 0;
+      const target = lifted ? pair.lift : 0;
       if (lifted) { entry.lift = pair.lift; entry.velocity = pair.velocity; }
       else if (motionOff) { entry.lift = target; entry.velocity = 0; }
       else advancePadSpring(entry, target, dt);
       group.position.copy(d.normal).multiplyScalar(entry.lift);
       let lift = entry.lift;
-      if (wormPads && lifted && energyMotion) {
+      if (wormPads && lifted && energyMotion && entry.lift > 0) {
         // Twins share the pair seed, so they shudder together.
         const shake = padTremble(resources.tremble, energyClock.current, pair.seed);
-        group.position.addScaledVector(d.normal, shake.n).addScaledVector(d.right, shake.u).addScaledVector(d.up, shake.v);
-        lift += shake.n;
+        const openness = burrowPair(d.pair)?.openness ?? 1;
+        group.position.addScaledVector(d.normal, shake.n * openness).addScaledVector(d.right, shake.u * openness).addScaledVector(d.up, shake.v * openness);
+        lift += shake.n * openness;
       }
       entry.cycle = pair.pose.cycle;
       entry.impact = pair.pose.impact;

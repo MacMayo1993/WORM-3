@@ -6,6 +6,7 @@ import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { burrowPair } from '../worm/burrowBridge.js';
 import * as THREE from 'three';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
@@ -612,7 +613,7 @@ const MobiusTunnel = ({
     _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat2);
 
     const formationState = useGameStore.getState();
-    const mouthLift = formationState.wormHealerMode ? WORM_PAD_HEIGHT : 0;
+    const mouthLift = formationState.wormHealerMode ? WORM_PAD_HEIGHT * (burrowPair(tunnelId)?.openness ?? 1) : 0;
     const cubeLift = raisedPresentation ? Math.max(0, padMotion.get(tunnelId)?.lift ?? 0) : 0;
     // Ribbon anchors: just inside each sticker tile's own surface, so the ribbon
     // reaches the tile the player flipped rather than the far side of its cubie.
@@ -734,7 +735,9 @@ const MobiusTunnel = ({
         : WORM_IDLE_OPACITY;
     const lerpSpeed = targetDim > dimRef.current ? DIM_LERP_UP : DIM_LERP_DOWN;
     dimRef.current += (targetDim - dimRef.current) * Math.min(1, delta * lerpSpeed);
-    const dim = dimRef.current;
+    const burrow = burrowPair(tunnelId);
+    const openness = burrow?.openness ?? 1;
+    const dim = dimRef.current * openness;
 
     // Subtle opacity pulse, scaled by dim factor
     pulseT.current += delta * 1.5;
@@ -770,7 +773,7 @@ const MobiusTunnel = ({
       const progress = Math.min(1, formationAge.current / PLATFORM_FORMATION_SECONDS);
       const a = mesh1.userData.wormPlatformFormation;
       const b = mesh2.userData.wormPlatformFormation;
-      uniforms.uGrowT.value = reduced ? 1 : Math.min(progress,
+      uniforms.uGrowT.value = burrow ? openness : reduced ? 1 : Math.min(progress,
         a?.formationTarget === 1 ? a.formationProgress : 1,
         b?.formationTarget === 1 ? b.formationProgress : 1);
       // The portal appears with its emerging ribbon, not as a complete floating ring.
@@ -789,6 +792,7 @@ const MobiusTunnel = ({
     } else {
       uniforms.uGrowT.value = 1.0;
     }
+    uniforms.uGrowT.value = Math.min(uniforms.uGrowT.value, openness);
 
     // Tunnel pulse: on a flip, fire a travelling light-soliton from the entry tile
     // (vUv.y=0) through the centre to its antipodal partner (vUv.y=1), plus a small

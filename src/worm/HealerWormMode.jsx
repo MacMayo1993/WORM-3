@@ -10,6 +10,7 @@ import DemoPracticeTargets from './healerWorm/DemoPracticeTargets.jsx';
 import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
 import { isHotTile } from './healerWorm/elementalGameplay.js';
 import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
+import BurrowEffects from './healerWorm/BurrowEffects.jsx';
 // src/worm/HealerWormMode.jsx
 // WORM Chase-Cam Mode — top-level wrapper and game-phase driver.
 // Chase camera follows the worm crawling on the cube exterior.
@@ -714,6 +715,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             {/* Elemental orb wash — bathes the whole cube in the claimed element. */}
             <ElementalAtmosphere size={size} />
+            <BurrowEffects size={size} hidden={wormInTunnel || !wormAlive} />
             <TunnelInteriorView worm={worm} size={size} />
             {/* The shaft the camera actually rides inside — encloses the view so the
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}

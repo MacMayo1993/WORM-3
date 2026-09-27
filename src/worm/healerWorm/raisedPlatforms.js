@@ -15,6 +15,10 @@ export function raisedPlatformPosition(tile, size, ctx) {
     const cap = ctx.getFlipCap?.() ?? 6;
     // All faces travel with the whole piece. Only the flipped face is a tunnel.
     if (!cubie?.stickers[tile.dirKey] || !cubieHasFlippedFace(cubie, cap)) return null;
+    // A buried or rising mouth cannot capture a platform jump. Ordinary faces
+    // stay standable if another open flipped face keeps the whole piece raised.
+    if (isLiveFlippedFace(cubie.stickers[tile.dirKey], cap) && ctx.isBurrowFaceOpen?.(cubie.stickers[tile.dirKey]) === false) return null;
+    if (!Object.values(cubie.stickers).some(sticker => isLiveFlippedFace(sticker, cap) && ctx.isBurrowFaceOpen?.(sticker) !== false)) return null;
     const point = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, raisedWormExpansion(wormExpansion.amount, size)));
     return isLiveFlippedFace(cubie.stickers[tile.dirKey], cap)
         ? point.addScaledVector(FACE_NORMALS[tile.dirKey], WORM_PAD_HEIGHT) : point;

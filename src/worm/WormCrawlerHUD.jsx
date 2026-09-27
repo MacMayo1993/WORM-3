@@ -1180,7 +1180,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     ['Time', formatTime(wormTimeAlive)],
                     ['Healed', wormHealedCount],
                     ['Collected', wormSessionOrbs],
-                    storyId ? [`Chapter ${storyChapterId(storyId)}`, `Level ${storyChapterIndex(storyId)} / ${STORY_CHAPTER_SIZE}`] : ['Next tunnel', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
+                    storyId ? [`Chapter ${storyChapterId(storyId)}`, `Level ${storyChapterIndex(storyId)} / ${STORY_CHAPTER_SIZE}`] : ['Next burrow', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
                 <details className="screen-disclosure"><summary>Controls & sound</summary>

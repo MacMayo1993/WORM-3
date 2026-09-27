@@ -1,3 +1,4 @@
+import { burrowTileOpen } from '../burrowBridge.js';
 import TunnelSafetyMarkers from './TunnelSafetyMarkers.jsx';
 import RaisedCautionPerimeter from './RaisedCautionPerimeter.jsx';
 import { raisedPortalPosition } from '../raisedPortalPosition.js';
@@ -247,6 +248,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
 
         for (let i = 0; i < allPositions.length; i++) {
             const tile = allPositions[i];
+            if (!burrowTileOpen(cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers?.[tile.dirKey], size)) continue;
             const { tunnelKey, normal: n, faceId } = tile;
             const wp = raisedPortalPosition(tile.x, tile.y, tile.z, tile.dirKey, size, useGameStore.getState());
             const isVoid = !!(tunnelKey && voidKeys.has(tunnelKey));
