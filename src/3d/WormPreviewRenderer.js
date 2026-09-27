@@ -1,6 +1,7 @@
 import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody, poseHeadAccessories, poseHandmadeHat } from '../worm/wormAccessories.js';
 import { safeAccessories } from '../worm/handmadeAccessoriesData.js';
 import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormPreviewMotion.js';
+import { wormPreviewTargetOptions } from './wormPreviewTargets.js';
 // WormPreviewRenderer.js
 // Renders worm thumbnails — the character picker's plate, the store's skin and
 // hat cards — using the *same* geometry and materials as the worm you steer in
@@ -356,6 +357,10 @@ let _envTried = false;
 function _ensureEnvironment() {
   if (_envTried || !renderer?.extensions || !renderer.getContext?.()) return;
   _envTried = true;
+  // Three's PMREMGenerator always uses linearly filtered half-float targets.
+  // The preview itself can run with NEAREST or RGBA8, but PMREM cannot.
+  const options = _linearOptions();
+  if (options.type !== THREE.HalfFloatType || options.minFilter !== THREE.LinearFilter) return;
   let pmrem = null;
   try {
     pmrem = new THREE.PMREMGenerator(renderer);
@@ -416,9 +421,10 @@ function ensureOwnRenderer() {
   _initScene();
 }
 
-function _linearType() {
-  const ext = renderer?.extensions;
-  return ext?.has?.('EXT_color_buffer_half_float') || ext?.has?.('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType;
+let _sceneTargetOptions = null;
+function _linearOptions() {
+  if (!_sceneTargetOptions) _sceneTargetOptions = wormPreviewTargetOptions(renderer);
+  return _sceneTargetOptions;
 }
 
 function _targetFor(width, height) {
@@ -426,13 +432,7 @@ function _targetFor(width, height) {
   let target = _targets.get(key);
   if (!target) {
     target = {
-      scene: new THREE.WebGLRenderTarget(width, height, {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-        format: THREE.RGBAFormat,
-        type: _linearType(),
-        samples: 4,          // MSAA — the beads are round, jaggies read as cheap
-      }),
+      scene: new THREE.WebGLRenderTarget(width, height, _linearOptions()),
       out: new THREE.WebGLRenderTarget(width, height, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat }),
     };
     _targets.set(key, target);
