@@ -5,10 +5,12 @@ import { it, expect, vi } from 'vitest';
 import VoidCore from '../3d/VoidCore.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
+import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { tunnelDockForCellInto, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { coreCellIndex, coreLayout, coreZoomLimit } from '../3d/antipodalCore.js';
+import { getTileStyleMaterial, sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 
 // jsdom has touch events, so it reads as mobile; the core's light is desktop-only.
 vi.mock('../utils/device.js', async (importOriginal) => ({ ...(await importOriginal()), isMobile: false }));
@@ -71,6 +73,49 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     for (let i = 0; i < 240; i++) frame();
     expect(colour(own).equals(rest[0])).toBe(true); // and settles back
 
+    // Equipped patterns and custom palette follow the partner, not the face
+    // physically above the core slot. Styling stays batched after a scramble.
+    await act(async () => useGameStore.setState({ settings: {
+      ...useGameStore.getState().settings, colorScheme: 'custom', customColors: { 5: '#b24bde', 2: '#28be80' },
+      manifoldStyles: { 5: 'checkerboard', 2: 'circuit' }
+    } })); frame();
+    const pattern = scene.getObjectByName('antipodal-core-style-5-checkerboard');
+    expect(pattern).toBeInstanceOf(THREE.InstancedMesh);
+    expect(pattern.count).toBe(9);
+    expect(pattern.material.uniforms.time).toBe(sharedUniforms.time);
+    const source = getTileStyleMaterial('checkerboard', '#b24bde', false, null, '#28be80');
+    expect(pattern.material).not.toBe(source);
+    expect(source.vertexShader).not.toContain('coreModel');
+    expect(new THREE.Color().fromArray(pattern.instanceColor.array).getHexString()).toBe('b24bde');
+    const dock = tunnelDockForCellInto(new THREE.Vector3(), 2, 1, 1, 'PX', 3);
+    const batchPosition = new THREE.Vector3(), batchMatrix = new THREE.Matrix4();
+    const batchIndex = layout.stickers.slice(0, own).filter(s => {
+      const id = layout.stickers.indexOf(s);
+      return colour(id).getHexString() === 'b24bde';
+    }).length;
+    pattern.getMatrixAt(batchIndex, batchMatrix);
+    expect(batchPosition.setFromMatrixPosition(batchMatrix).distanceTo(dock)).toBeLessThan(tunnelCoreScale(3) * 0.01);
+    stickers.getMatrixAt(own, batchMatrix);
+    expect(batchMatrix.elements[0]).toBe(0); // no duplicate plain sticker under the pattern
+
+    const patternMaterial = pattern.material;
+    const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.6);
+    refs[coreCellIndex(2, 1, 1, 3)].quaternion.copy(turn);
+    await act(async () => useGameStore.setState({ animState: { axis: 'row', sliceIndex: 1, dir: 1, t: 0.4 } })); frame();
+    pattern.getMatrixAt(batchIndex, batchMatrix);
+    const turnedNormal = new THREE.Vector3(0, 0, 1).transformDirection(batchMatrix);
+    expect(turnedNormal.distanceTo(new THREE.Vector3(1, 0, 0).applyQuaternion(turn))).toBeLessThan(1e-6);
+    refs[coreCellIndex(2, 1, 1, 3)].quaternion.identity();
+    await act(async () => useGameStore.setState({ cubies: rotateSliceCubies(cubies, 3, 'row', 2, 1), animState: null })); frame();
+    expect(scene.getObjectByName('antipodal-core-style-5-checkerboard').material).toBe(patternMaterial);
+
+    await act(async () => useGameStore.setState({ cubies, settings: {
+      ...useGameStore.getState().settings, colorScheme: 'standard', customColors: null, manifoldStyles: {}
+    } })); frame();
+    expect(scene.getObjectByName('antipodal-core-style-5-checkerboard')).toBeUndefined();
+    stickers.getMatrixAt(own, batchMatrix);
+    expect(batchMatrix.determinant()).toBeGreaterThan(0); // plain tile restored
+
     // A slice turn turns the same slice of the core.
     const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.6);
     refs[coreCellIndex(2, 2, 2, 3)].quaternion.copy(q);
@@ -105,11 +150,11 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     expect(zoom.scale.x).toBeCloseTo(1, 3);
     camera.position.set(0, 0.3, 0.3);
     for (let i = 0; i < 60; i++) frame();
-    const dock = tunnelDockForCellInto(new THREE.Vector3(), 1, 1, 2, 'PZ', 3);
-    const limit = coreZoomLimit(dock, 3);
+    const rideDock = tunnelDockForCellInto(new THREE.Vector3(), 1, 1, 2, 'PZ', 3);
+    const limit = coreZoomLimit(rideDock, 3);
     expect(zoom.scale.x).toBeGreaterThan(limit * 0.95);
     // The entry dock is a fixed point of the swell: the worm still dives into its tile.
-    expect(dock.clone().multiplyScalar(zoom.scale.x).add(zoom.position).distanceTo(dock)).toBeLessThan(1e-9);
+    expect(rideDock.clone().multiplyScalar(zoom.scale.x).add(zoom.position).distanceTo(rideDock)).toBeLessThan(1e-9);
     // Through the core and on the way out, it lets go.
     tunnelState.t = 0.9;
     for (let i = 0; i < 60; i++) frame();

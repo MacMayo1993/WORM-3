@@ -165,11 +165,15 @@ describe('parameterisation', () => {
     const pts = [];
     const p = new THREE.Vector3();
     for (let i = 0; i < 40; i++) pts.push(tunnelPathArcPointInto(p, path, (i / 39) * path.total).clone());
-    const gaps = pts.slice(1).map((q, i) => q.distanceTo(pts[i]));
-    // Only the step that straddles a corner is short (it cuts the chord), so the
-    // tolerance is a hair over exact — nothing like the stretched beads that
-    // uniform-t stepping produces.
-    expect(Math.max(...gaps) / Math.min(...gaps)).toBeLessThan(1.1);
+    const step = path.total / 39;
+    for (let i = 0; i < 39; i++) {
+      // Measure through any bend crossed by this step. A straight chord cuts
+      // the corner short by an amount that depends on the core's dimensions.
+      const bends = [...path.legArc0].filter(a => a > i * step && a < (i + 1) * step);
+      const segment = [pts[i], ...bends.map(a => tunnelPathArcPointInto(new THREE.Vector3(), path, a)), pts[i + 1]];
+      const distance = segment.slice(1).reduce((sum, q, j) => sum + q.distanceTo(segment[j]), 0);
+      expect(distance).toBeCloseTo(step, 10);
+    }
   });
 });
 
