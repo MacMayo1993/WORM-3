@@ -32,7 +32,7 @@ export const AXIS_VECTORS = {
  * @param {{cam:THREE.Vector3, look:THREE.Vector3, up:THREE.Vector3}} out
  * @param {number[]|THREE.Vector3} impact world-space hit point
  * @param {'col'|'row'|'depth'|null} axis turning axis; null for a hit with no
- *   slice (a bomb), which frames the whole cube leaning toward the impact
+ *   slice metadata, which frames the whole cube leaning toward the impact
  * @param {number|null} layer turning layer index (0 … size-1)
  * @param {number} size cube size
  * @param {{scale?:number, fov?:number, aspect?:number}} lens cubie spacing (1 unless exploded), vertical FOV in degrees, aspect
@@ -70,17 +70,38 @@ export function sliceShotInto(out, impact, axis, layer, size, { scale = 1, fov =
   _side.crossVectors(_n, _axis).normalize();
   _dir.copy(_n).addScaledVector(_axis, 0.5 * alongSign).addScaledVector(_side, 0.35).normalize();
 
-  // Distance that holds the cube's bounding sphere in the narrower half-angle,
-  // plus how far the aim sits off the cube's centre.
+  // Enclose the cube in a sphere about the off-centre aim BEFORE fitting it
+  // through the narrower half-angle. Adding the aim offset after projection
+  // underestimates portrait distance. Leave room for the cut and turning edge.
   const half = k * scale + 0.5;
   const radius = Math.sqrt(3) * half + FRAME_MARGIN;
   const halfV = THREE.MathUtils.degToRad(fov) / 2;
   const halfH = Math.atan(Math.tan(halfV) * aspect);
-  const distance = radius / Math.sin(Math.min(halfV, halfH)) + out.look.length();
+  const distance = (radius + out.look.length()) / Math.sin(Math.min(halfV, halfH)) * 1.08;
   out.cam.copy(out.look).addScaledVector(_dir, distance);
 
   // Level horizon: world up, unless the shot looks nearly straight up or down.
   out.up.set(0, 1, 0);
   if (Math.abs(_dir.y) > 0.9) out.up.copy(_axis.y ? _side : _axis);
+  return out;
+}
+
+// Bomb cuts have no rotating layer to explain. Keep the original close impact
+// shot so the blast and severed tail stay legible even on a portrait Mega board.
+export function bombImpactShotInto(out, impact, size) {
+  const point = Array.isArray(impact) ? _centre.fromArray(impact) : _centre.copy(impact);
+  const ax = Math.abs(point.x), ay = Math.abs(point.y), az = Math.abs(point.z);
+  if (ax >= ay && ax >= az) _n.set(Math.sign(point.x) || 1, 0, 0);
+  else if (ay >= az) _n.set(0, Math.sign(point.y) || 1, 0);
+  else _n.set(0, 0, Math.sign(point.z) || 1);
+  _side.crossVectors(_n, _axis.set(0, 1, 0));
+  if (_side.lengthSq() < 1e-6) _side.set(1, 0, 0);
+  _side.normalize();
+  out.look.copy(point);
+  out.cam.copy(point)
+    .addScaledVector(_n, 2.4 + size * 0.55)
+    .addScaledVector(_side, 1.3 + size * 0.28)
+    .addScaledVector(_axis, 0.9 + size * 0.12);
+  out.up.set(0, _n.y < -0.85 ? -1 : 1, 0);
   return out;
 }
