@@ -43,6 +43,7 @@ export const makeDisparityRuntimeDefaults = () => ({
 
 // Worm session fields reset on each worm run.
 export const makeWormSessionDefaults = () => ({
+  showCutawayLens: false,
   wormStoryLevel: null, wormStoryStarted: false, wormStoryReady: false, wormStoryTarget: null, wormStoryProgress: '', wormStoryChecklist: null, wormStoryResult: null,
   demoWormSteered: false,
   wormHealedCount: 0,

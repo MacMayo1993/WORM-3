@@ -358,9 +358,13 @@ Settings, equipped cosmetics, wallet/ownership, XP, campaign records, mission pr
 | **Net** | An unfolded face layout alongside the 3D cube. |
 | **Tunnels: Off / Hints / Full** | Hide routes, show thin connections, or render the fuller treatment. |
 | **Far-side window** | Picture-in-picture inspection of the opposite side. |
+| **Live portal windows** | A moving view from the linked exit inside the most visible live wormhole mouths. Toggle in Settings → Scene. |
+| **Cutaway lens** | A draggable, resizable window through the exterior to the actual interior routes and worm. Open from the magnifier, Settings → Scene, or WORM's Pause menu. |
 | **Flip pads** | Full, subtle, or flat small-pad bounce settings; raised-cubie geometry has its own gameplay role. |
 
 View availability can be restricted by a lesson or mode. Whole-cube view changes, a raised flipped cubie, and the timed Explode pickup are related presentations with different purposes.
+
+The cutaway lens supports touch dragging and arrow keys; Escape closes it. Opening it from WORM's Pause menu keeps the simulation paused, and closing it returns to Pause. The lens and far-side window are mutually exclusive. See [portal inspection](docs/features/portal-inspection.md) for rendering budgets and limits.
 
 ### Procedural tile materials
 

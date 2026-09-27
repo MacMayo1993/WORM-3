@@ -33,6 +33,7 @@ export const MODAL_SURFACES = [
   { id: 'tutorial',          flag: 'showTutorial',          close: (s) => s.setShowTutorial(false) },
   { id: 'leaderboard',       flag: 'showLeaderboard',       close: (s) => s.setShowLeaderboard(false) },
   { id: 'netPanel',          flag: 'showNetPanel',          close: (s) => s.setShowNetPanel(false) },
+  { id: 'cutawayLens',       flag: 'showCutawayLens',       close: (s) => s.setShowCutawayLens(false) },
   { id: 'packSelect',        flag: 'showPackSelect',        close: (s) => s.setShowPackSelect(false) },
   { id: 'levelSelect',       flag: 'showLevelSelect',       close: (s) => s.setShowLevelSelect(false) },
 ];
@@ -60,7 +61,7 @@ export const BLOCKING_FLAGS = [
  * turning. They are still Escape-dismissible (see MODAL_SURFACES) — being
  * closable is not the same as owning the screen.
  */
-const AMBIENT_IDS = new Set(['leaderboard', 'netPanel']);
+const AMBIENT_IDS = new Set(['leaderboard', 'netPanel', 'cutawayLens']);
 
 /**
  * The topmost modal surface currently open, or null.

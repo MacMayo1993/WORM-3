@@ -31,6 +31,11 @@ export const createVisualSlice = (set, get) => ({
   // so scripted sequences like the demo's view showcase can drive it with the
   // same setters they use for every other view toggle.
   showAntipodalPiP: false,
+  showCutawayLens: false,
+  setShowCutawayLens: (showCutawayLens) => set(showCutawayLens
+    ? { showCutawayLens: true, showAntipodalPiP: false }
+    : { showCutawayLens: false }),
+  toggleCutawayLens: () => set(state => ({ showCutawayLens: !state.showCutawayLens, showAntipodalPiP: false })),
 
   setVisualMode: (visualMode) => set(typeof visualMode === 'function'
     ? (state) => ({ visualMode: visualMode(state.visualMode) })
@@ -58,9 +63,9 @@ export const createVisualSlice = (set, get) => ({
   toggleLeaderboard: () => set((state) => ({ showLeaderboard: !state.showLeaderboard })),
 
   setShowAntipodalPiP: (showAntipodalPiP) => set(typeof showAntipodalPiP === 'function'
-    ? (state) => ({ showAntipodalPiP: showAntipodalPiP(state.showAntipodalPiP) })
-    : { showAntipodalPiP }),
-  toggleAntipodalPiP: () => set((state) => ({ showAntipodalPiP: !state.showAntipodalPiP })),
+    ? (state) => ({ showAntipodalPiP: showAntipodalPiP(state.showAntipodalPiP), showCutawayLens: false })
+    : { showAntipodalPiP, showCutawayLens: false }),
+  toggleAntipodalPiP: () => set((state) => ({ showAntipodalPiP: !state.showAntipodalPiP, showCutawayLens: false })),
 
   toggleFlipMode: () => set((state) => ({ flipMode: !state.flipMode })),
   toggleTunnels: () => set((state) => ({ showTunnels: !state.showTunnels })),

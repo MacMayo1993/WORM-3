@@ -24,7 +24,7 @@ describe('selectCubeInputBlocked', () => {
   });
 
   it.each(
-    MODAL_SURFACES.filter((s) => !['leaderboard', 'netPanel'].includes(s.id)).map((s) => [s.id, s.flag])
+    MODAL_SURFACES.filter((s) => !['leaderboard', 'netPanel', 'cutawayLens'].includes(s.id)).map((s) => [s.id, s.flag])
   )('blocks while the %s modal is open', (_id, flag) => {
     expect(selectCubeInputBlocked({ ...idle(), [flag]: true })).toBe(true);
   });
@@ -33,7 +33,7 @@ describe('selectCubeInputBlocked', () => {
     expect(selectCubeInputBlocked({ victory: 'rubiks' })).toBe(true);
   });
 
-  it.each(['showLeaderboard', 'showNetPanel'])(
+  it.each(['showLeaderboard', 'showNetPanel', 'showCutawayLens'])(
     'keeps play live with the ambient %s panel open',
     (flag) => {
       expect(selectCubeInputBlocked({ ...idle(), [flag]: true })).toBe(false);

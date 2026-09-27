@@ -23,6 +23,7 @@ import { elementalFeedback } from './healerWorm/elementalFeedback.js';
 
 import React, { useMemo, useState, useLayoutEffect, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { inspectionSuspended } from '../3d/inspectionBridge.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { FACE_COLORS } from '../utils/constants.js';
@@ -1145,6 +1146,7 @@ function SignatureGuide() {
 
 function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc: _fc }) {
     const storyId = useGameStore(s => s.wormStoryLevel);
+    const inTunnel = useGameStore(s => ['entering', 'tunnel', 'exiting'].includes(s.wormPhase));
     const green = UI_MOSS_LIGHT;
     const blue = UI_MOSS_LIGHT;
     const dialogRef = useRef(null);
@@ -1248,6 +1250,9 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                 </details>
                 {/* Secondary navigation */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'clamp(10px, 2vh, 14px)' }}>
+                    <button disabled={inTunnel} onClick={() => useGameStore.getState().setShowCutawayLens(true)} style={{ ...LIST_BTN_STYLE, opacity: inTunnel ? 0.5 : 1 }}>
+                        <span aria-hidden="true">⌕</span><span>{inTunnel ? 'Cutaway available on the surface' : 'Inspect inside the cube'}</span>
+                    </button>
                     {onToggleAntipodal && (
                         <button
                             onClick={onToggleAntipodal}
@@ -1298,6 +1303,7 @@ function HudContext({ surface, demo, onInspect }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame, onStoryNext }) {
+    const showCutawayLens = useGameStore(s => s.showCutawayLens && !inspectionSuspended(s));
     const [isMinimized, setIsMinimized] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const captureMode = useGameStore(s => s.captureMode);
@@ -1509,7 +1515,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             </div>}
 
             {/* ── Pause Menu Overlay ── */}
-            {isPaused && (
+            {isPaused && !showCutawayLens && (
                 <PauseMenu
                     onResume={handleResume}
                     onHome={onHome}

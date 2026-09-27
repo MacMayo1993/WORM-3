@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
 
 const EXPECTED_KEYS = [
+  'showCutawayLens', 'setShowCutawayLens', 'toggleCutawayLens',
   'captureMode', 'setCaptureMode',
   'wormStoryLevel', 'wormStoryStarted', 'wormStoryReady', 'wormStoryTarget', 'wormStoryProgress', 'wormStoryChecklist', 'wormStoryResult', 'startWormStory', 'completeWormStory', 'claimWormStoryReward',
   'wormStoryVisualBase', 'wormStoryViewBase', 'applyWormStoryLook',

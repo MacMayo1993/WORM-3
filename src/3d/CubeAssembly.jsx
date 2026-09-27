@@ -35,6 +35,7 @@ const _liveLayers = [];
 const _liveAngles = [];
 import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
 import { liveCubies } from '../worm/liveCubies.js';
+import InspectionViews from './InspectionViews.jsx';
 import { getManifoldGridId } from '../game/gridIds.js';
 import { recordChaosHealing } from '../game/chaosExperience.js';
 import { collectHealWave, healTilePair, isHealable } from '../game/chaosHeal.js';
@@ -1206,6 +1207,7 @@ const CubeAssembly = React.memo(({
     <StickerInstanceProvider>
       <StickerAnimationDriver />
       <group ref={cubeGroupRef}>
+        <InspectionViews cubeRef={cubeGroupRef} exteriorRef={exteriorRef} manifoldMap={manifoldMap} />
         <WormholeNetwork
           manifoldMap={manifoldMap}
           cubieRefs={cubieRefs.current}

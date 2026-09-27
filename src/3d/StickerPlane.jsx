@@ -1,4 +1,5 @@
 import { FlipPadOffset } from './PadSprings.jsx';
+import { registerInspectionSurface } from './inspectionBridge.js';
 import { effectiveFlipPads } from '../game/raisedCubie.js';
 import { flipPose } from '../utils/flipPose.js';
 import { chaosFlipPose, CHAOS_FLIP_DURATION } from './chaosFlipPose.js';
@@ -932,6 +933,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const stickerGridId = meta ? `${presentation ? 'intro:' : ''}${getManifoldGridId(meta, faceSize)}` : null;
   const stickerGridIdRef = useRef(stickerGridId);
   stickerGridIdRef.current = stickerGridId;
+  useLayoutEffect(() => presentation ? undefined : registerInspectionSurface(stickerGridId, innerGroupRef.current), [stickerGridId, presentation]);
   // Per-sticker dynamic selectors — subscribe only to this sticker's own derived values.
   // When disparityDeathByGridId grows (a tile dies) Zustand re-runs all selectors, but
   // only the sticker whose primitive return value actually changed triggers a re-render.

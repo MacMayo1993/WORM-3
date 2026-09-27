@@ -108,6 +108,7 @@ export default function GameScene({
     wormPhase,
     wormHealedCount,
     perfReducedFX,
+    showCutawayLens,
   } = useGameStore(useShallow((s) => ({
     visualMode: s.visualMode,
     explosionT: s.explosionT,
@@ -125,6 +126,7 @@ export default function GameScene({
     wormPhase: s.wormPhase,
     wormHealedCount: s.wormHealedCount ?? 0,
     perfReducedFX: s.perfReducedFX ?? false,
+    showCutawayLens: s.showCutawayLens,
   })));
 
   // Cube self-shadowing — the cubie bodies already declare cast/receiveShadow, so the
@@ -343,7 +345,7 @@ export default function GameScene({
           two-camera pass) which an EffectComposer cannot share, so AO and the PiP are
           mutually exclusive — toggling the PiP on gracefully drops AO for that view.
           Gated off on mobile / low-FPS / wireframe / glass via aoEnabled. */}
-      {aoEnabled && !shouldShowAntipodalPiP && (
+      {aoEnabled && !shouldShowAntipodalPiP && !showCutawayLens && (
         <Suspense fallback={null}><SceneEffects kind="game" /></Suspense>
       )}
     </>
