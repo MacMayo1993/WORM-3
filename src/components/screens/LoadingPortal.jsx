@@ -11,8 +11,9 @@
  *  - the portals, behind the cube: the spinning funnel in the paper (grid
  *    swirling in, sticker confetti falling through, a worm riding the vortex
  *    out of the throat and back), the same tunnel seen through the portal
- *    hanging above, and the far half of each Rubik-coloured lip;
- *  - the near half of each lip, drawn over the cube as it goes in and comes out.
+ *    hanging above (viewed from below), and the exposed halves of their lips;
+ *  - the upper portal's far lip and the floor portal's near lip, drawn over the
+ *    cube to hide the cut lines as it comes out and goes in.
  *
  * The portals sit wherever LoadingScene's `.wl-well` elements are, so the cube's
  * CSS fall, shadow and ripple always line up with them. Time is measured from
@@ -329,9 +330,8 @@ function drawFunnel(ctx, well, t, spin, pulse, traffic = true) {
 }
 
 // ── The lip: a toy-bright ring of the six sticker colours, turning with the vortex.
-// The falling cube passes between its halves: the back half ('back') is drawn
-// behind the cube and the front half ('front') over it, which also hides the
-// line where the cube is cut off as it goes in or comes out.
+// 'back' and 'front' name the upper and lower screen-space arcs. The ceiling
+// exit overlays its BACK arc; the floor entrance overlays its FRONT arc.
 function drawRim(ctx, well, spin, pulse, half) {
   const { cx, cy, a, b } = well;
   const outer = [a * (1 + RIM), b * (1 + RIM)];
@@ -434,19 +434,25 @@ export default function LoadingPortal({ wellRef, topRef, startedAt, translucent 
         layer.clearRect(0, 0, W, H);
       }
       const spin = spinAngle(t);
-      // Behind the cube: both tunnels and the far halves of their lips.
+      // Behind the cube: both tunnels and each mouth's exposed rim. Reflect
+      // the ceiling funnel vertically so we see its underside, facing down.
       if (top) {
         drawHalo(ctx, top, pulse);
+        ctx.save();
+        ctx.translate(0, 2 * top.cy);
+        ctx.scale(1, -1);
         drawFunnel(ctx, top, t, spin, pulse, false);
-        drawRim(ctx, top, spin, pulse, 'back');
+        ctx.restore();
+        drawRim(ctx, top, spin, pulse, 'front');
       }
       if (well) {
         drawFunnel(ctx, well, t, spin, pulse);
         drawRim(ctx, well, spin, pulse, 'back');
         drawMotes(ctx, well, t, true);
       }
-      // In front of it: the near halves of both lips.
-      if (top) drawRim(front, top, spin, pulse, 'front');
+      // Cover only the clipped edge of each mouth. The cube leaving the upper
+      // portal must cover its lower rim, rather than disappearing behind it.
+      if (top) drawRim(front, top, spin, pulse, 'back');
       if (well) drawRim(front, well, spin, pulse, 'front');
     };
 
@@ -490,7 +496,7 @@ export default function LoadingPortal({ wellRef, topRef, startedAt, translucent 
     <>
       <canvas ref={paperRef} className="wl-backdrop" aria-hidden="true" />
       <canvas ref={vortexRef} className="wl-backdrop" aria-hidden="true" />
-      <canvas ref={frontRef} className="wl-backdrop wl-front" aria-hidden="true" />
+      <canvas ref={frontRef} className="wl-backdrop wl-portal-lips" aria-hidden="true" />
     </>
   );
 }

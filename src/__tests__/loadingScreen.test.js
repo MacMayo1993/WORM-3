@@ -84,7 +84,7 @@ describe('loading screen timing', () => {
 
   it('ripples the paper as the cube passes through, when the vortex kicks', () => {
     const passPercent = (PASS_AT / FALL.period) * 100;
-    expect(passPercent).toBeCloseTo(25, 6);
+    expect(passPercent).toBeCloseTo(50, 6);
     const cssPassPercent = keyframes('wl-shock').match(/0%, ([\d.]+)% \{[^}]*opacity: 0; \}/);
     expect(cssPassPercent).not.toBeNull();
     expect(Number(cssPassPercent[1])).toBeCloseTo(passPercent, 6);
@@ -114,21 +114,30 @@ describe('the shaft between the portals', () => {
   const clip = shaftClipPath('R', 12);
   const points = clip.slice('polygon('.length, -1).split(', ');
 
-  it('runs along both portals\' near edges, corner to corner', () => {
+  it('reveals the cube through the ceiling opening and hides it inside the floor opening', () => {
     expect(points).toHaveLength(26);
     expect(points[0]).toBe('0% calc(R + R * 0)');
-    expect(points[6]).toBe('50% calc(R + R * 1)'); // the top portal's nearest point
+    expect(points[6]).toBe('50% calc(R + R * -1)'); // far edge: the whole exit mouth is visible
     expect(points[12]).toBe('100% calc(R + R * 0)');
     expect(points[13]).toBe('100% calc(100% - R + R * 0)');
     expect(points[19]).toBe('50% calc(100% - R + R * 1)');
     expect(points[25]).toBe('0% calc(100% - R + R * 0)');
   });
 
-  it('only ever bulges toward the viewer: the near half of each portal', () => {
-    for (const point of points) {
+  it('clips opposite sides of the downward exit and upward entrance', () => {
+    for (const [i, point] of points.entries()) {
       const sin = Number(point.match(/\* (-?[\d.]+)\)$/)[1]);
-      expect(sin).toBeGreaterThanOrEqual(0);
+      if (i <= 12) expect(sin).toBeLessThanOrEqual(0);
+      else expect(sin).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  it('starts above the visible exit and keeps the discarded twin below the entrance', () => {
+    // Conservative projected half-height of the tilted CSS cube, in cubes.
+    const halfCube = 0.9;
+    const halfMouth = 2.4 * 0.18;
+    expect(-FALL.lead + halfCube).toBeLessThan(-halfMouth);
+    expect(2 * FALL.drop - FALL.lead - halfCube).toBeGreaterThan(FALL.drop + halfMouth);
   });
 });
 
