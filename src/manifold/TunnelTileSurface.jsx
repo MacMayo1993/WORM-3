@@ -20,7 +20,8 @@ const vertexShader = `
     vTileCenter = uTileCenter;
     vec4 wp = modelMatrix * vec4(position, 1.0);
     float ends = sin(uv.y * 3.14159265)
-      * smoothstep(0.0, 0.14, uv.y) * smoothstep(1.0, 0.86, uv.y);
+      * smoothstep(0.0, 0.14, uv.y) * smoothstep(1.0, 0.86, uv.y)
+      * smoothstep(0.0, 0.10, abs(uv.y - 0.5));
     wp.xyz += uWhipAxis * (sin(uv.y * 12.0 - uWhipPhase) * uWhipAmp * ends);
     vWorldPos = wp.xyz;
     vec4 mv = viewMatrix * wp;

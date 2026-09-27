@@ -8,4 +8,5 @@ export const tunnelState = {
   activeTunnelId: null, // pairId of the tunnel the worm is currently traversing (null when idle)
   tunnel: null,    // that tunnel's descriptor ({ entry, exit } grid tiles), for the core's approach zoom
   coreZoom: 1,     // how swollen the antipodal core is right now (VoidCore); the ridden band meets it
+  coreZoomAnchor: null, // the fixed dock of that growth, in cube coordinates
 };

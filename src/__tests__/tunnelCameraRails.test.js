@@ -1,4 +1,4 @@
-import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelCameraTwistAt } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.js';
 import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
@@ -317,7 +317,7 @@ describe('tunnelCamPoseInto', () => {
           for (let t = 0; t <= 1; t += 0.01) {
             tunnelCamPoseInto(pose, tunnel, t, size);
             const arc = tunnelTToArc(path, t) - backForHead(t, size);
-            tunnelRideFrameInto(frame, path, arc, tunnelCameraTwistAt(path, arc));
+            tunnelCameraFrameInto(frame, path, arc);
             expect(pose.up.distanceTo(frame.normal)).toBeLessThan(1e-8);
           }
         }

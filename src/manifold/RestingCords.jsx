@@ -8,7 +8,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
-import { tunnelDockForMeshInto, tunnelDockWidth, tunnelGaugeAt } from '../utils/tunnelPath.js';
+import { tunnelDockForMeshInto, tunnelDockWidth, tunnelGaugeAt, makeTunnelPath, buildTunnelPathInto, tunnelPathRibbonInto, tunnelPathRibbonTangentInto, tunnelRibbonSampleU, tunnelCorePoseInto } from '../utils/tunnelPath.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 
 /**
@@ -39,7 +39,7 @@ import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
  */
 
 // Must be even: the segment at CORD_SEGS/2 is the gap hidden by the mini-cube body.
-const CORD_SEGS = 12;
+const CORD_SEGS = 32;
 const VERTS_PER_STRAND   = (CORD_SEGS + 1) * 2;
 const INDICES_PER_STRAND = (CORD_SEGS - 1) * 6;
 
@@ -97,7 +97,7 @@ const _tileGuard = makeTileGuard();
 const vertexShader = `
   attribute float aSide;      // -1 / +1 across the strip width
   attribute float aT;         // 0→1 along the strand
-  attribute vec3  aTangent;   // strand direction (piecewise constant per arm)
+  attribute vec3  aTangent;   // local direction along the curved strand
   attribute float aWidth;     // world-space strip width for this vertex
   attribute vec3  aColor;
   attribute float aHeat;      // flips / effective flip cap
@@ -250,20 +250,19 @@ function createCordGeometry(maxStrands) {
  *
  * Path matches MobiusTunnel.fillRibbon: startPos → midA (first arm), gap,
  * midB → endPos (second arm), narrowing to `dockWidth` (the core tile's width)
- * where it plugs in. Tangents are piecewise constant, so each arm needs one normalize.
+ * where it plugs in. Both arms follow the same smooth shoulders as the focus band.
  */
+const cordPath = makeTunnelPath();
+const cordPoint = new THREE.Vector3(), cordTangent = new THREE.Vector3();
 function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWidth, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0, charge = 0, front = 0) {
   const { pos, tan, col, side, tt, wid, heatArr, chargeArr, frontArr } = attrs;
   const halfSegs = CORD_SEGS / 2;
   const base = slot * VERTS_PER_STRAND;
 
-  const tAx = midAPos.x - startPos.x, tAy = midAPos.y - startPos.y, tAz = midAPos.z - startPos.z;
-  const tALen = Math.sqrt(tAx * tAx + tAy * tAy + tAz * tAz) || 1;
-  const tBx = endPos.x - midBPos.x, tBy = endPos.y - midBPos.y, tBz = endPos.z - midBPos.z;
-  const tBLen = Math.sqrt(tBx * tBx + tBy * tBy + tBz * tBz) || 1;
+  buildTunnelPathInto(cordPath, startPos, _faceNorm1, endPos, _faceNorm2, midAPos, midBPos);
 
   for (let i = 0; i <= CORD_SEGS; i++) {
-    const t     = i / CORD_SEGS;
+    const t = tunnelRibbonSampleU(i, CORD_SEGS);
     // Swell at whichever end is mid-flip, so the cord pulses with the tile
     // rather than only being dragged around by it.
     let w       = tunnelGaugeAt(Math.abs(2.0 * t - 1.0), width, Math.min(width, dockWidth)) * flipWidthPulse(t, flipP1, flipP2);
@@ -273,20 +272,10 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWi
       w *= 1 + Math.abs(charge) * (0.35 + 0.9 * Math.exp(-(((along - front) / 0.1) ** 2)));
     }
 
-    let cx, cy, cz, nx, ny, nz;
-    if (i <= halfSegs) {
-      const s = i / halfSegs;
-      cx = startPos.x + (midAPos.x - startPos.x) * s;
-      cy = startPos.y + (midAPos.y - startPos.y) * s;
-      cz = startPos.z + (midAPos.z - startPos.z) * s;
-      nx = tAx / tALen; ny = tAy / tALen; nz = tAz / tALen;
-    } else {
-      const s = (i - halfSegs) / halfSegs;
-      cx = midBPos.x + (endPos.x - midBPos.x) * s;
-      cy = midBPos.y + (endPos.y - midBPos.y) * s;
-      cz = midBPos.z + (endPos.z - midBPos.z) * s;
-      nx = tBx / tBLen; ny = tBy / tBLen; nz = tBz / tBLen;
-    }
+    tunnelPathRibbonInto(cordPoint, cordPath, t);
+    tunnelPathRibbonTangentInto(cordTangent, cordPath, t);
+    const { x: cx, y: cy, z: cz } = cordPoint;
+    const { x: nx, y: ny, z: nz } = cordTangent;
 
     // The strip is expanded camera-facing in the vertex shader, so which way it
     // spreads is not known here — but the offset is always aWidth/2 long, and a
@@ -341,6 +330,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
   // charge ends as well as while it runs.
   const chargeCacheRef = useRef(new Float32Array(maxStrands));
 
+  const previousZoom = useRef(1);
   const uniforms = useMemo(() => ({
     uTime:    { value: 0 },
     uOpacity: { value: IDLE_OPACITY },
@@ -369,7 +359,10 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
     let moved = forceRebuildRef.current;
     let slot  = 0;
     const nowMs = tunnelCharges.size ? performance.now() : 0;
-    const size = useGameStore.getState().size;
+    const state = useGameStore.getState(), size = state.size;
+    const coreZoom = state.wormHealerMode ? (tunnelState.coreZoom ?? 1) : 1;
+    if (coreZoom !== previousZoom.current) moved = true;
+    previousZoom.current = coreZoom;
     if (chargeCacheRef.current.length < maxStrands) chargeCacheRef.current = new Float32Array(maxStrands);
     const chargeCache = chargeCacheRef.current;
 
@@ -422,6 +415,8 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
       // Dock on the antipodal core's tiles beneath each mouth, matching the ribbon.
       tunnelDockForMeshInto(_midA, t.meshIdx1, t.dirKey1, size, mesh1);
       tunnelDockForMeshInto(_midB, t.meshIdx2, t.dirKey2, size, mesh2);
+      tunnelCorePoseInto(_midA, coreZoom, tunnelState.coreZoomAnchor);
+      tunnelCorePoseInto(_midB, coreZoom, tunnelState.coreZoomAnchor);
 
       const c = slot * 6;
       if (!moved) {
@@ -443,7 +438,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
         _colorB.set(t.color2);
         // Anchors after flip motion, so a shaking tile carries its guard plane.
         setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
-        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, tunnelDockWidth(size), _colorA, _colorB, heat, _tileGuard, flipP1, flipP2, charge, front);
+        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, tunnelDockWidth(size) * coreZoom, _colorA, _colorB, heat, _tileGuard, flipP1, flipP2, charge, front);
       }
       slot++;
     }

@@ -14,7 +14,7 @@ import {
   makeTunnelPath,
   buildTunnelPathInto,
   tunnelPathRibbonInto,
-  tunnelPathRibbonTangentInto,
+  tunnelPathRibbonTangentInto, tunnelRibbonSampleU, tunnelCorePoseInto,
   tunnelDockForMeshInto,
   tunnelDockWidth,
   tunnelMouthWidth,
@@ -44,7 +44,7 @@ const FACE_NORM_LOCAL = {
 // Band width comes from the shared gauge (tunnelPath.js): exactly the core tile's
 // width where the band plugs into the core, flaring gently to its own tile. The
 // rails stand a fixed share of the band's width, so a thin band has low rails.
-const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
+const RIBBON_SEGS    = 96;   // even; enough samples for the curved dock shoulders
 const REBUILD_EPS_SQ = 1e-4;
 const RAIL_RATIO     = 0.25; // guard-rail height as a share of the band's width
 
@@ -85,9 +85,11 @@ const vertexShader = `
 
   varying vec2 vUv;
   varying vec3 vWorldPos;
+  varying vec3 vSurfaceNormal;
 
   void main() {
     vUv = uv;
+    vSurfaceNormal = normalize(mat3(modelMatrix) * normal);
     vec4 wp = modelMatrix * vec4(position, 1.0);
 
     // Whip: a travelling transverse wave along the ribbon, pinned to zero at
@@ -102,7 +104,8 @@ const vertexShader = `
     // budget (tunnelTileGuard) cannot see this term, so hold it off the last
     // stretch entirely and let the pin be real.
     float ends = sin(vUv.y * 3.14159265)
-               * smoothstep(0.0, 0.14, vUv.y) * smoothstep(1.0, 0.86, vUv.y);
+               * smoothstep(0.0, 0.14, vUv.y) * smoothstep(1.0, 0.86, vUv.y)
+               * smoothstep(0.0, 0.10, abs(vUv.y - 0.5));
     wp.xyz += uWhipAxis * (sin(vUv.y * 12.0 - uWhipPhase) * uWhipAmp * ends);
 
     vWorldPos = wp.xyz;
@@ -138,6 +141,7 @@ const fragmentShader = `
   uniform float uSolitonAmp;       // 0 when no pulse, sin-eased envelope while travelling
   varying vec2  vUv;
   varying vec3  vWorldPos;
+  varying vec3  vSurfaceNormal;
   ${rideColorShader}
 
   // Cheap hash for per-column parallax variation (streaks at different "radii").
@@ -154,13 +158,17 @@ const fragmentShader = `
     if (uRideMode > 0.5) {
       vec3 base = rideColor(vUv.y);
       float edge = 1.0 - smoothstep(0.035, 0.06, min(vUv.x, 1.0 - vUv.x));
-      float phase = vUv.y * 10.0 - uTime * 0.18;
-      float footprint = max(fwidth(phase), 0.002);
-      float dash = 1.0 - smoothstep(0.055, 0.055 + footprint, abs(fract(phase + 0.5) - 0.5));
-      dash *= 1.0 - smoothstep(0.12, 0.4, footprint);
-      float lane = smoothstep(0.28, 0.36, abs(vUv.x - 0.5));
-      vec3 color = mix(base * 0.65 + vec3(0.045), vec3(0.025, 0.035, 0.045), edge);
-      color += base * dash * lane * 0.22;
+      // A soft, glossy ribbon in the same colors as the cubies. Its shading
+      // follows the curve instead of painting a flat road with dashed lanes.
+      vec3 n = normalize(vSurfaceNormal);
+      vec3 view = normalize(cameraPosition - vWorldPos);
+      if (dot(n, view) < 0.0) n = -n;
+      vec3 key = normalize(vec3(0.4, 0.85, 0.6));
+      float shade = 0.58 + 0.28 * max(0.0, dot(n, key));
+      float gloss = pow(max(0.0, dot(n, normalize(key + view))), 32.0);
+      float flow = 0.5 + 0.5 * sin(vUv.y * 18.0 - uTime * 1.1);
+      vec3 color = base * (shade + flow * 0.035) + vec3(gloss * 0.14);
+      color = mix(color, base * 0.28 + vec3(0.012), edge * 0.65);
       gl_FragColor = vec4(color, 1.0);
       #include <colorspace_fragment>
       return;
@@ -262,7 +270,8 @@ const bumperVertexShader = `
     // while the ribbon snapped out from under them.
     vec3  p    = position;
     float ends = sin(aTripFrac * 3.14159265)
-               * smoothstep(0.0, 0.14, aTripFrac) * smoothstep(1.0, 0.86, aTripFrac);
+               * smoothstep(0.0, 0.14, aTripFrac) * smoothstep(1.0, 0.86, aTripFrac)
+               * smoothstep(0.0, 0.10, abs(aTripFrac - 0.5));
     p += uWhipAxis * (sin(aTripFrac * 12.0 - uWhipPhase) * uWhipAmp * ends);
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
@@ -328,7 +337,7 @@ const bumperFragmentShader = `
  */
 function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, mouthW, dockW, guard, flipP1 = 0, flipP2 = 0) {
   for (let i = 0; i <= segs; i++) {
-    const t     = i / segs;
+    const t = tunnelRibbonSampleU(i, segs);
     // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
     let w       = 0.5 * tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW) * flipWidthPulse(t, flipP1, flipP2);
 
@@ -342,6 +351,8 @@ function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, mouthW, dock
     if (w > room) w = room;
 
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
+    tunnelPathRibbonTangentInto(_segTangent, path, t);
+    _perpCurrent.addScaledVector(_segTangent, -_perpCurrent.dot(_segTangent)).normalize();
 
     for (let side = 0; side < 2; side++) {
       const sign = side === 0 ? -w : w;
@@ -370,7 +381,7 @@ function fillBumpers(
   path, axis, perpStart, segs, mouthW, dockW, guard
 ) {
   for (let i = 0; i <= segs; i++) {
-    const t     = i / segs;
+    const t = tunnelRibbonSampleU(i, segs);
     const gauge = tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW);
     let w       = gauge / 2;
     let bh      = RAIL_RATIO * gauge;
@@ -392,11 +403,8 @@ function fillBumpers(
 
     // Width (cross-section) direction with Möbius half-twist
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
-
-    // Segment tangent — per leg now, not per arm: the throat and the run to the
-    // core point in different directions, and rails built off a single per-arm
-    // tangent would lean out of the band at the mouth.
     tunnelPathRibbonTangentInto(_segTangent, path, t);
+    _perpCurrent.addScaledVector(_segTangent, -_perpCurrent.dot(_segTangent)).normalize();
 
     // Surface normal: tangent × perpCurrent — rotates 180° over the ribbon length
     _surfaceNormal.crossVectors(_segTangent, _perpCurrent);
@@ -508,6 +516,8 @@ const MobiusTunnel = ({
   const lastStartRef     = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef       = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastGaugeRef     = useRef(-1);
+  const lastDockARef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
+  const lastDockBRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
 
   // Exit portal refs — group holds position/orientation; children animate independently
   const exitPortalGroupRef  = useRef();
@@ -628,16 +638,21 @@ const MobiusTunnel = ({
     // the core's copy of its slice is. Flip motion stays on the anchors only.
     tunnelDockForMeshInto(_midA, meshIdx1, dirKey1, state.size, mesh1);
     tunnelDockForMeshInto(_midB, meshIdx2, dirKey2, state.size, mesh2);
+    const coreZoom = wormMode ? (tunnelState.coreZoom ?? 1) : 1;
+    tunnelCorePoseInto(_midA, coreZoom, tunnelState.coreZoomAnchor);
+    tunnelCorePoseInto(_midB, coreZoom, tunnelState.coreZoomAnchor);
 
     // Gauge: plug into the core tile at its width. On a WORM ride the core swells
     // round the entry tile (VoidCore), so the ridden band widens with it to keep
     // meeting the tile the player sees; the worm's floor keeps its own width out
     // at the tiles.
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
-    const dockW = tunnelDockWidth(state.size) * (isActive && wormMode ? (tunnelState.coreZoom ?? 1) : 1);
+    const dockW = tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
 
     const moved = tileFlipping ||
+      lastDockARef.current.distanceToSquared(_midA) > 1e-12 ||
+      lastDockBRef.current.distanceToSquared(_midB) > 1e-12 ||
       Math.abs(dockW - lastGaugeRef.current) > 1e-4 ||
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
       lastEndRef  .current.distanceToSquared(_vEnd)   > REBUILD_EPS_SQ;
@@ -655,6 +670,7 @@ const MobiusTunnel = ({
       lastStartRef.current.copy(_vStart);
       lastEndRef  .current.copy(_vEnd);
       lastGaugeRef.current = dockW;
+      lastDockARef.current.copy(_midA); lastDockBRef.current.copy(_midB);
 
       // The route itself — throats along each tile's own world normal, docks on the
       // core tiles beneath them, crossing through the centre. Everything below sweeps this.

@@ -197,6 +197,7 @@ function VoidCore({ cubieRefs = null }) {
     f.zoom += (zoomTarget - f.zoom) * (1 - Math.exp(-dt * 10));
     if (Math.abs(f.zoom - 1) < 1e-4 && zoomTarget === 1) f.zoom = 1;
     tunnelState.coreZoom = wormMode ? f.zoom : 1;
+    tunnelState.coreZoomAnchor = f.dock;
     if (zoomRef.current) {
       zoomRef.current.scale.setScalar(f.zoom);
       zoomRef.current.position.copy(f.dock).multiplyScalar(1 - f.zoom);
@@ -215,7 +216,7 @@ function VoidCore({ cubieRefs = null }) {
       light.color.copy(_tint);
       light.intensity = exposure * (0.5 + 1.1 * energy) * (1 + f.flash * 1.5);
     }
-  });
+  }, -0.25); // publish the core pose before its attached ribbons/cords update
 
   return (
     <group ref={rootRef} name="antipodal-core">

@@ -33,6 +33,8 @@ import * as THREE from 'three';
 
 /** Half-width of the antipodal core cube at the centre (VoidCore.jsx). */
 export const TUNNEL_MINI_FACE_R = 0.25;
+/** Same surface plane as the miniature's glossy sticker. */
+export const TUNNEL_CORE_STICKER_OFFSET = 0.504;
 
 // ── The antipodal core and its docks ─────────────────────────────────────────
 // The centre holds a miniature of the cube, TUNNEL_MINI_FACE_R·2 wide at every
@@ -43,7 +45,7 @@ export const TUNNEL_MINI_FACE_R = 0.25;
 // showing where it came from). Because the miniature is a scaled copy about the
 // centre, "beneath" is exact: a tile's dock lies on the ray from the centre
 // through the tile, and a solved cube's partners, which are true antipodes,
-// give a straight diameter.
+// remain opposite, joined by a smooth route through the centre.
 
 /** How much the core shrinks an N×N cube: it is always TUNNEL_MINI_FACE_R·2 wide. */
 export const tunnelCoreScale = (size) => (2 * TUNNEL_MINI_FACE_R) / Math.max(1, size);
@@ -54,7 +56,13 @@ export const tunnelCoreScale = (size) => (2 * TUNNEL_MINI_FACE_R) / Math.max(1, 
  * normal; mid-turn both may carry the slice's rotation, which the core copies.
  */
 export function tunnelDockInto(out, centre, normal, size) {
-  return out.copy(normal).multiplyScalar(0.5).add(centre).multiplyScalar(tunnelCoreScale(size));
+  return out.copy(normal).multiplyScalar(TUNNEL_CORE_STICKER_OFFSET).add(centre).multiplyScalar(tunnelCoreScale(size));
+}
+
+/** The rendered core grows about its entry dock; every attached band follows. */
+export function tunnelCorePoseInto(out, zoom, anchor) {
+  if (anchor && zoom !== 1) out.sub(anchor).multiplyScalar(zoom).add(anchor);
+  return out;
 }
 
 // ── Gauge: how wide a tunnel is ──────────────────────────────────────────────
@@ -185,6 +193,9 @@ export function tunnelBoreRadiusAt(t) {
 
 // vStart → throatA → midA → core → midB → throatB → vEnd
 const LEG_COUNT = 6;
+const ARC_STEPS = 48;
+const _curvePoint = new THREE.Vector3(), _curvePrev = new THREE.Vector3();
+const _coreTangent = new THREE.Vector3();
 const _axial = new THREE.Vector3();
 const _dockSide = new THREE.Vector3();
 
@@ -201,6 +212,10 @@ export const makeTunnelPath = () => {
     vEnd: new THREE.Vector3(),     // exit sticker surface
     // Per-leg world lengths and the parameter span each leg occupies.
     legLen: [0, 0, 0, 0, 0, 0],
+    // Cubic shoulders and core crossing. The outer throats remain exactly axial.
+    legC1: Array.from({ length: LEG_COUNT }, () => new THREE.Vector3()),
+    legC2: Array.from({ length: LEG_COUNT }, () => new THREE.Vector3()),
+    legArc: Array.from({ length: LEG_COUNT }, () => new Float64Array(ARC_STEPS + 1)),
     legT: [0, 0, 0, 0, 0, 0],
     legT0: [0, 0, 0, 0, 0, 0],
     legArc0: [0, 0, 0, 0, 0, 0],
@@ -269,9 +284,32 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, do
   path.throatA.copy(vStart).addScaledVector(n1, -throatDepth(vStart, n1, path.midA));
   path.throatB.copy(vEnd).addScaledVector(n2, -throatDepth(vEnd, n2, path.midB));
 
+  // Meet both stickers square-on, with no kink at a throat or core dock.
+  // The handles are bounded by axial depth so corner routes cannot overshoot.
+  const bendA = Math.max(0, _axial.subVectors(path.throatA, path.midA).dot(path.nStart)) * 0.48;
+  const bendB = Math.max(0, _axial.subVectors(path.throatB, path.midB).dot(path.nEnd)) * 0.48;
+  path.legC1[1].copy(path.throatA).addScaledVector(path.nStart, -bendA);
+  path.legC2[1].copy(path.midA).addScaledVector(path.nStart, bendA);
+  path.legC1[4].copy(path.midB).addScaledVector(path.nEnd, bendB);
+  path.legC2[4].copy(path.throatB).addScaledVector(path.nEnd, -bendB);
+  _coreTangent.subVectors(path.midB, path.midA).normalize();
+  const coreHandle = Math.min(path.midA.length(), path.midB.length()) * 0.35;
+  path.legC1[2].copy(path.midA).addScaledVector(path.nStart, -coreHandle);
+  path.legC2[2].copy(path.core).addScaledVector(_coreTangent, -coreHandle);
+  path.legC1[3].copy(path.core).addScaledVector(_coreTangent, coreHandle);
+  path.legC2[3].copy(path.midB).addScaledVector(path.nEnd, -coreHandle);
+
   let total = 0;
   for (let i = 0; i < LEG_COUNT; i++) {
-    const len = path.legA[i].distanceTo(path.legB[i]);
+    const lut = path.legArc[i];
+    let len = 0;
+    _curvePrev.copy(path.legA[i]);
+    for (let j = 1; j <= ARC_STEPS; j++) {
+      legPointInto(_curvePoint, path, i, j / ARC_STEPS);
+      len += _curvePoint.distanceTo(_curvePrev);
+      lut[j] = len;
+      _curvePrev.copy(_curvePoint);
+    }
     path.legLen[i] = len;
     path.legArc0[i] = total;
     total += len;
@@ -280,7 +318,7 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, do
   path.armALen = path.legLen[0] + path.legLen[1];
   path.armBLen = path.legLen[4] + path.legLen[5];
 
-  // Split each arm's parameter span between its throat and its diagonal. By length
+  // Split each arm's parameter span between its throat and its curved shoulder. By length
   // the throat is the short one, so the floor is what usually decides — see
   // TUNNEL_THROAT_T_SHARE.
   const shareA = path.armALen > 0
@@ -308,6 +346,35 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, do
   return path;
 }
 
+// Evaluate a cubic and invert its small arc table without allocating. Every
+// consumer (rider, camera, ribbon and resting cord) samples this same curve.
+function legPointInto(out, path, leg, t) {
+  if (leg === 0 || leg === 5) return out.lerpVectors(path.legA[leg], path.legB[leg], t);
+  const v = 1 - t;
+  return out.copy(path.legA[leg]).multiplyScalar(v * v * v)
+    .addScaledVector(path.legC1[leg], 3 * v * v * t)
+    .addScaledVector(path.legC2[leg], 3 * v * t * t)
+    .addScaledVector(path.legB[leg], t * t * t);
+}
+function legParameter(path, leg, fraction) {
+  if (leg === 0 || leg === 5 || fraction <= 0 || fraction >= 1) return fraction;
+  const lut = path.legArc[leg], arc = fraction * path.legLen[leg];
+  let lo = 0, hi = ARC_STEPS;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (lut[mid] < arc) lo = mid; else hi = mid; }
+  const span = lut[hi] - lut[lo];
+  return (lo + (span > 0 ? (arc - lut[lo]) / span : 0)) / ARC_STEPS;
+}
+function legTangentInto(out, path, leg, t) {
+  if (leg === 0 || leg === 5) return out.subVectors(path.legB[leg], path.legA[leg]).normalize();
+  const v = 1 - t;
+  out.copy(path.legA[leg]).multiplyScalar(-v * v)
+    .addScaledVector(path.legC1[leg], v * v - 2 * v * t)
+    .addScaledVector(path.legC2[leg], 2 * v * t - t * t)
+    .addScaledVector(path.legB[leg], t * t);
+  if (out.lengthSq() < 1e-16) out.subVectors(path.legB[leg], path.legA[leg]);
+  return out.normalize();
+}
+
 /** Index of the last leg whose parameter span has started by t. */
 function legIndexForT(path, t) {
   for (let i = LEG_COUNT - 1; i >= 0; i--) {
@@ -322,7 +389,7 @@ export function tunnelPathPointInto(out, path, t) {
   const c = t < 0 ? 0 : t > 1 ? 1 : t;
   const i = legIndexForT(path, c);
   const f = path.legT[i] > 0 ? Math.min(1, Math.max(0, (c - path.legT0[i]) / path.legT[i])) : 0;
-  return out.lerpVectors(path.legA[i], path.legB[i], f);
+  return legPointInto(out, path, i, legParameter(path, i, f));
 }
 
 /** Convert traversal parameter t to world arc-length along the path. */
@@ -340,7 +407,7 @@ export function tunnelPathArcPointInto(out, path, arc) {
     if (path.legLen[i] <= 0) continue;
     if (a >= path.legArc0[i] || i === 0) {
       const f = Math.min(1, Math.max(0, (a - path.legArc0[i]) / path.legLen[i]));
-      return out.lerpVectors(path.legA[i], path.legB[i], f);
+      return legPointInto(out, path, i, legParameter(path, i, f));
     }
   }
   return out.copy(path.vEnd);
@@ -401,13 +468,33 @@ function ribbonFracForU(path, u, leg) {
 export function tunnelPathRibbonInto(out, path, u) {
   const c = u < 0 ? 0 : u > 1 ? 1 : u;
   const leg = ribbonLegForU(path, c);
-  return out.lerpVectors(path.legA[leg], path.legB[leg], ribbonFracForU(path, c, leg));
+  return legPointInto(out, path, leg, legParameter(path, leg, ribbonFracForU(path, c, leg)));
 }
 
-/** Write the unit tangent of the ribbon at u ∈ [0,1]. */
+/** Write the continuous unit tangent of the ribbon at u ∈ [0,1]. */
 export function tunnelPathRibbonTangentInto(out, path, u) {
-  const leg = ribbonLegForU(path, u < 0 ? 0 : u > 1 ? 1 : u);
-  out.subVectors(path.legB[leg], path.legA[leg]);
-  if (out.lengthSq() < 1e-12) out.set(0, 1, 0);
-  return out.normalize();
+  const c = Math.max(0, Math.min(1, u));
+  const leg = ribbonLegForU(path, c);
+  return legTangentInto(out, path, leg, legParameter(path, leg, ribbonFracForU(path, c, leg)));
+}
+
+export function tunnelPathArcTangentInto(out, path, arc) {
+  const a = Math.max(0, Math.min(path.total, arc));
+  for (let i = LEG_COUNT - 1; i >= 0; i--) {
+    if (path.legLen[i] <= 0) continue;
+    if (a >= path.legArc0[i] || i === 0) {
+      const f = Math.max(0, Math.min(1, (a - path.legArc0[i]) / path.legLen[i]));
+      return legTangentInto(out, path, i, legParameter(path, i, f));
+    }
+  }
+  return out.copy(path.nEnd);
+}
+
+// Two independent strips: reserve a vertex for EACH core dock. Previously the
+// exit strip started one whole segment away, leaving daylight at that join.
+export function tunnelRibbonSampleU(index, segments) {
+  const half = segments / 2;
+  if (index <= half) return index / segments;
+  if (index === half + 1) return 0.5 + Number.EPSILON;
+  return 0.5 + 0.5 * (index - half - 1) / (half - 1);
 }

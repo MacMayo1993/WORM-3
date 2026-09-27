@@ -8,8 +8,8 @@
 // any tile T shows T's partner. A tunnel then reads exactly as it runs — it dives
 // from T into the core tile that shows where it leads, crosses the centre, and
 // comes out of the core tile beneath the partner, which shows where it came
-// from (tunnelDockInto places those docks). On a solved cube the route is a
-// straight diameter.
+// from (tunnelDockInto places those docks). The route curves into each dock
+// along its face normal and crosses through the centre.
 //
 // The miniature follows the live cubie meshes, so a slice turn turns the same
 // slice of the core, and a tile keeps its partner's colour through the turn.
@@ -17,7 +17,7 @@
 // Pure helpers and shaders only; the React side lives in VoidCore.jsx.
 
 import * as THREE from 'three';
-import { TUNNEL_MINI_FACE_R, TUNNEL_CORE_TILE, tunnelCoreScale } from '../utils/tunnelPath.js';
+import { TUNNEL_MINI_FACE_R, TUNNEL_CORE_TILE, TUNNEL_CORE_STICKER_OFFSET, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
 /** Half-width of the core, where the tunnels dock. */
@@ -25,7 +25,7 @@ export const CORE_HALF = TUNNEL_MINI_FACE_R;
 /** A core sticker's width as a share of its cubie; tunnels plug in at this width. */
 export const CORE_STICKER = TUNNEL_CORE_TILE;
 /** Sticker front face offset from its cubie centre, in cubie units. */
-export const CORE_STICKER_OFFSET = 0.5 + 0.004;
+export const CORE_STICKER_OFFSET = TUNNEL_CORE_STICKER_OFFSET;
 
 export const CORE_DIRS = {
   PX: [1, 0, 0], NX: [-1, 0, 0], PY: [0, 1, 0], NY: [0, -1, 0], PZ: [0, 0, 1], NZ: [0, 0, -1]

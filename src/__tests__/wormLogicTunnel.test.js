@@ -75,11 +75,12 @@ describe('tunnel corner smoothing', () => {
   const sharp = new THREE.Vector3();
   const smooth = new THREE.Vector3();
 
-  it('rounds an interior corner — the smoothed point sits off the sharp vertex', () => {
-    const corner = cl.armALen; // where the entry diagonal meets the core crossing
+  it('keeps the rider exactly on the core dock of the shared smooth curve', () => {
+    const corner = cl.armALen;
     getTunnelArcPosInto(sharp, cl, corner);
     getTunnelArcPosSmoothInto(smooth, cl, corner);
-    expect(smooth.distanceTo(sharp)).toBeGreaterThan(0.01);
+    expect(smooth.distanceTo(sharp)).toBeLessThan(1e-12);
+    expect(smooth.distanceTo(cl.midA)).toBeLessThan(1e-12);
   });
 
   it('fades to the exact route at the mouths so the throat still threads the hole', () => {

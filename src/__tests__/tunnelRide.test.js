@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeTunnelCenterline, buildTunnelCenterlineInto } from '../worm/wormLogic.js';
-import { makeTunnelRideFrame, tunnelRideFrameInto, TUNNEL_RIDE_CLEARANCE, TUNNEL_RIDE_WIDTH, fillTunnelRideGeometry, tunnelRideCoreArc, tunnelRideTwistAt } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, TUNNEL_RIDE_CLEARANCE, TUNNEL_RIDE_WIDTH, fillTunnelRideGeometry, tunnelRideCoreArc, tunnelRideTwistAt, tunnelRideSampleArc } from '../utils/tunnelRide.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { tunnelDockWidth } from '../utils/tunnelPath.js';
 
@@ -55,7 +55,9 @@ describe('Möbius surface riding', () => {
         expect(f.normal.distanceTo(r.normal)).toBeLessThan(1e-8);
         const clearance = f.center.clone().sub(f.floor).dot(f.normal);
         expect(clearance).toBeGreaterThanOrEqual(-1e-10);
-        if (arc >= 0.25 && path.total - arc >= 0.25) expect(clearance).toBeCloseTo(TUNNEL_RIDE_CLEARANCE, 8);
+        expect(clearance).toBeLessThanOrEqual(TUNNEL_RIDE_CLEARANCE + 1e-10);
+        const dockDistance = Math.max(0, path.armALen - arc, arc - (path.total - path.armBLen));
+        if (arc >= 0.25 && path.total - arc >= 0.25 && dockDistance >= 0.35) expect(clearance).toBeCloseTo(TUNNEL_RIDE_CLEARANCE, 8);
       }
     }
   });
@@ -93,8 +95,8 @@ describe('Möbius surface riding', () => {
         .distanceTo(new THREE.Vector3().fromBufferAttribute(geo.attributes.position, i * 2 + 1));
       // Last sample on the entry arm, next to the dock: the band there is (all but)
       // the core tile's width, and through the crossing it is exactly that.
-      const iDock = Math.floor(path.armALen / path.total * 160);
-      const along = (path.armALen - iDock / 160 * path.total) / path.armALen;
+      const iDock = Math.round(path.armALen / path.total * 160);
+      const along = (path.armALen - tunnelRideSampleArc(path, iDock, 160)) / path.armALen;
       expect(width(iDock)).toBeCloseTo(dock + (TUNNEL_RIDE_WIDTH - dock) * along, 5);
       expect(width(iDock + 1)).toBeCloseTo(dock, 5);
       for (let i = 0; i <= 160; i++) expect(width(i)).toBeLessThanOrEqual(Math.max(TUNNEL_RIDE_WIDTH, dock) + 1e-9);
@@ -115,7 +117,7 @@ describe('Möbius surface riding', () => {
     fillTunnelRideGeometry(geo, left, right, path, 160);
     const f = makeTunnelRideFrame(), l = new THREE.Vector3(), r = new THREE.Vector3();
     for (let i = 0; i <= 160; i++) {
-      tunnelRideFrameInto(f, path, path.total * i / 160);
+      tunnelRideFrameInto(f, path, tunnelRideSampleArc(path, i, 160));
       l.fromBufferAttribute(geo.attributes.position, i * 2);
       r.fromBufferAttribute(geo.attributes.position, i * 2 + 1);
       expect(l.clone().lerp(r, 0.5).distanceTo(f.floor)).toBeLessThan(1e-6);
