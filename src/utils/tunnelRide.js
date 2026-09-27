@@ -1,13 +1,14 @@
 import * as THREE from 'three';
-import { tunnelPathArcPointInto, tunnelArmFractionAt, tunnelGaugeAt } from './tunnelPath.js';
+import { tunnelPathArcPointInto, tunnelPathArcTangentInto, tunnelArmFractionAt, tunnelGaugeAt } from './tunnelPath.js';
 
 // One swept surface for the track, recorded body and camera. The body centre
-// keeps its existing route; the floor is one bead radius underneath it.
+// follows the shared route; the floor is one bead radius underneath it,
+// tapering to the centerline where the band seats on a core sticker.
 export const TUNNEL_RIDE_CLEARANCE = 0.115;
 // The worm's floor at its widest, where the ride leaves a tile: room for the
 // body (a bead is TUNNEL_RIDE_CLEARANCE across its radius) and a little more.
 export const TUNNEL_RIDE_WIDTH = 0.36;
-const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+const a = new THREE.Vector3(), b = new THREE.Vector3();
 const prev = new THREE.Vector3(), next = new THREE.Vector3();
 const rotation = new THREE.Quaternion();
 const clamp = (v, max) => Math.max(0, Math.min(max, v));
@@ -31,23 +32,9 @@ export function tunnelCameraTwistAt(path, arc) {
   return THREE.MathUtils.smoothstep(arc, core - halfSpan, core + halfSpan);
 }
 
-export function tunnelRidePointInto(out, path, arc) {
-  const edge = Math.min(arc, path.total - arc);
-  const window = 0.34 * clamp(edge / 0.6, 1);
-  tunnelPathArcPointInto(out, path, arc);
-  if (window < 0.0001) return out;
-  // Exact box-filter integral of a polyline. Unlike three discrete taps this
-  // has a continuous tangent at a bend, so the worm and camera cannot snap.
-  for (let i = 1; i < path.legLen.length; i++) {
-    const distance = Math.abs(arc - path.legArc0[i]);
-    if (distance >= window || path.legLen[i - 1] < 1e-8 || path.legLen[i] < 1e-8) continue;
-    a.subVectors(path.legB[i - 1], path.legA[i - 1]).divideScalar(path.legLen[i - 1]);
-    b.subVectors(path.legB[i], path.legA[i]).divideScalar(path.legLen[i]);
-    c.subVectors(b, a);
-    out.addScaledVector(c, (window - distance) ** 2 / (4 * window));
-  }
-  return out;
-}
+// The shared path is already C1 continuous, including the dock tangents.
+// A separate corner filter would pull the ribbon away from the core sticker.
+export const tunnelRidePointInto = tunnelPathArcPointInto;
 
 export const makeTunnelRideFrame = () => ({
   center: new THREE.Vector3(), tangent: new THREE.Vector3(),
@@ -63,15 +50,8 @@ function forwardPath(path) {
   }
   return true;
 }
-const ahead = new THREE.Vector3(), behind = new THREE.Vector3();
 const FRAME_STEPS = 256;
-function tangentInto(out, path, arc) {
-  tunnelRidePointInto(ahead, path, Math.min(path.total, arc + 0.001));
-  tunnelRidePointInto(behind, path, Math.max(0, arc - 0.001));
-  out.subVectors(ahead, behind);
-  if (out.lengthSq() < 1e-10) out.copy(path.nStart).negate();
-  return out.normalize();
-}
+const tangentInto = tunnelPathArcTangentInto;
 function rideFrames(path) {
   const legs = path.legA.length;
   let cache = path.rideFrames;
@@ -113,17 +93,50 @@ export function tunnelRideFrameInto(out, path, arc, twist = tunnelRideTwistAt(pa
   out.right.crossVectors(out.tangent, out.normal).normalize();
   // Let the track grow out of the aperture without protruding over the tile.
   const mouth = THREE.MathUtils.smoothstep(Math.min(s, path.total - s), 0, 0.25);
-  out.floor.copy(out.center).addScaledVector(out.normal, -TUNNEL_RIDE_CLEARANCE * mouth);
+  // Seat the ribbon on its actual core tile. A fixed bead-radius offset here
+  // displaced small-board bands onto neighboring stickers (or off the cube).
+  const dockDistance = Math.max(0, path.armALen - s, s - (path.total - path.armBLen));
+  const seat = THREE.MathUtils.smoothstep(dockDistance, 0, 0.35);
+  out.floor.copy(out.center).addScaledVector(out.normal, -TUNNEL_RIDE_CLEARANCE * mouth * seat);
+  return out;
+}
+
+const cameraFrame = makeTunnelRideFrame();
+// The tiny core can bend the body over centimetres even on a 15×15 board. The
+// lens banks over a wider window while keeping the exact same centerline.
+export function tunnelCameraFrameInto(out, path, arc) {
+  const s = clamp(arc, path.total);
+  const window = 0.4 * THREE.MathUtils.smoothstep(Math.min(s, path.total - s), 0, 0.6);
+  out.normal.set(0, 0, 0); out.tangent.set(0, 0, 0);
+  for (let i = -4; i <= 4; i++) {
+    const sample = clamp(s + i * window / 4, path.total);
+    tunnelRideFrameInto(cameraFrame, path, sample, tunnelCameraTwistAt(path, sample));
+    out.normal.addScaledVector(cameraFrame.normal, 5 - Math.abs(i));
+    out.tangent.addScaledVector(cameraFrame.tangent, 5 - Math.abs(i));
+  }
+  out.tangent.normalize();
+  out.normal.addScaledVector(out.tangent, -out.normal.dot(out.tangent)).normalize();
+  out.right.crossVectors(out.tangent, out.normal).normalize();
   return out;
 }
 
 const frame = makeTunnelRideFrame();
+// Keep both docking cross-sections in the mesh even on large cubes, where the
+// miniature occupies less than one uniform segment of the complete route.
+export function tunnelRideSampleArc(path, index, segments) {
+  const dockA = Math.max(1, Math.min(segments - 3, Math.round(path.armALen / path.total * segments)));
+  const dockB = Math.max(dockA + 2, Math.min(segments - 1, Math.round((path.total - path.armBLen) / path.total * segments)));
+  if (index <= dockA) return index / dockA * path.armALen;
+  const endCore = path.total - path.armBLen;
+  if (index <= dockB) return path.armALen + (index - dockA) / (dockB - dockA) * (endCore - path.armALen);
+  return endCore + (index - dockB) / (segments - dockB) * path.armBLen;
+}
 // Writes the existing ribbon and bumper buffers; no new per-frame objects.
 // The band is `mouthWidth` where it leaves each tile and narrows to `dockWidth`
 // where it plugs into the core (see tunnelGaugeAt).
 export function fillTunnelRideGeometry(geo, left, right, path, segments, mouthWidth = TUNNEL_RIDE_WIDTH, dockWidth = TUNNEL_RIDE_WIDTH) {
   for (let i = 0; i <= segments; i++) {
-    const u = i / segments, arc = u * path.total;
+    const arc = tunnelRideSampleArc(path, i, segments), u = arc / (path.total || 1);
     tunnelRideFrameInto(frame, path, arc);
     const mouth = THREE.MathUtils.smoothstep(Math.min(arc, path.total - arc), 0, 0.3);
     const width = 0.5 * tunnelGaugeAt(tunnelArmFractionAt(path, arc), mouthWidth, dockWidth) * mouth;
@@ -133,9 +146,12 @@ export function fillTunnelRideGeometry(geo, left, right, path, segments, mouthWi
       a.copy(frame.floor).addScaledVector(frame.right, sign * width);
       geo.attributes.position.setXYZ(vi, a.x, a.y, a.z);
       geo.attributes.uv.setXY(vi, side, u);
+      geo.attributes.aDistance?.setX(vi, arc);
       const rail = side === 0 ? left : right;
       for (let h = 0; h < 2; h++) {
-        b.copy(a).addScaledVector(frame.normal, h * 0.035 * mouth);
+        const dockDistance = Math.max(0, path.armALen - arc, arc - (path.total - path.armBLen));
+        const seat = THREE.MathUtils.smoothstep(dockDistance, 0, 0.2);
+        b.copy(a).addScaledVector(frame.normal, h * 0.035 * mouth * seat);
         rail.attributes.position.setXYZ(i * 2 + h, b.x, b.y, b.z);
         rail.attributes.aHeightFrac.setX(i * 2 + h, h);
         rail.attributes.aTripFrac.setX(i * 2 + h, u);

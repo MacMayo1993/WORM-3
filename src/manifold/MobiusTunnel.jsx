@@ -1,5 +1,7 @@
 import { fillTunnelRideGeometry, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import TunnelTileSurface from './TunnelTileSurface.jsx';
+import { tunnelFinishGLSL } from './tunnelFinish.js';
+import { makeTunnelVeil, fillTunnelVeil, veilVertexShader, veilFragmentShader } from './tunnelRibbonVeil.js';
 import { PLATFORM_FORMATION_SECONDS, platformFormationHeld } from '../worm/platformFormation.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { WORM_PAD_HEIGHT } from '../game/raisedCubie.js';
@@ -14,7 +16,7 @@ import {
   makeTunnelPath,
   buildTunnelPathInto,
   tunnelPathRibbonInto,
-  tunnelPathRibbonTangentInto,
+  tunnelPathRibbonTangentInto, tunnelRibbonSampleU, tunnelCorePoseInto,
   tunnelDockForMeshInto,
   tunnelDockWidth,
   tunnelMouthWidth,
@@ -44,7 +46,7 @@ const FACE_NORM_LOCAL = {
 // Band width comes from the shared gauge (tunnelPath.js): exactly the core tile's
 // width where the band plugs into the core, flaring gently to its own tile. The
 // rails stand a fixed share of the band's width, so a thin band has low rails.
-const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
+const RIBBON_SEGS    = 96;   // even; enough samples for the curved dock shoulders
 const REBUILD_EPS_SQ = 1e-4;
 const RAIL_RATIO     = 0.25; // guard-rail height as a share of the band's width
 
@@ -58,6 +60,7 @@ const _faceNorm2     = new THREE.Vector3();
 const _vStart        = new THREE.Vector3();
 const _vEnd          = new THREE.Vector3();
 const _midA          = new THREE.Vector3();
+const _coreCenter    = new THREE.Vector3();
 const _midB          = new THREE.Vector3();
 const _axis          = new THREE.Vector3();
 const _perpBase      = new THREE.Vector3();
@@ -66,7 +69,6 @@ const _segTangent    = new THREE.Vector3();
 const _surfaceNormal = new THREE.Vector3();
 const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
-const _portalPos     = new THREE.Vector3();
 const _whipAxis      = new THREE.Vector3();
 const _ribbonPt      = new THREE.Vector3();
 // Half-space pair keeping ribbon and rails behind the two stickers they hang off.
@@ -82,12 +84,17 @@ const vertexShader = `
   uniform vec3  uWhipAxis;   // world-space direction the ribbon snaps along
   uniform float uWhipAmp;    // 0 when idle; decaying envelope during a flip
   uniform float uWhipPhase;  // advances with the soliton, so the wave travels
+  attribute float aDistance;
 
   varying vec2 vUv;
+  varying float vDistance;
   varying vec3 vWorldPos;
+  varying vec3 vSurfaceNormal;
 
   void main() {
     vUv = uv;
+    vDistance = aDistance;
+    vSurfaceNormal = normalize(mat3(modelMatrix) * normal);
     vec4 wp = modelMatrix * vec4(position, 1.0);
 
     // Whip: a travelling transverse wave along the ribbon, pinned to zero at
@@ -102,7 +109,8 @@ const vertexShader = `
     // budget (tunnelTileGuard) cannot see this term, so hold it off the last
     // stretch entirely and let the pin be real.
     float ends = sin(vUv.y * 3.14159265)
-               * smoothstep(0.0, 0.14, vUv.y) * smoothstep(1.0, 0.86, vUv.y);
+               * smoothstep(0.0, 0.14, vUv.y) * smoothstep(1.0, 0.86, vUv.y)
+               * smoothstep(0.0, 0.10, abs(vUv.y - 0.5));
     wp.xyz += uWhipAxis * (sin(vUv.y * 12.0 - uWhipPhase) * uWhipAmp * ends);
 
     vWorldPos = wp.xyz;
@@ -113,8 +121,7 @@ const vertexShader = `
 // Ribbon fragment shader.
 // vUv.y: 0 = tile1 end, 0.5 = centre (VoidCore), 1 = tile2 end.
 // Each half is the solid color of its own tile — no cross-blending.
-// Scroll flows toward the centre from both ends so movement reads as "into the tunnel".
-// uScrollSpeed is modulated by tunnel progress so it accelerates at the Möbius midpoint.
+// Slow spiral light echoes the intro without moving the physical floor.
 const rideColorShader = `
   vec3 rideColor(float trip) {
     // Two solid endpoint colors, with only pixel-width filtering at the core.
@@ -123,121 +130,29 @@ const rideColorShader = `
   }
 `;
 const fragmentShader = `
-  uniform vec3  uColorA;
-  uniform vec3  uColorB;
-  uniform float uOpacity;
-  uniform float uRideMode;
-  uniform float uRideCore;
-  uniform float uTime;
-  uniform float uScrollSpeed;
-  uniform float uGrowT;
-  uniform float uPulseBoost;
-  uniform float uSolitonProgress;  // 0→1 position of the flip pulse along the ribbon
-  uniform float uIdlePadProgress;
-  uniform float uIdlePadAmp;
-  uniform float uSolitonAmp;       // 0 when no pulse, sin-eased envelope while travelling
-  varying vec2  vUv;
-  varying vec3  vWorldPos;
-  ${rideColorShader}
-
-  // Cheap hash for per-column parallax variation (streaks at different "radii").
-  float hash(float n) { return fract(sin(n * 91.3458) * 47453.5453); }
-
+  uniform vec3 uColorA, uColorB;
+  uniform float uOpacity, uRideMode, uRideCore, uTime;
+  uniform float uGrowT, uPulseBoost, uSolitonProgress, uSolitonAmp;
+  uniform float uIdlePadProgress, uIdlePadAmp;
+  varying vec2 vUv;
+  varying float vDistance;
+  varying vec3 vWorldPos, vSurfaceNormal;
+  ${tunnelFinishGLSL}
   void main() {
-    // Tunnel birth grow-in: left beam from tile1 toward centre, right beam from tile2.
-    float leftFront  = uGrowT * 0.5;
-    float rightFront = 1.0 - uGrowT * 0.5;
+    float leftFront = uGrowT * 0.5, rightFront = 1.0 - leftFront;
     if (vUv.y > leftFront && vUv.y < rightFront) discard;
-
-    // WORM: an opaque, filtered track. No white-hot hash streaks, Fresnel
-    // wash or transparent floor drawn over the body from the far side.
-    if (uRideMode > 0.5) {
-      vec3 base = rideColor(vUv.y);
-      float edge = 1.0 - smoothstep(0.035, 0.06, min(vUv.x, 1.0 - vUv.x));
-      float phase = vUv.y * 10.0 - uTime * 0.18;
-      float footprint = max(fwidth(phase), 0.002);
-      float dash = 1.0 - smoothstep(0.055, 0.055 + footprint, abs(fract(phase + 0.5) - 0.5));
-      dash *= 1.0 - smoothstep(0.12, 0.4, footprint);
-      float lane = smoothstep(0.28, 0.36, abs(vUv.x - 0.5));
-      vec3 color = mix(base * 0.65 + vec3(0.045), vec3(0.025, 0.035, 0.045), edge);
-      color += base * dash * lane * 0.22;
-      gl_FragColor = vec4(color, 1.0);
-      #include <colorspace_fragment>
-      return;
-    }
-
-    // Each half shows its own tile's color …
-    vec3 tileColor = vUv.y < 0.5 ? uColorA : uColorB;
-
-    // … but at the Möbius midpoint the two colors fuse into a bright plasma bridge —
-    // the visual statement that these two tiles are the SAME point in RP2. (#3)
-    float seam = 1.0 - smoothstep(0.0, 0.17, abs(vUv.y - 0.5));
-    seam *= seam;
-    float seamFlicker = 0.82 + 0.18 * sin(uTime * 6.0 + vUv.x * 12.0);
-    vec3  plasmaCol   = mix((uColorA + uColorB) * 0.7, vec3(1.0), 0.35);
-    tileColor = mix(tileColor, plasmaCol, seam * seamFlicker);
-
-    // Scroll toward centre from each tile end (halfPos: 0=tile edge, 1=centre).
-    float halfPos = vUv.y < 0.5 ? vUv.y * 2.0 : (1.0 - vUv.y) * 2.0;
-
-    // Near racing stripes.
-    float scroll = fract(halfPos * 4.0 - uTime * uScrollSpeed);
-    float spark  = (1.0 - smoothstep(0.0, 0.08, scroll)) * 0.6;
-
-    // Far parallax warp-streaks: finer, slower, per-column offset. Two speeds read
-    // as depth — you're looking INTO a shaft, not at a painted band. (#2)
-    float colOff    = hash(floor(vUv.x * 7.0));
-    float farScroll = fract(halfPos * 9.0 - uTime * uScrollSpeed * 0.42 + colOff);
-    float farStreak = (1.0 - smoothstep(0.0, 0.045, farScroll)) * 0.32;
-
-    // Cylindrical depth illusion: ribbon reads as a 3D tube rather than a flat band.
-    // centerBulge peaks at U=0.5 (ribbon centre) and falls off toward edges.
-    float centerBulge = 1.0 - pow(abs(vUv.x * 2.0 - 1.0), 0.6);
-    float shading = 0.58 + centerBulge * 0.64;
-
-    // Depth fade: full intensity where the worm is (near halfPos=1 / midpoint),
-    // softer at tile-end portals so the tunnel has visual perspective depth.
-    float depthFade = 0.32 + halfPos * 0.68;
-
-    // Fresnel silhouette glow — reconstruct the flat ribbon normal from screen-space
-    // derivatives and glow at grazing angles, so the tunnel reads as a lit volume. (#1)
-    vec3  dpdx  = dFdx(vWorldPos);
-    vec3  dpdy  = dFdy(vWorldPos);
-    vec3  ncr   = cross(dpdx, dpdy);
-    vec3  N     = length(ncr) > 1e-6 ? normalize(ncr) : vec3(0.0, 0.0, 1.0);
-    vec3  V     = normalize(cameraPosition - vWorldPos);
-    float fres  = pow(1.0 - abs(dot(N, V)), 3.0);
-
-    // Travelling light-soliton: a flip fires a bright pulse from the entry tile,
-    // through the centre, out to its antipodal partner — the identification event. (#5)
-    float sol = exp(-pow((vUv.y - uSolitonProgress) / 0.055, 2.0)) * uSolitonAmp;
-    // Idle impacts enter from both mouths and meet at the Core; travel retains
-    // the existing one-way soliton. This changes uniforms, never anchor geometry.
-    float idleDistance = min(abs(vUv.y - uIdlePadProgress), abs(vUv.y - (1.0 - uIdlePadProgress)));
-    sol += exp(-pow(idleDistance / 0.055, 2.0)) * uIdlePadAmp;
-
-    float intensity = (0.75 + spark + farStreak * depthFade + uPulseBoost * 0.3) * shading * depthFade;
-    intensity += seam * 0.85;   // plasma bridge blooms
-    intensity += fres * 0.9;    // rim glow
-    intensity += sol * 1.6;     // travelling pulse
-
-    // A restrained bright leading edge makes the two growing halves legible.
-    float frontDistance = min(abs(vUv.y - leftFront), abs(vUv.y - rightFront));
-    float birthFront = (1.0 - smoothstep(0.0, 0.035, frontDistance)) * (1.0 - step(1.0, uGrowT));
-    vec3 col = tileColor * (intensity + birthFront * 0.8);
-    col = mix(col, vec3(1.0), clamp(sol, 0.0, 0.85)); // soliton core reads white-hot
-
-    float edgeFade     = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
-    float boostOpacity = uOpacity + uPulseBoost * 0.45 + fres * 0.35 + sol * 0.5;
-
-    // Black border along each ribbon edge
-    float leftEdge    = 1.0 - smoothstep(0.0, 0.055, vUv.x);
-    float rightEdge   = 1.0 - smoothstep(1.0, 0.945, vUv.x);
-    float edgeOutline = clamp(leftEdge + rightEdge, 0.0, 1.0);
-
-    vec3  finalCol   = mix(col * (1.0 + uPulseBoost * 1.2), vec3(0.0), edgeOutline);
-    float finalAlpha = max(boostOpacity * edgeFade, edgeOutline * 0.88);
-    gl_FragColor = vec4(finalCol, finalAlpha);
+    float core = uRideMode > 0.5 ? uRideCore : 0.5;
+    float aa = max(fwidth(vUv.y), 0.00001);
+    vec3 base = mix(uColorA, uColorB, smoothstep(core - aa, core + aa, vUv.y));
+    vec3 color = tunnelSatin(base, vSurfaceNormal, normalize(cameraPosition - vWorldPos), vUv, vDistance, uTime);
+    float pulse = exp(-pow((vUv.y - uSolitonProgress) / 0.055, 2.0)) * uSolitonAmp;
+    float idle = min(abs(vUv.y - uIdlePadProgress), abs(vUv.y - (1.0 - uIdlePadProgress)));
+    pulse += exp(-pow(idle / 0.055, 2.0)) * uIdlePadAmp;
+    float front = min(abs(vUv.y - leftFront), abs(vUv.y - rightFront));
+    float birth = (1.0 - smoothstep(0.0, 0.025, front)) * (1.0 - step(1.0, uGrowT));
+    color += mix(base, vec3(0.9, 0.96, 1.0), 0.35) * (pulse * 0.35 + birth * 0.3 + uPulseBoost * 0.15);
+    gl_FragColor = vec4(color, uRideMode > 0.5 ? 1.0 : min(1.0, uOpacity + 0.12));
+    #include <colorspace_fragment>
   }
 `;
 
@@ -262,54 +177,27 @@ const bumperVertexShader = `
     // while the ribbon snapped out from under them.
     vec3  p    = position;
     float ends = sin(aTripFrac * 3.14159265)
-               * smoothstep(0.0, 0.14, aTripFrac) * smoothstep(1.0, 0.86, aTripFrac);
+               * smoothstep(0.0, 0.14, aTripFrac) * smoothstep(1.0, 0.86, aTripFrac)
+               * smoothstep(0.0, 0.10, abs(aTripFrac - 0.5));
     p += uWhipAxis * (sin(aTripFrac * 12.0 - uWhipPhase) * uWhipAmp * ends);
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
   }
 `;
 
-// Bumper fragment shader: solid neon colour, fading at the top edge.
-// The Möbius half-twist continuously rotates the surface normal, so the
-// bumper that starts pointing "up" at tile 1 ends pointing "down" at tile 2
-// — the non-orientability of RP2 made physically visible.
-// At the halfway point (vTripFrac ≈ 0.5) a bright glow marks the exact flip moment.
+// Pearly lips follow the same half-twist and endpoint colors as the spine.
 const bumperFragmentShader = `
-  uniform vec3  uColor;
-  uniform vec3  uColorA;
-  uniform vec3  uColorB;
-  uniform float uRideCore;
-  uniform float uOpacity;
-  uniform float uRideMode;
-  uniform float uGrowT;
-  varying float vHeightFrac;
-  varying float vTripFrac;
+  uniform vec3 uColorA, uColorB;
+  uniform float uRideCore, uOpacity, uRideMode, uGrowT;
+  varying float vHeightFrac, vTripFrac;
   ${rideColorShader}
-
   void main() {
     if (vTripFrac > uGrowT * 0.5 && vTripFrac < 1.0 - uGrowT * 0.5) discard;
-    if (uRideMode > 0.5) {
-      gl_FragColor = vec4(rideColor(vTripFrac) * 0.7 + vec3(0.06), 1.0);
-      #include <colorspace_fragment>
-      return;
-    }
-    float topFade = 1.0 - smoothstep(0.6, 1.0, vHeightFrac);
-
-    // Möbius flip highlight: glows white near the halfway point (t=0.5),
-    // where the surface normal has rotated 90° and non-orientability is most dramatic.
-    float flipDist = abs(vTripFrac - 0.5);
-    float flipGlow = smoothstep(0.10, 0.0, flipDist);
-
-    // Black outline at base and top of each guard rail — makes bumpers feel like solid barriers
-    float baseOutline = 1.0 - smoothstep(0.0, 0.15, vHeightFrac);
-    float topOutline  = (1.0 - smoothstep(1.0, 0.80, vHeightFrac)) * topFade;
-    float outline     = clamp(baseOutline + topOutline, 0.0, 1.0);
-
-    // Flip point brightens toward white; rest of bumper uses neon base color
-    vec3 flipColor  = mix(uColor * 2.2, vec3(1.0, 1.0, 1.0), flipGlow * 0.55);
-    vec3  finalCol  = mix(flipColor * 1.8, vec3(0.0), outline);
-    float finalAlpha = max(uOpacity * topFade * (1.0 + flipGlow * 0.5), outline * 0.92);
-    gl_FragColor = vec4(finalCol, finalAlpha);
+    vec3 base = rideColor(vTripFrac);
+    vec3 lip = mix(base, vec3(0.9, 0.96, 1.0), 0.38);
+    vec3 color = mix(base * 0.6, lip * 0.9, smoothstep(0.4, 1.0, vHeightFrac));
+    gl_FragColor = vec4(color, uRideMode > 0.5 ? 1.0 : uOpacity * 0.85);
+    #include <colorspace_fragment>
   }
 `;
 
@@ -326,9 +214,12 @@ const bumperFragmentShader = `
  * arm, so |2t − 1| is how far along the arm from the dock it is).
  * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
-function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, mouthW, dockW, guard, flipP1 = 0, flipP2 = 0) {
+function fillRibbon(posArray, uvArray, distanceArray, path, axis, perpStart, segs, mouthW, dockW, guard, flipP1 = 0, flipP2 = 0) {
   for (let i = 0; i <= segs; i++) {
-    const t     = i / segs;
+    const t = tunnelRibbonSampleU(i, segs);
+    // Each exposed arm owns half the UV range, but not half the route length.
+    // Compute before Float32 UV storage rounds the distinct exit dock to 0.5.
+    const arc = t <= 0.5 ? t * 2 * path.armALen : path.total - (1 - t) * 2 * path.armBLen;
     // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
     let w       = 0.5 * tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW) * flipWidthPulse(t, flipP1, flipP2);
 
@@ -342,6 +233,8 @@ function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, mouthW, dock
     if (w > room) w = room;
 
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
+    tunnelPathRibbonTangentInto(_segTangent, path, t);
+    _perpCurrent.addScaledVector(_segTangent, -_perpCurrent.dot(_segTangent)).normalize();
 
     for (let side = 0; side < 2; side++) {
       const sign = side === 0 ? -w : w;
@@ -352,6 +245,7 @@ function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, mouthW, dock
       const ui = (i * 2 + side) * 2;
       uvArray[ui]     = side;
       uvArray[ui + 1] = t;
+      distanceArray[i * 2 + side] = arc;
     }
   }
 }
@@ -370,7 +264,7 @@ function fillBumpers(
   path, axis, perpStart, segs, mouthW, dockW, guard
 ) {
   for (let i = 0; i <= segs; i++) {
-    const t     = i / segs;
+    const t = tunnelRibbonSampleU(i, segs);
     const gauge = tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW);
     let w       = gauge / 2;
     let bh      = RAIL_RATIO * gauge;
@@ -392,11 +286,8 @@ function fillBumpers(
 
     // Width (cross-section) direction with Möbius half-twist
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
-
-    // Segment tangent — per leg now, not per arm: the throat and the run to the
-    // core point in different directions, and rails built off a single per-arm
-    // tangent would lean out of the band at the mouth.
     tunnelPathRibbonTangentInto(_segTangent, path, t);
+    _perpCurrent.addScaledVector(_segTangent, -_perpCurrent.dot(_segTangent)).normalize();
 
     // Surface normal: tangent × perpCurrent — rotates 180° over the ribbon length
     _surfaceNormal.crossVectors(_segTangent, _perpCurrent);
@@ -455,6 +346,7 @@ function createRibbonGeos(segs, continuous = false) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertCount * 3), 3));
   geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(vertCount * 2), 2));
+  geo.setAttribute('aDistance', new THREE.BufferAttribute(new Float32Array(vertCount), 1));
   geo.setIndex(mainIndices);
 
   // Bumper geometries — include aTripFrac (t along ribbon) for the flip-point highlight
@@ -471,7 +363,7 @@ function createRibbonGeos(segs, continuous = false) {
 }
 
 /**
- * MobiusTunnel — the FOCUS tier: one Möbius ribbon + two guard-rail bumpers + exit portal.
+ * MobiusTunnel — the FOCUS tier: one Möbius ribbon, two edge rails, and an open translucent veil.
  *
  * This is the expensive, high-fidelity render, and it is deliberately rare. WormholeNetwork
  * mounts at most FOCUS_BUDGET of these — the tunnel the worm is traversing plus the most
@@ -479,15 +371,15 @@ function createRibbonGeos(segs, continuous = false) {
  * merged, cheaply-shaded strand. Nothing here should be made cheaper for density's sake;
  * density is the resting tier's job.
  *
- * Racing stripes scroll toward the center mini-cube from both tile ends (Rainbow Road feel).
- * Scroll speed accelerates at the Möbius midpoint (t=0.5) when the worm is traversing,
- * giving a sense of acceleration through the topological twist.
+ * The opaque satin spine carries a half-twist. Two translucent curled sides
+ * borrow the intro passages' ribs and spiral light while leaving the top open.
+ * They reuse the exact ribbon edge and rail frames, with no new travel route.
  *
  * Bumpers on each ribbon edge physically rotate 180° over the ribbon length due to the
  * Möbius half-twist, going from upright to inverted — demonstrating RP2 non-orientability.
  * A bright glow at the halfway point marks the exact flip moment.
  *
- * Exit portal shows a layered glow + orbiting rings — the destination reads as a real place.
+ * The actual core sticker is the destination; no floating portal planes cover it.
  */
 const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
@@ -496,6 +388,7 @@ const MobiusTunnel = ({
 }) => {
   const flipCap          = useGameStore(selectEffectiveFlipCap);
   const wormMode = useGameStore(s => s.wormHealerMode);
+  const detailed = useGameStore(s => !s.perfReducedFX);
   const ribbonMode = wormMode || raisedPresentation;
   const styled = style1 !== 'solid' || style2 !== 'solid';
   const groupRef = useRef();
@@ -503,18 +396,15 @@ const MobiusTunnel = ({
   const meshRef          = useRef();
   const formationAge = useRef(0);
   const pulseT           = useRef(Math.random() * Math.PI * 2);
-  const portalPulseT     = useRef(Math.random() * Math.PI * 2);
   const dimRef           = useRef(WORM_IDLE_OPACITY);
   const lastStartRef     = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef       = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastGaugeRef     = useRef(-1);
-
-  // Exit portal refs — group holds position/orientation; children animate independently
-  const exitPortalGroupRef  = useRef();
-  const exitPortalMatRef    = useRef();
-  const exitPortalGlowRef   = useRef();
+  const lastDockARef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
+  const lastDockBRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
 
   const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(segments, ribbonMode), [segments, ribbonMode]);
+  const veilGeo = useMemo(() => detailed ? makeTunnelVeil(segments, ribbonMode) : null, [segments, ribbonMode, detailed]);
 
   // Whip uniforms are created once and spread BY REFERENCE into the ribbon and
   // both bumper materials, so all three read the same {value} objects and stay
@@ -536,7 +426,6 @@ const MobiusTunnel = ({
     uTileCenterA: { value: new THREE.Vector3() },
     uTileCenterB: { value: new THREE.Vector3() },
     uTime:        { value: 0.0 },
-    uScrollSpeed: { value: 1.0 },
     uGrowT:       { value: 1.0 },
     uPulseBoost:  { value: 0.0 },
     uIdlePadProgress: { value: 0 },
@@ -547,7 +436,6 @@ const MobiusTunnel = ({
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bumperUniformsL = useMemo(() => ({
-    uColor:   { value: new THREE.Color(color1) },
     uColorA: uniforms.uColorA,
     uColorB: uniforms.uColorB,
     uRideCore: uniforms.uRideCore,
@@ -558,7 +446,6 @@ const MobiusTunnel = ({
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bumperUniformsR = useMemo(() => ({
-    uColor:   { value: new THREE.Color(color2) },
     uColorA: uniforms.uColorA,
     uColorB: uniforms.uColorB,
     uRideCore: uniforms.uRideCore,
@@ -574,10 +461,6 @@ const MobiusTunnel = ({
     const cB = dead ? '#444444' : color2;
     uniforms.uColorA.value.set(cA);
     uniforms.uColorB.value.set(cB);
-    bumperUniformsL.uColor.value.set(cA);
-    bumperUniformsR.uColor.value.set(cB);
-    if (exitPortalMatRef.current) exitPortalMatRef.current.color.set(cB);
-    if (exitPortalGlowRef.current) exitPortalGlowRef.current.material.color.set(cB);
   }, [color1, color2, flips, flipCap, uniforms, bumperUniformsL, bumperUniformsR]);
 
   useEffect(() => {
@@ -585,6 +468,10 @@ const MobiusTunnel = ({
     const g = geo, lg = leftGeo, rg = rightGeo;
     return () => { g.dispose(); lg.dispose(); rg.dispose(); };
   }, [geo, leftGeo, rightGeo]);
+  useEffect(() => {
+    lastStartRef.current.set(Infinity, Infinity, Infinity);
+    return () => veilGeo?.dispose();
+  }, [veilGeo]);
 
   useFrame((_state, delta) => {
     const state = useGameStore.getState();
@@ -593,7 +480,7 @@ const MobiusTunnel = ({
     if (groupRef.current) groupRef.current.visible = !wormMode || !tunnelState.active || occupied;
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
     if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
-    if (wormMode && (state.wormPaused || !state.wormAlive || prefersReducedMotion())) delta = 0;
+    if (state.settings?.reducedMotion || prefersReducedMotion() || (wormMode && (state.wormPaused || !state.wormAlive))) delta = 0;
     const mesh1 = cubieRefs[meshIdx1];
     const mesh2 = cubieRefs[meshIdx2];
     if (!mesh1 || !mesh2 || !meshRef.current) return;
@@ -628,37 +515,38 @@ const MobiusTunnel = ({
     // the core's copy of its slice is. Flip motion stays on the anchors only.
     tunnelDockForMeshInto(_midA, meshIdx1, dirKey1, state.size, mesh1);
     tunnelDockForMeshInto(_midB, meshIdx2, dirKey2, state.size, mesh2);
+    // A head or recorded tail rides the simulation's fixed route. Applying the
+    // cosmetic core zoom here would move the track out from under that history
+    // and the camera, especially on the crossing and exit arm.
+    const coreZoom = wormMode && !occupied ? (tunnelState.coreZoom ?? 1) : 1;
+    tunnelCorePoseInto(_midA, coreZoom, tunnelState.coreZoomAnchor);
+    tunnelCorePoseInto(_midB, coreZoom, tunnelState.coreZoomAnchor);
+    tunnelCorePoseInto(_coreCenter.set(0, 0, 0), coreZoom, tunnelState.coreZoomAnchor);
 
-    // Gauge: plug into the core tile at its width. On a WORM ride the core swells
-    // round the entry tile (VoidCore), so the ridden band widens with it to keep
-    // meeting the tile the player sees; the worm's floor keeps its own width out
-    // at the tiles.
+    // Unoccupied bands follow the enlarged core; occupied bands keep the same
+    // width as well as the same route until their last body segment clears.
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
-    const dockW = tunnelDockWidth(state.size) * (isActive && wormMode ? (tunnelState.coreZoom ?? 1) : 1);
+    const dockW = tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
 
     const moved = tileFlipping ||
+      lastDockARef.current.distanceToSquared(_midA) > 1e-12 ||
+      lastDockBRef.current.distanceToSquared(_midB) > 1e-12 ||
       Math.abs(dockW - lastGaugeRef.current) > 1e-4 ||
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
       lastEndRef  .current.distanceToSquared(_vEnd)   > REBUILD_EPS_SQ;
 
-    // ── Scroll speed: accelerates at midpoint during active traversal ────────
-    // When the worm is inside this tunnel, ramp speed up around t=0.5 (the Möbius flip).
-    // Outside traversal, constant casual scroll.
-    const tp = isActive ? (tunnelState.t ?? 0) : 0;
-    uniforms.uScrollSpeed.value = isActive
-      ? 0.7 + 3.2 * Math.sin(Math.PI * tp)
-      : 1.0;
     uniforms.uTime.value += delta;
 
     if (moved) {
       lastStartRef.current.copy(_vStart);
       lastEndRef  .current.copy(_vEnd);
       lastGaugeRef.current = dockW;
+      lastDockARef.current.copy(_midA); lastDockBRef.current.copy(_midB);
 
       // The route itself — throats along each tile's own world normal, docks on the
       // core tiles beneath them, crossing through the centre. Everything below sweeps this.
-      buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _midA, _midB);
+      buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _midA, _midB, _coreCenter);
       uniforms.uPatternRepeats.value = _tunnelPath.total / mouthW;
       uniforms.uTileCenterA.value.copy(_wPos1);
       uniforms.uTileCenterB.value.copy(_wPos2);
@@ -683,17 +571,6 @@ const MobiusTunnel = ({
       // with it rather than letting the band slip out from behind the sticker.
       setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
 
-      // Exit portal group: place between VoidCore face and exit cubie, facing inward.
-      if (exitPortalGroupRef.current) {
-        _portalPos.copy(_midB).addScaledVector(_faceNorm2, 0.15);
-        exitPortalGroupRef.current.position.copy(_portalPos);
-        exitPortalGroupRef.current.lookAt(
-          _portalPos.x - _faceNorm2.x,
-          _portalPos.y - _faceNorm2.y,
-          _portalPos.z - _faceNorm2.z
-        );
-      }
-
       if (ribbonMode) {
         fillTunnelRideGeometry(geo, leftGeo, rightGeo, _tunnelPath, segments, mouthW, dockW);
         uniforms.uRideCore.value = tunnelRideCoreArc(_tunnelPath) / (_tunnelPath.total || 1);
@@ -701,6 +578,7 @@ const MobiusTunnel = ({
         fillRibbon(
           geo.attributes.position.array,
           geo.attributes.uv.array,
+          geo.attributes.aDistance.array,
           _tunnelPath,
           _axis, _perpBase,
           RIBBON_SEGS, mouthW, dockW, _tileGuard, flipP1, flipP2
@@ -719,7 +597,9 @@ const MobiusTunnel = ({
       }
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;
+      geo.attributes.aDistance.needsUpdate = true;
       geo.computeVertexNormals();
+      if (veilGeo) fillTunnelVeil(veilGeo, geo, leftGeo, _tunnelPath, segments, _tileGuard);
       leftGeo.attributes.position.needsUpdate    = true;
       leftGeo.attributes.aHeightFrac.needsUpdate  = true;
       leftGeo.attributes.aTripFrac.needsUpdate    = true;
@@ -749,23 +629,6 @@ const MobiusTunnel = ({
     bumperUniformsL.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
     bumperUniformsR.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
 
-    // ── Exit portal animation ────────────────────────────────────────────────
-    // Portal pulses and breathes; rings orbit at independent rates.
-    // When the active worm is approaching, portal scales up for anticipation.
-    portalPulseT.current += delta * 2.2;
-    const ppt = portalPulseT.current;
-    const proximityBoost = isActive ? 0.18 * Math.max(0, Math.sin(Math.PI * tp)) : 0;
-    const portalBreath = 1.0 + 0.08 * Math.sin(ppt) + proximityBoost;
-
-    if (exitPortalGroupRef.current) exitPortalGroupRef.current.scale.setScalar(portalBreath);
-
-    if (exitPortalMatRef.current) {
-      exitPortalMatRef.current.opacity = (0.60 + 0.18 * Math.sin(ppt)) * dim;
-    }
-    if (exitPortalGlowRef.current) {
-      exitPortalGlowRef.current.material.opacity = (0.30 + 0.12 * Math.sin(ppt + 0.8)) * dim;
-    }
-
     // Tunnel birth: grow-in from both portal ends toward centre (first flip only)
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
     let whipAmp = 0;
@@ -780,9 +643,7 @@ const MobiusTunnel = ({
       uniforms.uGrowT.value = burrow ? openness : reduced ? 1 : Math.min(progress,
         a?.formationTarget === 1 ? a.formationProgress : 1,
         b?.formationTarget === 1 ? b.formationProgress : 1);
-      // The portal appears with its emerging ribbon, not as a complete floating ring.
-      const portalScale = THREE.MathUtils.smoothstep(uniforms.uGrowT.value, 0, .22);
-      if (exitPortalGroupRef.current) exitPortalGroupRef.current.scale.multiplyScalar(portalScale);
+
     } else if (birth) {
       const rawT = (performance.now() - birth.startMs) / birth.durationMs;
       uniforms.uGrowT.value = Math.min(1, Math.max(0, rawT));
@@ -854,8 +715,8 @@ const MobiusTunnel = ({
 
   return (
     <group ref={groupRef}>
-      {/* Main ribbon — racing stripes scroll toward the mini-cube, speed ramps at midpoint.
-          frustumCulled is off on all three meshes here: vertex positions are written in world
+      {/* The solid Möbius spine stays readable inside the intro-inspired open curls.
+          frustumCulled is off here: vertex positions are written in world
           space into meshes parented at the origin, so the lazily-computed bounding sphere goes
           stale on the first rebuild and culling against it pops the ribbon in and out. */}
       <mesh ref={meshRef} geometry={geo} frustumCulled={false} visible={!styled}>
@@ -866,7 +727,7 @@ const MobiusTunnel = ({
           side={THREE.DoubleSide}
           transparent={!ribbonMode}
           depthWrite={ribbonMode}
-          toneMapped={!ribbonMode}
+          toneMapped={false}
           extensions={{ derivatives: true }}
         />
       </mesh>
@@ -885,7 +746,7 @@ const MobiusTunnel = ({
           side={THREE.DoubleSide}
           transparent={!ribbonMode}
           depthWrite={ribbonMode}
-          toneMapped={!ribbonMode}
+          toneMapped={false}
         />
       </mesh>
 
@@ -899,43 +760,14 @@ const MobiusTunnel = ({
           side={THREE.DoubleSide}
           transparent={!ribbonMode}
           depthWrite={ribbonMode}
-          toneMapped={!ribbonMode}
+          toneMapped={false}
         />
       </mesh>
 
-      {/* Exit portal group — positioned/oriented as one unit in useFrame */}
-      <group ref={exitPortalGroupRef} visible={!ribbonMode}>
-        {/* Additive glow bloom behind the portal face — larger than the portal itself */}
-        <mesh ref={exitPortalGlowRef} position={[0, 0, -0.01]}>
-          <planeGeometry args={[0.90, 0.90]} />
-          <meshBasicMaterial
-            color={color2}
-            transparent
-            opacity={0.30}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            side={THREE.FrontSide}
-          />
-        </mesh>
-
-        {/* Main portal face — solid exit color */}
-        <mesh>
-          <planeGeometry args={[0.55, 0.55]} />
-          <meshBasicMaterial
-            ref={exitPortalMatRef}
-            color={color2}
-            transparent
-            opacity={0.60}
-            depthWrite={false}
-            side={THREE.FrontSide}
-          />
-        </mesh>
-
-        {/* Orbiting torus rings removed — every tunnel's exit portal sits on the
-            central mini-cube face, so with many active tunnels the rings stacked
-            into a cluster of overlapping spinning circles at the cube's core.
-            The portal glow + face already read the tunnel mouth without the noise. */}
-      </group>
+      {veilGeo && <mesh name="tunnel-open-veil" geometry={veilGeo} frustumCulled={false} renderOrder={1}>
+        <shaderMaterial uniforms={uniforms} vertexShader={veilVertexShader} fragmentShader={veilFragmentShader}
+          side={THREE.DoubleSide} transparent depthWrite={false} toneMapped={false} extensions={{ derivatives: true }} />
+      </mesh>}
 
     </group>
   );

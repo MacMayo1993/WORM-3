@@ -1,4 +1,4 @@
-import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelCameraTwistAt } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.js';
 // src/worm/tunnelCameraRails.js
 //
 // The pose of the wormhole camera as a pure function of how far along the
@@ -187,7 +187,7 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
 
   // Follow the same transported frame, spreading the concealed half-turn over
   // the approach and departure so the camera circles the solid core smoothly.
-  tunnelRideFrameInto(_rideFrame, _camPath, camArc, tunnelCameraTwistAt(_camPath, camArc));
+  tunnelCameraFrameInto(_rideFrame, _camPath, camArc);
   out.up.copy(_rideFrame.normal);
   if (camArc >= 0 && camArc <= _camPath.total) out.tangent.copy(_rideFrame.tangent);
 

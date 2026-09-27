@@ -10,7 +10,7 @@ import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } fro
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildTunnelCenterlineInto, makeTunnelCenterline } from '../worm/wormLogic.js';
 import {
-  CORE_DIRS, CORE_HALF, CORE_STICKER, CORE_STICKER_LOCAL, CORE_ZOOM_MARGIN, CORE_INTERIOR_FILL,
+  CORE_DIRS, CORE_HALF, CORE_STICKER_OFFSET, CORE_STICKER, CORE_STICKER_LOCAL, CORE_ZOOM_MARGIN, CORE_INTERIOR_FILL,
   coreLayout, coreCellIndex, coreCubieMatrixInto, corePartnerColorId,
   coreZoomLimit, coreZoomAt, coreZoomReach,
   networkCharge, countFlippedStickers, interiorExposure
@@ -21,7 +21,7 @@ const SIZES = [2, 3, 4, 5, 7];
 const dockOf = (cell, size) => tunnelDockForCellInto(new THREE.Vector3(), cell.x, cell.y, cell.z, cell.dirKey, size);
 const stickerCentre = (cell, size) => {
   const k = (size - 1) / 2;
-  return V(cell.x - k, cell.y - k, cell.z - k).addScaledVector(V(...CORE_DIRS[cell.dirKey]), 0.5);
+  return V(cell.x - k, cell.y - k, cell.z - k).addScaledVector(V(...CORE_DIRS[cell.dirKey]), CORE_STICKER_OFFSET);
 };
 const colourUnder = (cubies, size, cell) =>
   corePartnerColorId(cubies, buildManifoldGridMap(cubies, size), size, cell, findAntipodalStickerByGrid);
@@ -44,7 +44,7 @@ describe('the antipodal core layout', () => {
       for (const cell of coreLayout(size).stickers) {
         coreCubieMatrixInto(cubie, cell.x, cell.y, cell.z, size);
         p.setFromMatrixPosition(sticker.multiplyMatrices(cubie, CORE_STICKER_LOCAL[cell.dirKey]));
-        expect(p.distanceTo(dockOf(cell, size))).toBeLessThan(s * 0.01);
+        expect(p.distanceTo(dockOf(cell, size))).toBeLessThan(1e-12);
       }
     }
   });
@@ -55,17 +55,16 @@ describe('tunnel docks on the core', () => {
     for (const size of SIZES) {
       for (const cell of coreLayout(size).stickers) {
         const dock = dockOf(cell, size);
-        expect(Math.max(...dock.toArray().map(Math.abs))).toBeCloseTo(CORE_HALF, 12);
+        expect(Math.max(...dock.toArray().map(Math.abs))).toBeCloseTo(CORE_HALF + (CORE_STICKER_OFFSET - 0.5) * tunnelCoreScale(size), 12);
         expect(dock.clone().normalize().distanceTo(stickerCentre(cell, size).normalize())).toBeLessThan(1e-12);
       }
     }
   });
 
-  it('places the centre tile of an odd cube at the face-centre dock', () => {
+  it('seats face-centre docks on the sticker front of an odd cube', () => {
     for (const size of [3, 5, 7]) {
       const c = (size - 1) / 2;
-      expect(dockOf({ x: c, y: size - 1, z: c, dirKey: 'PY' }, size).distanceTo(V(0, TUNNEL_MINI_FACE_R, 0)))
-        .toBeLessThan(1e-12);
+      expect(dockOf({ x: c, y: size - 1, z: c, dirKey: 'PY' }, size).toArray()).toEqual([0, (c + CORE_STICKER_OFFSET) * tunnelCoreScale(size), 0]);
     }
   });
 
@@ -75,7 +74,7 @@ describe('tunnel docks on the core', () => {
     const dock = tunnelDockForCellInto(new THREE.Vector3(), 2, 2, 0, 'NZ', 3, q);
     coreCubieMatrixInto(cubie, 2, 2, 0, 3, q);
     p.setFromMatrixPosition(sticker.multiplyMatrices(cubie, CORE_STICKER_LOCAL.NZ));
-    expect(p.distanceTo(dock)).toBeLessThan(tunnelCoreScale(3) * 0.01);
+    expect(p.distanceTo(dock)).toBeLessThan(1e-12);
     expect(dock.distanceTo(dockOf({ x: 2, y: 2, z: 0, dirKey: 'NZ' }, 3).applyQuaternion(q))).toBeLessThan(1e-12);
   });
 
@@ -84,10 +83,10 @@ describe('tunnel docks on the core', () => {
     const a = tunnelDockForMeshInto(new THREE.Vector3(), coreCellIndex(3, 0, 1, 4), 'PX', 4, mesh);
     expect(a.toArray()).toEqual(dockOf({ x: 3, y: 0, z: 1, dirKey: 'PX' }, 4).toArray());
     expect(tunnelDockInto(new THREE.Vector3(), V(1, 1, 1), V(0, 0, 1), 3).toArray())
-      .toEqual([1, 1, 1.5].map(v => v * tunnelCoreScale(3)));
+      .toEqual([1, 1, 1 + CORE_STICKER_OFFSET].map(v => v * tunnelCoreScale(3)));
   });
 
-  it('makes every solved-cube tunnel a straight diameter through the centre', () => {
+  it('joins antipodal docks through the centre on every solved-cube tunnel', () => {
     for (const size of [3, 4]) {
       const cubies = makeCubies(size);
       const map = buildManifoldGridMap(cubies, size);

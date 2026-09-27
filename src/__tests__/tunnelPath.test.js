@@ -162,17 +162,19 @@ describe('parameterisation', () => {
   });
 
   it('samples evenly in world space when stepped by arc-length', () => {
-    const pts = [];
-    const p = new THREE.Vector3();
-    for (let i = 0; i < 40; i++) pts.push(tunnelPathArcPointInto(p, path, (i / 39) * path.total).clone());
+    const previous = new THREE.Vector3(), point = new THREE.Vector3();
     const step = path.total / 39;
     for (let i = 0; i < 39; i++) {
-      // Measure through any bend crossed by this step. A straight chord cuts
-      // the corner short by an amount that depends on the core's dimensions.
-      const bends = [...path.legArc0].filter(a => a > i * step && a < (i + 1) * step);
-      const segment = [pts[i], ...bends.map(a => tunnelPathArcPointInto(new THREE.Vector3(), path, a)), pts[i + 1]];
-      const distance = segment.slice(1).reduce((sum, q, j) => sum + q.distanceTo(segment[j]), 0);
-      expect(distance).toBeCloseTo(step, 10);
+      // Integrate along the curved shoulders, rather than cutting them with
+      // straight chords. The arc lookup is numerical: allow 0.2% pacing error.
+      tunnelPathArcPointInto(previous, path, i * step);
+      let distance = 0;
+      for (let j = 1; j <= 64; j++) {
+        tunnelPathArcPointInto(point, path, (i + j / 64) * step);
+        distance += previous.distanceTo(point);
+        previous.copy(point);
+      }
+      expect(Math.abs(distance / step - 1)).toBeLessThan(0.002);
     }
   });
 });

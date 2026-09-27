@@ -1,13 +1,16 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
+import { tunnelFinishGLSL } from './tunnelFinish.js';
 
 const vertexShader = `
   uniform vec3 uTileCenter;
   uniform vec3 uWhipAxis;
   uniform float uWhipAmp;
   uniform float uWhipPhase;
+  attribute float aDistance;
   varying vec2 vUv;
+  varying float vDistance;
   varying vec3 vNormal;
   varying vec3 vViewPosition;
   varying vec3 vTileCenter;
@@ -15,12 +18,14 @@ const vertexShader = `
   varying vec3 vWorldNormal;
   void main() {
     vUv = uv;
+    vDistance = aDistance;
     vNormal = normalize(normalMatrix * normal);
     vWorldNormal = normalize(mat3(modelMatrix) * normal);
     vTileCenter = uTileCenter;
     vec4 wp = modelMatrix * vec4(position, 1.0);
     float ends = sin(uv.y * 3.14159265)
-      * smoothstep(0.0, 0.14, uv.y) * smoothstep(1.0, 0.86, uv.y);
+      * smoothstep(0.0, 0.14, uv.y) * smoothstep(1.0, 0.86, uv.y)
+      * smoothstep(0.0, 0.10, abs(uv.y - 0.5));
     wp.xyz += uWhipAxis * (sin(uv.y * 12.0 - uWhipPhase) * uWhipAmp * ends);
     vWorldPos = wp.xyz;
     vec4 mv = viewMatrix * wp;
@@ -58,9 +63,12 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
       uniform float uGrowT;
       uniform float uOpacity;
       uniform float uPatternRepeats;
+      uniform float uTime;
       varying vec2 vUv;
+      varying float vDistance;
       vec2 tileUv;
       ${tileShader}
+      ${tunnelFinishGLSL}
       void main() {
         float core = uRideMode > 0.5 ? uRideCore : 0.5;
         if (uTileSide < 0.5 ? vUv.y >= core : vUv.y < core) discard;
@@ -70,8 +78,10 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
         tileMain();
         // Keep the track opaque in WORM, including translucent tile styles.
         gl_FragColor.a = uRideMode > 0.5 ? 1.0 : gl_FragColor.a * uOpacity;
-        float edge = 1.0 - smoothstep(0.02, 0.04, min(vUv.x, 1.0 - vUv.x));
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.025, 0.035, 0.045), edge);
+        float edge = 1.0 - smoothstep(0.018, 0.05, min(vUv.x, 1.0 - vUv.x));
+        vec3 pearl = mix(baseColor, vec3(0.9, 0.96, 1.0), 0.38);
+        float spiral = tunnelSpiral(vDistance, vUv.x, uTime, 0.06);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb + pearl * spiral * 0.05, pearl * 0.8, edge * 0.8);
       }
     `,
     side: THREE.DoubleSide,
