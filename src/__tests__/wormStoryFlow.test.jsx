@@ -1,4 +1,4 @@
-import React, { act, useEffect } from 'react';
+import React, { act, useEffect, useLayoutEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -15,12 +15,17 @@ import { ttAt } from '../worm/circularBuffers.js';
 import { getNextSurfacePosition, getActiveTunnels } from '../worm/wormLogic.js';
 vi.mock('@react-three/fiber', () => ({ useThree: () => ({ camera: {} }) }));
 vi.mock('../utils/feel.js', async original => ({ ...(await original()), feel: vi.fn(), stopFeel: vi.fn(), resumeFeel: vi.fn(), setFeelEnabled: vi.fn() }));
-let root, host, worm;
+let root, host, worm, layoutStarts;
 const state = () => useGameStore.getState();
 function Harness() {
   const cubies = useGameStore(s => s.cubies);
   const size = useGameStore(s => s.size);
   const api = useWormCrawler(size, cubies);
+  const runId = useGameStore(s => s.wormRunId);
+  useLayoutEffect(() => {
+    if (state().wormStoryLevel) layoutStarts.push({ runId, ready: state().wormStoryReady,
+      pos: { ...api.pos.current }, phase: api.phase.current, head: api.headInterpPos.current.clone() });
+  }, [runId, size, api]);
   useEffect(() => { worm = api; }, [api]);
   return null;
 }
@@ -29,7 +34,7 @@ function begin(id) {
   const size = storyLevel(id).cubeSize ?? 5;
   if (state().size !== size) act(() => useGameStore.setState({ size, cubies: makeCubies(size) }));
   act(() => state().initWormMode(undefined, undefined, 1.4, 1, 30, null, false, false, id));
-  act(() => useGameStore.setState({ wormGamePhase: 'active', wormPaused: false }));
+  act(() => useGameStore.setState({ wormGamePhase: 'active' }));
   frame();
   expect(state()).toMatchObject({ wormStoryReady: true, wormPaused: true, wormStoryStarted: false });
   act(() => state().startWormStory());
@@ -46,6 +51,7 @@ function until(predicate, max = 2000) {
   expect(predicate()).toBeTruthy();
 }
 beforeEach(() => {
+  layoutStarts = [];
   globalThis.IS_REACT_ACT_ENVIRONMENT = true; resetLiveRotation();
   useGameStore.setState({ cubies: makeCubies(5), size: 5, demoMode: false, wormCharacter: 'glow', wormControlMode: 'oriented', animState: null,
     playerProgress: { ...newProgress(), wormStory: { stars: {1:1,2:1,3:1,4:1,5:1}, claimed: {} } } });
@@ -53,6 +59,24 @@ beforeEach(() => {
   act(() => root.render(<Harness />));
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); state().clearDisparityGame(); vi.restoreAllMocks(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
+it('stages the fresh level before paint when retrying a previous tunnel run', () => {
+  begin(2);
+  worm.phase.current = 'tunnel';
+  worm.headInterpPos.current.set(81, -23, 17);
+  worm.pos.current = { x: 0, y: 0, z: 0, dirKey: 'NZ' };
+  worm.timeAliveRef.current = 90;
+  const oldBoard = state().cubies;
+  act(() => state().initWormMode(undefined, undefined, null, null, null, null, false, false, 1));
+  // No simulation frame has run. A layout observer already sees the new body,
+  // spawn face and board, instead of the prior tunnel/camera anchor.
+  const start = layoutStarts.at(-1);
+  expect(start).toMatchObject({ runId: state().wormRunId, ready: true, phase: 'crawling',
+    pos: { x: Math.floor(state().size / 2), y: 0, z: state().size - 1, dirKey: 'PZ' } });
+  expect(start.head.toArray()).not.toEqual([81, -23, 17]);
+  expect(state().cubies).not.toBe(oldBoard);
+  expect(worm.timeAliveRef.current).toBe(0);
+  expect(state().wormPaused).toBe(true);
+});
 it('requires cross-face routing for 18 orbs and all six colors, then resets on retry', () => {
   begin(1);
   for (let i = 0; i < 500; i++) frame();
