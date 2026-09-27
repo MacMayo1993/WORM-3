@@ -88,6 +88,7 @@ const _vStart    = new THREE.Vector3();
 const _vEnd      = new THREE.Vector3();
 const _midA      = new THREE.Vector3();
 const _midB      = new THREE.Vector3();
+const _coreCenter = new THREE.Vector3();
 const _colorA    = new THREE.Color();
 const _colorB    = new THREE.Color();
 const _charge    = { active: false, front: 0, glow: 0, arrived: false };
@@ -259,7 +260,7 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWi
   const halfSegs = CORD_SEGS / 2;
   const base = slot * VERTS_PER_STRAND;
 
-  buildTunnelPathInto(cordPath, startPos, _faceNorm1, endPos, _faceNorm2, midAPos, midBPos);
+  buildTunnelPathInto(cordPath, startPos, _faceNorm1, endPos, _faceNorm2, midAPos, midBPos, _coreCenter);
 
   for (let i = 0; i <= CORD_SEGS; i++) {
     const t = tunnelRibbonSampleU(i, CORD_SEGS);
@@ -361,6 +362,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
     const nowMs = tunnelCharges.size ? performance.now() : 0;
     const state = useGameStore.getState(), size = state.size;
     const coreZoom = state.wormHealerMode ? (tunnelState.coreZoom ?? 1) : 1;
+    tunnelCorePoseInto(_coreCenter.set(0, 0, 0), coreZoom, tunnelState.coreZoomAnchor);
     if (coreZoom !== previousZoom.current) moved = true;
     previousZoom.current = coreZoom;
     if (chargeCacheRef.current.length < maxStrands) chargeCacheRef.current = new Float32Array(maxStrands);

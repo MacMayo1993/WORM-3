@@ -260,13 +260,14 @@ function throatDepth(anchor, normal, dock) {
  * @param {THREE.Vector3} [dockA] entry dock point on the antipodal core (tunnelDockInto).
  *   Omitted, the tunnel docks on the centre of the core face along n1.
  * @param {THREE.Vector3} [dockB] exit dock point, same.
+ * @param {THREE.Vector3} [coreCenter] core center in the docks' coordinate space.
  */
-export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, dockB = null) {
+export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, dockB = null, coreCenter = null) {
   path.vStart.copy(vStart);
   path.vEnd.copy(vEnd);
   path.nStart.copy(n1).normalize();
   path.nEnd.copy(n2).normalize();
-  path.core.set(0, 0, 0);
+  if (coreCenter) path.core.copy(coreCenter); else path.core.set(0, 0, 0);
   if (dockA) path.midA.copy(dockA); else path.midA.copy(n1).multiplyScalar(TUNNEL_MINI_FACE_R);
   if (dockB) path.midB.copy(dockB); else path.midB.copy(n2).multiplyScalar(TUNNEL_MINI_FACE_R);
   // Slice turns can put both mouths on the same physical face. Sharing its
@@ -293,7 +294,7 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, do
   path.legC1[4].copy(path.midB).addScaledVector(path.nEnd, bendB);
   path.legC2[4].copy(path.throatB).addScaledVector(path.nEnd, -bendB);
   _coreTangent.subVectors(path.midB, path.midA).normalize();
-  const coreHandle = Math.min(path.midA.length(), path.midB.length()) * 0.35;
+  const coreHandle = Math.min(path.midA.distanceTo(path.core), path.midB.distanceTo(path.core)) * 0.35;
   path.legC1[2].copy(path.midA).addScaledVector(path.nStart, -coreHandle);
   path.legC2[2].copy(path.core).addScaledVector(_coreTangent, -coreHandle);
   path.legC1[3].copy(path.core).addScaledVector(_coreTangent, coreHandle);

@@ -39,7 +39,9 @@ it('keeps the colored ribbon welded to both raised tile mouths during bounce and
     await act(async () => { store = root.render(draw(true)); });
     const ribbon = store.getState().scene.children[0].children[0];
     expect(ribbon.material.transparent).toBe(false);
-    expect(ribbon.geometry.index.count).toBe(64 * 6); // Continuous through the half twist.
+    const segments = ribbon.geometry.attributes.position.count / 2 - 1;
+    const exitVertex = segments * 2;
+    expect(ribbon.geometry.index.count).toBe(segments * 6); // Continuous through the half twist.
     const checkMouth = (mesh, sign, vertex, lift) => {
       const normal = new THREE.Vector3(0, 0, sign).applyQuaternion(mesh.quaternion);
       const mouth = mesh.position.clone().addScaledVector(normal, TUNNEL_ANCHOR_OFFSET + lift);
@@ -51,14 +53,14 @@ it('keeps the colored ribbon welded to both raised tile mouths during bounce and
       a.position.set(2.55 * Math.sin(angle), 0, 2.55 * Math.cos(angle));
       a.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
       store.getState().advance(frame / 60);
-      checkMouth(a, 1, 0, lift); checkMouth(b, -1, 128, lift);
+      checkMouth(a, 1, 0, lift); checkMouth(b, -1, exitVertex, lift);
     }
     expect(ribbon.material.uniforms.uColorA.value.getHexString()).toBe('1234ff');
     expect(ribbon.material.uniforms.uColorB.value.getHexString()).toBe('12ff34');
     // A lone pad's unflipped partner must remain on its original surface.
     await act(async () => root.render(draw(false)));
     store.getState().advance(4 / 60);
-    checkMouth(a, 1, 0, motion.lift); checkMouth(b, -1, 128, 0);
+    checkMouth(a, 1, 0, motion.lift); checkMouth(b, -1, exitVertex, 0);
   } finally { padMotion.delete(id); }
 }));
 

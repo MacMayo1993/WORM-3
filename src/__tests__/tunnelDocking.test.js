@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { CORE_DIRS, CORE_STICKER_LOCAL, coreCubieMatrixInto } from '../3d/antipodalCore.js';
 import {
   makeTunnelPath, buildTunnelPathInto, tunnelDockForCellInto, tunnelDockWidth,
-  tunnelPathArcTangentInto, tunnelPathRibbonInto, tunnelRibbonSampleU, tunnelCorePoseInto
+  tunnelPathArcTangentInto, tunnelPathPointInto, tunnelPathRibbonInto, tunnelRibbonSampleU, tunnelCorePoseInto
 } from '../utils/tunnelPath.js';
 import { fillTunnelRideGeometry, tunnelRideSampleArc } from '../utils/tunnelRide.js';
 
@@ -79,6 +79,21 @@ describe('bands seated on antipodal core stickers', () => {
       const sticker = V().setFromMatrixPosition(matrix.multiplyMatrices(cubie, CORE_STICKER_LOCAL[dir]));
       sticker.sub(anchor).multiplyScalar(zoom).add(anchor);
       expect(dock.distanceTo(sticker)).toBeLessThan(1e-12);
+    }
+  });
+
+  it('carries the complete hidden crossing with a translated and enlarged core', () => {
+    const a = route(6, 'PY'), b = route(6, 'NZ');
+    const base = buildTunnelPathInto(makeTunnelPath(), a.start, a.n, b.start, b.n, a.dock, b.dock);
+    for (const zoom of [2, 6]) {
+      const pose = p => tunnelCorePoseInto(p.clone(), zoom, a.dock);
+      const enlarged = buildTunnelPathInto(makeTunnelPath(), a.start, a.n, b.start, b.n, pose(a.dock), pose(b.dock), pose(V()));
+      expect(enlarged.core.distanceTo(pose(V()))).toBeLessThan(1e-12);
+      for (let i = 0; i <= 20; i++) {
+        const t = 0.4 + i * 0.01;
+        const expected = pose(tunnelPathPointInto(V(), base, t));
+        expect(tunnelPathPointInto(V(), enlarged, t).distanceTo(expected)).toBeLessThan(1e-10);
+      }
     }
   });
 });

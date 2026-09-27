@@ -58,6 +58,7 @@ const _faceNorm2     = new THREE.Vector3();
 const _vStart        = new THREE.Vector3();
 const _vEnd          = new THREE.Vector3();
 const _midA          = new THREE.Vector3();
+const _coreCenter    = new THREE.Vector3();
 const _midB          = new THREE.Vector3();
 const _axis          = new THREE.Vector3();
 const _perpBase      = new THREE.Vector3();
@@ -638,14 +639,16 @@ const MobiusTunnel = ({
     // the core's copy of its slice is. Flip motion stays on the anchors only.
     tunnelDockForMeshInto(_midA, meshIdx1, dirKey1, state.size, mesh1);
     tunnelDockForMeshInto(_midB, meshIdx2, dirKey2, state.size, mesh2);
-    const coreZoom = wormMode ? (tunnelState.coreZoom ?? 1) : 1;
+    // A head or recorded tail rides the simulation's fixed route. Applying the
+    // cosmetic core zoom here would move the track out from under that history
+    // and the camera, especially on the crossing and exit arm.
+    const coreZoom = wormMode && !occupied ? (tunnelState.coreZoom ?? 1) : 1;
     tunnelCorePoseInto(_midA, coreZoom, tunnelState.coreZoomAnchor);
     tunnelCorePoseInto(_midB, coreZoom, tunnelState.coreZoomAnchor);
+    tunnelCorePoseInto(_coreCenter.set(0, 0, 0), coreZoom, tunnelState.coreZoomAnchor);
 
-    // Gauge: plug into the core tile at its width. On a WORM ride the core swells
-    // round the entry tile (VoidCore), so the ridden band widens with it to keep
-    // meeting the tile the player sees; the worm's floor keeps its own width out
-    // at the tiles.
+    // Unoccupied bands follow the enlarged core; occupied bands keep the same
+    // width as well as the same route until their last body segment clears.
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
     const dockW = tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
@@ -674,7 +677,7 @@ const MobiusTunnel = ({
 
       // The route itself — throats along each tile's own world normal, docks on the
       // core tiles beneath them, crossing through the centre. Everything below sweeps this.
-      buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _midA, _midB);
+      buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _midA, _midB, _coreCenter);
       uniforms.uPatternRepeats.value = _tunnelPath.total / mouthW;
       uniforms.uTileCenterA.value.copy(_wPos1);
       uniforms.uTileCenterB.value.copy(_wPos2);
