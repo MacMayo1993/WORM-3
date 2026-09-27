@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { shAt } from '../circularBuffers.js';
 import { BASE_TAIL_LENGTH, BODY_BALL_SPACING, WORM_LIFT } from './constants.js';
 import { inchGaitInto } from './inchGait.js';
+import { tunnelBodyDistance } from './tunnelBodyFit.js';
 
 const head = new THREE.Vector3();
 const gaitPoint = { dist: 0, arch: 0 };
@@ -51,7 +52,7 @@ export function findSlicePathHit(worm, axis, layer, size) {
   for (let i = 0; i < history.count && distance <= reach; i++) {
     const record = shAt(history, i);
     const b = record.pos;
-    const length = a.distanceTo(b);
+    const length = tunnelBodyDistance(a.distanceTo(b), previous, record);
     const change = b[coord] - a[coord];
     let t = Infinity;
     if (length > EPS && Math.abs(change) > EPS && !record.transit && !previous?.transit) {
@@ -107,11 +108,11 @@ export function clipSliceHistory(worm, hit) {
   end.normal.lerpVectors(normal, end.normal, hit.historyT).normalize();
   end.pos.fromArray(hit.cutPosition);
   if (previous) {
-    for (const key of ['tx', 'ty', 'tz', 'restTxn', 'restTx', 'restTy', 'restTz', 'transit']) end[key] = previous[key];
+    for (const key of ['tx', 'ty', 'tz', 'restTxn', 'restTx', 'restTy', 'restTz', 'transit', 'rideWidth', 'rideClearance', 'rideWeight']) end[key] = previous[key];
   } else {
     const tile = (worm.interpT.current < 0.5 && worm.prevTile.current) || worm.pos.current;
     end.tx = tile.x; end.ty = tile.y; end.tz = tile.z;
-    end.restTxn = 0; end.transit = false;
+    end.restTxn = 0; end.transit = false; end.rideWeight = 0;
   }
   history.count = hit.historyIndex + 1;
 }

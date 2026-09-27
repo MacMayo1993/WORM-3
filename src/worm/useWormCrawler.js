@@ -801,6 +801,7 @@ export function useWormCrawler(size, cubies) {
             moveDir: f('moveDir'),
             phase: f('phase'),
             tunnelProgress: f('tunnelProgress'),
+            tunnelRide: f('tunnelRide'),
             activeTunnel: f('activeTunnel'),
             tunnelPassages: f('tunnelPassages'),
             onFlippedTile: f('onFlippedTile'),

@@ -8,6 +8,10 @@ export const TUNNEL_RIDE_CLEARANCE = 0.115;
 // The worm's floor at its widest, where the ride leaves a tile: room for the
 // body (a bead is TUNNEL_RIDE_CLEARANCE across its radius) and a little more.
 export const TUNNEL_RIDE_WIDTH = 0.36;
+// The aperture is already wider than this gauge. Pinching the floor to zero
+// at the mouth left the first body beads hanging over an invisible track.
+export const tunnelRideWidthAt = (path, arc, dockWidth, mouthWidth = TUNNEL_RIDE_WIDTH) =>
+  tunnelGaugeAt(tunnelArmFractionAt(path, arc), mouthWidth, dockWidth);
 const a = new THREE.Vector3(), b = new THREE.Vector3();
 const prev = new THREE.Vector3(), next = new THREE.Vector3();
 const rotation = new THREE.Quaternion();
@@ -139,7 +143,7 @@ export function fillTunnelRideGeometry(geo, left, right, path, segments, mouthWi
     const arc = tunnelRideSampleArc(path, i, segments), u = arc / (path.total || 1);
     tunnelRideFrameInto(frame, path, arc);
     const mouth = THREE.MathUtils.smoothstep(Math.min(arc, path.total - arc), 0, 0.3);
-    const width = 0.5 * tunnelGaugeAt(tunnelArmFractionAt(path, arc), mouthWidth, dockWidth) * mouth;
+    const width = 0.5 * tunnelRideWidthAt(path, arc, dockWidth, mouthWidth);
     for (let side = 0; side < 2; side++) {
       const sign = side === 0 ? -1 : 1;
       const vi = i * 2 + side;

@@ -48,6 +48,7 @@ import { arcLift } from './jumpArc.js';
 // from tests, and injecting it through ctx would only obscure the contract.
 
 import * as THREE from 'three';
+import { makeTunnelBodyProfile, tunnelBodyDistance } from './tunnelBodyFit.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { getStickerSafe } from '../../game/cubeState.js';
 import { rotateVec90 } from '../../game/cubeRotation.js';
@@ -89,6 +90,7 @@ import {
     WORM_LIFT,
     TUNNEL_SPEED_SCALE,
     TUNNEL_INTERIOR_SPEED_SCALE,
+    TUNNEL_EXIT_RATE,
     tunnelHandoffSeconds,
     FACE_NORMALS,
     INITIAL_DIR,
@@ -277,6 +279,7 @@ export function makeWormSim(size) {
         // ── Tunnels / wormholes ────────────────────────────────────────────────
         tunnelApproach: new THREE.Vector3(),
         tunnelProgress: 0,
+        tunnelRide: makeTunnelBodyProfile(),
         activeTunnel: null,
         pendingTunnelTrigger: null,
         onFlippedTile: false,
@@ -363,6 +366,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.phase = 'crawling';
     sim.prevPhase = 'crawling';
     sim.tunnelProgress = 0;
+    sim.tunnelRide.rideWeight = 0;
     sim.activeTunnel = null;
     sim.stepAcc = 0;
     sim.pendingTurns = [];
@@ -547,7 +551,7 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
     let bPos = departure ? collisionB : b.pos;
     let bNormal = departure ? collisionBNormal : b.normal;
     let distance = 0;
-    let length = a.distanceTo(bPos);
+    let length = tunnelBodyDistance(a.distanceTo(bPos), null, b);
     const gait = sim.bodyGait;
     for (let bead = 1; bead < sim.tailLength; bead++) {
         let target = bead * BODY_BALL_SPACING;
@@ -561,11 +565,12 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
             distance += length;
             a = departure ? collisionA.copy(bPos) : bPos;
             an = departure ? collisionANormal.copy(bNormal) : bNormal;
+            const previous = b;
             b = shAt(history, ++index);
             if (departure) departureBodySample(b, collisionB, collisionBNormal);
             bPos = departure ? collisionB : b.pos;
             bNormal = departure ? collisionBNormal : b.normal;
-            length = a.distanceTo(bPos);
+            length = tunnelBodyDistance(a.distanceTo(bPos), previous, b);
         }
         if (target > distance + length) break;
         // The connected neck is not a self-crossing.
@@ -1901,7 +1906,7 @@ const PHASE_HANDLERS = {
             }
         },
         update(sim, size, ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (1.0 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
+            const nextProgress = sim.tunnelProgress + delta * (TUNNEL_EXIT_RATE * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
             advanceTunnelHead(sim, 'exiting', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {

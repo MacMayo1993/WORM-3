@@ -46,6 +46,9 @@ it('keeps the colored ribbon welded to both raised tile mouths during bounce and
       const normal = new THREE.Vector3(0, 0, sign).applyQuaternion(mesh.quaternion);
       const mouth = mesh.position.clone().addScaledVector(normal, TUNNEL_ANCHOR_OFFSET + lift);
       const rendered = new THREE.Vector3().fromBufferAttribute(ribbon.geometry.attributes.position, vertex);
+      // The mouth now has a full-width floor; its midpoint stays welded to
+      // the aperture as the pad bounces and the cubie rotates.
+      rendered.add(new THREE.Vector3().fromBufferAttribute(ribbon.geometry.attributes.position, vertex + 1)).multiplyScalar(0.5);
       expect(rendered.distanceTo(mouth)).toBeLessThan(1e-5);
     };
     for (const [frame, lift, angle] of [[1, .3, 0], [2, .39, .4], [3, .31, Math.PI / 2]]) {

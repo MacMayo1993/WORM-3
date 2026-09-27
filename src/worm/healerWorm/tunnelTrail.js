@@ -1,4 +1,6 @@
-import { makeTunnelRideFrame, tunnelRideFrameInto } from '../../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideWidthAt } from '../../utils/tunnelRide.js';
+import { tunnelDockWidth } from '../../utils/tunnelPath.js';
+import { makeTunnelBodyProfile } from './tunnelBodyFit.js';
 import * as THREE from 'three';
 import { shPush, shAt } from '../circularBuffers.js';
 import {
@@ -22,7 +24,9 @@ export function advanceTunnelHead(sim, phase, nextProgress, size) {
     const from = Math.min(1, sim.tunnelProgress);
     const to = Math.min(1, nextProgress);
     const wind = phase === 'windup' || phase === 'windout';
-    if (!wind) buildTunnelCenterlineInto(path, tunnel, size, sim.expansionAmount);
+    buildTunnelCenterlineInto(path, tunnel, size, sim.expansionAmount);
+    const profile = sim.tunnelRide ??= makeTunnelBodyProfile();
+    const dockWidth = tunnelDockWidth(size);
     const entryN = FACE_NORMALS[tunnel.entry.dirKey];
     const exitN = FACE_NORMALS[tunnel.exit.dirKey];
 
@@ -40,7 +44,14 @@ export function advanceTunnelHead(sim, phase, nextProgress, size) {
             } else {
                 getWindWorldPosInto(sim.headInterpPos, tunnel, exiting ? 'exit' : 'entry', exiting ? windoutHeadS(p) : p, size, sim.expansionAmount);
             }
-            normal.copy(exiting ? exitN : entryN);
+            const arc = exiting ? path.total : 0;
+            tunnelRideFrameInto(rideFrame, path, arc);
+            // Roll onto the band during the end of the entry flourish, and
+            // back onto the tile during the start of the exit flourish.
+            profile.rideWeight = THREE.MathUtils.smoothstep(exiting ? 1 - p : p, 0.65, 1);
+            normal.copy(exiting ? exitN : entryN).lerp(rideFrame.normal, profile.rideWeight).normalize();
+            profile.rideWidth = tunnelRideWidthAt(path, arc, dockWidth);
+            profile.rideClearance = 0;
         } else {
             const t = phase === 'entering' ? p * 0.33
                 : phase === 'tunnel' ? 0.33 + p * 0.34 : 0.67 + p * 0.33;
@@ -48,15 +59,14 @@ export function advanceTunnelHead(sim, phase, nextProgress, size) {
             tunnelRideFrameInto(rideFrame, path, arc);
             sim.headInterpPos.copy(rideFrame.center);
             normal.copy(rideFrame.normal);
-            // Join the surface-facing wind-up/out without snapping the face at
-            // the aperture, where the floor already tapers out of sight.
-            const mouthBlend = THREE.MathUtils.smoothstep(Math.min(arc, path.total - arc), 0, 0.25);
-            normal.lerp(arc < path.total / 2 ? entryN : exitN, 1 - mouthBlend).normalize();
+            profile.rideWeight = 1;
+            profile.rideWidth = tunnelRideWidthAt(path, arc, dockWidth);
+            profile.rideClearance = rideFrame.center.distanceTo(rideFrame.floor);
         }
         sim.currentNormal.copy(normal);
         if (record && (sim.stepHistory.count === 0 ||
             shAt(sim.stepHistory, 0).pos.distanceToSquared(sim.headInterpPos) >= 0.0001 || p === 1)) {
-            shPush(sim.stepHistory, sim.headInterpPos, normal, -1, -1, -1, true);
+            shPush(sim.stepHistory, sim.headInterpPos, normal, -1, -1, -1, true, profile);
         }
     };
     if (from === 0) sample(0, true);

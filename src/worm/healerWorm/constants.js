@@ -22,9 +22,12 @@ export const TUNNEL_SURF_SWAY = 0.22;
 // Base rate shared by all five traversal phases. The interior has its own
 // multiplier below so its readability does not depend on surface flourish time.
 export const TUNNEL_SPEED_SCALE = 0.90;
-// Slow only the dive, interior and exit: ~5.8s to read the route instead of ~3.7s.
+// Slow only the dive, interior and exit; the exit arm gets an extra viewing beat.
 // Keep the short surface flourishes and normal crawl speed unchanged.
 export const TUNNEL_INTERIOR_SPEED_SCALE = 0.65;
+// The outward arm takes twice as long as before, avoiding the rush away from
+// the tiny center crossing. Surface movement and mouth flourishes are unchanged.
+export const TUNNEL_EXIT_RATE = 0.5;
 
 // Face outward normals.
 export const FACE_NORMALS = {
@@ -56,8 +59,9 @@ export const INITIAL_POS = (size) => {
 export const DEFAULT_POWERUP_COUNT = 5;
 export const ORB_SEGMENT_GROWTH = 3; // every orb adds exactly 3 visual balls
 export const STEPS_PER_TILE = 50; // sub-steps recorded per tile (0.02 resolution)
-// World-space distance between visible body balls — MUST match WormBody's placement
-// (segment i sits at i * 0.09 world units, see HealerWormMode targetDist). It
+// Surface distance between visible body balls — MUST match WormBody's placement.
+// Narrow tunnel sections use tunnelBodyDistance for both rendering and contact
+// queries; on the surface segment i sits at i * 0.09 world units. This spacing
 // drives how many tiles the body is assumed to occupy for self-collision, tail-cut
 // length, and the trail start. It had drifted to 0.14 (~1.56x too long), which made
 // the collision/trail "tail" extend well past the body you actually see — causing
