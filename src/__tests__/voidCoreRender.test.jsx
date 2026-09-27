@@ -139,6 +139,13 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     expect(antiverse.visible).toBe(true);
     const initialTime = universe.uTime.value; frame();
     expect(universe.uTime.value).toBeGreaterThan(initialTime);
+    // Capture hides UI, while the same 3D field keeps drawing and animating.
+    await act(async () => useGameStore.getState().setCaptureMode(true));
+    const captureTime = universe.uTime.value; frame();
+    expect(antiverse.visible).toBe(true);
+    expect(universe.uOpacity.value).toBe(1);
+    expect(universe.uTime.value).toBeGreaterThan(captureTime);
+    await act(async () => useGameStore.getState().setCaptureMode(false));
     await act(async () => useGameStore.setState({ settings: { ...useGameStore.getState().settings, reducedMotion: true } }));
     const heldTime = universe.uTime.value; frame(); frame();
     expect(universe.uTime.value).toBe(heldTime);
