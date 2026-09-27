@@ -11,7 +11,7 @@ import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import { useDialogBehavior } from '../ui/Panel.jsx';
 
 const sourceName = source => source === 'conway' ? 'Surface surge' : source === 'chain' ? 'Chain spread' : 'Chaos';
-export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play Again', onSecondary, secondaryLabel, onConfigure }) {
+export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play Again', onSecondary, secondaryLabel, onConfigure, demoNavigation = false }) {
   const { winner, deaths, result, run, record, settings } = useGameStore(useShallow(s => ({
     winner: s.disparityWinner, deaths: s.disparityDeaths, result: s.lastBetResult,
     run: s.chaosExperience, record: s.chaosRecord, settings: s.settings,
@@ -34,6 +34,10 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
     : result ? `Prediction missed · −${result.wager} PP` : 'Round complete';
   return <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-results" style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT, ...arcadeModeVars('chaos'), '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'] }} role="dialog" aria-modal="true" aria-labelledby="chaos-result-title">
     <div className="chaos-result-sheet">
+      {demoNavigation && <nav className="chaos-demo-next" aria-label="Demo navigation">
+        <span>Chaos complete</span>
+        <button type="button" className="chaos-button chaos-button-primary" onClick={onDismiss}>Next: Random →</button>
+      </nav>}
       <header className="chaos-result-hero">
         <ChaosGlyph kind="trophy" />
         <div className="chaos-kicker">Chaos</div>
@@ -88,11 +92,11 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
           <p className="chaos-note">Elimination order: earliest first.</p>
         </details>
         <p className="chaos-note">Your record: {record.rounds} rounds · {record.correct}/{record.predictions} correct predictions · best streak {record.bestStreak}.</p>
-        <div className="chaos-actions">
+        {!demoNavigation && <div className="chaos-actions">
           <button disabled={!ready} onClick={onDismiss}>{primaryLabel}</button>
           {onConfigure && <button disabled={!ready} onClick={onConfigure}>Change setup</button>}
           {onSecondary && <button disabled={!ready} onClick={onSecondary}>{secondaryLabel || "Main menu"}</button>}
-        </div>
+        </div>}
       </div>
     </div>
   </div>;

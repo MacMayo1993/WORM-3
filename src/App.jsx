@@ -75,7 +75,7 @@ import MobiIntroScreen, {
   MOBI_LINES_BIOME, MOBI_LINES_CHAOS,
   MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
-import { UI_FONT, TEXT_MICRO } from './utils/uiTheme.js';
+import { UI_FONT, TEXT_MICRO, Z } from './utils/uiTheme.js';
 import ScreenTransition from './components/ScreenTransition.jsx';
 // Static (not lazy): a Suspense fallback must be present the instant a lazy
 // chunk starts loading, so the loading cube cannot itself live in a lazy chunk.
@@ -1624,12 +1624,13 @@ export default function WORM3() {
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       </ScreenTransition>
-      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
+      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoForecastVisible && !demoChromeQuiet)} freezeOnExit
+        style={{ position: 'relative', zIndex: Z.DEMO }}>
         <DemoCoach
           step={demoStep}
           copy={demoCoachCopy}
           onCopySeen={handleDemoCoachCopySeen}
-          onNext={demoStep === 'chaos-forecast' ? handleDemoChaosSkip : () => advanceDemoStep(demoStep)}
+          onNext={demoStep === 'chaos-forecast' ? handleDemoDisparityDismiss : () => advanceDemoStep(demoStep)}
           onExit={handleExitDemo}
         />
       </ScreenTransition>

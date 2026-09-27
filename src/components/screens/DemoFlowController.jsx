@@ -760,7 +760,7 @@ const TRY_COPY = {
   'learn-to-solve': 'Follow the <strong>gold ring</strong> — drag the glowing layer the way the light sweeps. It always knows the way home.',
   'twin-paradox': 'With Flip on, tap a tile. Its opposite twin moves with it.',
   'flip-gateway': 'Tap nine different pairs to send them across. Then tap the moved tiles to bring them back.',
-  'make-it-yours': 'Preview your colors, tiles, and background. Use <strong>Edit look</strong> to keep experimenting, or <strong>Continue to Chaos</strong> when you’re ready.',
+  'make-it-yours': 'Take a look at your colors, tiles, and background. Use <strong>Edit look</strong> to keep experimenting. Press <strong>Next: Chaos</strong> when you’re ready.',
   'worm-traversal': 'Steer left or right. Collect orbs, then jump onto raised flip pads to ride and heal their tunnels.',
   'chaos-forecast': 'Tap a damaged tile to send a healing wave through the damaged tiles joined to it. Healing can change which pair survives.',
   // Random remixes presentation only (useRandomMode): palette, tile styles and
@@ -777,9 +777,12 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
   ensureDemoShellStyle();
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const showSettings = useGameStore((s) => s.showSettings);
+  const showWinner = useGameStore((s) => s.showDisparityWinner);
   // ScreenTransition can retain this component during its exit animation.
   // Hide its controls immediately so Settings owns every tap on the panel.
   if (showSettings) return null;
+  // The result dialog owns a pinned Next action inside its focus trap.
+  if (step === 'chaos-forecast' && showWinner) return null;
   if (step === 'worm-traversal' || (!copyOverride && !TRY_COPY[step])) return null;
 
   if (copyOverride) {
@@ -806,7 +809,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
         </button>
       )}
       <button type="button" onClick={onNext} className="demo-coach-pill-btn">
-        {step === 'make-it-yours' ? 'Continue to Chaos' : 'Skip lesson →'}
+        {step === 'make-it-yours' ? 'Next: Chaos →' : step === 'chaos-forecast' ? 'Next: Random →' : 'Skip lesson →'}
       </button>
     </div>
   );

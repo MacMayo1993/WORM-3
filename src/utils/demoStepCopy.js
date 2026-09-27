@@ -22,7 +22,7 @@ export const STEP_COPY = {
   'twin-paradox': 'Every tile has a twin on the opposite side. Turn on Flip, then tap a tile to move the pair together.',
   'flip-gateway': 'Send nine tile pairs through the middle, then bring them back. Start with the face in front of you.',
   'view-showcase': 'Let’s look at the same cube in a few different ways. Use Next to explore each view.',
-  'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings to preview your look. Choose Continue to Chaos when you’re ready. Your choices stay saved.',
+  'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings to preview your look. Press Next: Chaos when you’re ready. Your choices stay saved.',
   'worm-traversal': 'Steer, collect orbs, and jump onto raised flip pads to ride their tunnels. Practice also covers power-ups, elements, and hazards.',
   // The round's live HUD keeps its rules behind "Inspect match", so the setup
   // line carries the three the player acts on: aim the first strike, flips wear
@@ -41,7 +41,7 @@ export const STEP_INTRO_LINES = {
     'Each tile has a twin on the opposite side. Every flip uses some of their life. At the flip limit, worn-out twins drop out together. Watch the live counters to see which colors are still in the round.',
     'First, choose the color pair you think will win. This demo prediction is free. After confirming your pick, tap a tile to choose where the storm strikes first; the countdown then starts the round.',
     'During the storm, tap a damaged tile to heal it and send a healing wave through connected damaged tiles. Lost tiles cannot return. Healing can change the winner, so act before your pair disappears!',
-    'When one twin pair remains, the results show who survived and award your demo points. Full Chaos mode also lets you predict the last color, the winning pair, the first color out, or how quickly the cube collapses.',
+    'When one twin pair remains, the results show who survived. Press Next: Random whenever you’re ready to leave this practice, even during the storm. Full Chaos mode also offers predictions on the last color, winning pair, first color out, or collapse speed.',
   ],
   'random-showcase': [
     'Random is a cube puzzle with a changing look. Solve it while the palette and tile styles remix every ten seconds. Your goal is still to make every face one color.',

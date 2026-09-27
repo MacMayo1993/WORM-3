@@ -14,13 +14,18 @@ export default function ScreenTransition({ show, children, duration = DURATION, 
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState('idle');
   const timerRef = useRef(null);
+  const frameRef = useRef(null);
   const frozenRef = useRef(null);
   if (show) frozenRef.current = children;
 
   const cleanup = useCallback(() => {
-    if (timerRef.current) {
+    if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
+    }
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
     }
   }, []);
 
@@ -30,8 +35,14 @@ export default function ScreenTransition({ show, children, duration = DURATION, 
     if (show && !mounted) {
       setMounted(true);
       setPhase('entering');
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setPhase('entered'));
+    } else if (show && mounted) {
+      // Also re-enter when show returns during an exit. Cancelling only the
+      // unmount timer would leave the retained screen at opacity zero.
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = requestAnimationFrame(() => {
+          frameRef.current = null;
+          setPhase('entered');
+        });
       });
     } else if (!show && mounted) {
       setPhase('exiting');

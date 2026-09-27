@@ -32,6 +32,14 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
       backdropFilter: 'var(--paper-blur, none)',
       fontFamily: UI_FONT, textAlign: 'center', padding: 24,
     }}>
+      {onSkip && <div style={{ position: 'sticky', top: 0, zIndex: 1, alignSelf: 'stretch',
+        display: 'flex', justifyContent: 'flex-end', flexShrink: 0, marginBottom: 12, pointerEvents: 'none' }}>
+        <button type="button" onClick={onSkip} style={{
+          minHeight: 52, padding: '12px 22px', borderRadius: 999, border: `2px solid ${UI_MOSS_LIGHT}`,
+          background: UI_MOSS, color: UI_CREAM, fontFamily: UI_FONT, fontSize: 14, fontWeight: 800,
+          cursor: 'pointer', touchAction: 'manipulation', pointerEvents: 'auto',
+        }}>Next: Random →</button>
+      </div>}
       <p style={{
         color: UI_GOLD, fontSize: 12, fontWeight: 800,
         letterSpacing: '0.16em', textTransform: 'uppercase', margin: '0 0 8px',
@@ -113,21 +121,6 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
         {selected ? 'Confirm pick' : 'Choose a pair'}
       </button>
 
-      {onSkip && (
-        <button
-          type="button"
-          onClick={onSkip}
-          style={{
-            minHeight: 48, flexShrink: 0, marginTop: 14, padding: '10px 32px',
-            background: 'transparent',
-            color: 'rgba(255,253,242,0.72)', border: 'none', borderRadius: 10,
-            fontFamily: UI_FONT, fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', letterSpacing: '0.04em',
-          }}
-        >
-          Skip lesson
-        </button>
-      )}
     </DemoDialog>
   );
 }

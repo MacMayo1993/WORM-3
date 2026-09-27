@@ -324,9 +324,8 @@ export default function UILayer({
         <ScreenTransition show={showDisparityWinner}>
           <Suspense fallback={<ScreenFallback label="Loading" />}>
             {demoMode && onDemoDisparityDismiss ? (
-              // In the demo there's no real replay — a single Continue advances
-              // to the next demo step.
-              <DisparityWinnerScreen onDismiss={onDemoDisparityDismiss} primaryLabel="Continue →" />
+              // Keep the next lesson reachable above the scrollable recap.
+              <DisparityWinnerScreen onDismiss={onDemoDisparityDismiss} demoNavigation />
             ) : (
               // Replay returns to predictions with the same setup; changing
               // settings and leaving the mode remain separate choices.

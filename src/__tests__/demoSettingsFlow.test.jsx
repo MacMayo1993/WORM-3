@@ -4,6 +4,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useDemoMode } from '../hooks/useDemoMode.js';
 import SettingsMenu from '../components/menus/SettingsMenu.jsx';
+import ScreenTransition from '../components/ScreenTransition.jsx';
+import DemoForecastPicker from '../components/screens/DemoForecastPicker.jsx';
+import DisparityWinnerScreen from '../components/screens/DisparityWinnerScreen.jsx';
 import { DemoCoach, DemoStepIntro } from '../components/screens/DemoFlowController.jsx';
 import { STEP_INTRO_LINES } from '../utils/demoStepCopy.js';
 import { makeCubies } from '../game/cubeState.js';
@@ -25,13 +28,17 @@ function Harness() {
   demo = useDemoMode(callbacks);
   const settings = useGameStore(s => s.settings);
   const showSettings = useGameStore(s => s.showSettings);
+  const showWinner = useGameStore(s => s.showDisparityWinner);
   return <>
     {showSettings && <SettingsMenu settings={settings}
       onSettingsChange={useGameStore.getState().setSettings}
       onClose={() => useGameStore.getState().setShowSettings(false)} />}
-    {/* Keep the coach mounted like ScreenTransition does during its exit. */}
-    {demo.demoTryVisible && <DemoCoach step={demo.demoStep}
-      onNext={() => demo.advanceDemoStep(demo.demoStep)} />}
+    <ScreenTransition show={demo.demoTryVisible && !demo.demoStepIntroVisible && !demo.demoForecastVisible && !showSettings} freezeOnExit>
+      <DemoCoach step={demo.demoStep} onNext={demo.demoStep === 'chaos-forecast'
+        ? demo.handleDemoDisparityDismiss : () => demo.advanceDemoStep(demo.demoStep)} />
+    </ScreenTransition>
+    {demo.demoForecastVisible && <DemoForecastPicker onPick={demo.handleDemoForecastPick} onSkip={demo.handleDemoChaosSkip} />}
+    {showWinner && <DisparityWinnerScreen demoNavigation onDismiss={demo.handleDemoDisparityDismiss} />}
     {demo.demoStepIntroVisible && <DemoStepIntro step={demo.demoStep}
       onContinue={demo.handleDemoStepContinue} onSkip={() => demo.advanceDemoStep(demo.demoStep)} />}
   </>;
@@ -49,6 +56,7 @@ beforeEach(() => {
     demoMode: true, demoStep: 'make-it-yours', size: 3, cubies: makeCubies(3),
     showSettings: false, showMainMenu: false, showWelcome: false,
     wormHealerMode: false, wormPauseMenuOpen: false, randomMode: false,
+    showDisparityWinner: false, disparityWinner: null, chaosLevel: 0,
     ownedItems: [...before.ownedItems, 'scheme_pastel', 'tile_checkerboard'],
   });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
@@ -60,7 +68,7 @@ afterEach(() => {
   vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
 
-it('keeps palette and tile edits on Settings until an explicit Continue to Chaos', () => {
+it('keeps palette and tile edits on Settings until an explicit Next: Chaos →', () => {
   act(() => demo.handleDemoStepContinue());
   wait(20000); // The old coach appeared above the modal after twelve seconds.
   expect(host.querySelector('.demo-coach-pill')).toBeNull();
@@ -78,11 +86,11 @@ it('keeps palette and tile edits on Settings until an explicit Continue to Chaos
   wait(20000);
   expect(demo.demoCelebrationStep).toBeNull();
   expect(demo.demoStep).toBe('make-it-yours');
-  expect(button('Continue to Chaos')).toBeDefined();
+  expect(button('Next: Chaos →')).toBeDefined();
   click(button('Edit look'));
   expect(host.querySelector('.demo-coach-pill')).toBeNull();
   click(host.querySelector('[aria-label="Close settings"]'));
-  click(button('Continue to Chaos'));
+  click(button('Next: Chaos →'));
   expect(demo.demoStep).toBe('chaos-forecast');
   expect(demo.demoStepIntroVisible).toBe(true);
   expect(demo.demoForecastVisible).toBe(false);
@@ -103,7 +111,29 @@ it('opens the preview actions immediately when Settings closes before the coach 
   expect(demo.demoTryVisible).toBe(true);
   expect(demo.demoCelebrationStep).toBeNull();
   expect(button('Edit look')).toBeDefined();
-  expect(button('Continue to Chaos')).toBeDefined();
+  expect(button('Next: Chaos →')).toBeDefined();
+});
+
+it('restores visible preview actions after Edit look is closed during the 180ms exit', () => {
+  act(() => demo.handleDemoStepContinue());
+  wait(1700);
+  click(host.querySelector('[aria-label="Close settings"]'));
+  wait(250);
+  const opacity = () => host.querySelector('.demo-coach-pill').parentElement.style.opacity;
+  expect(opacity()).toBe('1');
+  for (let i = 0; i < 3; i++) {
+    click(button('Edit look'));
+    wait(50);
+    act(() => host.querySelector('.settings-overlay').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    wait(250);
+    expect(opacity()).toBe('1');
+    expect(demo.demoStep).toBe('make-it-yours');
+    expect(demo.demoStepIntroVisible).toBe(false);
+  }
+  wait(20000);
+  expect(demo.demoStep).toBe('make-it-yours');
+  click(button('Next: Chaos →'));
+  expect(demo.demoStep).toBe('chaos-forecast');
 });
 
 it.each([
@@ -144,3 +174,41 @@ it('can skip the longer Chaos briefing without starting a round', () => {
   expect(callbacks.startDisparityGame).not.toHaveBeenCalled();
   expect(useGameStore.getState().randomMode).toBe(false);
 });
+
+it.each(['forecast', 'first strike', 'playing', 'winner reveal', 'results'])(
+  'offers Next during Chaos %s and advances once with the correct reward', phase => {
+    act(() => useGameStore.getState().setDemoStep('chaos-forecast'));
+    act(() => demo.handleDemoStepContinue());
+    expect(demo.demoTryVisible).toBe(true); // No five-second wait.
+    if (phase !== 'forecast') {
+      click(host.querySelector('[aria-pressed="false"]'));
+      click(button('Confirm pick'));
+      act(() => useGameStore.setState({ chaosIgnitionPicking: phase === 'first strike', chaosLevel: phase === 'playing' ? 3 : 0 }));
+    }
+    const won = phase === 'winner reveal' || phase === 'results';
+    if (won) act(() => useGameStore.setState({
+      disparityWinner: { pair: ['M1-001', 'M4-009'] }, showDisparityWinner: phase === 'results',
+    }));
+    wait(50);
+    const next = button('Next: Random →');
+    expect(next).toBeDefined();
+    expect(next.disabled).toBe(false);
+    if (phase === 'forecast') expect(next.parentElement.style.position).toBe('sticky');
+    if (phase === 'results') {
+      expect(next.closest('[aria-label="Demo navigation"]')).not.toBeNull();
+      expect(document.activeElement).toBe(next);
+      expect(host.querySelector('.demo-coach-pill')).toBeNull();
+    }
+    const coins = useGameStore.getState().parityPoints;
+    act(() => { next.click(); next.click(); });
+    expect(useGameStore.getState().parityPoints).toBe(coins + (won ? 200 : 50));
+    expect(demo.demoTryVisible).toBe(false);
+    expect(useGameStore.getState().showDisparityWinner).toBe(false);
+    expect(useGameStore.getState().chaosLevel).toBe(0);
+    expect(callbacks.cancelDisparityRun).toHaveBeenCalled();
+    wait(2800);
+    expect(demo.demoStep).toBe('random-showcase');
+    expect(demo.demoStepIntroVisible).toBe(true);
+    expect(useGameStore.getState().randomMode).toBe(false);
+  }
+);
