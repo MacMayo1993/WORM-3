@@ -1,0 +1,171 @@
+.worm-countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  z-index: 20;
+  --countdown-ink: #22352c;
+}
+
+.worm-countdown-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.worm-countdown-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(92vw, 680px);
+  height: min(58vh, 360px);
+  isolation: isolate;
+}
+
+/* Nested cubie mouths: a little depth without blanketing the game scene. */
+.worm-countdown-portal {
+  position: absolute;
+  width: clamp(130px, 29vw, 235px);
+  aspect-ratio: 1;
+  border-radius: 32%;
+  background: radial-gradient(ellipse, #173b3055, #173b3000 70%);
+  transform: rotate(-12deg);
+  transition: transform calc(var(--beat) * .6) ease-out;
+  z-index: -1;
+}
+
+.worm-countdown-portal i {
+  position: absolute;
+  inset: 0;
+  border: 3px solid #fffaf0b3;
+  border-radius: 28%;
+  box-shadow: 0 0 0 2px #22352c44, inset 0 0 24px #ffffff12;
+}
+
+.worm-countdown-portal i:nth-child(2) { inset: 12%; transform: rotate(20deg); border-color: var(--accent); opacity: .8; }
+.worm-countdown-portal i:nth-child(3) { inset: 24%; transform: rotate(40deg); opacity: .5; }
+.worm-countdown[data-stage="launch"] .worm-countdown-portal { transform: rotate(32deg) scale(1.15); }
+
+.worm-countdown-beat {
+  display: grid;
+  justify-items: center;
+  position: relative;
+}
+
+.worm-countdown-digit {
+  font: 400 clamp(100px, 25vw, 184px)/1 var(--countdown-display);
+  color: #fffdf4;
+  -webkit-text-stroke: 3px var(--countdown-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 6px 0 var(--accent), 0 9px 0 var(--countdown-ink), 0 15px 22px #10251f44;
+  animation: wormCountdownBeat var(--beat) both;
+}
+
+.worm-countdown-ready {
+  margin-top: 22px;
+  padding: 5px 12px;
+  border: 2px solid var(--countdown-ink);
+  border-radius: 7px;
+  background: #fffdf4;
+  color: var(--countdown-ink);
+  box-shadow: 0 3px 0 var(--countdown-ink);
+  font: 900 10px/1 var(--countdown-ui);
+  letter-spacing: .2em;
+}
+
+.worm-countdown-pips { display: flex; gap: 7px; margin-top: 13px; }
+.worm-countdown-pips i {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--countdown-ink);
+  border-radius: 3px;
+  background: #fffdf4;
+  box-shadow: 0 1px 0 #fffdf4b3;
+}
+.worm-countdown-pips i[data-lit="true"] { background: var(--pip-color); }
+
+.worm-countdown-ripple {
+  position: absolute;
+  top: 28%;
+  left: 50%;
+  width: clamp(100px, 25vw, 184px);
+  aspect-ratio: 1;
+  border: 3px solid var(--accent);
+  border-radius: 28%;
+  z-index: -1;
+  animation: wormCountdownRipple var(--beat) ease-out both;
+}
+
+.worm-countdown-word {
+  display: flex;
+  justify-content: center;
+  font: 400 clamp(54px, 17vw, 126px)/1.15 var(--countdown-display);
+  white-space: nowrap;
+}
+
+.worm-countdown-letter {
+  display: inline-block;
+  color: var(--letter-color);
+  -webkit-text-stroke: 4px #fffdf4;
+  paint-order: stroke fill;
+  text-shadow: 0 5px 0 var(--countdown-ink), 0 8px 16px #10251f55;
+  transform-origin: 50% 60%;
+  animation: wormCountdownLetterIn calc(var(--beat) * .65) var(--letter-delay) both;
+}
+
+/* Keep the same four letters mounted through launch → exit. The last letter
+   lands by .815 of the final beat; the mouth seals by .98, before release. */
+.worm-countdown[data-stage="exit"] .worm-countdown-letter {
+  animation: wormCountdownBurrow calc(var(--beat) * .65) var(--letter-delay) cubic-bezier(.6, 0, .8, .4) both;
+}
+.worm-countdown[data-stage="exit"] .worm-countdown-portal {
+  animation: wormCountdownSeal calc(var(--beat) * .98) ease-in both;
+}
+
+@keyframes wormCountdownBeat {
+  0% { transform: translateY(-22px) scale(.65) rotate(-9deg); opacity: 0; }
+  24% { transform: translateY(3px) scale(1.12) rotate(3deg); opacity: 1; }
+  42%, 72% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+  100% { transform: translateY(7px) scale(.9); opacity: 0; }
+}
+@keyframes wormCountdownRipple {
+  0% { transform: translate(-50%, -50%) rotate(-18deg) scale(.6); opacity: .8; }
+  100% { transform: translate(-50%, -50%) rotate(24deg) scale(1.9); opacity: 0; }
+}
+@keyframes wormCountdownLetterIn {
+  0% { transform: translateY(30px) scale(.4) rotate(-12deg); opacity: 0; }
+  60% { transform: translateY(-6px) scale(1.1) rotate(3deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+}
+@keyframes wormCountdownBurrow {
+  0% { transform: translate(0, 0) scale(1) rotate(0); opacity: 1; }
+  24% { transform: translate(0, -8px) scale(1.04) rotate(-4deg); opacity: 1; }
+  80% { opacity: .85; }
+  100% { transform: translate(var(--dock), .08em) scale(.02) rotate(28deg); opacity: 0; }
+}
+@keyframes wormCountdownSeal {
+  0%, 48% { transform: rotate(32deg) scale(1.15); opacity: 1; }
+  100% { transform: rotate(100deg) scale(.03); opacity: 0; }
+}
+
+@media (max-height: 480px) {
+  .worm-countdown-art { transform: scale(.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .worm-countdown-digit, .worm-countdown-letter { animation: none; }
+  .worm-countdown-ripple { display: none; }
+  .worm-countdown-portal { transition: none; }
+  .worm-countdown[data-stage="launch"] .worm-countdown-portal { transform: rotate(-12deg); }
+  .worm-countdown[data-stage="exit"] .worm-countdown-letter,
+  .worm-countdown[data-stage="exit"] .worm-countdown-portal {
+    animation: wormCountdownFade calc(var(--beat) * .7) linear both;
+  }
+}
+@keyframes wormCountdownFade { to { opacity: 0; } }

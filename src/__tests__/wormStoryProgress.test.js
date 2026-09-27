@@ -9,6 +9,8 @@ function start(id = 1) {
   state().initWormMode(undefined, undefined, 3.5, 1, 30, null, true, true, id);
   useGameStore.setState({ wormStoryReady: true, wormGamePhase: 'active' });
   state().startWormStory();
+  // This rewards-only harness has no phase driver. Finish its launch first.
+  useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
 }
 beforeEach(() => {
   state().clearDisparityGame();

@@ -128,7 +128,7 @@ it('replaces the next task with the finishing instruction once every task is don
   expect([...host.querySelectorAll('.worm-story-live li')].map(li => li.textContent)).toEqual(['Land and clear your tail to finish']);
 });
 
-it('puts Start level at the bottom, then shows controls and automatic checked tasks', () => {
+it('puts Start level at the bottom, counts down, then shows automatic checked tasks', () => {
   const runId = useGameStore.getState().wormRunId;
   useGameStore.setState({ wormStoryLevel: 7, wormStoryReady: true, wormStoryStarted: false, wormStoryChecklist: null, wormPauseMenuOpen: false });
   renderPhase('crawling');
@@ -140,6 +140,12 @@ it('puts Start level at the bottom, then shows controls and automatic checked ta
   expect(start.textContent).toContain('Start level');
   act(() => start.click());
   expect(host.querySelector('.worm-story-start')).toBeNull();
+  expect(host.querySelector('.worm-countdown-digit').textContent).toBe('3');
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  expect(host.querySelector('[aria-label="Pause"]').disabled).toBe(true);
+  // Complete the phase driver's handoff in this DOM-only harness.
+  act(() => useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false }));
+  expect(host.querySelector('.worm-countdown')).toBeNull();
   expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
   act(() => useGameStore.setState({ wormStoryChecklist: { runId, levelId: 7, seconds: 260,
     goals: [{ key: 'boosts', label: 'Finish boosts', value: 2, target: 2, done: true }] } }));

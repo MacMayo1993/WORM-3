@@ -25,7 +25,10 @@ export const createWormSlice = (set, get) => ({
   wormStoryVisualBase: null,
   wormStoryViewBase: null,
   applyWormStoryLook: id => set(s => id !== null && !storyUnlocked(s.playerProgress, id) ? s : storyVisualChanges(s, id)),
-  startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen ? { wormStoryStarted: true, wormPaused: false } : s),
+  // Dismiss the briefing into the shared countdown. Only the phase driver may
+  // release movement/objective time once the WORM launch has finished.
+  startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && !s.wormStoryStarted && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen
+    ? { wormStoryStarted: true, wormPaused: true, wormGamePhase: 'countdown', wormCountdownStep: 3 } : s),
   completeWormStory: (runId, metrics) => set(s => completeStoryChanges(s, runId, metrics)),
   claimWormStoryReward: (id, choice) => set(s => claimStoryChanges(s, id, choice)),
   setWormHealerMode: (v) => set(s => ({ wormHealerMode: v, ...(!v ? storyVisualChanges(s, null) : {}) })),
