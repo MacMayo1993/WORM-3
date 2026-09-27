@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 
 // ─── Step History Circular Buffer ────────────────────────────────────────────
 // Pre-allocated ring of {pos, normal} objects — eliminates per-step Vector3
@@ -7,14 +8,14 @@ import * as THREE from 'three';
 // can ride a mid-rotation slice (and bake the turn at commit) without snapping.
 export function makeStepHistory(capacity) {
     return {
-        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3(), tx: -1, ty: -1, tz: -1, restTxn: 0, restTx: -1, restTy: -1, restTz: -1, transit: false })),
+        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3(), tx: -1, ty: -1, tz: -1, restTxn: 0, restTx: -1, restTy: -1, restTz: -1, transit: false, rideWidth: TUNNEL_RIDE_WIDTH, rideClearance: 0, rideWeight: 0 })),
         distance: 0, // monotonic length of the recorded route, including tunnel travel
         head: 0,   // next write slot; newest entry is at (head-1+capacity)%capacity
         count: 0,
         capacity,
     };
 }
-export function shPush(sh, pos, normal, tx, ty, tz, transit = false) {
+export function shPush(sh, pos, normal, tx, ty, tz, transit = false, ride = null) {
     if (sh.count > 0) sh.distance += shAt(sh, 0).pos.distanceTo(pos);
     const slot = sh.buf[sh.head];
     slot.pos.copy(pos);
@@ -23,6 +24,9 @@ export function shPush(sh, pos, normal, tx, ty, tz, transit = false) {
     slot.ty = ty;
     slot.tz = tz;
     slot.transit = transit;
+    slot.rideWidth = ride?.rideWidth ?? TUNNEL_RIDE_WIDTH;
+    slot.rideClearance = ride?.rideClearance ?? 0;
+    slot.rideWeight = ride?.rideWeight ?? 0;
     slot.restTxn = 0;
     sh.head = (sh.head + 1) % sh.capacity;
     if (sh.count < sh.capacity) sh.count++;

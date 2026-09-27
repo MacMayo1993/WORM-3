@@ -99,7 +99,10 @@ describe('Möbius surface riding', () => {
       const along = (path.armALen - tunnelRideSampleArc(path, iDock, 160)) / path.armALen;
       expect(width(iDock)).toBeCloseTo(dock + (TUNNEL_RIDE_WIDTH - dock) * along, 5);
       expect(width(iDock + 1)).toBeCloseTo(dock, 5);
-      for (let i = 0; i <= 160; i++) expect(width(i)).toBeLessThanOrEqual(Math.max(TUNNEL_RIDE_WIDTH, dock) + 1e-9);
+      // Positions are Float32; the full-width mouth now reaches the bound.
+      for (let i = 0; i <= 160; i++) expect(width(i)).toBeLessThanOrEqual(Math.max(TUNNEL_RIDE_WIDTH, dock) + 1e-6);
+      expect(width(0)).toBeCloseTo(TUNNEL_RIDE_WIDTH, 6);
+      expect(width(160)).toBeCloseTo(TUNNEL_RIDE_WIDTH, 6);
     }
     expect(TUNNEL_RIDE_WIDTH).toBeGreaterThan(2 * TUNNEL_RIDE_CLEARANCE); // the worm still fits on it
   });

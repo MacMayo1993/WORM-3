@@ -51,8 +51,7 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
         for (let i = 0; i <= segments; i++) {
           const arc = tunnelRideSampleArc(path, i, segments);
           tunnelRideFrameInto(ride, path, arc);
-          const mouth = THREE.MathUtils.smoothstep(Math.min(arc, path.total - arc), 0, 0.3);
-          const halfWidth = 0.5 * tunnelGaugeAt(tunnelArmFractionAt(path, arc), TUNNEL_RIDE_WIDTH, tunnelDockWidth(size)) * mouth;
+          const halfWidth = 0.5 * tunnelGaugeAt(tunnelArmFractionAt(path, arc), TUNNEL_RIDE_WIDTH, tunnelDockWidth(size));
           for (const side of [0, 1]) {
             actual.fromBufferAttribute(positions, i * 2 + side);
             expected.copy(ride.floor).addScaledVector(ride.right, side === 0 ? -halfWidth : halfWidth);

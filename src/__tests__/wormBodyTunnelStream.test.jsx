@@ -10,6 +10,8 @@ import { makeWormSim, resetWormSim } from '../worm/healerWorm/wormSim.js';
 import { shPush, shReset, ttPush, ttReset } from '../worm/circularBuffers.js';
 import { checkWormHitBySlice, cutWormTail } from '../worm/wormHelpers.js';
 import { advanceTunnelHead } from '../worm/healerWorm/tunnelTrail.js';
+import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
 import { WORM_LIFT } from '../worm/healerWorm/constants.js';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 
@@ -61,6 +63,24 @@ function traverse(phase) {
   }
 }
 
+it('seats the rendered head on the band and sizes it to the local gauge at entry, core and exit', () => {
+  sim.activeTunnel = route;
+  const path = buildTunnelCenterlineInto(makeTunnelCenterline(), route, 3);
+  const ride = makeTunnelRideFrame(), matrix = new THREE.Matrix4();
+  for (const [phase, progress, t] of [['entering', 0.03, 0.0099], ['tunnel', 0.5, 0.5], ['exiting', 0.4, 0.802]]) {
+    shReset(sim.stepHistory);
+    sim.phase = phase; sim.tunnelProgress = 0;
+    advanceTunnelHead(sim, phase, progress, 3); sim.tunnelProgress = progress;
+    renderPoints(); mesh.getMatrixAt(0, matrix);
+    const center = new THREE.Vector3().setFromMatrixPosition(matrix);
+    const scale = new THREE.Vector3().setFromMatrixScale(matrix);
+    tunnelRideFrameInto(ride, path, tunnelTToArc(path, t));
+    expect(center.clone().sub(ride.floor).dot(ride.normal)).toBeCloseTo(scale.x, 6);
+    expect(scale.x * 2).toBeLessThan(sim.tunnelRide.rideWidth);
+    expect(center.clone().sub(ride.center).dot(ride.right)).toBeCloseTo(0, 6);
+  }
+});
+
 it('renders the interior tail continuously when the head exits and then crawls away', () => {
   shReset(sim.stepHistory);
   for (let z = 6; z >= 1.5; z -= 0.01) shPush(sim.stepHistory, new THREE.Vector3(0, 0, z), new THREE.Vector3(0, 0, 1), -1, -1, -1, true);
@@ -86,6 +106,38 @@ it('renders the interior tail continuously when the head exits and then crawls a
   expect(emergedAfter - emergedBefore).toBeGreaterThanOrEqual(10);
   expect(emergedAfter - emergedBefore).toBeLessThanOrEqual(12);
   expect(departed.some(p => Math.abs(p.z) < 1.5)).toBe(true);
+});
+
+it('keeps narrowed beads round and connected instead of stretching them along the band', () => {
+  shReset(sim.stepHistory);
+  sim.phase = 'tunnel'; sim.headInterpPos.set(0, 0, 0); sim.currentNormal.set(0, 0, 1);
+  Object.assign(sim.tunnelRide, { rideWidth: 0.045, rideClearance: 0, rideWeight: 1 });
+  for (let i = 1000; i >= 0; i--) {
+    shPush(sim.stepHistory, new THREE.Vector3(0, -i / 1000, 0), sim.currentNormal, -1, -1, -1, true, sim.tunnelRide);
+  }
+  const points = renderPoints();
+  const matrix = new THREE.Matrix4(), scale = new THREE.Vector3();
+  expect(points).toHaveLength(40);
+  for (let i = 1; i < 30; i++) {
+    mesh.getMatrixAt(i, matrix); scale.setFromMatrixScale(matrix);
+    expect(scale.x).toBeCloseTo(scale.y, 7);
+    expect(scale.x).toBeCloseTo(scale.z, 7);
+    expect(scale.x * 2).toBeLessThan(sim.tunnelRide.rideWidth);
+    expect(points[i].distanceTo(points[i - 1])).toBeLessThan(scale.x * 2);
+  }
+});
+
+it('does not cut an old surface route beyond the tail shortened by a narrow band', () => {
+  shReset(sim.stepHistory);
+  sim.phase = 'crawling'; sim.headInterpPos.set(0, 0, 1.52); sim.currentNormal.set(0, 0, 1);
+  // This old surface leg crosses the right slice, but the intervening narrow
+  // tunnel uses the entire body before any bead can reach that leg.
+  for (let x = 2; x >= 0; x -= 0.01) shPush(sim.stepHistory, new THREE.Vector3(x, -1, 1.6), sim.currentNormal, 1, 0, 2);
+  const ride = { rideWidth: 0.045, rideClearance: 0, rideWeight: 1 };
+  for (let y = -1; y <= 0; y += 0.01) shPush(sim.stepHistory, new THREE.Vector3(0, y, 1.6), sim.currentNormal, -1, -1, -1, true, ride);
+  const points = renderPoints();
+  expect(points.every(point => Math.abs(point.x) < 0.1)).toBe(true);
+  expect(checkWormHitBySlice(worm, 'col', 2, 3)).toBeNull();
 });
 
 it('uses route distance even when dense samples exceed the old sample-count cap', () => {

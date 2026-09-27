@@ -741,9 +741,11 @@ describe('flipped tiles and tunnel traversal', () => {
       stepWormSim(sim, 1 / 60, SIZE, ctx);
     }
     expect(sim.phase).toBe('crawling');
-    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(5.5);
-    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(6.1);
+    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(7.3);
+    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(7.8);
     expect(elapsed.tunnel).toBeGreaterThan(2.5);
+    expect(elapsed.exiting).toBeGreaterThan(3.3);
+    expect(elapsed.exiting).toBeLessThan(3.5);
     expect(elapsed.windup).toBeLessThan(0.21);
     expect(elapsed.windout).toBeLessThan(0.21);
     expect(sim.pos.dirKey).toBe('NZ');

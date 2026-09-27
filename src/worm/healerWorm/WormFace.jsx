@@ -154,6 +154,9 @@ export function WormFace({ worm, size }) {
         }
 
         const state = useGameStore.getState();
+        const rideWeight = inTransit ? (worm.tunnelRide?.current?.rideWeight ?? 0) : 0;
+        const rideShift = inTransit ? (worm.tunnelHeadShift ?? 0) : 0;
+        _faceHeadPos.addScaledVector(normal, rideShift);
         const dt = state.wormPaused || !state.wormAlive ? 0 : Math.min(delta, 0.05);
         faceTime.current += dt;
         const count = worm.orbPickupColorsRef.current.length;
@@ -166,6 +169,7 @@ export function WormFace({ worm, size }) {
             const bodyTransit = phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout';
             normal = worm.currentNormal.current;
             mobi.group.position.copy(worm.headInterpPos.current);
+            mobi.group.position.addScaledVector(normal, rideShift);
             if (!bodyTransit) {
                 const jump = worm.isJumping.current ? worm.jumpLift() : 0;
                 mobi.group.position.addScaledVector(normal, WORM_LIFT + jump);
@@ -190,12 +194,14 @@ export function WormFace({ worm, size }) {
             if (!bodyTransit) mobi.group.position.addScaledVector(normal, 0.035);
             animateMobi(mobi, faceTime.current, { pulse: facePulse.current, transit: !!inTransit });
             mobi.group.scale.setScalar(MOBI_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
-            poseHeadAccessories(accessories, mobi.group.position, _faceForward, normal, MOBI_RADIUS,
+            const headRadius = MOBI_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1);
+            poseHeadAccessories(accessories, mobi.group.position, _faceForward, normal, headRadius,
                 reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
             if (hatGroupRef.current) {
-                hatGroupRef.current.position.copy(mobi.group.position).addScaledVector(normal, MOBI_RADIUS * 1.1);
+                hatGroupRef.current.position.copy(mobi.group.position).addScaledVector(normal, headRadius * 1.1);
                 hatGroupRef.current.quaternion.copy(mobi.group.quaternion);
                 poseHandmadeHat(hatGroupRef.current,wormHatId,_faceForward,normal,reducedMotion ? 0 : faceTime.current,!!inTransit);
+                hatGroupRef.current.scale.multiplyScalar(worm.tunnelHeadScale ?? 1);
             }
             return;
         }
@@ -213,11 +219,11 @@ export function WormFace({ worm, size }) {
         // The Book Worm's head is a round orb like everyone else's now, so it
         // takes the shared sphere layout too — it only needs the small lift that
         // keeps its head level with its floating book body.
-        if (isBook) _faceHeadPos.addScaledVector(normal, BOOK_HEAD_LIFT);
+        if (isBook) _faceHeadPos.addScaledVector(normal, BOOK_HEAD_LIFT * (1 - rideWeight));
         layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), _faceParts);
 
         poseHeadAccessories(accessories, _faceHeadPos, _faceForward, normal,
-            HEAD_RADIUS * (worm.pickupHeadScale ?? 1), reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
+            HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
         animateWormFace(_faceParts, wormCharacterId, faceTime.current, {
             pulse: facePulse.current, transit: !!inTransit, reducedMotion,
         });
@@ -229,6 +235,7 @@ export function WormFace({ worm, size }) {
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);
             hatGroupRef.current.quaternion.copy(_hatAlignQuat);
             poseHandmadeHat(hatGroupRef.current,wormHatId,_faceForward,normal,reducedMotion ? 0 : faceTime.current,!!inTransit);
+            hatGroupRef.current.scale.multiplyScalar(worm.tunnelHeadScale ?? 1);
         }
 
     });

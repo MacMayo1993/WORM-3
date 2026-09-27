@@ -3,6 +3,8 @@ import { EMPTY_ACCESSORIES } from '../handmadeAccessoriesData.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
 import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelSwim.js';
+import { makeTunnelBodyProfile, blendTunnelBodyProfile, fitTunnelBodyInto, tunnelBodyDistance } from './tunnelBodyFit.js';
+import { MOBI_RADIUS } from '../mobiModel.js';
 import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
 import { SPRING_CHARGE } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
@@ -186,6 +188,8 @@ export function WormBody({ worm, size }) {
     if (!inchStateRef.current) inchStateRef.current = makeInchGaitState();
     const characterTimeRef = useRef(0);
     const tunnelStroke = useRef({ side: 0, lift: 0, scale: 1, bank: 0 });
+    const rideProfile = useRef(makeTunnelBodyProfile());
+    const rideFit = useRef({ scale: 1, side: 0, lift: 0, shift: 0 });
     const pickupRef = useRef({ seq: useGameStore.getState().wormOrbFlash?.seq, age: Infinity, active: false, pulses: [], count: worm.tailLength.current });
     const elementalBodyRef = useRef({ active: false, color: new THREE.Color() });
     const pickupColor = useMemo(() => new THREE.Color(), []);
@@ -237,6 +241,7 @@ export function WormBody({ worm, size }) {
         const _bodyTransit = worm.phase.current === 'windup' || worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
         bodyPathHeadInto(_bodyHeadPos, worm, _bodyTransit);
         _headPathPoint.transit = _bodyTransit;
+        blendTunnelBodyProfile(_headPathPoint, _bodyTransit ? worm.tunnelRide?.current : null);
         // Only the in-tunnel shots put the lens on the body's own line — the surface
         // chase camera sits well above and behind it, so nothing there needs culling
         // and gating on the phase keeps segments from blinking out during a jump.
@@ -248,6 +253,10 @@ export function WormBody({ worm, size }) {
         const _isBook = isBookRef.current;
         const _isWiggle = isWiggleRef.current;
         const _isPrism = isPrismRef.current;
+        const headRadius = isMobi ? MOBI_RADIUS : _isBook ? BOOK_HEAD_RADIUS : 0.092;
+        fitTunnelBodyInto(rideFit.current, _headPathPoint, headRadius * worm.pickupHeadScale * worm.tunnelHeadScale);
+        worm.tunnelHeadScale *= rideFit.current.scale;
+        worm.tunnelHeadShift = rideFit.current.shift;
         const mesh = _isBook ? boxMeshRef.current : meshRef.current;
         if (!mesh) return;
 
@@ -279,7 +288,7 @@ export function WormBody({ worm, size }) {
             if (headMesh) {
                 _bookHeadDummy.position.copy(_bodyHeadPos);
                 if (orbitT > 0) rocketOrbitInto(_bookHeadDummy.position, size, orbitT);
-                _bookHeadDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT);
+                _bookHeadDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight) + worm.tunnelHeadShift);
                 _bookHeadDummy.quaternion.identity();
                 _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS * worm.pickupHeadScale * worm.tunnelHeadScale);
                 _bookHeadDummy.updateMatrix();
@@ -439,6 +448,7 @@ export function WormBody({ worm, size }) {
             const fade = 1 - i / (sweep ? visibleCount : tLen);
             let swimWeight = 0;
             let segmentTransit = false;
+            blendTunnelBodyProfile(rideProfile.current, null);
 
             if (i === 0) {
                 // Head — reset quaternion every frame: body segments (below) rotate this
@@ -449,7 +459,8 @@ export function WormBody({ worm, size }) {
                 // Book worm rides slightly higher off the surface — see the isBook
                 // lift below (matches the body segments so the head doesn't float
                 // at a different height than the rest of the book).
-                if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, 0.092 * PAGE_HINGE_Y);
+                if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, 0.092 * PAGE_HINGE_Y * (1 - _headPathPoint.rideWeight));
+                _wormDummy.position.addScaledVector(_bodyNormal, worm.tunnelHeadShift);
                 _wormDummy.scale.setScalar(0.092);
                 // Book Worm draws its head as the orb above, so the spine box
                 // must not also be drawn here — two heads, one inside the other.
@@ -478,13 +489,18 @@ export function WormBody({ worm, size }) {
                     const ptB = _pathCursor.b;
                     const aPos = effPos(ptA, _bodyEffA);
                     const bPos = effPos(ptB, _bodyEffB);
-                    const distToNext = aPos.distanceTo(bPos);
+                    // Measure the render path in local body lengths. As the
+                    // band narrows, bead spacing contracts with their radius;
+                    // round beads stay connected through the tight core turn.
+                    // Contact queries use the same metric over this history.
+                    const distToNext = tunnelBodyDistance(aPos.distanceTo(bPos), ptA, ptB);
 
                     if (cumulativeDist + distToNext >= targetDist) {
                         // Found the bracket on the curve! Interpolate exact point.
                         segmentTransit = !!(ptA.transit || ptB.transit);
                         const t = distToNext > 0 ? (targetDist - cumulativeDist) / distToNext : 0;
                         swimWeight = (ptA.transit ? 1 - t : 0) + (ptB.transit ? t : 0);
+                        blendTunnelBodyProfile(rideProfile.current, ptA, ptB, t);
                         // Use scratch vectors instead of .clone() to avoid GC pressure
                         _bodyClonePos.lerpVectors(aPos, bPos, t);
                         blendBodyNormalInto(_bodyCloneNormal, ptA.normal, ptB.normal, t, _bodyRideAxis,
@@ -520,6 +536,7 @@ export function WormBody({ worm, size }) {
                     const last = _fillCount > 0 ? shAt(steps, _fillCount - 1) : _headPathPoint;
                     _bodyClonePos.copy(effPos(last, _bodyEffA));
                     segmentTransit = !!last.transit;
+                    blendTunnelBodyProfile(rideProfile.current, last);
                     _bodyCloneNormal.copy(last.normal);
                     const angle = _ride && last.tx >= 0 ? liveLayerAngle(last.tx, last.ty, last.tz) : null;
                     if (angle !== null) _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, angle);
@@ -527,7 +544,6 @@ export function WormBody({ worm, size }) {
                 }
 
                 const stroke = tunnelSwimInto(tunnelStroke.current, i, tLen, time, swimWeight, reducedPickupMotion);
-                if (swimWeight > 0) offsetTunnelSwimInto(_bodyClonePos, _bodySegForward, _bodyCloneNormal, stroke);
 
                 if (!segmentTransit && foundPosition && orbitT === 0) {
                     clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : isMobi ? 0.15 : 0.10, surface);
@@ -562,7 +578,7 @@ export function WormBody({ worm, size }) {
                     }
                 }
                 _wormDummy.position.copy(_bodyClonePos);
-                if (_isBook || isMobi || _isInch || _isPrism) {
+                if (_isBook || isMobi || _isInch || _isPrism || segmentTransit) {
                     // Orient the cover to face the direction of travel, using the same
                     // lookAt convention CrawlerCharacter.jsx uses (local -Z = forward),
                     // so the page-flap hinge math below (wormBookFX.js) matches exactly.
@@ -621,6 +637,18 @@ export function WormBody({ worm, size }) {
             }
             _wormDummy.scale.multiplyScalar(wormBodyTaper(i, sweep ? visibleCount : tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
+            if (i !== 0 && (swimWeight > 0 || rideProfile.current.rideWeight > 0)) {
+                const stroke = tunnelStroke.current;
+                // Pages and cube capsules have a wider footprint than a sphere.
+                const footprint = _isBook || isMobi ? 1.45 : 1;
+                const radius = Math.max(_wormDummy.scale.x, _wormDummy.scale.y) * footprint;
+                const fit = fitTunnelBodyInto(rideFit.current, rideProfile.current, radius,
+                    stroke.side, stroke.lift, _wormDummy.scale.y * (_isBook ? SPINE_GEO_ARGS[1] / 2 : 1));
+                _wormDummy.scale.multiplyScalar(fit.scale);
+                _wormDummy.position.addScaledVector(_bodyCloneNormal, fit.shift);
+                offsetTunnelSwimInto(_wormDummy.position, _bodySegForward, _bodyCloneNormal, fit);
+                _bodyClonePos.copy(_wormDummy.position);
+            }
             // Surface clearance above was solved for the resting bead radius; the
             // pickup pulse swells beads past it. Lift a swollen bead by the extra
             // radius so it grows away from the tiles instead of into them. (Unit
