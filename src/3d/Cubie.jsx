@@ -1,5 +1,6 @@
 import { advancePlatformFormation, platformFormationHeld } from '../worm/platformFormation.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
+import { burrowBridge, burrowCubieLift } from '../worm/burrowBridge.js';
 import { useRaisedCubieSpring } from './raisedCubieContext.js';
 import { cubieHasFlippedFace, selectiveCubieOffsetRatio, wormRaisedAmount, cubeRaisedAmount, flipCubePadsEnabled, effectiveFlipPads, LEGACY_PIECE_POP } from '../game/raisedCubie.js';
 import { advancePieceSpring } from './padPose.js';
@@ -422,8 +423,10 @@ const Cubie = React.forwardRef(function Cubie({
   const pieceRef = useRef();
   useImperativeHandle(ref, () => pieceRef.current, []);
   const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
+  const burrowHomeKey = `${origHomeX},${origHomeY},${origHomeZ}`;
   const liftSpring = useRaisedCubieSpring(`${size}:${origHomeX},${origHomeY},${origHomeZ}`);
   const poppedRef = useRef(false);
+  const burrowOffset = useMemo(() => new THREE.Vector3(), []);
   const raised = (!wormMode || wormPads) && (wormPads || (!mirrorMode && flipPads !== 'off'))
     && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Mega normally omits individual bodies. Materialize a body for a raised
@@ -436,12 +439,25 @@ const Cubie = React.forwardRef(function Cubie({
     const spring = liftSpring.current;
     // Chaos lightning jolts: an empty map costs one size check per idle cubie.
     const kick = cubieKicks.size ? cubieKicks.get(popKey) : undefined;
-    if (!kick && !_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0) return;
+    const burrows = wormPads ? burrowBridge.current : null;
+    const burrowingHere = burrows?.wakeCubies.has(burrowHomeKey);
+    if (!kick && !_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0 && !burrowingHere) return;
     if (!popGroupRef.current || !pieceRef.current) return;
     const state = useGameStore.getState();
     const reduced = settings?.reducedMotion || prefersReducedMotion();
+    const managedBurrow = burrows && Object.values(cubie.stickers).some(sticker =>
+      burrows.bySticker.has(getManifoldGridId(sticker, size)));
+    const target = raised ? (managedBurrow ? burrowCubieLift(cubie, size, effectiveFlipCap) : 1) : 0;
     if (wormPads) {
-      advancePlatformFormation(spring, raised, platformFormationHeld(state) ? 0 : delta, reduced);
+      if (managedBurrow) {
+        // The simulation owns a burrow's timing, including every safety hold.
+        // Publish the same pose to the existing platform/tunnel presentation.
+        spring.lift = target; spring.velocity = 0;
+        spring.formationTarget = raised ? 1 : 0;
+        spring.formationFrom = target; spring.formationElapsed = 0;
+        spring.formationDuration = 0; spring.formationRemaining = 0;
+        spring.formationProgress = target;
+      } else advancePlatformFormation(spring, raised, platformFormationHeld(state) ? 0 : delta, reduced);
       pieceRef.current.userData.wormPlatformFormation = spring;
     } else if (reduced) { spring.lift = raised ? 1 : 0; spring.velocity = 0; }
     else advancePieceSpring(spring, raised ? 1 : 0, Math.min(delta, 0.05));
@@ -471,7 +487,18 @@ const Cubie = React.forwardRef(function Cubie({
         popGroupRef.current.position.z += kick.z * k;
       }
     }
-    poppedRef.current = distance > 0 || spring.lift !== 0 || !!kick;
+    burrowOffset.set(0, 0, 0);
+    if (burrowingHere && target === 0 && !reduced) {
+      for (const [dir, sticker] of Object.entries(cubie.stickers)) {
+        const wake = burrows.wake.get(getManifoldGridId(sticker, size));
+        if (!wake || wake.phase === 'closing') continue;
+        const axis = dir[1].toLowerCase();
+        burrowOffset[axis] += (dir[0] === 'P' ? 1 : -1) * wake.strength * 0.13;
+      }
+      burrowOffset.applyQuaternion(pieceRef.current.quaternion);
+      popGroupRef.current.position.add(burrowOffset);
+    }
+    poppedRef.current = distance > 0 || spring.lift !== 0 || !!kick || burrowOffset.lengthSq() > 0;
     if (!raised && spring.lift === 0 && returningBody) setReturningBody(false);
   }, -0.75); // after CubeAssembly (-1), before pad stalks (-0.5) and tunnel anchors
 

@@ -117,6 +117,8 @@ Difficulty changes crawl speed, orb supply, and wormhole frequency together. Orb
 
 ### Raised portals and continuous tunnel travel
 
+Automatic wormholes first burrow beneath neighboring tiles, warn both endpoints, and rise into a timed traversal window. They retreat and resurface at the same pair without spreading or healing themselves. Jumps and occupied tunnel routes hold the cycle. [Burrowing mechanics and timing](docs/features/burrowing-flips.md).
+
 A flipped sticker marks an active wormhole. The containing cubie rises, with caution tape at the original surface opening. An antipodal-colored stalk and band connect the raised mouth to the interior route. An unflipped face on that raised cubie can still be a landing surface without becoming a tunnel entrance.
 
 Jump onto the raised entrance and use the contextual jump/dive action to enter. The worm winds into the mouth, travels through the cube, and winds out at the partner's current location. The head and body animate along the route; the tail can remain inside after the head has resumed crawling. Healing and Story completion account for tail clearance instead of instantly erasing the passage.

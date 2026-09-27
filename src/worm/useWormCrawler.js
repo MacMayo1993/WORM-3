@@ -34,6 +34,8 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { getWormTunnelSnapshot } from './tunnelSnapshot.js';
+import { burrowBridge, burrowEntryOpen } from './burrowBridge.js';
+import { flipPadPair } from '../game/flipPad.js';
 import { canFlipStickerPair, flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker } from '../game/cubeState.js';
@@ -192,6 +194,8 @@ export function useWormCrawler(size, cubies) {
         ctxRef.current = {
             // ── reads ───────────────────────────────────────────────────────────
             getCubies: () => useGameStore.getState().cubies,
+            getRotationEpoch: () => useGameStore.getState().rotationEpoch,
+            isBurrowFaceOpen: sticker => burrowEntryOpen(simRef.current.burrows.pairs.get(flipPadPair(sticker, sizeRef.current))),
             getFlipCap: () => selectEffectiveFlipCap(useGameStore.getState()),
             getTunnelEntry: () => tunnelEntryRule(useGameStore.getState()),
             getGamePhase: () => useGameStore.getState().wormGamePhase,
@@ -240,6 +244,7 @@ export function useWormCrawler(size, cubies) {
             getActiveTunnels: () => activeTunnelsRef.current,
             resolveTunnel: (x, y, z, dirKey) => {
                 const hit = tunnelLookupRef.current.get(`${x},${y},${z},${dirKey}`);
+                if (hit && !burrowEntryOpen(simRef.current.burrows.pairs.get(hit.tunnel.pairId))) return null;
                 if (!hit) return null;
                 if (hit.reversed) {
                     return {
@@ -330,6 +335,12 @@ export function useWormCrawler(size, cubies) {
                         cubies: flipStickerPair(state.cubies, sizeRef.current, tile.x, tile.y, tile.z, tile.dirKey, mm),
                     };
                 });
+                // New arrivals are queried in the same simulation tick. Do not
+                // wait for React's effect to refresh the collision lookup.
+                const live = useGameStore.getState();
+                const snapshot = getWormTunnelSnapshot(live.cubies, sizeRef.current, live.rotationEpoch);
+                tunnelLookupRef.current = snapshot.lookup;
+                activeTunnelsRef.current = snapshot.tunnels;
             },
             canCreateMobiTunnel: tile => {
                 const state = useGameStore.getState();
@@ -527,6 +538,7 @@ export function useWormCrawler(size, cubies) {
         // still returns without advancing gameplay, so Story must hold it too.
         const elementalRevealHeld = sim.elementalFocusT > 0;
         withPersistenceBatch(() => stepWormSim(sim, delta, sizeRef.current, ctxRef.current));
+        burrowBridge.current = sim.burrows;
         feedbackRef.current.tunnel(sim.phase, sim.tunnelProgress, sim.alive);
         if (sim.combat) {
             const c = sim.combat;
@@ -554,7 +566,8 @@ export function useWormCrawler(size, cubies) {
             else if (c.ambient) {
                 const current = useGameStore.getState();
                 const tunnels = getWormTunnelSnapshot(current.cubies,sizeRef.current,current.rotationEpoch).tunnels;
-                stepAmbientCombat(c,delta,combatPlayer,tunnels.filter(hit => !sim.voidTunnelKeys.has(hit.tunnelKey)),onContact);
+                stepAmbientCombat(c,delta,combatPlayer,tunnels.filter(hit => !sim.voidTunnelKeys.has(hit.tunnelKey) &&
+                    burrowEntryOpen(sim.burrows.pairs.get(hit.tunnel.pairId))),onContact);
             } else stepCombat(c,delta,combatPlayer,onContact);
             if (sim.alive) {
                 if (c.shotsFired > previousShots) ctxRef.current.feel('shot');
@@ -672,6 +685,7 @@ export function useWormCrawler(size, cubies) {
         wormExpansion.amount = 0;
         useGameStore.setState({ exploded: false, explosionT: 0, wormExplodeActive: false });
         resetWormSim(sim, size, { orbCount: characterOrbCount(wormOrbCount, useGameStore.getState().wormCharacter), wormholeInterval });
+        burrowBridge.current = sim.burrows;
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
@@ -705,6 +719,7 @@ export function useWormCrawler(size, cubies) {
     }, [size, wormRunId, wormOrbCount, wormholeInterval]);
 
     useEffect(() => () => {
+        if (burrowBridge.current === simRef.current.burrows) burrowBridge.current = null;
         if (deathMenuTimer.current) {
             clearTimeout(deathMenuTimer.current);
             deathMenuTimer.current = null;

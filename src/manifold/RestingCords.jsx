@@ -1,5 +1,6 @@
 import { padMotion } from '../3d/padMotionBridge.js';
 import { useRef, useEffect, useMemo } from 'react';
+import { burrowPair } from '../worm/burrowBridge.js';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
@@ -377,6 +378,10 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
     for (let i = 0; i < tunnels.length && slot < maxStrands; i++) {
       const t = tunnels[i];
       if (focusIds.has(t.pairId)) continue; // drawn at full detail by the focus tier
+      const burrow = burrowPair(t.pairId);
+      const openness = burrow?.openness ?? 1;
+      if (burrow) moved = true; // Includes the last frame of an opening/retreat.
+      if (openness <= 0) continue;
 
       const mesh1 = cubieRefs[t.meshIdx1];
       const mesh2 = cubieRefs[t.meshIdx2];
@@ -435,7 +440,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
         cache[c + 3] = _vEnd.x;   cache[c + 4] = _vEnd.y;   cache[c + 5] = _vEnd.z;
 
         const heat  = Math.min(1, t.flips / flipCap);
-        const width = CORD_W_MIN + (CORD_W_MAX - CORD_W_MIN) * heat;
+        const width = (CORD_W_MIN + (CORD_W_MAX - CORD_W_MIN) * heat) * openness;
         _colorA.set(t.color1);
         _colorB.set(t.color2);
         // Anchors after flip motion, so a shaking tile carries its guard plane.

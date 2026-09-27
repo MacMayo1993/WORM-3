@@ -1,5 +1,6 @@
 import { useGameStore } from '../../hooks/useGameStore.js';
 import React, { useMemo, useRef } from 'react';
+import { burrowTileOpen } from '../burrowBridge.js';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { raisedPortalPosition } from '../raisedPortalPosition.js';
@@ -68,6 +69,7 @@ export default function TunnelSafetyMarkers({ positions, size, worm, cubies, voi
     camera.getWorldPosition(cameraPosition);
     camera.getWorldQuaternion(cameraQuaternion);
     for (const tile of positions) {
+      if (!burrowTileOpen(cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers?.[tile.dirKey], size)) continue;
       const wp = raisedPortalPosition(tile.x, tile.y, tile.z, tile.dirKey, size, useGameStore.getState());
       const n = tile.normal;
       // Do not let a raised sign peek around a face turned away from the camera.

@@ -3,6 +3,8 @@ import { padEntryDecision } from './padEntry.js';
 import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
 import { movingSliceCrossing } from './sliceCrossing.js';
 import { tickExpansion } from './expansion.js';
+import { makeBurrows, startBurrow, tickBurrows } from './burrows.js';
+import { burrowEntryOpen } from '../burrowBridge.js';
 import { EXPLODE_DURATION } from '../wormExpansion.js';
 import { cubeGridIndex } from '../../game/cubeWorldGeometry.js';
 import { bodyCoverageCount } from './bodyCoverage.js';
@@ -68,7 +70,7 @@ import {
     makeStepHistory, shPush, shAt, shReset, shMarkRestRead, shReleaseRestRead,
     makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace,
 } from '../circularBuffers.js';
-import { isSurfaceTilePos, randomFreeTile, randomUnflippedTile } from './surfaceTiles.js';
+import { isSurfaceTilePos, randomFreeTile } from './surfaceTiles.js';
 import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady } from './economy.js';
 import { rotationClock } from './rotationClockBridge.js';
 import { chooseSafeLane, isTileOnLane } from './safeLane.js';
@@ -281,6 +283,7 @@ export function makeWormSim(size) {
         lastFlipped: false,
         wormholeTimer: DEFAULT_WORMHOLE_FLIP_INTERVAL,
         wormholeCountdown: DEFAULT_WORMHOLE_FLIP_INTERVAL,
+        burrows: makeBurrows(),
         tunnelUseCounts: new Map(),
         voidTunnelKeys: new Set(),
         pendingVoidKill: null,
@@ -466,6 +469,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.survivalTick = 0;
     sim.wormholeTimer = wormholeInterval;
     sim.wormholeCountdown = wormholeInterval;
+    sim.burrows = makeBurrows();
     return sim;
 }
 
@@ -750,7 +754,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     }) !== 'ride') return;
     if (isParityLocked(sim, { x, y, z, dirKey }, ctx)) return;
     const resolved = ctx.resolveTunnel(x, y, z, dirKey);
-    if (!resolved) return;
+    if (!resolved || !burrowEntryOpen(sim.burrows.pairs.get(resolved.tunnel?.pairId))) return;
 
     const { tunnel, tunnelKey } = resolved;
 
@@ -987,7 +991,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
     // Wait for its center (0.5 is only the border), including rotation landings.
     if (sim.interpT < 1) return false;
     if (ctx.allowRingHeal?.() === false) return false;
-    const tunnels = ctx.getActiveTunnels?.() ?? [];
+    const tunnels = (ctx.getActiveTunnels?.() ?? []).filter(hit => burrowEntryOpen(sim.burrows.pairs.get(hit.tunnel?.pairId)));
     // Prune stale healed keys, but only when there are any — the common case is an
     // empty set, and materialising an active-key Set every crawl step just to iterate
     // an empty prune list was pure allocation churn on mega cubes with many tunnels.
@@ -2204,13 +2208,15 @@ export function stepWormSim(sim, delta, size, ctx) {
         ctx.onSurvivalTick();
     }
 
+    tickBurrows(sim, size, ctx, delta);
+
     // In finalHealing / solved phases no new wormholes spawn — player heals the
     // remaining ones.
     const gamePhaseNow = ctx.getGamePhase();
     const noMoreSpawns = gamePhaseNow === 'finalHealing' || gamePhaseNow === 'solved';
     // Pause wormhole spawning (antipodal tile flips) while the worm is travelling
     // inside a wormhole — freeze the clock so no flips happen until it crawls back out.
-    if (sim.phase === 'crawling') {
+    if (sim.phase === 'crawling' && !liveRotation.active && !sim.isJumping && !sim.tunnelPassages.length) {
         sim.wormholeTimer -= delta;
         if (sim.wormholeTimer <= 0) {
             // Hold at the active-pair ceiling: skip the spawn (but still reset the timer)
@@ -2220,8 +2226,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             // interval after a heal refills the slot.
             const atCap = (ctx.getActiveTunnels?.() ?? []).length >= activeTunnelCap(size);
             if (!noMoreSpawns && !atCap && !ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && !ctx.isStoryMode?.()) {
-                const tile = randomUnflippedTile(ctx.getCubies(), size, [sim.pos]);
-                if (tile) ctx.spawnWormholePair(tile);
+                startBurrow(sim, size, ctx);
             }
             sim.wormholeTimer = ctx.getWormholeInterval();
         }

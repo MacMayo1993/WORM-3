@@ -1,3 +1,4 @@
+import { burrowSticker } from '../worm/burrowBridge.js';
 import { FlipPadOffset } from './PadSprings.jsx';
 import { registerInspectionSurface } from './inspectionBridge.js';
 import { effectiveFlipPads } from '../game/raisedCubie.js';
@@ -792,6 +793,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }));
   // Persistent wispy ring — replaces static color rings on all tiles
   const wispyRingMatRef = useRef();
+  const burrowDecorRef = useRef();
+  const burrowBorderRef = useRef();
   const [wispyRingUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
     uAntiColor: { value: new THREE.Color() },
@@ -1263,7 +1266,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     const hasFlips = (meta?.flips ?? 0) > 0;
     const wormhole = hasFlips && meta?.curr !== meta?.orig;
     const showGhostTile = !isDead && hasFlips;
-    const showWormholeHazardFx = !isDead && wormhole;
+    const burrow = wormHealerMode ? burrowSticker(meta, faceSize) : null;
+    const showWormholeHazardFx = !isDead && wormhole && (!burrow || burrow.openness > 0.05);
+    const showBurrowDecor = !burrow || burrow.openness > 0.05;
+    if (burrowDecorRef.current) burrowDecorRef.current.visible = showBurrowDecor;
+    if (burrowBorderRef.current) burrowBorderRef.current.visible = showBurrowDecor;
+    if (burrow && !showWormholeHazardFx && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) groupRef.current.position.set(...pos);
 
     const needsGhostUpdate = showGhostTile && spiderMatRef.current && (
       (wormhole && spiderMatRef.current.uniforms.uBurst.value !== 1.0) ||
@@ -2167,7 +2175,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           NOTE: ringRef stays declared — the flip midpoint/pulse code still references
           ringRef.current under null guards, so those branches simply no-op. */}
       {!isDead && !isSudokube && isWormhole && (
-        <mesh position={[0, 0, 0.006]} renderOrder={2}>
+        <mesh ref={burrowBorderRef} position={[0, 0, 0.006]} renderOrder={2}>
           <primitive object={_neonBorderGeo} attach="geometry" />
           <shaderMaterial
             ref={neonBorderMatRef}
@@ -2292,6 +2300,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </group>
       )}
 
+      <group ref={burrowDecorRef}>
       {/* Tally Marks - skip if origColor is white on non-white tile */}
       {!isDead && !isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
         <TallyMarks
@@ -2402,6 +2411,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           })}
         </>
       )}
+
+      </group>
 
       {/* Flip burst effects. Each fires only on a flip or animated heal transition,
           so a never-flipped Mega tile carries none of them.
