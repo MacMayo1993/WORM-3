@@ -1,31 +1,39 @@
-/* LoadingScene.css — the opening's cube hopping over a wormhole in its paper.
+/* LoadingScene.css — the opening's cube falling for ever between two portals.
  *
  * Loaded with the lazy LoadingScene chunk; the cover's shell (LoadingScreen.css)
- * lays out .wl-scene, .wl-stage and .wl-well.
+ * lays out .wl-scene, the two .wl-well portals and the .wl-gap between them.
  *
  * Design goals:
  *  - The cube is CSS 3D animated with transform/opacity only, so it runs on the
  *    compositor and keeps moving while heavy chunks/EXR maps decode on the main
  *    thread. No WebGL: that would collide with the app's single R3F <Canvas>.
  *  - It is the opening's cube (IntroScene): black plastic cubies, glossy classic
- *    stickers (colours injected from constants.js), the top layer clacking home
- *    as it lands, and the sticker flip wave to antipodal colours.
- *  - The paper and wormhole are LoadingPortal's canvases; `.wl-well` marks the
- *    mouth so the shadow and landing ring here line up with it.
- *  - Fully respects prefers-reduced-motion (a still 3/4 pose).
+ *    stickers (colours injected from constants.js), a top layer that twists, and
+ *    the sticker flip wave to antipodal colours.
+ *  - The portals are LoadingPortal's canvases; the `.wl-well`s mark where they
+ *    are, so the fall, the shadow and the ripple here line up with them.
+ *  - Fully respects prefers-reduced-motion (a still 3/4 pose between portals).
  *
- * Timeline (one hop per --wl-beat; the apex is 0, the landing 15%): the top layer
- * turns a quarter on each hop, so --wl-cycle = 4 beats brings it full circle. The
- * flip wave turns the stickers antipodal after the first landing (7.5–11% of the
- * cycle) and back after the third (57.5–61%). loadingWormhole.js (BEAT) mirrors
- * the beat so the vortex kicks on each landing.
+ * The fall: the cube drops a drop (--wl-drop, the gap between the portals'
+ * centres) every --wl-beat, at a steady terminal speed, starting 0.7 cubes up
+ * inside the top portal. A twin one drop below makes the loop: as the cube sinks
+ * into the paper its twin is the same cube coming out of the top, and when the
+ * fall repeats the two swap places unseen. The shaft is clipped to the open air
+ * between the portals' near edges (shaftClipPath), and the near halves of their
+ * lips are drawn over it. loadingWormhole.js (FALL) holds the same numbers and
+ * kicks both portals as the cube passes through, 25% into each fall.
+ *
+ * Over four falls (--wl-cycle) the top layer gives two half twists, each while
+ * the cube is in the open (16.5% and 66.5% of the cycle), and the flip wave
+ * turns the stickers antipodal (40.6%) and back (90.6%).
  */
 
 .wl-scene {
   --wl-c: calc(var(--wl-cube) / 3);
   --wl-half: calc(var(--wl-cube) / 2);
-  --wl-beat: 3s;
-  --wl-cycle: 12s;
+  --wl-wb: calc(var(--wl-well-w) * 0.18);
+  --wl-beat: 2.4s;
+  --wl-cycle: 9.6s;
 }
 
 .wl-backdrop {
@@ -36,39 +44,54 @@
   pointer-events: none;
 }
 
-.wl-drop,
-.wl-hop {
+/* The near halves of the portals' lips, over the falling cube. */
+.wl-backdrop.wl-front {
+  z-index: 3;
+}
+
+/* === The shaft: the open air between the portals === */
+.wl-shaft {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--wl-well-w);
+  margin-left: calc(var(--wl-well-w) / -2);
+  pointer-events: none;
+}
+
+/* The cube, centred on the top portal and falling one drop per beat. */
+.wl-fall {
+  position: absolute;
+  left: 50%;
+  top: var(--wl-wb);
+  width: var(--wl-cube);
+  height: var(--wl-cube);
+  margin: calc(var(--wl-cube) / -2) 0 0 calc(var(--wl-cube) / -2);
+  animation: wl-fall var(--wl-beat) linear infinite;
+}
+
+@keyframes wl-fall {
+  from { transform: translateY(calc(var(--wl-cube) * -0.7)); }
+  to { transform: translateY(calc(var(--wl-cube) * -0.7 + var(--wl-drop))); }
+}
+
+.wl-view {
   position: absolute;
   inset: 0;
-}
-
-/* The cube is dropped in from above the screen, like the opening's. */
-.wl-drop {
-  animation: wl-drop 0.45s cubic-bezier(0.55, 0, 1, 0.45) both;
-}
-
-@keyframes wl-drop {
-  from { transform: translateY(-80vh); }
-  to { transform: none; }
-}
-
-/* Squash and stretch pivot on the cube's base, pressing into the vortex. */
-.wl-hop {
   perspective: calc(var(--wl-cube) * 4.2);
-  transform-origin: 50% 115%;
-  animation: wl-hop var(--wl-beat) infinite both;
 }
 
-@keyframes wl-hop {
-  0% { transform: translateY(calc(var(--wl-cube) * -0.45)) scale(1, 1); animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
-  15% { transform: translateY(0) scale(0.93, 1.08); animation-timing-function: cubic-bezier(0, 0, 0.3, 1); }
-  19% { transform: translateY(0) scale(1.14, 0.82); animation-timing-function: ease-in-out; }
-  25% { transform: translateY(0) scale(0.96, 1.05); animation-timing-function: ease-in-out; }
-  31% { transform: translateY(0) scale(1.02, 0.98); animation-timing-function: ease-in-out; }
-  37%, 73% { transform: translateY(0) scale(1, 1); animation-timing-function: ease-in-out; }
-  80% { transform: translateY(0) scale(1.1, 0.87); animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1); }
-  85% { transform: translateY(calc(var(--wl-cube) * -0.2)) scale(0.93, 1.09); animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1); }
-  100% { transform: translateY(calc(var(--wl-cube) * -0.45)) scale(1, 1); }
+/* The twin waits out the first fall, so the cube's first entrance is out of
+   the portal above rather than halfway into the paper. */
+.wl-twin {
+  transform: translateY(var(--wl-drop));
+  animation: wl-first-fall var(--wl-beat);
+}
+
+@keyframes wl-first-fall {
+  from, to { visibility: hidden; }
 }
 
 .wl-cube {
@@ -84,7 +107,7 @@
   to { transform: rotateX(-26deg) rotateY(calc(var(--wl-yaw) + 7deg)); }
 }
 
-/* === Layers: the top one twists a quarter on every hop === */
+/* === Layers: the top one gives a half twist every other fall === */
 .wl-layer {
   position: absolute;
   inset: 0;
@@ -100,21 +123,15 @@
   transform: translateY(var(--wl-c));
 }
 
-/* It turns as the cube falls, overshoots and clacks home on landing. */
+/* It turns in the open, overshoots and clacks home. */
 @keyframes wl-twist {
-  0% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(-90deg); animation-timing-function: ease-in-out; }
-  3.5% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(4deg); animation-timing-function: ease-out; }
-  4.6% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(-3deg); animation-timing-function: ease-in-out; }
-  6%, 25% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(0deg); animation-timing-function: ease-in-out; }
-  28.5% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(94deg); animation-timing-function: ease-out; }
-  29.6% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(87deg); animation-timing-function: ease-in-out; }
-  31%, 50% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(90deg); animation-timing-function: ease-in-out; }
-  53.5% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(184deg); animation-timing-function: ease-out; }
-  54.6% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(177deg); animation-timing-function: ease-in-out; }
-  56%, 75% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(180deg); animation-timing-function: ease-in-out; }
-  78.5% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(274deg); animation-timing-function: ease-out; }
-  79.6% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(267deg); animation-timing-function: ease-in-out; }
-  81%, 100% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(270deg); }
+  0%, 16.46% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(0deg); animation-timing-function: ease-in-out; }
+  22.71% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(185deg); animation-timing-function: ease-out; }
+  23.96% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(177deg); animation-timing-function: ease-in-out; }
+  25.63%, 66.46% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(180deg); animation-timing-function: ease-in-out; }
+  72.71% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(365deg); animation-timing-function: ease-out; }
+  73.96% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(357deg); animation-timing-function: ease-in-out; }
+  75.63%, 100% { transform: translateY(calc(var(--wl-c) * -1)) rotateY(360deg); }
 }
 
 /* === Faces: black plastic cubies, a sticker inset on each === */
@@ -142,10 +159,10 @@
   height: 100%;
 }
 
-.wl-front { transform: translateZ(var(--wl-half)); }
-.wl-right { transform: rotateY(90deg) translateZ(var(--wl-half)); --wl-shade: 0.16; --wl-turn: -3s; }
-.wl-back { transform: rotateY(180deg) translateZ(var(--wl-half)); --wl-shade: 0.34; --wl-turn: -6s; }
-.wl-left { transform: rotateY(-90deg) translateZ(var(--wl-half)); --wl-shade: 0.26; --wl-turn: -9s; }
+.wl-front { transform: translateZ(var(--wl-half)); --wl-shade-far: 0.34; }
+.wl-right { transform: rotateY(90deg) translateZ(var(--wl-half)); --wl-shade: 0.16; --wl-shade-far: 0.26; }
+.wl-back { transform: rotateY(180deg) translateZ(var(--wl-half)); --wl-shade: 0.34; --wl-shade-far: 0; }
+.wl-left { transform: rotateY(-90deg) translateZ(var(--wl-half)); --wl-shade: 0.26; --wl-shade-far: 0.16; }
 .wl-top { transform: rotateX(90deg) translateZ(calc(var(--wl-c) / 2)); }
 .wl-bottom { transform: rotateX(-90deg) translateZ(calc(var(--wl-c) / 2)); --wl-shade: 0.4; }
 
@@ -162,18 +179,16 @@
   pointer-events: none;
 }
 
-/* The top layer's strips carry their shade round with each quarter turn. A strip
-   is one quarter ahead of the one before it in the ring (front, right, back, left). */
+/* The top layer's strips carry their shade round with each half turn: a strip
+   swaps its light for that of the face opposite, and back. */
 .wl-layer-top > .wl-face:not(.wl-cap)::after {
-  animation: wl-shade-turn var(--wl-cycle) var(--wl-turn, 0s) infinite both;
+  animation: wl-shade-turn var(--wl-cycle) infinite both;
 }
 
 @keyframes wl-shade-turn {
-  0% { opacity: 0.26; animation-timing-function: ease-in-out; }
-  3.5%, 25% { opacity: 0; animation-timing-function: ease-in-out; }
-  28.5%, 50% { opacity: 0.16; animation-timing-function: ease-in-out; }
-  53.5%, 75% { opacity: 0.34; animation-timing-function: ease-in-out; }
-  78.5%, 100% { opacity: 0.26; }
+  0%, 16.46% { opacity: var(--wl-shade, 0); animation-timing-function: ease-in-out; }
+  22.71%, 66.46% { opacity: var(--wl-shade-far, 0); animation-timing-function: ease-in-out; }
+  72.71%, 100% { opacity: var(--wl-shade, 0); }
 }
 
 /* === Stickers: glossy, domed, and flipping to their antipodal colour ===
@@ -209,16 +224,17 @@
 }
 
 /* Pops off the face as it turns (never cutting into the cubie) and settles
-   antipodal side up; the wave comes round again to turn it back. */
+   antipodal side up, in the open after the second fall; the fourth turns it back. */
 @keyframes wl-flip {
-  0%, 7.5% { transform: translateZ(0.5px) rotateX(0deg); animation-timing-function: cubic-bezier(0.45, 0, 0.8, 0.5); }
-  9.25% { transform: translateZ(calc(var(--wl-c) * 0.45)) rotateX(90deg); animation-timing-function: cubic-bezier(0.2, 0.5, 0.55, 1); }
-  11%, 57.5% { transform: translateZ(0.5px) rotateX(180deg); animation-timing-function: cubic-bezier(0.45, 0, 0.8, 0.5); }
-  59.25% { transform: translateZ(calc(var(--wl-c) * 0.45)) rotateX(270deg); animation-timing-function: cubic-bezier(0.2, 0.5, 0.55, 1); }
-  61%, 100% { transform: translateZ(0.5px) rotateX(360deg); }
+  0%, 40.63% { transform: translateZ(0.5px) rotateX(0deg); animation-timing-function: cubic-bezier(0.45, 0, 0.8, 0.5); }
+  42.81% { transform: translateZ(calc(var(--wl-c) * 0.45)) rotateX(90deg); animation-timing-function: cubic-bezier(0.2, 0.5, 0.55, 1); }
+  45%, 90.63% { transform: translateZ(0.5px) rotateX(180deg); animation-timing-function: cubic-bezier(0.45, 0, 0.8, 0.5); }
+  92.81% { transform: translateZ(calc(var(--wl-c) * 0.45)) rotateX(270deg); animation-timing-function: cubic-bezier(0.2, 0.5, 0.55, 1); }
+  95%, 100% { transform: translateZ(0.5px) rotateX(360deg); }
 }
 
-/* The cube's shadow falls into the funnel: faint at the top of a hop. */
+/* The cube's shadow in the funnel: gone while the cube is inside the portals,
+   gathering as it falls toward the paper again. */
 .wl-shadow {
   position: absolute;
   left: 25%;
@@ -231,16 +247,14 @@
 }
 
 @keyframes wl-shadow {
-  0% { transform: scale(0.5, 0.5); opacity: 0.4; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
-  15% { transform: scale(0.96, 0.96); opacity: 1; animation-timing-function: cubic-bezier(0, 0, 0.3, 1); }
-  19% { transform: scale(1.12, 1.04); animation-timing-function: ease-in-out; }
-  37%, 73% { transform: scale(1, 1); opacity: 1; animation-timing-function: ease-in-out; }
-  80% { transform: scale(1.06, 1.02); animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1); }
-  85% { transform: scale(0.84, 0.84); opacity: 0.8; animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1); }
-  100% { transform: scale(0.5, 0.5); opacity: 0.4; }
+  0% { transform: scale(1, 1); opacity: 0.95; animation-timing-function: ease-in; }
+  25% { transform: scale(1.25, 1.2); opacity: 0.3; animation-timing-function: ease-out; }
+  32% { transform: scale(1.3, 1.25); opacity: 0; }
+  40% { transform: scale(0.45, 0.45); opacity: 0; animation-timing-function: ease-in; }
+  100% { transform: scale(1, 1); opacity: 0.95; }
 }
 
-/* An ink ring spreads over the paper from each landing, as in the opening. */
+/* An ink ripple spreads over the paper as the cube passes through. */
 .wl-shock {
   position: absolute;
   inset: 0;
@@ -251,15 +265,14 @@
 }
 
 @keyframes wl-shock {
-  0%, 15% { transform: scale(1.04); opacity: 0; }
-  15.5% { transform: scale(1.06); opacity: 0.5; animation-timing-function: cubic-bezier(0, 0.6, 0.4, 1); }
-  48%, 100% { transform: scale(1.75); opacity: 0; }
+  0%, 25% { transform: scale(1.04); opacity: 0; }
+  25.5% { transform: scale(1.06); opacity: 0.5; animation-timing-function: cubic-bezier(0, 0.6, 0.4, 1); }
+  58%, 100% { transform: scale(1.75); opacity: 0; }
 }
 
-/* === Reduced motion: a still, lit 3/4 pose; every loop stops === */
+/* === Reduced motion: the cube still, in the open between the portals === */
 @media (prefers-reduced-motion: reduce) {
-  .wl-drop,
-  .wl-hop,
+  .wl-fall,
   .wl-cube,
   .wl-layer-top,
   .wl-sticker,
@@ -267,5 +280,11 @@
   .wl-shadow,
   .wl-shock {
     animation: none;
+  }
+  .wl-fall {
+    transform: translateY(calc(var(--wl-drop) * 0.5));
+  }
+  .wl-twin {
+    display: none;
   }
 }

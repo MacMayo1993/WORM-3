@@ -8,43 +8,71 @@
 // sinks to a throat: s = 0 at the rim, 1 at the throat.
 
 /**
- * The cube's hop, in seconds. Must match LoadingScene.css: `--wl-beat` and the
- * `wl-hop` keyframes, whose landing sits at 15% of the beat. Time 0 is the apex
- * the cube drops from as the screen mounts.
+ * The cube's endless fall between the two portals: out of the one above, into
+ * the one on the paper, and out of the one above again. Must match
+ * LoadingScene.css: `--wl-beat` is the period, `--wl-drop` the drop between the
+ * portals (in cubes), and the `wl-fall` keyframes start the cube `lead` cubes
+ * above the top portal, still inside it. Time 0 is that start, as the screen
+ * mounts. The cube passes through both portals at once — its centre sinks
+ * through the bottom mouth as its twin's comes out of the top one — `lead`
+ * cubes into each fall.
  */
-export const BEAT = { period: 3, land: 0.45 };
+export const FALL = { period: 2.4, drop: 2.8, lead: 0.7 };
+/** Seconds into each fall at which the cube passes through the portals. */
+export const PASS_AT = (FALL.period * FALL.lead) / FALL.drop;
+
+const fmt = (v) => +v.toFixed(4);
+
+/**
+ * The CSS clip-path for the shaft the cube falls down, which is exactly as wide
+ * as the portals and runs from the top of the one above to the bottom of the one
+ * on the paper. The cube is in the open only between the two portals' near
+ * edges — below the front arc of the top portal, above the front arc of the
+ * bottom one — and inside a portal (out of sight) beyond them. `rim` is the CSS
+ * length of a portal's half-height.
+ */
+export function shaftClipPath(rim = 'var(--wl-wb)', steps = 12) {
+  const arc = (centre, from, to) =>
+    Array.from({ length: steps + 1 }, (_, i) => {
+      const angle = from + ((to - from) * i) / steps;
+      return `${fmt(50 + 50 * Math.cos(angle))}% calc(${centre} + ${rim} * ${fmt(Math.sin(angle))})`;
+    });
+  // Left to right along the top portal's near edge, then back right to left
+  // along the bottom portal's.
+  return `polygon(${[...arc(rim, Math.PI, 0), ...arc(`100% - ${rim}`, 0, Math.PI)].join(', ')})`;
+}
 
 export const THROAT = 0.17; // throat radius, as a fraction of the mouth
 const DEPTH = 0.5; // how far the throat sinks toward the viewer, in units of b
 const SPIN = 0.85; // radians per second
-const KICK = 0.9; // extra turn each landing gives the vortex, radians
+const KICK = 0.9; // extra turn each pass gives the vortex, radians
 
 const fract = (v) => v - Math.floor(v);
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-/** Seconds since the cube last landed, or null before its first landing. */
-export function sinceLanding(t) {
-  if (t < BEAT.land) return null;
-  return (t - BEAT.land) % BEAT.period;
+/** Seconds since the cube last passed through the portals, or null before its first pass. */
+export function sincePass(t) {
+  if (t < PASS_AT) return null;
+  return (t - PASS_AT) % FALL.period;
 }
 
-/** 1 the instant the cube lands, easing to 0 before the next hop. */
-export function landingPulse(t) {
-  const since = sinceLanding(t);
+/** 1 the instant the cube passes through, easing to 0 well before the next pass. */
+export function passPulse(t) {
+  const since = sincePass(t);
   return since === null ? 0 : Math.exp(-since / 0.35);
 }
 
-/** How many times the cube has landed by time t. */
-export const landings = (t) => (t < BEAT.land ? 0 : Math.floor((t - BEAT.land) / BEAT.period) + 1);
+/** How many times the cube has passed through the portals by time t. */
+export const passes = (t) => (t < PASS_AT ? 0 : Math.floor((t - PASS_AT) / FALL.period) + 1);
 
 /**
- * The vortex's turn: a steady spin plus a kick that each landing adds and that
- * eases in over half a second, so the funnel visibly whirls when the cube lands.
- * Monotonic and continuous across landings.
+ * The vortex's turn: a steady spin plus a kick that each pass adds and that
+ * eases in over half a second, so both portals whirl as the cube goes through.
+ * Monotonic and continuous across passes.
  */
 export function spinAngle(t) {
-  const since = sinceLanding(t);
-  const kicks = since === null ? 0 : landings(t) - Math.exp(-since / 0.5);
+  const since = sincePass(t);
+  const kicks = since === null ? 0 : passes(t) - Math.exp(-since / 0.5);
   return SPIN * t + KICK * kicks;
 }
 
@@ -70,7 +98,7 @@ const LENS_LIMIT = 4.2; // beyond this (in mouth radii) the paper is untouched
  * Where a point of the flat paper is drawn once the wormhole drags it: pulled
  * toward the mouth and swirled the way the vortex turns, strongest at the rim
  * and gone a few mouth-widths out. Paper that ends up inside the mouth is hidden
- * by the caller. `pulse` (0–1) winds the swirl a little tighter on a landing.
+ * by the caller. `pulse` (0–1) winds the swirl a little tighter as the cube passes.
  */
 export function lensPaperPoint(well, x, y, pulse, out = {}) {
   const dx = (x - well.cx) / well.a;

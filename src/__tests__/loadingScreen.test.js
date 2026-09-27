@@ -4,20 +4,24 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { PAPER_GRID, glslFloat, glslVec3, paperShiftX, paperShiftY } from '../utils/paperGrid.js';
 import { LOADING_CUBE, RING, WAVE_SPREAD } from '../components/screens/loadingCube.js';
 import {
-  BEAT,
+  FALL,
+  PASS_AT,
   THROAT,
   MOTE_COUNT,
   WORM_SEGMENTS,
   funnelPoint,
-  landingPulse,
-  landings,
   lensPaperPoint,
   mote,
+  passPulse,
+  passes,
+  shaftClipPath,
   spinAngle,
   wormPose
 } from '../components/screens/loadingWormhole.js';
 
 const css = readFileSync('src/components/screens/LoadingScene.css', 'utf8');
+const shellCss = readFileSync('src/components/screens/LoadingScreen.css', 'utf8');
+const keyframes = (name) => css.slice(css.indexOf(`@keyframes ${name}`), css.indexOf('\n}\n', css.indexOf(`@keyframes ${name}`)));
 const well = { cx: 400, cy: 300, a: 200, b: 72 };
 const faces = LOADING_CUBE.flatMap((layer) => layer.faces);
 const stickers = faces.flatMap((face) => face.stickers.map((s) => ({ ...s, face })));
@@ -68,31 +72,60 @@ describe('loading cube', () => {
 });
 
 describe('loading screen timing', () => {
-  it('shares its hop with the stylesheet', () => {
-    expect(css).toContain(`--wl-beat: ${BEAT.period}s;`);
-    // The top layer turns a quarter per hop, so the full cycle is four hops.
-    expect(css).toContain(`--wl-cycle: ${BEAT.period * 4}s;`);
-    const hop = css.slice(css.indexOf('@keyframes wl-hop'));
-    const landing = hop.match(/(\d+(?:\.\d+)?)% \{ transform: translateY\(0\)/);
-    expect(Number(landing[1])).toBeCloseTo((BEAT.land / BEAT.period) * 100, 6);
+  it('shares the fall between the portals with the stylesheets', () => {
+    expect(css).toContain(`--wl-beat: ${FALL.period}s;`);
+    // The top layer turns a half twist every other fall, so the full cycle is four.
+    expect(css).toContain(`--wl-cycle: ${FALL.period * 4}s;`);
+    expect(shellCss).toContain(`--wl-drop: calc(var(--wl-cube) * ${FALL.drop});`);
+    const fall = keyframes('wl-fall');
+    expect(fall).toContain(`from { transform: translateY(calc(var(--wl-cube) * -${FALL.lead})); }`);
+    expect(fall).toContain(`to { transform: translateY(calc(var(--wl-cube) * -${FALL.lead} + var(--wl-drop))); }`);
   });
 
-  it('pulses when the cube lands and not before', () => {
-    expect(landingPulse(0)).toBe(0);
-    expect(landingPulse(BEAT.land - 0.01)).toBe(0);
-    expect(landingPulse(BEAT.land)).toBeCloseTo(1, 6);
-    expect(landingPulse(BEAT.land + BEAT.period)).toBeCloseTo(1, 6);
-    expect(landingPulse(BEAT.land + 1)).toBeLessThan(0.1);
-    expect(landings(BEAT.land + 2 * BEAT.period + 0.1)).toBe(3);
+  it('ripples the paper as the cube passes through, when the vortex kicks', () => {
+    const passPercent = (PASS_AT / FALL.period) * 100;
+    expect(passPercent).toBeCloseTo(25, 6);
+    expect(keyframes('wl-shock')).toMatch(new RegExp(`0%, ${passPercent}% \\{[^}]*opacity: 0; \\}`));
   });
 
-  it('spins the vortex forward without a jump at any landing', () => {
+  it('pulses as the cube passes through the portals and not before', () => {
+    expect(passPulse(0)).toBe(0);
+    expect(passPulse(PASS_AT - 0.01)).toBe(0);
+    expect(passPulse(PASS_AT)).toBeCloseTo(1, 6);
+    expect(passPulse(PASS_AT + FALL.period)).toBeCloseTo(1, 6);
+    expect(passPulse(PASS_AT + 1)).toBeLessThan(0.1);
+    expect(passes(PASS_AT + 2 * FALL.period + 0.1)).toBe(3);
+  });
+
+  it('spins the vortex forward without a jump at any pass', () => {
     let last = spinAngle(0);
-    for (let t = 0.005; t < 4 * BEAT.period; t += 0.005) {
+    for (let t = 0.005; t < 4 * FALL.period; t += 0.005) {
       const angle = spinAngle(t);
       expect(angle).toBeGreaterThan(last);
       expect(angle - last).toBeLessThan(0.05);
       last = angle;
+    }
+  });
+});
+
+describe('the shaft between the portals', () => {
+  const clip = shaftClipPath('R', 12);
+  const points = clip.slice('polygon('.length, -1).split(', ');
+
+  it('runs along both portals\' near edges, corner to corner', () => {
+    expect(points).toHaveLength(26);
+    expect(points[0]).toBe('0% calc(R + R * 0)');
+    expect(points[6]).toBe('50% calc(R + R * 1)'); // the top portal's nearest point
+    expect(points[12]).toBe('100% calc(R + R * 0)');
+    expect(points[13]).toBe('100% calc(100% - R + R * 0)');
+    expect(points[19]).toBe('50% calc(100% - R + R * 1)');
+    expect(points[25]).toBe('0% calc(100% - R + R * 0)');
+  });
+
+  it('only ever bulges toward the viewer: the near half of each portal', () => {
+    for (const point of points) {
+      const sin = Number(point.match(/\* (-?[\d.]+)\)$/)[1]);
+      expect(sin).toBeGreaterThanOrEqual(0);
     }
   });
 });

@@ -1,11 +1,11 @@
 // src/components/screens/LoadingScreen.jsx
 /**
- * LoadingScreen — the opening's Rubik's cube, hopping over a wormhole in the
- * opening's graph paper.
+ * LoadingScreen — the opening's Rubik's cube, falling for ever between two
+ * portals in the opening's graph paper.
  *
  * A full-screen cover shown while a heavy mode/scene loads, so the player never
  * watches chunks parse or a 20MB environment map "pop in". This is the static
- * shell — cover, title card and status line. The animated cube and wormhole
+ * shell — cover, title card and status line. The animated cube and portals
  * (LoadingScene) are a lazy chunk with their own stylesheet: nothing needs them
  * before first render and the initial CSS budget has no room for them.
  * preloadAssets.js warms that chunk during the opening, and until it arrives the
@@ -29,10 +29,11 @@ import './LoadingScreen.css';
 
 const LoadingScene = React.lazy(() => import('./LoadingScene.jsx'));
 
-// Holds the cube and wormhole's space while their chunk loads.
+// Holds the portals' space while their chunk loads.
 const ScenePlaceholder = () => (
   <div className="wl-scene">
-    <div className="wl-stage" />
+    <div className="wl-well" />
+    <div className="wl-gap" />
     <div className="wl-well" />
   </div>
 );
