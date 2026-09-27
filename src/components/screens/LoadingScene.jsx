@@ -1,16 +1,17 @@
 // src/components/screens/LoadingScene.jsx
 /**
  * LoadingScene — the loading screen's animated heart: the opening's Rubik's cube
- * hopping over a wormhole in the opening's graph paper.
+ * falling for ever between two linked portals in the opening's graph paper.
  *
  * The same black-plastic cube with glossy classic stickers as IntroScene drops
- * in as its top layer clacks home, then keeps hopping — a quarter twist of the
- * top layer on every hop, the sticker flip wave turning the cube to its antipodal
- * colours and back — while LoadingPortal draws the waving paper and the funnel
- * spinning beneath it.
+ * out of a portal hanging above, falls into the wormhole in the paper, and comes
+ * straight back out of the portal above — mid-transit it is in both at once, its
+ * lower half already falling out of the top portal. On the way its top layer
+ * gives a half twist, and the sticker flip wave turns the cube to its antipodal
+ * colours and back. LoadingPortal draws the waving paper and both portals.
  *
  * The cube is pure CSS 3D, animated on the compositor so it keeps moving while
- * the main thread is busy parsing; the paper and wormhole are 2D canvases (never
+ * the main thread is busy parsing; the paper and portals are 2D canvases (never
  * WebGL, which would compete with the app's R3F canvas for a context).
  *
  * Lazy-loaded by LoadingScreen, with its stylesheet, to keep both off the
@@ -20,6 +21,7 @@
 import React, { useRef, useState } from 'react';
 import { RUBIKS_FACE_COLORS } from '../../utils/constants.js';
 import { CUBE_YAW, LOADING_CUBE } from './loadingCube.js';
+import { shaftClipPath } from './loadingWormhole.js';
 import LoadingPortal from './LoadingPortal.jsx';
 import './LoadingScene.css';
 
@@ -52,24 +54,35 @@ const Cube = React.memo(function Cube() {
   );
 });
 
+// Everything between the two portals' near edges; see shaftClipPath.
+const SHAFT_STYLE = { clipPath: shaftClipPath() };
+
 export default function LoadingScene({ translucent = false }) {
   const wellRef = useRef(null);
-  // The CSS animations start as the scene mounts; the wormhole keeps the same clock.
+  const topRef = useRef(null);
+  // The CSS animations start as the scene mounts; the portals keep the same clock.
   const [startedAt] = useState(() => performance.now());
   return (
     <>
-      <LoadingPortal wellRef={wellRef} startedAt={startedAt} translucent={translucent} />
+      <LoadingPortal wellRef={wellRef} topRef={topRef} startedAt={startedAt} translucent={translucent} />
       <div className="wl-scene">
-        <div className="wl-stage">
-          <div className="wl-drop">
-            <div className="wl-hop">
-              <Cube />
-            </div>
-          </div>
-        </div>
+        <div className="wl-well" ref={topRef} />
+        <div className="wl-gap" />
         <div className="wl-well" ref={wellRef}>
           <i className="wl-shadow" />
           <i className="wl-shock" />
+        </div>
+        {/* The cube and its twin one drop below: as the one goes into the
+            paper, the other is the same cube coming out of the portal above. */}
+        <div className="wl-shaft" style={SHAFT_STYLE}>
+          <div className="wl-fall">
+            <div className="wl-view">
+              <Cube />
+            </div>
+            <div className="wl-view wl-twin">
+              <Cube />
+            </div>
+          </div>
         </div>
       </div>
     </>
