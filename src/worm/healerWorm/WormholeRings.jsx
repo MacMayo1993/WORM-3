@@ -4,6 +4,8 @@ import RaisedCautionPerimeter from './RaisedCautionPerimeter.jsx';
 import { raisedPortalPosition } from '../raisedPortalPosition.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { wormExpansion } from '../wormExpansion.js';
+import { liveRotation, liveLayerAngle } from '../liveRotation.js';
+import { WORM_CAUTION_POLE_HEIGHT, WORM_CAUTION_TAPE_TOP } from '../../game/raisedCubie.js';
 // src/worm/healerWorm/WormholeRings.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import React, { useRef } from 'react';
@@ -27,6 +29,7 @@ const _ringUp = new THREE.Vector3();
 const _bubbleDummy = new THREE.Object3D();
 const _sparkDummy = new THREE.Object3D();
 const _cautionDummy = new THREE.Object3D();
+const _cautionAxis = new THREE.Vector3(), _cautionTurn = new THREE.Quaternion();
 const _voidFrameDummy = new THREE.Object3D();
 const _voidArcAxisY = new THREE.Vector3(0, 1, 0);
 const _voidArcRight = new THREE.Vector3();
@@ -180,6 +183,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     const frameBudgetRef = useRef(0);
     const lastPhaseRef = useRef('crawling');
     const lastHiddenRef = useRef(false);
+    const lastRotationActive = useRef(false);
     const clearedRef = useRef(false);
 
     // Instance capacities. Writes are contiguous from slot 0, so the frame loop sets
@@ -194,6 +198,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     const MAX_MOTES = MAX_RINGS * MOTES_PER_LIVE;
 
     useFrame(({ clock }, delta) => {
+        if (rotationEpoch !== useGameStore.getState().rotationEpoch) return;
         const phase = worm?.phase?.current ?? 'crawling';
         const inTunnelPhase = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
         // Hidden, the rings are off-camera inside the cube: keep them ticking slowly
@@ -212,7 +217,10 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         lastHiddenRef.current = hidden;
 
         frameBudgetRef.current += delta;
-        if (frameBudgetRef.current < targetStep) return;
+        const rotationChanged = lastRotationActive.current !== liveRotation.active;
+        lastRotationActive.current = liveRotation.active;
+        const movingFence = !raisedPads && (liveRotation.active || rotationChanged);
+        if (frameBudgetRef.current < targetStep && !movingFence) return;
         frameBudgetRef.current = 0;
 
         // Nothing to render and counts already zeroed last pass — skip all work.
@@ -380,10 +388,14 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
             _tapeForward.crossVectors(n, _tapeRight).normalize();
             if (!raisedPads) { // Legacy demo portals retain their individual fences.
                 const floor = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, wormExpansion.amount);
-                const poleHeight = dangerous ? 0.88 : 0.68;
+                const poleHeight = dangerous ? 0.44 : WORM_CAUTION_POLE_HEIGHT;
                 const tapeWidth = dangerous ? 0.14 : 0.12;
                 const poleCenter = poleHeight / 2 + 0.01;
-                const tapeLift = poleHeight - 0.025 - tapeWidth / 2;
+                const tapeLift = (dangerous ? 0.4275 : WORM_CAUTION_TAPE_TOP) - tapeWidth / 2;
+                const angle = liveLayerAngle(tile.x, tile.y, tile.z);
+                _cautionAxis.set(liveRotation.axis === 'col' ? 1 : 0, liveRotation.axis === 'row' ? 1 : 0, liveRotation.axis === 'depth' ? 1 : 0);
+                _cautionTurn.identity();
+                if (angle !== null) _cautionTurn.setFromAxisAngle(_cautionAxis, angle);
                 
                 const corners = CAUTION_CORNERS;
 
@@ -396,6 +408,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                         floor[2] + _tapeRight.z * cx + _tapeForward.z * cy + n.z * poleCenter
                     );
                     _cautionDummy.quaternion.setFromUnitVectors(_voidArcAxisY, n);
+                    _cautionDummy.position.applyQuaternion(_cautionTurn);
+                    _cautionDummy.quaternion.premultiply(_cautionTurn);
                     _cautionDummy.scale.set(1, poleHeight, 1);
                     _cautionDummy.updateMatrix();
                     poles.setMatrixAt(poleIdx++, _cautionDummy.matrix);
@@ -467,6 +481,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
                         floor[2] + _tapeRight.z * mx + _tapeForward.z * my + n.z * (tapeLift + sag)
                     );
                     _cautionDummy.quaternion.setFromRotationMatrix(_tapeMat4);
+                    _cautionDummy.position.applyQuaternion(_cautionTurn);
+                    _cautionDummy.quaternion.premultiply(_cautionTurn);
                     // Scale X ensures it reaches exactly pole to pole
                     _cautionDummy.scale.set(tapeLength, tapeWidth, 1);
                     _cautionDummy.updateMatrix();
@@ -548,7 +564,7 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
 
     return (
         <group visible={!hidden}>
-            {raisedPads && <RaisedCautionPerimeter positions={allPositions} cubies={cubies} size={size} texture={cautionTexture} />}
+            {raisedPads && <RaisedCautionPerimeter positions={allPositions} cubies={cubies} size={size} texture={cautionTexture} rotationEpoch={rotationEpoch} />}
             <TunnelSafetyMarkers positions={allPositions} size={size} worm={worm} cubies={cubies}
                 voidTunnelKeysRef={voidTunnelKeysRef} tunnelUseCountsRef={tunnelUseCountsRef} hidden={hidden} />
             {/* Live wormhole rings — bright neon pink, fast spin */}

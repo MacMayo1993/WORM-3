@@ -3,7 +3,7 @@ import { Vector3 } from 'three';
 import { makeCubies } from '../game/cubeState.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { makeWormSim, resetWormSim, startJump, jumpLiftOf, queueTurn, stepWormSim } from '../worm/healerWorm/wormSim.js';
-import { WORM_PAD_HEIGHT, WORM_CAUTION_TAPE_TOP } from '../game/raisedCubie.js';
+import { WORM_PAD_HEIGHT, WORM_PLATFORM_LANDING_HEIGHT } from '../game/raisedCubie.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { samplePlatformArc, tickPlatformJump } from '../worm/healerWorm/raisedPlatforms.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
@@ -34,7 +34,7 @@ it.each([3, 7, 15])('clears the actual raised cubie on every face of a %i cube',
     startJump(sim, ctx, size, { allowDive: false });
     const flight = sim.padFlight;
     expect(flight).toBeTruthy();
-    expect(flight.end.clone().sub(flight.start).dot(normal)).toBeCloseTo(WORM_CAUTION_TAPE_TOP, 10);
+    expect(flight.end.clone().sub(flight.start).dot(normal)).toBeCloseTo(WORM_PLATFORM_LANDING_HEIGHT, 10);
     expect(flight.above.clone().sub(flight.start).dot(normal)).toBeLessThanOrEqual(sim.jumpHeight);
     const center = flight.end.clone().addScaledVector(normal, -.52 - WORM_PAD_HEIGHT);
     let cleared = false;

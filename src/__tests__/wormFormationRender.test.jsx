@@ -10,7 +10,7 @@ import { makeCubies } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
-import { WORM_PIECE_POP, WORM_PAD_HEIGHT, WORM_CAUTION_TAPE_TOP, wormRaisedAmount } from '../game/raisedCubie.js';
+import { WORM_PIECE_POP, WORM_PAD_HEIGHT, WORM_PLATFORM_LANDING_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 import { makeTunnelCenterline, buildTunnelCenterlineInto, getWindWorldPosInto } from '../worm/wormLogic.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
@@ -105,9 +105,9 @@ it.each([false, true])('raises real cubies, grows the band and lands after forma
     expect(shell.material.depthWrite).toBe(false);
     expect(shell.material.opacity).toBeLessThan(0.2);
     expect(sim.padFlight).toBeNull();
-    expect(sim.headInterpPos.z).toBeCloseTo(1.52 + WORM_CAUTION_TAPE_TOP, 6);
+    expect(sim.headInterpPos.z).toBeCloseTo(1.52 + WORM_PLATFORM_LANDING_HEIGHT, 6);
     if (demoMode) {
-      expect(marker.position.z).toBeCloseTo(1.52 + WORM_CAUTION_TAPE_TOP + .035, 6);
+      expect(marker.position.z).toBeCloseTo(1.52 + WORM_PLATFORM_LANDING_HEIGHT + .035, 6);
       await act(async () => useGameStore.setState({ demoWormComplete: true }));
       expect(store.getState().scene.getObjectByName('practice-target')).toBeUndefined();
     }

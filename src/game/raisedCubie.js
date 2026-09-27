@@ -1,12 +1,13 @@
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { cubeExpansionScale, cubeExpansionMultiplier } from './cubeWorldGeometry.js';
 
-// Caution posts stay on the unraised cube. A WORM pad's landing surface meets
-// the upper edge of their tape, on every board size (not a share of full Explode).
-export const WORM_CAUTION_POLE_HEIGHT = 0.68;
-export const WORM_CAUTION_TAPE_TOP = WORM_CAUTION_POLE_HEIGHT - 0.025;
+// Caution fences sit halfway up to the landing, grounded on the unraised cube.
+// Their visual height is independent of the platform/jump geometry.
+export const WORM_CAUTION_POLE_HEIGHT = 0.34;
+export const WORM_CAUTION_TAPE_TOP = 0.3275;
+export const WORM_PLATFORM_LANDING_HEIGHT = 0.655;
 export const WORM_PAD_HEIGHT = 0.3;
-export const WORM_PIECE_POP = WORM_CAUTION_TAPE_TOP - WORM_PAD_HEIGHT;
+export const WORM_PIECE_POP = WORM_PLATFORM_LANDING_HEIGHT - WORM_PAD_HEIGHT;
 // FLIP CUBE and Chaos expose the whole piece and its connecting band.
 export const CUBE_PIECE_POP = 0.55;
 export const LEGACY_PIECE_POP = 0.1;

@@ -9,7 +9,7 @@ const FACES = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 // Build the boundary of the exposed floor opening, not a separate fence around
 // every portal sticker. A raised corner exposes three faces; their shared cube
 // edges are inside the opening and must not carry crossing strips of tape.
-export function buildCautionPerimeter(positions, cubies, size, cap, separateCubies = false) {
+export function buildCautionPerimeter(positions, cubies, size, cap, separateCubies = false, rotation = null) {
   const faces = new Map();
   const visited = new Set();
   const addFace = (tile, dirKey) => {
@@ -41,7 +41,11 @@ export function buildCautionPerimeter(positions, cubies, size, cap, separateCubi
       const center = [face.x, face.y, face.z];
       // Adjacent cubies share corners only while assembled. Explode separates
       // their unit-sized openings, so each cubie then needs its own boundary.
-      const key = `${separateCubies ? center.join(',') + ':' : ''}${q.join(',')}`;
+      const layer = rotation ? face[rotation.axis === 'col' ? 'x' : rotation.axis === 'row' ? 'y' : 'z'] : null;
+      // A shared vertex cannot belong to two independently moving layers.
+      // Split only those seams; neighbors on one layer keep a joined boundary.
+      const group = separateCubies ? center.join(',') : rotation?.sliceIndices.includes(layer) ? `layer${layer}` : '';
+      const key = `${group}:${q.join(',')}`;
       if (!vertices.has(key)) vertices.set(key, { key, grid: q, center, normals: new Set(), up: new THREE.Vector3() });
       return vertices.get(key);
     });
