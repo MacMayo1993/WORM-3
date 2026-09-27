@@ -32,7 +32,7 @@
 import * as THREE from 'three';
 
 /** Half-width of the antipodal core cube at the centre (VoidCore.jsx). */
-export const TUNNEL_MINI_FACE_R = 0.25;
+export const TUNNEL_MINI_FACE_R = 0.2125;
 /** Same surface plane as the miniature's glossy sticker. */
 export const TUNNEL_CORE_STICKER_OFFSET = 0.504;
 

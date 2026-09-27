@@ -10,7 +10,7 @@ import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } fro
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildTunnelCenterlineInto, makeTunnelCenterline } from '../worm/wormLogic.js';
 import {
-  CORE_DIRS, CORE_HALF, CORE_STICKER_OFFSET, CORE_STICKER, CORE_STICKER_LOCAL, CORE_ZOOM_MARGIN,
+  CORE_DIRS, CORE_HALF, CORE_STICKER_OFFSET, CORE_STICKER, CORE_STICKER_LOCAL, CORE_ZOOM_MARGIN, CORE_INTERIOR_FILL,
   coreLayout, coreCellIndex, coreCubieMatrixInto, corePartnerColorId,
   coreZoomLimit, coreZoomAt, coreZoomReach,
   networkCharge, countFlippedStickers, interiorExposure
@@ -82,7 +82,8 @@ describe('tunnel docks on the core', () => {
     const mesh = new THREE.Object3D();
     const a = tunnelDockForMeshInto(new THREE.Vector3(), coreCellIndex(3, 0, 1, 4), 'PX', 4, mesh);
     expect(a.toArray()).toEqual(dockOf({ x: 3, y: 0, z: 1, dirKey: 'PX' }, 4).toArray());
-    expect(tunnelDockInto(new THREE.Vector3(), V(1, 1, 1), V(0, 0, 1), 3).toArray()).toEqual([1 / 6, 1 / 6, (1 + CORE_STICKER_OFFSET) / 6]);
+    expect(tunnelDockInto(new THREE.Vector3(), V(1, 1, 1), V(0, 0, 1), 3).toArray())
+      .toEqual([1, 1, 1 + CORE_STICKER_OFFSET].map(v => v * tunnelCoreScale(3)));
   });
 
   it('joins antipodal docks through the centre on every solved-cube tunnel', () => {
@@ -173,7 +174,7 @@ describe('what the core shows', () => {
 describe('the approach zoom', () => {
   it('never grows the core past the outer cube\'s hollow, anchored on any dock', () => {
     for (const size of SIZES) {
-      const h = size / 2 - CORE_ZOOM_MARGIN;
+      const h = (size / 2 - CORE_ZOOM_MARGIN) * CORE_INTERIOR_FILL;
       for (const cell of coreLayout(size).stickers) {
         const dock = dockOf(cell, size);
         const g = coreZoomLimit(dock, size);

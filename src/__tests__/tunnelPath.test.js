@@ -162,14 +162,20 @@ describe('parameterisation', () => {
   });
 
   it('samples evenly in world space when stepped by arc-length', () => {
-    const pts = [];
-    const p = new THREE.Vector3();
-    for (let i = 0; i < 40; i++) pts.push(tunnelPathArcPointInto(p, path, (i / 39) * path.total).clone());
-    const gaps = pts.slice(1).map((q, i) => q.distanceTo(pts[i]));
-    // Only the step that straddles a corner is short (it cuts the chord), so the
-    // tolerance is a hair over exact — nothing like the stretched beads that
-    // uniform-t stepping produces.
-    expect(Math.max(...gaps) / Math.min(...gaps)).toBeLessThan(1.1);
+    const previous = new THREE.Vector3(), point = new THREE.Vector3();
+    const step = path.total / 39;
+    for (let i = 0; i < 39; i++) {
+      // Integrate along the curved shoulders, rather than cutting them with
+      // straight chords. The arc lookup is numerical: allow 0.2% pacing error.
+      tunnelPathArcPointInto(previous, path, i * step);
+      let distance = 0;
+      for (let j = 1; j <= 64; j++) {
+        tunnelPathArcPointInto(point, path, (i + j / 64) * step);
+        distance += previous.distanceTo(point);
+        previous.copy(point);
+      }
+      expect(Math.abs(distance / step - 1)).toBeLessThan(0.002);
+    }
   });
 });
 

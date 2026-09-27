@@ -19,6 +19,8 @@
 import * as THREE from 'three';
 import { TUNNEL_MINI_FACE_R, TUNNEL_CORE_TILE, TUNNEL_CORE_STICKER_OFFSET, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
+import { rubiksFinish } from './rubiksPiece.js';
+import { bodyMaterialProps, CLASSIC_BODY_MODES, CLASSIC_BODY_COAT } from './cubeViewStyles.js';
 
 /** Half-width of the core, where the tunnels dock. */
 export const CORE_HALF = TUNNEL_MINI_FACE_R;
@@ -115,13 +117,15 @@ export function corePartnerColorId(cubies, map, size, cell, findPartner) {
 export const CORE_ZOOM_MAX = 6;
 /** Keep the grown core this far inside the outer cube's inner walls. */
 export const CORE_ZOOM_MARGIN = 0.12;
+/** Leave more breathing room during the close-up, as well as at rest. */
+export const CORE_INTERIOR_FILL = 0.85;
 
 /**
  * The largest growth about `dock` (a point on the core's surface) that keeps
  * the core inside the hollow of a `size` cube.
  */
 export function coreZoomLimit(dock, size) {
-  const h = size / 2 - CORE_ZOOM_MARGIN, r = CORE_HALF;
+  const h = (size / 2 - CORE_ZOOM_MARGIN) * CORE_INTERIOR_FILL, r = CORE_HALF;
   let g = CORE_ZOOM_MAX;
   for (const d of [dock.x, dock.y, dock.z]) {
     if (r + d > 1e-9) g = Math.min(g, (h + d) / (r + d)); // the face at −r stays above −h
@@ -178,10 +182,8 @@ export function interiorExposure({ explosionT = 0, visualMode = 'classic', hollo
  * reaches. `glow` is a shared uniform ({ value }).
  */
 export function createCoreStickerMaterial(glow, performanceMode = false) {
-  const Lit = performanceMode ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
-  const material = new Lit({
-    roughness: 0.26, metalness: 0, ...(performanceMode ? {} : { clearcoat: 1, clearcoatRoughness: 0.14 })
-  });
+  const { Material, sticker } = rubiksFinish(performanceMode);
+  const material = new Material({ ...sticker, envMapIntensity: 0.3 });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uCoreGlow = glow;
     shader.fragmentShader = shader.fragmentShader
@@ -192,43 +194,12 @@ export function createCoreStickerMaterial(glow, performanceMode = false) {
   return material;
 }
 
-export function createCoreBodyMaterial(performanceMode = false) {
+export function createCoreBodyMaterial(performanceMode = false, mode = 'classic') {
   const Lit = performanceMode ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
-  return new Lit({ color: '#141416', roughness: 0.34, metalness: 0, ...(performanceMode ? {} : { clearcoat: 0.4, clearcoatRoughness: 0.35 }) });
-}
-
-const HALO_VERTEX = /* glsl */ `
-  uniform float uSize;
-  varying vec2 vLocal;
-  void main() {
-    vLocal = uv * 2.0 - 1.0;
-    // Billboard: always faces the camera, centred on the core.
-    vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-    mv.xy += position.xy * uSize;
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const HALO_FRAGMENT = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uIntensity;
-  varying vec2 vLocal;
-  void main() {
-    float r2 = dot(vLocal, vLocal);
-    float g = (exp(-r2 * 7.0) * 0.8 + exp(-r2 * 28.0) * 0.6) * (1.0 - smoothstep(0.6, 1.0, r2));
-    gl_FragColor = vec4(uColor * g * uIntensity, 1.0);
-    #include <colorspace_fragment>
-  }
-`;
-
-/** A soft corona round the core, depth-tested at its centre so the cube silhouettes against it. */
-export function createCoreHaloMaterial() {
-  return new THREE.ShaderMaterial({
-    uniforms: { uSize: { value: 0.9 }, uColor: { value: new THREE.Color('#ffe7c2') }, uIntensity: { value: 0 } },
-    vertexShader: HALO_VERTEX,
-    fragmentShader: HALO_FRAGMENT,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
+  return new Lit({
+    ...bodyMaterialProps(mode),
+    ...(!performanceMode && CLASSIC_BODY_MODES.has(mode) ? CLASSIC_BODY_COAT : {}),
+    // The hidden crossing still needs an opaque shell, including glass view.
+    transparent: false, opacity: 1, depthWrite: true
   });
 }
