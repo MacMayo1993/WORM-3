@@ -74,6 +74,20 @@ describe('raised opening caution perimeter', () => {
     }
   });
 
+  it('splits shared seams between rotating layers while keeping same-layer neighbors joined', () => {
+    const cubies = makeCubies(5);
+    const positions = [[1, 2], [2, 2], [3, 2], [1, 3]].map(([x, y]) => raised(cubies, x, y, 4, 'PZ'));
+    const rotation = { axis: 'col', sliceIndices: [1, 3] };
+    const p = buildCautionPerimeter(positions, cubies, 5, 6, false, rotation);
+    // Six edges around the two joined layer-1 openings; four on each other layer.
+    expect(p.edges).toHaveLength(14);
+    expectClosed(p);
+    for (const edge of p.edges) {
+      expect(edge.a.center[0]).toBe(edge.face.x);
+      expect(edge.b.center[0]).toBe(edge.face.x);
+    }
+  });
+
   it.each([3, 6, 15])('keeps unit-size openings during Explode on every face of a %i cube', size => {
     const mid = Math.floor(size / 2);
     for (const dir of ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ']) {

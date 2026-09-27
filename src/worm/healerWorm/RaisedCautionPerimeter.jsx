@@ -4,15 +4,18 @@ import * as THREE from 'three';
 import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import { WORM_CAUTION_POLE_HEIGHT, WORM_CAUTION_TAPE_TOP } from '../../game/raisedCubie.js';
 import { wormExpansion } from '../wormExpansion.js';
+import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { buildCautionPerimeter, cautionPointInto } from './cautionPerimeter.js';
 
 const dummy = new THREE.Object3D(), point = new THREE.Vector3();
 const poleAxis = new THREE.Vector3(0, 1, 0), poleUp = new THREE.Vector3();
+const rotationAxis = new THREE.Vector3();
 const TAPE_WIDTH = 0.12;
 
-export default function RaisedCautionPerimeter({ positions, cubies, size, texture }) {
+export default function RaisedCautionPerimeter({ positions, cubies, size, texture, rotationEpoch = useGameStore.getState().rotationEpoch }) {
   const poles = useRef();
   const lastExpansion = useRef(NaN);
+  const motion = useRef({ active: false, txn: -1, layouts: null, perimeter: null });
   const cap = useGameStore(selectEffectiveFlipCap);
   const layouts = useMemo(() => [
     buildCautionPerimeter(positions, cubies, size, cap),
@@ -38,12 +41,33 @@ export default function RaisedCautionPerimeter({ positions, cubies, size, textur
 
   useFrame(() => {
     const expansion = wormExpansion.amount;
-    if (!poles.current || lastExpansion.current === expansion) return;
+    // Keep the last posed fence until React supplies the committed coordinates;
+    // applying the cleared bridge to old grid data would snap it backwards.
+    if (!poles.current || rotationEpoch !== useGameStore.getState().rotationEpoch) return;
+    const rotating = liveRotation.active;
+    if (!rotating && !motion.current.active && lastExpansion.current === expansion) return;
     lastExpansion.current = expansion;
-    const perimeter = layouts[expansion > 0 ? 1 : 0];
+    motion.current.active = rotating;
+    let perimeter = layouts[expansion > 0 ? 1 : 0];
+    if (rotating) {
+      rotationAxis.set(liveRotation.axis === 'col' ? 1 : 0, liveRotation.axis === 'row' ? 1 : 0, liveRotation.axis === 'depth' ? 1 : 0);
+      if (expansion === 0) {
+        if (motion.current.txn !== liveRotation.txnId || motion.current.layouts !== layouts) {
+          motion.current.txn = liveRotation.txnId;
+          motion.current.layouts = layouts;
+          motion.current.perimeter = buildCautionPerimeter(positions, cubies, size, cap, false, liveRotation);
+        }
+        perimeter = motion.current.perimeter;
+      }
+    }
     perimeter.posts.forEach((vertex, index) => {
       cautionPointInto(dummy.position, vertex, size, expansion, 0.01 + WORM_CAUTION_POLE_HEIGHT / 2);
       poleUp.copy(vertex.up).normalize();
+      const angle = liveLayerAngle(...vertex.center);
+      if (angle !== null) {
+        dummy.position.applyAxisAngle(rotationAxis, angle);
+        poleUp.applyAxisAngle(rotationAxis, angle);
+      }
       dummy.quaternion.setFromUnitVectors(poleAxis, poleUp);
       dummy.scale.set(1, WORM_CAUTION_POLE_HEIGHT * vertex.up.length(), 1);
       dummy.updateMatrix();
@@ -57,6 +81,8 @@ export default function RaisedCautionPerimeter({ positions, cubies, size, textur
       // the tape. A rectangular instance would leave triangular gaps there.
       for (let j = 0; j < 4; j++) {
         cautionPointInto(point, j < 2 ? a : b, size, expansion, WORM_CAUTION_TAPE_TOP - (j % 2) * TAPE_WIDTH);
+        const angle = liveLayerAngle(...(j < 2 ? a : b).center);
+        if (angle !== null) point.applyAxisAngle(rotationAxis, angle);
         attribute.setXYZ(index * 4 + j, point.x, point.y, point.z);
       }
     });

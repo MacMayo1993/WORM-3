@@ -7,7 +7,7 @@ import { makeCubies } from '../game/cubeState.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { buildCautionPerimeter } from '../worm/healerWorm/cautionPerimeter.js';
-import { WORM_CAUTION_TAPE_TOP } from '../game/raisedCubie.js';
+import { WORM_CAUTION_TAPE_TOP, WORM_PLATFORM_LANDING_HEIGHT, WORM_CAUTION_POLE_HEIGHT } from '../game/raisedCubie.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getWormTunnelSnapshot } from '../worm/tunnelSnapshot.js';
 import { raisedPlatformPosition } from '../worm/healerWorm/raisedPlatforms.js';
@@ -18,6 +18,12 @@ import RaisedCautionPerimeter from '../worm/healerWorm/RaisedCautionPerimeter.js
 
 vi.mock('../worm/healerWorm/TunnelSafetyMarkers.jsx', () => ({ default: () => null }));
 extend(THREE);
+
+it('halves the fence height independently of the raised landing', () => {
+  expect(WORM_CAUTION_POLE_HEIGHT).toBeCloseTo(0.68 / 2, 10);
+  expect(WORM_CAUTION_TAPE_TOP).toBeCloseTo(0.655 / 2, 10);
+  expect(WORM_PLATFORM_LANDING_HEIGHT).toBeCloseTo(0.655, 10);
+});
 
 it.each([3, 7, 15].flatMap(size => [{ size, corner: false }, { size, corner: true }]))('grounds the actual perimeter on size $size, corner=$corner', async ({ size, corner }) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -61,7 +67,8 @@ it.each([3, 7, 15].flatMap(size => [{ size, corner: false }, { size, corner: tru
       perimeter.faces.forEach(face => {
         const tile = { ...face, normal: FACE_NORMALS[face.dirKey] };
         const floor = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, 0));
-        const landing = floor.clone().addScaledVector(tile.normal, WORM_CAUTION_TAPE_TOP);
+        const landing = floor.clone().addScaledVector(tile.normal, WORM_PLATFORM_LANDING_HEIGHT);
+        const tapeTop = floor.clone().addScaledVector(tile.normal, WORM_CAUTION_TAPE_TOP);
         if (!corner) expect(raisedPlatformPosition(tile, size, { getCubies: () => cubies }).distanceTo(landing)).toBeLessThan(1e-8);
         for (const [index, vertex] of perimeter.posts.entries()) {
           if (!vertex.normals.has(tile.dirKey)) continue;
@@ -73,7 +80,7 @@ it.each([3, 7, 15].flatMap(size => [{ size, corner: false }, { size, corner: tru
           if (edge.face.dirKey !== tile.dirKey) continue;
           for (const corner of [0, 2]) {
             const top = new THREE.Vector3().fromBufferAttribute(tape.geometry.attributes.position, index * 4 + corner);
-            expect(top.sub(landing).dot(tile.normal)).toBeCloseTo(0, 6);
+            expect(top.sub(tapeTop).dot(tile.normal)).toBeCloseTo(0, 6);
           }
         }
       });

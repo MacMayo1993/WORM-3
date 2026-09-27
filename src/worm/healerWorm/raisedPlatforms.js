@@ -64,7 +64,7 @@ export function startPlatformJump(sim, size, ctx, allowRide) {
         padHeight: isLiveFlippedFace(ctx.getCubies()[target.x][target.y][target.z].stickers[target.dirKey], ctx.getFlipCap?.() ?? 6) ? WORM_PAD_HEIGHT : 0,
         startNormal: sim.currentNormal.clone(), endNormal,
         target: { ...target }, moveDir, allowRide, // Time the landing for the end of the lift if the player jumps during
-        // construction; the destination remains fixed at the tape-height platform.
+        // construction; the destination remains fixed at the raised platform.
         duration: Math.max((livePlatformFormation(target, size)?.formationRemaining ?? 0) + 1 / 60,
             Math.min(1.25, 0.65 + Math.max(0, start.distanceTo(destination) - 3) * 0.035)) };
     sim.isJumping = true;
@@ -83,7 +83,7 @@ export function samplePlatformArc(flight, t, out) {
     const travel = (t - 0.2) / 0.58, across = smooth(travel), rise = smooth(travel / 0.45);
     out.lerpVectors(launch, above, across);
     // Reach clearance height before crossing over the ledge, then settle onto
-    // its top. The ordinary landing stays at tape height on every board size.
+    // its top. The ordinary landing has a fixed height on every board size.
     const height = (above.x - launch.x) * endNormal.x + (above.y - launch.y) * endNormal.y + (above.z - launch.z) * endNormal.z;
     return out.addScaledVector(endNormal, Math.max(0, height) * (rise - across));
 }
