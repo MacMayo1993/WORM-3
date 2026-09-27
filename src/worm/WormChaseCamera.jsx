@@ -15,6 +15,7 @@ import { tunnelState } from './tunnelProgressBridge.js';
 import {
     makeTunnelCamPose,
     tunnelCamPoseInto,
+    TUNNEL_CAM_NEAR,
     diveProgress,
     portalDist,
     ENTER_END_T,
@@ -195,6 +196,7 @@ export default function WormChaseCamera({ worm, size }) {
     const revealTRef = useRef(1);               // countdown reveal dolly progress (0 = fully pulled back)
     const revealActiveRef = useRef(false);
     const cameraRunRef = useRef(null);
+    const surfaceNearRef = useRef(camera.near);
 
     // This camera is the app's shared one, and the chase view leaves it wide
     // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
@@ -203,9 +205,11 @@ export default function WormChaseCamera({ worm, size }) {
     // never re-runs its own setup.
     useEffect(() => {
         const restoreFov = camera.fov;
+        const restoreNear = surfaceNearRef.current;
         const restoreUp = camera.up.clone();
         return () => {
             camera.fov = restoreFov;
+            camera.near = restoreNear;
             camera.up.copy(restoreUp);
             camera.updateProjectionMatrix();
         };
@@ -238,6 +242,12 @@ export default function WormChaseCamera({ worm, size }) {
         // reset the smoothing refs mid-crawl.
         const horizonMode = gameState.wormCameraHorizon ?? 'face';
         const phase = worm.phase.current;
+        const near = phase !== 'crawling' && worm.activeTunnel.current
+            ? Math.min(surfaceNearRef.current, TUNNEL_CAM_NEAR) : surfaceNearRef.current;
+        if (camera.near !== near) {
+            camera.near = near;
+            camera.updateProjectionMatrix();
+        }
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
         if (mobile) {

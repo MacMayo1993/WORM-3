@@ -8,6 +8,7 @@ import { CORE_ZOOM_MAX } from './antipodalCore.js';
 const LEG_SAMPLES = [0, 12, 4, 4, 12];
 export const CORE_PASSAGE_POINTS = 33;
 export const CORE_PASSAGE_RADIUS = 0.18;
+export const CORE_MIRROR_HALF = TUNNEL_MINI_FACE_R * 0.9;
 // Maximum face extent after zooming about any dock. Outer throats are always
 // beyond the core; omit them and crop long shoulders to this bounded region.
 export const CORE_PASSAGE_EXTENT = TUNNEL_MINI_FACE_R * (2 * CORE_ZOOM_MAX - 1) + 0.02;
@@ -38,6 +39,8 @@ export function makeCorePassage() {
     path: makeTunnelPath(), signature: '',
     uniforms: {
       uPassageOpen: { value: 0 },
+      uCoreRoomCenter: { value: new THREE.Vector3() },
+      uCoreRoomHalf: { value: 0 },
       uPassageRadius: { value: CORE_PASSAGE_RADIUS },
       uPassagePoints: { value: Array.from({ length: CORE_PASSAGE_POINTS }, () => new THREE.Vector3()) }
     }
@@ -78,5 +81,18 @@ float portalDistance(vec3 point) {
     distanceSq = min(distanceSq, dot(radial, radial));
   }
   return sqrt(distanceSq) - uPassageRadius;
+}
+`;
+
+// Hollow the plastic behind the mirrors, keeping the exterior shell intact.
+// The mirrors use only corePassageGLSL so the room does not erase itself.
+export const coreRoomCutoutGLSL = corePassageGLSL.replace('float portalDistance(', 'float boreDistance(') + `
+uniform vec3 uCoreRoomCenter;
+uniform float uCoreRoomHalf;
+float portalDistance(vec3 point) {
+  float bore = boreDistance(point);
+  if (uPassageOpen < 0.5 || uCoreRoomHalf <= 0.0) return bore;
+  vec3 d = abs(point - uCoreRoomCenter) - vec3(uCoreRoomHalf);
+  return min(bore, max(d.x, max(d.y, d.z)));
 }
 `;

@@ -16,18 +16,19 @@ import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.
 // start pose.
 
 import * as THREE from 'three';
+import { coreZoomBoundsInto } from '../3d/antipodalCore.js';
 import { buildTunnelPathForTunnel, getTunnelArcPosSmoothInto } from './wormLogic.js';
 import { makeTunnelPath, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from '../utils/tunnelPath.js';
 
 // Offset from the centerline while riding.
 //
-// The worm's body occupies that centerline — it is strung along the exact route
-// the camera trails down — so this offset is the only thing keeping the lens out
-// of it. At 0.32 the nearest segment passed a fifth of a unit under the lens and
-// filled a third of the frame, which reads as the camera being inside the worm
-// rather than following it. It has to stay under the bore's radius, though, or
-// the lens ends up outside the shaft looking back through its wall.
+// Lift above the worm in the open arms. cameraRideHeight eases this to zero
+// through the outer mouths and the core: those cutouts follow the rider's
+// centerline, and an elevated camera would pass through their solid walls.
+// The worm renderer already fades body segments that get too close to the lens.
 export const TUNNEL_CAM_UP = 0.62;
+// The default 0.1 near plane cuts away the rim of the small core openings.
+export const TUNNEL_CAM_NEAR = 0.02;
 
 // The exterior framing used to watch a mouth from outside the cube — shared by
 // windup, the start of the dive, and windout, so the dive provably begins from
@@ -127,6 +128,17 @@ export function backForHead(tHead, size) {
 
 const _fwd = new THREE.Vector3();
 const _camPath = makeTunnelPath();
+const _coreBounds = new THREE.Box3();
+
+function cameraRideHeight(point, arc, tHead) {
+  const mouthClearance = THREE.MathUtils.smoothstep(Math.min(arc, _camPath.total - arc), 0.1, 0.55);
+  // Follow the exact carved centerline through BOTH core holes. Ease out of the
+  // elevated chase view before reaching any position the zoomed core can occupy.
+  // Using its complete zoom envelope avoids a frame of clipping when VoidCore
+  // grows after the camera update, and keeps the shot still as the zoom recedes.
+  const coreClearance = THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(point), 0.2, 1);
+  return cameraUpForHead(tHead) * mouthClearance * coreClearance;
+}
 
 // How far apart the two samples used to differentiate the route are, in world
 // units. Small enough to read as the local direction of travel, large enough not
@@ -172,6 +184,7 @@ const _rideFrame = makeTunnelRideFrame();
  */
 export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   buildTunnelPathForTunnel(_camPath, tunnel, size);
+  coreZoomBoundsInto(_coreBounds, _camPath.midA, size);
   const headArc = tunnelPathTToArc(_camPath, tHead);
   const camArc = headArc - backForHead(tHead, size);
 
@@ -185,8 +198,7 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   if (out.tangent.lengthSq() < 1e-12) out.tangent.copy(_camPath.nStart).negate();
   out.tangent.normalize();
 
-  // Follow the same transported frame, spreading the concealed half-turn over
-  // the approach and departure so the camera circles the solid core smoothly.
+  // Keep the gentle banking while the lens goes through the core openings.
   tunnelCameraFrameInto(_rideFrame, _camPath, camArc);
   out.up.copy(_rideFrame.normal);
   if (camArc >= 0 && camArc <= _camPath.total) out.tangent.copy(_rideFrame.tangent);
@@ -210,16 +222,7 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
 
   // Clear the worm's back once inside, then look slightly down at the track.
   // A parallel raised aim left the core and worm at the bottom of a phone view.
-  const mouthClearance = THREE.MathUtils.smoothstep(Math.min(camArc, _camPath.total - camArc), 0.1, 0.55);
-  let rideHeight = cameraUpForHead(tHead) * mouthClearance;
-  // On a small cube the head can approach its exit while the trailing lens is
-  // still at the core. Keep the lens outside the cube's circumscribed sphere
-  // even after the ordinary exit-height ramp has begun, avoiding a black frame.
-  const coreClearance = 0.48;
-  const projection = out.cam.dot(out.up), distanceSq = out.cam.lengthSq();
-  if (distanceSq + 2 * projection * rideHeight + rideHeight * rideHeight < coreClearance * coreClearance) {
-    rideHeight = -projection + Math.sqrt(projection * projection + coreClearance * coreClearance - distanceSq);
-  }
+  const rideHeight = cameraRideHeight(out.cam, camArc, tHead);
   out.cam.addScaledVector(out.up, rideHeight);
   out.look.add(out.cam).addScaledVector(out.up, -rideHeight * 0.75);
   return out;
@@ -307,8 +310,9 @@ export function tunnelExitPoseInto(out, tunnel, progress, size) {
   const sideBlend = diveEase((arc - _camPath.total - 0.35) / (outsideDistance - 0.35));
   _poseDir.subVectors(out.look, out.cam);
   cameraArcPointInto(out.cam, _camPath, arc);
-  const mouthClearance = THREE.MathUtils.smoothstep(Math.min(arc, _camPath.total - arc), 0.1, 0.55);
-  out.cam.addScaledVector(_exitRail.up, cameraUpForHead(tHead) * mouthClearance * (1 - blend))
+  // The exit blend changes the LENS arc. Apply core clearance at that actual
+  // position too: on small boards the head exits while the camera is in the core.
+  out.cam.addScaledVector(_exitRail.up, cameraRideHeight(out.cam, arc, tHead) * (1 - blend))
     .addScaledVector(_exitSideRail, (1.2 + size * 0.22) * sideBlend);
   out.look.copy(out.cam).add(_poseDir);
   return out;

@@ -177,10 +177,20 @@ it('mirrors the live cube, flashes both docked tiles, lights only an opened cube
     expect(zoom.scale.x).toBeGreaterThan(limit * 0.95);
     // The entry dock is a fixed point of the swell: the worm still dives into its tile.
     expect(rideDock.clone().multiplyScalar(zoom.scale.x).add(zoom.position).distanceTo(rideDock)).toBeLessThan(1e-9);
-    // Through the core and on the way out, it lets go.
+    // The head can already be near the exit while the trailing lens is still
+    // inside. Hold the room open until the CAMERA has crossed its far wall.
     tunnelState.t = 0.9;
+    camera.position.set(0, 0, 0);
     for (let i = 0; i < 60; i++) frame();
-    expect(zoom.scale.x).toBeCloseTo(1, 3);
+    expect(zoom.scale.x).toBeGreaterThan(limit * 0.99);
+    const room = scene.getObjectByName('anticube-mirror-room');
+    expect(room.visible).toBe(true);
+    expect(room.parent).toBe(zoom);
+    const roomUniforms = bodies.material.userData.portalCutout;
+    expect(roomUniforms.uCoreRoomCenter.value.distanceTo(zoom.position)).toBeLessThan(1e-9);
+    camera.position.set(0, 0, -3);
+    for (let i = 0; i < 60; i++) frame();
+    expect(zoom.scale.x).toBeCloseTo(1, 2);
     // Reduced motion never swells it.
     tunnelState.t = 0.4; tunnelState.activeTunnelId = 'ride-2';
     await act(async () => useGameStore.setState({ settings: { ...useGameStore.getState().settings, reducedMotion: true } }));
