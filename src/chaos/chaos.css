@@ -113,6 +113,12 @@
 .chaos-medals { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 20px; }.chaos-medals span { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 6px; background: color-mix(in srgb, var(--chaos-accent) 4%, transparent); border: 1px solid color-mix(in srgb, var(--chaos-accent) 20%, transparent); color: #d9e9ac; font-size: 11px; }.chaos-medals .chaos-glyph { width: 14px; height: 14px; }
 .chaos-timeline { border-top: 1px solid var(--chaos-line); padding: 6px 0; }.chaos-timeline summary { cursor: pointer; padding: 12px 0; font-size: 12px; color: #becac5; line-height: 1.5; }.chaos-timeline ol { list-style: none; padding: 0; margin: 8px 0; max-height: 240px; overflow-y: auto; }.chaos-timeline li { display: flex; align-items: baseline; gap: 12px; border-left: 2px solid color-mix(in srgb, var(--chaos-accent) 27%, transparent); padding: 10px 0 10px 12px; font-size: 12px; }.chaos-timeline time { color: var(--chaos-accent); min-width: 32px; font: 11px var(--chaos-mono); }.chaos-timeline small { display: block; color: var(--chaos-muted); margin-top: 5px; overflow-wrap: anywhere; }
 .chaos-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }.chaos-actions button:first-child { grid-column: 1 / -1; }
+.chaos-result-footer { padding: 0 28px 24px; }
+.chaos-results--demo .chaos-result-sheet { display: flex; flex-direction: column; width: min(480px, 100%); overflow: hidden; }
+.chaos-results--demo .chaos-result-hero { flex: 1; min-height: 0; overflow-y: auto; }
+.chaos-results--demo .chaos-result-footer { flex: 0 0 auto; padding: 16px; background: var(--arcade-card); }
+.chaos-results--demo .chaos-actions { margin: 0; }
+.chaos-results--demo .chaos-actions button { min-height: 56px; touch-action: manipulation; }
 @keyframes chaos-enter { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
 @keyframes chaos-tile-enter { from { opacity: 0; translate: 0 15px; scale: .88; } to { opacity: 1; translate: 0 0; scale: 1; } }
 @media (hover: hover) { .chaos-ui button:not(:disabled):hover { border-color: color-mix(in srgb, var(--chaos-accent) 60%, transparent); }.chaos-bet-type:hover, .chaos-pick-pair:hover { transform: translateY(-2px); }.chaos-button-primary:not(:disabled):hover, .chaos-actions button:first-child:not(:disabled):hover { background: #e5ff9b; }.chaos-back:hover, .chaos-detail-button:hover { color: var(--chaos-accent); } }

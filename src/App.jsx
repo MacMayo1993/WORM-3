@@ -593,7 +593,7 @@ export default function WORM3() {
     demoViewSpotlight, handleDemoViewSpotlightClick,
     demoFlipSpotlight, handleDemoFlipSpotlightSkip,
     demoTourIndex, handleDemoNavTap, handleDemoTourSkip,
-    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp, demoFlipProgress,
+    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp, demoChaosComplete, demoFlipProgress,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
     cancelDisparityRun, startDisparityGame,
@@ -615,7 +615,7 @@ export default function WORM3() {
 
   // The demo's floating pills stand down while a full modal owns the screen.
   const wormPauseMenuOpen = useGameStore(s => s.wormPauseMenuOpen);
-  const demoChromeQuiet = showStore || showSettings || showHelp || wormPauseMenuOpen;
+  const demoChromeQuiet = showStore || showSettings || showHelp || wormPauseMenuOpen || demoChaosComplete;
   // …except on the Settings step, where the demo opened Settings itself. There
   // an open panel is the expected state, not an interruption, so suppressing
   // the coach pill would leave that step as the only one in the demo with no
@@ -1537,6 +1537,7 @@ export default function WORM3() {
               demoDialogueVisible: demoMode && (
                 demoColdOpenVisible || demoStepIntroVisible || (demoTryVisible && !!demoCoachCopy)
               ),
+              demoChaosComplete,
             }}
             handlers={{
               onReset: handleReset,

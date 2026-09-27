@@ -8,10 +8,10 @@ import { Z, UI_FONT, HEADING_FONT, MONO_FONT } from '../../utils/uiTheme.js';
 import '../../chaos/chaos.css';
 import { ChaosGlyph } from '../../chaos/ChaosArt.jsx';
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
-import { useDialogBehavior } from '../ui/Panel.jsx';
+import DemoDialog from './DemoDialog.jsx';
 
 const sourceName = source => source === 'conway' ? 'Surface surge' : source === 'chain' ? 'Chain spread' : 'Chaos';
-export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play Again', onSecondary, secondaryLabel, onConfigure }) {
+export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play Again', onSecondary, secondaryLabel, onConfigure, demo = false }) {
   const { winner, deaths, result, run, record, settings } = useGameStore(useShallow(s => ({
     winner: s.disparityWinner, deaths: s.disparityDeaths, result: s.lastBetResult,
     run: s.chaosExperience, record: s.chaosRecord, settings: s.settings,
@@ -19,9 +19,9 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
   const paletteSettings = run?.paletteSettings || settings;
   const { faces: faceInfo } = bettingPalette(paletteSettings);
   const [ready, setReady] = useState(false);
-  const dialogRef = useRef(null);
-  const onDialogKeyDown = useDialogBehavior(dialogRef, ready ? onSecondary : undefined);
+  const continueRef = useRef(null);
   useEffect(() => { const t = setTimeout(() => setReady(true), 500); return () => clearTimeout(t); }, []);
+  useEffect(() => { if (demo && ready) continueRef.current?.focus(); }, [demo, ready]);
   const pair = winner?.pair || (winner?.gridId ? [winner.gridId] : []);
   const elapsed = run?.endedAt != null ? Math.max(0, Math.round((run.endedAt - run.startedAt) / 1000)) : null;
   const events = run?.events || [];
@@ -32,12 +32,13 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
   const outcome = result?.push ? `${result.wager} PP returned`
     : result?.won ? `Prediction won · +${result.net ?? result.payout - result.wager} PP`
     : result ? `Prediction missed · −${result.wager} PP` : 'Round complete';
-  return <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-results" style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT, ...arcadeModeVars('chaos'), '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'] }} role="dialog" aria-modal="true" aria-labelledby="chaos-result-title">
+  return <DemoDialog onClose={ready ? (demo ? onDismiss : onSecondary) : undefined} className={`chaos-ui chaos-results${demo ? ' chaos-results--demo' : ''}`} style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT, ...arcadeModeVars('chaos'), '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'] }} aria-labelledby="chaos-result-title">
     <div className="chaos-result-sheet">
       <header className="chaos-result-hero">
         <ChaosGlyph kind="trophy" />
-        <div className="chaos-kicker">Chaos</div>
-        <h1 id="chaos-result-title" style={{ fontFamily: HEADING_FONT }}>Last pair standing</h1>
+        <div className="chaos-kicker">{demo ? 'Call the Winner · Complete' : 'Chaos'}</div>
+        <h1 id="chaos-result-title" style={{ fontFamily: HEADING_FONT }}>{demo ? 'Chaos complete' : 'Last pair standing'}</h1>
+        {demo && <p className="chaos-result-subtitle">Round finished. Continue to Surprise Cube.</p>}
         
         <div className="chaos-winners">
           {pair.map((id, i) => <React.Fragment key={id}>
@@ -49,7 +50,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
           </React.Fragment>)}
         </div>
       </header>
-      <div className="chaos-result-body">
+      {!demo && <div className="chaos-result-body">
         <div className="chaos-result-call" data-won={result?.won}>
           <ChaosGlyph kind={result?.won ? 'trophy' : 'storm'} />
           <div>
@@ -88,12 +89,14 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
           <p className="chaos-note">Elimination order: earliest first.</p>
         </details>
         <p className="chaos-note">Your record: {record.rounds} rounds · {record.correct}/{record.predictions} correct predictions · best streak {record.bestStreak}.</p>
+      </div>}
+      <footer className="chaos-result-footer">
         <div className="chaos-actions">
-          <button disabled={!ready} onClick={onDismiss}>{primaryLabel}</button>
+          <button ref={continueRef} disabled={!ready} onClick={onDismiss}>{primaryLabel}</button>
           {onConfigure && <button disabled={!ready} onClick={onConfigure}>Change setup</button>}
           {onSecondary && <button disabled={!ready} onClick={onSecondary}>{secondaryLabel || "Main menu"}</button>}
         </div>
-      </div>
+      </footer>
     </div>
-  </div>;
+  </DemoDialog>;
 }
