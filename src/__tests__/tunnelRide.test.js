@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeTunnelCenterline, buildTunnelCenterlineInto } from '../worm/wormLogic.js';
-import { makeTunnelRideFrame, tunnelRideFrameInto, TUNNEL_RIDE_CLEARANCE, fillTunnelRideGeometry, tunnelRideCoreArc, tunnelRideTwistAt } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, TUNNEL_RIDE_CLEARANCE, TUNNEL_RIDE_WIDTH, fillTunnelRideGeometry, tunnelRideCoreArc, tunnelRideTwistAt } from '../utils/tunnelRide.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
+import { tunnelDockWidth } from '../utils/tunnelPath.js';
 
 const tile = (dirKey, size, corner = false) => {
   const normal = FACE_NORMALS[dirKey];
@@ -73,6 +74,32 @@ describe('Möbius surface riding', () => {
     const start = makeTunnelRideFrame(), end = makeTunnelRideFrame();
     tunnelRideFrameInto(start, path, 0); tunnelRideFrameInto(end, path, path.total);
     expect(start.normal.dot(end.normal)).toBeCloseTo(-1, 8);
+  });
+
+  it('narrows the ridden band from the worm\'s floor at each tile to the core tile it plugs into', () => {
+    const count = 161 * 2;
+    const geometry = () => {
+      const g = new THREE.BufferGeometry();
+      for (const [name, width] of [['position', 3], ['uv', 2], ['aHeightFrac', 1], ['aTripFrac', 1]])
+        g.setAttribute(name, new THREE.BufferAttribute(new Float32Array(count * width), width));
+      return g;
+    };
+    for (const zoom of [1, 3]) {
+      const geo = geometry(), left = geometry(), right = geometry();
+      const path = build(tile('PY', 5, true), tile('NX', 5), 5);
+      const dock = tunnelDockWidth(5) * zoom;
+      fillTunnelRideGeometry(geo, left, right, path, 160, TUNNEL_RIDE_WIDTH, dock);
+      const width = (i) => new THREE.Vector3().fromBufferAttribute(geo.attributes.position, i * 2)
+        .distanceTo(new THREE.Vector3().fromBufferAttribute(geo.attributes.position, i * 2 + 1));
+      // Last sample on the entry arm, next to the dock: the band there is (all but)
+      // the core tile's width, and through the crossing it is exactly that.
+      const iDock = Math.floor(path.armALen / path.total * 160);
+      const along = (path.armALen - iDock / 160 * path.total) / path.armALen;
+      expect(width(iDock)).toBeCloseTo(dock + (TUNNEL_RIDE_WIDTH - dock) * along, 5);
+      expect(width(iDock + 1)).toBeCloseTo(dock, 5);
+      for (let i = 0; i <= 160; i++) expect(width(i)).toBeLessThanOrEqual(Math.max(TUNNEL_RIDE_WIDTH, dock) + 1e-9);
+    }
+    expect(TUNNEL_RIDE_WIDTH).toBeGreaterThan(2 * TUNNEL_RIDE_CLEARANCE); // the worm still fits on it
   });
 
   it('writes the rendered floor and rails at their actual riding positions', () => {

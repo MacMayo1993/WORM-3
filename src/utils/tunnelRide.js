@@ -1,10 +1,12 @@
 import * as THREE from 'three';
-import { tunnelPathArcPointInto } from './tunnelPath.js';
+import { tunnelPathArcPointInto, tunnelArmFractionAt, tunnelGaugeAt } from './tunnelPath.js';
 
 // One swept surface for the track, recorded body and camera. The body centre
 // keeps its existing route; the floor is one bead radius underneath it.
 export const TUNNEL_RIDE_CLEARANCE = 0.115;
-export const TUNNEL_RIDE_WIDTH = 0.64;
+// The worm's floor at its widest, where the ride leaves a tile: room for the
+// body (a bead is TUNNEL_RIDE_CLEARANCE across its radius) and a little more.
+export const TUNNEL_RIDE_WIDTH = 0.36;
 const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
 const prev = new THREE.Vector3(), next = new THREE.Vector3();
 const rotation = new THREE.Quaternion();
@@ -117,13 +119,14 @@ export function tunnelRideFrameInto(out, path, arc, twist = tunnelRideTwistAt(pa
 
 const frame = makeTunnelRideFrame();
 // Writes the existing ribbon and bumper buffers; no new per-frame objects.
-export function fillTunnelRideGeometry(geo, left, right, path, segments) {
+// The band is `mouthWidth` where it leaves each tile and narrows to `dockWidth`
+// where it plugs into the core (see tunnelGaugeAt).
+export function fillTunnelRideGeometry(geo, left, right, path, segments, mouthWidth = TUNNEL_RIDE_WIDTH, dockWidth = TUNNEL_RIDE_WIDTH) {
   for (let i = 0; i <= segments; i++) {
     const u = i / segments, arc = u * path.total;
     tunnelRideFrameInto(frame, path, arc);
     const mouth = THREE.MathUtils.smoothstep(Math.min(arc, path.total - arc), 0, 0.3);
-    const core = THREE.MathUtils.smoothstep(frame.center.length(), 0.35, 0.9);
-    const width = THREE.MathUtils.lerp(0.19, TUNNEL_RIDE_WIDTH * 0.5, core) * mouth;
+    const width = 0.5 * tunnelGaugeAt(tunnelArmFractionAt(path, arc), mouthWidth, dockWidth) * mouth;
     for (let side = 0; side < 2; side++) {
       const sign = side === 0 ? -1 : 1;
       const vi = i * 2 + side;

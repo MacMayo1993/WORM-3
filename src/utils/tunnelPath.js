@@ -57,6 +57,42 @@ export function tunnelDockInto(out, centre, normal, size) {
   return out.copy(normal).multiplyScalar(0.5).add(centre).multiplyScalar(tunnelCoreScale(size));
 }
 
+// ── Gauge: how wide a tunnel is ──────────────────────────────────────────────
+// A tunnel plugs into its core tile at exactly that tile's width, and flares
+// only gently on the way out to its own tile: at most twice the core tile, and
+// never past TUNNEL_MOUTH_WIDTH. Every tunnel renderer takes its width from here
+// so the band, its rails and the hint cords all fit the tile they dock on.
+
+/** A core sticker's width as a share of its (shrunk) cubie, like the play cube's. */
+export const TUNNEL_CORE_TILE = 0.86;
+/** The widest a tunnel gets, at its own tile — under half a play tile. */
+export const TUNNEL_MOUTH_WIDTH = 0.36;
+/** How far a tunnel flares from its core tile to its own tile, at most. */
+export const TUNNEL_FLARE = 2;
+
+/** Width of the core tile a tunnel docks on: the band's width where it plugs in. */
+export const tunnelDockWidth = (size) => TUNNEL_CORE_TILE * tunnelCoreScale(size);
+
+/** Width of a tunnel where it leaves its own tile. */
+export const tunnelMouthWidth = (size) => Math.min(TUNNEL_MOUTH_WIDTH, TUNNEL_FLARE * tunnelDockWidth(size));
+
+/** Width `along` an arm: 0 at the core dock, 1 at the tile mouth. */
+export function tunnelGaugeAt(along, mouthWidth, dockWidth) {
+  const a = along < 0 ? 0 : along > 1 ? 1 : along;
+  return dockWidth + (mouthWidth - dockWidth) * a;
+}
+
+/**
+ * Where arc-length `arc` sits along its arm: 0 at the core dock (and through
+ * the crossing between the two docks), 1 at the arm's tile mouth.
+ */
+export function tunnelArmFractionAt(path, arc) {
+  if (arc <= path.armALen) return path.armALen > 0 ? 1 - arc / path.armALen : 0;
+  const armB0 = path.total - path.armBLen;
+  if (arc >= armB0) return path.armBLen > 0 ? (arc - armB0) / path.armBLen : 0;
+  return 0;
+}
+
 const DOCK_NORMALS = {
   PX: [1, 0, 0], NX: [-1, 0, 0], PY: [0, 1, 0], NY: [0, -1, 0], PZ: [0, 0, 1], NZ: [0, 0, -1]
 };

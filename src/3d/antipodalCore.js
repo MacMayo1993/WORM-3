@@ -17,13 +17,13 @@
 // Pure helpers and shaders only; the React side lives in VoidCore.jsx.
 
 import * as THREE from 'three';
-import { TUNNEL_MINI_FACE_R, tunnelCoreScale } from '../utils/tunnelPath.js';
+import { TUNNEL_MINI_FACE_R, TUNNEL_CORE_TILE, tunnelCoreScale } from '../utils/tunnelPath.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
 /** Half-width of the core, where the tunnels dock. */
 export const CORE_HALF = TUNNEL_MINI_FACE_R;
-/** A core sticker's width as a share of its cubie, like the play cube's 0.85. */
-export const CORE_STICKER = 0.86;
+/** A core sticker's width as a share of its cubie; tunnels plug in at this width. */
+export const CORE_STICKER = TUNNEL_CORE_TILE;
 /** Sticker front face offset from its cubie centre, in cubie units. */
 export const CORE_STICKER_OFFSET = 0.5 + 0.004;
 

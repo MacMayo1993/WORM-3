@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
-  TUNNEL_MINI_FACE_R, tunnelCoreScale, tunnelDockInto, tunnelDockForCellInto, tunnelDockForMeshInto
+  TUNNEL_MINI_FACE_R, TUNNEL_MOUTH_WIDTH, TUNNEL_FLARE, tunnelCoreScale, tunnelDockInto, tunnelDockForCellInto,
+  tunnelDockForMeshInto, tunnelDockWidth, tunnelMouthWidth, tunnelGaugeAt, tunnelArmFractionAt
 } from '../utils/tunnelPath.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { makeCubies } from '../game/cubeState.js';
@@ -9,7 +10,7 @@ import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } fro
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildTunnelCenterlineInto, makeTunnelCenterline } from '../worm/wormLogic.js';
 import {
-  CORE_DIRS, CORE_HALF, CORE_STICKER_LOCAL, CORE_ZOOM_MARGIN,
+  CORE_DIRS, CORE_HALF, CORE_STICKER, CORE_STICKER_LOCAL, CORE_ZOOM_MARGIN,
   coreLayout, coreCellIndex, coreCubieMatrixInto, corePartnerColorId,
   coreZoomLimit, coreZoomAt, coreZoomReach,
   networkCharge, countFlippedStickers, interiorExposure
@@ -96,6 +97,42 @@ describe('tunnel docks on the core', () => {
         expect(path.core.length()).toBe(0);
       }
     }
+  });
+});
+
+describe('tunnel gauge', () => {
+  it('plugs every tunnel into its core tile at exactly that tile\'s width', () => {
+    for (const size of [2, 3, 4, 5, 7, 15]) {
+      expect(tunnelDockWidth(size)).toBeCloseTo(CORE_STICKER * tunnelCoreScale(size), 12);
+      expect(tunnelGaugeAt(0, tunnelMouthWidth(size), tunnelDockWidth(size))).toBeCloseTo(tunnelDockWidth(size), 12);
+    }
+  });
+
+  it('flares only gently toward its own tile, and never past half the old band', () => {
+    for (const size of [2, 3, 4, 5, 7, 15]) {
+      const mouth = tunnelMouthWidth(size), dock = tunnelDockWidth(size);
+      expect(mouth).toBeGreaterThanOrEqual(dock);
+      expect(mouth).toBeLessThanOrEqual(TUNNEL_FLARE * dock + 1e-12);
+      expect(mouth).toBeLessThanOrEqual(TUNNEL_MOUTH_WIDTH);
+      let prev = -1;
+      for (let a = 0; a <= 1.0001; a += 0.1) {
+        const w = tunnelGaugeAt(a, mouth, dock);
+        expect(w).toBeGreaterThanOrEqual(prev);
+        prev = w;
+      }
+      expect(tunnelGaugeAt(1, mouth, dock)).toBeCloseTo(mouth, 12);
+    }
+    expect(TUNNEL_MOUTH_WIDTH).toBeLessThanOrEqual(0.72 / 2);
+  });
+
+  it('measures each arm from its dock (0) to its mouth (1), and holds 0 through the crossing', () => {
+    const path = buildTunnelCenterlineInto(makeTunnelCenterline(),
+      { entry: { x: 2, y: 2, z: 2, dirKey: 'PZ' }, exit: { x: 0, y: 0, z: 0, dirKey: 'NZ' } }, 3);
+    expect(tunnelArmFractionAt(path, 0)).toBe(1);
+    expect(tunnelArmFractionAt(path, path.armALen)).toBeCloseTo(0, 12);
+    expect(tunnelArmFractionAt(path, path.legArc0[3])).toBe(0);
+    expect(tunnelArmFractionAt(path, path.total - path.armBLen)).toBeCloseTo(0, 12);
+    expect(tunnelArmFractionAt(path, path.total)).toBeCloseTo(1, 12);
   });
 });
 

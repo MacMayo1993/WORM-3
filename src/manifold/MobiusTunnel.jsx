@@ -14,7 +14,10 @@ import {
   buildTunnelPathInto,
   tunnelPathRibbonInto,
   tunnelPathRibbonTangentInto,
-  tunnelDockForMeshInto
+  tunnelDockForMeshInto,
+  tunnelDockWidth,
+  tunnelMouthWidth,
+  tunnelGaugeAt
 } from '../utils/tunnelPath.js';
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
@@ -37,14 +40,12 @@ const FACE_NORM_LOCAL = {
   PZ: [0, 0, 1], NZ: [0, 0, -1],
 };
 
-// Band width and rail height, both taken down 15% from 0.85 / 0.30: at the old
-// size the ribbon and its rails crowded the bore they hang inside, and from the
-// riding camera the tunnel filled the frame instead of framing the worm in it.
-const RIBBON_WIDTH   = 0.72;
+// Band width comes from the shared gauge (tunnelPath.js): exactly the core tile's
+// width where the band plugs into the core, flaring gently to its own tile. The
+// rails stand a fixed share of the band's width, so a thin band has low rails.
 const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
 const REBUILD_EPS_SQ = 1e-4;
-const TAPER_MIN      = 0.15; // narrowest fraction of full width at the mini-cube
-const BUMPER_HEIGHT  = 0.255; // guard-rail height at full width
+const RAIL_RATIO     = 0.25; // guard-rail height as a share of the band's width
 
 // Module-level cached objects — no per-frame allocation.
 const _wPos1         = new THREE.Vector3();
@@ -319,17 +320,16 @@ const bumperFragmentShader = `
  * interior skipped at u = 0.5. Sampling the same module the worm and camera ride
  * is what keeps the band welded to the route they take through it.
  *
- * Width tapers from full at tile ends to TAPER_MIN fraction at the mini-cube crossing.
+ * Width runs from `mouthW` at the tile ends to `dockW` — the core tile's own
+ * width — where each arm plugs into the core (ribbon u is by arc within each
+ * arm, so |2t − 1| is how far along the arm from the dock it is).
  * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
-function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, width, guard, flipP1 = 0, flipP2 = 0) {
-  const halfW    = width / 2;
-
+function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, mouthW, dockW, guard, flipP1 = 0, flipP2 = 0) {
   for (let i = 0; i <= segs; i++) {
     const t     = i / segs;
-    const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
     // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
-    let w       = halfW * taper * flipWidthPulse(t, flipP1, flipP2);
+    let w       = 0.5 * tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW) * flipWidthPulse(t, flipP1, flipP2);
 
     tunnelPathRibbonInto(_ribbonPt, path, t);
     const cx = _ribbonPt.x, cy = _ribbonPt.y, cz = _ribbonPt.z;
@@ -366,15 +366,13 @@ function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, width, guard
  */
 function fillBumpers(
   leftPosArr, rightPosArr, leftHFArr, rightHFArr, leftTFArr, rightTFArr,
-  path, axis, perpStart, segs, width, guard
+  path, axis, perpStart, segs, mouthW, dockW, guard
 ) {
-  const halfW    = width / 2;
-
   for (let i = 0; i <= segs; i++) {
     const t     = i / segs;
-    const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
-    let w       = halfW * taper;
-    let bh      = BUMPER_HEIGHT * taper;
+    const gauge = tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW);
+    let w       = gauge / 2;
+    let bh      = RAIL_RATIO * gauge;
 
     // Centre position — the same sampler fillRibbon uses, so the rails sit on the
     // band's edges through the throat bend instead of cutting the corner.
@@ -508,6 +506,7 @@ const MobiusTunnel = ({
   const dimRef           = useRef(WORM_IDLE_OPACITY);
   const lastStartRef     = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef       = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
+  const lastGaugeRef     = useRef(-1);
 
   // Exit portal refs — group holds position/orientation; children animate independently
   const exitPortalGroupRef  = useRef();
@@ -629,14 +628,22 @@ const MobiusTunnel = ({
     tunnelDockForMeshInto(_midA, meshIdx1, dirKey1, state.size, mesh1);
     tunnelDockForMeshInto(_midB, meshIdx2, dirKey2, state.size, mesh2);
 
+    // Gauge: plug into the core tile at its width. On a WORM ride the core swells
+    // round the entry tile (VoidCore), so the ridden band widens with it to keep
+    // meeting the tile the player sees; the worm's floor keeps its own width out
+    // at the tiles.
+    const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
+    const dockW = tunnelDockWidth(state.size) * (isActive && wormMode ? (tunnelState.coreZoom ?? 1) : 1);
+    const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
+
     const moved = tileFlipping ||
+      Math.abs(dockW - lastGaugeRef.current) > 1e-4 ||
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
       lastEndRef  .current.distanceToSquared(_vEnd)   > REBUILD_EPS_SQ;
 
     // ── Scroll speed: accelerates at midpoint during active traversal ────────
     // When the worm is inside this tunnel, ramp speed up around t=0.5 (the Möbius flip).
     // Outside traversal, constant casual scroll.
-    const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
     const tp = isActive ? (tunnelState.t ?? 0) : 0;
     uniforms.uScrollSpeed.value = isActive
       ? 0.7 + 3.2 * Math.sin(Math.PI * tp)
@@ -646,11 +653,12 @@ const MobiusTunnel = ({
     if (moved) {
       lastStartRef.current.copy(_vStart);
       lastEndRef  .current.copy(_vEnd);
+      lastGaugeRef.current = dockW;
 
       // The route itself — throats along each tile's own world normal, docks on the
       // core tiles beneath them, crossing through the centre. Everything below sweeps this.
       buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _midA, _midB);
-      uniforms.uPatternRepeats.value = _tunnelPath.total / (ribbonMode ? TUNNEL_RIDE_WIDTH : RIBBON_WIDTH);
+      uniforms.uPatternRepeats.value = _tunnelPath.total / mouthW;
       uniforms.uTileCenterA.value.copy(_wPos1);
       uniforms.uTileCenterB.value.copy(_wPos2);
 
@@ -686,7 +694,7 @@ const MobiusTunnel = ({
       }
 
       if (ribbonMode) {
-        fillTunnelRideGeometry(geo, leftGeo, rightGeo, _tunnelPath, segments);
+        fillTunnelRideGeometry(geo, leftGeo, rightGeo, _tunnelPath, segments, mouthW, dockW);
         uniforms.uRideCore.value = tunnelRideCoreArc(_tunnelPath) / (_tunnelPath.total || 1);
       } else {
         fillRibbon(
@@ -694,7 +702,7 @@ const MobiusTunnel = ({
           geo.attributes.uv.array,
           _tunnelPath,
           _axis, _perpBase,
-          RIBBON_SEGS, RIBBON_WIDTH, _tileGuard, flipP1, flipP2
+          RIBBON_SEGS, mouthW, dockW, _tileGuard, flipP1, flipP2
         );
         fillBumpers(
           leftGeo.attributes.position.array,
@@ -705,7 +713,7 @@ const MobiusTunnel = ({
           rightGeo.attributes.aTripFrac.array,
           _tunnelPath,
           _axis, _perpBase,
-          RIBBON_SEGS, RIBBON_WIDTH, _tileGuard
+          RIBBON_SEGS, mouthW, dockW, _tileGuard
         );
       }
       geo.attributes.position.needsUpdate = true;

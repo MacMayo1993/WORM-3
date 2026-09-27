@@ -196,6 +196,7 @@ function VoidCore({ cubieRefs = null }) {
     }
     f.zoom += (zoomTarget - f.zoom) * (1 - Math.exp(-dt * 10));
     if (Math.abs(f.zoom - 1) < 1e-4 && zoomTarget === 1) f.zoom = 1;
+    tunnelState.coreZoom = wormMode ? f.zoom : 1;
     if (zoomRef.current) {
       zoomRef.current.scale.setScalar(f.zoom);
       zoomRef.current.position.copy(f.dock).multiplyScalar(1 - f.zoom);
