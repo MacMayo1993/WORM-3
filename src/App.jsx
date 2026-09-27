@@ -75,7 +75,7 @@ import MobiIntroScreen, {
   MOBI_LINES_BIOME, MOBI_LINES_CHAOS,
   MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
-import { UI_FONT, TEXT_MICRO } from './utils/uiTheme.js';
+import { UI_FONT, TEXT_MICRO, Z } from './utils/uiTheme.js';
 import ScreenTransition from './components/ScreenTransition.jsx';
 // Static (not lazy): a Suspense fallback must be present the instant a lazy
 // chunk starts loading, so the loading cube cannot itself live in a lazy chunk.
@@ -616,15 +616,6 @@ export default function WORM3() {
   // The demo's floating pills stand down while a full modal owns the screen.
   const wormPauseMenuOpen = useGameStore(s => s.wormPauseMenuOpen);
   const demoChromeQuiet = showStore || showSettings || showHelp || wormPauseMenuOpen;
-  // …except on the Settings step, where the demo opened Settings itself. There
-  // an open panel is the expected state, not an interruption, so suppressing
-  // the coach pill would leave that step as the only one in the demo with no
-  // visible way out — which is exactly what used to strand an unattended demo
-  // on it. Closing Settings still completes the step; this is the escape hatch
-  // for a player who does not want to.
-  const demoCoachQuiet = demoStep === 'make-it-yours'
-    ? (showStore || showHelp || wormPauseMenuOpen)
-    : demoChromeQuiet;
 
   // Home during the demo is a real exit, not just a screen change: without this
   // the demo's overlays kept rendering over the main menu and its borrowed look
@@ -1633,12 +1624,13 @@ export default function WORM3() {
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       </ScreenTransition>
-      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoCoachQuiet)} freezeOnExit>
+      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoForecastVisible && !demoChromeQuiet)} freezeOnExit
+        style={{ position: 'relative', zIndex: Z.DEMO }}>
         <DemoCoach
           step={demoStep}
           copy={demoCoachCopy}
           onCopySeen={handleDemoCoachCopySeen}
-          onNext={demoStep === 'chaos-forecast' ? handleDemoChaosSkip : () => advanceDemoStep(demoStep)}
+          onNext={demoStep === 'chaos-forecast' ? handleDemoDisparityDismiss : () => advanceDemoStep(demoStep)}
           onExit={handleExitDemo}
         />
       </ScreenTransition>

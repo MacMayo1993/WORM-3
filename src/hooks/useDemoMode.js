@@ -42,10 +42,9 @@ const scheduleDemoTimer = (callback, delay) => demoTimer(callback, delay,
 // parked on it forever while every other step moved along.
 //
 // The values differ on purpose — a step whose mechanic takes longer to read
-// should not be interrupted by an escape hatch too early — but every step type
-// must have one. Add a step type here when you add one to DEMO_LEVEL_CONFIGS.
+// should not be interrupted by an escape hatch too early. Chaos instead offers
+// Next immediately, from the forecast through the finished round.
 const COACH_DELAY_MS = {
-  chaos: 5000,      // the winner-call is quick to grasp
   worm: 10000,      // let the worm actually get moving first
   settings: 12000,  // give them a beat to open a tab before offering the exit
   random: 12000,    // remixes land every 10s (useRandomMode); offer out once one has been seen
@@ -281,7 +280,7 @@ export function useDemoMode({
 
     // Settings step: a plain solved cube behind the real Settings menu. The
     // menu itself is opened by handleDemoStepContinue once the launch stamp has
-    // cleared, and closing it is what completes the step.
+    // cleared. Closing it returns to a preview; Next: Chaos ends the step.
     if (config.type === 'settings') {
       settingsStepEntryRef.current = { ...useGameStore.getState().settings };
       const targetSize = config.cubeSize || 3;
@@ -534,6 +533,9 @@ export function useDemoMode({
   const advanceDemoStep = useCallback((fromStep) => {
     const store = useGameStore.getState();
     if (store.demoStep !== fromStep) return;
+    // A stale coach click must never advance the lesson while the player is
+    // choosing a palette or tile style in the Settings modal.
+    if (fromStep === 'make-it-yours' && store.showSettings) return;
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     setDemoFlipProgress(null);
@@ -666,6 +668,7 @@ export function useDemoMode({
     // because beginCubeTryPhase already sequences both around their WATCH beat.
     if (config && config.type !== 'cube' && config.type !== 'tour') {
       setDemoHintStep(step);
+      if (config.type === 'chaos') setDemoTryVisible(true);
       const delay = COACH_DELAY_MS[config.type];
       if (delay != null) {
         demoWatchTimers.current.push(scheduleDemoTimer(() => {
@@ -870,6 +873,8 @@ export function useDemoMode({
     if (demoRewardPendingRef.current) return;
     const store = useGameStore.getState();
     demoRewardPendingRef.current = true;
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
     setDemoForecastVisible(false);
     setDemoRewardStamp({ amount: reward, correct });
     store.earnCoins(reward);
@@ -883,7 +888,7 @@ export function useDemoMode({
       demoRewardPendingRef.current = false;
       advanceDemoStepRef.current?.('chaos-forecast');
     }, 2600));
-  }, [cancelDisparityRun]);
+  }, [cancelDisparityRun, clearDemoWatchTimers]);
 
   const handleDemoChaosSkip = useCallback(() => {
     finishChaosWithReward(50, false);
@@ -1025,9 +1030,9 @@ export function useDemoMode({
     }
   }, [demoMode, demoStep, cubies, size, celebrateStep]);
 
-  // Settings step: the player closing the Settings menu is what completes it.
-  // Armed only while the step is live, so the menu they open later (from the top
-  // bar, during any other step) doesn't advance anything.
+  // Closing Settings lets the player inspect the cube and edit it again. Only
+  // the explicit Next: Chaos action advances; a close or preview action
+  // must not replace the settings guidance with the next mode's dialogue.
   const showSettings = useGameStore((s) => s.showSettings);
   const settingsWereOpenRef = useRef(false);
   useEffect(() => {
@@ -1038,9 +1043,9 @@ export function useDemoMode({
     if (showSettings) { settingsWereOpenRef.current = true; return; }
     if (settingsWereOpenRef.current) {
       settingsWereOpenRef.current = false;
-      celebrateStep('make-it-yours');
+      setDemoTryVisible(true);
     }
-  }, [demoMode, demoStep, showSettings, celebrateStep]);
+  }, [demoMode, demoStep, showSettings]);
 
   // Clean up timers on unmount.
   useEffect(() => () => {

@@ -3,7 +3,7 @@ import {
   DEMO_STEPS, DEMO_LEVEL_CONFIGS, TRY_COPY, STEP_COMPLETE_NOTE, CONTROL_TOUR_SEQUENCE, CONTROL_TOUR_KEYS,
   VIEW_SHOWCASE_SEQUENCE,
 } from '../components/screens/DemoFlowController.jsx';
-import { STEP_COPY } from '../utils/demoStepCopy.js';
+import { STEP_COPY, STEP_INTRO_LINES } from '../utils/demoStepCopy.js';
 import { FLIP_CAP } from '../utils/constants.js';
 import { WORM_DEMO_LESSONS } from '../game/wormDemoLessons.js';
 import { WORMHOLE_MAX_TRAVERSALS as WORM_MAX_RIDES } from '../worm/healerWorm/constants.js';
@@ -152,7 +152,8 @@ describe('control tour', () => {
 describe('demo copy stays in plain language', () => {
   const JARGON = ['antipodal', 'manifold', 'topolog', 'parity point', 'projective', 'holonomy', 'rp2'];
 
-  const allStepCopy = Object.entries(STEP_COPY).filter(([id]) => id !== 'cosmetic-reward');
+  const allStepCopy = Object.entries(STEP_COPY).filter(([id]) => id !== 'cosmetic-reward')
+    .flatMap(([id, line]) => (STEP_INTRO_LINES[id] || [line]).map(copy => [id, copy]));
 
   it('no step setup line leans on math jargon', () => {
     for (const [id, line] of allStepCopy) {
@@ -226,14 +227,14 @@ describe('demo explains every mode’s rules accurately', () => {
   });
 
   it('Chaos: the setup line covers the first strike, tile wear in twin pairs, and healing', () => {
-    const line = STEP_COPY['chaos-forecast'].toLowerCase();
+    const line = STEP_INTRO_LINES['chaos-forecast'].join(' ').toLowerCase();
     expect(line).toContain('strikes first');
     expect(line).toContain('twins drop out together');
     expect(line).toContain('heal');
   });
 
   it('Random: says only the look changes, never the rules, on the real ten-second cycle', () => {
-    for (const line of [STEP_COPY['random-showcase'], TRY_COPY['random-showcase']]) {
+    for (const line of [STEP_INTRO_LINES['random-showcase'].join(' '), TRY_COPY['random-showcase']]) {
       expect(line.toLowerCase()).not.toMatch(/\brules\b/);
       expect(line.toLowerCase()).toContain('ten seconds');
     }

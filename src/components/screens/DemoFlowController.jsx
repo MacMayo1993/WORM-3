@@ -9,7 +9,7 @@ import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.
 import { inspectionLens } from '../../3d/inspectionBridge.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useKociembaSolver } from '../../teach/useKociembaSolver.js';
-import { STEP_COPY, TWIN_ASIDE } from '../../utils/demoStepCopy.js';
+import { STEP_COPY, STEP_INTRO_LINES, TWIN_ASIDE } from '../../utils/demoStepCopy.js';
 import MobiIntroScreen from './MobiIntroScreen.jsx';
 
 // Step ids are permanent (configs, tests and save data key off them); the
@@ -25,8 +25,8 @@ const DEMO_STEPS = [
   { id: 'control-tour', label: 'Your Controls', num: 6 },
   { id: 'view-showcase', label: 'Every Look', num: 7 },
   { id: 'make-it-yours', label: 'Settings', num: 8 },
-  { id: 'chaos-forecast', label: 'Call the Winner', num: 9 },
-  { id: 'random-showcase', label: 'Surprise Cube', num: 10 },
+  { id: 'chaos-forecast', label: 'Chaos · Call the Winner', num: 9 },
+  { id: 'random-showcase', label: 'Random · Surprise Cube', num: 10 },
   { id: 'cosmetic-reward', label: 'Spend Your Points', num: 11 },
   { id: 'end', label: 'Complete', num: 12 },
 ];
@@ -619,20 +619,18 @@ const DemoProgressBar = ({ currentStep }) => {
   );
 };
 
-// Step intro: Mobi delivers just the setup line over the blurred live scene.
-// The hands-on guidance is surfaced by the staged UI (auto-played WATCH beat,
-// progress pills, the coach's Next pill), so repeating it here read as Mobi
-// talking twice — the intro stays to the single setup sentence.
+// Most steps need only a setup line. Chaos and Random get a player-paced
+// briefing before the forecast picker or live remixing can start.
 const DemoStepIntro = ({ step, onContinue, onSkip }) => {
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
-  const lines = [STEP_COPY[step]].filter(Boolean);
+  const lines = STEP_INTRO_LINES[step] || [STEP_COPY[step]].filter(Boolean);
   return (
     <MobiIntroScreen
       key={step}
       lines={lines}
       modeName={`${info.num <= 4 ? 'Demo' : 'Explore'} ${info.num <= 4 ? info.num : info.num - 4} · ${info.label}`}
-      primaryLabel="Let’s try it"
+      primaryLabel={step === 'chaos-forecast' ? 'Choose a pair' : step === 'random-showcase' ? 'Start Random' : 'Let’s try it'}
       onComplete={onContinue}
       skipLabel="Skip lesson"
       onSkip={onSkip}
@@ -762,7 +760,7 @@ const TRY_COPY = {
   'learn-to-solve': 'Follow the <strong>gold ring</strong> — drag the glowing layer the way the light sweeps. It always knows the way home.',
   'twin-paradox': 'With Flip on, tap a tile. Its opposite twin moves with it.',
   'flip-gateway': 'Tap nine different pairs to send them across. Then tap the moved tiles to bring them back.',
-  'make-it-yours': 'Try the <strong>Colors</strong>, <strong>Tiles</strong> and <strong>Scene</strong> tabs. Close Settings when you like what you see.',
+  'make-it-yours': 'Take a look at your colors, tiles, and background. Use <strong>Edit look</strong> to keep experimenting. Press <strong>Next: Chaos</strong> when you’re ready.',
   'worm-traversal': 'Steer left or right. Collect orbs, then jump onto raised flip pads to ride and heal their tunnels.',
   'chaos-forecast': 'Tap a damaged tile to send a healing wave through the damaged tiles joined to it. Healing can change which pair survives.',
   // Random remixes presentation only (useRandomMode): palette, tile styles and
@@ -778,6 +776,13 @@ const TRY_COPY = {
 const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => {
   ensureDemoShellStyle();
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
+  const showSettings = useGameStore((s) => s.showSettings);
+  const showWinner = useGameStore((s) => s.showDisparityWinner);
+  // ScreenTransition can retain this component during its exit animation.
+  // Hide its controls immediately so Settings owns every tap on the panel.
+  if (showSettings) return null;
+  // The result dialog owns a pinned Next action inside its focus trap.
+  if (step === 'chaos-forecast' && showWinner) return null;
   if (step === 'worm-traversal' || (!copyOverride && !TRY_COPY[step])) return null;
 
   if (copyOverride) {
@@ -797,9 +802,14 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
   }
 
   return (
-    <div className={`demo-coach-pill${wormHealerMode ? ' demo-coach-pill--bottom' : ''}`}>
+    <div className={`demo-coach-pill${wormHealerMode ? ' demo-coach-pill--bottom' : ''}`} style={{ display: 'flex', gap: 8 }}>
+      {step === 'make-it-yours' && (
+        <button type="button" onClick={() => useGameStore.getState().setShowSettings(true)} className="demo-coach-pill-btn">
+          Edit look
+        </button>
+      )}
       <button type="button" onClick={onNext} className="demo-coach-pill-btn">
-        Skip lesson →
+        {step === 'make-it-yours' ? 'Next: Chaos →' : step === 'chaos-forecast' ? 'Next: Random →' : 'Skip lesson →'}
       </button>
     </div>
   );
