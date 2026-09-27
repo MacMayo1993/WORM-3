@@ -11,7 +11,7 @@ import { getWormTunnelSnapshot, resetWormTunnelSnapshots } from '../worm/tunnelS
 import { raisedPlatformPosition } from '../worm/healerWorm/raisedPlatforms.js';
 import { getNextSurfacePosition } from '../worm/wormLogic.js';
 import { resetLiveRotation, liveRotation } from '../worm/liveRotation.js';
-import { ttReset } from '../worm/circularBuffers.js';
+import { ttReset, ttPush } from '../worm/circularBuffers.js';
 
 const SIZE = 6;
 beforeEach(() => { resetManifoldMap(); resetWormTunnelSnapshots(); resetLiveRotation(); });
@@ -125,6 +125,43 @@ describe('burrowing ambient tunnels', () => {
         expect(h.ctx.spawnWormholePair).not.toHaveBeenCalled();
         h.sim.pos = original; ttReset(h.sim.tileTrail, `${original.x},${original.y},${original.z},${original.dirKey}`);
         h.until(pair, 'open');
+    });
+
+    it.each([0, 1])('holds a partial opening until the crawler clears endpoint %i', endpoint => {
+        const h = setup(); startBurrow(h.sim, SIZE, h.ctx);
+        const pair = [...h.sim.burrows.pairs.values()][0]; h.until(pair, 'opening');
+        h.tick(0.4);
+        const elapsed = pair.elapsed, lift = pair.openness;
+        const original = h.sim.pos, end = h.ends(pair)[endpoint];
+        const key = p => `${p.x},${p.y},${p.z},${p.dirKey}`;
+        const expectHeld = () => {
+            h.tick(BURROW_TIMING.opening * 2);
+            expect(pair.phase).toBe('opening');
+            expect(pair.elapsed).toBe(elapsed);
+            expect(pair.openness).toBe(lift);
+            expect(burrowEntryOpen(pair)).toBe(false);
+            for (const p of h.ends(pair)) {
+                expect(burrowCubieLift(h.ctx.getCubies()[p.x][p.y][p.z], SIZE, 9999)).toBe(lift);
+            }
+        };
+        // The head reaches the endpoint after the lift has already started.
+        h.sim.pos = { ...end }; ttReset(h.sim.tileTrail, key(end));
+        expectHeld();
+        // Leaving with the head does not clear the previous tile or trailing body.
+        h.sim.pos = original; h.sim.prevTile = { ...end };
+        ttReset(h.sim.tileTrail, key(original));
+        expectHeld();
+        h.sim.prevTile = null; h.sim.tailLength = 24; // Body extends beyond one cell.
+        ttReset(h.sim.tileTrail, key(end)); ttPush(h.sim.tileTrail, key(original));
+        expectHeld();
+        ttReset(h.sim.tileTrail, key(original));
+        h.tick(0.05);
+        expect(pair.elapsed).toBeCloseTo(elapsed + 0.05);
+        expect(pair.openness).toBeGreaterThan(lift);
+        expect(pair.openness).toBeLessThan(1); // No accumulated-time snap on release.
+        h.until(pair, 'open');
+        expect(pair.remaining).toBe(BURROW_TIMING.open);
+        expect(h.ctx.spawnWormholePair).toHaveBeenCalledTimes(1);
     });
 
     it('keeps final-healing tunnels open and cancels uncommitted arrivals', () => {

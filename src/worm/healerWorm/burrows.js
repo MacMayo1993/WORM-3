@@ -166,6 +166,12 @@ export function tickBurrows(sim, size, ctx, delta) {
             pair.openingFrom = pair.openness;
             setPhase(pair, 'opening');
         }
+        if (pair.phase === 'opening') {
+            occupied ??= occupiedCells(sim, size);
+            // The crawler can reach either mouth after settling cleared it.
+            // Hold the clock as well as the lift so clearing it resumes smoothly.
+            if (ends.some(p => occupied.has(cellKey(p)))) continue;
+        }
         pair.elapsed += dt;
         if (pair.phase === 'burrowing' && pair.elapsed >= pair.route.length * BURROW_TIMING.step) {
             setPhase(pair, 'settling');

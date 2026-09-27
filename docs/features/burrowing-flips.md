@@ -19,6 +19,8 @@ does not add spreading, offspring, or extra spawn clocks.
 These clocks use simulation time. Pause, hidden tabs, focus/rescue freezes,
 rotations, jumps, rocket flight, tunnel transit and a tail on a raised route hold
 the cycle. A new opening or retreat also waits for occupied endpoint cubies.
+An opening already in progress holds its timer and lift whenever either endpoint
+becomes occupied, then resumes from the same height after the crawler clears it.
 Reduced motion retains the seam cues while suppressing the small traveling lift.
 
 ## State and scope
