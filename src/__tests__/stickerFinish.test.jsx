@@ -14,7 +14,7 @@ import { makeCubies } from '../game/cubeState.js';
 vi.mock('../3d/BiomeGroundTextures.js', () => ({ BIOME_GROUND_TEXTURES: {} }));
 extend(THREE);
 
-const STYLES = Object.keys(TILE_STYLES).filter((s) => s !== 'glass');
+const STYLES = Object.keys(TILE_STYLES);
 const count = (src, re) => (src.match(re) || []).length;
 
 describe('sticker finish', () => {
@@ -42,8 +42,8 @@ describe('sticker finish', () => {
     expect(solid).not.toContain('antipodalColorShown');
   });
 
-  it('leaves glass, and any shader without exactly one main(), as it was', () => {
-    expect(getGlassMaterial('#888888').fragmentShader).not.toContain('stickerFinish');
+  it('finishes glass too, and leaves any shader without exactly one main() as it was', () => {
+    expect(getGlassMaterial('#888888').fragmentShader).toContain('stickerFinish');
     const odd = 'void helper() {}';
     expect(withStickerFinish(odd)).toBe(odd);
   });
@@ -65,10 +65,23 @@ describe('sticker finish', () => {
   });
 });
 
-it.each([
-  ['carbonFiber', THREE.ExtrudeGeometry],
-  ['eyeball', THREE.PlaneGeometry]
-])('puts a %s tile on the play cube\'s sticker shape', async (style, Geometry) => {
+// Every view mode that draws stickers (wireframe and mirror draw none) puts them on
+// the menu cube's rounded sticker, plain ones clear-coated, styled ones finished.
+const PLAIN = 'plain', FINISHED = 'finished';
+const VIEW_CASES = [
+  ...['classic', 'grid', 'chrome', 'neon', 'gap', 'lego'].flatMap((mode) => [
+    [mode, 'solid', false, THREE.ExtrudeGeometry, PLAIN],
+    [mode, 'carbonFiber', false, THREE.ExtrudeGeometry, FINISHED]
+  ]),
+  ['classic', 'eyeball', false, THREE.PlaneGeometry, FINISHED],
+  ['glass', 'solid', false, THREE.ExtrudeGeometry, FINISHED],
+  ['glass', 'carbonFiber', false, THREE.ExtrudeGeometry, FINISHED],
+  ['sudokube', 'carbonFiber', false, THREE.ExtrudeGeometry, PLAIN],
+  ['classic', 'solid', true, THREE.ExtrudeGeometry, PLAIN],
+  ['classic', 'carbonFiber', true, THREE.ExtrudeGeometry, FINISHED]
+];
+
+it.each(VIEW_CASES)('%s view, %s tile (hollow: %s) wears the play cube\'s sticker', async (mode, style, hollow, Geometry, finish) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -87,12 +100,18 @@ it.each([
   try {
     await act(async () => {
       store = root.render(<PadProvider>
-        <StickerPlane meta={meta} pos={[0, 0, 0.51]} mode="classic" faceRow={1} faceCol={1} faceSize={3} />
+        <StickerPlane meta={meta} pos={[0, 0, 0.51]} mode={mode} hollow={hollow} faceRow={1} faceCol={1} faceSize={3} />
       </PadProvider>);
     });
     const front = store.getState().scene.getObjectByName('sticker-front');
     expect(front.geometry).toBeInstanceOf(Geometry);
-    expect(front.material.fragmentShader).toContain('stickerFinish');
+    if (finish === FINISHED) expect(front.material.fragmentShader).toContain('stickerFinish');
+    else expect(front.material.roughness).toBe(0.24); // rubiksFinish's sticker coat
+    // Hollow's frame keeps its window: no front-face vertex near the centre.
+    if (hollow) {
+      const p = front.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) expect(Math.max(Math.abs(p.getX(i)), Math.abs(p.getY(i)))).toBeGreaterThan(0.33);
+    }
   } finally {
     await act(async () => root.unmount());
     useGameStore.setState(before, true);

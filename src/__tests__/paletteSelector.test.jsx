@@ -41,7 +41,7 @@ it('filters families, gives an empty state for unowned families, and preserves p
 });
 it('keeps antipodal face labels paired and marks the selected palette', () => {
   expect([...host.querySelectorAll('.palette-current .palette-pair')].map(p => p.textContent)).toEqual(['FrontBack', 'LeftRight', 'TopBottom']);
-  expect(button('Standard').getAttribute('aria-pressed')).toBe('true');
+  expect(button('Classic').getAttribute('aria-pressed')).toBe('true');
 });
 
 it('keeps separate hero and body selections synchronized through card taps and arrow navigation', () => {
@@ -61,7 +61,7 @@ it('keeps separate hero and body selections synchronized through card taps and a
   act(() => button('Neon').click());
   expectSelection('Neon', 'neon');
   act(() => button('Next palette').click());
-  expectSelection('Standard', 'standard');
+  expectSelection('Classic', 'standard');
   act(() => button('Previous palette').click());
   expectSelection('Neon', 'neon');
 });

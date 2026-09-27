@@ -317,8 +317,8 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     uniforms,
     // Eyeball tiles displace a tessellated plane so the eye bulges off the face
     vertexShader: safeStyle === 'eyeball' ? eyeballBulgeVertexShader : baseVertexShader,
-    // Every style but glass wears the menu cube's sticker finish (stickerFinish.js).
-    fragmentShader: isGlass ? styleShader : withStickerFinish(styleShader),
+    // Every style, glass included, wears the menu cube's sticker finish (stickerFinish.js).
+    fragmentShader: withStickerFinish(styleShader),
     side: isGlass ? THREE.DoubleSide : THREE.FrontSide,
     transparent: isGlass,
     depthWrite: !isGlass,

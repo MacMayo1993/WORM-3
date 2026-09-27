@@ -1,27 +1,12 @@
 // src/utils/constants.js
 // Core game constants and color mappings
 
-export const COLORS = {
-  red: '#DC3154',
-  blue: '#3973E8',
-  yellow: '#FFE600',
-  white: '#FFFFFF',
-  orange: '#E98D06',
-  green: '#38C875',
-  black: '#121212',
-  wormhole: '#dda15e'
-};
-
 /**
- * Classic Rubik's sticker palette — the physical cube's colours, as distinct
- * from COLORS above, which is the in-game standard scheme.
- *
- * The two differ on purpose. The in-game scheme is tuned for the manifold's
- * antipodal reveal and sits in a bright, screen-native register. This one is
- * the toy: a deep crimson red rather than a light one, and a vivid orange, so
- * red and orange separate the way they do on a real cube. Reach for it where
- * the UI is naming the physical object — the cube-face nav tiles and the mode
- * carousel — and for COLORS where the game is rendering play state.
+ * Classic Rubik's sticker palette — the physical cube's colours: a deep crimson
+ * red and a vivid orange, so red and orange separate the way they do on a real
+ * cube. The opening, the menu cube and the mode carousel wear it, and so does
+ * the play cube: COLORS below (and with it FACE_COLORS and the standard scheme)
+ * takes its face colours from here, so every cube in the game is the same toy.
  */
 export const RUBIKS_CLASSIC = {
   red: '#C41E3A',
@@ -30,6 +15,12 @@ export const RUBIKS_CLASSIC = {
   orange: '#FF7A00',
   yellow: '#FFD500',
   white: '#F0F0F0'
+};
+
+export const COLORS = {
+  ...RUBIKS_CLASSIC,
+  black: '#121212',
+  wormhole: '#dda15e'
 };
 
 /** The same palette keyed by face ID, so callers can go straight from DIR_TO_COLOR. */

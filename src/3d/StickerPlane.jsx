@@ -105,25 +105,8 @@ const _worldQuat = new THREE.Quaternion();
 // Scratch for the flip camera-impulse: the tile's outward normal in world space.
 const _flipWorldQuat = new THREE.Quaternion();
 const _flipWorldN = new THREE.Vector3();
-// Frame-shaped sticker Shape for hollow cube mode.
-const _stickerFrameShape = (() => {
-  const outer = 0.425;
-  const inner = 0.34;
-  const shape = new THREE.Shape();
-  shape.moveTo(-outer, -outer);
-  shape.lineTo(outer, -outer);
-  shape.lineTo(outer, outer);
-  shape.lineTo(-outer, outer);
-  shape.closePath();
-  const hole = new THREE.Path();
-  hole.moveTo(-inner, -inner);
-  hole.lineTo(-inner, inner);
-  hole.lineTo(inner, inner);
-  hole.lineTo(inner, -inner);
-  hole.closePath();
-  shape.holes.push(hole);
-  return shape;
-})();
+// Hollow cube mode's frame: the play sticker with a rounded window through it.
+const _hollowStickerGeo = createPlayStickerGeometry(0.85, 0.68);
 
 const spiderVertexShader = `
   varying vec2 vUv;
@@ -1809,11 +1792,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Use shader material for non-solid styles (when no texture is applied)
   const useShaderStyle = !isGlass && tileStyle !== 'solid' && !currTexture && !isSudokube && !glbFullFace;
-  // A plain coloured tile gets the rounded, glossy sticker; textured and glass tiles keep the flat quad.
-  const plainSticker = !hollow && !useGlassStyle && !useShaderStyle && !isSudokube && !renderTexture;
+  // Every view mode wears the menu cube's sticker: a plain coloured tile (hollow's frame
+  // and Sudokube's white number tile included) gets the rounded, clear-coated sticker;
+  // only a loaded face texture keeps the flat quad it is sliced across.
+  const plainSticker = !useGlassStyle && !useShaderStyle && !renderTexture;
   // Every shader style but the eyeball (which domes a tessellated plane) sits on the play
-  // sticker. Styles never take a face texture, so they need no per-tile UV slice either.
-  const roundedStyle = !hollow && !useGlassStyle && useShaderStyle && tileStyle !== 'eyeball';
+  // sticker, as does glass. Neither takes a face texture, so needs no per-tile UV slice.
+  const roundedStyle = !hollow && (useGlassStyle || (useShaderStyle && tileStyle !== 'eyeball'));
   const styleMaterial = useMemo(() => {
     if (!useShaderStyle) return null;
     // Ensure we have a valid color string
@@ -2043,14 +2028,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         )}
 
         {/* Main sticker — omitted when the InstancedMesh handles rendering */}
-        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : plainSticker ? 'sticker' : roundedStyle ? 'styled' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
+        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : plainSticker ? 'sticker' : useGlassStyle ? 'glass' : roundedStyle ? 'styled' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
           {hollow ? (
-            <shapeGeometry args={[_stickerFrameShape]} />
+            <primitive object={_hollowStickerGeo} attach="geometry" />
           ) : plainSticker ? (
             <primitive object={_playStickerGeo} attach="geometry" />
           ) : roundedStyle ? (
-            // Styled tiles wear the same rounded, bevelled sticker as plain ones;
-            // the style shader adds the matching finish (stickerFinish.js).
+            // Styled and glass tiles wear the same rounded, bevelled sticker as plain
+            // ones; their shader adds the matching finish (stickerFinish.js).
             <primitive object={_playStickerGeo} attach="geometry" />
           ) : faceRow != null ? (
             // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.

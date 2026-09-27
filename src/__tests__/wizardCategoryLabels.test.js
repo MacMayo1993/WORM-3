@@ -13,7 +13,7 @@ describe('wizard category labels', () => {
 
   it('calls an uploaded palette by what the player did, not by its key', () => {
     expect(paletteLabel({ colorScheme: 'custom', customColors: { 1: '#fff' } })).toBe('Your Photo');
-    expect(paletteLabel({ colorScheme: 'standard' })).toBe('Standard');
+    expect(paletteLabel({ colorScheme: 'standard' })).toBe('Classic');
   });
 
   it('reads six matching faces as that style, not as "Per Face"', () => {

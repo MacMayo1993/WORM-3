@@ -35,9 +35,12 @@ export const PLAY_STICKER_DEPTH = 0.016;
  * clear of the cubie face 0.02 behind. UVs are 0–1 across the front, as on a
  * PlaneGeometry, so textured stickers map exactly as they did.
  */
-export function createPlayStickerGeometry(size = 0.85) {
+export function createPlayStickerGeometry(size = 0.85, hole = 0) {
   const bevel = 0.008;
-  const geometry = new THREE.ExtrudeGeometry(roundedSquare(size - 2 * bevel, 0.13), {
+  const shape = roundedSquare(size - 2 * bevel, 0.13);
+  // Hollow mode's frame: the same sticker with a rounded window punched through.
+  if (hole > 0) shape.holes.push(roundedSquare(hole + 2 * bevel, 0.06));
+  const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: PLAY_STICKER_DEPTH - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 5
   });
   geometry.translate(0, 0, -(PLAY_STICKER_DEPTH - bevel));
