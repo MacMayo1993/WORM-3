@@ -10,6 +10,7 @@ import { getStickerWorldPos } from '../game/coordinates.js';
 import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
 import { rocketOrbitInto, rocketOrbitT } from '../worm/healerWorm/rocketOrbit.js';
 import { getWindWorldPosInto } from '../worm/wormLogic.js';
+import { TUNNEL_CAM_NEAR } from '../worm/tunnelCameraRails.js';
 
 const scene = vi.hoisted(() => ({ frame: null, camera: null, size: null, mobile: true }));
 vi.mock('@react-three/fiber', () => ({
@@ -141,6 +142,26 @@ it('uses a clean overview while a fresh Story board is still waiting to be stage
   render(worm, size); tick();
   const overview = new Vector3(.6, 1.1, 1).normalize().multiplyScalar(5 + size * 4);
   expect(scene.camera.position.distanceTo(overview)).toBeLessThan(1e-8);
+});
+
+it('preserves the core aperture at the near plane and restores the surface camera afterward', () => {
+  const size = 3, worm = makeWorm(size), originalNear = scene.camera.near;
+  worm.activeTunnel.current = {
+    entry: { x: 1, y: 1, z: 2, dirKey: 'PZ' }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' }
+  };
+  worm.phase.current = 'tunnel'; worm.tunnelProgress.current = .5;
+  useGameStore.setState({ wormGamePhase: 'active' });
+  render(worm, size); tick();
+  expect(scene.camera.near).toBe(TUNNEL_CAM_NEAR);
+  worm.phase.current = 'crawling'; worm.activeTunnel.current = null;
+  tick();
+  expect(scene.camera.near).toBe(originalNear);
+  worm.phase.current = 'tunnel'; worm.activeTunnel.current = {
+    entry: { x: 1, y: 1, z: 2, dirKey: 'PZ' }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' }
+  };
+  tick();
+  act(() => root.render(null));
+  expect(scene.camera.near).toBe(originalNear);
 });
 
 it('tracks rendered jump and rocket height through turns', () => {

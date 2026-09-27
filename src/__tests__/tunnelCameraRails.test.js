@@ -22,6 +22,10 @@ import { tunnelBoreRadiusAt as tubeRadiusAt } from '../utils/tunnelPath.js';
 import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { getTunnelWorldPosInto } from '../worm/wormLogic.js';
+import { makeCorePassage, updateCorePassage, CORE_PASSAGE_RADIUS } from '../3d/corePassage.js';
+import { coreZoomLimit, CORE_HALF } from '../3d/antipodalCore.js';
+import { tunnelPathArcPointInto } from '../utils/tunnelPath.js';
+import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 
 // A tunnel joining the middle tile of +Y to the middle tile of −Y on an n×n
 // cube: the antipodal pair with the longest, straightest path, so distances
@@ -325,15 +329,61 @@ describe('tunnelCamPoseInto', () => {
     }
   });
 
-  it('keeps the lens outside the solid core without a sudden roll', () => {
+  it('keeps a gradual roll through the core openings', () => {
     for (const size of [3, 7, 15]) for (const route of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {
       for (const tunnel of [route, { entry: route.exit, exit: route.entry }]) {
         const pose = makeTunnelCamPose(), previousUp = new THREE.Vector3();
         for (let i = 0; i <= 1000; i++) {
           tunnelCamPoseInto(pose, tunnel, i / 1000, size);
-          expect(Math.max(...pose.cam.toArray().map(Math.abs))).toBeGreaterThan(0.27);
           if (i) expect(previousUp.dot(pose.up)).toBeGreaterThan(0.99);
           previousUp.copy(pose.up);
+        }
+      }
+    }
+  });
+
+  it('threads the carved entry and exit at every zoom, including the trailing exit camera', () => {
+    const passage = makeCorePassage(), pose = makeTunnelCamPose();
+    const closest = new THREE.Vector3(), segment = new THREE.Line3(), start = makeTunnelCamPose();
+    for (const size of [2, 3, 6, 15]) for (const route of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {
+      for (const reverse of [false, true]) {
+        const tunnel = { entry: reverse ? route.exit : route.entry, exit: reverse ? route.entry : route.exit,
+          padExpansion: wormRaisedAmount(size), padHeight: WORM_PAD_HEIGHT };
+        updateCorePassage(passage, tunnel, size, 0);
+        const { path } = passage, points = passage.uniforms.uPassagePoints.value;
+        const limit = coreZoomLimit(path.midA, size);
+        start.cam.copy(path.vStart).addScaledVector(path.nStart, portalDist(size));
+        start.look.copy(path.vStart); start.up.set(1, 0, 0);
+        const bounds = [1, (limit + 1) / 2, limit].map(zoom => {
+          const center = path.midA.clone().multiplyScalar(1 - zoom);
+          return new THREE.Box3(center.clone().addScalar(-CORE_HALF * zoom - .01), center.clone().addScalar(CORE_HALF * zoom + .01));
+        });
+        const crossed = bounds.map(() => 0);
+        for (let i = 0; i <= 600; i++) {
+          const t = i / 600;
+          if (t < .33) tunnelEntryPoseInto(pose, tunnel, t / .33, size, start);
+          else if (t < .67) tunnelCamPoseInto(pose, tunnel, t, size);
+          else tunnelExitPoseInto(pose, tunnel, (t - .67) / .33, size);
+          for (const [index, box] of bounds.entries()) if (box.containsPoint(pose.cam)) {
+            crossed[index]++;
+            let gap = Infinity;
+            for (let j = 1; j < points.length; j++) {
+              segment.set(points[j - 1], points[j]).closestPointToPoint(pose.cam, true, closest);
+              gap = Math.min(gap, closest.distanceTo(pose.cam));
+            }
+            // Include a near-plane-sized margin, not just the lens point.
+            expect(gap + .07).toBeLessThan(CORE_PASSAGE_RADIUS);
+          }
+        }
+        crossed.forEach(count => expect(count).toBeGreaterThan(0));
+        // Before the exit blend accelerates the lens, it also stays on the
+        // exact rider centerline wherever that line crosses the core.
+        for (let t = .33; t < .67; t += .01) {
+          const arc = tunnelTToArc(path, t) - backForHead(t, size);
+          tunnelPathArcPointInto(closest, path, arc);
+          if (!bounds[0].containsPoint(closest)) continue;
+          tunnelCamPoseInto(pose, tunnel, t, size);
+          expect(pose.cam.distanceTo(closest)).toBeLessThan(1e-8);
         }
       }
     }

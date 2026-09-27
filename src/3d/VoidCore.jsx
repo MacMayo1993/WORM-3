@@ -33,7 +33,8 @@ import { createPlayStickerGeometry } from './rubiksPiece.js';
 import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
 import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
-import { makeCorePassage, updateCorePassage, corePassageGLSL } from './corePassage.js';
+import { makeCorePassage, updateCorePassage, coreRoomCutoutGLSL, CORE_MIRROR_HALF } from './corePassage.js';
+import { createCoreReflection, createCoreMirrorRoom } from './coreMirrorRoom.js';
 import { wormExpansion } from '../worm/wormExpansion.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
@@ -43,7 +44,7 @@ import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import {
   CORE_DIRS, CORE_STICKER, CORE_STICKER_LOCAL,
   coreLayout, coreCubieMatrixInto, corePartnerColorId,
-  coreZoomLimit, coreZoomAt,
+  coreZoomLimit, coreZoomAt, CORE_HALF,
   countFlippedStickers, networkCharge, interiorExposure,
   createCoreStickerMaterial, createCoreBodyMaterial
 } from './antipodalCore.js';
@@ -96,12 +97,20 @@ function VoidCore({ cubieRefs = null }) {
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
-    bodyMaterial: withPortalCutout(createCoreBodyMaterial(isMobile, mode), passage.uniforms, corePassageGLSL, 'core', true),
-    stickerMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile), passage.uniforms, corePassageGLSL, 'core', true)
+    bodyMaterial: withPortalCutout(createCoreBodyMaterial(isMobile, mode), passage.uniforms, coreRoomCutoutGLSL, 'core-room', true),
+    stickerMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile), passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
   }), [glow, mode, passage]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
   const antiverse = useMemo(() => createAntiverse(size), [size]);
   useEffect(() => () => antiverse.dispose(), [antiverse]);
+  const reflection = useMemo(() => wormMode ? createCoreReflection(cubies, size, faceColors) : null, [wormMode, cubies, size, faceColors]);
+  useEffect(() => () => reflection?.dispose(), [reflection]);
+  const mirrors = useMemo(() => createCoreMirrorRoom(size, passage.uniforms, null), [size, passage]);
+  useLayoutEffect(() => {
+    mirrors.material.envMap = reflection;
+    mirrors.material.needsUpdate = true;
+  }, [mirrors, reflection]);
+  useEffect(() => () => mirrors.dispose(), [mirrors]);
   useLayoutEffect(() => {
     antiverse.uniforms.uPalette.value.forEach((color, i) => color.set(faceColors[i + 1]));
   }, [antiverse, faceColors]);
@@ -118,7 +127,7 @@ function VoidCore({ cubieRefs = null }) {
         key, id, style,
         geometry: new THREE.PlaneGeometry(CORE_STICKER, CORE_STICKER, style === 'eyeball' ? 12 : 1, style === 'eyeball' ? 12 : 1),
         material: withPortalCutout(createCoreTileStyle(style, faceColors[id], faceColors[ANTIPODAL_COLOR[id]], tunnelCoreScale(size)),
-          passage.uniforms, corePassageGLSL, 'core', true)
+          passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
       });
     }
     return byColor;
@@ -156,7 +165,7 @@ function VoidCore({ cubieRefs = null }) {
     fx.current = {
       layoutDirty: true, flash: 0, flashTiles: [], tint: LIGHT_BASE.clone(), tintMix: 0,
       seenPulse: useGameStore.getState().flipPulse?.at ?? null,
-      zoom: 1, rideId: null, through: false, limit: 1,
+      zoom: 1, rideId: null, through: false, inside: false, departed: false, release: 0, limit: 1,
       dock: new THREE.Vector3(), normal: new THREE.Vector3()
     };
   }
@@ -256,15 +265,22 @@ function VoidCore({ cubieRefs = null }) {
         const { entry } = ride;
         f.rideId = tunnelState.activeTunnelId;
         f.through = false;
+        f.inside = false; f.departed = false; f.release = 0;
         tunnelDockForCellInto(f.dock, entry.x, entry.y, entry.z, entry.dirKey, size);
         f.normal.fromArray(CORE_DIRS[entry.dirKey] || CORE_DIRS.PY);
         f.limit = coreZoomLimit(f.dock, size);
       }
       rootRef.current.worldToLocal(_lens.copy(camera.position));
-      const height = _lens.sub(f.dock).dot(f.normal);
+      const height = _lens.dot(f.normal) - f.dock.dot(f.normal);
       if (height <= 0) f.through = true;
-      const release = THREE.MathUtils.smoothstep(tunnelState.t, 0.62, 0.8);
-      zoomTarget = coreZoomAt(f.through ? 0 : height, f.limit, size, release);
+      _lens.addScaledVector(f.dock, f.zoom - 1);
+      const inside = Math.max(Math.abs(_lens.x), Math.abs(_lens.y), Math.abs(_lens.z)) < CORE_HALF * f.zoom;
+      if (inside) f.inside = true;
+      else if (f.inside) f.departed = true;
+      if (f.departed) f.release = Math.min(1, f.release + dt / .55);
+      // The head is well ahead of the lens. Keep the room open until the
+      // camera itself leaves, instead of shrinking it around the following view.
+      zoomTarget = coreZoomAt(f.through ? 0 : height, f.limit, size, f.release);
     } else {
       f.rideId = null;
     }
@@ -276,6 +292,9 @@ function VoidCore({ cubieRefs = null }) {
       zoomRef.current.scale.setScalar(f.zoom);
       zoomRef.current.position.copy(f.dock).multiplyScalar(1 - f.zoom);
     }
+    mirrors.group.visible = wormMode && passage.uniforms.uPassageOpen.value > .5;
+    passage.uniforms.uCoreRoomHalf.value = mirrors.group.visible ? CORE_MIRROR_HALF * f.zoom : 0;
+    passage.uniforms.uCoreRoomCenter.value.copy(f.dock).multiplyScalar(1 - f.zoom);
 
     const energy = 0.35 + 0.65 * charge;
     _tint.copy(LIGHT_BASE).lerp(f.tint, 0.65 * f.tintMix);
@@ -301,6 +320,7 @@ function VoidCore({ cubieRefs = null }) {
   return (
     <group ref={rootRef} name="antipodal-core">
       <group ref={zoomRef}>
+        <primitive object={mirrors.group} dispose={null} />
         <instancedMesh
           key={`bodies-${size}`}
           name="antipodal-core-body"

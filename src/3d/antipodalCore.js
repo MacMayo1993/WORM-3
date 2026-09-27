@@ -134,6 +134,22 @@ export function coreZoomLimit(dock, size) {
   return Math.max(1, g);
 }
 
+/** All positions occupied by the core as it grows about this ride's entry dock. */
+export function coreZoomBoundsInto(box, dock, size) {
+  const zoom = coreZoomLimit(dock, size);
+  // Include the sticker fronts, which sit just beyond the nominal half-width.
+  const half = CORE_HALF + tunnelCoreScale(size) * (CORE_STICKER_OFFSET - 0.5);
+  box.min.copy(dock).multiplyScalar(1 - zoom).addScalar(-half * zoom);
+  box.max.copy(dock).multiplyScalar(1 - zoom).addScalar(half * zoom);
+  // The faces move linearly with zoom. The union of the two endpoint boxes
+  // therefore contains every intermediate scale, independent of frame order.
+  for (const axis of ['x', 'y', 'z']) {
+    box.min[axis] = Math.min(box.min[axis], -half);
+    box.max[axis] = Math.max(box.max[axis], half);
+  }
+  return box;
+}
+
 /** How far above the entry face the lens is when the core starts to grow. */
 export const coreZoomReach = (size) => 0.9 * (size / 2 - CORE_HALF) + 0.2;
 

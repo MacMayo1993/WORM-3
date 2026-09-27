@@ -10,6 +10,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { FACE_COLORS } from '../utils/constants.js';
+import { CORE_MIRROR_HALF } from '../3d/corePassage.js';
 extend(THREE);
 
 it('opens both backs and core materials, retains the tail passage, and restores a clean exterior', async () => {
@@ -45,6 +46,18 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     expect(body.userData.portalCutout.uPassageOpen.value).toBe(1);
     expect(body.userData.portalCutout).toBe(sticker.userData.portalCutout);
     expect(styled.uniforms.uPassagePoints).toBe(body.userData.portalCutout.uPassagePoints);
+    const room = scene.getObjectByName('anticube-mirror-room');
+    const mirrors = scene.getObjectByName('anticube-mirror-tiles');
+    expect(room.visible).toBe(true);
+    expect(mirrors.material.envMap.isCubeTexture).toBe(true);
+    expect(body.userData.portalCutout.uCoreRoomHalf.value).toBeCloseTo(CORE_MIRROR_HALF);
+    // Both the mirror faces and the dark grout leave the same passage clear.
+    for (const mesh of room.children) expect(mesh.material.userData.portalCutout).toBe(body.userData.portalCutout);
+    const reflection = mirrors.material.envMap;
+    const disposed = vi.fn(); reflection.addEventListener('dispose', disposed);
+    await act(async () => useGameStore.setState({ cubies: makeCubies(3) }));
+    expect(mirrors.material.envMap).not.toBe(reflection);
+    expect(disposed).toHaveBeenCalledOnce();
     const inner = scene.getObjectByName('tunnel-interior-0-1-1-NX').material;
     const cached = getTileStyleMaterial('checkerboard', FACE_COLORS[5], false, null, FACE_COLORS[2]);
     expect(inner).not.toBe(cached);
@@ -60,10 +73,13 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     worm.tunnelPassages.current = [{ tunnel }];
     await frame();
     expect(body.userData.portalCutout.uPassageOpen.value).toBe(1);
+    expect(room.visible).toBe(true);
     worm.tunnelPassages.current = [];
     worm.phase.current = 'crawling';
     await frame();
     expect(body.userData.portalCutout.uPassageOpen.value).toBe(0);
+    expect(body.userData.portalCutout.uCoreRoomHalf.value).toBe(0);
+    expect(room.visible).toBe(false);
     expect(interior.visible).toBe(false); // no invisible depth-writing wall or floating mouth
     expect(scene.getObjectByName('tunnel-interior-mouth-0').visible).toBe(false);
   } finally {
