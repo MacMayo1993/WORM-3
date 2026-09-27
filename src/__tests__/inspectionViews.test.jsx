@@ -19,13 +19,14 @@ it('captures without recursion, follows moved mouths, exposes the interior and c
   cubies = flipStickerPair(cubies, 3, 2, 2, 2, 'PZ', map);
   useGameStore.setState({ cubies, size: 3, showWelcome: false, showMainMenu: false, showSettings: false, showHelp: false,
     showAntipodalPiP: false, showCutawayLens: false, wormHealerMode: false, perfReducedFX: false,
-    settings: { ...before.settings, livePortalViews: true } });
+    settings: { ...before.settings, livePortalViews: false } });
   const pair = livePortalPairs(cubies, 3, map, 6)[0];
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(50, 4 / 3, 0.01, 100);
   camera.position.set(0, 0, 9); camera.updateMatrixWorld(true);
   const cube = new THREE.Group(), exterior = new THREE.Group(), a = new THREE.Group(), b = new THREE.Group();
   scene.add(cube); cube.add(exterior); exterior.add(a, b);
-  a.position.z = 1.55; b.position.z = -1.55; b.rotation.y = Math.PI;
+  // Both mouths face the viewer (possible after a layer turn); still capture one.
+  a.position.z = 1.55; b.position.z = -1.55;
   const batch = new THREE.Mesh(); batch.name = 'StickerInstanceMesh'; scene.add(batch);
   const cleanupA = registerInspectionSurface(pair.a, a), cleanupB = registerInspectionSurface(pair.b, b);
   const cubeRef = createRef(), exteriorRef = createRef(); cubeRef.current = cube; exteriorRef.current = exterior;
@@ -49,9 +50,16 @@ it('captures without recursion, follows moved mouths, exposes the interior and c
   };
   context.value = { gl, scene, camera, size: { width: 800, height: 600 } };
   const root = createRoot(document.createElement('div'));
+  let time = 1000;
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => time);
   try {
     await act(async () => root.render(<InspectionViews cubeRef={cubeRef} exteriorRef={exteriorRef} manifoldMap={map} />));
-    const draw = () => { context.frame(); gl.render(scene, camera); };
+    expect(scene.onBeforeRender).toBe(priorHook);
+    expect(scene.getObjectByName('LivePortalViews')).toBeUndefined();
+    for (let i = 0; i < 60; i++) gl.render(scene, camera);
+    expect(captures).toHaveLength(0);
+    act(() => useGameStore.setState({ settings: { ...before.settings, livePortalViews: true } }));
+    const draw = (delta = 1 / 60) => { time += delta * 1000; context.frame(); gl.render(scene, camera); };
     draw();
     expect(captures).toHaveLength(1);
     expect(captures[0]).toMatchObject({ exterior: true, batch: true, windows: false });
@@ -59,23 +67,37 @@ it('captures without recursion, follows moved mouths, exposes the interior and c
     expect(windows.children.filter(o => o.visible)).toHaveLength(1);
     a.position.y = 0.4; draw();
     expect(windows.children[0].matrix.elements[13]).toBeCloseTo(0.4);
+    expect(captures).toHaveLength(2); // camera and image update together, every frame
 
-    useGameStore.getState().setShowCutawayLens(true);
+    for (let i = 0; i < 30; i++) draw(1 / 20);
+    const beforeFallback = captures.length;
+    expect(beforeFallback).toBeLessThan(20);
+    expect(windows.visible).toBe(false);
+    for (let i = 0; i < 60; i++) draw();
+    expect(captures).toHaveLength(beforeFallback); // no automatic retry / FPS oscillation
+
+    act(() => useGameStore.getState().setShowCutawayLens(true));
     draw();
-    expect(captures).toHaveLength(2); // lens switches mode immediately, despite throttle
-    expect(captures[1]).toMatchObject({ exterior: false, batch: false, windows: false });
-    expect(captures[1].camera.view.enabled).toBe(true);
+    expect(captures).toHaveLength(beforeFallback + 1); // lens remains independently available
+    expect(captures.at(-1)).toMatchObject({ exterior: false, batch: false, windows: false });
+    expect(captures.at(-1).camera.view.enabled).toBe(true);
     expect(exterior.visible).toBe(true); expect(batch.visible).toBe(true); expect(target).toBeNull();
 
-    useGameStore.getState().setShowAntipodalPiP(true);
+    act(() => useGameStore.getState().setShowAntipodalPiP(true));
     draw();
-    expect(captures).toHaveLength(2); expect(windows.visible).toBe(false);
-    useGameStore.setState({ showAntipodalPiP: false, settings: { ...before.settings, livePortalViews: false } });
-    draw(); expect(captures).toHaveLength(2);
+    expect(captures).toHaveLength(beforeFallback + 1); expect(windows.visible).toBe(false);
+    act(() => useGameStore.setState({ showAntipodalPiP: false, settings: { ...before.settings, livePortalViews: false } }));
+    draw(); expect(captures).toHaveLength(beforeFallback + 1);
+    expect(scene.onBeforeRender).toBe(priorHook);
+    act(() => useGameStore.setState({ settings: { ...before.settings, livePortalViews: true } }));
+    draw(); expect(captures).toHaveLength(beforeFallback + 2); // explicit retry
+    act(() => useGameStore.setState({ perfReducedFX: true }));
+    draw(); expect(captures).toHaveLength(beforeFallback + 2);
     await act(async () => root.unmount());
     expect(scene.onBeforeRender).toBe(priorHook);
     expect(scene.getObjectByName('LivePortalViews')).toBeUndefined();
   } finally {
+    clock.mockRestore();
     await act(async () => root.unmount()); cleanupA(); cleanupB();
     useGameStore.setState(before, true); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }

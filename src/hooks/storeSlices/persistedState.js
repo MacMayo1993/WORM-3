@@ -16,7 +16,7 @@ import { STARTING_BANKROLL } from '../../utils/economyConstants.js';
 
 export const SETTINGS_STORAGE_KEY = 'worm3_settings';
 export const SETTINGS_VERSION_KEY = 'worm3_settings_version';
-export const CURRENT_SETTINGS_VERSION = 1;
+export const CURRENT_SETTINGS_VERSION = 2;
 export const PARITY_POINTS_KEY = 'worm3_parity_points';
 export const OWNED_ITEMS_KEY = 'worm3_owned_items';
 export const BET_STREAK_KEY = 'worm3_bet_streak';
@@ -36,14 +36,11 @@ const DEV_FREE_ECONOMY = !!import.meta.env?.DEV || UNLOCK_ALL;
 const migrateSettings = (rawSettings, version) => {
   if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };
 
-  // v0 → v1: normalise into DEFAULT_SETTINGS shape (first schema version).
-  // Add new `if (version < N)` blocks above this line for future migrations.
-  if (version < CURRENT_SETTINGS_VERSION) {
-    return { ...DEFAULT_SETTINGS, ...rawSettings };
-  }
-
-  // Current version — merge in case new keys were added to DEFAULT_SETTINGS.
-  return { ...DEFAULT_SETTINGS, ...rawSettings };
+  const settings = { ...DEFAULT_SETTINGS, ...rawSettings };
+  // v2: the first portal release persisted its expensive default-on value.
+  // Existing players also get the safe default; a new opt-in persists normally.
+  if (version < 2) settings.livePortalViews = false;
+  return settings;
 };
 
 // Load persisted state from localStorage
