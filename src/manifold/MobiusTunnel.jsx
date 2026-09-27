@@ -43,7 +43,7 @@ const FACE_NORM_LOCAL = {
 const RIBBON_WIDTH   = 0.72;
 const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
 const REBUILD_EPS_SQ = 1e-4;
-const MINI_FACE_R    = TUNNEL_MINI_FACE_R; // must match MINI_S in VoidCore.jsx
+const MINI_FACE_R    = TUNNEL_MINI_FACE_R; // the VoidCore's port faces (CORE_DOCK in voidCoreParts.js)
 const TAPER_MIN      = 0.15; // narrowest fraction of full width at the mini-cube
 const BUMPER_HEIGHT  = 0.255; // guard-rail height at full width
 

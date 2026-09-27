@@ -31,7 +31,7 @@
 
 import * as THREE from 'three';
 
-/** Half-width of the VoidCore mini-cube — must match MINI_S in VoidCore.jsx. */
+/** Distance from the centre to the VoidCore's port faces, where tunnels dock (voidCoreParts.js builds on it). */
 export const TUNNEL_MINI_FACE_R = 0.25;
 
 /**
