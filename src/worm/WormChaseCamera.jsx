@@ -496,6 +496,7 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.active = false;
             tunnelState.t = 0;
             tunnelState.activeTunnelId = null;
+            tunnelState.tunnel = null;
             // Smooth interpolated worm world position (copy into scratch — no .clone())
             _camWormWorld.copy(worm.headInterpPos.current);
             // Track the same elevated shell as the body throughout the rocket arc.
@@ -697,6 +698,7 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.active = true;
             tunnelState.t = phase === 'entering' ? tp * ENTER_END_T : 0;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
+            tunnelState.tunnel = tunnel;
             if (phase === 'windup') {
                 _rails.cam.copy(_entryTileCenter).addScaledVector(entN, portalDist(size));
                 _rails.look.copy(_entryTileCenter);
@@ -722,6 +724,7 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.active = true;
             tunnelState.t = tHead;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
+            tunnelState.tunnel = tunnel;
             if (phase === 'exiting') tunnelExitPoseInto(_rails, tunnel, tp, size);
             else tunnelCamPoseInto(_rails, tunnel, tHead, size);
             applyTunnelPose(_rails, 1 - Math.exp(-10 * delta));
@@ -731,6 +734,7 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.active = true;
             tunnelState.t = 1;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
+            tunnelState.tunnel = tunnel;
             const extN = FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY;
             const fwd = DIR_FORWARD[tunnel.exit.dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
             _camForward.fromArray(fwd);

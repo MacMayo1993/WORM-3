@@ -31,8 +31,62 @@
 
 import * as THREE from 'three';
 
-/** Distance from the centre to the VoidCore's port faces, where tunnels dock (voidCoreParts.js builds on it). */
+/** Half-width of the antipodal core cube at the centre (VoidCore.jsx). */
 export const TUNNEL_MINI_FACE_R = 0.25;
+
+// ── The antipodal core and its docks ─────────────────────────────────────────
+// The centre holds a miniature of the cube, TUNNEL_MINI_FACE_R·2 wide at every
+// board size, in which each tile shows its antipodal partner. A tunnel docks on
+// the miniature's own tile directly beneath its mouth (the one showing where the
+// tunnel leads), crosses through the centre (the one point the antipodal map
+// fixes), and leaves by the miniature's tile beneath the far mouth (the one
+// showing where it came from). Because the miniature is a scaled copy about the
+// centre, "beneath" is exact: a tile's dock lies on the ray from the centre
+// through the tile, and a solved cube's partners, which are true antipodes,
+// give a straight diameter.
+
+/** How much the core shrinks an N×N cube: it is always TUNNEL_MINI_FACE_R·2 wide. */
+export const tunnelCoreScale = (size) => (2 * TUNNEL_MINI_FACE_R) / Math.max(1, size);
+
+/**
+ * A tile's dock: the core's sticker beneath it. `centre` is the tile's cubie
+ * centre in unexploded, centred cube coordinates and `normal` its outward face
+ * normal; mid-turn both may carry the slice's rotation, which the core copies.
+ */
+export function tunnelDockInto(out, centre, normal, size) {
+  return out.copy(normal).multiplyScalar(0.5).add(centre).multiplyScalar(tunnelCoreScale(size));
+}
+
+const DOCK_NORMALS = {
+  PX: [1, 0, 0], NX: [-1, 0, 0], PY: [0, 1, 0], NY: [0, -1, 0], PZ: [0, 0, 1], NZ: [0, 0, -1]
+};
+const _dockCentre = new THREE.Vector3();
+const _dockNormal = new THREE.Vector3();
+
+/**
+ * A tile's dock from its grid cell and sticker key, optionally carried by the
+ * cubie's live rotation (the cube-space quaternion of its mesh, identity at rest).
+ */
+export function tunnelDockForCellInto(out, x, y, z, dirKey, size, quaternion = null) {
+  const k = (size - 1) / 2;
+  const n = DOCK_NORMALS[dirKey] || DOCK_NORMALS.PY;
+  _dockCentre.set(x - k, y - k, z - k);
+  _dockNormal.set(n[0], n[1], n[2]);
+  if (quaternion) {
+    _dockCentre.applyQuaternion(quaternion);
+    _dockNormal.applyQuaternion(quaternion);
+  }
+  return tunnelDockInto(out, _dockCentre, _dockNormal, size);
+}
+
+/**
+ * The same, for a cubie mesh by its CubeAssembly index (cubies are laid out
+ * x-major: idx = x·N² + y·N + z) and the mesh itself for its live rotation.
+ */
+export function tunnelDockForMeshInto(out, meshIdx, dirKey, size, mesh = null) {
+  const x = Math.floor(meshIdx / (size * size)), y = Math.floor(meshIdx / size) % size, z = meshIdx % size;
+  return tunnelDockForCellInto(out, x, y, z, dirKey, size, mesh ? mesh.quaternion : null);
+}
 
 /**
  * Depth of the straight axial run inside each mouth, in world units (one cubie is
@@ -58,9 +112,9 @@ export const TUNNEL_THROAT_MAX_FRACTION = 0.55;
 export const TUNNEL_THROAT_T_SHARE = 0.45;
 
 // t landmarks of the traversal parameterisation, unchanged from when the path was
-// three legs: the entry arm owns [0, ARM_A_END], the core crossing the span up to
-// ARM_B_START, and the exit arm the rest. Phases, portal charge and the tube's
-// head marker are all expressed against these.
+// three legs: the entry arm owns [0, ARM_A_END], the core crossing (dock, centre,
+// dock) the span up to ARM_B_START, and the exit arm the rest. Phases, portal
+// charge and the tube's head marker are all expressed against these.
 export const ARM_A_END = 0.4;
 export const ARM_B_START = 0.6;
 
@@ -93,7 +147,8 @@ export function tunnelBoreRadiusAt(t) {
   return base + (BORE_CORE - BORE_THROAT) * arm;
 }
 
-const LEG_COUNT = 5;
+// vStart → throatA → midA → core → midB → throatB → vEnd
+const LEG_COUNT = 6;
 const _axial = new THREE.Vector3();
 const _dockSide = new THREE.Vector3();
 
@@ -103,15 +158,16 @@ export const makeTunnelPath = () => {
     // Control points, mouth to mouth.
     vStart: new THREE.Vector3(),   // entry sticker surface
     throatA: new THREE.Vector3(),  // straight down the entry tile's normal
-    midA: new THREE.Vector3(),     // entry-side dock on the mini-cube
-    midB: new THREE.Vector3(),     // exit-side dock on the mini-cube
+    midA: new THREE.Vector3(),     // entry-side dock on the antipodal core
+    core: new THREE.Vector3(),     // the centre: every crossing passes through it
+    midB: new THREE.Vector3(),     // exit-side dock on the antipodal core
     throatB: new THREE.Vector3(),  // straight up the exit tile's normal
     vEnd: new THREE.Vector3(),     // exit sticker surface
     // Per-leg world lengths and the parameter span each leg occupies.
-    legLen: [0, 0, 0, 0, 0],
-    legT: [0, 0, 0, 0, 0],
-    legT0: [0, 0, 0, 0, 0],
-    legArc0: [0, 0, 0, 0, 0],
+    legLen: [0, 0, 0, 0, 0, 0],
+    legT: [0, 0, 0, 0, 0, 0],
+    legT0: [0, 0, 0, 0, 0, 0],
+    legArc0: [0, 0, 0, 0, 0, 0],
     // Outward unit normals of the two mouths, kept so samplers can extrapolate off
     // the ends of the path (a camera trailing the head is outside the cube before
     // the head has gone in, and again after it comes out).
@@ -124,8 +180,8 @@ export const makeTunnelPath = () => {
     legA: null,
     legB: null
   };
-  path.legA = [path.vStart, path.throatA, path.midA, path.midB, path.throatB];
-  path.legB = [path.throatA, path.midA, path.midB, path.throatB, path.vEnd];
+  path.legA = [path.vStart, path.throatA, path.midA, path.core, path.midB, path.throatB];
+  path.legB = [path.throatA, path.midA, path.core, path.midB, path.throatB, path.vEnd];
   return path;
 };
 
@@ -150,19 +206,18 @@ function throatDepth(anchor, normal, dock) {
  * @param {THREE.Vector3} n1     entry face outward unit normal (throat direction)
  * @param {THREE.Vector3} vEnd   exit sticker's surface anchor
  * @param {THREE.Vector3} n2     exit face outward unit normal (throat direction)
- * @param {THREE.Vector3} [dockN1] entry dock direction on the mini-cube, if it differs
- *   from n1. A tile that is mid-flip or riding a rotating slice has a world normal that
- *   no longer matches its colour's face, and the core dock must follow the colour (see
- *   MobiusTunnel) while the throat follows the tile the worm is actually falling through.
- * @param {THREE.Vector3} [dockN2] exit dock direction, same reasoning.
+ * @param {THREE.Vector3} [dockA] entry dock point on the antipodal core (tunnelDockInto).
+ *   Omitted, the tunnel docks on the centre of the core face along n1.
+ * @param {THREE.Vector3} [dockB] exit dock point, same.
  */
-export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockN1 = n1, dockN2 = n2) {
+export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockA = null, dockB = null) {
   path.vStart.copy(vStart);
   path.vEnd.copy(vEnd);
   path.nStart.copy(n1).normalize();
   path.nEnd.copy(n2).normalize();
-  path.midA.copy(dockN1).multiplyScalar(TUNNEL_MINI_FACE_R);
-  path.midB.copy(dockN2).multiplyScalar(TUNNEL_MINI_FACE_R);
+  path.core.set(0, 0, 0);
+  if (dockA) path.midA.copy(dockA); else path.midA.copy(n1).multiplyScalar(TUNNEL_MINI_FACE_R);
+  if (dockB) path.midB.copy(dockB); else path.midB.copy(n2).multiplyScalar(TUNNEL_MINI_FACE_R);
   // Slice turns can put both mouths on the same physical face. Sharing its
   // centre dock collapses the entire core leg (20% of traversal time) to a
   // point. Separate the docks along the mouths' in-face separation instead.
@@ -187,7 +242,7 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockN1 = n1, doc
   }
   path.total = total;
   path.armALen = path.legLen[0] + path.legLen[1];
-  path.armBLen = path.legLen[3] + path.legLen[4];
+  path.armBLen = path.legLen[4] + path.legLen[5];
 
   // Split each arm's parameter span between its throat and its diagonal. By length
   // the throat is the short one, so the floor is what usually decides — see
@@ -196,13 +251,18 @@ export function buildTunnelPathInto(path, vStart, n1, vEnd, n2, dockN1 = n1, doc
     ? Math.max(TUNNEL_THROAT_T_SHARE, path.legLen[0] / path.armALen)
     : 0;
   const shareB = path.armBLen > 0
-    ? Math.max(TUNNEL_THROAT_T_SHARE, path.legLen[4] / path.armBLen)
+    ? Math.max(TUNNEL_THROAT_T_SHARE, path.legLen[5] / path.armBLen)
     : 0;
   path.legT[0] = path.legLen[0] > 0 ? ARM_A_END * shareA : 0;
   path.legT[1] = ARM_A_END - path.legT[0];
-  path.legT[2] = ARM_B_START - ARM_A_END;
-  path.legT[4] = path.legLen[4] > 0 ? (1 - ARM_B_START) * shareB : 0;
-  path.legT[3] = (1 - ARM_B_START) - path.legT[4];
+  // The crossing's span is shared between its two halves by length, so the
+  // head crosses the core at an even pace whichever docks it joins.
+  const crossLen = path.legLen[2] + path.legLen[3];
+  const crossShare = crossLen > 0 ? path.legLen[2] / crossLen : 0.5;
+  path.legT[2] = (ARM_B_START - ARM_A_END) * crossShare;
+  path.legT[3] = (ARM_B_START - ARM_A_END) - path.legT[2];
+  path.legT[5] = path.legLen[5] > 0 ? (1 - ARM_B_START) * shareB : 0;
+  path.legT[4] = (1 - ARM_B_START) - path.legT[5];
 
   let t0 = 0;
   for (let i = 0; i < LEG_COUNT; i++) {
@@ -282,9 +342,9 @@ function ribbonLegForU(path, u) {
     return arc <= path.legLen[0] ? 0 : 1;
   }
   const arc = ((u - 0.5) / 0.5) * path.armBLen;
-  if (path.legLen[4] <= 0) return 3;
-  if (path.legLen[3] <= 0) return 4;
-  return arc <= path.legLen[3] ? 3 : 4;
+  if (path.legLen[5] <= 0) return 4;
+  if (path.legLen[4] <= 0) return 5;
+  return arc <= path.legLen[4] ? 4 : 5;
 }
 
 /**
@@ -297,7 +357,7 @@ function ribbonFracForU(path, u, leg) {
   const arc = leg <= 1
     ? (Math.min(0.5, Math.max(0, u)) / 0.5) * path.armALen
     : ((Math.min(1, Math.max(0.5, u)) - 0.5) / 0.5) * path.armBLen;
-  const armArc0 = leg === 1 ? path.legLen[0] : leg === 4 ? path.legLen[3] : 0;
+  const armArc0 = leg === 1 ? path.legLen[0] : leg === 5 ? path.legLen[4] : 0;
   return Math.min(1, Math.max(0, (arc - armArc0) / len));
 }
 

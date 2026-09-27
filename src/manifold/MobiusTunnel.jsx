@@ -14,7 +14,7 @@ import {
   buildTunnelPathInto,
   tunnelPathRibbonInto,
   tunnelPathRibbonTangentInto,
-  TUNNEL_MINI_FACE_R
+  tunnelDockForMeshInto
 } from '../utils/tunnelPath.js';
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
@@ -43,7 +43,6 @@ const FACE_NORM_LOCAL = {
 const RIBBON_WIDTH   = 0.72;
 const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
 const REBUILD_EPS_SQ = 1e-4;
-const MINI_FACE_R    = TUNNEL_MINI_FACE_R; // the VoidCore's port faces (CORE_DOCK in voidCoreParts.js)
 const TAPER_MIN      = 0.15; // narrowest fraction of full width at the mini-cube
 const BUMPER_HEIGHT  = 0.255; // guard-rail height at full width
 
@@ -68,8 +67,6 @@ const _side          = new THREE.Vector3(0, 0, 1);
 const _portalPos     = new THREE.Vector3();
 const _whipAxis      = new THREE.Vector3();
 const _ribbonPt      = new THREE.Vector3();
-const _dockNorm1     = new THREE.Vector3();
-const _dockNorm2     = new THREE.Vector3();
 // Half-space pair keeping ribbon and rails behind the two stickers they hang off.
 const _tileGuard     = makeTileGuard();
 // The shared centerline this tunnel's band is swept along. One per module is enough:
@@ -626,12 +623,11 @@ const MobiusTunnel = ({
     const flipP2 = applyTileFlipMotion(_vEnd, _faceNorm2, gridId2);
     const tileFlipping = flipP1 > 0 || flipP2 > 0;
 
-    // Mini-cube face docking points — use LOCAL color direction so the tunnel
-    // always routes through the correct colored face regardless of cube rotation.
-    _dockNorm1.set(n1[0], n1[1], n1[2]);
-    _dockNorm2.set(n2[0], n2[1], n2[2]);
-    _midA.copy(_dockNorm1).multiplyScalar(MINI_FACE_R);
-    _midB.copy(_dockNorm2).multiplyScalar(MINI_FACE_R);
+    // Dock on the antipodal core's own tile beneath each mouth (the one showing
+    // where the tunnel leads), carried by the cubie's live rotation exactly as
+    // the core's copy of its slice is. Flip motion stays on the anchors only.
+    tunnelDockForMeshInto(_midA, meshIdx1, dirKey1, state.size, mesh1);
+    tunnelDockForMeshInto(_midB, meshIdx2, dirKey2, state.size, mesh2);
 
     const moved = tileFlipping ||
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
@@ -652,8 +648,8 @@ const MobiusTunnel = ({
       lastEndRef  .current.copy(_vEnd);
 
       // The route itself — throats along each tile's own world normal, docks on the
-      // colour-correct mini-cube faces. Everything below sweeps this.
-      buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _dockNorm1, _dockNorm2);
+      // core tiles beneath them, crossing through the centre. Everything below sweeps this.
+      buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _midA, _midB);
       uniforms.uPatternRepeats.value = _tunnelPath.total / (ribbonMode ? TUNNEL_RIDE_WIDTH : RIBBON_WIDTH);
       uniforms.uTileCenterA.value.copy(_wPos1);
       uniforms.uTileCenterB.value.copy(_wPos2);

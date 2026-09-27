@@ -2,6 +2,8 @@ import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { tunnelDockForMeshInto } from '../utils/tunnelPath.js';
 
 /**
  * TunnelSnap — the death of an antipodal pair, made visible.
@@ -24,7 +26,6 @@ const VERTS     = (SEGS + 1) * 2;
 const IDX_COUNT = (SEGS - 1) * 6;
 
 // Match MobiusTunnel / RestingCords so the snap starts exactly where the cord was.
-const MINI_FACE_R = 0.25;
 const SNAP_WIDTH  = 0.34;
 
 // Deliberately much fatter than the cord's taper. A tunnel's ends are anchored on
@@ -196,8 +197,10 @@ const SnapCord = ({ death, cubieRefs }) => {
     _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat);
     _vEnd.copy(_wPos).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
 
-    _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
-    _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
+    // Docks on the antipodal core's tiles beneath each mouth, as the ribbon had.
+    const size = useGameStore.getState().size;
+    tunnelDockForMeshInto(_midA, death.meshIdx1, death.dirKey1, size, mesh1);
+    tunnelDockForMeshInto(_midB, death.meshIdx2, death.dirKey2, size, mesh2);
 
     // ── Cord halves ──────────────────────────────────────────────────────────
     const pos  = geo.attributes.position.array;

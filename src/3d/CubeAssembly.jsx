@@ -1210,8 +1210,9 @@ const CubeAssembly = React.memo(({
           manifoldMap={manifoldMap}
           cubieRefs={cubieRefs.current}
         />
-        {/* VoidCore: swirling wormhole-color rings at the cube's hollow center */}
-        <VoidCore />
+        {/* VoidCore: the antipodal cube at the centre. It copies the live cubie
+            meshes (slice turns included) and every tunnel docks on its tiles. */}
+        <VoidCore cubieRefs={cubieRefs.current} />
         {/* Keep cubies mounted for stable anchors; hide the exterior only while the
             lens is inside. The ribbons and VoidCore remain visible throughout. */}
         <group ref={exteriorRef}>
@@ -1282,7 +1283,7 @@ const CubeAssembly = React.memo(({
           )}
           <group>
             {items.map((it, idx) => {
-              // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
+              // Skip the center cubie on odd-sized cubes — the antipodal core (VoidCore) occupies that space
               const isCenterVoid = size % 2 !== 0 &&
                 it.pos[0] === 0 && it.pos[1] === 0 && it.pos[2] === 0;
               if (isCenterVoid) return null;

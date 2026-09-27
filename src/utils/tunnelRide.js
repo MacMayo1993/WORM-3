@@ -10,13 +10,14 @@ const prev = new THREE.Vector3(), next = new THREE.Vector3();
 const rotation = new THREE.Quaternion();
 const clamp = (v, max) => Math.max(0, Math.min(max, v));
 
-export const tunnelRideCoreArc = path => path.armALen + path.legLen[2] * 0.5;
+// Arc-length at the centre of the cube, where every crossing turns.
+export const tunnelRideCoreArc = path => path.legArc0[3];
 
 export function tunnelRideTwistAt(path, arc) {
   const core = tunnelRideCoreArc(path);
   // Complete the half-turn inside the solid center cube, leaving both exposed
   // arms untwisted. The body uses this exact frame, including reverse visits.
-  const halfSpan = Math.max(1e-6, path.legLen[2] * 0.35);
+  const halfSpan = Math.max(1e-6, (path.legLen[2] + path.legLen[3]) * 0.35);
   return THREE.MathUtils.smoothstep(arc, core - halfSpan, core + halfSpan);
 }
 
@@ -70,15 +71,16 @@ function tangentInto(out, path, arc) {
   return out.normalize();
 }
 function rideFrames(path) {
+  const legs = path.legA.length;
   let cache = path.rideFrames;
   let unchanged = !!cache;
-  for (let i = 0; unchanged && i < 6; i++) unchanged = (i < 5 ? path.legA[i] : path.vEnd).equals(cache.controls[i]);
+  for (let i = 0; unchanged && i <= legs; i++) unchanged = (i < legs ? path.legA[i] : path.vEnd).equals(cache.controls[i]);
   if (unchanged) return cache;
   if (!cache) cache = path.rideFrames = {
-    controls: Array.from({ length: 6 }, () => new THREE.Vector3()),
+    controls: Array.from({ length: legs + 1 }, () => new THREE.Vector3()),
     normals: Array.from({ length: FRAME_STEPS + 1 }, () => new THREE.Vector3()),
   };
-  for (let i = 0; i < 6; i++) cache.controls[i].copy(i < 5 ? path.legA[i] : path.vEnd);
+  for (let i = 0; i <= legs; i++) cache.controls[i].copy(i < legs ? path.legA[i] : path.vEnd);
   cache.forward = forwardPath(path);
   const sign = cache.forward ? 1 : -1;
   for (let i = 0; i <= FRAME_STEPS; i++) {

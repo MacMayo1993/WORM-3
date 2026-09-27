@@ -7,6 +7,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
+import { tunnelDockForMeshInto } from '../utils/tunnelPath.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 
 /**
@@ -43,7 +44,6 @@ const INDICES_PER_STRAND = (CORD_SEGS - 1) * 6;
 
 // Geometry constants — must match MobiusTunnel.jsx so a cord and the full
 // ribbon for the same pair trace the same centerline (no jump on promotion).
-const MINI_FACE_R = 0.25;
 // Narrowing toward the core reads as "diving in", but 0.15 took the cord to
 // sub-pixel width exactly where it crosses the middle of the screen.
 const TAPER_MIN   = 0.35;
@@ -371,6 +371,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
     let moved = forceRebuildRef.current;
     let slot  = 0;
     const nowMs = tunnelCharges.size ? performance.now() : 0;
+    const size = useGameStore.getState().size;
     if (chargeCacheRef.current.length < maxStrands) chargeCacheRef.current = new Float32Array(maxStrands);
     const chargeCache = chargeCacheRef.current;
 
@@ -416,9 +417,9 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
       if (charge !== 0 || chargeCache[slot] !== 0) moved = true;
       chargeCache[slot] = charge;
 
-      // Dock on the mini-cube face in LOCAL colour direction, matching the ribbon.
-      _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
-      _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
+      // Dock on the antipodal core's tiles beneath each mouth, matching the ribbon.
+      tunnelDockForMeshInto(_midA, t.meshIdx1, t.dirKey1, size, mesh1);
+      tunnelDockForMeshInto(_midB, t.meshIdx2, t.dirKey2, size, mesh2);
 
       const c = slot * 6;
       if (!moved) {

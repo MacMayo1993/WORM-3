@@ -36,7 +36,7 @@ it.each([false, true])('raises real cubies, grows the band and lands after forma
     <DemoPracticeTargets size={3} />
     {[2, 0].map((z, i) => <Cubie key={i} ref={el => { refs[i] = el; gridRefs[indices[i]] = el; }}
       cubie={cubies[1][1][z]} position={[0, 0, z - 1]} size={3} wormMode />)}
-    {raised && <MobiusTunnel meshIdx1={0} meshIdx2={1} dirKey1="PZ" dirKey2="NZ" cubieRefs={refs}
+    {raised && <MobiusTunnel meshIdx1={indices[0]} meshIdx2={indices[1]} dirKey1="PZ" dirKey2="NZ" cubieRefs={gridRefs}
       flips={1} color1="#e83a50" color2="#ffaa00" gridId1="a" gridId2="b" tunnelId="a|b" />}
   </PadProvider>;
   try {

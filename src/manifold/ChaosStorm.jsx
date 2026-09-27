@@ -36,7 +36,7 @@ import { SURFACE_OFFSET, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import { buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { stormMeshIndex } from '../game/chaosStormEvents.js';
 import { effectiveFlipPads } from '../game/raisedCubie.js';
-import { makeTunnelPath, buildTunnelPathInto, tunnelPathArcPointInto, TUNNEL_MINI_FACE_R } from '../utils/tunnelPath.js';
+import { makeTunnelPath, buildTunnelPathInto, tunnelPathArcPointInto, tunnelDockForMeshInto } from '../utils/tunnelPath.js';
 import { padMotion } from '../3d/padMotionBridge.js';
 import { fireCubieKick } from '../3d/cubieKick.js';
 import { fireCameraShake } from '../3d/flipImpulse.js';
@@ -698,17 +698,18 @@ function updateCharge(ctx, c) {
     c.live = false;
     return;
   }
-  // Dock on the mini-cube face in the tile's LOCAL colour direction — the same
-  // convention every tunnel renderer uses, so the surge rides the visible tunnel.
-  const d1 = FACE_N[c.from.dirKey], d2 = FACE_N[c.to.dirKey];
-  c.dock1.set(d1[0], d1[1], d1[2]);
-  c.dock2.set(d2[0], d2[1], d2[2]);
+  // Dock on the antipodal core's tiles beneath each mouth — the same docks every
+  // tunnel renderer uses, so the surge rides the visible tunnel.
+  const i1 = stormMeshIndex(c.from, ctx.size), i2 = stormMeshIndex(c.to, ctx.size);
+  tunnelDockForMeshInto(c.dock1, i1, c.from.dirKey, ctx.size, ctx.refs?.[i1]);
+  tunnelDockForMeshInto(c.dock2, i2, c.to.dirKey, ctx.size, ctx.refs?.[i2]);
   c.throated = ctx.showTunnels && tunnelFocus.ids.has(c.pairId);
   if (c.throated) {
     buildTunnelPathInto(c.path, c.vStart, c.n1, c.vEnd, c.n2, c.dock1, c.dock2);
   } else {
-    c.path.midA.copy(c.dock1).multiplyScalar(TUNNEL_MINI_FACE_R);
-    c.path.midB.copy(c.dock2).multiplyScalar(TUNNEL_MINI_FACE_R);
+    // Straight across between the docks: the crossing is hidden inside the core.
+    c.path.midA.copy(c.dock1);
+    c.path.midB.copy(c.dock2);
     c.legLen[0] = c.vStart.distanceTo(c.path.midA);
     c.legLen[1] = c.path.midA.distanceTo(c.path.midB);
     c.legLen[2] = c.path.midB.distanceTo(c.vEnd);
