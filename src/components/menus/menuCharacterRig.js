@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents } from '../../worm/wormCharacterVisuals.js';
+import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents, characterSegmentPattern } from '../../worm/wormCharacterVisuals.js';
 import { createWormSkinMaterial, updateWormSkinMaterialTime, applyBioluminescence } from '../../worm/wormSkinMaterial.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi } from '../../worm/mobiModel.js';
 import { createMobiSegmentAssets, createMobiSegment, disposeMobiSegmentAssets } from '../../worm/mobiSegments.js';
@@ -26,6 +26,7 @@ export function createMenuCharacterRig(character) {
   const spine = character === 'book' ? own(new THREE.BoxGeometry(...SPINE_GEO_ARGS)) : null;
   const pageGeometries = character === 'book' ? [own(createBookPageGeometry(1)), own(createBookPageGeometry(-1))] : null;
   const accents = createCharacterAccents(character);
+  accents.setSkin(skin);
   const mobi = character === 'mobi' ? createMobiModel() : null;
   const mobiAssets = mobi ? createMobiSegmentAssets() : null;
   const mobiTails = [];
@@ -39,6 +40,7 @@ export function createMenuCharacterRig(character) {
       return { holder };
     }
     const material = own(createWormSkinMaterial({ color: skin.body, emissive: skin.body, emissiveIntensity: .12 }));
+    characterSegmentPattern(material.color, character, skin, i, new THREE.Color());
     applyCharacterFinish(material, character);
     applyBioluminescence(material, skin.glow, character === 'glow');
     const isBook = character === 'book' && i > 0;
@@ -109,6 +111,7 @@ export function createMenuCharacterRig(character) {
         layoutWormFace(origin, localForward, localUp, MENU_WORM_RADIUS, face);
         animateWormFace(face, character, time, { reducedMotion, pulse: motion?.pulse ?? 0, transit: motion?.transit ?? false });
         poseCharacterAccents(accents.group, origin, localForward, localUp, MENU_WORM_RADIUS);
+        accents.update(reducedMotion ? 0 : time);
         if (mobi) {
           mobi.group.visible = visible; mobi.group.position.copy(origin); mobi.group.scale.setScalar(MENU_WORM_RADIUS);
           orientMobi(mobi.group, localForward, localUp);

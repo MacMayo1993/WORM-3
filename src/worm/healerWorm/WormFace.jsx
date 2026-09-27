@@ -16,7 +16,7 @@ import { getTunnelWorldPosSmoothInto, getWindWorldPosInto } from '../wormLogic.j
 import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
-import { _hatAlignQuat, _hatYUp } from '../wormCosmeticsData.js';
+import { _hatAlignQuat, _hatYUp, getSkin } from '../wormCosmeticsData.js';
 import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD, } from './constants.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, MOBI_RADIUS } from '../mobiModel.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
@@ -52,8 +52,10 @@ export function WormFace({ worm, size }) {
     const faceOpacityRef = useRef(1);
     const wormHatId = useGameStore(s => s.wormHat ?? 'none');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
+    const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const accents = useMemo(() => createCharacterAccents(wormCharacterId), [wormCharacterId]);
     useEffect(() => () => accents.dispose(), [accents]);
+    useEffect(() => { accents.setSkin(getSkin(wormSkinId)); }, [accents, wormSkinId]);
     const isBook = wormCharacterId === 'book';
     const showBookGlasses = isBook && equipment.face === 'none';
     const isMobi = wormCharacterId === 'mobi';
@@ -221,6 +223,7 @@ export function WormFace({ worm, size }) {
         });
 
         poseCharacterAccents(accents.group, _faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
+        accents.update(reducedMotion ? 0 : faceTime.current);
 
         if (hatGroupRef.current) {
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);

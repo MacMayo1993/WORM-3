@@ -11,6 +11,9 @@ export function finishWormEyes(eyes, pupils, character = 'classic', mouth = null
     emissiveIntensity: character === 'glow' ? 0.65 : 0.22, roughness: 0.25, metalness: 0.12, toneMapped: false });
   const lidMat = new THREE.MeshBasicMaterial({ color: profile.lid });
   const glintMat = new THREE.MeshBasicMaterial({ color: '#fffdf2', toneMapped: false });
+  // The Dancer's lashes ride the lid, so they blink and arch with it.
+  const lashGeo = character === 'wiggle' ? new THREE.CylinderGeometry(0.05, 0.085, 0.5, 5) : null;
+  const _lashDir = new THREE.Vector3();
   const attachments = [];
   for (let i = 0; i < 2; i++) {
     if (!eyes[i] || !pupils[i]) continue;
@@ -19,6 +22,15 @@ export function finishWormEyes(eyes, pupils, character = 'classic', mouth = null
     lid.scale.y = 0.88;
     eyes[i].userData.wormBrow = lid;
     eyes[i].add(lid); attachments.push(lid);
+    if (lashGeo) {
+      for (const angle of [0.55, 0.95, 1.35]) {
+        const a = i ? angle : Math.PI - angle; // eye 0's local +x points inward
+        const lash = new THREE.Mesh(lashGeo, lidMat);
+        lash.position.set(Math.cos(a) * 1.18, Math.sin(a) * 1.18, 0);
+        lash.quaternion.setFromUnitVectors(THREE.Object3D.DEFAULT_UP, _lashDir.set(Math.cos(a), Math.sin(a), 0.35).normalize());
+        lid.add(lash);
+      }
+    }
     const iris = new THREE.Mesh(irisGeo, irisMat);
     iris.position.z = 0.64;
     pupils[i].add(iris); attachments.push(iris);
@@ -48,7 +60,7 @@ export function finishWormEyes(eyes, pupils, character = 'classic', mouth = null
     attachments.forEach(part => part.removeFromParent());
     eyes.forEach(eye => { if (eye) delete eye.userData.wormBrow; });
     if (mouth) mouth.geometry = originalMouth;
-    [irisGeo, lidGeo, glintGeo, irisMat, lidMat, glintMat, smileGeometry, teethGeometry].forEach(resource => resource?.dispose());
+    [irisGeo, lidGeo, glintGeo, lashGeo, irisMat, lidMat, glintMat, smileGeometry, teethGeometry].forEach(resource => resource?.dispose());
   };
 }
 

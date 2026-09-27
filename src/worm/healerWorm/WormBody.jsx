@@ -7,7 +7,7 @@ import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
 import { SPRING_CHARGE } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
-import { createCharacterGeometry, applyCharacterFinish, prismColor } from '../wormCharacterVisuals.js';
+import { createCharacterGeometry, applyCharacterFinish, prismColor, characterSegmentPattern } from '../wormCharacterVisuals.js';
 import { wormBodyTaper } from '../wormCharacterFinish.js';
 // src/worm/healerWorm/WormBody.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
@@ -164,6 +164,10 @@ export function WormBody({ worm, size }) {
     const lastHaloHexRef = useRef(null);
     const bellyColorRef = useRef(bellyColor);
     bellyColorRef.current = bellyColor;
+    // The character's body pattern (characterSegmentPattern) reads the whole skin.
+    const patternRef = useRef({ character: wormCharacterId, skin });
+    patternRef.current.character = wormCharacterId;
+    patternRef.current.skin = skin;
     const isInchRef = useRef(isInch);
     isInchRef.current = isInch;
     const isGlowRef = useRef(isGlow);
@@ -401,7 +405,8 @@ export function WormBody({ worm, size }) {
         const elementStrength = experience ? Math.min(1, (worm.elementalT?.current ?? 0) / experience.fadeOut) : 0;
         if (experience) elementalBodyRef.current.color.set(experience.body);
         const colorDirty = !!experience || previousElementActive || pickup.active || wasPickupActive || prevCS.mesh !== mesh || _transitCull || _isPrism || colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
-            baseColor !== prevCS.baseColor || bellyCol !== prevCS.bellyCol || _isGlow !== prevCS.isGlow || _isInch !== prevCS.isInch;
+            baseColor !== prevCS.baseColor || bellyCol !== prevCS.bellyCol || _isGlow !== prevCS.isGlow || _isInch !== prevCS.isInch ||
+            patternRef.current.character !== prevCS.character;
         if (colorDirty) {
             prevCS.mesh = mesh;
             prevCS.epoch = colorEpoch;
@@ -410,6 +415,7 @@ export function WormBody({ worm, size }) {
             prevCS.bellyCol = bellyCol;
             prevCS.isGlow = _isGlow;
             prevCS.isInch = _isInch;
+            prevCS.character = patternRef.current.character;
         }
 
         // Book Worm page bank — one value per frame, shared by every segment below.
@@ -716,14 +722,12 @@ export function WormBody({ worm, size }) {
                     // separated from its neighbours by the worm's base colour.
                     const trioOffset = (i - BASE_TAIL_LENGTH) % ORB_SEGMENT_GROWTH;
                     _bodyColor.set(trioOffset === 1 ? orbColors[orbPickupIndex] : baseColor);
-                } else if (_isInch) {
-                    // Alternating body/belly bands for visible ring pattern. Uses writeIdx
-                    // (not i) so bands keep alternating once LOD thinning makes consecutive
-                    // drawn segments an even number of real segments apart.
-                    _bodyColor.set(baseColor);
-                    if (writeIdx % 2 !== 0) _bodyColor.lerp(_bookPageColor.set(bellyCol), 0.28);
                 } else {
-                    _bodyColor.set(baseColor);
+                    // The character's pattern: the Brute's belly bands, the Dancer's
+                    // stripes, the Ranger's saddle. Uses writeIdx (not i) so bands keep
+                    // alternating once LOD thinning makes consecutive drawn segments an
+                    // even number of real segments apart.
+                    characterSegmentPattern(_bodyColor.set(baseColor), patternRef.current.character, patternRef.current.skin, writeIdx, _bookPageColor);
                 }
                 if (experience) {
                     const shimmer = elementalBodyWave(element, characterTimeRef.current, i, tLen);

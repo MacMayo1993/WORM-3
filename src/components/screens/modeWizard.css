@@ -65,8 +65,6 @@
 }
 .mode-wizard .worm-profile { --wardrobe-line:var(--mode-accent); }
 .mode-wizard .worm-profile :is(.worm-profile-filter[aria-pressed=true],.worm-profile-footer>button) { background:var(--mode-accent); color:var(--wiz-check-ink); }
-.mode-wizard .worm-profile-categories button[aria-selected=true] { box-shadow:inset 3px 0 var(--mode-accent); }
-.mode-wizard .worm-profile-option[aria-pressed=true] { box-shadow:0 0 0 2px var(--mode-accent); }
 .mode-wizard .worm-path-card { box-shadow:0 4px 0 var(--wiz-card-shadow); }
 .mode-wizard .worm-path-free :is(.worm-path-art,.worm-path-kicker) { color:var(--mode-ink); }
 
@@ -110,6 +108,5 @@
 .cube-path-screen button:focus-visible { outline: 3px solid var(--arcade-focus); outline-offset: 4px; }
 .mode-wizard .mode-wizard-sheet > div:last-child > button:first-of-type { font-size: clamp(15px, 4.5vw, 20px) !important; }
 .mode-wizard .worm-profile :is(.worm-profile-filter[aria-pressed=true],.worm-profile-footer>button) { background: var(--mode-accent); color: var(--arcade-accent-ink); }
-.mode-wizard .worm-profile-option[aria-pressed=true] { box-shadow: 0 0 0 3px var(--arcade-ink-strong); }
 .mode-wizard .worm-path-card { border: 2px solid var(--arcade-line) !important; background: var(--arcade-card); box-shadow: 0 6px 0 var(--arcade-line); }
 .mode-wizard.worm-entry-choice .worm-path-free .worm-path-cta { background: #FFD500; color: #1a1410; }

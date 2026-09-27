@@ -29,6 +29,7 @@ const renderScale = (maxPixelRatio) => Math.min(maxPixelRatio, typeof window ===
  * @param maxRenderPixels  backing-buffer limit; large character art can opt into sharper rendering
  * @param animated     idle motion — true for hero previews, false for chips
  * @param framing      'body' for thumbnails, 'character' for the selector stage, 'head' for hats
+ * @param aspect       width ÷ height; a wide 'character' canvas gets the stage's own shot
  */
 export default function WormPreviewCanvas({
   characterId = 'classic',
@@ -36,6 +37,7 @@ export default function WormPreviewCanvas({
   hatId = 'none',
   accessories,
   size = 64,
+  aspect = 1,
   animated = false,
   direct = false,
   maxPixelRatio = 2,
@@ -59,7 +61,7 @@ export default function WormPreviewCanvas({
     }
     const px = Math.min(maxRenderPixels, Math.round(size * renderScale(maxPixelRatio)));
     canvas.width = px;
-    canvas.height = px;
+    canvas.height = Math.max(1, Math.round(px / aspect));
     idRef.current = registerWormPreview(canvas, { characterId, skinId, hatId, accessories, palette, animated, framing, companion });
     return () => {
       if (idRef.current !== null) unregisterWormPreview(idRef.current);
@@ -67,7 +69,7 @@ export default function WormPreviewCanvas({
     };
     // Size changes remount the preview; the option effect below handles the rest.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size, maxPixelRatio, maxRenderPixels, direct]);
+  }, [size, aspect, maxPixelRatio, maxRenderPixels, direct]);
 
   useEffect(() => {
     if (idRef.current !== null) (direct ? updateDirectWormPreview : updateWormPreview)(idRef.current, { characterId, skinId, hatId, accessories, palette, animated, framing, companion });
@@ -77,7 +79,7 @@ export default function WormPreviewCanvas({
   return (
     <Surface
       ref={canvasRef}
-      style={{ display: 'block', width: `${size}px`, height: `${size}px`, ...style }}
+      style={{ display: 'block', width: `${size}px`, height: `${size / aspect}px`, ...style }}
     />
   );
 }

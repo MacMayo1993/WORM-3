@@ -6,7 +6,7 @@ import { safeAccessories, HANDMADE_HATS } from './handmadeAccessoriesData.js';
 const constructors = { sphere: THREE.SphereGeometry, box: THREE.BoxGeometry, cylinder: THREE.CylinderGeometry,
   cone: THREE.ConeGeometry, torus: THREE.TorusGeometry };
 
-// Merge decorative stitches/beads by material: bounded draw calls, no new textures.
+// Merge decorative stitches/beads by colour and finish: bounded draw calls, no new textures.
 export function buildCraftModel(id) {
   const group = new THREE.Group(), batches = new Map(), dummy = new THREE.Object3D();
   for (const part of getHandmadeParts(id)) {
@@ -14,7 +14,7 @@ export function buildCraftModel(id) {
     dummy.position.fromArray(part.pos); dummy.rotation.set(...(part.rot || [0,0,0]));
     dummy.scale.fromArray(part.scale || [1,1,1]); dummy.updateMatrix();
     geometry.applyMatrix4(dummy.matrix);
-    const key = part.role || part.mat.color;
+    const key = part.role || `${part.mat.color}|${part.mat.roughness}|${part.mat.metalness}|${part.mat.opacity ?? 1}`;
     if (!batches.has(key)) batches.set(key, { parts: [], mat: part.mat, role: part.role });
     batches.get(key).parts.push(geometry);
   }
