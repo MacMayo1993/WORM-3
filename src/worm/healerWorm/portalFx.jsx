@@ -11,27 +11,31 @@ const getStickerWorldPos = (x, y, z, face, size) => raisedPortalPosition(x, y, z
 
 // Pre-allocated scratch vector for PortalGlow
 const _glowPos = new THREE.Vector3();
+const _glowUp = new THREE.Vector3(0, 0, 1);
 
 // ─── Portal indicator (glows when on a flipped tile) ─────────────────────────
 export function PortalGlow({ worm, size }) {
     const meshRef = useRef();
     useFrame(({ clock }) => {
-        if (!meshRef.current) return;
+        const mesh = meshRef.current;
+        if (!mesh) return;
+        // Zero opacity still writes depth. An always-present, upright ring was
+        // masking transparent scenery ahead of the head even on ordinary tiles.
+        mesh.visible = worm.phase.current === 'crawling' && worm.onFlippedTile.current;
+        if (!mesh.visible) return;
         const { x, y, z, dirKey } = worm.pos.current;
         const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
         const n = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
         _glowPos.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.2);
-        meshRef.current.position.copy(_glowPos);
-        const inTunnel = worm.phase.current !== 'crawling';
-        meshRef.current.material.opacity = (!inTunnel && worm.onFlippedTile.current)
-            ? 0.3 + Math.sin(clock.elapsedTime * 6) * 0.2
-            : 0;
+        mesh.position.copy(_glowPos);
+        mesh.quaternion.setFromUnitVectors(_glowUp, n);
+        mesh.material.opacity = 0.3 + Math.sin(clock.elapsedTime * 6) * 0.2;
     });
 
     return (
-        <mesh ref={meshRef}>
+        <mesh ref={meshRef} visible={false}>
             <ringGeometry args={[0.4, 0.7, 32]} />
-            <meshBasicMaterial color="#ff00ff" transparent opacity={0} side={THREE.DoubleSide} />
+            <meshBasicMaterial color="#ff00ff" transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
     );
 }
