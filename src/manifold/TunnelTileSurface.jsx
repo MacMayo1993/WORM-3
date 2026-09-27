@@ -8,7 +8,9 @@ const vertexShader = `
   uniform vec3 uWhipAxis;
   uniform float uWhipAmp;
   uniform float uWhipPhase;
+  attribute float aDistance;
   varying vec2 vUv;
+  varying float vDistance;
   varying vec3 vNormal;
   varying vec3 vViewPosition;
   varying vec3 vTileCenter;
@@ -16,6 +18,7 @@ const vertexShader = `
   varying vec3 vWorldNormal;
   void main() {
     vUv = uv;
+    vDistance = aDistance;
     vNormal = normalize(normalMatrix * normal);
     vWorldNormal = normalize(mat3(modelMatrix) * normal);
     vTileCenter = uTileCenter;
@@ -60,8 +63,9 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
       uniform float uGrowT;
       uniform float uOpacity;
       uniform float uPatternRepeats;
-      uniform float uTime, uLength;
+      uniform float uTime;
       varying vec2 vUv;
+      varying float vDistance;
       vec2 tileUv;
       ${tileShader}
       ${tunnelFinishGLSL}
@@ -76,7 +80,7 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
         gl_FragColor.a = uRideMode > 0.5 ? 1.0 : gl_FragColor.a * uOpacity;
         float edge = 1.0 - smoothstep(0.018, 0.05, min(vUv.x, 1.0 - vUv.x));
         vec3 pearl = mix(baseColor, vec3(0.9, 0.96, 1.0), 0.38);
-        float spiral = tunnelLine(vUv.y * uLength * 1.1 - vUv.x * 0.7 - uTime * 0.16, 0.06);
+        float spiral = tunnelSpiral(vDistance, vUv.x, uTime, 0.06);
         gl_FragColor.rgb = mix(gl_FragColor.rgb + pearl * spiral * 0.05, pearl * 0.8, edge * 0.8);
       }
     `,

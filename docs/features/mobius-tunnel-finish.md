@@ -12,6 +12,10 @@ inherit the half-twist, slice turns, occupied-route zoom rules, and flip motion.
 Their radius fades to zero at the mouths and core docks, and the same aperture
 half-space guard bounds every curl. Growth, colors, pulses, and the animation
 clock are shared with the main band. Custom tile patterns retain their designs.
+The spine, styled surfaces, and curls share a per-vertex arc-distance attribute
+for spiral phase. It is sampled before Float32 UV conversion, so asymmetric arms
+and the two distinct core docks keep the correct distances across the hidden gap.
+The curls also continue the spine's cross-strip coordinate at both welded edges.
 
 One extra mesh draws both curled sides of each detailed tunnel, with normal
 alpha blending and no depth writes. Geometry changes only when the band rebuilds;

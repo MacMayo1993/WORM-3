@@ -84,13 +84,16 @@ const vertexShader = `
   uniform vec3  uWhipAxis;   // world-space direction the ribbon snaps along
   uniform float uWhipAmp;    // 0 when idle; decaying envelope during a flip
   uniform float uWhipPhase;  // advances with the soliton, so the wave travels
+  attribute float aDistance;
 
   varying vec2 vUv;
+  varying float vDistance;
   varying vec3 vWorldPos;
   varying vec3 vSurfaceNormal;
 
   void main() {
     vUv = uv;
+    vDistance = aDistance;
     vSurfaceNormal = normalize(mat3(modelMatrix) * normal);
     vec4 wp = modelMatrix * vec4(position, 1.0);
 
@@ -128,10 +131,11 @@ const rideColorShader = `
 `;
 const fragmentShader = `
   uniform vec3 uColorA, uColorB;
-  uniform float uOpacity, uRideMode, uRideCore, uTime, uLength;
+  uniform float uOpacity, uRideMode, uRideCore, uTime;
   uniform float uGrowT, uPulseBoost, uSolitonProgress, uSolitonAmp;
   uniform float uIdlePadProgress, uIdlePadAmp;
   varying vec2 vUv;
+  varying float vDistance;
   varying vec3 vWorldPos, vSurfaceNormal;
   ${tunnelFinishGLSL}
   void main() {
@@ -140,7 +144,7 @@ const fragmentShader = `
     float core = uRideMode > 0.5 ? uRideCore : 0.5;
     float aa = max(fwidth(vUv.y), 0.00001);
     vec3 base = mix(uColorA, uColorB, smoothstep(core - aa, core + aa, vUv.y));
-    vec3 color = tunnelSatin(base, vSurfaceNormal, normalize(cameraPosition - vWorldPos), vUv, vUv.y * uLength, uTime);
+    vec3 color = tunnelSatin(base, vSurfaceNormal, normalize(cameraPosition - vWorldPos), vUv, vDistance, uTime);
     float pulse = exp(-pow((vUv.y - uSolitonProgress) / 0.055, 2.0)) * uSolitonAmp;
     float idle = min(abs(vUv.y - uIdlePadProgress), abs(vUv.y - (1.0 - uIdlePadProgress)));
     pulse += exp(-pow(idle / 0.055, 2.0)) * uIdlePadAmp;
@@ -210,9 +214,12 @@ const bumperFragmentShader = `
  * arm, so |2t − 1| is how far along the arm from the dock it is).
  * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
-function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, mouthW, dockW, guard, flipP1 = 0, flipP2 = 0) {
+function fillRibbon(posArray, uvArray, distanceArray, path, axis, perpStart, segs, mouthW, dockW, guard, flipP1 = 0, flipP2 = 0) {
   for (let i = 0; i <= segs; i++) {
     const t = tunnelRibbonSampleU(i, segs);
+    // Each exposed arm owns half the UV range, but not half the route length.
+    // Compute before Float32 UV storage rounds the distinct exit dock to 0.5.
+    const arc = t <= 0.5 ? t * 2 * path.armALen : path.total - (1 - t) * 2 * path.armBLen;
     // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
     let w       = 0.5 * tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW) * flipWidthPulse(t, flipP1, flipP2);
 
@@ -238,6 +245,7 @@ function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, mouthW, dock
       const ui = (i * 2 + side) * 2;
       uvArray[ui]     = side;
       uvArray[ui + 1] = t;
+      distanceArray[i * 2 + side] = arc;
     }
   }
 }
@@ -338,6 +346,7 @@ function createRibbonGeos(segs, continuous = false) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertCount * 3), 3));
   geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(vertCount * 2), 2));
+  geo.setAttribute('aDistance', new THREE.BufferAttribute(new Float32Array(vertCount), 1));
   geo.setIndex(mainIndices);
 
   // Bumper geometries — include aTripFrac (t along ribbon) for the flip-point highlight
@@ -414,7 +423,6 @@ const MobiusTunnel = ({
     uRideMode:    { value: 0 },
     uRideCore:    { value: 0.5 },
     uPatternRepeats: { value: 1 },
-    uLength: { value: 1 },
     uTileCenterA: { value: new THREE.Vector3() },
     uTileCenterB: { value: new THREE.Vector3() },
     uTime:        { value: 0.0 },
@@ -540,7 +548,6 @@ const MobiusTunnel = ({
       // core tiles beneath them, crossing through the centre. Everything below sweeps this.
       buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _midA, _midB, _coreCenter);
       uniforms.uPatternRepeats.value = _tunnelPath.total / mouthW;
-      uniforms.uLength.value = _tunnelPath.total;
       uniforms.uTileCenterA.value.copy(_wPos1);
       uniforms.uTileCenterB.value.copy(_wPos2);
 
@@ -571,6 +578,7 @@ const MobiusTunnel = ({
         fillRibbon(
           geo.attributes.position.array,
           geo.attributes.uv.array,
+          geo.attributes.aDistance.array,
           _tunnelPath,
           _axis, _perpBase,
           RIBBON_SEGS, mouthW, dockW, _tileGuard, flipP1, flipP2
@@ -589,8 +597,9 @@ const MobiusTunnel = ({
       }
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;
+      geo.attributes.aDistance.needsUpdate = true;
       geo.computeVertexNormals();
-      if (veilGeo) fillTunnelVeil(veilGeo, geo, leftGeo, _tunnelPath, segments, ribbonMode, _tileGuard);
+      if (veilGeo) fillTunnelVeil(veilGeo, geo, leftGeo, _tunnelPath, segments, _tileGuard);
       leftGeo.attributes.position.needsUpdate    = true;
       leftGeo.attributes.aHeightFrac.needsUpdate  = true;
       leftGeo.attributes.aTripFrac.needsUpdate    = true;

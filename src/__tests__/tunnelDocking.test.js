@@ -12,7 +12,7 @@ import { makeTileGuard, setTileGuard } from '../manifold/tunnelTileGuard.js';
 const V = () => new THREE.Vector3();
 const geometry = segments => {
   const geo = new THREE.BufferGeometry();
-  for (const [key, width] of [['position', 3], ['uv', 2], ['aHeightFrac', 1], ['aTripFrac', 1]]) {
+  for (const [key, width] of [['position', 3], ['uv', 2], ['aHeightFrac', 1], ['aTripFrac', 1], ['aDistance', 1]]) {
     geo.setAttribute(key, new THREE.BufferAttribute(new Float32Array((segments + 1) * 2 * width), width));
   }
   return geo;
@@ -36,7 +36,7 @@ describe('bands seated on antipodal core stickers', () => {
       fillTunnelRideGeometry(geo, left, right, path, segments, 0.36, tunnelDockWidth(size));
       const fixed = geo.attributes.position.array.slice();
       const guard = setTileGuard(makeTileGuard(), start, n, end, exitN);
-      fillTunnelVeil(veil, geo, left, path, segments, true, guard);
+      fillTunnelVeil(veil, geo, left, path, segments, guard);
       expect(geo.attributes.position.array).toEqual(fixed);
       for (let i = 0; i <= segments; i++) {
         const arc = tunnelRideSampleArc(path, i, segments);

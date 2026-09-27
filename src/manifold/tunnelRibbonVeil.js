@@ -15,6 +15,7 @@ export function makeTunnelVeil(segments, continuous) {
   geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(count * 2), 2));
   geo.setAttribute('aDistance', new THREE.BufferAttribute(new Float32Array(count), 1));
+  geo.setAttribute('aRibbonU', new THREE.BufferAttribute(new Float32Array(count), 1));
   geo.setAttribute('aEnvelope', new THREE.BufferAttribute(new Float32Array(count), 1));
   const indices = [];
   for (let i = 0; i < segments; i++) {
@@ -28,7 +29,7 @@ export function makeTunnelVeil(segments, continuous) {
   return geo;
 }
 
-export function fillTunnelVeil(geo, ribbon, rail, path, segments, continuous, guard) {
+export function fillTunnelVeil(geo, ribbon, rail, path, segments, guard) {
   const pos = geo.attributes.position, uv = geo.attributes.uv;
   const distance = geo.attributes.aDistance, envelope = geo.attributes.aEnvelope;
   for (let i = 0; i <= segments; i++) {
@@ -42,8 +43,7 @@ export function fillTunnelVeil(geo, ribbon, rail, path, segments, continuous, gu
     const height = up.length();
     up.normalize();
     const t = ribbon.attributes.uv.getY(i * 2);
-    const arc = continuous ? t * path.total : t <= 0.5
-      ? t * 2 * path.armALen : path.total - (1 - t) * 2 * path.armBLen;
+    const arc = ribbon.attributes.aDistance.getX(i * 2);
     const dockDistance = Math.max(0, path.armALen - arc, arc - (path.total - path.armBLen));
     const fade = THREE.MathUtils.smoothstep(dockDistance, 0, 0.3)
       * THREE.MathUtils.smoothstep(Math.min(arc, path.total - arc), 0, 0.28);
@@ -59,24 +59,29 @@ export function fillTunnelVeil(geo, ribbon, rail, path, segments, continuous, gu
       pos.setXYZ(index, point.x, point.y, point.z);
       uv.setXY(index, across, t);
       distance.setX(index, arc);
+      // Continue the spine's cross-strip coordinate outward through both curls.
+      // The right weld starts at 1, rather than restarting its spiral at 0.
+      geo.attributes.aRibbonU.setX(index, side ? 1 + across : -across);
       envelope.setX(index, Math.min(1, radius / Math.max(halfWidth * 0.5, 0.0001)));
     }
   }
   pos.needsUpdate = true; uv.needsUpdate = true;
   distance.needsUpdate = true; envelope.needsUpdate = true;
+  geo.attributes.aRibbonU.needsUpdate = true;
   geo.computeVertexNormals();
 }
 
 export const veilVertexShader = `
   uniform vec3 uWhipAxis;
   uniform float uWhipAmp, uWhipPhase;
-  attribute float aDistance, aEnvelope;
+  attribute float aDistance, aEnvelope, aRibbonU;
   varying vec2 vUv;
-  varying float vDistance, vEnvelope;
+  varying float vDistance, vEnvelope, vRibbonU;
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   void main() {
     vUv = uv; vDistance = aDistance; vEnvelope = aEnvelope;
+    vRibbonU = aRibbonU;
     vec4 wp = modelMatrix * vec4(position, 1.0);
     float ends = sin(uv.y * 3.14159265)
       * smoothstep(0.0, 0.14, uv.y) * smoothstep(1.0, 0.86, uv.y)
@@ -93,7 +98,7 @@ export const veilFragmentShader = `
   uniform float uTime, uOpacity, uGrowT, uRideMode, uRideCore;
   uniform float uSolitonProgress, uSolitonAmp, uIdlePadProgress, uIdlePadAmp;
   varying vec2 vUv;
-  varying float vDistance, vEnvelope;
+  varying float vDistance, vEnvelope, vRibbonU;
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   ${tunnelFinishGLSL}
@@ -104,7 +109,7 @@ export const veilFragmentShader = `
     vec3 base = mix(uColorA, uColorB, smoothstep(core - aa, core + aa, vUv.y));
     vec3 pearl = mix(base, vec3(0.92, 0.97, 1.0), 0.45);
     float ribs = tunnelLine(vDistance * 1.65, 0.028);
-    float spiral = tunnelLine(vDistance * 1.1 - vUv.x * 0.7 - uTime * 0.16, 0.055);
+    float spiral = tunnelSpiral(vDistance, vRibbonU, uTime, 0.055);
     float rim = smoothstep(0.82, 0.97, vUv.x);
     float pulse = exp(-pow((vUv.y - uSolitonProgress) / 0.055, 2.0)) * uSolitonAmp;
     float idle = min(abs(vUv.y - uIdlePadProgress), abs(vUv.y - (1.0 - uIdlePadProgress)));

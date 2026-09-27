@@ -146,6 +146,7 @@ export function fillTunnelRideGeometry(geo, left, right, path, segments, mouthWi
       a.copy(frame.floor).addScaledVector(frame.right, sign * width);
       geo.attributes.position.setXYZ(vi, a.x, a.y, a.z);
       geo.attributes.uv.setXY(vi, side, u);
+      geo.attributes.aDistance?.setX(vi, arc);
       const rail = side === 0 ? left : right;
       for (let h = 0; h < 2; h++) {
         const dockDistance = Math.max(0, path.armALen - arc, arc - (path.total - path.armBLen));
