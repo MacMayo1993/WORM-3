@@ -66,8 +66,18 @@ const context = await browser.newContext(args.mobile
   ? { viewport: { width: 412, height: 915 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true }
   : { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
 await context.addInitScript({ path: path.join(here, 'instrument.js') });
+if (args.seed) await context.addInitScript(seed => {
+  let value = Number(seed) >>> 0;
+  Math.random = () => { value = (Math.imul(value, 1664525) + 1013904223) >>> 0; return value / 4294967296; };
+}, args.seed);
 if (!args.draw) await context.addInitScript(() => { window.__perf.noDraw = true; });
 const page = await context.newPage();
+const shaderErrors = [];
+page.on('console', message => {
+  if (message.type() === 'error' && /THREE.WebGLProgram|VALIDATE_STATUS|shader error/i.test(message.text())) {
+    shaderErrors.push(message.text()); console.error(message.text());
+  }
+});
 page.on('pageerror', (e) => { if (!/\.hdr/.test(e.message)) console.error('pageerror:', e.message.slice(0, 160)); });
 
 const click = async (re, timeout = 30000) => {
@@ -108,6 +118,7 @@ while ((await page.evaluate(() => window.__store.getState().wormGamePhase)) !== 
   if (Date.now() - t0 > 240000) throw new Error('WORM run never reached the active phase');
   await page.waitForTimeout(1000);
 }
+if (args.freeze || MODE === 'batching') await page.evaluate(() => window.__store.setState({ wormPaused: true }));
 const cdp = await context.newCDPSession(page);
 if (args.throttle) await cdp.send('Emulation.setCPUThrottlingRate', { rate: +args.throttle });
 await page.waitForTimeout(2000);
@@ -126,7 +137,13 @@ const playFor = async (ms) => {
 };
 const phases = (frames) => frames.reduce((acc, f) => ((acc[f.s] = (acc[f.s] || 0) + 1), acc), {});
 const inpage = fs.readFileSync(path.join(here, 'inpage.js'), 'utf8').replace(/^(\/\/.*\n)+/, '');
-const out = { mode: MODE, url: URL, ms: MS, size: args.size || 3, mobile: !!args.mobile, throttle: +(args.throttle || 1), draws: args.draw ? 'real' : 'suppressed' };
+const measuredState = await page.evaluate(() => {
+  const s = window.__store.getState();
+  return { size: s.size, orbs: s.wormPowerups?.length, theme: s.wormElementalTheme, reducedFX: s.perfReducedFX };
+});
+if (args.size && +args.size !== measuredState.size) throw Error(`Requested size ${args.size}, launched ${measuredState.size}`);
+const out = { mode: MODE, url: URL, ms: MS, size: measuredState.size, scene: measuredState, freeze: !!args.freeze || MODE === 'batching', seed: args.seed,
+  mobile: !!args.mobile, throttle: +(args.throttle || 1), draws: args.draw ? 'real' : 'suppressed' };
 
 if (MODE === 'frames' || MODE === 'react') {
   await page.evaluate((react) => { const W = window.__perf; W.frames = []; W.renders = {}; W.reactOn = react; }, MODE === 'react');
@@ -204,6 +221,60 @@ if (MODE === 'ab') {
   }
 }
 
+if (MODE === 'batching') {
+  await page.evaluate(`(${inpage})()`);
+  const setup = fs.readFileSync(path.join(here, 'batching.js'), 'utf8').replace(/^(\/\/.*\n)+/, '');
+  console.log('reference:', JSON.stringify(await page.evaluate(`(${setup})()`)));
+  await page.waitForTimeout(2000);
+  out.windows = [];
+  for (const reference of [true, false, true, false]) {
+    await page.evaluate(on => window.__perf.batchReference(on), reference);
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { const W = window.__perf; W.frames = []; W.byOwner = {}; W.attrib = true; });
+    await page.waitForTimeout(MS);
+    const measured = summarize(await page.evaluate(() => window.__perf.frames));
+    const owners = await page.evaluate(() => {
+      const W = window.__perf; W.attrib = false;
+      return Object.fromEntries(Object.entries(W.byOwner).map(([k, v]) => [k, { draws: v.draws / W.frames.length, triangles: v.tris / W.frames.length }]));
+    });
+    measured.owners = owners;
+    measured.quality = await page.evaluate(() => ({ reducedFX: window.__store.getState().perfReducedFX,
+      dpr: window.__perf.roots.r3f.containerInfo.getState().viewport.dpr }));
+    out.windows.push({ reference, ...measured });
+    console.log(JSON.stringify({ reference, ...measured, owners: undefined }));
+  }
+  if (args.out) fs.writeFileSync(args.out, JSON.stringify(out, null, 2));
+  if (args.shots) {
+    fs.mkdirSync(args.shots, { recursive: true });
+    await page.evaluate(dpr => { window.__perf.batchDpr = dpr; }, +(args['shot-dpr'] || 1));
+    for (const pose of String(args.poses || 'overview,exploded,glass,inside').split(',')) {
+      await page.evaluate(pose => {
+        const W = window.__perf;
+        W.batchPose = pose;
+        window.__wormExpansion.amount = pose === 'exploded' ? .35 : 0;
+        window.__store.setState({ wormViewPower: pose === 'glass' ? 'view-glass' : null });
+        W.noDraw = false;
+      }, pose);
+      await page.waitForTimeout(1500);
+      for (const reference of [true, false]) {
+        await page.evaluate(on => {
+          const W = window.__perf, state = W.roots.r3f.containerInfo.getState();
+          state.setFrameloop('always'); state.clock.elapsedTime = W.batchTime;
+          W.batchReference(on);
+        }, reference);
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        // Let software WebGL finish the captured frame without queuing more
+        // multi-million-triangle frames while Playwright reads the compositor.
+        await page.evaluate(() => {
+          const state = window.__perf.roots.r3f.containerInfo.getState();
+          state.setFrameloop('never'); state.gl.getContext().finish();
+        });
+        await page.screenshot({ path: path.join(args.shots, `${pose}-${reference ? 'reference' : 'batched'}.png`), timeout: 60000 });
+      }
+    }
+  }
+}
+if (shaderErrors.length) { await browser.close(); throw Error(`${shaderErrors.length} WebGL shader errors`); }
 if (args.out) fs.writeFileSync(args.out, JSON.stringify(out, null, 2));
 if (args.screenshot) {
   // Visual QA is outside the measurement window and always uses real draws.

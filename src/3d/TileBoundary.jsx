@@ -1,5 +1,6 @@
 import React from 'react';
 import * as THREE from 'three';
+import { TileSurfaceInstance } from './TileSurfaceInstances.jsx';
 
 // Shared, static geometry: only the perimeter is drawn, leaving the sticker,
 // portal aperture and theme artwork unobstructed. No per-frame animation.
@@ -26,7 +27,11 @@ const vertexShader = `
 varying vec2 tilePosition;
 void main() {
     tilePosition = position.xy;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 local = vec4(position, 1.0);
+    #ifdef USE_INSTANCING
+        local = instanceMatrix * local;
+    #endif
+    gl_Position = projectionMatrix * modelViewMatrix * local;
 }`;
 const ordinaryMaterial = new THREE.ShaderMaterial({
     vertexShader,
@@ -65,10 +70,10 @@ void main() {
 });
 
 export default function TileBoundary({ flipped }) {
-    return <mesh
+    return <TileSurfaceInstance
+        name={flipped ? 'flipped-tile-border' : 'tile-border'}
         position={[0, 0, 0.012]}
         geometry={flipped ? flippedGeometry : ordinaryGeometry}
         material={flipped ? flippedMaterial : ordinaryMaterial}
-        dispose={null}
     />;
 }

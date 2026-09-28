@@ -28,6 +28,7 @@ it('captures without recursion, follows moved mouths, exposes the interior and c
   // Both mouths face the viewer (possible after a layer turn); still capture one.
   a.position.z = 1.55; b.position.z = -1.55;
   const batch = new THREE.Mesh(); batch.name = 'StickerInstanceMesh'; scene.add(batch);
+  const surfaces = new THREE.Group(); surfaces.name = 'TileSurfaceBatches'; scene.add(surfaces);
   const cleanupA = registerInspectionSurface(pair.a, a), cleanupB = registerInspectionSurface(pair.b, b);
   const cubeRef = createRef(), exteriorRef = createRef(); cubeRef.current = cube; exteriorRef.current = exterior;
   const priorHook = vi.fn(); scene.onBeforeRender = priorHook;
@@ -45,7 +46,7 @@ it('captures without recursion, follows moved mouths, exposes the interior and c
     render: (s, c) => {
       s.updateMatrixWorld(true);
       s.onBeforeRender(gl, s, c, target);
-      if (target) captures.push({ target, camera: c.clone(), exterior: exterior.visible, batch: batch.visible, windows: s.getObjectByName('LivePortalViews').visible });
+      if (target) captures.push({ target, camera: c.clone(), exterior: exterior.visible, batch: batch.visible, surfaces: surfaces.visible, windows: s.getObjectByName('LivePortalViews').visible });
     },
   };
   context.value = { gl, scene, camera, size: { width: 800, height: 600 } };
@@ -62,7 +63,7 @@ it('captures without recursion, follows moved mouths, exposes the interior and c
     const draw = (delta = 1 / 60) => { time += delta * 1000; context.frame(); gl.render(scene, camera); };
     draw();
     expect(captures).toHaveLength(1);
-    expect(captures[0]).toMatchObject({ exterior: true, batch: true, windows: false });
+    expect(captures[0]).toMatchObject({ exterior: true, batch: true, surfaces: true, windows: false });
     const windows = scene.getObjectByName('LivePortalViews');
     expect(windows.children.filter(o => o.visible)).toHaveLength(1);
     a.position.y = 0.4; draw();
@@ -79,9 +80,10 @@ it('captures without recursion, follows moved mouths, exposes the interior and c
     act(() => useGameStore.getState().setShowCutawayLens(true));
     draw();
     expect(captures).toHaveLength(beforeFallback + 1); // lens remains independently available
-    expect(captures.at(-1)).toMatchObject({ exterior: false, batch: false, windows: false });
+    expect(captures.at(-1)).toMatchObject({ exterior: false, batch: false, surfaces: false, windows: false });
     expect(captures.at(-1).camera.view.enabled).toBe(true);
     expect(exterior.visible).toBe(true); expect(batch.visible).toBe(true); expect(target).toBeNull();
+    expect(surfaces.visible).toBe(true);
 
     act(() => useGameStore.getState().setShowAntipodalPiP(true));
     draw();

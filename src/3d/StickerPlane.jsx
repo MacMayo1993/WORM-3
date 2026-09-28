@@ -21,6 +21,7 @@ import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.j
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
+import { TileSurfaceInstance, useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
 import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
 import { getWormPress, getWormContact, wormPress } from '../worm/tilePressBridge.js';
 import { updateTilePressVisual } from '../worm/tilePressVisual.js';
@@ -847,6 +848,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // ── InstancedMesh batch integration ─────────────────────────────────────────
   const instanceCtx = useStickerInstances();
+  const surfaceCtx = useTileSurfaceInstances();
   // THREE.Color kept in sync with the current material colour; manager reads it
   // each frame to upload per-instance colour without any allocation.
   const instanceColorRef = useRef(new THREE.Color());
@@ -1812,8 +1814,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [useShaderStyle, tileStyle, baseColor, antipodalHex]);
 
   const backTileStyle = isDead ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
+  const instanceBack = wormHealerMode && surfaceCtx && !useGlassStyle && backTileStyle === 'solid';
   const backMaterial = useMemo(() => {
     if (!antipodalHex) return null;
+    if (instanceBack) return surfaceCtx.backMaterial;
     if (useGlassStyle) {
       const material = getGlassMaterial(isDead ? '#555555' : antipodalHex).clone();
       material.side = THREE.FrontSide;
@@ -1821,12 +1825,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
     if (backTileStyle !== 'solid') return getTileStyleMaterial(backTileStyle, antipodalHex, false, null, baseColor);
     return new THREE.MeshStandardMaterial({ color: isDead ? '#555555' : antipodalHex, roughness: 0.45, metalness: 0.08 });
-  }, [backTileStyle, antipodalHex, baseColor, isDead, useGlassStyle]);
+  }, [backTileStyle, antipodalHex, baseColor, isDead, useGlassStyle, instanceBack, surfaceCtx]);
   useEffect(() => () => {
     // Shader styles belong to the shared tile cache; only the plain back owns
     // its material, along with the glass clone. Never dispose a cached shader.
-    if (useGlassStyle || backMaterial?.isMeshStandardMaterial) backMaterial?.dispose();
-  }, [backMaterial, useGlassStyle]);
+    if (!instanceBack && (useGlassStyle || backMaterial?.isMeshStandardMaterial)) backMaterial?.dispose();
+  }, [backMaterial, useGlassStyle, instanceBack]);
 
   // Set up UVs to show the correct portion of the face texture
   // Skip for hollow frame geometry (different UV layout, textures not applicable)
@@ -2004,7 +2008,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           at 80% scale so the interior reads as distinct from the front face. It sits
           just behind the solid sticker's 0.016 thickness, or the sticker's back would hide it. */}
       {antipodalHex && (
-        <mesh name="sticker-antipodal-back" material={backMaterial} position={[0, 0, -0.018]} rotation={[0, Math.PI, 0]} scale={[0.8, 0.8, 1]} dispose={null}>
+        instanceBack ? <TileSurfaceInstance name="sticker-antipodal-back" geometry={_sharedStickerGeo} material={backMaterial}
+          color={isDead ? '#555555' : antipodalHex} position={[0, 0, -0.018]} rotation={[0, Math.PI, 0]} scale={[0.8, 0.8, 1]} />
+        : <mesh name="sticker-antipodal-back" material={backMaterial} position={[0, 0, -0.018]} rotation={[0, Math.PI, 0]} scale={[0.8, 0.8, 1]} dispose={null}>
           <primitive object={_sharedStickerGeo} attach="geometry" />
         </mesh>
       )}

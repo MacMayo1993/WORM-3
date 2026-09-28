@@ -31,9 +31,13 @@ node scripts/perf-worm/run.mjs --mode=frames    --url=... --profile             
 node scripts/perf-worm/run.mjs --mode=attribute --url=... --ms=20000            # draws/uploads/compiles by component
 node scripts/perf-worm/run.mjs --mode=react     --url=... --ms=20000            # which components re-render
 node scripts/perf-worm/run.mjs --mode=ab        --url=... --seq=base,A,B,AB     # price a fix on a frozen scene
+node scripts/perf-worm/run.mjs --mode=batching  --url=... --size=6 --ms=3000 --shots=/tmp/batching6
 ```
 
 Common flags: `--size=5` (board size in the wizard), `--mobile` (412×915 touch viewport), `--draw` (keep real draw calls), `--out=result.json`, `--screenshot=scene.png` (enables real draws after measurement).
+`--freeze` pauses at the start of active play. `--seed=71` seeds `Math.random`;
+wall-clock-dependent activity can still make separate launches differ. The runner
+checks the actual launched board size, rather than only labelling the requested size.
 
 | Mode | Output |
 | --- | --- |
@@ -41,6 +45,17 @@ Common flags: `--size=5` (board size in the wizard), `--mobile` (412×915 touch 
 | `attribute` | render passes; draws and triangles per frame by owning component; uploads by attribute; materials that force three.js back through program selection every frame; every shader link attributed to the draw that triggered it |
 | `react` | commit rates plus render counts per component (DOM root and R3F root) |
 | `ab` | pauses the run so every window renders the same scene, then toggles in-page patches: **A** transparent double-sided materials in one pass, **B** instanced attributes upload only the live range, **C** hidden subtrees skip world-matrix updates, **D** inward-facing antipodal sticker backs hidden |
+| `batching` | alternates individual tile meshes / three cage material groups with the production batches in one frozen scene; pins reduced FX and DPR 1; records draw ownership and optionally captures paired real-draw images |
+
+`batching` uses `batching.js` to reconstruct individual tile meshes from the real
+component props and split merged cages back into their three original colour/alpha
+groups. It holds the camera and animation clock fixed. `--shots=directory` captures
+overview, Explode, glass and interior pairs; `--poses=overview` restricts capture.
+`--shot-dpr=0.5` lowers only capture resolution when software WebGL readback is slow.
+These are draw-count and visual comparisons, **not historical CPU benchmarks**:
+batch-maintenance callbacks keep running in the reference windows too. Shadow
+quality must stay pinned; otherwise the adaptive tier adds/removes an entire shadow
+pass between windows. Any WebGL shader compilation errors fail the run.
 
 ## What the numbers mean
 
