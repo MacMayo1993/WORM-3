@@ -13,10 +13,8 @@ uniform float uExteriorOpen;
 uniform vec3 uExteriorPoints[${SAMPLES * 2}];
 float portalDistance(vec3 point) {
   if (uExteriorOpen < 0.5) return 1000.0;
-  // Keep only the outward skin while the room is open. Inner cubie walls and
-  // dedicated sticker backs otherwise hide the colored room through the mouth.
-  vec3 facing = cross(dFdx(point), dFdy(point));
-  if (!gl_FrontFacing || dot(facing, point) < 0.0) return -1.0;
+  // These materials also cover raised pads, buildings and energy effects.
+  // Clip only inside either bore, regardless of the fragment's orientation.
   float distanceSq = 1000000.0;
   for (int i = 0; i < ${SAMPLES - 1}; i++) {
     vec3 edge = uExteriorPoints[i + 1] - uExteriorPoints[i];
@@ -48,8 +46,7 @@ export function createExteriorPortals() {
       const material = source.isShaderMaterial ? source.clone() : source;
       if (source.isShaderMaterial) material.uniforms = { ...source.uniforms };
       else originals.set(source, { onBeforeCompile: source.onBeforeCompile,
-        customProgramCacheKey: source.customProgramCacheKey, extensions: source.extensions, portalCutout: source.userData.portalCutout });
-      material.extensions = { ...material.extensions, derivatives: true };
+        customProgramCacheKey: source.customProgramCacheKey, portalCutout: source.userData.portalCutout });
       withPortalCutout(material, uniforms, exteriorPortalGLSL, 'outer-mouth');
       material.needsUpdate = true;
       materials.set(source, material); owned.add(material);
@@ -86,7 +83,6 @@ export function createExteriorPortals() {
       originals.forEach((original, material) => {
         material.onBeforeCompile = original.onBeforeCompile;
         material.customProgramCacheKey = original.customProgramCacheKey;
-        material.extensions = original.extensions;
         if (original.portalCutout === undefined) delete material.userData.portalCutout;
         else material.userData.portalCutout = original.portalCutout;
         material.needsUpdate = true;
