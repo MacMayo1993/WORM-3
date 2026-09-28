@@ -10,7 +10,7 @@ export const WORM_HAPTICS = {
   exit: [28, 35, 12], heal: [20, 50, 32, 65, 48],
   shot: 12, shotHit: [18, 20, 8], enemyDown: [24, 32, 12], recharge: 6,
   shieldHit: [35, 35, 22], jump: [12, 22, 8], boost: [18, 30, 12],
-  cut: [40, 30, 35], death: [55, 45, 85], rocket: [22, 25, 45],
+  cut: [40, 30, 35], death: [55, 45, 85], rocket: [35, 25, 70, 25, 45],
   rocketLand: [25, 30, 10], magnet: [12, 25, 12, 25, 18],
 };
 

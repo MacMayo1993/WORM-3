@@ -11,6 +11,7 @@ import { sliceShotInto } from './sliceShot.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import { wormExpansion, getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
 import { rocketOrbitInto, rocketOrbitT, rocketFrameInto } from './healerWorm/rocketOrbit.js';
+import { rocketBurnInto, rocketShakeAmount, rocketShakeInto } from './healerWorm/rocketFx.js';
 import { tunnelState } from './tunnelProgressBridge.js';
 import {
     makeTunnelCamPose,
@@ -150,6 +151,14 @@ const _cutFocusPos = new THREE.Vector3();
 const _cutUp = new THREE.Vector3();
 const CUT_FOCUS_PEAK = 1; // the swing reaches the full slice shot
 
+// Rocket burn: the envelope shared with RocketExhaust, the three-quarter flight
+// offset, and the rumble applied on top of the chase.
+const _rocketBurn = {};
+const _rocketSide = new THREE.Vector3();
+const ROCKET_CAM_SIDE = 0.9;
+const _rocketShake = new THREE.Vector3();
+const _shakeAxis = new THREE.Vector3();
+
 const frameForward = new THREE.Vector3();
 const frameDirection = new THREE.Vector3();
 const frameCorrection = new THREE.Quaternion();
@@ -198,6 +207,7 @@ export default function WormChaseCamera({ worm, size }) {
     const revealActiveRef = useRef(false);
     const cameraRunRef = useRef(null);
     const surfaceNearRef = useRef(camera.near);
+    const rocketShakeTime = useRef(0);          // clock for the rocket's camera rumble
 
     // This camera is the app's shared one, and the chase view leaves it wide
     // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
@@ -417,7 +427,16 @@ export default function WormChaseCamera({ worm, size }) {
             : phase === 'exiting' ? 1 - diveEase((_enterP - 0.5) / 0.5)
             : 0;
         const rocketLift = rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current);
-        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), wormTunnelFov(baseFov), tunnelMix) + rocketLift * 2;
+        // The burn widens the lens for speed, with an extra punch at liftoff.
+        rocketBurnInto(_rocketBurn, worm.rocketActive.current, worm.rocketT.current,
+            worm.rocketFlight?.current, worm.landingGraceT?.current);
+        // At liftoff the camera also drops back (below), so the worm blasts away
+        // from the lens before the chase catches up. Reduced motion skips the
+        // punch and the rumble; the steady flight framing stays.
+        const rocketCalm = prefersReducedMotion();
+        const rocketKick = rocketCalm ? 0 : _rocketBurn.liftoff * _rocketBurn.ignite;
+        const rocketFov = rocketLift * 4 + rocketKick * 5;
+        const targetFov = THREE.MathUtils.lerp(wormSurfaceFov(baseFov), wormTunnelFov(baseFov), tunnelMix) + rocketFov;
         const fovAlpha = enteredReveal ? 1 : 1 - Math.exp(-6 * delta);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -593,7 +612,15 @@ export default function WormChaseCamera({ worm, size }) {
             // pitched down by the portrait rake on narrow viewports.
             _camTargetCam.copy(_camWormWorld)
                 .addScaledVector(_camNormal, (camHeight + rakeLift) * (1 + 0.12 * rocketLift))
-                .addScaledVector(_camForward, -camBack * rakeTuck - rocketLift * 0.9);
+                .addScaledVector(_camForward, -camBack * rakeTuck - rocketLift * 0.9 - rocketKick * 0.8);
+            // In flight the chase swings a little off the tail to a three-quarter
+            // view: straight behind, the plume and contrail point into the lens and
+            // vanish under it. The worm stays the look target, so steering still
+            // reads as up-screen.
+            if (rocketLift > 0) {
+                _rocketSide.crossVectors(_camForward, _camNormal);
+                _camTargetCam.addScaledVector(_rocketSide, ROCKET_CAM_SIDE * rocketLift);
+            }
             _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, rakeAhead + rocketLift * 0.35);
             // Mobile follows the player on every board size. A center bias grows
             // with the board and used to pull Mega's head out of the viewport.
@@ -714,6 +741,17 @@ export default function WormChaseCamera({ worm, size }) {
                     lookAtRef.current.copy(camera.position).addScaledVector(platformFrame.current.direction,
                         camera.position.distanceTo(_mobileHeadWorld));
                 }
+            }
+            // Rocket rumble: a kick at ignition, a faint engine buzz, a thump at
+            // touchdown. Applied last and never fed back into camPosRef, so the chase
+            // damping cannot smear it. Phones keep the head pinned and feel the burn
+            // through haptics instead; reduced motion keeps the lens still.
+            const shake = mobile || rocketCalm || gameState.wormPaused ? 0 : rocketShakeAmount(_rocketBurn);
+            if (shake > 1e-4) {
+                rocketShakeTime.current += delta;
+                rocketShakeInto(_rocketShake, rocketShakeTime.current, shake);
+                camera.position.addScaledVector(_shakeAxis.set(1, 0, 0).applyQuaternion(camera.quaternion), _rocketShake.x);
+                camera.position.addScaledVector(_shakeAxis.set(0, 1, 0).applyQuaternion(camera.quaternion), _rocketShake.y);
             }
             camUpRef.current.copy(camera.up);
         } else if (phase === 'windup' || phase === 'entering') {
