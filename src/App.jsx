@@ -1,3 +1,4 @@
+import AntipodalCameraPanel from './components/overlays/AntipodalCameraPanel.jsx';
 import { storyLevel, storyUnlocked, storyLaunchSettings } from './worm/story/levels.js';
 import { LevelUpCue, AchievementCue } from './progression/ProgressWidgets.jsx';
 import { getDirectWormPreview, subscribeDirectWormPreview } from './3d/directWormPreview.js';
@@ -506,7 +507,7 @@ export default function WORM3() {
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
-  const showAntipodalFrame = !showWelcome && (showAntipodalPiP && !wormholePhaseActive);
+  const showAntipodalFrame = !showWelcome && !showMainMenu && !showSettings && !showHelp && showAntipodalPiP && !wormholePhaseActive;
 
   // Page visibility — the shared Canvas parks its render loop while the app is
   // backgrounded (tab switched, screen off, another app on top). The scene is
@@ -1437,40 +1438,7 @@ export default function WORM3() {
       </CanvasErrorBoundary>
 
       <CaptureChrome>
-      {/* Antipodal PiP frame overlay — border + label drawn over the canvas scissor region */}
-      {showAntipodalFrame && (
-        <div
-          style={{
-            position: 'fixed',
-            top: `${(isMobile ? (window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches ? 36 : 44) : 56) + 8}px`,
-            left: '8px',
-            width: '240px',
-            height: '180px',
-            border: '2px solid rgba(0, 217, 255, 0.7)',
-            borderRadius: '6px',
-            pointerEvents: 'none',
-            zIndex: 50,
-            boxShadow: '0 0 12px rgba(0, 217, 255, 0.35), inset 0 0 8px rgba(0, 0, 0, 0.4)',
-          }}
-        >
-          <span style={{
-            position: 'absolute',
-            top: '4px',
-            left: '6px',
-            fontSize: TEXT_MICRO,
-            fontFamily: UI_FONT,
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            color: 'rgba(0, 217, 255, 0.85)',
-            textTransform: 'uppercase',
-            pointerEvents: 'none',
-          }}>
-            {/* Says what the window shows, not what the maths calls it — this
-                frame is most players' first meeting with the mechanic. */}
-            ↕ Far Side
-          </span>
-        </div>
-      )}
+      <AntipodalCameraPanel active={showAntipodalFrame} />
 
       {/* Welcome DOM overlay — transparent background, Canvas shows through */}
       {showWelcome && (

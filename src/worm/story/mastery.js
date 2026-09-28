@@ -1,4 +1,5 @@
 import { drawViewPower, getViewPowerDef } from '../healerWorm/viewPowerups.js';
+import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { tileKey } from '../healerWorm/wormSim.js';
 import { ttAt } from '../circularBuffers.js';
@@ -133,7 +134,7 @@ export function offerStoryPower(sim, p, level, size, cubies) {
       const sticker = cubies[nearby.x][nearby.y][nearby.z].stickers[nearby.dirKey];
       const distance = Math.hypot(nearby.x-tile.x, nearby.y-tile.y, nearby.z-tile.z);
       if (nearby.dirKey !== tile.dirKey || distance < 1 || distance > 2 || sticker.curr !== sticker.orig || occupied.has(tileKey(nearby))) continue;
-      sim.powerups.push({ ...nearby, type: 'apple' });
+      sim.powerups.push(makeGrowthOrb(nearby));
       if (++added >= 4) break;
     }
   }

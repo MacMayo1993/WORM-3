@@ -4,6 +4,7 @@ import { stageStory } from '../worm/story/runtime.js';
 import { updateMastery, offerStoryPower, nextStoryPower, STORY_POWER_OPENING_DELAY, STORY_POWER_COOLDOWN } from '../worm/story/mastery.js';
 import { makeWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 import { getNextSurfacePosition } from '../worm/wormLogic.js';
+import { rotateTilePosition } from '../worm/wormHelpers.js';
 const setup = id => {
   const level = storyLevel(id), size = level.cubeSize ?? 5, sim = makeWormSim(size);
   const p = stageStory(sim, size, level, 'classic');
@@ -66,4 +67,21 @@ it('introduces calmer required pickups before rockets without starving later obj
   expect(nextStoryPower(p, level)).toBe('rocket');
   p.mechanics.rockets = 1;
   expect(nextStoryPower(p, level)).toBeNull();
+});
+
+it('gives mastery magnet bonuses stable identities through a layer turn and fresh identities on reoffer', () => {
+  const { sim, p, size, offer } = setup(40);
+  sim.powerups = []; p.powerDelay = 0;
+  expect(offer()).toBe(true);
+  expect(sim.specials[0].type).toBe('magnet');
+  expect(sim.powerups).toHaveLength(4);
+  const before = sim.powerups.slice(), ids = before.map(p => p.spawnId);
+  expect(ids.every(Boolean)).toBe(true);
+  expect(new Set(ids).size).toBe(4);
+  sim.powerups = before.map(p => rotateTilePosition(p, 'row', before[0].y, 1, size));
+  expect(sim.powerups.map(p => p.spawnId)).toEqual(ids);
+  expect(tileKey(sim.powerups[0])).not.toBe(tileKey(before[0]));
+  sim.powerups = []; sim.specials = []; p.powerDelay = 0;
+  expect(offer()).toBe(true);
+  expect(sim.powerups.every(p => p.spawnId && !ids.includes(p.spawnId))).toBe(true);
 });

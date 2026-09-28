@@ -257,6 +257,7 @@ export function makeWormSim(size) {
         rocketBoostHandoffT: 0, // crawling seconds left to restore ground speed
         orbShowerT: 0,
         orbShowerDelay: 0,
+        orbShowerFace: 0,
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalPatches: new Map(),
@@ -420,6 +421,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.rocketBoostHandoffT = 0;
     sim.orbShowerT = 0;
     sim.orbShowerDelay = 0;
+    sim.orbShowerFace = 0;
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.elementalPatches.clear();
