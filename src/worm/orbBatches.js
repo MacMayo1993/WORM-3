@@ -1,3 +1,4 @@
+import { uploadInstancePrefix, setInstanceCount } from '../3d/instanceUploads.js';
 import * as THREE from 'three';
 
 // Batch only opaque parts. Transparent shells, additive rings and patterned
@@ -36,8 +37,8 @@ export function createOrbBatches(capacity = 256) {
         },
         end() {
             for (const { mesh, count } of batches.values()) {
-                mesh.count = count;
-                if (count) mesh.instanceMatrix.needsUpdate = true;
+                setInstanceCount(mesh, count);
+                uploadInstancePrefix(mesh.instanceMatrix, count);
             }
         },
         dispose() {

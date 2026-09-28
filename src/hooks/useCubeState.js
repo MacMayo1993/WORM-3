@@ -1,3 +1,4 @@
+import { currentExplosion } from '../worm/wormExpansion.js';
 /**
  * useCubeState Hook
  *
@@ -150,7 +151,7 @@ export function useCubeState() {
 
     const currentCubies = cubiesRef.current;
     const currentSize = currentCubies.length;
-    const currentExplosionT = explosionTRef.current;
+    const currentExplosionT = currentExplosion(useGameStore.getState());
     // Re-use the manifold map already computed by useMemo — sticker flips don't
     // change cube geometry so the cached map is always valid here.
     const currentManifoldMap = manifoldMapRef.current;

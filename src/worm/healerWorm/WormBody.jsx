@@ -1,3 +1,5 @@
+import { WormPointLight } from '../WormLighting.jsx';
+import { uploadInstancePrefix } from '../../3d/instanceUploads.js';
 import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody } from '../wormAccessories.js';
 import { EMPTY_ACCESSORIES } from '../handmadeAccessoriesData.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
@@ -299,8 +301,8 @@ export function WormBody({ worm, size }) {
                 }
                 headMesh.setColorAt(0, _bookPageColor);
                 headMesh.count = 1;
-                headMesh.instanceMatrix.needsUpdate = true;
-                if (headMesh.instanceColor) headMesh.instanceColor.needsUpdate = true;
+                uploadInstancePrefix(headMesh.instanceMatrix, headMesh.count);
+                if (headMesh.instanceColor) uploadInstancePrefix(headMesh.instanceColor, headMesh.count);
             }
         } else if (bookHeadRef.current) {
             bookHeadRef.current.count = 0;
@@ -825,31 +827,31 @@ export function WormBody({ worm, size }) {
             for (const part of [mobiCoreRef.current, mobiFrameRef.current, mobiGasRef.current]) {
                 if (!part) continue;
                 part.count = part === mobiCoreRef.current ? mobiCoreCount : writeIdx;
-                part.instanceMatrix.needsUpdate = true;
-                if (part.instanceColor) part.instanceColor.needsUpdate = true;
+                uploadInstancePrefix(part.instanceMatrix, part.count);
+                if (part.instanceColor) uploadInstancePrefix(part.instanceColor, part.count);
             }
         }
         if (isMobi) {
-            mobiAssets.gasGeometry.attributes.mobiBandColor.needsUpdate = true;
-            mobiAssets.gasGeometry.attributes.mobiPhase.needsUpdate = true;
-            mobiAssets.coreGeometry.attributes.mobiBandColor.needsUpdate = true;
+            uploadInstancePrefix(mobiAssets.gasGeometry.attributes.mobiBandColor, writeIdx);
+            uploadInstancePrefix(mobiAssets.gasGeometry.attributes.mobiPhase, writeIdx);
+            uploadInstancePrefix(mobiAssets.coreGeometry.attributes.mobiBandColor, mobiCoreCount);
         }
         if (isMobi) mobiBandsRef.current.forEach((band, face) => {
             if (!band) return;
             band.count = mobiBandCounts.current[face];
-            band.instanceMatrix.needsUpdate = true;
+            uploadInstancePrefix(band.instanceMatrix, band.count);
         });
         finishAccessoryBody(accessoryRig, reducedPickupMotion ? 0 : time, _transitCull,
             orbColors[orbColors.length - 1] ?? skin.body, accessoryPalette);
         mesh.count = writeIdx;
-        mesh.instanceMatrix.needsUpdate = true;
+        uploadInstancePrefix(mesh.instanceMatrix, mesh.count);
         endWormSegments();
 
         const haloMesh = haloRef.current;
         if (haloMesh) {
             haloMesh.count = _isGlow ? haloIdx : 0;
             if (haloIdx > 0) {
-                haloMesh.instanceMatrix.needsUpdate = true;
+                uploadInstancePrefix(haloMesh.instanceMatrix, haloMesh.count);
                 // The uniform holds a THREE.Color; set(hexString) re-parses the same
                 // literal every frame. Only touch it when the equipped glow changes.
                 if (lastHaloHexRef.current !== glowColorRef.current) {
@@ -858,14 +860,14 @@ export function WormBody({ worm, size }) {
                 }
             }
         }
-        if (mesh.instanceColor && colorDirty) mesh.instanceColor.needsUpdate = true;
+        if (mesh.instanceColor && colorDirty) uploadInstancePrefix(mesh.instanceColor, mesh.count);
 
         // Update book worm page-flap overlay counts (meshes are only mounted when isBook)
         if (_isBook) {
             const lp = leftPageRef.current;
             const rp = rightPageRef.current;
-            if (lp) { lp.count = pageWriteIdx; lp.instanceMatrix.needsUpdate = true; if (lp.instanceColor && colorDirty) lp.instanceColor.needsUpdate = true; }
-            if (rp) { rp.count = pageWriteIdx; rp.instanceMatrix.needsUpdate = true; if (rp.instanceColor && colorDirty) rp.instanceColor.needsUpdate = true; }
+            if (lp) { lp.count = pageWriteIdx; uploadInstancePrefix(lp.instanceMatrix, lp.count); if (lp.instanceColor && colorDirty) uploadInstancePrefix(lp.instanceColor, lp.count); }
+            if (rp) { rp.count = pageWriteIdx; uploadInstancePrefix(rp.instanceMatrix, rp.count); if (rp.instanceColor && colorDirty) uploadInstancePrefix(rp.instanceColor, rp.count); }
         }
     });
 
@@ -977,5 +979,5 @@ export function GlowWormAura({ worm, size }) {
 
     if (!isGlow) return null;
 
-    return <pointLight ref={lightRef} color={glowColor} intensity={2.0} distance={5.5} decay={2} />;
+    return <WormPointLight ref={lightRef} color={glowColor} intensity={2.0} distance={5.5} decay={2} />;
 }

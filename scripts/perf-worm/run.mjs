@@ -64,7 +64,7 @@ const browser = await chromium.launch({
 });
 const context = await browser.newContext(args.mobile
   ? { viewport: { width: 412, height: 915 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true }
-  : { viewport: { width: 640, height: 400 }, deviceScaleFactor: 1 });
+  : { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
 await context.addInitScript({ path: path.join(here, 'instrument.js') });
 if (!args.draw) await context.addInitScript(() => { window.__perf.noDraw = true; });
 const page = await context.newPage();
@@ -205,4 +205,10 @@ if (MODE === 'ab') {
 }
 
 if (args.out) fs.writeFileSync(args.out, JSON.stringify(out, null, 2));
+if (args.screenshot) {
+  // Visual QA is outside the measurement window and always uses real draws.
+  await page.evaluate(() => { window.__store.setState({ wormPaused: true }); window.__perf.noDraw = false; });
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: args.screenshot });
+}
 await browser.close();

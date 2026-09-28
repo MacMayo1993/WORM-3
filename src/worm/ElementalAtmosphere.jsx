@@ -154,7 +154,11 @@ export default function ElementalAtmosphere({ size = 3 }) {
 
 
   useFrame((_, delta) => {
-    if (!def || useGameStore.getState().wormPaused) return;
+    if (!def) {
+      if (lightRef.current) lightRef.current.intensity = 0;
+      return;
+    }
+    if (useGameStore.getState().wormPaused) return;
     elapsedRef.current += Math.min(delta, 0.1);
     // The shared envelope — the same one the cube skin scales itself by — so the
     // light can no longer be at full strength while the layer is still welling up,
@@ -164,12 +168,10 @@ export default function ElementalAtmosphere({ size = 3 }) {
     if (lightRef.current) lightRef.current.intensity = 0.55 * env.intensity;
   });
 
-  if (!def) return null;
-
   return (
     <group>
       {/* The element laid on the cube itself — the main event. */}
-      <ElementalCubeSkin size={size} />
+      {def && <ElementalCubeSkin size={size} />}
 
       {/* Element-coloured fill light — the worm and cube pick up the element's hue
           as they move through it. */}
@@ -210,7 +212,7 @@ export default function ElementalAtmosphere({ size = 3 }) {
       {/* Drifting medium around the cube — bubbles/embers/spores/snow. Reduced
           motion and the floor budget both zero the count, which drops the field
           entirely rather than animating an empty buffer. */}
-      {quality.particleCount > 0 && (
+      {def && quality.particleCount > 0 && (
         <ElementalParticles
           element={element}
           kind={def.particle}

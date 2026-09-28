@@ -1,3 +1,4 @@
+import { uploadInstancePrefix, setInstanceCount } from './instanceUploads.js';
 import { burrowPair } from '../worm/burrowBridge.js';
 import { createPadStalkGeometry, PAD_STALK_DEPTH, PAD_BACK_CLEARANCE } from './padStalkGeometry.js';
 import { RaisedCubieContext } from './raisedCubieContext.js';
@@ -196,11 +197,11 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
     frames.dt = dt;
     frames.motion = energyMotion ? 1 : 0;
     for (const ref of [stalkRef, mouthRef]) {
-      ref.current.count = energyPads ? 0 : count;
-      ref.current.instanceMatrix.needsUpdate = true;
+      setInstanceCount(ref.current, energyPads ? 0 : count);
+      uploadInstancePrefix(ref.current.instanceMatrix, ref.current.count);
     }
-    if (stalkRef.current.instanceColor) stalkRef.current.instanceColor.needsUpdate = true;
-  }, -0.5);
+    uploadInstancePrefix(stalkRef.current.instanceColor, stalkRef.current.count);
+  }, -0.35); // after live WORM expansion and raised-piece positioning
 
   return <PadContext.Provider value={entries}>
     <RaisedCubieContext.Provider value={cubieSprings}>{children}</RaisedCubieContext.Provider>

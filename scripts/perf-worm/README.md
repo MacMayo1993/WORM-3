@@ -33,7 +33,7 @@ node scripts/perf-worm/run.mjs --mode=react     --url=... --ms=20000            
 node scripts/perf-worm/run.mjs --mode=ab        --url=... --seq=base,A,B,AB     # price a fix on a frozen scene
 ```
 
-Common flags: `--size=5` (board size in the wizard), `--mobile` (412×915 touch viewport), `--draw` (keep real draw calls), `--out=result.json`.
+Common flags: `--size=5` (board size in the wizard), `--mobile` (412×915 touch viewport), `--draw` (keep real draw calls), `--out=result.json`, `--screenshot=scene.png` (enables real draws after measurement).
 
 | Mode | Output |
 | --- | --- |
@@ -49,3 +49,18 @@ Common flags: `--size=5` (board size in the wizard), `--mobile` (412×915 touch 
 - Shader links are counted on the main thread. On a real device the driver compile runs on top, so each link costs more than it does here.
 - Runs retry automatically after a death. `phases` shows how many frames fell in each state (`gamePhase|wormPhase|turning|element|FX tier`), so a window that wandered into the death screen is visible.
 - Tunnel rides are not exercised: the scripted worm never deliberately jumps onto a raised flipped tile.
+
+## Corrections after review
+
+- Desktop now uses 1280×800. The original 640×400 run activated the game's
+  `isMobile` branch (width ≤768); its timings were not a desktop visual workload.
+- WebGL2 `bufferSubData(..., srcOffset, 0)` copies the remaining source; the byte
+  counter now implements that rule. The original patch B counted empty-pool
+  uploads as zero while still transferring full buffers. Its reported 99% upload
+  reduction is invalid and needs a fresh baseline. Patch B now skips dirtying
+  empty buffers and uses the supported `updateRanges` API for active instances.
+- Per-owner uploads now come from actual GL calls, not attribute-version changes.
+- Patch C remains an experimental matrix flag only. In r159, a parent's forced
+  update overrides it; it is not a demonstrated hidden-subtree optimization.
+- Draw suppression isolates instrumented CPU submission work, not GPU time or
+  physical-phone FPS. A and B are broad patches, not component-isolated fixes.

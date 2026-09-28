@@ -1,3 +1,4 @@
+import { wormExpansion } from '../worm/wormExpansion.js';
 import { advancePlatformFormation, platformFormationHeld } from '../worm/platformFormation.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { burrowBridge, burrowCubieLift } from '../worm/burrowBridge.js';
@@ -470,7 +471,7 @@ const Cubie = React.forwardRef(function Cubie({
     const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;
     const impact = !wormPads && !reduced && entry && rawT >= 0 && rawT < 1 ? Math.sin(rawT * Math.PI) * 1.5 : 0;
     const center = pieceRef.current.position;
-    const ratio = selectiveCubieOffsetRatio(size, state.explosionT, amount);
+    const ratio = selectiveCubieOffsetRatio(size, wormMode ? wormExpansion.amount : state.explosionT, amount);
     // Preserve the original impact hop, but do not add a second full explosion.
     const distance = Math.max(center.length() * ratio, impact);
     popGroupRef.current.position.copy(center).normalize().multiplyScalar(distance);
@@ -500,7 +501,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
     poppedRef.current = distance > 0 || spring.lift !== 0 || !!kick || burrowOffset.lengthSq() > 0;
     if (!raised && spring.lift === 0 && returningBody) setReturningBody(false);
-  }, -0.75); // after CubeAssembly (-1), before pad stalks (-0.5) and tunnel anchors
+  }, wormMode ? -0.4 : -0.75); // WORM: after live expansion, before pad stalks and tunnel anchors
 
   return (
     <group ref={popGroupRef}>

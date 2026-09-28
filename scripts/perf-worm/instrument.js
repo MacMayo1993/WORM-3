@@ -58,10 +58,16 @@
     tap('drawElementsInstanced', (a) => { const t = triangles(a[0], a[1]) * a[4]; W.c.draw++; W.c.inst++; W.c.tris += t; owned(t); }, true);
     tap('drawArraysInstanced', (a) => { const t = triangles(a[0], a[2]) * a[3]; W.c.draw++; W.c.inst++; W.c.tris += t; owned(t); }, true);
     tap('useProgram', () => W.c.prog++);
-    tap('bufferData', (a) => { W.c.bufData++; W.c.bufBytes += a[1]?.byteLength ?? (typeof a[1] === 'number' ? a[1] : 0); });
+    tap('bufferData', (a) => {
+      const bytes = a[1]?.byteLength ?? (typeof a[1] === 'number' ? a[1] : 0);
+      W.c.bufData++; W.c.bufBytes += bytes; W.recordUpload?.(a[1], bytes);
+    });
     tap('bufferSubData', (a) => {
       W.c.bufSub++;
-      W.c.bufBytes += a[4] !== undefined ? a[4] * a[2].BYTES_PER_ELEMENT : a[2]?.byteLength ?? 0;
+      const data = a[2], elementSize = data?.BYTES_PER_ELEMENT ?? 1;
+      const remaining = (data?.byteLength ?? 0) / elementSize - (a[3] ?? 0);
+      const bytes = (a[4] || remaining) * elementSize;
+      W.c.bufBytes += bytes; W.recordUpload?.(data, bytes);
     });
     tap('texImage2D', () => W.c.tex++);
     tap('texSubImage2D', () => W.c.texSub++);

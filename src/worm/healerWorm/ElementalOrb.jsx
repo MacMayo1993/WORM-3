@@ -1,3 +1,4 @@
+import { WormPointLight } from '../WormLighting.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import NatureClaimLeaves from './NatureClaimLeaves.jsx';
 // src/worm/healerWorm/ElementalOrb.jsx
@@ -414,7 +415,7 @@ export default function ElementalOrb({ special, size }) {
         <mesh ref={shockRef} geometry={_geos.shock} material={trim.shock} raycast={() => null} />
       </group>
 
-      {lightsRef.current && <pointLight ref={lightRef} color={color} intensity={0} distance={3.0 * ORB_SCALE} decay={2} />}
+      {lightsRef.current && <WormPointLight ref={lightRef} color={color} intensity={0} distance={3.0 * ORB_SCALE} decay={2} />}
     </group>
   );
 }

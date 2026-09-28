@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import { remapExpansionPoint, EXPLODE_AMOUNT, wormExpansion, getWormStickerWorldPos } from '../worm/wormExpansion.js';
+import { remapExpansionPoint, EXPLODE_AMOUNT, wormExpansion, getWormStickerWorldPos, publishWormExpansion, currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
 import { makeWormSim, resetWormSim, evaluatePosAndNormal } from '../worm/healerWorm/wormSim.js';
 import { tickExpansion } from '../worm/healerWorm/expansion.js';
 import { advanceTunnelHead } from '../worm/healerWorm/tunnelTrail.js';
@@ -78,4 +78,37 @@ describe('expanded worm geometry', () => {
     advanceTunnelHead(sim, 'windout', 1, size);
     expect(sim.headInterpPos.distanceTo(handoff)).toBeLessThan(1e-7);
   });
+});
+
+
+it('publishes only transition/guide boundaries while every animation sample stays live', () => {
+  let snapshot = 0, writes = 0;
+  const amounts = [...Array.from({ length: 72 }, (_, i) => EXPLODE_AMOUNT * (i + 1) / 72),
+    ...Array.from({ length: 72 }, (_, i) => EXPLODE_AMOUNT * (71 - i) / 72)];
+  for (const amount of amounts) {
+    if (publishWormExpansion(amount)) { writes++; snapshot = amount; }
+    expect(currentExplosion({ wormHealerMode: true, explosionT: snapshot })).toBe(amount);
+    expect(snapshot > 0.15).toBe(amount > 0.15);
+  }
+  expect(writes).toBe(6);
+  expect(snapshot).toBe(0);
+  expect(currentExplosion({ wormHealerMode: false, explosionT: 0.6 })).toBe(0.6);
+});
+
+it.each([3, 6, 10, 15])('moves live cubie centres continuously without scaling stickers or changing turns (%s)', size => {
+  const piece = new THREE.Object3D(), sticker = new THREE.Object3D();
+  const k = (size - 1) / 2;
+  piece.position.set(k, -k, k);
+  piece.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.7);
+  piece.position.applyQuaternion(piece.quaternion);
+  sticker.position.set(0, 0, 0.51); piece.add(sticker);
+  const home = piece.position.clone(), turn = piece.quaternion.clone();
+  let before = 0;
+  for (const amount of [0.01, 0.07, 0.2, 0.35, 0.31, 0.12, 0]) {
+    rescaleExpandedCubies([null, piece], size, before, amount);
+    expect(piece.position.distanceTo(home.clone().multiplyScalar(cubeExpansionScale(size, amount)))).toBeLessThan(1e-10);
+    expect(piece.quaternion.equals(turn)).toBe(true);
+    expect(sticker.getWorldPosition(new THREE.Vector3()).distanceTo(piece.position)).toBeCloseTo(0.51, 10);
+    before = amount;
+  }
 });

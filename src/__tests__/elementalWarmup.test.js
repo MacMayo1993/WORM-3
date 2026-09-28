@@ -79,3 +79,10 @@ describe('warmUpElementalSkins', () => {
     expect(second).toBe(first);
   });
 });
+
+
+it('compiles effects against the real scene light rig', () => {
+  const renderer = fakeRenderer(), scene = { name: 'live WORM scene' };
+  warmUpElementalSkins(renderer, fakeCamera, scene);
+  expect(renderer.compile.mock.calls[0][2]).toBe(scene);
+});

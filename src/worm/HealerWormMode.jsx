@@ -1,3 +1,4 @@
+import { WormLighting } from './WormLighting.jsx';
 import { holdsRotationTimer } from './characterAbilities.js';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { storySurfaceTile } from './story/mastery.js';
@@ -118,10 +119,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // the driver's shader compile in the same frame the wash mounted, which is the
     // hitch players reported when a power-up appeared. Same treatment CubeAssembly
     // gives tile styles and HealerBombs' <WarmUp> gives bombs.
-    const { gl, camera } = useThree();
+    const { gl, camera, scene } = useThree();
     useEffect(() => {
-        warmUpElementalSkins(gl, camera);
-    }, [gl, camera]);
+        warmUpElementalSkins(gl, camera, scene);
+    }, [gl, camera, scene]);
 
     // Keep the feel layer's SFX/haptics channels in sync with the player's settings.
     const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
@@ -720,7 +721,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const wormAlive = wormGamePhase !== 'scrambling';
 
     return (
-        <>
+        <WormLighting>
             <WormChaseCamera worm={worm} size={size} />
             <DemoPracticeTargets size={size} />
             {!demoMode && (combatMode || enemiesEnabled) && <CombatScene maxEnemies={combatMode ? 4 : 1} />}
@@ -768,6 +769,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} worm={worm} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />
-        </>
+        </WormLighting>
     );
 }

@@ -1,3 +1,4 @@
+import { currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { bodyMaterialProps } from './cubeViewStyles.js';
 import { raisedCubieExtent } from './raisedCubieMotion.js';
@@ -696,7 +697,17 @@ const CubeAssembly = React.memo(({
   const onAnimCompleteRef = useRef(onAnimComplete);
   onAnimCompleteRef.current = onAnimComplete;
   const explosionFactorRef = useRef(explosionFactor);
-  explosionFactorRef.current = explosionFactor;
+  explosionFactorRef.current = currentExplosion(useGameStore.getState());
+  const appliedExpansionRef = useRef(explosionFactorRef.current);
+  // Simulation advances at -0.5. Move the lattice immediately afterwards,
+  // before raised pieces (-0.4), pads (-0.35), camera (-0.25) and stickers (0).
+  useFrame(() => {
+    const state = useGameStore.getState();
+    if (!state.wormHealerMode) return;
+    const amount = currentExplosion(state);
+    rescaleExpandedCubies(cubieRefs.current, size, appliedExpansionRef.current, amount);
+    appliedExpansionRef.current = explosionFactorRef.current = amount;
+  }, -0.45);
 
   // Pre-compile default tile style shaders on mount to prevent first-use stalls.
   // warmUpDefaultStyles calls renderer.compile() which triggers GLSL compilation
@@ -900,7 +911,9 @@ const CubeAssembly = React.memo(({
 
     // Snap if we just finished an animation OR if the logical state jumped (drag snap)
     if ((wasAnimating && !nowAnimating) || epochChanged) {
-      const expansionFactor = cubeExpansionScale(size, explosionFactorRef.current);
+      const amount = currentExplosion(committed);
+      appliedExpansionRef.current = amount;
+      const expansionFactor = cubeExpansionScale(size, amount);
       for (let idx = 0; idx < positionCache.length; idx++) {
         const g = cubieRefs.current[idx];
         if (!g) continue;
@@ -1138,7 +1151,9 @@ const CubeAssembly = React.memo(({
       sliceIndicesRef.current = null;
       sliceDirByIdxRef.current = null;
       // Reduce explosion distance by 15% for larger cubes (4x4, 5x5)
-      const expansionFactor = cubeExpansionScale(size, explosionFactor);
+      const amount = currentExplosion(useGameStore.getState());
+      appliedExpansionRef.current = amount;
+      const expansionFactor = cubeExpansionScale(size, amount);
       items.forEach((it, idx) => {
         const g = cubieRefs.current[idx];
         if (g) {
@@ -1151,7 +1166,7 @@ const CubeAssembly = React.memo(({
         }
       });
     }
-  }, [animState, items, explosionFactor]);
+  }, [animState, items, explosionFactor, size, wormHealerMode]);
 
   // ── Mega Mode chassis geometry ────────────────────────────────────────────
   // A single 15×15 shell would cost >1,100 individual rounded bodies, so Mega
