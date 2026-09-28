@@ -35,7 +35,7 @@ it('renders a connected airborne body around a corner and anchors exhaust at its
   root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
   let state;
   try {
-    await act(async () => { state = root.render(<><WormBody worm={worm} size={3}/><RocketExhaust worm={worm}/></>); });
+    await act(async () => { state = root.render(<><WormBody worm={worm} size={3}/><RocketExhaust worm={worm} size={3}/></>); });
     state.getState().advance(1 / 60);
     expect(wormSegments.count).toBe(30);
     for (let i = 1; i < wormSegments.count; i++) {
@@ -43,9 +43,16 @@ it('renders a connected airborne body around a corner and anchors exhaust at its
       const b = new THREE.Vector3().fromArray(wormSegments.positions, i * 3);
       expect(a.distanceTo(b)).toBeCloseTo(BODY_BALL_SPACING, 3);
     }
-    const exhaust = state.getState().scene.children.find(group => group.children.some(mesh => mesh.material?.uniforms?.uTime));
-    expect(exhaust?.visible).toBe(true);
-    expect(exhaust.position.distanceTo(new THREE.Vector3().fromArray(wormSegments.tail))).toBeCloseTo(.055, 6);
+    // The booster (and the plume inside it) sits on the rendered tail, nozzle
+    // pointing straight back along the body.
+    const hasPlume = object => object.children.some(child => child.material?.uniforms?.uTime);
+    const booster = state.getState().scene.children.find(group => group.children.some(hasPlume));
+    expect(booster?.visible).toBe(true);
+    expect(booster.children.find(hasPlume).visible).toBe(true);
+    const tail = new THREE.Vector3().fromArray(wormSegments.tail);
+    expect(booster.position.distanceTo(tail)).toBeCloseTo(0, 6);
+    const away = tail.clone().sub(new THREE.Vector3().fromArray(wormSegments.beforeTail)).normalize();
+    expect(new THREE.Vector3(0, 1, 0).applyQuaternion(booster.quaternion).dot(away)).toBeCloseTo(1, 6);
   } finally {
     await act(async () => root.unmount());
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;

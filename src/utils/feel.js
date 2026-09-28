@@ -241,15 +241,20 @@ const SFX = {
   specialSpawn() {
     chord([880, 1318.51], { dur: 0.22, gain: 0.16 });
   },
-  // Launch: thrust noise under a rising sweep.
+  // Ignition: a deep thump, then the roar — a low rumble that carries on as the
+  // worm climbs, crackle on top, and an engine note that rises with the speed.
   rocket() {
-    burst(0.42, 0.34, 'lowpass', 1400);
-    sweep(180, 1200, 0.42, 0.26, 'sawtooth');
+    sweep(120, 36, 0.5, 0.42);
+    noise({ dur: 1.6, gain: 0.3, type: 'lowpass', freq: 700, q: 0.7 });
+    noise({ dur: 1.1, gain: 0.16, type: 'lowpass', freq: 1500, when: 0.3 });
+    noise({ dur: 0.7, gain: 0.08, type: 'bandpass', freq: 3200, q: 0.8, when: 0.03 });
+    sweep(110, 520, 1.1, 0.1, 'sawtooth', 0.06);
   },
-  // Touchdown at the end of the flight — a short, dry thud.
+  // Touchdown: the retro burn hisses out, then a short, dry thud.
   rocketLand() {
-    burst(0.1, 0.32, 'lowpass', 420);
-    sweep(150, 70, 0.12, 0.24);
+    noise({ dur: 0.34, gain: 0.16, type: 'highpass', freq: 1800 });
+    burst(0.12, 0.3, 'lowpass', 420);
+    sweep(150, 60, 0.16, 0.26, 'sine', 0.05);
   },
   // A special timed out untouched. Deliberately soft and downward — informative,
   // not punitive; missing one is a small shrug, not a failure state.

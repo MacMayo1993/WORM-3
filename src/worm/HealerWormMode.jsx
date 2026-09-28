@@ -748,7 +748,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 <WormBody worm={worm} size={size} /><WormFace worm={worm} size={size} />
             </group>
             <WormEffectWarmup body={reflectionSource} />
-            {wormAlive && <RocketExhaust worm={worm} />}
+            {wormAlive && <RocketExhaust worm={worm} size={size} />}
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
             {wormAlive && glowCharacter && <WormTrail worm={worm} size={size} abilityTrail />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
