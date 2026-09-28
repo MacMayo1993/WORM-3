@@ -677,14 +677,8 @@ export function WormBody({ worm, size }) {
             // own trailing distance keeps it clear of the lens anyway.
             if (_transitCull && i !== 0) {
                 const _camD = _bodyClonePos.distanceTo(_camWorldPos);
-                // The close core shot follows a much smaller worm. Keep its
-                // body visible in the mirrors, fading only lens intersections.
-                const visit = worm.coreVisit?.current;
-                const close = visit && visit.elapsed >= 0 && !visit.complete;
-                const hide = close ? Math.max(_wormDummy.scale.x, _wormDummy.scale.y, _wormDummy.scale.z) * 3 : CAM_CULL_HIDE;
-                const full = close ? hide * 1.7 : CAM_CULL_FULL;
-                if (_camD < hide) continue;
-                if (_camD < full) _wormDummy.scale.multiplyScalar((_camD - hide) / (full - hide));
+                if (_camD < CAM_CULL_HIDE) continue;
+                if (_camD < CAM_CULL_FULL) _wormDummy.scale.multiplyScalar((_camD - CAM_CULL_HIDE) / (CAM_CULL_FULL - CAM_CULL_HIDE));
             }
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(writeIdx, _wormDummy.matrix);

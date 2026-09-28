@@ -1,4 +1,3 @@
-import { orbitCorePoseInto } from './coreVisit.js';
 import { nearbyPlatform, makePlatformFrame, framePlatform } from './platformFraming.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov } from './healerWorm/zoomLimit.js';
@@ -755,11 +754,7 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.tunnel = tunnel;
             if (phase === 'exiting') tunnelExitPoseInto(_rails, tunnel, tp, size);
             else tunnelCamPoseInto(_rails, tunnel, tHead, size);
-            const visit = worm.coreVisit?.current;
-            orbitCorePoseInto(_rails, visit, worm.currentNormal.current, worm.tunnelHeadShift ?? 0);
-            // The orbit is already eased and must complete one full turn in
-            // simulation time; extra quaternion lag would miss the return pose.
-            applyTunnelPose(_rails, visit?.elapsed >= 0 && !visit.complete ? 1 : 1 - Math.exp(-10 * delta));
+            applyTunnelPose(_rails, 1 - Math.exp(-10 * delta));
         } else if (phase === 'windout') {
             const tunnel = worm.activeTunnel.current;
             const tp = THREE.MathUtils.clamp(worm.tunnelProgress.current, 0, 1);
