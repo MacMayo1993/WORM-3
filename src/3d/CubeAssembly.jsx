@@ -126,6 +126,10 @@ const CubeAssembly = React.memo(({
       flipWaveOrigins: s.flipWaveOrigins,
       wormHealerMode: s.wormHealerMode,
       wormViewPower: s.wormViewPower,
+      // Cubie swaps Random-mode view/material types when the adaptive tier
+      // changes. Re-render this owner too so its post-child layout pass patches
+      // the replacement materials before a tunnel can expose the aperture.
+      perfReducedFX: s.perfReducedFX,
       // Keep puzzle controls disabled through the tunnel ride. Exterior visibility
       // is handled per frame from the lens position below.
       wormTunnelActive: s.wormHealerMode && s.wormPhase === 'tunnel',
