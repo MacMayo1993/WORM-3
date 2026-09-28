@@ -741,14 +741,41 @@ describe('flipped tiles and tunnel traversal', () => {
       stepWormSim(sim, 1 / 60, SIZE, ctx);
     }
     expect(sim.phase).toBe('crawling');
-    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(7.3);
-    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(7.8);
+    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(8.8);
+    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(9.3);
     expect(elapsed.tunnel).toBeGreaterThan(2.5);
     expect(elapsed.exiting).toBeGreaterThan(3.3);
-    expect(elapsed.exiting).toBeLessThan(3.5);
+    expect(elapsed.exiting).toBeLessThan(5.1);
     expect(elapsed.windup).toBeLessThan(0.21);
     expect(elapsed.windout).toBeLessThan(0.21);
     expect(sim.pos.dirKey).toBe('NZ');
+  });
+
+  it.each([30, 60, 120])('holds the worm and its trail for a pause-aware 1.5-second interior orbit at %s Hz', hz => {
+    const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    const sim = makeSim(); let paused = false;
+    const ctx = makeCtx({ getCubies: () => cubies, resolveTunnel: () => ({ tunnel, tunnelKey }), isPaused: () => paused });
+    expect(runUntil(sim, ctx, () => sim.coreVisit?.elapsed === 0)).toBe(true);
+    const head = sim.headInterpPos.clone(), distance = sim.stepHistory.distance, progress = sim.tunnelProgress;
+    const visit = sim.coreVisit;
+    paused = true;
+    for (let i = 0; i < hz; i++) stepWormSim(sim, 1 / hz, SIZE, ctx);
+    expect(visit.elapsed).toBe(0);
+    paused = false;
+    let frames = 0;
+    while (!visit.complete && frames < hz * 2) {
+      stepWormSim(sim, 1 / hz, SIZE, ctx); frames++;
+      expect(sim.headInterpPos.distanceTo(head)).toBe(0);
+      expect(sim.stepHistory.distance).toBe(distance);
+      expect(sim.tunnelProgress).toBe(progress);
+    }
+    expect(visit.elapsed).toBe(1.5);
+    expect(frames / hz).toBeGreaterThanOrEqual(1.5);
+    expect(frames / hz).toBeLessThanOrEqual(1.5 + 1 / hz);
+    stepWormSim(sim, 1 / hz, SIZE, ctx);
+    expect(sim.headInterpPos.distanceTo(head)).toBeGreaterThan(0);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.coreVisit).toBeNull();
   });
 
   it('resumes crawling with a long tail inside and heals only after it clears', () => {

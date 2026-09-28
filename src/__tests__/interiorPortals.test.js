@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { makeCorePassage, updateCorePassage, CORE_PASSAGE_RADIUS, CORE_PASSAGE_EXTENT } from '../3d/corePassage.js';
+import { makeCorePassage, updateCorePassage, coreOpeningRadius, CORE_PASSAGE_EXTENT } from '../3d/corePassage.js';
 import { makeInteriorPortals, syncInteriorPortals } from '../worm/healerWorm/interiorPortals.js';
 import { tunnelPathArcPointInto } from '../utils/tunnelPath.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
@@ -31,9 +31,8 @@ describe('interior portal openings', () => {
           line.set(points[j - 1], points[j]).closestPointToPoint(point, true, closest);
           gap = Math.min(gap, closest.distanceTo(point));
         }
-        // The polyline bore contains a 0.14-radius rider throughout the route,
-        // even where an enlarged core's face intersects either curved arm.
-        expect(gap + 0.14).toBeLessThan(CORE_PASSAGE_RADIUS);
+        // The sampled route stays inside even the smallest tile-sized bore.
+        expect(gap).toBeLessThan(coreOpeningRadius(size, 1));
       }
     }
     updateCorePassage(passage, null, 3, 0);

@@ -18,7 +18,12 @@ export function blendTunnelBodyProfile(out, a, b = a, t = 0) {
 // Reserve room for both the body and its stroke: radius <= 36% of the width,
 // lateral swim <= 8%, leaving at least 6% of the width before either rail.
 export function tunnelBodyScale(profile, radius) {
-  const fit = Math.min(1, (profile?.rideWidth ?? TUNNEL_RIDE_WIDTH) * 0.36 / Math.max(radius, 1e-6));
+  // At a core dock the band is flush with the opening's centre. The seated
+  // head is one radius above it, so its full upper extent must fit inside the
+  // tile's circular cutout, including the face and swimming stroke.
+  const t = Math.max(0, Math.min(1, (profile?.rideClearance ?? 0) / .06));
+  const fraction = .19 + .17 * t * t * (3 - 2 * t);
+  const fit = Math.min(1, (profile?.rideWidth ?? TUNNEL_RIDE_WIDTH) * fraction / Math.max(radius, 1e-6));
   return 1 + (fit - 1) * (profile?.rideWeight ?? 0);
 }
 

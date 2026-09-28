@@ -1,3 +1,4 @@
+import { coreOpeningRadius } from '../3d/corePassage.js';
 import { expect, it } from 'vitest';
 import * as THREE from 'three';
 import { makeStepHistory, shPush, shAt } from '../worm/circularBuffers.js';
@@ -45,4 +46,12 @@ it('retains the tail gauge independently of the head and clears reused surface s
   expect(shAt(history, 0).rideClearance).toBe(0);
   const untouched = fitTunnelBodyInto({}, makeTunnelBodyProfile(), 0.12, 0.04, 0.01);
   expect(untouched).toEqual({ scale: 1, side: 0.04, lift: 0.01, shift: 0 });
+});
+
+it('fits the complete seated head and its face through one tile even without core zoom', () => {
+  for (const size of [2,3,6,15]) for (const radius of [.092,.16,.22]) {
+    const width=tunnelDockWidth(size);
+    const fit=fitTunnelBodyInto({}, {rideWeight:1,rideWidth:width,rideClearance:0},radius,.07,.014);
+    expect(Math.hypot(fit.shift + radius*fit.scale*1.1 + fit.lift,fit.side)).toBeLessThan(coreOpeningRadius(size));
+  }
 });

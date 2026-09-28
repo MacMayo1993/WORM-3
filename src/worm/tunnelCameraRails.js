@@ -16,6 +16,7 @@ import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.
 // start pose.
 
 import * as THREE from 'three';
+import { coreTrailAtPoint } from './coreVisit.js';
 import { coreZoomBoundsInto } from '../3d/antipodalCore.js';
 import { buildTunnelPathForTunnel, getTunnelArcPosSmoothInto } from './wormLogic.js';
 import { makeTunnelPath, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from '../utils/tunnelPath.js';
@@ -28,7 +29,7 @@ import { makeTunnelPath, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from
 // The worm renderer already fades body segments that get too close to the lens.
 export const TUNNEL_CAM_UP = 0.62;
 // The default 0.1 near plane cuts away the rim of the small core openings.
-export const TUNNEL_CAM_NEAR = 0.02;
+export const TUNNEL_CAM_NEAR = 0.002;
 
 // The exterior framing used to watch a mouth from outside the cube — shared by
 // windup, the start of the dive, and windout, so the dive provably begins from
@@ -129,6 +130,18 @@ export function backForHead(tHead, size) {
 const _fwd = new THREE.Vector3();
 const _camPath = makeTunnelPath();
 const _coreBounds = new THREE.Box3();
+const _headPoint = new THREE.Vector3();
+
+// Close in on the head before the anticube entry, then keep following it out.
+// Growing the trail by at most 40% of distance travelled prevents a backward
+// camera move while the worm regains its full width on the outward arm.
+export function cameraArcForHead(path, tHead, size) {
+  const headArc = tunnelPathTToArc(path, tHead);
+  tunnelPathArcPointExtendedInto(_headPoint, path, headArc);
+  const close = coreTrailAtPoint(_headPoint, path.midA, size);
+  const follow = 1 - THREE.MathUtils.smoothstep(path.armALen - headArc, .12, .9);
+  return headArc - THREE.MathUtils.lerp(backForHead(tHead, size), Math.min(backForHead(tHead, size), close), follow);
+}
 
 function cameraRideHeight(point, arc, tHead) {
   const mouthClearance = THREE.MathUtils.smoothstep(Math.min(arc, _camPath.total - arc), 0.1, 0.55);
@@ -185,8 +198,7 @@ const _rideFrame = makeTunnelRideFrame();
 export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   buildTunnelPathForTunnel(_camPath, tunnel, size);
   coreZoomBoundsInto(_coreBounds, _camPath.midA, size);
-  const headArc = tunnelPathTToArc(_camPath, tHead);
-  const camArc = headArc - backForHead(tHead, size);
+  const camArc = cameraArcForHead(_camPath, tHead, size);
 
   cameraArcPointInto(out.cam, _camPath, camArc);
 
@@ -225,6 +237,8 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   const rideHeight = cameraRideHeight(out.cam, camArc, tHead);
   out.cam.addScaledVector(out.up, rideHeight);
   out.look.add(out.cam).addScaledVector(out.up, -rideHeight * 0.75);
+  const followHead = 1 - THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(_headPoint), 0, .5);
+  out.look.lerp(_headPoint, followHead);
   return out;
 }
 
@@ -258,7 +272,8 @@ export function blendTunnelPosesInto(out, from, to, t) {
   _poseA.slerp(_poseB, t);
   out.cam.lerpVectors(from.cam, to.cam, t);
   out.up.set(0, 1, 0).applyQuaternion(_poseA);
-  out.look.set(0, 0, -LOOK_AHEAD_ARC).applyQuaternion(_poseA).add(out.cam);
+  out.look.set(0, 0, -THREE.MathUtils.lerp(from.cam.distanceTo(from.look), to.cam.distanceTo(to.look), t))
+    .applyQuaternion(_poseA).add(out.cam);
   return out;
 }
 
@@ -279,7 +294,7 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   const height = _entryLateral.dot(_camPath.nStart);
   _entryLateral.addScaledVector(_camPath.nStart, -height);
   const arc = THREE.MathUtils.lerp(-height,
-    tunnelPathTToArc(_camPath, tHead) - backForHead(tHead, size), blend);
+    cameraArcForHead(_camPath, tHead, size), blend);
   _poseDir.subVectors(out.look, out.cam);
   cameraArcPointInto(out.cam, _camPath, arc);
   out.cam.addScaledVector(_entryLateral, diveEase(-arc / Math.max(0.1, height * 0.5)));
@@ -305,7 +320,7 @@ export function tunnelExitPoseInto(out, tunnel, progress, size) {
 
   // Move along the actual route until the lens clears the mouth. Only then
   // introduce the side offset; a straight chord cuts through neighbouring tiles.
-  const arc = THREE.MathUtils.lerp(tunnelPathTToArc(_camPath, tHead) - backForHead(tHead, size),
+  const arc = THREE.MathUtils.lerp(cameraArcForHead(_camPath, tHead, size),
     _camPath.total + outsideDistance, blend);
   const sideBlend = diveEase((arc - _camPath.total - 0.35) / (outsideDistance - 0.35));
   _poseDir.subVectors(out.look, out.cam);

@@ -1,4 +1,5 @@
 import { WormLighting } from './WormLighting.jsx';
+import { CoreWormReflections } from './healerWorm/CoreWormReflections.jsx';
 import { holdsRotationTimer } from './characterAbilities.js';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { storySurfaceTile } from './story/mastery.js';
@@ -94,6 +95,7 @@ const _seedBackDir = new THREE.Vector3();
 
 // ─── Main exported wrapper ────────────────────────────────────────────────────
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal, onAnimatedShuffle }) {
+    const reflectionSource = useRef();
     const worm = useWormCrawler(size, cubies);
 
     // ── Game phase + scramble state ────────────────────────────────────────────
@@ -735,13 +737,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
             {wormAlive && <ElementalPatches worm={worm} size={size} />}
-            {wormAlive && <WormBody worm={worm} size={size} />}
+            {wormAlive && <group ref={reflectionSource}><WormBody worm={worm} size={size} /><WormFace worm={worm} size={size} /></group>}
             {wormAlive && <RocketExhaust worm={worm} />}
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
             {wormAlive && glowCharacter && <WormTrail worm={worm} size={size} abilityTrail />}
             {wormAlive && <SignatureEffects worm={worm} size={size} />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
-            {wormAlive && <WormFace worm={worm} size={size} />}
+            {wormAlive && <CoreWormReflections source={reflectionSource} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}
             {wormAlive && <TunnelPortalFX worm={worm} size={size} />}
             {/* Hidden, not unmounted, for the tunnel ride. The camera is inside the

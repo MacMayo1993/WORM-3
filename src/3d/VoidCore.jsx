@@ -33,7 +33,7 @@ import { createPlayStickerGeometry } from './rubiksPiece.js';
 import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
 import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
-import { makeCorePassage, updateCorePassage, coreRoomCutoutGLSL, CORE_MIRROR_HALF } from './corePassage.js';
+import { makeCorePassage, updateCorePassage, coreRoomCutoutGLSL, CORE_MIRROR_HALF, coreOpeningRadius } from './corePassage.js';
 import { createCoreReflection, createCoreMirrorRoom } from './coreMirrorRoom.js';
 import { wormExpansion, currentExplosion } from '../worm/wormExpansion.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
@@ -292,8 +292,10 @@ function VoidCore({ cubieRefs = null }) {
       zoomRef.current.scale.setScalar(f.zoom);
       zoomRef.current.position.copy(f.dock).multiplyScalar(1 - f.zoom);
     }
+    passage.uniforms.uPassageRadius.value = coreOpeningRadius(size, f.zoom);
     mirrors.group.visible = wormMode && passage.uniforms.uPassageOpen.value > .5;
-    passage.uniforms.uCoreRoomHalf.value = mirrors.group.visible ? CORE_MIRROR_HALF * f.zoom : 0;
+    // Clear the plastic a little behind the mirrors so their surfaces cannot z-fight.
+    passage.uniforms.uCoreRoomHalf.value = mirrors.group.visible ? (CORE_MIRROR_HALF + .001) * f.zoom : 0;
     passage.uniforms.uCoreRoomCenter.value.copy(f.dock).multiplyScalar(1 - f.zoom);
 
     const energy = 0.35 + 0.65 * charge;
