@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getTunnelWorldPosInto } from '../wormLogic.js';
 import { diveProgress } from '../tunnelCameraRails.js';
-import { tunnelBoreRadiusAt } from '../../utils/tunnelPath.js';
+import { tunnelBoreRadiusAt, tunnelTraversalT } from '../../utils/tunnelPath.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
@@ -268,9 +268,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
     // Head position along the full traversal, matching WormChaseCamera's mapping
     // of per-phase progress onto the 0→1 tunnel parameter.
     const tp = worm.tunnelProgress.current ?? 0;
-    const headProgress = phase === 'tunnel' ? 0.33 + tp * 0.34
-      : phase === 'exiting' ? 0.67 + tp * 0.33
-        : phase === 'entering' ? tp * 0.33 : 1;
+    const headProgress = tunnelTraversalT(phase, tp);
     uniforms.uHead.value = tunnelTubeHeadProgress(slot, headProgress);
   });
 

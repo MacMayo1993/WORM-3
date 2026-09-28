@@ -18,7 +18,6 @@ import {
     TUNNEL_CAM_NEAR,
     diveProgress,
     portalDist,
-    ENTER_END_T,
     diveEase,
     blendTunnelPosesInto,
     tunnelExitPoseInto,
@@ -40,6 +39,8 @@ import {
     tunnelHandoffSeconds,
 } from './healerWorm/constants.js';
 import { makeElementalRevealOrbit, sampleElementalRevealOrbit } from './elementalRevealOrbit.js';
+import { tunnelTraversalT } from '../utils/tunnelPath.js';
+import { getTunnelWorldPosInto } from './wormLogic.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
 const _camForward = new THREE.Vector3();
@@ -719,11 +720,9 @@ export default function WormChaseCamera({ worm, size }) {
             const tunnel = worm.activeTunnel.current;
             const tp = THREE.MathUtils.clamp(worm.tunnelProgress.current, 0, 1);
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
-            _entryTileCenter.fromArray(getStickerWorldPos(
-                tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, tunnel.padExpansion ?? 0
-            ));
+            getTunnelWorldPosInto(_entryTileCenter, tunnel, 0, size);
             tunnelState.active = true;
-            tunnelState.t = phase === 'entering' ? tp * ENTER_END_T : 0;
+            tunnelState.t = tunnelTraversalT(phase, tp);
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
             tunnelState.tunnel = tunnel;
             if (phase === 'windup') {
@@ -731,10 +730,10 @@ export default function WormChaseCamera({ worm, size }) {
                 _rails.look.copy(_entryTileCenter);
                 // A face-tangent up remains valid when looking down ±Y.
                 _rails.up.set(Math.abs(entN.y) > 0.9 ? 1 : 0, Math.abs(entN.y) > 0.9 ? 0 : 1, 0);
-                // The head's short aperture handoff must not compress the
-                // entire camera move into 180 ms. Entering continues this blend.
+                // Reach the mouth during the handoff, ready to follow the head
+                // inside immediately instead of starting another outside hold.
                 blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails,
-                    diveEase(tp * tunnelHandoffSeconds(tunnel) / 0.7));
+                    diveEase(tp));
             } else {
                 tunnelEntryPoseInto(transitionPose.current, tunnel, tp, size, phaseStartPose.current);
             }
@@ -747,7 +746,7 @@ export default function WormChaseCamera({ worm, size }) {
         } else if (phase === 'tunnel' || phase === 'exiting') {
             const tunnel = worm.activeTunnel.current;
             const tp = THREE.MathUtils.clamp(worm.tunnelProgress.current, 0, 1);
-            const tHead = phase === 'tunnel' ? 0.33 + tp * 0.34 : 0.67 + tp * 0.33;
+            const tHead = tunnelTraversalT(phase, tp);
             tunnelState.active = true;
             tunnelState.t = tHead;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;

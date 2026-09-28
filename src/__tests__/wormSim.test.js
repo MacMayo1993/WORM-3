@@ -38,7 +38,7 @@ import * as THREE from 'three';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { inchCrawlAdvance, advanceInchGaitState } from '../worm/healerWorm/inchGait.js';
 import { shPush, shAt, shReset, ttAt, ttReset, ttPush } from '../worm/circularBuffers.js';
-import { getNextSurfacePosition, getWormholeHealRing } from '../worm/wormLogic.js';
+import { getNextSurfacePosition, getWormholeHealRing, makeTunnelCenterline, buildTunnelCenterlineInto } from '../worm/wormLogic.js';
 import { tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
 import { raisedPlatformPosition } from '../worm/healerWorm/raisedPlatforms.js';
 import { WORM_PAD_HEIGHT, WORM_PIECE_POP, raisedWormExpansion } from '../game/raisedCubie.js';
@@ -727,29 +727,31 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(sim.pos.dirKey).toBe('NZ');
   });
 
-  it('gives the interior ride time to read while keeping surface flourishes short', () => {
+  it.each([30, 60, 120].flatMap(hz => [false, true].map(raised => [hz, raised])))('takes 4 seconds in, 2 through the center and 4 out at %s Hz (raised: %s)', (hz, raised) => {
     const { cubies, tunnel, tunnelKey } = makeFlippedWorld();
+    if (raised) { tunnel.padHeight = WORM_PAD_HEIGHT; tunnel.padExpansion = WORM_PIECE_POP; }
     const sim = makeSim();
     const ctx = makeCtx({
       getCubies: () => cubies,
       resolveTunnel: () => ({ tunnel, tunnelKey }),
     });
     expect(runUntil(sim, ctx, () => sim.phase === 'windup')).toBe(true);
+    const path = buildTunnelCenterlineInto(makeTunnelCenterline(), sim.activeTunnel, SIZE);
     const elapsed = {};
-    for (let frame = 0; frame < 1200 && sim.phase !== 'crawling'; frame++) {
-      elapsed[sim.phase] = (elapsed[sim.phase] ?? 0) + 1 / 60;
-      stepWormSim(sim, 1 / 60, SIZE, ctx);
+    for (let frame = 0; frame < hz * 11 && sim.phase !== 'crawling'; frame++) {
+      const before = sim.phase;
+      elapsed[sim.phase] = (elapsed[sim.phase] ?? 0) + 1 / hz;
+      stepWormSim(sim, 1 / hz, SIZE, ctx);
+      if (before === 'entering' && sim.phase === 'tunnel') expect(sim.headInterpPos.distanceTo(path.midA)).toBeLessThan(1e-8);
+      if (before === 'tunnel' && sim.phase === 'exiting') expect(sim.headInterpPos.distanceTo(path.midB)).toBeLessThan(1e-8);
     }
     expect(sim.phase).toBe('crawling');
-    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(12.9);
-    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(13.2);
-    expect(elapsed.tunnel).toBeGreaterThan(1.8);
-    expect(elapsed.tunnel).toBeLessThan(1.9);
+    expect(elapsed.windup + elapsed.entering).toBeCloseTo(4, 6);
+    expect(elapsed.tunnel).toBeCloseTo(2, 6);
+    expect(elapsed.exiting + elapsed.windout).toBeCloseTo(4, 6);
+    expect(Object.values(elapsed).reduce((a, b) => a + b, 0)).toBeCloseTo(10, 6);
     expect(elapsed.entering).toBeCloseTo(elapsed.exiting, 6);
-    expect(elapsed.exiting).toBeGreaterThan(5.5);
-    expect(elapsed.exiting).toBeLessThan(5.7);
-    expect(elapsed.windup).toBeLessThan(0.21);
-    expect(elapsed.windout).toBeLessThan(0.21);
+    expect(elapsed.windup).toBeLessThanOrEqual(.4 + 1e-9);
     expect(sim.pos.dirKey).toBe('NZ');
   });
 
@@ -768,10 +770,10 @@ describe('flipped tiles and tunnel traversal', () => {
       elapsed[phase] = (elapsed[phase] ?? 0) + 1 / hz;
       stepWormSim(sim, 1 / hz, SIZE, ctx);
       if (sim.phase === phase) expect(sim.tunnelProgress).toBeGreaterThan(progress);
-      expect(Object.values(elapsed).reduce((a, b) => a + b, 0)).toBeLessThan(13.3);
+      expect(Object.values(elapsed).reduce((a, b) => a + b, 0)).toBeLessThan(10.1);
     }
     expect(elapsed.entering).toBeCloseTo(elapsed.exiting, 6);
-    expect(elapsed.tunnel).toBeLessThan(1.9);
+    expect(elapsed.tunnel).toBeCloseTo(2, 6);
   });
 
   it('resumes crawling with a long tail inside and heals only after it clears', () => {
@@ -1591,7 +1593,7 @@ it('holds a raised tunnel open throughout the reverse orbit, including a short t
     stepWormSim(sim, 1 / 60, SIZE, ctx);
     expect(ctx.events.some(e => e.type === 'heal')).toBe(false);
   }
-  expect(frames / 60).toBeCloseTo(1.4, 1);
+  expect(frames / 60).toBeCloseTo(.4, 6);
   expect(sim.phase).toBe('crawling');
   stepWormSim(sim, 1 / 60, SIZE, ctx);
   expect(ctx.events.filter(e => e.type === 'heal')).toHaveLength(1);

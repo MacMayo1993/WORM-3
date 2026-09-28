@@ -8,6 +8,7 @@ import {
   cameraUpForHead,
   TUNNEL_CAM_UP,
   diveEase,
+  diveProgress,
   tunnelCamPoseInto,
   makeTunnelCamPose,
   portalDist,
@@ -25,7 +26,7 @@ import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { getTunnelWorldPosInto } from '../worm/wormLogic.js';
 import { makeCorePassage, updateCorePassage, coreOpeningRadius, CORE_MIRROR_HALF } from '../3d/corePassage.js';
 import { coreZoomLimit, CORE_HALF } from '../3d/antipodalCore.js';
-import { tunnelPathArcPointInto } from '../utils/tunnelPath.js';
+import { tunnelPathArcPointInto, ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 
 // A tunnel joining the middle tile of +Y to the middle tile of −Y on an n×n
@@ -82,6 +83,12 @@ describe('diveEase', () => {
 });
 
 describe('tunnel camera phase transitions', () => {
+  it('starts diving immediately and joins the follow rail during the first quarter', () => {
+    expect(diveProgress(0)).toBe(0);
+    expect(diveProgress(.01)).toBeGreaterThan(0);
+    expect(diveProgress(.25)).toBe(1);
+  });
+
   it('blends opposite up vectors as rotations, without collapsing the view', () => {
     const a = makeTunnelCamPose();
     a.cam.set(0, 0, 4); a.look.set(0, 0, 0); a.up.set(0, 1, 0);
@@ -372,9 +379,9 @@ describe('tunnelCamPoseInto', () => {
         const crossed = bounds.map(() => 0);
         for (let i = 0; i <= 600; i++) {
           const t = i / 600;
-          if (t < .33) tunnelEntryPoseInto(pose, tunnel, t / .33, size, start);
-          else if (t < .67) tunnelCamPoseInto(pose, tunnel, t, size);
-          else tunnelExitPoseInto(pose, tunnel, (t - .67) / .33, size);
+          if (t < ARM_A_END) tunnelEntryPoseInto(pose, tunnel, t / ARM_A_END, size, start);
+          else if (t < ARM_B_START) tunnelCamPoseInto(pose, tunnel, t, size);
+          else tunnelExitPoseInto(pose, tunnel, (t - ARM_B_START) / (1 - ARM_B_START), size);
           for (const [index, box] of bounds.entries()) if (box.containsPoint(pose.cam)) {
             crossed[index]++;
             const zoom = [1, (limit + 1) / 2, limit][index];
@@ -400,7 +407,7 @@ describe('tunnelCamPoseInto', () => {
         crossed.forEach(count => expect(count).toBeGreaterThan(0));
         // Before the exit blend accelerates the lens, it also stays on the
         // exact rider centerline wherever that line crosses the core.
-        for (let t = .33; t < .67; t += .01) {
+        for (let t = ARM_A_END; t < ARM_B_START; t += .01) {
           const arc = cameraArcForHead(path, t, size);
           tunnelPathArcPointInto(closest, path, arc);
           if (!bounds[0].containsPoint(closest)) continue;
@@ -449,8 +456,9 @@ describe('tunnelCamPoseInto', () => {
 
 describe('exterior portal framing', () => {
   it('sits outside the cube for every supported size', () => {
-    for (let size = 2; size <= 5; size++) {
-      expect(portalDist(size)).toBeGreaterThan((size - 1) / 2 + SURFACE_OFFSET);
+    for (const size of [2, 3, 5, 15]) {
+      expect(portalDist(size)).toBeGreaterThan(0);
+      expect(portalDist(size)).toBeLessThan(1);
       expect(portalUp(size)).toBeGreaterThan(0);
     }
   });

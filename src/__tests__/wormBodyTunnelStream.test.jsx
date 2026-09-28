@@ -13,6 +13,7 @@ import { advanceTunnelHead } from '../worm/healerWorm/tunnelTrail.js';
 import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.js';
 import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
+import { tunnelTraversalT } from '../utils/tunnelPath.js';
 import { WORM_LIFT } from '../worm/healerWorm/constants.js';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 
@@ -68,7 +69,7 @@ it('seats the rendered head on the band and sizes it to the local gauge at entry
   sim.activeTunnel = route;
   const path = buildTunnelCenterlineInto(makeTunnelCenterline(), route, 3);
   const ride = makeTunnelRideFrame(), matrix = new THREE.Matrix4();
-  for (const [phase, progress, t] of [['entering', 0.03, 0.0099], ['tunnel', 0.5, 0.5], ['exiting', 0.4, 0.802]]) {
+  for (const [phase, progress, t] of [['entering', 0.03, 0.012], ['tunnel', 0.5, 0.5], ['exiting', 0.4, 0.76]]) {
     shReset(sim.stepHistory);
     sim.phase = phase; sim.tunnelProgress = 0;
     advanceTunnelHead(sim, phase, progress, 3); sim.tunnelProgress = progress;
@@ -91,7 +92,7 @@ it('keeps the rendered head small enough to see past throughout the core crossin
     advanceTunnelHead(sim, 'tunnel', progress, 3);
     renderPoints(); mesh.getMatrixAt(0, matrix);
     center.setFromMatrixPosition(matrix); scale.setFromMatrixScale(matrix);
-    tunnelCamPoseInto(pose, route, .33 + progress * .34, 3);
+    tunnelCamPoseInto(pose, route, tunnelTraversalT('tunnel', progress), 3);
     // A head subtending less than 23 degrees leaves the passage readable,
     // including when the lens must sit on the centerline at the aperture.
     expect(Math.max(scale.x, scale.y, scale.z) / center.distanceTo(pose.cam)).toBeLessThan(.2);

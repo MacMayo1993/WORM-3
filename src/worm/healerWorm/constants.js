@@ -19,15 +19,10 @@ export const TUNNEL_SURF_BACK = 0.264;     // camera behind worm along tunnel ax
 export const TUNNEL_SURF_UP = 0.132;       // raise camera above ribbon surface; nonzero value causes Möbius orbit (camera rolls 180° over tunnel) — intentional RP² effect
 export const TUNNEL_LOOK_AHEAD = 1.8;      // 1 arm-length ahead; keeps exit in view without shooting past the cube
 export const TUNNEL_SURF_SWAY = 0.22;
-// Base rate shared by all five traversal phases. The interior has its own
-// multiplier below so its readability does not depend on surface flourish time.
-export const TUNNEL_SPEED_SCALE = 0.90;
-// Match the two arms; keep the center crossing short and continuously moving.
-// A full interior ride takes about 13 seconds, with no center hold.
-export const TUNNEL_INTERIOR_SPEED_SCALE = 0.40;
-export const TUNNEL_ENTER_RATE = 0.5;
-export const TUNNEL_EXIT_RATE = TUNNEL_ENTER_RATE;
-export const TUNNEL_CROSSING_RATE = 1.5;
+// Ten seconds from the first mouth handoff to resumed crawling: 4 in, 2
+// through the center, 4 out. Each arm's budget INCLUDES its surface flourish.
+export const TUNNEL_ARM_SECONDS = 4;
+export const TUNNEL_CROSSING_SECONDS = 2;
 
 // Face outward normals.
 export const FACE_NORMALS = {
@@ -126,9 +121,10 @@ export const activeTunnelCap = (size) =>
 export const MAX_TAIL = 1200;
 
 // Short handoff at each aperture; body extrusion follows distance, not this timer.
-export const TUNNEL_HANDOFF_SECONDS = 0.18;
-export const TUNNEL_ORBIT_SECONDS = 1.4;
+export const TUNNEL_HANDOFF_SECONDS = 0.2;
+export const TUNNEL_ORBIT_SECONDS = 0.4;
 export const tunnelHandoffSeconds = tunnel => tunnel?.padHeight > 0 ? TUNNEL_ORBIT_SECONDS : TUNNEL_HANDOFF_SECONDS;
+export const tunnelArmSeconds = tunnel => TUNNEL_ARM_SECONDS - tunnelHandoffSeconds(tunnel);
 // Preserve the phase parameter for camera/face consumers: surface=0, mouth=1.
 export const windoutHeadS = (progress) => 1 - Math.min(1, Math.max(0, progress));
 export const HEAL_COST = 4; // worm segments (balls) required to fully heal one tunnel
