@@ -1,3 +1,4 @@
+import { makeCoreVisit, stopForCoreVisit, CORE_VISIT_SECONDS } from '../coreVisit.js';
 import { raisedWormExpansion } from '../../game/raisedCubie.js';
 import { padEntryDecision } from './padEntry.js';
 import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
@@ -279,6 +280,7 @@ export function makeWormSim(size) {
         // ── Tunnels / wormholes ────────────────────────────────────────────────
         tunnelApproach: new THREE.Vector3(),
         tunnelProgress: 0,
+        coreVisit: null,
         tunnelRide: makeTunnelBodyProfile(),
         activeTunnel: null,
         pendingTunnelTrigger: null,
@@ -366,6 +368,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.phase = 'crawling';
     sim.prevPhase = 'crawling';
     sim.tunnelProgress = 0;
+    sim.coreVisit = null;
     sim.tunnelRide.rideWeight = 0;
     sim.activeTunnel = null;
     sim.stepAcc = 0;
@@ -831,6 +834,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
     sim.headInterpPos.copy(sim.tunnelApproach);
     sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: raisedWormExpansion(sim.expansionAmount, size), padHeight: WORM_PAD_HEIGHT } : tunnel;
+    sim.coreVisit = makeCoreVisit(sim.activeTunnel, size, sim.expansionAmount, ctx.reducedMotion?.() ?? false);
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
     // Remove the exit portal tile from the trail so the head landing on it after
@@ -1874,8 +1878,9 @@ const PHASE_HANDLERS = {
         },
         update(sim, size, ctx, delta) {
             const collapsing = sim.pendingVoidKill?.tunnelKey === sim.currentTunnelKey;
-            const nextProgress = Math.min(collapsing ? 0.5 : 1,
+            let nextProgress = Math.min(collapsing ? 0.5 : 1,
                 sim.tunnelProgress + delta * (0.65 * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE));
+            if (!collapsing) nextProgress = stopForCoreVisit(sim, nextProgress);
             advanceTunnelHead(sim, 'tunnel', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (collapsing && nextProgress >= 0.5) {
@@ -1906,7 +1911,7 @@ const PHASE_HANDLERS = {
             }
         },
         update(sim, size, ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (TUNNEL_EXIT_RATE * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
+            const nextProgress = stopForCoreVisit(sim, sim.tunnelProgress + delta * (TUNNEL_EXIT_RATE * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE));
             advanceTunnelHead(sim, 'exiting', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1) {
@@ -1983,6 +1988,7 @@ const PHASE_HANDLERS = {
                 sim.lastRecordedT = 1 + 1 / STEPS_PER_TILE;
                 sim.tunnelProgress = 0;
                 sim.activeTunnel = null;
+                sim.coreVisit = null;
                 sim.phase = 'crawling';
                 // crawling.enter() fires next tick → grace steps + crawl-resume publish
             }
@@ -2009,6 +2015,14 @@ export function stepWormSim(sim, delta, size, ctx) {
         sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
     }
     if (paused) { sim.signatureRequested = false; return; }
+
+    const visit = sim.coreVisit;
+    if (visit && visit.elapsed >= 0 && !visit.complete) {
+        visit.elapsed = Math.min(CORE_VISIT_SECONDS, visit.elapsed + Math.min(delta, MAX_TICK_DELTA));
+        // Present the exact final orbit pose before movement resumes next tick.
+        if (visit.elapsed >= CORE_VISIT_SECONDS) visit.complete = true;
+        return;
+    }
 
     if (usesRaisedPlatforms(ctx)) sim.pendingTunnelTrigger = null;
     if (sim.padFlight) {

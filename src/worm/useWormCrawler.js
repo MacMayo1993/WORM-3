@@ -225,6 +225,7 @@ export function useWormCrawler(size, cubies) {
                     recordStoryMechanic(p, key, id);
             },
             allowDemoSignature: () => wormDemoLesson(useGameStore.getState()).id === 'signature',
+            reducedMotion: () => !!useGameStore.getState().settings?.reducedMotion || !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
             isPaused: () => !!useGameStore.getState().wormPaused || document.hidden,
             isJumpRescueEnabled: () => {
                 const s = useGameStore.getState();
@@ -813,6 +814,7 @@ export function useWormCrawler(size, cubies) {
             moveDir: f('moveDir'),
             phase: f('phase'),
             tunnelProgress: f('tunnelProgress'),
+            coreVisit: f('coreVisit'),
             tunnelRide: f('tunnelRide'),
             activeTunnel: f('activeTunnel'),
             tunnelPassages: f('tunnelPassages'),
