@@ -511,7 +511,10 @@ export function useWormCrawler(size, cubies) {
                 exploded: false, explosionT: 0,
                 wormOrbInventory: practice.inventory, wormBodyTiles: lesson.id === 'heal' ? 2 : 0,
                 wormSessionOrbs: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
-                wormPhase: 'crawling', wormAlive: true, wormPaused: true, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
+                // A retry can interrupt a rescue or a tunnel ride. Reset the
+                // HUD mirrors with the sim, or stale rescue UI disables steering.
+                wormPhase: 'crawling', wormAlive: true, wormPaused: true, wormJumpRescueActive: false,
+                wormActiveTunnelColors: null, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
                 wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormViewPower: null, wormSpecialNotice: null,
                 wormBoostState: 'ready', wormOrbFlash: null, demoWormSteered: false, demoWormTarget: practice.target,
                 demoWormProgress: '', demoWormHazardCleared: null });

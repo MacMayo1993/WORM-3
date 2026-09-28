@@ -12,21 +12,15 @@ import { makeCubies } from '../game/cubeState.js';
 import { totalFlippedCount } from '../game/demoProgress.js';
 import { inspectionLens } from '../3d/inspectionBridge.js';
 
-// Mirrors advanceDemoStep in useDemoMode.js: next id, or 'end' past the last.
-const IDS = DEMO_STEPS.map((s) => s.id);
-const advance = (from) => {
-  if (from === 'worm-traversal') return 'end';
-  const i = IDS.indexOf(from);
-  return IDS[i + 1] || 'end';
-};
+import { DEMO_STEP_IDS as IDS, nextDemoStep as advance } from '../game/demoSequence.js';
 
 describe('demo flow state machine', () => {
   it('has the expected 12-step order ending in end', () => {
     expect(IDS).toEqual([
+      'worm-traversal',
       'baby-cube',
       'twin-paradox',
       'flip-gateway',
-      'worm-traversal',
       'learn-to-solve',
       'control-tour',
       'view-showcase',
@@ -48,7 +42,7 @@ describe('demo flow state machine', () => {
       step = advance(step);
     }
     expect(step).toBe('end');
-    expect([...seen]).toEqual(['baby-cube', 'twin-paradox', 'flip-gateway', 'worm-traversal']);
+    expect([...seen]).toEqual(IDS.slice(0, -1));
   });
 
   it('numbers steps 1..n in order, so the progress pill never disagrees with the stamps', () => {
@@ -83,9 +77,9 @@ describe('demo flow state machine', () => {
     expect(DEMO_LEVEL_CONFIGS['control-tour'].type).toBe('tour');
   });
 
-  it('worm-traversal has an escape hatch and ends the core tour', () => {
+  it('WORM practice leads into the rest of the required tour', () => {
     expect(TRY_COPY['worm-traversal']).toBeTruthy();
-    expect(advance('worm-traversal')).toBe('end');
+    expect(advance('worm-traversal')).toBe('baby-cube');
   });
 
   // ── Coverage: every step the player can stand in has to say something ──────

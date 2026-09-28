@@ -78,22 +78,23 @@ export const createModesSlice = (set, _get) => ({
   demoMode: false,
   demoStep: null,
   wormPauseMenuOpen: false,
-  demoExploring: false,
-  demoExploreComplete: false,
 
   startDemo: () => set({
     xpActivityRuns: {},
     demoMode: true,
-    demoStep: 'baby-cube',
+    wormPauseMenuOpen: false,
+    ...newWormDemo(),
+    demoStep: 'worm-traversal',
     showMainMenu: false,
   }),
   setDemoStep: (demoStep) => set({ demoStep, ...(demoStep === 'worm-traversal' ? newWormDemo() : { demoWormTarget: null }) }),
   startWormDemoLesson: () => set(s => wormDemoActive(s) && s.demoWormPrepared && ['active', 'finalHealing'].includes(s.wormGamePhase) && !s.demoWormComplete && !s.demoWormFinished && s.wormAlive && !s.wormPauseMenuOpen ? { demoWormStarted: true, wormPaused: false } : {}),
   restartWormDemoLesson: () => set(s => !wormDemoActive(s) ? {} : ({ demoWormAttempt: s.demoWormAttempt + 1, demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true, showWormDeathMenu: false })),
-  nextWormDemoLesson: () => set(s => !wormDemoActive(s) ? {} : s.demoWormLessonIndex + 1 >= WORM_DEMO_LESSON_COUNT
+  nextWormDemoLesson: () => set(s => !wormDemoActive(s) || !s.demoWormComplete || s.demoWormFinished ? {} : s.demoWormLessonIndex + 1 >= WORM_DEMO_LESSON_COUNT
     ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null }
     : { demoWormLessonIndex: s.demoWormLessonIndex + 1, demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true }),
-  finishWormDemo: () => set(s => wormDemoActive(s) ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null } : {}),
+  finishWormDemo: () => set(s => wormDemoActive(s) && s.demoWormComplete && s.demoWormLessonIndex === WORM_DEMO_LESSON_COUNT - 1
+    ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null } : {}),
   exitDemo: () => set({
     ...newWormDemo(),
     demoMode: false,

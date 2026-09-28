@@ -1,18 +1,16 @@
 import { characterOrbCount } from '../characterAbilities.js';
 import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import { updateMastery, STORY_POWER_OPENING_DELAY } from './mastery.js';
-import * as THREE from 'three';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
-import { getStickerWorldPos } from '../../game/coordinates.js';
-import { shReset, shPush, ttReset, ttPush, ttAt } from '../circularBuffers.js';
-import { BASE_TAIL_LENGTH, BODY_BALL_SPACING, WORM_LIFT } from '../healerWorm/constants.js';
+import { ttAt } from '../circularBuffers.js';
+import { BODY_BALL_SPACING } from '../healerWorm/constants.js';
 import { getActiveTunnels, getStableKey, findStickerByStableKey } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
-import { hasJumpClearance, tileKey } from '../healerWorm/wormSim.js';
+import { tileKey } from '../healerWorm/wormSim.js';
 import { STORY_WORLDS, STORY_ORB_ROUTES } from './worlds.js';
+import { BODY_JUMP_PATH, seedPracticeBody, trackPracticeBodyJump } from '../healerWorm/bodyJumpPractice.js';
 
-const CROSSING_PATH = [[2,0],[1,0],[0,0],[0,1],[0,2],[1,2],[2,2],[3,2],[4,2],[4,3],[3,3],[2,3],[1,3],[0,3]];
 const LONG_PATH = [[2,0],[1,0],[0,0],[0,1],[0,2],[0,3],[0,4],[1,4],[1,3]];
 const MOUTHS = [[1,2,4,'PZ'], [4,2,1,'PX'], [1,4,2,'PY'], [3,2,4,'PZ'], [4,2,3,'PX'], [3,4,2,'PY']];
 // Smallest board the authored 5×5 templates fit. Below it, trails, mouths and
@@ -26,7 +24,7 @@ export const STORY_ORB_REFILL_INTERVAL = 1.5;
 export function storyBodyPath(size, level) {
   const offset = Math.floor(size / 2) - 2;
   if (size >= TEMPLATE_SIZE) {
-    const template = level.kind === 'jump' ? CROSSING_PATH : level.id === 1 ? LONG_PATH.slice(0, 6) : LONG_PATH;
+    const template = level.kind === 'jump' ? BODY_JUMP_PATH : level.id === 1 ? LONG_PATH.slice(0, 6) : LONG_PATH;
     return template.map(([x, y]) => [x + offset, y]);
   }
   const c = Math.floor(size / 2);
@@ -80,23 +78,6 @@ const routeCell = (size, [u, v]) => {
   return [Math.round(u * (size - 1) / 4), Math.round(v * (size - 1) / 4)];
 };
 
-function seedBody(sim, size, path) {
-  const normal = new THREE.Vector3(0, 0, 1);
-  // Keep the authored unit-length trail aligned to the centered spawn column.
-  // Only its face depth changes; stretching the path would stretch the body.
-  const edge = size - 1;
-  shReset(sim.stepHistory);
-  ttReset(sim.tileTrail, `${path.at(-1).join(',')},${edge},PZ`);
-  const point = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3();
-  for (let i = path.length - 1; i > 0; i--) {
-    a.fromArray(getStickerWorldPos(...path[i], edge, 'PZ', size, 0)).addScaledVector(normal, WORM_LIFT);
-    b.fromArray(getStickerWorldPos(...path[i - 1], edge, 'PZ', size, 0)).addScaledVector(normal, WORM_LIFT);
-    for (let n = 0; n < 50; n++) shPush(sim.stepHistory, point.lerpVectors(a, b, n / 50), normal, path[i][0], path[i][1], edge);
-    ttPush(sim.tileTrail, `${path[i - 1][0]},${path[i - 1][1]},${edge},PZ`);
-  }
-  sim.tailLength = BASE_TAIL_LENGTH;
-}
-
 export function stageStory(sim, size, level, character) {
   const base = stageWormPractice(sim, size, { id: 'steer' });
   const edge = size - 1;
@@ -135,7 +116,7 @@ export function stageStory(sim, size, level, character) {
       }
     }
   }
-  seedBody(sim, size, body);
+  seedPracticeBody(sim, size, body);
   if (level.kind === 'jump') {
     const row = size >= TEMPLATE_SIZE ? 2 : size - 1;
     base.target = { x: Math.floor(size / 2), y: row, z: edge, dirKey: 'PZ' };
@@ -218,24 +199,7 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
   const cutting = sim.cutFocusT > 0;
   if (cutting && !practice.wasCut) practice.cuts++;
   practice.wasCut = cutting;
-  if (level.kind === 'jump') {
-    if (sim.isJumping) {
-      practice.airborne = true;
-      // Count a clearance once per airborne episode, only at real body contact
-      // height. Double jumps and several frames over one tile cannot add points.
-      if (!practice.crossedThisJump && !sim.rocketActive && sim.interpT >= 0.5) {
-        const key = tileKey(sim.pos);
-        for (let i = 3; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) {
-          if (ttAt(sim.tileTrail, i) === key) {
-            practice.crossedThisJump = hasJumpClearance(sim); break;
-          }
-        }
-      }
-    } else if (practice.airborne) {
-      if (practice.crossedThisJump && sim.alive && sim.phase === 'crawling') practice.bodyJumps++;
-      practice.airborne = false; practice.crossedThisJump = false;
-    }
-  }
+  if (level.kind === 'jump') trackPracticeBodyJump(sim, practice, state.size);
   updateMastery(sim, practice, level, delta);
   return {
     ...practice.mechanics, elements: practice.elements.size, powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,

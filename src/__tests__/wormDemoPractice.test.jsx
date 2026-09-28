@@ -81,6 +81,7 @@ function collectExplodeOrb() {
 
 it.each(['restart', 'next'])('clears the exploded renderer and traversal geometry when practice moves to %s', action => {
   collectExplodeOrb();
+  input('jump'); until(() => state().demoWormComplete);
   act(() => action === 'restart' ? state().restartWormDemoLesson() : state().nextWormDemoLesson());
   frame();
   expect(worm.expansionAmount.current).toBe(0);
@@ -112,6 +113,31 @@ it('requires a real landing for the single-jump lesson', () => {
   lesson('jump'); input('jump'); until(() => worm.isJumping.current);
   expect(state().demoWormComplete).toBe(false);
   until(() => state().demoWormComplete); expect(worm.isJumping.current).toBe(false);
+});
+it('requires clearing the staged body and landing, and supports the live Jump now rescue', () => {
+  lesson('body-jump');
+  expect(state().demoWormTarget).toMatchObject({ x: 2, y: 2, z: 4 });
+  until(() => state().wormJumpRescueActive);
+  expect(state().demoWormComplete).toBe(false);
+  input('jump'); until(() => worm.isJumping.current);
+  until(() => state().demoWormProgress === 'Body cleared — land safely');
+  expect(state().demoWormComplete).toBe(false);
+  until(() => state().demoWormComplete);
+  expect(state().wormAlive).toBe(true);
+  expect(worm.isJumping.current).toBe(false);
+  expect(state().demoWormCompleted).toContain('body-jump');
+});
+it('completes a planned body jump before the rescue cue, without counting an empty hop', () => {
+  lesson('body-jump'); input('turnRight'); input('jump');
+  until(() => worm.isJumping.current); until(() => !worm.isJumping.current);
+  expect(state().demoWormComplete).toBe(false);
+  act(() => state().restartWormDemoLesson()); frame(); frame();
+  act(() => state().startWormDemoLesson());
+  until(() => worm.pos.current.y === 1 && worm.interpT.current > 0.8);
+  input('jump');
+  until(() => state().demoWormComplete);
+  expect(state().wormAlive).toBe(true);
+  expect(state().wormJumpRescueActive).toBe(false);
 });
 it('counts a double jump only when both presses land in one flight', () => {
   lesson('double-jump'); input('jump'); until(() => worm.isJumping.current);
@@ -149,6 +175,17 @@ it.each(['tunnel', 'heal'])('finishes %s only after the tail exits and preserves
   expect(state().wormHealedCount).toBe(id === 'heal' ? 1 : 0);
   if (id === 'heal') expect(Object.values(state().wormOrbInventory).reduce((a, b) => a + b, 0)).toBe(2);
 });
+it('retries healing during the tunnel ride with fresh charges and working controls', () => {
+  lesson('heal'); input('jump'); until(() => state().wormTunnelCount > 0);
+  expect(state().demoWormProgress).toBe('Riding through the tunnel…');
+  act(() => state().restartWormDemoLesson()); frame(); frame();
+  expect(state()).toMatchObject({ wormPhase: 'crawling', wormJumpRescueActive: false,
+    wormActiveTunnelColors: null, demoWormComplete: false, wormTunnelCount: 0 });
+  expect(Object.values(state().wormOrbInventory).reduce((sum, n) => sum + n, 0)).toBe(6);
+  act(() => state().startWormDemoLesson()); input('jump');
+  until(() => state().demoWormComplete, 1600);
+  expect(state().wormHealedCount).toBe(1);
+});
 it('walks under a raised tunnel without entering and can retry the jump route', () => {
   lesson('tunnel'); frames(90);
   expect(state().wormTunnelCount).toBe(0); expect(state().demoWormComplete).toBe(false);
@@ -179,15 +216,15 @@ it('teaches the real Light Trail and waits until it paints behind the tail', () 
   until(() => state().demoWormComplete); expect(worm.signature.current.seq).toBe(1);
   expect(worm.signature.current.glowTrail.path.count).toBeGreaterThanOrEqual(2);
 });
-it('retries only the current exercise; skipping gives no completion credit and clears old buffs', () => {
+it('retries the current exercise and blocks Next and early finish until goals are met', () => {
   lesson('magnet'); until(() => state().demoWormComplete);
   act(() => state().nextWormDemoLesson()); frame();
   expect(state().wormMagnetActive).toBe(false); expect(state().demoWormComplete).toBe(false);
   act(() => state().restartWormDemoLesson()); frame(); expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('water');
   act(() => state().nextWormDemoLesson()); frame();
   expect(state().demoWormCompleted).not.toContain('water');
-  act(() => state().finishWormDemo()); expect(state().demoWormFinished).toBe(true);
-  expect(state().demoWormTarget).toBeNull();
+  expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('water');
+  act(() => state().finishWormDemo()); expect(state().demoWormFinished).toBe(false);
 });
 it('covers the ring with the current body and heals through the real ring logic', () => {
   lesson('surround');
@@ -197,6 +234,22 @@ it('covers the ring with the current body and heals through the real ring logic'
   until(() => state().demoWormComplete);
   expect(state().wormHealedCount).toBe(1);
   expect(state().wormBodyTiles).toBe(0);
+});
+
+it.each(['retry', 'next'])('clears a live body-collision rescue when leaving the ring lesson via %s', action => {
+  lesson('surround');
+  until(() => worm.pos.current.x === 3 && worm.interpT.current > 0.9); input('turnLeft');
+  until(() => worm.pos.current.y === 3 && worm.interpT.current > 0.9); input('turnLeft');
+  until(() => worm.pos.current.x === 1 && worm.interpT.current > 0.9); input('turnLeft');
+  until(() => state().demoWormComplete);
+  input('turnLeft');
+  until(() => state().wormJumpRescueActive);
+  act(() => action === 'retry' ? state().restartWormDemoLesson() : state().nextWormDemoLesson());
+  frame(); frame();
+  expect(state().wormJumpRescueActive).toBe(false);
+  expect(wormBuffs.jumpRescueT).toBe(0);
+  act(() => state().startWormDemoLesson());
+  expect(host.querySelector('[aria-label="Turn left"]').disabled).toBe(false);
 });
 it('waits for Try it, honors manual pause after success, and changes lessons only on Next', () => {
   act(() => state().restartWormDemoLesson());
@@ -232,8 +285,9 @@ it('does not finish the chapter after a tunnel and awards no real XP or coins fo
 
 it('covers every elemental orb and keeps the store lesson count in sync', () => {
   expect(WORM_DEMO_LESSONS).toHaveLength(WORM_DEMO_LESSON_COUNT);
-  // Double jump follows the single jump it builds on; Story levels count it.
-  expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'jump') + 1].id).toBe('double-jump');
+  // Body clearance follows the basic hop, then double jump builds on both.
+  expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'jump') + 1].id).toBe('body-jump');
+  expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'body-jump') + 1].id).toBe('double-jump');
   expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'double-jump') + 1].id).toBe('boost');
   for (const id of ELEMENTAL_TYPES) expect(WORM_DEMO_LESSONS.some(l => l.id === id)).toBe(true);
 });

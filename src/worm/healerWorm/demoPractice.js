@@ -5,6 +5,8 @@ import { getWormholeHealRing } from '../wormLogic.js';
 import { ttReset, ttAt } from '../circularBuffers.js';
 import { resetWormSim, tileKey } from './wormSim.js';
 import { BODY_BALL_SPACING, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from './constants.js';
+import { BODY_JUMP_PATH, seedPracticeBody, trackPracticeBodyJump } from './bodyJumpPractice.js';
+import { bodyCoverageCount } from './bodyCoverage.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 
 export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COLORS[face]) {
@@ -21,6 +23,11 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   sim.headInterpPos.copy(sim._curWP);
   ttReset(sim.tileTrail, tileKey(sim.pos)); ttReset(sim.pathHistory, tileKey(sim.pos));
   sim.tailLength = ring ? Math.ceil(8 / BODY_BALL_SPACING) : BASE_TAIL_LENGTH;
+  if (lesson.id === 'body-jump') {
+    seedPracticeBody(sim, size, BODY_JUMP_PATH.map(([x, y]) => [x + c - 2, y]));
+    sim.tailLength = Math.ceil(10 / BODY_BALL_SPACING);
+    target.y = 2;
+  }
   let cubies = makeCubies(size);
   if (['tunnel', 'heal', 'surround'].includes(lesson.id)) {
     cubies = flipStickerPair(cubies, size, target.x, target.y, target.z, target.dirKey, buildManifoldGridMap(cubies, size));
@@ -40,8 +47,8 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   if (['rocket', 'magnet', 'water', 'fire', 'grass', 'ice', 'lightning'].includes(lesson.id)) {
     sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lesson.id, id: `demo-${lesson.id}`, ttl: 9999, maxTtl: 9999 }];
   }
-  const marked = ring || ['tunnel', 'heal'].includes(lesson.id) ? { ...target, ring } : null;
-  return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, elementTime: 0 };
+  const marked = ring || ['tunnel', 'heal', 'body-jump'].includes(lesson.id) ? { ...target, ring } : null;
+  return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
 }
 
 // Reads actual outcomes after a physics tick. No input press alone completes a
@@ -56,6 +63,11 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
     case 'steer': done = !!state.demoWormSteered; break;
     case 'orbs': done = state.wormSessionOrbs >= 2; progress = `${Math.min(2, state.wormSessionOrbs)} / 2 orbs`; break;
     case 'jump': done = practice.sawJump && !sim.isJumping; break;
+    case 'body-jump':
+      trackPracticeBodyJump(sim, practice, size);
+      done = practice.bodyJumps > 0;
+      progress = practice.crossedThisJump ? 'Body cleared — land safely' : 'Jump over the body crossing ahead';
+      break;
     // Both presses must land in ONE flight: a single hop that lands resets the
     // count, exactly as landing hands both jumps back in live play.
     case 'double-jump':
@@ -66,11 +78,16 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
       break;
     case 'boost': done = practice.sawBoost && sim.boostActiveT <= 0; break;
     case 'tunnel':
-    case 'heal': done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && state.wormPhase === 'crawling' && sim.tunnelPassages.length === 0 && (lesson.id !== 'heal' || sim.healed > 0); break;
+    case 'heal':
+      done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && state.wormPhase === 'crawling' && sim.tunnelPassages.length === 0 && (lesson.id !== 'heal' || sim.healed > 0);
+      progress = state.wormTunnelCount === 0 ? 'Jump onto the raised pad ahead; Retry resets your approach'
+        : sim.phase !== 'crawling' ? 'Riding through the tunnel…'
+          : sim.tunnelPassages.length ? 'Keep moving — your tail is still exiting' : '';
+      break;
     case 'surround':
     case 'bomb': {
       const occupied = new Set();
-      for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
+      for (let i = 0; i < bodyCoverageCount(sim.tailLength, sim.tileTrail.count, size, sim.expansionAmount); i++) occupied.add(ttAt(sim.tileTrail, i));
       const ring = getWormholeHealRing(practice.target, size);
       const count = [...ring].filter(key => occupied.has(key)).length;
       progress = `${count} / ${ring.size} tiles covered together`;

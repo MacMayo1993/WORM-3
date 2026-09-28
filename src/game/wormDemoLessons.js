@@ -1,14 +1,15 @@
 // One live task at a time. Completion comes from simulation outcomes, never taps
-// on Next, and skipped exercises are not recorded as completed.
+// on Next. Every exercise leads to the next required part of the demo.
 export const WORM_DEMO_LESSONS = [
   { id: 'steer', title: 'Find your direction', instruction: 'Swipe left or right, or use the arrow buttons. The worm keeps moving.', success: 'You are steering. Next, grow your worm.' },
   { id: 'orbs', title: 'Collect and grow', instruction: 'Follow the two glowing orbs. Each pickup adds three healing charges to your tail.', success: 'Two orbs give six charges. Each orb takes its tile’s color, and healing a tunnel costs four charges of that tunnel’s color. Orbs over raised tiles float: jump to reach them.' },
   { id: 'jump', title: 'Jump', instruction: 'Press JUMP once, then land. Use a jump to clear your body or a gap. Watch for the Jump now cue if your body blocks the route.', success: 'You landed. You can steer during a surface jump; jumps near raised pads aim for the platform.' },
+  { id: 'body-jump', title: 'Jump over your body', instruction: 'Your tail crosses the route ahead. Press Try it, keep straight, then press JUMP as you approach the crossing. Clear your body and land safely. If you stop at the Jump now cue, jump to escape; Retry sets up the crossing again.', success: 'You cleared your own body and landed safely. Jump before reaching it; walking into your tail can end the run.' },
   { id: 'double-jump', title: 'Double jump', instruction: 'Press JUMP, then press it again before you land. The second jump climbs on from your current height.', success: 'You landed a double jump. Each flight gets two jumps, and landing gives both back. Near a raised pad, the second press aims for the platform.' },
   { id: 'boost', title: 'Burst of speed', instruction: 'Press Boost and feel the speed change. It recharges after the burst.', success: 'Boost is a timed burst. Watch the button for its recharge.' },
   { id: 'tunnel', title: 'Jump onto a flip pad', instruction: 'Face the raised tile ahead. Press JUMP to land on the marked pad and ride its tunnel. Walking underneath does not enter.', success: 'You rode the band and emerged from the opposite raised tile. With no matching charges, the tunnel stays open. An open tunnel holds for three rides; the fourth collapses and ends the run.' },
-  { id: 'heal', title: 'Heal on exit', instruction: 'You have six charges matching the raised tile. Press JUMP to ride its tunnel, then keep moving until your whole tail clears the exit.', success: 'Four charges sealed both ends after your tail cleared. The remaining two stay with you.' },
-  { id: 'surround', title: 'Surround to flip it back', instruction: 'Follow the eight marked tiles around the hole. Cover the whole ring with your body at once. Practice length is supplied.', success: 'Surrounding the entrance flips both tiles home without spending orbs.' },
+  { id: 'heal', title: 'Heal on exit', instruction: 'You have six matching charges. Press Try it, then JUMP toward the raised pad. Ride through and keep moving until your whole tail clears the exit. Retry gives you a fresh pad and charges.', success: 'Four charges sealed both ends; two remain. Next, learn to heal by surrounding a hole.' },
+  { id: 'surround', title: 'Surround to flip it back', instruction: 'Follow the eight marked floor tiles around the hole. Turn left at each corner and keep your whole body on the ring. Your practice worm is long enough; Retry resets the route.', success: 'Surrounding the entrance flips both tiles home without spending orbs. Next, try the rocket.' },
   { id: 'rocket', title: 'Rocket flight', instruction: 'Collect the rocket orb ahead. Steer during the flight, then land.', success: 'Rocket flight protects you from body collisions and skips tunnel entrances.' },
   { id: 'magnet', title: 'Pull nearby orbs', instruction: 'Collect the magnet ahead, then pass near the glowing orbs to pull them in.', success: 'The magnet reaches two tiles away, including around cube edges.' },
   { id: 'water', title: 'Water momentum', instruction: 'Collect the blue droplet and keep a straight route to build speed. Turning sheds momentum.', success: 'Water adds up to 25% speed on a straight route.' },
@@ -18,12 +19,7 @@ export const WORM_DEMO_LESSONS = [
   { id: 'lightning', title: 'Ride the storm', instruction: 'Collect the purple lightning orb and keep crawling as the cube lights up.', success: 'Lightning transforms the cube with electrical veins and strikes.' },
   { id: 'signature', title: 'Your signature move', instruction: 'Press Trail, then crawl until you see it painted behind your tail. Glow Worm paints for eight seconds; the trail stays for twelve more.', success: 'Your Light Trail is visible. Its cooldown is separate from Boost, and portal enemies glow brighter while it is active. Each worm character has its own signature move.' },
   { id: 'bomb', title: 'Disarm a bomb', instruction: 'Surround the bomb using the marked ring before its fuse runs out. Your practice worm is already long enough.', success: 'A complete ring disarms the bomb. In real runs, keep clear of its blast lanes: a blast that catches your head on the ground ends the run, and one that catches your body burns off your tail. Jumping protects your head.' },
-  { id: 'rotation', title: 'Watch the turning layer', instruction: 'Watch the lit layer and countdown. Get off it before it turns: a turn that catches your head ends the run, and one that catches your body cuts off your tail.', success: 'You cleared the turning layer. You have finished WORM practice.' },
+  { id: 'rotation', title: 'Watch the turning layer', instruction: 'Watch the lit layer and countdown. Get off it before it turns: a turn that catches your head ends the run, and one that catches your body cuts off your tail.', success: 'You cleared the turning layer. WORM practice is complete; next we’ll learn to twist and flip the cube.' },
 ];
-// The last exercise of the WORM loop itself: steer, grow, jump, ride, heal. The
-// practice is the demo's final step, so here the card offers Finish first and
-// the rest (power-ups, elements, hazards) as an opt-in, the same way the end
-// screen offers its extra lessons; nothing is dropped, and Next still walks on.
-export const WORM_DEMO_CHECKPOINT = 'heal';
 export { wormDemoActive, newWormDemo } from './wormDemoState.js';
 export const wormDemoLesson = s => WORM_DEMO_LESSONS[s.demoWormLessonIndex ?? 0] ?? WORM_DEMO_LESSONS[0];

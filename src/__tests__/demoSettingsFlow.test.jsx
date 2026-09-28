@@ -37,10 +37,10 @@ function Harness() {
       <DemoCoach step={demo.demoStep} onNext={demo.demoStep === 'chaos-forecast'
         ? demo.handleDemoDisparityDismiss : () => demo.advanceDemoStep(demo.demoStep)} />
     </ScreenTransition>
-    {demo.demoForecastVisible && <DemoForecastPicker onPick={demo.handleDemoForecastPick} onSkip={demo.handleDemoChaosSkip} />}
+    {demo.demoForecastVisible && <DemoForecastPicker onPick={demo.handleDemoForecastPick} onExit={demo.handleExitDemo} />}
     {showWinner && <DisparityWinnerScreen demoNavigation onDismiss={demo.handleDemoDisparityDismiss} />}
     {demo.demoStepIntroVisible && <DemoStepIntro step={demo.demoStep}
-      onContinue={demo.handleDemoStepContinue} onSkip={() => demo.advanceDemoStep(demo.demoStep)} />}
+      onContinue={demo.handleDemoStepContinue} onExit={demo.handleExitDemo} />}
   </>;
 }
 const button = label => [...host.querySelectorAll('button')].find(b => b.textContent === label);
@@ -165,22 +165,23 @@ it.each([
   }
 });
 
-it('can skip the longer Chaos briefing without starting a round', () => {
+it('can exit the required Chaos briefing without skipping into the next section', () => {
   act(() => demo.advanceDemoStep('make-it-yours'));
-  click(button('Skip lesson'));
+  click(button('Exit Demo'));
   wait(300);
-  expect(demo.demoStep).toBe('random-showcase');
+  expect(demo.demoStep).toBeNull();
+  expect(useGameStore.getState().demoMode).toBe(false);
   expect(demo.demoForecastVisible).toBe(false);
   expect(callbacks.startDisparityGame).not.toHaveBeenCalled();
   expect(useGameStore.getState().randomMode).toBe(false);
 });
 
-it.each(['forecast', 'first strike', 'playing', 'winner reveal', 'results'])(
+it.each(['first strike', 'playing', 'winner reveal', 'results'])(
   'offers Next during Chaos %s and advances once with the correct reward', phase => {
     act(() => useGameStore.getState().setDemoStep('chaos-forecast'));
     act(() => demo.handleDemoStepContinue());
     expect(demo.demoTryVisible).toBe(true); // No five-second wait.
-    if (phase !== 'forecast') {
+    {
       click(host.querySelector('[aria-pressed="false"]'));
       click(button('Confirm pick'));
       act(() => useGameStore.setState({ chaosIgnitionPicking: phase === 'first strike', chaosLevel: phase === 'playing' ? 3 : 0 }));
@@ -193,7 +194,6 @@ it.each(['forecast', 'first strike', 'playing', 'winner reveal', 'results'])(
     const next = button('Next: Random →');
     expect(next).toBeDefined();
     expect(next.disabled).toBe(false);
-    if (phase === 'forecast') expect(next.parentElement.style.position).toBe('sticky');
     if (phase === 'results') {
       expect(next.closest('[aria-label="Demo navigation"]')).not.toBeNull();
       expect(document.activeElement).toBe(next);
