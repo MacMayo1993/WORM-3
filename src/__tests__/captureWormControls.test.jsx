@@ -48,3 +48,12 @@ it('does not turn ordinary HUD taps into capture jumps', () => {
   touch('touchstart', [finger()]); touch('touchend', [], [finger()]);
   expect(turn).not.toHaveBeenCalledWith('jump');
 });
+it('leaves keyboard input on camera buttons to the UI', () => {
+  const panel = document.createElement('div'); panel.dataset.gameInput = 'ui';
+  const button = document.createElement('button'); panel.append(button); host.append(panel);
+  turn.mockClear();
+  for (const key of [' ', 'ArrowLeft', 'q', 'f']) act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+  expect(turn).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
+  expect(turn).toHaveBeenCalledWith('jump');
+});

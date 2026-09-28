@@ -8,6 +8,14 @@ export const ORB_SHOWER_CAP = 144;
 export const DEMO_ORB_GOAL = 12;
 let orbSequence = 0;
 const keyOf = p => `${p.x},${p.y},${p.z},${p.dirKey}`;
+const SHOWER_FACES = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
+
+export function orbShowerCapacity(size, baseOrbs) {
+  // Classic can already fill most of a small board. Reserve a complete six-face
+  // wave above that permanent supply, while keeping the usual large-board cap.
+  return Math.min(6 * size * size - 1,
+    Math.max(baseOrbs + SHOWER_FACES.length, Math.min(ORB_SHOWER_CAP, Math.floor(6 * size * size * 0.65))));
+}
 
 // Identity survives layer rotations, while a respawn on the same tile gets a
 // fresh entrance. Never reset the sequence between runs or demo lessons.
@@ -23,7 +31,8 @@ export function startOrbShower(sim, ctx) {
 // One orb per face per wave. Avoid the body, head, other pickups and open pads;
 // never fall back to an occupied tile when a small board fills up.
 export function showerWave(sim, size, cubies) {
-  const cap = Math.min(ORB_SHOWER_CAP, Math.floor(6 * size * size * 0.65));
+  const baseOrbs = sim.powerups.reduce((count, orb) => count + !orb.shower, 0);
+  const cap = orbShowerCapacity(size, baseOrbs);
   if (sim.powerups.length >= cap) return false;
   const occupied = new Set([...sim.powerups, ...sim.specials, sim.pos].map(keyOf));
   if (sim.prevTile) occupied.add(keyOf(sim.prevTile));
@@ -37,9 +46,16 @@ export function showerWave(sim, size, cubies) {
     faces.get(tile.dirKey).push(tile);
   }
   const before = sim.powerups.length;
-  for (const tiles of faces.values()) {
+  const firstFace = sim.orbShowerFace ?? 0;
+  for (let offset = 0; offset < SHOWER_FACES.length; offset++) {
     if (sim.powerups.length >= cap) break;
+    const index = (firstFace + offset) % SHOWER_FACES.length;
+    const tiles = faces.get(SHOWER_FACES[index]);
+    if (!tiles?.length) continue;
     sim.powerups.push(makeGrowthOrb(tiles[Math.floor(sim.rand() * tiles.length)], { shower: true }));
+    // Resume after the last face actually served. Even one newly available slot
+    // per wave rotates through the cube rather than restarting at PX forever.
+    sim.orbShowerFace = (index + 1) % SHOWER_FACES.length;
   }
   return sim.powerups.length > before;
 }

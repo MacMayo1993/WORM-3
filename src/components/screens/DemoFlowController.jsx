@@ -410,32 +410,6 @@ const ensureDemoShellStyle = () => {
       }
     }
 
-    /* A view that opens the Far Side window puts a 240x180 picture-in-picture in
-       the top-left corner — and the centred card lands straight on top of it,
-       hiding the very thing the copy is telling the player to look at. Two ways
-       out, depending on which axis has room:
-
-         • Tall enough to spare: drop the card below the window. 44px top bar +
-           8px gap + 180px window + a margin.
-         • Short and wide (landscape phones): there is no vertical room to give,
-           so send the card to the right instead and leave the left column to
-           the window.
-
-       Doubled class so this outranks the mobile media-query block above it
-       regardless of source order. */
-    @media (min-height: 620px) {
-      .demo-intro-root.demo-intro-root--clear-pip {
-        padding-top: max(252px, calc(env(safe-area-inset-top, 0px) + 244px));
-      }
-    }
-
-    @media (max-height: 619px) {
-      .demo-intro-root.demo-intro-root--clear-pip {
-        justify-content: flex-end;
-        padding-right: 18px;
-      }
-    }
-
     /* Worm mode owns the top edge with its glance strip — dock the pill at the
        bottom, above the thumb tray. Declared last so it wins over the mobile
        media-query top override. */
@@ -1034,11 +1008,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'mirror',
     title: 'Far Side',
-    copy: 'The small window shows the opposite view. Watch both views as the paired tiles flip.',
-    // This is the one view whose subject is in the top-left corner rather than
-    // in the middle of the screen, so the card has to get out of the window's
-    // way — see .demo-intro-root--clear-pip.
-    clearsTopLeft: true,
+    copy: 'The small window shows the opposite view. Tap Far side to expand it if tucked away, and watch paired tiles flip in both views.',
     // The strongest twin-teaching view in the game: main camera and the picture
     // -in-picture sit at opposite ends of the same line through the cube's
     // centre, so a flipped pair shows up in both at once. Stage one flip so
@@ -1251,7 +1221,7 @@ const DemoViewShowcase = ({ subStep, onNext }) => {
 
   return (
     <div
-      className={`demo-intro-root${entry.clearsTopLeft ? ' demo-intro-root--clear-pip' : ''}`}
+      className="demo-intro-root"
       style={{ pointerEvents: 'none', background: 'none', backdropFilter: 'none' }}
     >
       <section className="demo-intro-card" style={{ pointerEvents: 'auto' }} aria-live="polite">

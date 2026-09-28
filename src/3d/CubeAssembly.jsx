@@ -1228,7 +1228,7 @@ const CubeAssembly = React.memo(({
   return (
     <StickerInstanceProvider exteriorPortals={exteriorPortals}>
       <StickerAnimationDriver />
-      <group ref={cubeGroupRef}>
+      <group ref={cubeGroupRef} name="game-cube">
         <InspectionViews cubeRef={cubeGroupRef} exteriorRef={exteriorRef} manifoldMap={manifoldMap} />
         <WormholeNetwork
           manifoldMap={manifoldMap}
