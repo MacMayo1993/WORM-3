@@ -60,6 +60,7 @@ export const makeWormSessionDefaults = () => ({
   // mid-tunnel countdown freezes with the simulation instead of a wall clock.
   wormExplodeActive: false,
   wormRocketActive: false,
+  wormOrbShowerActive: false,
   wormMagnetActive: false,
   wormMagnetSeq: 0,
   // Active elemental wash ('water'|'fire'|'grass'|'ice') or null — drives the

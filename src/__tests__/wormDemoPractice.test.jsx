@@ -57,12 +57,16 @@ it('uses Easy speed and keeps moving and accepting controls after steering succe
   expect(state().demoWormCompleted).toEqual(['steer']);
   expect(host.textContent).toContain('Keep practicing');
 });
-it('collects two staged orbs through the production pickup path and gives six charges', () => {
-  lesson('orbs'); until(() => state().demoWormComplete);
-  expect(state().wormSessionOrbs).toBe(2); expect(state().wormBodyTiles).toBe(2); expect(Object.values(state().wormOrbInventory).reduce((a, b) => a + b, 0)).toBe(6);
+it('provides abundant orbs on every face and grows a long worm through twelve real pickups', () => {
+  lesson('orbs');
+  const supply = state().wormPowerups.length;
+  expect(supply).toBeGreaterThan(60);
+  expect(new Set(state().wormPowerups.map(p => p.dirKey)).size).toBe(6);
+  until(() => state().demoWormComplete);
+  expect(state().wormSessionOrbs).toBe(12); expect(state().wormBodyTiles).toBe(12); expect(Object.values(state().wormOrbInventory).reduce((a, b) => a + b, 0)).toBe(36);
   const pos = { ...worm.pos.current }; frames(20);
   expect(state().wormPaused).toBe(false); expect(worm.pos.current).not.toEqual(pos);
-  expect(state().wormPowerups).toHaveLength(2);
+  expect(state().wormPowerups).toHaveLength(supply);
   expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('orbs');
 });
 
@@ -220,10 +224,10 @@ it('retries the current exercise and blocks Next and early finish until goals ar
   lesson('magnet'); until(() => state().demoWormComplete);
   act(() => state().nextWormDemoLesson()); frame();
   expect(state().wormMagnetActive).toBe(false); expect(state().demoWormComplete).toBe(false);
-  act(() => state().restartWormDemoLesson()); frame(); expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('water');
+  act(() => state().restartWormDemoLesson()); frame(); expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('orb-shower');
   act(() => state().nextWormDemoLesson()); frame();
-  expect(state().demoWormCompleted).not.toContain('water');
-  expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('water');
+  expect(state().demoWormCompleted).not.toContain('orb-shower');
+  expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('orb-shower');
   act(() => state().finishWormDemo()); expect(state().demoWormFinished).toBe(false);
 });
 it('covers the ring with the current body and heals through the real ring logic', () => {
@@ -290,4 +294,27 @@ it('covers every elemental orb and keeps the store lesson count in sync', () => 
   expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'body-jump') + 1].id).toBe('double-jump');
   expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'double-jump') + 1].id).toBe('boost');
   for (const id of ELEMENTAL_TYPES) expect(WORM_DEMO_LESSONS.some(l => l.id === id)).toBe(true);
+});
+
+it('showcases the full Orb Shower, freezes its countdown on pause, and clears it on Retry', () => {
+  lesson('orb-shower');
+  expect(state().demoWormComplete).toBe(false);
+  until(() => state().wormOrbShowerActive);
+  expect(worm.orbShowerT.current).toBeGreaterThan(9);
+  frames(60);
+  expect(state().wormPowerups.length).toBeGreaterThan(24);
+  expect(state().demoWormComplete).toBe(false);
+  act(() => useGameStore.setState({ wormPaused: true }));
+  const left = worm.orbShowerT.current; frames(40);
+  expect(worm.orbShowerT.current).toBe(left);
+  act(() => useGameStore.setState({ wormPaused: false }));
+  until(() => state().demoWormComplete);
+  expect(state().wormOrbShowerActive).toBe(false);
+  expect(state().wormPowerups.length).toBeGreaterThan(40);
+  expect(state().wormSessionOrbs).toBeGreaterThan(0);
+  act(() => state().restartWormDemoLesson()); frame();
+  expect(worm.orbShowerT.current).toBe(0);
+  expect(wormBuffs.orbShowerT).toBe(0);
+  expect(state().wormPowerups).toHaveLength(0);
+  expect(state().demoWormComplete).toBe(false);
 });

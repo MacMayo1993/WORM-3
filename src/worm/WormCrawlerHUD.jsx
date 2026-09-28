@@ -1,3 +1,4 @@
+import { ORB_SHOWER_DURATION } from './healerWorm/orbSpawning.js';
 import { getViewPowerDef, VIEW_POWER_DURATION } from './healerWorm/viewPowerups.js';
 import { EXPLODE_DURATION } from './wormExpansion.js';
 import { ScreenHeading } from '../components/ui/ModeArtwork.jsx';
@@ -744,6 +745,20 @@ function SpecialIcon({ type, size = 14 }) {
 // instead of draining against a wall clock.
 
 function BuffStrip({ detailed = false, onInspect }) {
+    const showerActive = useGameStore(s => s.wormOrbShowerActive ?? false);
+    const showerSeconds = useRef(null);
+    const showerFill = useRef(null);
+    useEffect(() => {
+        if (!showerActive) return;
+        let raf;
+        const paint = () => {
+            if (showerSeconds.current) showerSeconds.current.textContent = `${Math.max(0, wormBuffs.orbShowerT).toFixed(1)}s`;
+            if (showerFill.current) showerFill.current.style.width = `${100 * wormBuffs.orbShowerT / ORB_SHOWER_DURATION}%`;
+            raf = requestAnimationFrame(paint);
+        };
+        paint();
+        return () => cancelAnimationFrame(raf);
+    }, [showerActive, detailed]);
     const explodeActive = useGameStore(s => s.wormExplodeActive ?? false);
     const viewPower = useGameStore(s => s.wormViewPower);
     const viewDef = getViewPowerDef(viewPower);
@@ -821,7 +836,7 @@ function BuffStrip({ detailed = false, onInspect }) {
         paint();
         return () => cancelAnimationFrame(raf);
     }, [explodeActive]);
-    if (!viewDef && !rocketActive && !magnetActive && !elementalTheme && !explodeActive) return null;
+    if (!showerActive && !viewDef && !rocketActive && !magnetActive && !elementalTheme && !explodeActive) return null;
 
     const rocketDef = getSpecialDef('rocket');
     const magnetDef = getSpecialDef('magnet');
@@ -836,6 +851,15 @@ function BuffStrip({ detailed = false, onInspect }) {
                 <span ref={viewSeconds} aria-hidden="true" />
             </button>
             {detailed && <p>{viewDef.description}</p>}
+        </div>}
+        {showerActive && <div className="worm-buff-item">
+            <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
+                style={{ '--power-color': getSpecialDef('orb-shower').color }} aria-label="Orb Shower active" aria-haspopup={detailed ? undefined : 'dialog'}>
+                <span ref={showerFill} className="worm-buff-meter" aria-hidden="true" style={{ width: '100%' }} />
+                <SpecialIcon type="orb-shower" /><span className="worm-buff-name">Orb Shower</span>
+                <span ref={showerSeconds} aria-hidden="true" />
+            </button>
+            {detailed && <p>{getSpecialDef('orb-shower').description}</p>}
         </div>}
         {explodeActive && <div className="worm-buff-item">
             <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
@@ -1134,7 +1158,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
 }
 
 function HudContext({ surface, demo, onInspect }) {
-    const hasBuff = useGameStore(s => s.wormExplodeActive || s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme || !!s.wormViewPower);
+    const hasBuff = useGameStore(s => s.wormOrbShowerActive || s.wormExplodeActive || s.wormRocketActive || s.wormMagnetActive || !!s.wormElementalTheme || !!s.wormViewPower);
     const [hasTunnel, setHasTunnel] = useState(!!wormBuffs.tunnelNeeds);
     useEffect(() => {
         const id = setInterval(() => setHasTunnel(!!wormBuffs.tunnelNeeds), 100);

@@ -1,3 +1,4 @@
+import { createOrbReveal, orbRevealProgress } from '../orbReveal.js';
 import { WormPointLight } from '../WormLighting.jsx';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import NatureClaimLeaves from './NatureClaimLeaves.jsx';
@@ -47,7 +48,6 @@ const ORB_SCALE = 1.5;
 // Extra clearance over SPECIAL_HOVER_HEIGHT: the flat badge could sit low, a
 // half-unit sphere cannot without sinking into the face.
 const ELEM_HOVER_LIFT = 0.3;
-const SPAWN_TIME = 0.55; // seconds for the orb to pop in
 const SHOCK_TIME = 0.7; // seconds the spawn shockwave takes to run out
 const FADE_FLOOR = 0.5; // an offering never dims past half — it should stay grabbable
 
@@ -130,16 +130,12 @@ function getOrbTrimMaterials(element, color, accent, particleSize) {
   return set;
 }
 
-const easeOutBack = (t) => {
-  const c = 1.9;
-  const p = t - 1;
-  return 1 + (c + 1) * p * p * p + c * p * p;
-};
-
 export default function ElementalOrb({ special, size }) {
   const def = getSpecialDef(special.type);
 
   const groupRef = useRef();
+  const arrival = useRef({ effect: null, done: false });
+  useEffect(() => () => arrival.current.effect?.dispose(), []);
   const bodyRef = useRef();
   const spinRef = useRef();
   const ringARef = useRef();
@@ -230,9 +226,8 @@ export default function ElementalOrb({ special, size }) {
     const fade = ttl >= SPECIAL_FADE_TIME ? 1 : Math.max(0, ttl / SPECIAL_FADE_TIME);
     const alpha = Math.max(FADE_FLOOR, fade);
 
-    // Spawn pop, with a slight overshoot so a new offering announces itself.
-    const spawn = Math.min(1, ageRef.current / SPAWN_TIME);
-    const pop = reducedRef.current ? spawn : easeOutBack(spawn);
+    // Assemble at its final size; the shared grain reveals the orb without a pop.
+    const pop = 1;
     const breathe = reducedRef.current ? 1 : 1 + Math.sin(t * 2.6) * 0.035;
 
     if (bodyRef.current) bodyRef.current.scale.setScalar(1.15 * ORB_SCALE * pop * breathe);
@@ -332,12 +327,18 @@ export default function ElementalOrb({ special, size }) {
         shockRef.current.material.opacity = 0.8 * (1 - s) * (1 - s);
       }
     }
+    group.visible = true;
+    const reveal = arrival.current;
+    if (!reveal.done) {
+      reveal.effect ??= createOrbReveal(group, { radius: 1.35, reducedMotion: reducedRef.current });
+      reveal.done = !reveal.effect.update(orbRevealProgress(ageRef.current));
+    }
   });
 
   if (!def) return null;
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} visible={false}>
       {/* ── Orb body ───────────────────────────────────────────────────────── */}
       <group ref={bodyRef}>
         <group ref={spinRef}>

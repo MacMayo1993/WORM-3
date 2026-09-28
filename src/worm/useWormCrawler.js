@@ -265,7 +265,7 @@ export function useWormCrawler(size, cubies) {
                 // screen — clear both the live readout and the store transitions.
                 resetWormBuffs();
                 resetWormSegments();
-                useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null, wormViewPower: null });
+                useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null, wormViewPower: null });
                 if (deathMenuTimer.current) {
                     clearTimeout(deathMenuTimer.current);
                     deathMenuTimer.current = null;
@@ -411,6 +411,10 @@ export function useWormCrawler(size, cubies) {
                     useGameStore.setState({ wormRocketActive: active });
                 }
             },
+            onOrbShowerState: seconds => {
+                wormBuffs.orbShowerT = seconds;
+                useGameStore.setState({ wormOrbShowerActive: seconds > 0 });
+            },
             // Called only on real transitions — start, refresh, expiry — so writing
             // unconditionally is still two or three store writes per magnet. `seq`
             // bumps on a refresh as well, which is what lets the strip rescale its
@@ -515,7 +519,7 @@ export function useWormCrawler(size, cubies) {
                 // HUD mirrors with the sim, or stale rescue UI disables steering.
                 wormPhase: 'crawling', wormAlive: true, wormPaused: true, wormJumpRescueActive: false,
                 wormActiveTunnelColors: null, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
-                wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormElementalTheme: null, wormViewPower: null, wormSpecialNotice: null,
+                wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormElementalTheme: null, wormViewPower: null, wormSpecialNotice: null,
                 wormBoostState: 'ready', wormOrbFlash: null, demoWormSteered: false, demoWormTarget: practice.target,
                 demoWormProgress: '', demoWormHazardCleared: null });
             return; // Let the shared tunnel snapshot observe the staged board first.
@@ -644,6 +648,7 @@ export function useWormCrawler(size, cubies) {
         for (const patch of sim.elementalPatches.values()) if (patch.type === 'grass') springs++;
         wormBuffs.springCount = springs;
         wormBuffs.explodeT = sim.explodeT;
+        wormBuffs.orbShowerT = sim.orbShowerT;
         wormBuffs.magnetT = sim.magnetT;
         wormBuffs.magnetMaxT = sim.magnetMaxT;
         wormBuffs.rocketActive = sim.rocketActive;
@@ -713,7 +718,7 @@ export function useWormCrawler(size, cubies) {
             wormPowerups: sim.powerups,
             wormSpecials: [],
             wormExplodeActive: false, wormRocketActive: false,
-            wormMagnetActive: false,
+            wormOrbShowerActive: false, wormMagnetActive: false,
             wormMagnetSeq: 0,
             wormSpecialNotice: null,
             wormElementalTheme: null, wormViewPower: null,
@@ -752,7 +757,7 @@ export function useWormCrawler(size, cubies) {
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
-        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormViewPower: null, wormJumpRescueActive: false });
+        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormViewPower: null, wormJumpRescueActive: false });
     }, []);
 
     // When a cube rotation commits, transform the whole sim (worm, powerups, trails,
@@ -836,6 +841,7 @@ export function useWormCrawler(size, cubies) {
             expansionAmount: f('expansionAmount'),
             rocketFlight: f('rocketFlight'),
             landingGraceT: f('landingGraceT'),
+            orbShowerT: f('orbShowerT'),
             magnetT: f('magnetT'),
             pendingOrbAttractionsRef: f('pendingOrbAttractions'),
             specials: f('specials'),

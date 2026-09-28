@@ -20,7 +20,7 @@ export const tileKeyOf = (t) => `${t.x},${t.y},${t.z},${t.dirKey}`;
 // one-in-sixteen event, and players read that as broken. A shuffle bag holding one
 // of each type instead spreads the draws evenly.
 //
-// Each bag holds explode, rocket, magnet, and one cube-view pickup. Elemental orbs are NOT drawn
+// Each bag holds explode, rocket, magnet, orb shower, and one cube-view pickup. Elemental orbs are NOT drawn
 // here — they spawn on their own offering track (see spawnElementalOffering in
 // wormSim), so this bag only balances how the protective buffs come up. The longest
 // possible run of a type is two (tail of one bag, head of the next) and even that is

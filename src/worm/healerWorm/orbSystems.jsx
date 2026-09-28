@@ -1,9 +1,10 @@
+import { createOrbReveal, orbRevealProgress } from '../orbReveal.js';
 import { WormPointLight } from '../WormLighting.jsx';
 import { ORB_GULP_DURATION } from './pickupPulse.js';
 import { wormSegments } from '../wormSegments.js';
 // src/worm/healerWorm/orbSystems.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split).
-import { memo, useState, useMemo, useRef } from 'react';
+import { memo, useState, useMemo, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -50,7 +51,7 @@ function PowerupOrbsImpl({ size }) {
         let sig = wormPowerups.length + '|';
         for (const p of wormPowerups) {
             const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
-            sig += `${p.x},${p.y},${p.z},${p.dirKey}:${sticker?.curr ?? 0},${sticker?.orig ?? 0};`;
+            sig += `${p.spawnId ?? ""}:${p.x},${p.y},${p.z},${p.dirKey}:${sticker?.curr ?? 0},${sticker?.orig ?? 0};`;
         }
         return sig;
     }, [wormPowerups, cubies]);
@@ -119,8 +120,10 @@ function SpecialOrb({ special, size }) {
     const timerRef = useRef();
     const reducedRef = useRef(prefersReducedMotion());
     const look = getSpecialDef(special.type);
+    const arrival = useRef({ age: 0, effect: null, done: false });
+    useEffect(() => () => arrival.current.effect?.dispose(), []);
 
-    useFrame((state) => {
+    useFrame((state, delta) => {
         const group = groupRef.current;
         if (!group) return;
 
@@ -172,6 +175,13 @@ function SpecialOrb({ special, size }) {
             timerRef.current.rotation.z = -t * 0.8;
             timerRef.current.material.opacity = 0.7 * alpha;
         }
+        group.visible = true;
+        const reveal = arrival.current;
+        if (!reveal.done) {
+            reveal.age += Math.min(delta, 0.05);
+            reveal.effect ??= createOrbReveal(group, { radius: 0.65, reducedMotion: reducedRef.current });
+            reveal.done = !reveal.effect.update(orbRevealProgress(reveal.age));
+        }
     });
 
     // Tag each material with its design opacity so the fade above scales from it
@@ -179,7 +189,7 @@ function SpecialOrb({ special, size }) {
     const tag = (v) => (mesh) => { if (mesh) mesh.userData.baseOpacity = v; };
 
     return (
-        <group ref={groupRef}>
+        <group ref={groupRef} visible={false}>
             <group ref={spinRef}>
                 {special.type === 'explode' ? (
                     <>
@@ -290,7 +300,7 @@ export function SpecialOrbs({ size, hidden = false }) {
     return (
         <group visible={!hidden}>
             {specials.map(sp => (
-                (isElementalType(sp.type) || isViewPower(sp.type))
+                (isElementalType(sp.type) || isViewPower(sp.type) || sp.type === 'orb-shower')
                     ? <ElementalOrb key={sp.id} special={sp} size={size} />
                     : <SpecialOrb key={sp.id} special={sp} size={size} />
             ))}

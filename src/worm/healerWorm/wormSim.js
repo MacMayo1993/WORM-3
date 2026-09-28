@@ -1,3 +1,4 @@
+import { makeGrowthOrb, startOrbShower, tickOrbShower } from './orbSpawning.js';
 import { raisedWormExpansion } from '../../game/raisedCubie.js';
 import { padEntryDecision } from './padEntry.js';
 import { usesRaisedPlatforms, startPlatformJump, tickPlatformJump, WORM_PAD_HEIGHT } from './raisedPlatforms.js';
@@ -254,6 +255,8 @@ export function makeWormSim(size) {
         rocketT: 0,
         rocketFlight: 0, // launch/landing progress, independent of refreshed fuel
         rocketBoostHandoffT: 0, // crawling seconds left to restore ground speed
+        orbShowerT: 0,
+        orbShowerDelay: 0,
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalPatches: new Map(),
@@ -357,7 +360,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     const startPos = INITIAL_POS(size);
     const initial = [];
     for (let i = 0; i < Math.min(orbCount, 6 * size * size - 1); i++) {
-        initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
+        initial.push(makeGrowthOrb(randomFreeTile(size, [...initial, startPos])));
     }
 
     sim.pos = startPos;
@@ -415,6 +418,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.rocketT = 0;
     sim.rocketFlight = 0;
     sim.rocketBoostHandoffT = 0;
+    sim.orbShowerT = 0;
+    sim.orbShowerDelay = 0;
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.elementalPatches.clear();
@@ -644,6 +649,7 @@ export function startElemental(sim, ctx, type) {
 export function activateSpecial(sim, ctx, type) {
     if (type === 'rocket') startRocket(sim, ctx);
     else if (type === 'magnet') startMagnet(sim, ctx);
+    else if (type === 'orb-shower') startOrbShower(sim, ctx);
     else if (type === 'explode') {
         sim.explodeT = EXPLODE_DURATION;
         ctx.onExplodeState?.(true);
@@ -946,8 +952,8 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
             });
         }
         ctx.feel('orb', { combo: sim.orbCombo });
-        if (ctx.isStoryMode?.()) sim.powerups.splice(puIdx--, 1);
-        else sim.powerups[puIdx] = { ...respawnTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
+        if (ctx.isStoryMode?.() || pickedUp.shower) sim.powerups.splice(puIdx--, 1);
+        else sim.powerups[puIdx] = makeGrowthOrb(respawnTile(size, [...sim.powerups, ...sim.specials, sim.pos]));
         collectedAny = true;
     }
 
@@ -2119,6 +2125,8 @@ export function stepWormSim(sim, delta, size, ctx) {
             }
         }
     }
+    tickOrbShower(sim, delta, size, ctx);
+
     // ── Magnet: drain the reach window. Frozen outside crawling for the same reason
     // boost is — there is nothing to pick up during a wormhole transit, so the buff
     // shouldn't burn while the worm is inside one.

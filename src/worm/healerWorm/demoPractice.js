@@ -1,7 +1,9 @@
+import { makeGrowthOrb, DEMO_ORB_GOAL } from './orbSpawning.js';
+import { getAllSurfaceTiles } from './surfaceTiles.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
-import { getWormholeHealRing } from '../wormLogic.js';
+import { getWormholeHealRing, getNextSurfacePosition } from '../wormLogic.js';
 import { ttReset, ttAt } from '../circularBuffers.js';
 import { resetWormSim, tileKey } from './wormSim.js';
 import { BODY_BALL_SPACING, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from './constants.js';
@@ -40,15 +42,30 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
     sim.orbPickupFaceIds = Array(2).fill(face);
     sim.orbPickupColors = Array(2).fill(orbColor(face));
   }
-  if (lesson.id === 'orbs') sim.powerups = [1, 2].map(y => ({ x: c, y, z: size - 1, dirKey: 'PZ', type: 'apple' }));
-  if (lesson.id === 'magnet' || lesson.id === 'signature') {
-    sim.powerups = [-1, 1].map(dx => ({ x: c + dx, y: 2, z: size - 1, dirKey: 'PZ', type: 'apple' }));
+  if (lesson.id === 'orbs') {
+    // A guaranteed trail carries the first growth lesson around the cube's edge.
+    // Plenty of side routes remain rewarding if the player chooses to steer.
+    const route = new Map();
+    let next = sim.pos, heading = sim.moveDir;
+    for (let i = 0; i < DEMO_ORB_GOAL; i++) {
+      next = getNextSurfacePosition(next, heading, size);
+      heading = next.moveDir;
+      route.set(tileKey(next), next);
+    }
+    for (const tile of getAllSurfaceTiles(size)) {
+      if ((tile.x + tile.y + tile.z) % 2 === 0) route.set(tileKey(tile), tile);
+    }
+    route.delete(tileKey(sim.pos));
+    sim.powerups = [...route.values()].map(tile => makeGrowthOrb(tile));
   }
-  if (['rocket', 'magnet', 'water', 'fire', 'grass', 'ice', 'lightning'].includes(lesson.id)) {
+  if (lesson.id === 'magnet' || lesson.id === 'signature') {
+    sim.powerups = [-1, 1].map(dx => makeGrowthOrb({ x: c + dx, y: 2, z: size - 1, dirKey: 'PZ' }));
+  }
+  if (['rocket', 'magnet', 'orb-shower', 'water', 'fire', 'grass', 'ice', 'lightning'].includes(lesson.id)) {
     sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lesson.id, id: `demo-${lesson.id}`, ttl: 9999, maxTtl: 9999 }];
   }
   const marked = ring || ['tunnel', 'heal', 'body-jump'].includes(lesson.id) ? { ...target, ring } : null;
-  return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
+  return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, sawShower: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
 }
 
 // Reads actual outcomes after a physics tick. No input press alone completes a
@@ -57,11 +74,16 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
   practice.sawJump ||= sim.isJumping;
   practice.sawBoost ||= sim.boostActiveT > 0;
   practice.sawRocket ||= sim.rocketActive;
+  practice.sawShower ||= sim.orbShowerT > 0;
   if (sim.elementalType === lesson.id && sim.elementalFocusT <= 0) practice.elementTime += Math.min(delta, 0.05);
   let done = false, progress = '';
   switch (lesson.id) {
     case 'steer': done = !!state.demoWormSteered; break;
-    case 'orbs': done = state.wormSessionOrbs >= 2; progress = `${Math.min(2, state.wormSessionOrbs)} / 2 orbs`; break;
+    case 'orbs': done = state.wormSessionOrbs >= DEMO_ORB_GOAL; progress = `${Math.min(DEMO_ORB_GOAL, state.wormSessionOrbs)} / ${DEMO_ORB_GOAL} orbs — watch your tail grow`; break;
+    case 'orb-shower':
+      done = practice.sawShower && sim.orbShowerT === 0;
+      progress = practice.sawShower ? (sim.orbShowerT > 0 ? `Orb rain: ${Math.ceil(sim.orbShowerT)}s — collect and grow` : 'Shower complete — keep collecting the extra orbs') : 'Collect the rain-cloud power-up ahead';
+      break;
     case 'jump': done = practice.sawJump && !sim.isJumping; break;
     case 'body-jump':
       trackPracticeBodyJump(sim, practice, size);
