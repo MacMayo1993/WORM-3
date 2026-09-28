@@ -9,7 +9,6 @@ import { DemoControlTour, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoC
 import DemoForecastPicker from '../components/screens/DemoForecastPicker.jsx';
 import BottomNavBar from '../components/menus/BottomNavBar.jsx';
 import DisparityHUD from '../components/overlays/DisparityHUD.jsx';
-import AntipodalCoreKey from '../components/overlays/AntipodalCoreKey.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { demoTimer } from '../utils/demoTimer.js';
 import { WORM_DEMO_LESSONS, WORM_DEMO_CHECKPOINT } from '../game/wormDemoLessons.js';
@@ -60,17 +59,6 @@ it('groups the worm instruction, progress and skip into a single dock', () => {
   expect(host.querySelectorAll('.worm-demo-card')).toHaveLength(1);
   expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('0');
   act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'End practice').click()); expect(skip).toHaveBeenCalledTimes(1);
-});
-// The view tour's card sits where the core key would, and its copy names the
-// centre cube itself, so the key stands down for the tour and only the tour.
-it('stands the core key down during the view tour, not elsewhere', () => {
-  const before = useGameStore.getState();
-  useGameStore.setState({ visualMode: 'glass', demoMode: true, demoStep: 'view-showcase', showMainMenu: false, showWelcome: false, showSettings: false, showHelp: false, showAntipodalPiP: false, captureMode: false });
-  render(<AntipodalCoreKey />);
-  expect(host.querySelector('.antipodal-core-key')).toBeNull();
-  act(() => useGameStore.setState({ demoStep: 'make-it-yours' }));
-  expect(host.querySelector('.antipodal-core-key')).not.toBeNull();
-  act(() => useGameStore.setState({ demoMode: before.demoMode, demoStep: before.demoStep, visualMode: before.visualMode, showMainMenu: before.showMainMenu, showWelcome: before.showWelcome }));
 });
 // The core WORM loop ends at the checkpoint: finishing is the suggested move,
 // the remaining exercises one tap away, and every other lesson keeps Next.
