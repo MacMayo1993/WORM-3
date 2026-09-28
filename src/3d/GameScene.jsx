@@ -93,7 +93,6 @@ export default function GameScene({
   // ── State from store ──────────────────────────────────────────────────────
   const {
     visualMode,
-    explosionT,
     currentLevelData,
     blackHolePulse,
     settings,
@@ -111,7 +110,6 @@ export default function GameScene({
     showCutawayLens,
   } = useGameStore(useShallow((s) => ({
     visualMode: s.visualMode,
-    explosionT: s.explosionT,
     currentLevelData: s.currentLevelData,
     blackHolePulse: s.blackHolePulse,
     settings: s.settings,
@@ -327,7 +325,7 @@ export default function GameScene({
           <ErrorBoundary3D resetKey={wormRunId} label="Worm scene interrupted. Try again to restart.">
             <Suspense fallback={null}>
               <HealerWormMode3DWrapper
-                cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal} onAnimatedShuffle={onAnimatedShuffle}
+                cubies={cubies} size={size} animState={animState} onRotate={onRotate} onHeal={onHeal} onAnimatedShuffle={onAnimatedShuffle}
               />
             </Suspense>
           </ErrorBoundary3D>

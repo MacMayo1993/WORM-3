@@ -35,7 +35,7 @@ import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
 import { makeCorePassage, updateCorePassage, coreRoomCutoutGLSL, CORE_MIRROR_HALF } from './corePassage.js';
 import { createCoreReflection, createCoreMirrorRoom } from './coreMirrorRoom.js';
-import { wormExpansion } from '../worm/wormExpansion.js';
+import { wormExpansion, currentExplosion } from '../worm/wormExpansion.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { createAntiverse, antiverseVisibility } from './antiverse.js';
@@ -299,7 +299,7 @@ function VoidCore({ cubieRefs = null }) {
     const energy = 0.35 + 0.65 * charge;
     _tint.copy(LIGHT_BASE).lerp(f.tint, 0.65 * f.tintMix);
     const universe = antiverse.uniforms;
-    const opacity = antiverseVisibility(state, f.zoom);
+    const opacity = antiverseVisibility(state, f.zoom, currentExplosion(state));
     antiverse.group.visible = opacity > 0;
     antiverse.points.visible = !state.perfReducedFX;
     if (opacity > 0) {

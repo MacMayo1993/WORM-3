@@ -1,3 +1,4 @@
+import { WormPointLight } from '../WormLighting.jsx';
 import { ORB_GULP_DURATION } from './pickupPulse.js';
 import { wormSegments } from '../wormSegments.js';
 // src/worm/healerWorm/orbSystems.jsx
@@ -73,8 +74,7 @@ function PowerupOrbsImpl({ size }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orbSignature, faceColors, manifoldStyles]);
 
-    const expansion = useGameStore(s => s.explosionT);
-    return <ParityOrbs explosionFactor={expansion} orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
+    return <ParityOrbs wormMode orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
 }
 
 export const PowerupOrbs = memo(PowerupOrbsImpl);
@@ -276,7 +276,7 @@ function SpecialOrb({ special, size }) {
                     blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
                 />
             </mesh>
-            <pointLight ref={lightRef} color={look.color} intensity={1.2} distance={3.2} decay={2} />
+            <WormPointLight ref={lightRef} color={look.color} intensity={1.2} distance={3.2} decay={2} />
         </group>
     );
 }

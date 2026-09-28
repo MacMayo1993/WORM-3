@@ -1,3 +1,4 @@
+import { currentExplosion } from '../../worm/wormExpansion.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -13,6 +14,7 @@ const CursorHighlight = () => {
       explosionFactor: s.explosionT,
     }))
   );
+  const anchorRef = useRef();
   const meshRef = useRef();
   const glowRef = useRef();
 
@@ -65,8 +67,14 @@ const CursorHighlight = () => {
     }
   }, [face]);
 
+  const surfaceOffset = useMemo(() => new THREE.Vector3(0, 0, 0.53).applyEuler(new THREE.Euler(...rotation)), [rotation]);
+
   // Animate glow
   useFrame((state) => {
+    if (anchorRef.current) {
+      const ratio = cubeExpansionScale(size, currentExplosion(useGameStore.getState())) / cubeExpansionScale(size, explosionFactor);
+      anchorRef.current.position.fromArray(position).sub(surfaceOffset).multiplyScalar(ratio).add(surfaceOffset);
+    }
     if (meshRef.current) {
       const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.15 + 0.85;
       meshRef.current.material.opacity = 0.4 * pulse;
@@ -78,7 +86,7 @@ const CursorHighlight = () => {
   });
 
   return (
-    <group position={position} rotation={rotation}>
+    <group ref={anchorRef} position={position} rotation={rotation}>
       {/* Inner glow ring */}
       <mesh ref={meshRef}>
         <ringGeometry args={[0.35, 0.48, 32]} />

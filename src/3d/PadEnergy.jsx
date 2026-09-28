@@ -1,3 +1,4 @@
+import { uploadInstancePrefix, setInstanceCount } from './instanceUploads.js';
 // src/3d/PadEnergy.jsx
 //
 // Raised flip pads hover a short hop off the cube on an unstable wormhole: a
@@ -169,11 +170,12 @@ export function PadEnergy({ frames }) {
       }
     }
     res.writer.end();
-    column.count = vortex.count = n;
-    column.instanceMatrix.needsUpdate = vortex.instanceMatrix.needsUpdate = true;
-    if (column.instanceColor) column.instanceColor.needsUpdate = true;
-    if (vortex.instanceColor) vortex.instanceColor.needsUpdate = true;
-    res.columnGeo.attributes.aSeed.needsUpdate = res.vortexGeo.attributes.aSeed.needsUpdate = true;
+    for (const mesh of [column, vortex]) {
+      setInstanceCount(mesh, n);
+      uploadInstancePrefix(mesh.instanceMatrix, n);
+      uploadInstancePrefix(mesh.instanceColor, n);
+      uploadInstancePrefix(mesh.geometry.attributes.aSeed, n);
+    }
 
     // Sparks spread round-robin over the pads, a steady rate per pad.
     const clock = res.sparkClock;
@@ -197,7 +199,7 @@ export function PadEnergy({ frames }) {
     const cam = state.camera;
     const fov = cam?.isPerspectiveCamera ? cam.fov : 50;
     res.sparkMat.uniforms.uScale.value = (state.size.height * state.viewport.dpr) / (2 * Math.tan((fov * Math.PI) / 360));
-  }, -0.45);
+  }, -0.3); // consume this frame's PadProvider matrices (-0.35)
 
   return <group>
     <instancedMesh ref={columnRef} args={[res.columnGeo, res.columnMat, capacity]} count={0} frustumCulled={false} raycast={() => null} dispose={null} renderOrder={4} />

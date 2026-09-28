@@ -1,4 +1,4 @@
-import { wormExpansion } from './wormExpansion.js';
+import { wormExpansion, publishWormExpansion } from './wormExpansion.js';
 import { getStableKey } from './wormLogic.js';
 import { characterOrbCount } from './characterAbilities.js';
 import { orbsCarried } from './healerWorm/economy.js';
@@ -402,8 +402,7 @@ export function useWormCrawler(size, cubies) {
             // tick, so the countdown freezes with the simulation during a pause or a
             // tunnel transit instead of running off a wall clock.
             onExpansionAmount: (amount) => {
-                wormExpansion.amount = amount;
-                useGameStore.setState({ explosionT: amount });
+                if (publishWormExpansion(amount)) useGameStore.setState({ explosionT: amount });
             },
             onExplodeState: (active) => useGameStore.setState({ wormExplodeActive: active }),
             onRocketState: (active) => {

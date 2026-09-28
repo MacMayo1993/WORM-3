@@ -1,3 +1,4 @@
+import { currentExplosion } from '../../worm/wormExpansion.js';
 // src/components/overlays/SolveHighlight.jsx
 // Visual highlighting for solve mode pieces
 
@@ -13,6 +14,7 @@ const PieceHighlight = React.memo(({ x, y, z, dir, solved, type }) => {
   const { size, explosionFactor } = useGameStore(
     useShallow(s => ({ size: s.size, explosionFactor: s.explosionT }))
   );
+  const anchorRef = useRef();
   const meshRef = useRef();
   const glowRef = useRef();
   const phaseRef = useRef(Math.random() * Math.PI * 2);
@@ -77,8 +79,14 @@ const PieceHighlight = React.memo(({ x, y, z, dir, solved, type }) => {
     }
   }, [solved, type]);
 
+  const surfaceOffset = useMemo(() => new THREE.Vector3(0, 0, 0.54).applyEuler(new THREE.Euler(...rotation)), [rotation]);
+
   // Animate glow
   useFrame((state) => {
+    if (anchorRef.current) {
+      const ratio = cubeExpansionScale(size, currentExplosion(useGameStore.getState())) / cubeExpansionScale(size, explosionFactor);
+      anchorRef.current.position.fromArray(position).sub(surfaceOffset).multiplyScalar(ratio).add(surfaceOffset);
+    }
     const t = state.clock.elapsedTime + phaseRef.current;
 
     if (meshRef.current) {
@@ -92,7 +100,7 @@ const PieceHighlight = React.memo(({ x, y, z, dir, solved, type }) => {
   });
 
   return (
-    <group position={position} rotation={rotation}>
+    <group ref={anchorRef} position={position} rotation={rotation}>
       {/* Inner highlight ring */}
       <mesh ref={meshRef}>
         <ringGeometry args={[0.32, 0.44, 24]} />

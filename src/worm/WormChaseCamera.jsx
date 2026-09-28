@@ -9,7 +9,7 @@ import { useIsMobile } from '../hooks/useIsMobile.js';
 import { bodyPathHeadInto } from './healerWorm/sliceBodyPath.js';
 import { sliceShotInto } from './sliceShot.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import { getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
+import { wormExpansion, getWormStickerWorldPos as getStickerWorldPos } from './wormExpansion.js';
 import { rocketOrbitInto, rocketOrbitT, rocketFrameInto } from './healerWorm/rocketOrbit.js';
 import { tunnelState } from './tunnelProgressBridge.js';
 import {
@@ -310,7 +310,7 @@ export default function WormChaseCamera({ worm, size }) {
         } else if (focusRemaining > 0 || elementalOrbitRef.current) {
             if (!elementalOrbitRef.current) {
                 elementalOrbitRef.current = makeElementalRevealOrbit(camera, lookAtRef.current, {
-                    size, expansion: gameState.explosionT ?? 0, reducedMotion: prefersReducedMotion(),
+                    size, expansion: wormExpansion.amount, reducedMotion: prefersReducedMotion(),
                 });
                 elementalOrbitRef.current.duration = focusRemaining;
             }

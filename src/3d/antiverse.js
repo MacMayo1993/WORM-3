@@ -156,10 +156,10 @@ export function createAntiverse(size) {
 
 // Closed cubes pay no atmosphere draws. A close WORM ride clears the field so
 // its enlarged core and tunnel crossing remain readable and correctly occluded.
-export function antiverseVisibility(state, zoom = 1) {
+export function antiverseVisibility(state, zoom = 1, expansion = state.explosionT) {
   const openView = state.showCutawayLens || state.settings?.livePortalViews || state.hollowMode ||
     ['glass', 'gap', 'wireframe'].includes(state.visualMode);
-  const exposure = openView ? 1 : Math.min(1, Math.max(0, state.explosionT || 0) * 1.5);
+  const exposure = openView ? 1 : Math.min(1, Math.max(0, expansion || 0) * 1.5);
   // Capture Mode hides UI chrome, not the running 3D scene.
   if (state.wormHealerMode && state.wormPhase === 'tunnel') return 0;
   return exposure * Math.max(0, Math.min(1, 1 - (zoom - 1) / 0.35));

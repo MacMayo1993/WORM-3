@@ -4,6 +4,17 @@ Measured against `main` at `b57429c` (interior portal openings). Earlier reviews
 
 No game code changed in this pass. This is the audit only; the fixes are listed in priority order below.
 
+## Measurement corrections from implementation review
+
+The tables below preserve the original run, but three qualifications supersede
+its conclusions: the original 640×400 viewport selected the game's **mobile**
+visual branch; patch B's **99% upload reduction is invalid** because a zero-length
+WebGL2 update uploads the remaining buffer, while the counter recorded zero;
+and patch C does **not reliably skip hidden matrix updates** in three.js r159.
+The committed runner and upload instrumentation now correct the first two.
+See `scripts/perf-worm/README.md`. These CPU-only timings do not establish a
+physical-device FPS improvement.
+
 ## Headline
 
 On an ordinary 3×3 free-play run, the frame does far more work than the scene needs. In production mode, per frame, with draws suppressed so only CPU work counts:
@@ -268,3 +279,51 @@ node scripts/perf-worm/run.mjs --mode=attribute --url=http://localhost:4173/WORM
 ```
 
 Compare against the headline table. Then confirm on a physical phone with real draws (`--draw`, or Chrome remote debugging). This audit cannot measure GPU time, and P0-2, P1-6 and P2-11 all have GPU-side effects as well.
+
+
+## Implementation follow-up — fixed lights, upload ranges, live expansion
+
+The first implementation addresses findings 1, 3 and 4, retaining the existing
+transparent shell rendering and interior tile backs:
+
+- WORM has a fixed pool of four point lights on desktop, two on mobile. Orb and
+  Glow Worm sources keep their animated colour, intensity, distance and live
+  transforms; the nearest visible sources occupy the pool. Inactive slots use
+  zero intensity, never visibility gating. The elemental hemisphere stays
+  mounted, and elemental warm-up compiles against the actual scene light rig.
+- Pads, orb batches, stickers and all worm-body variants upload active prefixes
+  through r159's supported range API. Empty pad/orb batches are hidden and do
+  not dirty their buffers. Pending ranges survive skipped renders and shrinking
+  counts, so restored meshes cannot lose unconsumed writes.
+- The WORM simulation publishes continuous expansion to its existing bridge.
+  Store notifications occur at transition boundaries and the interior-guide
+  threshold (six writes over a complete opening/closing cycle at 60 Hz).
+  Lattice centres update after simulation, followed by raised cubies, pads,
+  pad energy, camera and stickers. Camera framing, orb fallback placement,
+  interior snapshots, antiverse exposure and highlight anchors use the live
+  amount. Non-WORM Explode retains its existing store-driven animation.
+
+Validation: full CI passed after rebasing onto `0feb495`, including the new
+mirror-room/camera changes (296 files / 3,634 tests, zero lint errors, production
+build and bundle budgets). A real-draw browser screenshot was also checked:
+cube, worm, orbs, lighting and HUD rendered successfully. The real R3F lattice test exercises 3×3 and 6×6 expansion and
+collapse with raised corners and no React commits between store boundaries.
+Upload tests exercise three.js's actual WebGLAttributes path in WebGL1 and
+WebGL2, including empty pools and pending writes across hidden frames.
+
+A short corrected-harness check compared `738f48c` with this implementation
+before the mirror-room/camera rebase, using unminified production builds,
+1280×800, 3×3 Free Play, 15 seconds of live play, and suppressed draws:
+
+| Measurement | Main baseline | Implementation |
+| --- | ---: | ---: |
+| Median uploads per frame | 1,041.1 KiB | 52.2 KiB |
+| Program links during the sample | 120 | 21 |
+| Script time p50 / p95 | 5.4 / 8.0 ms | 5.7 / 8.3 ms |
+| Maximum sampled script time | 308.4 ms | 38.9 ms |
+
+These are sanity-check observations, not a controlled FPS benchmark. Random
+pickups differed (lightning versus grass), and adaptive FX tiers differed.
+Uploads fell about 95%, while ordinary script-frame cost was similar. The
+samples support reduced wasted uploads and fewer compilation hitches; they do
+not establish a general frame-rate improvement or physical-phone GPU results.

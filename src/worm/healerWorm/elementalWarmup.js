@@ -79,7 +79,7 @@ function collectElementalMaterials() {
  * @param {THREE.Camera} camera
  * @returns {number} how many materials were warmed (0 if called without a renderer)
  */
-export function warmUpElementalSkins(renderer, camera) {
+export function warmUpElementalSkins(renderer, camera, targetScene = null) {
   if (!renderer || !camera) return 0;
 
   const materials = collectElementalMaterials();
@@ -91,7 +91,7 @@ export function warmUpElementalSkins(renderer, camera) {
     if (material) scene.add(material.userData.elementalPoints ? new THREE.Points(geo, material) : material.userData.elementalInstanced ? new THREE.InstancedMesh(geo, material, 1) : new THREE.Mesh(geo, material));
   }
 
-  renderer.compile(scene, camera);
+  renderer.compile(scene, camera, targetScene);
 
   // The dummy meshes go; the materials are module-cached by their own getters and
   // are what the real skins will pick up, so they must outlive this scene.

@@ -12,7 +12,7 @@
 //   patches      A/B toggles used to price the audit's recommendations:
 //                  A  transparent DoubleSide materials render in one pass
 //                  B  instanced attributes upload only the live instance range
-//                  C  hidden subtrees skip matrixWorld updates
+//                  C  experimental hidden matrix flag (parent force can override it)
 //                  D  inward-facing antipodal sticker backs hidden (camera outside)
 () => {
   const W = window.__perf;
@@ -87,28 +87,28 @@
     return render.call(this, scene, camera);
   };
 
-  // ── Upload attribution by attribute version ────────────────────────────────
-  const versions = new WeakMap();
+  // Attribute buffers identify actual GL uploads, including modern updateRanges
+  // and WebGL1 subarrays. Version changes alone are not uploads (hidden meshes).
+  const uploadOwners = new WeakMap();
   W.uploads = {};
-  W.trackUploads = (armed) => {
+  W.trackUploads = () => {
     W.scene.traverse((o) => {
       const g = o.geometry;
       if (!g?.attributes) return;
       const owner = label(o, g, null);
-      const check = (name, a) => {
-        if (!a?.array) return;
-        const prev = versions.get(a);
-        versions.set(a, a.version);
-        if (!armed || prev === a.version) return;
-        const range = a._updateRange?.count > 0 ? a._updateRange.count * a.array.BYTES_PER_ELEMENT : a.array.byteLength;
-        const u = (W.uploads[`${owner} .${name}${prev === undefined ? ' [new]' : ''}`] ||= { n: 0, bytes: 0 });
-        u.n++;
-        u.bytes += range;
+      const track = (name, a) => {
+        if (a?.array?.buffer) uploadOwners.set(a.array.buffer, `${owner} .${name}`);
       };
-      for (const [n, a] of Object.entries(g.attributes)) check(n, a);
-      if (g.index) check('index', g.index);
-      if (o.isInstancedMesh) { check('instanceMatrix', o.instanceMatrix); check('instanceColor', o.instanceColor); }
+      for (const [n, a] of Object.entries(g.attributes)) track(n, a);
+      track('index', g.index);
+      if (o.isInstancedMesh) { track('instanceMatrix', o.instanceMatrix); track('instanceColor', o.instanceColor); }
     });
+  };
+  W.recordUpload = (data, bytes) => {
+    if (!W.attrib || !bytes) return;
+    const owner = data && typeof data === 'object' ? uploadOwners.get(data.buffer ?? data) : null;
+    const u = (W.uploads[owner || '(unattributed buffer)'] ||= { n: 0, bytes: 0 });
+    u.n++; u.bytes += bytes;
   };
 
   // ── A/B patches ────────────────────────────────────────────────────────────
@@ -117,12 +117,26 @@
   const liveRange = (attr, mesh, itemSize, on) => {
     if (!attr) return;
     if (on && !savedRange.has(attr)) {
-      savedRange.set(attr, attr._updateRange);
-      Object.defineProperty(attr, '_updateRange', {
-        configurable: true, get: () => ({ offset: 0, count: Math.max(0, mesh.count) * itemSize }), set() {}
+      const own = Object.getOwnPropertyDescriptor(attr, 'needsUpdate');
+      let proto = attr, descriptor;
+      while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, 'needsUpdate'))) proto = Object.getPrototypeOf(proto);
+      if (!descriptor?.set) return;
+      savedRange.set(attr, own ?? null);
+      Object.defineProperty(attr, 'needsUpdate', {
+        configurable: true,
+        set(value) {
+          if (value !== true || mesh.count <= 0) return;
+          let end = Math.min(attr.array.length, mesh.count * itemSize);
+          for (const range of attr.updateRanges) end = Math.max(end, range.start + range.count);
+          attr.clearUpdateRanges();
+          attr.addUpdateRange(0, end);
+          descriptor.set.call(attr, value);
+        }
       });
     } else if (!on && savedRange.has(attr)) {
-      Object.defineProperty(attr, '_updateRange', { configurable: true, writable: true, value: savedRange.get(attr) });
+      const own = savedRange.get(attr);
+      if (own) Object.defineProperty(attr, 'needsUpdate', own);
+      else delete attr.needsUpdate;
       savedRange.delete(attr);
     }
   };

@@ -1,3 +1,5 @@
+import { wormExpansion } from './wormExpansion.js';
+import { WormPointLight } from './WormLighting.jsx';
 import { createOrbBatches } from './orbBatches.js';
 import { getOrbMaterials } from './orbMaterials.js';
 import { createOrbVisibility } from './orbVisibility.js';
@@ -232,7 +234,7 @@ function SingleOrbImpl({
 
       {/* Point light — target orbs only; non-target glow via emissive + AdditiveBlending */}
       {isTarget && (
-        <pointLight color={gemColor} intensity={1.1} distance={3.3} decay={2} />
+        <WormPointLight color={gemColor} intensity={1.1} distance={3.3} decay={2} />
       )}
     </group>
   );
@@ -295,7 +297,7 @@ const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
  */
 export default function ParityOrbs({
   orbs, size, explosionFactor = 0,
-  mode = 'surface', targetTunnelId = null, isGlowWorm = false,
+  mode = 'surface', targetTunnelId = null, isGlowWorm = false, wormMode = false,
 }) {
   const isTunnelMode = mode === 'tunnel';
 
@@ -340,11 +342,14 @@ export default function ParityOrbs({
         _scratchPos.addScaledVector(_scratchBob, bobAmt);
         group.position.copy(_scratchPos);
       } else {
-        const _bob = HOVER_ABOVE + Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
+        const base = wormMode && gridX >= 0
+          ? getSegmentWorldPos({ x: gridX, y: gridY, z: gridZ, dirKey }, size, wormExpansion.amount) : position;
+        const elevatedLift = wormMode && gridX >= 0 && elevated ? 1.2 : 0;
+        const _bob = elevatedLift + HOVER_ABOVE + Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
         group.position.set(
-          position[0] + bn[0] * _bob,
-          position[1] + bn[1] * _bob,
-          position[2] + bn[2] * _bob
+          base[0] + bn[0] * _bob,
+          base[1] + bn[1] * _bob,
+          base[2] + bn[2] * _bob
         );
       }
 
@@ -517,7 +522,7 @@ export default function ParityOrbs({
         position = [_tunnelOrbScratch.x, _tunnelOrbScratch.y, _tunnelOrbScratch.z];
         key = `${orb.tunnelId}-${orb.t}`;
       } else {
-        position = getSegmentWorldPos(orb, size, explosionFactor);
+        position = getSegmentWorldPos(orb, size, wormMode ? wormExpansion.amount : explosionFactor);
         if (orb.elevated) {
           const bn = BOB_NORMALS[orb.dirKey] || BOB_NORMALS.PY;
           const ELEVATED_HOVER = 1.2;
@@ -546,7 +551,7 @@ export default function ParityOrbs({
         gridZ:     orb.z  ?? -1,
       };
     });
-  }, [orbs, size, explosionFactor, isTunnelMode, targetTunnelId]);
+  }, [orbs, size, explosionFactor, isTunnelMode, targetTunnelId, wormMode]);
 
   return (
     <group ref={orbRootRef}>

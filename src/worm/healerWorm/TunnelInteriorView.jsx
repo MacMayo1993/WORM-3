@@ -1,3 +1,4 @@
+import { wormExpansion } from '../wormExpansion.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 // src/worm/healerWorm/TunnelInteriorView.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
@@ -66,7 +67,7 @@ export function TunnelInteriorView({ worm, size }) {
     // Precompute every surface sticker's world position and rotation (size-dependent only).
     // Materials read each tile's live outward color, then its antipodal back,
     // exactly as StickerPlane does, including after flips and slice rotations.
-    const expansion = useGameStore(s => s.wormPhase === 'crawling' ? 0 : s.explosionT);
+    const expansion = useGameStore(s => s.wormPhase === 'crawling' ? 0 : wormExpansion.amount);
     const scale = cubeExpansionScale(size, expansion);
     const stickerLayout = useMemo(() => {
         const n = size - 1;

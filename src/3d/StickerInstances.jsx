@@ -1,3 +1,4 @@
+import { uploadInstancePrefix } from './instanceUploads.js';
 import { PadProvider } from './PadSprings.jsx';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
@@ -156,7 +157,7 @@ export function StickerInstanceProvider({ children }) {
     // Seed the per-instance color so the first frame shows the correct colour.
     if (colorRef.current) {
       instanceMesh.setColorAt(slot, colorRef.current);
-      if (instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
+      uploadInstancePrefix(instanceMesh.instanceColor, instanceMesh.count);
       // Cache the seeded color so the first useFrame skips the redundant upload.
       const base = slot * 3;
       const lc = lastColorsRef.current;
@@ -172,7 +173,7 @@ export function StickerInstanceProvider({ children }) {
     const entry = registryRef.current.get(id);
     if (!entry) return;
     instanceMesh.setMatrixAt(entry.slot, _zeroMatrix);
-    instanceMesh.instanceMatrix.needsUpdate = true;
+    uploadInstancePrefix(instanceMesh.instanceMatrix, instanceMesh.count);
     zeroedSlotsRef.current.delete(entry.slot);
     registryRef.current.delete(id);
     freeSlotsRef.current.push(entry.slot);
@@ -212,7 +213,8 @@ export function StickerInstanceProvider({ children }) {
   // positive priority increments an internal counter that disables gl.render()
   // entirely, causing the scene to stop rendering (black screen).
   useFrame(() => {
-    if (registryRef.current.size === 0) return;
+    instanceMesh.visible = registryRef.current.size > 0;
+    if (!instanceMesh.visible) return;
 
     transformTracker.begin();
     let matDirty = false;
@@ -272,8 +274,8 @@ export function StickerInstanceProvider({ children }) {
       }
     }
 
-    if (matDirty) instanceMesh.instanceMatrix.needsUpdate = true;
-    if (colDirty && instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
+    if (matDirty) uploadInstancePrefix(instanceMesh.instanceMatrix, instanceMesh.count);
+    if (colDirty) uploadInstancePrefix(instanceMesh.instanceColor, instanceMesh.count);
   });
 
   const ctx = useMemo(() => ({ register, unregister }), [register, unregister]);
