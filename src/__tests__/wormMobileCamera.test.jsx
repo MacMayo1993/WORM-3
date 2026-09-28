@@ -7,10 +7,13 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import WormChaseCamera from '../worm/WormChaseCamera.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
+import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH,
+  tunnelArmSeconds, tunnelHandoffSeconds } from '../worm/healerWorm/constants.js';
 import { rocketOrbitInto, rocketOrbitT } from '../worm/healerWorm/rocketOrbit.js';
-import { getWindWorldPosInto } from '../worm/wormLogic.js';
+import { getWindWorldPosInto, getTunnelWorldPosInto } from '../worm/wormLogic.js';
+import { tunnelTraversalT } from '../utils/tunnelPath.js';
 import { TUNNEL_CAM_NEAR } from '../worm/tunnelCameraRails.js';
+import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 
 const scene = vi.hoisted(() => ({ frame: null, camera: null, size: null, mobile: true }));
 vi.mock('@react-three/fiber', () => ({
@@ -221,6 +224,45 @@ it.each(['PY', 'NX'])('keeps Mega centered at a tunnel mouth and after a %s exit
   worm.phase.current = 'crawling'; worm.activeTunnel.current = null;
   worm.pos.current = tunnel.exit;
   for (let i = 0; i < 60; i++) { tick(); expectCentered(worm, size); }
+});
+
+it.each([3, 5, 15])('enters a raised wormhole promptly on a %s cube in phone and desktop views', size => {
+  for (const mobile of [true, false]) {
+    scene.mobile = mobile;
+    const worm = makeWorm(size, 'PY');
+    const tunnel = { entry: tileOnFace(size, 'PY'), exit: tileOnFace(size, 'NY'),
+      padExpansion: wormRaisedAmount(size), padHeight: WORM_PAD_HEIGHT };
+    render(worm, size, String(mobile)); tick();
+    useGameStore.setState({ wormGamePhase: 'active' });
+    for (let i = 0; i < 120; i++) tick();
+    worm.activeTunnel.current = tunnel;
+    const mouth = getTunnelWorldPosInto(new Vector3(), tunnel, 0, size);
+    const normal = FACE_NORMALS.PY;
+    let crossedAt = null;
+    let previousHeight = Infinity;
+    for (let frame = 0; frame <= 240; frame++) {
+      const time = frame / 60;
+      const handoff = tunnelHandoffSeconds(tunnel);
+      const entering = time >= handoff;
+      const progress = entering ? (time - handoff) / tunnelArmSeconds(tunnel) : time / handoff;
+      worm.phase.current = entering ? 'entering' : 'windup';
+      worm.tunnelProgress.current = progress;
+      if (entering) getTunnelWorldPosInto(worm.headInterpPos.current, tunnel, tunnelTraversalT('entering', progress), size);
+      else getWindWorldPosInto(worm.headInterpPos.current, tunnel, 'entry', progress, size);
+      tick();
+      const height = scene.camera.position.clone().sub(mouth).dot(normal);
+      expect(height).toBeLessThanOrEqual(previousHeight + 1e-8);
+      previousHeight = height;
+      if (height < 0 && crossedAt === null) {
+        crossedAt = time;
+        // The camera enters the mouth, rather than cutting through its tile.
+        const lateral = scene.camera.position.clone().sub(mouth).addScaledVector(normal, -height);
+        expect(lateral.length()).toBeLessThan(.01);
+      }
+    }
+    expect(crossedAt).not.toBeNull();
+    expect(crossedAt).toBeLessThan(1.4);
+  }
 });
 
 it('retains whole-board framing on desktop', () => {

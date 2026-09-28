@@ -162,6 +162,17 @@ export const TUNNEL_THROAT_T_SHARE = 0.45;
 export const ARM_A_END = 0.4;
 export const ARM_B_START = 0.6;
 
+// Keep simulation, camera and effects on the same phase landmarks. The center
+// phase owns exactly the dock-to-dock crossing, not pieces of the exposed arms.
+export function tunnelTraversalT(phase, progress) {
+  const p = Math.min(1, Math.max(0, progress ?? 0));
+  if (phase === 'windup') return 0;
+  if (phase === 'entering') return p * ARM_A_END;
+  if (phase === 'tunnel') return ARM_A_END + p * (ARM_B_START - ARM_A_END);
+  if (phase === 'exiting') return ARM_B_START + p * (1 - ARM_B_START);
+  return 1;
+}
+
 // ── Bore profile ─────────────────────────────────────────────────────────────
 // The radius of the shaft swept around this centerline (TunnelTube). It lives
 // here, next to the path itself, because it is in a fixed relationship with two

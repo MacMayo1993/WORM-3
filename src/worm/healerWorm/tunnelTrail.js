@@ -1,5 +1,5 @@
 import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideWidthAt } from '../../utils/tunnelRide.js';
-import { tunnelDockWidth } from '../../utils/tunnelPath.js';
+import { tunnelDockWidth, tunnelTraversalT } from '../../utils/tunnelPath.js';
 import { makeTunnelBodyProfile } from './tunnelBodyFit.js';
 import * as THREE from 'three';
 import { shPush, shAt } from '../circularBuffers.js';
@@ -53,8 +53,7 @@ export function advanceTunnelHead(sim, phase, nextProgress, size) {
             profile.rideWidth = tunnelRideWidthAt(path, arc, dockWidth);
             profile.rideClearance = 0;
         } else {
-            const t = phase === 'entering' ? p * 0.33
-                : phase === 'tunnel' ? 0.33 + p * 0.34 : 0.67 + p * 0.33;
+            const t = tunnelTraversalT(phase, p);
             const arc = tunnelTToArc(path, t);
             tunnelRideFrameInto(rideFrame, path, arc);
             sim.headInterpPos.copy(rideFrame.center);

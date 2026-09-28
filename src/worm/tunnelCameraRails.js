@@ -18,7 +18,8 @@ import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.
 import * as THREE from 'three';
 import { coreZoomBoundsInto } from '../3d/antipodalCore.js';
 import { buildTunnelPathForTunnel, getTunnelArcPosSmoothInto } from './wormLogic.js';
-import { makeTunnelPath, tunnelDockWidth, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from '../utils/tunnelPath.js';
+import { makeTunnelPath, tunnelDockWidth, tunnelPathTToArc, tunnelPathArcPointExtendedInto,
+  ARM_A_END, tunnelTraversalT } from '../utils/tunnelPath.js';
 
 // Offset from the centerline while riding.
 //
@@ -30,17 +31,13 @@ export const TUNNEL_CAM_UP = 0.62;
 // The default 0.1 near plane cuts away the rim of the small core openings.
 export const TUNNEL_CAM_NEAR = 0.002;
 
-// The exterior framing used to watch a mouth from outside the cube — shared by
-// windup, the start of the dive, and windout, so the dive provably begins from
-// the pose the previous phase left the camera in.
-export const portalDist = (size) => 2.8 + size * 0.85;
+// Meet the mouth up close instead of pulling back to a whole-cube overview.
+// This is an offset FROM the entry tile, not a distance from the cube center.
+export const portalDist = (size) => 0.6 + size * 0.02;
 export const portalUp = (size) => 1.3 + size * 0.32;
 
-// tHead at the moment the 'entering' phase hands over to 'tunnel'. The whole
-// traversal is parameterised 0→1 and the three phases split it 0.33 / 0.34 /
-// 0.33; several files map their own progress onto it (TunnelTube's uHead,
-// portalFx's traversalProgress, tunnelState.t).
-export const ENTER_END_T = 0.33;
+// Handoff at the actual core dock, shared with the simulation and effects.
+export const ENTER_END_T = ARM_A_END;
 
 const _axisDelta = new THREE.Vector3();
 
@@ -69,7 +66,7 @@ export function cameraUpForHead(tHead) {
   // there, and the shot of the worm bursting out wants to be straight up the exit
   // tile's axis rather than nudged off to one side of it.
   return TUNNEL_CAM_UP
-    * THREE.MathUtils.smoothstep(tHead, 0.33, 0.43)
+    * THREE.MathUtils.smoothstep(tHead, ARM_A_END, ARM_A_END + 0.1)
     * (1 - THREE.MathUtils.smoothstep(tHead, 0.80, 0.95));
 }
 
@@ -83,21 +80,8 @@ export const diveEase = (p) => {
   return c * c * c * (c * (c * 6 - 15) + 10);
 };
 
-/**
- * Fraction of the 'entering' phase spent held on the exterior framing before the
- * dive begins at all.
- *
- * The suck-in is the beat the hold exists for: the head is already through the
- * aperture from the first frame of the phase, and the body streams in behind it
- * over the whole of it. A camera that leaves immediately takes the tail — which is
- * still out on the surface, BEHIND the lens — off screen before any of that
- * happens, so the worm merely stopped existing. Held here, the player watches the
- * body drain into the hole from outside, and only then falls in after it.
- */
-export const DIVE_HOLD = 0.18;
-
-/** Dive progress (0→1) for a given 'entering' phase progress, including the hold. */
-export const diveProgress = (tp) => diveEase((tp - DIVE_HOLD) / (1 - DIVE_HOLD));
+/** Start the dive immediately and join the follow rail in the first quarter. */
+export const diveProgress = (tp) => diveEase(tp / 0.25);
 
 /**
  * How far behind the head the camera trails.
@@ -140,7 +124,11 @@ export function cameraArcForHead(path, tHead, size) {
   tunnelPathArcPointExtendedInto(_headPoint, path, headArc);
   const close = Math.max(.9, tunnelDockWidth(size) * 6) + _headPoint.length() * .4;
   const follow = 1 - THREE.MathUtils.smoothstep(path.armALen - headArc, .12, .9);
-  return headArc - THREE.MathUtils.lerp(backForHead(tHead, size), Math.min(backForHead(tHead, size), close), follow);
+  const trail = THREE.MathUtils.lerp(backForHead(tHead, size), Math.min(backForHead(tHead, size), close), follow);
+  // Follow closely through the outer mouth, then let the head pull away to the
+  // wider mirror-room framing. A full trailing distance at the first frame
+  // keeps the lens outside until the head is already deep in the entry arm.
+  return headArc - Math.min(trail, 0.18 + headArc * 0.5);
 }
 
 function cameraRideHeight(point, arc, tHead) {
@@ -289,7 +277,7 @@ const _entryLateral = new THREE.Vector3();
 /** Dive along route distance, so corner-tile tunnels use their own opening too. */
 export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   const p = THREE.MathUtils.clamp(progress, 0, 1);
-  const tHead = p * ENTER_END_T;
+  const tHead = tunnelTraversalT('entering', p);
   tunnelCamPoseInto(_entryRide, tunnel, tHead, size);
   const blend = diveProgress(p);
   blendTunnelPosesInto(out, from, _entryRide, blend);
@@ -308,7 +296,7 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
 /** One exit shot shared by exiting's endpoint and windout's starting pose. */
 export function tunnelExitPoseInto(out, tunnel, progress, size) {
   const p = THREE.MathUtils.clamp(progress, 0, 1);
-  const tHead = 0.67 + p * 0.33;
+  const tHead = tunnelTraversalT('exiting', p);
   tunnelCamPoseInto(_exitRail, tunnel, tHead, size);
   const blend = diveEase((p - 0.50) / 0.50);
   _exitSideRail.set(0, 1, 0).cross(_camPath.nEnd);

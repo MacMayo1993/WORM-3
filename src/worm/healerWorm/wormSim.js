@@ -88,11 +88,8 @@ import { isViewPower, VIEW_POWER_DURATION } from './viewPowerups.js';
 import { isElementalType, ELEMENTAL_TYPES } from './specialDefs.js';
 import {
     WORM_LIFT,
-    TUNNEL_SPEED_SCALE,
-    TUNNEL_INTERIOR_SPEED_SCALE,
-    TUNNEL_EXIT_RATE,
-    TUNNEL_ENTER_RATE,
-    TUNNEL_CROSSING_RATE,
+    TUNNEL_CROSSING_SECONDS,
+    tunnelArmSeconds,
     tunnelHandoffSeconds,
     FACE_NORMALS,
     INITIAL_DIR,
@@ -1845,7 +1842,7 @@ const PHASE_HANDLERS = {
             const nextProgress = sim.tunnelProgress + delta / tunnelHandoffSeconds(sim.activeTunnel);
             advanceTunnelHead(sim, 'windup', nextProgress, size);
             sim.tunnelProgress = nextProgress;
-            if (sim.tunnelProgress >= 1) {
+            if (sim.tunnelProgress >= 1 - 1e-9) {
                 sim.tunnelProgress = 0;
                 sim.phase = 'entering'; // entering.enter() fires next tick
             }
@@ -1858,10 +1855,10 @@ const PHASE_HANDLERS = {
             ctx.onPhase('entering');
         },
         update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (TUNNEL_ENTER_RATE * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
+            const nextProgress = sim.tunnelProgress + delta / tunnelArmSeconds(sim.activeTunnel);
             advanceTunnelHead(sim, 'entering', nextProgress, size);
             sim.tunnelProgress = nextProgress;
-            if (sim.tunnelProgress >= 1) {
+            if (sim.tunnelProgress >= 1 - 1e-9) {
                 sim.tunnelProgress = 0;
                 sim.phase = 'tunnel';
                 // tunnel.enter() fires next tick → ctx.onPhase('tunnel')
@@ -1877,7 +1874,7 @@ const PHASE_HANDLERS = {
         update(sim, size, ctx, delta) {
             const collapsing = sim.pendingVoidKill?.tunnelKey === sim.currentTunnelKey;
             const nextProgress = Math.min(collapsing ? 0.5 : 1,
-                sim.tunnelProgress + delta * (TUNNEL_CROSSING_RATE * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE));
+                sim.tunnelProgress + delta / TUNNEL_CROSSING_SECONDS);
             advanceTunnelHead(sim, 'tunnel', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (collapsing && nextProgress >= 0.5) {
@@ -1887,7 +1884,7 @@ const PHASE_HANDLERS = {
                 killWormSim(sim, ctx, { reason: 'void-tunnel-exhausted', tunnelKey, traversals, progress: 0.5 });
                 return true;
             }
-            if (sim.tunnelProgress >= 1) {
+            if (sim.tunnelProgress >= 1 - 1e-9) {
                 sim.tunnelProgress = 0;
                 sim.phase = 'exiting';
                 // exiting.enter() fires next tick → ctx.onPhase + pos snap to exit tile
@@ -1908,10 +1905,10 @@ const PHASE_HANDLERS = {
             }
         },
         update(sim, size, ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta * (TUNNEL_EXIT_RATE * TUNNEL_SPEED_SCALE * TUNNEL_INTERIOR_SPEED_SCALE);
+            const nextProgress = sim.tunnelProgress + delta / tunnelArmSeconds(sim.activeTunnel);
             advanceTunnelHead(sim, 'exiting', nextProgress, size);
             sim.tunnelProgress = nextProgress;
-            if (sim.tunnelProgress >= 1) {
+            if (sim.tunnelProgress >= 1 - 1e-9) {
                 const exitedTunnel = sim.activeTunnel; // capture (kept alive for windout)
                 const exitStableKey = sim.currentTunnelStableKey;
                 const exitTunnelKey = sim.currentTunnelKey;
@@ -1963,7 +1960,7 @@ const PHASE_HANDLERS = {
             const nextProgress = sim.tunnelProgress + delta / tunnelHandoffSeconds(sim.activeTunnel);
             advanceTunnelHead(sim, 'windout', nextProgress, size);
             sim.tunnelProgress = nextProgress;
-            if (sim.tunnelProgress >= 1) {
+            if (sim.tunnelProgress >= 1 - 1e-9) {
                 // Resume from the exit pose, never interpolate from the old entry tile.
                 // padExpansion is 0 when no piece rises; the pad height marks a pad route.
                 if (sim.activeTunnel?.padHeight > 0) {

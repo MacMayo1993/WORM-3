@@ -6,6 +6,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { raisedPortalPosition } from '../raisedPortalPosition.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { FACE_NORMALS } from './constants.js';
+import { tunnelTraversalT } from '../../utils/tunnelPath.js';
 
 const getStickerWorldPos = (x, y, z, face, size) => raisedPortalPosition(x, y, z, face, size, useGameStore.getState());
 
@@ -58,21 +59,6 @@ const _fxPos = new THREE.Vector3();
 const _fxNormal = new THREE.Vector3();
 const _fxQuat = new THREE.Quaternion();
 const _fxRingUp = new THREE.Vector3(0, 0, 1); // ring/disc geometry lies in XY → flat normal is +Z
-
-/**
- * Overall traversal progress, 0 at the wind-up spiral to 1 as the worm clears the
- * exit hole. The per-phase progress value restarts at 0 each phase, so on its own
- * it cannot say how close the worm is to surfacing. Same mapping WormChaseCamera
- * uses for tunnelState.t, so the holes charge in step with the ride.
- */
-function traversalProgress(phase, prog) {
-    const p = Math.min(1, Math.max(0, prog ?? 0));
-    if (phase === 'windup') return 0;
-    if (phase === 'entering') return p * 0.33;
-    if (phase === 'tunnel') return 0.33 + p * 0.34;
-    if (phase === 'exiting') return 0.67 + p * 0.33;
-    return 1;
-}
 
 // Radius of a fully open hole. The sticker is 0.88 across, so this is the largest
 // circle that stays inside the tile.
@@ -175,7 +161,7 @@ export function TunnelPortalFX({ worm, size }) {
         const openTarget = occupied ? 1 : 0;
         const drawable = !!tunnel && (phase === 'windup' || phase === 'entering' || phase === 'windout' || phase === 'crawling');
 
-        const trip = traversalProgress(phase, prog);
+        const trip = tunnelTraversalT(phase, prog);
         entryOpenRef.current += (openTarget - entryOpenRef.current) * Math.min(1, delta * 7);
         exitOpenRef.current += (openTarget - exitOpenRef.current) * Math.min(1, delta * 7);
 

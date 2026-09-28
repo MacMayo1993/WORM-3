@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { getTunnelWorldPosSmoothInto, getWindWorldPosInto } from '../wormLogic.js';
+import { tunnelTraversalT } from '../../utils/tunnelPath.js';
 import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
@@ -108,7 +109,7 @@ export function WormFace({ worm, size }) {
             } else {
                 // Derive forward from the tunnel tangent at the current parametric position.
                 const tp = worm.tunnelProgress.current;
-                const t = phase === 'entering' ? tp * 0.33 : phase === 'tunnel' ? 0.33 + tp * 0.34 : 0.67 + tp * 0.33;
+                const t = tunnelTraversalT(phase, tp);
                 const tAhead = Math.min(t + 0.02, 1.0);
                 getTunnelWorldPosSmoothInto(_faceTunnelAhead, worm.activeTunnel.current, tAhead, size);
                 _faceForward.copy(_faceTunnelAhead).sub(_faceHeadPos);
