@@ -44,7 +44,7 @@ import { isBombDisarmed } from '../worm/healerWorm/bombs.js';
 // order (children before parents) and priority sorting without a WebGL renderer.
 function Harness(props) {
   const tree = HealerWormMode3DWrapper(props);
-  return React.Children.toArray(tree.props.children).find(child => child.type === WormChaseCamera);
+  return React.Children.toArray(tree.props.children.props.children).find(child => child.type === WormChaseCamera);
 }
 let root, host, rotate, sim;
 const tick = (count = 1, delta = 0.1) => act(() => { for (let i = 0; i < count; i++) frames.slice().sort((a, b) => a.priority - b.priority).forEach(sub => sub.run({}, delta)); });

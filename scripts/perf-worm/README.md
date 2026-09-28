@@ -79,3 +79,29 @@ pass between windows. Any WebGL shader compilation errors fail the run.
   update overrides it; it is not a demonstrated hidden-subtree optimization.
 - Draw suppression isolates instrumented CPU submission work, not GPU time or
   physical-phone FPS. A and B are broad patches, not component-isolated fixes.
+
+## Repeated effect lifecycle checks
+
+```bash
+node scripts/perf-worm/run.mjs --mode=events --size=3 --seed=71 --ms=1400 --cycles=6 --url=http://localhost:4173/WORM-3/ --out=/tmp/worm-effects.json
+```
+
+`events` pins reduced FX and DPR 1, pauses gameplay, installs a solved board with
+one row of parity orbs, and repeats the same rendering transitions:
+
+- A magnet pickup's `OrbPickupBurst`, using its production pending-effect bridge.
+  This uses `pickup=false` so the burst can complete while gameplay stays paused.
+- Three native paired flips of the centre front tile, including the raised Möbius
+  ribbon and higher-flip decoration, then removal of the pair.
+- Scrambling/active visibility transitions for the worm renderers. This isolates
+  resource lifetimes; it does not simulate a complete death and restart.
+
+Each event records actual shader link calls, rAF callback CPU timings and renderer
+resource counts. Each cycle also collects garbage and records heap usage.
+`--shots=directory` captures real-draw wormhole, pickup and Explode views after the
+timing windows; `--program-keys` includes renderer cache keys for link diagnostics.
+The JSON's `scene` describes entry state and `fixture` describes the controlled
+event workload. Compare
+separate production builds with the same fixture. Shader links are the primary
+result: software WebGL, background work and initialization differences limit CPU
+comparisons, and these measurements cannot establish physical-device FPS.

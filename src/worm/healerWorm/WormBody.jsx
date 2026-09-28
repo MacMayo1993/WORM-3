@@ -201,6 +201,20 @@ export function WormBody({ worm, size }) {
     // skin/character swap, or tail length change) instead of every frame.
     const prevColorStateRef = useRef({ epoch: -1, visibleCount: -1, baseColor: null, bellyCol: null, isGlow: null, isInch: null });
 
+    const runId = useGameStore(s => s.wormRunId);
+    useEffect(() => {
+        bookInitedRef.current = false; bookTurnRef.current = 0;
+        prevHeadPosRef.current.set(0, 0, 0); prevHeadDirRef.current.set(0, 0, 0);
+        transitScaleRef.current = 1; characterTimeRef.current = 0;
+        inchStateRef.current = makeInchGaitState(); lastHaloHexRef.current = null;
+        const pickup = pickupRef.current;
+        pickup.seq = useGameStore.getState().wormOrbFlash?.seq;
+        pickup.age = Infinity; pickup.active = false; pickup.pulses.length = 0;
+        pickup.count = worm.tailLength.current;
+        elementalBodyRef.current.active = false;
+        prevColorStateRef.current.epoch = -1;
+    }, [runId, worm]);
+
     useFrame((state, delta) => {
         beginAccessoryBody(accessoryRig);
         const frozen = useGameStore.getState().wormPaused || !useGameStore.getState().wormAlive;
