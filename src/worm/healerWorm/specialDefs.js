@@ -22,6 +22,12 @@ import { VIEW_POWER_DEFS } from './viewPowerups.js';
 import { ELEMENTAL_DEFS, ELEMENTAL_TYPES, isElementalType } from './elementalDefs.js';
 
 const BASE_SPECIAL_DEFS = {
+  'orb-shower': {
+    label: 'Orb Shower', color: '#72edbb', accent: '#fff0a8', icon: 'orb-shower', particle: 'bubbles',
+    iconPath: 'M7 3a4 4 0 0 1 7-1 4 4 0 0 1 5 6H5a3 3 0 0 1 2-5zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM19 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+    iconAccent: 'M4 9h2v2H4zm7 4h2v2h-2zm7-4h2v2h-2z',
+    description: 'Rain extra growth orbs across all six faces for 10 seconds of play. Collect them to grow your worm; leftover orbs stay until collected.',
+  },
   explode: {
     label: 'Explode', color: '#ba8cff', accent: '#fff0a8', icon: 'explode',
     iconPath: 'M2 2h7v7H2zm13 0h7v7h-7zM2 15h7v7H2zm13 0h7v7h-7z',
@@ -62,7 +68,7 @@ export const SPECIAL_DEFS = { ...BASE_SPECIAL_DEFS, ...ELEMENTAL_DEFS, ...VIEW_P
 /** Canonical list of supported special types (buffs + elements). */
 export const SPECIAL_TYPES = Object.keys(SPECIAL_DEFS);
 
-/** Just the ambient pickups (explode / rocket / magnet) — the always-present half of each bag. */
+/** The four gameplay buffs — every bag offers each plus one cube-view pickup. */
 export const BUFF_TYPES = Object.keys(BASE_SPECIAL_DEFS);
 
 /** Just the elemental orb types, in catalogue order. */

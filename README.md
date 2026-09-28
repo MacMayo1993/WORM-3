@@ -155,9 +155,12 @@ Power pickups produce a temporary change with a visible activation, timer, and e
 | Power | Effect |
 | --- | --- |
 | **Rocket** | Fly above the cube for six seconds, steer the landing, and remain protected from collisions and wormhole entry during flight. |
+| **Orb Shower** | Rain extra growth orbs onto all six faces for 10 seconds of play. Leftover orbs stay until collected; another pickup refreshes the timer. |
 | **Magnet** | For eight seconds, attract ordinary orbs within two surface steps, including around face edges. |
 | **Explode** | Separate cubies and open gaps for a 12-second play window, then close smoothly. Timing accounts for jumps, turns, and tunnel exits. This differs from a single flipped cubie rising. |
 | **View powers** | Transform the cube into Classic, Grid, Sudoku, Wireframe, Glass, Chrome, Neon, Gap, or LEGO presentation for 20 seconds, then restore its prior view. |
+
+New orbs assemble with the opening cube/bomb dissolve played in reverse. Shower orbs also fall toward their tiles; reduced-motion settings use a gentle fade. The demo stages a dense 12-orb growth exercise and a separate full-length Orb Shower lesson.
 
 ### Five elements
 

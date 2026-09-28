@@ -1,3 +1,4 @@
+import { ORB_SHOWER_DURATION, ORB_SHOWER_CAP, makeGrowthOrb, showerWave, tickOrbShower } from '../worm/healerWorm/orbSpawning.js';
 import { isViewPower, VIEW_POWER_TYPES, VIEW_POWER_DURATION } from '../worm/healerWorm/viewPowerups.js';
 import { EXPLODE_DURATION, EXPLODE_AMOUNT } from '../worm/wormExpansion.js';
 import { tickExpansion } from '../worm/healerWorm/expansion.js';
@@ -101,6 +102,7 @@ function makeCtx(overrides = {}) {
     onExpansionAmount: log('expansion'),
     onRocketState: log('rocketState'),
     onMagnetState: log('magnetState'),
+    onOrbShowerState: log('showerState'),
     onSpecialSpawned: log('specialSpawned'),
     onSpecialExpired: log('specialExpired'),
     onElementalTheme: log('elemental'),
@@ -736,10 +738,10 @@ describe('special type chooser', () => {
     return () => values[i++ % values.length];
   };
 
-  it('balances three gameplay powers with one view power in each bag', () => {
+  it('balances four gameplay powers with one view power in each bag', () => {
     const picker = makeSpecialPicker();
-    const drawn = Array.from({ length: 4 }, () => drawSpecialType(picker, { rand: () => 0.4 }));
-    expect(drawn).toEqual(expect.arrayContaining(['rocket', 'magnet', 'explode']));
+    const drawn = Array.from({ length: 5 }, () => drawSpecialType(picker, { rand: () => 0.4 }));
+    expect(drawn).toEqual(expect.arrayContaining(['rocket', 'magnet', 'explode', 'orb-shower']));
     expect(drawn.filter(isViewPower)).toHaveLength(1);
   });
 
@@ -1289,13 +1291,13 @@ it.each(['remote', 'head', 'glow'])('credits Story magnet catches for remote mag
 
 
 describe('Explode pickup', () => {
-  it('offers Explode as the first ambient pickup, then balances all four power categories', () => {
+  it('offers Explode as the first ambient pickup, then balances all five power categories', () => {
     const sim = makeSim(), ctx = makeCtx();
     sim.specialTimer = 0;
     stepWormSim(sim, 0.05, SIZE, ctx);
     expect(sim.specials.find(s => !isElementalType(s.type))?.type).toBe('explode');
-    const types = Array.from({ length: 4 }, () => drawSpecialType(sim.specialPicker));
-    expect(types).toEqual(expect.arrayContaining(['explode', 'rocket', 'magnet']));
+    const types = Array.from({ length: 5 }, () => drawSpecialType(sim.specialPicker));
+    expect(types).toEqual(expect.arrayContaining(['explode', 'rocket', 'magnet', 'orb-shower']));
     expect(types.filter(isViewPower)).toHaveLength(1);
   });
 
@@ -1360,7 +1362,7 @@ describe('Explode pickup', () => {
 describe('temporary cube views', () => {
   it('offers every supported view before repeating, without crowding out other powers', () => {
     const picker = makeSpecialPicker();
-    const draws = Array.from({ length: VIEW_POWER_TYPES.length * 4 }, () => drawSpecialType(picker, { rand: () => 0.3 }));
+    const draws = Array.from({ length: VIEW_POWER_TYPES.length * 5 }, () => drawSpecialType(picker, { rand: () => 0.3 }));
     expect(new Set(draws.filter(isViewPower))).toEqual(new Set(VIEW_POWER_TYPES));
     expect(draws.filter(t => t === 'rocket')).toHaveLength(VIEW_POWER_TYPES.length);
   });
@@ -1402,5 +1404,65 @@ describe('temporary cube views', () => {
     resetWormSim(sim, SIZE, { orbCount: 0 });
     expect(sim.viewPower).toBeNull();
     expect(sim.viewPowerT).toBe(0);
+  });
+});
+
+
+describe('Orb Shower', () => {
+  it('rains onto all six faces for exactly ten play seconds, freezes on pause and refreshes without stacking', () => {
+    const sim = makeSim(), ctx = makeCtx({ getSpeed: () => 0.001, isDemoLesson: () => true });
+    activateSpecial(sim, ctx, 'orb-shower');
+    run(sim, ctx, 0.05);
+    expect(sim.powerups).toHaveLength(6);
+    expect(new Set(sim.powerups.map(p => p.dirKey)).size).toBe(6);
+    run(sim, ctx, 2);
+    const left = sim.orbShowerT, count = sim.powerups.length;
+    run(sim, { ...ctx, isPaused: () => true }, 3);
+    expect(sim.orbShowerT).toBe(left); expect(sim.powerups).toHaveLength(count);
+    sim.phase = 'entering';
+    // No phase dispatch needed to verify the shared transit clock gate.
+    const transit = sim.orbShowerT;
+    tickOrbShower(sim, 1, SIZE, ctx);
+    expect(sim.orbShowerT).toBe(transit);
+    sim.phase = 'crawling';
+    activateSpecial(sim, ctx, 'orb-shower');
+    expect(sim.orbShowerT).toBe(ORB_SHOWER_DURATION);
+    run(sim, ctx, 9.95); expect(sim.orbShowerT).toBeCloseTo(0.05);
+    run(sim, ctx, 0.05); expect(sim.orbShowerT).toBe(0);
+    const leftovers = sim.powerups.slice();
+    run(sim, ctx, 2); expect(sim.powerups).toEqual(leftovers);
+    expect(eventsOf(ctx, 'showerState').map(e => e.args[0])).toEqual([10, 10, 0]);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.orbShowerT).toBe(0); expect(sim.powerups).toHaveLength(0);
+  });
+
+  it('never duplicates or overlaps protected tiles, and bounds repeated showers on small and large boards', () => {
+    for (const size of [2, 5, 15]) {
+      const sim = makeWormSim(size); resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
+      const cubies = makeCubies(size);
+      const blocked = { x: 0, y: 0, z: size - 1, dirKey: 'PZ' };
+      cubies[0][0][size - 1].stickers.PZ.curr = 2;
+      sim.specials = [special(1, 0, size - 1, 'PZ', 'orb-shower')];
+      for (let i = 0; i < 100; i++) showerWave(sim, size, cubies);
+      const keys = new Set(sim.powerups.map(tileKey));
+      expect(keys.size).toBe(sim.powerups.length);
+      expect(keys.has(tileKey(sim.pos))).toBe(false);
+      expect(keys.has(tileKey(blocked))).toBe(false);
+      expect(keys.has(tileKey(sim.specials[0]))).toBe(false);
+      expect(sim.powerups.length).toBeLessThanOrEqual(Math.min(ORB_SHOWER_CAP, Math.floor(6 * size * size * 0.65)));
+    }
+  });
+
+  it('claims the new special through contact, and collects bonus orbs as growth without permanently respawning them', () => {
+    const sim = makeSim(), ctx = makeCtx({ isDemoLesson: () => true });
+    sim.specials = [special(2, 3, 4, 'PZ', 'orb-shower')];
+    stepUntilCommit(sim, ctx);
+    expect(sim.orbShowerT).toBeGreaterThan(0);
+    sim.orbShowerT = 0; sim.magnetT = 5;
+    sim.powerups = [makeGrowthOrb({ x: 2, y: 4, z: 4, dirKey: 'PZ' }, { shower: true })];
+    const tail = sim.tailLength;
+    stepUntilCommit(sim, ctx);
+    expect(sim.tailLength).toBeGreaterThan(tail);
+    expect(sim.powerups).toHaveLength(0);
   });
 });

@@ -1,3 +1,4 @@
+import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { characterOrbCount } from '../characterAbilities.js';
 import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
 import { updateMastery, STORY_POWER_OPENING_DELAY } from './mastery.js';
@@ -112,7 +113,7 @@ export function stageStory(sim, size, level, character) {
       const tile = { x, y, z, dirKey };
       if (reserved[x][y][z].stickers[dirKey].curr === sticker.orig && tileKey(tile) !== tileKey(sim.pos) && !bodyKeys.has(tileKey(tile))) {
         used.add(key);
-        sim.powerups.push({ ...tile, type: 'apple' });
+        sim.powerups.push(makeGrowthOrb(tile));
       }
     }
   }
@@ -130,7 +131,7 @@ export function stageStory(sim, size, level, character) {
   while (sim.powerups.length < targetCount) {
     const tile = randomUnflippedTile(base.cubies, size, [...sim.powerups, sim.pos, ...reservedMouths, ...body.map(([x, y]) => ({ x, y, z: edge, dirKey: 'PZ' }))]);
     if (!tile) break;
-    sim.powerups.push({ ...tile, type: 'apple' });
+    sim.powerups.push(makeGrowthOrb(tile));
   }
   sim.specials = [];
   // Preserve the staged density (including Classic's bonus) by sticker color,
@@ -188,7 +189,7 @@ export function replenishStoryOrbs(sim, practice, state, size, delta) {
   let added = false;
   for (const tiles of Object.values(candidates)) {
     const tile = tiles[Math.floor(sim.rand() * tiles.length)];
-    sim.powerups.push({ ...tile, type: 'apple' });
+    sim.powerups.push(makeGrowthOrb(tile));
     added = true;
   }
   return added;

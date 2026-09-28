@@ -79,3 +79,22 @@ export function addIntroDissolve(material, uniform) {
 export function addFrameDissolve(material, uniforms) {
   return patch(material, uniforms, '(uDissolveFrame * modelMatrix * vec4(transformed, 1.0)).xyz', 'frame-dissolve');
 }
+
+// Pickups run the same field backwards. They include custom tile/element shaders,
+// so inject at main() instead of assuming built-in material chunks are present.
+// Preserve the source material's shader patch and its program-cache identity.
+export function addOrbReveal(material, uniforms, sourceKey) {
+  const previous = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    previous.call(material, shader, renderer);
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = 'uniform mat4 uDissolveFrame;\nvarying vec3 vDissolvePos;\n' +
+      shader.vertexShader.replace(/void\s+main\s*\(\s*\)\s*\{/, `$&\n vDissolvePos = (uDissolveFrame * modelMatrix * vec4(position, 1.0)).xyz;`);
+    shader.fragmentShader = FIELD + '\nuniform float uOrbOpacity;\n' + shader.fragmentShader
+      .replace(/void\s+main\s*\(\s*\)\s*\{/, `$&\n${DISCARD.replace('#include <clipping_planes_fragment>', '')}`)
+      .replace(/}\s*$/, `gl_FragColor.rgb += ${EDGE};\n gl_FragColor.a *= uOrbOpacity;\n}`);
+  };
+  material.customProgramCacheKey = () => `orb-reveal:${sourceKey}`;
+  material.needsUpdate = true;
+  return material;
+}

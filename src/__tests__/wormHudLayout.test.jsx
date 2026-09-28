@@ -20,7 +20,7 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   useGameStore.setState({ demoMode: false, wormHealerMode: true, wormAlive: true,
     wormStoryLevel: null, wormStoryStarted: false, wormStoryChecklist: null, wormStoryResult: null, wormCombatMode: false, wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
-    wormElementalTheme: null, wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false,
+    wormElementalTheme: null, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false,
     wormMission: { title: 'Collect 3 face orbs', target: 3, progress: 0, reward: 30, xp: 60, sequence: 5 },
     wormRunAchievements: [] });
   wormBuffs.signature = { character: 'inch', ready: true, seconds: 0, fraction: 1 };
@@ -239,4 +239,14 @@ it('shows the cube view and sim-driven countdown, then removes it on expiry', ()
   expect(host.querySelector('[aria-label="Glass Cube active"]').textContent).toContain('7s');
   act(() => useGameStore.setState({ wormViewPower: null }));
   expect(host.querySelector('[aria-label="Glass Cube active"]')).toBeNull();
+});
+
+it('shows Orb Shower with a live ten-second countdown and removes it when rain ends', () => {
+  useGameStore.setState({ wormOrbShowerActive: true }); wormBuffs.orbShowerT = 10;
+  renderPhase('crawling');
+  const chip = () => host.querySelector('[aria-label="Orb Shower active"]');
+  expect(chip().textContent).toContain('10.0s');
+  wormBuffs.orbShowerT = 4.2; act(() => vi.advanceTimersByTime(100));
+  expect(chip().textContent).toContain('4.2s');
+  act(() => useGameStore.setState({ wormOrbShowerActive: false })); expect(chip()).toBeNull();
 });

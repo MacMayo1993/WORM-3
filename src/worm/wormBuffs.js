@@ -22,6 +22,7 @@ export const wormBuffs = {
   waterMomentum: 0,
   springReady: false,
   springCount: 0,
+  orbShowerT: 0,
   magnetT: 0,        // seconds of magnet reach remaining
   magnetMaxT: 0,     // duration of the active magnet, for the fill fraction
   rocketActive: false,
@@ -64,6 +65,7 @@ export function resetWormBuffs() {
   wormBuffs.waterMomentum = 0;
   wormBuffs.springReady = false;
   wormBuffs.springCount = 0;
+  wormBuffs.orbShowerT = 0;
   wormBuffs.magnetT = 0;
   wormBuffs.magnetMaxT = 0;
   wormBuffs.rocketActive = false;

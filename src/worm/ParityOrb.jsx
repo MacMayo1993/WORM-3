@@ -1,3 +1,5 @@
+import { createOrbReveal, orbRevealProgress, orbRainLift } from './orbReveal.js';
+import { prefersReducedMotion } from '../utils/device.js';
 import { wormExpansion } from './wormExpansion.js';
 import { WormPointLight } from './WormLighting.jsx';
 import { createOrbBatches } from './orbBatches.js';
@@ -89,7 +91,7 @@ for (const [variant, geometry] of Object.entries(_orbGeos)) {
 function SingleOrbImpl({
   position, color = '#ffd700', antipodalColor = '#ffd700', styleKey = 'solid',
   collected = false, isTarget = false, elevated = false, matchReserveColor = false,
-  dirKey = 'PY', orbKey, type = 'parity',
+  dirKey = 'PY', orbKey, type = 'parity', shower = false,
   registerAnim, unregisterAnim,
   gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false, reducedDetail = false,
 }) {
@@ -164,27 +166,28 @@ function SingleOrbImpl({
       get type()          { return typeRef.current; },
       get poles()         { return poleRefs.current; },
       get styledBand()    { return styledBandRef.current; },
-      timeOffset,
+      timeOffset, shower, reducedDetail, age: 0, reveal: null, arrived: false,
     });
     return () => unregisterAnim(orbKey);
-  }, [orbKey, timeOffset, registerAnim, unregisterAnim]);
+  }, [orbKey, timeOffset, shower, reducedDetail, registerAnim, unregisterAnim]);
 
   if (collected) return null;
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Optional fallback for future budgets. Every currently supported size,
-  // including Mega, selects the complete parity orb below.
+  // Shower beads keep the bright round gem and credited face color. After
+  // assembly they join one shared opaque draw per color, so a rain of dozens
+  // does not multiply the full pickup's transparent rings and glass layers.
   if (reducedDetail) {
     return (
-      <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
+      <group ref={orbGroupRef} visible={false} position={[position[0], position[1], position[2]]}>
         <mesh ref={coreRef} geometry={g.shell} material={mat.reduced} />
       </group>
     );
   }
 
   return (
-    <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
+    <group ref={orbGroupRef} visible={false} position={[position[0], position[1], position[2]]}>
 
       {/* Smooth glassy gem shell — iridescent + clearcoat so it catches the light and
           shimmers with view angle. Low emissive (vs the old flat glowing ball) so the
@@ -274,6 +277,7 @@ const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
   a.styleKey === b.styleKey &&
   a.dirKey === b.dirKey &&
   a.type === b.type &&
+  a.shower === b.shower &&
   a.collected === b.collected &&
   a.isTarget === b.isTarget &&
   a.elevated === b.elevated &&
@@ -307,13 +311,14 @@ export default function ParityOrbs({
 
   const animMapRef = useRef(new Map());
   const orbRootRef = useRef();
+  const reducedMotion = useRef(prefersReducedMotion());
   const visibility = useMemo(() => createOrbVisibility(), []);
   const batches = useMemo(() => createOrbBatches(), []);
   useEffect(() => () => batches.dispose(), [batches]);
   const registerAnim   = useCallback((key, refs) => { animMapRef.current.set(key, refs); }, []);
-  const unregisterAnim = useCallback((key) => { animMapRef.current.delete(key); }, []);
+  const unregisterAnim = useCallback((key) => { animMapRef.current.get(key)?.reveal?.dispose(); animMapRef.current.delete(key); }, []);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     // PiP renders a second camera: main-camera culling must not hide its orbs.
     const cull = !useGameStore.getState().showAntipodalPiP;
@@ -329,6 +334,8 @@ export default function ParityOrbs({
       } = refs;
       if (!group || !core) continue;
       const time = t + timeOffset;
+      refs.age += Math.min(delta, 0.05);
+      const arrival = orbRevealProgress(refs.age, refs.shower);
 
       // ── World position — glued to live cubie transform ─────────────────────
       const bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
@@ -355,6 +362,16 @@ export default function ParityOrbs({
           base[1] + bn[1] * _bob,
           base[2] + bn[2] * _bob
         );
+      }
+
+      if (refs.shower && arrival < 1) {
+        if (!cubie) _scratchBob.set(...bn);
+        group.position.addScaledVector(_scratchBob, orbRainLift(arrival, reducedMotion.current));
+      }
+      // Advance off-screen arrivals too: camera moves never replay the entrance.
+      if (!refs.arrived) {
+        refs.reveal ??= createOrbReveal(group, { radius: isTarget ? 0.75 : 0.6, reducedMotion: reducedMotion.current });
+        refs.arrived = !refs.reveal.update(arrival);
       }
 
       // Keep placement current even when hidden so turning slices and camera
@@ -510,8 +527,18 @@ export default function ParityOrbs({
       // Hidden proxy meshes retain the exact animated transforms. Only these
       // three opaque parts enter the shared draws; all other parts stay intact.
       group.updateWorldMatrix(false, true);
-      batches.add(innerCore);
-      for (const pole of refs.poles) batches.add(pole);
+      // Arriving parts dissolve in one common orb frame. Once formed, put the
+      // opaque pieces back into their shared draw calls.
+      if (refs.reducedDetail) core.visible = !refs.arrived;
+      if (innerCore) innerCore.visible = !refs.arrived;
+      for (const pole of refs.poles) if (pole) pole.visible = !refs.arrived;
+      if (refs.arrived) {
+        if (refs.reducedDetail) batches.add(core);
+        else {
+          batches.add(innerCore);
+          for (const pole of refs.poles) batches.add(pole);
+        }
+      }
     }
     batches.end();
   });
@@ -536,7 +563,7 @@ export default function ParityOrbs({
             position[2] + bn[2] * ELEVATED_HOVER,
           ];
         }
-        key = `${orb.x}-${orb.y}-${orb.z}-${orb.dirKey}`;
+        key = orb.spawnId ?? `${orb.x}-${orb.y}-${orb.z}-${orb.dirKey}`;
       }
 
       return {
@@ -548,6 +575,7 @@ export default function ParityOrbs({
         dirKey:         orb.dirKey         || 'PY',
         type:           orb.type           || 'parity',
         key,
+        shower: !!orb.shower,
         isTarget:  isTunnelMode && orb.tunnelId === targetTunnelId,
         elevated:  orb.elevated || false,
         gridX:     orb.x  ?? -1,
@@ -571,6 +599,7 @@ export default function ParityOrbs({
           styleKey={data.styleKey}
           dirKey={data.dirKey}
           type={data.type}
+          shower={data.shower}
           isTarget={data.isTarget}
           elevated={data.elevated}
           gridX={data.gridX}
@@ -579,7 +608,7 @@ export default function ParityOrbs({
           isGlowWorm={isGlowWorm}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}
-          reducedDetail={fxBudget(size).orbDetail === 'reduced' && !isTunnelMode}
+          reducedDetail={data.shower || (fxBudget(size).orbDetail === 'reduced' && !isTunnelMode)}
         />
       ))}
     </group>
