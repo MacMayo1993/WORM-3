@@ -8,6 +8,9 @@ export const PER_CUBELET_VIEW_STYLES = [
   'classic', 'grid', 'sudokube', 'wireframe', 'glass',
   'chrome', 'neon', 'gap', 'lego'
 ];
+// Keep the mixed-view identity without rebuilding glass and brick resources
+// across the whole board at every mobile remix.
+export const LIGHT_CUBELET_VIEW_STYLES = ['classic', 'grid', 'sudokube', 'chrome', 'gap'];
 
 // Modes that draw glowing LED edges over the cubie body.
 export const LED_EDGE_MODES = new Set(['wireframe', 'neon']);

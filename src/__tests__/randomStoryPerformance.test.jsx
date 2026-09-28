@@ -1,16 +1,43 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { useRandomMode } from '../hooks/useRandomMode.js';
+import { useRandomMode, LIGHT_REMIX_STYLES } from '../hooks/useRandomMode.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
+import { TILE_STYLES } from '../utils/colorSchemes.js';
+const device = vi.hoisted(() => ({ mobile: false }));
+vi.mock('../utils/device.js', () => ({ get isMobile() { return device.mobile; }, prefersReducedMotion: () => false }));
 function Harness() { useRandomMode(); return null; }
 let root, host;
 afterEach(() => {
   if (root) act(() => root.unmount());
   host?.remove(); vi.useRealTimers();
-  useGameStore.setState({ randomMode: false, wormHealerMode: false, wormPaused: false });
+  useGameStore.setState({ randomMode: false, wormHealerMode: false, wormPaused: false, perfReducedFX: false });
+  device.mobile = false;
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+});
+
+it.each(['mobile', 'reduced effects'])('bounds shader variety across a full Remix run on %s', tier => {
+  vi.useFakeTimers(); globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  device.mobile = tier === 'mobile';
+  useGameStore.setState({ randomMode: true, wormHealerMode: true, wormPaused: false,
+    perfReducedFX: tier === 'reduced effects', showMainMenu: false, showSettings: false,
+    showWelcome: false, showTutorial: false });
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  act(() => root.render(<Harness />));
+  const initial = useGameStore.getState().randomStyleTick;
+  for (let cycle = 1; cycle <= 100; cycle++) {
+    act(() => vi.advanceTimersByTime(10000));
+    const state = useGameStore.getState();
+    expect(state.randomStyleTick).toBe(initial + cycle);
+    expect(state.wormPaused).toBe(false);
+    expect(Object.values(state.settings.manifoldStyles)).toHaveLength(6);
+    for (const style of Object.values(state.settings.manifoldStyles)) {
+      expect(LIGHT_REMIX_STYLES).toContain(style);
+      expect(TILE_STYLES[style].cost).toBe('low');
+      expect(TILE_STYLES[style].type).not.toBe('3d');
+    }
+  }
 });
 it('retains cached materials, updates a remix atomically, and skips paused story cycles', () => {
   vi.useFakeTimers(); globalThis.IS_REACT_ACT_ENVIRONMENT = true;
