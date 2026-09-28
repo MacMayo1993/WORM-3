@@ -16,10 +16,9 @@ import { makeTunnelRideFrame, tunnelCameraFrameInto } from '../utils/tunnelRide.
 // start pose.
 
 import * as THREE from 'three';
-import { coreTrailAtPoint } from './coreVisit.js';
 import { coreZoomBoundsInto } from '../3d/antipodalCore.js';
 import { buildTunnelPathForTunnel, getTunnelArcPosSmoothInto } from './wormLogic.js';
-import { makeTunnelPath, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from '../utils/tunnelPath.js';
+import { makeTunnelPath, tunnelDockWidth, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from '../utils/tunnelPath.js';
 
 // Offset from the centerline while riding.
 //
@@ -132,13 +131,13 @@ const _camPath = makeTunnelPath();
 const _coreBounds = new THREE.Box3();
 const _headPoint = new THREE.Vector3();
 
-// Close in on the head before the anticube entry, then keep following it out.
+// Follow the head through the anticube without pressing the lens into its body.
 // Growing the trail by at most 40% of distance travelled prevents a backward
 // camera move while the worm regains its full width on the outward arm.
 export function cameraArcForHead(path, tHead, size) {
   const headArc = tunnelPathTToArc(path, tHead);
   tunnelPathArcPointExtendedInto(_headPoint, path, headArc);
-  const close = coreTrailAtPoint(_headPoint, path.midA, size);
+  const close = Math.max(.3, tunnelDockWidth(size) * 4) + _headPoint.length() * .4;
   const follow = 1 - THREE.MathUtils.smoothstep(path.armALen - headArc, .12, .9);
   return headArc - THREE.MathUtils.lerp(backForHead(tHead, size), Math.min(backForHead(tHead, size), close), follow);
 }

@@ -22,12 +22,11 @@ export const TUNNEL_SURF_SWAY = 0.22;
 // Base rate shared by all five traversal phases. The interior has its own
 // multiplier below so its readability does not depend on surface flourish time.
 export const TUNNEL_SPEED_SCALE = 0.90;
-// Slow only the dive, interior and exit; the exit arm gets an extra viewing beat.
-// Keep the short surface flourishes and normal crawl speed unchanged.
+// Match the two arms; keep the center crossing short and continuously moving.
 export const TUNNEL_INTERIOR_SPEED_SCALE = 0.65;
-// The outward arm takes twice as long as before, avoiding the rush away from
-// the tiny center crossing. Surface movement and mouth flourishes are unchanged.
-export const TUNNEL_EXIT_RATE = 0.5;
+export const TUNNEL_ENTER_RATE = 0.5;
+export const TUNNEL_EXIT_RATE = TUNNEL_ENTER_RATE;
+export const TUNNEL_CROSSING_RATE = 1.5;
 
 // Face outward normals.
 export const FACE_NORMALS = {
