@@ -55,18 +55,13 @@ export function projectToTileCenterAxisInto(out, point, tileCenter, faceNormal) 
 /**
  * Lateral camera offset from the tunnel centerline.
  *
- * The entry arm must stay at zero: even a small cinematic "up" offset moves
- * the lens across the face of the entry sticker instead of through its centre.
- * Once the camera is safely beyond the mouth, ease the usual riding height
- * back in so the Möbius roll remains visible through the rest of the trip.
+ * Rise above the band after entering the outer shell. The actual pose also
+ * checks shell/core clearance so both circular apertures remain centered.
  */
 export function cameraUpForHead(tHead) {
-  // …and it eases back OUT again on the approach to the exit mouth, for the same
-  // reason it is held off the entry one: the bore narrows to the width of a tile
-  // there, and the shot of the worm bursting out wants to be straight up the exit
-  // tile's axis rather than nudged off to one side of it.
+  // Return to the centerline before the exit mouth.
   return TUNNEL_CAM_UP
-    * THREE.MathUtils.smoothstep(tHead, ARM_A_END, ARM_A_END + 0.1)
+    * THREE.MathUtils.smoothstep(tHead, 0.04, 0.16)
     * (1 - THREE.MathUtils.smoothstep(tHead, 0.80, 0.95));
 }
 
@@ -80,8 +75,8 @@ export const diveEase = (p) => {
   return c * c * c * (c * (c * 6 - 15) + 10);
 };
 
-/** Start the dive immediately and join the follow rail in the first quarter. */
-export const diveProgress = (tp) => diveEase(tp / 0.25);
+/** Join the follow rail within the first 16% of the entry arm (under 0.6s). */
+export const diveProgress = (tp) => diveEase(tp / 0.16);
 
 /**
  * How far behind the head the camera trails.
@@ -131,14 +126,23 @@ export function cameraArcForHead(path, tHead, size) {
   return headArc - Math.min(trail, 0.18 + headArc * 0.5);
 }
 
-function cameraRideHeight(point, arc, tHead) {
+function cameraRideHeight(point, arc, tHead, size) {
   const mouthClearance = THREE.MathUtils.smoothstep(Math.min(arc, _camPath.total - arc), 0.1, 0.55);
   // Follow the exact carved centerline through BOTH core holes. Ease out of the
   // elevated chase view before reaching any position the zoomed core can occupy.
   // Using its complete zoom envelope avoids a frame of clipping when VoidCore
   // grows after the camera update, and keeps the shot still as the zoom recedes.
   const coreClearance = THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(point), 0.2, 1);
-  return cameraUpForHead(tHead) * mouthClearance * coreClearance;
+  const insideShell = THREE.MathUtils.smoothstep(size / 2 + .03 - Math.max(Math.abs(point.x), Math.abs(point.y), Math.abs(point.z)), .1, .6);
+  return cameraUpForHead(tHead) * mouthClearance * coreClearance * insideShell;
+}
+
+const _cameraLift = new THREE.Vector3();
+function cameraLiftInto(out, up, tHead) {
+  // During entry, raising the view must not push it back toward the mouth as
+  // the transported frame bends. Release that constraint beyond the entry arm.
+  return out.copy(up).addScaledVector(_camPath.nStart,
+    -up.dot(_camPath.nStart) * (1 - THREE.MathUtils.smoothstep(tHead, ARM_A_END, ARM_A_END + .08)));
 }
 
 // How far apart the two samples used to differentiate the route are, in world
@@ -222,9 +226,10 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
 
   // Clear the worm's back once inside, then look slightly down at the track.
   // A parallel raised aim left the core and worm at the bottom of a phone view.
-  const rideHeight = cameraRideHeight(out.cam, camArc, tHead);
-  out.cam.addScaledVector(out.up, rideHeight);
-  out.look.add(out.cam).addScaledVector(out.up, -rideHeight * 0.75);
+  const rideHeight = cameraRideHeight(out.cam, camArc, tHead, size);
+  cameraLiftInto(_cameraLift, out.up, tHead);
+  out.cam.addScaledVector(_cameraLift, rideHeight);
+  out.look.add(out.cam).addScaledVector(_cameraLift, -rideHeight * 0.75);
   // From the farther, elevated approach keep looking down the track. Lock to
   // the head once the lens has lowered onto the route through the core holes.
   const followHead = (1 - THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(_headPoint), 0, .5))
@@ -289,6 +294,7 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   _poseDir.subVectors(out.look, out.cam);
   cameraArcPointInto(out.cam, _camPath, arc);
   out.cam.addScaledVector(_entryLateral, diveEase(-arc / Math.max(0.1, height * 0.5)));
+  out.cam.addScaledVector(cameraLiftInto(_cameraLift, _entryRide.up, tHead), cameraRideHeight(out.cam, arc, tHead, size) * blend);
   out.look.copy(out.cam).add(_poseDir);
   return out;
 }
@@ -318,7 +324,7 @@ export function tunnelExitPoseInto(out, tunnel, progress, size) {
   cameraArcPointInto(out.cam, _camPath, arc);
   // The exit blend changes the LENS arc. Apply core clearance at that actual
   // position too: on small boards the head exits while the camera is in the core.
-  out.cam.addScaledVector(_exitRail.up, cameraRideHeight(out.cam, arc, tHead) * (1 - blend))
+  out.cam.addScaledVector(_exitRail.up, cameraRideHeight(out.cam, arc, tHead, size) * (1 - blend))
     .addScaledVector(_exitSideRail, (1.2 + size * 0.22) * sideBlend);
   out.look.copy(out.cam).add(_poseDir);
   return out;

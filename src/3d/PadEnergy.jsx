@@ -102,7 +102,7 @@ const _color = new THREE.Color();
 const _pts = new Float32Array(ARC_POINTS * 3);
 const _spark = { px: 0, py: 0, pz: 0, vx: 0, vy: 0, vz: 0, life: 0, size: 0 };
 
-export function PadEnergy({ frames }) {
+export function PadEnergy({ frames, exteriorPortals }) {
   const capacity = frames.lift.length;
   const columnRef = useRef(), vortexRef = useRef();
   const res = useMemo(() => {
@@ -202,8 +202,8 @@ export function PadEnergy({ frames }) {
   }, -0.3); // consume this frame's PadProvider matrices (-0.35)
 
   return <group>
-    <instancedMesh ref={columnRef} args={[res.columnGeo, res.columnMat, capacity]} count={0} frustumCulled={false} raycast={() => null} dispose={null} renderOrder={4} />
-    <instancedMesh ref={vortexRef} args={[res.vortexGeo, res.vortexMat, capacity]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
+    <instancedMesh ref={columnRef} args={[res.columnGeo, exteriorPortals?.materialFor(res.columnMat) ?? res.columnMat, capacity]} count={0} frustumCulled={false} raycast={() => null} dispose={null} renderOrder={4} />
+    <instancedMesh ref={vortexRef} args={[res.vortexGeo, exteriorPortals?.materialFor(res.vortexMat) ?? res.vortexMat, capacity]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
     <mesh geometry={res.stripGeo} material={res.stripMats.lit} frustumCulled={false} renderOrder={5} raycast={() => null} dispose={null} />
     <points geometry={res.sparks.geo} material={res.sparkMat} frustumCulled={false} renderOrder={6} raycast={() => null} dispose={null} />
   </group>;

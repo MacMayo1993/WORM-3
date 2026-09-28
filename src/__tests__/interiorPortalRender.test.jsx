@@ -10,6 +10,8 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { FACE_COLORS } from '../utils/constants.js';
+import { tunnelCoreClipUniforms } from '../manifold/tunnelCoreClip.js';
+import { CORE_HALF } from '../3d/antipodalCore.js';
 import { CORE_MIRROR_HALF } from '../3d/corePassage.js';
 extend(THREE);
 
@@ -35,6 +37,16 @@ it('opens both backs and core materials, retains the tail passage, and restores 
     const scene = store.getState().scene;
     const interior = scene.getObjectByName('tunnel-interior');
     expect(interior.visible).toBe(true);
+    // Ready through the opening while the lens is still outside the shell.
+    worm.phase.current = 'entering';
+    store.getState().camera.position.set(0, 0, 4);
+    await frame();
+    expect(interior.visible).toBe(true);
+    expect(scene.getObjectByName('tunnel-interior-0-1-1-NX').visible).toBe(true);
+    expect(tunnelCoreClipUniforms.uTunnelCoreHalf.value).toBeCloseTo(CORE_HALF + .002);
+    worm.phase.current = 'tunnel';
+    store.getState().camera.position.set(0, 0, 1);
+    await frame();
     for (const side of [0, 1]) {
       const mouth = scene.getObjectByName(`tunnel-interior-mouth-${side}`);
       expect(mouth.visible).toBe(true);

@@ -86,7 +86,7 @@ describe('tunnel camera phase transitions', () => {
   it('starts diving immediately and joins the follow rail during the first quarter', () => {
     expect(diveProgress(0)).toBe(0);
     expect(diveProgress(.01)).toBeGreaterThan(0);
-    expect(diveProgress(.25)).toBe(1);
+    expect(diveProgress(.16)).toBe(1);
   });
 
   it('blends opposite up vectors as rotations, without collapsing the view', () => {
@@ -255,7 +255,7 @@ describe('tunnelCamPoseInto', () => {
     // the face of that sticker instead of through its centre — and the bore is
     // only a tile wide there, so an offset lens would be outside the shaft.
     expect(cameraUpForHead(0)).toBe(0);
-    expect(cameraUpForHead(ENTER_END_T)).toBe(0);
+    expect(cameraUpForHead(0.04)).toBe(0);
     expect(cameraUpForHead(1)).toBe(0);
     // Full height for the ride between them, where the body has to pass under it.
     expect(cameraUpForHead(0.6)).toBeCloseTo(TUNNEL_CAM_UP, 6);

@@ -53,7 +53,7 @@ const _zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
  * to the Three.js scene root (world space) so sticker world matrices can be
  * applied without any parent-transform offset.
  */
-export function StickerInstanceProvider({ children }) {
+export function StickerInstanceProvider({ children, exteriorPortals }) {
   const { scene } = useThree();
 
   // ── InstancedMesh ───────────────────────────────────────────────────────────
@@ -69,7 +69,8 @@ export function StickerInstanceProvider({ children }) {
     // still one draw call for every plain sticker on the cube.
     const geo = createPlayStickerGeometry();
     const { Material, sticker } = rubiksFinish(isMobile);
-    const mat = new Material({ ...sticker, envMapIntensity: 0.3 });
+    const source = new Material({ ...sticker, envMapIntensity: 0.3 });
+    const mat = exteriorPortals?.materialFor(source) ?? source;
     const mesh = new THREE.InstancedMesh(geo, mat, MAX_INSTANCES);
     // Render all MAX_INSTANCES slots; unused ones are zeroed out (invisible).
     mesh.count = MAX_INSTANCES;
@@ -82,7 +83,7 @@ export function StickerInstanceProvider({ children }) {
     for (let i = 0; i < MAX_INSTANCES; i++) mesh.setMatrixAt(i, _zeroMatrix);
     mesh.instanceMatrix.needsUpdate = true;
     return mesh;
-  }, []);
+  }, [exteriorPortals]);
 
   // Add to scene root.  Remove on unmount.
   // NOTE: geometry and material are NOT disposed here.  In React 18 Strict Mode
@@ -283,7 +284,7 @@ export function StickerInstanceProvider({ children }) {
 
   return (
     <StickerInstanceContext.Provider value={ctx}>
-      <TileSurfaceProvider><PadProvider>{children}</PadProvider></TileSurfaceProvider>
+      <TileSurfaceProvider exteriorPortals={exteriorPortals}><PadProvider exteriorPortals={exteriorPortals}>{children}</PadProvider></TileSurfaceProvider>
     </StickerInstanceContext.Provider>
   );
 }

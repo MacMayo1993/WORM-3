@@ -1,3 +1,4 @@
+import { tunnelCoreClipUniforms } from '../manifold/tunnelCoreClip.js';
 /**
  * VoidCore
  *
@@ -170,6 +171,8 @@ function VoidCore({ cubieRefs = null }) {
     };
   }
 
+  useEffect(() => () => { tunnelCoreClipUniforms.uTunnelCoreHalf.value = 0; }, []);
+
   // Colours land with the cube state they belong to; the next frame re-lays
   // the matrices too, since a committed turn snaps the meshes back to rest.
   useLayoutEffect(() => {
@@ -297,6 +300,8 @@ function VoidCore({ cubieRefs = null }) {
     // Clear the plastic a little behind the mirrors so their surfaces cannot z-fight.
     passage.uniforms.uCoreRoomHalf.value = mirrors.group.visible ? (CORE_MIRROR_HALF + .001) * f.zoom : 0;
     passage.uniforms.uCoreRoomCenter.value.copy(f.dock).multiplyScalar(1 - f.zoom);
+    tunnelCoreClipUniforms.uTunnelCoreHalf.value = wormMode ? CORE_HALF * f.zoom + .002 : 0;
+    tunnelCoreClipUniforms.uTunnelCoreCenter.value.copy(passage.uniforms.uCoreRoomCenter.value);
 
     const energy = 0.35 + 0.65 * charge;
     _tint.copy(LIGHT_BASE).lerp(f.tint, 0.65 * f.tintMix);
