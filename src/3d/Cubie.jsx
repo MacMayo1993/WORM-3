@@ -23,7 +23,7 @@ import { hollowFrameGeometry } from './hollowFrameGeometry.js';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import {
-  PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps, CLASSIC_BODY_MODES, CLASSIC_BODY_SIZE, CLASSIC_BODY_COAT
+  PER_CUBELET_VIEW_STYLES, LIGHT_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps, CLASSIC_BODY_MODES, CLASSIC_BODY_SIZE, CLASSIC_BODY_COAT
 } from './cubeViewStyles.js';
 // Canonical Sudokube number (matches win detection in winDetection.js).
 import { faceValue as sudokuValue, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
@@ -174,8 +174,9 @@ const Cubie = React.forwardRef(function Cubie({
   // physical cubelet through rotations rather than flickering. Outside Random Mode the
   // global View-tab visualMode applies to the whole cube exactly as before.
   const effectiveVisualMode = useMemo(
-    () => (powerView ?? (wormNeon ? 'neon' : randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick) : visualMode)),
-    [powerView, wormNeon, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ]
+    () => (powerView ?? (wormNeon ? 'neon' : randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick,
+      isMobile || perfReducedFX ? LIGHT_CUBELET_VIEW_STYLES : PER_CUBELET_VIEW_STYLES) : visualMode)),
+    [powerView, wormNeon, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ, perfReducedFX]
   );
 
   // Derived per-style render switches.

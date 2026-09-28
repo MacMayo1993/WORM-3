@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { createExteriorPortals } from '../3d/exteriorPortals.js';
 import { buildTunnelPathForTunnel } from '../worm/wormLogic.js';
@@ -7,6 +7,25 @@ import { INTERIOR_PORTAL_RADIUS, interiorPortalFrameInto } from '../worm/healerW
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
+
+it('releases portal copies when remix materials are retired', () => {
+  const portals = createExteriorPortals();
+  const retired = [];
+  for (let cycle = 0; cycle < 50; cycle++) {
+    const source = new THREE.ShaderMaterial();
+    const copy = portals.materialFor(source);
+    const disposed = vi.fn(); copy.addEventListener('dispose', disposed);
+    source.dispose();
+    expect(disposed).toHaveBeenCalledTimes(1);
+    retired.push(disposed);
+  }
+  const body = new THREE.MeshStandardMaterial(), original = body.onBeforeCompile;
+  portals.materialFor(body); body.dispose();
+  expect(body.onBeforeCompile).toBe(original);
+  expect(body.userData.portalCutout).toBeUndefined();
+  portals.dispose();
+  retired.forEach(disposed => expect(disposed).toHaveBeenCalledTimes(1));
+});
 
 it('keeps both raised apertures open through plastic, including corner and reversed paths', () => {
   const portals = createExteriorPortals(), point = new THREE.Vector3(), closest = new THREE.Vector3();

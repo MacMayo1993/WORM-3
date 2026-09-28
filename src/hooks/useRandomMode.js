@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { COLOR_SCHEMES, TILE_STYLES } from '../utils/colorSchemes.js';
+import { isMobile } from '../utils/device.js';
+
+// Reuse a small shader family on constrained devices. Sampling the entire
+// catalog can introduce six cold programs plus per-tile 3D effects every cycle.
+export const LIGHT_REMIX_STYLES = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid'];
 
 const CYCLE_MS = 10000;
 
@@ -12,9 +17,11 @@ function pick(arr) {
 }
 
 function applyRandomStyle() {
+  const state = useGameStore.getState();
+  const tileKeys = isMobile || state.perfReducedFX ? LIGHT_REMIX_STYLES : TILE_KEYS;
   const scheme = pick(SCHEME_KEYS);
   const manifoldStyles = {};
-  for (let i = 1; i <= 6; i++) manifoldStyles[i] = pick(TILE_KEYS);
+  for (let i = 1; i <= 6; i++) manifoldStyles[i] = pick(tileKeys);
   // The bounded material cache is keyed by style and colors. Retain reusable
   // shaders instead of disposing every program at each ten-second remix.
   // Per-cubelet view styles (classic/grid/sudoku/wireframe/glass) are derived in Cubie

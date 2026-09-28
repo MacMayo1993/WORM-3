@@ -35,6 +35,17 @@ export function createExteriorPortals() {
     uExteriorPoints: { value: Array.from({ length: SAMPLES * 2 }, () => new THREE.Vector3()) } };
   const path = makeTunnelPath(), center = new THREE.Vector3(), axis = new THREE.Vector3();
   const materials = new Map(), owned = new Set(), originals = new Map();
+  const releases = new Map();
+  const restore = source => {
+    const original = originals.get(source);
+    if (!original) return;
+    source.onBeforeCompile = original.onBeforeCompile;
+    source.customProgramCacheKey = original.customProgramCacheKey;
+    if (original.portalCutout === undefined) delete source.userData.portalCutout;
+    else source.userData.portalCutout = original.portalCutout;
+    source.needsUpdate = true;
+    originals.delete(source);
+  };
   let snapshot = null;
   const materialFor = source => {
     if (!source) return source;
@@ -50,6 +61,16 @@ export function createExteriorPortals() {
       withPortalCutout(material, uniforms, exteriorPortalGLSL, 'outer-mouth');
       material.needsUpdate = true;
       materials.set(source, material); owned.add(material);
+      // Random view changes dispose private glass/body materials; cache
+      // eviction disposes old style sources. Release their portal copies too.
+      const release = () => {
+        source.removeEventListener('dispose', release);
+        releases.delete(source); materials.delete(source); owned.delete(material);
+        restore(source);
+        if (material !== source) material.dispose();
+      };
+      releases.set(source, release);
+      source.addEventListener('dispose', release);
     }
     return materials.get(source);
   };
@@ -79,14 +100,10 @@ export function createExteriorPortals() {
       }
     },
     dispose() {
+      releases.forEach((release, source) => source.removeEventListener('dispose', release));
+      releases.clear();
       owned.forEach(material => { if (material.isShaderMaterial) material.dispose(); });
-      originals.forEach((original, material) => {
-        material.onBeforeCompile = original.onBeforeCompile;
-        material.customProgramCacheKey = original.customProgramCacheKey;
-        if (original.portalCutout === undefined) delete material.userData.portalCutout;
-        else material.userData.portalCutout = original.portalCutout;
-        material.needsUpdate = true;
-      });
+      originals.forEach((original, material) => restore(material));
       materials.clear(); owned.clear(); originals.clear();
     }
   };
