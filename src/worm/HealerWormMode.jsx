@@ -1,3 +1,5 @@
+import { PickupMaterialProvider } from './healerWorm/PickupMaterials.jsx';
+import WormEffectWarmup from './healerWorm/WormEffectWarmup.jsx';
 import { WormLighting } from './WormLighting.jsx';
 import { CoreWormReflections } from './healerWorm/CoreWormReflections.jsx';
 import { holdsRotationTimer } from './characterAbilities.js';
@@ -723,7 +725,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const wormAlive = wormGamePhase !== 'scrambling';
 
     return (
-        <WormLighting>
+        <WormLighting><PickupMaterialProvider>
             <WormChaseCamera worm={worm} size={size} />
             <DemoPracticeTargets size={size} />
             {!demoMode && (combatMode || enemiesEnabled) && <CombatScene maxEnemies={combatMode ? 4 : 1} />}
@@ -736,12 +738,16 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}
             <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
-            {wormAlive && <ElementalPatches worm={worm} size={size} />}
-            {wormAlive && <group ref={reflectionSource}><WormBody worm={worm} size={size} /><WormFace worm={worm} size={size} /></group>}
+            <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /></group>
+            {/* Keep the equipped body/face and their programs through retries. The
+                hidden scramble frame also prepares their instanced attributes. */}
+            <group ref={reflectionSource} visible={wormAlive}>
+                <WormBody worm={worm} size={size} /><WormFace worm={worm} size={size} />
+            </group>
+            <WormEffectWarmup body={reflectionSource} />
             {wormAlive && <RocketExhaust worm={worm} />}
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}
             {wormAlive && glowCharacter && <WormTrail worm={worm} size={size} abilityTrail />}
-            {wormAlive && <SignatureEffects worm={worm} size={size} />}
             {wormAlive && <GlowWormAura worm={worm} size={size} />}
             {wormAlive && <CoreWormReflections source={reflectionSource} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}
@@ -771,6 +777,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} worm={worm} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />
-        </WormLighting>
+        </PickupMaterialProvider></WormLighting>
     );
 }

@@ -277,3 +277,22 @@ it('keeps rendered head and body above the expanded face with bead spacing intac
   for (const point of points) expect(point.z).toBeGreaterThan(2.1);
   for (let i = 1; i < points.length; i++) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.2);
 });
+
+it('clears pickup presentation on retry while retaining the equipped skin material', () => {
+  const material = () => {
+    const body = React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh');
+    return React.Children.toArray(body.props.children).find(child => child.props.attach === 'material').props.object;
+  };
+  const skin = material(), dispose = vi.spyOn(skin, 'dispose');
+  useGameStore.setState({ wormOrbFlash: { seq: 901, color: '#ff0000' } });
+  renderPoints();
+  act(() => {
+    resetWormSim(sim, 3, { orbCount: 0, wormholeInterval: 9999 });
+    useGameStore.setState({ wormRunId: useGameStore.getState().wormRunId + 1,
+      wormOrbFlash: null, wormPaused: true });
+  });
+  renderPoints();
+  expect(material()).toBe(skin); expect(dispose).not.toHaveBeenCalled();
+  expect(worm.pickupHeadScale).toBe(1);
+  expect(mesh.count).toBeLessThanOrEqual(sim.tailLength);
+});

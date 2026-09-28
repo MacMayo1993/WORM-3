@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { usePickupMaterials } from './usePickupMaterials.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import {
   PICKUP_BURST_SECONDS, PICKUP_MAX_SPARKS, PICKUP_MOTES,
@@ -28,10 +29,8 @@ const MOTE = new THREE.OctahedronGeometry(0.5, 1);
 const WHITE = new THREE.Color('#ffffff');
 const dummy = new THREE.Object3D(), dir = new THREE.Vector3(), normal = new THREE.Vector3();
 
-const additive = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false };
-const solid = { transparent: true, depthWrite: false, toneMapped: false };
-
 export default function OrbPickupBurst({ position, normal: surfaceNormal, color = '#ffd700', combo = 0, pickup = true, reducedMotion = false, onDone }) {
+  const materials = usePickupMaterials(color);
   const root = useRef(), core = useRef(), coreHalo = useRef(), rings = useRef([]), sparks = useRef(), motes = useRef();
   const age = useRef(0), done = useRef(false);
   const base = useMemo(() => new THREE.Color(color), [color]);
@@ -48,9 +47,10 @@ export default function OrbPickupBurst({ position, normal: surfaceNormal, color 
       for (let i = 0; i < mesh.count; i++) mesh.setMatrixAt(i, dummy.matrix);
       mesh.instanceMatrix.needsUpdate = true;
     }
-  }, []);
+  }, [materials]);
 
   useFrame((_state, delta) => {
+    if (!materials) return;
     if (pickup && useGameStore.getState().wormPaused) return;
     age.current += delta;
     const t = age.current;
@@ -110,26 +110,27 @@ export default function OrbPickupBurst({ position, normal: surfaceNormal, color 
     }
   });
 
+  if (!materials) return null;
   return (
     <group ref={root} position={position} quaternion={quaternion}>
       <mesh ref={core} geometry={CORE} visible={false}>
-        <meshBasicMaterial color="#ffffff" {...additive} />
+        <primitive object={materials.core} attach="material" />
       </mesh>
       <mesh ref={coreHalo} geometry={CORE} visible={false}>
-        <meshBasicMaterial color={color} {...additive} side={THREE.BackSide} />
+        <primitive object={materials.halo} attach="material" />
       </mesh>
-      {[color, '#ffffff'].map((ringColor, i) => (
+      {[materials.ring, materials.ringWhite].map((material, i) => (
         <mesh key={i} ref={el => { rings.current[i] = el; }} geometry={RING} visible={false}>
-          <meshBasicMaterial color={ringColor} {...solid} side={THREE.DoubleSide} />
+          <primitive object={material} attach="material" />
         </mesh>
       ))}
       {!reducedMotion && (
         <>
           <instancedMesh ref={sparks} args={[SHARD, null, PICKUP_MAX_SPARKS]} frustumCulled={false}>
-            <meshBasicMaterial {...solid} />
+            <primitive object={materials.sparks} attach="material" />
           </instancedMesh>
           <instancedMesh ref={motes} args={[MOTE, null, PICKUP_MOTES]} frustumCulled={false}>
-            <meshBasicMaterial color={color} {...solid} />
+            <primitive object={materials.motes} attach="material" />
           </instancedMesh>
         </>
       )}

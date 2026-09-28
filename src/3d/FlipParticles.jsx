@@ -1,3 +1,4 @@
+import { particleVertex as VERTEX_SHADER, particleFragment as FRAGMENT_SHADER } from './flipBurstShaders.js';
 // src/3d/FlipParticles.jsx
 // Tile-shard burst effect during flip animation.
 // Drop-in API compatibility: parent calls ref.trigger(color).
@@ -10,40 +11,6 @@ const _particleDummy = new THREE.Object3D();
 const _baseBurstColor = new THREE.Color();
 
 const PARTICLE_COUNT = 20;
-
-const VERTEX_SHADER = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const FRAGMENT_SHADER = `
-  uniform vec3  uColor;
-  uniform float uOpacity;
-  varying vec2  vUv;
-
-  void main() {
-    vec2 p = (vUv - 0.5) * 2.0;
-
-    // Rounded-square signed-distance
-    float corner = 0.28;
-    vec2  q = abs(p) - (1.0 - corner);
-    float dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - corner;
-    float chipAlpha = 1.0 - smoothstep(-0.05, 0.12, dist);
-
-    // Inner highlight radiates from center (chromatic only).
-    float highlight = 1.0 - smoothstep(0.0, 0.55, length(p));
-    vec3 litColor = uColor * (1.0 + highlight * 0.22);
-
-    // Crisp sticker-edge border
-    float border = 1.0 - smoothstep(0.82, 0.98, max(abs(p.x), abs(p.y)));
-    litColor += uColor * (border * 0.16);
-
-    gl_FragColor = vec4(clamp(litColor, 0.0, 1.0), chipAlpha * uOpacity);
-  }
-`;
 
 const FlipParticles = React.forwardRef((_props, ref) => {
   const meshRef = useRef(null);

@@ -73,6 +73,12 @@ export function WormFace({ worm, size }) {
     const facePulse = useRef(0);
     const previousOrbs = useRef(0);
 
+    const runId = useGameStore(s => s.wormRunId);
+    useEffect(() => {
+        faceTime.current = 0; facePulse.current = 0; previousOrbs.current = 0;
+        faceOpacityRef.current = 1;
+    }, [runId]);
+
     useFrame((_, delta) => {
         // Face stays visible through the whole Möbius ride now (worm rides the band on-camera).
         const showFace = true;

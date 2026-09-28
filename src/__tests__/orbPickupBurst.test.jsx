@@ -117,3 +117,44 @@ describe('orb pickup burst render', () => {
     } finally { await act(async () => root.unmount()); }
   });
 });
+
+it('reuses finished bursts under StrictMode without sharing live colours or leaking pool slots', async () => {
+  const { PickupMaterialProvider } = await import('../worm/healerWorm/PickupMaterials.jsx');
+  const { usePickupPool } = await import('../worm/healerWorm/usePickupMaterials.js');
+  let pool;
+  function ReadPool() { const current = usePickupPool(); React.useLayoutEffect(() => { pool = current; }, [current]); return null; }
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas);
+  root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
+  let store;
+  const render = async colors => act(async () => {
+    store = root.render(<React.StrictMode><PickupMaterialProvider><ReadPool />
+      {colors.map((color, i) => <OrbPickupBurst key={i} position={[i, 0, 0]} color={color} />)}
+    </PickupMaterialProvider></React.StrictMode>);
+  });
+  try {
+    await render(['#ff0000', '#00ff00']);
+    expect(pool.size.active).toBe(2);
+    const groups = store.getState().scene.children;
+    const haloA = groups.find(g => g.position.x === 0).children[1].material, haloB = groups.find(g => g.position.x === 1).children[1].material;
+    expect(haloA).not.toBe(haloB);
+    expect(haloA.color.getHexString()).toBe('ff0000'); expect(haloB.color.getHexString()).toBe('00ff00');
+    haloA.opacity = .1; expect(haloB.opacity).toBe(1);
+    const disposed = vi.spyOn(haloA, 'dispose');
+    await render([]); expect(pool.size.active).toBe(0); expect(disposed).not.toHaveBeenCalled();
+    for (let i = 0; i < 12; i++) {
+      await render(['#0000ff']);
+      const halo = store.getState().scene.children[0].children[1].material;
+      expect([haloA, haloB]).toContain(halo);
+      expect(halo.color.getHexString()).toBe('0000ff'); expect(halo.opacity).toBe(1);
+      expect(pool.size.active).toBe(1);
+      await render([]);
+    }
+    expect(pool.size).toEqual({ active: 0, idle: 2 });
+    await act(async () => root.unmount());
+    expect(disposed).toHaveBeenCalledTimes(1);
+  } finally { delete globalThis.IS_REACT_ACT_ENVIRONMENT; }
+});

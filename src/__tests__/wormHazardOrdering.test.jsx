@@ -153,7 +153,7 @@ it('does not evaluate or dequeue a slice while another move awaits commit', () =
 it('stops damage and slice dispatch after a fatal bomb on the rotation frame', () => {
   tick(100); // just before the ten-second hazard fires
   expect(rotate).not.toHaveBeenCalled();
-  const bombProps = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  const bombProps = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
   const second = { id: 2, tile: { ...sim.pos }, fuse: 0.001, maxFuse: 5 };
   bombProps.bombsRef.current.push({ ...second, id: 1 }, second);
   tick();
@@ -170,7 +170,7 @@ it('stops damage and slice dispatch after a fatal bomb on the rotation frame', (
 
 it('holds bombs and the rotation countdown through a rescue and its release frame', () => {
   tick(95);
-  const bombProps = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  const bombProps = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
   const bomb = { id: 3, tile: { ...sim.pos }, fuse: 0.3, maxFuse: 5 };
   bombProps.bombsRef.current.push(bomb);
   act(() => useGameStore.setState({ wormJumpRescueActive: true }));
@@ -211,7 +211,7 @@ it.each([1, 2, 3])('keeps story level %i free of ambient bombs, rotations and or
   tick(500);
   expect(rotate).not.toHaveBeenCalled();
   expect(useGameStore.getState().wormGamePhase).toBe('active');
-  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
   expect(props.bombsRef.current).toHaveLength(0);
 });
 
@@ -232,7 +232,7 @@ it.each([[4,14], [5,14], [6,11]])('repeats the full warned cycle for story level
   expect(useGameStore.getState().wormGamePhase).toBe('active');
   expect(useGameStore.getState().wormStoryResult).toBeNull();
   expect(new Set(rotate.mock.calls.map(call => call[0])).size).toBe(3);
-  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
   expect(props.bombsRef.current).toHaveLength(0);
 });
 
@@ -243,7 +243,7 @@ it('spawns a Story bomb, credits only a full live ring, and suppresses ordinary 
   sim.pos = { x: 0, y: 0, z: 2, dirKey: 'PZ' };
   worm.storyBombsNeeded = () => true; worm.recordStoryBomb = vi.fn();
   act(() => useGameStore.setState({ wormStoryLevel: 9, wormStoryStarted: true, wormStoryResult: null, wormPaused: false }));
-  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
   for (let i = 0; i < 600 && props.bombsRef.current.length === 0; i++) tick();
   expect(props.bombsRef.current).toHaveLength(1);
   const bomb = props.bombsRef.current[0]; expect(bomb.maxFuse).toBe(25);
@@ -275,7 +275,7 @@ it('publishes the impact effect once for a death caused during the live rotation
   const details = { reason: 'slice-rotation', liveCrossing: true, axis: 'row', sliceIndex: 1, impactPosition: [1,2,3] };
   worm.tick.mockImplementationOnce(() => worm.killWorm(details));
   tick();
-  const effect = React.Children.toArray(tree.props.children).find(child => child.type === ThunkEffect).props.thunkRef;
+  const effect = React.Children.toArray(tree.props.children.props.children).find(child => child.type === ThunkEffect).props.thunkRef;
   expect(effect.current).toMatchObject({ active: true, text: "WORM'D", pos: [1,2,3] });
   effect.current.active = false;
   tick(5);
@@ -343,7 +343,7 @@ it('requires the live bomb ring to disarm and complete the demo lesson without r
   isBombDisarmed.mockImplementation(actualDisarm);
   const { result } = startHazardLesson('bomb');
   tick();
-  const props = React.Children.toArray(tree.props.children).find(child => child.type === HealerBombs).props;
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
   expect(props.bombsRef.current).toHaveLength(1);
   const bomb = props.bombsRef.current[0], ring = [...bombDisarmRing(bomb, 3)];
   expect(bomb.maxFuse).toBe(25);

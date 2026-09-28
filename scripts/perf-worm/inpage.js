@@ -47,7 +47,7 @@
     return '(no React owner)';
   };
   const label = (object, geometry, material) =>
-    `${W.ownerOf(object)} :: ${object.isInstancedMesh ? 'Inst ' : ''}${geometry?.type || ''}/${material?.type || ''}`;
+    `${W.ownerOf(object)} :: ${object.isInstancedMesh ? 'Inst ' : ''}${geometry?.type || ''}/${material?.type || ''}${material?.fragmentShader ? ' [fs:' + material.fragmentShader.length + ']' : ''}`;
 
   // ── renderBufferDirect wrapper: labels + program-selection churn ───────────
   const props = gl.properties;

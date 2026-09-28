@@ -118,7 +118,7 @@ while ((await page.evaluate(() => window.__store.getState().wormGamePhase)) !== 
   if (Date.now() - t0 > 240000) throw new Error('WORM run never reached the active phase');
   await page.waitForTimeout(1000);
 }
-if (args.freeze || MODE === 'batching') await page.evaluate(() => window.__store.setState({ wormPaused: true }));
+if (args.freeze || MODE === 'batching' || MODE === 'events') await page.evaluate(() => window.__store.setState({ wormPaused: true }));
 const cdp = await context.newCDPSession(page);
 if (args.throttle) await cdp.send('Emulation.setCPUThrottlingRate', { rate: +args.throttle });
 await page.waitForTimeout(2000);
@@ -142,8 +142,68 @@ const measuredState = await page.evaluate(() => {
   return { size: s.size, orbs: s.wormPowerups?.length, theme: s.wormElementalTheme, reducedFX: s.perfReducedFX };
 });
 if (args.size && +args.size !== measuredState.size) throw Error(`Requested size ${args.size}, launched ${measuredState.size}`);
-const out = { mode: MODE, url: URL, ms: MS, size: measuredState.size, scene: measuredState, freeze: !!args.freeze || MODE === 'batching', seed: args.seed,
+const out = { mode: MODE, url: URL, ms: MS, size: measuredState.size, scene: measuredState, freeze: !!args.freeze || MODE === 'batching' || MODE === 'events', seed: args.seed,
   mobile: !!args.mobile, throttle: +(args.throttle || 1), draws: args.draw ? 'real' : 'suppressed' };
+
+if (MODE === 'events') {
+  await page.evaluate(`(${inpage})()`);
+  const setup = fs.readFileSync(path.join(here, 'events.js'), 'utf8').replace(/^(\/\/.*\n)+/, '');
+  out.fixture = await page.evaluate(`(${setup})()`);
+  console.log('events:', JSON.stringify(out.fixture));
+  await page.waitForTimeout(1800);
+  out.events = [];
+  for (let cycle = 0; cycle < +(args.cycles || 5); cycle++) {
+    for (const event of ['pickup', 'wormhole', 'clear', 'hide-worm', 'show-worm']) {
+      await page.evaluate(event => {
+        const W = window.__perf; W.frames = []; W.linkLog = []; W.eventStart = performance.now(); W.effectEvent(event);
+      }, event);
+      await page.waitForTimeout(MS);
+      const result = await page.evaluate(() => {
+        const W = window.__perf;
+        return { frames: W.frames.filter(f => f.ts >= W.eventStart), links: W.linkLog, programs: W.gl.info.programs.length, ...W.gl.info.memory };
+      });
+      const row = { cycle, event, ...summarize(result.frames), shaderLinks: result.links.length, links: result.links,
+        resources: { programs: result.programs, geometries: result.geometries, textures: result.textures } };
+      if (args['program-keys']) row.programKeys = await page.evaluate(() => window.__perf.gl.info.programs.map(p => ({ name: p.name, key: p.cacheKey, owners: p.usedTimes })));
+      out.events.push(row); console.log(JSON.stringify(row));
+    }
+    await cdp.send('HeapProfiler.collectGarbage');
+    const heap = await cdp.send('Runtime.getHeapUsage');
+    (out.heap ||= []).push({ cycle, ...heap });
+    console.log('heap:', JSON.stringify({ cycle, ...heap }));
+  }
+  if (args.out) fs.writeFileSync(args.out, JSON.stringify(out, null, 2));
+  if (args.shots) {
+    fs.mkdirSync(args.shots, { recursive: true });
+    await page.evaluate(() => {
+      const W = window.__perf, root = W.roots.r3f.containerInfo, state = root.getState();
+      W.attrib = false; clearInterval(W.patchTimer);
+      state.clock.getDelta = () => { state.clock.elapsedTime += .02; return .02; };
+      state.internal.subscribe({ current: () => {
+        const n = window.__store.getState().size, camera = state.camera;
+        camera.up.set(0, 1, 0); camera.fov = 50;
+        camera.position.set(n, n * .85, n * 1.35); camera.lookAt(0, 0, 0);
+        camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+      } }, -.245, root);
+      W.effectEvent('wormhole');
+    });
+    await page.waitForTimeout(1000);
+    for (const pose of ['wormhole', 'pickup', 'exploded']) {
+      await page.evaluate(pose => {
+        const W = window.__perf, state = W.roots.r3f.containerInfo.getState();
+        if (pose === 'pickup') W.effectEvent('pickup');
+        window.__wormExpansion.amount = pose === 'exploded' ? .35 : 0;
+        W.noDraw = false; state.setFrameloop('always');
+      }, pose);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+      await page.evaluate(() => {
+        const state = window.__perf.roots.r3f.containerInfo.getState();
+        state.setFrameloop('never'); state.gl.getContext().finish();
+      });
+      await page.screenshot({ path: path.join(args.shots, `${pose}.png`), timeout: 60000 });
+    }
+  }
+}
 
 if (MODE === 'frames' || MODE === 'react') {
   await page.evaluate((react) => { const W = window.__perf; W.frames = []; W.renders = {}; W.reactOn = react; }, MODE === 'react');
