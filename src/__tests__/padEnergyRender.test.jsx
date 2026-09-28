@@ -1,3 +1,4 @@
+import { createExteriorPortals } from '../3d/exteriorPortals.js';
 import React, { act, createRef } from 'react';
 import { createRoot, extend } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -20,10 +21,11 @@ it.each([[true, 0, 'off', true], [true, 0, 'full'], [false, 0, 'full'], [false, 
     xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
   const root = createRoot(canvas);
   root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
+  const exteriorPortals = createExteriorPortals();
   const front = createRef(), back = createRef();
   const cubies = makeCubies(3);
   const a = cubies[1][1][2].stickers.PZ, b = cubies[1][1][0].stickers.NZ;
-  const draw = flips => <PadProvider>
+  const draw = flips => <PadProvider exteriorPortals={exteriorPortals}>
     <FlipPadOffset meta={{ ...a, flips }} size={3} pos={[0, 0, 0.51]} rot={[0, 0, 0]}><group ref={front} position={[0, 0, 0.51]} /></FlipPadOffset>
     <FlipPadOffset meta={{ ...b, flips }} size={3} pos={[0, 0, -0.51]} rot={[0, Math.PI, 0]}><group ref={back} position={[0, 0, -0.51]} /></FlipPadOffset>
   </PadProvider>;
@@ -55,6 +57,9 @@ it.each([[true, 0, 'off', true], [true, 0, 'full'], [false, 0, 'full'], [false, 
     expect(shook).toBe(true);
     const columns = find(o => o.isInstancedMesh && o.material.fragmentShader?.includes('vLocal.z'));
     expect(columns.count).toBe(2);
+    expect(columns.material.userData.portalCutout).toBe(exteriorPortals.uniforms);
+    const vortex = find(o => o.isInstancedMesh && o.material.fragmentShader?.includes('float eye'));
+    expect(vortex.material.userData.portalCutout).toBe(exteriorPortals.uniforms);
     expect(columns.material.transparent).toBe(true);
     expect(columns.material.depthWrite).toBe(false);
     expect(find(o => o.isInstancedMesh && o.material.isMeshStandardMaterial).count).toBe(0);
@@ -94,6 +99,7 @@ it.each([[true, 0, 'off', true], [true, 0, 'full'], [false, 0, 'full'], [false, 
     }
   } finally {
     await act(async () => root.unmount());
+    exteriorPortals.dispose();
     useGameStore.setState(before, true);
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }

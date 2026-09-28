@@ -2,7 +2,6 @@ import { wormExpansion } from '../wormExpansion.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 // src/worm/healerWorm/TunnelInteriorView.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import { tunnelCameraInside } from '../tunnelVisibility.js';
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -49,7 +48,6 @@ export function TunnelInteriorView({ worm, size }) {
     const backingMatRef = useRef();
     const dimMatRef = useRef();
     const stickerMeshesRef = useRef([]);
-    const opacityRef = useRef(0);
     const prevPhaseRef = useRef('crawling');
     const stickerMatsAssigned = useRef(false);
     const materialSnapshot = useRef({ cubies: null, settings: null, cap: null });
@@ -128,14 +126,10 @@ export function TunnelInteriorView({ worm, size }) {
     useFrame((_state, delta) => {
         const phase = worm.phase.current;
         const prevPhase = prevPhaseRef.current;
-        // The camera can cross a mouth partway through entering/exiting.
-        // Use the same lens boundary as the exterior instead of hiding by phase.
-        const active = tunnelCameraInside(_state.camera.position, size, phase);
-        // ...but the traversal as a whole starts at 'entering', which is when the
-        // sticker materials get assigned. These have to be separate: keying the
-        // assignment's lifetime off `active` cleared it one frame after it was set,
-        // so the stickers were never revealed and the cube read as solid black.
+        // Show the room through the open entrance before the lens crosses the
+        // shell. A phase-boundary fade exposed a dark backing for a few frames.
         const inTraversal = ['windup', 'entering', 'tunnel', 'exiting', 'windout'].includes(phase);
+        const active = inTraversal;
         const tunnel = worm.activeTunnel?.current ?? worm.tunnelPassages?.current?.at(-1)?.tunnel ?? null;
         syncInteriorPortals(portals, tunnel, size, expansion);
 
@@ -184,7 +178,7 @@ export function TunnelInteriorView({ worm, size }) {
                     }
                     mesh.material = ownedMaterials.get(source);
                 } else mesh.material = source;
-                mesh.visible = false; // revealed gradually by opacity ramp
+                mesh.visible = false; // revealed together once materials are assigned
             }
             stickerMatsAssigned.current = true;
             materialSnapshot.current = { cubies, settings, cap, portals: !!tunnel };
@@ -199,8 +193,7 @@ export function TunnelInteriorView({ worm, size }) {
 
         prevPhaseRef.current = phase;
 
-        opacityRef.current += ((active ? 1 : 0) - opacityRef.current) * Math.min(1, delta * (active ? 10 : 5));
-        const opacity = opacityRef.current;
+        const opacity = active ? 1 : 0;
         if (groupRef.current) groupRef.current.visible = active && opacity >= 0.01;
 
         if (backingMatRef.current) backingMatRef.current.opacity = opacity;
@@ -212,7 +205,7 @@ export function TunnelInteriorView({ worm, size }) {
             return;
         }
 
-        // Materials already assigned — just reveal stickers as opacity ramps in
+        // Materials already assigned — reveal the complete room in this frame
         for (let i = 0; i < stickerLayout.length; i++) {
             const mesh = meshes[i];
             if (mesh) mesh.visible = true;
@@ -223,7 +216,7 @@ export function TunnelInteriorView({ worm, size }) {
         <group ref={groupRef} name="tunnel-interior" visible={false}>
             {/* Solid black backing — fills the gaps between tiles like real Rubik's plastic */}
             <mesh geometry={backingGeo} frustumCulled={false}>
-                <meshBasicMaterial ref={backingMatRef} onUpdate={clipBacking} color="#000000" side={THREE.BackSide} transparent opacity={0} depthWrite={true} />
+                <meshBasicMaterial ref={backingMatRef} onUpdate={clipBacking} color="#000000" side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
             </mesh>
             {/* Interior dimmer. renderOrder 1 puts it after the sticker planes (0) so it
                 tints them, and before TunnelTube (2) so the shaft still reads at full

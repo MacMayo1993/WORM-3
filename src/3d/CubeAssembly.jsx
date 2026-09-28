@@ -1,4 +1,6 @@
-import { currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
+import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import { createExteriorPortals } from './exteriorPortals.js';
+import { wormExpansion, currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { bodyMaterialProps } from './cubeViewStyles.js';
 import { raisedCubieExtent } from './raisedCubieMotion.js';
@@ -140,10 +142,15 @@ const CubeAssembly = React.memo(({
   );
   const powerView = wormHealerMode ? getViewPowerDef(wormViewPower)?.view : null;
   const exteriorRef = useRef(null);
+  const exteriorPortals = useMemo(() => createExteriorPortals(), []);
+  useEffect(() => () => exteriorPortals.dispose(), [exteriorPortals]);
+  // Cube/style commits refresh materials, without scanning the scene each frame.
+  useLayoutEffect(() => { exteriorPortals.apply(exteriorRef.current); });
   useFrame(({ camera }) => {
     const state = useGameStore.getState();
+    exteriorPortals.update(state.wormHealerMode ? tunnelState.portalTunnel : null, size, wormExpansion.amount);
     if (exteriorRef.current) exteriorRef.current.visible = !state.wormHealerMode ||
-      !tunnelCameraInside(camera.position, size, state.wormPhase);
+      !tunnelCameraInside(camera.position, size, state.wormPhase, tunnelState.portalTunnel);
   }, -0.24); // after the chase camera (-0.25), before tile batches sample visibility
   const cubieRefs = useRef([]);
   // Expose cubie refs + size to ParityOrbs so orbs can read live cubie transforms each frame.
@@ -1219,7 +1226,7 @@ const CubeAssembly = React.memo(({
   megaChassisRef.current = megaChassis;
 
   return (
-    <StickerInstanceProvider>
+    <StickerInstanceProvider exteriorPortals={exteriorPortals}>
       <StickerAnimationDriver />
       <group ref={cubeGroupRef}>
         <InspectionViews cubeRef={cubeGroupRef} exteriorRef={exteriorRef} manifoldMap={manifoldMap} />

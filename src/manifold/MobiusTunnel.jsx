@@ -1,3 +1,4 @@
+import { tunnelCoreClipUniforms } from './tunnelCoreClip.js';
 import { vertexShader, fragmentShader, bumperVertexShader, bumperFragmentShader } from './mobiusTunnelShaders.js';
 import { fillTunnelRideGeometry, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import TunnelTileSurface from './TunnelTileSurface.jsx';
@@ -310,6 +311,7 @@ const MobiusTunnel = ({
     uIdlePadAmp: { value: 0 },
     uSolitonProgress: { value: -1.0 },
     uSolitonAmp:      { value: 0.0 },
+    ...tunnelCoreClipUniforms,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -321,6 +323,7 @@ const MobiusTunnel = ({
     uRideMode: uniforms.uRideMode,
     uCameraClearance: uniforms.uCameraClearance,
     uGrowT: uniforms.uGrowT,
+    ...tunnelCoreClipUniforms,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -332,6 +335,7 @@ const MobiusTunnel = ({
     uRideMode: uniforms.uRideMode,
     uCameraClearance: uniforms.uCameraClearance,
     uGrowT: uniforms.uGrowT,
+    ...tunnelCoreClipUniforms,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 

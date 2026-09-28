@@ -4,7 +4,7 @@ import { setInstanceCount, uploadInstancePrefix } from './instanceUploads.js';
 
 // Opaque tile accessories share geometry/material draws but retain their own
 // live anchors. Dense slots also remove hidden tiles from the submitted count.
-export function createSurfaceBatches(capacity = 2048) {
+export function createSurfaceBatches(capacity = 2048, materialFor = material => material) {
   const group = new THREE.Group();
   group.name = 'TileSurfaceBatches';
   const entries = new Set(), batches = new Map();
@@ -49,7 +49,7 @@ export function createSurfaceBatches(capacity = 2048) {
         const key = `${geometry.uuid}:${material.uuid}:${!!colorRef}`;
         let batch = batches.get(key);
         if (!batch) {
-          const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+          const mesh = new THREE.InstancedMesh(geometry, materialFor(material), capacity);
           mesh.name = `TileSurfaceBatch:${anchor.name || geometry.type}`;
           mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
           mesh.frustumCulled = false;

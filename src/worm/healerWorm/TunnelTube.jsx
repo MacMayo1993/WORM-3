@@ -1,3 +1,4 @@
+import { tunnelCoreClipGLSL, tunnelCoreClipUniforms } from '../../manifold/tunnelCoreClip.js';
 import { tunnelState } from '../tunnelProgressBridge.js';
 import { tunnelFinishGLSL } from '../../manifold/tunnelFinish.js';
 import { wormExpansion } from '../wormExpansion.js';
@@ -52,8 +53,10 @@ const _tmp = new THREE.Vector3();
 
 const vertexShader = `
   varying vec2 vUv;
+  varying vec3 vWorldPoint;
   void main() {
     vUv = uv;
+    vWorldPoint = (modelMatrix * vec4(position, 1.0)).xyz;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
   }
@@ -71,9 +74,12 @@ const fragmentShader = `
   uniform float uOpacity;
   uniform float uHead;
   varying vec2 vUv;
+  varying vec3 vWorldPoint;
   ${tunnelFinishGLSL}
+  ${tunnelCoreClipGLSL}
 
   void main() {
+    if (outsideTunnelCore(vWorldPoint) < 0.5) discard;
     float y = vUv.y;
     float angle = vUv.x * 6.2831853;
     float twist = angle - y * 3.14159265;
@@ -160,6 +166,7 @@ function TunnelTubeSlot({ slot, worm, size }) {
 
   const geo = useMemo(() => createTubeGeometry(), []);
   const uniforms = useMemo(() => ({
+    ...tunnelCoreClipUniforms,
     uColorA:  { value: new THREE.Color('#00aaff') },
     uColorB:  { value: new THREE.Color('#ff8800') },
     uTime:    { value: 0 },

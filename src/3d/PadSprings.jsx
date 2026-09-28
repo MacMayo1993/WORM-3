@@ -20,7 +20,7 @@ const PadContext = createContext(null);
 const MAX_PADS = 2048;
 
 // One scheduler and two instanced draws per scene, regardless of pad count.
-export function PadProvider({ children, profile: profileOverride = null, paused = false }) {
+export function PadProvider({ children, profile: profileOverride = null, paused = false, exteriorPortals = null }) {
   const entries = useMemo(() => new Set(), []);
   const pairs = useMemo(() => new Map(), []);
   const cubieSprings = useMemo(() => new Map(), []);
@@ -207,7 +207,7 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
     <RaisedCubieContext.Provider value={cubieSprings}>{children}</RaisedCubieContext.Provider>
     <instancedMesh ref={stalkRef} args={[resources.stalk, resources.stalkMaterial, MAX_PADS]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
     <instancedMesh ref={mouthRef} args={[resources.mouth, resources.mouthMaterial, MAX_PADS]} count={0} frustumCulled={false} raycast={() => null} dispose={null} />
-    {energyOn && <PadEnergy frames={frames} />}
+    {energyOn && <PadEnergy frames={frames} exteriorPortals={exteriorPortals} />}
   </PadContext.Provider>;
 }
 
