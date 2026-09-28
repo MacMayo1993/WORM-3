@@ -313,6 +313,15 @@ describe('tunnelCamPoseInto', () => {
     }
   });
 
+  it('leaves at least three quarters of a cubie between lens and head at the twist', () => {
+    const pose = makeTunnelCamPose(), head = new THREE.Vector3();
+    for (const size of [3, 5, 15]) for (const tunnel of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {
+      tunnelCamPoseInto(pose, tunnel, .5, size);
+      getTunnelWorldPosInto(head, tunnel, .5, size);
+      expect(pose.cam.distanceTo(head)).toBeGreaterThan(.75);
+    }
+  });
+
   it('banks gradually around the concealed turn, including a reversed visit', () => {
     for (const size of [2, 3, 7, 15]) {
       for (const route of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {

@@ -131,13 +131,14 @@ const _camPath = makeTunnelPath();
 const _coreBounds = new THREE.Box3();
 const _headPoint = new THREE.Vector3();
 
-// Follow the head through the anticube without pressing the lens into its body.
+// Leave room for the worm's twist and the mirrors. Keep the increased trail
+// on the same curve so pulling back cannot cut across either core aperture.
 // Growing the trail by at most 40% of distance travelled prevents a backward
 // camera move while the worm regains its full width on the outward arm.
 export function cameraArcForHead(path, tHead, size) {
   const headArc = tunnelPathTToArc(path, tHead);
   tunnelPathArcPointExtendedInto(_headPoint, path, headArc);
-  const close = Math.max(.3, tunnelDockWidth(size) * 4) + _headPoint.length() * .4;
+  const close = Math.max(.9, tunnelDockWidth(size) * 6) + _headPoint.length() * .4;
   const follow = 1 - THREE.MathUtils.smoothstep(path.armALen - headArc, .12, .9);
   return headArc - THREE.MathUtils.lerp(backForHead(tHead, size), Math.min(backForHead(tHead, size), close), follow);
 }
@@ -236,7 +237,10 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   const rideHeight = cameraRideHeight(out.cam, camArc, tHead);
   out.cam.addScaledVector(out.up, rideHeight);
   out.look.add(out.cam).addScaledVector(out.up, -rideHeight * 0.75);
-  const followHead = 1 - THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(_headPoint), 0, .5);
+  // From the farther, elevated approach keep looking down the track. Lock to
+  // the head once the lens has lowered onto the route through the core holes.
+  const followHead = (1 - THREE.MathUtils.smoothstep(_coreBounds.distanceToPoint(_headPoint), 0, .5))
+    * (1 - THREE.MathUtils.smoothstep(rideHeight, 0, .15));
   out.look.lerp(_headPoint, followHead);
   return out;
 }

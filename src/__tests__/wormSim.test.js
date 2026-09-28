@@ -741,13 +741,13 @@ describe('flipped tiles and tunnel traversal', () => {
       stepWormSim(sim, 1 / 60, SIZE, ctx);
     }
     expect(sim.phase).toBe('crawling');
-    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(7.9);
-    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(8.2);
-    expect(elapsed.tunnel).toBeGreaterThan(1.1);
-    expect(elapsed.tunnel).toBeLessThan(1.2);
+    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeGreaterThan(12.9);
+    expect(elapsed.entering + elapsed.tunnel + elapsed.exiting).toBeLessThan(13.2);
+    expect(elapsed.tunnel).toBeGreaterThan(1.8);
+    expect(elapsed.tunnel).toBeLessThan(1.9);
     expect(elapsed.entering).toBeCloseTo(elapsed.exiting, 6);
-    expect(elapsed.exiting).toBeGreaterThan(3.3);
-    expect(elapsed.exiting).toBeLessThan(3.5);
+    expect(elapsed.exiting).toBeGreaterThan(5.5);
+    expect(elapsed.exiting).toBeLessThan(5.7);
     expect(elapsed.windup).toBeLessThan(0.21);
     expect(elapsed.windout).toBeLessThan(0.21);
     expect(sim.pos.dirKey).toBe('NZ');
@@ -768,10 +768,10 @@ describe('flipped tiles and tunnel traversal', () => {
       elapsed[phase] = (elapsed[phase] ?? 0) + 1 / hz;
       stepWormSim(sim, 1 / hz, SIZE, ctx);
       if (sim.phase === phase) expect(sim.tunnelProgress).toBeGreaterThan(progress);
-      expect(Object.values(elapsed).reduce((a, b) => a + b, 0)).toBeLessThan(8.3);
+      expect(Object.values(elapsed).reduce((a, b) => a + b, 0)).toBeLessThan(13.3);
     }
     expect(elapsed.entering).toBeCloseTo(elapsed.exiting, 6);
-    expect(elapsed.tunnel).toBeLessThan(1.2);
+    expect(elapsed.tunnel).toBeLessThan(1.9);
   });
 
   it('resumes crawling with a long tail inside and heals only after it clears', () => {

@@ -1,3 +1,4 @@
+import { tunnelCameraClearanceGLSL } from './tunnelCameraClearance.js';
 import * as THREE from 'three';
 import { tileRoom } from './tunnelTileGuard.js';
 import { tunnelFinishGLSL } from './tunnelFinish.js';
@@ -102,6 +103,7 @@ export const veilFragmentShader = `
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   ${tunnelFinishGLSL}
+  ${tunnelCameraClearanceGLSL}
   void main() {
     if (vUv.y > uGrowT * 0.5 && vUv.y < 1.0 - uGrowT * 0.5) discard;
     float core = uRideMode > 0.5 ? uRideCore : 0.5;
@@ -120,6 +122,7 @@ export const veilFragmentShader = `
     vec3 color = base * 0.65 + pearl * (0.24 + ribs * 0.25 + spiral * 0.18 + rim * 0.2 + pulse * 0.3);
     float alpha = (0.07 + ribs * 0.3 + spiral * 0.16 + rim * 0.32 + fresnel * 0.10 + pulse * 0.12)
       * uOpacity * vEnvelope * smoothstep(0.0, 0.12, vUv.x);
+    alpha *= tunnelCameraVisibility(vWorldPos);
     if (alpha < 0.008) discard;
     gl_FragColor = vec4(color, alpha);
     #include <colorspace_fragment>

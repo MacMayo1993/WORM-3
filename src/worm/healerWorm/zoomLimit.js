@@ -20,3 +20,9 @@ export function boundedWormZoom(size, baseBack, orbCount, burst) {
 export function wormSurfaceFov(baseFov) {
     return 2 * Math.atan(Math.tan(baseFov * Math.PI / 360) * 1.08) * 180 / Math.PI;
 }
+
+// Show 25% more of the tunnel at the same distance in either screen direction.
+// This leaves room for mirror walls beside the worm, including on portrait phones.
+export function wormTunnelFov(baseFov) {
+    return 2 * Math.atan(Math.tan((baseFov + 6) * Math.PI / 360) * 1.25) * 180 / Math.PI;
+}
