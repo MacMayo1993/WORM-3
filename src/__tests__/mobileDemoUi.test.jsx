@@ -11,12 +11,12 @@ import BottomNavBar from '../components/menus/BottomNavBar.jsx';
 import DisparityHUD from '../components/overlays/DisparityHUD.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { demoTimer } from '../utils/demoTimer.js';
-import { WORM_DEMO_LESSONS, WORM_DEMO_CHECKPOINT } from '../game/wormDemoLessons.js';
+import { WORM_DEMO_LESSONS } from '../game/wormDemoLessons.js';
 let host, root;
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-  useGameStore.setState({ wormAlive: true, wormGamePhase: 'active', demoWormLessonIndex: 0, demoWormComplete: false, demoWormFinished: false, wormPauseMenuOpen: false, wormHealerMode: false, demoExploring: false, demoExploreComplete: false });
+  useGameStore.setState({ wormAlive: true, wormGamePhase: 'active', demoWormLessonIndex: 0, demoWormComplete: false, demoWormFinished: false, wormPauseMenuOpen: false, wormHealerMode: false });
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
 const render = node => act(() => root.render(node));
@@ -54,31 +54,23 @@ it('traps focus in the dialog and gives Escape one close action', () => {
   expect(document.activeElement).toBe(buttons[0]);
   act(() => buttons[0].dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))); expect(close).toHaveBeenCalledTimes(1);
 });
-it('groups the worm instruction, progress and skip into a single dock', () => {
-  const skip = vi.fn(); render(<DemoWormControlHint onSkip={skip} />);
+it('requires the exercise goal before Next and offers no skip or early finish', () => {
+  render(<DemoWormControlHint />);
   expect(host.querySelectorAll('.worm-demo-card')).toHaveLength(1);
   expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('0');
-  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'End practice').click()); expect(skip).toHaveBeenCalledTimes(1);
+  expect([...host.querySelectorAll('button')].find(b => b.textContent === 'Next').disabled).toBe(true);
+  expect(host.textContent).not.toMatch(/Skip|End practice|Finish practice/);
 });
-// The core WORM loop ends at the checkpoint: finishing is the suggested move,
-// the remaining exercises one tap away, and every other lesson keeps Next.
-it('offers Finish first once the core WORM loop is done, with the rest one tap away', () => {
-  const index = WORM_DEMO_LESSONS.findIndex(l => l.id === WORM_DEMO_CHECKPOINT);
-  const finish = vi.fn(), next = vi.fn();
-  const { finishWormDemo, nextWormDemoLesson } = useGameStore.getState();
-  useGameStore.setState({ demoWormLessonIndex: index, demoWormComplete: true, demoWormStarted: true, finishWormDemo: finish, nextWormDemoLesson: next });
+it('continues after healing and preserves Next if the player dies after reaching the goal', () => {
+  useGameStore.setState({ demoWormLessonIndex: WORM_DEMO_LESSONS.findIndex(l => l.id === 'heal'), demoWormComplete: true, demoWormStarted: true });
   render(<DemoWormControlHint />);
-  const button = text => [...host.querySelectorAll('button')].find(b => b.textContent === text);
-  expect(button('Finish practice').className).toBe('arcade-primary');
-  expect(button('Next')).toBeUndefined();
-  expect(host.textContent).toContain(`${WORM_DEMO_LESSONS.length - index - 1} more exercises`);
-  act(() => button('Keep practicing').click()); expect(next).toHaveBeenCalledTimes(1);
-  act(() => button('Finish practice').click()); expect(finish).toHaveBeenCalledTimes(1);
-  // One lesson earlier the card is the ordinary one.
-  act(() => useGameStore.setState({ demoWormLessonIndex: index - 1 }));
-  expect(button('Next').className).toBe('arcade-primary');
-  expect(button('Finish practice')).toBeUndefined();
-  act(() => useGameStore.setState({ finishWormDemo, nextWormDemoLesson, demoWormComplete: false, demoWormStarted: false }));
+  const next = () => [...host.querySelectorAll('button')].find(b => b.textContent === 'Next');
+  expect(next().disabled).toBe(false);
+  expect(host.textContent).toContain('learn to heal by surrounding');
+  expect(host.textContent).not.toContain('Finish practice');
+  act(() => useGameStore.setState({ wormAlive: false }));
+  expect(next().disabled).toBe(false);
+  expect(host.textContent).toContain('Goal reached');
 });
 it('keeps the flip instruction and live pair counter together across the phase change', () => {
   const draw = phase => <>
@@ -135,10 +127,9 @@ it('keeps Chaos demo guidance inside match details instead of covering the HUD',
   act(() => host.querySelector('[aria-label="Inspect match"]').click());
   expect(host.querySelector('#chaos-match-details').textContent).toContain('Will it be your pick?');
 });
-it('finishes Explore as 7/7 and removes its already-completed invitation', () => {
-  useGameStore.setState({demoExploring:true, demoExploreComplete:true});
+it('finishes all eleven sections before offering free play', () => {
   render(<><DemoProgressBar currentStep="end"/><DemoEndScreen /></>);
-  expect(host.textContent).toContain('7 / 7'); expect(host.textContent).toContain('Explore Complete');
+  expect(host.textContent).toContain('11 / 11'); expect(host.textContent).toContain('Demo Complete');
   expect(host.textContent).not.toContain('Keep learning');
 });
 

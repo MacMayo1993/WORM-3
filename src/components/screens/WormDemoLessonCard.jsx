@@ -1,16 +1,16 @@
 import React, { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { WORM_DEMO_LESSONS, WORM_DEMO_CHECKPOINT, wormDemoLesson } from '../../game/wormDemoLessons.js';
+import { WORM_DEMO_LESSONS, wormDemoLesson } from '../../game/wormDemoLessons.js';
 import { arcadeModeVars } from '../../utils/arcadeTheme.js';
 import '../ui/arcadeTheme.css';
 import './wormDemoLesson.css';
 
-export default function WormDemoLessonCard({ onRetry, onSkip }) {
+export default function WormDemoLessonCard({ onRetry }) {
   const s = useGameStore(useShallow(s => ({ demoWormLessonIndex: s.demoWormLessonIndex, complete: s.demoWormComplete, started: s.demoWormStarted, prepared: s.demoWormPrepared, start: s.startWormDemoLesson,
     progress: s.demoWormProgress, alive: s.wormAlive, paused: s.wormPauseMenuOpen,
     details: s.wormDeathDetails, phase: s.wormGamePhase, finished: s.demoWormFinished,
-    retry: s.restartWormDemoLesson, next: s.nextWormDemoLesson, finish: s.finishWormDemo })));
+    retry: s.restartWormDemoLesson, next: s.nextWormDemoLesson })));
   const lesson = wormDemoLesson(s);
   const retryRef = useRef(null);
   useEffect(() => { if (s.alive === false && !s.paused) retryRef.current?.focus(); }, [s.alive, s.paused]);
@@ -26,28 +26,17 @@ export default function WormDemoLessonCard({ onRetry, onSkip }) {
     : 'Your run ended. Try this exercise again with a fresh practice board.';
   const index = s.demoWormLessonIndex ?? 0;
   const last = index === WORM_DEMO_LESSONS.length - 1;
-  // Past the core loop, finishing is the suggested move and more practice the option.
-  const checkpoint = s.complete && !dead && lesson.id === WORM_DEMO_CHECKPOINT && !last;
-  const remaining = WORM_DEMO_LESSONS.length - index - 1;
-  const finish = onSkip ?? s.finish;
   return <section className="arcade-card arcade-paper worm-demo-card" style={arcadeModeVars('worm')} aria-label="WORM practice">
     <div className="worm-demo-heading"><strong>{lesson.title}</strong><span>{(s.demoWormLessonIndex ?? 0) + 1}/{WORM_DEMO_LESSONS.length}</span></div>
     <div className="worm-demo-track" role="progressbar" aria-label="WORM practice progress" aria-valuemin={0} aria-valuemax={WORM_DEMO_LESSONS.length} aria-valuenow={(s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)}>
       <div style={{ width: `${((s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)) / WORM_DEMO_LESSONS.length * 100}%` }} />
     </div>
-    <p role="status" aria-live="polite">{dead ? advice : s.complete ? lesson.success : lesson.instruction}</p>
-    {checkpoint && <div className="worm-demo-detail">That’s the whole WORM loop. Finish here, or keep practicing: {remaining} more exercises on power-ups, elements and hazards.</div>}
-    {s.complete && !dead && !checkpoint && <div className="worm-demo-detail">Goal reached. Keep practicing, or choose {last ? 'Finish' : 'Next'} when you’re ready.</div>}
+    <p role="status" aria-live="polite">{s.complete ? lesson.success : dead ? advice : lesson.instruction}</p>
+    {s.complete && <div className="worm-demo-detail">Goal reached. Keep practicing, or choose {last ? 'Next: Flip Cube' : 'Next'} when you’re ready. Your completion is saved for this attempt.</div>}
     {s.progress && !s.complete && !dead && <div className="worm-demo-detail">{s.progress}</div>}
     <div className="worm-demo-actions">
       <button ref={retryRef} disabled={!dead && !s.started && !s.prepared} className={dead || !s.started ? 'arcade-primary' : 'arcade-key'} onClick={!s.started && !dead ? s.start : onRetry ?? s.retry}>{dead ? 'Try again' : !s.started ? 'Try it' : 'Retry'}</button>
-      {checkpoint ? <>
-        <button className="arcade-key" onClick={s.next}>Keep practicing</button>
-        <button className="arcade-primary" onClick={finish}>Finish practice</button>
-      </> : <>
-        <button className={s.complete && !dead ? 'arcade-primary' : 'arcade-key'} onClick={s.next}>{s.complete ? (last ? 'Finish' : 'Next') : 'Skip exercise'}</button>
-        <button className="arcade-key" onClick={finish}>End practice</button>
-      </>}
+      <button disabled={!s.complete} className={s.complete ? 'arcade-primary' : 'arcade-key'} onClick={s.next}>{last ? 'Next: Flip Cube' : 'Next'}</button>
     </div>
   </section>;
 }

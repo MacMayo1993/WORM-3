@@ -12,24 +12,8 @@ import { useKociembaSolver } from '../../teach/useKociembaSolver.js';
 import { STEP_COPY, STEP_INTRO_LINES, TWIN_ASIDE } from '../../utils/demoStepCopy.js';
 import MobiIntroScreen from './MobiIntroScreen.jsx';
 
-// Step ids are permanent (configs, tests and save data key off them); the
-// labels are player-facing and stay in plain language — "Meet the Twins", not
-// "Twin Paradox". A first-timer should be able to read the whole progress
-// sequence and know what they just did.
-const DEMO_STEPS = [
-  { id: 'baby-cube', label: 'First Twist', num: 1 },
-  { id: 'twin-paradox', label: 'Meet the Twins', num: 2 },
-  { id: 'flip-gateway', label: 'Through the Middle', num: 3 },
-  { id: 'worm-traversal', label: 'WORM Practice', num: 4 },
-  { id: 'learn-to-solve', label: 'Learn to Solve', num: 5 },
-  { id: 'control-tour', label: 'Your Controls', num: 6 },
-  { id: 'view-showcase', label: 'Every Look', num: 7 },
-  { id: 'make-it-yours', label: 'Settings', num: 8 },
-  { id: 'chaos-forecast', label: 'Chaos · Call the Winner', num: 9 },
-  { id: 'random-showcase', label: 'Random · Surprise Cube', num: 10 },
-  { id: 'cosmetic-reward', label: 'Spend Your Points', num: 11 },
-  { id: 'end', label: 'Complete', num: 12 },
-];
+import { DEMO_STEPS } from '../../game/demoSequence.js';
+export { DEMO_STEP_IDS } from '../../game/demoSequence.js';
 
 // Extra line held under a step's STEP COMPLETE stamp: the rule the player just
 // brushed against but the hands-on phase had no room to spell out. The twin
@@ -48,8 +32,6 @@ const STEP_COMPLETE_NOTE = {
   // together — or the enemies that live runs send through the portals.
   'worm-traversal': 'Full runs start scrambled. Warned layer turns undo the scramble while new tunnels open on a timer; after the last turn, heal every tunnel to win. Enemies can also come through portals: steer to aim, hold Fire.',
 };
-
-export const DEMO_STEP_IDS = DEMO_STEPS.map(s => s.id);
 
 const DEMO_SHELL_STYLE_ID = 'worm3-demo-shell-style';
 
@@ -486,7 +468,7 @@ const ensureDemoShellStyle = () => {
     /* Worm control hint — non-blocking pill during early worm-step play.
        Sits above the bottom-docked progress pill AND the raised step hint
        (both stay up through play); fades out once the player makes progress
-       (first tunnel) or the skip pill appears. */
+       or the practice card appears. */
     .demo-worm-hint {
       position: fixed;
       left: 50%;
@@ -600,16 +582,14 @@ const DemoProgressBar = ({ currentStep }) => {
   // Worm mode's glance strip owns the top edge — dock the pill at the bottom there.
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const idx = DEMO_STEPS.findIndex(s => s.id === currentStep);
-  const exploring = useGameStore(s => s.demoExploring);
-  const optional = currentStep === 'end' ? exploring : idx >= 4;
-  const total = optional ? 7 : 4;
-  const current = currentStep === 'end' ? total : optional ? idx - 3 : idx + 1;
+  const total = DEMO_STEPS.length - 1;
+  const current = currentStep === 'end' ? total : idx + 1;
   const progress = current / total;
 
   return (
     <div className={`demo-progress-pill${wormHealerMode ? ' demo-progress-pill--bottom' : ''}`}>
-      <span className="demo-progress-label">{optional ? 'EXPLORE' : 'DEMO'}</span>
-      <div className="demo-progress-track" role="progressbar" aria-label={optional ? "Explore progress" : "Demo progress"} aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
+      <span className="demo-progress-label">DEMO</span>
+      <div className="demo-progress-track" role="progressbar" aria-label="Demo progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
         <div className="demo-progress-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <span className="demo-progress-count">
@@ -621,7 +601,7 @@ const DemoProgressBar = ({ currentStep }) => {
 
 // Most steps need only a setup line. Chaos and Random get a player-paced
 // briefing before the forecast picker or live remixing can start.
-const DemoStepIntro = ({ step, onContinue, onSkip }) => {
+const DemoStepIntro = ({ step, onContinue, onExit }) => {
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
   const lines = STEP_INTRO_LINES[step] || [STEP_COPY[step]].filter(Boolean);
@@ -629,11 +609,11 @@ const DemoStepIntro = ({ step, onContinue, onSkip }) => {
     <MobiIntroScreen
       key={step}
       lines={lines}
-      modeName={`${info.num <= 4 ? 'Demo' : 'Explore'} ${info.num <= 4 ? info.num : info.num - 4} · ${info.label}`}
+      modeName={`Demo ${info.num} · ${info.label}`}
       primaryLabel={step === 'chaos-forecast' ? 'Choose a pair' : step === 'random-showcase' ? 'Start Random' : 'Let’s try it'}
       onComplete={onContinue}
-      skipLabel="Skip lesson"
-      onSkip={onSkip}
+      skipLabel="Exit Demo"
+      onSkip={onExit}
       // The in-game top bar is up during the demo — keep the dialogue under it.
       topInset="var(--topbar-h)"
     />
@@ -644,8 +624,7 @@ const DemoStepIntro = ({ step, onContinue, onSkip }) => {
 //   • `watch` is auto-performed by the app so the mechanic plays itself
 //     (a rotation via startAnimatedShuffle, or a live flip via onTapFlip that
 //     fires the tunnel birth + travelling soliton).
-//   • then the DemoCoach invites one optional hands-on interaction before the
-//     player advances with Next.
+//   • then the player completes the hands-on goal before the next section.
 const DEMO_LEVEL_CONFIGS = {
   'baby-cube': {
     type: 'cube',
@@ -765,7 +744,7 @@ const TRY_COPY = {
   'chaos-forecast': 'Tap a damaged tile to send a healing wave through the damaged tiles joined to it. Healing can change which pair survives.',
   // Random remixes presentation only (useRandomMode): palette, tile styles and
   // per-cubelet looks. The rules never change, so the copy must not say they do.
-  'random-showcase': 'Every ten seconds the colors and tile looks remix. Each face still solves the same way. Tap Skip lesson when you’re ready.',
+  'random-showcase': 'Every ten seconds the colors and tile looks remix. Each face still solves the same way. Watch a remix, then press Next: Store.',
 };
 
 // Coach: the guidance already played inside the step-intro dialogue and the hint
@@ -801,6 +780,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
     );
   }
 
+  if (!['make-it-yours', 'chaos-forecast', 'random-showcase'].includes(step)) return null;
   return (
     <div className={`demo-coach-pill${wormHealerMode ? ' demo-coach-pill--bottom' : ''}`} style={{ display: 'flex', gap: 8 }}>
       {step === 'make-it-yours' && (
@@ -809,7 +789,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
         </button>
       )}
       <button type="button" onClick={onNext} className="demo-coach-pill-btn">
-        {step === 'make-it-yours' ? 'Next: Chaos →' : step === 'chaos-forecast' ? 'Next: Random →' : 'Skip lesson →'}
+        {step === 'make-it-yours' ? 'Next: Chaos →' : step === 'chaos-forecast' ? 'Next: Random →' : 'Next: Store →'}
       </button>
     </div>
   );
@@ -896,9 +876,8 @@ const CONTROL_TOUR_SEQUENCE = [
 
 const CONTROL_TOUR_KEYS = CONTROL_TOUR_SEQUENCE.map((b) => b.key);
 
-// Caption + pointer for one control-tour beat. Non-blocking apart from its own
-// Skip button: the player has to reach the real button underneath it.
-const DemoControlTour = ({ index, onSkip }) => {
+// Caption + pointer for one control-tour beat; the real button stays reachable.
+const DemoControlTour = ({ index }) => {
   ensureDemoShellStyle();
   const beat = CONTROL_TOUR_SEQUENCE[index];
   const targetRef = useDemoTarget(beat?.key);
@@ -918,17 +897,6 @@ const DemoControlTour = ({ index, onSkip }) => {
         {beat.title}
       </h3>
       <p className="demo-intro-copy" style={{ marginBottom: 8 }}>{beat.copy}</p>
-      {onSkip && (
-        <button
-          type="button"
-          onClick={onSkip}
-          aria-label="Skip lesson"
-          className="demo-intro-button"
-          style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
-        >
-          Skip lesson
-        </button>
-      )}
     </div>
   );
 };
@@ -1123,7 +1091,7 @@ const DemoStepComplete = ({ step, onDismiss }) => {
       <div className="demo-beat-flash" />
       <div className="demo-complete-stamp demo-complete-stamp--hold">
         <p className="demo-complete-check">✓</p>
-        <p className="demo-beat-sub">{info.num <= 4 ? 'Demo' : 'Explore'} {info.num <= 4 ? info.num : info.num - 4} Complete</p>
+        <p className="demo-beat-sub">Demo {info.num} Complete</p>
         <h2 className="demo-beat-title">{info.label}</h2>
         {step === 'worm-traversal' && <p className="demo-complete-note">{completedExercises} of {WORM_DEMO_LESSON_COUNT} exercises completed. Replay practice whenever you like.</p>}
         {STEP_COMPLETE_NOTE[step] && (
@@ -1180,7 +1148,7 @@ const DemoRewardStamp = ({ amount, correct }) => {
 // Shown before the view sequence starts: the Views tile on the bottom nav bar
 // pulses (see BottomNavBar `spotlightViews`) and this hint asks for the tap
 // that kicks off the first view.
-const DemoViewSpotlightHint = ({ onSkip }) => {
+const DemoViewSpotlightHint = () => {
   ensureDemoShellStyle();
   const targetRef = useDemoTarget('views');
   return (
@@ -1188,17 +1156,6 @@ const DemoViewSpotlightHint = ({ onSkip }) => {
       <p className="demo-intro-copy" style={{ marginBottom: 8 }}>
         Tap the glowing <strong>Views</strong> button below to open the first view mode.
       </p>
-      {onSkip && (
-        <button
-          type="button"
-          onClick={onSkip}
-          aria-label="Skip lesson"
-          className="demo-intro-button"
-          style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
-        >
-          Skip lesson
-        </button>
-      )}
     </div>
   );
 };
@@ -1286,7 +1243,7 @@ const DemoTeachCameo = () => {
   );
 };
 
-const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
+const DemoViewShowcase = ({ subStep, onNext }) => {
   ensureDemoShellStyle();
   const entry = VIEW_SHOWCASE_SEQUENCE[subStep];
   if (!entry) return null;
@@ -1307,17 +1264,6 @@ const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
           <button type="button" onClick={onNext} className="demo-intro-button">
             {subStep < VIEW_SHOWCASE_SEQUENCE.length - 1 ? 'Next View' : 'Done'}
           </button>
-          {onSkip && (
-            <button
-              type="button"
-              onClick={onSkip}
-              aria-label="Skip lesson"
-              className="demo-intro-button"
-              style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
-            >
-              Skip lesson
-            </button>
-          )}
         </div>
       </section>
     </div>

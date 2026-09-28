@@ -1,17 +1,12 @@
 import { XpReceipt } from '../../progression/ProgressWidgets.jsx';
 import DemoDialog from './DemoDialog.jsx';
-import { useGameStore } from '../../hooks/useGameStore.js';
 import React, { useState } from 'react';
 import {
   UI_FONT, HEADING_FONT,
   UI_CREAM, UI_MOSS, UI_ACTION_SHADOW,
  Z } from '../../utils/uiTheme.js';
 
-// Six-mode landing: the demo taught rotate → twin → flip → views → worm →
-// chaos → random → store, and this screen sends the player into the real mode
-// that matches whichever beat they liked. Each row names a destination and ties
-// it back to something the demo just showed. WORM is the primary CTA because the
-// demo ends on worm/chaos gameplay.
+// Mode choices are offered after every section of the guided demo.
 const MODES = [
   {
     id: 'worm',
@@ -26,13 +21,12 @@ const MODES = [
   { id: 'store', name: 'Store', blurb: 'Spend Parity Points on palettes, styles, and worm gear.' },
 ];
 
-const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit, onExplore }) => {
-  const explored = useGameStore(s => s.demoExploreComplete);
+const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit }) => {
   const [expanded, setExpanded] = useState(false);
   const handlers = { worm: onWorm, story: onStory, freeplay: onFreeplay, chaos: onChaos, random: onRandom, store: onStore };
 
   return (
-    <DemoDialog onClose={onExit} aria-label={explored ? "Explore complete" : "Demo complete"} style={{
+    <DemoDialog onClose={onExit} aria-label="Demo complete" style={{
       position: 'fixed', inset: 0, zIndex: Z.DEMO,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
@@ -56,7 +50,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           color: '#7b6f45', fontSize: 11, fontWeight: 800,
           letterSpacing: '0.18em', textTransform: 'uppercase', margin: '0 0 6px',
         }}>
-          {explored ? 'Explore Complete' : 'Demo Complete'}
+          Demo Complete
         </p>
         <XpReceipt mode="demo" />
         <h1 style={{
@@ -121,10 +115,6 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           style={{ minHeight: 48, marginTop: 12, background: 'transparent', border: 0, color: '#43513a', font: 'inherit' }}>
           {expanded ? 'Show fewer modes' : 'Show all modes'}
         </button>
-        {!explored && <button type="button" onClick={onExplore}
-          style={{ display: 'block', width: '100%', minHeight: 48, background: 'transparent', border: '1px solid #cec8be', borderRadius: 12, color: '#43513a', font: 'inherit' }}>
-          Keep learning: 7 more lessons
-        </button>}
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button
             type="button"

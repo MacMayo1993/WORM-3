@@ -586,13 +586,12 @@ export default function WORM3() {
     handleDemoCoachCopySeen, demoHintStep,
     onTapFlipRef,
     handleStartDemo, handleDemoStepContinue, advanceDemoStep,
-    handleDemoExplore,
     handleDemoReplay, handleDemoFreeplay, handleExitDemo,
-    handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
-    demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
+    handleDemoForecastPick, handleDemoDisparityDismiss,
+    demoShowcaseSubStep, handleDemoShowcaseNext,
     demoViewSpotlight, handleDemoViewSpotlightClick,
     demoFlipSpotlight, handleDemoFlipSpotlightSkip,
-    demoTourIndex, handleDemoNavTap, handleDemoTourSkip,
+    demoTourIndex, handleDemoNavTap,
     demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp, demoFlipProgress,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
@@ -1609,7 +1608,7 @@ export default function WORM3() {
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
       {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
-      {/* Cold open: Mobi frames the twin concept before the first step. */}
+      {/* Cold open: introduce WORM before its practice exercises. */}
       <ScreenTransition show={!!(demoMode && demoColdOpenVisible)} freezeOnExit>
         <MobiIntroScreen
           lines={MOBI_LINES_DEMO_INTRO}
@@ -1622,7 +1621,7 @@ export default function WORM3() {
         />
       </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
-        <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
+        <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onExit={handleExitDemo} />
       </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoForecastVisible && !demoChromeQuiet)} freezeOnExit
         style={{ position: 'relative', zIndex: Z.DEMO }}>
@@ -1636,7 +1635,7 @@ export default function WORM3() {
       </ScreenTransition>
       {demoMode && demoForecastVisible && (
         <Suspense fallback={null}>
-          <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
+          <DemoForecastPicker onPick={handleDemoForecastPick} onExit={handleExitDemo} />
         </Suspense>
       )}
       {/* Per-step gesture hint — stays up for the whole hands-on phase so the
@@ -1659,11 +1658,11 @@ export default function WORM3() {
         <DemoTeachCameo />
       )}
       <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
-        <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />
+        <DemoViewSpotlightHint />
       </ScreenTransition>
       {/* Control tour: one card per bottom-bar button, waiting on that press. */}
       <ScreenTransition show={!!(demoMode && demoTourIndex >= 0 && !demoStepIntroVisible && !demoChromeQuiet && !demoCelebrationStep)} freezeOnExit>
-        <DemoControlTour index={demoTourIndex} onSkip={handleDemoTourSkip} />
+        <DemoControlTour index={demoTourIndex} />
       </ScreenTransition>
       {/* Twin step: asks for the Flip button press that arms tile-flipping. */}
       <ScreenTransition show={!!(demoMode && demoFlipSpotlight && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
@@ -1673,7 +1672,6 @@ export default function WORM3() {
         <DemoViewShowcase
           subStep={demoShowcaseSubStep}
           onNext={handleDemoShowcaseNext}
-          onSkip={handleDemoShowcaseSkip}
         />
       </ScreenTransition>
       {demoMode && demoStep === 'end' && (
@@ -1685,7 +1683,6 @@ export default function WORM3() {
             onChaos={() => { handleExitDemo(); handleMenuDisparity(); }}
             onRandom={() => { handleExitDemo(); handleMenuRandomMode(); }}
             onStore={() => { handleExitDemo(); handleOpenStore(); }}
-            onExplore={handleDemoExplore}
             onReplay={handleDemoReplay}
             onExit={handleExitDemo}
           />

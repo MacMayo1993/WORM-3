@@ -12,21 +12,11 @@ import MobiStage, { MobiKey, useMobiSpeech } from './MobiStage.jsx';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
-// Demo cold open — the framing beat before step 1. Sets up the game's one
-// core promise (opposite tiles are twins) so the player twists the first cube
-// knowing why, then hands off to the interactive steps.
-//
-// Deliberately jargon-free: no "antipodal", no "manifold", no topology. The
-// idea a first-timer needs is spatial, not mathematical — "the tile dead
-// opposite this one is the same tile" — so every line points at the cube
-// instead of at the theory. The formal name shows up once, later, as an aside
-// (TWIN_ASIDE in demoStepCopy.js).
+// Demo cold open starts with WORM; the cube lessons follow its practice sequence.
 export const MOBI_LINES_DEMO_INTRO = [
-  "Aloha! I'm Mobi. I'm from a world called WORM³.",
-  "This is a Flip Cube. It slipped out of my world and landed here scrambled.",
-  "Every tile has a twin straight through the middle. Flip one and its twin flips too.",
-  "Help me heal it, and my way home stays open.",
-  "Try the controls one step at a time. You can skip any step.",
+  "Aloha! I'm Mobi. Let’s start WORM³ by learning to steer a worm.",
+  "Collect orbs, jump over your body, and ride tunnels to heal the cube.",
+  "We’ll practice each move, then work through the cube, its controls, and every other section together.",
 ];
 
 // Worm mode intro. Kept short and literal: a first-timer needs to know the

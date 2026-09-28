@@ -1,4 +1,4 @@
-import React, { act } from 'react';
+import React, { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 function renderHook(hook) {
@@ -18,7 +18,10 @@ import { PAIRS, pairPoint } from '../components/intro/introTopology.js';
 import { Vector3 } from 'three';
 import { makeCubies } from '../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../game/manifoldLogic.js';
-import { CONTROL_TOUR_KEYS } from '../components/screens/DemoFlowController.jsx';
+import { WORM_DEMO_LESSON_COUNT } from '../game/wormDemoState.js';
+import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { newWormDemo } from '../game/wormDemoState.js';
+import { CONTROL_TOUR_KEYS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE } from '../components/screens/DemoFlowController.jsx';
 
 const callbacks = { setRotatedCubies: vi.fn(), cancelShuffle: vi.fn(), changeSize: vi.fn(), reset: vi.fn(),
   cancelDisparityRun: vi.fn(), startDisparityGame: vi.fn(), animatedShuffle: vi.fn(), handleOpenStore: vi.fn() };
@@ -72,18 +75,22 @@ describe('short demo and retry', () => {
       expect(result.current.demoCelebrationStep).toBe('flip-gateway');
     } finally { unmount(); }
   });
-  it('keeps practicing after emergence and offers optional lessons only when practice ends', () => {
+  it('keeps WORM practice required and advances to the cube only after the final exercise', () => {
     const { result, unmount } = renderHook(() => useDemoMode(callbacks));
     act(() => useGameStore.setState({ wormTunnelCount: 1, wormPhase: 'windup' }));
     expect(result.current.demoCelebrationStep).toBeNull();
     act(() => useGameStore.setState({ wormPhase: 'crawling' }));
     expect(result.current.demoCelebrationStep).toBeNull();
     act(() => useGameStore.getState().finishWormDemo());
+    act(() => result.current.advanceDemoStep('worm-traversal'));
+    expect(useGameStore.getState().demoStep).toBe('worm-traversal');
+    expect(result.current.demoCelebrationStep).toBeNull();
+    act(() => useGameStore.setState({ demoWormLessonIndex: WORM_DEMO_LESSON_COUNT - 1, demoWormComplete: true }));
+    act(() => useGameStore.getState().nextWormDemoLesson());
     expect(result.current.demoCelebrationStep).toBe('worm-traversal');
     act(() => result.current.dismissDemoCelebration());
-    expect(useGameStore.getState().demoStep).toBe('end');
-    act(() => result.current.handleDemoExplore());
-    expect(useGameStore.getState().demoStep).toBe('learn-to-solve');
+    expect(useGameStore.getState().demoStep).toBe('baby-cube');
+    expect(result.current.demoStepIntroVisible).toBe(true);
     unmount();
   });
 });
@@ -134,6 +141,116 @@ describe('demo runs each mode on its live mechanics', () => {
       expect(cancelDisparityRun).toHaveBeenCalled();
       expect(useGameStore.getState().chaosIgnitionPicking).toBe(false);
       expect(useGameStore.getState().demoMode).toBe(false);
+    } finally { unmount(); }
+  });
+});
+describe('required curriculum', () => {
+  beforeEach(() => {
+    vi.useFakeTimers(); vi.clearAllMocks();
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    useGameStore.setState({ ...newWormDemo(), demoMode: false, demoStep: null, size: 3, cubies: makeCubies(3),
+      wormHealerMode: false, wormPauseMenuOpen: false, showSettings: false, victory: null });
+  });
+  afterEach(() => { useGameStore.setState({ demoMode: false }); vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
+  const store = () => useGameStore.getState();
+  const rotate = moves => {
+    let cubies = store().cubies;
+    for (const { axis, sliceIndex, dir } of moves) cubies = rotateSliceCubies(cubies, store().size, axis, sliceIndex, dir);
+    store().setRotatedCubies(cubies);
+  };
+  const live = { ...callbacks,
+    changeSize: size => useGameStore.setState({ size, cubies: makeCubies(size) }),
+    reset: () => store().setRotatedCubies(makeCubies(store().size)),
+    setRotatedCubies: cubies => store().setRotatedCubies(cubies),
+    startAnimatedShuffle: (moves, done) => { rotate(moves); done?.(); },
+  };
+  it.each(['handleStartDemo', 'handleDemoReplay'])('%s starts with fresh WORM practice even after an old completed run', action => {
+    const { result, unmount } = renderHook(() => useDemoMode(live));
+    try {
+      act(() => useGameStore.setState({ demoWormLessonIndex: 18, demoWormComplete: true, demoWormFinished: true, demoWormCompleted: ['rotation'], wormPauseMenuOpen: true }));
+      act(() => result.current[action]());
+      expect(store()).toMatchObject({ demoMode: true, demoStep: 'worm-traversal', demoWormLessonIndex: 0,
+        demoWormComplete: false, demoWormFinished: false, demoWormCompleted: [], wormPauseMenuOpen: false, wormHealerMode: true });
+      expect(result.current.demoColdOpenVisible).toBe(true);
+    } finally { unmount(); }
+  });
+  it('runs from WORM through every remaining section to completion without an optional branch', async () => {
+    const { result, unmount } = renderHook(() => {
+      const [navSheetOpen, setNavOpen] = useState(false);
+      return { ...useDemoMode({ ...live, navSheetOpen, closeNavSheet: () => setNavOpen(false) }), setNavOpen };
+    });
+    const seen = [];
+    const enter = step => {
+      expect(store().demoStep).toBe(step); seen.push(step);
+      act(() => result.current.handleDemoStepContinue());
+    };
+    const celebrate = step => {
+      expect(result.current.demoCelebrationStep).toBe(step);
+      act(() => result.current.dismissDemoCelebration());
+    };
+    const flip = (x, y) => act(() => store().setRotatedCubies(flipStickerPair(store().cubies, store().size, x, y, store().size - 1, 'PZ', buildManifoldGridMap(store().cubies, store().size))));
+    try {
+      act(() => result.current.handleStartDemo());
+      act(() => result.current.handleDemoColdOpenContinue());
+      enter('worm-traversal');
+      // Physics outcomes for each exercise are covered in wormDemoPractice;
+      // this boundary starts at the last achieved goal, then uses the real Next.
+      act(() => useGameStore.setState({ demoWormLessonIndex: WORM_DEMO_LESSON_COUNT - 1, demoWormComplete: true }));
+      act(() => store().nextWormDemoLesson());
+      celebrate('worm-traversal');
+      enter('baby-cube');
+      act(() => vi.advanceTimersByTime(3000));
+      act(() => rotate([...DEMO_LEVEL_CONFIGS['baby-cube'].watch.moves].reverse().map(m => ({ ...m, dir: -m.dir }))));
+      celebrate('baby-cube');
+      result.current.onTapFlipRef.current = ({ x, y }) => flip(x, y);
+      enter('twin-paradox');
+      act(() => vi.advanceTimersByTime(1600));
+      act(() => store().setFlipMode(true));
+      act(() => vi.advanceTimersByTime(3000));
+      flip(1, 1); celebrate('twin-paradox');
+      enter('flip-gateway');
+      for (let repeat = 0; repeat < 2; repeat++) for (let x = 0; x < 3; x++) for (let y = 0; y < 3; y++) flip(x, y);
+      celebrate('flip-gateway');
+      enter('learn-to-solve');
+      act(() => rotate([...DEMO_LEVEL_CONFIGS['learn-to-solve'].scrambleSequence].reverse().map(m => ({ ...m, dir: -m.dir }))));
+      celebrate('learn-to-solve');
+      enter('control-tour');
+      act(() => vi.advanceTimersByTime(2000));
+      for (const key of CONTROL_TOUR_KEYS) {
+        await act(async () => result.current.handleDemoNavTap(key));
+        if (['views', 'more'].includes(key)) {
+          act(() => result.current.setNavOpen(true));
+          act(() => result.current.setNavOpen(false));
+        }
+      }
+      celebrate('control-tour');
+      enter('view-showcase');
+      act(() => result.current.handleDemoViewSpotlightClick());
+      for (let i = 0; i < VIEW_SHOWCASE_SEQUENCE.length; i++) {
+        expect(result.current.demoShowcaseSubStep).toBe(i);
+        act(() => result.current.handleDemoShowcaseNext());
+      }
+      enter('make-it-yours');
+      act(() => vi.advanceTimersByTime(2000));
+      act(() => store().setShowSettings(false));
+      act(() => result.current.advanceDemoStep('make-it-yours'));
+      enter('chaos-forecast');
+      expect(result.current.demoForecastVisible).toBe(true);
+      act(() => result.current.handleDemoDisparityDismiss());
+      expect(store().demoStep).toBe('chaos-forecast');
+      act(() => result.current.handleDemoForecastPick({ id: 'red-orange', faceIds: [1, 4] }));
+      act(() => result.current.handleDemoDisparityDismiss());
+      act(() => vi.advanceTimersByTime(2800));
+      enter('random-showcase');
+      act(() => vi.advanceTimersByTime(12000));
+      expect(result.current.demoTryVisible).toBe(true);
+      act(() => result.current.advanceDemoStep('random-showcase'));
+      enter('cosmetic-reward');
+      expect(callbacks.handleOpenStore).toHaveBeenCalled();
+      act(() => result.current.advanceDemoStep('cosmetic-reward'));
+      expect(store().demoStep).toBe('end');
+      expect(seen).toEqual(['worm-traversal', 'baby-cube', 'twin-paradox', 'flip-gateway', 'learn-to-solve',
+        'control-tour', 'view-showcase', 'make-it-yours', 'chaos-forecast', 'random-showcase', 'cosmetic-reward']);
     } finally { unmount(); }
   });
 });

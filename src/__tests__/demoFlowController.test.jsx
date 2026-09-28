@@ -11,10 +11,10 @@ import { checkRubiksSolved } from '../game/winDetection.js';
 describe('demo flow configuration', () => {
   it('keeps the shipped demo in the intended stage order plus end state', () => {
     expect(DEMO_STEP_IDS).toEqual([
+      'worm-traversal',
       'baby-cube',
       'twin-paradox',
       'flip-gateway',
-      'worm-traversal',
       'learn-to-solve',
       'control-tour',
       'view-showcase',

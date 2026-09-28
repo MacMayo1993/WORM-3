@@ -23,7 +23,7 @@ export const STEP_COPY = {
   'flip-gateway': 'Send nine tile pairs through the middle, then bring them back. Start with the face in front of you.',
   'view-showcase': 'Let’s look at the same cube in a few different ways. Use Next to explore each view.',
   'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings to preview your look. Press Next: Chaos when you’re ready. Your choices stay saved.',
-  'worm-traversal': 'Steer, collect orbs, and jump onto raised flip pads to ride their tunnels. Practice also covers power-ups, elements, and hazards.',
+  'worm-traversal': 'Start with WORM: steer, collect orbs, and jump onto raised flip pads. Complete each practice exercise, then continue through Flip Cube, the controls, views, Settings, Chaos, Random, and the Store.',
   // The round's live HUD keeps its rules behind "Inspect match", so the setup
   // line carries the three the player acts on: aim the first strike, flips wear
   // tiles out in twin pairs, and taps heal.
@@ -47,7 +47,7 @@ export const STEP_INTRO_LINES = {
     'Random is a cube puzzle with a changing look. Solve it while the palette and tile styles remix every ten seconds. Your goal is still to make every face one color.',
     'Individual cubelets can switch between solid, glass, wireframe, numbered, and grid looks. The cube’s size and background stay fixed, so you can focus on following the pieces through each new look.',
     'A remix does not scramble the cube again or undo your moves. Matching pieces still belong together when their colors change. Keep making the same twists you learned earlier; only their appearance changes.',
-    'This practice starts with a scrambled 3×3. Try a few turns and watch a remix, or solve the whole cube. Choose Skip lesson whenever you’re ready to move on; the look you chose in Settings returns afterward.',
+    'This practice starts with a scrambled 3×3. Try a few turns and watch a remix, or solve the whole cube. After watching a remix, press Next: Store to continue; the look you chose in Settings returns afterward.',
   ],
 };
 

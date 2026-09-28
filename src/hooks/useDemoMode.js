@@ -13,8 +13,10 @@ import {
   applyDemoOverrides, looksLikeDemoSettings, mergeDemoSettings, demoLookChanged, DEMO_CONTROLLED_KEYS, DEMO_SETTINGS_OVERRIDES,
 } from '../utils/demoSettings.js';
 import {
-  DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE, CONTROL_TOUR_SEQUENCE,
+  DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE, CONTROL_TOUR_SEQUENCE,
 } from '../components/screens/DemoFlowController.jsx';
+
+import { DEMO_STEP_IDS, nextDemoStep } from '../game/demoSequence.js';
 
 // The demo temporarily overwrites the player's persisted settings (the Classic
 // palette on plain stickers over the desert — see utils/demoSettings.js). This
@@ -43,7 +45,7 @@ const scheduleDemoTimer = (callback, delay) => demoTimer(callback, delay,
 //
 // The values differ on purpose — a step whose mechanic takes longer to read
 // should not be interrupted by an escape hatch too early. Chaos instead offers
-// Next immediately, from the forecast through the finished round.
+// Next after the forecast has been chosen, through the finished round.
 const COACH_DELAY_MS = {
   worm: 10000,      // let the worm actually get moving first
   settings: 12000,  // give them a beat to open a tab before offering the exit
@@ -105,7 +107,7 @@ export function useDemoMode({
   // along through worm, chaos and random, and out the far end of the demo.
   const playerCustomizedRef = useRef(false);
   // Settings as they stood when the Settings step opened, so the step can tell
-  // "player picked something" from "player skipped".
+  // "player picked something" from "player kept the current look".
   const settingsStepEntryRef = useRef(null);
   const demoWatchTimers = useRef([]);
   const onTapFlipRef = useRef(null);
@@ -450,7 +452,7 @@ export function useDemoMode({
   // for them to close it again.
   const tourSheetOpenedRef = useRef(false);
 
-  // Reading time belongs to the player. Skip remains available on every beat.
+  // Each beat waits for the player to use its control.
   const enterTourBeat = useCallback((index) => {
     tourSheetOpenedRef.current = false;
     setDemoTourIndex(index);
@@ -495,12 +497,6 @@ export function useDemoMode({
     });
   }, []);
 
-  const handleDemoTourSkip = useCallback(() => {
-    setDemoTourIndex(-1);
-    closeNavSheet?.();
-    advanceDemoStepRef.current?.('control-tour');
-  }, [closeNavSheet]);
-
   const handleStartDemo = useCallback(() => {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
@@ -510,17 +506,15 @@ export function useDemoMode({
     preDemoSettingsRef.current = { ...store.settings };
     try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { /* private mode */ }
     store.startDemo();
-    useGameStore.setState({ demoExploreComplete: false, demoExploring: false });
     applyDemoSettings();
     // Pre-stage the first step's cube so Mobi's cold-open blurs the right scene
     // (otherwise the menu's 3×3 lingers behind the dialogue until Start).
-    applyDemoStepConfig('baby-cube');
+    applyDemoStepConfig(DEMO_STEP_IDS[0]);
     // Cover the demo's opening scene the same way mode entries do, so the desert
     // environment map doesn't pop in behind Mobi's cold open (self-dismisses if
     // it's already warm — warmDemoAssets() often pre-fetches it).
     armSceneGate?.('Demo');
-    // Cold open first: Mobi frames the "every tile has a twin" idea before the
-    // player touches anything, then hands off to the baby-cube step intro.
+    // Introduce WORM first, then hand off to its required practice sequence.
     setDemoColdOpenVisible(true);
   }, [clearDemoWatchTimers, applyDemoSettings, applyDemoStepConfig, armSceneGate]);
 
@@ -533,6 +527,7 @@ export function useDemoMode({
   const advanceDemoStep = useCallback((fromStep) => {
     const store = useGameStore.getState();
     if (store.demoStep !== fromStep) return;
+    if (fromStep === 'worm-traversal' && !store.demoWormFinished) return;
     // A stale coach click must never advance the lesson while the player is
     // choosing a palette or tile style in the Settings modal.
     if (fromStep === 'make-it-yours' && store.showSettings) return;
@@ -563,9 +558,7 @@ export function useDemoMode({
     if (fromStep === 'make-it-yours') {
       store.setShowSettings(false);
       // Only a player who actually changed something owns the look from here on.
-      // Skipping the step leaves the demo staging its own theme as before —
-      // treating a skip as a choice would freeze the demo into whatever was on
-      // screen at the time.
+      // Keeping the current look leaves the demo staging its theme as before.
       const now = useGameStore.getState().settings;
       if (demoLookChanged(settingsStepEntryRef.current, now)) {
         playerCustomizedRef.current = true;
@@ -583,11 +576,9 @@ export function useDemoMode({
       setDemoShowcaseSubStep(-1);
       setDemoViewSpotlight(false);
     }
-    const idx = DEMO_STEP_IDS.indexOf(fromStep);
-    const nextStep = fromStep === 'worm-traversal' ? 'end' : DEMO_STEP_IDS[idx + 1] || 'end';
+    const nextStep = nextDemoStep(fromStep);
     if (nextStep === 'end') store.recordDiscoveryXp('introduction');
     store.setDemoStep(nextStep);
-    if (fromStep === 'cosmetic-reward') useGameStore.setState({ demoExploreComplete: true });
     // Pre-stage plain cube steps so the intro dialogue blurs the upcoming
     // scene. Other types (worm/chaos/showcase/random) start on Continue —
     // pre-staging them would kick off gameplay or overlays behind the blur.
@@ -736,9 +727,8 @@ export function useDemoMode({
     const store = useGameStore.getState();
     cleanupAllDemoState(store);
     store.startDemo();
-    useGameStore.setState({ demoExploreComplete: false, demoExploring: false });
     applyDemoSettings();
-    applyDemoStepConfig('baby-cube');
+    applyDemoStepConfig(DEMO_STEP_IDS[0]);
     setDemoColdOpenVisible(true);
   }, [cleanupAllDemoState, applyDemoSettings, applyDemoStepConfig]);
 
@@ -819,7 +809,7 @@ export function useDemoMode({
     useGameStore.getState().resetGame();
     // Same launch as a live round, first-strike pick included: the player aims
     // where the storm hits first (ChaosIgnitionPrompt), then the countdown runs.
-    // Skipping, exiting or Home all clear the pick with the rest of the session.
+    // Advancing, exiting or Home clears the pick with the rest of the session.
     startDisparityGame(wizardSettings, { pickIgnition: true });
   }, [startDisparityGame]);
 
@@ -850,18 +840,6 @@ export function useDemoMode({
     }
   }, [demoShowcaseSubStep, advanceDemoStep]);
 
-  const handleDemoShowcaseSkip = useCallback(() => {
-    const store = useGameStore.getState();
-    setDemoViewSpotlight(false);
-    VIEW_SHOWCASE_SEQUENCE[demoShowcaseSubStep]?.cleanup(store);
-    store.setVisualMode('classic');
-    store.setExploded(false);
-    store.setHollowMode(false);
-    store.setShowNetPanel(false);
-    setDemoShowcaseSubStep(-1);
-    advanceDemoStep('view-showcase');
-  }, [demoShowcaseSubStep, advanceDemoStep]);
-
   // Award the Parity Points, flash the reward stamp (same launch-stamp text
   // treatment as a new step), then advance once it clears. The pending ref
   // blocks the showDisparityWinner safety-net below from advancing early and
@@ -890,10 +868,6 @@ export function useDemoMode({
     }, 2600));
   }, [cancelDisparityRun, clearDemoWatchTimers]);
 
-  const handleDemoChaosSkip = useCallback(() => {
-    finishChaosWithReward(50, false);
-  }, [finishChaosWithReward]);
-
   // Mobi's mid-step aside was acknowledged — drop back to the compact coach
   // pill. Held here rather than inside DemoCoach so the app knows the blocking
   // dialogue is gone and can restore the bottom nav.
@@ -903,6 +877,7 @@ export function useDemoMode({
     if (!demoMode || demoStep !== 'chaos-forecast') return;
     const store = useGameStore.getState();
     const pick = demoForecastPickRef.current;
+    if (!pick) return;
     const winner = store.disparityWinner;
     const winnerFaceIds = winner?.pair?.map((gid) => {
       const m = gid.match(/^M(\d+)-/);
@@ -1052,7 +1027,7 @@ export function useDemoMode({
     clearDemoWatchTimers();
   }, [clearDemoWatchTimers]);
 
-  // The WORM chapter finishes only after the practice sequence or explicit exit.
+  // The WORM chapter finishes after every exercise in the practice sequence.
   const demoWormFinished = useGameStore(s => s.demoWormFinished);
   useEffect(() => {
     if (!demoMode || demoStep !== 'worm-traversal' || !demoWormFinished) return;
@@ -1060,7 +1035,7 @@ export function useDemoMode({
     celebrateStep('worm-traversal');
   }, [demoMode, demoStep, demoWormFinished, celebrateStep]);
 
-  // A failed attempt stays in the lesson. The hint supplies retry and skip.
+  // A failed attempt stays in the lesson. The card supplies Retry.
   const wormAlive = useGameStore((s) => s.wormAlive);
   useEffect(() => {
     if (!demoMode || demoStep !== 'worm-traversal' || wormAlive !== false) return;
@@ -1068,13 +1043,6 @@ export function useDemoMode({
     clearDemoWatchTimers();
     setDemoTryVisible(false);
   }, [demoMode, demoStep, wormAlive, clearDemoWatchTimers]);
-
-  const handleDemoExplore = useCallback(() => {
-    useGameStore.setState({ demoExploring: true });
-    useGameStore.getState().setDemoStep('learn-to-solve');
-    applyDemoStepConfig('learn-to-solve');
-    setDemoStepIntroVisible(true);
-  }, [applyDemoStepConfig]);
 
   // Safety net: advance when disparity winner screen is dismissed.
   useEffect(() => {
@@ -1112,12 +1080,10 @@ export function useDemoMode({
     handleStartDemo,
     handleDemoStepContinue,
     advanceDemoStep,
-    handleDemoExplore,
     handleDemoReplay,
     handleDemoFreeplay,
     handleExitDemo,
     handleDemoForecastPick,
-    handleDemoChaosSkip,
     handleDemoDisparityDismiss,
     demoShowcaseSubStep,
     demoCelebrationStep,
@@ -1131,8 +1097,6 @@ export function useDemoMode({
     handleDemoFlipSpotlightSkip,
     demoTourIndex,
     handleDemoNavTap,
-    handleDemoTourSkip,
     handleDemoShowcaseNext,
-    handleDemoShowcaseSkip,
   };
 }

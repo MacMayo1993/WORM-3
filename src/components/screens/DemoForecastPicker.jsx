@@ -20,11 +20,11 @@ const FORECAST_RULES = [
   'The last pair standing wins. This forecast is free; in Chaos mode you can stake Parity Points on four kinds of prediction.',
 ];
 
-export default function DemoForecastPicker({ onPick, onSkip }) {
+export default function DemoForecastPicker({ onPick, onExit }) {
   const [selected, setSelected] = useState(null);
 
   return (
-    <DemoDialog onClose={onSkip} aria-label="Choose a color pair" style={{
+    <DemoDialog onClose={onExit} aria-label="Choose a color pair" style={{
       position: 'fixed', inset: 0, zIndex: 11500,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'safe center', overflowY: 'auto', boxSizing: 'border-box',
@@ -32,13 +32,13 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
       backdropFilter: 'var(--paper-blur, none)',
       fontFamily: UI_FONT, textAlign: 'center', padding: 24,
     }}>
-      {onSkip && <div style={{ position: 'sticky', top: 0, zIndex: 1, alignSelf: 'stretch',
+      {onExit && <div style={{ position: 'sticky', top: 0, zIndex: 1, alignSelf: 'stretch',
         display: 'flex', justifyContent: 'flex-end', flexShrink: 0, marginBottom: 12, pointerEvents: 'none' }}>
-        <button type="button" onClick={onSkip} style={{
+        <button type="button" onClick={onExit} style={{
           minHeight: 52, padding: '12px 22px', borderRadius: 999, border: `2px solid ${UI_MOSS_LIGHT}`,
           background: UI_MOSS, color: UI_CREAM, fontFamily: UI_FONT, fontSize: 14, fontWeight: 800,
           cursor: 'pointer', touchAction: 'manipulation', pointerEvents: 'auto',
-        }}>Next: Random →</button>
+        }}>Exit Demo</button>
       </div>}
       <p style={{
         color: UI_GOLD, fontSize: 12, fontWeight: 800,
