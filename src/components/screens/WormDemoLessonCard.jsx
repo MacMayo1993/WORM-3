@@ -32,7 +32,7 @@ export default function WormDemoLessonCard({ onRetry }) {
       <div style={{ width: `${((s.demoWormLessonIndex ?? 0) + (s.complete ? 1 : 0)) / WORM_DEMO_LESSONS.length * 100}%` }} />
     </div>
     <p role="status" aria-live="polite">{s.complete ? lesson.success : dead ? advice : lesson.instruction}</p>
-    {s.complete && <div className="worm-demo-detail">Goal reached. Keep practicing, or choose {last ? 'Next: Flip Cube' : 'Next'} when you’re ready. Your completion is saved for this attempt.</div>}
+    {s.complete && <div className="worm-demo-detail">Goal reached. Keep playing or tap {last ? 'Next: Flip Cube' : 'Next'}.</div>}
     {s.progress && !s.complete && !dead && <div className="worm-demo-detail">{s.progress}</div>}
     <div className="worm-demo-actions">
       <button ref={retryRef} disabled={!dead && !s.started && !s.prepared} className={dead || !s.started ? 'arcade-primary' : 'arcade-key'} onClick={!s.started && !dead ? s.start : onRetry ?? s.retry}>{dead ? 'Try again' : !s.started ? 'Try it' : 'Retry'}</button>
