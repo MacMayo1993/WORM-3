@@ -1,5 +1,5 @@
 // src/worm/healerWorm/HealerBombs.jsx
-// Renders WORM healer-mode bombs and their detonation fire.
+// Renders WORM healer-mode bombs, disarm crumbles and detonation fire.
 //
 // Live bombs live in a ref written by the mode's frame loop (bombsRef); this
 // component mirrors the set of bomb IDs into state so each bomb mounts/unmounts
@@ -8,6 +8,8 @@
 // runs out. Detonations are pushed imperatively through blastApiRef.spawn() and
 // drawn as flame-shaped, flickering, rising fire that shoots out along the blast
 // arms — a plus of flames that flare over every covered tile.
+// Successful disarms instead leave a harmless shell that uses the opening cube's
+// dissolve shader and drifting flecks, with all danger indicators extinguished.
 //
 // Performance: every mesh reuses a module-level shared geometry (the same
 // pattern as orbSystems/ParityOrb) so a spawn never allocates or GPU-uploads new
@@ -20,10 +22,18 @@ import * as THREE from 'three';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { FACE_NORMALS, DIR_FORWARD } from './constants.js';
 import { BOMB_FUSE_SECONDS } from './bombs.js';
+import { addFrameDissolve } from '../../components/intro/introDissolve.js';
+import { prefersReducedMotion } from '../../utils/device.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import {
+  BOMB_RADIUS, BOMB_DISSOLVE_HOLD, BOMB_FLECKS, BOMB_FIELD_SCALE,
+  BOMB_FIELD_MID, bombDissolveProgress, bombFleck,
+} from './bombDissolve.js';
 
 const BOMB_LIFT = 0.34; // how far the bomb body floats off the tile surface
-const BOMB_RADIUS = 0.42; // +30% over the original 0.32
 const _UP = new THREE.Vector3(0, 1, 0);
+const DISSOLVE_FIELD = new THREE.Matrix4().makeScale(BOMB_FIELD_SCALE, BOMB_FIELD_SCALE, BOMB_FIELD_SCALE)
+  .setPosition(0, -BOMB_FIELD_SCALE * BOMB_FIELD_MID, 0);
 
 // ─── Shared flame texture (teardrop: white-hot base → orange → transparent tip) ─
 function makeFlameTexture() {
@@ -61,7 +71,8 @@ const GEO = {
   fuse: new THREE.CylinderGeometry(0.03, 0.045, 0.32, 8),
   spark: new THREE.SphereGeometry(0.09, 10, 10),
   ember: new THREE.SphereGeometry(0.05, 6, 6),
-  flameCore: new THREE.SphereGeometry(0.3, 14, 14)
+  flameCore: new THREE.SphereGeometry(0.3, 14, 14),
+  fleck: new THREE.PlaneGeometry(1, 0.62)
 };
 // Static (non-animated) shared materials — safe to reuse; R3F never disposes
 // objects passed by prop (only ones it creates from JSX intrinsics).
@@ -69,8 +80,87 @@ const MAT = {
   body: new THREE.MeshStandardMaterial({ color: '#0f1116', roughness: 0.25, metalness: 0.75 }),
   highlight: new THREE.MeshBasicMaterial({ color: '#8a93a8', transparent: true, opacity: 0.5, toneMapped: false }),
   fuse: new THREE.MeshStandardMaterial({ color: '#6b5330', roughness: 0.9 }),
-  spark: new THREE.MeshBasicMaterial({ color: '#fff0a0', toneMapped: false })
+  spark: new THREE.MeshBasicMaterial({ color: '#fff0a0', toneMapped: false }),
+  fleck: new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.5 })
 };
+// Retain the warmed programs after WarmUp unmounts. Disarmed bombs clone their
+// own uniforms/materials but use these same program keys; disposing a remnant
+// must not evict the shader and force the next disarm to compile it again.
+const WARM_DISSOLVE_UNIFORMS = { uDissolve: { value: 0 }, uDissolveFrame: { value: new THREE.Matrix4() } };
+const WARM_DISSOLVE_MATERIALS = Object.fromEntries(['body', 'highlight', 'fuse']
+  .map(key => [key, addFrameDissolve(MAT[key].clone(), WARM_DISSOLVE_UNIFORMS)]));
+
+function bombPosition(bomb, size) {
+  const { x, y, z, dirKey } = bomb.tile;
+  const base = getStickerWorldPos(x, y, z, dirKey, size);
+  const normal = FACE_NORMALS[dirKey] ?? _UP;
+  return [base[0] + normal.x * BOMB_LIFT, base[1] + normal.y * BOMB_LIFT, base[2] + normal.z * BOMB_LIFT];
+}
+
+// Both states draw exactly the same shell and fuse. Only the disarmed copy owns
+// patched materials: changing its uniforms must never dissolve a nearby live bomb.
+function BombShell({ materials = MAT, quatUp }) {
+  return <>
+    <mesh geometry={GEO.body} material={materials.body} />
+    <mesh geometry={GEO.highlight} material={materials.highlight} position={[-BOMB_RADIUS * 0.35, BOMB_RADIUS * 0.5, BOMB_RADIUS * 0.55]} />
+    <group quaternion={quatUp}>
+      <mesh geometry={GEO.fuse} material={materials.fuse} position={[0, BOMB_RADIUS + 0.14, 0]} rotation={[0, 0, 0.25]} />
+    </group>
+  </>;
+}
+
+// A visual-only remnant. The simulation has already removed this bomb, awarded
+// its reward and stopped its fuse. The front crosses in 1.1s, then the last flecks
+// settle out. Like the blast effect, completion can finish behind a success card.
+function DisarmedBomb({ bomb, size, hidden, onDone, warmup = false }) {
+  const root = useRef(), frame = useRef(), shell = useRef(), flecks = useRef();
+  const age = useRef(0), done = useRef(false);
+  const uniforms = useMemo(() => ({ uDissolve: { value: 0 }, uDissolveFrame: { value: new THREE.Matrix4() } }), []);
+  const materials = useMemo(() => warmup ? WARM_DISSOLVE_MATERIALS : Object.fromEntries(['body', 'highlight', 'fuse']
+    .map(key => [key, addFrameDissolve(MAT[key].clone(), uniforms)])), [uniforms, warmup]);
+  useEffect(() => () => {
+    if (!warmup) Object.values(materials).forEach(material => material.dispose());
+  }, [materials, warmup]);
+  const scratch = useMemo(() => ({ dummy: new THREE.Object3D(), color: new THREE.Color() }), []);
+  const fleckColors = useMemo(() => new THREE.InstancedBufferAttribute(new Float32Array(BOMB_FLECKS * 3).fill(1), 3), []);
+  const quatUp = useMemo(() => new THREE.Quaternion().setFromUnitVectors(_UP,
+    new THREE.Vector3(...(DIR_FORWARD[bomb.tile.dirKey]?.up ?? [0, 1, 0])).normalize()), [bomb.tile.dirKey]);
+
+  useFrame((_, delta) => {
+    if (warmup || hidden || done.current) return;
+    age.current += Math.min(delta, 0.1);
+    const progress = bombDissolveProgress(age.current);
+    shell.current.visible = progress < 1;
+    uniforms.uDissolve.value = progress;
+    root.current.updateWorldMatrix(true, true);
+    uniforms.uDissolveFrame.value.copy(frame.current.matrixWorld).invert().premultiply(DISSOLVE_FIELD);
+    const reduced = prefersReducedMotion() || useGameStore.getState().settings?.reducedMotion;
+    let flying = 0;
+    for (let i = 0; i < BOMB_FLECKS; i++) {
+      const fleck = bombFleck(i, age.current, bomb.id, reduced);
+      if (fleck) {
+        flying++;
+        scratch.dummy.position.fromArray(fleck.position);
+        scratch.dummy.rotation.set(...fleck.spin);
+        scratch.dummy.scale.setScalar(fleck.scale);
+        flecks.current.setColorAt(i, scratch.color.set(fleck.color));
+      } else scratch.dummy.scale.setScalar(0);
+      scratch.dummy.updateMatrix();
+      flecks.current.setMatrixAt(i, scratch.dummy.matrix);
+    }
+    flecks.current.visible = flying > 0;
+    flecks.current.instanceMatrix.needsUpdate = true;
+    if (flecks.current.instanceColor) flecks.current.instanceColor.needsUpdate = true;
+    if (age.current >= BOMB_DISSOLVE_HOLD) { done.current = true; onDone(); }
+  });
+
+  return <group ref={root} position={bombPosition(bomb, size)}>
+    <group ref={shell}><BombShell materials={materials} quatUp={quatUp} /></group>
+    <group ref={frame} quaternion={quatUp}>
+      <instancedMesh ref={flecks} args={[GEO.fleck, MAT.fleck, BOMB_FLECKS]} instanceColor={fleckColors} visible={warmup} frustumCulled={false} />
+    </group>
+  </group>;
+}
 
 // ─── Floating countdown number (canvas-texture sprite, always faces camera) ────
 function makeCountdownCanvas() {
@@ -107,12 +197,12 @@ function Bomb({ bomb, size }) {
 
   const canvas = useMemo(() => makeCountdownCanvas(), []);
   const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+  useEffect(() => () => texture.dispose(), [texture]);
   const lastSecRef = useRef(-1);
 
   const dirKey = bomb.tile.dirKey;
-  const base = getStickerWorldPos(bomb.tile.x, bomb.tile.y, bomb.tile.z, dirKey, size);
   const normal = FACE_NORMALS[dirKey] ?? _UP;
-  const pos = [base[0] + normal.x * BOMB_LIFT, base[1] + normal.y * BOMB_LIFT, base[2] + normal.z * BOMB_LIFT];
+  const pos = bombPosition(bomb, size);
   const up = DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
   // Two orientations: the danger ring lies FLAT on the tile (aligned to the face
   // normal); the fuse + embers stand UP along the face's "up" (so they read as
@@ -164,10 +254,7 @@ function Bomb({ bomb, size }) {
 
   return (
     <group position={pos}>
-      {/* bomb body — dark metal sphere */}
-      <mesh geometry={GEO.body} material={MAT.body} />
-      {/* glossy highlight cap */}
-      <mesh geometry={GEO.highlight} material={MAT.highlight} position={[-BOMB_RADIUS * 0.35, BOMB_RADIUS * 0.5, BOMB_RADIUS * 0.55]} />
+      <BombShell quatUp={quatUp} />
 
       {/* flat furniture on the tile: danger ring + underglow (aligned to normal) */}
       <group quaternion={quatFlat}>
@@ -181,7 +268,6 @@ function Bomb({ bomb, size }) {
 
       {/* upright furniture: fuse + spark + flame + embers (aligned to face "up") */}
       <group quaternion={quatUp}>
-        <mesh geometry={GEO.fuse} material={MAT.fuse} position={[0, BOMB_RADIUS + 0.14, 0]} rotation={[0, 0, 0.25]} />
         <mesh ref={fuseSparkRef} geometry={GEO.spark} material={MAT.spark} position={[0.06, fuseTipY, 0]} />
         <sprite ref={fuseFlameRef} position={[0.06, fuseTipY + 0.12, 0]} scale={[0.2, 0.32, 1]}>
           <spriteMaterial map={FLAME_TEX} transparent opacity={0.85} blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
@@ -296,6 +382,7 @@ function WarmUp() {
   return (
     <group position={[0, 0, 0]} scale={0.02} frustumCulled={false}>
       <mesh geometry={GEO.body} material={MAT.body} />
+      <DisarmedBomb bomb={{ id: 0, tile: { x: 1, y: 1, z: 2, dirKey: 'PZ' } }} size={3} warmup />
       <mesh geometry={GEO.flameCore}>
         <meshBasicMaterial color="#ffdf9a" transparent blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
       </mesh>
@@ -320,6 +407,7 @@ export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size, hidden
   const [ids, setIds] = useState([]);
   const lastMembershipRef = useRef(-1);
   const [bursts, setBursts] = useState([]);
+  const [disarmed, setDisarmed] = useState([]);
   const burstSeq = useRef(0);
 
   // Register the imperative blast-spawn handle for the mode's frame loop.
@@ -328,6 +416,12 @@ export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size, hidden
   useEffect(() => {
     if (!blastApiRef) return undefined;
     blastApiRef.current = {
+      disarm: (bomb) => {
+        // Snapshot the tile before the live hazard list compacts. A small bounded
+        // tail prevents rapid practice retries from accumulating visual remnants.
+        setDisarmed(list => [...list.filter(b => b.id !== bomb.id), { ...bomb, tile: { ...bomb.tile } }].slice(-6));
+      },
+      clear: () => { setDisarmed([]); setBursts([]); },
       spawn: (flamePoints) => {
         const id = burstSeq.current++;
         setBursts((b) => [...b, {
@@ -365,6 +459,8 @@ export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size, hidden
         const bomb = live.find((b) => b.id === id);
         return bomb ? <Bomb key={id} bomb={bomb} size={size} /> : null;
       })}
+      {disarmed.map(bomb => <DisarmedBomb key={bomb.id} bomb={bomb} size={size} hidden={hidden}
+        onDone={() => setDisarmed(list => list.filter(b => b.id !== bomb.id))} />)}
       {bursts.map((burst) => (
         <BlastBurst
           key={burst.id}
