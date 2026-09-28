@@ -164,6 +164,24 @@ it('preserves the core aperture at the near plane and restores the surface camer
   expect(scene.camera.near).toBe(originalNear);
 });
 
+it('widens the portrait tunnel view and restores normal surface framing after departure', () => {
+  const size = 5, worm = makeWorm(size);
+  useGameStore.setState({ wormGamePhase: 'active' });
+  render(worm, size);
+  for (let i = 0; i < 180; i++) tick();
+  const surfaceFov = scene.camera.fov;
+  worm.activeTunnel.current = {
+    entry: { x: 2, y: 4, z: 2, dirKey: 'PY' }, exit: { x: 2, y: 0, z: 2, dirKey: 'NY' }
+  };
+  worm.phase.current = 'tunnel'; worm.tunnelProgress.current = .5;
+  for (let i = 0; i < 180; i++) tick();
+  expect(scene.camera.fov).toBeGreaterThan(100);
+  expect(scene.camera.fov).toBeLessThan(103);
+  worm.phase.current = 'crawling'; worm.activeTunnel.current = null;
+  for (let i = 0; i < 180; i++) tick();
+  expect(scene.camera.fov).toBeCloseTo(surfaceFov, 0);
+});
+
 it('tracks rendered jump and rocket height through turns', () => {
   const size = 15, worm = makeWorm(size);
   render(worm, size); tick();

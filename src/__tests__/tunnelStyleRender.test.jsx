@@ -1,3 +1,4 @@
+import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import React, { act } from 'react';
 import { createRoot, extend } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -18,6 +19,7 @@ extend(THREE);
 it('renders a solid core, styled halves, and matching live antipodal backs inside and outside transit', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
+  const bridge = { ...tunnelState };
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     fillRect() {}, beginPath() {}, arc() {}, fill() {}, createRadialGradient: () => ({ addColorStop() {} }),
   });
@@ -66,6 +68,17 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     expect(inner.material).toBe(cached);
     expect(inner.visible).toBe(true);
 
+    tunnelState.active = true; tunnelState.activeTunnelId = 'a|b'; frame();
+    const clearance = halves[0].material.uniforms.uCameraClearance;
+    expect(clearance.value).toBe(1);
+    for (const part of halves[0].parent.children) {
+      expect(part.material.uniforms.uCameraClearance).toBe(clearance);
+    }
+    const intact = halves[0].geometry.attributes.position.version;
+    tunnelState.active = false; frame();
+    expect(clearance.value).toBe(0);
+    expect(halves[0].geometry.attributes.position.version).toBe(intact);
+
     const sharedTime = halves[0].material.uniforms.time;
     expect(sharedTime).toBe(halves[1].material.uniforms.time);
     const held = sharedTime.value;
@@ -95,6 +108,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const raised = scene.getObjectByName('tunnel-styled-half-0');
     expect(raised.material.transparent).toBe(false);
     expect(raised.material.depthWrite).toBe(true);
+    expect(raised.material.uniforms.uCameraClearance.value).toBe(0);
     expect(raised.material.uniforms.uRideMode.value).toBe(1); // FLIP CUBE keeps its raised, opaque bands too.
     const veil = scene.getObjectByName('tunnel-open-veil');
     expect(veil.material.transparent).toBe(true);
@@ -113,6 +127,7 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     expect(scene.getObjectByName('tunnel-open-veil').geometry.attributes.position.array.some(v => v !== 0)).toBe(true);
   } finally {
     await act(async () => root.unmount()); useGameStore.setState(before, true);
+    Object.assign(tunnelState, bridge);
     context.mockRestore(); delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }
 });

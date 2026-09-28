@@ -23,7 +23,8 @@ export const TUNNEL_SURF_SWAY = 0.22;
 // multiplier below so its readability does not depend on surface flourish time.
 export const TUNNEL_SPEED_SCALE = 0.90;
 // Match the two arms; keep the center crossing short and continuously moving.
-export const TUNNEL_INTERIOR_SPEED_SCALE = 0.65;
+// A full interior ride takes about 13 seconds, with no center hold.
+export const TUNNEL_INTERIOR_SPEED_SCALE = 0.40;
 export const TUNNEL_ENTER_RATE = 0.5;
 export const TUNNEL_EXIT_RATE = TUNNEL_ENTER_RATE;
 export const TUNNEL_CROSSING_RATE = 1.5;

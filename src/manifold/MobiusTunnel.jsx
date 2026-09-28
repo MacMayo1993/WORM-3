@@ -1,3 +1,4 @@
+import { tunnelCameraClearanceGLSL } from './tunnelCameraClearance.js';
 import { fillTunnelRideGeometry, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import TunnelTileSurface from './TunnelTileSurface.jsx';
 import { tunnelFinishGLSL } from './tunnelFinish.js';
@@ -138,7 +139,9 @@ const fragmentShader = `
   varying float vDistance;
   varying vec3 vWorldPos, vSurfaceNormal;
   ${tunnelFinishGLSL}
+  ${tunnelCameraClearanceGLSL}
   void main() {
+    clearTunnelCamera(vWorldPos);
     float leftFront = uGrowT * 0.5, rightFront = 1.0 - leftFront;
     if (vUv.y > leftFront && vUv.y < rightFront) discard;
     float core = uRideMode > 0.5 ? uRideCore : 0.5;
@@ -167,6 +170,7 @@ const bumperVertexShader = `
   attribute float aTripFrac;
   varying  float vHeightFrac;
   varying  float vTripFrac;
+  varying vec3 vCameraPoint;
 
   void main() {
     vHeightFrac = aHeightFrac;
@@ -181,6 +185,7 @@ const bumperVertexShader = `
                * smoothstep(0.0, 0.10, abs(aTripFrac - 0.5));
     p += uWhipAxis * (sin(aTripFrac * 12.0 - uWhipPhase) * uWhipAmp * ends);
 
+    vCameraPoint = (modelMatrix * vec4(p, 1.0)).xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
   }
 `;
@@ -190,8 +195,11 @@ const bumperFragmentShader = `
   uniform vec3 uColorA, uColorB;
   uniform float uRideCore, uOpacity, uRideMode, uGrowT;
   varying float vHeightFrac, vTripFrac;
+  varying vec3 vCameraPoint;
   ${rideColorShader}
+  ${tunnelCameraClearanceGLSL}
   void main() {
+    clearTunnelCamera(vCameraPoint);
     if (vTripFrac > uGrowT * 0.5 && vTripFrac < 1.0 - uGrowT * 0.5) discard;
     vec3 base = rideColor(vTripFrac);
     vec3 lip = mix(base, vec3(0.9, 0.96, 1.0), 0.38);
@@ -421,6 +429,7 @@ const MobiusTunnel = ({
     uColorB:      { value: new THREE.Color(color2) },
     uOpacity:     { value: 0.92 },
     uRideMode:    { value: 0 },
+    uCameraClearance: { value: 0 },
     uRideCore:    { value: 0.5 },
     uPatternRepeats: { value: 1 },
     uTileCenterA: { value: new THREE.Vector3() },
@@ -441,6 +450,7 @@ const MobiusTunnel = ({
     uRideCore: uniforms.uRideCore,
     uOpacity: { value: 0.93 },
     uRideMode: uniforms.uRideMode,
+    uCameraClearance: uniforms.uCameraClearance,
     uGrowT: uniforms.uGrowT,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -451,6 +461,7 @@ const MobiusTunnel = ({
     uRideCore: uniforms.uRideCore,
     uOpacity: { value: 0.93 },
     uRideMode: uniforms.uRideMode,
+    uCameraClearance: uniforms.uCameraClearance,
     uGrowT: uniforms.uGrowT,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -479,6 +490,7 @@ const MobiusTunnel = ({
     // Keep every tail-occupied track; unrelated ribbons cannot cross the ride.
     if (groupRef.current) groupRef.current.visible = !wormMode || !tunnelState.active || occupied;
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
+    uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
     if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
     if (state.settings?.reducedMotion || prefersReducedMotion() || (wormMode && (state.wormPaused || !state.wormAlive))) delta = 0;
     const mesh1 = cubieRefs[meshIdx1];

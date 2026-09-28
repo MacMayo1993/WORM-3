@@ -1,3 +1,4 @@
+import { tunnelCameraClearanceGLSL } from './tunnelCameraClearance.js';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
@@ -15,6 +16,7 @@ const vertexShader = `
   varying vec3 vViewPosition;
   varying vec3 vTileCenter;
   varying vec3 vWorldPos;
+  varying vec3 vTunnelCameraPoint;
   varying vec3 vWorldNormal;
   void main() {
     vUv = uv;
@@ -28,6 +30,7 @@ const vertexShader = `
       * smoothstep(0.0, 0.10, abs(uv.y - 0.5));
     wp.xyz += uWhipAxis * (sin(uv.y * 12.0 - uWhipPhase) * uWhipAmp * ends);
     vWorldPos = wp.xyz;
+    vTunnelCameraPoint = wp.xyz;
     vec4 mv = viewMatrix * wp;
     vViewPosition = -mv.xyz;
     gl_Position = projectionMatrix * mv;
@@ -66,10 +69,13 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
       uniform float uTime;
       varying vec2 vUv;
       varying float vDistance;
+      varying vec3 vTunnelCameraPoint;
       vec2 tileUv;
       ${tileShader}
       ${tunnelFinishGLSL}
+      ${tunnelCameraClearanceGLSL}
       void main() {
+        clearTunnelCamera(vTunnelCameraPoint);
         float core = uRideMode > 0.5 ? uRideCore : 0.5;
         if (uTileSide < 0.5 ? vUv.y >= core : vUv.y < core) discard;
         if (vUv.y > uGrowT * 0.5 && vUv.y < 1.0 - uGrowT * 0.5) discard;
