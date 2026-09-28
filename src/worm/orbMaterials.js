@@ -24,13 +24,9 @@ export function getOrbMaterials(gemColor, bandColor, isTarget, elevated = false,
     innerGlow: basic(gemColor, 0.18, { blending: THREE.AdditiveBlending, side: THREE.BackSide }),
     // Great-circle parity halo — a smooth glowing ring in place of the old
     // wireframe octahedron. Additive so it reads as light, not a hard frame.
-    cage: basic('#e8fbff', isTarget ? 0.55 : 0.42, { blending: THREE.AdditiveBlending }),
-    // Second, cross-tilted halo so the antipodal signature reads from any angle
-    // without any straight edges.
-    cage2: basic('#dff8ff', isTarget ? 0.38 : 0.28, { blending: THREE.AdditiveBlending }),
-    // Luminous axis connecting the antipodal poles — soft additive glow rod,
-    // no longer a flat opaque cylinder.
-    axis: basic('#ffffff', 0.5, { blending: THREE.AdditiveBlending }),
+    // Linear RGB and opacity live in the merged cage's RGBA vertex attribute;
+    // alpha stays separate from RGB so display-space additive blending is exact.
+    cage: basic('#ffffff', 1, { blending: THREE.AdditiveBlending, vertexColors: true }),
     nodeGem: new THREE.MeshBasicMaterial({ color: gemColor, toneMapped: false }),
     nodeBand: new THREE.MeshBasicMaterial({ color: bandColor, toneMapped: false }),
     band: new THREE.MeshStandardMaterial({
@@ -52,4 +48,3 @@ export function getOrbMaterials(gemColor, bandColor, isTarget, elevated = false,
   _orbMatCache.set(key, set);
   return set;
 }
-

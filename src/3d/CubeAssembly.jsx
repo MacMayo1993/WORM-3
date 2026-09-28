@@ -144,7 +144,7 @@ const CubeAssembly = React.memo(({
     const state = useGameStore.getState();
     if (exteriorRef.current) exteriorRef.current.visible = !state.wormHealerMode ||
       !tunnelCameraInside(camera.position, size, state.wormPhase);
-  });
+  }, -0.24); // after the chase camera (-0.25), before tile batches sample visibility
   const cubieRefs = useRef([]);
   // Expose cubie refs + size to ParityOrbs so orbs can read live cubie transforms each frame.
   liveCubies.refs = cubieRefs.current;

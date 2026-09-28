@@ -1,6 +1,7 @@
 import { wormExpansion } from './wormExpansion.js';
 import { WormPointLight } from './WormLighting.jsx';
 import { createOrbBatches } from './orbBatches.js';
+import { createParityCageGeometry } from './parityCage.js';
 import { getOrbMaterials } from './orbMaterials.js';
 import { createOrbVisibility } from './orbVisibility.js';
 // src/worm/ParityOrb.jsx
@@ -77,6 +78,11 @@ const _orbGeos = {
     parityAxis:   new THREE.CylinderGeometry(0.012, 0.012, 0.68, 12),
   },
 };
+
+// Shared cage geometry keeps the three additive pieces in one per-orb draw.
+for (const [variant, geometry] of Object.entries(_orbGeos)) {
+  geometry.cage = createParityCageGeometry(geometry, variant === 'target');
+}
 
 // SingleOrb renders geometry and registers refs with the parent OrbAnimator.
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
@@ -198,9 +204,7 @@ function SingleOrbImpl({
           "antipodal pair" even when tile colours are close, but its outline is now
           all curves — no diamond, no hard edges. */}
       <group ref={parityMarkRef} rotation={[Math.PI / 4, 0, Math.PI / 4]}>
-        <mesh geometry={g.parityCage} material={mat.cage} rotation={[Math.PI / 2, 0, 0]} />
-        <mesh geometry={g.parityCage2} material={mat.cage2} rotation={[Math.PI / 2, Math.PI / 3, 0]} />
-        <mesh geometry={g.parityAxis} material={mat.axis} />
+        <mesh name="ParityOrbCageBatch" geometry={g.cage} material={mat.cage} />
         <mesh ref={el => { poleRefs.current[0] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeGem} position={[0, isTarget ? 0.34 : 0.27, 0]} />
         <mesh ref={el => { poleRefs.current[1] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeBand} position={[0, isTarget ? -0.34 : -0.27, 0]} />
       </group>

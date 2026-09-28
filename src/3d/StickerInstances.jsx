@@ -1,5 +1,6 @@
 import { uploadInstancePrefix } from './instanceUploads.js';
 import { PadProvider } from './PadSprings.jsx';
+import { TileSurfaceProvider } from './TileSurfaceInstances.jsx';
 import { createWorldTransformTracker } from './worldTransformTracker.js';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
 import { isMobile } from '../utils/device.js';
@@ -282,7 +283,7 @@ export function StickerInstanceProvider({ children }) {
 
   return (
     <StickerInstanceContext.Provider value={ctx}>
-      <PadProvider>{children}</PadProvider>
+      <TileSurfaceProvider><PadProvider>{children}</PadProvider></TileSurfaceProvider>
     </StickerInstanceContext.Provider>
   );
 }

@@ -13,6 +13,7 @@ export default {
     {
       name: 'perf-expose-store',
       transform(code, id) {
+        if (id.endsWith('/src/worm/wormExpansion.js')) return `${code}\nwindow.__wormExpansion = wormExpansion;\n`;
         if (!id.endsWith('/src/hooks/useGameStore.js')) return null;
         return `${code}\nif (typeof window !== 'undefined') window.__store = useGameStore;\n`;
       }
