@@ -96,8 +96,9 @@ describe('physical slice cuts', () => {
     expect(shAt(sim.stepHistory, sim.stepHistory.count - 1).pos.x).toBeCloseTo(-0.5);
     expect(shAt(sim.stepHistory, sim.stepHistory.count - 1).tx).toBeLessThan(3);
     expect(sim.stepHistory.distance).toBe(traveled);
-    expect(sim.orbPickupColors).toHaveLength(4);
-    expect(useGameStore.getState().wormOrbInventory[1]).toBe(12);
+    // Six of the surviving sixteen segments carry two orbs.
+    expect(sim.orbPickupColors).toHaveLength(2);
+    expect(useGameStore.getState().wormOrbInventory[1]).toBe(6);
     // There is no remaining centre-line across the rotating/static boundary.
     expect(checkWormHitBySlice(worm, 'col', 3, 7)).toBeNull();
   });

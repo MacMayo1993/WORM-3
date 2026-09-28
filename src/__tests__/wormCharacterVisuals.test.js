@@ -73,7 +73,9 @@ describe('character identity', () => {
     expect(colour('wiggle', 2)).toBe(base);
     expect(colour('inch', 3)).not.toBe(colour('wiggle', 3));
     expect(colour('classic', 2)).not.toBe(base);
-    expect(colour('classic', 3)).toBe(base);
+    expect(colour('classic', 3)).toBe(colour('classic', 2));
+    expect(colour('classic', 4)).not.toBe(base);
+    expect(colour('classic', 5)).toBe(base);
     expect(colour('glow', 1)).toBe(base);
   });
 });

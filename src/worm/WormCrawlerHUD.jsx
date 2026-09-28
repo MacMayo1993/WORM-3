@@ -422,8 +422,8 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
 const PAUSE_BTN_STYLE = {
     width: 48,
     height: 48,
-    // Full 48px target; it bleeds into the bar's padding so the rail stays short.
-    marginBlock: -3,
+    // Keep the full touch target inside its row.
+    marginBlock: 0,
     borderRadius: 14,
     background: HUD_SURFACE_SOFT,
     border: `2px solid ${GAME_HUD.border}`,
@@ -1339,8 +1339,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         </div>
                     </div>
 
-                    {!combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
                 </div>
+                {!combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
 
                 <div className="worm-hud-status-row">
                     {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}

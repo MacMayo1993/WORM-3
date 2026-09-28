@@ -1,7 +1,7 @@
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import * as THREE from 'three';
 import { shAt } from '../circularBuffers.js';
-import { BASE_TAIL_LENGTH, BODY_BALL_SPACING, WORM_LIFT } from './constants.js';
+import { MIN_SURVIVING_TAIL_LENGTH, BODY_BALL_SPACING, WORM_LIFT } from './constants.js';
 import { inchGaitInto } from './inchGait.js';
 import { tunnelBodyDistance } from './tunnelBodyFit.js';
 
@@ -83,7 +83,7 @@ export function findSlicePathHit(worm, axis, layer, size) {
       const protectedHead = (worm.landingGraceT?.current ?? 0) > 0 ||
         (worm.isJumping?.current && (worm.jumpLift?.() ?? 0) > 0.45);
       return {
-        type: (headOnLayer && !headOnOuterCap && !protectedHead) || keepCount < BASE_TAIL_LENGTH ? 'death' : 'cut',
+        type: (headOnLayer && !headOnOuterCap && !protectedHead) || keepCount < MIN_SURVIVING_TAIL_LENGTH ? 'death' : 'cut',
         cutDistance, keepCount, historyIndex: i, historyT: t,
         cutPosition: [a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t],
         headOnLayer,

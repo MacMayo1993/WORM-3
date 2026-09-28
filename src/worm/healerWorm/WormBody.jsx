@@ -43,6 +43,8 @@ import {
 } from '../wormBookFX.js';
 import {
     WORM_LIFT,
+    WORM_HEAD_RADIUS,
+    WORM_BODY_RADIUS,
     ORB_SEGMENT_GROWTH,
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
@@ -269,7 +271,7 @@ export function WormBody({ worm, size }) {
         const _isBook = isBookRef.current;
         const _isWiggle = isWiggleRef.current;
         const _isPrism = isPrismRef.current;
-        const headRadius = isMobi ? MOBI_RADIUS : _isBook ? BOOK_HEAD_RADIUS : 0.092;
+        const headRadius = isMobi ? MOBI_RADIUS : _isBook ? BOOK_HEAD_RADIUS : WORM_HEAD_RADIUS;
         fitTunnelBodyInto(rideFit.current, _headPathPoint, headRadius * worm.pickupHeadScale * worm.tunnelHeadScale);
         worm.tunnelHeadScale *= rideFit.current.scale;
         worm.tunnelHeadShift = rideFit.current.shift;
@@ -477,7 +479,7 @@ export function WormBody({ worm, size }) {
                 // at a different height than the rest of the book).
                 if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, 0.092 * PAGE_HINGE_Y * (1 - _headPathPoint.rideWeight));
                 _wormDummy.position.addScaledVector(_bodyNormal, worm.tunnelHeadShift);
-                _wormDummy.scale.setScalar(0.092);
+                _wormDummy.scale.setScalar(_isBook ? 0.092 : WORM_HEAD_RADIUS);
                 // Book Worm draws its head as the orb above, so the spine box
                 // must not also be drawn here — two heads, one inside the other.
                 if (_isBook || isMobi) _wormDummy.scale.setScalar(0.00001);
@@ -622,7 +624,7 @@ export function WormBody({ worm, size }) {
                     const glowSc = 0.088 + Math.sin(time * 3.5 + i * 1.6) * 0.01;
                     _wormDummy.scale.setScalar(glowSc);
                 } else {
-                    _wormDummy.scale.setScalar(0.09);
+                    _wormDummy.scale.setScalar(WORM_BODY_RADIUS);
                 }
             }
 

@@ -11,6 +11,7 @@ import {
     STEPS_PER_TILE,
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
+    MIN_SURVIVING_TAIL_LENGTH,
     ORB_SEGMENT_GROWTH,
     WORM_LIFT,
 } from './healerWorm/constants.js';
@@ -299,7 +300,7 @@ export function cutWormTail(worm, cut) {
         worm.tailLength.current = Math.min(worm.tailLength.current, cut.keepCount);
     } else {
         shTrimTo(worm.stepHistory.current, cutTrailIdx * STEPS_PER_TILE);
-        worm.tailLength.current = Math.min(worm.tailLength.current, Math.max(BASE_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING)));
+        worm.tailLength.current = Math.min(worm.tailLength.current, Math.max(MIN_SURVIVING_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING)));
     }
     const orbsLeft = orbsCarried(worm.tailLength.current);
     const removedFaceIds = worm.orbPickupFaceIdsRef?.current?.slice(orbsLeft) ?? [];

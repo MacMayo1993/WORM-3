@@ -18,14 +18,15 @@ import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp, getSkin } from '../wormCosmeticsData.js';
-import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD, } from './constants.js';
+import { WORM_LIFT, WORM_HEAD_RADIUS, FACE_NORMALS, DIR_FORWARD } from './constants.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, MOBI_RADIUS } from '../mobiModel.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
 import { rocketOrbitT, rocketOrbitInto, rocketFrameInto } from './rocketOrbit.js';
 
 // Head radius, matching WormBody's head scale.
-const HEAD_RADIUS = 0.092;
+// Book keeps its authored head; round characters share the larger body head.
+const headRadiusFor = character => character === 'book' ? 0.092 : WORM_HEAD_RADIUS;
 
 // Reused each frame so the layout never allocates.
 const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, null], mouth: null, hat: null };
@@ -227,15 +228,15 @@ export function WormFace({ worm, size }) {
         // takes the shared sphere layout too — it only needs the small lift that
         // keeps its head level with its floating book body.
         if (isBook) _faceHeadPos.addScaledVector(normal, BOOK_HEAD_LIFT * (1 - rideWeight));
-        layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), _faceParts);
+        layoutWormFace(_faceHeadPos, _faceForward, normal, headRadiusFor(wormCharacterId) * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), _faceParts);
 
         poseHeadAccessories(accessories, _faceHeadPos, _faceForward, normal,
-            HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
+            headRadiusFor(wormCharacterId) * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
         animateWormFace(_faceParts, wormCharacterId, faceTime.current, {
             pulse: facePulse.current, transit: !!inTransit, reducedMotion,
         });
 
-        poseCharacterAccents(accents.group, _faceHeadPos, _faceForward, normal, HEAD_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
+        poseCharacterAccents(accents.group, _faceHeadPos, _faceForward, normal, headRadiusFor(wormCharacterId) * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
         accents.update(reducedMotion ? 0 : faceTime.current);
 
         if (hatGroupRef.current) {
@@ -286,7 +287,7 @@ export function WormFace({ worm, size }) {
             </mesh>
             {wormHatId !== 'none' && (
                 <group ref={hatGroupRef}>
-                    <WormHat3D type={wormHatId} scale={HEAD_RADIUS * FACE_LAYOUT.hatScale} />
+                    <WormHat3D type={wormHatId} scale={headRadiusFor(wormCharacterId) * FACE_LAYOUT.hatScale} />
                 </group>
             )}
             {/* Book worm glasses — two torus rings, only rendered for book character */}

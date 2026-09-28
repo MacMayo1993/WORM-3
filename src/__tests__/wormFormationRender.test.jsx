@@ -111,6 +111,27 @@ it.each([false, true])('raises real cubies, grows the band and lands after forma
       await act(async () => useGameStore.setState({ demoWormComplete: true }));
       expect(store.getState().scene.getObjectByName('practice-target')).toBeUndefined();
     }
+    // Death -> replay retains the scene, but must drop every old raised pose
+    // even while the new scramble/countdown keeps formation time frozen.
+    await act(async () => {
+      useGameStore.setState({ wormAlive: false, wormPaused: true });
+    });
+    await act(async () => {
+      for (const [z, dir] of [[2, 'PZ'], [0, 'NZ']]) {
+        cubies[1][1][z] = { ...cubies[1][1][z], stickers: {
+          ...cubies[1][1][z].stickers, [dir]: { ...cubies[1][1][z].stickers[dir], flips: 0 }
+        } };
+      }
+      useGameStore.setState({ wormRunId: useGameStore.getState().wormRunId + 1,
+        wormAlive: true, wormPaused: true, wormGamePhase: 'countdown' });
+      root.render(draw(false));
+    });
+    // Check before the first frame: no stale pop-out can flash behind the countdown.
+    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1, 8);
+    expect(refs[1].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(-1, 8);
+    for (let i = 0; i < 90; i++) frame();
+    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1, 8);
+    expect(refs[1].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(-1, 8);
   } finally {
     await act(async () => root.unmount());
     useGameStore.setState(before, true); Object.assign(liveCubies, liveBefore);

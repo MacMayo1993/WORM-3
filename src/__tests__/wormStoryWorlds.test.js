@@ -1,3 +1,4 @@
+import { BASE_TAIL_LENGTH } from '../worm/healerWorm/constants.js';
 import { beforeEach, expect, it } from 'vitest';
 import { STORY_WORLDS, storyAppearance } from '../worm/story/worlds.js';
 import { WORM_STORY_LEVELS, WORM_STORY_CHAPTERS } from '../worm/story/levels.js';
@@ -55,7 +56,7 @@ it.each(WORM_STORY_LEVELS)('keeps level $id routes unique, on safe tiles, and su
   const staged = stageStory(sim, size, level, 'glow');
   expect(new Set(sim.powerups.map(tileKey)).size).toBe(sim.powerups.length);
   expect(getActiveTunnels(staged.cubies, size)).toHaveLength(['tunnel','collector','restore','mastery'].includes(level.kind) ? Math.min(2,level.target) : 0);
-  expect(sim.tailLength).toBe(4);
+  expect(sim.tailLength).toBe(BASE_TAIL_LENGTH);
   expect(staged.pendingMouths.length + getActiveTunnels(staged.cubies,size).length).toBe(['tunnel','collector','restore','mastery'].includes(level.kind) ? level.target : 0);
   const colors = {};
   for (const orb of sim.powerups) {

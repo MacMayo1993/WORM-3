@@ -9,7 +9,7 @@ import { publishRaisedCubie } from './raisedCubieMotion.js';
 import { cubieKicks, cubieKickAmount, KICK_DURATION_MS } from './cubieKick.js';
 import { prefersReducedMotion, isMobile } from '../utils/device.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
-import React, { useMemo, useRef, useEffect, useState, useImperativeHandle } from 'react';
+import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
@@ -138,6 +138,7 @@ const Cubie = React.forwardRef(function Cubie({
   const enableShadows = !perfReducedFX;
   const cubePads = useGameStore(flipCubePadsEnabled) && !wormMode;
   const wormPads = wormMode;
+  const wormRunId = useGameStore(s => wormMode ? s.wormRunId : 0);
   const raisedWindow = (wormPads || cubePads) && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Hollow's 12-beam-per-cubie representation would create more than 14,000
   // meshes on a 15×15 shell. Mega disables that view and keeps its optimized chassis.
@@ -426,8 +427,15 @@ const Cubie = React.forwardRef(function Cubie({
   useImperativeHandle(ref, () => pieceRef.current, []);
   const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
   const burrowHomeKey = `${origHomeX},${origHomeY},${origHomeZ}`;
-  const liftSpring = useRaisedCubieSpring(`${size}:${origHomeX},${origHomeY},${origHomeZ}`);
+  const liftSpring = useRaisedCubieSpring(`${size}:${origHomeX},${origHomeY},${origHomeZ}`, wormRunId);
   const poppedRef = useRef(false);
+  useLayoutEffect(() => {
+    // Replay starts paused: clear the old transform before paint, rather than
+    // asking the frozen formation animation to retract during the countdown.
+    popGroupRef.current?.position.set(0, 0, 0);
+    poppedRef.current = false;
+    if (pieceRef.current) delete pieceRef.current.userData.wormPlatformFormation;
+  }, [wormRunId]);
   const burrowOffset = useMemo(() => new THREE.Vector3(), []);
   const raised = (!wormMode || wormPads) && (wormPads || (!mirrorMode && flipPads !== 'off'))
     && cubieHasFlippedFace(cubie, effectiveFlipCap);

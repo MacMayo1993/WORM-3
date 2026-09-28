@@ -29,6 +29,17 @@ export function PadProvider({ children, profile: profileOverride = null, paused 
   const energyOn = useGameStore(s => menuPads || (!profileOverride && (!!s.wormHealerMode || flipCubePadsEnabled(s))));
   const frames = useMemo(() => createEnergyFrames(MAX_PADS), []);
   const energyClock = useRef(0);
+  const runId = useGameStore(s => profileOverride ? 0 : s.wormRunId);
+  useLayoutEffect(() => {
+    for (const [key, pair] of pairs) removePadMotion(key, pair);
+    pairs.clear();
+    for (const entry of entries) {
+      entry.lift = 0; entry.velocity = 0; entry.active = false;
+      entry.group.current?.position.set(0, 0, 0);
+    }
+    frames.count = 0;
+    energyClock.current = 0;
+  }, [runId, entries, pairs, frames]);
   const stalkRef = useRef(), mouthRef = useRef();
   const resources = useMemo(() => ({
     stalk: createPadStalkGeometry(), mouth: new THREE.PlaneGeometry(0.76, 0.76),

@@ -1,3 +1,4 @@
+import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
 import { Vector3 } from 'three';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from '../worm/healerWorm/wiggleSweep.js';
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -264,6 +265,8 @@ describe('character abilities', () => {
   });
   it('collects crossed orbs once with normal growth, leaving off-path orbs', () => {
     const { sim, ctx } = world('wiggle', { isStoryMode: () => true });
+    // Short-tail geometry: the swept route remains on row 2.
+    sim.tailLength = 4;
     sim.powerups = [0, 4].map(x => ({ x, y: 2, z: 4, dirKey: 'PZ', type: 'apple' }));
     sim.powerups.push({ x: 0, y: 4, z: 4, dirKey: 'PZ', type: 'apple' });
     const length = sim.tailLength;
@@ -286,7 +289,7 @@ describe('character abilities', () => {
     run(sim, ctx, 1.05);
     expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
     expect(eventsOf(ctx, 'pickup')[0].args[4]).toBe(3);
-    expect(sim.tailLength).toBe(7);
+    expect(sim.tailLength).toBe(BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH);
   });
 });
 
