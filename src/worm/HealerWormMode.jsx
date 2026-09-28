@@ -219,6 +219,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             resetRotationClock();
             bombsRef.current          = [];
             bombMembershipRef.current++;
+            blastApiRef.current?.clear();
             bombTimerRef.current      = BOMB_SPAWN_INTERVAL;
             // Freeze the worm until the countdown completes
             useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
@@ -463,6 +464,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             if (demoHazardAttemptRef.current !== attempt) {
                 demoHazardAttemptRef.current = attempt;
                 bombsRef.current = []; bombMembershipRef.current++;
+                blastApiRef.current?.clear();
                 autoTimerRef.current = 0; pendingRotRef.current = null; warningProgressRef.current = 0;
                 resetRotationClock();
                 if (practiceLesson === 'bomb' && store.demoWormTarget) {
@@ -550,6 +552,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     if (!useGameStore.getState().wormAlive) { bombs[kept++] = bomb; continue; }
                     // Disarm: body fully encircles the bomb — reward and remove it.
                     if (isBombDisarmed(bomb, occupied, size)) {
+                        blastApiRef.current?.disarm(bomb);
                         if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
                         else if (store.wormStoryLevel) worm.recordStoryBomb?.(bomb.id);
                         else useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);
