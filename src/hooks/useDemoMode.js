@@ -16,7 +16,7 @@ import {
   DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE, CONTROL_TOUR_SEQUENCE,
 } from '../components/screens/DemoFlowController.jsx';
 
-import { DEMO_STEP_IDS, nextDemoStep } from '../game/demoSequence.js';
+import { nextDemoStep } from '../game/demoSequence.js';
 
 // The demo temporarily overwrites the player's persisted settings (the Classic
 // palette on plain stickers over the desert — see utils/demoSettings.js). This
@@ -505,18 +505,17 @@ export function useDemoMode({
     tourCompletedRef.current = false;
     preDemoSettingsRef.current = { ...store.settings };
     try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { /* private mode */ }
+    // The introduction owns the screen. Tear down any prior run, but leave
+    // WORM unmounted until the player finishes both Mobi briefing screens.
+    cancelShuffle();
+    cancelDisparityRun();
+    store.clearLevel();
+    store.clearDisparityGame();
+    store.setRandomMode(false);
     store.startDemo();
     applyDemoSettings();
-    // Pre-stage the first step's cube so Mobi's cold-open blurs the right scene
-    // (otherwise the menu's 3×3 lingers behind the dialogue until Start).
-    applyDemoStepConfig(DEMO_STEP_IDS[0]);
-    // Cover the demo's opening scene the same way mode entries do, so the desert
-    // environment map doesn't pop in behind Mobi's cold open (self-dismisses if
-    // it's already warm — warmDemoAssets() often pre-fetches it).
-    armSceneGate?.('Demo');
-    // Introduce WORM first, then hand off to its required practice sequence.
     setDemoColdOpenVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings, applyDemoStepConfig, armSceneGate]);
+  }, [clearDemoWatchTimers, applyDemoSettings, cancelShuffle, cancelDisparityRun]);
 
   // Cold open dismissed → drop into the first step's intro.
   const handleDemoColdOpenContinue = useCallback(() => {
@@ -728,9 +727,9 @@ export function useDemoMode({
     cleanupAllDemoState(store);
     store.startDemo();
     applyDemoSettings();
-    applyDemoStepConfig(DEMO_STEP_IDS[0]);
+    tourCompletedRef.current = false;
     setDemoColdOpenVisible(true);
-  }, [cleanupAllDemoState, applyDemoSettings, applyDemoStepConfig]);
+  }, [cleanupAllDemoState, applyDemoSettings]);
 
   const handleDemoFreeplay = useCallback(() => {
     const store = useGameStore.getState();

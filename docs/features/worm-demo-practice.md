@@ -4,6 +4,9 @@ Demo starts with the WORM introduction and 19 required exercises, then continues
 through First Twist, Meet the Twins, Through the Middle, Learn to Solve, Controls,
 Views, Settings, Chaos, Random, and Store. There is one 11-section progress track.
 Mode choices appear after the whole curriculum; players can exit the demo anytime.
+Mobi’s opening and WORM briefing run before WORM initializes, on both first entry
+and replay. The worm, practice HUD, and WORM loading gate start only after the
+player finishes the briefing.
 
 Each fresh board waits for **Try it**. Reaching the goal unlocks **Next** while
 practice keeps running. Next stays available if the player dies after success.
