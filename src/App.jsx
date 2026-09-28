@@ -1609,7 +1609,8 @@ export default function WORM3() {
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
       {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
       {/* Cold open: introduce WORM before its practice exercises. */}
-      <ScreenTransition show={!!(demoMode && demoColdOpenVisible)} freezeOnExit>
+      <ScreenTransition show={!!(demoMode && demoColdOpenVisible)} freezeOnExit
+        style={{ position: 'relative', zIndex: Z.INTRO }}>
         <MobiIntroScreen
           lines={MOBI_LINES_DEMO_INTRO}
           modeName="Demo"
@@ -1620,7 +1621,8 @@ export default function WORM3() {
           topInset="var(--topbar-h)"
         />
       </ScreenTransition>
-      <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
+      <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit
+        style={{ position: 'relative', zIndex: Z.INTRO }}>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onExit={handleExitDemo} />
       </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoForecastVisible && !demoChromeQuiet)} freezeOnExit

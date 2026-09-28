@@ -164,14 +164,45 @@ describe('required curriculum', () => {
     setRotatedCubies: cubies => store().setRotatedCubies(cubies),
     startAnimatedShuffle: (moves, done) => { rotate(moves); done?.(); },
   };
-  it.each(['handleStartDemo', 'handleDemoReplay'])('%s starts with fresh WORM practice even after an old completed run', action => {
-    const { result, unmount } = renderHook(() => useDemoMode(live));
+  it.each(['handleStartDemo', 'handleDemoReplay'])('%s finishes Mobi’s introduction before initializing WORM', action => {
+    const armSceneGate = vi.fn();
+    const { result, unmount } = renderHook(() => useDemoMode({ ...live, armSceneGate }));
     try {
-      act(() => useGameStore.setState({ demoWormLessonIndex: 18, demoWormComplete: true, demoWormFinished: true, demoWormCompleted: ['rotation'], wormPauseMenuOpen: true }));
+      act(() => useGameStore.setState({ demoWormLessonIndex: 18, demoWormComplete: true, demoWormFinished: true,
+        demoWormCompleted: ['rotation'], wormHealerMode: true, wormPauseMenuOpen: true }));
+      const run = store().wormRunId;
       act(() => result.current[action]());
       expect(store()).toMatchObject({ demoMode: true, demoStep: 'worm-traversal', demoWormLessonIndex: 0,
-        demoWormComplete: false, demoWormFinished: false, demoWormCompleted: [], wormPauseMenuOpen: false, wormHealerMode: true });
+        demoWormComplete: false, demoWormFinished: false, demoWormCompleted: [], wormPauseMenuOpen: false, wormHealerMode: false });
       expect(result.current.demoColdOpenVisible).toBe(true);
+      act(() => vi.advanceTimersByTime(60000));
+      expect(store().wormHealerMode).toBe(false);
+      expect(store().wormRunId).toBe(run);
+      expect(armSceneGate).not.toHaveBeenCalled();
+      act(() => result.current.handleDemoColdOpenContinue());
+      expect(result.current.demoColdOpenVisible).toBe(false);
+      expect(result.current.demoStepIntroVisible).toBe(true);
+      act(() => vi.advanceTimersByTime(60000));
+      expect(store().wormHealerMode).toBe(false);
+      expect(store().wormRunId).toBe(run);
+      act(() => result.current.handleDemoStepContinue());
+      expect(result.current.demoStepIntroVisible).toBe(false);
+      expect(store()).toMatchObject({ wormHealerMode: true, wormRunId: run + 1, wormPaused: true,
+        demoWormStarted: false, demoWormFinished: false, demoWormLessonIndex: 0 });
+      expect(armSceneGate).toHaveBeenCalledTimes(1);
+      expect(armSceneGate).toHaveBeenCalledWith('Worm Mode', expect.objectContaining({ eager: true }));
+    } finally { unmount(); }
+  });
+  it('can leave Mobi’s introduction without ever starting a WORM run', () => {
+    const { result, unmount } = renderHook(() => useDemoMode(live));
+    try {
+      const run = store().wormRunId;
+      act(() => result.current.handleStartDemo());
+      act(() => result.current.handleExitDemo());
+      act(() => vi.advanceTimersByTime(60000));
+      expect(store()).toMatchObject({ demoMode: false, wormHealerMode: false, wormRunId: run, showMainMenu: true });
+      expect(result.current.demoColdOpenVisible).toBe(false);
+      expect(result.current.demoStepIntroVisible).toBe(false);
     } finally { unmount(); }
   });
   it('runs from WORM through every remaining section to completion without an optional branch', async () => {
