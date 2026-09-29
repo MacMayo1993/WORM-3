@@ -11,10 +11,10 @@ export default function ProjectiscopeBackground({ design }) {
     renderer.current = instance;
     return () => { renderer.current = null; instance.dispose(); };
   }, [scene, design]);
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const s = useGameStore.getState();
-    renderer.current?.update(performance.now(), document.hidden || prefersReducedMotion() || s.perfReducedFX ||
-      s.projectiscopeEditing || s.showSettings || s.wormPaused && s.wormHealerMode);
+    renderer.current?.update(performance.now(), document.hidden || prefersReducedMotion() ||
+      s.projectiscopeEditing || s.showSettings || s.wormPaused && s.wormHealerMode, camera, s.perfReducedFX);
   });
   return null;
 }

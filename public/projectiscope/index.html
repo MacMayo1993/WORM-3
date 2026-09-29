@@ -561,7 +561,7 @@ const bloomCache={b1:document.createElement('canvas'),b2:document.createElement(
 function setRC(t,w){t.W=w;t.C=w/2;t.R=w/2*0.94;}
 const PERF={scale:1,ema:0,frames:0};
 function resize(){
-  const w=Math.round(Math.min(art.clientWidth*(backgroundMode?1:dpr)*PERF.scale,backgroundMode?512:1000));if(!w||w===rc.W)return;
+  const w=Math.round(Math.min(art.clientWidth*(backgroundMode?1:dpr)*PERF.scale,backgroundMode?1024:1000));if(!w||w===rc.W)return;
   for(const c of [D,acc,ovl]){c.width=w;c.height=w;}setRC(rc,w);setRC(oc,w);
   clearGround(rc,1);S.overDirty=true;S.dirty=true;
 }
@@ -590,11 +590,6 @@ function present(){
   if(!rc.W)return;
   dctx.globalCompositeOperation='source-over';dctx.globalAlpha=1;dctx.drawImage(acc,0,0);
   applyBloom(dctx,acc,rc.W,bloomCache);dctx.drawImage(ovl,0,0);
-  if(backgroundMode){
-    const veil=dctx.createRadialGradient(rc.C,rc.C,0,rc.C,rc.C,rc.W*.7);
-    veil.addColorStop(0,'rgba(5,7,17,.65)');veil.addColorStop(1,'rgba(5,7,17,.25)');
-    dctx.fillStyle=veil;dctx.fillRect(0,0,rc.W,rc.W);
-  }
   D.dataset.frame=String((Number(D.dataset.frame)||0)+1);
 }
 function clearGround(t,a){const g=t.ctx;g.globalCompositeOperation='source-over';g.globalAlpha=a;g.fillStyle=S.colors.ground;g.fillRect(0,0,t.W,t.W);g.globalAlpha=1;}
@@ -725,10 +720,10 @@ function traceMirror(g,t,f){
 }
 function paintOverlay(t){
   const g=t.ctx,{W,C,R}=t,col=S.colors;g.clearRect(0,0,W,W);
-  if(S.vignette>0){const gr=g.createRadialGradient(C,C,R*0.3,C,C,R*1.12);gr.addColorStop(0,hexA(col.ground,0));gr.addColorStop(1,hexA(col.ground,S.vignette));g.fillStyle=gr;g.fillRect(0,0,W,W);}
-  if(S.frame==='circle'){g.fillStyle=col.ground;g.beginPath();g.rect(0,0,W,W);g.arc(C,C,R*1.005,0,6.283);g.fill('evenodd');}
+  if(!backgroundMode&&S.vignette>0){const gr=g.createRadialGradient(C,C,R*0.3,C,C,R*1.12);gr.addColorStop(0,hexA(col.ground,0));gr.addColorStop(1,hexA(col.ground,S.vignette));g.fillStyle=gr;g.fillRect(0,0,W,W);}
+  if(!backgroundMode&&S.frame==='circle'){g.fillStyle=col.ground;g.beginPath();g.rect(0,0,W,W);g.arc(C,C,R*1.005,0,6.283);g.fill('evenodd');}
   const u=Math.max(1,W/700);
-  if(S.rim){g.lineWidth=u;g.strokeStyle=hexA(col.other,0.28);g.setLineDash(S.foldE>0.5?[W/140,W/180]:[]);g.beginPath();g.arc(C,C,R,0,6.283);g.stroke();g.setLineDash([]);}
+  if(!backgroundMode&&S.rim){g.lineWidth=u;g.strokeStyle=hexA(col.other,0.28);g.setLineDash(S.foldE>0.5?[W/140,W/180]:[]);g.beginPath();g.arc(C,C,R,0,6.283);g.stroke();g.setLineDash([]);}
   g.lineCap='round';
   if(S.lesson)return;
   for(const f of S.G.inv){
@@ -1010,7 +1005,7 @@ function loop(now){
     if(moved||S.dirty){paintLesson(rc);paintOverlay(oc);present();S.dirty=false;S.overDirty=false;}
     if(!backgroundMode)requestAnimationFrame(loop);return;
   }
-  const tgt=S.pending?0:(S.sphere?0:1);
+  const tgt=backgroundMode?1:(S.pending?0:(S.sphere?0:1));
   if(S.fold!==tgt){const step=dt*(S.pending?1.6:1.1);S.fold=Math.abs(tgt-S.fold)<=step?tgt:S.fold+Math.sign(tgt-S.fold)*step;S.foldE=smooth(S.fold);S.dirty=true;S.overDirty=true;}
   if(S.pending&&S.fold<=0){const a=S.pending;S.pending=null;a();}
   if(!S.paused&&S.speed>0){S.t+=dt*S.speed*(backgroundMode?0.4:1.6);S.dirty=true;}
@@ -1047,7 +1042,7 @@ function applyRecipe(o){
   S.pal=(o.pal in PAL||o.pal==='custom')?o.pal:'custom';
   if(Array.isArray(o.V)&&o.V.length===9&&o.V.every(x=>typeof x==='number'))S.V=orthonormalize(o.V);
   S.drawn=Array.isArray(o.drawn)?o.drawn.filter(d=>Array.isArray(d.p)&&d.p.length>=6).slice(0,400).map(d=>{const w=Float64Array.from(d.p.map(Number));return {ci:Math.min(3,Math.max(0,d.ci|0)),w:Math.min(8,Math.max(0.5,+d.w||2)),world:w,n:w.length/3|0};}):[];
-  if(backgroundMode){S.fold=S.sphere?0:1;S.foldE=S.fold;}
+  if(backgroundMode){S.fold=1;S.foldE=1;}
   rebuildGroup(true);rebuildMotif();syncUI();S.overDirty=true;setStageBg();
 }
 const LS='folded-rotations-looks-v1';
@@ -1275,7 +1270,7 @@ window.__projectiscope={
   stepBackground(now){if(backgroundMode)loop(now);},
   backgroundDesign(){
     if(S.pending){const next=S.pending;S.pending=null;next();}
-    S.lesson=false;S.fold=S.sphere?0:1;S.foldE=S.fold;
+    S.lesson=false;S.fold=backgroundMode?1:(S.sphere?0:1);S.foldE=S.fold;
     updateWorld();paintFrame(rc,1);paintOverlay(oc);present();
     return {version:1,recipe:encode(recipeObj()),thumbnail:composite(256).toDataURL('image/jpeg',.78)};
   },

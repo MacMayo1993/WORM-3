@@ -1,7 +1,7 @@
 import React, { act, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-import { Color } from 'three';
+import { BackSide, Color, PerspectiveCamera, Scene, Vector3 } from 'three';
 import { ScenePanel } from '../components/menus/settings/ScenePanel.jsx';
 import SceneStep from '../components/screens/wizardSteps/SceneStep.jsx';
 import ProjectiscopeCreator from '../projectiscope/ProjectiscopeCreator.jsx';
@@ -76,8 +76,9 @@ it('does not unpause a new run when the creator closes', () => {
   act(() => root.render(null));
   expect(useGameStore.getState().wormPaused).toBe(true);
 });
-it('feeds the scene through one throttled texture and releases it on exit', () => {
-  const previous = new Color('black'), scene = { background: previous };
+it('surrounds the camera with a moving dome independently of texture updates and cleans up', () => {
+  const previous = new Color('black'), scene = new Scene(), camera = new PerspectiveCamera();
+  scene.background = previous;
   const renderer = createProjectiscopeBackground(scene, design);
   const iframe = frame();
   expect(new URL(iframe.src).search).toBe('');
@@ -88,12 +89,33 @@ it('feeds the scene through one throttled texture and releases it on exit', () =
   const api = { setPaused: vi.fn(), stepBackground: vi.fn(() => { canvas.dataset.frame = String(Number(canvas.dataset.frame || 0) + 1); }) };
   iframe.contentWindow.__projectiscope = api;
   message('configured', {}, 'https://wrong.example'); expect(scene.background).toBe(previous);
-  message('configured'); expect(scene.background.isCanvasTexture).toBe(true);
-  const texture = scene.background, dispose = vi.spyOn(texture, 'dispose');
-  renderer.update(1000, false); renderer.update(1060, false); renderer.update(1125, true);
+  message('configured'); expect(scene.background).toBe(previous);
+  const dome = scene.getObjectByName('Projectiscope 360 dome');
+  expect(dome.geometry.type).toBe('SphereGeometry'); expect(dome.material.side).toBe(BackSide);
+  expect(dome.material.depthWrite).toBe(false); expect(dome.frustumCulled).toBe(false);
+  const texture = dome.material.uniforms.designMap.value, dispose = vi.spyOn(texture, 'dispose');
+  const disposeGeometry = vi.spyOn(dome.geometry, 'dispose'), disposeMaterial = vi.spyOn(dome.material, 'dispose');
+  expect(texture.isCanvasTexture).toBe(true);
+  camera.position.set(2, 3, 4);
+  renderer.update(1000, false, camera);
+  expect(dome.position).toEqual(new Vector3(2, 3, 4));
+  const yaw = dome.rotation.y;
+  renderer.update(1016, false, camera); renderer.update(1060, false, camera);
+  expect(dome.rotation.y).toBeGreaterThan(yaw);
+  expect(api.stepBackground).toHaveBeenCalledTimes(1);
+  const rotation = dome.rotation.clone();
+  camera.position.set(-12, 24, 36); camera.rotation.y = Math.PI / 2;
+  renderer.update(1125, true, camera);
+  expect(dome.rotation.equals(rotation)).toBe(true); expect(dome.position).toEqual(camera.position);
   expect(api.stepBackground).toHaveBeenCalledTimes(2);
   expect(api.setPaused.mock.calls).toEqual([[false], [true]]);
+  // Adaptive quality lowers canvas frequency but must not freeze the sky.
+  renderer.update(1141, false, camera, true);
+  expect(dome.rotation.y).toBeGreaterThan(rotation.y);
+  expect(api.stepBackground).toHaveBeenCalledTimes(2);
   renderer.dispose();
+  expect(disposeGeometry).toHaveBeenCalledOnce(); expect(disposeMaterial).toHaveBeenCalledOnce();
+  expect(scene.children).toHaveLength(0);
   expect(dispose).toHaveBeenCalledOnce(); expect(scene.background).toBe(previous); expect(frame()).toBeNull();
   renderer.update(1500, false); expect(api.stepBackground).toHaveBeenCalledTimes(2);
 });
