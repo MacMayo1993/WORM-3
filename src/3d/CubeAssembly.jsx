@@ -31,6 +31,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, setLiveRotation, resetLiveRotation, syncRotationFrame } from '../worm/liveRotation.js';
+import { createOpeningTurn, advanceOpeningTurn } from '../worm/healerWorm/openingRotation.js';
 const jumpRescueActive = () => useGameStore.getState().wormJumpRescueActive;
 // Scratch layer/angle lists handed to setLiveRotation every frame — it copies out
 // of them, so they are reused rather than reallocated per frame.
@@ -164,6 +165,7 @@ const CubeAssembly = React.memo(({
   const controlsEnabledRef = useRef(true); // Track controls state with ref for immediate updates
   const cubeGroupRef = useRef(null);
   const gsapAnimRef = useRef(null);
+  const openingTurnRef = useRef(null);
   // Freeze an in-flight layer synchronously with the rescue transition. A React
   // render alone can arrive after GSAP has advanced another gameplay frame.
   useEffect(() => useGameStore.subscribe(
@@ -825,9 +827,10 @@ const CubeAssembly = React.memo(({
   // Track the previous animation progress for incremental rotation
   const prevProgressRef = useRef(0);
 
-  // Start GSAP animation when animState changes
+  // Start the render-clock opening or the ordinary GSAP turn.
   useEffect(() => {
     initializedMoveRef.current = null;
+    openingTurnRef.current = null;
     if (useGameStore.getState().animState !== animState) return;
     if (!animState) {
       // Reset progress refs when animation ends
@@ -852,6 +855,7 @@ const CubeAssembly = React.memo(({
     // Kill any existing animation
     if (gsapAnimRef.current) {
       gsapAnimRef.current.kill();
+      gsapAnimRef.current = null;
     }
 
     // Reset progress for new animation
@@ -864,9 +868,6 @@ const CubeAssembly = React.memo(({
     // Shuffle moves use faster, crisper animations
     const isShuffle = !!animState?.isShuffle;
     const isWormScramble = !!animState?.wormScramble;
-    // The worm-mode opening scramble now plays fast (like shuffle): 20 parallel
-    // pair-moves would drag if each ran at full in-game turn length, so they snap
-    // through crisply to get the player into the game sooner.
     const isFast = isShuffle;
     // Worm-mode hazard rotations (the auto inverse-turns that grind through the worm)
     // run far slower than a normal turn so the planes menacingly creep through instead
@@ -875,23 +876,28 @@ const CubeAssembly = React.memo(({
     // opening scramble, not normal solving).
     const isWormHazard = !isFast && !isWormScramble && useGameStore.getState().wormHealerMode;
     const baseDuration = isFast ? 0.12 : 0.35;
+    const complete = () => {
+      if (useGameStore.getState().animState !== animState) return;
+      gsapAnimRef.current = null;
+      sliceIndicesRef.current = null;
+      const layers = animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex];
+      const dirs = animState.sliceDirs?.length ? animState.sliceDirs : layers.map(() => animState.dir);
+      const finalAngle = Math.PI / 2 * (animState.numTurns ?? 1);
+      setLiveRotation(animState.axis, layers, dirs.map(d => d * finalAngle), animState.sliceIndex, animState.dir * finalAngle);
+      resetLiveRotation();
+      vibrate(isFast ? 8 : 14);
+      onAnimCompleteRef.current();
+    };
+    if (isShuffle && isWormScramble) {
+      openingTurnRef.current = createOpeningTurn(size, complete);
+      return () => { openingTurnRef.current = null; };
+    }
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
       value: 1,
       paused: jumpRescueActive(),
       duration: animState.teachSlow ? 0.8 : isWormHazard ? baseDuration * 4.0 : baseDuration,
       ease: isWormHazard ? "power2.inOut" : isFast ? "power2.out" : "back.out(1.4)",
-      onComplete: () => {
-        if (useGameStore.getState().animState !== animState) return;
-        gsapAnimRef.current = null;
-        sliceIndicesRef.current = null;
-        const layers = animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex];
-        const dirs = animState.sliceDirs?.length ? animState.sliceDirs : layers.map(() => animState.dir);
-        const finalAngle = Math.PI / 2 * (animState.numTurns ?? 1);
-        setLiveRotation(animState.axis, layers, dirs.map(d => d * finalAngle), animState.sliceIndex, animState.dir * finalAngle);
-        resetLiveRotation();
-        vibrate(isFast ? 8 : 14);
-        onAnimCompleteRef.current();
-      }
+      onComplete: complete
     });
 
     return () => {
@@ -900,7 +906,7 @@ const CubeAssembly = React.memo(({
         gsapAnimRef.current = null;
       }
     };
-  }, [animState]);
+  }, [animState, size]);
 
   // Priority -2: earliest possible hook — detects state changes (via rotationEpoch)
   // or animState transitions and snaps all cubies to their grid positions
@@ -914,6 +920,14 @@ const CubeAssembly = React.memo(({
   // matrixWorld, producing a one-frame flash of new colours at wrong positions.
 
   useFrame(() => {
+    const opening = openingTurnRef.current;
+    if (opening && opening.elapsed >= opening.duration && !jumpRescueActive() &&
+        useGameStore.getState().animState === initializedMoveRef.current) {
+      // The previous frame displayed the exact 90° pose. Commit BEFORE the
+      // epoch/reset pass so no later subscriber samples new colors on old poses.
+      openingTurnRef.current = null;
+      opening.complete();
+    }
     // Store commits are synchronous; React props may still describe the old turn.
     const committed = useGameStore.getState();
     const wasAnimating = prevAnimStateRef.current !== null;
@@ -945,7 +959,7 @@ const CubeAssembly = React.memo(({
   // Priority -1: runs before all priority-0 subscribers (StickerPlane animations
   // and StickerInstanceProvider matrix sampling) so that cubieRef positions and
   // quaternions are fully updated before StickerInstances reads matrixWorld.
-  useFrame((state) => {
+  useFrame((state, delta) => {
     // Update shared time uniform for animated tile styles
     updateSharedTime(state.clock.elapsedTime);
     // Pre-compute tremor surge once so all StickerPlane instances read a shared
@@ -1038,6 +1052,12 @@ const CubeAssembly = React.memo(({
     // Handle GSAP snap animation (completing rotation after release)
     if (!syncRotationFrame(useGameStore.getState().animState, initializedMoveRef.current)) return;
 
+    const opening = openingTurnRef.current;
+    if (opening) {
+      if (jumpRescueActive()) return;
+      animProgressRef.current.value = advanceOpeningTurn(opening, delta);
+    }
+
     const { axis, dir, sliceIndex } = animState;
     const worldAxis = axis === 'col' ? _axisCol : axis === 'row' ? _axisRow : _axisDepth;
 
@@ -1111,7 +1131,7 @@ const CubeAssembly = React.memo(({
     // Apply rotation only to cubies in the slice, each by its own plane direction.
     const sliceSet = sliceIndicesRef.current;
     const dirByIdx = sliceDirByIdxRef.current;
-    if (sliceSet && Math.abs(dRot) > 0.0001) {
+    if (sliceSet && (opening ? dRot !== 0 : Math.abs(dRot) > 0.0001)) {
       sliceSet.forEach(idx => {
         const g = cubieRefs.current[idx];
         if (!g) return;

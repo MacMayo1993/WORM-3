@@ -224,9 +224,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // Freeze the worm until the countdown completes
             useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
 
-            // Play all 15 moves through the shared animated-shuffle pipeline:
-            // fast 0.12s power2.out animations (no back-easing overshoot → no black layers),
-            // properly sequenced, not counted as player moves.
+            // Keep the full scramble and its inverse. CubeAssembly presents these
+            // turns on the render clock with size-aware, non-overshooting easing;
+            // the shared shuffle queue commits them without counting player moves.
             // When done, go to 'spawning' so the worm can emerge before the countdown.
             const afterShuffle = () => {
                 gameModePhaseRef.current = 'spawning';
