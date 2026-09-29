@@ -589,6 +589,13 @@ textarea:focus-visible,
   gap: 8px;
 }
 
+.sheet-group-note {
+  margin: 0 0 10px;
+  color: #657156;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .sheet-item {
   display: flex;
   align-items: center;
