@@ -72,13 +72,13 @@ export default function ProjectiscopeCreator({ design, onApply, onCancel, accent
         <p className="projectiscope-intro">Draw, choose colors, and explore symmetry.</p>
         <iframe ref={frame} src={`${PROJECTISCOPE_URL}#creator=1`} title="Projectiscope background designer" />
         <footer style={styles.footer}>
-          <span className="mode-wizard-footer-note" role="status">{error || (ready ? 'Your last design is the starting point. Apply when you’re ready.' : 'Loading your creator…')}</span>
+          <span className="mode-wizard-footer-note" role="status">{error || (ready ? 'Apply to save your design for next time.' : 'Loading your creator…')}</span>
           <button type="button" className="mode-wizard-primary piece piece--bar piece--glint"
             style={{ '--piece-color': accent }} disabled={!ready || saving} onClick={apply}
             aria-label={saving ? 'Saving…' : 'Apply background'}>
             <span className="piece-face"><span className="piece-trailer">{saving ? 'Saving…' : 'Apply background'}</span><b className="piece-trailer" aria-hidden="true">→</b></span>
           </button>
-          <button type="button" style={styles.btnSecondary} onClick={onCancel}>Cancel</button>
+          <button type="button" className="projectiscope-cancel" style={styles.btnSecondary} onClick={onCancel}>Cancel</button>
         </footer>
       </div>
     </dialog>, document.body);
