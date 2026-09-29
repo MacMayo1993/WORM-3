@@ -64,7 +64,8 @@ export function characterSegmentPattern(out, character, skin, index, scratch) {
   // Brute: ribbed bands in the belly colour.
   if (character === 'inch' && index % 2 === 1) return out.lerp(scratch.set(skin.belly), 0.28);
   // Ranger: an earthworm's saddle, the paler band just behind the head.
-  if (character === 'classic' && index === 2) return out.lerp(scratch.set(skin.antenna), 0.42);
+  if (character === 'classic' && (index === 2 || index === 3)) return out.lerp(scratch.set(skin.antenna), 0.58);
+  if (character === 'classic' && index > 3 && index % 2 === 0) return out.lerp(scratch.set(skin.belly), 0.18);
   return out;
 }
 

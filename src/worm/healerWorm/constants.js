@@ -62,7 +62,10 @@ export const STEPS_PER_TILE = 50; // sub-steps recorded per tile (0.02 resolutio
 // the collision/trail "tail" extend well past the body you actually see — causing
 // false-positive tail-bite deaths and a trail that started too far behind the tail.
 export const BODY_BALL_SPACING = 0.09;
-export const BASE_TAIL_LENGTH = 4;
+// Nine trailing beads span 0.81 tiles: visible at spawn without granting orbs.
+export const BASE_TAIL_LENGTH = 10;
+export const WORM_HEAD_RADIUS = 0.115;
+export const WORM_BODY_RADIUS = 0.105;
 export const DEFAULT_WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
 export const MAX_JUMPS = 2;
 export const MAX_POWERUP_RENDER = 24;

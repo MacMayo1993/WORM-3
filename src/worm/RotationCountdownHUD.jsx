@@ -15,7 +15,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { UI_FONT, MONO_FONT, NIGHT_TEXT_MUTED } from '../utils/uiTheme.js';
+import { UI_FONT, MONO_FONT, GAME_HUD } from '../utils/uiTheme.js';
 import { rotationClock } from './healerWorm/rotationClockBridge.js';
 
 const BAR_W = 132;
@@ -68,7 +68,7 @@ export default function RotationCountdownHUD() {
       // The bar drains rather than fills: a shortening bar and a falling number
       // say the same thing, and two cues that agree are read faster than one.
       const remaining = Math.max(0, Math.min(1, left / total));
-      const colour = held ? NIGHT_TEXT_MUTED : warn > 0.66 ? CRITICAL : warn > 0 ? HOT : CALM;
+      const colour = held ? GAME_HUD.muted : warn > 0.66 ? CRITICAL : warn > 0 ? HOT : CALM;
       const fill = fillRef.current;
       if (fill) {
         fill.style.width = `${remaining * 100}%`;
@@ -77,14 +77,14 @@ export default function RotationCountdownHUD() {
       }
       const seconds = secondsRef.current;
       if (seconds) {
-        seconds.textContent = held ? '- -' : left.toFixed(1);
+        seconds.textContent = held ? '—' : `${Math.max(0, left).toFixed(1)}s`;
         seconds.style.color = colour;
       }
       const label = labelRef.current;
       // The wording stays put and the colour escalates: a label that rewrites
       // itself next to a number that is already moving is one moving thing too
       // many at the moment the player most needs to read it.
-      if (label) label.textContent = held ? 'Turn paused' : 'Turn in';
+      if (label) label.textContent = held ? 'Rotation held' : 'Rotation in';
     };
     rafRef.current = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(rafRef.current);
@@ -100,11 +100,14 @@ export default function RotationCountdownHUD() {
         display: 'none',
         alignItems: 'center',
         gap: 9,
-        padding: '0 3px 1px',
+        padding: '5px 10px',
+        minHeight: 30,
+        flexShrink: 0,
+        boxSizing: 'border-box',
         lineHeight: 1,
-        borderRadius: 999,
-        background: 'transparent',
-        border: 0,
+        borderRadius: 12,
+        background: GAME_HUD.surface,
+        border: `2px solid ${GAME_HUD.border}`,
         boxShadow: 'none',
         pointerEvents: 'none',
         fontFamily: UI_FONT
@@ -113,15 +116,15 @@ export default function RotationCountdownHUD() {
       <span
         ref={labelRef}
         style={{
-          fontSize: 8.5,
+          fontSize: 11,
           fontWeight: 800,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: NIGHT_TEXT_MUTED,
+          color: GAME_HUD.muted,
           whiteSpace: 'nowrap'
         }}
       >
-        Turn in
+        Rotation in
       </span>
 
       <div style={{ width: BAR_W, flex: '1 1 auto', minWidth: 0, height: 4, borderRadius: 999, background: '#26372d1f', overflow: 'hidden' }}>
@@ -131,16 +134,17 @@ export default function RotationCountdownHUD() {
       <span
         ref={secondsRef}
         style={{
-          fontSize: 11,
+          fontSize: 14,
           fontWeight: 800,
           fontFamily: MONO_FONT,
           fontVariantNumeric: 'tabular-nums',
           color: CALM,
-          minWidth: 34,
+          minWidth: 48,
+          flexShrink: 0,
           textAlign: 'right'
         }}
       >
-        0.0
+        0.0s
       </span>
     </div>
   );

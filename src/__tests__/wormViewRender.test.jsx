@@ -2,7 +2,7 @@ import { it, expect, vi } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 
 const rig = vi.hoisted(() => ({ state: {} }));
-vi.mock('react', async original => ({ ...await original(), useMemo: fn => fn(), useRef: value => ({ current: value }), useEffect: () => {}, useState: value => [value, () => {}], useImperativeHandle: () => {} }));
+vi.mock('react', async original => ({ ...await original(), useMemo: fn => fn(), useRef: value => ({ current: value }), useEffect: () => {}, useLayoutEffect: () => {}, useState: value => [value, () => {}], useImperativeHandle: () => {} }));
 vi.mock('@react-three/fiber', () => ({ useFrame: () => {} }));
 vi.mock('@react-three/drei', () => ({ RoundedBox: () => null }));
 vi.mock('zustand/react/shallow', () => ({ useShallow: fn => fn }));

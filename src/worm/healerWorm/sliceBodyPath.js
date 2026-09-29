@@ -82,6 +82,8 @@ export function findSlicePathHit(worm, axis, layer, size) {
       const keepCount = Math.max(1, lo);
       const protectedHead = (worm.landingGraceT?.current ?? 0) > 0 ||
         (worm.isJumping?.current && (worm.jumpLift?.() ?? 0) > 0.45);
+      // Survivors must retain the intrinsic body used by pickup/deposit accounting.
+      // Below that base, rebuilding pickups would credit inventory without carried orbs.
       return {
         type: (headOnLayer && !headOnOuterCap && !protectedHead) || keepCount < BASE_TAIL_LENGTH ? 'death' : 'cut',
         cutDistance, keepCount, historyIndex: i, historyT: t,

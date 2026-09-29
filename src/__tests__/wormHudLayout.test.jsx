@@ -250,3 +250,18 @@ it('shows Orb Shower with a live ten-second countdown and removes it when rain e
   expect(chip().textContent).toContain('4.2s');
   act(() => useGameStore.setState({ wormOrbShowerActive: false })); expect(chip()).toBeNull();
 });
+
+it('gives the rotation countdown its own row outside the pause and inventory rail', () => {
+  Object.assign(rotationClock, { armed: true, total: 10, secondsLeft: 7.4, warning: 0, held: false });
+  renderPhase('crawling');
+  act(() => vi.advanceTimersByTime(20));
+  const clock = host.querySelector('.worm-rotation-clock');
+  expect(clock.parentElement.className).toBe('worm-hud-top');
+  expect(clock.closest('.worm-hud-bar')).toBeNull();
+  expect(host.querySelector('[aria-label="Pause"]').closest('.worm-hud-bar')).not.toBeNull();
+  expect(clock.textContent).toContain('Rotation in');
+  expect(clock.textContent).toContain('7.4s');
+  rotationClock.secondsLeft = 2.1;
+  act(() => vi.advanceTimersByTime(20));
+  expect(clock.textContent).toContain('2.1s');
+});

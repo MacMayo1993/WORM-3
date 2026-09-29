@@ -951,8 +951,10 @@ export default function WORM3() {
   const handleWormRetry = useCallback(() => {
     useGameStore.getState().clearLevel();
     const wormState = useGameStore.getState();
-    wormState.initWormMode(undefined, undefined, null, null, null, null, wormState.wormCombatMode, wormState.wormEnemiesEnabled, wormState.wormStoryLevel);
+    // Clear the old board before run subscribers start the new scramble.
+    // reset() also clears XP, so it must precede the new run's initialization.
     reset();
+    wormState.initWormMode(undefined, undefined, null, null, null, null, wormState.wormCombatMode, wormState.wormEnemiesEnabled, wormState.wormStoryLevel);
   }, [reset]);
 
   const handleWormNewGame = useCallback(() => {
