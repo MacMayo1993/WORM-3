@@ -9,6 +9,7 @@ export const DOME_DRIFT_SPEED = 0.065;
 
 export const domeFragmentShader = `
   uniform sampler2D designMap;
+  uniform sampler2D drawingMap;
   varying vec3 direction;
   vec2 diskUV(vec3 d) {
     float r = length(d.xy);
@@ -21,15 +22,19 @@ export const domeFragmentShader = `
     vec2 uv = diskUV(d);
     vec3 front = texture2D(designMap, uv).rgb;
     vec3 back = texture2D(designMap, vec2(1.0) - uv).rgb;
+    vec4 frontInk = texture2D(drawingMap, uv);
+    vec4 backInk = texture2D(drawingMap, vec2(1.0) - uv);
+    front = mix(front, frontInk.rgb, frontInk.a);
+    back = mix(back, backInk.rgb, backInk.a);
     float sheet = smoothstep(-${DOME_SEAM_WIDTH}, ${DOME_SEAM_WIDTH}, d.z);
     gl_FragColor = vec4(mix(back, front, sheet) * 0.78, 1.0);
     #include <colorspace_fragment>
   }
 `;
 
-export function createProjectiscopeDome(texture) {
+export function createProjectiscopeDome(texture, drawingTexture) {
   const material = new ShaderMaterial({
-    uniforms: { designMap: { value: texture } },
+    uniforms: { designMap: { value: texture }, drawingMap: { value: drawingTexture } },
     vertexShader: `
       varying vec3 direction;
       void main() {

@@ -1,13 +1,16 @@
 import React, { act, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-import { BackSide, Color, PerspectiveCamera, Scene, Vector3 } from 'three';
+import { BackSide, Color, PerspectiveCamera, Scene, Texture, Vector3 } from 'three';
 import { ScenePanel } from '../components/menus/settings/ScenePanel.jsx';
 import SceneStep from '../components/screens/wizardSteps/SceneStep.jsx';
 import ProjectiscopeCreator from '../projectiscope/ProjectiscopeCreator.jsx';
 import { createProjectiscopeBackground } from '../projectiscope/backgroundRenderer.js';
+import { createGpuArt } from '../projectiscope/gpuRenderer.js';
 import { validProjectiscopeDesign, projectiscopeConfig } from '../projectiscope/design.js';
 import { useGameStore } from '../hooks/useGameStore.js';
+
+vi.mock('../projectiscope/gpuRenderer.js', () => ({ createGpuArt: vi.fn(() => ({ texture: new Texture(), update: vi.fn(() => false), dispose: vi.fn() })) }));
 
 vi.mock('../components/screens/wizardSteps/CubePlate.jsx', () => ({ default: ({ onNext, onPrev }) => <><button onClick={onNext}>Next scene</button><button onClick={onPrev}>Previous scene</button></> }));
 
@@ -76,7 +79,7 @@ it('does not unpause a new run when the creator closes', () => {
   act(() => root.render(null));
   expect(useGameStore.getState().wormPaused).toBe(true);
 });
-it('bakes once, releases the editor, and keeps the camera surrounded by a moving dome', () => {
+it('exports curves once, releases the editor, and animates the GPU dome independently of the drawing texture', () => {
   const previous = new Color('black'), scene = new Scene(), camera = new PerspectiveCamera();
   scene.background = previous;
   const renderer = createProjectiscopeBackground(scene, design);
@@ -88,7 +91,7 @@ it('bakes once, releases the editor, and keeps the camera surrounded by a moving
   iframe.contentDocument.body.append(canvas);
   const copy = vi.fn();
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: copy });
-  const api = { renderBackground: vi.fn(() => canvas) };
+  const api = { gpuBackground: vi.fn(() => ({ canvas, model: { recipe: {} } })) };
   iframe.contentWindow.__projectiscope = api;
   const post = vi.spyOn(iframe.contentWindow, 'postMessage');
   message('ready'); expect(post).toHaveBeenCalledWith(projectiscopeConfig(design, true), location.origin);
@@ -97,12 +100,12 @@ it('bakes once, releases the editor, and keeps the camera surrounded by a moving
   const dome = scene.getObjectByName('Projectiscope 360 dome');
   expect(dome.geometry.type).toBe('SphereGeometry'); expect(dome.material.side).toBe(BackSide);
   expect(dome.material.depthWrite).toBe(false); expect(dome.frustumCulled).toBe(false);
-  const texture = dome.material.uniforms.designMap.value, dispose = vi.spyOn(texture, 'dispose');
-  expect(api.renderBackground).toHaveBeenCalledOnce(); expect(frame()).toBeNull();
+  const texture = dome.material.uniforms.drawingMap.value, dispose = vi.spyOn(texture, 'dispose');
+  expect(api.gpuBackground).toHaveBeenCalledOnce(); expect(frame()).toBeNull();
   expect(copy.mock.calls[0][0] === canvas).toBe(true);
   expect(copy.mock.calls[0].slice(1)).toEqual([0, 0]);
   expect(texture.image === canvas).toBe(false); expect(texture.image.ownerDocument === document).toBe(true);
-  const textureVersion = texture.version;
+  const textureVersion = texture.version, art = createGpuArt.mock.results.at(-1).value;
   context.mockRestore();
   const disposeGeometry = vi.spyOn(dome.geometry, 'dispose'), disposeMaterial = vi.spyOn(dome.material, 'dispose');
   expect(texture.isCanvasTexture).toBe(true);
@@ -118,14 +121,16 @@ it('bakes once, releases the editor, and keeps the camera surrounded by a moving
   expect(dome.rotation.equals(rotation)).toBe(true); expect(dome.position).toEqual(camera.position);
   renderer.update(1141, false, camera);
   expect(dome.rotation.y).toBeGreaterThan(rotation.y);
-  // No more paints or uploads, regardless of how long the game runs.
+  // The custom drawing stays uploaded once while the live GPU art advances.
   for (let now = 1157; now < 10000; now += 16) renderer.update(now, false, camera);
-  expect(api.renderBackground).toHaveBeenCalledOnce(); expect(texture.version).toBe(textureVersion);
+  expect(api.gpuBackground).toHaveBeenCalledOnce(); expect(texture.version).toBe(textureVersion);
   renderer.dispose();
+  expect(art.update).toHaveBeenCalledWith(1125, expect.any(Number), true, false);
+  expect(art.dispose).toHaveBeenCalledOnce();
   expect(disposeGeometry).toHaveBeenCalledOnce(); expect(disposeMaterial).toHaveBeenCalledOnce();
   expect(scene.children).toHaveLength(0);
   expect(dispose).toHaveBeenCalledOnce(); expect(scene.background).toBe(previous); expect(frame()).toBeNull();
-  renderer.update(1500, false); expect(api.renderBackground).toHaveBeenCalledOnce();
+  renderer.update(1500, false); expect(api.gpuBackground).toHaveBeenCalledOnce();
 });
 
 it('cancels a background that is still loading without adding a dome later', () => {
