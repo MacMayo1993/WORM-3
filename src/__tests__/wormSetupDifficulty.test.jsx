@@ -2,7 +2,10 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { it, expect, vi } from 'vitest';
 vi.mock('../hooks/index.js', () => ({ useIsMobile: () => true }));
-vi.mock('../hooks/useGameStore.js', () => ({ useGameStore: selector => selector({ ownedItems: [] }) }));
+vi.mock('../hooks/useGameStore.js', () => {
+  const state = { ownedItems: [], settings: { projectiscopeDesign: { version: 1, recipe: 'saved-background' } } };
+  return { useGameStore: Object.assign(selector => selector(state), { getState: () => state }) };
+});
 vi.mock('../3d/WormPreviewCanvas.jsx', () => ({ default: () => null }));
 vi.mock('../components/screens/wizardSteps/CubePlate.jsx', () => ({ default: () => null }));
 vi.mock('../components/screens/WizardChrome.jsx', async importOriginal => ({
@@ -43,7 +46,8 @@ for (const [name, Wizard, category, sizes] of [
       expect(choice.style.minHeight).toBe('48px');
       click('Scene'); click(category); // selection survives category changes
       click('Continue');
-      expect(launch).toHaveBeenCalledWith(expect.objectContaining({ cubeSize: size }));
+      expect(launch).toHaveBeenCalledWith(expect.objectContaining({ cubeSize: size,
+        projectiscopeDesign: { version: 1, recipe: 'saved-background' } }));
       if (name === 'Worm') expect(launch.mock.lastCall[0].megaMode).toBe(false);
     } finally { act(() => root.unmount()); host.remove(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; }
   });

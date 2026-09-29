@@ -140,6 +140,7 @@ export function useChaosWorker({
   addDisparityEliminatedFacesBulk,
   chaosResyncEpoch,
 }) {
+  const projectiscopeEditing = useGameStore(s => s.projectiscopeEditing);
   const workerRef = useRef(null);
   const manifoldMapRef = useRef(null);
   const disparityFlipCapRef = useRef(disparityFlipCap);
@@ -365,7 +366,7 @@ export function useChaosWorker({
           chaosLevel,
           disparityFlipCap,
           explosionT,
-          animating: !!animState,
+          animating: !!animState || projectiscopeEditing,
           ignition: ignition?.gridId ? { gridId: ignition.gridId } : null,
           gen: genRef.current,
         },
@@ -453,6 +454,6 @@ export function useChaosWorker({
 
   useEffect(() => {
     if (!workerRef.current) return;
-    workerRef.current.postMessage({ type: 'SET_ANIMATING', payload: { animating: !!animState } });
-  }, [animState]);
+    workerRef.current.postMessage({ type: 'SET_ANIMATING', payload: { animating: !!animState || projectiscopeEditing } });
+  }, [animState, projectiscopeEditing]);
 }

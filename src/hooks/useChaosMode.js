@@ -14,6 +14,7 @@ import { buildSurfaceCoords, computeChaosMetrics } from '../game/chaosMetrics.js
 export const chaosCountdownState = { countdown: 0 };
 
 export function useChaosMode() {
+  const projectiscopeEditing = useGameStore(s => s.projectiscopeEditing);
   const {
     chaosLevel, setChaosLevel, disparityFlipCap,
     autoRotateEnabled, setAutoRotateEnabled,
@@ -107,7 +108,7 @@ export function useChaosMode() {
   }, []);
 
   useEffect(() => {
-    if (!autoRotateEnabled || !chaosMode) {
+    if (!autoRotateEnabled || !chaosMode || projectiscopeEditing) {
       setUpcomingRotation(null);
       setRotationCountdown(0);
       chaosCountdownState.countdown = 0;
@@ -182,7 +183,7 @@ export function useChaosMode() {
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [autoRotateEnabled, chaosMode, size, generateRandomRotation, setAnimState, setPendingMove, setUpcomingRotation, setRotationCountdown]);
+  }, [autoRotateEnabled, chaosMode, projectiscopeEditing, size, generateRandomRotation, setAnimState, setPendingMove, setUpcomingRotation, setRotationCountdown]);
 
   const onCascadeComplete = useCallback((id) => {
     setCascades((prev) => prev.filter((c) => c.id !== id));

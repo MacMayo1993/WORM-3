@@ -759,11 +759,11 @@ export default function WORM3() {
     setShowRandomWizard(true);
   }, []);
 
-  const handleRandomWizardComplete = useCallback(({ backgroundTheme, cubeSize }) => {
+  const handleRandomWizardComplete = useCallback(({ backgroundTheme, projectiscopeDesign, cubeSize }) => {
     setShowRandomWizard(false);
     useGameStore.getState().setRandomMode(true);
 
-    const newSettings = { ...settings, backgroundTheme };
+    const newSettings = { ...settings, backgroundTheme, projectiscopeDesign: projectiscopeDesign ?? settings.projectiscopeDesign };
     setSettings(newSettings);
     useGameStore.getState().clearLevel();
 
@@ -795,6 +795,7 @@ export default function WORM3() {
       ...settings,
       colorScheme: wizardSettings.colorScheme,
       backgroundTheme: wizardSettings.backgroundTheme,
+      projectiscopeDesign: wizardSettings.projectiscopeDesign ?? settings.projectiscopeDesign,
       manifoldStyles,
       biomeMode: { enabled: false, faceAssignment: null },
     };
@@ -872,6 +873,7 @@ export default function WORM3() {
       ...settings,
       colorScheme: wizardSettings.colorScheme,
       backgroundTheme: wizardSettings.backgroundTheme,
+      projectiscopeDesign: wizardSettings.projectiscopeDesign ?? settings.projectiscopeDesign,
       manifoldStyles,
       biomeMode: { enabled: false, faceAssignment: null },
       wormEnemiesEnabled: chapterLevel ? settings.wormEnemiesEnabled : wizardSettings.wormEnemiesEnabled !== false,

@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { Suspense, useState } from 'react';
 import { BACKGROUNDS } from '../../../utils/backgrounds.js';
 import { useGameStore } from '../../../hooks/useGameStore.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({ value: bg.id, label: bg.label }));
+const ProjectiscopeCreator = React.lazy(() => import('../../../projectiscope/ProjectiscopeCreator.jsx'));
 
 export function ScenePanel({ settings, onSettingsChange }) {
+  const [creating, setCreating] = useState(false);
   const canInspect = useGameStore(s => !s.showWelcome && !s.showMainMenu &&
     !(s.wormHealerMode && ['entering', 'tunnel', 'exiting'].includes(s.wormPhase)));
   const update = (key, val) => onSettingsChange({ ...settings, [key]: val });
@@ -42,7 +44,10 @@ export function ScenePanel({ settings, onSettingsChange }) {
       </div>
       <h3 className="settings-section-title">Background</h3>
       <div className="settings-radio-group">
-        {BG_OPTIONS.map(opt => (
+        {BG_OPTIONS.map(opt => opt.value === 'projectiscope' ? (
+          <button type="button" key={opt.value} className={`settings-radio${settings.backgroundTheme === opt.value ? ' active' : ''}`}
+            aria-pressed={settings.backgroundTheme === opt.value} onClick={() => setCreating(true)}>{opt.label}</button>
+        ) : (
           <label key={opt.value}
             className={`settings-radio${settings.backgroundTheme === opt.value ? ' active' : ''}`}>
             <input type="radio" name="backgroundTheme" value={opt.value}
@@ -52,6 +57,13 @@ export function ScenePanel({ settings, onSettingsChange }) {
           </label>
         ))}
       </div>
+      {creating && <Suspense fallback={<p role="status">Opening background creator…</p>}>
+        <ProjectiscopeCreator design={settings.projectiscopeDesign} onCancel={() => setCreating(false)}
+          onApply={projectiscopeDesign => {
+            onSettingsChange({ ...settings, backgroundTheme: 'projectiscope', projectiscopeDesign });
+            setCreating(false);
+          }} />
+      </Suspense>}
     </section>
   );
 }

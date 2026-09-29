@@ -45,6 +45,7 @@ export function useWizardCosmetics({ initialSettings, accent, accentShadow, extr
     customColors: initialSettings?.customColors || null,
     tileStyle: 'solid',
     backgroundTheme: initialSettings?.backgroundTheme || 'blackhole',
+    projectiscopeDesign: initialSettings?.projectiscopeDesign || useGameStore.getState().settings.projectiscopeDesign || null,
     // Per-face tile styles; null means "use the global tileStyle".
     perFaceStyles: null,
     ...extra

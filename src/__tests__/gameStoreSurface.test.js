@@ -91,7 +91,7 @@ const EXPECTED_KEYS = [
   'showCutscene', 'showDevConsole', 'showDisparityWinner', 'showFirstFlipCaption',
   'showFirstFlipTutorial', 'showHelp', 'showLeaderboard', 'showLevelSelect',
   'showLevelTutorial', 'showMainMenu', 'showMobileTouchHint', 'showNetPanel',
-  'showPackSelect', 'showSettings', 'showTunnels', 'showTutorial',
+  'projectiscopeEditing', 'showPackSelect', 'showSettings', 'showTunnels', 'showTutorial',
   'showWelcome', 'showWormDeathMenu', 'size', 'solveFocusedStep',
   'solveHighlights', 'solveModeActive', 'spendCoins', 'startDemo',
   'teachCourseActive', 'teachModeActive', 'toggleAntipodalPiP', 'toggleChaos', 'toggleDevConsole',

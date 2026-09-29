@@ -215,6 +215,7 @@ export function useDisparityGame({
     setSettings({
       ...chaosSetupSettings(settings, wizardSettings),
       backgroundTheme: wizardSettings.backgroundTheme || settings.backgroundTheme,
+      projectiscopeDesign: wizardSettings.projectiscopeDesign ?? settings.projectiscopeDesign,
       manifoldStyles,
       biomeMode: { enabled: false, faceAssignment: null },
     });
