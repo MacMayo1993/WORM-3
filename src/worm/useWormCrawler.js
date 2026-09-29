@@ -848,6 +848,8 @@ export function useWormCrawler(size, cubies) {
             pendingSpecialFlashRef: f('pendingSpecialFlash'),
             headInterpPos: f('headInterpPos'),
             padFlight: f('padFlight'),
+            onRaisedPlatform: f('onRaisedPlatform'),
+            raisedDeparture: f('raisedDeparture'),
             currentNormal: f('currentNormal'),
             tailLength: f('tailLength'),
             bodyGait: f('bodyGait'),

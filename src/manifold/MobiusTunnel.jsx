@@ -525,7 +525,9 @@ const MobiusTunnel = ({
       const progress = Math.min(1, formationAge.current / PLATFORM_FORMATION_SECONDS);
       const a = mesh1.userData.wormPlatformFormation;
       const b = mesh2.userData.wormPlatformFormation;
-      uniforms.uGrowT.value = burrow ? openness : reduced ? 1 : Math.min(progress,
+      // A jump that hurried the pieces up hurries the band with them.
+      const rushed = a?.rushed || b?.rushed;
+      uniforms.uGrowT.value = burrow ? openness : reduced ? 1 : Math.min(rushed ? 1 : progress,
         a?.formationTarget === 1 ? a.formationProgress : 1,
         b?.formationTarget === 1 ? b.formationProgress : 1);
 

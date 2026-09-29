@@ -52,6 +52,12 @@ export function rideLiveRotation(worm) {
     // The sim already evaluated a jump from its moving source to a stationary
     // landing and recorded that world-space path for the body. Do not ride it twice.
     if (worm.rotationDeparture?.current) return false;
+    // A pad flight follows its own arc: anchoring it to the crawl's tiles pinned
+    // the head to the floor while the body rose behind it. A raised pad's hover
+    // is not part of its cubie mesh either, and with no layer turning the sim's
+    // pose on and off a pad is already exact.
+    if (worm.padFlight?.current) return false;
+    if (!liveRotation.active && (worm.onRaisedPlatform?.current || worm.raisedDeparture?.current)) return false;
 
     // Rest-read: the current step crossed onto (or is stepping back off) a mid-rotation
     // slice from static ground. tick()'s grid math already targets the committed

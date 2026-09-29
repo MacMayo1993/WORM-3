@@ -93,6 +93,7 @@ import {
     tunnelArmSeconds,
     tunnelHandoffSeconds,
     FACE_NORMALS,
+    DIR_FORWARD,
     INITIAL_DIR,
     INITIAL_POS,
     ORB_SEGMENT_GROWTH,
@@ -776,7 +777,7 @@ export function killWormSim(sim, ctx, details = null) {
     ctx.onDeath(details, Math.floor(sim.timeAlive));
 }
 
-function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = false, intentional = false) {
+function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = false, intentional = false, landingHeading = null) {
     if (usesRaisedPlatforms(ctx) && !skipDeposit && padEntryDecision({
         rule: 'pad', event: intentional ? 'land' : 'crawl', flipped: true, resolved: true,
         turning: liveRotation.active || !!sim.restRead, rocket: sim.rocketActive, grace: sim.landingGraceT > 0,
@@ -854,7 +855,12 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 
     sim.tunnelApproach.copy(sim.headInterpPos).addScaledVector(sim.currentNormal, WORM_LIFT);
     sim.headInterpPos.copy(sim.tunnelApproach);
-    sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: raisedWormExpansion(sim.expansionAmount, size), padHeight: WORM_PAD_HEIGHT } : tunnel;
+    // The pad coil leaves along the heading the worm arrived with and, on exit,
+    // runs backwards into the heading it will crawl away on.
+    const exitForward = DIR_FORWARD[tunnel.exit.dirKey]?.[sim.moveDir];
+    sim.activeTunnel = usesRaisedPlatforms(ctx) ? { ...tunnel, padExpansion: raisedWormExpansion(sim.expansionAmount, size), padHeight: WORM_PAD_HEIGHT,
+        entryHeading: landingHeading ?? DIR_FORWARD[tunnel.entry.dirKey]?.[sim.moveDir],
+        exitHeading: exitForward && exitForward.map(v => -v) } : tunnel;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
     // Remove the exit portal tile from the trail so the head landing on it after
@@ -1863,11 +1869,19 @@ const PHASE_HANDLERS = {
     // publishes wormPhase:'windup' via ctx.onTunnelEnter, so no enter() here.
     windup: {
         update(sim, size, _ctx, delta) {
-            const nextProgress = sim.tunnelProgress + delta / tunnelHandoffSeconds(sim.activeTunnel);
+            const handoff = tunnelHandoffSeconds(sim.activeTunnel);
+            const nextProgress = sim.tunnelProgress + delta / handoff;
             advanceTunnelHead(sim, 'windup', nextProgress, size);
             sim.tunnelProgress = nextProgress;
             if (sim.tunnelProgress >= 1 - 1e-9) {
+                // Spend the overshoot on the entry arm, so the head never holds
+                // a frame at the mouth between the two phases.
+                const carry = Math.max(0, nextProgress - 1) * handoff / tunnelArmSeconds(sim.activeTunnel);
                 sim.tunnelProgress = 0;
+                if (carry > 0) {
+                    advanceTunnelHead(sim, 'entering', carry, size);
+                    sim.tunnelProgress = carry;
+                }
                 sim.phase = 'entering'; // entering.enter() fires next tick
             }
             return false;
@@ -2044,7 +2058,9 @@ export function stepWormSim(sim, delta, size, ctx) {
         if (landed && landed.allowRide && !liveRotation.active && !sim.restRead) {
             const { x, y, z, dirKey } = sim.pos;
             const sticker = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
-            if (sticker && sticker.curr !== sticker.orig) beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, false, true);
+            if (sticker && sticker.curr !== sticker.orig) beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, false, true, landed.heading.toArray());
+            // Spend the rest of this tick on the coil, so touchdown never holds a frame.
+            if (sim.phase === 'windup' && landed.leftover > 0) PHASE_HANDLERS.windup.update(sim, size, ctx, landed.leftover);
         }
         return;
     }
@@ -2324,6 +2340,12 @@ export function stepWormSim(sim, delta, size, ctx) {
         PHASE_HANDLERS[sim.prevPhase]?.exit?.(sim, size, ctx);
         PHASE_HANDLERS[currentPhase]?.enter?.(sim, size, ctx);
         sim.prevPhase = currentPhase;
+        // A tunnel hands back a finished step (the pad centre). Commit it first,
+        // so the head keeps moving off the exit coil instead of holding a frame.
+        if (currentPhase === 'crawling' && sim.interpT >= 1 && sim.stepAcc >= STEP_SEC && sim.alive) {
+            PHASE_HANDLERS.crawling.update(sim, size, ctx, 0, STEP_SEC);
+            if (!sim.alive || sim.phase !== 'crawling') return;
+        }
     }
     PHASE_HANDLERS[currentPhase].update(sim, size, ctx, delta, STEP_SEC);
     // Damage and rendering share the same contracted body layout, including

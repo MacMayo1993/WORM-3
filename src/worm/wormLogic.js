@@ -481,30 +481,57 @@ const ZERO3 = [0, 0, 0];
 
 // ── Surface / tunnel mouth handoff ───────────────────────────────────────────
 // s = 0 is the lifted landing position; s = 1 is the aperture centre.
-// Raised pads get one complete loop above the rim before the axial dive. Exit
-// samples this exact curve backwards. Ordinary crawl-entry tunnels stay axial.
+// Ordinary crawl-entry tunnels stay axial. Raised pads coil once on the pad and
+// sink into the aperture: the coil leaves along the heading the worm landed
+// with (tunnel.entryHeading), at about its landing speed, and slows to a stop
+// over the mouth, so the head turns straight down into the ride instead of
+// whipping round a fixed loop. The exit samples this curve backwards with
+// tunnel.exitHeading, the reverse of the departure, so the worm leaves the pad
+// already moving the way it will crawl.
+// The coil and a head's radius stay inside the 0.85 pad.
+export const PAD_COIL_DIAMETER = 0.3;
+// Coil angle w(s): a Hermite with w'(0) = launch and w'(1) = 0. At the orbit
+// time this starts near 2.2 units/s, the pace of a landing, and decelerates.
+const PAD_COIL_LAUNCH = 1.9;
+// The sink starts once the coil is back within the aperture. Its end slope
+// matches the entry arm's own pace, so the head keeps moving into the tunnel.
+const PAD_COIL_SINK_START = 0.72;
+const PAD_COIL_SINK_SLOPE = 1.4;
+const padCoilTurn = s => (s * s * s - 2 * s * s + s) * PAD_COIL_LAUNCH + s * s * (3 - 2 * s);
+function padCoilSink(s) {
+  const u = Math.max(0, Math.min(1, (s - PAD_COIL_SINK_START) / (1 - PAD_COIL_SINK_START)));
+  return u * u * (3 - 2 * u) + (u * u * u - u * u) * PAD_COIL_SINK_SLOPE;
+}
 const _windForward = new THREE.Vector3();
 const _windSide = new THREE.Vector3();
 const _windNormal = new THREE.Vector3();
+/** Unit in-plane heading of a raised pad's coil on one side of the tunnel. */
+export function padCoilHeadingInto(out, tunnel, side) {
+  const tile = side === 'exit' ? tunnel.exit : tunnel.entry;
+  const stored = side === 'exit' ? tunnel.exitHeading : tunnel.entryHeading;
+  const n = TUNNEL_FACE_NORMALS[tile.dirKey] || ZERO3;
+  _windNormal.fromArray(n);
+  out.fromArray(stored ?? DIR_FORWARD[tile.dirKey]?.up ?? [0, 1, 0]).projectOnPlane(_windNormal);
+  if (out.lengthSq() < 1e-8) out.fromArray(DIR_FORWARD[tile.dirKey]?.up ?? [0, 1, 0]);
+  return out.normalize();
+}
 export const getWindWorldPosInto = (out, tunnel, side, s, size, explosionFactor = wormExpansion.amount) => {
   const tile = side === 'exit' ? tunnel.exit : tunnel.entry;
   const n = TUNNEL_FACE_NORMALS[tile.dirKey] || ZERO3;
   const wp = getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, tunnel.padExpansion ?? explosionFactor);
   const cl = Math.max(0, Math.min(1, s));
   const orbit = tunnel.padHeight > 0;
-  const dive = orbit ? THREE.MathUtils.smoothstep(cl, 0.82, 1) : cl;
+  const dive = orbit ? padCoilSink(cl) : cl;
   const lift = (tunnel.padHeight ?? 0) + THREE.MathUtils.lerp(WORM_LIFT, TUNNEL_ANCHOR_OFFSET - SURFACE_OFFSET, dive);
   out.set(wp[0] + n[0] * lift, wp[1] + n[1] * lift, wp[2] + n[2] * lift);
   if (orbit) {
-    const radius = 0.38 * THREE.MathUtils.smoothstep(cl, 0, 0.12)
-      * (1 - THREE.MathUtils.smoothstep(cl, 0.70, 0.82));
-    const angle = Math.PI * 2 * THREE.MathUtils.smoothstep(cl, 0.12, 0.70);
-    _windNormal.fromArray(n);
-    _windForward.fromArray(DIR_FORWARD[tile.dirKey]?.up ?? [0, 1, 0]);
-    _windSide.crossVectors(_windForward, _windNormal);
-    out.addScaledVector(_windForward, radius * Math.cos(angle))
-      .addScaledVector(_windSide, radius * Math.sin(angle))
-      .addScaledVector(_windNormal, radius * 0.3);
+    // A circle through the pad centre, tangent to the heading there: it
+    // leaves forward, bends round to one side and returns over the mouth.
+    const turn = 2 * Math.PI * padCoilTurn(cl);
+    padCoilHeadingInto(_windForward, tunnel, side);
+    _windSide.crossVectors(_windNormal.fromArray(n), _windForward);
+    out.addScaledVector(_windForward, PAD_COIL_DIAMETER / 2 * Math.sin(turn))
+      .addScaledVector(_windSide, PAD_COIL_DIAMETER / 2 * (1 - Math.cos(turn)));
   }
   return out;
 };

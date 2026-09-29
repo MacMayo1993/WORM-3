@@ -18,7 +18,7 @@ import WormHat3D from '../wormCosmetics.jsx';
 import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp, getSkin } from '../wormCosmeticsData.js';
-import { WORM_LIFT, WORM_HEAD_RADIUS, FACE_NORMALS, DIR_FORWARD } from './constants.js';
+import { WORM_LIFT, WORM_HEAD_RADIUS, FACE_NORMALS, DIR_FORWARD, windoutHeadS } from './constants.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, MOBI_RADIUS } from '../mobiModel.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
@@ -37,6 +37,8 @@ const _faceForward = new THREE.Vector3();
 const _rocketFaceNormal = new THREE.Vector3();
 const _faceHeadPos = new THREE.Vector3();
 const _faceTunnelAhead = new THREE.Vector3(); // scratch for tunnel tangent during enter/exit
+const _faceTunnelBehind = new THREE.Vector3();
+const _faceFlightTurn = new THREE.Quaternion();
 const _mobiRideAxis = new THREE.Vector3();
 
 export function WormFace({ worm, size }) {
@@ -106,11 +108,17 @@ export function WormFace({ worm, size }) {
             normal = worm.currentNormal.current;
 
             if (phase === 'windout' || phase === 'windup') {
-                // Aim along the short mouth handoff. A fixed world-Z fallback
-                // would turn the face sideways on the other five face directions.
+                // Look along the mouth handoff itself: round a raised pad's coil
+                // and then down into the mouth (up out of it on exit). A fixed
+                // span keeps the direction defined at both ends of the curve.
                 const exiting = phase === 'windout';
-                getWindWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, exiting ? 'exit' : 'entry', exiting ? 0 : 1, size);
-                _faceForward.copy(_faceTunnelAhead).sub(_faceHeadPos);
+                const side = exiting ? 'exit' : 'entry';
+                const tp = THREE.MathUtils.clamp(worm.tunnelProgress.current, 0, 1);
+                const step = exiting ? -0.03 : 0.03;
+                const ahead = THREE.MathUtils.clamp((exiting ? windoutHeadS(tp) : tp) + step, 0, 1);
+                getWindWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, side, ahead, size);
+                getWindWorldPosInto(_faceTunnelBehind, worm.activeTunnel.current, side, THREE.MathUtils.clamp(ahead - step, 0, 1), size);
+                _faceForward.subVectors(_faceTunnelAhead, _faceTunnelBehind);
                 if (_faceForward.lengthSq() < 1e-12) _faceForward.copy(normal).multiplyScalar(exiting ? 1 : -1);
                 _faceForward.normalize();
             } else {
@@ -126,6 +134,15 @@ export function WormFace({ worm, size }) {
 
             // Head rides the ribbon/spiral centerline; the layout places the face
             // on the head sphere from its centre.
+        } else if (worm.padFlight?.current) {
+            // A pad flight carries the head along its arc. The crawl
+            // interpolation still points at the tile the jump left from, which
+            // left the eyes on the floor while the head flew. Face the landing
+            // heading, turned with the flight's normal across a cube edge.
+            const flight = worm.padFlight.current;
+            normal = worm.currentNormal.current;
+            bodyPathHeadInto(_faceHeadPos, worm);
+            _faceForward.copy(flight.heading).applyQuaternion(_faceFlightTurn.setFromUnitVectors(flight.endNormal, normal));
         } else {
             const { dirKey } = worm.pos.current;
             normal = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;

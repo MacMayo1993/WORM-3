@@ -38,11 +38,45 @@ left on the cube surface to mark the opening below. The earlier 0.06 piece pop w
 - Whole cubies ease out for two seconds. The Möbius ribbon and rails grow together from
   both mouths, even when tunnel view is Off/Hints. Pause holds progress, and reduced motion
   presents the completed geometry immediately. Cosmetic pad settings cannot disable it.
-- Deliberate Jump captures the raised landing; it clears the ledge by 0.35 units and uses
-  the same sampled arc for head and tail. An early jump waits for the rise to complete.
+- Deliberate Jump captures the raised landing and uses the same sampled arc for head and
+  tail. An early jump hurries the rise to meet it (superseded; see the pad jump pass below).
   Unflipped faces on the same cubie remain jumpable, without triggering a tunnel ride.
 - This is a platform/perimeter correction. The existing crawl and tunnel-collapse death
   rules remain as documented below; it does not add a new fall-death trigger.
+
+### Smooth pad jump and dive — 2026-09-29
+
+Playtest: the jump into a tunnel looked broken on every board size. Measured at 60 Hz, the
+head froze for up to 0.4 s at the press, stopped dead in mid-air above the pad, and on a pad
+still forming (every demo run) stretched the whole flight into two seconds of slow motion.
+Touchdown whipped a full loop around the rim in 0.23 s at up to 15 units/s. The camera
+surged at the press, snapped to a point over the mouth, then rolled up to 180° while
+diving in. A render-side re-anchor also pinned the flying head to the floor tiles, so the
+body rose as a stalk behind a face that never left the ground.
+
+- **Flight.** One cubic Bézier from the visible head to the pad, walked uniformly in natural
+  time (near-ballistic): it leaves along the crawl and lands still moving. Its height is the
+  lowest that clears the raised piece (0.65 box) and the cube body, searched per jump, so
+  one rule works on every size and across edges. A head already under the piece backs out
+  first, starting near crawl pace. A short landing flare meets the pad at about the coil's
+  pace. Timing warps are closed-form, so touchdown lands exactly on time at any frame rate.
+- **Forming pads.** A jump at a pad that is still rising hurries its formation
+  (`rushPlatformFormation`): the same ease continues at a faster rate and finishes just
+  before touchdown, and the band grows in step. If a rise cannot be hurried, the wait
+  becomes hang time at the apex, never a frozen launch.
+- **Coil.** Touchdown flows into a circle through the pad centre, leaving along the landing
+  heading at about 2.2 units/s and slowing over the mouth. It sinks straight down into the
+  entry arm at the arm's own pace, and spare tick time carries across both handoffs. The
+  coil (0.3 across) keeps the head on the 0.85 pad. It takes `TUNNEL_ORBIT_SECONDS` (0.8);
+  the total inbound time is still four seconds. The exit runs it backwards into the
+  departure heading, and the crawl resumes on the same tick.
+- **Face and marker.** The face rides the flying head, facing the landing heading, and
+  looks along the coil. The landing ring marks the pad, not a floor tile.
+- **Camera.** Worm-and-pad framing holds for the whole flight and is critically damped in
+  and out. The windup swings from behind the landing heading with it as screen-up (no
+  roll), carrying the lens's landing motion. The dive keeps that up and rolls onto the
+  band's frame over the entry arm (≤ ~115°/s, down from 585–1,380°/s). Measured bounds live
+  in `padJumpSmoothness.test.jsx`.
 
 ### WORM low hover and unstable wormhole — earlier pass, superseded heights
 

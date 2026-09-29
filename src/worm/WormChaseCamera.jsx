@@ -1,4 +1,4 @@
-import { nearbyPlatform, makePlatformFrame, framePlatform } from './platformFraming.js';
+import { nearbyPlatform, makePlatformFrame, framePlatform, resetPlatformFrame } from './platformFraming.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov, wormTunnelFov } from './healerWorm/zoomLimit.js';
 import React, { useEffect, useRef } from 'react';
@@ -18,11 +18,11 @@ import {
     tunnelCamPoseInto,
     TUNNEL_CAM_NEAR,
     diveProgress,
-    portalDist,
     diveEase,
     blendTunnelPosesInto,
     tunnelExitPoseInto,
     tunnelEntryPoseInto,
+    windupPoseInto,
 } from './tunnelCameraRails.js';
 import {
     CAM_HEIGHT_BASE,
@@ -41,7 +41,7 @@ import {
 } from './healerWorm/constants.js';
 import { makeElementalRevealOrbit, sampleElementalRevealOrbit } from './elementalRevealOrbit.js';
 import { tunnelTraversalT } from '../utils/tunnelPath.js';
-import { getTunnelWorldPosInto } from './wormLogic.js';
+import { getTunnelWorldPosInto, padCoilHeadingInto } from './wormLogic.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
 const _camForward = new THREE.Vector3();
@@ -106,6 +106,7 @@ const FACE_TRANS_DURATION = 0.25;
 // Victory flourish: radians/sec the camera orbits the solved cube (~10s per revolution).
 const SOLVED_ORBIT_SPEED = 0.6;
 const _entryTileCenter = new THREE.Vector3();
+const _windupHeading = new THREE.Vector3();
 const _WORLD_UP = new THREE.Vector3(0, 1, 0);
 const _rails = makeTunnelCamPose();
 // Heal-focus scratch — the push-in framing while a ring heal freezes the worm.
@@ -201,6 +202,10 @@ export default function WormChaseCamera({ worm, size }) {
     const sliceFreezeActiveRef = useRef(false); // are we mid slice-death freeze frame?
     const sliceFreezeTRef = useRef(0);          // elapsed settle time of that freeze
     const phaseStartPose = useRef(makeTunnelCamPose());
+    const phaseStartVel = useRef(new THREE.Vector3());    // lens velocity when the phase began
+    const camVelRef = useRef(new THREE.Vector3());
+    const lastCamPosRef = useRef(new THREE.Vector3());
+    const lastCamDeltaRef = useRef(0);
     const transitionPose = useRef(makeTunnelCamPose());
     const elementalOrbitRef = useRef(null);
     const revealTRef = useRef(1);               // countdown reveal dolly progress (0 = fully pulled back)
@@ -229,6 +234,12 @@ export default function WormChaseCamera({ worm, size }) {
     useFrame((_, delta) => {
         // Match the simulation clock after a hitch; never snap the lens on resume.
         delta = Math.min(Math.max(0, delta), MAX_TICK_DELTA);
+        // How the lens moved last frame, so a handoff can carry that motion on.
+        if (lastCamDeltaRef.current > 0) {
+            camVelRef.current.subVectors(camera.position, lastCamPosRef.current).divideScalar(lastCamDeltaRef.current);
+        } else camVelRef.current.set(0, 0, 0);
+        lastCamPosRef.current.copy(camera.position);
+        lastCamDeltaRef.current = delta;
         const gameState = useGameStore.getState();
         const gamePhase = gameState.wormGamePhase ?? 'active';
         const newRun = cameraRunRef.current !== gameState.wormRunId;
@@ -526,6 +537,11 @@ export default function WormChaseCamera({ worm, size }) {
         }
 
         if (prevPhaseRef.current !== phase) {
+            // A landing hands over a moving lens. Bounded, so a hitch frame
+            // cannot fling the swing that follows.
+            phaseStartVel.current.copy(camVelRef.current).clampLength(0, 6);
+            // The entry pad's framing must not return with the worm at the exit.
+            if (phase !== 'crawling') resetPlatformFrame(platformFrame.current);
             phaseStartPose.current.cam.copy(camPosRef.current);
             phaseStartPose.current.look.set(0, 0, -1.6).applyQuaternion(camera.quaternion)
                 .add(phaseStartPose.current.cam);
@@ -734,7 +750,7 @@ export default function WormChaseCamera({ worm, size }) {
             if (!cutBeat && !(worm.healPauseT?.current > 0)) {
                 bodyPathHeadInto(_mobileHeadWorld, worm, false);
                 framePlatform(camera, platformFrame.current, nearbyPlatform(worm, size, gameState),
-                    _mobileHeadWorld, _camNormal, _camForward, delta);
+                    _mobileHeadWorld, _camNormal, _camForward, delta, !!worm.padFlight?.current);
                 if (platformFrame.current.weight > 0.001) {
                     camPosRef.current.copy(camera.position);
                     camera.getWorldDirection(platformFrame.current.direction);
@@ -764,14 +780,21 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
             tunnelState.tunnel = tunnel;
             if (phase === 'windup') {
-                _rails.cam.copy(_entryTileCenter).addScaledVector(entN, portalDist(size));
-                _rails.look.copy(_entryTileCenter);
-                // A face-tangent up remains valid when looking down ±Y.
-                _rails.up.set(Math.abs(entN.y) > 0.9 ? 1 : 0, Math.abs(entN.y) > 0.9 ? 0 : 1, 0);
+                // Swing over the pad from behind the landing heading, with the
+                // heading as screen-up: pitching down from the chase needs no
+                // roll, whichever way the worm arrived. The dive continues from here.
+                padCoilHeadingInto(_windupHeading, tunnel, 'entry');
+                windupPoseInto(_rails, _entryTileCenter, entN, _windupHeading, size);
                 // Reach the mouth during the handoff, ready to follow the head
                 // inside immediately instead of starting another outside hold.
                 blendTunnelPosesInto(transitionPose.current, phaseStartPose.current, _rails,
                     diveEase(tp));
+                // Carry the lens's landing motion into the swing, fading it out,
+                // rather than stopping it dead on the touchdown frame.
+                const handoff = tunnelHandoffSeconds(tunnel), elapsed = tp * handoff;
+                const carry = elapsed * (1 - tp) * (1 - tp);
+                transitionPose.current.cam.addScaledVector(phaseStartVel.current, carry);
+                transitionPose.current.look.addScaledVector(phaseStartVel.current, carry);
             } else {
                 tunnelEntryPoseInto(transitionPose.current, tunnel, tp, size, phaseStartPose.current);
             }

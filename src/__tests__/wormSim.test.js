@@ -32,6 +32,7 @@ import {
   activeTunnelCap,
   MAX_ACTIVE_TUNNEL_PAIRS,
   SURFACE_JUMP_HEIGHT,
+  TUNNEL_ORBIT_SECONDS,
 } from '../worm/healerWorm/constants.js';
 import { makeCubies } from '../game/cubeState.js';
 import * as THREE from 'three';
@@ -751,7 +752,8 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(elapsed.exiting + elapsed.windout).toBeCloseTo(4, 6);
     expect(Object.values(elapsed).reduce((a, b) => a + b, 0)).toBeCloseTo(10, 6);
     expect(elapsed.entering).toBeCloseTo(elapsed.exiting, 6);
-    expect(elapsed.windup).toBeLessThanOrEqual(.4 + 1e-9);
+    // Raised pads spend the orbit time on the landing coil; crawl entries hand off faster.
+    expect(elapsed.windup).toBeLessThanOrEqual(TUNNEL_ORBIT_SECONDS + 1e-9);
     expect(sim.pos.dirKey).toBe('NZ');
   });
 
@@ -1556,7 +1558,9 @@ describe('raised WORM platforms', () => {
     expect(sim.onRaisedPlatform).toBe(true);
     expect(sim.headInterpPos.z).toBeCloseTo(1.52 + WORM_PIECE_POP + WORM_PAD_HEIGHT + 0.08, 6);
     expect(sim.stepHistory.count).toBeGreaterThan(64);
-    expect(shAt(sim.stepHistory, 0).pos.distanceTo(sim.headInterpPos)).toBeLessThan(1e-6);
+    // The landing tick spends its leftover time on the coil. The trail keeps up
+    // with the head to within its minimum sample spacing (0.01) plus one sample.
+    expect(shAt(sim.stepHistory, 0).pos.distanceTo(sim.headInterpPos)).toBeLessThan(0.012);
   });
   it("lands on a raised unflipped face without entering a tunnel", () => {
     const sim = makeSim();
@@ -1591,7 +1595,9 @@ describe('raised WORM platforms', () => {
   it('rescue jumps can land on a pad without triggering a ride', () => {
     const sim = makeSim(), ctx = platformCtx(sim);
     startJump(sim, ctx, SIZE, { allowDive: false });
-    for (let i = 0; i < 40; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
+    expect(sim.padFlight).toBeTruthy();
+    for (let i = 0; i < 120 && sim.padFlight; i++) stepWormSim(sim, 1 / 60, SIZE, ctx);
+    stepWormSim(sim, 1 / 60, SIZE, ctx);
     expect(sim.phase).toBe('crawling');
     expect(sim.onRaisedPlatform).toBe(true);
   });
@@ -1669,7 +1675,7 @@ it('holds a raised tunnel open throughout the reverse orbit, including a short t
     stepWormSim(sim, 1 / 60, SIZE, ctx);
     expect(ctx.events.some(e => e.type === 'heal')).toBe(false);
   }
-  expect(frames / 60).toBeCloseTo(.4, 6);
+  expect(frames / 60).toBeCloseTo(TUNNEL_ORBIT_SECONDS, 6);
   expect(sim.phase).toBe('crawling');
   stepWormSim(sim, 1 / 60, SIZE, ctx);
   expect(ctx.events.filter(e => e.type === 'heal')).toHaveLength(1);
