@@ -14,7 +14,7 @@ vi.mock('../components/screens/wizardSteps/CubePlate.jsx', () => ({ default: ({ 
 const design = { version: 1, recipe: btoa(JSON.stringify({ v: 1, grp: 'I', seed: 87 })), thumbnail: 'data:image/jpeg;base64,YQ==' };
 let root, host, before;
 const frame = () => document.querySelector('iframe');
-const button = text => [...document.querySelectorAll('button')].find(b => b.textContent === text);
+const button = text => [...document.querySelectorAll('button')].find(b => b.textContent === text || b.getAttribute('aria-label') === text);
 const message = (type, extra = {}, origin = location.origin, source = frame().contentWindow) => act(() => {
   window.dispatchEvent(new MessageEvent('message', { origin, source, data: { type: `projectiscope:${type}`, ...extra } }));
 });
