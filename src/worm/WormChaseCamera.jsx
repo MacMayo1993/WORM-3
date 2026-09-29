@@ -1,4 +1,5 @@
 import { nearbyPlatform, makePlatformFrame, framePlatform } from './platformFraming.js';
+import { OPENING_FOV, openingCameraDistance } from './healerWorm/openingRotation.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov, wormTunnelFov } from './healerWorm/zoomLimit.js';
 import React, { useEffect, useRef } from 'react';
@@ -357,7 +358,14 @@ export default function WormChaseCamera({ worm, size }) {
         // leftover position/up-vector data (the intermittent "starts inside the cube /
         // upside down" glitch).
         if (gamePhase === 'scrambling' || (awaitingStory && !gameState.wormStoryReady)) {
-            const dist = 5 + size * 4.0;
+            // Own the lens too: retries used to inherit a tunnel/rocket FOV.
+            // Fit the full swept cube to the viewport, including narrow phones.
+            if (gamePhase === 'scrambling' && camera.fov !== OPENING_FOV) {
+                camera.fov = OPENING_FOV;
+                camera.updateProjectionMatrix();
+            }
+            const dist = gamePhase === 'scrambling'
+                ? openingCameraDistance(size, viewportAspect) : 5 + size * 4.0;
             _camTargetCam.set(0.6, 1.1, 1).normalize().multiplyScalar(dist);
             _camTargetLook.set(0, 0, 0);
             // Snap straight to the overview framing the instant a new run's scramble

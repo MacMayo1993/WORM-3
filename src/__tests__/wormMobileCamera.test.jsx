@@ -366,3 +366,29 @@ it.each([3, 7, 15])('frames the head and a raised cubie together on a portrait s
     }
   } finally { useGameStore.setState(before, true); }
 });
+
+it.each([2, 3, 4, 5, 6, 7, 8, 9, 10, 15])('fits every rotating corner of the size-%i opening on portrait and landscape screens', size => {
+  const worm = makeWorm(size);
+  for (const [width, height] of [[320, 568], [430, 850], [568, 320], [1280, 800]]) {
+    scene.size = { width, height };
+    scene.camera.aspect = width / height;
+    scene.camera.fov = 100; // retry after a tunnel/rocket shot
+    scene.camera.updateProjectionMatrix();
+    scene.camera.position.set(0, 0, 0);
+    useGameStore.setState({ wormGamePhase: 'scrambling', wormRunId: `${size}:${width}` });
+    render(worm, size); tick();
+    expect(scene.camera.fov).toBe(55);
+    for (const axis of [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]) {
+      for (const angle of [0, Math.PI / 8, Math.PI / 4, Math.PI / 2]) {
+        for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+          const ndc = new Vector3(x, y, z).multiplyScalar(size / 2 + .04)
+            .applyAxisAngle(axis, angle).project(scene.camera);
+          expect(Math.abs(ndc.x)).toBeLessThan(.9);
+          expect(Math.abs(ndc.y)).toBeLessThan(.9);
+          expect(ndc.z).toBeGreaterThan(-1);
+          expect(ndc.z).toBeLessThan(1);
+        }
+      }
+    }
+  }
+});
