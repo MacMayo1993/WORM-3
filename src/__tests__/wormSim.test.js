@@ -1273,8 +1273,18 @@ describe('contextual jump mechanics', () => {
     shPush(sim.stepHistory, new THREE.Vector3(0, 1, 1.75), normal, 1, 1, 2);
     expect(hasJumpClearance(sim)).toBe(false);
     advanceInchGaitState(sim.bodyGait, 1, 100, 10);
-    Object.assign(sim.bodyGait, { enabled: true, move: 1, phase: 0 });
-    expect(hasJumpClearance(sim)).toBe(true);
+    // Loops are narrower than the head's clearance window is long, so only a loop
+    // standing right over the crossing lifts the whole strand clear: roll the gait
+    // round one pitch and find it.
+    const { spacing } = sim.bodyGait.shape;
+    const clears = (phase) => {
+      Object.assign(sim.bodyGait, { enabled: true, move: 1, phase });
+      return hasJumpClearance(sim);
+    };
+    let phase = 0;
+    while (phase < spacing && !clears(phase)) phase += spacing / 100;
+    expect(phase).toBeLessThan(spacing);
+    expect(clears(phase)).toBe(true);
     sim.bodyGait.move = 0;
     expect(hasJumpClearance(sim)).toBe(false);
   });

@@ -25,6 +25,7 @@ import {
   INCH_ARCH_ASPECT,
   INCH_ARCH_DUTY,
   INCH_MAX_PITCH,
+  INCH_ANCHOR_LENGTH,
   INCH_SKEW
 } from '../worm/healerWorm/inchGait.js';
 import { CORNER_STEP_LENGTH } from '../worm/healerWorm/wormSim.js';
@@ -85,13 +86,17 @@ describe('inch worm gait', () => {
     // the phase sends it forward at twice the crawl speed instead, which is what read
     // as the animation spazzing.
     const count = 400;
+    // A window around one crest, narrower than the loop pitch so it only ever
+    // holds that one: every crest away from the head has the same height.
+    const { spacing } = inchLoopShape(count);
+    const centre = -Math.round(6 / spacing) * spacing;
     const crestWorld = (phase) => {
       let best = -1;
       let where = 0;
       for (let i = 1; i < count; i++) {
         const g = gait(i, count, phase);
         const w = phase - g.dist;
-        if (w > -7 && w < -5 && g.arch > best) {
+        if (Math.abs(w - centre) < 0.4 * spacing && g.arch > best) {
           best = g.arch;
           where = w;
         }
@@ -112,13 +117,15 @@ describe('inch worm gait', () => {
     // the body as the worm advances. Track one crest by the world spot it stands on,
     // since every crest away from the head has exactly the same height.
     const count = 400;
+    const { spacing } = inchLoopShape(count);
+    const centre = -Math.round(6 / spacing) * spacing;
     const crestIndex = (phase) => {
       let best = -1;
       let at = 0;
       for (let i = 1; i < count; i++) {
         const g = gait(i, count, phase);
         const w = phase - g.dist;
-        if (w > -7 && w < -5 && g.arch > best) { best = g.arch; at = i; }
+        if (Math.abs(w - centre) < 0.4 * spacing && g.arch > best) { best = g.arch; at = i; }
       }
       expect(best).toBeGreaterThan(0.5);
       return at;
@@ -133,7 +140,7 @@ describe('inch worm gait', () => {
     for (const count of [40, 400, 1200]) {
       const shape = inchLoopShape(count);
       // Skip the head taper, where the rise is deliberately eased in.
-      const skip = Math.ceil(Math.min(shape.halfWidth, shape.bodyArc * 0.25) / INCH_BALL_SPACING) + 1;
+      const skip = Math.ceil(Math.min(Math.max(shape.halfWidth, INCH_ANCHOR_LENGTH), shape.bodyArc * 0.25) / INCH_BALL_SPACING) + 1;
       let min = Infinity;
       let max = 0;
       for (let p = 0; p < 24; p++) {
@@ -200,7 +207,7 @@ describe('inch worm gait', () => {
     const count = 400;
     const shape = inchLoopShape(count);
     // Past the head taper, which eases beads into the gait on purpose.
-    const skip = Math.ceil(shape.halfWidth / INCH_BALL_SPACING) + 1;
+    const skip = Math.ceil(Math.max(shape.halfWidth, INCH_ANCHOR_LENGTH) / INCH_BALL_SPACING) + 1;
     let flatPairs = 0;
     let lifted = 0;
     for (let p = 0; p < 30; p++) {
@@ -230,6 +237,17 @@ describe('inch worm gait', () => {
     for (let k = 0; k < counts.length; k++) {
       expect(Math.abs(loops[k] - inchHumpCount(counts[k]))).toBeLessThanOrEqual(1);
     }
+    // ...and not only once the body is enormous: the lengths a run actually reaches
+    // (4 beads, +3 per orb) carry more loops as they grow, not one lone hump.
+    const inRun = (count) => {
+      let most = 0;
+      for (let p = 0; p < 60; p++) most = Math.max(most, countLoops(count, p * 0.05));
+      return most;
+    };
+    expect(inRun(22)).toBeGreaterThanOrEqual(2);
+    expect(inRun(31)).toBeGreaterThanOrEqual(3);
+    expect(inRun(40)).toBeGreaterThanOrEqual(4);
+    expect(inRun(40)).toBeGreaterThan(inRun(22));
     // A fresh worm still inches — one loop passes over it at a time.
     let sawALoop = false;
     for (let p = 0; p < 60; p++) if (countLoops(8, p * 0.05) >= 1) sawALoop = true;
@@ -253,8 +271,14 @@ describe('inch worm gait', () => {
     for (let i = crest; i < count && a[i] > 0.02; i++) behind++;
     for (let i = crest; i >= 0 && a[i] > 0.02; i--) ahead++;
     expect(behind).toBeGreaterThan(ahead);
-    // No cliff at either edge of a loop.
-    for (let i = 1; i < count; i++) expect(Math.abs(a[i] - a[i - 1])).toBeLessThan(0.35);
+    // No cliff at either edge of a loop: a bead leaving the ground or landing
+    // eases in from zero rather than popping.
+    const { height } = inchLoopShape(count);
+    for (let i = 1; i < count; i++) {
+      if (Math.min(a[i], a[i - 1]) === 0) expect(Math.max(a[i], a[i - 1]) * height).toBeLessThan(0.6 * INCH_BALL_SPACING);
+      // ...and even the steep leading face never lifts a bead as far as it travels.
+      expect(Math.abs(a[i] - a[i - 1]) * height).toBeLessThan(0.85 * INCH_BALL_SPACING);
+    }
   });
 
   it('never slides a segment more than one loop can account for', () => {
