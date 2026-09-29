@@ -1289,6 +1289,72 @@ describe('contextual jump mechanics', () => {
     expect(hasJumpClearance(sim)).toBe(false);
   });
 
+  function makeInchCrossing(dirKey = 'PZ') {
+    const sim = makeSim();
+    const normal = new THREE.Vector3(...({ PZ: [0, 0, 1], NZ: [0, 0, -1],
+      PX: [1, 0, 0], NX: [-1, 0, 0], PY: [0, 1, 0], NY: [0, -1, 0] }[dirKey]));
+    const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    const point = (x, y, z = 1.6) => new THREE.Vector3(x, y, z).applyQuaternion(rotation);
+    sim.pos.dirKey = dirKey;
+    sim.prevWorldPos = point(-1, 0, 1.52);
+    sim.curWorldPos = point(1, 0, 1.52);
+    sim.tailLength = 100;
+    // Head -> left corner -> upper corner -> crossing strand. Every record
+    // lies on the ordinary crawl plane; only the actual gait creates the gap.
+    shReset(sim.stepHistory);
+    for (const [x, y] of [[0, -1], [0, 1], [-1, 1], [-1, 0]]) {
+      shPush(sim.stepHistory, point(x, y), normal, 1, 1, 2);
+    }
+    advanceInchGaitState(sim.bodyGait, 1, sim.tailLength, 10);
+    Object.assign(sim.bodyGait, { enabled: true, move: 1 });
+    return sim;
+  }
+
+  it.each(['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'])(
+    'crawls all the way beneath a ground-level Inch hump on %s', dirKey => {
+      const sim = makeInchCrossing(dirKey);
+      const pitch = sim.bodyGait.shape.spacing;
+      sim.interpT = 0;
+      sim.bodyGait.phase = 3 % pitch;
+      // The rescue forecast must see the same planted opening as live motion.
+      for (const progress of [0.4, 0.5, 0.6, 0.8, 1]) {
+        expect(hasJumpClearance(sim, progress)).toBe(true);
+      }
+      for (let i = 0; i <= 100; i++) {
+        sim.interpT = i / 100;
+        sim.bodyGait.phase = 3 % pitch + 2 * sim.interpT;
+        expect(hasJumpClearance(sim), `crossing ${i}%`).toBe(true);
+      }
+      // The feet and an unraised body are still solid.
+      sim.interpT = 0.5;
+      sim.bodyGait.phase = 4 % pitch + pitch / 2;
+      expect(hasJumpClearance(sim)).toBe(false);
+      sim.bodyGait.move = 0;
+      expect(hasJumpClearance(sim)).toBe(false);
+    });
+
+  it.each([30, 60, 120])('survives a live Inch underpass at %i fps without a rescue prompt', fps => {
+    const sim = makeInchCrossing();
+    sim.curWorldPos.set(0, 0, 1.52);
+    sim.interpT = 0;
+    sim.stepAcc = 0;
+    sim.moveDir = 'right';
+    sim.crawlDistance = sim.bodyGait.phase = sim.bodyGait.crawled = 3 % sim.bodyGait.shape.spacing;
+    sim.pendingSelfCollision = { key: tileKey(sim.pos) };
+    ttReset(sim.tileTrail, tileKey(sim.pos));
+    ttPush(sim.tileTrail, tileKey(sim.pos));
+    const ctx = makeCtx({ getCharacter: () => 'inch', isJumpRescueEnabled: () => true,
+      onJumpRescue: active => ctx.events.push({ type: 'rescue', args: [active] }) });
+    for (let i = 0; i < fps * 2 && sim.headInterpPos.x < 0.3; i++) {
+      stepWormSim(sim, 1 / fps, SIZE, ctx);
+      expect(sim.alive).toBe(true);
+      expect(sim.jumpRescueHeld).toBe(false);
+      expect(sim.bodyGait.crawled).toBeCloseTo(sim.crawlDistance, 10);
+    }
+    expect(sim.headInterpPos.x).toBeGreaterThanOrEqual(0.3);
+    expect(eventsOf(ctx, 'rescue')).toHaveLength(0);
+  });
+
   it('requires real clearance and detects an already airborne body underneath', () => {
     const sim = makeSim();
     sim.interpT = 1;

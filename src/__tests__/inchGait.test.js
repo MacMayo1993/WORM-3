@@ -275,7 +275,9 @@ describe('inch worm gait', () => {
     // eases in from zero rather than popping.
     const { height } = inchLoopShape(count);
     for (let i = 1; i < count; i++) {
-      if (Math.min(a[i], a[i - 1]) === 0) expect(Math.max(a[i], a[i - 1]) * height).toBeLessThan(0.6 * INCH_BALL_SPACING);
+      // The planted head is forced to zero even when it sits beneath a crest;
+      // its separate neck taper is not a loop's ground contact.
+      if (i > 1 && Math.min(a[i], a[i - 1]) === 0) expect(Math.max(a[i], a[i - 1]) * height).toBeLessThan(0.6 * INCH_BALL_SPACING);
       // ...and even the steep leading face never lifts a bead as far as it travels.
       expect(Math.abs(a[i] - a[i - 1]) * height).toBeLessThan(0.85 * INCH_BALL_SPACING);
     }

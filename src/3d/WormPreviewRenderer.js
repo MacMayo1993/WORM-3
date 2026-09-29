@@ -206,6 +206,8 @@ function _frameCamera(framing, characterId, aspect = 1) {
   camera.zoom = characterId === 'mobi' && (framing === 'head' || framing === 'portrait') ? 0.68 : 1;
   // Keep the larger Dancer head and its hats inside the existing closeups.
   if (characterId === 'wiggle' && (framing === 'head' || framing === 'portrait')) camera.zoom = HEAD_SCALE / WORM_HEAD_RADIUS;
+  // Inch's walkable arches carry backpacks higher and closer to this camera.
+  if (characterId === 'inch' && framing === 'body') camera.zoom = 0.8;
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
   // Yaw the worm rather than orbit the camera: the face reads best turned a
