@@ -412,9 +412,6 @@ export default function WORM3() {
   // Parity instability — flipped tiles spontaneously re-flip and propagate
   useParityDecay();
 
-  // Random style cycling — randomizes colors and tiles every 15s
-  useRandomMode();
-
   // Screen shake on each style cycle
   const randomStyleTick = useGameStore(s => s.randomStyleTick);
   const [randomShaking, setRandomShaking] = useState(false);
@@ -540,6 +537,8 @@ export default function WORM3() {
   const [mobiLines, setMobiLines] = useState([]);
   const [mobiModeName, setMobiModeName] = useState('');
   const pendingMobiAction = useRef(null);
+  // These local screens precede wormHealerMode, so wormPaused cannot gate them.
+  useRandomMode(showMobiIntro || showWormModeWizard || showRandomWizard);
 
   const launchWithMobi = useCallback((lines, modeName, postAction) => {
     setMobiLines(lines);
@@ -1415,6 +1414,10 @@ export default function WORM3() {
             showSettings ? <color attach="background" args={['#000005']} /> : (
               <MenuScene onCubeClick={handleMenuTeach} background={menuBackground} />
             )
+          ) : showMobiIntro || showWormModeWizard ? (
+            // Mobi is a DOM introduction. Mount the game only after dismissal;
+            // compiling an unseen Random cube can freeze speech and controls.
+            <color attach="background" args={['#000005']} />
           ) : (
             <Suspense fallback={null}>
               <GameScene

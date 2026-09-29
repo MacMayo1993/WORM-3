@@ -1,4 +1,6 @@
 import { resolveBiomeManifoldStyles } from '../../modes/CityBiomeMode.js';
+import { isMobile } from '../../utils/device.js';
+import { LIGHT_REMIX_STYLES } from '../../utils/randomStyles.js';
 // Each chapter borrows a complete authored look; player cosmetics stay owned
 // and equipped independently. Face/color IDs retain their gameplay meaning.
 // `view` borrows the cube's other presentations for a level: a visual mode
@@ -85,11 +87,15 @@ const VISUAL_KEYS = ['colorScheme', 'customColors', 'backgroundTheme', 'manifold
 // saved and restored separately from the player's persisted look.
 const VIEW_KEYS = ['visualMode', 'hollowMode', 'randomMode', 'showAntipodalPiP'];
 
-export function storyAppearance(id) {
+export function storyAppearance(id, reducedFX = false) {
   const look = STORY_WORLDS[id];
+  // The authored shaders otherwise load before Random's first ten-second cycle,
+  // bypassing the mobile pool entirely on launch and every retry.
+  const styles = look?.view.randomMode && (isMobile || reducedFX)
+    ? Object.fromEntries(LIGHT_REMIX_STYLES.map((style, i) => [i + 1, style])) : look?.styles;
   return look ? {
     colorScheme: look.palette, customColors: null, backgroundTheme: look.background,
-    manifoldStyles: { ...look.styles }, biomeMode: { enabled: false, faceAssignment: null },
+    manifoldStyles: { ...styles }, biomeMode: { enabled: false, faceAssignment: null },
   } : null;
 }
 
@@ -113,7 +119,7 @@ export function persistentStorySettings(state) {
 }
 
 export function storyVisualChanges(state, id) {
-  const appearance = storyAppearance(id);
+  const appearance = storyAppearance(id, state.perfReducedFX);
   if (!appearance) return state.wormStoryVisualBase
     ? { settings: persistentStorySettings(state), wormStoryVisualBase: null, ...(state.wormStoryViewBase ?? {}), wormStoryViewBase: null } : {};
   const base = state.wormStoryVisualBase ?? Object.fromEntries(VISUAL_KEYS.map(key => [key, state.settings[key]]));
