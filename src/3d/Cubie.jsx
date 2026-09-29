@@ -174,11 +174,16 @@ const Cubie = React.forwardRef(function Cubie({
   // (randomStyleTick). Keyed by the piece's home position so the style follows the
   // physical cubelet through rotations rather than flickering. Outside Random Mode the
   // global View-tab visualMode applies to the whole cube exactly as before.
-  const effectiveVisualMode = useMemo(
-    () => (powerView ?? (wormNeon ? 'neon' : randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick,
-      isMobile || perfReducedFX ? LIGHT_CUBELET_VIEW_STYLES : PER_CUBELET_VIEW_STYLES) : visualMode)),
-    [powerView, wormNeon, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ, perfReducedFX]
-  );
+  const effectiveVisualMode = useMemo(() => {
+    if (powerView) return powerView;
+    if (wormNeon) return 'neon';
+    if (!randomMode) return visualMode;
+    // Preserve batching and avoid font workers/material remounts while a mobile
+    // worm is running. Palette changes still remix the board every ten seconds.
+    if (wormMode && (isMobile || perfReducedFX)) return 'classic';
+    return pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick,
+      isMobile || perfReducedFX ? LIGHT_CUBELET_VIEW_STYLES : PER_CUBELET_VIEW_STYLES);
+  }, [powerView, wormNeon, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ, perfReducedFX, wormMode]);
 
   // Derived per-style render switches.
   const isLego = effectiveVisualMode === 'lego';

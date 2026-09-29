@@ -1,7 +1,7 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { useRandomMode, LIGHT_REMIX_STYLES } from '../hooks/useRandomMode.js';
+import { useRandomMode } from '../hooks/useRandomMode.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { TILE_STYLES } from '../utils/colorSchemes.js';
@@ -35,11 +35,11 @@ it('does not remix behind Mobi before Worm mode exists, then starts a full play 
 
 it.each([26, 30, 40])('uses lightweight shaders from the first frame of Random chapter %s', id => {
   device.mobile = true;
-  expect(Object.values(storyAppearance(id).manifoldStyles)).toEqual(LIGHT_REMIX_STYLES);
+  expect(Object.values(storyAppearance(id).manifoldStyles)).toEqual(Array(6).fill('solid'));
   device.mobile = false;
   expect(storyAppearance(id).manifoldStyles).toEqual(STORY_WORLDS[id].styles);
   const state = { ...useGameStore.getState(), perfReducedFX: true };
-  expect(Object.values(storyVisualChanges(state, id).settings.manifoldStyles)).toEqual(LIGHT_REMIX_STYLES);
+  expect(Object.values(storyVisualChanges(state, id).settings.manifoldStyles)).toEqual(Array(6).fill('solid'));
   expect(storyAppearance(25, true).manifoldStyles).toEqual(STORY_WORLDS[25].styles);
 });
 afterEach(() => {
@@ -66,7 +66,7 @@ it.each(['mobile', 'reduced effects'])('bounds shader variety across a full Remi
     expect(state.wormPaused).toBe(false);
     expect(Object.values(state.settings.manifoldStyles)).toHaveLength(6);
     for (const style of Object.values(state.settings.manifoldStyles)) {
-      expect(LIGHT_REMIX_STYLES).toContain(style);
+      expect(style).toBe('solid');
       expect(TILE_STYLES[style].cost).toBe('low');
       expect(TILE_STYLES[style].type).not.toBe('3d');
     }

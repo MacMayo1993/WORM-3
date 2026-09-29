@@ -12,6 +12,7 @@ const CYCLE_MS = 10000;
 
 const SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'biome' && k !== 'custom');
 const TILE_KEYS = Object.keys(TILE_STYLES);
+const BATCHED_TILE_KEYS = ['solid'];
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -19,7 +20,9 @@ function pick(arr) {
 
 function applyRandomStyle() {
   const state = useGameStore.getState();
-  const tileKeys = isMobile || state.perfReducedFX ? LIGHT_REMIX_STYLES : TILE_KEYS;
+  const constrained = isMobile || state.perfReducedFX;
+  const tileKeys = constrained && state.wormHealerMode ? BATCHED_TILE_KEYS
+    : constrained ? LIGHT_REMIX_STYLES : TILE_KEYS;
   const scheme = pick(SCHEME_KEYS);
   const manifoldStyles = {};
   for (let i = 1; i <= 6; i++) manifoldStyles[i] = pick(tileKeys);
