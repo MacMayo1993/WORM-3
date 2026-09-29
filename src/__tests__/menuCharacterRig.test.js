@@ -15,7 +15,11 @@ it.each(WORM_CHARACTERS.map(c => c.id))('poses and disposes the shared %s charac
   rig.group.updateMatrixWorld(true);
   rig.group.traverse(o => { if (o.isMesh) expect(o.matrixWorld.elements.every(Number.isFinite)).toBe(true); });
   if (character === 'mobi') expect(rig.group.getObjectByName('transparent-body')).toBeDefined();
-  if (character === 'book') expect(rig.segments[2].hinges).toHaveLength(2);
+  if (character === 'book') {
+    // Every body segment is a whole volume: a spine and two hinged boards.
+    for (const segment of rig.segments.slice(1)) expect(segment.book.hinges).toHaveLength(2);
+    expect(rig.segments[0].book ?? null).toBeNull();
+  }
   if (character === 'prism') expect(rig.segments[1].holder.children[0].geometry.type).toBe('IcosahedronGeometry');
   rig.dispose();
 });

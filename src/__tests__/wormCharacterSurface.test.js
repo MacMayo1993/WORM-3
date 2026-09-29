@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto } from '../worm/healerWorm/bodySurface.js';
-import { createBookPageGeometry, PAGE_GEO_ARGS, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_HINGE_Y, pageHingeAngles, smoothTurn, turnSignalFromDirections } from '../worm/wormBookFX.js';
+import {
+  createBookParts, disposeBookParts, bookCoverAngles, bookCoverMatrixInto, bookScaleForRadius, bookVolumeScale, bookGroundLift,
+  BOOK_PART, BOOK_BELLY, BOOK_MAX_ANGLE, BOOK_BANK_GAIN, BOOK_BREATH_RATE, BOOK_BREATH_PHASE, smoothTurn, turnSignalFromDirections
+} from '../worm/wormBookFX.js';
 
 const idle = { active: false, sliceIndices: [], angles: [] };
 const axes = ['x', 'y', 'z'];
@@ -79,24 +82,74 @@ describe('character surface clearance', () => {
 });
 
 describe('bookworm geometry', () => {
-  it('uses mirrored curved leaves and a low bound page stack', () => {
-    const left = createBookPageGeometry(1), right = createBookPageGeometry(-1);
-    const l = left.attributes.position, r = right.attributes.position;
-    const heights = new Set(Array.from({ length: l.count }, (_, i) => l.getY(i).toFixed(4)));
-    expect(heights.size).toBeGreaterThan(4); // a box has just two Y planes
-    left.computeBoundingBox(); right.computeBoundingBox();
-    expect(left.boundingBox.max.y).toBeCloseTo(right.boundingBox.max.y, 6);
-    expect(PAGE_HINGE_Y + PAGE_LAYER_COUNT * PAGE_LAYER_GAP + left.boundingBox.max.y).toBeLessThan(PAGE_GEO_ARGS[0] * .3);
-    expect([...r.array].every(Number.isFinite)).toBe(true);
-    left.dispose(); right.dispose();
+  // Every vertex of a posed volume, in book units about the segment centre.
+  const posedBook = (parts, angles) => {
+    const points = [], v = new THREE.Vector3(), m = new THREE.Matrix4();
+    const each = (geometry, matrix) => {
+      const p = geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) points.push(v.fromBufferAttribute(p, i).applyMatrix4(matrix).clone());
+    };
+    each(parts.spine, m.identity());
+    each(parts.left, bookCoverMatrixInto(new THREE.Matrix4(), m.identity(), angles.left));
+    each(parts.right, bookCoverMatrixInto(new THREE.Matrix4(), m.identity(), angles.right));
+    return points;
+  };
+
+  it('builds a spine, mirrored boards and a page block from one binding', () => {
+    const parts = createBookParts();
+    for (const geometry of Object.values(parts)) {
+      expect([...geometry.attributes.position.array].every(Number.isFinite)).toBe(true);
+      expect(geometry.attributes.bookPart.count).toBe(geometry.attributes.position.count);
+    }
+    const kinds = g => new Set(g.attributes.bookPart.array);
+    expect([...kinds(parts.left)].sort()).toEqual([BOOK_PART.cover, BOOK_PART.board, BOOK_PART.paper].sort());
+    expect(kinds(parts.spine)).toEqual(new Set([BOOK_PART.spine, BOOK_PART.gilt]));
+    parts.left.computeBoundingBox(); parts.right.computeBoundingBox();
+    expect(parts.left.boundingBox.min.x).toBeCloseTo(-parts.right.boundingBox.max.x, 6);
+    expect(parts.left.boundingBox.max.x).toBeCloseTo(-parts.right.boundingBox.min.x, 6);
+    disposeBookParts(parts);
   });
 
-  it('keeps page banking bounded and smoothing independent of frame rate', () => {
-    for (const turn of [-100, -1, 0, 1, 100]) {
-      const { left, right } = pageHingeAngles(turn);
-      expect(Math.abs(left)).toBeLessThan(.35);
-      expect(Math.abs(right)).toBeLessThan(.35);
+  it('rests on the bead belly it replaces and never reaches through it', () => {
+    const parts = createBookParts();
+    for (const turn of [-100, -1, 0, 0.4, 1, 100]) for (const time of [0, 0.3, 1.1, 2.7]) for (const index of [1, 2, 7]) {
+      const points = posedBook(parts, bookCoverAngles(turn, time, index));
+      const low = Math.min(...points.map(p => p.y)), high = Math.max(...points.map(p => p.y));
+      expect(low).toBeGreaterThanOrEqual(-BOOK_BELLY - 1e-6);
+      // Lower and wider than a bead: the spine ridge stays under the bead's crown.
+      expect(high).toBeLessThan(BOOK_BELLY);
     }
+    // The most drooped board just meets the belly, so the pages sit on the tile.
+    const droop = posedBook(parts, { left: BOOK_MAX_ANGLE, right: -BOOK_MAX_ANGLE });
+    expect(Math.min(...droop.map(p => p.y))).toBeCloseTo(-BOOK_BELLY, 6);
+    disposeBookParts(parts);
+  });
+
+  it('grounds any size of volume and alternates sizes along the body', () => {
+    const radius = 0.1;
+    for (const index of [1, 2, 3, 4]) {
+      const scale = bookScaleForRadius(radius) * bookVolumeScale(index);
+      // Raised by the ground lift, the book's belly sits exactly `radius` below the centre.
+      expect(bookGroundLift(scale, radius) - BOOK_BELLY * scale).toBeCloseTo(-radius, 10);
+    }
+    expect(bookVolumeScale(1)).not.toBe(bookVolumeScale(2));
+    expect(bookVolumeScale(2)).toBe(bookVolumeScale(4));
+  });
+
+  it('keeps board banking bounded and smoothing independent of frame rate', () => {
+    for (const turn of [-100, -1, 0, 1, 100]) for (const time of [0, 0.5, 1.7]) {
+      const { left, right } = bookCoverAngles(turn, time, 3);
+      // Pitched down on both sides, never flat and never past the droop limit.
+      expect(left).toBeGreaterThan(0.4);
+      expect(-right).toBeGreaterThan(0.4);
+      expect(Math.max(left, -right)).toBeLessThanOrEqual(BOOK_MAX_ANGLE + 1e-9);
+      // A turn tips the spread like a seesaw: both boards by the same bank.
+      expect(left + right).toBeCloseTo(2 * Math.max(-1, Math.min(1, turn)) * BOOK_BANK_GAIN, 10);
+    }
+    // The breath is a wave running tailward: each volume takes the pose the
+    // one ahead of it had a beat earlier.
+    const beat = BOOK_BREATH_PHASE / BOOK_BREATH_RATE;
+    for (const time of [0, 0.4, 2.2]) expect(bookCoverAngles(0, time + beat, 4).left).toBeCloseTo(bookCoverAngles(0, time, 3).left, 10);
     let slow = 0, fast = 0;
     for (let i = 0; i < 30; i++) slow = smoothTurn(slow, 1, 1 / 30);
     for (let i = 0; i < 120; i++) fast = smoothTurn(fast, 1, 1 / 120);
