@@ -24,6 +24,8 @@ import { prefersReducedMotion } from '../utils/device.js';
 import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents, characterSegmentPattern } from '../worm/wormCharacterVisuals.js';
 import { animateWormFace } from '../worm/wormFaceExpression.js';
 import { finishWormEyes, wormBodyTaper } from '../worm/wormCharacterFinish.js';
+import { WIGGLE_BODY_SCALE, wiggleBodyOffset } from '../worm/wiggleBody.js';
+import { WORM_HEAD_RADIUS } from '../worm/healerWorm/constants.js';
 import * as THREE from 'three';
 import { createCubieGeometry, createStickerGeometry, rubiksFinish } from './rubiksPiece.js';
 import { RUBIKS_CLASSIC } from '../utils/constants.js';
@@ -55,7 +57,6 @@ const previewGait = { dist: 0, arch: 0 };
 const SEGMENTS = 9;          // head + 8 beads — a readable stretch of worm
 // Face features and the hat seat come from the shared layout (wormFaceLayout),
 // which is also what the played worm uses.
-const HAT_SCALE = HEAD_SCALE * FACE_LAYOUT.hatScale;
 
 // Forward is +X, the surface normal (worm's "up") is +Y, so right is +Z —
 // the same basis WormFace derives on the cube surface.
@@ -105,7 +106,7 @@ function _buildRig() {
   // Body beads. Material colour carries the segment colour directly (the game
   // uses white + per-instance colour because it draws one instanced mesh).
   const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
-  const characterGeometries = { inch: createCharacterGeometry('inch'), prism: createCharacterGeometry('prism'), default: sphereGeo };
+  const characterGeometries = { inch: createCharacterGeometry('inch'), prism: createCharacterGeometry('prism'), wiggle: createCharacterGeometry('wiggle'), default: sphereGeo };
   const accents = Object.fromEntries(['classic', 'wiggle', 'glow', 'book', 'inch', 'prism'].map(id => [id, createCharacterAccents(id)]));
   Object.values(accents).forEach(a => group.add(a.group));
   // Thin spine/binding — the pages (below) are the visible body now, not a
@@ -225,6 +226,8 @@ function _frameCamera(framing, characterId, aspect = 1) {
   camera.position.set(f.pos[0], f.pos[1], f.pos[2]);
   camera.lookAt(f.look[0], f.look[1], f.look[2]);
   camera.zoom = characterId === 'mobi' && (framing === 'head' || framing === 'portrait') ? 0.68 : 1;
+  // Keep the larger Dancer head and its hats inside the existing closeups.
+  if (characterId === 'wiggle' && (framing === 'head' || framing === 'portrait')) camera.zoom = HEAD_SCALE / WORM_HEAD_RADIUS;
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
   // Yaw the worm rather than orbit the camera: the face reads best turned a
@@ -470,8 +473,7 @@ function _segmentOffset(i, character, time, out, crawling = false, roaming = fal
     d = previewGait.dist;
     y = previewGait.arch * shape.height;
   } else if (wiggle) {
-    z = Math.sin(d * 13 - time * (crawling ? 5.5 : 2.2)) * (crawling ? 0.11 : 0.055) * Math.min(1, i / 1.5);
-    y = crawling ? 0 : Math.sin(d * 9 - time * 2.2) * 0.006;
+    z = wiggleBodyOffset(d, time);
   } else if (book) {
     // Straight spine, no wiggle: the per-segment orientation for the open-book
     // body is derived from consecutive offsets (see _poseWorm's isBook block),
@@ -529,6 +531,7 @@ function _poseWorm(opts, time) {
   const isBook = characterId === 'book';
   const isPrism = characterId === 'prism';
   const isMobi = characterId === 'mobi';
+  const headScale = characterId === 'wiggle' ? WORM_HEAD_RADIUS : HEAD_SCALE;
   rig.mobi.group.visible = isMobi;
 
   // Skin FX (material personality + surface displacement)
@@ -589,7 +592,7 @@ function _poseWorm(opts, time) {
 
     body.position.copy(_off);
     body.quaternion.identity();
-    if ((isInch || isPrism) && i > 0) {
+    if ((isInch || isPrism || characterId === 'wiggle') && i > 0) {
       _segmentOffset(i - 1, characterId, time, _pbPrevOff, opts.framing === 'runway' || roaming, roaming);
       _pbZ.subVectors(_off, _pbPrevOff).normalize();
       _pbX.crossVectors(UP, _pbZ).normalize();
@@ -598,13 +601,15 @@ function _poseWorm(opts, time) {
       body.quaternion.setFromRotationMatrix(_pbBasisMat);
     }
     if (i === 0) {
-      body.scale.setScalar(HEAD_SCALE);
+      body.scale.setScalar(headScale);
     } else if (isBook) {
       body.scale.set(BOOK_BODY_SCALE[0], BOOK_BODY_SCALE[1], BOOK_BODY_SCALE[2]);
     } else if (isInch) {
       body.scale.setScalar(INCH_BODY_SCALE + inchArch * 0.03);
     } else if (isGlow) {
       body.scale.setScalar(0.088 + Math.sin(time * 3.5 + i * 1.6) * 0.01);
+    } else if (characterId === 'wiggle') {
+      body.scale.fromArray(WIGGLE_BODY_SCALE);
     } else {
       body.scale.setScalar(BODY_SCALE);
     }
@@ -742,12 +747,12 @@ function _poseWorm(opts, time) {
   // Its head rides at the book body's height, matching WormFace in gameplay.
   if (isBook) _anchor.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y;
   if (opts.companion) _menuForward.set(Math.cos(opts.companion.heading), 0, Math.sin(opts.companion.heading));
-  layoutWormFace(_anchor, opts.companion ? _menuForward : (roaming ? _roamForward : FWD), UP, HEAD_SCALE, _faceParts);
+  layoutWormFace(_anchor, opts.companion ? _menuForward : (roaming ? _roamForward : FWD), UP, headScale, _faceParts);
 
   for (const [id, accent] of Object.entries(rig.accents)) {
     accent.group.visible = id === characterId;
     if (accent.group.visible) {
-      poseCharacterAccents(accent.group, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD, UP, HEAD_SCALE);
+      poseCharacterAccents(accent.group, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD, UP, headScale);
       accent.setSkin(skin);
       accent.update(time);
     }
@@ -771,7 +776,7 @@ function _poseWorm(opts, time) {
   }
 
   poseHeadAccessories(rig.accessories, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD,
-    UP, isMobi ? MOBI_RADIUS : HEAD_SCALE, time, false, characterId);
+    UP, isMobi ? MOBI_RADIUS : headScale, time, false, characterId);
   finishAccessoryBody(rig.accessories,time,false,skin.body,opts.palette);
 
   // Hat — rebuilt only when the hat changes, then parked above the head.
@@ -782,7 +787,7 @@ function _poseWorm(opts, time) {
       requestHatParts();
       return;
     }
-    for (const part of getHatParts ? getHatParts(hatId, isMobi ? MOBI_RADIUS * FACE_LAYOUT.hatScale : HAT_SCALE) : []) {
+    for (const part of getHatParts ? getHatParts(hatId, (isMobi ? MOBI_RADIUS : headScale) * FACE_LAYOUT.hatScale) : []) {
       const [geoName, args] = part.geo;
       const geo = _geometry(geoName, args);
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({

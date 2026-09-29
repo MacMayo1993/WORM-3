@@ -10,7 +10,7 @@ import { setWormSharedRenderer, drawDirectWormPreview } from '../3d/WormPreviewR
 import { inchGaitInto, inchLoopShape } from '../worm/healerWorm/inchGait.js';
 
 describe('character visual safety', () => {
-  it.each(['prism', 'inch'])('%s detail stays within the unit collision envelope', character => {
+  it.each(['prism', 'inch', 'wiggle'])('%s detail stays within the unit collision envelope', character => {
     const geometry = createCharacterGeometry(character);
     const p = geometry.attributes.position;
     for (let i = 0; i < p.count; i++) {
@@ -70,7 +70,8 @@ describe('character identity', () => {
     const base = skin.body.slice(1);
     for (const character of ['classic', 'wiggle', 'inch', 'glow', 'book']) expect(colour(character, 0)).toBe(base);
     expect(colour('wiggle', 1)).not.toBe(base);
-    expect(colour('wiggle', 2)).toBe(base);
+    expect(colour('wiggle', 8)).toBe(base);
+    expect(colour('wiggle', 2)).toBe(colour('wiggle', 4));
     expect(colour('inch', 3)).not.toBe(colour('wiggle', 3));
     expect(colour('classic', 2)).not.toBe(base);
     expect(colour('classic', 3)).toBe(colour('classic', 2));

@@ -8,7 +8,8 @@ import * as THREE from 'three';
 const AXES = ['x', 'y', 'z'];
 
 export function createBodySurface() {
-  return { boxes: [], count: 0, point: new THREE.Vector3(), direction: new THREE.Vector3(), axis: new THREE.Vector3() };
+  return { boxes: [], count: 0, point: new THREE.Vector3(), direction: new THREE.Vector3(), axis: new THREE.Vector3(),
+    shapeAxis: new THREE.Vector3(), shapeInverse: new THREE.Quaternion() };
 }
 
 export function updateBodySurface(surface, size, rotation) {
@@ -48,16 +49,26 @@ export function updateBodySurface(surface, size, rotation) {
  * Ray intervals are joined before pushing, so exiting one slab cannot put a bead
  * inside a differently rotating neighbour. All scratch is reused per frame.
  */
-export function clearBodySurfaceInto(position, normal, radius, surface) {
+export function clearBodySurfaceInto(position, normal, radius, surface, shape = null) {
   const { point, direction, boxes, count } = surface;
   for (let i = 0; i < count; i++) {
     const box = boxes[i];
     point.copy(position).applyQuaternion(box.inverse).sub(box.center);
     direction.copy(normal).applyQuaternion(box.inverse);
+    // An oriented ellipsoid needs its support radius on each slab axis. Using
+    // just scale.x embeds its long end on turns; using the maximum makes its
+    // flattened belly float. With a shape, radius is a small skin-detail margin.
+    if (shape) surface.shapeInverse.copy(box.inverse).multiply(shape.quaternion).invert();
     let enter = -Infinity;
     let exit = Infinity;
     for (const axis of AXES) {
-      const h = box.half[axis] + radius;
+      let support = radius;
+      if (shape) {
+        const v = surface.shapeAxis.set(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0)
+          .applyQuaternion(surface.shapeInverse);
+        support += Math.hypot(v.x * shape.scale.x, v.y * shape.scale.y, v.z * shape.scale.z);
+      }
+      const h = box.half[axis] + support;
       const d = direction[axis];
       const p = point[axis];
       if (Math.abs(d) < 1e-8) {
