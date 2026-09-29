@@ -7,6 +7,7 @@ import { pushChaosStormEvents, clearChaosStorm } from '../manifold/chaosStormBri
 import { clearCubieKicks } from '../3d/cubieKick.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { pruneExpiredFx } from '../utils/transientFx.js';
+import { isChaosSizeSupported } from '../utils/chaosSetup.js';
 
 const MAX_CASCADES = 4;
 
@@ -342,7 +343,10 @@ export function useChaosWorker({
     const worker = workerRef.current;
     if (!worker) return;
 
-    if (chaosMode) {
+    // Also guard restored/directly installed state that bypasses store actions.
+    // Fall through to the normal STOP/refund/cleanup path for an unsafe board.
+    if (chaosMode && !isChaosSizeSupported(size)) useGameStore.getState().setChaosLevel(0);
+    if (chaosMode && isChaosSizeSupported(size)) {
       clearChaosStorm();
       manifoldMapRef.current = buildManifoldGridMap(cubies, size);
       // The player's first strike, handed to the sim once. Consumed here so the
@@ -389,10 +393,10 @@ export function useChaosWorker({
     // parity score out rather than letting clearDisparityGame discard it.
     useGameStore.getState().cashOutParityScore();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chaosMode]);
+  }, [chaosMode, size]);
 
   useEffect(() => {
-    if (!workerRef.current || !chaosMode) return;
+    if (!workerRef.current || !chaosMode || !isChaosSizeSupported(size)) return;
     // Use cubiesRef to read current state without triggering on every chaos flip.
     // This effect must only fire on actual cube rotations (rotationEpoch), not on
     // every disparity flip — otherwise the worker state rolls back to the main
@@ -425,7 +429,7 @@ export function useChaosWorker({
   // away from the board — which is exactly what made the ALIVE counter
   // disagree with the un-tombstoned tiles on screen.
   useEffect(() => {
-    if (!workerRef.current || !chaosMode || !chaosResyncEpoch) return;
+    if (!workerRef.current || !chaosMode || !isChaosSizeSupported(size) || !chaosResyncEpoch) return;
     genRef.current += 1;
     manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
     workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies: cubiesRef.current, gen: genRef.current } });

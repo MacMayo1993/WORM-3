@@ -6,6 +6,7 @@
  */
 
 import { makeCubies } from '../../game/cubeState.js';
+import { isChaosSizeSupported } from '../../utils/chaosSetup.js';
 
 export const createCubeSlice = (set, _get) => ({
   // ========================================================================
@@ -21,7 +22,12 @@ export const createCubeSlice = (set, _get) => ({
   // instead of replaying a single-slice move.
   lastRotation: null,
 
-  setSize: (size) => set((state) => ({ size, cubies: makeCubies(size), rotationEpoch: state.rotationEpoch + 1, lastRotation: null })),
+  setSize: (size) => set((state) => ({
+    size, cubies: makeCubies(size), rotationEpoch: state.rotationEpoch + 1, lastRotation: null,
+    // Stop the storm in the same update as a larger board is installed, before
+    // subscribers can schedule a worker or full-pad render for that combination.
+    chaosLevel: isChaosSizeSupported(size) ? state.chaosLevel : 0,
+  })),
   setCubies: (cubies) => set(typeof cubies === 'function'
     ? (state) => ({ cubies: cubies(state.cubies) })
     : { cubies }),

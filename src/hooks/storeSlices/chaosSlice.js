@@ -4,7 +4,9 @@
  * Part of the useGameStore assembly (see src/hooks/useGameStore.js).
  */
 
-export const createChaosSlice = (set, _get) => ({
+import { isChaosSizeSupported } from '../../utils/chaosSetup.js';
+
+export const createChaosSlice = (set, get) => ({
   // ========================================================================
   // CHAOS MODE STATE
   // ========================================================================
@@ -27,9 +29,13 @@ export const createChaosSlice = (set, _get) => ({
   chaosIgnitionPicking: false,
 
   triggerCameraOrbit: (dir) => set(state => ({ cameraOrbitDir: dir, cameraOrbitRequest: state.cameraOrbitRequest + 1 })),
-  setChaosLevel: (chaosLevel) => set(typeof chaosLevel === 'function'
-    ? (state) => ({ chaosLevel: chaosLevel(state.chaosLevel) })
-    : { chaosLevel }),
+  // The wizard caps its own size picker, but the in-game menu and C shortcut
+  // can start Chaos on an existing board. Keep that workload limit here too.
+  setChaosLevel: (chaosLevel) => set(state => ({
+    chaosLevel: isChaosSizeSupported(state.size)
+      ? (typeof chaosLevel === 'function' ? chaosLevel(state.chaosLevel) : chaosLevel)
+      : 0,
+  })),
   setAutoRotateEnabled: (autoRotateEnabled) => set({ autoRotateEnabled }),
   setCascades: (cascades) => set(typeof cascades === 'function'
     ? (state) => ({ cascades: cascades(state.cascades) })
@@ -43,7 +49,5 @@ export const createChaosSlice = (set, _get) => ({
   setChaosIgnition: (chaosIgnition) => set({ chaosIgnition }),
   setChaosIgnitionPicking: (chaosIgnitionPicking) => set({ chaosIgnitionPicking: !!chaosIgnitionPicking }),
 
-  toggleChaos: () => set((state) => ({
-    chaosLevel: state.chaosLevel === 0 ? 1 : 0
-  })),
+  toggleChaos: () => get().setChaosLevel(level => level > 0 ? 0 : 1),
 });

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { isChaosSizeSupported, MAX_CHAOS_SIZE } from '../../utils/chaosSetup.js';
 
 /**
  * SecondaryModesSheet - Bottom sheet modal with grouped controls
@@ -11,6 +12,7 @@ const SheetItem = ({ label, active, onClick, color, locked, icon }) => (
   <button
     className={`sheet-item ${active ? 'sheet-item-active' : ''} ${locked ? 'sheet-item-locked' : ''}`}
     onClick={locked ? undefined : onClick}
+    disabled={!!locked}
     style={active ? { borderColor: color, color } : undefined}
   >
     {icon && <span className="sheet-item-icon">{icon}</span>}
@@ -34,7 +36,7 @@ const SecondaryModesSheet = ({
   showNetPanel, onToggleNet, netLocked,
   hollowMode, onToggleHollow,
   visualMode, onCycleVisualMode,
-  size, onChangeSize, sizeLocked,
+  size = 3, onChangeSize, sizeLocked,
   // Solver (3×3 only — Flip moved to the main nav bar)
   solveModeActive, onToggleSolve,
   teachModeActive, onToggleTeach,
@@ -57,6 +59,7 @@ const SecondaryModesSheet = ({
   if (!open) return null;
 
   const isViewsMode = mode === 'views';
+  const chaosSizeLocked = !isChaosSizeSupported(size);
 
   return (
     <>
@@ -133,9 +136,12 @@ const SecondaryModesSheet = ({
             {/* Core Modes */}
             <div className="sheet-group">
               <div className="sheet-group-title">Chaos</div>
+              {chaosSizeLocked && <p className="sheet-group-note">
+                Chaos supports cubes up to {MAX_CHAOS_SIZE}×{MAX_CHAOS_SIZE}. Choose a smaller cube to enable it.
+              </p>}
               <div className="sheet-grid">
-                <SheetItem label="Chaos" active={chaosMode} onClick={onToggleChaos} color="#ef4444" locked={chaosLocked} />
-                {chaosMode && !chaosLocked && (
+                <SheetItem label="Chaos" active={chaosMode} onClick={onToggleChaos} color="#ef4444" locked={chaosLocked || (chaosSizeLocked && !chaosMode)} />
+                {chaosMode && !chaosLocked && !chaosSizeLocked && (
                   <>
                     {[1, 2, 3, 4, 5].map((l) => (
                       <SheetItem

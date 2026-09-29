@@ -1,4 +1,6 @@
 export const MAX_CHAOS_SIZE = 5;
+// Shared by every launch path, including Chaos enabled inside Flip Cube.
+export const isChaosSizeSupported = size => Number.isInteger(size) && size >= 2 && size <= MAX_CHAOS_SIZE;
 export const normalizeChaosSize = value => Number.isFinite(Number(value))
   ? Math.max(2, Math.min(MAX_CHAOS_SIZE, Math.round(Number(value)))) : 3;
 
