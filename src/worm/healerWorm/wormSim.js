@@ -15,7 +15,7 @@ import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
-import { makeInchGaitState, advanceInchGaitState, inchGaitInto } from './inchGait.js';
+import { makeInchGaitState, advanceInchGaitState, inchGaitInto, inchBodyRadius } from './inchGait.js';
 import { arcLift } from './jumpArc.js';
 // src/worm/healerWorm/wormSim.js
 //
@@ -98,6 +98,7 @@ import {
     ORB_SEGMENT_GROWTH,
     STEPS_PER_TILE,
     BODY_BALL_SPACING,
+    WORM_HEAD_RADIUS,
     BASE_TAIL_LENGTH,
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
     MAX_JUMPS,
@@ -540,6 +541,14 @@ const collisionA = new THREE.Vector3();
 const collisionANormal = new THREE.Vector3();
 const collisionB = new THREE.Vector3();
 const collisionBNormal = new THREE.Vector3();
+const cornerCrawlProgress = t => t < 0.45 ? t / 0.9 : t <= 0.55 ? 0.5 : 0.5 + (t - 0.55) / 0.9;
+
+function crawlProgressDistance(sim, from, to) {
+    // The corner pivot holds position from .45 to .55.
+    return sim.crossingCorner && !sim.cornerVault
+        ? (cornerCrawlProgress(to) - cornerCrawlProgress(from)) * CORNER_STEP_LENGTH
+        : (to - from) * (sim.prevWorldPos ? sim.prevWorldPos.distanceTo(sim.curWorldPos) : 0);
+}
 
 /** Tile trails are broad phase only: test the occupied body, including inch arches. */
 export function hasJumpClearance(sim, progress = sim.interpT) {
@@ -559,11 +568,15 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
     let distance = 0;
     let length = tunnelBodyDistance(a.distanceTo(bPos), null, b);
     const gait = sim.bodyGait;
+    const inch = gait?.enabled && gait.shape.height !== undefined;
+    // Rescue looks ahead within this step. Advance the lattice with that head,
+    // otherwise prediction slides a planted arch away from its actual opening.
+    const gaitPhase = inch ? gait.phase + crawlProgressDistance(sim, sim.interpT, progress) : 0;
     for (let bead = 1; bead < sim.tailLength; bead++) {
         let target = bead * BODY_BALL_SPACING;
         let arch = 0;
-        if (gait?.enabled && gait.shape.height !== undefined) {
-            inchGaitInto(collisionGait, bead, sim.tailLength, gait.phase, gait.move, gait.shape);
+        if (inch) {
+            inchGaitInto(collisionGait, bead, sim.tailLength, gaitPhase, gait.move, gait.shape);
             target = collisionGait.dist;
             arch = collisionGait.arch * gait.shape.height;
         }
@@ -587,8 +600,12 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
         collisionBody.lerpVectors(a, bPos, t).addScaledVector(collisionNormal, arch);
         collisionBody.sub(collisionHead);
         const vertical = collisionBody.dot(normal);
-        // Two 0.092-radius beads, with a small tolerance for sampling.
-        if (collisionBody.lengthSq() - vertical * vertical < 0.04 && Math.abs(vertical) <= 0.2) return false;
+        if (inch) {
+            // Inch's rounded flanks leave diagonal space beneath the arch. A
+            // rectangular height/width envelope seals that visible opening.
+            const radius = WORM_HEAD_RADIUS + inchBodyRadius(collisionGait.arch) + 0.006;
+            if (collisionBody.lengthSq() <= radius * radius) return false;
+        } else if (collisionBody.lengthSq() - vertical * vertical < 0.04 && Math.abs(vertical) <= 0.2) return false;
     }
     // Empty space on a previously visited tile is safe, including the approach
     // to an overhead strand. Keep checking until the head leaves the tile.
@@ -1558,13 +1575,7 @@ const PHASE_HANDLERS = {
                 // head is still short of this center, skipping contact entirely.
                 sim.interpT = sim.stepAcc + delta >= STEP_SEC
                     ? 1 : Math.min(1, sim.interpT + delta / STEP_SEC);
-                // The corner pivot holds position from .45 to .55; count only
-                // movement, and use the step being traversed, not the next tile.
-                const progress = t => t < 0.45 ? t / 0.9 : t <= 0.55 ? 0.5 : 0.5 + (t - 0.55) / 0.9;
-                const distance = sim.crossingCorner && !sim.cornerVault
-                    ? (progress(sim.interpT) - progress(before)) * CORNER_STEP_LENGTH
-                    : (sim.interpT - before) * (sim.prevWorldPos ? sim.prevWorldPos.distanceTo(sim.curWorldPos) : 0);
-                sim.crawlDistance += distance;
+                sim.crawlDistance += crawlProgressDistance(sim, before, sim.interpT);
                 const sliceHit = ctx.getGamePhase() === 'active' && movingSliceCrossing(sim, before, jumpLiftOf(sim));
                 if (sliceHit) {
                     sim.interpT = 0.5;
@@ -1573,6 +1584,11 @@ const PHASE_HANDLERS = {
                         liveCrossing: true, impactPosition: sim.headInterpPos.toArray() });
                     return true;
                 }
+            }
+
+            // Contact must use this tick's contraction, just as rendering does.
+            if (sim.bodyGait.enabled) {
+                advanceInchGaitState(sim.bodyGait, sim.crawlDistance, sim.tailLength, delta);
             }
 
             if (headOnSurface && sim.pendingTunnelTrigger) {
@@ -2006,6 +2022,7 @@ const PHASE_HANDLERS = {
 export function stepWormSim(sim, delta, size, ctx) {
     sim.jumpRescueHeld = false;
     if (!sim.alive) return;
+    sim.bodyGait.enabled = ctx.getCharacter?.() === 'inch';
     const paused = ctx.isPaused();
     if (sim.phase === 'crawling' &&
         (paused || sim.signature.charge > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0)) {
@@ -2311,8 +2328,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     PHASE_HANDLERS[currentPhase].update(sim, size, ctx, delta, STEP_SEC);
     // Damage and rendering share the same contracted body layout, including
     // frames when the renderer skips work. Slice rides never advance this gait.
-    sim.bodyGait.enabled = ctx.getCharacter?.() === 'inch';
-    if (sim.bodyGait.enabled && sim.alive) {
+    if (currentPhase !== 'crawling' && sim.bodyGait.enabled && sim.alive) {
         advanceInchGaitState(sim.bodyGait, sim.crawlDistance, sim.tailLength, delta);
     }
     // A phase handler can kill the worm. Death is terminal for this tick too:

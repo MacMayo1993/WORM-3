@@ -14,7 +14,8 @@ import { makeTunnelCamPose, tunnelCamPoseInto } from '../worm/tunnelCameraRails.
 import { makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc } from '../worm/wormLogic.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
 import { tunnelTraversalT } from '../utils/tunnelPath.js';
-import { WORM_LIFT } from '../worm/healerWorm/constants.js';
+import { WORM_LIFT, WORM_HEAD_RADIUS } from '../worm/healerWorm/constants.js';
+import { advanceInchGaitState, inchGaitInto, inchBodyRadius } from '../worm/healerWorm/inchGait.js';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 
 let frame, tree;
@@ -88,6 +89,32 @@ function surfaceRoute(corners, size = 3) {
     }
   }
 }
+
+it('renders actual head clearance beneath the Inch humps throughout a crossing', () => {
+  act(() => {
+    useGameStore.setState({ wormCharacter: 'inch', wormAccessories: {} });
+    root.render(<Harness worm={worm} />);
+  });
+  React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
+  sim.tailLength = 100;
+  advanceInchGaitState(sim.bodyGait, 1, sim.tailLength, 10);
+  Object.assign(sim.bodyGait, { enabled: true, move: 1 });
+  const shape = sim.bodyGait.shape;
+  const gait = {};
+  for (let frameIndex = 0; frameIndex <= 60; frameIndex++) {
+    const travel = frameIndex / 30;
+    sim.bodyGait.phase = 3 % shape.spacing + travel;
+    surfaceRoute([[-1 + travel, 0], [-1, 0], [-1, 1], [0, 1], [0, -1]]
+      .map(([x, y]) => new THREE.Vector3(x, y, 1.6)));
+    const points = renderPoints();
+    for (let bead = 1; bead < points.length; bead++) {
+      inchGaitInto(gait, bead, sim.tailLength, sim.bodyGait.phase, 1, shape);
+      if (gait.dist < 1) continue; // Connected neck, not the crossing strand.
+      const gap = points[0].distanceTo(points[bead]) - WORM_HEAD_RADIUS - inchBodyRadius(gait.arch);
+      expect(gap, `frame ${frameIndex}, bead ${bead}`).toBeGreaterThan(0.006);
+    }
+  }
+});
 
 it('gives a newly spawned Wiggle ten connected, distinct segments instead of a pile at the head', () => {
   selectWiggle();

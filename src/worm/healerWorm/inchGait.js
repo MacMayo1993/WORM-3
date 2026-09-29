@@ -77,15 +77,21 @@
 // Narrower loops leave fewer beads on each face, so the arch takes a larger share
 // of its pitch (INCH_ARCH_DUTY) and a slightly gentler skew, keeping the steep
 // leading face at least two beads long.
+// Keep the opening wide AND tall enough for a 0.115-radius head: the older
+// 0.65 duty / 1.6 aspect capped the crest at 0.183, below even the collision
+// envelope. These proportions reach 0.327 and leave space along the flanks too.
 
 /** World-space gap between two Inch Worm body balls at rest. */
 export const INCH_BALL_SPACING = 0.095;
 
+/** Radius used by both the rendered beads and underpass contact checks. */
+export const inchBodyRadius = arch => 0.082 + arch * 0.03;
+
 /**
- * Loop half-width : loop height. Roughly 1.6:1 keeps the arch fuller than a
- * semicircle without pinching into a spike.
+ * Loop half-width : loop height. A nearly round arch leaves room for the
+ * head beneath it while keeping the short multi-hump pitch.
  */
-export const INCH_ARCH_ASPECT = 1.6;
+export const INCH_ARCH_ASPECT = 1.1;
 
 /**
  * Fraction of a loop's pitch that the arch itself occupies; the rest is flat body.
@@ -93,7 +99,7 @@ export const INCH_ARCH_ASPECT = 1.6;
  * This is what makes a loop legible — an arch only reads as an arch against
  * straight worm on either side of it — and it is also the pacing.
  */
-export const INCH_ARCH_DUTY = 0.65;
+export const INCH_ARCH_DUTY = 0.8;
 
 /**
  * Longest loop-to-loop distance, in world units (a cube tile is 1): about nine
@@ -118,7 +124,7 @@ export const INCH_MIN_HALF_WIDTH = 0.12;
  * tips over and is thrown forward — the push, rather than a symmetric bob. The two
  * faces still add up to 2 × halfWidth.
  */
-export const INCH_SKEW = 0.25;
+export const INCH_SKEW = 0.1;
 
 /**
  * Head taper, as a fraction of the body.

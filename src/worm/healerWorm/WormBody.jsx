@@ -52,7 +52,7 @@ import {
     MAX_TAIL,
     DIR_FORWARD,
 } from './constants.js';
-import { inchGaitInto, makeInchGaitState, advanceInchGaitState } from './inchGait.js';
+import { inchBodyRadius, inchGaitInto, makeInchGaitState, advanceInchGaitState } from './inchGait.js';
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
 import { rocketOrbitT, rocketOrbitInto, cubeShellDirInto } from './rocketOrbit.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
@@ -582,7 +582,7 @@ export function WormBody({ worm, size }) {
                 const stroke = tunnelSwimInto(tunnelStroke.current, i, tLen, time, swimWeight, reducedPickupMotion);
 
                 if (!_isWiggle && !segmentTransit && foundPosition && orbitT === 0) {
-                    clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : isMobi ? 0.15 : 0.10, surface);
+                    clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? inchBodyRadius(_inchArch) + 0.002 : isMobi ? 0.15 : 0.10, surface);
                 }
                 // Follow the airborne tangent when orienting books and capsules.
                 // Position was already lifted before the path's distance was measured.
@@ -616,7 +616,7 @@ export function WormBody({ worm, size }) {
                 }
                 if (_isInch) {
                     // Segments fatten at each hump's peak, thin elsewhere — only while moving.
-                    const sc = 0.082 + _inchArch * 0.03; // 0.082 (rest/extended) → fatter at the hump
+                    const sc = inchBodyRadius(_inchArch); // 0.082 (rest/extended) → fatter at the hump
                     _wormDummy.scale.setScalar(sc);
                 } else if (_isBook) {
                     _wormDummy.scale.setScalar(bookScaleForRadius(BOOK_BEAD_RADIUS) * bookVolumeScale(i));
