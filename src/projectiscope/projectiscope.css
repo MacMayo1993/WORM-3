@@ -7,6 +7,10 @@
 .projectiscope-creator .projectiscope-intro { margin:0; padding:8px 14px; color:var(--arcade-muted); font-size:13px; text-align:center; }
 .projectiscope-creator iframe { display:block; width:100%; flex:1; min-height:0; border:0!important; background:var(--arcade-paper); }
 .projectiscope-creator footer { flex-shrink:0; }
+.projectiscope-creator .mode-wizard-footer-note { color:var(--arcade-ink); font-size:14px; font-weight:600; line-height:1.4; }
+.projectiscope-creator .mode-wizard-primary { min-height:56px; }
+.projectiscope-creator .mode-wizard-primary .piece-trailer { font-size:clamp(17px,4.5vw,24px); }
+.projectiscope-creator .projectiscope-cancel { font-size:14px!important; text-decoration-thickness:1px; }
 .projectiscope-creator button:disabled { opacity:.45; cursor:wait; }
 @media(max-height:520px) {
   .projectiscope-creator .projectiscope-intro { display:none; }
