@@ -69,6 +69,14 @@
 // So width comes first now, from the body's own length, and height follows it at a
 // fixed aspect. A short worm gets one small loop scaled to itself; once the body
 // outgrows INCH_MAX_PITCH it carries a train of identical loops.
+//
+// That pitch is deliberately short — about nine beads. It used to be two world
+// units (~22 beads), which a run only reaches after six orbs, so in practice every
+// Inch Worm carried one lone hump however much it grew. Now the loop count tracks
+// the body: two by ~20 beads, three by ~30, four by ~40, and on up the train.
+// Narrower loops leave fewer beads on each face, so the arch takes a larger share
+// of its pitch (INCH_ARCH_DUTY) and a slightly gentler skew, keeping the steep
+// leading face at least two beads long.
 
 /** World-space gap between two Inch Worm body balls at rest. */
 export const INCH_BALL_SPACING = 0.095;
@@ -85,16 +93,17 @@ export const INCH_ARCH_ASPECT = 1.6;
  * This is what makes a loop legible — an arch only reads as an arch against
  * straight worm on either side of it — and it is also the pacing.
  */
-export const INCH_ARCH_DUTY = 0.45;
+export const INCH_ARCH_DUTY = 0.65;
 
 /**
- * Longest loop-to-loop distance, in world units (a cube tile is 1).
+ * Longest loop-to-loop distance, in world units (a cube tile is 1): about nine
+ * beads.
  *
- * Below this the worm carries exactly one loop, sized to itself, which is what a
- * real inchworm does. Past it the pitch stops growing and a long body carries a
- * train of identical loops rather than one enormous one.
+ * Below this the worm carries exactly one loop, sized to itself. Past it the pitch
+ * stops growing and the body carries a train of identical loops, one more for
+ * roughly every nine beads of length, rather than one enormous one.
  */
-export const INCH_MAX_PITCH = 2.0;
+export const INCH_MAX_PITCH = 0.9;
 
 /**
  * Floor under the half-width, so a fresh 4-ball worm still visibly humps instead
@@ -109,7 +118,7 @@ export const INCH_MIN_HALF_WIDTH = 0.12;
  * tips over and is thrown forward — the push, rather than a symmetric bob. The two
  * faces still add up to 2 × halfWidth.
  */
-export const INCH_SKEW = 0.3;
+export const INCH_SKEW = 0.25;
 
 /**
  * Head taper, as a fraction of the body.
@@ -125,6 +134,13 @@ export const INCH_SKEW = 0.3;
  * an inchworm does anyway.
  */
 export const INCH_ANCHOR_FRACTION = 0.25;
+
+/**
+ * Length of that head taper once the body is long enough to afford it, in world
+ * units. It no longer follows the loop's half-width: loops are narrow now, and a
+ * taper that short would lift the bead behind the head a third of the way up at once.
+ */
+export const INCH_ANCHOR_LENGTH = 0.45;
 
 // ── Arch profile ────────────────────────────────────────────────────────────
 // Written against `xs`, the arch coordinate running −1 (the leading, head-ward
@@ -265,7 +281,7 @@ export function inchGaitInto(out, i, count, phase, move, shape) {
   // Ease the first stretch of body into the gait so a loop cannot pop the bead
   // right behind the planted head off the ground. Scaling the rise and the ground
   // contraction by the same factor keeps the two consistent through the taper.
-  const anchor = Math.min(halfWidth, bodyArc * INCH_ANCHOR_FRACTION) || 1e-6;
+  const anchor = Math.min(Math.max(halfWidth, INCH_ANCHOR_LENGTH), bodyArc * INCH_ANCHOR_FRACTION) || 1e-6;
   const ease = arc < anchor ? arc / anchor : 1;
   const w = m * ease;
 
