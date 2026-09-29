@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { COLOR_SCHEMES, TILE_STYLES } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
+import { LIGHT_REMIX_STYLES } from '../utils/randomStyles.js';
+export { LIGHT_REMIX_STYLES } from '../utils/randomStyles.js';
 
 // Reuse a small shader family on constrained devices. Sampling the entire
 // catalog can introduce six cold programs plus per-tile 3D effects every cycle.
-export const LIGHT_REMIX_STYLES = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid'];
 
 const CYCLE_MS = 10000;
 
@@ -33,7 +34,7 @@ function applyRandomStyle() {
   }));
 }
 
-export function useRandomMode() {
+export function useRandomMode(suspended = false) {
   const randomMode = useGameStore(s => s.randomMode);
   const showMainMenu = useGameStore(s => s.showMainMenu);
   const showSettings = useGameStore(s => s.showSettings);
@@ -43,7 +44,7 @@ export function useRandomMode() {
   const wormHealerMode = useGameStore(s => s.wormHealerMode);
   const wormRunId = useGameStore(s => s.wormRunId);
 
-  const inGame = !showMainMenu && !showSettings && !showWelcome && !showTutorial;
+  const inGame = !suspended && !showMainMenu && !showSettings && !showWelcome && !showTutorial;
 
   const activeRef = useRef(false);
   const active = randomMode && inGame && !(wormHealerMode && wormPaused);
