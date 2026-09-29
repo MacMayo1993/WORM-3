@@ -586,10 +586,10 @@ function applyBloom(g,src,W,cache){
   g.globalAlpha=Math.min(1,k*(dark?0.8:0.45));g.drawImage(b2,0,0,W,W);
   g.restore();
 }
-function present(){
+function present(transparent=false){
   if(!rc.W)return;
-  dctx.globalCompositeOperation='source-over';dctx.globalAlpha=1;dctx.drawImage(acc,0,0);
-  applyBloom(dctx,acc,rc.W,bloomCache);dctx.drawImage(ovl,0,0);
+  dctx.globalCompositeOperation='source-over';dctx.globalAlpha=1;if(transparent)dctx.clearRect(0,0,rc.W,rc.W);dctx.drawImage(acc,0,0);
+  if(!transparent)applyBloom(dctx,acc,rc.W,bloomCache);dctx.drawImage(ovl,0,0);
   D.dataset.frame=String((Number(D.dataset.frame)||0)+1);
 }
 function clearGround(t,a){const g=t.ctx;g.globalCompositeOperation='source-over';g.globalAlpha=a;g.fillStyle=S.colors.ground;g.fillRect(0,0,t.W,t.W);g.globalAlpha=1;}
@@ -684,8 +684,8 @@ function drawStroke(t,P3,count,closed,dots,Wm,color,lw,alpha){
   }
   finish();
 }
-function paintFrame(t,clearAlpha){
-  clearGround(t,clearAlpha);
+function paintFrame(t,clearAlpha,transparent=false){
+  if(transparent)t.ctx.clearRect(0,0,t.W,t.W);else clearGround(t,clearAlpha);
   const g=t.ctx,G=S.G,M=S.M,col=S.colors;
   g.globalCompositeOperation=S.blend;g.lineCap='round';g.lineJoin='round';
   const scale=t.W/900;
@@ -1258,6 +1258,15 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.immersive)toggleI
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&S.immersive&&document.body.classList.contains('immersive')){/* user left native fullscreen; keep the in-page view */}});
 ['pointermove','pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{if(S.immersive)pokeHud();}));
 
+// Deterministic one-shot frame, even when the hidden page's clock is suspended.
+// The game copies this canvas and releases the iframe after baking its dome.
+function renderBackground(){
+  if(S.pending){const next=S.pending;S.pending=null;next();}
+  resize();
+  S.lesson=false;S.fold=backgroundMode?1:(S.sphere?0:1);S.foldE=S.fold;
+  updateWorld();paintFrame(rc,1);paintOverlay(oc);present();
+  return D;
+}
 window.__projectiscope={
   setGroup(g,n){if(!['O','T','I','D','C'].includes(g))return;transition(()=>{S.grp=g;if(n)S.n=Math.max(2,Math.min(16,n|0));rebuildGroup();syncUI();});},
   setPalette(k){if(!(k in PAL))return;S.pal=k;S.colors=clonePal(PAL[k]);S.blend=PAL[k].blend;S.glow=PAL[k].glow;S.opacity=PAL[k].opacity;syncUI();clearGround(rc,1);S.overDirty=true;S.dirty=true;setStageBg();},
@@ -1268,10 +1277,25 @@ window.__projectiscope={
   setJourney(on){if(!!on!==S.journey)toggleJourney();},
   recipe(){return encode(recipeObj());},
   stepBackground(now){if(backgroundMode)loop(now);},
-  backgroundDesign(){
+  renderBackground,
+  gpuBackground(){
     if(S.pending){const next=S.pending;S.pending=null;next();}
-    S.lesson=false;S.fold=backgroundMode?1:(S.sphere?0:1);S.foldE=S.fold;
-    updateWorld();paintFrame(rc,1);paintOverlay(oc);present();
+    const recipe=recipeObj(),M=S.M,G=S.G;
+    // Export the exact seeded generator, rather than maintaining a second one.
+    // All arrays are plain data; the parent clones them before releasing us.
+    const model={recipe,center:M.c0.slice(),chir:M.chir,d1:M.d1,d2:M.d2,
+      groups:G.els.map(g=>g.slice()),characters:G.chars.map(c=>Array.from(c)),
+      strokes:M.strokes.map(s=>({u:Array.from(s.u),v:Array.from(s.v),closed:s.closed,dots:s.dots,
+        ci:s.ci,w:s.w,alpha:s.alpha,phase:s.phase,wob:s.wob,cu:s.cu,cv:s.cv}))};
+    const show=S.showMotif;
+    try{
+      S.showMotif=false;S.fold=S.foldE=1;resize();
+      paintFrame(rc,1,true);paintOverlay(oc);present(true);
+      return {model,canvas:D};
+    }finally{S.showMotif=show;S.dirty=S.overDirty=true;}
+  },
+  backgroundDesign(){
+    renderBackground();
     return {version:1,recipe:encode(recipeObj()),thumbnail:composite(256).toDataURL('image/jpeg',.78)};
   },
   applyRecipe(code){applyRecipe(decode(code));}
