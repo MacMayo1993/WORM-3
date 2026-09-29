@@ -1,6 +1,5 @@
 import { resolveBiomeManifoldStyles } from '../../modes/CityBiomeMode.js';
 import { isMobile } from '../../utils/device.js';
-import { LIGHT_REMIX_STYLES } from '../../utils/randomStyles.js';
 // Each chapter borrows a complete authored look; player cosmetics stay owned
 // and equipped independently. Face/color IDs retain their gameplay meaning.
 // `view` borrows the cube's other presentations for a level: a visual mode
@@ -92,7 +91,7 @@ export function storyAppearance(id, reducedFX = false) {
   // The authored shaders otherwise load before Random's first ten-second cycle,
   // bypassing the mobile pool entirely on launch and every retry.
   const styles = look?.view.randomMode && (isMobile || reducedFX)
-    ? Object.fromEntries(LIGHT_REMIX_STYLES.map((style, i) => [i + 1, style])) : look?.styles;
+    ? Object.fromEntries([1, 2, 3, 4, 5, 6].map(id => [id, 'solid'])) : look?.styles;
   return look ? {
     colorScheme: look.palette, customColors: null, backgroundTheme: look.background,
     manifoldStyles: { ...styles }, biomeMode: { enabled: false, faceAssignment: null },

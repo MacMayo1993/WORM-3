@@ -724,6 +724,9 @@ const CubeAssembly = React.memo(({
   // warmUpDefaultStyles calls renderer.compile() which triggers GLSL compilation
   // before any user interaction, eliminating the ~200 ms hitch on first style pick.
   useEffect(() => {
+    // Batched solid Remix tiles do not use the six default procedural shaders.
+    const state = useGameStore.getState();
+    if (state.wormHealerMode && state.randomMode && (isTouchDevice || state.perfReducedFX)) return;
     const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment);
     const colors = fc ? Object.values(fc) : [];
     if (colors.length === 0) return;
