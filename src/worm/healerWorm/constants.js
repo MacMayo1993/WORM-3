@@ -64,8 +64,6 @@ export const STEPS_PER_TILE = 50; // sub-steps recorded per tile (0.02 resolutio
 export const BODY_BALL_SPACING = 0.09;
 // Nine trailing beads span 0.81 tiles: visible at spawn without granting orbs.
 export const BASE_TAIL_LENGTH = 10;
-// A fuller starter must not make previously survivable tail cuts fatal.
-export const MIN_SURVIVING_TAIL_LENGTH = 4;
 export const WORM_HEAD_RADIUS = 0.115;
 export const WORM_BODY_RADIUS = 0.105;
 export const DEFAULT_WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns

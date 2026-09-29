@@ -1,3 +1,4 @@
+import { BASE_TAIL_LENGTH, BODY_BALL_SPACING } from '../worm/healerWorm/constants.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { makeWormSim, resetWormSim, jumpLiftOf } from '../worm/healerWorm/wormSim.js';
@@ -79,7 +80,8 @@ describe('physical slice cuts', () => {
     const b = a.clone(); b[coord] += 1;
     const { worm } = fixture([a, b], size, 10, normal);
     const hit = checkWormHitBySlice(worm, axis, 1, size);
-    expect(hit.type).toBe('cut');
+    expect(hit.keepCount).toBe(5);
+    expect(hit.type).toBe('death');
     expect(hit.cutDistance).toBeCloseTo(0.5);
     expect(hit.cutPosition[{ x: 0, y: 1, z: 2 }[coord]]).toBeCloseTo(-k + 0.5);
   });
@@ -140,6 +142,24 @@ describe('physical slice cuts', () => {
     expect(a).toEqual(b);
     expect(a.type).toBe('death');
     expect(a.cutPosition[0]).toBeCloseTo(-1.5);
+  });
+
+  it.each([4, 5, 6, 7, 8, 9, 10])('requires the economic base after a cut retaining %i segments', count => {
+    // The seam is x=-0.5; place it just beyond the retained bead prefix.
+    const distance = count * BODY_BALL_SPACING + 0.015;
+    const { sim, worm } = fixture([
+      new THREE.Vector3(-0.5 - distance, 0, 3.6), new THREE.Vector3(1, 0, 3.6),
+    ]);
+    const hit = checkWormHitBySlice(worm, 'col', 3, 7);
+    expect(hit.headOnLayer).toBe(false);
+    expect(hit.keepCount).toBe(count);
+    expect(hit.type).toBe(count < BASE_TAIL_LENGTH ? 'death' : 'cut');
+    cutWormTail(worm, hit);
+    // Fatal cuts still sever exactly at the seam for the death presentation.
+    expect(sim.tailLength).toBe(count);
+    expect(sim.orbPickupColors).toEqual([]);
+    expect(sim.orbPickupFaceIds).toEqual([]);
+    expect(Object.values(useGameStore.getState().wormOrbInventory).reduce((a, b) => a + b, 0)).toBe(0);
   });
 
   it('does not manufacture a minimum-length body across a neck cut', () => {
