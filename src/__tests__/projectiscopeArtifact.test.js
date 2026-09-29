@@ -51,3 +51,25 @@ it('renders and restores a drawn recipe without a background animation loop', as
     expect(errors).toEqual([]);
   } finally { dom.window.close(); }
 });
+
+it('groups the original controls into setup categories without resetting their values or listeners', async () => {
+  const { installCreatorTheme } = await import('../projectiscope/creatorTheme.js');
+  const dom = new JSDOM(readFileSync('public/projectiscope/index.html', 'utf8'));
+  const doc = dom.window.document, palette = doc.getElementById('pal'), changed = vi.fn();
+  palette.value = 'neon'; palette.addEventListener('change', changed);
+  try {
+    installCreatorTheme(doc, '#00a749');
+    const tabs = [...doc.querySelectorAll('.creator-categories button')];
+    expect(tabs.map(b => b.textContent)).toEqual(['Pattern', 'Draw', 'Colors', 'Motion', 'Looks']);
+    tabs[2].click();
+    expect(doc.querySelector('#creator-panel-colors').hidden).toBe(false);
+    expect(doc.querySelector('#creator-panel-pattern').hidden).toBe(true);
+    expect(doc.getElementById('pal')).toBe(palette); expect(palette.value).toBe('neon');
+    palette.dispatchEvent(new dom.window.Event('change')); expect(changed).toHaveBeenCalledOnce();
+    tabs[2].dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(doc.activeElement).toBe(tabs[3]); expect(tabs[3].getAttribute('aria-current')).toBe('true');
+    expect(doc.querySelector('#creator-panel-motion').hidden).toBe(false);
+    installCreatorTheme(doc, '#00a749');
+    expect(doc.querySelectorAll('.creator-categories')).toHaveLength(1);
+  } finally { dom.window.close(); }
+});

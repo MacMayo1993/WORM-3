@@ -3,9 +3,16 @@ import { createPortal } from 'react-dom';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { PROJECTISCOPE_URL, projectiscopeConfig, validProjectiscopeDesign } from './design.js';
 import { prefersReducedMotion } from '../utils/device.js';
+import { wizardLayout } from '../components/screens/WizardChrome.jsx';
+import { useIsMobile } from '../hooks/useIsMobile.js';
+import { UI_CSS_VARS, ARCADE_INK_STRONG } from '../utils/uiTheme.js';
+import { MODE_THEMES } from '../utils/modeThemes.js';
+import { installCreatorTheme } from './creatorTheme.js';
 import './projectiscope.css';
 
-export default function ProjectiscopeCreator({ design, onApply, onCancel }) {
+export default function ProjectiscopeCreator({ design, onApply, onCancel, accent = MODE_THEMES.worm.accent }) {
+  const mobile = useIsMobile(), styles = wizardLayout(accent, undefined, mobile);
+  const initialAccent = useRef(accent);
   const dialog = useRef(null), frame = useRef(null), initial = useRef(design);
   const callbacks = useRef({ onApply, onCancel });
   callbacks.current = { onApply, onCancel };
@@ -22,7 +29,7 @@ export default function ProjectiscopeCreator({ design, onApply, onCancel }) {
     const message = event => {
       if (event.source !== frame.current?.contentWindow || event.origin !== location.origin) return;
       const m = event.data;
-      if (m?.type === 'projectiscope:ready') send();
+      if (m?.type === 'projectiscope:ready') { installCreatorTheme(frame.current.contentDocument, initialAccent.current); send(); }
       if (m?.type === 'projectiscope:configured') { setReady(true); clearTimeout(timeout.current); }
       if (m?.type === 'projectiscope:exit') callbacks.current.onCancel();
       if (!waiting.current) return;
@@ -51,15 +58,28 @@ export default function ProjectiscopeCreator({ design, onApply, onCancel }) {
     }, 10000);
   };
   return createPortal(
-    <dialog ref={dialog} className="projectiscope-creator" aria-labelledby="projectiscope-title"
+    <dialog ref={dialog} className="projectiscope-creator mode-wizard" aria-labelledby="projectiscope-title"
+      style={{ ...styles.overlay, ...UI_CSS_VARS, '--mode-accent': accent, '--mode-ink': ARCADE_INK_STRONG }}
       onCancel={e => { e.preventDefault(); onCancel(); }} onKeyDown={e => e.stopPropagation()}>
-      <header><div><h2 id="projectiscope-title">Create your background</h2>
-        <p>Draw, choose colors, and explore symmetry. Your last design is the starting point.</p></div>
-        <button type="button" onClick={onCancel} aria-label="Close background creator">×</button></header>
-      <iframe ref={frame} src={`${PROJECTISCOPE_URL}#creator=1`} title="Projectiscope background designer" />
-      <footer><span role="status">{error || (ready ? 'Apply wraps this design around you as a moving 360° dome.' : 'Loading your creator…')}</span>
-        <div><button type="button" onClick={onCancel}>Cancel</button>
-          <button type="button" className="projectiscope-apply" disabled={!ready || saving} onClick={apply}>
-            {saving ? 'Saving…' : 'Apply background'}</button></div></footer>
+      <div className="mode-wizard-sheet" style={styles.sheet}>
+        <header style={styles.modeBar}>
+          <button type="button" style={styles.backBtn} onClick={onCancel} aria-label="Close background creator">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M10 3L5 8l5 5" /></svg>
+          </button>
+          <h2 id="projectiscope-title" className="mode-wizard-kicker">Projectiscope</h2>
+          <span className="mode-wizard-count" aria-label="360-degree background">360°</span>
+        </header>
+        <p className="projectiscope-intro">Draw, choose colors, and explore symmetry.</p>
+        <iframe ref={frame} src={`${PROJECTISCOPE_URL}#creator=1`} title="Projectiscope background designer" />
+        <footer style={styles.footer}>
+          <span className="mode-wizard-footer-note" role="status">{error || (ready ? 'Your last design is the starting point. Apply when you’re ready.' : 'Loading your creator…')}</span>
+          <button type="button" className="mode-wizard-primary piece piece--bar piece--glint"
+            style={{ '--piece-color': accent }} disabled={!ready || saving} onClick={apply}
+            aria-label={saving ? 'Saving…' : 'Apply background'}>
+            <span className="piece-face"><span className="piece-trailer">{saving ? 'Saving…' : 'Apply background'}</span><b className="piece-trailer" aria-hidden="true">→</b></span>
+          </button>
+          <button type="button" style={styles.btnSecondary} onClick={onCancel}>Cancel</button>
+        </footer>
+      </div>
     </dialog>, document.body);
 }

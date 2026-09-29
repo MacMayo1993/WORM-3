@@ -1,0 +1,37 @@
+/* Embedded editor: same paper, ink, fonts and raised keys as the setup wizards. */
+html:has(.worm-setup) { padding:0; height:100%; }
+body.worm-setup {
+  --paper:var(--arcade-paper); --panel:var(--arcade-card); --ink:var(--arcade-ink);
+  --muted:var(--arcade-muted); --rule:var(--arcade-line-soft); --accent:var(--mode-accent);
+  --accent-ink:var(--arcade-ink); --sans:var(--ui-font); --display:var(--heading-font);
+  height:100dvh; overflow:hidden; font:500 14px/1.45 var(--ui-font); color-scheme:light;
+}
+.worm-setup #kaleidoApp { height:100%; }
+.worm-setup #kaleidoApp > .layout { height:100%; max-width:none; padding:0; gap:0; display:grid; grid-template-columns:1fr; grid-template-rows:minmax(140px,44%) minmax(0,1fr); }
+.worm-setup .stage { position:relative; top:auto; min-height:0; padding:10px; display:flex; align-items:center; justify-content:center; background:var(--arcade-paper); background-image:var(--arcade-grid); background-size:var(--arcade-grid-size); border-bottom:2px solid var(--arcade-line-soft); }
+.worm-setup .art { width:min(100%,calc(44dvh - 24px)); height:auto; max-width:100%; max-height:100%; flex-shrink:0; margin:0; border:2px solid var(--arcade-line); border-radius:16px; box-shadow:var(--arcade-key-shadow); }
+.worm-setup .caption,.worm-setup aside > h1,.worm-setup aside > .intro { display:none; }
+.worm-setup aside { display:flex; flex-direction:column; min-height:0; min-width:0; overflow:hidden; background:var(--arcade-card); }
+.worm-setup .creator-categories { display:flex; flex-shrink:0; overflow-x:auto; scrollbar-width:thin; border-bottom:1px solid var(--rule); }
+.worm-setup .creator-categories button { flex:1 0 auto; min-height:48px; padding:10px 12px; border:0; border-bottom:3px solid transparent; border-radius:0; box-shadow:none; background:transparent; font:800 13px/1.2 var(--heading-font); }
+.worm-setup .creator-categories button[aria-current=true] { border-bottom-color:var(--mode-ink); background:color-mix(in srgb,var(--mode-accent) 14%,transparent); }
+.worm-setup .creator-controls { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:12px 20px 24px; scrollbar-width:thin; }
+.worm-setup .creator-panel[hidden] { display:none; }
+.worm-setup details { margin-bottom:12px; border:1px solid var(--rule); border-radius:14px; background:var(--paper); padding:0 12px; }
+.worm-setup summary { min-height:44px; font:800 15px/1.3 var(--heading-font); }
+.worm-setup .top { padding:0 0 16px; border:0; }
+.worm-setup .top .row:not(:has(:not(#journey,#sound,#immersive,#lessonBtn))) { display:none; }
+.worm-setup button { min-height:44px; border:2px solid var(--arcade-line); border-radius:12px; box-shadow:var(--arcade-key-shadow); font:800 13px/1.25 var(--heading-font); touch-action:manipulation; }
+.worm-setup button[aria-pressed=true] { background:color-mix(in srgb,var(--mode-accent) 20%,var(--panel)); color:var(--ink); outline:2px solid var(--mode-ink); outline-offset:-2px; border-color:var(--mode-ink); }
+.worm-setup button.primary { background:var(--mode-accent); color:var(--mode-ink); }
+.worm-setup .seg { gap:6px; border:0; border-radius:0; overflow:visible; padding:3px; }
+.worm-setup .seg button { border:2px solid var(--arcade-line); border-radius:10px; }
+.worm-setup :is(select,input[type=number],input[type=text],textarea) { min-height:44px; border:2px solid var(--rule); border-radius:10px; font-family:var(--ui-font); }
+.worm-setup :is(input[type=color],input[type=range]) { min-height:44px; }
+.worm-setup .ctl { grid-template-columns:90px minmax(0,1fr) 36px; gap:8px; margin:4px 0; }
+.worm-setup .ctl label,.worm-setup .lbl { color:var(--ink); font-weight:750; }
+.worm-setup .note,.worm-setup .fact { font-size:13px; color:var(--muted); }
+.worm-setup :is(button,select,input,textarea,summary,.art):focus-visible { outline:3px solid var(--arcade-focus); outline-offset:3px; }
+.worm-setup .swatch { min-width:44px; min-height:44px; }
+@media(max-width:480px) { .worm-setup .creator-controls { padding:10px 12px 20px; } .worm-setup .creator-categories button { padding-inline:10px; } }
+@media(max-height:360px) { .worm-setup #kaleidoApp > .layout { grid-template-columns:minmax(120px,.75fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr); } .worm-setup .stage { align-items:center; border-bottom:0; border-right:2px solid var(--rule); } .worm-setup .art { width:min(100%,calc(100dvh - 24px)); height:auto; } }

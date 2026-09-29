@@ -81,7 +81,7 @@ export default function SceneStep({ cos, slot }) {
       </div>
       )}
       {creating && <Suspense fallback={<p role="status">Opening background creator…</p>}>
-        <ProjectiscopeCreator design={settings.projectiscopeDesign} onCancel={() => setCreating(false)}
+        <ProjectiscopeCreator accent={accent} design={settings.projectiscopeDesign} onCancel={() => setCreating(false)}
           onApply={projectiscopeDesign => {
             cos.setSettings(s => ({ ...s, backgroundTheme: 'projectiscope', projectiscopeDesign }));
             setCreating(false);
