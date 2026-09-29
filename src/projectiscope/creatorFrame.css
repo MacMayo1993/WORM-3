@@ -36,4 +36,6 @@ body.worm-setup {
 .worm-setup :is(button,select,input,textarea,summary,.art):focus-visible { outline:3px solid var(--arcade-focus); outline-offset:3px; }
 .worm-setup .swatch { min-width:44px; min-height:44px; }
 @media(max-width:480px) { .worm-setup .creator-controls { padding:10px 12px 20px; } .worm-setup .creator-categories button { padding-inline:10px; } }
-@media(min-width:600px) and (max-height:360px) { .worm-setup #kaleidoApp > .layout { grid-template-columns:minmax(120px,.75fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr); } .worm-setup .stage { align-items:center; border-bottom:0; border-right:2px solid var(--rule); } .worm-setup .art { width:min(100%,calc(100dvh - 24px)); height:auto; } }
+/* These dimensions belong to the iframe, after the dialog header and footer.
+   Below 240px, use side-by-side layout even on narrow phones so controls fit. */
+@media(max-height:240px), (min-width:600px) and (max-height:360px) { .worm-setup #kaleidoApp > .layout { grid-template-columns:minmax(120px,.75fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr); } .worm-setup .stage { align-items:center; border-bottom:0; border-right:2px solid var(--rule); } .worm-setup .art { width:min(100%,calc(100dvh - 24px)); height:auto; } }
