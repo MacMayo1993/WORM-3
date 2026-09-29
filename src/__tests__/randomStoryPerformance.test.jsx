@@ -5,10 +5,43 @@ import { useRandomMode, LIGHT_REMIX_STYLES } from '../hooks/useRandomMode.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { TILE_STYLES } from '../utils/colorSchemes.js';
+import { storyAppearance, storyVisualChanges, STORY_WORLDS } from '../worm/story/worlds.js';
 const device = vi.hoisted(() => ({ mobile: false }));
 vi.mock('../utils/device.js', () => ({ get isMobile() { return device.mobile; }, prefersReducedMotion: () => false }));
-function Harness() { useRandomMode(); return null; }
+function Harness({ suspended = false }) { useRandomMode(suspended); return null; }
 let root, host;
+it('does not remix behind Mobi before Worm mode exists, then starts a full play cycle', () => {
+  vi.useFakeTimers(); globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  useGameStore.setState({ randomMode: true, wormHealerMode: false, wormPaused: false,
+    showMainMenu: false, showSettings: false, showWelcome: false, showTutorial: false });
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  const initial = useGameStore.getState();
+  act(() => root.render(<Harness suspended />));
+  act(() => vi.advanceTimersByTime(60000));
+  expect(useGameStore.getState().settings).toBe(initial.settings);
+  expect(useGameStore.getState().randomStyleTick).toBe(initial.randomStyleTick);
+  act(() => {
+    useGameStore.setState({ wormHealerMode: true, wormPaused: true });
+    root.render(<Harness />);
+  });
+  act(() => vi.advanceTimersByTime(30000));
+  expect(useGameStore.getState().randomStyleTick).toBe(initial.randomStyleTick);
+  act(() => useGameStore.setState({ wormPaused: false }));
+  act(() => vi.advanceTimersByTime(9999));
+  expect(useGameStore.getState().randomStyleTick).toBe(initial.randomStyleTick);
+  act(() => vi.advanceTimersByTime(1));
+  expect(useGameStore.getState().randomStyleTick).toBe(initial.randomStyleTick + 1);
+});
+
+it.each([26, 30, 40])('uses lightweight shaders from the first frame of Random chapter %s', id => {
+  device.mobile = true;
+  expect(Object.values(storyAppearance(id).manifoldStyles)).toEqual(LIGHT_REMIX_STYLES);
+  device.mobile = false;
+  expect(storyAppearance(id).manifoldStyles).toEqual(STORY_WORLDS[id].styles);
+  const state = { ...useGameStore.getState(), perfReducedFX: true };
+  expect(Object.values(storyVisualChanges(state, id).settings.manifoldStyles)).toEqual(LIGHT_REMIX_STYLES);
+  expect(storyAppearance(25, true).manifoldStyles).toEqual(STORY_WORLDS[25].styles);
+});
 afterEach(() => {
   if (root) act(() => root.unmount());
   host?.remove(); vi.useRealTimers();
