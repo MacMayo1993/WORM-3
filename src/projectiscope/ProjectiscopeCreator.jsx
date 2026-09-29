@@ -57,7 +57,7 @@ export default function ProjectiscopeCreator({ design, onApply, onCancel }) {
         <p>Draw, choose colors, and explore symmetry. Your last design is the starting point.</p></div>
         <button type="button" onClick={onCancel} aria-label="Close background creator">×</button></header>
       <iframe ref={frame} src={`${PROJECTISCOPE_URL}#creator=1`} title="Projectiscope background designer" />
-      <footer><span role="status">{error || (ready ? 'Apply uses this design, with slower motion and a shaded center during play.' : 'Loading your creator…')}</span>
+      <footer><span role="status">{error || (ready ? 'Apply wraps this design around you as a moving 360° dome.' : 'Loading your creator…')}</span>
         <div><button type="button" onClick={onCancel}>Cancel</button>
           <button type="button" className="projectiscope-apply" disabled={!ready || saving} onClick={apply}>
             {saving ? 'Saving…' : 'Apply background'}</button></div></footer>
