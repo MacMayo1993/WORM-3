@@ -1258,6 +1258,15 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.immersive)toggleI
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&S.immersive&&document.body.classList.contains('immersive')){/* user left native fullscreen; keep the in-page view */}});
 ['pointermove','pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{if(S.immersive)pokeHud();}));
 
+// Deterministic one-shot frame, even when the hidden page's clock is suspended.
+// The game copies this canvas and releases the iframe after baking its dome.
+function renderBackground(){
+  if(S.pending){const next=S.pending;S.pending=null;next();}
+  resize();
+  S.lesson=false;S.fold=backgroundMode?1:(S.sphere?0:1);S.foldE=S.fold;
+  updateWorld();paintFrame(rc,1);paintOverlay(oc);present();
+  return D;
+}
 window.__projectiscope={
   setGroup(g,n){if(!['O','T','I','D','C'].includes(g))return;transition(()=>{S.grp=g;if(n)S.n=Math.max(2,Math.min(16,n|0));rebuildGroup();syncUI();});},
   setPalette(k){if(!(k in PAL))return;S.pal=k;S.colors=clonePal(PAL[k]);S.blend=PAL[k].blend;S.glow=PAL[k].glow;S.opacity=PAL[k].opacity;syncUI();clearGround(rc,1);S.overDirty=true;S.dirty=true;setStageBg();},
@@ -1268,10 +1277,9 @@ window.__projectiscope={
   setJourney(on){if(!!on!==S.journey)toggleJourney();},
   recipe(){return encode(recipeObj());},
   stepBackground(now){if(backgroundMode)loop(now);},
+  renderBackground,
   backgroundDesign(){
-    if(S.pending){const next=S.pending;S.pending=null;next();}
-    S.lesson=false;S.fold=backgroundMode?1:(S.sphere?0:1);S.foldE=S.fold;
-    updateWorld();paintFrame(rc,1);paintOverlay(oc);present();
+    renderBackground();
     return {version:1,recipe:encode(recipeObj()),thumbnail:composite(256).toDataURL('image/jpeg',.78)};
   },
   applyRecipe(code){applyRecipe(decode(code));}

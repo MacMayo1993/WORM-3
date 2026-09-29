@@ -76,7 +76,7 @@ it('does not unpause a new run when the creator closes', () => {
   act(() => root.render(null));
   expect(useGameStore.getState().wormPaused).toBe(true);
 });
-it('surrounds the camera with a moving dome independently of texture updates and cleans up', () => {
+it('bakes once, releases the editor, and keeps the camera surrounded by a moving dome', () => {
   const previous = new Color('black'), scene = new Scene(), camera = new PerspectiveCamera();
   scene.background = previous;
   const renderer = createProjectiscopeBackground(scene, design);
@@ -86,14 +86,24 @@ it('surrounds the camera with a moving dome independently of texture updates and
   iframe.contentDocument.write('<html><body></body></html>');
   const canvas = iframe.contentDocument.createElement('canvas'); canvas.id = 'paint';
   iframe.contentDocument.body.append(canvas);
-  const api = { setPaused: vi.fn(), stepBackground: vi.fn(() => { canvas.dataset.frame = String(Number(canvas.dataset.frame || 0) + 1); }) };
+  const copy = vi.fn();
+  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: copy });
+  const api = { renderBackground: vi.fn(() => canvas) };
   iframe.contentWindow.__projectiscope = api;
+  const post = vi.spyOn(iframe.contentWindow, 'postMessage');
+  message('ready'); expect(post).toHaveBeenCalledWith(projectiscopeConfig(design, true), location.origin);
   message('configured', {}, 'https://wrong.example'); expect(scene.background).toBe(previous);
   message('configured'); expect(scene.background).toBe(previous);
   const dome = scene.getObjectByName('Projectiscope 360 dome');
   expect(dome.geometry.type).toBe('SphereGeometry'); expect(dome.material.side).toBe(BackSide);
   expect(dome.material.depthWrite).toBe(false); expect(dome.frustumCulled).toBe(false);
   const texture = dome.material.uniforms.designMap.value, dispose = vi.spyOn(texture, 'dispose');
+  expect(api.renderBackground).toHaveBeenCalledOnce(); expect(frame()).toBeNull();
+  expect(copy.mock.calls[0][0] === canvas).toBe(true);
+  expect(copy.mock.calls[0].slice(1)).toEqual([0, 0]);
+  expect(texture.image === canvas).toBe(false); expect(texture.image.ownerDocument === document).toBe(true);
+  const textureVersion = texture.version;
+  context.mockRestore();
   const disposeGeometry = vi.spyOn(dome.geometry, 'dispose'), disposeMaterial = vi.spyOn(dome.material, 'dispose');
   expect(texture.isCanvasTexture).toBe(true);
   camera.position.set(2, 3, 4);
@@ -102,22 +112,28 @@ it('surrounds the camera with a moving dome independently of texture updates and
   const yaw = dome.rotation.y;
   renderer.update(1016, false, camera); renderer.update(1060, false, camera);
   expect(dome.rotation.y).toBeGreaterThan(yaw);
-  expect(api.stepBackground).toHaveBeenCalledTimes(1);
   const rotation = dome.rotation.clone();
   camera.position.set(-12, 24, 36); camera.rotation.y = Math.PI / 2;
   renderer.update(1125, true, camera);
   expect(dome.rotation.equals(rotation)).toBe(true); expect(dome.position).toEqual(camera.position);
-  expect(api.stepBackground).toHaveBeenCalledTimes(2);
-  expect(api.setPaused.mock.calls).toEqual([[false], [true]]);
-  // Adaptive quality lowers canvas frequency but must not freeze the sky.
-  renderer.update(1141, false, camera, true);
+  renderer.update(1141, false, camera);
   expect(dome.rotation.y).toBeGreaterThan(rotation.y);
-  expect(api.stepBackground).toHaveBeenCalledTimes(2);
+  // No more paints or uploads, regardless of how long the game runs.
+  for (let now = 1157; now < 10000; now += 16) renderer.update(now, false, camera);
+  expect(api.renderBackground).toHaveBeenCalledOnce(); expect(texture.version).toBe(textureVersion);
   renderer.dispose();
   expect(disposeGeometry).toHaveBeenCalledOnce(); expect(disposeMaterial).toHaveBeenCalledOnce();
   expect(scene.children).toHaveLength(0);
   expect(dispose).toHaveBeenCalledOnce(); expect(scene.background).toBe(previous); expect(frame()).toBeNull();
-  renderer.update(1500, false); expect(api.stepBackground).toHaveBeenCalledTimes(2);
+  renderer.update(1500, false); expect(api.renderBackground).toHaveBeenCalledOnce();
+});
+
+it('cancels a background that is still loading without adding a dome later', () => {
+  const scene = new Scene(), renderer = createProjectiscopeBackground(scene, design);
+  const source = frame().contentWindow;
+  renderer.dispose();
+  message('configured', {}, location.origin, source);
+  expect(frame()).toBeNull(); expect(scene.children).toHaveLength(0);
 });
 
 it('opens the creator from wizard arrows and cards before committing the scene', async () => {

@@ -14,7 +14,7 @@ export default function ProjectiscopeBackground({ design }) {
   useFrame(({ camera }) => {
     const s = useGameStore.getState();
     renderer.current?.update(performance.now(), document.hidden || prefersReducedMotion() ||
-      s.projectiscopeEditing || s.showSettings || s.wormPaused && s.wormHealerMode, camera, s.perfReducedFX);
+      s.projectiscopeEditing || s.showSettings || s.wormPaused && s.wormHealerMode, camera);
   });
   return null;
 }

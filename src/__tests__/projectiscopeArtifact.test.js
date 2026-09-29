@@ -31,7 +31,10 @@ it('renders and restores a drawn recipe without a background animation loop', as
     recipe.grp = 'I'; recipe.seed = 654; recipe.colors.ground = '#112233';
     recipe.drawn = [{ ci: 2, w: 3, p: [0, 0, 1, 0.2, 0.2, 0.96, 0.5, 0.5, 0.7] }];
     api.applyRecipe(btoa(JSON.stringify(recipe))); api.setPaused(true);
-    api.stepBackground(1000);
+    // One-shot baking works without advancing a clock or requesting any RAF.
+    const canvas = api.renderBackground();
+    expect(canvas).toBe(dom.window.document.getElementById('paint'));
+    expect(JSON.parse(atob(api.recipe())).t).toBe(recipe.t);
     const design = api.backgroundDesign(), restored = JSON.parse(atob(design.recipe));
     expect(restored).toMatchObject({ grp: 'I', seed: 654, colors: { ground: '#112233' }, drawn: recipe.drawn });
     expect(design.thumbnail).toMatch(/^data:image\/jpeg/);
