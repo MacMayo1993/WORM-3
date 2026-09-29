@@ -26,6 +26,7 @@ import AntipodalPiP from './AntipodalPiP.jsx';
 import InteractivePhotoBackground from './InteractivePhotoBackground.jsx';
 import BackgroundAmbience from './BackgroundAmbience.jsx';
 import TeachViewOffset from './TeachViewOffset.jsx';
+const ProjectiscopeBackground = React.lazy(() => import('../projectiscope/ProjectiscopeBackground.jsx'));
 
 const HealerWormMode3DWrapper = React.lazy(() =>
   import('../worm/HealerWormMode.jsx').then((mod) => ({ default: mod.HealerWormMode3DWrapper }))
@@ -168,6 +169,7 @@ export default function GameScene({
       return !currentLevelData.background || currentLevelData.background === 'blackhole';
     }
     if (settings.backgroundTheme === 'blackhole') return true;
+    if (settings.backgroundTheme === 'projectiscope') return false;
     if (bgConfig?.file) return false; // user-selected photo panorama
     if (PHOTO_PRESETS.has(settings.backgroundTheme)) return false; // HDRI preset
     return true; // falls through to the black-hole default
@@ -247,6 +249,9 @@ export default function GameScene({
           </ErrorBoundary3D>
         )}
         {/* Free play: Black Hole */}
+        {!currentLevelData && settings.backgroundTheme === 'projectiscope' && (
+          <ErrorBoundary3D><ProjectiscopeBackground design={settings.projectiscopeDesign} /></ErrorBoundary3D>
+        )}
         {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
         {/* Free play: Nebula */}
         {!currentLevelData && settings.backgroundTheme === 'nebula' && (

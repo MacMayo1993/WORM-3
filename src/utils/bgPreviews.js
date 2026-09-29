@@ -1,4 +1,5 @@
 export const BG_PREVIEWS = {
+  projectiscope: 'conic-gradient(from 45deg, #14223c, #61c3b4, #b086ef, #f8b16a, #14223c)',
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
   nebula: 'radial-gradient(circle at 50% 40%, #fff3ba 0%, #a35cff 34%, #2a1a5c 66%, #060616 100%)',
   cave: 'linear-gradient(135deg, #3d2817 0%, #1a120a 100%)',

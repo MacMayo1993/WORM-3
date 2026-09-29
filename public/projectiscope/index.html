@@ -1,0 +1,1953 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Projectiscope</title>
+
+
+
+<style>
+:root{
+  --paper:#eceef2; --panel:#ffffff; --ink:#171a2b; --muted:#5c6275; --rule:#d2d6df; --accent:#3b3fb6; --accent-ink:#fff;
+  --display:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --sans:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sym:"Noto Sans Symbols 2","Noto Sans Symbols","Segoe UI Symbol","Apple Symbols",sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--paper:#0f1120; --panel:#171a2e; --ink:#e7e8f2; --muted:#9ca0b8; --rule:#272b44; --accent:#a9acff; --accent-ink:#11132a;}
+}
+:root[data-theme="dark"]{--paper:#0f1120; --panel:#171a2e; --ink:#e7e8f2; --muted:#9ca0b8; --rule:#272b44; --accent:#a9acff; --accent-ink:#11132a;}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:28px;max-width:1280px;margin:0 auto;padding:22px 20px 40px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr);gap:16px;padding:12px 12px 36px}}
+.stage{position:sticky;top:calc(12px + env(safe-area-inset-top,0px))}
+@media (max-width:900px){.stage{position:static}}
+.art{position:relative;width:100%;max-width:min(86vh,840px);aspect-ratio:1;margin:0 auto;border-radius:6px;overflow:hidden;touch-action:none;cursor:grab}
+.art.drawing{cursor:crosshair}
+.art canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.caption{max-width:min(86vh,840px);margin:10px auto 0;color:var(--muted);font-size:13.5px}
+h1{font-family:var(--display);font-weight:400;font-size:44px;line-height:1;margin:0 0 8px;letter-spacing:-0.01em}
+.intro{font-size:15px;color:var(--muted);margin:0 0 14px}
+details{border-top:1px solid var(--rule)}
+summary{cursor:pointer;list-style:none;padding:13px 0;font-weight:600;font-size:14.5px;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-weight:400;font-size:18px;color:var(--muted)}
+details[open]>summary::after{content:"−"}
+.body{padding:0 0 14px}
+.top{border-top:1px solid var(--rule);padding:14px 0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row+.row{margin-top:8px}
+.ctl{display:grid;grid-template-columns:96px minmax(0,1fr) 40px;gap:10px;align-items:center;margin:7px 0}
+.ctl label{color:var(--muted);font-size:13.5px}
+.ctl output{font-variant-numeric:tabular-nums;text-align:right;font-size:13.5px}
+.lbl{color:var(--muted);font-size:13.5px;margin:10px 0 6px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select,input[type=number],input[type=text],textarea{font:inherit;padding:8px 10px;border:1px solid var(--rule);border-radius:7px;background:var(--panel);color:var(--ink)}
+select{width:100%}
+input[type=number]{width:92px}
+input[type=text]{flex:1;min-width:0}
+textarea{width:100%;font-size:12px;min-height:64px;resize:vertical}
+button{font:inherit;font-size:14px;padding:8px 12px;border-radius:7px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer}
+button:hover:not(:disabled){border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible,.art:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{padding:6px 11px;border-radius:999px;font-size:13.5px}
+.note{color:var(--muted);font-size:13px;margin:8px 0 0}
+.fact{font-size:14px;margin:10px 0 0}
+.colors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.colors label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+input[type=color]{width:100%;height:34px;padding:2px;border:1px solid var(--rule);border-radius:7px;background:var(--panel);cursor:pointer}
+.swatch{width:34px;height:34px;border-radius:50%;border:2px solid transparent;padding:0}
+.swatch[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--paper) inset}
+.gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.look{position:relative;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--panel)}
+.look button.open{display:block;width:100%;padding:0;border:0;border-radius:0;background:none}
+.look img{display:block;width:100%;aspect-ratio:1;object-fit:cover}
+.look .name{font-size:12px;padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.look .del{position:absolute;top:4px;right:4px;padding:1px 7px;font-size:13px;border-radius:999px;background:var(--panel)}
+.status{font-size:13px;color:var(--muted);min-height:1.4em;margin-top:8px}
+aside.lesson-on>details,aside.lesson-on>.top{display:none}
+.lesson{border-top:1px solid var(--rule);padding:14px 0}
+.lesson h2{font-family:var(--display);font-weight:400;font-size:28px;line-height:1.1;margin:0 0 6px}
+.step{font-size:15.5px;line-height:1.55;margin:14px 0 0;padding:12px 14px;border-left:3px solid var(--accent);background:var(--panel)}
+body.immersive{overflow:hidden}
+body.immersive aside,body.immersive .caption{display:none}
+body.immersive .layout{display:block;padding:0;max-width:none}
+body.immersive .stage{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:var(--ground,#000)}
+body.immersive .art{width:min(100vw,calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));max-width:none;border-radius:0}
+.hud{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding:8px;border-radius:12px;background:rgba(10,12,24,.55);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);transition:opacity .45s;max-width:calc(100vw - 24px)}
+.hud[hidden]{display:none}
+.hud.idle{opacity:0;pointer-events:none}
+.hud button{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.22)}
+.hud button[aria-pressed="true"]{background:#fff;color:#111;border-color:#fff}
+@media (prefers-reduced-motion: reduce){.hud{transition:none}}
+.modes{max-width:1280px;margin:0 auto;padding:14px 20px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+@media (max-width:900px){.modes{padding:10px 12px 0}}
+.modes .brand{font-family:var(--display);font-size:22px;margin-right:4px}
+.modes .seg button{padding:8px 16px}
+body.immersive .modes{display:none}
+#zodiacApp[hidden],#kaleidoApp[hidden]{display:none}
+#zodiacApp .layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:28px;max-width:1280px;margin:0 auto;padding:22px 20px 40px;align-items:start}
+@media (max-width:900px){#zodiacApp .layout{grid-template-columns:minmax(0,1fr);gap:16px;padding:12px 12px 36px}}
+#zodiacApp .stage{position:sticky;top:calc(12px + env(safe-area-inset-top,0px))}
+@media (max-width:900px){#zodiacApp .stage{position:relative}}
+#zodiacApp .sky{position:relative;width:100%;max-width:min(86vh,820px);aspect-ratio:1;margin:0 auto;border-radius:50%;overflow:hidden;touch-action:none;cursor:grab;background:#0c0a1d}
+#zodiacApp .sky canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#zodiacApp .caption{max-width:min(86vh,820px);margin:12px auto 0;color:var(--muted);font-size:14px;text-align:center}
+#zodiacApp h1{font-family:var(--display);font-weight:400;font-size:42px;line-height:1.05;margin:0 0 10px;letter-spacing:0.01em}
+#zodiacApp .intro{margin:0 0 14px;color:var(--muted)}
+#zodiacApp section{border-top:1px solid var(--rule);padding:14px 0}
+#zodiacApp h2{font-family:var(--display);font-weight:400;font-size:21px;margin:0 0 10px}
+#zodiacApp .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#zodiacApp .row+.row{margin-top:8px}
+#zodiacApp .seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+#zodiacApp .seg button{border:0;border-radius:0}
+#zodiacApp button{font:inherit;font-size:14px;padding:8px 12px;border-radius:8px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer}
+#zodiacApp button:hover:not(:disabled){border-color:var(--ink)}
+#zodiacApp button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#zodiacApp button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#zodiacApp button:focus-visible,#zodiacApp select:focus-visible,#zodiacApp input:focus-visible,#zodiacApp .sky:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#zodiacApp .ctl{display:grid;grid-template-columns:70px minmax(0,1fr) 46px;gap:10px;align-items:center;margin:10px 0 0}
+#zodiacApp .ctl label{color:var(--muted);font-size:13.5px}
+#zodiacApp .ctl output{text-align:right;font-size:13.5px}
+#zodiacApp input[type=range]{width:100%;accent-color:var(--accent)}
+#zodiacApp .note{color:var(--muted);font-size:13.5px;margin:10px 0 0}
+#zodiacApp .axes{display:grid;gap:6px;margin-top:4px}
+#zodiacApp .axis{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;text-align:left;width:100%;padding:7px 10px}
+#zodiacApp .pair{display:flex;border-radius:5px;overflow:hidden;height:22px}
+#zodiacApp .pair span{flex:1}
+#zodiacApp .axis .t{font-size:14px}
+#zodiacApp .axis .s{font-size:12.5px;color:var(--muted)}
+#zodiacApp .axis[aria-pressed="true"]{background:var(--panel);color:var(--ink);border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+#zodiacApp .form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#zodiacApp .form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+#zodiacApp .form .wide{grid-column:1/-1}
+#zodiacApp .form input,#zodiacApp .form select{font:inherit;font-size:14.5px;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;min-width:0}
+#zodiacApp .check{flex-direction:row!important;align-items:center;gap:8px!important;color:var(--ink)!important;font-size:14px!important}
+#zodiacApp .err{color:#c0392b;font-size:13.5px;margin:8px 0 0;min-height:1em}
+#zodiacApp table{width:100%;border-collapse:collapse;font-size:14px;margin-top:4px}
+#zodiacApp td{padding:5px 4px;border-bottom:1px solid var(--rule);vertical-align:top}
+#zodiacApp td.g{font-family:var(--sym);font-size:18px;width:28px;text-align:center}
+#zodiacApp td.h{color:var(--muted);text-align:right;white-space:nowrap}
+#zodiacApp .sym{font-family:var(--sym)}
+#zodiacApp .found{margin:8px 0 0;padding-left:18px}
+#zodiacApp .found li{margin:6px 0}
+#zodiacApp .chip{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:2px;vertical-align:0}
+#zodiacApp .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+#zodiacApp .chips button{padding:5px 10px;border-radius:999px;font-size:13px}
+#zodiacApp .gridwrap{overflow-x:auto;margin-top:12px}
+#zodiacApp table.grid{width:auto;border-collapse:collapse;margin:0}
+#zodiacApp .grid th,#zodiacApp .grid td{width:28px;height:28px;padding:0;text-align:center;border:1px solid var(--rule);font-weight:400;font-size:15px}
+#zodiacApp .grid th{color:var(--muted);background:var(--panel)}
+#zodiacApp .grid td{background:#15112b}
+#zodiacApp .grid button.cell{width:100%;height:100%;padding:0;border:0;border-radius:0;background:transparent;font-size:16px;cursor:pointer}
+#zodiacApp .grid button.cell[aria-pressed="true"]{background:#3a3170;outline:2px solid #fff3c4;outline-offset:-2px}
+#zodiacApp .asplist{list-style:none;padding:0;margin:12px 0 0}
+#zodiacApp .asplist li{margin:0 0 12px}
+#zodiacApp .ah{margin:0 0 6px;font-weight:600}
+#zodiacApp .ah .s,#zodiacApp .asp .s{font-weight:400;color:var(--muted);font-size:12.5px}
+#zodiacApp .ah .s{display:block}
+#zodiacApp .asplist button.asp{display:inline-block;margin:0 6px 6px 0;padding:5px 10px;font-size:13.5px;border-radius:999px}
+#zodiacApp .pop{position:absolute;z-index:5;width:min(300px,calc(100% - 16px));background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-radius:10px;padding:12px 14px 10px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:14px;line-height:1.45}
+#zodiacApp .pop[hidden]{display:none}
+#zodiacApp .pop p{margin:0 0 7px}
+#zodiacApp .pop .pt{font-size:16px;font-weight:600;padding:0 26px 6px 0;border-bottom:3px solid;margin-bottom:8px}
+#zodiacApp .pop .x{position:absolute;top:6px;right:6px;padding:2px 9px;font-size:16px;border-radius:999px}
+#zodiacApp .hpair{border:1px solid var(--rule);border-radius:10px;margin-top:8px;overflow:hidden}
+#zodiacApp .hrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;text-align:left;border:0;border-radius:0;padding:8px 10px;background:var(--panel)}
+#zodiacApp .hrow+.hrow{border-top:1px dashed var(--rule)}
+#zodiacApp .hrow .hn{font-family:var(--display);font-size:18px}
+#zodiacApp .hrow .s{color:var(--muted);font-size:12.5px}
+#zodiacApp .hrow .hp{font-size:17px;letter-spacing:2px}
+#zodiacApp .status{font-size:13px;color:var(--muted);min-height:1.2em;margin-top:8px}
+
+body.worm-creator .modes, body.worm-creator #lessonBtn, body.worm-creator #immersive,
+body.worm-creator #record, body.worm-creator #sound, body.worm-creator #journey { display:none }
+body.worm-background .modes, body.worm-background aside, body.worm-background .caption,
+body.worm-background #hud { display:none!important }
+body.worm-background .layout { display:block; padding:0 }
+body.worm-background .stage { position:fixed; inset:0; padding:0 }
+body.worm-background .art { width:100vw; max-width:none; border-radius:0 }
+</style>
+</head>
+<body data-mode="kaleido">
+<script>document.body.classList.add(new URLSearchParams(location.hash.slice(1)).has('background')?'worm-background':'worm-creator');</script>
+<nav class="modes" aria-label="Projectiscope views">
+  <span class="brand">Projectiscope</span>
+  <div class="seg" id="modeSwitch"><button data-v="kaleido" aria-pressed="true">Kaleidoscope</button><button data-v="zodiac" aria-pressed="false">Zodiac</button></div>
+</nav>
+<div id="kaleidoApp">
+<div class="layout">
+<main class="stage" id="stage">
+  <div class="art" id="art" tabindex="0" aria-label="Generative kaleidoscope. Drag to move the chart, or switch to Draw to add strokes. Space pauses.">
+    <canvas id="paint"></canvas>
+  </div>
+  <p class="caption" id="caption"></p>
+</main>
+<aside>
+  <h1>Projectiscope</h1>
+  <p class="intro">A projective kaleidoscope. A chiral motif is copied by every rotation of a symmetry group, then the sphere is folded into the projective plane. Nothing is reflected, yet mirrors appear: each half-turn becomes a mirror line after the fold.</p>
+
+  <div class="top">
+    <div class="row">
+      <button id="prev">Previous</button>
+      <input type="number" id="seed" min="1" max="999999" aria-label="Seed">
+      <button id="next">Next</button>
+    </div>
+    <div class="row">
+      <button id="rand" class="primary">New seed</button>
+      <button id="surprise">Surprise me</button>
+      <button id="pause" aria-pressed="false">Pause</button>
+    </div>
+    <div class="row">
+      <button id="journey" aria-pressed="false">Journey</button>
+      <button id="sound" aria-pressed="false">Sound off</button>
+      <button id="immersive">Immersive</button>
+    </div>
+    <div class="row"><button id="lessonBtn" class="primary">Show the fold with one shape</button></div>
+  </div>
+
+  <section class="lesson" id="lesson" hidden>
+    <h2>The fold, step by step</h2>
+    <p class="note">One shape and its antipodal twin on the sphere. Fold the sphere into the projective plane, then send the shape once through the line at infinity and watch its handedness.</p>
+    <p class="lbl">Shape</p>
+    <div class="seg" id="shapeSeg"><button data-v="squareF">Square with F</button><button data-v="flag">Flag</button><button data-v="spiral">Spiral</button></div>
+    <div class="ctl"><label for="lFold">Fold</label><input type="range" id="lFold" min="0" max="1" step="0.001"><output id="lFoldOut"></output></div>
+    <div class="row"><button id="playFold">Fold into RP²</button><button id="playUnfold">Unfold to the sphere</button></div>
+    <div class="ctl"><label for="lTrip">Trip</label><input type="range" id="lTrip" min="0" max="1" step="0.001"><output id="lTripOut"></output></div>
+    <div class="row"><button id="playTrip">Send it through infinity</button><button id="playBack">Bring it back</button></div>
+    <div class="row" style="margin-top:12px"><button id="playStory" class="primary">Play the whole story</button><button id="exitLesson">Back to the kaleidoscope</button></div>
+    <p class="step" id="lessonStep" aria-live="polite"></p>
+  </section>
+
+  <details open><summary>Symmetry</summary><div class="body">
+    <select id="grp" aria-label="Symmetry group">
+      <option value="O">Octahedral, 24 rotations</option>
+      <option value="T">Tetrahedral, 12 rotations</option>
+      <option value="I">Icosahedral, 60 rotations</option>
+      <option value="D">Dihedral, 2n rotations</option>
+      <option value="C">Cyclic, n rotations</option>
+    </select>
+    <div class="ctl" id="nctl" hidden><label for="n">n</label><input type="range" id="n" min="2" max="16" step="1"><output id="nOut"></output></div>
+    <p class="fact" id="fact"></p>
+    <div class="row" style="margin-top:10px">
+      <button id="view" aria-pressed="false">Unfold to the sphere</button>
+      <button id="driftChart" aria-pressed="false">Drift the chart</button>
+      <button id="resetV">Reset chart</button>
+    </div>
+  </div></details>
+
+  <details open><summary>Motif</summary><div class="body">
+    <p class="lbl">Stroke types</p>
+    <div class="chips" id="kinds"></div>
+    <p class="lbl">Curl</p>
+    <div class="seg" id="chirSeg"><button data-v="ccw">Counterclockwise</button><button data-v="cw">Clockwise</button><button data-v="mixed">Mixed</button></div>
+    <div class="ctl"><label for="dens">Strokes</label><input type="range" id="dens" min="1" max="24" step="1"><output id="densOut"></output></div>
+    <div class="ctl"><label for="reach">Reach</label><input type="range" id="reach" min="0.08" max="0.9" step="0.01"><output id="reachOut"></output></div>
+    <div class="ctl"><label for="weight">Weight</label><input type="range" id="weight" min="0.3" max="4" step="0.05"><output id="weightOut"></output></div>
+    <div class="ctl"><label for="opacity">Opacity</label><input type="range" id="opacity" min="0.1" max="1" step="0.01"><output id="opacityOut"></output></div>
+    <div class="ctl"><label for="fill">Fill</label><input type="range" id="fill" min="0" max="0.8" step="0.01"><output id="fillOut"></output></div>
+    <p class="lbl">Line style</p>
+    <div class="seg" id="dashSeg"><button data-v="solid">Solid</button><button data-v="dashed">Dashed</button><button data-v="dotted">Dotted</button></div>
+    <div class="row" style="margin-top:10px"><button id="showMotif" aria-pressed="true">Generated motif shown</button></div>
+  </div></details>
+
+  <details><summary>Draw your own</summary><div class="body">
+    <div class="seg" id="toolSeg"><button data-v="move">Move the chart</button><button data-v="draw">Draw</button></div>
+    <p class="note">In Draw mode, every stroke you make is copied by the whole group and folded with the rest.</p>
+    <p class="lbl">Brush color</p>
+    <div class="row" id="brushSw"></div>
+    <div class="ctl"><label for="brushW">Brush width</label><input type="range" id="brushW" min="0.5" max="8" step="0.1"><output id="brushWOut"></output></div>
+    <div class="row"><button id="undoDraw">Undo stroke</button><button id="clearDraw">Clear drawing</button></div>
+  </div></details>
+
+  <details open><summary>Color</summary><div class="body">
+    <div class="seg"><button id="bySheet" aria-pressed="true">By handedness</button><button id="byParity" aria-pressed="false">By global parity</button></div>
+    <select id="phi" hidden aria-label="Which parity" style="margin-top:8px"></select>
+    <p class="note" id="colorNote"></p>
+    <p class="lbl">Palette</p>
+    <select id="pal" aria-label="Palette">
+      <option value="night">Night glass</option>
+      <option value="porcelain">Porcelain</option>
+      <option value="dusk">Dusk</option>
+      <option value="neon">Neon</option>
+      <option value="sunprint">Sunprint</option>
+      <option value="ink">Ink and vermilion</option>
+      <option value="worm">WORM³</option>
+      <option value="custom" hidden>Custom</option>
+    </select>
+    <p class="lbl">Near sheet</p><div class="colors" id="warmC"></div>
+    <p class="lbl">Far sheet</p><div class="colors" id="coolC"></div>
+    <div class="colors" style="margin-top:10px">
+      <label>Ground<input type="color" id="cGround"></label>
+      <label>Twisting mirror<input type="color" id="cTwist"></label>
+      <label>Other mirror<input type="color" id="cOther"></label>
+      <label style="justify-content:flex-end"><button id="swap" style="padding:7px 6px">Swap sheets</button></label>
+    </div>
+    <p class="lbl">Blend</p>
+    <select id="blend"><option value="lighter">Glow (add light)</option><option value="screen">Screen</option><option value="source-over">Paint</option><option value="multiply">Multiply</option><option value="difference">Difference</option></select>
+    <div class="ctl"><label for="glow">Glow</label><input type="range" id="glow" min="0" max="1" step="0.01"><output id="glowOut"></output></div>
+  </div></details>
+
+  <details><summary>Motion</summary><div class="body">
+    <div class="ctl"><label for="speed">Speed</label><input type="range" id="speed" min="0" max="3" step="0.05"><output id="speedOut"></output></div>
+    <div class="ctl"><label for="trail">Trails</label><input type="range" id="trail" min="0" max="0.92" step="0.01"><output id="trailOut"></output></div>
+    <div class="ctl"><label for="drift">Wander</label><input type="range" id="drift" min="0" max="1.5" step="0.01"><output id="driftOut"></output></div>
+    <div class="ctl"><label for="spin">Spin</label><input type="range" id="spin" min="-1" max="1" step="0.01"><output id="spinOut"></output></div>
+    <div class="ctl"><label for="wobble">Wobble</label><input type="range" id="wobble" min="0" max="3" step="0.01"><output id="wobbleOut"></output></div>
+  </div></details>
+
+  <details><summary>Journey and sound</summary><div class="body">
+    <p class="note">Journey folds out to the sphere, becomes a new piece, and folds back in. Sound listens to the mirrors: a bell each time the motif crosses a twisting mirror, a soft pluck for the others, over a drone tuned to the group.</p>
+    <div class="ctl"><label for="pace">Journey pace</label><input type="range" id="pace" min="6" max="40" step="1"><output id="paceOut"></output></div>
+    <div class="ctl"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1" step="0.01"><output id="volumeOut"></output></div>
+    <div class="row" style="margin-top:6px"><button id="flashes" aria-pressed="true">Mirror flashes on</button></div>
+  </div></details>
+
+  <details><summary>Display</summary><div class="body">
+    <div class="ctl"><label for="bloom">Bloom</label><input type="range" id="bloom" min="0" max="1" step="0.01"><output id="bloomOut"></output></div>
+    <p class="lbl">Mirror lines</p>
+    <div class="seg" id="mirSeg"><button data-v="all">All</button><button data-v="twist">Twisting only</button><button data-v="none">None</button></div>
+    <p class="lbl">Frame</p>
+    <div class="seg" id="frameSeg"><button data-v="square">Square</button><button data-v="circle">Circle</button></div>
+    <div class="ctl"><label for="vignette">Vignette</label><input type="range" id="vignette" min="0" max="1" step="0.01"><output id="vignetteOut"></output></div>
+    <div class="row" style="margin-top:6px"><button id="rim" aria-pressed="true">Line at infinity shown</button></div>
+  </div></details>
+
+  <details><summary>Save and share</summary><div class="body">
+    <div class="row">
+      <select id="expSize" style="width:auto"><option value="0">Screen size</option><option value="2048">2048 px</option><option value="4096">4096 px</option></select>
+      <button id="save" class="primary" hidden>Save PNG</button>
+    </div>
+    <p class="note">Large exports redraw the scene as a long exposure, so trails come out clean at any size.</p>
+    <div class="row" style="margin-top:10px">
+      <select id="recLen" style="width:auto" aria-label="Clip length"><option value="6">6 s clip</option><option value="12" selected>12 s clip</option><option value="20">20 s clip</option></select>
+      <button id="record" hidden aria-pressed="false">Record clip</button>
+    </div>
+    <p class="note">Clips include the sound when it is on.</p>
+    <p class="lbl">My looks</p>
+    <div class="row"><input type="text" id="lookName" placeholder="Name this look" aria-label="Look name"><button id="saveLook">Save look</button></div>
+    <div class="gallery" id="gallery"></div>
+    <p class="note" id="galleryNote"></p>
+    <p class="lbl">Recipe</p>
+    <textarea id="recipe" aria-label="Recipe code" placeholder="Copy a recipe to share a look, or paste one here and apply it."></textarea>
+    <div class="row"><button id="copyRecipe">Copy recipe</button><button id="applyRecipe">Apply recipe</button><button id="resetP">Reset settings</button></div>
+    <p class="status" id="status" aria-live="polite"></p>
+  </div></details>
+</aside>
+</div>
+<div class="hud" id="hud" hidden>
+  <button id="hudExit">Exit</button><button id="hudPause">Pause</button><button id="hudJourney">Journey</button><button id="hudSurprise">Surprise me</button><button id="hudSound">Sound off</button><button id="hudRecord" hidden>Record</button>
+</div>
+
+</div>
+<div id="zodiacApp" hidden>
+<div class="layout">
+<main class="stage">
+  <div class="sky" id="z-sky" tabindex="0" aria-label="The zodiac on the celestial sphere, folding into the projective plane. Drag to turn it.">
+    <canvas id="z-cv"></canvas>
+  </div>
+  <div class="pop" id="z-pop" hidden role="dialog" aria-live="polite"></div>
+  <p class="caption" id="z-caption"></p>
+</main>
+<aside>
+  <h1>Folded Zodiac</h1>
+  <p class="intro">The twelve signs ride a band around the celestial sphere. Fold the sphere into the projective plane and every sign lands on its opposite: Aries on Libra, Taurus on Scorpio. The band itself becomes a Möbius strip.</p>
+
+  <section>
+    <div class="seg" id="z-foldSeg"><button data-v="0">Sphere</button><button data-v="1">Projective plane</button></div>
+    <div class="ctl"><label for="z-fold">Fold</label><input type="range" id="z-fold" min="0" max="1" step="0.001"><output id="z-foldOut"></output></div>
+    <div class="row" style="margin-top:10px"><button id="z-turn" aria-pressed="true">Sky turning</button><button id="z-resetView">Reset view</button></div>
+  </section>
+
+  <section>
+    <h2>Color by</h2>
+    <div class="seg" id="z-modeSeg"><button data-v="axis">Axis</button><button data-v="element">Element</button><button data-v="modality">Modality</button><button data-v="polarity">Polarity</button></div>
+    <p class="note" id="z-modeNote"></p>
+    <div class="axes" id="z-axes" style="margin-top:12px"></div>
+    <p class="note">Tap an axis to spotlight it.</p>
+  </section>
+
+  <section>
+    <h2>Birth chart</h2>
+    <div class="form">
+      <label>Date<input type="date" id="z-bDate"></label>
+      <label>Time<input type="time" id="z-bTime"></label>
+      <label class="check wide"><input type="checkbox" id="z-noTime"> I don’t know the birth time</label>
+      <label class="wide">Place of birth<input type="text" id="z-bPlace" list="z-cityList" placeholder="Start typing a city" autocomplete="off"></label>
+      <datalist id="z-cityList"></datalist>
+      <label>Latitude (north +)<input type="number" id="z-bLat" step="0.01" min="-89.9" max="89.9" placeholder="35.78"></label>
+      <label>Longitude (east +)<input type="number" id="z-bLon" step="0.01" min="-180" max="180" placeholder="-78.64"></label>
+      <label class="wide">Time zone<select id="z-bZone"></select></label>
+      <p class="note wide" id="z-offNote" style="margin:0"></p>
+    </div>
+    <p class="err" id="z-err" aria-live="polite"></p>
+    <div class="row"><button id="z-drawChart" class="primary">Draw the chart</button><button id="z-nowChart">Show the sky right now</button></div>
+    <p class="note">Pick a city and the coordinates and time zone fill in. The clock offset for that exact date, daylight saving included, comes from your browser’s time zone history. For a place not on the list, type its coordinates and choose its time zone. Positions are computed in this page to within about a degree; a planet within a degree of a sign boundary may belong to either sign. Nothing you enter leaves your browser.</p>
+  </section>
+
+  <section>
+    <h2 id="z-chartTitle">Placements</h2>
+    <table id="z-placeTable"></table>
+  </section>
+
+  <section>
+    <h2>Houses</h2>
+    <div class="row"><select id="z-houseSys" aria-label="House system" style="width:auto"><option value="placidus">Placidus</option><option value="whole">Whole sign</option><option value="equal">Equal</option><option value="porphyry">Porphyry</option></select>
+    <button id="z-houseShow" aria-pressed="true">Houses shown on the chart</button></div>
+    <p class="note" id="z-houseNote"></p>
+    <div id="z-houseList"></div>
+  </section>
+
+  <section>
+    <h2>Aspects</h2>
+    <p class="note" style="margin-top:0">On the sphere, aspects are chords across the chart. After the fold, points 180° apart are the same point, so an aspect of θ and one of 180° − θ become the same relationship: each pair is drawn as an equal-length bow along the band. Tap any line, planet, house number or angle on the chart, or an aspect here, to see what it is.</p>
+    <div class="chips" id="z-aspChips"></div>
+    <div class="gridwrap"><table class="grid" id="z-aspGrid"></table></div>
+    <ul class="asplist" id="z-aspList"></ul>
+    <p class="note" id="z-aspFold"></p>
+  </section>
+
+  <section>
+    <h2>Your chart, folded</h2>
+    <ul class="found" id="z-folded"></ul>
+  </section>
+
+  <section>
+    <div class="row"><button id="z-save" hidden>Save PNG</button></div>
+    <p class="status" id="z-status" aria-live="polite"></p>
+  </section>
+</aside>
+</div>
+</div>
+<script>
+(function(){
+// ================= math =================
+const PHI=(1+Math.sqrt(5))/2, I3=[1,0,0,0,1,0,0,0,1];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>{const l=Math.hypot(a[0],a[1],a[2]);return [a[0]/l,a[1]/l,a[2]/l];};
+function mmul(A,B){const C=new Array(9);for(let i=0;i<3;i++)for(let j=0;j<3;j++)C[3*i+j]=A[3*i]*B[j]+A[3*i+1]*B[3+j]+A[3*i+2]*B[6+j];return C;}
+function mvec(A,v){return [A[0]*v[0]+A[1]*v[1]+A[2]*v[2],A[3]*v[0]+A[4]*v[1]+A[5]*v[2],A[6]*v[0]+A[7]*v[1]+A[8]*v[2]];}
+const mT=A=>[A[0],A[3],A[6],A[1],A[4],A[7],A[2],A[5],A[8]];
+function rot(axis,ang){const [x,y,z]=norm(axis),c=Math.cos(ang),s=Math.sin(ang),t=1-c;
+  return [t*x*x+c,t*x*y-s*z,t*x*z+s*y, t*x*y+s*z,t*y*y+c,t*y*z-s*x, t*x*z-s*y,t*y*z+s*x,t*z*z+c];}
+function rotTo(a,b){a=norm(a);b=norm(b);const c=dot(a,b),ax=cross(a,b),s=Math.hypot(...ax);
+  if(s<1e-9)return c>0?I3.slice():rot([1,0,0],Math.PI);return rot(ax,Math.atan2(s,c));}
+function mkey(R){let s='';for(let i=0;i<9;i++){let v=Math.round(R[i]*1e4);if(v===0)v=0;s+=v+',';}return s;}
+function halfTurnAxis(R){const B=[R[0]+1,R[1],R[2],R[3],R[4]+1,R[5],R[6],R[7],R[8]+1];let best=null,bn=-1;
+  for(let j=0;j<3;j++){const col=[B[j],B[3+j],B[6+j]];const n=Math.hypot(...col);if(n>bn){bn=n;best=col;}}return norm(best);}
+function orthonormalize(M){ // keep the chart a clean rotation after many drags
+  let a=norm([M[0],M[1],M[2]]),b=[M[3],M[4],M[5]];const d=dot(a,b);b=norm([b[0]-d*a[0],b[1]-d*a[1],b[2]-d*a[2]]);const c=cross(a,b);
+  return [a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]];}
+const SUB='₀₁₂₃₄₅₆₇₈₉',sub=n=>String(n).split('').map(c=>SUB[+c]).join('');
+
+function buildGroup(kind,n){
+  let gens,view=[0,0,1];
+  if(kind==='O')gens=[rot([0,0,1],Math.PI/2),rot([1,1,1],2*Math.PI/3)];
+  if(kind==='T')gens=[rot([0,0,1],Math.PI),rot([1,1,1],2*Math.PI/3)];
+  if(kind==='I'){gens=[rot([0,1,PHI],2*Math.PI/5),rot([1,1,1],2*Math.PI/3)];view=[0,1,PHI];}
+  if(kind==='D')gens=[rot([0,0,1],2*Math.PI/n),rot([0,1,0],Math.PI)];
+  if(kind==='C')gens=[rot([0,0,1],2*Math.PI/n)];
+  const Q=rotTo(view,[0,0,1]),QT=mT(Q);
+  gens=gens.map(g=>mmul(mmul(Q,g),QT));
+  const els=[I3.slice()],idx=new Map([[mkey(I3),0]]);
+  for(let i=0;i<els.length;i++)for(const g of gens){const h=mmul(g,els[i]),k=mkey(h);if(!idx.has(k)){idx.set(k,els.length);els.push(h);}}
+  const N=els.length,find=R=>idx.get(mkey(R));
+  const mul=[];for(let a=0;a<N;a++){const r=new Int32Array(N);for(let b=0;b<N;b++)r[b]=find(mmul(els[a],els[b]));mul.push(r);}
+  const inG2=new Uint8Array(N);inG2[0]=1;const g2=[0];
+  const sq=[...new Set(els.map((_,g)=>mul[g][g]))];
+  for(let i=0;i<g2.length;i++)for(const s of sq){const h=mul[s][g2[i]];if(!inG2[h]){inG2[h]=1;g2.push(h);}}
+  const coset=new Int32Array(N).fill(-1);let q=0;
+  for(let g=0;g<N;g++){if(coset[g]>=0)continue;for(const s of g2)coset[mul[g][s]]=q;q++;}
+  const chars=[];
+  for(let bits=1;bits<(1<<q);bits++){const phi=new Uint8Array(N);for(let g=0;g<N;g++)phi[g]=(bits>>coset[g])&1;
+    let ok=true;for(let a=0;a<N&&ok;a++)for(let b=0;b<N;b++)if(phi[mul[a][b]]!==(phi[a]^phi[b])){ok=false;break;}
+    if(ok)chars.push(phi);}
+  const inv=[];
+  els.forEach((R,g)=>{if(Math.abs(R[0]+R[4]+R[8]+1)<1e-6)inv.push({g,axis:halfTurnAxis(R),twist:!!inG2[g],flash:0,sign:0});});
+  let nc=0;const cls=new Int32Array(inv.length).fill(-1);
+  for(let i=0;i<inv.length;i++){if(cls[i]>=0)continue;cls[i]=nc;
+    for(const R of els){const b=mvec(R,inv[i].axis);for(let j=0;j<inv.length;j++)if(cls[j]<0&&Math.abs(dot(b,inv[j].axis))>0.999)cls[j]=nc;}nc++;}
+  inv.forEach((f,i)=>f.cls=cls[i]);
+  return {kind,n,els,N,chars,inv,inG2,nclass:nc};
+}
+
+// ================= motif =================
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const KINDS=[['spiral','Spirals',2],['hook','Hooks',3],['petal','Petals',2],['dots','Dot trails',1],['rose','Roses',1.5],['wave','Waves',1.5]];
+function genMotif(seed,count,kinds,chirMode){
+  const R=mulberry(seed*2654435761>>>0);
+  const base=chirMode==='cw'?-1:chirMode==='ccw'?1:(R()<0.5?1:-1);
+  const pool=KINDS.filter(k=>kinds[k[0]]);const tot=pool.reduce((s,k)=>s+k[2],0);
+  const strokes=[];
+  for(let k=0;k<count&&pool.length;k++){
+    let r=R()*tot,kind=pool[0][0];for(const p of pool){if(r<p[2]){kind=p[0];break;}r-=p[2];}
+    const chir=chirMode==='mixed'?(R()<0.5?1:-1):base;
+    const cu=(R()-0.5)*1.1,cv=(R()-0.5)*1.1,ci=Math.floor(R()*4);
+    const w=0.7+R()*2.3,alpha=0.55+R()*0.4,phase=R()*6.283,wob=0.15+R()*0.35;
+    const u=[],v=[];let closed=false,dots=false;
+    if(kind==='spiral'){
+      const turns=0.7+R()*1.8,r0=0.02+R()*0.06,r1=0.16+R()*0.42,th0=R()*6.283,m=80;
+      for(let i=0;i<m;i++){const s=i/(m-1),th=th0+chir*6.283*turns*s,rr=r0+(r1-r0)*Math.pow(s,0.9);u.push(cu+rr*Math.cos(th));v.push(cv+rr*Math.sin(th));}
+    }else if(kind==='hook'){
+      let x=cu,y=cv,h=R()*6.283;const L=0.45+R()*0.8,c1=0.5+R()*2,c2=3+R()*9,m=60;
+      for(let i=0;i<m;i++){const s=i/(m-1);u.push(x);v.push(y);h+=chir*(c1+c2*s*s*s)/m;x+=L/m*Math.cos(h);y+=L/m*Math.sin(h);}
+    }else if(kind==='petal'){
+      closed=true;const a=0.1+R()*0.24,o=R()*6.283,m=64;
+      for(let i=0;i<m;i++){const th=6.283*i/m,thp=th+chir*0.75*Math.sin(th),rr=a*(0.55+0.45*Math.cos(th));
+        const px=rr*Math.cos(thp),py=0.55*rr*Math.sin(thp)+chir*0.25*rr*Math.sin(2*th);
+        u.push(cu+px*Math.cos(o)-py*Math.sin(o));v.push(cv+px*Math.sin(o)+py*Math.cos(o));}
+    }else if(kind==='rose'){
+      closed=true;const a=0.1+R()*0.22,kk=[2,3,4,5][Math.floor(R()*4)],o=R()*6.283,m=180;
+      for(let i=0;i<m;i++){const th=6.283*i/m,rr=a*Math.abs(Math.cos(kk*th/2))*(0.35+0.65*Math.abs(Math.cos(kk*th/2))),tw=th+chir*0.9*rr/a;
+        u.push(cu+rr*Math.cos(tw+o));v.push(cv+rr*Math.sin(tw+o));}
+    }else if(kind==='wave'){
+      const L=0.5+R()*0.7,A=0.03+R()*0.07,f=2+R()*4,o=R()*6.283,curl=chir*(0.6+R()*1.6),m=90;
+      let x=cu,y=cv,h=o;
+      for(let i=0;i<m;i++){const s=i/(m-1),off=A*s*Math.sin(6.283*f*s);u.push(x-off*Math.sin(h));v.push(y+off*Math.cos(h));h+=curl/m;x+=L/m*Math.cos(h);y+=L/m*Math.sin(h);}
+    }else{
+      dots=true;const m=9+Math.floor(R()*12),th0=R()*6.283,r1=0.12+R()*0.3;
+      for(let i=0;i<m;i++){const s=i/(m-1),th=th0+chir*3.6*s,rr=0.03+r1*s;u.push(cu+rr*Math.cos(th));v.push(cv+rr*Math.sin(th));}
+    }
+    strokes.push({u:Float64Array.from(u),v:Float64Array.from(v),n:u.length,closed,dots,ci,w,alpha,phase,wob,cu,cv,world:new Float64Array(3*(u.length+1))});
+  }
+  const c0=norm([R()*2-1,R()*2-1,R()*2-1+0.6]);
+  return {strokes,c0,chir:base,d1:0.8+R()*0.6,d2:0.8+R()*0.6};
+}
+
+// ================= palettes =================
+const PAL={
+  night:{ground:'#12163a',warm:['#ff9e5e','#ff5e8a','#ffd36b','#fff1dc'],cool:['#4fd8c9','#6f9dff','#b99cff','#dff4ff'],twist:'#ffe08a',other:'#ffffff',blend:'lighter',glow:0.55,opacity:0.7},
+  porcelain:{ground:'#f3f5f9',warm:['#1d3fa8','#3a64d8','#0f2466','#7c95e6'],cool:['#2f8f7a','#5fb39d','#1e5e50','#9ccfbf'],twist:'#c2410c',other:'#1e2a4a',blend:'multiply',glow:0,opacity:0.8},
+  dusk:{ground:'#241a2e',warm:['#f2a65a','#e85d75','#f7d488','#fbe9d0'],cool:['#8fb8de','#a0e8af','#c8b8ff','#e6f0ff'],twist:'#f7d488',other:'#e6f0ff',blend:'lighter',glow:0.55,opacity:0.65},
+  neon:{ground:'#07060f',warm:['#ff2e97','#ff9f1c','#ffe74c','#ffffff'],cool:['#00f5d4','#00bbf9','#9b5de5','#e0fbfc'],twist:'#ffe74c',other:'#ffffff',blend:'lighter',glow:0.9,opacity:0.7},
+  sunprint:{ground:'#1f4e8c',warm:['#f4f1e8','#dfe8f2','#ffffff','#b9cde4'],cool:['#8fb2d9','#6d93c2','#c9d8ea','#a3bfe0'],twist:'#ffffff',other:'#cfe0f5',blend:'source-over',glow:0.15,opacity:0.75},
+  worm:{ground:'#0d0f1a',warm:['#f4f4f4','#e53935','#1e6fe0','#cfcfcf'],cool:['#ffd400','#ff8a00','#2fb344','#e6c200'],twist:'#ffd400',other:'#f4f4f4',blend:'lighter',glow:0.5,opacity:0.7},
+  ink:{ground:'#f2f0ea',warm:['#1a1a1a','#3d3d3d','#6b6b6b','#111111'],cool:['#b0302a','#d0473f','#7a1f1b','#e07b73'],twist:'#b0302a',other:'#555555',blend:'multiply',glow:0,opacity:0.8}
+};
+const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;};
+const clonePal=p=>({ground:p.ground,warm:p.warm.slice(),cool:p.cool.slice(),twist:p.twist,other:p.other});
+
+// ================= state =================
+const $=s=>document.querySelector(s);
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DEF={grp:'O',n:8,dens:9,reach:0.34,weight:1,opacity:0.7,fill:0.22,dash:'solid',showMotif:true,
+  kinds:{spiral:true,hook:true,petal:true,dots:true,rose:false,wave:false},chir:'ccw',
+  speed:reduce?0:0.6,trail:0.6,drift:0.55,spin:0.5,wobble:1,
+  pal:'night',colors:clonePal(PAL.night),blend:'lighter',glow:0.55,
+  mode:'sheet',phi:0,sphere:false,driftChart:false,mirrors:'all',frame:'square',vignette:0.25,rim:true,
+  tool:'move',brushC:0,brushW:2.2,bloom:0.35,flashes:true,volume:0.7,pace:14};
+const backgroundMode=new URLSearchParams(location.hash.slice(1)).has('background');
+let backgroundFrameAt=0;
+const S=JSON.parse(JSON.stringify(DEF));
+Object.assign(S,{seed:1+Math.floor(Math.random()*99999),t:0,V:I3.slice(),G:null,M:null,drawn:[],paused:false,dirty:true,overDirty:true,
+  fold:1,foldE:1,pending:null,lesson:false,journey:false,jt:0,sound:false,recording:false,immersive:false});
+const art=$('#art'),D=$('#paint'),dctx=D.getContext('2d');
+const acc=document.createElement('canvas'),ovl=document.createElement('canvas');
+const dpr=Math.min(window.devicePixelRatio||1,2);
+let rc={ctx:acc.getContext('2d'),W:0,R:0,C:0},oc={ctx:ovl.getContext('2d'),W:0,R:0,C:0};
+const bloomCache={b1:document.createElement('canvas'),b2:document.createElement('canvas')};
+function setRC(t,w){t.W=w;t.C=w/2;t.R=w/2*0.94;}
+const PERF={scale:1,ema:0,frames:0};
+function resize(){
+  const w=Math.round(Math.min(art.clientWidth*(backgroundMode?1:dpr)*PERF.scale,backgroundMode?512:1000));if(!w||w===rc.W)return;
+  for(const c of [D,acc,ovl]){c.width=w;c.height=w;}setRC(rc,w);setRC(oc,w);
+  clearGround(rc,1);S.overDirty=true;S.dirty=true;
+}
+const lum=h=>{const n=parseInt(h.slice(1),16);return (0.2126*(n>>16&255)+0.7152*(n>>8&255)+0.0722*(n&255))/255;};
+// bloom: blur by downsampling; on dark grounds add the glow of what differs from the ground, on light grounds let ink bleed
+function applyBloom(g,src,W,cache){
+  if(S.bloom<=0||S.lesson)return;
+  const w1=Math.max(8,Math.round(W/6)),w2=Math.max(4,Math.round(W/18));
+  const {b1,b2}=cache;if(b1.width!==w1){b1.width=b1.height=w1;}if(b2.width!==w2){b2.width=b2.height=w2;}
+  const c1=b1.getContext('2d'),c2=b2.getContext('2d'),dark=lum(S.colors.ground)<0.45;
+  c1.globalCompositeOperation='source-over';c1.globalAlpha=1;c1.imageSmoothingEnabled=true;c1.drawImage(src,0,0,w1,w1);
+  if(dark){
+    // keep only what differs from the ground, then square it twice so only the brightest strokes bloom
+    c1.globalCompositeOperation='difference';c1.fillStyle=S.colors.ground;c1.fillRect(0,0,w1,w1);
+    c1.globalCompositeOperation='multiply';c1.drawImage(b1,0,0);c1.drawImage(b1,0,0);
+    c1.globalCompositeOperation='source-over';
+  }
+  c2.globalCompositeOperation='source-over';c2.clearRect(0,0,w2,w2);c2.drawImage(b1,0,0,w2,w2);
+  const k=S.bloom*S.bloom; // gentle at the low end of the slider
+  g.save();g.imageSmoothingEnabled=true;g.globalCompositeOperation=dark?'screen':'darken';
+  g.globalAlpha=Math.min(1,k*(dark?0.55:0.3));g.drawImage(b1,0,0,W,W);
+  g.globalAlpha=Math.min(1,k*(dark?0.8:0.45));g.drawImage(b2,0,0,W,W);
+  g.restore();
+}
+function present(){
+  if(!rc.W)return;
+  dctx.globalCompositeOperation='source-over';dctx.globalAlpha=1;dctx.drawImage(acc,0,0);
+  applyBloom(dctx,acc,rc.W,bloomCache);dctx.drawImage(ovl,0,0);
+  if(backgroundMode){
+    const veil=dctx.createRadialGradient(rc.C,rc.C,0,rc.C,rc.C,rc.W*.7);
+    veil.addColorStop(0,'rgba(5,7,17,.65)');veil.addColorStop(1,'rgba(5,7,17,.25)');
+    dctx.fillStyle=veil;dctx.fillRect(0,0,rc.W,rc.W);
+  }
+  D.dataset.frame=String((Number(D.dataset.frame)||0)+1);
+}
+function clearGround(t,a){const g=t.ctx;g.globalCompositeOperation='source-over';g.globalAlpha=a;g.fillStyle=S.colors.ground;g.fillRect(0,0,t.W,t.W);g.globalAlpha=1;}
+
+// ================= projection =================
+const tmp=[0,0];
+// fold morph: 0 = sphere seen from outside, 1 = projective plane (far hemisphere pulled through by the antipode)
+function disp(t,x,y,z,out){
+  const f=S.foldE;
+  if(f<=0){out[0]=t.C+x*t.R;out[1]=t.C-y*t.R;return;}
+  let X=x,Y=y,Z=z;if(Z<0){X=-X;Y=-Y;Z=-Z;}
+  const sr=Math.sqrt(X*X+Y*Y);let dx=0,dy=0;
+  if(sr>1e-12){const k=Math.atan2(sr,Z)/(Math.PI/2)/sr;dx=X*k;dy=Y*k;}
+  if(f>=1){out[0]=t.C+dx*t.R;out[1]=t.C-dy*t.R;return;}
+  out[0]=t.C+(x+(dx-x)*f)*t.R;out[1]=t.C-(y+(dy-y)*f)*t.R;
+}
+function unproject(clientX,clientY){ // screen point -> point on S² in world coordinates
+  const r=art.getBoundingClientRect();const sx=((clientX-r.left)/r.width*rc.W-rc.C)/rc.R,sy=-((clientY-r.top)/r.height*rc.W-rc.C)/rc.R;
+  const rr=Math.hypot(sx,sy);if(rr>1)return null;
+  let v;
+  if(S.foldE<0.5)v=[sx,sy,Math.sqrt(Math.max(0,1-rr*rr))];
+  else{const th=rr*Math.PI/2,s=rr>1e-9?Math.sin(th)/rr:0;v=[sx*s,sy*s,Math.cos(th)];}
+  return mvec(mT(S.V),v);
+}
+
+// ================= motif world points =================
+function updateWorld(){
+  const M=S.M,t=S.t;if(!M)return;
+  const amp=S.drift;
+  const dr=[amp*Math.sin(0.11*M.d1*t),amp*Math.sin(0.07*M.d2*t+1.3)];
+  let c=M.c0;
+  {const ref=Math.abs(c[2])<0.9?[0,0,1]:[1,0,0];const a=norm(cross(ref,c)),b=cross(c,a);
+    const r=Math.hypot(dr[0],dr[1]);if(r>1e-9){const d=[(dr[0]*a[0]+dr[1]*b[0])/r,(dr[0]*a[1]+dr[1]*b[1])/r,(dr[0]*a[2]+dr[1]*b[2])/r];
+      c=[Math.cos(r)*c[0]+Math.sin(r)*d[0],Math.cos(r)*c[1]+Math.sin(r)*d[1],Math.cos(r)*c[2]+Math.sin(r)*d[2]];}}
+  M.cNow=c;
+  const ref=Math.abs(c[2])<0.9?[0,0,1]:[1,0,0];const e1=norm(cross(ref,c)),e2=cross(c,e1);
+  const spin=0.12*S.spin*t*M.chir,cs=Math.cos(spin),sn=Math.sin(spin);
+  const f1=[cs*e1[0]+sn*e2[0],cs*e1[1]+sn*e2[1],cs*e1[2]+sn*e2[2]],f2=[-sn*e1[0]+cs*e2[0],-sn*e1[1]+cs*e2[1],-sn*e1[2]+cs*e2[2]];
+  const reach=S.reach;
+  for(const st of M.strokes){
+    const a=S.wobble*st.wob*Math.sin(0.4*t+st.phase),ca=Math.cos(a),sa=Math.sin(a),breath=1+0.08*S.wobble*Math.sin(0.5*t+st.phase*1.7);
+    const n=st.n,Wd=st.world;
+    for(let i=0;i<=n;i++){
+      if(i===n&&!st.closed)break;const j=i===n?0:i;
+      const du=(st.u[j]-st.cu)*breath,dv=(st.v[j]-st.cv)*breath;
+      const u=st.cu+ca*du-sa*dv,v=st.cv+sa*du+ca*dv;
+      const r=Math.hypot(u,v)*reach;
+      if(r<1e-9){Wd[3*i]=c[0];Wd[3*i+1]=c[1];Wd[3*i+2]=c[2];continue;}
+      const k=Math.sin(r)*reach/r,cr=Math.cos(r);
+      Wd[3*i]=cr*c[0]+k*(u*f1[0]+v*f2[0]);Wd[3*i+1]=cr*c[1]+k*(u*f1[1]+v*f2[1]);Wd[3*i+2]=cr*c[2]+k*(u*f1[2]+v*f2[2]);
+    }
+  }
+}
+
+// ================= drawing =================
+function drawStroke(t,P3,count,closed,dots,Wm,color,lw,alpha){
+  const g=t.ctx,far=0.22+0.78*S.foldE;
+  if(dots){
+    for(let i=0;i<count;i++){
+      const a0=P3[3*i],b0=P3[3*i+1],c0=P3[3*i+2];
+      const x=Wm[0]*a0+Wm[1]*b0+Wm[2]*c0,y=Wm[3]*a0+Wm[4]*b0+Wm[5]*c0,z=Wm[6]*a0+Wm[7]*b0+Wm[8]*c0;
+      const s=z>=0?0:1;disp(t,x,y,z,tmp);
+      g.globalAlpha=alpha*(s?far:1);g.fillStyle=color(s);
+      g.beginPath();g.arc(tmp[0],tmp[1],(0.6+1.8*i/count)*lw,0,6.283);g.fill();
+    }
+    return;
+  }
+  const n=closed?count+1:count;
+  let prevS=-1,px=0,py=0,pz=0,pieces=0,curS=0;
+  const dash=S.dash==='dashed'?[lw*3.2,lw*2.4]:S.dash==='dotted'?[0.01,lw*2.4]:null;
+  const finish=()=>{
+    const col=color(curS);if(!col)return;const a=alpha*(curS?far:1);g.strokeStyle=col;
+    if(S.glow>0){g.setLineDash([]);g.globalAlpha=a*0.25*S.glow;g.lineWidth=lw*(2+4*S.glow);g.stroke();}
+    if(dash)g.setLineDash(dash);
+    g.globalAlpha=a;g.lineWidth=lw;g.stroke();
+    if(dash)g.setLineDash([]);
+    if(closed&&pieces===1&&S.fill>0){g.fillStyle=col;g.globalAlpha=a*S.fill;g.fill();}
+  };
+  const stride=S.interacting&&n>24?2:1;
+  for(let i=0;i<n;i+=(i+stride>=n&&i!==n-1)?(n-1-i):stride){
+    const a0=P3[3*i],b0=P3[3*i+1],c0=P3[3*i+2];
+    const x=Wm[0]*a0+Wm[1]*b0+Wm[2]*c0,y=Wm[3]*a0+Wm[4]*b0+Wm[5]*c0,z=Wm[6]*a0+Wm[7]*b0+Wm[8]*c0;
+    const s=z>=0?0:1;
+    if(i===0){curS=s;pieces=1;g.beginPath();disp(t,x,y,z,tmp);g.moveTo(tmp[0],tmp[1]);}
+    else if(s!==prevS){
+      const q=pz/(pz-z);let bx=px+(x-px)*q,by=py+(y-py)*q;const l=Math.hypot(bx,by)||1;bx/=l;by/=l;
+      disp(t,bx,by,prevS?-1e-9:1e-9,tmp);g.lineTo(tmp[0],tmp[1]);finish();
+      curS=s;pieces++;g.beginPath();disp(t,bx,by,s?-1e-9:1e-9,tmp);g.moveTo(tmp[0],tmp[1]);
+      disp(t,x,y,z,tmp);g.lineTo(tmp[0],tmp[1]);
+    }else{disp(t,x,y,z,tmp);g.lineTo(tmp[0],tmp[1]);}
+    prevS=s;px=x;py=y;pz=z;
+  }
+  finish();
+}
+function paintFrame(t,clearAlpha){
+  clearGround(t,clearAlpha);
+  const g=t.ctx,G=S.G,M=S.M,col=S.colors;
+  g.globalCompositeOperation=S.blend;g.lineCap='round';g.lineJoin='round';
+  const scale=t.W/900;
+  const phi=S.mode==='parity'&&G.chars.length?G.chars[S.phi%G.chars.length]:null;
+  // With trails, each frame's strokes stack on the faded previous frames. Additive and multiplying blends then build
+  // up to about 1/(1 - trail) times the single-frame intensity and wash out to white (or black). Scale each frame's
+  // contribution down so the accumulated image keeps its color.
+  const comp=clearAlpha<1&&S.blend!=='source-over'?Math.pow(clearAlpha,0.9):1;
+  for(let e=0;e<G.N;e++){
+    const Wm=mmul(S.V,G.els[e]),fixed=phi?phi[e]:-1;
+    if(S.showMotif)for(const st of M.strokes){
+      const color=s=>((fixed>=0?fixed:s)?col.cool:col.warm)[st.ci];
+      drawStroke(t,st.world,st.n,st.closed,st.dots,Wm,color,st.w*scale*2*S.weight*(st.dots?0.8:1),st.alpha*S.opacity*comp);
+    }
+    for(const d of S.drawn){
+      const color=s=>((fixed>=0?fixed:s)?col.cool:col.warm)[d.ci];
+      drawStroke(t,d.world,d.n,false,false,Wm,color,d.w*scale*2,(0.9*S.opacity+0.1)*comp);
+    }
+  }
+  g.globalAlpha=1;g.globalCompositeOperation='source-over';g.setLineDash([]);
+}
+function traceMirror(g,t,f){
+  const a=mvec(S.V,f.axis);const u1=norm(Math.abs(a[2])<0.9?cross(a,[0,0,1]):cross(a,[1,0,0])),u2=cross(a,u1);
+  g.beginPath();let prev=null;const m=240;
+  for(let i=0;i<=m;i++){
+    const s=6.283*i/m,q=[Math.cos(s)*u1[0]+Math.sin(s)*u2[0],Math.cos(s)*u1[1]+Math.sin(s)*u2[1],Math.cos(s)*u1[2]+Math.sin(s)*u2[2]];
+    if(S.foldE<0.02&&q[2]<0){prev=null;continue;}
+    disp(t,q[0],q[1],q[2],tmp);
+    if(prev&&Math.hypot(tmp[0]-prev[0],tmp[1]-prev[1])<t.R*0.5)g.lineTo(tmp[0],tmp[1]);else g.moveTo(tmp[0],tmp[1]);
+    prev=[tmp[0],tmp[1]];
+  }
+}
+function paintOverlay(t){
+  const g=t.ctx,{W,C,R}=t,col=S.colors;g.clearRect(0,0,W,W);
+  if(S.vignette>0){const gr=g.createRadialGradient(C,C,R*0.3,C,C,R*1.12);gr.addColorStop(0,hexA(col.ground,0));gr.addColorStop(1,hexA(col.ground,S.vignette));g.fillStyle=gr;g.fillRect(0,0,W,W);}
+  if(S.frame==='circle'){g.fillStyle=col.ground;g.beginPath();g.rect(0,0,W,W);g.arc(C,C,R*1.005,0,6.283);g.fill('evenodd');}
+  const u=Math.max(1,W/700);
+  if(S.rim){g.lineWidth=u;g.strokeStyle=hexA(col.other,0.28);g.setLineDash(S.foldE>0.5?[W/140,W/180]:[]);g.beginPath();g.arc(C,C,R,0,6.283);g.stroke();g.setLineDash([]);}
+  g.lineCap='round';
+  if(S.lesson)return;
+  for(const f of S.G.inv){
+    const show=S.mirrors==='all'||(S.mirrors==='twist'&&f.twist),fl=S.flashes?f.flash:0;
+    if(!show&&fl<0.01)continue;
+    traceMirror(g,t,f);
+    const c=f.twist?col.twist:col.other;
+    if(fl>0.01){
+      g.setLineDash([]);
+      g.strokeStyle=hexA(c,0.18*fl);g.lineWidth=u*(6+26*fl);g.stroke();
+      g.strokeStyle=hexA(c,0.5*fl);g.lineWidth=u*(2+7*fl);g.stroke();
+    }
+    if(show){g.strokeStyle=f.twist?hexA(c,0.95):hexA(c,0.5);g.lineWidth=(f.twist?1.6:1.1)*u;g.setLineDash(f.twist?[]:[W/220,W/160]);g.stroke();}
+  }
+  g.setLineDash([]);
+}
+
+// ================= simple shape demo =================
+const L={fold:0,trip:0,shape:'squareF',queue:[],anim:null,prevV:null};
+function densify(pts,closed,step=0.05){
+  const out=[];const n=pts.length,m=closed?n:n-1;
+  for(let i=0;i<m;i++){const a=pts[i],b=pts[(i+1)%n];const k=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/step));
+    for(let j=0;j<k;j++)out.push([a[0]+(b[0]-a[0])*j/k,a[1]+(b[1]-a[1])*j/k]);}
+  if(!closed)out.push(pts[n-1]);return out;
+}
+function shapeParts(kind){
+  const parts=[];
+  if(kind==='squareF'){
+    parts.push({role:'outline',closed:true,pts:densify([[-1,-1],[1,-1],[1,1],[-1,1]],true)});
+    for(let v=-0.88;v<=0.89;v+=0.16)parts.push({role:'hatch',pts:densify([[-0.97,v],[0.97,v]],false)});
+    parts.push({role:'ink',pts:densify([[-0.42,-0.66],[-0.42,0.66],[0.5,0.66]],false)});
+    parts.push({role:'ink',pts:densify([[-0.42,0.04],[0.28,0.04]],false)});
+  }else if(kind==='flag'){
+    parts.push({role:'ink',pts:densify([[-0.6,-1.1],[-0.6,1]],false)});
+    const A=[-0.6,1],B=[0.9,0.62],C=[-0.6,0.22];
+    parts.push({role:'outline',closed:true,pts:densify([A,B,C],true)});
+    for(let v=0.28;v<0.97;v+=0.09){const ur=v>=0.62?-0.6+(1-v)/(1-0.62)*1.5:-0.6+(v-0.22)/(0.62-0.22)*1.5;parts.push({role:'hatch',pts:densify([[-0.58,v],[ur-0.02,v]],false)});}
+  }else{
+    const pts=[];for(let i=0;i<=160;i++){const s=i/160,th=s*6.283*2.2,r=0.08+0.92*s;pts.push([r*Math.cos(th),r*Math.sin(th)]);}
+    parts.push({role:'outline',pts});
+    parts.push({role:'ink',pts:densify([[0.92*Math.cos(6.283*2.2),0.92*Math.sin(6.283*2.2)],[0.92*Math.cos(6.283*2.2)+0.25,0.92*Math.sin(6.283*2.2)+0.28]],false)});
+  }
+  return parts;
+}
+let lessonParts=shapeParts('squareF');
+function lessonWorld(){
+  // the thesis ride: rotate about the y-axis by pi*trip, carrying the square from the pole N to -N
+  const a=Math.PI*L.trip,c=[Math.sin(a),0,Math.cos(a)],e1=[Math.cos(a),0,-Math.sin(a)],e2=[0,1,0],rho=0.34;
+  return lessonParts.map(p=>{
+    const w=new Float64Array(3*p.pts.length);
+    p.pts.forEach(([u,v],i)=>{const r=Math.hypot(u,v)*rho;let x,y,z;
+      if(r<1e-9){x=c[0];y=c[1];z=c[2];}else{const k=Math.sin(r)*rho/r,cr=Math.cos(r);x=cr*c[0]+k*(u*e1[0]+v*e2[0]);y=cr*c[1]+k*(u*e1[1]+v*e2[1]);z=cr*c[2]+k*(u*e1[2]+v*e2[2]);}
+      w[3*i]=x;w[3*i+1]=y;w[3*i+2]=z;});
+    return {role:p.role,closed:!!p.closed,n:p.pts.length,w};
+  });
+}
+function paintLesson(t){
+  clearGround(t,1);
+  const g=t.ctx,col=S.colors,scale=t.W/900,save={glow:S.glow,dash:S.dash,fill:S.fill};
+  S.glow=0;S.dash='solid';S.fill=0;g.globalCompositeOperation='source-over';g.lineCap='round';g.lineJoin='round';
+  const parts=lessonWorld(),folded=S.foldE>=0.999;
+  const copies=[{sign:-1,base:col.cool[1]},{sign:1,base:col.warm[0]}]; // twin first, then the original
+  for(const cp of copies){
+    for(const p of parts){
+      const arr=cp.sign>0?p.w:p.w.map(x=>-x);
+      // once folded, the far-sheet half of each copy sits exactly under the near half of the other; draw only the near sheet
+      const color=s=>folded&&s?null:(p.role==='ink'?col.ground:cp.base);
+      const lw=(p.role==='outline'?4:p.role==='ink'?9:2.2)*scale,al=p.role==='hatch'?0.75:1;
+      if(p.role==='ink'){ // light halo so the letter reads on any fill
+        drawStroke(t,arr,p.n,false,false,S.V,s=>folded&&s?null:cp.base,lw+5*scale,1);
+      }
+      drawStroke(t,arr,p.n,p.closed,false,S.V,color,lw,al);
+    }
+  }
+  Object.assign(S,save);g.globalAlpha=1;
+}
+function lessonText(){
+  const noun={squareF:'square',flag:'flag',spiral:'spiral'}[L.shape],f=L.fold,tr=L.trip;
+  const flipped=L.shape==='squareF'?'the F has turned into its mirror image':`the ${noun} has turned into its mirror image`;
+  if(f<0.02){
+    if(tr<0.02)return `This is the sphere, the orientation double cover. The warm ${noun} and the cool ${noun} are antipodal twins: two lifts of one ${noun} in the projective plane. The faint copy is on the far side.`;
+    if(tr>0.98)return `Unfolded after the trip, the twins have traded places. The warm ${noun} is now on the far side and the cool one faces you. On the sphere nothing was reflected; the sheets were exchanged.`;
+    return `On the sphere the trip is only a rotation: the warm ${noun} slides over the horizon while its cool twin comes around from the far side.`;
+  }
+  if(f<0.98)return `Folding: the far hemisphere is pulled through the center by the antipodal map, and each twin lands exactly on its partner. Every point of the projective plane is one pair of opposite points on the sphere.`;
+  if(tr<0.02)return `Now this is the projective plane, with a single ${noun}. The dashed rim is the line at infinity, where opposite points of the rim are the same point. Send the ${noun} through it.`;
+  if(tr<0.98)return `Crossing the line at infinity: part of the ${noun} leaves through one edge and comes back in through the opposite edge, because those are the same points.`;
+  return `Back in the same place, but ${flipped}. The trip reversed its handedness, and the color changed because you are now seeing the other lift. That exchange of sheets is orientation monodromy.`;
+}
+function syncLesson(){
+  $('#lFold').value=L.fold;$('#lFoldOut').textContent=L.fold<0.01?'S²':L.fold>0.99?'RP²':Math.round(L.fold*100)+'%';
+  $('#lTrip').value=L.trip;$('#lTripOut').textContent=Math.round(L.trip*180)+'°';
+  setPressed('#shapeSeg',L.shape);
+  const txt=lessonText();$('#lessonStep').textContent=txt;$('#caption').textContent=txt;
+}
+function lessonTo(key,to,dur){L.queue.push({key,to,dur});}
+function lessonPause(ms){L.queue.push({pause:ms});}
+function lessonStep(dt){
+  if(!L.anim&&L.queue.length){const q=L.queue.shift();L.anim=q.pause?{pause:q.pause/1000,t:0}:{key:q.key,from:L[q.key],to:q.to,dur:reduce?0.001:q.dur,t:0};}
+  const a=L.anim;if(!a)return false;
+  a.t+=dt;
+  if(a.pause!==undefined){if(a.t>=a.pause)L.anim=null;return true;}
+  const u=Math.min(1,a.t/a.dur),e=u<0.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+  L[a.key]=a.from+(a.to-a.from)*e;if(u>=1)L.anim=null;
+  return true;
+}
+function enterLesson(){
+  if(S.lesson)return;
+  S.lesson=true;L.prevV=S.V;S.V=I3.slice();L.fold=0;L.trip=0;L.queue=[];L.anim=null;
+  if(S.journey)toggleJourney();
+  document.querySelector('aside').classList.add('lesson-on');$('#lesson').hidden=false;
+  S.dirty=true;S.overDirty=true;syncLesson();
+  lessonTo('fold',0,0.01);
+}
+function exitLesson(){
+  if(!S.lesson)return;
+  S.lesson=false;S.fold=L.fold;S.foldE=smooth(L.fold);S.V=L.prevV||I3.slice();L.queue=[];L.anim=null;
+  document.querySelector('aside').classList.remove('lesson-on');$('#lesson').hidden=true;
+  clearGround(rc,1);S.dirty=true;S.overDirty=true;updateText();
+}
+
+// ================= sound =================
+const AU={ctx:null,count:0,last:{}};
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+const ROOT={O:50,T:45,I:52,D:48,C:43},CHORD={O:[0,7,14,16],T:[0,7,12,15],I:[0,7,11,14],D:[0,5,7,12],C:[0,7,12,19]};
+const PENTA=[0,2,4,7,9];
+function impulse(ctx,dur,decay){const len=Math.floor(ctx.sampleRate*dur),b=ctx.createBuffer(2,len,ctx.sampleRate);
+  for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);}return b;}
+function audioInit(){
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;
+  const ctx=new AC();AU.ctx=ctx;
+  AU.master=ctx.createGain();AU.master.gain.value=0;
+  const comp=ctx.createDynamicsCompressor();comp.threshold.value=-16;comp.ratio.value=3;
+  AU.bus=ctx.createGain();const rev=ctx.createConvolver();rev.buffer=impulse(ctx,3.6,2.4);const wet=ctx.createGain();wet.gain.value=0.55;
+  AU.bus.connect(comp);AU.bus.connect(rev);rev.connect(wet);wet.connect(comp);comp.connect(AU.master);AU.master.connect(ctx.destination);
+  try{AU.dest=ctx.createMediaStreamDestination();AU.master.connect(AU.dest);}catch(e){AU.dest=null;}
+  const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=800;lp.Q.value=0.8;
+  const lfo=ctx.createOscillator();lfo.frequency.value=0.06;const lg=ctx.createGain();lg.gain.value=450;lfo.connect(lg);lg.connect(lp.frequency);lfo.start();
+  AU.padGain=ctx.createGain();AU.padGain.gain.value=0.05;lp.connect(AU.padGain);AU.padGain.connect(AU.bus);
+  AU.pad=[0,1,2,3].map(i=>{const o=ctx.createOscillator();o.type=i%2?'triangle':'sine';o.detune.value=(i-1.5)*7;o.connect(lp);o.start();return o;});
+  setChord(true);return true;
+}
+function setChord(now){
+  if(!AU.ctx)return;const r=ROOT[S.grp],ch=CHORD[S.grp],t=AU.ctx.currentTime;
+  AU.pad.forEach((o,i)=>{const f=mtof(r-12+ch[i]);if(now)o.frequency.value=f;else o.frequency.setTargetAtTime(f,t,1.2);});
+}
+function setVolume(){if(!AU.ctx)return;AU.master.gain.setTargetAtTime(S.sound?S.volume*0.9:0,AU.ctx.currentTime,0.25);}
+function ping(f,dir,pan){
+  if(!S.sound||!AU.ctx)return;
+  const ctx=AU.ctx,t=ctx.currentTime;
+  if(AU.last[f.cls]&&t-AU.last[f.cls]<0.09)return;AU.last[f.cls]=t;
+  const idx=f.cls*2+(AU.count++)+(dir>0?0:3);
+  const m=ROOT[S.grp]+12+PENTA[idx%5]+12*(Math.floor(idx/5)%2)+(f.twist?12:0),fr=mtof(m);
+  const out=ctx.createGain();out.gain.value=0;
+  let node=out;
+  if(ctx.createStereoPanner){const p=ctx.createStereoPanner();p.pan.value=Math.max(-0.9,Math.min(0.9,pan));out.connect(p);node=p;}
+  node.connect(AU.bus);
+  if(f.twist){ // bell: the reversal no global parity can predict
+    const c=ctx.createOscillator(),mo=ctx.createOscillator(),mg=ctx.createGain();
+    c.frequency.value=fr;mo.frequency.value=fr*3.51;mg.gain.setValueAtTime(fr*2.4,t);mg.gain.exponentialRampToValueAtTime(fr*0.05,t+2.2);
+    mo.connect(mg);mg.connect(c.frequency);c.connect(out);
+    out.gain.setValueAtTime(0,t);out.gain.linearRampToValueAtTime(0.2,t+0.006);out.gain.exponentialRampToValueAtTime(0.0008,t+2.6);
+    c.start(t);mo.start(t);c.stop(t+2.7);mo.stop(t+2.7);
+  }else{ // soft pluck: a reversal a global parity accounts for
+    const o=ctx.createOscillator(),lp=ctx.createBiquadFilter();o.type='triangle';o.frequency.value=fr;
+    lp.type='lowpass';lp.frequency.setValueAtTime(4200,t);lp.frequency.exponentialRampToValueAtTime(380,t+0.5);
+    o.connect(lp);lp.connect(out);
+    out.gain.setValueAtTime(0,t);out.gain.linearRampToValueAtTime(0.16,t+0.004);out.gain.exponentialRampToValueAtTime(0.0008,t+1.1);
+    o.start(t);o.stop(t+1.2);
+  }
+}
+// motif center crossing a mirror: every mirror in the same conjugacy class is crossed by some copy at that instant
+function detectCrossings(){
+  if(backgroundMode)return; // Keep gameplay free of mirror flashes and bridge events.
+  const M=S.M,G=S.G;if(!M||!M.cNow||!G)return;const c=M.cNow;
+  const live=!S.paused&&S.speed>0&&S.showMotif;
+  for(const f of G.inv){
+    const s=dot(c,f.axis)>=0?1:-1;
+    if(f.sign&&s!==f.sign&&live){
+      for(const h of G.inv)if(h.cls===f.cls)h.flash=Math.max(h.flash,h===f?1:0.75);
+      ping(f,s,mvec(S.V,c)[0]);
+      if(window.__psHook)window.__psHook({type:'mirror',twist:f.twist,cls:f.cls,group:S.grp,n:S.n});
+    }
+    f.sign=s;
+  }
+}
+
+// ================= text and controls =================
+const SLIDERS=[['bloom','bloom',2],['volume','volume',2],['pace','pace',0],['n','n',0],['dens','dens',0],['reach','reach',2],['weight','weight',2],['opacity','opacity',2],['fill','fill',2],['brushW','brushW',1],['glow','glow',2],['speed','speed',2],['trail','trail',2],['drift','drift',2],['spin','spin',2],['wobble','wobble',2],['vignette','vignette',2]];
+function groupName(){const n=S.n;return {O:'The octahedral group',T:'The tetrahedral group',I:'The icosahedral group',D:`The dihedral group D${sub(n)}`,C:`The cyclic group C${sub(n)}`}[S.grp];}
+function setPressed(sel,val){document.querySelectorAll(sel+' button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===val)));}
+function buildColorInputs(){
+  for(const side of ['warm','cool']){
+    const box=$(side==='warm'?'#warmC':'#coolC');box.innerHTML='';
+    S.colors[side].forEach((c,i)=>{const l=document.createElement('label');l.textContent=`Tone ${i+1}`;const inp=document.createElement('input');inp.type='color';inp.value=c;inp.setAttribute('aria-label',`${side==='warm'?'Near':'Far'} sheet tone ${i+1}`);
+      inp.addEventListener('input',()=>{S.colors[side][i]=inp.value;markCustom();refreshBrush();});l.appendChild(inp);box.appendChild(l);});
+  }
+  $('#cGround').value=S.colors.ground;$('#cTwist').value=S.colors.twist;$('#cOther').value=S.colors.other;
+}
+function refreshBrush(){
+  const box=$('#brushSw');box.innerHTML='';
+  S.colors.warm.forEach((c,i)=>{const b=document.createElement('button');b.className='swatch';b.style.background=c;b.setAttribute('aria-label',`Brush tone ${i+1}`);b.setAttribute('aria-pressed',String(S.brushC===i));
+    b.addEventListener('click',()=>{S.brushC=i;refreshBrush();});box.appendChild(b);});
+}
+function buildKinds(){
+  const box=$('#kinds');box.innerHTML='';
+  for(const [k,label] of KINDS){const b=document.createElement('button');b.textContent=label;b.setAttribute('aria-pressed',String(!!S.kinds[k]));
+    b.addEventListener('click',()=>{const next=!S.kinds[k];if(!next&&Object.values(S.kinds).filter(Boolean).length<=1){status('Keep at least one stroke type on.');return;}S.kinds[k]=next;buildKinds();rebuildMotif();});box.appendChild(b);}
+}
+function markCustom(){setStageBg();S.pal='custom';$('#pal').querySelector('[value=custom]').hidden=false;$('#pal').value='custom';clearGround(rc,1);S.dirty=true;S.overDirty=true;}
+function syncUI(){
+  for(const [id,k,d] of SLIDERS){$('#'+id).value=S[k];$('#'+id+'Out').textContent=(+S[k]).toFixed(d);}
+  $('#seed').value=S.seed;$('#grp').value=S.grp;$('#blend').value=S.blend;
+  const po=$('#pal');po.querySelector('[value=custom]').hidden=S.pal!=='custom';po.value=S.pal;
+  setPressed('#chirSeg',S.chir);setPressed('#dashSeg',S.dash);setPressed('#toolSeg',S.tool);setPressed('#mirSeg',S.mirrors);setPressed('#frameSeg',S.frame);
+  $('#showMotif').setAttribute('aria-pressed',String(S.showMotif));$('#showMotif').textContent=S.showMotif?'Generated motif shown':'Generated motif hidden';
+  $('#rim').setAttribute('aria-pressed',String(S.rim));$('#rim').textContent=S.rim?'Line at infinity shown':'Line at infinity hidden';
+  $('#pause').setAttribute('aria-pressed',String(S.paused));$('#pause').textContent=S.paused?'Play':'Pause';
+  art.classList.toggle('drawing',S.tool==='draw');
+  for(const [id,val,on,off] of [['#journey',S.journey,'Journey on','Journey'],['#hudJourney',S.journey,'Journey on','Journey'],['#sound',S.sound,'Sound on','Sound off'],['#hudSound',S.sound,'Sound on','Sound off'],['#flashes',S.flashes,'Mirror flashes on','Mirror flashes off']]){const b=$(id);if(!b)continue;b.setAttribute('aria-pressed',String(!!val));b.textContent=val?on:off;}
+  $('#hudPause').textContent=S.paused?'Play':'Pause';
+  buildKinds();buildColorInputs();refreshBrush();updateText();
+}
+function updateText(){
+  const G=S.G;if(!G)return;const inv=G.inv.length,tw=G.inv.filter(f=>f.twist).length;
+  let f=`${groupName()} has ${G.N} rotation${G.N>1?'s':''}. `;
+  if(!inv)f+='It has no half-turns, so nothing in the picture can be reversed after the fold.';
+  else if(inv===1)f+=`Its one half-turn folds into a mirror line, and that mirror is ${tw?'twisting (solid)':'not twisting (dashed)'}.`;
+  else f+=`Its ${inv} half-turns fold into mirror lines; ${tw===inv?'all of them are twisting (solid)':tw?`${tw} ${tw>1?'are':'is'} twisting (solid)`:'none is twisting (all dashed)'}.`;
+  $('#fact').textContent=f;
+  const hasPhi=G.chars.length>0;$('#byParity').disabled=!hasPhi;
+  if(!hasPhi&&S.mode==='parity')S.mode='sheet';
+  $('#bySheet').setAttribute('aria-pressed',String(S.mode==='sheet'));$('#byParity').setAttribute('aria-pressed',String(S.mode==='parity'));
+  const sel=$('#phi');sel.hidden=!(S.mode==='parity'&&G.chars.length>1);
+  sel.innerHTML=G.chars.map((_,i)=>`<option value="${i}">φ${G.chars.length>1?sub(i+1):''}</option>`).join('');sel.value=String(S.phi%Math.max(1,G.chars.length));
+  let note=S.mode==='sheet'
+    ?'Near-sheet tones read as drawn; far-sheet tones come through the fold and read mirrored. The two swap across every mirror line.'
+    :'Each copy takes its tones from φ(g), a parity of the rotation alone. Across dashed mirrors the tones swap with the handedness. Across solid mirrors a reflected pair keeps the same tones: no global parity can see that reversal.';
+  if(!hasPhi)note+=' This group has no global parity at all, so every mirror is twisting.';
+  $('#colorNote').textContent=note;
+  $('#caption').textContent=S.sphere
+    ?'Unfolded: the sphere carries only rotated copies, with no mirror symmetry anywhere. Faint strokes are on the far side.'
+    :(S.tool==='draw'?'Drawing: each stroke is copied by every rotation and folded. Switch back to Move the chart to drag the view.':'Folded: the disk is the projective plane, its dashed rim the line at infinity where opposite points meet. Drag to move the chart.');
+  $('#view').textContent=S.sphere?'Fold into RP²':'Unfold to the sphere';$('#view').setAttribute('aria-pressed',String(S.sphere));
+  $('#driftChart').setAttribute('aria-pressed',String(S.driftChart));
+  $('#nctl').hidden=!(S.grp==='D'||S.grp==='C');
+}
+let statusTimer=0;
+function status(msg){$('#status').textContent=msg;clearTimeout(statusTimer);statusTimer=setTimeout(()=>{$('#status').textContent='';},5000);}
+
+// ================= lifecycle =================
+const moving=()=>!S.paused&&(S.speed>0||S.driftChart);
+function softClear(){if(!moving()||S.trail<0.05)clearGround(rc,1);} // when animating, old trails dissolve into the new piece
+function rebuildGroup(keepPhi){S.G=buildGroup(S.grp,S.n);if(!keepPhi)S.phi=0;S.overDirty=true;S.dirty=true;softClear();updateText();setChord(false);}
+function rebuildMotif(){S.M=genMotif(S.seed,S.dens,S.kinds,S.chir);S.dirty=true;softClear();$('#seed').value=S.seed;}
+function transition(fn){ // fold out to the sphere, change, fold back in
+  if(backgroundMode||reduce||S.paused||!rc.W){fn();return;}
+  if(S.pending){const prev=S.pending;S.pending=()=>{prev();fn();};return;}
+  S.pending=fn;
+}
+let last=performance.now();
+const smooth=x=>x*x*(3-2*x);
+// keep the frame rate up: lower the internal resolution when frames get expensive, raise it again when there is room
+function adapt(ms){
+  PERF.ema=PERF.ema?PERF.ema*0.9+ms*0.1:ms;
+  if(++PERF.frames<45||S.interacting||S.recording)return;
+  if(PERF.ema>20&&PERF.scale>0.55){PERF.scale=Math.max(0.55,PERF.scale-0.15);PERF.frames=0;PERF.ema=0;resize();}
+  else if(PERF.ema<8&&PERF.scale<1){PERF.scale=Math.min(1,PERF.scale+0.1);PERF.frames=0;PERF.ema=0;resize();}
+}
+function loop(now){
+  if(backgroundMode && (document.hidden || now-backgroundFrameAt<125))return;
+  backgroundFrameAt=now;
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  if(document.body.dataset.mode==='zodiac'){if(!backgroundMode)requestAnimationFrame(loop);return;}
+  if(S.lesson){
+    const moved=lessonStep(dt);
+    if(moved)syncLesson();
+    S.foldE=smooth(Math.min(1,Math.max(0,L.fold)));
+    if(moved||S.dirty){paintLesson(rc);paintOverlay(oc);present();S.dirty=false;S.overDirty=false;}
+    if(!backgroundMode)requestAnimationFrame(loop);return;
+  }
+  const tgt=S.pending?0:(S.sphere?0:1);
+  if(S.fold!==tgt){const step=dt*(S.pending?1.6:1.1);S.fold=Math.abs(tgt-S.fold)<=step?tgt:S.fold+Math.sign(tgt-S.fold)*step;S.foldE=smooth(S.fold);S.dirty=true;S.overDirty=true;}
+  if(S.pending&&S.fold<=0){const a=S.pending;S.pending=null;a();}
+  if(!S.paused&&S.speed>0){S.t+=dt*S.speed*(backgroundMode?0.4:1.6);S.dirty=true;}
+  if(!S.paused&&S.driftChart){S.V=orthonormalize(mmul(rot([0.3,1,0.15],dt*0.12),S.V));S.dirty=true;S.overDirty=true;}
+  if(S.journey&&!S.paused&&!S.pending){S.jt+=dt;if(S.jt>S.pace){S.jt=0;transition(()=>randomize(true));}}
+  let changed=false;
+  const t0=performance.now();
+  if(S.dirty&&rc.W){updateWorld();detectCrossings();paintFrame(rc,moving()&&!S.interacting?1-S.trail:1);S.dirty=false;changed=true;}
+  if(S.G)for(const f of S.G.inv){if(f.flash>0.004){f.flash*=Math.exp(-dt*2.2);S.overDirty=true;}else f.flash=0;}
+  if(S.overDirty&&oc.W){paintOverlay(oc);S.overDirty=false;changed=true;}
+  if(changed||S.recording)present();
+  if(changed)adapt(performance.now()-t0);
+  if(!backgroundMode)requestAnimationFrame(loop);
+}
+
+// ================= recipes and looks =================
+const RKEYS=['grp','n','seed','dens','reach','weight','opacity','fill','dash','showMotif','kinds','chir','speed','trail','drift','spin','wobble','pal','colors','blend','glow','mode','phi','sphere','mirrors','frame','vignette','rim','t','V','bloom'];
+function recipeObj(){const o={v:1};for(const k of RKEYS)o[k]=S[k];o.t=+S.t.toFixed(3);o.V=S.V.map(x=>+x.toFixed(5));
+  o.drawn=S.drawn.map(d=>({ci:d.ci,w:+d.w.toFixed(2),p:Array.from(d.world.slice(0,3*d.n),x=>+x.toFixed(4))}));return o;}
+function encode(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o))));}
+function decode(s){return JSON.parse(decodeURIComponent(escape(atob(s.trim()))));}
+function applyRecipe(o){
+  if(!o||o.v!==1)throw new Error('bad');
+  const num=(k,lo,hi)=>{if(typeof o[k]==='number'&&isFinite(o[k]))S[k]=Math.min(hi,Math.max(lo,o[k]));};
+  if(['O','T','I','D','C'].includes(o.grp))S.grp=o.grp;
+  num('n',2,16);S.n=Math.round(S.n);num('seed',1,999999);S.seed=Math.round(S.seed);num('dens',1,24);S.dens=Math.round(S.dens);
+  num('reach',0.08,0.9);num('weight',0.3,4);num('opacity',0.1,1);num('fill',0,0.8);num('speed',0,3);num('trail',0,0.92);num('drift',0,1.5);num('spin',-1,1);num('wobble',0,3);num('glow',0,1);num('vignette',0,1);num('bloom',0,1);num('t',-1e6,1e6);num('phi',0,3);
+  for(const [k,vals] of [['dash',['solid','dashed','dotted']],['chir',['ccw','cw','mixed']],['blend',['lighter','screen','source-over','multiply','difference']],['mode',['sheet','parity']],['mirrors',['all','twist','none']],['frame',['square','circle']]])if(vals.includes(o[k]))S[k]=o[k];
+  for(const k of ['showMotif','sphere','rim'])if(typeof o[k]==='boolean')S[k]=o[k];
+  if(o.kinds&&typeof o.kinds==='object'){const nk={};for(const [k] of KINDS)nk[k]=!!o.kinds[k];if(Object.values(nk).some(Boolean))S.kinds=nk;}
+  const hex=/^#[0-9a-f]{6}$/i;
+  if(o.colors&&hex.test(o.colors.ground)&&Array.isArray(o.colors.warm)&&o.colors.warm.length===4&&o.colors.warm.every(c=>hex.test(c))&&Array.isArray(o.colors.cool)&&o.colors.cool.length===4&&o.colors.cool.every(c=>hex.test(c)))
+    S.colors={ground:o.colors.ground,warm:o.colors.warm.slice(),cool:o.colors.cool.slice(),twist:hex.test(o.colors.twist)?o.colors.twist:'#ffe08a',other:hex.test(o.colors.other)?o.colors.other:'#ffffff'};
+  S.pal=(o.pal in PAL||o.pal==='custom')?o.pal:'custom';
+  if(Array.isArray(o.V)&&o.V.length===9&&o.V.every(x=>typeof x==='number'))S.V=orthonormalize(o.V);
+  S.drawn=Array.isArray(o.drawn)?o.drawn.filter(d=>Array.isArray(d.p)&&d.p.length>=6).slice(0,400).map(d=>{const w=Float64Array.from(d.p.map(Number));return {ci:Math.min(3,Math.max(0,d.ci|0)),w:Math.min(8,Math.max(0.5,+d.w||2)),world:w,n:w.length/3|0};}):[];
+  if(backgroundMode){S.fold=S.sphere?0:1;S.foldE=S.fold;}
+  rebuildGroup(true);rebuildMotif();syncUI();S.overDirty=true;setStageBg();
+}
+const LS='folded-rotations-looks-v1';
+function loadLooks(){try{return JSON.parse(localStorage.getItem(LS)||'[]');}catch(e){return null;}}
+function storeLooks(a){try{localStorage.setItem(LS,JSON.stringify(a));return true;}catch(e){return false;}}
+function renderGallery(){
+  const looks=loadLooks(),box=$('#gallery');box.innerHTML='';
+  if(looks===null){$('#galleryNote').textContent='Looks can’t be kept in this browser. Use Copy recipe instead.';$('#saveLook').disabled=true;return;}
+  $('#galleryNote').textContent=looks.length?'Looks are kept in this browser only.':'Saved looks appear here, kept in this browser.';
+  looks.forEach((l,i)=>{
+    const d=document.createElement('div');d.className='look';
+    const b=document.createElement('button');b.className='open';b.setAttribute('aria-label',`Open look ${l.name}`);
+    const img=document.createElement('img');img.src=l.thumb;img.alt='';b.appendChild(img);
+    const nm=document.createElement('div');nm.className='name';nm.textContent=l.name;b.appendChild(nm);
+    b.addEventListener('click',()=>{try{applyRecipe(decode(l.recipe));status(`Opened ${l.name}.`);}catch(e){status('This look could not be opened.');}});
+    const x=document.createElement('button');x.className='del';x.textContent='×';x.setAttribute('aria-label',`Delete look ${l.name}`);
+    x.addEventListener('click',()=>{const a=loadLooks()||[];a.splice(i,1);storeLooks(a);renderGallery();});
+    d.appendChild(b);d.appendChild(x);box.appendChild(d);
+  });
+}
+function composite(size){present();const out=document.createElement('canvas');out.width=out.height=size;out.getContext('2d').drawImage(D,0,0,size,size);return out;}
+
+// high-resolution render as a long exposure of recent frames
+function renderLarge(size){
+  const out=document.createElement('canvas');out.width=out.height=size;
+  const t={ctx:out.getContext('2d')};setRC(t,size);
+  const t0=S.t,moving=(S.speed>0||S.driftChart)&&S.trail>0.02;
+  if(S.lesson){paintLesson(t);}
+  else if(moving&&S.speed>0){
+    const K=Math.min(120,Math.ceil(Math.log(0.01)/Math.log(S.trail))),step=S.speed*1.6/60;
+    clearGround(t,1);
+    for(let k=K;k>=0;k--){S.t=t0-k*step;updateWorld();paintFrame(t,1-S.trail);}
+  }else{updateWorld();paintFrame(t,1);}
+  S.t=t0;updateWorld();
+  const ovc=document.createElement('canvas');ovc.width=ovc.height=size;const to={ctx:ovc.getContext('2d')};setRC(to,size);paintOverlay(to);
+  const fin=document.createElement('canvas');fin.width=fin.height=size;const fc=fin.getContext('2d');
+  fc.drawImage(out,0,0);applyBloom(fc,out,size,{b1:document.createElement('canvas'),b2:document.createElement('canvas')});fc.drawImage(ovc,0,0);
+  S.dirty=true;return fin;
+}
+
+// ================= events =================
+const on=(sel,ev,f)=>$(sel).addEventListener(ev,f);
+on('#prev','click',()=>{S.seed=Math.max(1,S.seed-1);rebuildMotif();});
+on('#next','click',()=>{S.seed=Math.min(999999,S.seed+1);rebuildMotif();});
+on('#rand','click',()=>{S.seed=1+Math.floor(Math.random()*999999);rebuildMotif();});
+on('#seed','change',e=>{const v=Math.round(+e.target.value);if(v>=1&&v<=999999){S.seed=v;rebuildMotif();}else e.target.value=S.seed;});
+on('#pause','click',()=>{S.paused=!S.paused;syncUI();});
+function randomize(journey){
+  const r=Math.random,pick=a=>a[Math.floor(r()*a.length)];
+  S.grp=pick(['O','T','I','D','C','O','I','D']);S.n=3+Math.floor(r()*12);S.seed=1+Math.floor(r()*999999);
+  S.dens=4+Math.floor(r()*14);S.reach=+(0.18+r()*0.5).toFixed(2);S.weight=+(0.6+r()*1.6).toFixed(2);S.fill=+(r()*0.4).toFixed(2);
+  S.dash=r()<0.75?'solid':pick(['dashed','dotted']);S.chir=pick(['ccw','cw','mixed']);
+  const nk={};for(const [k] of KINDS)nk[k]=r()<0.55;if(!Object.values(nk).some(Boolean))nk.spiral=true;S.kinds=nk;
+  const pk=pick(Object.keys(PAL));S.pal=pk;S.colors=clonePal(PAL[pk]);S.blend=PAL[pk].blend;S.glow=PAL[pk].glow;S.opacity=PAL[pk].opacity;
+  S.trail=+(0.4+r()*0.4).toFixed(2);S.drift=+(0.3+r()*1).toFixed(2);S.spin=+(r()*2-1).toFixed(2);S.wobble=+(r()*2).toFixed(2);
+  S.mode=r()<0.35?'parity':'sheet';S.bloom=+(0.1+r()*0.4).toFixed(2);
+  if(journey){if(S.speed<0.4)S.speed=0.7;}else S.frame=r()<0.3?'circle':'square';
+  rebuildGroup();rebuildMotif();syncUI();S.overDirty=true;setStageBg();
+}
+on('#surprise','click',()=>transition(()=>randomize(false)));
+on('#grp','change',e=>{const v=e.target.value;transition(()=>{S.grp=v;rebuildGroup();});});
+on('#n','change',()=>transition(()=>rebuildGroup()));
+on('#view','click',()=>{S.sphere=!S.sphere;updateText();S.overDirty=true;S.dirty=true;});
+on('#driftChart','click',()=>{S.driftChart=!S.driftChart;updateText();});
+on('#resetV','click',()=>{S.V=I3.slice();S.overDirty=true;S.dirty=true;clearGround(rc,1);});
+for(const [id,k,d] of SLIDERS){
+  on('#'+id,'input',e=>{S[k]=+e.target.value;$('#'+id+'Out').textContent=S[k].toFixed(d);
+    if(k==='dens')rebuildMotif();if(k==='vignette')S.overDirty=true;if(k==='volume')setVolume();if(k==='bloom')present();S.dirty=true;});
+}
+const segs=[['#chirSeg','chir',()=>rebuildMotif()],['#dashSeg','dash',null],['#toolSeg','tool',()=>{art.classList.toggle('drawing',S.tool==='draw');updateText();}],['#mirSeg','mirrors',()=>{S.overDirty=true;}],['#frameSeg','frame',()=>{S.overDirty=true;}]];
+for(const [sel,k,after] of segs)document.querySelectorAll(sel+' button').forEach(b=>b.addEventListener('click',()=>{S[k]=b.dataset.v;setPressed(sel,S[k]);if(after)after();S.dirty=true;}));
+on('#showMotif','click',()=>{S.showMotif=!S.showMotif;syncUI();clearGround(rc,1);S.dirty=true;});
+on('#rim','click',()=>{S.rim=!S.rim;syncUI();S.overDirty=true;});
+on('#bySheet','click',()=>{S.mode='sheet';updateText();S.dirty=true;clearGround(rc,1);});
+on('#byParity','click',()=>{S.mode='parity';updateText();S.dirty=true;clearGround(rc,1);});
+on('#phi','change',e=>{S.phi=+e.target.value;S.dirty=true;clearGround(rc,1);});
+on('#pal','change',e=>{const k=e.target.value;if(!(k in PAL))return;S.pal=k;S.colors=clonePal(PAL[k]);S.blend=PAL[k].blend;S.glow=PAL[k].glow;S.opacity=PAL[k].opacity;syncUI();clearGround(rc,1);S.overDirty=true;S.dirty=true;setStageBg();});
+on('#cGround','input',e=>{S.colors.ground=e.target.value;markCustom();});
+on('#cTwist','input',e=>{S.colors.twist=e.target.value;markCustom();});
+on('#cOther','input',e=>{S.colors.other=e.target.value;markCustom();});
+on('#swap','click',()=>{const w=S.colors.warm;S.colors.warm=S.colors.cool;S.colors.cool=w;markCustom();buildColorInputs();refreshBrush();});
+on('#blend','change',e=>{S.blend=e.target.value;clearGround(rc,1);S.dirty=true;});
+on('#undoDraw','click',()=>{if(S.drawn.pop()){clearGround(rc,1);S.dirty=true;}});
+on('#clearDraw','click',()=>{if(S.drawn.length){S.drawn=[];clearGround(rc,1);S.dirty=true;status('Drawing cleared.');}});
+on('#resetP','click',()=>{const keep={seed:S.seed};Object.assign(S,JSON.parse(JSON.stringify(DEF)),keep);S.V=I3.slice();S.paused=false;rebuildGroup();rebuildMotif();syncUI();status('Settings reset. Your drawing was kept.');});
+
+// pointer: move the chart or draw
+let drag=null,cur=null;
+art.addEventListener('pointerdown',e=>{
+  art.setPointerCapture(e.pointerId);
+  if(S.tool==='draw'){if(S.fold>0&&S.fold<1)return;const p=unproject(e.clientX,e.clientY);if(!p)return;cur={ci:S.brushC,w:S.brushW,pts:[p],lx:e.clientX,ly:e.clientY};
+    S.drawn.push(cur.stroke={ci:cur.ci,w:cur.w,world:Float64Array.from(p),n:1});S.dirty=true;}
+  else{drag=[e.clientX,e.clientY];S.interacting=true;clearTimeout(S.iTimer);}
+});
+art.addEventListener('pointermove',e=>{
+  if(cur){if(Math.hypot(e.clientX-cur.lx,e.clientY-cur.ly)<2.5)return;const p=unproject(e.clientX,e.clientY);if(!p)return;cur.lx=e.clientX;cur.ly=e.clientY;
+    cur.pts.push(p);if(cur.pts.length>600)return;cur.stroke.world=Float64Array.from(cur.pts.flat());cur.stroke.n=cur.pts.length;S.dirty=true;return;}
+  if(!drag)return;const dx=e.clientX-drag[0],dy=e.clientY-drag[1];drag=[e.clientX,e.clientY];
+  const k=3/art.clientWidth;S.V=orthonormalize(mmul(rot([1,0,0],dy*k),mmul(rot([0,1,0],dx*k),S.V)));S.dirty=true;S.overDirty=true;
+});
+const endPtr=()=>{if(cur&&cur.pts.length<2){S.drawn.pop();}cur=null;drag=null;S.dirty=true;
+  if(S.interacting){clearTimeout(S.iTimer);S.iTimer=setTimeout(()=>{S.interacting=false;S.dirty=true;},120);}};
+art.addEventListener('pointerup',endPtr);art.addEventListener('pointercancel',endPtr);
+art.addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();S.paused=!S.paused;syncUI();return;}
+  if(e.key==='f'){toggleImmersive();return;}if(e.key==='j'){toggleJourney();return;}
+  const k=0.08;let r=null;
+  if(e.key==='ArrowLeft')r=rot([0,1,0],-k);if(e.key==='ArrowRight')r=rot([0,1,0],k);if(e.key==='ArrowUp')r=rot([1,0,0],-k);if(e.key==='ArrowDown')r=rot([1,0,0],k);
+  if(r){e.preventDefault();S.V=orthonormalize(mmul(r,S.V));S.dirty=true;S.overDirty=true;
+    S.interacting=true;clearTimeout(S.iTimer);S.iTimer=setTimeout(()=>{S.interacting=false;S.dirty=true;},250);}
+});
+new ResizeObserver(resize).observe(art);
+
+on('#copyRecipe','click',async()=>{const code=encode(recipeObj());$('#recipe').value=code;
+  try{await navigator.clipboard.writeText(code);status('Recipe copied.');}catch(e){$('#recipe').select();status('Recipe is in the box below; copy it from there.');}});
+on('#applyRecipe','click',()=>{const s=$('#recipe').value;if(!s.trim()){status('Paste a recipe into the box first.');return;}
+  try{applyRecipe(decode(s));status('Recipe applied.');}catch(e){status('That recipe could not be read. Check that the whole code was pasted.');}});
+on('#saveLook','click',()=>{
+  const a=loadLooks();if(a===null){status('Looks can’t be kept in this browser.');return;}
+  const name=($('#lookName').value.trim()||`Look ${a.length+1}`).slice(0,40);
+  const th=composite(180).toDataURL('image/jpeg',0.82);
+  a.unshift({name,thumb:th,recipe:encode(recipeObj())});if(a.length>24)a.length=24;
+  if(!storeLooks(a)){status('There is no room left to keep this look. Delete one and try again.');return;}
+  $('#lookName').value='';renderGallery();status(`Saved ${name}.`);
+});
+
+// ---------- saving files ----------
+const inClaude=!!(window.claude&&typeof window.claude.use==='function');
+const dlReady=inClaude?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+async function offerFile(name,blob){
+  const dl=await dlReady;
+  if(dl){try{await dl.save({filename:name,data:blob});status(`Saved ${name}.`);return true;}
+    catch(err){const c=err&&err.code;status(c==='declined'?'Save cancelled.':c==='rate_limited'?'A save prompt is already open.':c==='too_large'?'That file is too large here. Try a smaller size or a shorter clip.':'Saving is not available in this view.');return false;}}
+  if(inClaude){status('Saving is not available in this view.');return false;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);status(`Saved ${name}.`);return true;
+}
+dlReady.then(dl=>{
+  if(inClaude&&!dl)return;
+  $('#save').hidden=false;
+  if(canRecord){$('#record').hidden=false;$('#hudRecord').hidden=false;}
+});
+on('#save','click',()=>{
+  const btn=$('#save'),size=+$('#expSize').value;btn.disabled=true;status(size?'Rendering…':'');
+  setTimeout(()=>{
+    let out;try{out=size?renderLarge(size):composite(rc.W);}catch(e){btn.disabled=false;status('The image was too large for this device. Try a smaller size.');return;}
+    const name=`projectiscope-${S.grp}${S.grp==='D'||S.grp==='C'?S.n:''}-${S.seed}${size?'-'+size:''}.png`;
+    out.toBlob(async blob=>{btn.disabled=false;if(!blob){status('The image could not be created. Try a smaller size.');return;}await offerFile(name,blob);},'image/png');
+  },30);
+});
+
+// ---------- recording ----------
+const canRecord=!!(D.captureStream&&window.MediaRecorder);
+const MIMES=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+let recTimer=0;
+function startRecording(){
+  if(S.recording||!canRecord)return;
+  const mime=MIMES.find(m=>{try{return MediaRecorder.isTypeSupported(m);}catch(e){return false;}});
+  if(!mime){status('Video recording is not supported in this browser.');return;}
+  const stream=D.captureStream(60);
+  if(S.sound&&AU.dest){const tr=AU.dest.stream.getAudioTracks()[0];if(tr)stream.addTrack(tr);}
+  let rec;try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:14e6});}catch(e){status('Video recording could not start here.');return;}
+  const chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const secs=+$('#recLen').value;let left=secs;
+  rec.onstop=async()=>{
+    clearInterval(recTimer);S.recording=false;syncRec();
+    const blob=new Blob(chunks,{type:mime.split(';')[0]});
+    if(!blob.size){status('Nothing was recorded. Try again with the animation playing.');return;}
+    status('Clip ready.');await offerFile(`projectiscope-${S.grp}-${S.seed}.${mime.includes('mp4')?'mp4':'webm'}`,blob);
+  };
+  S.recording=true;S.rec=rec;syncRec();rec.start(250);
+  status(`Recording… ${left} s`);
+  recTimer=setInterval(()=>{left--;if(left>0)status(`Recording… ${left} s`);else if(rec.state==='recording')rec.stop();},1000);
+}
+function stopRecording(){if(S.rec&&S.rec.state==='recording')S.rec.stop();}
+function syncRec(){for(const id of ['#record','#hudRecord']){const b=$(id);b.textContent=S.recording?'Stop recording':(id==='#record'?'Record clip':'Record');b.setAttribute('aria-pressed',String(S.recording));}}
+on('#record','click',()=>S.recording?stopRecording():startRecording());
+on('#hudRecord','click',()=>S.recording?stopRecording():startRecording());
+
+// ---------- sound, journey, immersive ----------
+function toggleSound(){
+  if(!AU.ctx&&!audioInit()){status('Sound is not supported in this browser.');return;}
+  S.sound=!S.sound;if(S.sound&&AU.ctx.state!=='running')AU.ctx.resume();setVolume();syncUI();
+  if(S.sound)status('Sound on. Bells ring on twisting mirrors, soft plucks on the others.');
+}
+function toggleJourney(){S.journey=!S.journey;S.jt=S.pace*0.6;if(S.journey&&S.speed===0){S.speed=0.6;}syncUI();if(S.journey)status('Journey on. A new piece folds in every few seconds.');}
+on('#sound','click',toggleSound);on('#hudSound','click',toggleSound);
+on('#journey','click',toggleJourney);on('#hudJourney','click',toggleJourney);
+on('#flashes','click',()=>{S.flashes=!S.flashes;syncUI();S.overDirty=true;});
+on('#hudPause','click',()=>{S.paused=!S.paused;syncUI();});
+on('#hudSurprise','click',()=>transition(()=>randomize(false)));
+function setStageBg(){$('#stage').style.setProperty('--ground',S.colors.ground);}
+let hudTimer=0;
+function pokeHud(){const h=$('#hud');h.classList.remove('idle');clearTimeout(hudTimer);hudTimer=setTimeout(()=>{if(S.immersive)h.classList.add('idle');},2600);}
+function toggleImmersive(){
+  S.immersive=!S.immersive;document.body.classList.toggle('immersive',S.immersive);$('#hud').hidden=!S.immersive;setStageBg();
+  if(!S.immersive&&window.parent!==window&&window.__psHook)window.__psHook({type:'exit'});
+  if(S.immersive&&window.parent===window){try{const r=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();if(r&&r.catch)r.catch(()=>{});}catch(e){}pokeHud();art.focus();}
+  else{try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch(e){}}
+  requestAnimationFrame(resize);
+}
+on('#immersive','click',toggleImmersive);
+on('#lessonBtn','click',enterLesson);on('#exitLesson','click',exitLesson);
+on('#lFold','input',e=>{L.queue=[];L.anim=null;L.fold=+e.target.value;syncLesson();S.dirty=true;});
+on('#lTrip','input',e=>{L.queue=[];L.anim=null;L.trip=+e.target.value;syncLesson();S.dirty=true;});
+on('#playFold','click',()=>{L.queue=[];L.anim=null;lessonTo('fold',1,2.2);});
+on('#playUnfold','click',()=>{L.queue=[];L.anim=null;lessonTo('fold',0,2.2);});
+on('#playTrip','click',()=>{L.queue=[];L.anim=null;lessonTo('trip',1,4.5);});
+on('#playBack','click',()=>{L.queue=[];L.anim=null;lessonTo('trip',0,4.5);});
+on('#playStory','click',()=>{L.queue=[];L.anim=null;
+  lessonTo('trip',0,0.6);lessonTo('fold',0,0.8);lessonPause(1800);lessonTo('fold',1,2.6);lessonPause(1800);lessonTo('trip',1,5);lessonPause(2200);lessonTo('fold',0,2.6);lessonPause(1500);});
+document.querySelectorAll('#shapeSeg button').forEach(b=>b.addEventListener('click',()=>{L.shape=b.dataset.v;lessonParts=shapeParts(L.shape);syncLesson();S.dirty=true;}));on('#hudExit','click',toggleImmersive);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.immersive)toggleImmersive();});
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&S.immersive&&document.body.classList.contains('immersive')){/* user left native fullscreen; keep the in-page view */}});
+['pointermove','pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{if(S.immersive)pokeHud();}));
+
+window.__projectiscope={
+  setGroup(g,n){if(!['O','T','I','D','C'].includes(g))return;transition(()=>{S.grp=g;if(n)S.n=Math.max(2,Math.min(16,n|0));rebuildGroup();syncUI();});},
+  setPalette(k){if(!(k in PAL))return;S.pal=k;S.colors=clonePal(PAL[k]);S.blend=PAL[k].blend;S.glow=PAL[k].glow;S.opacity=PAL[k].opacity;syncUI();clearGround(rc,1);S.overDirty=true;S.dirty=true;setStageBg();},
+  setSeed(v){v=Math.round(+v);if(v>=1&&v<=999999){S.seed=v;rebuildMotif();}},
+  surprise(){transition(()=>randomize(false));},
+  setPaused(p){S.paused=!!p;syncUI();},
+  setImmersive(on){if(!!on!==S.immersive)toggleImmersive();},
+  setJourney(on){if(!!on!==S.journey)toggleJourney();},
+  recipe(){return encode(recipeObj());},
+  stepBackground(now){if(backgroundMode)loop(now);},
+  backgroundDesign(){
+    if(S.pending){const next=S.pending;S.pending=null;next();}
+    S.lesson=false;S.fold=S.sphere?0:1;S.foldE=S.fold;
+    updateWorld();paintFrame(rc,1);paintOverlay(oc);present();
+    return {version:1,recipe:encode(recipeObj()),thumbnail:composite(256).toDataURL('image/jpeg',.78)};
+  },
+  applyRecipe(code){applyRecipe(decode(code));}
+};
+resize();rebuildGroup();rebuildMotif();syncUI();syncRec();setStageBg();renderGallery();if(!backgroundMode)requestAnimationFrame(loop);
+})();
+
+</script>
+<script>
+// ===== low-precision ephemeris (after Paul Schlyter's "How to compute planetary positions") =====
+const RAD=Math.PI/180;
+const rev=x=>((x%360)+360)%360;
+const sind=x=>Math.sin(x*RAD),cosd=x=>Math.cos(x*RAD);
+function dayNumber(utcMs){return (utcMs-Date.UTC(1999,11,31,0,0,0))/86400000;}
+function kepler(M,e){let E=M+e/RAD*sind(M)*(1+e*cosd(M));for(let k=0;k<30;k++){const dE=(E-e/RAD*sind(E)-M)/(1-e*cosd(E));E-=dE;if(Math.abs(dE)<1e-7)break;}return E;}
+function orbitPos(el){ // returns ecliptic rectangular coords (heliocentric, or geocentric for the Moon)
+  const {N,i,w,a,e,M}=el;const E=kepler(rev(M),e);
+  const xv=a*(cosd(E)-e),yv=a*Math.sqrt(1-e*e)*sind(E);
+  const v=Math.atan2(yv,xv)/RAD,r=Math.hypot(xv,yv);
+  const vw=v+w;
+  return [r*(cosd(N)*cosd(vw)-sind(N)*sind(vw)*cosd(i)),r*(sind(N)*cosd(vw)+cosd(N)*sind(vw)*cosd(i)),r*sind(vw)*sind(i)];
+}
+function elements(d){
+  return {
+    sun:{N:0,i:0,w:282.9404+4.70935e-5*d,a:1,e:0.016709-1.151e-9*d,M:356.0470+0.9856002585*d},
+    moon:{N:125.1228-0.0529538083*d,i:5.1454,w:318.0634+0.1643573223*d,a:60.2666,e:0.054900,M:115.3654+13.0649929509*d},
+    mercury:{N:48.3313+3.24587e-5*d,i:7.0047+5.00e-8*d,w:29.1241+1.01444e-5*d,a:0.387098,e:0.205635+5.59e-10*d,M:168.6562+4.0923344368*d},
+    venus:{N:76.6799+2.46590e-5*d,i:3.3946+2.75e-8*d,w:54.8910+1.38374e-5*d,a:0.723330,e:0.006773-1.302e-9*d,M:48.0052+1.6021302244*d},
+    mars:{N:49.5574+2.11081e-5*d,i:1.8497-1.78e-8*d,w:286.5016+2.92961e-5*d,a:1.523688,e:0.093405+2.516e-9*d,M:18.6021+0.5240207766*d},
+    jupiter:{N:100.4542+2.76854e-5*d,i:1.3030-1.557e-7*d,w:273.8777+1.64505e-5*d,a:5.20256,e:0.048498+4.469e-9*d,M:19.8950+0.0830853001*d},
+    saturn:{N:113.6634+2.38980e-5*d,i:2.4886-1.081e-7*d,w:339.3939+2.97661e-5*d,a:9.55475,e:0.055546-9.499e-9*d,M:316.9670+0.0334442282*d},
+    uranus:{N:74.0005+1.3978e-5*d,i:0.7733+1.9e-8*d,w:96.6612+3.0565e-5*d,a:19.18171-1.55e-8*d,e:0.047318+7.45e-9*d,M:142.5905+0.011725806*d},
+    neptune:{N:131.7806+3.0173e-5*d,i:1.7700-2.55e-7*d,w:272.8461-6.027e-6*d,a:30.05826+3.313e-8*d,e:0.008606+2.15e-9*d,M:260.2471+0.005995147*d}
+  };
+}
+function positions(utcMs){
+  const d=dayNumber(utcMs),el=elements(d),out={};
+  const sunH=orbitPos(el.sun); // Sun's geocentric position (from the Sun's orbit around the Earth, in effect)
+  out.sun=rev(Math.atan2(sunH[1],sunH[0])/RAD);
+  // Moon with the largest perturbations
+  const Ms=rev(el.sun.M),Mm=rev(el.moon.M),Nm=rev(el.moon.N),ws=el.sun.w,wm=el.moon.w;
+  const Ls=rev(Ms+ws),Lm=rev(Mm+wm+Nm),D=Lm-Ls,F=Lm-Nm;
+  const mp=orbitPos(el.moon);let lonM=Math.atan2(mp[1],mp[0])/RAD;
+  lonM+=-1.274*sind(Mm-2*D)+0.658*sind(2*D)-0.186*sind(Ms)-0.059*sind(2*Mm-2*D)-0.057*sind(Mm-2*D+Ms)+0.053*sind(Mm+2*D)
+       +0.046*sind(2*D-Ms)+0.041*sind(Mm-Ms)-0.035*sind(D)-0.031*sind(Mm+Ms)-0.015*sind(2*F-2*D)+0.011*sind(Mm-4*D);
+  out.moon=rev(lonM);
+  const Mj=rev(el.jupiter.M),Msa=rev(el.saturn.M),Mu=rev(el.uranus.M);
+  for(const p of ['mercury','venus','mars','jupiter','saturn','uranus','neptune']){
+    const h=orbitPos(el[p]);let lon=Math.atan2(h[1],h[0])/RAD;const lat=Math.atan2(h[2],Math.hypot(h[0],h[1]))/RAD,r=Math.hypot(...h);
+    if(p==='jupiter')lon+=-0.332*sind(2*Mj-5*Msa-67.6)-0.056*sind(2*Mj-2*Msa+21)+0.042*sind(3*Mj-5*Msa+21)-0.036*sind(Mj-2*Msa)+0.022*cosd(Mj-Msa)+0.023*sind(2*Mj-3*Msa+52)-0.016*sind(Mj-5*Msa-69);
+    if(p==='saturn')lon+=0.812*sind(2*Mj-5*Msa-67.6)-0.229*cosd(2*Mj-4*Msa-2)+0.119*sind(Mj-2*Msa-3)+0.046*sind(2*Mj-6*Msa-69)+0.014*sind(Mj-3*Msa+32);
+    if(p==='uranus')lon+=0.040*sind(Msa-2*Mu+6)+0.035*sind(Msa-3*Mu+33)-0.015*sind(Mj-Mu+20);
+    const xh=r*cosd(lat)*cosd(lon),yh=r*cosd(lat)*sind(lon);
+    out[p]=rev(Math.atan2(yh+sunH[1],xh+sunH[0])/RAD);
+  }
+  // Pluto from its fitted series
+  {const S=50.03+0.033459652*d,P=238.95+0.003968789*d;
+   const lon=238.9508+0.00400703*d-19.799*sind(P)+19.848*cosd(P)+0.897*sind(2*P)-4.956*cosd(2*P)+0.610*sind(3*P)+1.211*cosd(3*P)
+     -0.341*sind(4*P)-0.190*cosd(4*P)+0.128*sind(5*P)-0.034*cosd(5*P)-0.038*sind(6*P)+0.031*cosd(6*P)+0.020*sind(S-P)-0.010*cosd(S-P);
+   const lat=-3.9082-5.453*sind(P)-14.975*cosd(P)+3.527*sind(2*P)+1.673*cosd(2*P)-1.051*sind(3*P)+0.328*cosd(3*P)+0.179*sind(4*P)-0.292*cosd(4*P)
+     +0.019*sind(5*P)+0.100*cosd(5*P)-0.031*sind(6*P)-0.026*cosd(6*P)+0.011*cosd(S-P);
+   const r=40.72+6.68*sind(P)+6.90*cosd(P)-1.18*sind(2*P)-0.03*cosd(2*P)+0.15*sind(3*P)-0.14*cosd(3*P);
+   const xh=r*cosd(lat)*cosd(lon),yh=r*cosd(lat)*sind(lon);
+   out.pluto=rev(Math.atan2(yh+sunH[1],xh+sunH[0])/RAD);}
+  out.node=rev(el.moon.N);
+  return {lon:out,d};
+}
+function angles(utcMs,latDeg,lonDeg){
+  const d=dayNumber(utcMs),jd=2451543.5+d,eps=23.4393-3.563e-7*d;
+  const gmst=rev(280.46061837+360.98564736629*(jd-2451545.0));
+  const ramc=rev(gmst+lonDeg);
+  const mc=rev(Math.atan2(sind(ramc),cosd(ramc)*cosd(eps))/RAD);
+  const asc=rev(Math.atan2(cosd(ramc),-(sind(ramc)*cosd(eps)+Math.tan(latDeg*RAD)*sind(eps)))/RAD);
+  return {asc,mc,ramc,eps};
+}
+
+
+// ================= interface =================
+(function(){
+if(document.body.classList.contains('worm-creator')||document.body.classList.contains('worm-background'))return;
+const $=s=>document.querySelector(s);
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const VS='\uFE0E';
+const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const SG=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'].map(g=>g+VS);
+const ELEM=['Fire','Earth','Air','Water'],MODAL=['Cardinal','Fixed','Mutable'];
+const AXIS_COL=[['#z-e0476b','#z-f5a8ba'],['#1c9a78','#86dcc2'],['#z-dc8a1a','#z-f6cd82'],['#3a6fd8','#z-a3bff4'],['#8a4fd6','#z-cdb0f5'],['#7a9e14','#z-cde38a']];
+const ELEM_COL=['#z-e8553b','#4f9a3a','#z-e9c440','#3a7bd5'],MOD_COL=['#z-e0476b','#3a6fd8','#z-dc8a1a'],POL_COL=['#z-f0b340','#5b63d6'];
+const BODIES=[['sun','☉','Sun'],['moon','☽','Moon'],['mercury','☿','Mercury'],['venus','♀','Venus'],['mars','♂','Mars'],['jupiter','♃','Jupiter'],['saturn','♄','Saturn'],['uranus','♅','Uranus'],['neptune','♆','Neptune'],['pluto','♇','Pluto'],['node','☊','North node']];
+const MODE_NOTE={
+  axis:'Each opposite pair shares a hue, one deep and one light. After the fold, every stretch of the band carries its sign solid and its opposite in stripes.',
+  element:'Element does not survive the fold. Opposite signs are always fire and air, or earth and water, so every point of the folded band holds two elements.',
+  modality:'Modality survives the fold. Opposite signs always share it, so each folded stretch is a single color.',
+  polarity:'Polarity survives too. Fire and air are both yang, earth and water both yin, so an axis never mixes them.'
+};
+function signColor(k,mode){
+  if(mode==='element')return ELEM_COL[k%4];
+  if(mode==='modality')return MOD_COL[k%3];
+  if(mode==='polarity')return POL_COL[k%2];
+  return AXIS_COL[k%6][k<6?0:1];
+}
+
+// ---------- math ----------
+const R=Math.PI/180;
+function mmul(A,B){const C=new Array(9);for(let i=0;i<3;i++)for(let j=0;j<3;j++)C[3*i+j]=A[3*i]*B[j]+A[3*i+1]*B[3+j]+A[3*i+2]*B[6+j];return C;}
+function mvec(A,v){return [A[0]*v[0]+A[1]*v[1]+A[2]*v[2],A[3]*v[0]+A[4]*v[1]+A[5]*v[2],A[6]*v[0]+A[7]*v[1]+A[8]*v[2]];}
+function rot(axis,ang){const l=Math.hypot(...axis),x=axis[0]/l,y=axis[1]/l,z=axis[2]/l,c=Math.cos(ang),s=Math.sin(ang),t=1-c;
+  return [t*x*x+c,t*x*y-s*z,t*x*z+s*y, t*x*y+s*z,t*y*y+c,t*y*z-s*x, t*x*z-s*y,t*y*z+s*x,t*z*z+c];}
+function ortho(M){const n=a=>{const l=Math.hypot(...a);return a.map(x=>x/l);};let a=n([M[0],M[1],M[2]]),b=[M[3],M[4],M[5]];const d=a[0]*b[0]+a[1]*b[1]+a[2]*b[2];b=n([b[0]-d*a[0],b[1]-d*a[1],b[2]-d*a[2]]);
+  const c=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];return [...a,...b,...c];}
+const pt=(lam,bet)=>[Math.cos(bet*R)*Math.cos(lam*R),Math.cos(bet*R)*Math.sin(lam*R),Math.sin(bet*R)];
+const V0=rot([1,0,0],-62*R);
+
+// ---------- state ----------
+const SYM=()=>(getComputedStyle(document.documentElement).getPropertyValue('--sym')||'sans-serif').trim();
+const S={houseSys:'placidus',showHouses:true,showAsp:Object.fromEntries(['conj','semi','sext','square','trine','quin','opp'].map(k=>[k,true])),hlAsp:-1,V:V0.slice(),psi:-1.2,turning:!reduce,fold:reduce?1:0,foldTarget:reduce?1:0,foldE:reduce?1:0,mode:'axis',spot:-1,chart:null,t:0,dragging:false,dirty:true};
+const smooth=x=>x*x*(3-2*x);
+const sky=$('#z-sky'),cv=$('#z-cv'),ctx=cv.getContext('2d');
+let W=0,C=0,RR=0,dpr=Math.min(window.devicePixelRatio||1,2);
+function resize(){const w=Math.round(Math.min(sky.clientWidth*dpr,1600));if(!w||w===W)return;cv.width=cv.height=W=w;C=w/2;RR=w/2*0.985;S.dirty=true;}
+
+// fold morph: 0 sphere seen from outside, 1 projective plane (disk model, far hemisphere pulled through by the antipode)
+function disp(q,out){
+  const f=S.foldE,x=q[0],y=q[1],z=q[2];
+  if(f<=0){out[0]=C+x*RR;out[1]=C-y*RR;return;}
+  let X=x,Y=y,Z=z;if(Z<0){X=-X;Y=-Y;Z=-Z;}
+  const sr=Math.hypot(X,Y);let dx=0,dy=0;if(sr>1e-12){const k=Math.atan2(sr,Z)/(Math.PI/2)/sr;dx=X*k;dy=Y*k;}
+  if(f>=1){out[0]=C+dx*RR;out[1]=C-dy*RR;return;}
+  out[0]=C+(x+(dx-x)*f)*RR;out[1]=C-(y+(dy-y)*f)*RR;
+}
+const tmp=[0,0];
+let Wm=null;
+// split a closed spherical polygon into its near-sheet and far-sheet parts
+function clipHalf(P,sign){
+  const out=[];
+  for(let i=0;i<P.length;i++){
+    const a=P[i],b=P[(i+1)%P.length],da=sign*a[2],db=sign*b[2];
+    if(da>=0)out.push(a);
+    if((da>=0)!==(db>=0)){const t=da/(da-db);let p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,0];const l=Math.hypot(p[0],p[1])||1;p=[p[0]/l,p[1]/l,sign*1e-9];out.push(p);}
+  }
+  return out;
+}
+function tracePoly(P){ctx.beginPath();P.forEach((q,i)=>{disp(q,tmp);i?ctx.lineTo(tmp[0],tmp[1]):ctx.moveTo(tmp[0],tmp[1]);});ctx.closePath();}
+function strokeLine(P,color,width,aNear,aFar){
+  let prev=null;const flush=()=>{};
+  let started=false,curS=0;
+  const fin=()=>{if(!started)return;ctx.strokeStyle=color;ctx.globalAlpha=curS?aFar:aNear;ctx.lineWidth=width;ctx.stroke();started=false;};
+  for(let i=0;i<P.length;i++){
+    const q=P[i],s=q[2]<0?1:0;
+    if(!started){ctx.beginPath();disp(q,tmp);ctx.moveTo(tmp[0],tmp[1]);started=true;curS=s;prev=q;continue;}
+    if(s!==curS){
+      const t=prev[2]/(prev[2]-q[2]);let bx=prev[0]+(q[0]-prev[0])*t,by=prev[1]+(q[1]-prev[1])*t;const l=Math.hypot(bx,by)||1;bx/=l;by/=l;
+      disp([bx,by,curS?-1e-9:1e-9],tmp);ctx.lineTo(tmp[0],tmp[1]);fin();
+      ctx.beginPath();disp([bx,by,s?-1e-9:1e-9],tmp);ctx.moveTo(tmp[0],tmp[1]);started=true;curS=s;
+    }
+    disp(q,tmp);ctx.lineTo(tmp[0],tmp[1]);prev=q;
+  }
+  fin();
+}
+// local frame at (lambda, beta): draw text and marks that turn and mirror with the surface
+function frameAt(lam,bet){
+  const p=mvec(Wm,pt(lam,bet)),el=mvec(Wm,[-Math.sin(lam*R),Math.cos(lam*R),0]),eb=mvec(Wm,[-Math.sin(bet*R)*Math.cos(lam*R),-Math.sin(bet*R)*Math.sin(lam*R),Math.cos(bet*R)]);
+  const far=p[2]<0;let e=0.004;
+  const P0=[0,0],P1=[0,0],P2=[0,0];disp(p,P0);
+  const off=(v,sg)=>{const q=[p[0]+sg*e*v[0],p[1]+sg*e*v[1],p[2]+sg*e*v[2]];return q;};
+  let sx=1,q1=off(el,1);if((q1[2]<0)!==far){sx=-1;q1=off(el,-1);}disp(q1,P1);
+  let sy=1,q2=off(eb,1);if((q2[2]<0)!==far){sy=-1;q2=off(eb,-1);}disp(q2,P2);
+  const u=0.1*R/e; // one local unit is a tenth of a degree
+  return {x:P0[0],y:P0[1],a:(P1[0]-P0[0])*sx*u,b:(P1[1]-P0[1])*sx*u,c:(P2[0]-P0[0])*sy*u,d:(P2[1]-P0[1])*sy*u,far};
+}
+function withFrame(F,fn){ctx.save();ctx.setTransform(F.a,F.b,-F.c,-F.d,F.x,F.y);fn();ctx.restore();}
+function farAlpha(far,near=1,farFaint=0.28,farFolded=0.95){if(!far)return near;const f=S.foldE;return f<0.5?farFaint*(1-f*1.2):farFolded*Math.min(1,(f-0.5)*2.2);}
+
+// ---------- scene data ----------
+const sectors=SIGNS.map((_,k)=>{const P=[],l0=30*k;for(let l=l0;l<=l0+30.001;l+=1.5)P.push(pt(l,11));for(let l=l0+30;l>=l0-0.001;l-=1.5)P.push(pt(l,-11));return P;});
+const edges=[];for(let k=0;k<12;k++){const P=[];for(let b=-11;b<=11.001;b+=2)P.push(pt(30*k,b));edges.push(P);}
+for(const b of [11,-11]){const P=[];for(let l=0;l<=360.001;l+=1.5)P.push(pt(l,b));edges.push(P);}
+const stars=(()=>{let a=987654321;const rnd=()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+  const s=[];for(let i=0;i<520;i++){const z=rnd()*2-1,th=rnd()*6.283,r=Math.sqrt(1-z*z);s.push({p:[r*Math.cos(th),r*Math.sin(th),z],m:0.4+rnd()*1.2,a:0.35+rnd()*0.6});}return s;})();
+const patterns=new Map();
+function stripes(color){
+  const key=color+'|'+dpr;if(patterns.has(key))return patterns.get(key);
+  const n=Math.round(10*dpr),c=document.createElement('canvas');c.width=c.height=n;const g=c.getContext('2d');
+  g.strokeStyle=color;g.lineWidth=n*0.34;g.lineCap='square';
+  for(const o of [-n,0,n]){g.beginPath();g.moveTo(o,n);g.lineTo(o+n,0);g.stroke();}
+  const p=ctx.createPattern(c,'repeat');patterns.set(key,p);return p;
+}
+
+// ---------- chart placement ----------
+function layoutBodies(ch){
+  const items=BODIES.map(([k,g,n])=>({k,g,n,lam:ch.lon[k]})).sort((a,b)=>a.lam-b.lam);
+  const offs=[0,5.5,-5.5,11,-11,16.5];let run=0;
+  items.forEach((it,i)=>{const prev=items[i-1];if(prev&&it.lam-prev.lam<5)run++;else run=0;it.bet=offs[run%offs.length];});
+  const first=items[0],last=items[items.length-1];if(items.length>1&&first.lam+360-last.lam<5&&first.bet===0)first.bet=offs[1];
+  return items;
+}
+const ASPECTS=[
+  {k:'conj',n:'Conjunction',a:0,orb:8,g:'☌',col:'#z-fff3c4',pair:'opp'},
+  {k:'semi',n:'Semi-sextile',a:30,orb:2,g:'⚺',col:'#z-a9b2c6',dash:true,pair:'quin'},
+  {k:'sext',n:'Sextile',a:60,orb:5,g:'⚹',col:'#4fd6c6',pair:'trine'},
+  {k:'square',n:'Square',a:90,orb:7,g:'□',col:'#z-ff6b5e',pair:'square'},
+  {k:'trine',n:'Trine',a:120,orb:8,g:'△',col:'#6fa2ff',pair:'sext'},
+  {k:'quin',n:'Quincunx',a:150,orb:3,g:'⚻',col:'#z-a6e36b',dash:true,pair:'semi'},
+  {k:'opp',n:'Opposition',a:180,orb:8,g:'☍',col:'#z-ffb14a',pair:'conj'}];
+const AK=Object.fromEntries(ASPECTS.map(a=>[a.k,a]));
+function aspectPoints(ch){
+  const pts=BODIES.filter(b=>b[0]!=='node').map(([k,g,n])=>({k,g,n,lam:ch.lon[k],lum:k==='sun'||k==='moon'}));
+  if(ch.ang){pts.push({k:'asc',g:'AC',n:'Ascendant',lam:ch.ang.asc,angle:true});pts.push({k:'mc',g:'MC',n:'Midheaven',lam:ch.ang.mc,angle:true});}
+  return pts;
+}
+function aspects(ch){
+  const pts=aspectPoints(ch),list=[];
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+    const p=pts[i],q=pts[j];if(p.angle&&q.angle)continue;
+    let d=Math.abs(p.lam-q.lam)%360;if(d>180)d=360-d;
+    let best=null;
+    for(const A of ASPECTS){const orb=A.orb+((p.lum||q.lum)&&A.orb>=5?2:0),o=Math.abs(d-A.a);if(o<=orb&&(!best||o<best.o))best={A,o};}
+    if(best)list.push({p,q,A:best.A,orb:best.o,d});
+  }
+  return list;
+}
+function oppositions(ch){
+  const list=[],ks=BODIES.filter(b=>b[0]!=='node');
+  for(let i=0;i<ks.length;i++)for(let j=i+1;j<ks.length;j++){
+    let d=Math.abs(ch.lon[ks[i][0]]-ch.lon[ks[j][0]])%360;if(d>180)d=360-d;
+    if(Math.abs(d-180)<=8)list.push({a:ks[i],b:ks[j],d});
+  }
+  return list;
+}
+
+// ---------- rendering ----------
+// ---------- houses ----------
+const HOUSE_MEAN=['self, body and first impressions','money, possessions and values','communication, siblings and short journeys','home, family and roots','creativity, romance, play and children','work, health and daily routine',
+  'partnership and marriage','shared resources, intimacy and transformation','travel, philosophy and higher learning','career, reputation and public life','friends, groups and hopes','solitude, the hidden and endings'];
+const HSYS={placidus:'Placidus',whole:'Whole sign',equal:'Equal',porphyry:'Porphyry'};
+const rv=x=>((x%360)+360)%360;
+function placidusCusps(a,lat){
+  const cusp=(off,F,above)=>{let lam=rv(a.ramc+off);
+    for(let k=0;k<60;k++){const dec=Math.asin(Math.sin(a.eps*R)*Math.sin(lam*R)),x=Math.tan(lat*R)*Math.tan(dec);if(Math.abs(x)>=1)return null;
+      const dsa=90+Math.asin(x)/R,ra=above?a.ramc+F*dsa:a.ramc+180-F*(180-dsa),nl=rv(Math.atan2(Math.sin(ra*R),Math.cos(ra*R)*Math.cos(a.eps*R))/R);
+      if(Math.abs(nl-lam)<1e-7){lam=nl;break;}lam=nl;}
+    return lam;};
+  const c11=cusp(30,1/3,true),c12=cusp(60,2/3,true),c2=cusp(120,2/3,false),c3=cusp(150,1/3,false);
+  if([c11,c12,c2,c3].some(c=>c===null||!isFinite(c)))return null;
+  return [a.asc,c2,c3,a.mc+180,c11+180,c12+180,a.asc+180,c2+180,c3+180,a.mc,c11,c12].map(rv);
+}
+function computeCusps(ch){
+  const a=ch.ang;if(!a)return null;let sys=S.houseSys,c=null;ch.houseNote='';
+  if(sys==='placidus'){c=placidusCusps(a,ch.lat);if(!c){sys='porphyry';ch.houseNote='Placidus houses are undefined this close to the pole, so Porphyry houses are shown instead.';}}
+  if(sys==='whole'){const b=Math.floor(a.asc/30)*30;c=Array.from({length:12},(_,i)=>rv(b+30*i));}
+  if(sys==='equal')c=Array.from({length:12},(_,i)=>rv(a.asc+30*i));
+  if(sys==='porphyry'){const ic=rv(a.mc+180),dsc=rv(a.asc+180),q1=rv(ic-a.asc),q2=rv(dsc-ic);
+    const h=[a.asc,a.asc+q1/3,a.asc+2*q1/3,ic,ic+q2/3,ic+2*q2/3];c=[...h,...h.map(x=>x+180)].map(rv);}
+  ch.sysUsed=sys;return c;
+}
+function houseOf(ch,l){if(!ch.cusps)return 0;for(let i=0;i<12;i++){const a=ch.cusps[i],b=ch.cusps[(i+1)%12],span=rv(b-a);if(rv(l-a)<span)return i+1;}return 1;}
+function houseMid(ch,i){const a=ch.cusps[i],b=ch.cusps[(i+1)%12];return rv(a+rv(b-a)/2);}
+
+let HITS=[];
+function render(){
+  if(!W)return;HITS=[];
+  Wm=mmul(S.V,rot([0,0,1],S.psi));
+  const f=S.foldE;
+  ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  const gr=ctx.createRadialGradient(C,C*0.9,0,C,C,C*1.05);gr.addColorStop(0,'#241c50');gr.addColorStop(0.7,'#130f2e');gr.addColorStop(1,'#0a0819');
+  ctx.fillStyle=gr;ctx.fillRect(0,0,W,W);
+  // stars
+  ctx.fillStyle='#z-fff';
+  for(const s of stars){const q=mvec(Wm,s.p);disp(q,tmp);ctx.globalAlpha=s.a*farAlpha(q[2]<0,1,0.35,0.9);ctx.beginPath();ctx.arc(tmp[0],tmp[1],s.m*dpr*(W/1000),0,6.283);ctx.fill();}
+  // band
+  const halves=sectors.map(P=>{const Q=P.map(p=>mvec(Wm,p));return {near:clipHalf(Q,1),far:clipHalf(Q,-1)};});
+  const dim=k=>S.spot<0||k%6===S.spot?1:0.16;
+  if(f<0.5)halves.forEach((h,k)=>{if(h.far.length>2){tracePoly(h.far);ctx.fillStyle=signColor(k,S.mode);ctx.globalAlpha=0.3*(1-2*f)*dim(k);ctx.fill();}});
+  halves.forEach((h,k)=>{if(h.near.length>2){tracePoly(h.near);ctx.fillStyle=signColor(k,S.mode);ctx.globalAlpha=0.95*dim(k);ctx.fill();}});
+  if(f>=0.5)halves.forEach((h,k)=>{if(h.far.length>2){tracePoly(h.far);ctx.fillStyle=stripes(signColor(k,S.mode));ctx.globalAlpha=Math.min(1,(f-0.5)*2.2)*dim(k);ctx.fill();}});
+  // borders
+  const lw=Math.max(1,W/800);
+  for(const P of edges)strokeLine(P.map(p=>mvec(Wm,p)),'#z-ffffff',lw,0.45,f<0.5?0.12:0.3);
+  // sign glyphs
+  const symFont=SYM();
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  for(let k=0;k<12;k++){
+    const F=frameAt(30*k+15,-6.2),a=farAlpha(F.far)*(dim(k)<1?0.35:1);
+    withFrame(F,()=>{ctx.globalAlpha=a;ctx.font=`76px ${symFont}`;ctx.fillStyle='#1a1433';ctx.fillText(SG[k],0,6);});
+  }
+  // chart
+  const ch=S.chart;
+  if(ch){
+    const sym=symFont;
+    // aspects: chords inside the sphere, which become bows along the folded band
+    const chordA=Math.max(0,1-f/0.55),bowA=Math.max(0,(f-0.45)/0.55);
+    ch.asp.forEach((x,idx)=>{
+      if(!S.showAsp[x.A.k])return;
+      const hl=S.hlAsp<0||S.hlAsp===idx,base=hl?(S.hlAsp===idx?1:0.8):0.1,w=(S.hlAsp===idx?3:x.p.lum||x.q.lum?2:1.5)*lw;
+      if(x.A.k==='conj')return;
+      if(chordA>0){
+        const A=[0,0],B=[0,0];disp(mvec(Wm,pt(x.p.lam,0)),A);disp(mvec(Wm,pt(x.q.lam,0)),B);
+        ctx.save();if(x.A.dash)ctx.setLineDash([5*dpr,5*dpr]);ctx.strokeStyle=x.A.col;ctx.globalAlpha=base*chordA;ctx.lineWidth=w;
+        ctx.beginPath();ctx.moveTo(A[0],A[1]);ctx.lineTo(B[0],B[1]);ctx.stroke();ctx.restore();
+        if(chordA>0.3)HITS.push({kind:'asp',idx,pts:[A,B]});
+      }
+      if(bowA>0&&x.A.k!=='opp'){
+        // in the projective plane the two points are joined along the folded band; take the shorter way round
+        let D=((x.q.lam-x.p.lam)%180+180)%180;if(D>90)D-=180;
+        const h=(x.A.k==='square'||x.A.k==='semi'?1:-1)*(13+Math.abs(D)*0.14),P=[];
+        for(let i=0;i<=48;i++){const t=i/48;P.push(mvec(Wm,pt(x.p.lam+D*t,h*Math.sin(Math.PI*t))));}
+        ctx.save();if(x.A.dash)ctx.setLineDash([5*dpr,5*dpr]);strokeLine(P,x.A.col,w,base*bowA,base*bowA);ctx.restore();
+        if(bowA>0.3){let run=[];for(const q of P){const Sp=[0,0];disp(q,Sp);if(run.length&&Math.hypot(Sp[0]-run[run.length-1][0],Sp[1]-run[run.length-1][1])>RR*0.4){HITS.push({kind:'asp',idx,pts:run});run=[];}run.push(Sp);}if(run.length>1)HITS.push({kind:'asp',idx,pts:run});}
+      }
+    });
+    // angles
+    if(ch.ang){
+      for(const [lam,lab,main] of [[ch.ang.asc,'AC',1],[ch.ang.asc+180,'DC',0],[ch.ang.mc,'MC',1],[ch.ang.mc+180,'IC',0]]){
+        const P=[];for(let b=-12;b<=12.001;b+=1)P.push(mvec(Wm,pt(lam,b)));strokeLine(P,'#z-fff3c4',(main?2.4:1.6)*lw,0.95,farAlpha(true,1,0.3,0.85));
+        const F=frameAt(lam,-15.5);if(farAlpha(F.far)>0.3)HITS.push({kind:'angle',lab,x:F.x,y:F.y,r:30*Math.hypot(F.a,F.b)});withFrame(F,()=>{ctx.globalAlpha=farAlpha(F.far);ctx.font=`600 44px Figtree, sans-serif`;ctx.fillStyle='#z-fff3c4';ctx.fillText(lab,0,0);});
+      }
+    }
+    if(ch.cusps&&S.showHouses){
+      for(let i=0;i<12;i++){
+        const l=ch.cusps[i],P=[];for(let b=-22;b<=22.001;b+=1)P.push(mvec(Wm,pt(l,b)));
+        ctx.save();ctx.setLineDash([4*dpr,5*dpr]);strokeLine(P,'#z-d9d2ff',(i%3===0?1.6:1.1)*lw,0.75,farAlpha(true,1,0.25,0.7));ctx.restore();
+        const F=frameAt(houseMid(ch,i),17.5),a=farAlpha(F.far);
+        if(a>0.3)HITS.push({kind:'house',i,x:F.x,y:F.y,r:42*Math.hypot(F.a,F.b)});
+        withFrame(F,()=>{ctx.globalAlpha=a;ctx.beginPath();ctx.arc(0,0,36,0,6.283);ctx.fillStyle='rgba(20,15,45,0.8)';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#z-d9d2ff';ctx.stroke();
+          ctx.fillStyle='#z-ece8ff';ctx.font='600 40px Figtree, sans-serif';ctx.fillText(String(i+1),0,2);});
+      }
+    }
+    for(const it of ch.items){
+      const F=frameAt(it.lam,it.bet),a=farAlpha(F.far);
+      if(a>0.3)HITS.push({kind:'body',key:it.k,x:F.x,y:F.y,r:27*Math.hypot(F.a,F.b)});
+      withFrame(F,()=>{
+        ctx.globalAlpha=a;ctx.beginPath();ctx.arc(0,0,27,0,6.283);ctx.fillStyle='#0f0c24';ctx.fill();ctx.lineWidth=4;ctx.strokeStyle='#z-fff3c4';ctx.stroke();
+        ctx.fillStyle='#z-fff3c4';ctx.font=`36px ${sym}`;ctx.fillText(it.g+VS,0,2);
+      });
+    }
+    // rings where an opposition becomes a single point
+    if(f>0.85)ch.asp.forEach((x,idx)=>{if(x.A.k!=='opp'&&x.A.k!=='conj')return;if(!S.showAsp[x.A.k])return;if(S.hlAsp>=0&&S.hlAsp!==idx)return;
+      const F=frameAt(x.p.lam,0);const pulse=0.5+0.5*Math.sin(S.t*3);
+      withFrame(F,()=>{ctx.globalAlpha=(f-0.85)/0.15*(0.5+0.4*pulse);ctx.lineWidth=5;ctx.strokeStyle=x.A.col;ctx.beginPath();ctx.arc(0,0,48+8*pulse,0,6.283);ctx.stroke();});});
+  }
+  // rim: the line at infinity once folded
+  ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=0.25+0.3*f;ctx.strokeStyle='#z-ffffff';ctx.lineWidth=lw;ctx.setLineDash(f>0.5?[W/120,W/160]:[]);
+  ctx.beginPath();ctx.arc(C,C,RR,0,6.283);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+}
+
+// ---------- panel ----------
+function fmtDeg(l){const s=Math.floor(l/30),x=l-30*s;let dg=Math.floor(x),mn=Math.round((x-dg)*60);if(mn===60){dg++;mn=0;}return `${SIGNS[s]} ${dg}°${String(mn).padStart(2,'0')}′`;}
+function buildAxes(){
+  const box=$('#z-axes');box.innerHTML='';
+  for(let a=0;a<6;a++){
+    const b=document.createElement('button');b.className='axis';b.setAttribute('aria-pressed',String(S.spot===a));
+    const c1=signColor(a,S.mode),c2=signColor(a+6,S.mode);
+    b.innerHTML=`<span class="pair"><span style="background:${c1}"></span><span style="background:${c2}"></span></span><span><span class="t"><span class="sym">${SG[a]}</span> ${SIGNS[a]} and <span class="sym">${SG[a+6]}</span> ${SIGNS[a+6]}</span><br><span class="s">${MODAL[a%3]}; ${ELEM[a%4].toLowerCase()} and ${ELEM[(a+6)%4].toLowerCase()}</span></span>`;
+    b.addEventListener('click',()=>{S.spot=S.spot===a?-1:a;buildAxes();S.dirty=true;});
+    box.appendChild(b);
+  }
+}
+function setPressed(sel,val){document.querySelectorAll(sel+' button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===String(val))));}
+function syncControls(){
+  setPressed('#z-modeSeg',S.mode);$('#z-modeNote').textContent=MODE_NOTE[S.mode];
+  setPressed('#z-foldSeg',S.foldTarget>=0.5?1:0);$('#z-fold').value=S.fold;$('#z-foldOut').textContent=S.fold<0.01?'S²':S.fold>0.99?'RP²':Math.round(S.fold*100)+'%';
+  $('#z-turn').setAttribute('aria-pressed',String(S.turning));$('#z-turn').textContent=S.turning?'Sky turning':'Sky still';
+  const f=S.fold;
+  $('#z-caption').textContent=f<0.02?'The celestial sphere. Each sign has an opposite on the far side of the sky, drawn faintly through the sphere.'
+    :f<0.98?'Folding: the far half of the sky is pulled through by the antipodal map, carrying each sign onto its opposite.'
+    :'The projective plane. Each stretch of the band holds a sign and, striped and mirrored, its opposite. The dashed rim is the line at infinity, where the band crosses over with a twist: it is a Möbius strip.';
+}
+function renderChart(){
+  const ch=S.chart,t=$('#z-placeTable');if(!ch){t.innerHTML='';return;}
+  $('#z-chartTitle').textContent=ch.title;
+  let rows='';
+  for(const [k,g,n] of BODIES){
+    const l=ch.lon[k],sg=Math.floor(l/30);
+    const house=ch.cusps?`house ${houseOf(ch,l)}`:'';
+    rows+=`<tr><td class="g">${g}${VS}</td><td>${n}</td><td><span class="chip" style="background:${signColor(sg,S.mode)}"></span> ${fmtDeg(l)}</td><td class="h">${house}</td></tr>`;
+  }
+  if(ch.ang){rows+=`<tr><td class="g">AC</td><td>Ascendant</td><td><span class="chip" style="background:${signColor(Math.floor(ch.ang.asc/30),S.mode)}"></span> ${fmtDeg(ch.ang.asc)}</td><td class="h"></td></tr>`;
+    rows+=`<tr><td class="g">MC</td><td>Midheaven</td><td><span class="chip" style="background:${signColor(Math.floor(ch.ang.mc/30),S.mode)}"></span> ${fmtDeg(ch.ang.mc)}</td><td class="h"></td></tr>`;}
+  t.innerHTML=rows;
+  const ul=$('#z-folded');let html='';
+  const byAxis=[[],[],[],[],[],[]];for(const [k,g,n] of BODIES){const sg=Math.floor(ch.lon[k]/30);byAxis[sg%6].push(`${n} in ${SIGNS[sg]}`);}
+  const busy=byAxis.map((l,a)=>({l,a})).filter(x=>x.l.length).sort((x,y)=>y.l.length-x.l.length);
+  if(busy.length)html+=`<li>Busiest axis: ${SIGNS[busy[0].a]} and ${SIGNS[busy[0].a+6]}, carrying ${busy[0].l.join(', ')}. In the projective plane all of these sit on one stretch of the band.</li>`;
+  for(const o of ch.opps)html+=`<li>${o.a[2]} and ${o.b[2]} are opposite (${o.d.toFixed(1)}° apart). On the sphere they face each other across the sky; in the projective plane they are the same point.</li>`;
+  if(!ch.opps.length)html+=`<li>No planets are in opposition here, so no two of them become one point after the fold.</li>`;
+  if(ch.ang)html+=`<li>The ascendant and descendant are one point once folded, and so are the midheaven and the IC. All twelve house cusps fold into six lines: the 1st with the 7th, the 2nd with the 8th, and so on.</li>`;
+  html+=`<li>The fold cannot tell a conjunction from an opposition, or a sextile from a trine; squares stay as far apart as two points can be.</li>`;
+  ul.innerHTML=html;
+}
+function fmtOrb(o){const dg=Math.floor(o),mn=Math.round((o-dg)*60);return `${dg}°${String(mn===60?59:mn).padStart(2,'0')}′`;}
+function buildAspFilters(){
+  const box=$('#z-aspChips');box.innerHTML='';
+  for(const A of ASPECTS){const b=document.createElement('button');b.setAttribute('aria-pressed',String(S.showAsp[A.k]));
+    b.innerHTML=`<span class="sym" style="color:${A.col}">${A.g}${VS}</span> ${A.n}`;
+    b.addEventListener('click',()=>{S.showAsp[A.k]=!S.showAsp[A.k];buildAspFilters();renderAspects();S.dirty=true;});box.appendChild(b);}
+}
+function renderAspects(){
+  const ch=S.chart,list=$('#z-aspList'),grid=$('#z-aspGrid');
+  if(!ch){list.innerHTML='';grid.innerHTML='';return;}
+  // grid
+  const pts=ch.pts,find=(a,b)=>ch.asp.findIndex(x=>(x.p.k===a.k&&x.q.k===b.k)||(x.p.k===b.k&&x.q.k===a.k));
+  let g='<tr><th></th>'+pts.slice(0,-1).map(p=>`<th class="sym" title="${p.n}">${p.angle?p.g:p.g+VS}</th>`).join('')+'</tr>';
+  for(let i=1;i<pts.length;i++){
+    g+=`<tr><th class="sym" title="${pts[i].n}">${pts[i].angle?pts[i].g:pts[i].g+VS}</th>`;
+    for(let j=0;j<pts.length-1;j++){
+      if(j>=i){g+='<td></td>';continue;}
+      const idx=find(pts[i],pts[j]),x=ch.asp[idx];
+      g+=x&&S.showAsp[x.A.k]?`<td><button class="cell sym" data-i="${idx}" style="color:${x.A.col}" aria-pressed="${S.hlAsp===idx}" title="${pts[i].n} ${x.A.n.toLowerCase()} ${pts[j].n}, orb ${fmtOrb(x.orb)}">${x.A.g}${VS}</button></td>`:'<td></td>';
+    }
+    g+='</tr>';
+  }
+  grid.innerHTML=g;
+  grid.querySelectorAll('button.cell').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.i;S.hlAsp=S.hlAsp===i?-1:i;renderAspects();S.dirty=true;}));
+  // grouped list
+  let h='';
+  for(const A of ASPECTS){
+    const xs=ch.asp.map((x,i)=>({x,i})).filter(o=>o.x.A.k===A.k);
+    if(!xs.length||!S.showAsp[A.k])continue;
+    const P=AK[A.pair];
+    const fold=A.k===A.pair?'Folded, a square is its own partner: its two points stay as far apart as the band allows.':`Folded, these match the ${P.n.toLowerCase()} (${P.a}°).`;
+    const plural=A.k==='quin'?'Quincunxes':A.n+'s';
+    h+=`<li><p class="ah"><span class="sym" style="color:${A.col}">${A.g}${VS}</span> ${plural}, ${A.a}° <span class="s">${fold}</span></p>`;
+    h+=xs.map(o=>`<button class="asp" data-i="${o.i}" aria-pressed="${S.hlAsp===o.i}">${o.x.p.n} and ${o.x.q.n} <span class="s">orb ${fmtOrb(o.x.orb)}</span></button>`).join('')+'</li>';
+  }
+  list.innerHTML=h||'<li>No aspects of the types shown.</li>';
+  list.querySelectorAll('button.asp').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.i;S.hlAsp=S.hlAsp===i?-1:i;renderAspects();S.dirty=true;if(S.hlAsp>=0)showPop(aspectInfo(i),sky.clientWidth/2,sky.clientHeight*0.72);else hidePop();}));
+  // folded families
+  const cnt=k=>ch.asp.filter(x=>x.A.k===k).length;
+  $('#z-aspFold').textContent=`Folded, the ${cnt('trine')} trine${cnt('trine')===1?'':'s'} and ${cnt('sext')} sextile${cnt('sext')===1?'':'s'} become one family of ${cnt('trine')+cnt('sext')}, the ${cnt('opp')} opposition${cnt('opp')===1?'':'s'} join the ${cnt('conj')} conjunction${cnt('conj')===1?'':'s'} as single points, the ${cnt('quin')} quincunx${cnt('quin')===1?'':'es'} and ${cnt('semi')} semi-sextile${cnt('semi')===1?'':'s'} merge, and the ${cnt('square')} square${cnt('square')===1?'':'s'} stay on their own.`;
+}
+const ASP_MEAN={conj:'Traditionally read as fusion: the two act as one.',semi:'Traditionally a faint link between neighboring signs.',
+  sext:'Traditionally read as opportunity and easy cooperation.',square:'Traditionally read as tension and friction that pushes toward action.',
+  trine:'Traditionally read as harmony and natural ease.',quin:'Traditionally read as an awkward pairing that needs adjustment: the two signs share neither element nor modality.',
+  opp:'Traditionally read as polarity: two sides pulling against each other and seeking balance.'};
+const BODY_MEAN={sun:'identity and vitality',moon:'emotions and instinct',mercury:'thinking and communication',venus:'love, beauty and value',mars:'drive and assertion',
+  jupiter:'growth and expansion',saturn:'structure, limits and discipline',uranus:'change and disruption',neptune:'dreams, intuition and dissolving boundaries',pluto:'transformation and power',node:'direction and growth'};
+const ANGLE_MEAN={AC:'the ascendant, the sign rising on the eastern horizon: traditionally the outward self',DC:'the descendant, opposite the ascendant: traditionally partnership',
+  MC:'the midheaven, the highest point of the ecliptic: traditionally career and public life',IC:'the IC, opposite the midheaven: traditionally home and roots'};
+function aspectInfo(idx){
+  const ch=S.chart,x=ch.asp[idx],A=x.A,P=AK[A.pair];
+  const sgn=l=>SIGNS[Math.floor(((l%360)+360)%360/30)];
+  const fold=A.k==='conj'?'After the fold this stays a single point, the same as an opposition would.':A.k==='opp'?'After the fold the two become a single point on the band, indistinguishable from a conjunction.'
+    :A.k==='square'?'After the fold a square is still a square: the two points stay as far apart as the band allows.':`After the fold this becomes the same relationship as a ${P.n.toLowerCase()} (${P.a}°): a bow of ${Math.min(A.a,180-A.a)}° along the band.`;
+  return {col:A.col,title:`<span class="sym">${x.p.angle?x.p.g:x.p.g+VS}</span> ${x.p.n} <span class="sym" style="color:${A.col}">${A.g}${VS}</span> <span class="sym">${x.q.angle?x.q.g:x.q.g+VS}</span> ${x.q.n}`,
+    lines:[`<b>${A.n}</b>, ${A.a}°. They are ${x.d.toFixed(1)}° apart, an orb of ${fmtOrb(x.orb)}.`,`${x.p.n} in ${fmtDeg(x.p.lam)}; ${x.q.n} in ${fmtDeg(x.q.lam)}.`,ASP_MEAN[A.k],fold]};
+}
+function bodyInfo(key){
+  const ch=S.chart,b=BODIES.find(b=>b[0]===key),l=ch.lon[key],sg=Math.floor(l/30);
+  const house=ch.cusps?` House ${houseOf(ch,l)}.`:'';
+  const asp=ch.asp.filter(x=>x.p.k===key||x.q.k===key).map(x=>{const o=x.p.k===key?x.q:x.p;return `<span class="sym" style="color:${x.A.col}">${x.A.g}${VS}</span> ${o.n}`;});
+  return {col:signColor(sg,S.mode),title:`<span class="sym">${b[1]}${VS}</span> ${b[2]}`,
+    lines:[`${fmtDeg(l)}.${house}`,`Traditionally the planet of ${BODY_MEAN[key]}.`,asp.length?`Aspects: ${asp.join(', ')}.`:'No major aspects in this chart.',
+      `After the fold it shares its stretch of the band with anything in ${SIGNS[(sg+6)%12]}, the opposite sign.`]};
+}
+function angleInfo(lab){
+  const ch=S.chart,l=lab==='AC'?ch.ang.asc:lab==='DC'?ch.ang.asc+180:lab==='MC'?ch.ang.mc:ch.ang.mc+180,ll=((l%360)+360)%360;
+  const pair={AC:'DC',DC:'AC',MC:'IC',IC:'MC'}[lab];
+  return {col:'#z-fff3c4',title:lab,lines:[`${fmtDeg(ll)}: ${ANGLE_MEAN[lab]}.`,`It is exactly opposite the ${pair}, so after the fold the two are one point.`]};
+}
+function houseInfo(i){
+  const ch=S.chart,o=(i+6)%12,inH=BODIES.filter(b=>houseOf(ch,ch.lon[b[0]])===i+1).map(b=>b[2]),inO=BODIES.filter(b=>houseOf(ch,ch.lon[b[0]])===o+1).map(b=>b[2]);
+  const ord=n=>n+(['th','st','nd','rd'][(n%100>10&&n%100<14)?0:Math.min(n%10,4)%4]||'th');
+  return {col:'#z-d9d2ff',title:`${ord(i+1)} house`,lines:[`Begins at ${fmtDeg(ch.cusps[i])} (${HSYS[ch.sysUsed]} houses).`,`Traditionally the house of ${HOUSE_MEAN[i]}.`,
+    inH.length?`Holding: ${inH.join(', ')}.`:'No planets here.',
+    `Opposite: the ${ord(o+1)} house, of ${HOUSE_MEAN[o]}${inO.length?`, holding ${inO.join(', ')}`:''}. After the fold the two houses share one stretch of the band, and their cusps become one line.`]};
+}
+function renderHouses(){
+  const ch=S.chart,box=$('#z-houseList'),note=$('#z-houseNote');
+  if(!ch||!ch.cusps){box.innerHTML='';note.textContent=ch?'Houses need a birth time and a place.':'';return;}
+  note.textContent=ch.houseNote||'Opposite houses are listed together: after the fold, each pair is one stretch of the band.';
+  const ord=n=>n+(['th','st','nd','rd'][(n%100>10&&n%100<14)?0:Math.min(n%10,4)%4]||'th');
+  let h='';
+  for(let i=0;i<6;i++){
+    const row=j=>{const pl=BODIES.filter(b=>houseOf(ch,ch.lon[b[0]])===j+1).map(b=>`<span class="sym">${b[1]}${VS}</span>`).join(' ');
+      return `<button class="hrow" data-i="${j}"><span class="hn">${ord(j+1)}</span><span>${fmtDeg(ch.cusps[j])}<br><span class="s">${HOUSE_MEAN[j]}</span></span><span class="hp">${pl}</span></button>`;};
+    h+=`<div class="hpair">${row(i)}${row(i+6)}</div>`;
+  }
+  box.innerHTML=h;
+  box.querySelectorAll('button.hrow').forEach(b=>b.addEventListener('click',()=>showPop(houseInfo(+b.dataset.i),sky.clientWidth/2,sky.clientHeight*0.72)));
+}
+function showPop(info,sx,sy){
+  const pop=$('#z-pop'),st=$('#z-stage').getBoundingClientRect(),sk=sky.getBoundingClientRect();
+  pop.innerHTML=`<button class="x" id="z-popX" aria-label="Close">×</button><p class="pt" style="border-color:${info.col}">${info.title}</p>${info.lines.map(l=>`<p>${l}</p>`).join('')}`;
+  pop.hidden=false;
+  const x=sk.left-st.left+sx,y=sk.top-st.top+sy,pw=pop.offsetWidth||280,ph=pop.offsetHeight||160;
+  let left=Math.min(Math.max(8,x-pw/2),st.width-pw-8),top=y+18;if(top+ph>st.height-8)top=Math.max(8,y-ph-18);
+  pop.style.left=left+'px';pop.style.top=top+'px';
+  $('#z-popX').addEventListener('click',hidePop);
+}
+function hidePop(){$('#z-pop').hidden=true;}
+function segDist(px,py,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],L=dx*dx+dy*dy;let t=L?((px-a[0])*dx+(py-a[1])*dy)/L:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-a[0]-t*dx,py-a[1]-t*dy);}
+function hitTest(cx,cy,touch){
+  const r=sky.getBoundingClientRect(),px=(cx-r.left)*W/r.width,py=(cy-r.top)*W/r.height,tol=(touch?16:8)*dpr;
+  let best=null;
+  for(const h of HITS){
+    let d;
+    if(h.kind==='asp'){if(!S.showAsp[S.chart.asp[h.idx].A.k])continue;d=Infinity;for(let i=0;i+1<h.pts.length;i++)d=Math.min(d,segDist(px,py,h.pts[i],h.pts[i+1]));d-=2*dpr;}
+    else d=Math.max(0,Math.hypot(px-h.x,py-h.y)-h.r)-4*dpr; // markers win over lines passing under them
+    if(d<=tol&&(!best||d<best.d))best={h,d};
+  }
+  return best&&best.h;
+}
+function setChart(utc,title,lat,lon){
+  const p=positions(utc),ch={utc,title,lon:p.lon,ang:null};
+  if(lat!==null&&lon!==null){ch.ang=angles(utc,lat,lon);ch.lat=lat;}
+  ch.cusps=computeCusps(ch);
+  hidePop();ch.items=layoutBodies(ch);setTimeout(renderHouses,0);ch.opps=oppositions(ch);ch.asp=aspects(ch);ch.pts=aspectPoints(ch);S.hlAsp=-1;S.chart=ch;renderAspects();renderChart();S.dirty=true;
+}
+
+// ---------- form ----------
+const CITIES=[['New York, NY',40.71,-74.01,'America/New_York'],['Los Angeles, CA',34.05,-118.24,'America/Los_Angeles'],['Chicago, IL',41.88,-87.63,'America/Chicago'],['Houston, TX',29.76,-95.37,'America/Chicago'],['Atlanta, GA',33.75,-84.39,'America/New_York'],['Miami, FL',25.76,-80.19,'America/New_York'],['Raleigh, NC',35.78,-78.64,'America/New_York'],['Durham, NC',35.99,-78.9,'America/New_York'],['Greensboro, NC',36.07,-79.79,'America/New_York'],['Charlotte, NC',35.23,-80.84,'America/New_York'],['Rocky Mount, NC',35.94,-77.79,'America/New_York'],['Wilmington, NC',34.23,-77.94,'America/New_York'],['Norfolk, VA',36.85,-76.29,'America/New_York'],['Richmond, VA',37.54,-77.44,'America/New_York'],['Baltimore, MD',39.29,-76.61,'America/New_York'],['Washington, DC',38.91,-77.04,'America/New_York'],['Philadelphia, PA',39.95,-75.17,'America/New_York'],['Pittsburgh, PA',40.44,-79.99,'America/New_York'],['Boston, MA',42.36,-71.06,'America/New_York'],['Cleveland, OH',41.5,-81.69,'America/New_York'],['Columbus, OH',39.96,-83,'America/New_York'],['Cincinnati, OH',39.1,-84.51,'America/New_York'],['Detroit, MI',42.33,-83.05,'America/Detroit'],['Indianapolis, IN',39.77,-86.16,'America/Indiana/Indianapolis'],['Louisville, KY',38.25,-85.76,'America/Kentucky/Louisville'],['Milwaukee, WI',43.04,-87.91,'America/Chicago'],['Minneapolis, MN',44.98,-93.27,'America/Chicago'],['St. Louis, MO',38.63,-90.2,'America/Chicago'],['Kansas City, MO',39.1,-94.58,'America/Chicago'],['Nashville, TN',36.16,-86.78,'America/Chicago'],['Memphis, TN',35.15,-90.05,'America/Chicago'],['Birmingham, AL',33.52,-86.8,'America/Chicago'],['New Orleans, LA',29.95,-90.07,'America/Chicago'],['Jackson, MS',32.3,-90.18,'America/Chicago'],['Jacksonville, FL',30.33,-81.66,'America/New_York'],['Tampa, FL',27.95,-82.46,'America/New_York'],['Orlando, FL',28.54,-81.38,'America/New_York'],['Savannah, GA',32.08,-81.09,'America/New_York'],['Charleston, SC',32.78,-79.93,'America/New_York'],['Columbia, SC',34,-81.03,'America/New_York'],['Dallas, TX',32.78,-96.8,'America/Chicago'],['San Antonio, TX',29.42,-98.49,'America/Chicago'],['Austin, TX',30.27,-97.74,'America/Chicago'],['Oklahoma City, OK',35.47,-97.52,'America/Chicago'],['Denver, CO',39.74,-104.99,'America/Denver'],['Salt Lake City, UT',40.76,-111.89,'America/Denver'],['Phoenix, AZ',33.45,-112.07,'America/Phoenix'],['Las Vegas, NV',36.17,-115.14,'America/Los_Angeles'],['San Diego, CA',32.72,-117.16,'America/Los_Angeles'],['San Francisco, CA',37.77,-122.42,'America/Los_Angeles'],['Sacramento, CA',38.58,-121.49,'America/Los_Angeles'],['Portland, OR',45.52,-122.68,'America/Los_Angeles'],['Seattle, WA',47.61,-122.33,'America/Los_Angeles'],['Anchorage, AK',61.22,-149.9,'America/Anchorage'],['Honolulu, HI',21.31,-157.86,'Pacific/Honolulu'],['Toronto',43.65,-79.38,'America/Toronto'],['Montreal',45.5,-73.57,'America/Toronto'],['Vancouver',49.28,-123.12,'America/Vancouver'],['Mexico City',19.43,-99.13,'America/Mexico_City'],['Havana',23.11,-82.37,'America/Havana'],['Kingston, Jamaica',18.02,-76.8,'America/Jamaica'],['Port-au-Prince',18.59,-72.31,'America/Port-au-Prince'],['Santo Domingo',18.49,-69.93,'America/Santo_Domingo'],['San Juan, PR',18.47,-66.11,'America/Puerto_Rico'],['Bogotá',4.71,-74.07,'America/Bogota'],['Lima',-12.05,-77.04,'America/Lima'],['São Paulo',-23.55,-46.63,'America/Sao_Paulo'],['Rio de Janeiro',-22.91,-43.17,'America/Sao_Paulo'],['Buenos Aires',-34.6,-58.38,'America/Argentina/Buenos_Aires'],['London',51.51,-0.13,'Europe/London'],['Dublin',53.35,-6.26,'Europe/Dublin'],['Paris',48.86,2.35,'Europe/Paris'],['Amsterdam',52.37,4.9,'Europe/Amsterdam'],['Berlin',52.52,13.4,'Europe/Berlin'],['Madrid',40.42,-3.7,'Europe/Madrid'],['Lisbon',38.72,-9.14,'Europe/Lisbon'],['Rome',41.9,12.5,'Europe/Rome'],['Athens',37.98,23.73,'Europe/Athens'],['Stockholm',59.33,18.07,'Europe/Stockholm'],['Moscow',55.76,37.62,'Europe/Moscow'],['Istanbul',41.01,28.98,'Europe/Istanbul'],['Lagos',6.52,3.38,'Africa/Lagos'],['Accra',5.6,-0.19,'Africa/Accra'],['Cairo',30.04,31.24,'Africa/Cairo'],['Addis Ababa',9.03,38.74,'Africa/Addis_Ababa'],['Nairobi',-1.29,36.82,'Africa/Nairobi'],['Johannesburg',-26.2,28.05,'Africa/Johannesburg'],['Dubai',25.2,55.27,'Asia/Dubai'],['Tehran',35.69,51.39,'Asia/Tehran'],['Karachi',24.86,67.01,'Asia/Karachi'],['Mumbai',19.08,72.88,'Asia/Kolkata'],['Delhi',28.61,77.21,'Asia/Kolkata'],['Dhaka',23.81,90.41,'Asia/Dhaka'],['Bangkok',13.76,100.5,'Asia/Bangkok'],['Singapore',1.35,103.82,'Asia/Singapore'],['Jakarta',-6.21,106.85,'Asia/Jakarta'],['Hong Kong',22.32,114.17,'Asia/Hong_Kong'],['Beijing',39.9,116.41,'Asia/Shanghai'],['Shanghai',31.23,121.47,'Asia/Shanghai'],['Manila',14.6,120.98,'Asia/Manila'],['Seoul',37.57,126.98,'Asia/Seoul'],['Tokyo',35.68,139.69,'Asia/Tokyo'],['Sydney',-33.87,151.21,'Australia/Sydney'],['Melbourne',-37.81,144.96,'Australia/Melbourne'],['Auckland',-36.85,174.76,'Pacific/Auckland']];
+$('#z-cityList').innerHTML=CITIES.map(c=>`<option value="${c[0]}"></option>`).join('');
+// time zones: the browser's full list, with the clock offset for any past date taken from its time zone history
+let ZONES=[];try{ZONES=Intl.supportedValuesOf('timeZone');}catch(e){}
+if(!ZONES.length)ZONES=[...new Set(CITIES.map(c=>c[3]))].sort();
+if(!ZONES.includes('UTC'))ZONES=['UTC',...ZONES];
+const deviceZone=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';}catch(e){return 'UTC';}})();
+if(!ZONES.includes(deviceZone))ZONES.push(deviceZone);
+$('#z-bZone').innerHTML=ZONES.map(z=>`<option value="${z}">${z.replace(/_/g,' ')}</option>`).join('');
+$('#z-bZone').value=deviceZone;
+const fmtCache=new Map();
+function zoneOffsetMin(utcMs,zone){
+  let f=fmtCache.get(zone);
+  if(!f){f=new Intl.DateTimeFormat('en-US',{timeZone:zone,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});fmtCache.set(zone,f);}
+  const p={};for(const x of f.formatToParts(new Date(utcMs)))p[x.type]=x.value;
+  const asUTC=Date.UTC(+p.year,+p.month-1,+p.day,(+p.hour)%24,+p.minute,+p.second);
+  return Math.round((asUTC-utcMs)/60000);
+}
+function localToUtc(y,m,d,hh,mi,zone){const L=Date.UTC(y,m-1,d,hh,mi);let u=L-zoneOffsetMin(L,zone)*60000;u=L-zoneOffsetMin(u,zone)*60000;return u;}
+const offLabel=min=>{const s=min<0?'−':'+',a=Math.abs(min),hh=Math.floor(a/60),mm=a%60;return `UTC${s}${hh}${mm?':'+String(mm).padStart(2,'0'):''}`;};
+function readLocal(){const d=$('#z-bDate').value;if(!d)return null;const noTime=$('#z-noTime').checked,t=noTime?'12:00':($('#z-bTime').value||'12:00');
+  const [y,m,dd]=d.split('-').map(Number),[hh,mi]=t.split(':').map(Number);return {y,m,dd,hh,mi,noTime,t};}
+function updateOffNote(){
+  const L=readLocal(),z=$('#z-bZone').value,note=$('#z-offNote');
+  if(!L){note.textContent='';return;}
+  try{const u=localToUtc(L.y,L.m,L.dd,L.hh,L.mi,z),o=zoneOffsetMin(u,z);note.textContent=`Clock on that date in ${z.replace(/_/g,' ')}: ${offLabel(o)}.`;}
+  catch(e){note.textContent='';}
+}
+$('#z-bPlace').addEventListener('input',e=>{const v=e.target.value.trim().toLowerCase();const c=CITIES.find(c=>c[0].toLowerCase()===v);
+  if(c){$('#z-bLat').value=c[1];$('#z-bLon').value=c[2];if(ZONES.includes(c[3]))$('#z-bZone').value=c[3];updateOffNote();}});
+for(const id of ['#z-bDate','#z-bTime','#z-bZone','#z-noTime'])$(id).addEventListener('change',updateOffNote);
+$('#z-noTime').addEventListener('change',e=>{$('#z-bTime').disabled=e.target.checked;});
+$('#z-drawChart').addEventListener('click',()=>{
+  const err=$('#z-err');err.textContent='';
+  const L=readLocal();if(!L){err.textContent='Enter a birth date.';return;}
+  if(!L.noTime&&!$('#z-bTime').value){err.textContent='Enter a birth time, or tick “I don’t know the birth time”.';return;}
+  if(L.y<1800||L.y>2100){err.textContent='Enter a year between 1800 and 2100; the formulas here are tuned for that range.';return;}
+  const zone=$('#z-bZone').value;let utc;
+  try{utc=localToUtc(L.y,L.m,L.dd,L.hh,L.mi,zone);}catch(e){err.textContent='That time zone isn’t available in this browser. Choose another from the list.';return;}
+  let lat=null,lon=null;
+  if(!L.noTime){
+    const la=$('#z-bLat').value,lo=$('#z-bLon').value;
+    if(la!==''||lo!==''){
+      lat=+la;lon=+lo;
+      if(la===''||lo===''||!isFinite(lat)||!isFinite(lon)||Math.abs(lat)>89.9||Math.abs(lon)>180){err.textContent='Enter both a latitude (−89.9 to 89.9) and a longitude (−180 to 180), or pick a city.';return;}
+    }
+  }
+  const place=$('#z-bPlace').value.trim();
+  const title=`Chart for ${new Date(Date.UTC(L.y,L.m-1,L.dd)).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric',timeZone:'UTC'})}${L.noTime?'':' at '+L.t}${place?', '+place:''}`;
+  setChart(utc,title,lat,lon);
+  if(L.noTime)err.textContent='Without a birth time, the ascendant, midheaven and houses are left out, and the Moon may be off by several degrees.';
+  else if(lat===null)err.textContent='Add a place to see the ascendant, midheaven and houses.';
+});
+$('#z-nowChart').addEventListener('click',()=>{$('#z-err').textContent='';setChart(Date.now(),'The sky right now',null,null);});
+
+// ---------- controls ----------
+document.querySelectorAll('#z-modeSeg button').forEach(b=>b.addEventListener('click',()=>{S.mode=b.dataset.v;syncControls();buildAxes();renderChart();S.dirty=true;}));
+document.querySelectorAll('#z-foldSeg button').forEach(b=>b.addEventListener('click',()=>{S.foldTarget=+b.dataset.v;syncControls();}));
+$('#z-fold').addEventListener('input',e=>{S.fold=S.foldTarget=+e.target.value;S.foldE=smooth(S.fold);syncControls();S.dirty=true;});
+$('#z-turn').addEventListener('click',()=>{S.turning=!S.turning;syncControls();});
+$('#z-resetView').addEventListener('click',()=>{S.V=V0.slice();S.dirty=true;});
+let drag=null,down=null;
+sky.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];down={x:e.clientX,y:e.clientY,t:performance.now(),moved:false,touch:e.pointerType!=='mouse'};sky.setPointerCapture(e.pointerId);S.dragging=true;});
+sky.addEventListener('pointermove',e=>{
+  if(!drag){if(e.pointerType==='mouse'&&S.chart)sky.style.cursor=hitTest(e.clientX,e.clientY,false)?'pointer':'grab';return;}
+  if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>6)down.moved=true;
+  if(down&&!down.moved)return;const dx=e.clientX-drag[0],dy=e.clientY-drag[1];drag=[e.clientX,e.clientY];const k=3/sky.clientWidth;
+  S.V=ortho(mmul(rot([1,0,0],dy*k),mmul(rot([0,1,0],dx*k),S.V)));S.dirty=true;});
+const end=()=>{drag=null;S.dragging=false;};
+sky.addEventListener('pointerup',e=>{
+  const d=down;down=null;end();
+  if(!d||d.moved||performance.now()-d.t>600||!S.chart)return;
+  const h=hitTest(e.clientX,e.clientY,d.touch),r=sky.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+  if(!h){hidePop();if(S.hlAsp>=0){S.hlAsp=-1;renderAspects();S.dirty=true;}return;}
+  if(h.kind==='asp'){S.hlAsp=h.idx;renderAspects();S.dirty=true;showPop(aspectInfo(h.idx),sx,sy);}
+  else if(h.kind==='body'){S.hlAsp=-1;renderAspects();S.dirty=true;showPop(bodyInfo(h.key),sx,sy);}
+  else if(h.kind==='house')showPop(houseInfo(h.i),sx,sy);
+  else showPop(angleInfo(h.lab),sx,sy);
+});
+sky.addEventListener('pointercancel',()=>{down=null;end();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')hidePop();});
+sky.addEventListener('keydown',e=>{const k=0.08;let r=null;if(e.key==='ArrowLeft')r=rot([0,1,0],-k);if(e.key==='ArrowRight')r=rot([0,1,0],k);if(e.key==='ArrowUp')r=rot([1,0,0],-k);if(e.key==='ArrowDown')r=rot([1,0,0],k);
+  if(r){e.preventDefault();S.V=ortho(mmul(r,S.V));S.dirty=true;}if(e.key===' '){e.preventDefault();S.turning=!S.turning;syncControls();}});
+new ResizeObserver(resize).observe(sky);
+
+// ---------- saving ----------
+const inClaude=!!(window.claude&&typeof window.claude.use==='function');
+const dlReady=inClaude?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+dlReady.then(dl=>{if(inClaude&&!dl)return;$('#z-save').hidden=false;
+  $('#z-save').addEventListener('click',()=>{render();cv.toBlob(async blob=>{
+    if(!blob){$('#z-status').textContent='The image could not be created. Try again.';return;}
+    const name='projectiscope-zodiac.png';
+    if(dl){try{await dl.save({filename:name,data:blob});$('#z-status').textContent='Saved projectiscope-zodiac.png.';}catch(err){const c=err&&err.code;$('#z-status').textContent=c==='declined'?'Save cancelled.':'Saving is not available in this view.';}}
+    else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);$('#z-status').textContent='Saved projectiscope-zodiac.png.';}
+  },'image/png');});});
+
+// ---------- loop ----------
+let last=performance.now(),startT=last;
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  if(document.body.dataset.mode!=='zodiac'){startT=now;requestAnimationFrame(loop);return;}
+  S.t+=dt;
+  if(!reduce&&S.fold===0&&S.foldTarget===0&&!S.autoDone&&now-startT>1400){S.autoDone=true;S.foldTarget=1;}
+  if(S.fold!==S.foldTarget){const st=dt/2.4;S.fold=Math.abs(S.foldTarget-S.fold)<=st||reduce?S.foldTarget:S.fold+Math.sign(S.foldTarget-S.fold)*st;S.foldE=smooth(S.fold);syncControls();S.dirty=true;}
+  if(S.turning&&!S.dragging){S.psi+=dt*0.07;S.dirty=true;}
+  if(S.chart&&S.chart.asp.some(x=>x.A.k==='opp'||x.A.k==='conj')&&S.foldE>0.85)S.dirty=true;
+  if(S.dirty){render();S.dirty=false;}
+  requestAnimationFrame(loop);
+}
+$('#z-houseSys').addEventListener('change',e=>{S.houseSys=e.target.value;const ch=S.chart;if(ch){ch.cusps=computeCusps(ch);renderChart();renderHouses();hidePop();S.dirty=true;}});
+$('#z-houseShow').addEventListener('click',()=>{S.showHouses=!S.showHouses;$('#z-houseShow').setAttribute('aria-pressed',String(S.showHouses));$('#z-houseShow').textContent=S.showHouses?'Houses shown on the chart':'Houses hidden on the chart';S.dirty=true;});
+buildAxes();buildAspFilters();syncControls();resize();setChart(Date.now(),'The sky right now',null,null);
+(document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(()=>{S.dirty=true;});
+requestAnimationFrame(loop);
+})();
+
+</script>
+<script>
+(function(){
+  const btns=document.querySelectorAll('#modeSwitch button');
+  function setMode(m,push){
+    if(m!=='kaleido'&&m!=='zodiac')return;
+    document.body.dataset.mode=m;
+    document.getElementById('kaleidoApp').hidden=m!=='kaleido';
+    document.getElementById('zodiacApp').hidden=m!=='zodiac';
+    btns.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===m)));
+    document.title=m==='zodiac'?'Projectiscope: Folded Zodiac':'Projectiscope';
+    if(push){try{history.replaceState(null,'',m==='zodiac'?'#zodiac':'#');}catch(e){}}
+  }
+  btns.forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.v,true)));
+  // settings from the address: ?mode=zodiac&group=O&n=8&palette=worm&seed=42&immersive=1&journey=1
+  let q;try{q=new URLSearchParams(location.search);}catch(e){q=new Map();}
+  setMode(q.get('mode')||(location.hash==='#zodiac'?'zodiac':'kaleido'),false);
+  const api=window.__projectiscope,on=v=>v==='1'||v==='true';
+  function apply(c){
+    if(!api||!c)return;
+    if(c.mode)setMode(c.mode,false);
+    if(c.group)api.setGroup(c.group,c.n);
+    if(c.palette)api.setPalette(c.palette);
+    if(c.seed!=null)api.setSeed(c.seed);
+    if(c.recipe){try{api.applyRecipe(c.recipe);}catch(e){}}
+    if(c.paused!=null)api.setPaused(c.paused);
+    if(c.journey!=null)api.setJourney(c.journey);
+    if(c.immersive!=null)api.setImmersive(c.immersive);
+  }
+  apply({group:q.get('group'),n:q.get('n')?+q.get('n'):undefined,palette:q.get('palette'),seed:q.get('seed')?+q.get('seed'):undefined,
+    journey:q.get('journey')?on(q.get('journey')):undefined,immersive:q.get('immersive')?on(q.get('immersive')):undefined});
+  // embed bridge: a host page (such as the WORM³ game) can drive the viewer and hear mirror crossings
+  const embedded=window.parent!==window;
+  const post=m=>{if(embedded)window.parent.postMessage(m,location.origin);};
+  window.__psHook=ev=>post(Object.assign({},ev,{type:'projectiscope:'+ev.type}));
+  window.addEventListener('message',e=>{
+    if(!embedded||e.source!==window.parent||e.origin!==location.origin)return;
+    const m=e.data;if(!m||typeof m!=='object'||typeof m.type!=='string')return;
+    if(m.type==='projectiscope:config'){apply(m);post({type:'projectiscope:configured'});}
+    else if(m.type==='projectiscope:saveBackground'&&api){try{post({type:'projectiscope:background',design:api.backgroundDesign()});}catch(e){post({type:'projectiscope:error'});}}
+    else if(m.type==='projectiscope:surprise'&&api)api.surprise();
+    else if(m.type==='projectiscope:getRecipe'&&api)post({type:'projectiscope:recipe',recipe:api.recipe()});
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')post({type:'projectiscope:exit'});});
+  post({type:'projectiscope:ready'});
+})();
+</script>
+</body></html>

@@ -5,17 +5,21 @@
 // under it. Passing no slot renders both, which is what a caller outside the
 // wizard chrome wants.
 
-import React from 'react';
+import React, { Suspense, useState } from 'react';
 import { WIZ_SURFACE_RAISED } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
 import { BG_OPTIONS, Checkmark, sizeTier, styleLabel } from './shared.jsx';
+const ProjectiscopeCreator = React.lazy(() => import('../../../projectiscope/ProjectiscopeCreator.jsx'));
 
 export default function SceneStep({ cos, slot }) {
   const { settings, select, cubeSize, colors, accent, accentShadow } = cos;
+  const [creating, setCreating] = useState(false);
+  const choose = value => value === 'projectiscope' ? setCreating(true) : select('backgroundTheme', value);
 
   const index = Math.max(0, BG_OPTIONS.findIndex(o => o.value === settings.backgroundTheme));
-  const current = BG_OPTIONS[index];
-  const step = delta => select('backgroundTheme', BG_OPTIONS[(index + delta + BG_OPTIONS.length) % BG_OPTIONS.length].value);
+  const current = settings.backgroundTheme === 'projectiscope' && settings.projectiscopeDesign?.thumbnail
+    ? { ...BG_OPTIONS[index], thumbnail: settings.projectiscopeDesign.thumbnail } : BG_OPTIONS[index];
+  const step = delta => choose(BG_OPTIONS[(index + delta + BG_OPTIONS.length) % BG_OPTIONS.length].value);
 
   return (
     <>
@@ -38,10 +42,12 @@ export default function SceneStep({ cos, slot }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingBottom: '8px' }}>
         {BG_OPTIONS.map(opt => {
           const selected = settings.backgroundTheme === opt.value;
+          const thumbnail = opt.value === 'projectiscope' ? settings.projectiscopeDesign?.thumbnail : opt.thumbnail;
           return (
             <button
               key={opt.value}
-              onClick={() => select('backgroundTheme', opt.value)}
+              aria-pressed={selected}
+              onClick={() => choose(opt.value)}
               style={{
                 borderRadius: '10px', overflow: 'hidden', background: WIZ_SURFACE_RAISED,
                 border: selected ? `3px solid ${accent}` : '3px solid transparent',
@@ -51,8 +57,8 @@ export default function SceneStep({ cos, slot }) {
                 WebkitTapHighlightColor: 'transparent'
               }}
             >
-              {opt.thumbnail ? (
-                <img src={opt.thumbnail} alt={opt.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              {thumbnail ? (
+                <img src={thumbnail} alt={opt.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               ) : (
                 <div style={{ width: '100%', height: '100%', background: opt.gradient }} />
               )}
@@ -74,6 +80,13 @@ export default function SceneStep({ cos, slot }) {
         })}
       </div>
       )}
+      {creating && <Suspense fallback={<p role="status">Opening background creator…</p>}>
+        <ProjectiscopeCreator design={settings.projectiscopeDesign} onCancel={() => setCreating(false)}
+          onApply={projectiscopeDesign => {
+            cos.setSettings(s => ({ ...s, backgroundTheme: 'projectiscope', projectiscopeDesign }));
+            setCreating(false);
+          }} />
+      </Suspense>}
     </>
   );
 }

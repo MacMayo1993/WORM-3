@@ -50,6 +50,7 @@ export const createUiSlice = (set, _get) => ({
   showFirstFlipTutorial: false,
   showHelp: false,
   showSettings: false,
+  projectiscopeEditing: false,
   showMainMenu: true,
   showLevelSelect: false,
   // Campaign chooser, and which pack the chapter map is currently showing.

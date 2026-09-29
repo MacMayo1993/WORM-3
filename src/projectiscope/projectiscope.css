@@ -1,0 +1,14 @@
+.projectiscope-creator { position:fixed; inset:0; width:min(1200px,100vw); height:100dvh; max-width:100vw; max-height:100dvh; margin:auto; padding:0; border:0; background:#111625; color:#f5f2e8; font-family:inherit; }
+.projectiscope-creator[open] { display:flex; flex-direction:column; }
+.projectiscope-creator::backdrop { background:rgba(5,7,17,.85); }
+.projectiscope-creator header, .projectiscope-creator footer { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left)); flex-shrink:0; }
+.projectiscope-creator header { padding-top:max(12px,env(safe-area-inset-top)); }
+.projectiscope-creator h2 { margin:0; font-size:20px; }
+.projectiscope-creator p, .projectiscope-creator footer span { margin:4px 0 0; color:#c3c8d7; font-size:13px; }
+.projectiscope-creator iframe { display:block; width:100%; flex:1; min-height:0; border:0; background:#0d0f1a; }
+.projectiscope-creator footer { flex-wrap:wrap; padding-bottom:max(12px,env(safe-area-inset-bottom)); }
+.projectiscope-creator footer div { display:flex; gap:8px; margin-left:auto; }
+.projectiscope-creator button { min-height:44px; padding:8px 16px; border:1px solid #697084; border-radius:10px; color:inherit; background:#262e42; cursor:pointer; font:inherit; }
+.projectiscope-creator .projectiscope-apply { color:#142019; background:#bae9bd; border-color:#bae9bd; font-weight:700; }
+.projectiscope-creator button:disabled { opacity:.45; cursor:wait; }
+.projectiscope-creator button:focus-visible { outline:3px solid #ffd65f; outline-offset:2px; }
