@@ -13,6 +13,7 @@ import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.j
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
 import { createCharacterGeometry, applyCharacterFinish, prismColor, characterSegmentPattern } from '../wormCharacterVisuals.js';
 import { wormBodyTaper } from '../wormCharacterFinish.js';
+import { WIGGLE_BODY_SCALE, wiggleBodyOffset } from '../wiggleBody.js';
 // src/worm/healerWorm/WormBody.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import { useEffect, useMemo, useRef } from 'react';
@@ -49,6 +50,7 @@ import {
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
     MAX_TAIL,
+    DIR_FORWARD,
 } from './constants.js';
 import { inchGaitInto, makeInchGaitState, advanceInchGaitState } from './inchGait.js';
 import { createBodySurface, updateBodySurface, clearBodySurfaceInto, blendBodyNormalInto, bodyFrameInto } from './bodySurface.js';
@@ -83,6 +85,7 @@ const _inchGait = { dist: 0, arch: 0 };
 const _bodyHeadPos = new THREE.Vector3();
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
+const _wiggleForward = new THREE.Vector3();
 const _bodyCloneNormal = new THREE.Vector3();
 const _bodySegForward = new THREE.Vector3();
 const _bodySideVec = new THREE.Vector3();
@@ -104,6 +107,7 @@ const _pathCursor = makeStepPathCursor();
 const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal, tx: -1, ty: -1, tz: -1 };
 
 export function WormBody({ worm, size }) {
+    const wiggleHeadRef = useRef(new THREE.Vector3());
     const equipment = useGameStore(s => s.wormAccessories ?? EMPTY_ACCESSORIES);
     const accessoryRig = useMemo(() => createAccessoryRig({body: equipment.body, tail: equipment.tail}), [equipment.body, equipment.tail]);
     useEffect(() => () => accessoryRig.dispose(), [accessoryRig]);
@@ -270,6 +274,7 @@ export function WormBody({ worm, size }) {
         const _isGlow = isGlowRef.current;
         const _isBook = isBookRef.current;
         const _isWiggle = isWiggleRef.current;
+        worm.wiggleHeadPosition = _isWiggle ? wiggleHeadRef.current : null;
         const _isPrism = isPrismRef.current;
         const headRadius = isMobi ? MOBI_RADIUS : _isBook ? BOOK_HEAD_RADIUS : WORM_HEAD_RADIUS;
         fitTunnelBodyInto(rideFit.current, _headPathPoint, headRadius * worm.pickupHeadScale * worm.tunnelHeadScale);
@@ -449,6 +454,8 @@ export function WormBody({ worm, size }) {
         const _pageHinge = _isBook ? pageHingeAngles(bookTurnRef.current, reducedPickupMotion ? 0 : time) : _NO_HINGE;
 
         beginWormSegments();
+        if (_isWiggle) _wiggleForward.fromArray(DIR_FORWARD[worm.pos.current.dirKey][worm.moveDir.current]);
+        const skinDetail = _isWiggle ? getSkinFX(wormSkinId).bump?.amp ?? 0 : 0;
         for (let i = 0; i < visibleCount; i++) {
             // A collected orb grows three simulation segments. MOBI renders one
             // larger capsule at their center, preventing overlapping glass boxes
@@ -460,7 +467,8 @@ export function WormBody({ worm, size }) {
             // curve-walk math below; the walk's cumulative distance naturally catches up to
             // the next rendered segment's (larger) target distance. Surviving segments keep
             // their normal scale so orb growth never changes body-ball size at an LOD boundary.
-            const lodStep = i < 200 ? 1 : (i < 600 ? 2 : 4);
+            // Wiggle's slender silhouette needs every link, still in one draw.
+            const lodStep = _isWiggle ? 1 : i < 200 ? 1 : (i < 600 ? 2 : 4);
             if (i !== 0 && i % lodStep !== 0) continue;
 
             const fade = 1 - i / (sweep ? visibleCount : tLen);
@@ -480,6 +488,10 @@ export function WormBody({ worm, size }) {
                 if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, 0.092 * PAGE_HINGE_Y * (1 - _headPathPoint.rideWeight));
                 _wormDummy.position.addScaledVector(_bodyNormal, worm.tunnelHeadShift);
                 _wormDummy.scale.setScalar(_isBook ? 0.092 : WORM_HEAD_RADIUS);
+                if (_isWiggle) {
+                    bodyFrameInto(_bookBasisMat, _wiggleForward, _bodyNormal, _bookX, _bookY, _bookZ);
+                    _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);
+                }
                 // Book Worm draws its head as the orb above, so the spine box
                 // must not also be drawn here — two heads, one inside the other.
                 if (_isBook || isMobi) _wormDummy.scale.setScalar(0.00001);
@@ -530,14 +542,18 @@ export function WormBody({ worm, size }) {
                         _bodySegForward.subVectors(aPos, bPos).normalize();
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
 
-                        // Wiggle Worm is a sidewinder: a wide, smooth lateral wave that
-                        // travels down the whole body like a snake. The wave must span many
-                        // segments (small phase-step → long spatial wavelength); a large
-                        // phase-step would alias the closely-spaced (0.09 apart) segments into
-                        // a jagged scatter instead of a coherent S-curve.
-                        const wiggleAmp = (_isInch || segmentTransit) ? 0.0 : (_isWiggle ? 0.26 : 0.08) * Math.sin(fade * Math.PI) * (1 - flightBlend);
-                        const wigglePhase = targetDist * (_isWiggle ? 3 : 0.8 / BODY_BALL_SPACING) - time * (_isWiggle ? 8.0 : 6.0);
-                        _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
+                        if (_isWiggle && !segmentTransit) {
+                            // Ease the frame across sharp path hinges as well as bounding
+                            // the displacement. Length changes never re-phase the body.
+                            if (i === 1) _wiggleForward.copy(_bodySegForward);
+                            else _wiggleForward.lerp(_bodySegForward, 0.55).normalize();
+                            _bodySegForward.copy(_wiggleForward);
+                            _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
+                        }
+                        const wiggle = (_isInch || segmentTransit) ? 0 : _isWiggle
+                            ? wiggleBodyOffset(targetDist, reducedPickupMotion ? 0 : time)
+                            : Math.sin(targetDist * 0.8 / BODY_BALL_SPACING - time * 6) * 0.08 * Math.sin(fade * Math.PI);
+                        _bodyClonePos.addScaledVector(_bodySideVec, wiggle * (1 - flightBlend));
                         // Inch Worm: ride up off the surface along the normal wherever the
                         // wave has bunched the body, so each compression reads as a hump —
                         // taller with every orb carried.
@@ -558,12 +574,20 @@ export function WormBody({ worm, size }) {
                     _bodyCloneNormal.copy(last.normal);
                     const angle = _ride && last.tx >= 0 ? liveLayerAngle(last.tx, last.ty, last.tz) : null;
                     if (angle !== null) _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, angle);
-                    _bodySegForward.set(0, 0, 0);
+                    if (_isWiggle && !segmentTransit) {
+                        // An empty/short history used to stack the entire starting
+                        // worm at one point. Continue its oldest heading instead.
+                        _bodySegForward.copy(_wiggleForward);
+                        _bodyClonePos.addScaledVector(_bodySegForward, -Math.max(0, targetDist - cumulativeDist));
+                        _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
+                        _bodyClonePos.addScaledVector(_bodySideVec,
+                            wiggleBodyOffset(targetDist, reducedPickupMotion ? 0 : time) * (1 - flightBlend));
+                    } else _bodySegForward.set(0, 0, 0);
                 }
 
                 const stroke = tunnelSwimInto(tunnelStroke.current, i, tLen, time, swimWeight, reducedPickupMotion);
 
-                if (!segmentTransit && foundPosition && orbitT === 0) {
+                if (!_isWiggle && !segmentTransit && foundPosition && orbitT === 0) {
                     clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : isMobi ? 0.15 : 0.10, surface);
                 }
                 if (_isBook && !segmentTransit) {
@@ -592,11 +616,11 @@ export function WormBody({ worm, size }) {
                     // it again, outward from the cube where the bead now actually is.
                     if (blend > 0 && !segmentTransit && orbitT === 0) {
                         cubeShellDirInto(_bodyCloneNormal, _bodyClonePos, size);
-                        clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, 0.10, surface);
+                        if (!_isWiggle) clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, 0.10, surface);
                     }
                 }
                 _wormDummy.position.copy(_bodyClonePos);
-                if (_isBook || isMobi || _isInch || _isPrism || segmentTransit) {
+                if (_isBook || isMobi || _isInch || _isPrism || _isWiggle || segmentTransit) {
                     // Orient the cover to face the direction of travel, using the same
                     // lookAt convention CrawlerCharacter.jsx uses (local -Z = forward),
                     // so the page-flap hinge math below (wormBookFX.js) matches exactly.
@@ -623,6 +647,8 @@ export function WormBody({ worm, size }) {
                     // Slightly varied glow segment sizes
                     const glowSc = 0.088 + Math.sin(time * 3.5 + i * 1.6) * 0.01;
                     _wormDummy.scale.setScalar(glowSc);
+                } else if (_isWiggle && !segmentTransit) {
+                    _wormDummy.scale.fromArray(WIGGLE_BODY_SCALE);
                 } else {
                     _wormDummy.scale.setScalar(WORM_BODY_RADIUS);
                 }
@@ -672,9 +698,23 @@ export function WormBody({ worm, size }) {
             // radius so it grows away from the tiles instead of into them. (Unit
             // sphere geometry: uniform scale is the radius. Inch Worm's squash
             // presses down on purpose; the Book Worm's box is not a sphere.)
-            if (i !== 0 && !segmentTransit && orbitT === 0 && !_isBook && !_isInch) {
+            if (i !== 0 && !segmentTransit && orbitT === 0 && !_isBook && !_isInch && !_isWiggle) {
                 const excess = _wormDummy.scale.x - (isMobi ? 0.15 : 0.10);
                 if (excess > 0) _wormDummy.position.addScaledVector(_bodyCloneNormal, excess);
+            }
+            if (_isWiggle) {
+                // Solve with the final oriented shape, including pickup growth.
+                // Tunnel beads keep their exact band fit and round profile.
+                const onSurface = i === 0
+                    ? !_bodyTransit || (_headPathPoint.rideWeight === 0 && Math.max(Math.abs(_wormDummy.position.x), Math.abs(_wormDummy.position.y), Math.abs(_wormDummy.position.z)) >= size / 2)
+                    : !segmentTransit;
+                if (onSurface && orbitT === 0) {
+                    const margin = Math.max(_wormDummy.scale.x, _wormDummy.scale.y, _wormDummy.scale.z)
+                        * skinDetail + 0.001;
+                    clearBodySurfaceInto(_wormDummy.position, i === 0 ? _bodyNormal : _bodyCloneNormal, margin, surface, _wormDummy);
+                }
+                if (i === 0) wiggleHeadRef.current.copy(_wormDummy.position);
+                else _bodyClonePos.copy(_wormDummy.position);
             }
             // LOD removes distant instances to control cost, but must never make
             // the survivors larger: that produced an abrupt size jump at segment

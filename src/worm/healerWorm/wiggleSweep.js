@@ -1,6 +1,7 @@
 import { Quaternion, Vector3 } from 'three';
 import { shAt } from '../circularBuffers.js';
 import { BODY_BALL_SPACING, DIR_FORWARD, FACE_NORMALS, WORM_LIFT } from './constants.js';
+import { wiggleBodyOffset } from '../wiggleBody.js';
 
 export const WIGGLE_DURATION = 2.4;
 // Equal speed legs, eased at each reversal: center, left, right, left, right, center.
@@ -73,7 +74,7 @@ export function wigglePointInto(out, sweep, fraction, offset = sweep.offset, ela
     const u = b > a ? (distance - a) / (b - a) : 0;
     side.lerpVectors(sweep.sides[i - 1], sweep.sides[i], u).normalize();
     const envelope = Math.sin(Math.PI * Math.min(1, Math.max(0, elapsed / WIGGLE_DURATION)));
-    const wave = 0.26 * Math.sin(distance * 3 - sweep.phase - elapsed * 8) * Math.sin(Math.PI * fraction) * envelope;
+    const wave = wiggleBodyOffset(distance, sweep.phase / 8 + elapsed) * Math.sin(Math.PI * fraction) * envelope;
     out.addScaledVector(side, offset * fraction * fraction + wave);
     // A continuous radial surface map carries the offset across cube edges.
     // It cannot switch faces discontinuously or pull wrapped sections inside.

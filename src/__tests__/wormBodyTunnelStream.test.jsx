@@ -23,7 +23,7 @@ import { WormBody } from '../worm/healerWorm/WormBody.jsx';
 
 // Capture the production instance matrices on the CPU. This exercises the real
 // body cursor, phase handoff and surface projection without a WebGL context.
-function Harness({ worm }) { tree = WormBody({ worm, size: 3 }); return null; }
+function Harness({ worm, size = 3 }) { tree = WormBody({ worm, size }); return null; }
 let sim, worm, host, root, mesh;
 const route = { entry: { x: 1, y: 1, z: 2, dirKey: 'PZ' }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' } };
 beforeEach(() => {
@@ -65,6 +65,118 @@ function traverse(phase) {
   }
 }
 
+function selectWiggle(size = 3) {
+  act(() => {
+    useGameStore.setState({ wormCharacter: 'wiggle', wormAccessories: {} });
+    root.render(<Harness worm={worm} size={size} />);
+  });
+  React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
+}
+
+// A route in head-to-tail order, densely sampled just like simulation history.
+function surfaceRoute(corners, size = 3) {
+  shReset(sim.stepHistory);
+  sim.currentNormal.set(0, 0, 1);
+  sim.headInterpPos.copy(corners[0]).addScaledVector(sim.currentNormal, -WORM_LIFT);
+  for (let leg = corners.length - 1; leg > 0; leg--) {
+    const a = corners[leg], b = corners[leg - 1], n = Math.ceil(a.distanceTo(b) / 0.01);
+    for (let j = 0; j < n; j++) {
+      const p = a.clone().lerp(b, j / n);
+      shPush(sim.stepHistory, p, sim.currentNormal,
+        Math.max(0, Math.min(size - 1, Math.round(p.x + (size - 1) / 2))),
+        Math.max(0, Math.min(size - 1, Math.round(p.y + (size - 1) / 2))), size - 1);
+    }
+  }
+}
+
+it('gives a newly spawned Wiggle ten connected, distinct segments instead of a pile at the head', () => {
+  selectWiggle();
+  resetWormSim(sim, 3, { orbCount: 0, wormholeInterval: 9999 });
+  const points = renderPoints();
+  expect(points).toHaveLength(10);
+  expect(points[0].distanceTo(points.at(-1))).toBeGreaterThan(0.8);
+  expect(worm.wiggleHeadPosition.distanceTo(points[0])).toBeLessThan(1e-6);
+  for (let i = 1; i < points.length; i++) {
+    expect(points[i].distanceTo(points[i - 1])).toBeGreaterThan(0.08);
+    expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.12);
+  }
+});
+
+it('keeps a short Wiggle connected through a tight U-turn without folding across the other leg', () => {
+  selectWiggle(); sim.tailLength = 22;
+  surfaceRoute([[0.8, 0.15], [-0.2, 0.15], [-0.2, -0.15], [0.8, -0.15]]
+    .map(([x, y]) => new THREE.Vector3(x, y, 1.58)));
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  for (let frameIndex = 0; frameIndex < 100; frameIndex++) {
+    const points = renderPoints();
+    for (let i = 1; i < points.length; i++) {
+      expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.14);
+      for (let j = 0; j < i - 3; j++) expect(points[i].distanceTo(points[j])).toBeGreaterThan(0.18);
+    }
+  }
+});
+
+it('renders all 1200 Wiggle links through turns without the old gaps at 200 and 600', () => {
+  selectWiggle(12); sim.tailLength = 1200;
+  const corners = [];
+  for (let row = 0; row < 12; row++) {
+    const left = row % 2 ? 5.5 : -5.5;
+    corners.push(new THREE.Vector3(left, 5.5 - row, 6.08), new THREE.Vector3(-left, 5.5 - row, 6.08));
+  }
+  surfaceRoute(corners, 12);
+  const points = renderPoints();
+  expect(points).toHaveLength(1200);
+  for (let i = 1; i < points.length; i++) expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.14);
+});
+
+it('keeps Wiggle geometry outside turning tiles, including its head and swollen pickup beads', () => {
+  selectWiggle(); sim.tailLength = 25;
+  surfaceRoute([new THREE.Vector3(-1, 0, 1.58), new THREE.Vector3(1.3, 0, 1.58)]);
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  useGameStore.setState({ wormOrbFlash: { seq: 993, color: '#ff0000' } });
+  const body = React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh');
+  const geometry = React.Children.toArray(body.props.children).find(child => child.props.attach === 'geometry').props.object;
+  const vertices = geometry.attributes.position;
+  const point = new THREE.Vector3(), local = new THREE.Vector3(), matrix = new THREE.Matrix4();
+  const inverse = new THREE.Quaternion(), axis = new THREE.Vector3(1, 0, 0);
+  for (const angle of [0, 0.2, 0.7, 1.2, Math.PI / 2]) {
+    setLiveRotation('col', [1], [angle], 1, angle);
+    renderPoints();
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, matrix);
+      for (let v = 0; v < vertices.count; v++) {
+        point.fromBufferAttribute(vertices, v).applyMatrix4(matrix);
+        for (let x = 0; x < 3; x++) {
+          inverse.setFromAxisAngle(axis, x === 1 ? -angle : 0);
+          local.copy(point).applyQuaternion(inverse);
+          // Independent per-cubie containment check, not the production slab helper.
+          for (let y = 0; y < 3; y++) for (let z = 0; z < 3; z++) {
+            expect(Math.max(Math.abs(local.x - (x - 1)), Math.abs(local.y - (y - 1)), Math.abs(local.z - (z - 1)))).toBeGreaterThanOrEqual(0.49999);
+          }
+        }
+      }
+    }
+  }
+});
+
+it('does not re-phase Wiggle after a pickup, and freezes its pose while paused', () => {
+  selectWiggle(); sim.tailLength = 10;
+  surfaceRoute([new THREE.Vector3(0, 1, 1.58), new THREE.Vector3(0, -1, 1.58)]);
+  const before = renderPoints();
+  sim.tailLength += 3;
+  const after = renderPoints();
+  for (let i = 0; i < before.length; i++) {
+    expect(after[i].x).toBeCloseTo(before[i].x, 6);
+    expect(after[i].y).toBeCloseTo(before[i].y, 6);
+  }
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  useGameStore.setState({ wormPaused: true });
+  renderPoints();
+  const matrices = mesh.instanceMatrix.array.slice();
+  for (let i = 0; i < 10; i++) renderPoints();
+  expect(mesh.instanceMatrix.array).toEqual(matrices);
+});
+
 it('seats the rendered head on the band and sizes it to the local gauge at entry, core and exit', () => {
   sim.activeTunnel = route;
   const path = buildTunnelCenterlineInto(makeTunnelCenterline(), route, 3);
@@ -99,7 +211,8 @@ it('keeps the rendered head small enough to see past throughout the core crossin
   }
 });
 
-it('renders the interior tail continuously when the head exits and then crawls away', () => {
+it.each(['classic', 'wiggle'])('renders the %s interior tail continuously when the head exits and then crawls away', character => {
+  if (character === 'wiggle') selectWiggle();
   shReset(sim.stepHistory);
   for (let z = 6; z >= 1.5; z -= 0.01) shPush(sim.stepHistory, new THREE.Vector3(0, 0, z), new THREE.Vector3(0, 0, 1), -1, -1, -1, true);
   sim.activeTunnel = route;
@@ -126,7 +239,8 @@ it('renders the interior tail continuously when the head exits and then crawls a
   expect(departed.some(p => Math.abs(p.z) < 1.5)).toBe(true);
 });
 
-it('keeps narrowed beads round and connected instead of stretching them along the band', () => {
+it.each(['classic', 'wiggle'])('keeps narrowed %s beads round and connected instead of stretching them along the band', character => {
+  if (character === 'wiggle') selectWiggle();
   shReset(sim.stepHistory);
   sim.phase = 'tunnel'; sim.headInterpPos.set(0, 0, 0); sim.currentNormal.set(0, 0, 1);
   Object.assign(sim.tunnelRide, { rideWidth: 0.045, rideClearance: 0, rideWeight: 1 });
@@ -211,7 +325,8 @@ it('renders a connected three-tile tail sweep with its head fixed', () => {
   }
 });
 
-it('keeps a three-face sweep connected and outside the cube through both reversals', () => {
+it.each(['classic', 'wiggle'])('keeps a three-face %s sweep connected and outside the cube through both reversals', character => {
+  if (character === 'wiggle') selectWiggle();
   const r = 1.5 + WORM_LIFT;
   const route = [];
   const addLeg = (a, b, normal) => {

@@ -68,6 +68,10 @@ export function finishWormEyes(eyes, pupils, character = 'classic', mouth = null
 // give the body a silhouette instead of a string of equal beads.
 export function wormBodyTaper(index, count, character) {
   if (index === 0 || character === 'book' || character === 'mobi') return 1;
+  if (character === 'wiggle') {
+    const tail = Math.max(0, Math.min(1, (index - Math.max(2, count - 7)) / 6));
+    return (index === 1 ? 0.94 : 1) * (1 - 0.48 * tail * tail);
+  }
   const tail = Math.max(0, Math.min(1, (index - Math.max(1, count - 5)) / 4));
   return (index === 1 ? 0.88 : 1) * (1 - tail * (character === 'inch' ? 0.18 : 0.32));
 }

@@ -165,6 +165,8 @@ export function WormFace({ worm, size }) {
         const rideWeight = inTransit ? (worm.tunnelRide?.current?.rideWeight ?? 0) : 0;
         const rideShift = inTransit ? (worm.tunnelHeadShift ?? 0) : 0;
         _faceHeadPos.addScaledVector(normal, rideShift);
+        // WormBody runs first and supplies the final surface-cleared head anchor.
+        if (wormCharacterId === 'wiggle' && worm.wiggleHeadPosition) _faceHeadPos.copy(worm.wiggleHeadPosition);
         const dt = state.wormPaused || !state.wormAlive ? 0 : Math.min(delta, 0.05);
         faceTime.current += dt;
         const count = worm.orbPickupColorsRef.current.length;

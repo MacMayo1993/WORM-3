@@ -4,8 +4,10 @@ import * as THREE from 'three';
 // Gameplay instances and picker meshes use the same recipe, with no extra body draws.
 export function createCharacterGeometry(character) {
   const prism = character === 'prism';
-  const geometry = prism ? new THREE.IcosahedronGeometry(1, 1) : new THREE.SphereGeometry(1, character === 'inch' ? 20 : 16, 16);
-  if (!prism && character !== 'inch') return geometry;
+  // Wiggle draws every link even at maximum length. Eight latitude bands keep
+  // that full silhouette near the old thinned body's triangle budget.
+  const geometry = prism ? new THREE.IcosahedronGeometry(1, 1) : new THREE.SphereGeometry(1, character === 'inch' ? 20 : 16, character === 'wiggle' ? 8 : 16);
+  if (!prism && character !== 'inch' && character !== 'wiggle') return geometry;
   const p = geometry.attributes.position;
   const colors = [];
   for (let i = 0; i < p.count; i++) {
@@ -14,6 +16,12 @@ export function createCharacterGeometry(character) {
       // Broad jewel planes alternate in value; the moving spectrum supplies hue.
       const shade = 0.70 + (Math.floor(i / 3) % 5) * 0.075;
       colors.push(shade, shade, 1);
+    } else if (character === 'wiggle') {
+      // A continuous dorsal ribbon and shaded underside, rather than a high
+      // contrast colour change at every overlapping bead seam.
+      const ribbon = Math.exp(-x * x * 28) * Math.max(0, y);
+      const shade = y < -0.25 ? 0.82 : 1;
+      colors.push(shade * (1 - 0.20 * ribbon), shade, shade * (1 - 0.28 * ribbon));
     } else {
       const rib = 0.94 + 0.06 * Math.cos(z * Math.PI * 6);
       p.setXYZ(i, x * rib, y * rib, z);
@@ -29,7 +37,13 @@ export function createCharacterGeometry(character) {
 
 export function applyCharacterFinish(material, character) {
   const prism = character === 'prism', inch = character === 'inch';
-  material.vertexColors = prism || inch;
+  material.vertexColors = prism || inch || character === 'wiggle';
+  if (character === 'wiggle') {
+    material.roughness = Math.max(0.32, material.roughness);
+    material.clearcoat = 0.65;
+    material.clearcoatRoughness = 0.24;
+    material.flatShading = false;
+  }
   if (prism || inch || character === 'book') {
     material.roughness = prism ? 0.19 : inch ? 0.48 : 0.38;
     material.clearcoat = prism ? 1 : 0.45;
@@ -59,8 +73,11 @@ export function prismColor(out, index, time) {
  */
 export function characterSegmentPattern(out, character, skin, index, scratch) {
   if (index === 0) return out;
-  // Dancer: candy stripes in the skin's light accent.
-  if (character === 'wiggle' && index % 2 === 1) return out.lerp(scratch.set(skin.antenna), 0.5);
+  // Dancer: broad, softly blended bands that do not expose every bead seam.
+  if (character === 'wiggle') {
+    const band = 0.5 + 0.5 * Math.cos((index - 3) * Math.PI / 5);
+    return out.lerp(scratch.set(skin.antenna), band * 0.22);
+  }
   // Brute: ribbed bands in the belly colour.
   if (character === 'inch' && index % 2 === 1) return out.lerp(scratch.set(skin.belly), 0.28);
   // Ranger: an earthworm's saddle, the paler band just behind the head.
