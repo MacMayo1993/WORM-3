@@ -78,6 +78,9 @@ describe('character identity', () => {
     expect(colour('classic', 4)).not.toBe(base);
     expect(colour('classic', 5)).toBe(base);
     expect(colour('glow', 1)).toBe(base);
+    // The Sage's volumes are bound in three leathers, repeating down the body.
+    expect(new Set([1, 2, 3].map(i => colour('book', i))).size).toBe(3);
+    expect(colour('book', 4)).toBe(colour('book', 1));
   });
 });
 

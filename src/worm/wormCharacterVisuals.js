@@ -80,6 +80,12 @@ export function characterSegmentPattern(out, character, skin, index, scratch) {
   }
   // Brute: ribbed bands in the belly colour.
   if (character === 'inch' && index % 2 === 1) return out.lerp(scratch.set(skin.belly), 0.28);
+  // Sage: volumes of one set, bound alternately in the body, belly and
+  // antenna leathers, so each book reads on its own.
+  if (character === 'book') {
+    const volume = index % 3;
+    return volume === 1 ? out.lerp(scratch.set(skin.belly), 0.75) : volume === 2 ? out.lerp(scratch.set(skin.antenna), 0.3) : out;
+  }
   // Ranger: an earthworm's saddle, the paler band just behind the head.
   if (character === 'classic' && (index === 2 || index === 3)) return out.lerp(scratch.set(skin.antenna), 0.58);
   if (character === 'classic' && index > 3 && index % 2 === 0) return out.lerp(scratch.set(skin.belly), 0.18);
@@ -94,6 +100,7 @@ export function characterSegmentPattern(out, character, skin, index, scratch) {
 // Sage's spectacle arms, the Trickster's crystal horns.
 const _normal = new THREE.Vector3();
 const _zAxis = new THREE.Vector3(0, 0, 1);
+const _tint = new THREE.Color();
 export function createCharacterAccents(character) {
   const group = new THREE.Group();
   const geometries = [], materials = [];
@@ -141,6 +148,35 @@ export function createCharacterAccents(character) {
     add(geo(new THREE.TorusGeometry(0.085, 0.024, 5, 10, Math.PI)), brass, 0, 0.20, 0.96);
     const arm = geo(new THREE.CylinderGeometry(0.024, 0.024, 0.48, 5));
     for (const side of [-1, 1]) add(arm, brass, side * 0.68, 0.20, 0.68).rotation.x = Math.PI / 2;
+    // A quill tucked behind the right arm: ink-dipped nib forward and down,
+    // the feather sweeping up and back past the crown, clear of the hat seat.
+    // Built along +Y in its own frame, then turned so the vane faces outward.
+    const pivot = new THREE.Group();
+    pivot.position.set(0.74, 0.12, 0.62);
+    group.add(pivot);
+    const quill = new THREE.Group();
+    const dir = new THREE.Vector3(0.5, 0.82, -0.3).normalize();
+    const out = new THREE.Vector3(0.45, 0, 1);
+    out.addScaledVector(dir, -out.dot(dir)).normalize();
+    quill.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(dir, out), dir, out));
+    pivot.add(quill);
+    const part = (geometry, material, x, y, sx = 1, sy = 1, sz = 1, rz = 0) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, y, 0); mesh.scale.set(sx, sy, sz); mesh.rotation.z = rz;
+      mesh.raycast = () => null; quill.add(mesh); return mesh;
+    };
+    const vaneMat = mat({ color: '#fbf5e6', roughness: 0.55, side: THREE.DoubleSide });
+    const tipMat = mat({ color: '#7e22ce', roughness: 0.55, side: THREE.DoubleSide });
+    const shaftMat = mat({ color: '#efe4c8', roughness: 0.45 });
+    const inkMat = mat({ color: '#1c2744', roughness: 0.25, metalness: 0.2 });
+    const vane = geo(new THREE.SphereGeometry(1, 14, 8));
+    part(geo(new THREE.CylinderGeometry(0.018, 0.03, 1.5, 6)), shaftMat, 0, 0.62);
+    part(geo(new THREE.ConeGeometry(0.03, 0.16, 6)), inkMat, 0, -0.2, 1, 1, 1, Math.PI);
+    part(vane, vaneMat, 0.07, 0.8, 0.27, 0.56, 0.04, -0.08);
+    part(vane, tipMat, 0.16, 1.36, 0.16, 0.24, 0.035, -0.4);
+    // The vane takes the skin's pale antenna colour, the notched tip its belly.
+    tint = skin => { vaneMat.color.set('#fbf5e6').lerp(_tint.set(skin.antenna), 0.7); tipMat.color.set(skin.belly); };
+    update = time => { pivot.rotation.z = Math.sin(time * 1.7) * 0.05; pivot.rotation.x = Math.sin(time * 1.1 + 1) * 0.04; };
   } else if (character === 'inch') {
     const feelerMat = mat({ color: '#c4df70', roughness: 0.36, metalness: 0.05 });
     const feeler = geo(new THREE.CylinderGeometry(0.034, 0.055, 0.45, 6));

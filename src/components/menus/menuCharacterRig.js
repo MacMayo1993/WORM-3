@@ -9,7 +9,7 @@ import { animateWormFace } from '../../worm/wormFaceExpression.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import { makeWormHaloSprite } from '../../worm/wormGlowHalo.js';
-import { SPINE_GEO_ARGS, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_GEO_ARGS, PAGE_COLORS, createBookPageGeometry, createBookPaperMaterial, pageHingeAngles } from '../../worm/wormBookFX.js';
+import { createBookParts, createBookSegment, createBookBindingMaterial, poseBookSegment, bookScaleForRadius, bookVolumeScale, bookGroundLift } from '../../worm/wormBookFX.js';
 import { MENU_WORM_RADIUS, MENU_WORM_SEGMENTS } from './menuTunnelWormPath.js';
 
 const SKINS = { classic: 'slime', book: 'royal', inch: 'moss', glow: 'ice', wiggle: 'bubble', prism: 'royal', mobi: 'royal' };
@@ -23,8 +23,8 @@ export function createMenuCharacterRig(character) {
   const resources = new Set();
   const own = r => { resources.add(r); return r; };
   const geometry = own(createCharacterGeometry(character));
-  const spine = character === 'book' ? own(new THREE.BoxGeometry(...SPINE_GEO_ARGS)) : null;
-  const pageGeometries = character === 'book' ? [own(createBookPageGeometry(1)), own(createBookPageGeometry(-1))] : null;
+  const bookParts = character === 'book' ? createBookParts() : null;
+  if (bookParts) Object.values(bookParts).forEach(own);
   const accents = createCharacterAccents(character);
   accents.setSkin(skin);
   const mobi = character === 'mobi' ? createMobiModel() : null;
@@ -39,35 +39,31 @@ export function createMenuCharacterRig(character) {
       }
       return { holder };
     }
+    const radius = i === 0 ? MENU_WORM_RADIUS : .12;
+    const taper = wormBodyTaper(i, MENU_WORM_SEGMENTS, character);
+    if (bookParts && i > 0) {
+      // A volume in the bead's place, fore-edges resting where its belly would.
+      const binding = own(createBookBindingMaterial());
+      characterSegmentPattern(binding.color.set(skin.body), character, skin, i, new THREE.Color());
+      const book = createBookSegment(bookParts, binding);
+      const scale = bookScaleForRadius(radius) * bookVolumeScale(i) * taper;
+      book.group.scale.setScalar(scale);
+      book.group.position.y = bookGroundLift(scale, radius);
+      holder.add(book.group);
+      return { holder, material: null, book };
+    }
     const material = own(createWormSkinMaterial({ color: skin.body, emissive: skin.body, emissiveIntensity: .12 }));
     characterSegmentPattern(material.color, character, skin, i, new THREE.Color());
     applyCharacterFinish(material, character);
     applyBioluminescence(material, skin.glow, character === 'glow');
-    const isBook = character === 'book' && i > 0;
-    const body = new THREE.Mesh(isBook ? spine : geometry, material);
-    const radius = i === 0 ? MENU_WORM_RADIUS : .12;
-    body.scale.setScalar(radius * wormBodyTaper(i, MENU_WORM_SEGMENTS, character));
+    const body = new THREE.Mesh(geometry, material);
+    body.scale.setScalar(radius * taper);
     holder.add(body);
-    const hinges = [];
-    if (isBook && i % 2 === 0) {
-      for (const side of [1, -1]) {
-        const hinge = new THREE.Group();
-        hinge.position.set(side * PAGE_HINGE_X * radius, PAGE_HINGE_Y * radius, 0);
-        for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
-          const paper = own(createBookPaperMaterial()); paper.color.set(layer === 0 ? skin.body : PAGE_COLORS[layer % PAGE_COLORS.length]);
-          const page = new THREE.Mesh(pageGeometries[side === 1 ? 0 : 1], paper);
-          page.scale.setScalar(radius * 1.35);
-          page.position.set(side * PAGE_GEO_ARGS[0] * radius * .675, layer * PAGE_LAYER_GAP * radius, 0);
-          hinge.add(page);
-        }
-        holder.add(hinge); hinges.push(hinge);
-      }
-    }
     if (character === 'glow' && i % 2 === 0) {
       const halo = makeWormHaloSprite(); own(halo.material);
       halo.material.color.set(skin.glow); halo.scale.setScalar(.42); holder.add(halo);
     }
-    return { holder, material, hinges };
+    return { holder, material, book: null };
   });
   const eyeGeo = own(new THREE.SphereGeometry(1, 14, 12));
   const white = own(new THREE.MeshPhysicalMaterial({ color: '#f1f3e9', roughness: .22, clearcoat: 1 }));
@@ -102,9 +98,8 @@ export function createMenuCharacterRig(character) {
       if (segment.material) {
         updateWormSkinMaterialTime(segment.material, time);
         if (character === 'prism') prismColor(segment.material.color, i, time);
-        const hinges = pageHingeAngles(motion?.pulse ?? 0, reducedMotion ? 0 : time);
-        segment.hinges.forEach((hinge, index) => { hinge.rotation.z = index ? hinges.right : hinges.left; });
       }
+      if (segment.book) poseBookSegment(segment.book, motion?.pulse ?? 0, reducedMotion ? 0 : time, i);
       if (i === 0) {
         faceParts.forEach(part => { part.visible = visible && !mobi; });
         accents.group.visible = visible && !mobi;

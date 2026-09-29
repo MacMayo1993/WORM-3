@@ -38,9 +38,9 @@ import { getWormCharacter } from '../wormCharacterData.js';
 import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../wormSkinMaterial.js';
 import {
-    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-    BOOK_HEAD_RADIUS, BOOK_HEAD_LIFT, BOOK_SEGMENT_STRIDE, BOOK_PAGE_SCALE, SPINE_GEO_ARGS, createBookPageGeometry, createBookPaperMaterial, TURN_SIGNAL_GAIN,
-    turnSignalFromDirections, smoothTurn, pageHingeAngles,
+    BOOK_HEAD_RADIUS, BOOK_HEAD_LIFT, BOOK_BELLY, TURN_SIGNAL_GAIN, createBookParts, disposeBookParts, createBookBindingMaterial,
+    bookScaleForRadius, bookVolumeScale, bookGroundLift, bookCoverAngles, bookCoverMatrixInto,
+    turnSignalFromDirections, smoothTurn,
 } from '../wormBookFX.js';
 import {
     WORM_LIFT,
@@ -64,9 +64,12 @@ const _mobiSpinMatrix = new THREE.Matrix4();
 // Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
 const _bodyColor = new THREE.Color();
 const _pickupHighlight = new THREE.Color('#fff4c9');
-// Book Worm page-flip scratch — see the isBook block in the segment loop below.
-const _NO_HINGE = { left: 0, right: 0 };
-const _pageDummy = new THREE.Object3D();
+// Book Worm scratch — see the isBook blocks in the segment loop below.
+// Each volume stands in for a bead of this radius: the clearance every body
+// segment is solved to (clearBodySurfaceInto), so its fore-edges rest on the tile.
+const BOOK_BEAD_RADIUS = 0.10;
+const _bookAngles = { left: 0, right: 0 };
+const _bookCoverMatrix = new THREE.Matrix4();
 const _bookPageColor = new THREE.Color();
 const _bookHeadDir = new THREE.Vector3();
 const _bookZ = new THREE.Vector3();
@@ -74,10 +77,6 @@ const _bookX = new THREE.Vector3();
 const _bookY = new THREE.Vector3();
 const _bookBasisMat = new THREE.Matrix4();
 const _bookQuat = new THREE.Quaternion();
-const _bookHingeQuat = new THREE.Quaternion();
-const _bookPageQuat = new THREE.Quaternion();
-const _bookPageOffset = new THREE.Vector3();
-const _bookZAxisUnit = new THREE.Vector3(0, 0, 1);
 const _bookHeadDummy = new THREE.Object3D();
 // Scratch target for the Inch Worm gait, reused across every segment of every
 // frame (a 1200-segment body would otherwise allocate 1200 objects a frame).
@@ -112,12 +111,12 @@ export function WormBody({ worm, size }) {
     const accessoryRig = useMemo(() => createAccessoryRig({body: equipment.body, tail: equipment.tail}), [equipment.body, equipment.tail]);
     useEffect(() => () => accessoryRig.dispose(), [accessoryRig]);
     const surface = useMemo(() => createBodySurface(), []);
-    const bookPages = useMemo(() => [createBookPageGeometry(1), createBookPageGeometry(-1)], []);
-    useEffect(() => () => bookPages.forEach(g => g.dispose()), [bookPages]);
+    const bookParts = useMemo(() => createBookParts(), []);
+    useEffect(() => () => disposeBookParts(bookParts), [bookParts]);
     const meshRef = useRef();       // sphere body (classic / inch / glow)
-    const boxMeshRef = useRef();    // box body (book worm only)
-    const leftPageRef = useRef();   // book worm only — left page-stack overlay
-    const rightPageRef = useRef();  // book worm only — right page-stack overlay
+    const boxMeshRef = useRef();    // book worm only — each volume's spine (one per segment)
+    const leftPageRef = useRef();   // book worm only — left boards and pages
+    const rightPageRef = useRef();  // book worm only — right boards and pages
     const bookHeadRef = useRef();   // book worm only — the round head orb
     // Book Worm: turn force inferred from how fast the head's direction of
     // travel is swinging frame to frame (no continuous turn signal exists in
@@ -147,9 +146,9 @@ export function WormBody({ worm, size }) {
     const mobiGasRef = useRef();
     const mobiFrameRef = useRef();
     const characterGeometry = useMemo(() => createCharacterGeometry(wormCharacterId), [wormCharacterId]);
-    const paperMaterial = useMemo(() => createBookPaperMaterial(), []);
+    const bindingMaterial = useMemo(() => createBookBindingMaterial(), []);
     useEffect(() => () => characterGeometry.dispose(), [characterGeometry]);
-    useEffect(() => () => paperMaterial.dispose(), [paperMaterial]);
+    useEffect(() => () => bindingMaterial.dispose(), [bindingMaterial]);
     const skin = getSkin(wormSkinId);
     const wormColor = skin.body;
     const bellyColor = skin.belly;
@@ -415,7 +414,6 @@ export function WormBody({ worm, size }) {
         let mobiCoreCount = 0;
         mobiBandCounts.current.fill(0);
         let haloIdx = 0;  // compacted slot into the glow-halo overlay
-        let pageWriteIdx = 0; // book worm only — compacted slot into the page-flap overlays (body segments only, no head entry)
 
         const sweep = worm.signature.current.sweep;
         const visibleCount = Math.min(MAX_TAIL, sweep ? Math.max(tLen, Math.ceil((sweep.length + 8) / BODY_BALL_SPACING) + 1) : tLen);
@@ -450,9 +448,6 @@ export function WormBody({ worm, size }) {
             prevCS.character = patternRef.current.character;
         }
 
-        // Book Worm page bank — one value per frame, shared by every segment below.
-        const _pageHinge = _isBook ? pageHingeAngles(bookTurnRef.current, reducedPickupMotion ? 0 : time) : _NO_HINGE;
-
         beginWormSegments();
         if (_isWiggle) _wiggleForward.fromArray(DIR_FORWARD[worm.pos.current.dirKey][worm.moveDir.current]);
         const skinDetail = _isWiggle ? getSkinFX(wormSkinId).bump?.amp ?? 0 : 0;
@@ -482,10 +477,9 @@ export function WormBody({ worm, size }) {
                 _wormDummy.quaternion.identity();
                 _wormDummy.position.copy(_bodyHeadPos);
                 if (orbitT > 0) rocketOrbitInto(_wormDummy.position, size, orbitT);
-                // Book worm rides slightly higher off the surface — see the isBook
-                // lift below (matches the body segments so the head doesn't float
-                // at a different height than the rest of the book).
-                if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, 0.092 * PAGE_HINGE_Y * (1 - _headPathPoint.rideWeight));
+                // Book worm's head rides a hair high, on its books' line (the
+                // orb itself is drawn above; this dummy is only the zero-size slot).
+                if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, BOOK_HEAD_LIFT * (1 - _headPathPoint.rideWeight));
                 _wormDummy.position.addScaledVector(_bodyNormal, worm.tunnelHeadShift);
                 _wormDummy.scale.setScalar(_isBook ? 0.092 : WORM_HEAD_RADIUS);
                 if (_isWiggle) {
@@ -590,15 +584,6 @@ export function WormBody({ worm, size }) {
                 if (!_isWiggle && !segmentTransit && foundPosition && orbitT === 0) {
                     clearBodySurfaceInto(_bodyClonePos, _bodyCloneNormal, _isInch ? 0.084 + _inchArch * 0.03 : isMobi ? 0.15 : 0.10, surface);
                 }
-                if (_isBook && !segmentTransit) {
-                    // Book worm rides on top of the surface, lifted by its own
-                    // height, instead of centered/embedded at the usual crawl
-                    // height — a real book resting on the ground, not floating
-                    // through it. Mutates _bodyClonePos itself (not just this
-                    // segment's dummy) so the page instances below, which read
-                    // _bodyClonePos directly, inherit the same lift.
-                    _bodyClonePos.addScaledVector(_bodyCloneNormal, 0.088 * PAGE_HINGE_Y);
-                }
                 // Follow the airborne tangent when orienting books and capsules.
                 // Position was already lifted before the path's distance was measured.
                 if (orbitT > 0 && !segmentTransit) {
@@ -621,26 +606,20 @@ export function WormBody({ worm, size }) {
                 }
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isBook || isMobi || _isInch || _isPrism || _isWiggle || segmentTransit) {
-                    // Orient the cover to face the direction of travel, using the same
-                    // lookAt convention CrawlerCharacter.jsx uses (local -Z = forward),
-                    // so the page-flap hinge math below (wormBookFX.js) matches exactly.
+                    // Orient the segment to the direction of travel (local -Z =
+                    // forward, +Y = surface normal): book space in wormBookFX.js.
+                    // A book's boards hinge off this frame, banked or not.
                     bodyFrameInto(_bookBasisMat, _bodySegForward, _bodyCloneNormal, _bookX, _bookY, _bookZ);
                     _bookQuat.setFromRotationMatrix(_bookBasisMat);
                     _wormDummy.quaternion.copy(_bookQuat);
-                    if (swimWeight > 0) {
-                        _wormDummy.rotateZ(stroke.bank);
-                        // Page hinges share the banked cover frame.
-                        _bookQuat.copy(_wormDummy.quaternion);
-                        _bookX.set(1, 0, 0).applyQuaternion(_bookQuat);
-                        _bookY.set(0, 1, 0).applyQuaternion(_bookQuat);
-                    }
+                    if (swimWeight > 0) _wormDummy.rotateZ(stroke.bank);
                 }
                 if (_isInch) {
                     // Segments fatten at each hump's peak, thin elsewhere — only while moving.
                     const sc = 0.082 + _inchArch * 0.03; // 0.082 (rest/extended) → fatter at the hump
                     _wormDummy.scale.setScalar(sc);
                 } else if (_isBook) {
-                    _wormDummy.scale.set(0.088, 0.055, 0.1);
+                    _wormDummy.scale.setScalar(bookScaleForRadius(BOOK_BEAD_RADIUS) * bookVolumeScale(i));
                 } else if (isMobi) {
                     _wormDummy.scale.setScalar(MOBI_SEGMENT_RADIUS);
                 } else if (_isGlow) {
@@ -683,11 +662,12 @@ export function WormBody({ worm, size }) {
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
             if (i !== 0 && (swimWeight > 0 || rideProfile.current.rideWeight > 0)) {
                 const stroke = tunnelStroke.current;
-                // Pages and cube capsules have a wider footprint than a sphere.
-                const footprint = _isBook || isMobi ? 1.45 : 1;
+                // Cube capsules have a wider footprint than a sphere; a book's
+                // scale is in book units, BOOK_BELLY of which make its bead radius.
+                const footprint = isMobi ? 1.45 : _isBook ? BOOK_BELLY : 1;
                 const radius = Math.max(_wormDummy.scale.x, _wormDummy.scale.y) * footprint;
                 const fit = fitTunnelBodyInto(rideFit.current, rideProfile.current, radius,
-                    stroke.side, stroke.lift, _wormDummy.scale.y * (_isBook ? SPINE_GEO_ARGS[1] / 2 : 1));
+                    stroke.side, stroke.lift, _wormDummy.scale.y * (_isBook ? BOOK_BELLY : 1));
                 _wormDummy.scale.multiplyScalar(fit.scale);
                 _wormDummy.position.addScaledVector(_bodyCloneNormal, fit.shift);
                 offsetTunnelSwimInto(_wormDummy.position, _bodySegForward, _bodyCloneNormal, fit);
@@ -697,8 +677,11 @@ export function WormBody({ worm, size }) {
             // pickup pulse swells beads past it. Lift a swollen bead by the extra
             // radius so it grows away from the tiles instead of into them. (Unit
             // sphere geometry: uniform scale is the radius. Inch Worm's squash
-            // presses down on purpose; the Book Worm's box is not a sphere.)
-            if (i !== 0 && !segmentTransit && orbitT === 0 && !_isBook && !_isInch && !_isWiggle) {
+            // presses down on purpose.) A book always sets its fore-edges on the
+            // tile: swollen volumes rise, smaller and tapered ones settle down.
+            if (i !== 0 && !segmentTransit && orbitT === 0 && _isBook) {
+                _wormDummy.position.addScaledVector(_bodyCloneNormal, bookGroundLift(_wormDummy.scale.x, BOOK_BEAD_RADIUS));
+            } else if (i !== 0 && !segmentTransit && orbitT === 0 && !_isInch && !_isWiggle) {
                 const excess = _wormDummy.scale.x - (isMobi ? 0.15 : 0.10);
                 if (excess > 0) _wormDummy.position.addScaledVector(_bodyCloneNormal, excess);
             }
@@ -738,6 +721,14 @@ export function WormBody({ worm, size }) {
             }
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(writeIdx, _wormDummy.matrix);
+            if (_isBook) {
+                // Each volume's boards hinge off its spine: pitched open over the
+                // pages, breathing in a wave down the body and tipping together
+                // toward a turn (bookTurnRef). The head's slot is zero-sized.
+                bookCoverAngles(bookTurnRef.current, reducedPickupMotion ? 0 : time, i, _bookAngles);
+                leftPageRef.current?.setMatrixAt(writeIdx, bookCoverMatrixInto(_bookCoverMatrix, _wormDummy.matrix, _bookAngles.left));
+                rightPageRef.current?.setMatrixAt(writeIdx, bookCoverMatrixInto(_bookCoverMatrix, _wormDummy.matrix, _bookAngles.right));
+            }
             if (isMobi) {
                 mobiFrameRef.current?.setMatrixAt(writeIdx, _wormDummy.matrix);
                 const face = mobiCarriedFace(i, orbColors.length, worm.orbPickupFaceIdsRef.current);
@@ -764,7 +755,7 @@ export function WormBody({ worm, size }) {
             // anything re-deriving it would drift from what the player sees.
             pushWormSegment(_wormDummy.position.x, _wormDummy.position.y, _wormDummy.position.z);
             if (i > 0) poseBodyAccessories(accessoryRig, writeIdx, _wormDummy.position, _bodySegForward,
-                _bodyCloneNormal, Math.max(_wormDummy.scale.x, _wormDummy.scale.y),
+                _bodyCloneNormal, Math.max(_wormDummy.scale.x, _wormDummy.scale.y) * (_isBook ? BOOK_BELLY : 1),
                 reducedPickupMotion ? 0 : time, segmentTransit,
                 orbColors[orbColors.length - 1] ?? skin.body, accessoryPalette);
 
@@ -820,60 +811,12 @@ export function WormBody({ worm, size }) {
                 _bodyColor.lerp(pickupColor, pickupWave * 0.95);
                 // Keep every glass exterior clear; carried parity colors live inside it.
                 if (!isMobi) mesh.setColorAt(writeIdx, _bodyColor);
+                if (_isBook) {
+                    leftPageRef.current?.setColorAt(writeIdx, _bodyColor);
+                    rightPageRef.current?.setColorAt(writeIdx, _bodyColor);
+                }
             }
 
-            // Book Worm: a stack of thin page layers hinged along the cover's
-            // spine, propped open at rest and flung toward the outside of a
-            // turn (bookTurnRef, computed above from the head's frame-to-
-            // frame direction swing) — the whole stack banks together, layer
-            // count giving the body its visible "many pages" height.
-            if (_isBook && i !== 0 && i % BOOK_SEGMENT_STRIDE === 0) {
-                const pageScale = _wormDummy.scale.x * BOOK_PAGE_SCALE; // matches the cover's current (post transit/LOD) scale
-                // Hinge angles depend only on bookTurnRef, so they are the same for
-                // every segment — computed once above the loop instead of allocating
-                // a fresh {left,right} for each of up to MAX_TAIL segments per frame.
-                const left = _pageHinge.left;
-                const right = _pageHinge.right;
-
-                _bookHingeQuat.setFromAxisAngle(_bookZAxisUnit, left);
-                _bookPageQuat.copy(_bookQuat).multiply(_bookHingeQuat);
-                _bookPageOffset.set(PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_bookPageQuat);
-                for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
-                    _pageDummy.position.copy(_bodyClonePos)
-                        .addScaledVector(_bookX, PAGE_HINGE_X * pageScale)
-                        .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
-                        .addScaledVector(_bookPageOffset, pageScale);
-                    _pageDummy.quaternion.copy(_bookPageQuat);
-
-                    _pageDummy.scale.setScalar(pageScale);
-                    _pageDummy.updateMatrix();
-                    if (leftPageRef.current) leftPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
-                }
-
-                _bookHingeQuat.setFromAxisAngle(_bookZAxisUnit, right);
-                _bookPageQuat.copy(_bookQuat).multiply(_bookHingeQuat);
-                _bookPageOffset.set(-PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_bookPageQuat);
-                for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
-                    _pageDummy.position.copy(_bodyClonePos)
-                        .addScaledVector(_bookX, -PAGE_HINGE_X * pageScale)
-                        .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
-                        .addScaledVector(_bookPageOffset, pageScale);
-                    _pageDummy.quaternion.copy(_bookPageQuat);
-
-                    _pageDummy.scale.setScalar(pageScale);
-                    _pageDummy.updateMatrix();
-                    if (rightPageRef.current) rightPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
-                }
-
-                if (colorDirty) {
-                    for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
-                        _bookPageColor.set(layer === 0 ? baseColor : PAGE_COLORS[layer % PAGE_COLORS.length]);
-                        if (leftPageRef.current) leftPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
-                        if (rightPageRef.current) rightPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
-                    }
-                }
-                pageWriteIdx += PAGE_LAYER_COUNT;
-            }
             writeIdx++;
         }
 
@@ -916,44 +859,38 @@ export function WormBody({ worm, size }) {
         }
         if (mesh.instanceColor && colorDirty) uploadInstancePrefix(mesh.instanceColor, mesh.count);
 
-        // Update book worm page-flap overlay counts (meshes are only mounted when isBook)
+        // Book worm boards share the spine's slots (meshes are only mounted when isBook).
         if (_isBook) {
-            const lp = leftPageRef.current;
-            const rp = rightPageRef.current;
-            if (lp) { lp.count = pageWriteIdx; uploadInstancePrefix(lp.instanceMatrix, lp.count); if (lp.instanceColor && colorDirty) uploadInstancePrefix(lp.instanceColor, lp.count); }
-            if (rp) { rp.count = pageWriteIdx; uploadInstancePrefix(rp.instanceMatrix, rp.count); if (rp.instanceColor && colorDirty) uploadInstancePrefix(rp.instanceColor, rp.count); }
+            for (const board of [leftPageRef.current, rightPageRef.current]) {
+                if (!board) continue;
+                board.count = writeIdx;
+                uploadInstancePrefix(board.instanceMatrix, board.count);
+                if (board.instanceColor && colorDirty) uploadInstancePrefix(board.instanceColor, board.count);
+            }
         }
     });
 
     return isBook ? (
         /* Book body — Book Worm only. Conditionally mounted so the sphere instancedMesh
            (MAX_TAIL=1200 instances) is not allocated in GPU memory when unused.
-           The cover is the existing flattened box; the page-stack overlays
-           (PAGE_LAYER_COUNT thin layers per side) ride on top of it, hinged
-           along its spine (see the isBook block in the useFrame loop above
-           and wormBookFX.js for the hinge math). The head gets a standing
-           open-book face with inked paper leaves instead of a page stack. */
+           Every body segment is a hardback lying open face-down: its spine
+           (the worm's back ridge, one instance per segment) and two boards
+           over their pages, hinged off the spine (see the isBook blocks in
+           the useFrame loop above and wormBookFX.js). Three draws share one
+           binding material; the instance colour is each volume's cover. */
         <>
             <primitive object={accessoryRig.root} dispose={null} />
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-                {/* Thin spine/binding — the pages (below) are the visible body now, not a
-                    flat square slab the pages ride on top of. */}
-                <boxGeometry args={SPINE_GEO_ARGS} />
-                <meshStandardMaterial
-                    color="white"
-                    emissive="white"
-                    emissiveIntensity={0.18}
-                    roughness={0.58}
-                    metalness={0.2}
-                />
+                <primitive object={bookParts.spine} attach="geometry" />
+                <primitive object={bindingMaterial} attach="material" />
             </instancedMesh>
-            <instancedMesh ref={leftPageRef} args={[undefined, undefined, MAX_TAIL * PAGE_LAYER_COUNT]} frustumCulled={false}>
-                <primitive object={bookPages[0]} attach="geometry" />
-                <primitive object={paperMaterial} attach="material" />
+            <instancedMesh ref={leftPageRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+                <primitive object={bookParts.left} attach="geometry" />
+                <primitive object={bindingMaterial} attach="material" />
             </instancedMesh>
-            <instancedMesh ref={rightPageRef} args={[undefined, undefined, MAX_TAIL * PAGE_LAYER_COUNT]} frustumCulled={false}>
-                <primitive object={bookPages[1]} attach="geometry" />
-                <primitive object={paperMaterial} attach="material" />
+            <instancedMesh ref={rightPageRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+                <primitive object={bookParts.right} attach="geometry" />
+                <primitive object={bindingMaterial} attach="material" />
             </instancedMesh>
             {/* Round head orb — the same sphere the other worms wear, so the
                 Book Worm reads as a worm carrying books rather than as a
