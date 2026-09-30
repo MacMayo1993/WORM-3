@@ -1,42 +1,110 @@
 import { LIVING_SURFACE_STYLES } from './livingSurfaceCatalog.js';
-// Color scheme presets and settings utilities
-// Face antipodal pairs: 1↔4  |  2↔5  |  3↔6
-// High contrast within each pair is essential — the manifold flip reveals the opposite face
+// Color scheme presets and settings utilities.
+//
+// Every preset is six named colours drawn from its theme: Lava is magma, crimson,
+// white heat, basalt, molten gold and ash, not a rainbow wearing a volcanic name.
+// Within that theme a preset stays playable (paletteQuality.test.js holds it):
+//  - all 15 face pairs are clearly apart (OKLab distance ≥ 0.18);
+//  - opposite faces 1↔4, 2↔5, 3↔6 are counterparts at ≥ 0.22, so a flipped
+//    tile stands out against its face (Classic and City Biome keep the Rubik's
+//    sibling pairs instead: red/orange, green/blue, white/yellow);
+//  - no tile is dark enough to sink into the black plastic (OKLab L > 0.45);
+//  - no two palettes read as the same set.
 
 import { CITY_CONFIG, FACE_CITIES } from '../modes/CityBiomeMode.js';
 import { FACE_COLORS } from './constants.js';
 
-export const COLOR_SCHEMES = {
+// Faces 1–3 on the first row, their opposite faces 4–6 beneath, so each column
+// is an antipodal pair. Face 1 is the palette's signature colour (glows, world tints).
+const PRESETS = {
+  neon: [
+    ['#FF2E93', 'Hot Pink'], ['#00E1FF', 'Electric Cyan'], ['#FFF264', 'Sign Yellow'],
+    ['#28FF54', 'Tube Green'], ['#FF7F11', 'Neon Orange'], ['#A64DFF', 'Laser Violet']],
+  pastel: [
+    ['#FF6BAC', 'Bubblegum'], ['#67C4FF', 'Blue Raspberry'], ['#FFF999', 'Lemon Drop'],
+    ['#51E59D', 'Spearmint'], ['#FFA760', 'Orange Sherbet'], ['#A87AFF', 'Grape']],
+  sunset: [
+    ['#FF8424', 'Tangerine'], ['#FC3D89', 'Flamingo'], ['#FFD862', 'Sun Gold'],
+    ['#434DA7', 'Twilight'], ['#C9D3FF', 'Evening Sky'], ['#A75AE0', 'Dusk Violet']],
+  deepsea: [
+    ['#008EF7', 'Ocean Blue'], ['#009C84', 'Teal'], ['#8FE8F0', 'Sunlit Aqua'],
+    ['#F2E85C', 'Lure Glow'], ['#F29AC8', 'Moon Jelly'], ['#3B50A6', 'Abyss']],
+  lava: [
+    ['#FF6C21', 'Magma'], ['#C5132B', 'Crimson'], ['#FFF6E3', 'White Heat'],
+    ['#5B5563', 'Basalt'], ['#FFC218', 'Molten Gold'], ['#A09D9B', 'Ash']],
+  arctic: [
+    ['#0F64D5', 'Polar Blue'], ['#79D2FF', 'Sea Ice'], ['#F9FAFC', 'Snow'],
+    ['#F2C95C', 'Midnight Sun'], ['#FF8DAB', 'Alpenglow'], ['#7F8794', 'Slate']],
+  forest: [
+    ['#48AC54', 'Fern'], ['#954400', 'Bark'], ['#F4ECD5', 'Birch'],
+    ['#F72322', 'Toadstool'], ['#B5DD37', 'New Leaf'], ['#006A48', 'Pine']],
+  cyberpunk: [
+    ['#FF2A6D', 'Hot Magenta'], ['#7A30F0', 'Electric Violet'], ['#E4EAF6', 'Chrome'],
+    ['#00D4E3', 'Cyan'], ['#F2F20C', 'Acid Yellow'], ['#0B7C91', 'Dark Teal']],
+  cosmic: [
+    ['#D93BAA', 'Magenta Nebula'], ['#25BFB3', 'Teal Nebula'], ['#EFF2FF', 'Starlight'],
+    ['#F3B837', 'Stardust'], ['#F6A1C9', 'Rose Nebula'], ['#3553C7', 'Deep Space']],
+  sakura: [
+    ['#FFA2C0', 'Blossom'], ['#6BBF54', 'Spring Leaf'], ['#FFF4F7', 'Petal White'],
+    ['#7B4559', 'Cherry Bark'], ['#7CC4FF', 'Spring Sky'], ['#DA477F', 'Fuchsia']],
+  tropical: [
+    ['#EF2D5E', 'Hibiscus'], ['#17C5CB', 'Lagoon'], ['#FFE351', 'Pineapple'],
+    ['#189948', 'Palm'], ['#FE9000', 'Mango'], ['#1D63C9', 'Ocean']],
+  aurora: [
+    ['#1FEA78', 'Aurora Green'], ['#9152FC', 'Violet'], ['#E8F8AF', 'Pale Glow'],
+    ['#F04A78', 'Crimson Crown'], ['#1FB8C4', 'Teal'], ['#3351A9', 'Night Sky']],
+  halloween: [
+    ['#FF7A1A', 'Pumpkin'], ['#7ED321', 'Slime'], ['#F4F1E6', 'Ghost'],
+    ['#7B3FC4', 'Witch Purple'], ['#C0182F', 'Blood Red'], ['#7D7F87', 'Tombstone']],
+  retro: [
+    ['#D9622B', 'Burnt Orange'], ['#FDAD00', 'Harvest Gold'], ['#F7EDCE', 'Cream'],
+    ['#008A94', 'Teal'], ['#7B4B31', 'Chocolate'], ['#899B00', 'Avocado']],
+  midnight: [
+    ['#3D83FF', 'Moonlit Blue'], ['#BDA8F1', 'Lavender'], ['#F5F2E6', 'Moon Pearl'],
+    ['#E6BA4D', 'Moon Gold'], ['#21978F', 'Night Teal'], ['#484F9C', 'Midnight']],
+  gemstone: [
+    ['#D6124F', 'Ruby'], ['#0E53D7', 'Sapphire'], ['#E8F4FF', 'Diamond'],
+    ['#16A661', 'Emerald'], ['#F5B81C', 'Citrine'], ['#A04DE6', 'Amethyst']],
+  mondrian: [
+    ['#D7261E', 'Red'], ['#FAD304', 'Yellow'], ['#F4F2EC', 'White'],
+    ['#1F5CCC', 'Blue'], ['#A7A7A8', 'Gray'], ['#595858', 'Charcoal']],
+  artdeco: [
+    ['#DBB100', 'Gilt'], ['#1E9E72', 'Jade'], ['#F4ECD6', 'Ivory'],
+    ['#1854C5', 'Lapis'], ['#FF6B5A', 'Coral'], ['#5D5756', 'Onyx']],
+  noire: [
+    ['#D01E3C', 'Lipstick'], ['#F2C342', 'Gold'], ['#F8F6ED', 'Pearl'],
+    ['#00945E', 'Emerald'], ['#575762', 'Gunmetal'], ['#A6ABB6', 'Silver']],
+  vaporwave: [
+    ['#FF82CA', 'Hot Pink'], ['#01CDFE', 'Pool Cyan'], ['#FFFBAF', 'Pale Yellow'],
+    ['#00FDA0', 'Mint'], ['#B25DFF', 'Lavender'], ['#543BBC', 'Indigo']],
+  terracotta: [
+    ['#D55824', 'Terracotta'], ['#2E5FB0', 'Cobalt'], ['#F7EFDD', 'Adobe'],
+    ['#39AFA9', 'Turquoise'], ['#DEA3A4', 'Clay Rose'], ['#71503D', 'Umber']],
+  bioluminescence: [
+    ['#2DD9FF', 'Plankton Blue'], ['#D8FF6F', 'Firefly'], ['#11DA76', 'Foxfire'],
+    ['#FF4FD2', 'Jellyfish'], ['#8B71FF', 'Glow Violet'], ['#0059BE', 'Abyss Blue']],
+  saffron: [
+    ['#F29C00', 'Saffron'], ['#C02E0B', 'Paprika'], ['#FFEA92', 'Turmeric'],
+    ['#3D4EA9', 'Indigo'], ['#70B415', 'Cardamom'], ['#E77097', 'Rose Petal']],
+  eclipse: [
+    ['#F5B400', 'Ring of Fire'], ['#F2067E', 'Prominence'], ['#F4F6FF', 'Corona'],
+    ['#454AAB', 'Umbra'], ['#2BA7B0', 'Twilight'], ['#A84C2F', 'Blood Moon']],
+  // The printer's six: cyan, magenta and yellow inks and the red, green and blue
+  // they overprint to, so every face sits opposite its complement.
+  inkwell: [
+    ['#CC007F', 'Magenta'], ['#009FE3', 'Cyan'], ['#FFED00', 'Yellow'],
+    ['#00A651', 'Green'], ['#F94500', 'Red'], ['#3D4DB5', 'Blue']],
+  reef: [
+    ['#FF6F61', 'Coral'], ['#EFC900', 'Yellow Tang'], ['#FFF3E0', 'Sand'],
+    ['#1FC2CF', 'Turquoise'], ['#9759E5', 'Sea Fan'], ['#0B5CB0', 'Deep Reef']],
+};
+const byFace = pick => Object.fromEntries(Object.entries(PRESETS).map(([key, list]) =>
+  [key, Object.fromEntries(list.map((entry, i) => [i + 1, pick(entry)]))]));
 
-  // Six face IDs stay stable; opposite faces are 1/4, 2/5 and 3/6.
+export const COLOR_SCHEMES = {
   // 'standard' is the saved key; players see it as Classic, the Rubik's cube's own colours.
   standard: { ...FACE_COLORS },
-  neon: { 1: '#FF477E', 2: '#37DD69', 3: '#9B79FF', 4: '#3EDBFF', 5: '#FEF138', 6: '#FF9C43' },
-  pastel: { 1: '#FC4467', 2: '#2DC15B', 3: '#3692FD', 4: '#F4C263', 5: '#64D6F1', 6: '#CF91DD' },
-  sunset: { 1: '#E85B76', 2: '#D29D17', 3: '#DFA3FC', 4: '#4CB6B0', 5: '#697EE1', 6: '#F6DBB7' },
-  deepsea: { 1: '#368CBE', 2: '#D3A217', 3: '#CE70AA', 4: '#1BD3E7', 5: '#8A54FF', 6: '#F5DEBE' },
-  lava: { 1: '#E7485D', 2: '#F8A72B', 3: '#F19AD9', 4: '#4CC5B1', 5: '#DCEEC2', 6: '#7290ED' },
-  arctic: { 1: '#EAF5FA', 2: '#78B7E2', 3: '#EC80A4', 4: '#0EC06A', 5: '#A36DFF', 6: '#E5BC50' },
-  forest: { 1: '#DE3F25', 2: '#2CB36A', 3: '#ECE6B6', 4: '#37C0FE', 5: '#BC80BC', 6: '#DC9E36' },
-  cyberpunk: { 1: '#F34C9C', 2: '#8E79F6', 3: '#B6FB3B', 4: '#48DCD0', 5: '#FFB342', 6: '#EDE6FF' },
-  cosmic: { 1: '#C25486', 2: '#677FE3', 3: '#F6EBC5', 4: '#58C6B4', 5: '#E09BE7', 6: '#E8A340' },
-  sakura: { 1: '#F26F82', 2: '#5DA3EC', 3: '#EBEFCB', 4: '#27C68C', 5: '#C25DEC', 6: '#E9AC24' },
-  tropical: { 1: '#FF4F96', 2: '#28CE9D', 3: '#FEED59', 4: '#60A1E9', 5: '#AD56EE', 6: '#F49C59' },
-  aurora: { 1: '#D86BBE', 2: '#6472E7', 3: '#E2EFB7', 4: '#3DD76A', 5: '#68C8EA', 6: '#EAA13A' },
-  halloween: { 1: '#E57638', 2: '#A446F0', 3: '#EBDD91', 4: '#61AB67', 5: '#F477D3', 6: '#779DE0' },
-  retro: { 1: '#CD534C', 2: '#A25BC9', 3: '#F1E8B5', 4: '#0FD88D', 5: '#6BA4C7', 6: '#D8A23A' },
-  midnight: { 1: '#7285DA', 2: '#E566AE', 3: '#56D4F8', 4: '#EA9D1A', 5: '#FCDEC8', 6: '#2BB571' },
-  gemstone: { 1: '#DA5480', 2: '#3BB57C', 3: '#EDE964', 4: '#6392DD', 5: '#C357FD', 6: '#E59B4C' },
-  mondrian: { 1: '#DF4561', 2: '#E1B82F', 3: '#F3EBDD', 4: '#4F8ED2', 5: '#25B372', 6: '#D475EB' },
-  artdeco: { 1: '#DEEB3A', 2: '#409547', 3: '#DACAE9', 4: '#B85996', 5: '#6B9FCB', 6: '#DE974D' },
-  noire: { 1: '#CD6483', 2: '#61A6D1', 3: '#EFE8D4', 4: '#D3AA47', 5: '#F596FC', 6: '#638F3C' },
-  vaporwave: { 1: '#F77AAF', 2: '#A153DF', 3: '#EBE215', 4: '#42E2BC', 5: '#6CA5E8', 6: '#CF962D' },
-  terracotta: { 1: '#CF625F', 2: '#49953F', 3: '#F6EBC3', 4: '#75A9C7', 5: '#F18FEC', 6: '#D5AA37' },
-  bioluminescence: { 1: '#6FE793', 2: '#816FE6', 3: '#EFA94C', 4: '#EB75AC', 5: '#609F26', 6: '#79BAE6' },
-  saffron: { 1: '#E6A32B', 2: '#D56889', 3: '#E3ECBF', 4: '#0D8CCB', 5: '#38C595', 6: '#9953EC' },
-  eclipse: { 1: '#0B7EF0', 2: '#F74779', 3: '#F1E6C9', 4: '#D9A62C', 5: '#2ABCA5', 6: '#B291D9' },
-  inkwell: { 1: '#6C92C4', 2: '#DB6073', 3: '#F7E3C4', 4: '#15D894', 5: '#F093FF', 6: '#D5A537' },
-  reef: { 1: '#FE5A7A', 2: '#69B9D6', 3: '#E2F3C9', 4: '#5AA849', 5: '#C379F2', 6: '#E5AB52' },
+  ...byFace(([hex]) => hex),
 
   // ── BIOME SCHEME ─────────────────────────────────────────────────────────────
   biome: {
@@ -47,6 +115,12 @@ export const COLOR_SCHEMES = {
     5: CITY_CONFIG[FACE_CITIES[5]].pulseColor,
     6: CITY_CONFIG[FACE_CITIES[6]].pulseColor,
   },
+};
+
+/** What each preset calls its faces, for anywhere the game names a colour (Chaos bets). */
+export const PALETTE_FACE_NAMES = {
+  standard: { 1: 'Red', 2: 'Green', 3: 'White', 4: 'Orange', 5: 'Blue', 6: 'Yellow' },
+  ...byFace(([, name]) => name),
 };
 
 // ── LABELS ───────────────────────────────────────────────────────────────────
@@ -83,36 +157,36 @@ export const SCHEME_LABELS = {
   custom:     'Custom Upload',
 };
 
-// Browsing groups preserve palette IDs used by saved games and purchases.
-export const PALETTE_GROUPS = ['All', 'Essentials', 'Electric', 'Soft', 'Jewel', 'Studio'];
+// Browsing groups by theme; they only sort the picker, saved games and purchases keep palette IDs.
+export const PALETTE_GROUPS = ['All', 'Essentials', 'Nature', 'Sky', 'Electric', 'Culture'];
 export const PALETTE_INFO = {
   standard: { group: 'Essentials', description: "The Rubik's cube" },
-  neon: { group: 'Electric', description: 'Arcade brights' },
-  pastel: { group: 'Soft', description: 'Candy colors' },
-  sunset: { group: 'Jewel', description: 'Golden hour' },
-  deepsea: { group: 'Jewel', description: 'Ocean glass' },
-  lava: { group: 'Electric', description: 'Molten spectrum' },
-  arctic: { group: 'Soft', description: 'Glacier light' },
-  forest: { group: 'Jewel', description: 'Botanical color' },
-  cyberpunk: { group: 'Electric', description: 'Laser arcade' },
-  cosmic: { group: 'Jewel', description: 'Nebula gems' },
-  sakura: { group: 'Soft', description: 'Blossom garden' },
-  tropical: { group: 'Electric', description: 'Island brights' },
-  aurora: { group: 'Electric', description: 'Polar lights' },
-  halloween: { group: 'Jewel', description: 'Harvest magic' },
-  retro: { group: 'Studio', description: 'Seventies print' },
-  midnight: { group: 'Jewel', description: 'Moonlit color' },
-  gemstone: { group: 'Jewel', description: 'Polished gems' },
-  mondrian: { group: 'Essentials', description: 'Gallery primaries' },
-  artdeco: { group: 'Studio', description: 'Gilded geometry' },
-  noire: { group: 'Studio', description: 'Silver screen color' },
+  neon: { group: 'Electric', description: 'Sign-tube brights' },
+  pastel: { group: 'Essentials', description: 'Candy shop' },
+  sunset: { group: 'Sky', description: 'Golden hour into dusk' },
+  deepsea: { group: 'Nature', description: 'Sunlit shallows to the abyss' },
+  lava: { group: 'Nature', description: 'Magma and basalt' },
+  arctic: { group: 'Nature', description: 'Ice under the midnight sun' },
+  forest: { group: 'Nature', description: 'Woodland floor' },
+  cyberpunk: { group: 'Electric', description: 'Night city chrome' },
+  cosmic: { group: 'Sky', description: 'Nebula and stardust' },
+  sakura: { group: 'Nature', description: 'Cherry blossom spring' },
+  tropical: { group: 'Nature', description: 'Island fruit and lagoon' },
+  aurora: { group: 'Sky', description: 'Northern lights' },
+  halloween: { group: 'Culture', description: 'Trick or treat' },
+  retro: { group: 'Culture', description: 'Seventies print' },
+  midnight: { group: 'Sky', description: 'Moonlit night' },
+  gemstone: { group: 'Essentials', description: 'Cut jewels' },
+  mondrian: { group: 'Culture', description: 'De Stijl primaries' },
+  artdeco: { group: 'Culture', description: 'Black, gold and jade' },
+  noire: { group: 'Culture', description: 'Old Hollywood glamour' },
   vaporwave: { group: 'Electric', description: 'Poolside neon' },
-  terracotta: { group: 'Studio', description: 'Clay and mineral' },
+  terracotta: { group: 'Culture', description: 'Clay and turquoise' },
   bioluminescence: { group: 'Electric', description: 'Living light' },
-  saffron: { group: 'Jewel', description: 'Spice market' },
-  eclipse: { group: 'Jewel', description: 'Solar spectrum' },
-  inkwell: { group: 'Studio', description: 'Pigment collection' },
-  reef: { group: 'Soft', description: 'Coral garden' },
+  saffron: { group: 'Culture', description: 'Spice market' },
+  eclipse: { group: 'Sky', description: 'Totality' },
+  inkwell: { group: 'Essentials', description: "Printer's inks" },
+  reef: { group: 'Nature', description: 'Coral garden' },
 };
 
 // ── TILE STYLES ───────────────────────────────────────────────────────────────
