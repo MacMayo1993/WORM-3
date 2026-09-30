@@ -14,6 +14,8 @@ import { getWindWorldPosInto, getTunnelWorldPosInto } from '../worm/wormLogic.js
 import { tunnelTraversalT } from '../utils/tunnelPath.js';
 import { TUNNEL_CAM_NEAR } from '../worm/tunnelCameraRails.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
+import { makeCautionFall, cautionFallPoint, CAUTION_FALL_SECONDS } from '../worm/healerWorm/cautionRescue.js';
+import { tunnelState } from '../worm/tunnelProgressBridge.js';
 
 const scene = vi.hoisted(() => ({ frame: null, camera: null, size: null, mobile: true }));
 vi.mock('@react-three/fiber', () => ({
@@ -73,6 +75,46 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+});
+
+it.each([[412, 915], [915, 412], [1280, 800]])('keeps the caution-tape pull in view through death and retry at %sx%s', (width, height) => {
+  scene.size = { width, height };
+  scene.camera.aspect = width / height; scene.camera.updateProjectionMatrix();
+  for (const dirKey of Object.keys(FACE_NORMALS)) {
+    const size = 5, worm = makeWorm(size, dirKey);
+    const forward = new Vector3().fromArray(DIR_FORWARD[dirKey].up);
+    // The target is a corner tile; approach from the adjoining surface.
+    worm.headInterpPos.current.addScaledVector(forward, -1);
+    useGameStore.setState({ wormAlive: true, wormGamePhase: 'active' });
+    render(worm, size, dirKey);
+    for (let i = 0; i < 180; i++) tick();
+    const fall = makeCautionFall({ headInterpPos: worm.headInterpPos.current,
+      currentNormal: worm.currentNormal.current, expansionAmount: 0 }, worm.pos.current, size);
+    worm.phase.current = 'falling'; worm.cautionFall = ref(fall);
+    for (let i = 0; i <= Math.ceil(CAUTION_FALL_SECONDS * 60); i++) {
+      fall.elapsed = i / 60;
+      cautionFallPoint(worm.headInterpPos.current, fall, fall.elapsed);
+      tick();
+      for (const point of [fall.start, fall.mouth, worm.headInterpPos.current]) {
+        const ndc = point.clone().project(scene.camera);
+        expect(Math.abs(ndc.x)).toBeLessThan(0.9);
+        expect(Math.abs(ndc.y)).toBeLessThan(0.9);
+        expect(ndc.z).toBeGreaterThan(-1);
+        expect(ndc.z).toBeLessThan(1);
+      }
+      expect(scene.camera.position.clone().sub(fall.mouth).dot(fall.normal)).toBeGreaterThan(0.5);
+    }
+    expect(tunnelState.fallOpening).toBe(fall);
+    const held = scene.camera.position.clone();
+    worm.phase.current = 'dead'; useGameStore.setState({ wormAlive: false });
+    for (let i = 0; i < 30; i++) tick();
+    expect(scene.camera.position.distanceTo(held)).toBeLessThan(0.001);
+    worm.cautionFall.current = null;
+    Object.assign(worm, makeWorm(size, dirKey));
+    useGameStore.setState(s => ({ wormRunId: s.wormRunId + 1, wormAlive: true, wormGamePhase: 'scrambling' }));
+    tick();
+    expect(tunnelState.fallOpening).toBeNull();
+  }
 });
 
 it.each([

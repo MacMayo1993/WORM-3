@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { makeWormSim, resetWormSim, stepWormSim, queueTurn } from '../worm/healerWorm/wormSim.js';
-import { cautionEntry, cautionFallPoint, CAUTION_FALL_SECONDS } from '../worm/healerWorm/cautionRescue.js';
+import { cautionEntry, cautionFallPoint, CAUTION_FALL_SECONDS, makeCautionFall, tickCautionFall } from '../worm/healerWorm/cautionRescue.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { resetLiveRotation, setLiveRotation } from '../worm/liveRotation.js';
 import { wormExpansion } from '../worm/wormExpansion.js';
@@ -129,7 +129,7 @@ it('reuses one bounded opening for the fall and closes it after retry', () => {
     expect(portals.uniforms.uExteriorOpen.value).toBe(1);
     const points = portals.uniforms.uExteriorPoints.value;
     for (let i = 0; i < 9; i++) expect(points[i].equals(points[i + 9])).toBe(true);
-    for (const t of [0.5, 1, 1.5, CAUTION_FALL_SECONDS]) {
+    for (const t of [1, 1.5, CAUTION_FALL_SECONDS]) {
         const point = cautionFallPoint(new THREE.Vector3(), fall, t);
         const radial = point.sub(fall.mouth).projectOnPlane(fall.normal);
         expect(radial.length()).toBeLessThan(0.01);
@@ -137,4 +137,34 @@ it('reuses one bounded opening for the fall and closes it after retry', () => {
     portals.update(null, size, 0);
     expect(portals.uniforms.uExteriorOpen.value).toBe(0);
     portals.dispose();
+});
+
+it.each(Object.keys(FACE_NORMALS))('starts dissolving during the visible pull across the tape on %s', face => {
+    const s = stage(face);
+    s.sim.cautionFall = makeCautionFall(s.sim, s.target, size);
+    const fall = s.sim.cautionFall;
+    const startGap = fall.start.clone().sub(fall.mouth).projectOnPlane(fall.normal).length();
+    for (let i = 0; i < 20; i++) tickCautionFall(s.sim, 0.02);
+    const offset = s.sim.headInterpPos.clone().sub(fall.mouth);
+    expect(offset.dot(fall.normal)).toBeGreaterThan(0.1);
+    expect(offset.projectOnPlane(fall.normal).length()).toBeLessThan(startGap);
+    expect(offset.length()).toBeGreaterThan(0.3);
+    expect(fall.dissolve).toBeGreaterThan(0.1);
+    for (let i = 0; i < 100; i++) tickCautionFall(s.sim, 0.02);
+    expect(fall.dissolve).toBe(1);
+    expect(s.sim.headInterpPos.clone().sub(fall.mouth).dot(fall.normal)).toBeGreaterThan(-0.7);
+});
+
+it('freezes the pull and dissolve while paused and finishes them before the death card', () => {
+    const s = stage(); prompt(s); step(s, 1); step(s, 0.05);
+    const fall = s.sim.cautionFall;
+    const snapshot = [fall.elapsed, fall.dissolve, s.sim.headInterpPos.toArray(), s.sim.stepHistory.count];
+    s.ctx.isPaused = () => true; step(s, 20);
+    expect([fall.elapsed, fall.dissolve, s.sim.headInterpPos.toArray(), s.sim.stepHistory.count]).toEqual(snapshot);
+    s.ctx.isPaused = () => false;
+    for (let i = 0; i < 41; i++) step(s, 0.05);
+    expect(fall.dissolve).toBe(1);
+    expect(s.sim.alive).toBe(true);
+    for (let i = 0; i < 5; i++) step(s, 0.05);
+    expect(s.sim.alive).toBe(false);
 });

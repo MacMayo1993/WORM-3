@@ -3,11 +3,13 @@ import { raisedPlatformPosition, usesRaisedPlatforms } from './raisedPlatforms.j
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { liveRotation } from '../liveRotation.js';
 import { isTileInSlice } from '../wormLogic.js';
-import { FACE_NORMALS, WORM_LIFT } from './constants.js';
+import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT } from './constants.js';
 import { shPush } from '../circularBuffers.js';
 
-export const CAUTION_FALL_SECONDS = 2;
-export const CAUTION_DISSOLVE_START = 0.85;
+export const CAUTION_FALL_SECONDS = 2.2;
+export const CAUTION_DISSOLVE_START = 0.12;
+export const CAUTION_PULL_SECONDS = 0.95;
+const DISSOLVE_END = 2.05;
 
 // The fence belongs to the whole raised cubie, including its ordinary corner
 // faces. Query the same live platform/burrow rules used by jumps, rather than
@@ -31,18 +33,22 @@ export function makeCautionFall(sim, tile, size) {
     const mouth = new THREE.Vector3().fromArray(getStickerWorldPos(tile.x, tile.y, tile.z, tile.dirKey, size, sim.expansionAmount));
     const start = sim.headInterpPos.clone().addScaledVector(sim.currentNormal, WORM_LIFT);
     const approach = mouth.clone().sub(start).projectOnPlane(normal).normalize();
+    if (approach.lengthSq() < 1e-8) approach.fromArray(DIR_FORWARD[tile.dirKey].up);
     return { tile, elapsed: 0, sample: 0, start, mouth, normal, approach,
         startNormal: sim.currentNormal.clone(), forward: approach.clone(),
-        depth: Math.min(2.6, size * 0.45), dissolve: 0 };
+        depth: 0.65, dissolve: 0 };
 }
 
-// Travel over the exposed opening before dropping inward. This keeps the
-// route through the missing tile on all six faces, including corner openings.
+// Pull through the tape and across the tile before the shallow sink. Dissolve
+// DURING this visible travel, not after dropping several tiles behind the shell.
+// The same history draws the tail along the head's route on every cube face.
 export function cautionFallPoint(out, fall, elapsed) {
-    const glide = THREE.MathUtils.smoothstep(elapsed, 0, 0.48);
+    const glide = THREE.MathUtils.smoothstep(elapsed, 0, CAUTION_PULL_SECONDS);
     out.copy(fall.start).lerp(fall.mouth, glide);
-    const drop = Math.max(0, Math.min(1, (elapsed - 0.38) / 1.35));
-    return out.addScaledVector(fall.normal, WORM_LIFT * glide - fall.depth * drop * drop);
+    const drop = THREE.MathUtils.smoothstep(elapsed, 0.72, DISSOLVE_END);
+    // A small lift brings the head into the tape, without reading as a rescue jump.
+    const tug = 0.15 * Math.sin(Math.PI * glide);
+    return out.addScaledVector(fall.normal, WORM_LIFT * glide + tug - fall.depth * drop);
 }
 
 const point = new THREE.Vector3(), before = new THREE.Vector3(), normal = new THREE.Vector3();
@@ -54,7 +60,7 @@ export function tickCautionFall(sim, delta) {
     while (fall.sample / 120 <= fall.elapsed) {
         const t = fall.sample++ / 120;
         cautionFallPoint(point, fall, t);
-        normal.copy(fall.startNormal).lerp(fall.approach, THREE.MathUtils.smoothstep(t, 0.35, 0.8)).normalize();
+        normal.copy(fall.startNormal).lerp(fall.approach, THREE.MathUtils.smoothstep(t, 0.72, 1.3)).normalize();
         shPush(sim.stepHistory, point, normal, -1, -1, -1, true);
     }
     cautionFallPoint(sim.headInterpPos, fall, fall.elapsed);
@@ -64,6 +70,6 @@ export function tickCautionFall(sim, delta) {
     fall.forward.normalize();
     sim.currentNormal.copy(normal);
     fall.dissolve = THREE.MathUtils.clamp((fall.elapsed - CAUTION_DISSOLVE_START) /
-        (CAUTION_FALL_SECONDS - CAUTION_DISSOLVE_START), 0, 1);
+        (DISSOLVE_END - CAUTION_DISSOLVE_START), 0, 1);
     return fall.elapsed >= CAUTION_FALL_SECONDS;
 }
