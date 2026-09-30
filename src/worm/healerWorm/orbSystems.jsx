@@ -13,7 +13,7 @@ import { getStickerSafe } from '../../game/cubeState.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { getAntipodalOrbColor, getOrbColor, readLiveTile } from '../wormHelpers.js';
-import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX, ORB_HOVER_HEIGHT, ORB_ELEVATED_HOVER_HEIGHT } from './constants.js';
+import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX, ORB_HOVER_HEIGHT, ORB_ELEVATED_HOVER_HEIGHT, PARITY_ORB_SCALE } from './constants.js';
 import { isViewPower } from './viewPowerups.js';
 import { getSpecialDef, isElementalType } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
@@ -30,7 +30,7 @@ import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 // but a re-render of the mode above it (App re-renders every second on the
 // gameTime tick, and that cascades down the whole R3F tree) no longer walks the
 // orb subtree for nothing. See the note on SingleOrb in ParityOrb.jsx.
-function PowerupOrbsImpl({ size }) {
+function PowerupOrbsImpl({ size, worm = null }) {
     const { wormPowerups, cubies, settings, wormCharacter } = useGameStore(useShallow(s => ({
         wormPowerups: s.wormPowerups,
         cubies: s.cubies,
@@ -75,7 +75,8 @@ function PowerupOrbsImpl({ size }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orbSignature, faceColors, manifoldStyles]);
 
-    return <ParityOrbs wormMode orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
+    // The head position lets each orb perk up as the worm closes in (ParityOrbs).
+    return <ParityOrbs wormMode orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} focusRef={worm?.headInterpPos} />;
 }
 
 export const PowerupOrbs = memo(PowerupOrbsImpl);
@@ -322,7 +323,7 @@ export function SpecialOrbs({ size, hidden = false }) {
 const _mfxGeos = {
     // Sized to read like the parity gem it stands in for (shell 0.21, inner glow 0.30),
     // not the dim 0.075 speck it used to be — a big reason the pull was easy to miss.
-    bead: new THREE.SphereGeometry(0.18, 12, 10),
+    bead: new THREE.SphereGeometry(0.18 * PARITY_ORB_SCALE, 12, 10),
     field: new THREE.TorusGeometry(0.62, 0.018, 8, 40),
 };
 const _mfxHead = new THREE.Vector3();

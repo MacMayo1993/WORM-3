@@ -274,6 +274,10 @@ export const ORB_ATTRACTION_FX_DURATION = 0.42;
 // exactly where the gem was hovering instead of down on the tile surface — the old
 // origin mismatch was a big part of why the pull read as "the orb just vanished".
 export const ORB_HOVER_HEIGHT = 0.28;
+// Every parity orb part (gem, band, halos, rings, reveal and culling radii, and the
+// attraction bead that stands in for it) is built at this scale. 0.85 = 15% smaller
+// than the original design, which crowded the tile it sat on.
+export const PARITY_ORB_SCALE = 0.85;
 export const ORB_ELEVATED_HOVER_HEIGHT = 0.28 + 1.2;
 
 // ─── Frame delta clamp ────────────────────────────────────────────────────────
