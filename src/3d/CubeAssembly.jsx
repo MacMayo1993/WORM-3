@@ -264,7 +264,6 @@ const CubeAssembly = React.memo(({
   // which would defeat React.memo on all Cubie children.
   const animStateRef = useRef(animState);
   animStateRef.current = animState;
-  const prevAnimStateRef = useRef(null); // tracks last frame's animState for transition detection
   const prevRotationEpochRef = useRef(rotationEpoch);
   const flipModeRef = useRef(flipMode);
   flipModeRef.current = flipMode;
@@ -921,17 +920,10 @@ const CubeAssembly = React.memo(({
     };
   }, [animState, size]);
 
-  // Priority -2: earliest possible hook — detects state changes (via rotationEpoch)
-  // or animState transitions and snaps all cubies to their grid positions
-  // before any other useFrame runs.
-  //
-  // Why this is necessary: StickerPlane writes instanceColorRef.current in the
-  // React render body (not a useLayoutEffect), so in React 18 concurrent mode the
-  // colour ref can be updated by a speculative render before the commit that
-  // carries CubeAssembly's position-reset useLayoutEffect. Without this guard
-  // StickerInstances (priority 0) would sample the new colour with the still-rotated
-  // matrixWorld, producing a one-frame flash of new colours at wrong positions.
-
+  // Complete only after a frame has displayed the final pose. The store changes
+  // synchronously here, but React's replacement sticker materials do not. Keep
+  // the displayed layer at its final angle until the layout effect below commits
+  // BOTH the incoming stickers and their grid transforms before the next draw.
   useFrame(() => {
     if (pendingTurnCompleteRef.current &&
         renderedFinalTurnRef.current === initializedMoveRef.current &&
@@ -944,35 +936,9 @@ const CubeAssembly = React.memo(({
     const opening = openingTurnRef.current;
     if (opening && opening.elapsed >= opening.duration && !jumpRescueActive() &&
         useGameStore.getState().animState === initializedMoveRef.current) {
-      // The previous frame displayed the exact 90° pose. Commit BEFORE the
-      // epoch/reset pass so no later subscriber samples new colors on old poses.
+      // The previous frame displayed the exact 90° pose.
       openingTurnRef.current = null;
       opening.complete();
-    }
-    // Store commits are synchronous; React props may still describe the old turn.
-    const committed = useGameStore.getState();
-    const wasAnimating = prevAnimStateRef.current !== null;
-    const nowAnimating = committed.animState !== null;
-    const epochChanged = committed.rotationEpoch !== prevRotationEpochRef.current;
-
-    prevAnimStateRef.current = committed.animState;
-    prevRotationEpochRef.current = committed.rotationEpoch;
-
-    // Snap if we just finished an animation OR if the logical state jumped (drag snap)
-    if ((wasAnimating && !nowAnimating) || epochChanged) {
-      const amount = currentExplosion(committed);
-      appliedExpansionRef.current = amount;
-      const expansionFactor = cubeExpansionScale(size, amount);
-      for (let idx = 0; idx < positionCache.length; idx++) {
-        const g = cubieRefs.current[idx];
-        if (!g) continue;
-        g.position.set(
-          positionCache[idx][0] * expansionFactor,
-          positionCache[idx][1] * expansionFactor,
-          positionCache[idx][2] * expansionFactor
-        );
-        g.rotation.set(0, 0, 0);
-      }
     }
   }, -2);
 
@@ -1188,11 +1154,15 @@ const CubeAssembly = React.memo(({
     return arr;
   }, [cubies, size, positionCache]);
 
-  // Reset cubie positions/rotations when animation ends or cubies change.
-  // Uses useLayoutEffect so the reset happens BEFORE the browser paints,
-  // preventing a 1-frame glitch where cubies show new colors at old positions.
+  // StickerPlane commits its materials, artwork orientation and instance colors
+  // in this same React commit. Reset transforms here, never from a frame that
+  // merely sees the newer store epoch: that frame still renders the old stickers
+  // and would visibly undo the turn for one draw. An epoch change also handles
+  // queued turns whose idle state was batched away before React could render it.
   useLayoutEffect(() => {
-    if (!animState) {
+    const epochChanged = rotationEpoch !== prevRotationEpochRef.current;
+    prevRotationEpochRef.current = rotationEpoch;
+    if (!animState || epochChanged) {
       sliceIndicesRef.current = null;
       sliceDirByIdxRef.current = null;
       // Reduce explosion distance by 15% for larger cubes (4x4, 5x5)
@@ -1211,7 +1181,7 @@ const CubeAssembly = React.memo(({
         }
       });
     }
-  }, [animState, items, explosionFactor, size, wormHealerMode]);
+  }, [animState, rotationEpoch, items, explosionFactor, size, wormHealerMode]);
 
   // ── Mega Mode chassis geometry ────────────────────────────────────────────
   // A single 15×15 shell would cost >1,100 individual rounded bodies, so Mega

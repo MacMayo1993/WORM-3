@@ -146,7 +146,7 @@ it.each([
   expect(tween.to).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ duration, ease }));
 });
 
-it('resets committed poses before downstream frame subscribers see the new epoch', () => {
+it('resets poses when React commits the completed rotation', () => {
   const move = { axis: 'depth', sliceIndex: 0, dir: -1, isShuffle: true, wormScramble: true };
   mount(9, move);
   const original = liveCubies.refs.map(obj => obj.position.clone());

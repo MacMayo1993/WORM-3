@@ -1611,7 +1611,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         )}
 
         {/* Main sticker — omitted when the InstancedMesh handles rendering */}
-        {!isInstanceable && <mesh name="sticker-front" onBeforeRender={bindStyleIdentity} ref={meshRef} key={hollow ? 'frame' : plainSticker ? 'sticker' : useGlassStyle ? 'glass' : roundedStyle ? 'styled' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
+        {/* Shared materials are mesh props, not attached primitive children.
+            Replacing a primitive changes its shared R3F parent/previousAttach
+            bookkeeping and can overwrite a stationary tile's material when a
+            different slot swaps styles during a turn. */}
+        {!isInstanceable && <mesh name="sticker-front" onBeforeRender={bindStyleIdentity} ref={meshRef}
+          {...(useGlassStyle && glassMaterial ? { material: glassMaterial }
+            : useShaderStyle && styleMaterial ? { material: styleMaterial } : {})}
+          key={hollow ? 'frame' : plainSticker ? 'sticker' : useGlassStyle ? 'glass' : roundedStyle ? 'styled' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
           {hollow ? (
             <primitive object={_hollowStickerGeo} attach="geometry" />
           ) : plainSticker ? (
@@ -1630,11 +1637,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             // No texture atlas — share the module-level geometry to avoid per-sticker alloc.
             <primitive object={_sharedStickerGeo} attach="geometry" />
           )}
-          {useGlassStyle && glassMaterial ? (
-            <primitive object={glassMaterial} attach="material" />
-          ) : useShaderStyle && styleMaterial ? (
-            <primitive object={styleMaterial} attach="material" />
-          ) : plainSticker ? (
+          {!(useGlassStyle && glassMaterial) && !(useShaderStyle && styleMaterial) && (plainSticker ? (
             isMobile
               ? <meshStandardMaterial color={materialColor} {..._playFinish} envMapIntensity={0.3} />
               : <meshPhysicalMaterial color={materialColor} {..._playFinish} envMapIntensity={0.3} />
@@ -1649,7 +1652,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               metalness={0.05}
               envMapIntensity={0.3}
             />
-          )}
+          ))}
         </mesh>}
 
         {/* 3D style volumes — suppressed for full-face GLBs that cover the entire tile,

@@ -9,7 +9,10 @@ export function bindTileStyleIdentity(home, face) {
     // Consecutive meshes can use exactly the same ShaderMaterial/program.
     material.uniformsNeedUpdate = true;
   };
-  bind.tileStyleBound = true;
+  // R3F 8 shallow-compares enumerable function properties when applying props.
+  // An enumerable identical marker makes different identity closures compare
+  // equal, leaving a reused slot bound to the sticker that moved away.
+  Object.defineProperty(bind, 'tileStyleBound', { value: true });
   return bind;
 }
 
