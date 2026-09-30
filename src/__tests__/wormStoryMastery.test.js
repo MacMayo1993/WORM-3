@@ -75,13 +75,16 @@ it('does not count fatal landings or an Inch signature that only charged', () =>
   sim.isJumping = true; sim.jumpCount = 2; read();
   sim.alive = false; sim.isJumping = false; expect(read().doubleJumps).toBeUndefined();
 });
-it('checks all five elemental effects and reoffers a missed or expired power', () => {
+it('checks all five elemental effects and cycles back to missed powers', () => {
   const { sim, p, level, read } = setup(40);
   p.mechanics.rockets = 1; p.mechanics.magnetOrbs = 4; p.mechanics.explodes = 2;
   sim.specials = []; p.powerDelay = 0; offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies);
   expect(sim.specials[0].type).toBe('water');
-  sim.specials = []; p.powerDelay = 0; expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
-  expect(sim.specials[0].type).toBe('water');
+  for (const type of ['fire', 'grass', 'ice', 'lightning', 'water']) {
+    sim.specials = []; p.powerDelay = 0;
+    expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
+    expect(sim.specials[0].type).toBe(type);
+  }
   for (const type of ['water', 'fire', 'grass', 'ice', 'lightning']) {
     sim.specials = []; sim.elementalType = type; sim.elementalT = 15; sim.elementalFocusT = 0;
     sim.waterMomentum = 0;
@@ -109,17 +112,18 @@ it('finishes level eight with two collected elements without waiting for mastery
   p.powerDelay = 0;
   sim.specials = []; // missed offerings do not count and can be offered again
   expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
+  expect(sim.specials[0].type).toBe('fire');
   expect(read().elementPickups).toBeUndefined();
   const won = { alive: true, elapsed: 80, cuts: 0, orbs: 24, healed: 3, remaining: 0,
     tailClear: true, landed: true, rotationSettled: true };
   recordStoryMechanic(p, 'elementPickups');
   expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).toBeNull();
-  expect(nextStoryPower(p, level)).toBe('fire');
+  expect(nextStoryPower(p, level)).toBe('water');
   sim.specials = []; sim.elementalT = 10;
   expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(false);
   sim.elementalT = 0; p.powerDelay = 0;
   expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
-  expect(sim.specials[0].type).toBe('fire');
+  expect(sim.specials[0].type).toBe('water');
   recordStoryMechanic(p, 'elementPickups');
   expect(p.elements.size).toBe(0);
   expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).not.toBeNull();
