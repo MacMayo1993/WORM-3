@@ -36,16 +36,27 @@ describe('playable MOBI', () => {
     rig.group.scale.setScalar(1);
     expect(rig.shellMaterial.transparent).toBe(true);
     expect(rig.shellMaterial.depthWrite).toBe(false);
+    // The shell bobs and tilts with MOBI's gait, so measure in its own frame.
+    const toBody = new THREE.Matrix4(), local = new THREE.Matrix4();
     for (let t = 0; t < 20; t += 0.5) {
+      rig.group.position.z -= 0.4;
       animateMobi(rig, t, { pulse: 1, transit: true });
       rig.group.updateMatrixWorld(true);
-      const bounds = new THREE.Box3().setFromObject(rig.core, true);
+      toBody.copy(rig.body.matrixWorld).invert();
+      const bounds = new THREE.Box3();
+      const vertex = new THREE.Vector3();
+      rig.core.traverse(mesh => {
+        if (!mesh.isMesh) return;
+        local.multiplyMatrices(toBody, mesh.matrixWorld);
+        const position = mesh.geometry.attributes.position;
+        for (let i = 0; i < position.count; i++) bounds.expandByPoint(vertex.fromBufferAttribute(position, i).applyMatrix4(local));
+      });
       for (const axis of ['x', 'y', 'z']) {
         expect(bounds.min[axis]).toBeGreaterThan(-0.98);
         expect(bounds.max[axis]).toBeLessThan(0.98);
       }
-      const a = rig.core.getObjectByName('positive-pole').getWorldPosition(new THREE.Vector3());
-      const b = rig.core.getObjectByName('negative-pole').getWorldPosition(new THREE.Vector3());
+      const a = rig.core.getObjectByName('positive-pole').getWorldPosition(new THREE.Vector3()).applyMatrix4(toBody);
+      const b = rig.core.getObjectByName('negative-pole').getWorldPosition(new THREE.Vector3()).applyMatrix4(toBody);
       expect(a.add(b).length()).toBeLessThan(1e-10);
     }
     disposeMobi(rig);
@@ -152,4 +163,128 @@ it('freezes gas when paused and suppresses sparks with reduced motion', () => {
     window.matchMedia = previous;
     disposeMobi(rig);
   }
+});
+
+describe('MOBI secondary motion', () => {
+  const crawl = (rig, from, to, speed) => {
+    for (let t = from; t <= to + 1e-9; t += 1 / 60) {
+      rig.group.position.z -= speed / 60;
+      animateMobi(rig, t);
+    }
+  };
+
+  it('hops, leans and swings its antennae while crawling, and settles when it stops', async () => {
+    const rig = createMobiModel();
+    crawl(rig, 0, 1.5, 3);
+    expect(rig.motion.gait).toBeGreaterThan(0.6);
+    expect(rig.body.rotation.x).toBeLessThan(-0.03);
+    const heights = [];
+    for (let t = 1.5; t < 2.2; t += 1 / 60) { rig.group.position.z -= 3 / 60; animateMobi(rig, t); heights.push(rig.body.position.y); }
+    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(0.04);
+    expect(Math.abs(rig.antennae[0].rotation.x)).toBeGreaterThan(0.05);
+    crawl(rig, 2.2, 4, 0);
+    expect(rig.motion.gait).toBeLessThan(0.05);
+    disposeMobi(rig);
+  });
+
+  it('holds its whole pose when the caller freezes its clock', () => {
+    const rig = createMobiModel();
+    crawl(rig, 0, 1, 3);
+    const frozen = rig.lastTime;
+    rig.body.updateMatrix();
+    const body = rig.body.matrix.clone();
+    const antennae = rig.antennae.map(a => a.quaternion.clone());
+    const pupil = rig.pupils[0].position.clone();
+    for (let i = 0; i < 3; i++) animateMobi(rig, frozen);
+    rig.body.updateMatrix();
+    expect(rig.body.matrix.equals(body)).toBe(true);
+    rig.antennae.forEach((a, i) => expect(a.quaternion.equals(antennae[i])).toBe(true));
+    expect(rig.pupils[0].position.equals(pupil)).toBe(true);
+    disposeMobi(rig);
+  });
+
+  it('stands still and square with reduced motion', () => {
+    const previous = window.matchMedia;
+    window.matchMedia = vi.fn(() => ({ matches: true }));
+    const rig = createMobiModel();
+    try {
+      crawl(rig, 0, 1, 3);
+      expect(rig.motion.gait).toBe(0);
+      expect(rig.body.rotation.x).toBe(0);
+      expect(rig.body.rotation.z).toBe(0);
+      expect(rig.body.position.y).toBe(0);
+      expect(rig.antennae[0].rotation.x).toBe(0);
+    } finally {
+      window.matchMedia = previous;
+      disposeMobi(rig);
+    }
+  });
+
+  it('gives hats and glasses the animated head frame', async () => {
+    const { mobiHeadFrameInto, MOBI_RADIUS } = await import('../worm/mobiModel.js');
+    const rig = createMobiModel();
+    crawl(rig, 0, 1.3, 3);
+    rig.group.scale.setScalar(MOBI_RADIUS);
+    const center = new THREE.Vector3(), forward = new THREE.Vector3(), normal = new THREE.Vector3(), q = new THREE.Quaternion();
+    mobiHeadFrameInto(rig, center, forward, normal, q);
+    rig.group.updateMatrixWorld(true);
+    expect(center.distanceTo(rig.body.getWorldPosition(new THREE.Vector3()))).toBeLessThan(1e-9);
+    expect(normal.distanceTo(new THREE.Vector3(0, 1, 0).applyQuaternion(rig.body.getWorldQuaternion(new THREE.Quaternion())))).toBeLessThan(1e-9);
+    expect(forward.dot(normal)).toBeCloseTo(0, 9);
+    expect(q.length()).toBeCloseTo(1, 9);
+    disposeMobi(rig);
+  });
+});
+
+describe('MOBI tail blocks', () => {
+  it('draws one block per three segments, clear of the head, one per carried orb', async () => {
+    const { isMobiBlockSegment } = await import('../worm/mobiSegments.js');
+    const { mobiCarriedFace } = await import('../worm/mobiOrbAppearance.js');
+    const { BASE_TAIL_LENGTH: base, ORB_SEGMENT_GROWTH: growth } = await import('../worm/healerWorm/constants.js');
+    const orbs = 6, ids = [1, 2, 3, 4, 5, 6];
+    const blocks = [];
+    for (let i = 0; i < base + orbs * growth; i++) if (isMobiBlockSegment(i, base, growth)) blocks.push(i);
+    expect(blocks[0]).toBeGreaterThanOrEqual(growth);
+    for (let k = 1; k < blocks.length; k++) expect(blocks[k] - blocks[k - 1]).toBe(growth);
+    const carried = blocks.map(i => mobiCarriedFace(i, orbs, ids)).filter(Boolean);
+    expect(carried).toEqual(ids);
+  });
+
+  it('tumbles within the surface clearance and lies still with reduced motion', async () => {
+    const { mobiTailSwayInto } = await import('../worm/mobiSegments.js');
+    const out = {};
+    for (let block = 0; block < 12; block++) for (let travel = 0; travel < 6; travel += 0.13) {
+      mobiTailSwayInto(out, block, travel, travel * 0.7);
+      // Half-extent of a unit block along the normal after roll and pitch.
+      const reach = Math.cos(out.roll) * Math.cos(out.pitch) + Math.abs(Math.sin(out.roll)) + Math.abs(Math.sin(out.pitch));
+      expect(reach * 0.11).toBeLessThan(0.15);
+      expect(out.lift).toBeGreaterThanOrEqual(0);
+    }
+    expect(mobiTailSwayInto(out, 3, 2, 1, true)).toEqual({ roll: 0, pitch: 0, yaw: 0, lift: 0 });
+  });
+
+  it('passes each pose back down the tail as MOBI crawls', async () => {
+    const { mobiTailSwayInto } = await import('../worm/mobiSegments.js');
+    const lead = mobiTailSwayInto({}, 2, 1, 0.5);
+    const follow = mobiTailSwayInto({}, 3, 1 + 0.95 / 3.4, 0.5);
+    expect(follow.roll).toBeCloseTo(lead.roll, 9);
+  });
+});
+
+it('keeps the instanced tail bezel cheap and the same shape as the smooth one', async () => {
+  const { createMobiFrameGeometry } = await import('../worm/mobiModel.js');
+  const smooth = createMobiFrameGeometry(), cheap = createMobiFrameGeometry({ smooth: false });
+  expect(cheap.attributes.position.count).toBeLessThan(1500);
+  smooth.computeBoundingBox(); cheap.computeBoundingBox();
+  expect(cheap.boundingBox.min.distanceTo(smooth.boundingBox.min)).toBeLessThan(0.02);
+  expect(cheap.boundingBox.max.distanceTo(smooth.boundingBox.max)).toBeLessThan(0.02);
+  for (const geometry of [smooth, cheap]) for (const name of ['normal', 'color', 'mobiGlow']) {
+    expect(geometry.attributes[name].count).toBe(geometry.attributes.position.count);
+  }
+  const glowing = [...cheap.attributes.mobiGlow.array].filter(v => v > 0).length;
+  expect(glowing).toBeGreaterThan(0);
+  const tail = createMobiSegmentAssets(1200);
+  expect(tail.frameGeometry.attributes.position.count).toBe(cheap.attributes.position.count);
+  disposeMobiSegmentAssets(tail);
+  smooth.dispose(); cheap.dispose();
 });

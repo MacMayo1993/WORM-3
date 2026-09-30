@@ -33,7 +33,7 @@ const HALO_STRIDE = 2;
 const HALO_MAX = 48;
 const _haloDummy = new THREE.Object3D();
 import { getSkin } from '../wormCosmeticsData.js';
-import { createMobiSegmentAssets, disposeMobiSegmentAssets, MOBI_SEGMENT_RADIUS } from '../mobiSegments.js';
+import { createMobiSegmentAssets, disposeMobiSegmentAssets, MOBI_SEGMENT_RADIUS, isMobiBlockSegment, mobiTailSwayInto } from '../mobiSegments.js';
 import { getWormCharacter } from '../wormCharacterData.js';
 import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime, applyBioluminescence } from '../wormSkinMaterial.js';
@@ -61,6 +61,7 @@ import { bodyPathHeadInto } from './sliceBodyPath.js';
 const _wormDummy = new THREE.Object3D();
 const _mobiCoreMatrix = new THREE.Matrix4();
 const _mobiSpinMatrix = new THREE.Matrix4();
+const _mobiSway = { roll: 0, pitch: 0, yaw: 0, lift: 0 };
 // Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
 const _bodyColor = new THREE.Color();
 const _pickupHighlight = new THREE.Color('#fff4c9');
@@ -453,9 +454,9 @@ export function WormBody({ worm, size }) {
         const skinDetail = _isWiggle ? getSkinFX(wormSkinId).bump?.amp ?? 0 : 0;
         for (let i = 0; i < visibleCount; i++) {
             // A collected orb grows three simulation segments. MOBI renders one
-            // larger capsule at their center, preventing overlapping glass boxes
+            // larger block for each three, preventing overlapping glass boxes
             // from washing out the orb inside. Length/collision history is unchanged.
-            if (isMobi && (i < BASE_TAIL_LENGTH ? i !== 2 : (i - BASE_TAIL_LENGTH) % ORB_SEGMENT_GROWTH !== 1)) continue;
+            if (isMobi && i !== 0 && !isMobiBlockSegment(i, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH)) continue;
             // Distance LOD: segments far behind the head are visually indistinguishable at
             // gameplay camera distance, so thin them out — every segment near the head,
             // every 2nd beyond 200, every 4th beyond 600. Skipped segments never run the
@@ -622,6 +623,14 @@ export function WormBody({ worm, size }) {
                     _wormDummy.scale.setScalar(bookScaleForRadius(BOOK_BEAD_RADIUS) * bookVolumeScale(i));
                 } else if (isMobi) {
                     _wormDummy.scale.setScalar(MOBI_SEGMENT_RADIUS);
+                    // Blocks tumble a little in a follow-the-leader wave instead of
+                    // marching in lockstep. Surface only: tunnels own the swim stroke.
+                    if (!segmentTransit && swimWeight === 0 && orbitT === 0) {
+                        const sway = mobiTailSwayInto(_mobiSway, i / ORB_SEGMENT_GROWTH,
+                            worm.crawlDistance?.current ?? 0, time, reducedPickupMotion);
+                        _wormDummy.rotateZ(sway.roll).rotateX(sway.pitch).rotateY(sway.yaw);
+                        _wormDummy.position.addScaledVector(_bodyCloneNormal, sway.lift * MOBI_SEGMENT_RADIUS);
+                    }
                 } else if (_isGlow) {
                     // Slightly varied glow segment sizes
                     const glowSc = 0.088 + Math.sin(time * 3.5 + i * 1.6) * 0.01;
