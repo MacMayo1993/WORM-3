@@ -55,15 +55,20 @@ it('waits for the flight and recovery to finish before repeating a required rock
   expect(offer()).toBe(true);
   expect(sim.specials[0].type).toBe('rocket');
 });
-it('introduces calmer required pickups before rockets without starving later objectives', () => {
-  const { p, level } = setup(40);
-  expect(nextStoryPower(p, level)).toBe('magnet');
-  p.mechanics.magnetOrbs = 4;
-  for (const element of ['water', 'fire', 'grass', 'ice', 'lightning']) {
-    expect(nextStoryPower(p, level)).toBe(element); p.elements.add(element);
+it('cycles every unfinished quest power even when earlier tasks earn no credit', () => {
+  const { sim, p, level, offer } = setup(40);
+  for (let round = 0; round < 2; round++) {
+    for (const type of ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning']) {
+      sim.specials = []; p.powerDelay = 0;
+      expect(nextStoryPower(p, level)).toBe(type);
+      expect(offer()).toBe(true);
+      expect(sim.specials[0].type).toBe(type);
+    }
   }
-  expect(nextStoryPower(p, level)).toBe('explode');
-  p.mechanics.explodes = 2;
+  expect(p.mechanics).toEqual({});
+  expect(p.elements.size).toBe(0);
+  p.mechanics = { ...level.mechanics, rockets: 0 };
+  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning']);
   expect(nextStoryPower(p, level)).toBe('rocket');
   p.mechanics.rockets = 1;
   expect(nextStoryPower(p, level)).toBeNull();
@@ -82,6 +87,10 @@ it('gives mastery magnet bonuses stable identities through a layer turn and fres
   expect(sim.powerups.map(p => p.spawnId)).toEqual(ids);
   expect(tileKey(sim.powerups[0])).not.toBe(tileKey(before[0]));
   sim.powerups = []; sim.specials = []; p.powerDelay = 0;
+  p.mechanics = { explodes: 2, rockets: 1 };
+  p.elements = new Set(['water', 'fire', 'grass', 'ice', 'lightning']);
   expect(offer()).toBe(true);
+  expect(sim.specials[0].type).toBe('magnet');
+  expect(sim.powerups).toHaveLength(4);
   expect(sim.powerups.every(p => p.spawnId && !ids.includes(p.spawnId))).toBe(true);
 });

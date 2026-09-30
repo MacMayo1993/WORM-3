@@ -1,14 +1,17 @@
 import { drawViewPower, getViewPowerDef } from '../healerWorm/viewPowerups.js';
 import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
-import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { tileKey } from '../healerWorm/wormSim.js';
 import { ttAt } from '../circularBuffers.js';
-import { BODY_BALL_SPACING } from '../healerWorm/constants.js';
-import { getNextSurfacePosition } from '../wormLogic.js';
+import { BODY_BALL_SPACING, MAGNET_RADIUS } from '../healerWorm/constants.js';
+import { collectManifoldRing, getNextSurfacePosition } from '../wormLogic.js';
 
 export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning'];
 export const STORY_POWER_OPENING_DELAY = 10;
-export const STORY_POWER_COOLDOWN = 5;
+export const STORY_POWER_COOLDOWN = 3;
+export const STORY_POWER_LIFETIME = 20;
+// Explode gets an early slot even when a magnet catch or element mastery is
+// unfinished. The cursor advances on an offer, not on successful task credit.
+const STORY_POWER_CYCLE = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'];
 const HINTS = { rocket: 'Rocket: steer the flight and land', magnet: 'Magnet: pull orbs from neighboring tiles',
   explode: 'Explode: the cube spreads apart for 12 seconds. Keep crawling until it closes',
   water: 'Water: build momentum in a straight line', fire: 'Fire: leave a trail for 3 seconds',
@@ -67,15 +70,19 @@ export function updateMastery(sim, p, level, delta) {
 export function nextStoryPower(p, level) {
   const m = level.mechanics;
   if (!m) return null;
-  if ((p.mechanics.magnetOrbs ?? 0) < (m.magnetOrbs ?? 0)) return 'magnet';
-  if (m.elementPickups) {
-    const collected = p.mechanics.elementPickups ?? 0;
-    if (collected < m.elementPickups) return STORY_ELEMENTS[collected % STORY_ELEMENTS.length];
+  const needs = new Set();
+  for (const [key, type] of [['magnetOrbs', 'magnet'], ['explodes', 'explode'], ['rockets', 'rocket']]) {
+    if ((p.mechanics[key] ?? 0) < (m[key] ?? 0)) needs.add(type);
   }
-  const element = m.elements && STORY_ELEMENTS.slice(0, m.elements).find(type => !p.elements.has(type));
-  if (element) return element;
-  if ((p.mechanics.explodes ?? 0) < (m.explodes ?? 0)) return 'explode';
-  if ((p.mechanics.rockets ?? 0) < (m.rockets ?? 0)) return 'rocket';
+  if ((p.mechanics.elementPickups ?? 0) < (m.elementPickups ?? 0)) {
+    for (const type of STORY_ELEMENTS.slice(0, m.elementPickups)) needs.add(type);
+  }
+  for (const type of STORY_ELEMENTS.slice(0, m.elements ?? 0)) if (!p.elements.has(type)) needs.add(type);
+  const last = STORY_POWER_CYCLE.indexOf(p.lastPower);
+  for (let offset = 1; offset <= STORY_POWER_CYCLE.length; offset++) {
+    const type = STORY_POWER_CYCLE[(last + offset) % STORY_POWER_CYCLE.length];
+    if (needs.has(type)) return type;
+  }
   return null;
 }
 export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
@@ -95,7 +102,7 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
     }
   }
 }
-// One marked offering at a time; expiration reoffers it near the current face.
+// One marked offering at a time; missed powers return on the next fair cycle.
 // A completed power is not replaced until its effect ends, so elements never
 // overwrite an unfinished flight or spring jump. Quest magnet orbs replenish
 // only while remote catches are still outstanding.
@@ -111,31 +118,46 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   p.powerHint = displayedType ? hint(displayedType) : null;
   if ((!type && !canOfferView) || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
   if ((p.powerDelay ?? STORY_POWER_OPENING_DELAY) > 0) return false;
-  const occupied = new Set(sim.powerups.map(tileKey));
-  occupied.add(tileKey(sim.pos));
+  const blocked = new Set([tileKey(sim.pos)]);
+  if (sim.prevTile) blocked.add(tileKey(sim.prevTile));
   // A pickup is a deliberate turn, never a surprise on the next straight steps.
   // Follow the surface across seams too, rather than checking one grid axis.
   let ahead = sim.pos, heading = sim.moveDir;
   for (let i = 0; i < 3; i++) {
     ahead = getNextSurfacePosition(ahead, heading, size);
     if (!ahead) break;
-    occupied.add(tileKey(ahead)); heading = ahead.moveDir;
+    blocked.add(tileKey(ahead)); heading = ahead.moveDir;
   }
-  for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) occupied.add(ttAt(sim.tileTrail, i));
-  const tile = storySurfaceTile(sim, size, cubies, occupied);
+  for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) blocked.add(ttAt(sim.tileTrail, i));
+  const occupied = new Set([...blocked, ...sim.powerups.map(tileKey)]);
+  // A dense food route must not lock out a required power. Trade one ordinary
+  // orb's slot if necessary; the normal color refill restores that food later.
+  const tile = storySurfaceTile(sim, size, cubies, occupied) ?? (type ? storySurfaceTile(sim, size, cubies, blocked) : null);
   if (!tile) return false;
   if (canOfferView) { type = drawViewPower(sim.specialPicker, sim.rand); p.viewOffered = true; }
-  sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: 20, maxTtl: 20 }];
+  sim.powerups = sim.powerups.filter(orb => tileKey(orb) !== tileKey(tile));
+  sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: STORY_POWER_LIFETIME, maxTtl: STORY_POWER_LIFETIME }];
+  p.lastPower = type;
   p.powerDelay = STORY_POWER_COOLDOWN;
   p.powerHint = hint(type);
   if (type === 'magnet') {
-    let added = 0;
-    for (const nearby of getAllSurfaceTiles(size)) {
-      const sticker = cubies[nearby.x][nearby.y][nearby.z].stickers[nearby.dirKey];
-      const distance = Math.hypot(nearby.x-tile.x, nearby.y-tile.y, nearby.z-tile.z);
-      if (nearby.dirKey !== tile.dirKey || distance < 1 || distance > 2 || sticker.curr !== sticker.orig || occupied.has(tileKey(nearby))) continue;
-      sim.powerups.push(makeGrowthOrb(nearby));
-      if (++added >= 4) break;
+    // Reuse nearby food first and replace leftover support from earlier offers.
+    // This caps the bonus at four instead of adding four on every missed magnet.
+    sim.powerups = sim.powerups.filter(orb => !orb.storyMagnet);
+    const reach = collectManifoldRing(tile.x, tile.y, tile.z, tile.dirKey, size, MAGNET_RADIUS);
+    reach.delete(tileKey(tile));
+    const food = new Set(sim.powerups.map(tileKey));
+    const goal = Math.min(4, level.mechanics.magnetOrbs - (p.mechanics.magnetOrbs ?? 0));
+    let available = [...food].filter(key => reach.has(key) && !blocked.has(key)).length;
+    for (const key of reach) {
+      if (available >= goal) break;
+      if (blocked.has(key) || food.has(key)) continue;
+      const [x, y, z, dirKey] = key.split(',');
+      const nearby = { x: Number(x), y: Number(y), z: Number(z), dirKey };
+      const sticker = cubies[x]?.[y]?.[z]?.stickers[dirKey];
+      if (!sticker || sticker.curr !== sticker.orig) continue;
+      sim.powerups.push(makeGrowthOrb(nearby, { storyMagnet: true }));
+      available++;
     }
   }
   return true;

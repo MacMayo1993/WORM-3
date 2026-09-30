@@ -142,7 +142,7 @@ export function stageStory(sim, size, level, character) {
     orbTargets[color] = (orbTargets[color] ?? 0) + 1;
   }
   const practice = { ...base, pendingMouths, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
-    elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null,
+    elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), elementTime: 0, powerSeq: 0, bombIds: new Set() };
   return practice;
