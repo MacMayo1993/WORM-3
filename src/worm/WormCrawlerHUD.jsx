@@ -1193,8 +1193,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const practiceRunning = useGameStore(s => s.demoWormStarted && !s.demoWormFinished);
     const storyId = useGameStore(s => s.wormStoryLevel);
     const storyStarted = useGameStore(s => s.wormStoryStarted);
-    const controlsEnabled = wormAlive && (!demoLesson || practiceRunning) && (!storyId || storyStarted);
     const lesson = wormDemoLesson({ demoWormLessonIndex: lessonIndex });
+    const previewLesson = demoLesson && lesson.preview;
+    const controlsEnabled = wormAlive && (!demoLesson || (practiceRunning && !previewLesson)) && (!storyId || storyStarted);
     const trayRef = useRef(null);
     useLayoutEffect(() => {
         useGameStore.setState({ wormPauseMenuOpen: isPaused });
@@ -1366,7 +1367,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         {combatMode ? <CombatFireButton /> : demoLesson ? lesson.id === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
                         <div className="worm-primary-actions">
                             <div className="worm-jump-slot">
-                                {jumpRescue && <JumpRescueCue caution={cautionRescue} />}
+                                {jumpRescue && <JumpRescueCue caution={cautionRescue} watching={previewLesson} />}
                                 <button
                                     onPointerDown={handleJumpAction}
                                     onClick={e => { if (e.detail === 0) handleJumpAction(); }}
