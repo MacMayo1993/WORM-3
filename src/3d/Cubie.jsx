@@ -622,6 +622,7 @@ function cubiePropsAreEqual(prev, next) {
     if (ps === ns) continue;
     if (!ps || !ns) return false;
     if (ps.curr !== ns.curr || ps.flips !== ns.flips) return false;
+    if ((ps.uvTurns ?? 0) !== (ns.uvTurns ?? 0)) return false;
     // Two same-colour stickers can exchange grid slots during a rotation. Their
     // visible state is identical, but their animation registration and manifold
     // identity are not. Treating them as equal strands StickerPlane with stale

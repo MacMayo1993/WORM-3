@@ -13,18 +13,23 @@ export function createCoreTileStyle(style, color, antipodalColor, scale) {
       mat4 coreModel = modelMatrix * instanceMatrix;
       mat4 coreModelView = viewMatrix * coreModel;
       mat3 coreNormal = normalMatrix * mat3(instanceMatrix);
-      vCoreColor = instanceColor;`)
+      vCoreColor = instanceColor;
+      vCoreIdentity = aTileIdentity;`)
     // Reactive tile styles read the outer tile's grid position, not the tiny
     // core coordinates (otherwise every tile looks like the middle slice).
     .replace('vTileCenter = coreModel[3].xyz;', 'vTileCenter = instanceMatrix[3].xyz / uCoreScale;');
   const fragment = source.fragmentShader
     .replace(/\bbaseColor\b/g, 'vCoreColor')
-    .replace('uniform vec3 vCoreColor;', 'varying vec3 vCoreColor;');
+    .replace('uniform vec3 vCoreColor;', 'varying vec3 vCoreColor;')
+    .replace(/uniform vec3 tileHome;/g, '')
+    .replace(/uniform float tileFace;/g, '')
+    .replace(/\btileHome\b/g, 'vCoreIdentity.xyz')
+    .replace(/\btileFace\b/g, 'vCoreIdentity.w');
   const material = new THREE.ShaderMaterial({
     name: `antipodal-core-${style}`,
-    uniforms: { ...source.uniforms, uCoreScale: { value: scale } },
-    vertexShader: `varying vec3 vCoreColor; uniform float uCoreScale;\n${vertex}`,
-    fragmentShader: fragment,
+    uniforms: { ...source.uniforms, tileHome: { value: new THREE.Vector3() }, tileFace: { value: 0 }, uCoreScale: { value: scale } },
+    vertexShader: `attribute vec4 aTileIdentity; varying vec4 vCoreIdentity; varying vec3 vCoreColor; uniform float uCoreScale;\n${vertex}`,
+    fragmentShader: `varying vec4 vCoreIdentity;\n${fragment}`,
     side: source.side, transparent: source.transparent, depthWrite: source.depthWrite,
     extensions: { ...source.extensions }
   });

@@ -55,7 +55,10 @@ export function createExteriorPortals() {
       // place so React material refs and live opacity/map updates keep working.
       // Shader tiles may come from the shared style cache, so isolate those.
       const material = source.isShaderMaterial ? source.clone() : source;
-      if (source.isShaderMaterial) material.uniforms = { ...source.uniforms };
+      if (source.isShaderMaterial) {
+        material.uniforms = { ...source.uniforms };
+        material.onBeforeRender = source.onBeforeRender;
+      }
       else originals.set(source, { onBeforeCompile: source.onBeforeCompile,
         customProgramCacheKey: source.customProgramCacheKey, portalCutout: source.userData.portalCutout });
       withPortalCutout(material, uniforms, exteriorPortalGLSL, 'outer-mouth');

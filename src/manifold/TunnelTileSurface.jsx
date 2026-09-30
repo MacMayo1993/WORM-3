@@ -51,6 +51,8 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
     name: `tunnel-tile-${side}-${style}`,
     uniforms: {
       ...tile.uniforms,
+      tileHome: { value: new THREE.Vector3(0, 0, side) },
+      tileFace: { value: side },
       ...shared,
       baseColor: side === 0 ? shared.uColorA : shared.uColorB,
       antipodalColor: side === 0 ? shared.uColorB : shared.uColorA,

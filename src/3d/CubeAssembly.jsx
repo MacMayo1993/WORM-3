@@ -1,3 +1,4 @@
+import { bumpTileRolls } from './tileStyleIdentity.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { createExteriorPortals } from './exteriorPortals.js';
 import { wormExpansion, currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
@@ -166,6 +167,8 @@ const CubeAssembly = React.memo(({
   const cubeGroupRef = useRef(null);
   const gsapAnimRef = useRef(null);
   const openingTurnRef = useRef(null);
+  const pendingTurnCompleteRef = useRef(null);
+  const renderedFinalTurnRef = useRef(null);
   // Freeze an in-flight layer synchronously with the rescue transition. A React
   // render alone can arrive after GSAP has advanced another gameplay frame.
   useEffect(() => useGameStore.subscribe(
@@ -764,14 +767,14 @@ const CubeAssembly = React.memo(({
   const spinEnergyRef = useRef(0);
   const prevRotAngleRef = useRef(0);
   const wasRotActiveRef = useRef(false);
+  const prevSpinTxnRef = useRef(-1);
   const prevSpinTimeRef = useRef(0);
   const latchedSpinAxisRef = useRef(0);
   const latchedSpinSliceRef = useRef(0);
 
-  // Per-cell dice-roll state: a data texture (R = roll count) indexed by grid
-  // cell, bumped for the rotating slice on every turn. The dice style folds it
-  // into its face hash so a cell that a tile revisits never repeats its face,
-  // while non-rotated cells hold. Rebuilt when the cube size changes.
+  // Per-piece dice-roll state: indexed by original home cell, bumped for all
+  // turning pieces. A piece keeps its count through the grid remap at commit.
+  // Rebuilt when the cube size changes.
   const cellRollTexRef = useRef(null);
   const cellRollDataRef = useRef(null);
   useEffect(() => {
@@ -833,6 +836,8 @@ const CubeAssembly = React.memo(({
   useEffect(() => {
     initializedMoveRef.current = null;
     openingTurnRef.current = null;
+    pendingTurnCompleteRef.current = null;
+    renderedFinalTurnRef.current = null;
     if (useGameStore.getState().animState !== animState) return;
     if (!animState) {
       // Reset progress refs when animation ends
@@ -898,8 +903,10 @@ const CubeAssembly = React.memo(({
       value: 1,
       paused: jumpRescueActive(),
       duration: animState.teachSlow ? 0.8 : isWormHazard ? baseDuration * 4.0 : baseDuration,
-      ease: isWormHazard ? "power2.inOut" : isFast ? "power2.out" : "back.out(1.4)",
-      onComplete: complete
+      ease: isFast ? "power2.out" : "power2.inOut",
+      // The render loop must display the exact final pose before the logical
+      // grid moves; GSAP can finish between two WebGL frames.
+      onComplete: () => { pendingTurnCompleteRef.current = complete; }
     });
 
     return () => {
@@ -922,6 +929,14 @@ const CubeAssembly = React.memo(({
   // matrixWorld, producing a one-frame flash of new colours at wrong positions.
 
   useFrame(() => {
+    if (pendingTurnCompleteRef.current &&
+        renderedFinalTurnRef.current === initializedMoveRef.current &&
+        useGameStore.getState().animState === initializedMoveRef.current && !jumpRescueActive()) {
+      const complete = pendingTurnCompleteRef.current;
+      pendingTurnCompleteRef.current = null;
+      renderedFinalTurnRef.current = null;
+      complete();
+    }
     const opening = openingTurnRef.current;
     if (opening && opening.elapsed >= opening.duration && !jumpRescueActive() &&
         useGameStore.getState().animState === initializedMoveRef.current) {
@@ -979,35 +994,24 @@ const CubeAssembly = React.memo(({
       prevSpinTimeRef.current = now;
       const rotActive = liveRotation.active;
       let angSpeed = 0;
-      if (rotActive && wasRotActiveRef.current) {
+      const newTurn = rotActive && liveRotation.txnId !== prevSpinTxnRef.current;
+      if (rotActive && wasRotActiveRef.current && !newTurn) {
         angSpeed = Math.abs(liveRotation.angle - prevRotAngleRef.current) / dt;
       }
       prevRotAngleRef.current = rotActive ? liveRotation.angle : 0;
-      // Dice: on the frame a turn begins, bump the roll count of every cell in
-      // the rotating slice so their dice re-roll to a fresh face and a returning
-      // cell never repeats. Non-rotated cells are untouched → they hold.
-      if (rotActive && !wasRotActiveRef.current && cellRollDataRef.current) {
-        const data = cellRollDataRef.current;
-        const n = size;
-        const ax = liveRotation.axis;
-        const si = liveRotation.sliceIndex;
-        for (let a = 0; a < n; a++) {
-          for (let b = 0; b < n; b++) {
-            let cx, cy, cz;
-            if (ax === 'col') { cx = si; cy = a; cz = b; }
-            else if (ax === 'row') { cx = a; cy = si; cz = b; }
-            else { cx = a; cy = b; cz = si; }
-            const off = (cz * (n * n) + cx + cy * n) * 4;
-            data[off] = (data[off] + 1) & 255;
-          }
-        }
+      // Every turning plane rolls its physical pieces once per transaction,
+      // even when consecutive turns have no idle render frame between them.
+      if (newTurn && cellRollDataRef.current) {
+        bumpTileRolls(cellRollDataRef.current, useGameStore.getState().cubies, size,
+          liveRotation.axis, liveRotation.sliceIndices);
         cellRollTexRef.current.needsUpdate = true;
       }
+      if (rotActive) prevSpinTxnRef.current = liveRotation.txnId;
       wasRotActiveRef.current = rotActive;
       // ~6 rad/s (a fast quarter-turn) → full energy.
       const target = rotActive ? Math.min(1, angSpeed / 6) : 0;
       const e = spinEnergyRef.current;
-      spinEnergyRef.current = e < target ? target : e * 0.95;
+      spinEnergyRef.current = e < target ? target : e * Math.exp(-3.08 * dt);
 
       // Latch which slice is turning (world coord along its axis) while active,
       // and hold it through the energy decay so the just-moved tiles keep
@@ -1133,7 +1137,7 @@ const CubeAssembly = React.memo(({
     // Apply rotation only to cubies in the slice, each by its own plane direction.
     const sliceSet = sliceIndicesRef.current;
     const dirByIdx = sliceDirByIdxRef.current;
-    if (sliceSet && (opening ? dRot !== 0 : Math.abs(dRot) > 0.0001)) {
+    if (sliceSet && dRot !== 0) {
       sliceSet.forEach(idx => {
         const g = cubieRefs.current[idx];
         if (!g) return;
@@ -1142,6 +1146,7 @@ const CubeAssembly = React.memo(({
         g.rotateOnWorldAxis(worldAxis, dRot * sdir);
       });
     }
+    if (currentProgress >= 1) renderedFinalTurnRef.current = initializedMoveRef.current;
   }, -1);
 
   // Stable ref callbacks so that passing ref={fn} doesn't defeat React.memo on Cubie.

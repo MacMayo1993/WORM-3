@@ -1,3 +1,5 @@
+import { bindTileStyleIdentity } from './tileStyleIdentity.js';
+const bindPreviewIdentity = bindTileStyleIdentity(null, 0);
 import { prefersReducedMotion, isMobile } from '../utils/device.js';
 import { LIVING_SURFACE_KEYS } from '../utils/livingSurfaceCatalog.js';
 // TilePreviewRenderer.js
@@ -119,6 +121,7 @@ function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
     mat.uniforms.time.value = simTime;
   }
   mesh.material = mat;
+  mesh.onBeforeRender = bindPreviewIdentity;
 
   if (_usingShared) {
     // Save the render target R3F had set (restore it after so we don't break the main pipeline)

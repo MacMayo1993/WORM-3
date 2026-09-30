@@ -32,8 +32,8 @@ function frame(delta) {
     callbacks.get(-1)(state, delta);
   });
 }
-function mount(size, move) {
-  useGameStore.setState({ size, cubies: makeCubies(size), animState: move, wormHealerMode: true,
+function mount(size, move, wormHealerMode = true) {
+  useGameStore.setState({ size, cubies: makeCubies(size), animState: move, wormHealerMode,
     wormJumpRescueActive: false, explosionT: 0, rotationEpoch: 0 });
   act(() => root.render(<Harness size={size} move={move} />));
   const k = (size - 1) / 2;
@@ -155,4 +155,38 @@ it('resets committed poses before downstream frame subscribers see the new epoch
   expect(complete).toHaveBeenCalledTimes(1);
   expect(liveRotation.active).toBe(false);
   original.forEach((position, i) => expect(liveCubies.refs[i].position.distanceTo(position)).toBeLessThan(1e-8));
+});
+
+it.each([1, 2])('displays the final ordinary %i-quarter-turn pose before committing', numTurns => {
+  const move = { axis: 'col', sliceIndex: 0, dir: -1, numTurns };
+  mount(8, move, false);
+  const [progress, config] = tween.to.mock.calls.at(-1);
+  expect(config.ease).toBe('power2.inOut');
+  const original = liveCubies.refs[0].position.clone();
+  frame(1 / 60);
+  // Tiny increments used to be silently dropped near the easing endpoints.
+  for (const value of [0.00001, 0.00002, 0.3, 0.8, 0.99998, 0.99999]) {
+    progress.value = value; frame(1 / 60);
+  }
+  progress.value = 1;
+  config.onComplete(); // GSAP's callback runs before the next WebGL frame.
+  expect(complete).not.toHaveBeenCalled();
+  frame(1 / 60);
+  expect(complete).not.toHaveBeenCalled();
+  const expected = original.applyAxisAngle(new THREE.Vector3(1, 0, 0), -numTurns * Math.PI / 2);
+  expect(liveCubies.refs[0].position.distanceTo(expected)).toBeLessThan(1e-10);
+  frame(1 / 60);
+  expect(complete).toHaveBeenCalledTimes(1);
+  frame(1 / 60);
+  expect(complete).toHaveBeenCalledTimes(1);
+});
+
+it('does not commit a finished tween cancelled before its final render', () => {
+  mount(5, { axis: 'row', sliceIndex: 0, dir: 1 }, false);
+  const [progress, config] = tween.to.mock.calls.at(-1);
+  progress.value = 1; config.onComplete();
+  useGameStore.setState({ animState: null });
+  act(() => root.render(<Harness size={5} move={null} />));
+  frame(1 / 60); frame(1 / 60);
+  expect(complete).not.toHaveBeenCalled();
 });

@@ -1,3 +1,4 @@
+import { bindDefaultTileStyleIdentity } from '../tileStyleIdentity.js';
 import { livingSurfaceShaders } from './shaders/livingSurfaceShaders.js';
 import { LIVING_SURFACE_KEYS } from '../../utils/livingSurfaceCatalog.js';
 // TileStyleMaterials.jsx - Shared shader materials for tile styles
@@ -290,6 +291,8 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   const isGlass = safeStyle === 'glass';
 
   const uniforms = {
+    tileHome: { value: new THREE.Vector3() },
+    tileFace: { value: 0 },
     baseColor: { value: color },
     time: sharedUniforms.time,
     spin: sharedUniforms.spin,
@@ -328,6 +331,8 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     // shader compiling on WebGL1 too. It's inert for shaders that don't use them.
     extensions: { derivatives: true },
   });
+
+  material.onBeforeRender = bindDefaultTileStyleIdentity;
 
   // The bare style, for surfaces that bring their own vertex shader (tunnel bands).
   material.userData.styleFragmentShader = styleShader;

@@ -1,4 +1,5 @@
 import { spiderVertexShader, spiderFragmentShader, neonBorderVertexShader, neonBorderFragmentShader, eyelidVertexShader, eyelidFragmentShader, spinRevealVertexShader, spinRevealFragmentShader, hazardCrackVertexShader, hazardCrackFragmentShader, seamLeakFragmentShader, wormRimGlowFragmentShader, wormApertureFragmentShader, wispyRingVertexShader, wispyRingFragmentShader } from './stickerPortalShaders.js';
+import { bindTileStyleIdentity } from './tileStyleIdentity.js';
 import { burrowSticker } from '../worm/burrowBridge.js';
 import { FlipPadOffset } from './PadSprings.jsx';
 import { registerInspectionSurface } from './inspectionBridge.js';
@@ -1386,6 +1387,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
   }, [useShaderStyle, tileStyle, baseColor, antipodalHex]);
 
+  const bindStyleIdentity = useMemo(() => bindTileStyleIdentity({ x: meta?.origPos?.x, y: meta?.origPos?.y, z: meta?.origPos?.z }, meta?.orig),
+    [meta?.origPos?.x, meta?.origPos?.y, meta?.origPos?.z, meta?.orig]);
+
   const backTileStyle = isDead || lightweightNumbers ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
   const instanceBack = wormHealerMode && surfaceCtx && !useGlassStyle && backTileStyle === 'solid';
   const backMaterial = useMemo(() => {
@@ -1582,13 +1586,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           just behind the solid sticker's 0.016 thickness, or the sticker's back would hide it. */}
       {antipodalHex && (
         instanceBack ? <TileSurfaceInstance name="sticker-antipodal-back" geometry={_sharedStickerGeo} material={backMaterial}
-          color={isDead ? '#555555' : antipodalHex} position={[0, 0, -0.018]} rotation={[0, Math.PI, 0]} scale={[0.8, 0.8, 1]} />
-        : <mesh name="sticker-antipodal-back" material={backMaterial} position={[0, 0, -0.018]} rotation={[0, Math.PI, 0]} scale={[0.8, 0.8, 1]} dispose={null}>
+          color={isDead ? '#555555' : antipodalHex} position={[0, 0, -0.018]} rotation={[0, Math.PI, -(meta?.uvTurns ?? 0) * Math.PI / 2]} scale={[0.8, 0.8, 1]} />
+        : <mesh name="sticker-antipodal-back" onBeforeRender={bindStyleIdentity} material={backMaterial} position={[0, 0, -0.018]} rotation={[0, Math.PI, -(meta?.uvTurns ?? 0) * Math.PI / 2]} scale={[0.8, 0.8, 1]} dispose={null}>
           <primitive object={_sharedStickerGeo} attach="geometry" />
         </mesh>
       )}
 
-      <group ref={innerGroupRef}>
+      <group ref={innerGroupRef} rotation={[0, 0, (meta?.uvTurns ?? 0) * Math.PI / 2]}>
         {/* Background quad — full-square mesh 1 mm behind the disc-clipped main sticker
             so the white '#ffffff' texture-tint does not bleed through the transparent disc
             corners on textured tiles.  Only rendered when a texture is active; plain
@@ -1607,7 +1611,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         )}
 
         {/* Main sticker — omitted when the InstancedMesh handles rendering */}
-        {!isInstanceable && <mesh name="sticker-front" ref={meshRef} key={hollow ? 'frame' : plainSticker ? 'sticker' : useGlassStyle ? 'glass' : roundedStyle ? 'styled' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
+        {!isInstanceable && <mesh name="sticker-front" onBeforeRender={bindStyleIdentity} ref={meshRef} key={hollow ? 'frame' : plainSticker ? 'sticker' : useGlassStyle ? 'glass' : roundedStyle ? 'styled' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
           {hollow ? (
             <primitive object={_hollowStickerGeo} attach="geometry" />
           ) : plainSticker ? (
@@ -2075,6 +2079,7 @@ function stickerPropsAreEqual(prev, next) {
   if (!pm || !nm) return pm === nm;
   if (pm.curr !== nm.curr || pm.flips !== nm.flips) return false;
   if (pm.orig !== nm.orig || pm.origDir !== nm.origDir) return false;
+  if ((pm.uvTurns ?? 0) !== (nm.uvTurns ?? 0)) return false;
   return pm.origPos?.x === nm.origPos?.x
     && pm.origPos?.y === nm.origPos?.y
     && pm.origPos?.z === nm.origPos?.z;
