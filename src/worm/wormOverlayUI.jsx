@@ -314,7 +314,10 @@ export const TERTIARY_BTN_STYLE = {
 /** Full-width left-aligned row button (pause menu's navigation list). */
 export const LIST_BTN_STYLE = {
     ...KEY_BASE,
-    ...keyFace(false),
+    background: ARCADE_CARD,
+    color: ARCADE_INK_STRONG,
+    border: `1px solid ${ARCADE_INK_STRONG}66`,
+    boxShadow: 'none',
     width: '100%',
     minHeight: 48,
     padding: '10px 14px',

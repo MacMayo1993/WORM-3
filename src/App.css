@@ -3727,7 +3727,6 @@ textarea:focus-visible {
 .home-actions button { touch-action: manipulation; }
 .home-actions button:focus-visible, .home-feedback:focus-visible, .store-tab:focus-visible, .store-card:focus-visible, .store-icon-btn:focus-visible, .worm-pause-card button:focus-visible { outline: 3px solid #5f7f4a; outline-offset: 3px; }
 .worm-pause-card { overscroll-behavior: contain; }
-.worm-pause-card > div:last-child { position: sticky; bottom: -14px; padding: 10px 0; background: #1c2316; }
 @media (hover: hover) and (pointer: fine) {
   .home-nav button:hover, .home-text-button:hover { background: #ede8df; }
 }
