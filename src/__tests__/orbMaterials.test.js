@@ -26,3 +26,34 @@ describe('parity material ownership', () => {
         expect(getOrbMaterials('#fff', '#f00', false).band.side).toBe(DoubleSide);
     });
 });
+
+describe('parity orb colour roles', () => {
+    it('wears the manifold on the band and its antipodal partner on the gem body', async () => {
+        const { orbColorRoles } = await import('../worm/orbMaterials.js');
+        const { getOrbColor, getAntipodalOrbColor } = await import('../worm/wormHelpers.js');
+        const { resolveColors } = await import('../utils/colorSchemes.js');
+        const colors = resolveColors({});
+        // Face 3 is white, its antipode 6 is yellow: an orb on a white manifold
+        // has a yellow body and a white band.
+        const roles = orbColorRoles(getOrbColor(3, colors), getAntipodalOrbColor(3, colors));
+        expect(roles.gem).toBe(getOrbColor(6, colors));
+        expect(roles.band).toBe(getOrbColor(3, colors));
+        // Every antipodal pair maps the same way in both directions.
+        for (const [face, anti] of [[1, 4], [2, 5], [3, 6], [4, 1], [5, 2], [6, 3]]) {
+            expect(orbColorRoles(getOrbColor(face, colors), getAntipodalOrbColor(face, colors)))
+                .toEqual({ gem: getOrbColor(anti, colors), band: getOrbColor(face, colors) });
+        }
+    });
+
+    it('matches MOBI’s carried orbs', async () => {
+        const { createMobiOrbPalette } = await import('../worm/mobiOrbAppearance.js');
+        const { orbColorRoles } = await import('../worm/orbMaterials.js');
+        const { getOrbColor, getAntipodalOrbColor } = await import('../worm/wormHelpers.js');
+        const { resolveColors } = await import('../utils/colorSchemes.js');
+        const colors = resolveColors({});
+        const mobi = createMobiOrbPalette({})[3];
+        const roles = orbColorRoles(getOrbColor(3, colors), getAntipodalOrbColor(3, colors));
+        expect(mobi.gemColor).toBe(roles.gem);
+        expect(mobi.bandColor).toBe(roles.band);
+    });
+});
