@@ -19,6 +19,7 @@ import * as THREE from 'three';
 import { getTileStyleMaterial, sharedUniforms } from './styles/TileStyleMaterials.jsx';
 import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
 import { ALL_TILE_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
+import { observePreviewContext, previewContextAvailable } from './previewContext.js';
 
 // ─── Cube geometry constants ─────────────────────────────────────────────────
 // The preview cube is normalised to one unit across whatever its piece count, so
@@ -49,6 +50,7 @@ const ANTIPODE = { 1: 4, 2: 5, 3: 6, 4: 1, 5: 2, 6: 3 };
 
 let renderer = null;
 let _usingShared = false;
+let stopObservingContext = null;
 const _targets = new Map();   // size → WebGLRenderTarget
 const _buffers = new Map();   // size → { pixels, image }
 
@@ -128,12 +130,25 @@ function _initScene() {
 
 /** Called by TilePreviewHost (inside the R3F Canvas) to inject the main renderer. */
 export function setCubeSharedRenderer(gl) {
-  if (renderer) return;
+  if (renderer === gl && _usingShared) return;
+  stopObservingContext?.();
   if (fallbackTimer !== null) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+  if (animFrameId !== null) cancelAnimationFrame(animFrameId);
+  animFrameId = null;
+  lastTimestamp = null;
+  if (renderer && !_usingShared) renderer.dispose();
   renderer = gl;
   _usingShared = true;
-  _initScene();
-  for (const info of registry.values()) info.dirty = true;
+  resetPreviewTargets();
+  if (!scene) _initScene();
+  stopObservingContext = observePreviewContext(gl, resetPreviewTargets);
+}
+
+function resetPreviewTargets() {
+  for (const target of _targets.values()) target.dispose();
+  _targets.clear();
+  _buffers.clear();
+  for (const info of registry.values()) { info.dirty = true; info.nextFrame = 0; }
 }
 
 function ensureOwnRenderer() {
@@ -212,18 +227,14 @@ function _poseCube(opts, time) {
 
 function renderToCanvas(opts, time, targetCanvas) {
   if (_usingShared) {
-    if (!renderer) return;
-    // On the co-op path the main <Canvas> has unmounted and its context is lost —
-    // rendering would spew WebGL errors, so bail and leave the last frame up.
-    const glCtx = renderer.getContext?.();
-    if (!glCtx || glCtx.isContextLost?.()) return;
+    if (!previewContextAvailable(renderer)) return false;
   } else {
     ensureOwnRenderer();
     if (!renderer) return;
   }
 
   const size = targetCanvas.width;
-  if (!size) return;
+  if (!size) return false;
 
   // The setup preview is deliberately representative for large boards (8–15). Building a
   // literal 15×15 rig here creates 1,350 independent sticker meshes and redraws
@@ -248,39 +259,48 @@ function renderToCanvas(opts, time, targetCanvas) {
 
   const ctx = targetCanvas.getContext('2d');
 
-  if (_usingShared) {
-    const target = _targetFor(size);
-    const buf = _bufferFor(size, ctx);
+  try {
+    if (_usingShared) {
+      const target = _targetFor(size);
+      const buf = _bufferFor(size, ctx);
 
-    // The main pipeline's state is borrowed, not owned — put it all back.
-    const prevTarget = renderer.getRenderTarget();
-    const prevAlpha = renderer.getClearAlpha();
-    const prevAutoClear = renderer.autoClear;
-    renderer.setRenderTarget(target);
-    renderer.setClearAlpha(0);
-    renderer.clear();
-    renderer.render(scene, camera);
-    renderer.readRenderTargetPixels(target, 0, 0, size, size, buf.pixels);
-    renderer.setRenderTarget(prevTarget);
-    renderer.setClearAlpha(prevAlpha);
-    renderer.autoClear = prevAutoClear;
+      // The main pipeline's state is borrowed, not owned — put it all back.
+      const prevTarget = renderer.getRenderTarget();
+      const prevAlpha = renderer.getClearAlpha();
+      const prevAutoClear = renderer.autoClear;
+      try {
+        renderer.setRenderTarget(target);
+        renderer.setClearAlpha(0);
+        renderer.clear();
+        renderer.render(scene, camera);
+        if (!previewContextAvailable(renderer)) return false;
+        renderer.readRenderTargetPixels(target, 0, 0, size, size, buf.pixels);
+      } finally {
+        renderer.setRenderTarget(prevTarget);
+        renderer.setClearAlpha(prevAlpha);
+        renderer.autoClear = prevAutoClear;
+      }
+      if (!previewContextAvailable(renderer)) return false;
 
-    // WebGL reads bottom-up, canvas draws top-down — flip by whole rows.
-    const rowBytes = size * 4;
-    for (let y = 0; y < size; y++) {
-      const src = (size - 1 - y) * rowBytes;
-      buf.image.data.set(buf.pixels.subarray(src, src + rowBytes), y * rowBytes);
+      // WebGL reads bottom-up, canvas draws top-down — flip by whole rows.
+      const rowBytes = size * 4;
+      for (let y = 0; y < size; y++) {
+        const src = (size - 1 - y) * rowBytes;
+        buf.image.data.set(buf.pixels.subarray(src, src + rowBytes), y * rowBytes);
+      }
+      ctx.putImageData(buf.image, 0, 0);
+    } else {
+      renderer.setSize(size, size, false);
+      renderer.setClearAlpha(0);
+      renderer.render(scene, camera);
+      ctx.clearRect(0, 0, size, size);
+      ctx.drawImage(renderer.domElement, 0, 0, size, size);
     }
-    ctx.putImageData(buf.image, 0, 0);
-  } else {
-    renderer.setSize(size, size, false);
-    renderer.setClearAlpha(0);
-    renderer.render(scene, camera);
-    ctx.clearRect(0, 0, size, size);
-    ctx.drawImage(renderer.domElement, 0, 0, size, size);
-  }
 
-  sharedUniforms.time.value = savedTime;
+    return true;
+  } finally {
+    sharedUniforms.time.value = savedTime;
+  }
 }
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
@@ -308,7 +328,7 @@ export function tickCubePreviews(delta) {
   simTime += delta;
   for (const info of registry.values()) {
     if (info.dirty) {
-      renderToCanvas(info.opts, simTime, info.canvas);
+      if (!renderToCanvas(info.opts, simTime, info.canvas)) continue;
       info.dirty = false;
       info.nextFrame = simTime + ANIMATED_STEP;
       continue;

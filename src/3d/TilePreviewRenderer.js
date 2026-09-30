@@ -14,6 +14,7 @@ import { LIVING_SURFACE_KEYS } from '../utils/livingSurfaceCatalog.js';
 
 import * as THREE from 'three';
 import { getTileStyleMaterial } from './styles/TileStyleMaterials.jsx';
+import { observePreviewContext, previewContextAvailable } from './previewContext.js';
 
 const PREVIEW_SIZE = 64;
 
@@ -49,6 +50,7 @@ let renderer = null;      // set either by setSharedRenderer or ensureOwnRendere
 let _usingShared = false; // true when we borrowed the main R3F renderer
 let _renderTarget = null; // WebGLRenderTarget used when sharing the main renderer
 let _pixelBuf = null;     // Uint8Array for readRenderTargetPixels
+let stopObservingContext = null;
 
 let scene = null;
 let camera = null;
@@ -69,16 +71,36 @@ function _initScene() {
  * This avoids creating a second WebGL context, which causes context loss on mobile.
  */
 export function setSharedRenderer(gl) {
-  if (renderer) return; // already initialised
+  if (renderer === gl && _usingShared) return;
+  stopObservingContext?.();
+  if (animFrameId !== null) cancelAnimationFrame(animFrameId);
+  animFrameId = null;
+  lastTimestamp = null;
+  if (renderer && !_usingShared) renderer.dispose();
   renderer = gl;
   _usingShared = true;
+  resetPreviewTargets();
+  if (!scene) _initScene();
+  stopObservingContext = observePreviewContext(gl, resetPreviewTargets);
+}
+
+function resetPreviewTargets() {
+  _renderTarget?.dispose();
+  _renderTarget = null;
+  _pixelBuf = null;
+  snapshots.clear();
+  snapshotBytes = 0;
+  for (const info of registry.values()) { info.dirty = true; info.nextFrame = 0; }
+}
+
+function ensureRenderTarget() {
+  if (_renderTarget) return;
   _renderTarget = new THREE.WebGLRenderTarget(PREVIEW_SIZE, PREVIEW_SIZE, {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     format: THREE.RGBAFormat,
   });
   _pixelBuf = new Uint8Array(PREVIEW_SIZE * PREVIEW_SIZE * 4);
-  _initScene();
 }
 
 // Fallback: create our own renderer if setSharedRenderer was never called
@@ -108,7 +130,8 @@ function imageDataFor(ctx, canvas, w, h) {
 
 function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
   if (_usingShared) {
-    if (!renderer || !_renderTarget) return;
+    if (!previewContextAvailable(renderer)) return false;
+    ensureRenderTarget();
   } else {
     ensureOwnRenderer();
     if (!renderer) return;
@@ -123,55 +146,61 @@ function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
   mesh.material = mat;
   mesh.onBeforeRender = bindPreviewIdentity;
 
-  if (_usingShared) {
-    // Save the render target R3F had set (restore it after so we don't break the main pipeline)
-    const prevTarget = renderer.getRenderTarget();
-    renderer.setRenderTarget(_renderTarget);
-    renderer.clear();
-    renderer.render(scene, camera);
-    renderer.setRenderTarget(prevTarget);
-
-    // Read pixels back to CPU (WebGL origin is bottom-left; Canvas is top-left → Y-flip)
-    renderer.readRenderTargetPixels(_renderTarget, 0, 0, PREVIEW_SIZE, PREVIEW_SIZE, _pixelBuf);
-
-    const w = targetCanvas.width;
-    const h = targetCanvas.height;
-    const ctx = targetCanvas.getContext('2d');
-    const imgData = imageDataFor(ctx, targetCanvas, w, h);
-    const dst = imgData.data;
-    if (w === PREVIEW_SIZE && h === PREVIEW_SIZE) {
-      // Same resolution as the render target: the only work left is the Y flip,
-      // and a whole row copies at once.
-      const rowBytes = PREVIEW_SIZE * 4;
-      for (let dy = 0; dy < h; dy++) {
-        const si = (h - 1 - dy) * rowBytes;
-        dst.set(_pixelBuf.subarray(si, si + rowBytes), dy * rowBytes);
+  try {
+    if (_usingShared) {
+      // Save the render target R3F had set (restore it after so we don't break the main pipeline)
+      const prevTarget = renderer.getRenderTarget();
+      try {
+        renderer.setRenderTarget(_renderTarget);
+        renderer.clear();
+        renderer.render(scene, camera);
+      } finally {
+        renderer.setRenderTarget(prevTarget);
       }
-    } else {
-      for (let dy = 0; dy < h; dy++) {
-        const sy = Math.floor((h - 1 - dy) * PREVIEW_SIZE / h); // flip Y
-        const rowStart = sy * PREVIEW_SIZE;
-        let di = dy * w * 4;
-        for (let dx = 0; dx < w; dx++, di += 4) {
-          const si = (rowStart + Math.floor(dx * PREVIEW_SIZE / w)) * 4;
-          dst[di    ] = _pixelBuf[si    ];
-          dst[di + 1] = _pixelBuf[si + 1];
-          dst[di + 2] = _pixelBuf[si + 2];
-          dst[di + 3] = _pixelBuf[si + 3];
+
+      // Read pixels back to CPU (WebGL origin is bottom-left; Canvas is top-left → Y-flip)
+      if (!previewContextAvailable(renderer)) return false;
+      renderer.readRenderTargetPixels(_renderTarget, 0, 0, PREVIEW_SIZE, PREVIEW_SIZE, _pixelBuf);
+      if (!previewContextAvailable(renderer)) return false;
+
+      const w = targetCanvas.width;
+      const h = targetCanvas.height;
+      const ctx = targetCanvas.getContext('2d');
+      const imgData = imageDataFor(ctx, targetCanvas, w, h);
+      const dst = imgData.data;
+      if (w === PREVIEW_SIZE && h === PREVIEW_SIZE) {
+        // Same resolution as the render target: the only work left is the Y flip,
+        // and a whole row copies at once.
+        const rowBytes = PREVIEW_SIZE * 4;
+        for (let dy = 0; dy < h; dy++) {
+          const si = (h - 1 - dy) * rowBytes;
+          dst.set(_pixelBuf.subarray(si, si + rowBytes), dy * rowBytes);
+        }
+      } else {
+        for (let dy = 0; dy < h; dy++) {
+          const sy = Math.floor((h - 1 - dy) * PREVIEW_SIZE / h); // flip Y
+          const rowStart = sy * PREVIEW_SIZE;
+          let di = dy * w * 4;
+          for (let dx = 0; dx < w; dx++, di += 4) {
+            const si = (rowStart + Math.floor(dx * PREVIEW_SIZE / w)) * 4;
+            dst[di    ] = _pixelBuf[si    ];
+            dst[di + 1] = _pixelBuf[si + 1];
+            dst[di + 2] = _pixelBuf[si + 2];
+            dst[di + 3] = _pixelBuf[si + 3];
+          }
         }
       }
+      ctx.putImageData(imgData, 0, 0);
+    } else {
+      renderer.render(scene, camera);
+      const ctx = targetCanvas.getContext('2d');
+      ctx.drawImage(renderer.domElement, 0, 0, targetCanvas.width, targetCanvas.height);
     }
-    ctx.putImageData(imgData, 0, 0);
-  } else {
-    renderer.render(scene, camera);
-    const ctx = targetCanvas.getContext('2d');
-    ctx.drawImage(renderer.domElement, 0, 0, targetCanvas.width, targetCanvas.height);
-  }
 
-  if (savedTime !== null) {
-    mat.uniforms.time.value = savedTime;
+    return _usingShared ? _imgDataCache.get(targetCanvas) : null;
+  } finally {
+    if (savedTime !== null) mat.uniforms.time.value = savedTime;
   }
-  return _usingShared ? _imgDataCache.get(targetCanvas) : null;
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────
@@ -235,6 +264,7 @@ function drawPreview(info) {
     snapshots.delete(key); snapshots.set(key, cached);
   } else {
     const frame = renderToCanvas(info.styleKey, info.colorHex, animate ? simTime : 0, info.canvas);
+    if (frame === false) return;
     if (!animate) rememberSnapshot(key, frame);
   }
   info.dirty = false;
@@ -378,7 +408,7 @@ export function unregisterTilePreview(id) {
 
 /** True once the main R3F renderer has been shared (i.e. the <Canvas> is up). */
 export function hasSharedRenderer() {
-  return _usingShared && !!renderer;
+  return _usingShared && previewContextAvailable(renderer);
 }
 
 /**
@@ -388,7 +418,7 @@ export function hasSharedRenderer() {
  * second WebGL context, so it stays safe on mobile — unlike a standalone canvas.
  */
 export function renderTileImage(styleKey, colorHex, size = 96) {
-  if (!hasSharedRenderer() || !_renderTarget) return null;
+  if (!hasSharedRenderer()) return null;
   // The shared renderer belongs to the main <Canvas>. On the co-op path that
   // Canvas has unmounted and its context is lost — rendering would spew WebGL
   // errors — so bail to the flat-cube fallback.
@@ -398,7 +428,7 @@ export function renderTileImage(styleKey, colorHex, size = 96) {
   canvas.width = size;
   canvas.height = size;
   try {
-    renderToCanvas(styleKey, colorHex, simTime, canvas);
+    if (renderToCanvas(styleKey, colorHex, simTime, canvas) === false) return null;
     return canvas.toDataURL();
   } catch {
     return null;
