@@ -16,6 +16,16 @@ export const rotateVec90 = (vx, vy, vz, axis, dir) => {
   return [nx, ny, vz];
 };
 
+// StickerPlane's local +X/+Y basis on each cube face. Transporting this
+// basis preserves artwork orientation when the animated cubie resets to its
+// canonical grid slot at commit (colors alone cannot encode a tile's twist).
+export const STICKER_BASIS = {
+  PZ: [[1, 0, 0], [0, 1, 0]], NZ: [[-1, 0, 0], [0, 1, 0]],
+  PX: [[0, 0, -1], [0, 1, 0]], NX: [[0, 0, 1], [0, 1, 0]],
+  PY: [[1, 0, 0], [0, 0, -1]], NY: [[1, 0, 0], [0, 0, 1]],
+};
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
 // Rotate stickers on a cubie (remap keys to match new face orientation).
 // for...in iterates own enumerable string keys in insertion order without
 // allocating a temporary [key,value] tuple array as Object.entries() does
@@ -26,7 +36,15 @@ export const rotateStickers = (stickers, axis, dir) => {
     const [vx, vy, vz] = DIR_TO_VEC[k];
     const [rx, ry, rz] = rotateVec90(vx, vy, vz, axis, dir);
     const newKey = VEC_TO_DIR(rx, ry, rz);
-    next[newKey] = { ...stickers[k] };
+    const tangent = rotateVec90(...STICKER_BASIS[k][0], axis, dir);
+    const [right, up] = STICKER_BASIS[newKey];
+    const twist = Math.round(Math.atan2(dot(tangent, up), dot(tangent, right)) / (Math.PI / 2));
+    const uvTurns = ((stickers[k].uvTurns ?? 0) + twist + 4) % 4;
+    const sticker = { ...stickers[k] };
+    // Canonical zero keeps old saves and four-turn/inverse round trips equal.
+    if (uvTurns) sticker.uvTurns = uvTurns;
+    else delete sticker.uvTurns;
+    next[newKey] = sticker;
   }
   return next;
 };

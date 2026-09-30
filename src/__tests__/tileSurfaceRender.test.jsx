@@ -64,6 +64,21 @@ it('keeps tile accessory batches on the raised/rotating tile and restores glass/
     await act(async () => useGameStore.setState({ settings: { ...settings, manifoldStyles: Object.fromEntries([1, 2, 3, 4, 5, 6].map(id => [id, 'carbonFiber'])) } }));
     await render(); await frame();
     expect(scene.getObjectByName('sticker-antipodal-back').material.isShaderMaterial).toBe(true);
+    // A same-color sticker can change orientation without changing its identity.
+    // Both faces bind their own identity even when materials are shared/patched.
+    meta = { ...meta, uvTurns: 1 };
+    await render(); await frame();
+    const front = scene.getObjectByName('sticker-front');
+    expect(front.parent.rotation.z).toBeCloseTo(Math.PI / 2);
+    const patternedBack = scene.getObjectByName('sticker-antipodal-back');
+    for (const mesh of [front, patternedBack]) {
+      mesh.onBeforeRender(null, scene, null, mesh.geometry, mesh.material);
+      expect(mesh.material.uniforms.tileHome.value.toArray()).toEqual([2, 2, 5]);
+      expect(mesh.material.uniforms.tileFace.value).toBe(meta.orig);
+      expect(mesh.material.uniformsNeedUpdate).toBe(true);
+    }
+    expect(patternedBack.rotation.z).toBeCloseTo(-Math.PI / 2);
+
     await act(async () => useGameStore.setState({ settings }));
     await render(); await frame(); check('sticker-antipodal-back');
     layer.visible = false; await frame(); expect(back.visible).toBe(false);

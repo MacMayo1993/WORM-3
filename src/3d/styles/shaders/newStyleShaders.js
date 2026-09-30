@@ -498,6 +498,8 @@ export const newStyleShaders = {
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
+    uniform vec3 tileHome;
+    uniform float tileFace;
     varying vec3 vTileCenter;
 
     float raySphere(vec3 ro, vec3 rd, vec3 sc, float sr) {
@@ -525,7 +527,7 @@ export const newStyleShaders = {
       vec3 dp1perp = cross(N, dpdx);
       vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
       vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
-      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      float invmax = inversesqrt(max(1e-10, max(dot(T, T), dot(B, B))));
       T *= invmax; B *= invmax;
 
       vec3 V = normalize(vViewPosition);
@@ -689,6 +691,8 @@ export const newStyleShaders = {
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
+    uniform vec3 tileHome;
+    uniform float tileFace;
     varying vec3 vTileCenter;
     varying vec3 vWorldPos;
     varying vec3 vWorldNormal;
@@ -720,7 +724,7 @@ export const newStyleShaders = {
       vec3 dp1perp = cross(N, dpdx);
       vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
       vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
-      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      float invmax = inversesqrt(max(1e-10, max(dot(T, T), dot(B, B))));
       T *= invmax; B *= invmax;
       vec3 V = normalize(vViewPosition);
       vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
@@ -762,8 +766,8 @@ export const newStyleShaders = {
       float depth = mix(clamp(belowness * 1.1, 0.05, 1.0), 0.5, gUp);
 
       // Parallax caustic floor (two octaves; shifts with view = real depth).
-      float ca = caustic(floorUv * 3.2 + vTileCenter.xy * 2.0, time * 0.8)
-               + 0.5 * caustic(floorUv * 6.0 - vTileCenter.xy, time * 1.15);
+      float ca = caustic(floorUv * 3.2 + tileHome.xy * 2.0, time * 0.8)
+               + 0.5 * caustic(floorUv * 6.0 - tileHome.xy, time * 1.15);
 
       // Liquid (antipodal): bright shallow → saturated deep. Never black.
       vec3 shallow = mix(antipodalColor, vec3(1.0), 0.30);
@@ -816,7 +820,7 @@ export const newStyleShaders = {
   `,
 
   // Dice - a ray-traced six-sided die floating in each tile's glass chamber.
-  // Every tile seeds its own tumble from its world position, so all dice rotate
+  // Every tile seeds its own tumble from its physical identity, so all dice rotate
   // independently; a slice turn spins that slice's dice up hard. Die body is the
   // antipodal color, chamber is this face's color.
   dice: `
@@ -833,6 +837,8 @@ export const newStyleShaders = {
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
+    uniform vec3 tileHome;
+    uniform float tileFace;
     varying vec3 vTileCenter;
 
     mat3 rotX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
@@ -871,7 +877,7 @@ export const newStyleShaders = {
       vec3 dp1perp = cross(N, dpdx);
       vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
       vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
-      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      float invmax = inversesqrt(max(1e-10, max(dot(T, T), dot(B, B))));
       T *= invmax; B *= invmax;
       vec3 V = normalize(vViewPosition);
       vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
@@ -880,10 +886,8 @@ export const newStyleShaders = {
       vec3 rd = normalize(-vT);
       float boxDepth = 0.6;
 
-      // Snap tile center to nearest grid point so the seed stays stable while
-      // cubies are mid-rotation (modelMatrix[3] drifts continuously during a
-      // turn, producing random hash noise if fed straight into the seed).
-      vec3 snapped = round(vTileCenter);
+      // Physical identity is invariant through turns, expansion and grid commits.
+      vec3 snapped = tileHome + vec3(tileFace * 0.173);
 
       // Slice membership → only the tiles being turned spin up / get thrown.
       // axisCoord uses the raw vTileCenter: the coordinate along the rotation
@@ -897,19 +901,18 @@ export const newStyleShaders = {
       // How many times this die's grid cell has been rotated through. Folded
       // into the seed so a cell that returns later shows a FRESH face (the count
       // only ever rises), while non-rotated cells keep their count → same face.
-      vec3 gcell = clamp(snapped + vec3(cellK), vec3(0.0), vec3(cellGridN - 1.0));
+      vec3 gcell = clamp(tileHome, vec3(0.0), vec3(cellGridN - 1.0));
       float texelX = gcell.x + gcell.y * cellGridN;
       float u = (texelX + 0.5) / (cellGridN * cellGridN);
       float v = (gcell.z + 0.5) / cellGridN;
       float rollN = texture2D(cellRoll, vec2(u, v)).r * 255.0;
 
-      // Per-tile seed from snapped center + roll count → stable during rotation.
+      // Per-tile seed from home identity + roll count → stable during rotation.
       float seed = fract(sin(dot(snapped.xy + snapped.z * 1.7 + rollN * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
       float seed2 = fract(seed * 7.31 + 0.137 + rollN * 0.313);
 
-      // Rest orientation from snapped cell + roll count — rotated tiles land at a
-      // new cell (and that slice's counts were just bumped) so their die face
-      // changes; non-rotated tiles keep their cell and count, holding their face.
+      // Rest orientation follows the piece's roll count. Moving through other
+      // grid cells never changes the seed; only a new turn rerolls the die.
       float sp2 = sp * sp;
       float ra = seed * 20.0 + sp2 * (6.283 + seed * 3.0);
       float rb = seed2 * 20.0 + sp2 * (4.712 + seed2 * 2.5);
@@ -1011,6 +1014,8 @@ export const newStyleShaders = {
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
+    uniform vec3 tileHome;
+    uniform float tileFace;
     varying vec3 vTileCenter;
     varying vec3 vWorldPos;
     varying vec3 vWorldNormal;
@@ -1064,7 +1069,7 @@ export const newStyleShaders = {
       // Sand surface (world-vertical): jagged grainy crest, churned + tilted
       // while the slice turns (the world-level pour itself is automatic — the
       // tile reorients, so hv sweeps and the sand region follows gravity).
-      float jag   = (vnoise(vec2(hh * 7.0 + vTileCenter.x * 5.0, time * 0.3)) - 0.5) * 0.05;
+      float jag   = (vnoise(vec2(hh * 7.0 + tileHome.x * 5.0, time * 0.3)) - 0.5) * 0.05;
       float churn = (vnoise(vec2(hh * 10.0, time * 3.0)) - 0.5) * 0.06 * sp;
       float slope = hh * 0.5 * sp;
       float sandLevel = 0.02 + jag + churn + slope;
@@ -1073,7 +1078,7 @@ export const newStyleShaders = {
       float sand = mix(sandSide, 1.0, gUp);   // top/bottom faces = a full sand bed
 
       // Grain texture (per-tile varied, stable on the tile face).
-      vec2 gco = (p + 0.5) * 55.0 + vTileCenter.xy * 17.0;
+      vec2 gco = (p + 0.5) * 55.0 + tileHome.xy * 17.0;
       float grain = vnoise(gco * 0.5) * 0.6 + hash21(floor(gco)) * 0.4;
       vec3 sandDark  = antipodalColor * 0.55;
       vec3 sandLight = mix(antipodalColor, vec3(1.0), 0.38);
@@ -1126,6 +1131,8 @@ export const newStyleShaders = {
     uniform float spinAxis;
     uniform float spinSlice;
     varying vec2 vUv;
+    uniform vec3 tileHome;
+    uniform float tileFace;
     varying vec3 vTileCenter;
 
     // Smooth, bounded 2D metaball field in tile-local UV space.
@@ -1184,7 +1191,7 @@ export const newStyleShaders = {
       float sp = clamp(spin * member, 0.0, 1.0);
 
       // Per-tile phase so no two lamps are in sync.
-      float ph = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;
+      float ph = fract(sin(dot(tileHome.xy + tileHome.z * 1.7 + tileFace * 0.173, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;
 
       float F = lavaField(p, time, ph, sp);
       // The field is smooth and bounded now, so fwidth stays modest; clamp it to a
@@ -1237,6 +1244,8 @@ export const newStyleShaders = {
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
+    uniform vec3 tileHome;
+    uniform float tileFace;
     varying vec3 vTileCenter;
 
     float eyeHash(vec2 p) {
@@ -1257,7 +1266,7 @@ export const newStyleShaders = {
       vec2 p = vUv - 0.5;
       float r = length(p);
 
-      vec3 snapped = round(vTileCenter);
+      vec3 snapped = tileHome + vec3(tileFace * 0.173);
       float seed  = fract(sin(dot(snapped.xy + snapped.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
       float seed2 = fract(seed * 7.31 + 0.137);
       float seed3 = fract(seed2 * 3.47 + 0.891);

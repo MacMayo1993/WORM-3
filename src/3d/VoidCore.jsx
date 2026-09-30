@@ -151,10 +151,22 @@ function VoidCore({ cubieRefs = null }) {
     for (const batch of styled.batches) {
       const mesh = styledRefs.current.get(batch.key);
       if (!mesh) continue;
-      batch.indices.forEach((index, slot) => mesh.setColorAt(slot, _color.fromArray(rgb, index * 3)));
+      let identity = mesh.geometry.getAttribute('aTileIdentity');
+      if (!identity || identity.count !== batch.indices.length) {
+        identity = new THREE.InstancedBufferAttribute(new Float32Array(batch.indices.length * 4), 4);
+        mesh.geometry.setAttribute('aTileIdentity', identity);
+      }
+      batch.indices.forEach((index, slot) => {
+        mesh.setColorAt(slot, _color.fromArray(rgb, index * 3));
+        const cell = layout.stickers[index];
+        const meta = cubies[cell.x]?.[cell.y]?.[cell.z]?.stickers?.[cell.dirKey];
+        const home = meta?.origPos ?? cell;
+        identity.setXYZW(slot, home.x, home.y, home.z, meta?.orig ?? 0);
+      });
+      identity.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
     }
-  }, [styled]);
+  }, [styled, cubies, layout]);
 
   const rootRef = useRef();
   const zoomRef = useRef();

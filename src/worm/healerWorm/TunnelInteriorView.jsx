@@ -1,3 +1,4 @@
+import { bindTileStyleIdentity } from '../../3d/tileStyleIdentity.js';
 import { wormExpansion } from '../wormExpansion.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 // src/worm/healerWorm/TunnelInteriorView.jsx
@@ -167,6 +168,7 @@ export function TunnelInteriorView({ worm, size }) {
                 const colorHex = dead ? '#555555' : (fc[antipodalFaceId] ?? '#444');
                 const style = dead ? 'solid' : (manifoldStyles[antipodalFaceId] ?? 'solid');
                 const antiColorHex = fc[ANTIPODAL_COLOR[antipodalFaceId]] ?? '#ffffff';
+                mesh.onBeforeRender = bindTileStyleIdentity(sticker.origPos, sticker.orig);
                 const source = getTileStyleMaterial(style, colorHex, false, null, antiColorHex);
                 if (tunnel) {
                     usedMaterials.add(source);
