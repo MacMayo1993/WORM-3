@@ -73,7 +73,7 @@ import {
     makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace,
 } from '../circularBuffers.js';
 import { isSurfaceTilePos, randomFreeTile } from './surfaceTiles.js';
-import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady } from './economy.js';
+import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady, orbCreditFace } from './economy.js';
 import { rotationClock } from './rotationClockBridge.js';
 import { chooseSafeLane, isTileOnLane } from './safeLane.js';
 import {
@@ -989,7 +989,8 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
         // unless the magnet is dragging them down.
         const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
         if (tileIsFlipped && !sim.isJumping && !magnetActive && !sweepContact) continue; // out of reach
-        const refracted = refractPickup(sim, ctx, pickedSticker ? pickedSticker.curr : 0);
+        // The orb credits its body's colour: the antipode of the tile it sits on.
+        const refracted = refractPickup(sim, ctx, pickedSticker ? orbCreditFace(pickedSticker.curr) : 0);
         const pickedFaceId = refracted.faceId;
         const pickedColor = ctx.getOrbColor(pickedFaceId);
         // Combo climbs when pickups come in quick succession (≤2s apart). A magnet

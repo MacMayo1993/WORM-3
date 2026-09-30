@@ -10,6 +10,15 @@
 // and the Zustand store.
 
 import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH, HEAL_COST, WORMHOLE_MAX_TRAVERSALS } from './constants.js';
+import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+
+/**
+ * The face a parity orb credits when it is picked up: its body's colour, which is
+ * the antipode of the manifold it sits on (orbColorRoles). An orb on a white tile
+ * has a yellow body, so it adds yellow to the reserve and a yellow bead to the worm,
+ * and pays into yellow tunnels. 0 (no face) stays 0.
+ */
+export const orbCreditFace = (tileFace) => ANTIPODAL_COLOR[tileFace] ?? 0;
 
 /**
  * Number of whole orbs currently carried on the worm's body for a given tail

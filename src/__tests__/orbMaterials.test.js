@@ -45,15 +45,29 @@ describe('parity orb colour roles', () => {
         }
     });
 
-    it('matches MOBI’s carried orbs', async () => {
+    it('draws MOBI’s carried orb like the pickup it came from', async () => {
         const { createMobiOrbPalette } = await import('../worm/mobiOrbAppearance.js');
         const { orbColorRoles } = await import('../worm/orbMaterials.js');
+        const { orbCreditFace } = await import('../worm/healerWorm/economy.js');
         const { getOrbColor, getAntipodalOrbColor } = await import('../worm/wormHelpers.js');
         const { resolveColors } = await import('../utils/colorSchemes.js');
         const colors = resolveColors({});
-        const mobi = createMobiOrbPalette({})[3];
-        const roles = orbColorRoles(getOrbColor(3, colors), getAntipodalOrbColor(3, colors));
-        expect(mobi.gemColor).toBe(roles.gem);
-        expect(mobi.bandColor).toBe(roles.band);
+        const palette = createMobiOrbPalette({});
+        for (const tile of [1, 2, 3, 4, 5, 6]) {
+            // A world orb on this tile credits its body's face; MOBI carries that face.
+            const world = orbColorRoles(getOrbColor(tile, colors), getAntipodalOrbColor(tile, colors));
+            const carried = palette[orbCreditFace(tile)];
+            expect(carried.gemColor).toBe(world.gem);
+            expect(carried.bandColor).toBe(world.band);
+        }
+    });
+
+    it('patterns MOBI’s band with the style of the tile the orb came from', async () => {
+        const { createMobiOrbPalette } = await import('../worm/mobiOrbAppearance.js');
+        const { getOrbMaterials } = await import('../worm/orbMaterials.js');
+        // Only white (3) is patterned; its orbs credit yellow (6).
+        const palette = createMobiOrbPalette({ manifoldStyles: { 3: 'topographic' } });
+        expect(palette[6].bandMaterial).not.toBe(getOrbMaterials(palette[6].gemColor, palette[6].bandColor, false).band);
+        expect(palette[3].bandMaterial).toBe(getOrbMaterials(palette[3].gemColor, palette[3].bandColor, false).band);
     });
 });

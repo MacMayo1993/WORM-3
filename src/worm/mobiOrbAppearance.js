@@ -2,17 +2,21 @@ import * as THREE from 'three';
 import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from './healerWorm/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { getAntipodalOrbColor, getOrbColor } from './wormHelpers.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getOrbMaterials } from './orbMaterials.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 
-// Same face, antipodal gem and patterned band as the actual world pickup.
+// The carried orb looks exactly like the world pickup it came from. The palette is
+// indexed by the credited face, which is the pickup's body colour (orbCreditFace),
+// so the gem wears that face and the band wears its antipode: the manifold the
+// orb sat on, in that manifold's tile style (orbColorRoles).
 // Materials belong to the world caches, never to an individual MOBI segment.
 export function createMobiOrbPalette(settings) {
   const colors = resolveColors(settings);
   return Array.from({ length: 7 }, (_, face) => {
-    const bandColor = getOrbColor(face || 1, colors);
-    const gemColor = getAntipodalOrbColor(face || 1, colors);
-    const style = settings?.manifoldStyles?.[face] || 'solid';
+    const gemColor = getOrbColor(face || 1, colors);
+    const bandColor = getAntipodalOrbColor(face || 1, colors);
+    const style = settings?.manifoldStyles?.[ANTIPODAL_COLOR[face || 1]] || 'solid';
     const bandMaterial = style === 'solid'
       ? getOrbMaterials(gemColor, bandColor, false).band
       : getTileStyleMaterial(style, bandColor, false, null, gemColor);

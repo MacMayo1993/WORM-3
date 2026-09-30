@@ -9,7 +9,7 @@ import { ELEMENTAL_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
 import { storyLevel } from '../worm/story/levels.js';
 import { newProgress } from '../progression/model.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
-import { isHealReady } from '../worm/healerWorm/economy.js';
+import { isHealReady, orbCreditFace } from '../worm/healerWorm/economy.js';
 import { tileKey } from '../worm/healerWorm/wormSim.js';
 import { ttAt } from '../worm/circularBuffers.js';
 import { getNextSurfacePosition, getActiveTunnels } from '../worm/wormLogic.js';
@@ -302,7 +302,8 @@ it.each([2, 5, 6])('can collect the resources and heal every authored pair for l
     const tunnel = getActiveTunnels(state().cubies, state().size)[0], mouth = tunnel.entry;
     const color = state().cubies[mouth.x][mouth.y][mouth.z].stickers[mouth.dirKey].curr;
     while (state().wormOrbInventory[color] < 6) {
-      const orb = state().wormPowerups.find(p => state().cubies[p.x][p.y][p.z].stickers[p.dirKey].curr === color);
+      // An orb credits its body, the antipode of its tile: an orb on the opposite face pays this tunnel.
+      const orb = state().wormPowerups.find(p => orbCreditFace(state().cubies[p.x][p.y][p.z].stickers[p.dirKey].curr) === color);
       expect(orb).toBeTruthy();
       seek(orb, () => !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
     }
@@ -358,7 +359,7 @@ it('keeps deposited tunnels open until the ring and signature objectives are met
   const mouth = getActiveTunnels(state().cubies, state().size)[0].entry;
   const color = state().cubies[mouth.x][mouth.y][mouth.z].stickers[mouth.dirKey].curr;
   while (state().wormOrbInventory[color] < 6) {
-    const orb = state().wormPowerups.find(p => state().cubies[p.x][p.y][p.z].stickers[p.dirKey].curr === color);
+    const orb = state().wormPowerups.find(p => orbCreditFace(state().cubies[p.x][p.y][p.z].stickers[p.dirKey].curr) === color);
     seek(orb, () => !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
   }
   expect(state().wormHealedCount).toBe(0);

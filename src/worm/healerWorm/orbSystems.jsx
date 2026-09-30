@@ -24,8 +24,9 @@ import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
 // The band wears the manifold the orb sits on (its colour and tile style), and
 // the gem body wears that face's antipodal partner: on a white face, a yellow
-// gem in a white band (orbColorRoles). The face credited to the reserve on
-// pickup is still the manifold's own, the band. Face identity follows live rotations.
+// gem in a white band (orbColorRoles). The gem is what a pickup credits: yellow
+// to the reserve and a yellow bead on the worm (orbCreditFace). Face identity
+// follows live rotations.
 //
 // Memoised on `size`, its only prop. Everything else it needs comes from its own
 // store subscription, so it still re-renders the instant an orb tile changes —
