@@ -19,6 +19,28 @@ import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH, HEAL_COST, WORMHOLE_MAX_TRAVERSAL
 export const orbsCarried = (tailLength) =>
   Math.max(0, Math.floor((tailLength - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
 
+/**
+ * Split the body segments a cut removed across the orbs it cost, head-side first,
+ * so taking each one back restores exactly what was lost. Orbs past the cut lose
+ * their whole ORB_SEGMENT_GROWTH (tip-side first); the first lost orb, the one the
+ * cut went through, gets the remainder: only the segments it lost, since its
+ * head-side ones are still on the body. Extra tip segments (refraction bonuses)
+ * ride with it too, so the split always sums to `total`.
+ * @param {number} total segments removed (tail length before − after)
+ * @param {number} count orbs lost
+ * @returns {number[]} segments per lost orb, head-side first
+ */
+export function splitRemovedSegments(total, count) {
+  const out = new Array(Math.max(0, count)).fill(0);
+  let left = Math.max(0, Math.round(total));
+  for (let i = out.length - 1; i > 0 && left > 0; i--) {
+    out[i] = Math.min(ORB_SEGMENT_GROWTH, left);
+    left -= out[i];
+  }
+  if (out.length) out[0] = left;
+  return out;
+}
+
 /** A tunnel heals on exit once enough orb segments have been deposited into it. */
 export const isHealReady = (deposited) => (deposited ?? 0) >= HEAL_COST;
 

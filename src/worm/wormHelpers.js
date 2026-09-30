@@ -14,7 +14,7 @@ import {
     ORB_SEGMENT_GROWTH,
     WORM_LIFT,
 } from './healerWorm/constants.js';
-import { orbsCarried } from './healerWorm/economy.js';
+import { orbsCarried, splitRemovedSegments } from './healerWorm/economy.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { findSlicePathHit, clipSliceHistory } from './healerWorm/sliceBodyPath.js';
 
@@ -301,9 +301,12 @@ export function reconcileOrbInventoryAfterCut(inventory, removedFaceIds, segment
     return nextInventory;
 }
 
-// Returns the orbs the cut removed ({ faceIds, colors }, head-side first), so the
-// caller can scatter them to be taken back (droppedOrbs.js).
+// Returns the orbs the cut removed ({ faceIds, colors, segments }, head-side first),
+// so the caller can scatter them to be taken back (droppedOrbs.js). `segments` is
+// how many body segments each lost orb actually took with it: a cut through the
+// middle of an orb's trio keeps the head-side part, so that orb gives back less.
 export function cutWormTail(worm, cut) {
+    const lengthBefore = worm.tailLength.current;
     const physical = typeof cut === 'object' && Number.isFinite(cut.cutDistance);
     const cutTrailIdx = typeof cut === 'object' ? cut.cutTrailIdx : cut;
     ttTrimTo(worm.tileTrail.current, cutTrailIdx);
@@ -335,5 +338,6 @@ export function cutWormTail(worm, cut) {
             state.wormOrbInventory, removedFaceIds, segmentCapacity
         ),
     }));
-    return { faceIds: removedFaceIds, colors: removedColors };
+    const segments = splitRemovedSegments(lengthBefore - worm.tailLength.current, removedColors.length);
+    return { faceIds: removedFaceIds, colors: removedColors, segments };
 }

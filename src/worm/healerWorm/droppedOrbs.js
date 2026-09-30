@@ -11,6 +11,7 @@
 // so the renderer (DroppedOrbs.jsx) and the tests read the same values.
 import { collectManifoldRing } from '../wormLogic.js';
 import { parseTileKey } from '../wormHelpers.js';
+import { ORB_SEGMENT_GROWTH } from './constants.js';
 
 /** Seconds of crawling a dropped orb waits to be picked back up. */
 export const DROPPED_ORB_LIFETIME = 5;
@@ -33,9 +34,11 @@ let dropSequence = 0;
 
 /**
  * Pack the lost orbs into at most `max` drops, keeping neighbours together so a
- * drop gives back a run of the body. Each drop is a list of { faceId, color }.
+ * drop gives back a run of the body. Each drop is a list of { faceId, color, segments }:
+ * `segments` is what that orb's loss actually cost the body (cutWormTail), so
+ * taking it back never grows the worm past its length before the cut.
  */
-export function groupLostOrbs(faceIds, colors, max = MAX_DROPS_PER_CUT) {
+export function groupLostOrbs(faceIds, colors, max = MAX_DROPS_PER_CUT, segments = null) {
   const count = Math.max(faceIds?.length ?? 0, colors?.length ?? 0);
   if (count === 0) return [];
   const groups = Math.min(count, max);
@@ -43,7 +46,9 @@ export function groupLostOrbs(faceIds, colors, max = MAX_DROPS_PER_CUT) {
   for (let g = 0; g < groups; g++) {
     const start = Math.floor((g * count) / groups), end = Math.floor(((g + 1) * count) / groups);
     const payload = [];
-    for (let i = start; i < end; i++) payload.push({ faceId: faceIds?.[i] ?? 0, color: colors?.[i] ?? '#ffdd44' });
+    for (let i = start; i < end; i++) {
+      payload.push({ faceId: faceIds?.[i] ?? 0, color: colors?.[i] ?? '#ffdd44', segments: segments?.[i] ?? ORB_SEGMENT_GROWTH });
+    }
     out.push(payload);
   }
   return out;
@@ -95,7 +100,7 @@ export function chooseDropTiles(origin, size, count, blocked, rand = Math.random
  */
 export function scatterDroppedOrbs(sim, size, ctx, drop) {
   if (!sim.alive || !drop?.origin) return 0;
-  const groups = groupLostOrbs(drop.faceIds, drop.colors);
+  const groups = groupLostOrbs(drop.faceIds, drop.colors, MAX_DROPS_PER_CUT, drop.segments);
   if (!groups.length) return 0;
   const blocked = new Set();
   const block = t => t && blocked.add(tileKeyOf(t));

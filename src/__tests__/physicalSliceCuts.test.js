@@ -94,9 +94,12 @@ describe('physical slice cuts', () => {
     expect(hit.keepCount).toBe(16);
     const traveled = sim.stepHistory.distance;
     const removed = cutWormTail(worm, hit);
-    // The lost orbs come back to be scattered (droppedOrbs.js).
+    // The lost orbs come back to be scattered (droppedOrbs.js), carrying exactly
+    // the segments the cut removed between them.
     expect(removed.colors).toHaveLength(30);
     expect(removed.faceIds).toHaveLength(30);
+    expect(removed.segments).toHaveLength(30);
+    expect(removed.segments.reduce((a, b) => a + b, 0)).toBe(100 - 16);
     expect(sim.tailLength).toBe(16);
     expect(shAt(sim.stepHistory, sim.stepHistory.count - 1).pos.x).toBeCloseTo(-0.5);
     expect(shAt(sim.stepHistory, sim.stepHistory.count - 1).tx).toBeLessThan(3);
@@ -185,6 +188,22 @@ describe('physical slice cuts', () => {
     expect(sim.orbPickupColors).toEqual([]);
     expect(sim.orbPickupFaceIds).toEqual([]);
     expect(Object.values(useGameStore.getState().wormOrbInventory).reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  it('reports only the segments lost when a cut goes through the middle of an orb', () => {
+    // Tail 13 = base 10 + one orb's trio. A seam 11 beads back keeps one of the
+    // orb's three segments: the orb is lost, but only two segments went with it.
+    const distance = 11 * BODY_BALL_SPACING + 0.015;
+    const { sim, worm } = fixture([
+      new THREE.Vector3(-0.5 - distance, 0, 3.6), new THREE.Vector3(1, 0, 3.6),
+    ], 7, BASE_TAIL_LENGTH + 3);
+    sim.orbPickupColors = ['#ff0000'];
+    sim.orbPickupFaceIds = [1];
+    const hit = checkWormHitBySlice(worm, 'col', 3, 7);
+    expect(hit).toMatchObject({ type: 'cut', keepCount: 11 });
+    const removed = cutWormTail(worm, hit);
+    expect(sim.tailLength).toBe(11);
+    expect(removed).toEqual({ faceIds: [1], colors: ['#ff0000'], segments: [2] });
   });
 
   it('does not manufacture a minimum-length body across a neck cut', () => {
