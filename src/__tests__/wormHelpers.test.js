@@ -166,13 +166,43 @@ describe('checkWormHitBySlice', () => {
     expect(result).toBeNull();
   });
 
-  it('returns death when head is on slice but body is not', () => {
+  it('cuts the tail when the head rides the slice but the body is off it', () => {
     const worm = makeWorm(
       { x: 1, y: 0, z: 2, dirKey: 'PZ' },
       ['0,0,2,PZ'],
     );
     const result = checkWormHitBySlice(worm, 'col', 1);
-    expect(result).toEqual({ type: 'death' });
+    expect(result).toEqual({ type: 'cut', cutTrailIdx: 1 });
+  });
+
+  it('keeps the on-layer body when the head rides the slice', () => {
+    const worm = makeWorm(
+      { x: 1, y: 0, z: 2, dirKey: 'PZ' },
+      ['1,0,1,PZ', '0,0,1,PZ', '0,0,0,PZ'],
+    );
+    expect(checkWormHitBySlice(worm, 'col', 1)).toEqual({ type: 'cut', cutTrailIdx: 2 });
+  });
+
+  it('returns death when the head steps onto the turning slice mid-turn', () => {
+    const worm = makeWorm(
+      { x: 1, y: 0, z: 2, dirKey: 'PZ' },
+      ['0,0,2,PZ'],
+    );
+    expect(checkWormHitBySlice(worm, 'col', 1, undefined, { entering: true })).toEqual({ type: 'death' });
+  });
+
+  it('returns death when the head is caught crossing the seam as the turn fires', () => {
+    const worm = makeWorm(
+      { x: 1, y: 0, z: 2, dirKey: 'PZ' },
+      ['0,0,2,PZ'],
+    );
+    worm.prevTile = { current: { x: 0, y: 0, z: 2, dirKey: 'PZ' } };
+    worm.interpT = { current: 0.3 };
+    expect(checkWormHitBySlice(worm, 'col', 1)).toBeNull(); // still short of the seam
+    worm.interpT.current = 0.7;
+    expect(checkWormHitBySlice(worm, 'col', 1)).toEqual({ type: 'death' });
+    worm.interpT.current = 1;
+    expect(checkWormHitBySlice(worm, 'col', 1)).toEqual({ type: 'cut', cutTrailIdx: 1 });
   });
 
   it('returns null when head and all body on the slice', () => {

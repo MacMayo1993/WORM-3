@@ -204,12 +204,17 @@ export function tileKeyCoordAt(key, idx) {
 
 // Returns null | { type:'death' } | { type:'cut', cutTrailIdx }
 //
+// Riding a turning layer is never fatal on its own: whichever side of the seam the
+// head is on keeps the body up to the seam and the rest is cut off. The kill is
+// reserved for a head crossing the seam — `entering` (it stepped onto the layer
+// after the turn began) or mid-step across the seam as the turn fires.
+//
 // Rocket overdrive makes the entire worm impenetrable. Landing grace only clears the
 // head, while still allowing the normal tail-cut behavior.
-export function checkWormHitBySlice(worm, axis, sliceIndex, size) {
+export function checkWormHitBySlice(worm, axis, sliceIndex, size, opts = {}) {
     if (worm.rocketActive?.current) return null;
     if (size && worm.stepHistory?.current) {
-        const hit = findSlicePathHit(worm, axis, sliceIndex, size);
+        const hit = findSlicePathHit(worm, axis, sliceIndex, size, opts);
         if (!hit) return null;
         const coordIdx = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
         const trail = worm.tileTrail.current;
@@ -221,7 +226,8 @@ export function checkWormHitBySlice(worm, axis, sliceIndex, size) {
     // pos is the traversal destination, chosen before the head reaches it.
     // Damage must classify the occupied half of the step, not that future tile.
     const previous = worm.prevTile?.current;
-    const head = previous && (worm.interpT?.current ?? 1) < 0.5 ? previous : worm.pos.current;
+    const interpT = worm.interpT?.current ?? 1;
+    const head = previous && interpT < 0.5 ? previous : worm.pos.current;
     const axisCoord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
     const coordIdx  = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
     const airborne = (worm.landingGraceT?.current ?? 0) > 0;
@@ -231,21 +237,17 @@ export function checkWormHitBySlice(worm, axis, sliceIndex, size) {
     const activeTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
     const bodyEnd = Math.min(activeTiles, trail.count);
 
-    if (!headOnSlice) {
-        for (let i = 1; i < bodyEnd; i++) {
-            if (tileKeyCoordAt(ttAt(trail, i), coordIdx) === sliceIndex) {
-                return { type: 'cut', cutTrailIdx: i };
-            }
-        }
-        return null;
-    }
-
+    // The first body tile on the far side of the seam from the head.
+    let cutTrailIdx = 0;
     for (let i = 1; i < bodyEnd; i++) {
-        if (tileKeyCoordAt(ttAt(trail, i), coordIdx) !== sliceIndex) {
-            return { type: 'death' };
-        }
+        if ((tileKeyCoordAt(ttAt(trail, i), coordIdx) === sliceIndex) !== headOnSlice) { cutTrailIdx = i; break; }
     }
-    return null;
+    if (!cutTrailIdx) return null;
+    // A head past the seam but still finishing the step across it is caught in it.
+    const straddling = !!previous && interpT >= 0.5 && interpT < 1 && !airborne &&
+        (previous[axisCoord] === sliceIndex) !== (worm.pos.current[axisCoord] === sliceIndex);
+    if ((headOnSlice && opts.entering) || straddling) return { type: 'death' };
+    return { type: 'cut', cutTrailIdx };
 }
 
 /**
@@ -256,6 +258,9 @@ export function checkWormHitBySlice(worm, axis, sliceIndex, size) {
  * worm whose body crossed plane 0 (a tail cut) and whose head was trapped on plane 2
  * (death) survived with a cut, because plane 0 was evaluated first and the loop broke.
  *
+ * `opts.entering` marks a head that has just stepped onto a turning plane mid-turn
+ * (see stepTurnWatch): that is a crossing, and the one way riding a plane can kill.
+ *
  * Every plane is evaluated, then one result is chosen:
  *   • any death wins — being caught on a plane is fatal regardless of what else happened,
  *   • otherwise the cut nearest the head wins, since that is the one that actually
@@ -265,11 +270,11 @@ export function checkWormHitBySlice(worm, axis, sliceIndex, size) {
  *
  * @returns {null|{type:'death'|'cut', cutTrailIdx?:number, sliceIndex:number}}
  */
-export function resolveSliceHits(worm, axis, layers, size) {
+export function resolveSliceHits(worm, axis, layers, size, opts) {
     let death = null;
     let cut = null;
     for (const layer of layers) {
-        const hit = checkWormHitBySlice(worm, axis, layer, size);
+        const hit = checkWormHitBySlice(worm, axis, layer, size, opts);
         if (!hit) continue;
         if (hit.type === 'death') {
             if (!death || (hit.cutDistance ?? Infinity) < (death.cutDistance ?? Infinity)) death = { ...hit, sliceIndex: layer };

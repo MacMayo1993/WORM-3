@@ -978,9 +978,9 @@ describe('rocket overdrive', () => {
       tailLength: { current: 50 },
       rocketActive: { current: false },
     };
-    expect(checkWormHitBySlice(worm, 'col', 1)).toEqual({ type: 'death' });
+    expect(checkWormHitBySlice(worm, 'col', 1, undefined, { entering: true })).toEqual({ type: 'death' });
     worm.rocketActive.current = true;
-    expect(checkWormHitBySlice(worm, 'col', 1)).not.toEqual({ type: 'death' });
+    expect(checkWormHitBySlice(worm, 'col', 1, undefined, { entering: true })).not.toEqual({ type: 'death' });
   });
 });
 
