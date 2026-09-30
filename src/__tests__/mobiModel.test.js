@@ -100,16 +100,20 @@ it('preserves actual antipodal pickup colors and patterned bands without recolor
   const palette = createMobiOrbPalette(settings);
   const rig = createMobiModel(), other = createMobiModel();
   const shell = rig.shellMaterial.color.clone(), eyes = rig.eyes[0].children[0].material.color.clone();
-  setMobiOrbAppearance(rig, palette[1]);
-  expect(rig.primary.color.getHexString()).toBe(palette[1].gemColor.slice(1));
-  expect(rig.band.material).toBe(getTileStyleMaterial('checkerboard', palette[1].bandColor, false, null, palette[1].gemColor));
+  // An orb eaten off a red (checkerboard) tile has an orange body and credits orange:
+  // MOBI carries it as palette[4], orange core in the red tile's patterned band.
+  setMobiOrbAppearance(rig, palette[4]);
+  expect(palette[4].gemColor).toBe('#ff9900');
+  expect(palette[4].bandColor).toBe('#ee4455');
+  expect(rig.primary.color.getHexString()).toBe(palette[4].gemColor.slice(1));
+  expect(rig.band.material).toBe(getTileStyleMaterial('checkerboard', palette[4].bandColor, false, null, palette[4].gemColor));
   setMobiOrbAppearance(other, palette[2]);
   expect(rig.primary.color.equals(other.primary.color)).toBe(false);
   expect(rig.band.material).not.toBe(other.band.material);
   expect(rig.shellMaterial.color.equals(shell)).toBe(true);
   expect(rig.eyes[0].children[0].material.color.equals(eyes)).toBe(true);
   let disposed = false;
-  palette[1].bandMaterial.addEventListener('dispose', () => { disposed = true; });
+  palette[4].bandMaterial.addEventListener('dispose', () => { disposed = true; });
   disposeMobi(rig); disposeMobi(other);
   expect(disposed).toBe(false);
 });
