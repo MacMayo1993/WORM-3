@@ -75,8 +75,8 @@ function SingleOrbImpl({
   // already-compiled program and never links a new one mid-run. 'solid' has no
   // pattern worth carrying, so it keeps the emissive band below instead.
   const bandMaterial = useMemo(
-    () => (styleKey && styleKey !== 'solid' ? getTileStyleMaterial(styleKey, bandColor, false, null, gemColor) : null),
-    [styleKey, bandColor, gemColor]
+    () => (!shower && styleKey && styleKey !== 'solid' ? getTileStyleMaterial(styleKey, bandColor, false, null, gemColor) : null),
+    [shower, styleKey, bandColor, gemColor]
   );
   const mat = useMemo(() => getOrbMaterials(gemColor, bandColor, isTarget, elevated, isGlowWorm), [gemColor, bandColor, isTarget, elevated, isGlowWorm]);
   const orbGroupRef    = useRef();
@@ -150,8 +150,23 @@ function SingleOrbImpl({
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Use the simple gem only when the shared effects budget requests it.
-  // Shower pickups use the same parity silhouette as permanent pickups.
+  // Dense showers retain the current gem, Möbius band and crossed orbit rings,
+  // but use four opaque proxies. After their entrance these become shared
+  // instanced draws per colour pair, with no per-orb transparent layers.
+  if (shower) {
+    return (
+      <group ref={orbGroupRef} visible={false} position={[position[0], position[1], position[2]]}>
+        <mesh ref={shellRef} visible={false} geometry={g.shell} material={mat.reduced} />
+        <mesh ref={coreRef} visible={false} geometry={g.core} material={mat.band} />
+        <group ref={orbitSystemRef}>
+          <mesh ref={ringARef} visible={false} geometry={g.ringA} material={mat.nodeGem} rotation={[0.3, 0.4, 0]} />
+          <mesh ref={ringBRef} visible={false} geometry={g.ringB} material={mat.nodeBand} rotation={[-0.6, 0, 0.5]} />
+        </group>
+      </group>
+    );
+  }
+
+  // Ordinary pickups follow the shared effects budget.
   if (reducedDetail) {
     return (
       <group ref={orbGroupRef} visible={false} position={[position[0], position[1], position[2]]}>
@@ -537,11 +552,18 @@ export default function ParityOrbs({
         targetGlow.scale.setScalar(1 + Math.sin(time * 6.5) * 0.2);
         targetGlow.material.opacity = 0.22 + Math.sin(t * 6.2) * 0.08;
       }
-      // Hidden proxy meshes retain the exact animated transforms. Only these
-      // three opaque parts enter the shared draws; all other parts stay intact.
+      // Hidden proxy meshes retain the exact animated transforms. Shower orbs
+      // batch their entire opaque silhouette; ordinary orbs batch core and poles.
       group.updateWorldMatrix(false, true);
       // Arriving parts dissolve in one common orb frame. Once formed, put the
       // opaque pieces back into their shared draw calls.
+      if (refs.shower) {
+        for (const part of [shell, core, ringA, ringB]) {
+          part.visible = !refs.arrived;
+          if (refs.arrived) batches.add(part);
+        }
+        continue;
+      }
       if (refs.reducedDetail) core.visible = !refs.arrived;
       if (innerCore) innerCore.visible = !refs.arrived;
       for (const pole of refs.poles) if (pole) pole.visible = !refs.arrived;
