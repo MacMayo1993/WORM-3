@@ -228,6 +228,10 @@ const SFX = {
     burst(0.12, 0.5, 'highpass', 2600);
     sweep(420, 170, 0.12, 0.18, 'square');
   },
+  // A cut tail spilling its orbs, like scattered rings: a quick falling shimmer.
+  orbScatter() {
+    for (let i = 0; i < 5; i++) sweep(1560 - i * 170, 1320 - i * 170, 0.07, 0.11, 'triangle', 0.05 + i * 0.045);
+  },
   death() {
     sweep(400, 55, 0.7, 0.4, 'sawtooth');
   },
@@ -425,6 +429,7 @@ const HAPTICS = {
   exit: 35,
   heal: [0, 30, 40, 60],
   cut: [0, 50, 30, 50],
+  orbScatter: [0, 12, 20, 12, 20, 12],
   death: [0, 80, 40, 120],
   nearMiss: 8,
   specialSpawn: 10,

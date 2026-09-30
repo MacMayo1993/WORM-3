@@ -93,7 +93,10 @@ describe('physical slice cuts', () => {
     expect(hit.cutPosition).toEqual([-0.5, 0, 3.6]);
     expect(hit.keepCount).toBe(16);
     const traveled = sim.stepHistory.distance;
-    cutWormTail(worm, hit);
+    const removed = cutWormTail(worm, hit);
+    // The lost orbs come back to be scattered (droppedOrbs.js).
+    expect(removed.colors).toHaveLength(30);
+    expect(removed.faceIds).toHaveLength(30);
     expect(sim.tailLength).toBe(16);
     expect(shAt(sim.stepHistory, sim.stepHistory.count - 1).pos.x).toBeCloseTo(-0.5);
     expect(shAt(sim.stepHistory, sim.stepHistory.count - 1).tx).toBeLessThan(3);

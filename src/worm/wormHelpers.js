@@ -301,6 +301,8 @@ export function reconcileOrbInventoryAfterCut(inventory, removedFaceIds, segment
     return nextInventory;
 }
 
+// Returns the orbs the cut removed ({ faceIds, colors }, head-side first), so the
+// caller can scatter them to be taken back (droppedOrbs.js).
 export function cutWormTail(worm, cut) {
     const physical = typeof cut === 'object' && Number.isFinite(cut.cutDistance);
     const cutTrailIdx = typeof cut === 'object' ? cut.cutTrailIdx : cut;
@@ -314,6 +316,7 @@ export function cutWormTail(worm, cut) {
     }
     const orbsLeft = orbsCarried(worm.tailLength.current);
     const removedFaceIds = worm.orbPickupFaceIdsRef?.current?.slice(orbsLeft) ?? [];
+    const removedColors = worm.orbPickupColorsRef.current.slice(orbsLeft);
     const droppedVisualOrbs = worm.orbPickupColorsRef.current.length > orbsLeft;
     if (droppedVisualOrbs) {
         worm.orbPickupColorsRef.current.length = orbsLeft;
@@ -332,4 +335,5 @@ export function cutWormTail(worm, cut) {
             state.wormOrbInventory, removedFaceIds, segmentCapacity
         ),
     }));
+    return { faceIds: removedFaceIds, colors: removedColors };
 }
