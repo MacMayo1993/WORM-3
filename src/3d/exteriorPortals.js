@@ -85,8 +85,19 @@ export function createExteriorPortals() {
         object.material = Array.isArray(object.material) ? object.material.map(materialFor) : materialFor(object.material);
       });
     },
-    update(tunnel, size, expansion) {
-      uniforms.uExteriorOpen.value = tunnel ? 1 : 0;
+    update(tunnel, size, expansion, fall = null) {
+      uniforms.uExteriorOpen.value = tunnel || fall ? 1 : 0;
+      if (fall) {
+        if (snapshot?.fall === fall) return;
+        snapshot = { fall };
+        // A single, tile-sized bore follows the actual inward fall. Duplicate
+        // it into both shader slots so no unrelated exit tile opens up.
+        for (let side = 0; side < 2; side++) for (let i = 0; i < SAMPLES; i++) {
+          uniforms.uExteriorPoints.value[side * SAMPLES + i].copy(fall.mouth)
+            .addScaledVector(fall.normal, THREE.MathUtils.lerp(0.8, -fall.depth - 0.3, i / (SAMPLES - 1)));
+        }
+        return;
+      }
       if (!tunnel) return;
       if (snapshot?.tunnel === tunnel && snapshot.size === size && snapshot.expansion === expansion
         && snapshot.padHeight === tunnel.padHeight && snapshot.padExpansion === tunnel.padExpansion) return;

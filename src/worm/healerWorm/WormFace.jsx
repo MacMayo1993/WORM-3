@@ -106,7 +106,11 @@ export function WormFace({ worm, size }) {
         const inTransit = (phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout') && worm.activeTunnel.current;
 
         let normal;
-        if (inTransit) {
+        if (phase === 'falling' && worm.cautionFall?.current) {
+            _faceHeadPos.copy(worm.headInterpPos.current);
+            normal = worm.currentNormal.current;
+            _faceForward.copy(worm.cautionFall.current.forward);
+        } else if (inTransit) {
             // During entering/tunnel/exiting/windout the head is driven by getTunnelWorldPosSmoothInto
             // or getWindWorldPosInto. Read headInterpPos/currentNormal which are always current.
             _faceHeadPos.copy(worm.headInterpPos.current);
@@ -199,7 +203,7 @@ export function WormFace({ worm, size }) {
 
         if (mobi) {
             // Use the same interpolated anchor/current normal as the body.
-            const bodyTransit = phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout';
+            const bodyTransit = phase === 'falling' || phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout';
             normal = worm.currentNormal.current;
             mobi.group.position.copy(worm.headInterpPos.current);
             mobi.group.position.addScaledVector(normal, rideShift);

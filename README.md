@@ -121,6 +121,8 @@ Automatic wormholes first burrow beneath neighboring tiles, warn both endpoints,
 
 A flipped sticker marks an active wormhole. The containing cubie rises, with caution tape at the original surface opening. An antipodal-colored stalk and band connect the raised mouth to the interior route. An unflipped face on that raised cubie can still be a landing surface without becoming a tunnel entrance.
 
+Approaching the caution tape on the ground pauses play for a one-second rescue prompt. Press **left**, **right**, or **jump** to turn away or jump onto the platform. Missing the prompt sends the worm into the cube, followed by the dissolve death animation. Hazards and run timers stay frozen during the prompt; pausing or leaving the tab preserves the remaining response time.
+
 Jump onto the raised entrance and use the contextual jump/dive action to enter. The worm winds into the mouth, travels through the cube, and winds out at the partner's current location. The head and body animate along the route; the tail can remain inside after the head has resumed crawling. Healing and Story completion account for tail clearance instead of instantly erasing the passage.
 
 The tunnel presentation includes a central cubelet/core with paired entry and exit treatment. Tunnel bands, raised connections, and inward-facing sticker backs can use the selected tile materials as well as the corresponding face colors. Explosion and rotation update their positions with the board.

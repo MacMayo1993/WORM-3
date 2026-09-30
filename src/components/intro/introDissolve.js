@@ -77,7 +77,35 @@ export function addIntroDissolve(material, uniform) {
  * built-in materials. All patched materials share one program per material type.
  */
 export function addFrameDissolve(material, uniforms) {
-  return patch(material, uniforms, '(uDissolveFrame * modelMatrix * vec4(transformed, 1.0)).xyz', 'frame-dissolve');
+    return patch(material, uniforms, '(uDissolveFrame * modelMatrix * vec4(transformed, 1.0)).xyz', 'frame-dissolve');
+}
+
+// Whole-worm death: the same field, including instanced beads, skin patches
+// and shader-based accessories. Preserve the equipped material's program.
+export function addWormDissolve(material, uniforms, instanced = false) {
+  const previous = material.onBeforeCompile, sourceKey = material.customProgramCacheKey();
+  material.onBeforeCompile = (shader, renderer) => {
+    previous.call(material, shader, renderer);
+    Object.assign(shader.uniforms, uniforms);
+    const transform = instanced ? 'instanceMatrix * ' : '';
+    const prefix = 'uniform mat4 uDissolveFrame;\nvarying vec3 vDissolvePos;\n';
+    const builtin = shader.vertexShader.includes('#include <project_vertex>');
+    const position = `(uDissolveFrame * modelMatrix * ${transform}vec4(${builtin ? 'transformed' : 'position'}, 1.0)).xyz`;
+    shader.vertexShader = prefix + (builtin
+      ? shader.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>\nvDissolvePos = ${position};`)
+      : shader.vertexShader.replace(/void\s+main\s*\(\s*\)\s*\{/, `$&\nvDissolvePos = ${position};`));
+    const clipped = shader.fragmentShader.includes('#include <clipping_planes_fragment>');
+    let fragment = clipped
+      ? shader.fragmentShader.replace('#include <clipping_planes_fragment>', DISCARD)
+      : shader.fragmentShader.replace(/void\s+main\s*\(\s*\)\s*\{/, `$&\n${DISCARD.replace('#include <clipping_planes_fragment>', '')}`);
+    fragment = fragment.includes('#include <emissivemap_fragment>')
+      ? fragment.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n totalEmissiveRadiance += ${EDGE};`)
+      : fragment.replace(/}\s*$/, `gl_FragColor.rgb += ${EDGE};\n}`);
+    shader.fragmentShader = FIELD + fragment;
+  };
+  material.customProgramCacheKey = () => `worm-fall-dissolve:${instanced}:${sourceKey}`;
+  material.needsUpdate = true;
+  return material;
 }
 
 /**

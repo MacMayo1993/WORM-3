@@ -52,6 +52,10 @@ export default function WormSwipeControls({ onTurn, worm }) {
     }, [camera, worm]);
 
     const emitDirection = useCallback((dir) => {
+        if (useGameStore.getState().wormRescueKind === 'caution') {
+            onTurn(dir);
+            return;
+        }
         if (wormControlMode === 'oriented') {
             onTurn(mapOrientedDirection(dir));
             return;
@@ -99,7 +103,7 @@ export default function WormSwipeControls({ onTurn, worm }) {
             }
         };
         const onKey = (e) => {
-            if (e.repeat && e.key !== ' ') return;
+            if (e.repeat && (e.key !== ' ' || useGameStore.getState().wormJumpRescueActive)) return;
             if (e.target?.closest?.('input, textarea, select, [contenteditable=true], [data-game-input="ui"]')) return;
             if (e.key.toLowerCase() === 'f' && useGameStore.getState().wormHealerMode && !useGameStore.getState().demoMode) { e.preventDefault(); e.stopPropagation(); onTurn('fire-start'); return; }
             if (e.key.toLowerCase() === 'q') { e.preventDefault(); e.stopPropagation(); onTurn('signature'); return; }

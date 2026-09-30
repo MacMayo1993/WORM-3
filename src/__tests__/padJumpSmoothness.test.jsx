@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { makeCubies } from '../game/cubeState.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { makeWormSim, resetWormSim, startJump, stepWormSim, jumpLiftOf, tileKey } from '../worm/healerWorm/wormSim.js';
+import { makeWormSim, resetWormSim, queueTurn, startJump, stepWormSim, jumpLiftOf, tileKey } from '../worm/healerWorm/wormSim.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { advancePlatformFormation } from '../worm/platformFormation.js';
@@ -74,9 +74,9 @@ function ride(size, heading, pressAt, hz = 60, beforeJump = noop) {
   const dt = 1 / hz, frames = [];
   let pressed = false, previous = renderedHead(sim);
   for (let i = 0; i < hz * 8 && sim.alive; i++) {
-    if (!pressed && sim.headInterpPos.distanceTo(center) <= pressAt) {
+    if (!pressed && (sim.headInterpPos.distanceTo(center) <= pressAt || sim.cautionRescue)) {
       beforeJump(staged);
-      startJump(sim, ctx, size);
+      if (sim.cautionRescue) queueTurn(sim, 'jump'); else startJump(sim, ctx, size);
       pressed = true;
     }
     stepWormSim(sim, dt, size, ctx);
@@ -91,7 +91,7 @@ function ride(size, heading, pressAt, hz = 60, beforeJump = noop) {
 describe('jumping into a raised tunnel', () => {
   afterEach(() => { liveCubies.refs = null; liveCubies.size = 0; });
 
-  // From a tile and a half out (a clean arc) and from under the pad (backing out).
+  // Early jumps and late attempts caught by the caution-tape rescue both retain a smooth arc.
   it.each([3, 5, 7, 15].flatMap(size => [[size, 1.5], [size, 0.35]]))('never stalls or lurches on a %i cube, pressed %s from the pad', (size, pressAt) => {
     for (const hz of [30, 60, 120]) {
       for (const heading of ['up', 'right']) {
@@ -201,7 +201,10 @@ describe('the camera through a pad jump and dive', () => {
       let pressed = false, position = null, orientation = null, turn = 0, speed = 0, offscreen = 0;
       const padTop = center.clone().addScaledVector(FACE_NORMALS.PZ, 0.655);
       for (let i = 0; i < 60 * 8; i++) {
-        if (!pressed && i > 30 && sim.headInterpPos.distanceTo(center) <= (size === 3 ? 0.95 : 1.5)) { startJump(sim, ctx, size); pressed = true; }
+        if (!pressed && ((i > 30 && sim.headInterpPos.distanceTo(center) <= (size === 3 ? 0.95 : 1.5)) || sim.cautionRescue)) {
+          if (sim.cautionRescue) queueTurn(sim, 'jump'); else startJump(sim, ctx, size);
+          pressed = true;
+        }
         stepWormSim(sim, dt, size, ctx);
         scene.frame({}, dt);
         scene.camera.updateMatrixWorld(true);

@@ -260,7 +260,7 @@ export function WormBody({ worm, size }) {
         // the ribbon/spiral centerline exactly — no face-normal lift, or the head floats off.
         // windout uses getWindWorldPosInto which supplies its own lift, so WORM_LIFT must not
         // be added again here (face is already placed at headInterpPos + 0.09, consistent).
-        const _bodyTransit = worm.phase.current === 'windup' || worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
+        const _bodyTransit = worm.phase.current === 'falling' || worm.phase.current === 'windup' || worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
         bodyPathHeadInto(_bodyHeadPos, worm, _bodyTransit);
         _headPathPoint.transit = _bodyTransit;
         blendTunnelBodyProfile(_headPathPoint, _bodyTransit ? worm.tunnelRide?.current : null);
@@ -973,7 +973,8 @@ export function GlowWormAura({ worm, size }) {
             rocketOrbitInto(lightRef.current.position, size, rocketOrbitT(worm.rocketActive.current, worm.rocketT.current, worm.rocketFlight?.current));
             // Zero out only while inside the Möbius ribbon — worm is visible during entering/exiting
             const inTunnel = worm.phase.current === 'tunnel';
-            lightRef.current.intensity = inTunnel ? 0 : 1.2 + Math.sin(t * 4.0) * 0.4;
+            lightRef.current.intensity = (inTunnel ? 0 : 1.2 + Math.sin(t * 4.0) * 0.4)
+                * (1 - (worm.cautionFall?.current?.dissolve ?? 0));
         }
     });
 

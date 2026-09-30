@@ -17,6 +17,7 @@ import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, 
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState, inchGaitInto, inchBodyRadius } from './inchGait.js';
 import { arcLift } from './jumpArc.js';
+import { cautionEntry, makeCautionFall, tickCautionFall } from './cautionRescue.js';
 // src/worm/healerWorm/wormSim.js
 //
 // Pure(-ish) worm simulation core, extracted from useWormCrawler.js (2026-07).
@@ -309,6 +310,8 @@ export function makeWormSim(size) {
         jumpRescueCollision: null,
         jumpRescueRequested: false,
         jumpRescueHeld: false,
+        cautionRescue: null,
+        cautionFall: null,
         selfCollisionGraceSteps: 0,
 
         // ── Body / trails ──────────────────────────────────────────────────────
@@ -446,6 +449,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.jumpRescueCollision = null;
     sim.jumpRescueRequested = false;
     sim.jumpRescueHeld = false;
+    sim.cautionRescue = null;
+    sim.cautionFall = null;
     sim.selfCollisionGraceSteps = 0;
     sim.tailLength = BASE_TAIL_LENGTH;
     sim.orbPickupColors = [];
@@ -706,11 +711,52 @@ function pendingBodyStillPresent(sim) {
 }
 
 function clearJumpRescue(sim, ctx) {
-    const wasActive = sim.jumpRescueCollision !== null;
+    const wasActive = sim.jumpRescueCollision !== null || sim.cautionRescue !== null;
     sim.jumpRescueT = 0;
     sim.jumpRescueCollision = null;
     sim.jumpRescueRequested = false;
+    sim.cautionRescue = null;
     if (wasActive) ctx.onJumpRescue?.(false);
+}
+
+function tickCautionRescue(sim, delta, size, ctx) {
+    const rescue = sim.cautionRescue;
+    if (!rescue) return false;
+    if (!cautionEntry(sim, rescue.tile, size, ctx)) {
+        clearJumpRescue(sim, ctx);
+        return true;
+    }
+    const input = sim.jumpRescueRequested;
+    if (input) {
+        clearJumpRescue(sim, ctx);
+        if (input === 'jump') startJump(sim, ctx, size);
+        else {
+            sim.moveDir = turnWorm(sim.moveDir, input);
+            sim.lastTurnDir = input;
+            sim.tilesSinceTurn = 0;
+            sim.waterMomentum = 0;
+            sim.pendingSelfCollision = null;
+            // One departing step lets the player get clear of this edge before
+            // the usual body-contact rules resume.
+            sim.selfCollisionGraceSteps = Math.max(1, sim.selfCollisionGraceSteps);
+            ctx.onSteer?.();
+            ctx.feel('uiKey');
+        }
+        return true;
+    }
+    sim.jumpRescueT = Math.max(0, sim.jumpRescueT - Math.max(0, delta));
+    if (sim.jumpRescueT <= 1e-9) {
+        clearJumpRescue(sim, ctx);
+        sim.cautionFall = makeCautionFall(sim, rescue.tile, size);
+        sim.headInterpPos.copy(sim.cautionFall.start);
+        sim.phase = 'falling';
+        sim.pendingTurns.length = 0;
+        sim.pendingSelfCollision = null;
+        sim.pendingTunnelTrigger = null;
+        sim.signatureRequested = false;
+        ctx.onPhase('falling');
+    }
+    return true;
 }
 
 // The countdown is presentation time; every gameplay clock remains frozen.
@@ -760,9 +806,13 @@ function tickJumpRescue(sim, delta, size, ctx) {
 }
 
 export function queueTurn(sim, dir) {
+    if (!sim.alive || sim.phase === 'falling') return;
     if (sim.signature.sweep) return;
     if (sim.jumpRescueT > 0) {
-        if (dir === 'jump') sim.jumpRescueRequested = true;
+        if (sim.cautionRescue) {
+            const action = dir === 'turnLeft' ? 'left' : dir === 'turnRight' ? 'right' : dir;
+            if (!sim.jumpRescueRequested && ['left', 'right', 'jump'].includes(action)) sim.jumpRescueRequested = action;
+        } else if (dir === 'jump') sim.jumpRescueRequested = true;
         return;
     }
     if (dir === 'signature') { sim.signatureRequested = true; return; }
@@ -1775,6 +1825,20 @@ const PHASE_HANDLERS = {
             // arc covers it nicely.
 
             if (sim.stepAcc >= STEP_SEC) {
+                const caution = cautionEntry(sim, getNextSurfacePosition(sim.pos, sim.moveDir, size), size, ctx);
+                if (caution) {
+                    // Stop on the safe source tile before committing any pickups,
+                    // trail cells or body contacts on the other side of the tape.
+                    sim.cautionRescue = caution;
+                    sim.jumpRescueT = JUMP_RESCUE_SECONDS;
+                    sim.jumpRescueRequested = false;
+                    sim.jumpRescueHeld = true;
+                    sim.pendingTurns.length = 0;
+                    sim.signatureRequested = false;
+                    sim.stepAcc = STEP_SEC;
+                    ctx.onJumpRescue?.(true, 'caution');
+                    return true;
+                }
                 sim.stepAcc -= STEP_SEC;
                 sim.interpT = 0;
                 sim.lastRecordedT = 0;
@@ -2090,6 +2154,15 @@ export function stepWormSim(sim, delta, size, ctx) {
     }
     if (paused) { sim.signatureRequested = false; return; }
 
+    if (sim.phase === 'falling') {
+        sim.jumpRescueHeld = true;
+        if (tickCautionFall(sim, delta)) killWormSim(sim, ctx, {
+            reason: 'caution-fall', headTile: tileKey(sim.cautionFall.tile),
+            impactPosition: sim.cautionFall.mouth.toArray(),
+        });
+        return;
+    }
+
     if (usesRaisedPlatforms(ctx)) sim.pendingTunnelTrigger = null;
     if (sim.padFlight) {
         const landed = tickPlatformJump(sim, delta);
@@ -2143,9 +2216,9 @@ export function stepWormSim(sim, delta, size, ctx) {
         return;
     }
 
-    if (tickJumpRescue(sim, delta, size, ctx)) {
+    if (tickCautionRescue(sim, delta, size, ctx) || tickJumpRescue(sim, delta, size, ctx)) {
         // Restore the rest pose before the render bridge applies a slice angle.
-        sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
+        if (!sim.padFlight && sim.phase !== 'falling') sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
         sim.jumpRescueHeld = true;
         return;
     }
