@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createCharacterGeometry, applyCharacterFinish, prismColor, createCharacterAccents, poseCharacterAccents, characterSegmentPattern } from '../../worm/wormCharacterVisuals.js';
 import { createWormSkinMaterial, updateWormSkinMaterialTime, applyBioluminescence } from '../../worm/wormSkinMaterial.js';
 import { createMobiModel, animateMobi, orientMobi, disposeMobi } from '../../worm/mobiModel.js';
-import { createMobiSegmentAssets, createMobiSegment, disposeMobiSegmentAssets } from '../../worm/mobiSegments.js';
+import { createMobiSegmentAssets, createMobiSegment, disposeMobiSegmentAssets, mobiTailSwayInto } from '../../worm/mobiSegments.js';
 import { finishWormEyes, wormBodyTaper } from '../../worm/wormCharacterFinish.js';
 import { layoutWormFace, FACE_LAYOUT } from '../../worm/wormFaceLayout.js';
 import { animateWormFace } from '../../worm/wormFaceExpression.js';
@@ -35,7 +35,8 @@ export function createMenuCharacterRig(character) {
     if (mobi) {
       if (i > 0 && i % 3 === 2) {
         const tail = createMobiSegment(mobiAssets); holder.add(tail.group);
-        tail.group.scale.setScalar(.125); mobiTails.push(tail);
+        tail.group.scale.setScalar(.125 * wormBodyTaper(i, MENU_WORM_SEGMENTS, character)); mobiTails.push(tail);
+        return { holder, mobiTail: tail };
       }
       return { holder };
     }
@@ -81,6 +82,7 @@ export function createMenuCharacterRig(character) {
   // the eyes, mouth, accessories or MOBI shell floating at the old pose.
   segments[0].holder.add(...faceParts, accents.group);
   if (mobi) segments[0].holder.add(mobi.group);
+  const mobiSway = { roll: 0, pitch: 0, yaw: 0, lift: 0 };
   const side = new THREE.Vector3(), back = new THREE.Vector3(), basis = new THREE.Matrix4();
   const origin = new THREE.Vector3(), localUp = new THREE.Vector3(0, 1, 0), localForward = new THREE.Vector3(0, 0, -1);
   return {
@@ -100,6 +102,11 @@ export function createMenuCharacterRig(character) {
         if (character === 'prism') prismColor(segment.material.color, i, time);
       }
       if (segment.book) poseBookSegment(segment.book, motion?.pulse ?? 0, reducedMotion ? 0 : time, i);
+      if (segment.mobiTail) {
+        const sway = mobiTailSwayInto(mobiSway, i / 3, time * 0.6, time, reducedMotion);
+        segment.mobiTail.group.rotation.set(sway.pitch, sway.yaw, sway.roll);
+        segment.mobiTail.group.position.y = sway.lift * .125;
+      }
       if (i === 0) {
         faceParts.forEach(part => { part.visible = visible && !mobi; });
         accents.group.visible = visible && !mobi;

@@ -30,8 +30,8 @@ import * as THREE from 'three';
 import { createCubieGeometry, createStickerGeometry, rubiksFinish } from './rubiksPiece.js';
 import { RUBIKS_CLASSIC } from '../utils/constants.js';
 import { stepMenuWorm, menuWormSegment } from './menuWormMotion.js';
-import { createMobiSegmentAssets, createMobiSegment, MOBI_SEGMENT_RADIUS } from '../worm/mobiSegments.js';
-import { createMobiModel, animateMobi, orientMobi, MOBI_RADIUS } from '../worm/mobiModel.js';
+import { createMobiSegmentAssets, createMobiSegment, MOBI_SEGMENT_RADIUS, mobiTailSwayInto } from '../worm/mobiSegments.js';
+import { createMobiModel, animateMobi, orientMobi, mobiHeadFrameInto, MOBI_RADIUS } from '../worm/mobiModel.js';
 import { getSkin } from '../worm/wormCosmeticsData.js';
 import { layoutWormFace, FACE_LAYOUT } from '../worm/wormFaceLayout.js';
 import { getSkinFX } from '../worm/wormSkinFX.js';
@@ -471,6 +471,10 @@ function _segmentOffset(i, character, time, out, crawling = false, roaming = fal
 const _off = new THREE.Vector3();
 const _anchor = new THREE.Vector3();
 const _menuForward = new THREE.Vector3();
+const _mobiSway = { roll: 0, pitch: 0, yaw: 0, lift: 0 };
+const _mobiHeadPos = new THREE.Vector3();
+const _mobiHeadForward = new THREE.Vector3();
+const _mobiHeadNormal = new THREE.Vector3();
 const _roamForward = new THREE.Vector3();
 const _roamAhead = new THREE.Vector3();
 const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, null], mouth: null, hat: null };
@@ -609,13 +613,16 @@ function _poseWorm(opts, time) {
     mobiTail.group.visible = isMobi && shown && (i === 2 || (i >= 4 && (i - 4) % 3 === 1));
     if (mobiTail.group.visible) {
       mobiTail.group.position.copy(_off);
-      mobiTail.group.scale.setScalar(MOBI_SEGMENT_RADIUS);
+      mobiTail.group.scale.setScalar(MOBI_SEGMENT_RADIUS * wormBodyTaper(i, SEGMENTS, characterId));
       if (roaming) {
         previewPathPoint(time * PREVIEW_CRAWL_SPEED - i * SPACING, _menuForward);
         previewPathPoint(time * PREVIEW_CRAWL_SPEED - i * SPACING + 0.002, _roamAhead);
         _menuForward.subVectors(_roamAhead, _menuForward).setY(0).normalize();
       }
       orientMobi(mobiTail.group, roaming ? _menuForward : FWD, UP);
+      const sway = mobiTailSwayInto(_mobiSway, i / 3, time * 0.6, time, prefersReducedMotion());
+      mobiTail.group.rotateZ(sway.roll).rotateX(sway.pitch).rotateY(sway.yaw);
+      mobiTail.group.position.y += sway.lift * MOBI_SEGMENT_RADIUS;
       mobiTail.core.material.color.copy(_color);
       mobiTail.core.rotation.y = time * 0.48;
     }
@@ -692,12 +699,14 @@ function _poseWorm(opts, time) {
       tail.gas.material.uniforms.uTime.value = rig.mobi.gas.material.uniforms.uTime.value;
       tail.gas.material.uniforms.uMotion.value = rig.mobi.gas.material.uniforms.uMotion.value;
     }
-    rig.hatGroup.position.copy(_anchor).addScaledVector(UP, MOBI_RADIUS * 1.1);
-    rig.hatGroup.quaternion.copy(rig.mobi.group.quaternion);
+    // Hat and glasses ride the animated head, as in gameplay.
+    mobiHeadFrameInto(rig.mobi, _mobiHeadPos, _mobiHeadForward, _mobiHeadNormal, rig.hatGroup.quaternion);
+    rig.hatGroup.position.copy(_mobiHeadPos).addScaledVector(_mobiHeadNormal, MOBI_RADIUS * 1.1);
   }
 
-  poseHeadAccessories(rig.accessories, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD,
-    UP, isMobi ? MOBI_RADIUS : headScale, time, false, characterId);
+  if (isMobi) poseHeadAccessories(rig.accessories, _mobiHeadPos, _mobiHeadForward, _mobiHeadNormal, MOBI_RADIUS, time, false, characterId);
+  else poseHeadAccessories(rig.accessories, _anchor, opts.companion ? _menuForward : roaming ? _roamForward : FWD,
+    UP, headScale, time, false, characterId);
   finishAccessoryBody(rig.accessories,time,false,skin.body,opts.palette);
 
   // Hat — rebuilt only when the hat changes, then parked above the head.

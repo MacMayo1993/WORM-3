@@ -68,7 +68,9 @@ export function finishWormEyes(eyes, pupils, character = 'classic', mouth = null
 // give the body a silhouette instead of a string of equal beads.
 export function wormBodyTaper(index, count, character) {
   // The Book Worm's volumes taper too, down to pocket editions at the tail.
-  if (index === 0 || character === 'mobi') return 1;
+  if (index === 0) return 1;
+  // MOBI's blocks step down over the last stretch, as in the guide art.
+  if (character === 'mobi') return 1 - 0.3 * Math.max(0, Math.min(1, (index - Math.max(3, count - 7)) / 6));
   if (character === 'wiggle') {
     const tail = Math.max(0, Math.min(1, (index - Math.max(2, count - 7)) / 6));
     return (index === 1 ? 0.94 : 1) * (1 - 0.48 * tail * tail);

@@ -19,7 +19,7 @@ import { layoutWormFace, FACE_LAYOUT } from '../wormFaceLayout.js';
 import { BOOK_HEAD_LIFT } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp, getSkin } from '../wormCosmeticsData.js';
 import { WORM_LIFT, WORM_HEAD_RADIUS, FACE_NORMALS, DIR_FORWARD, windoutHeadS } from './constants.js';
-import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, MOBI_RADIUS } from '../mobiModel.js';
+import { createMobiModel, animateMobi, orientMobi, disposeMobi, setMobiOrbAppearance, mobiHeadFrameInto, MOBI_RADIUS } from '../mobiModel.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { bodyPathHeadInto } from './sliceBodyPath.js';
 import { rocketOrbitT, rocketOrbitInto, rocketFrameInto } from './rocketOrbit.js';
@@ -40,6 +40,10 @@ const _faceTunnelAhead = new THREE.Vector3(); // scratch for tunnel tangent duri
 const _faceTunnelBehind = new THREE.Vector3();
 const _faceFlightTurn = new THREE.Quaternion();
 const _mobiRideAxis = new THREE.Vector3();
+const _mobiHeadPos = new THREE.Vector3();
+const _mobiHeadForward = new THREE.Vector3();
+const _mobiHeadNormal = new THREE.Vector3();
+const _mobiHeadQuat = new THREE.Quaternion();
 
 export function WormFace({ worm, size }) {
     const equipment = useGameStore(s => s.wormAccessories ?? EMPTY_ACCESSORIES);
@@ -222,12 +226,14 @@ export function WormFace({ worm, size }) {
             animateMobi(mobi, faceTime.current, { pulse: facePulse.current, transit: !!inTransit });
             mobi.group.scale.setScalar(MOBI_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
             const headRadius = MOBI_RADIUS * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1);
-            poseHeadAccessories(accessories, mobi.group.position, _faceForward, normal, headRadius,
+            // Hats and glasses ride the animated head: its bob, lean and tilt.
+            mobiHeadFrameInto(mobi, _mobiHeadPos, _mobiHeadForward, _mobiHeadNormal, _mobiHeadQuat);
+            poseHeadAccessories(accessories, _mobiHeadPos, _mobiHeadForward, _mobiHeadNormal, headRadius,
                 reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
             if (hatGroupRef.current) {
-                hatGroupRef.current.position.copy(mobi.group.position).addScaledVector(normal, headRadius * 1.1);
-                hatGroupRef.current.quaternion.copy(mobi.group.quaternion);
-                poseHandmadeHat(hatGroupRef.current,wormHatId,_faceForward,normal,reducedMotion ? 0 : faceTime.current,!!inTransit);
+                hatGroupRef.current.position.copy(_mobiHeadPos).addScaledVector(_mobiHeadNormal, headRadius * 1.1);
+                hatGroupRef.current.quaternion.copy(_mobiHeadQuat);
+                poseHandmadeHat(hatGroupRef.current,wormHatId,_mobiHeadForward,_mobiHeadNormal,reducedMotion ? 0 : faceTime.current,!!inTransit);
                 hatGroupRef.current.scale.multiplyScalar(worm.tunnelHeadScale ?? 1);
             }
             return;
