@@ -22,8 +22,10 @@ import OrbPickupBurst from './OrbPickupBurst.jsx';
 import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
-// The gem shows the face credited to the reserve; the opposite-colored band
-// separates it from the tile underneath. Face identity follows live rotations.
+// The band wears the manifold the orb sits on (its colour and tile style), and
+// the gem body wears that face's antipodal partner: on a white face, a yellow
+// gem in a white band (orbColorRoles). The face credited to the reserve on
+// pickup is still the manifold's own, the band. Face identity follows live rotations.
 //
 // Memoised on `size`, its only prop. Everything else it needs comes from its own
 // store subscription, so it still re-renders the instant an orb tile changes —
@@ -65,7 +67,6 @@ function PowerupOrbsImpl({ size, worm = null }) {
             const elevated = !!(sticker && sticker.curr !== sticker.orig);
             return {
                 ...p,
-                matchReserveColor: true,
                 color: getOrbColor(faceId, faceColors),
                 antipodalColor: getAntipodalOrbColor(faceId, faceColors),
                 styleKey: manifoldStyles?.[faceId] || 'solid',

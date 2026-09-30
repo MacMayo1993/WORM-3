@@ -4,7 +4,7 @@ import { wormExpansion } from './wormExpansion.js';
 import { WormPointLight } from './WormLighting.jsx';
 import { createOrbBatches } from './orbBatches.js';
 import { PARITY_ORB_GEOMETRIES } from './parityOrbGeometries.js';
-import { getOrbMaterials } from './orbMaterials.js';
+import { getOrbMaterials, orbColorRoles } from './orbMaterials.js';
 import { createOrbVisibility } from './orbVisibility.js';
 // src/worm/ParityOrb.jsx
 // Collectible parity orbs — crystal-core visual design with inner plasma,
@@ -64,15 +64,13 @@ const _orbGeos = PARITY_ORB_GEOMETRIES;
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
 function SingleOrbImpl({
   position, color = '#ffd700', antipodalColor = '#ffd700', styleKey = 'solid',
-  collected = false, isTarget = false, elevated = false, matchReserveColor = false,
+  collected = false, isTarget = false, elevated = false,
   dirKey = 'PY', orbKey, type = 'parity', shower = false,
   registerAnim, unregisterAnim,
   gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false, reducedDetail = false,
 }) {
-  // WORM pickups advertise the color credited to the reserve in their main gem.
-  // The opposite-colored band keeps them distinct from the supporting tile.
-  const gemColor = matchReserveColor ? color : antipodalColor;
-  const bandColor = matchReserveColor ? antipodalColor : color;
+  // The band wears the manifold the orb sits on; the gem wears its antipodal partner.
+  const { gem: gemColor, band: bandColor } = orbColorRoles(color, antipodalColor);
   // The stickers' own material — same shader, same defines, so it shares their
   // already-compiled program and never links a new one mid-run. 'solid' has no
   // pattern worth carrying, so it keeps the emissive band below instead.
@@ -152,7 +150,8 @@ function SingleOrbImpl({
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Shower beads keep the bright round gem and credited face color. After
+  // Shower beads keep the bright round gem, in the antipodal colour like every
+  // orb body (on reduced-detail boards the band is dropped too). After
   // assembly they join one shared opaque draw per color, so a rain of dozens
   // does not multiply the full pickup's transparent rings and glass layers.
   if (reducedDetail) {
@@ -250,7 +249,6 @@ const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
   a.orbKey === b.orbKey &&
   a.color === b.color &&
   a.antipodalColor === b.antipodalColor &&
-  a.matchReserveColor === b.matchReserveColor &&
   a.styleKey === b.styleKey &&
   a.dirKey === b.dirKey &&
   a.type === b.type &&
@@ -588,7 +586,6 @@ export default function ParityOrbs({
         position,
         color:          orb.color          || '#ffd700',
         antipodalColor: orb.antipodalColor || orb.color || '#ffd700',
-        matchReserveColor: !!orb.matchReserveColor,
         styleKey:       orb.styleKey       || 'solid',
         dirKey:         orb.dirKey         || 'PY',
         type:           orb.type           || 'parity',
@@ -614,7 +611,6 @@ export default function ParityOrbs({
           position={data.position}
           color={data.color}
           antipodalColor={data.antipodalColor}
-          matchReserveColor={data.matchReserveColor}
           styleKey={data.styleKey}
           dirKey={data.dirKey}
           type={data.type}

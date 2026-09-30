@@ -1,5 +1,15 @@
 import * as THREE from 'three';
 
+/**
+ * Which colour each part of a parity orb wears. The band is the manifold the orb
+ * sits on (its colour, and its tile style on patterned boards); the gem body is
+ * that face's antipodal partner. On a white face: yellow gem, white band.
+ * MOBI's carried orbs (mobiOrbAppearance.js) follow the same rule.
+ */
+export function orbColorRoles(faceColor, antipodalColor) {
+  return { gem: antipodalColor, band: faceColor };
+}
+
 // A lit rim on the glass shell: the gem's own colour blooms at its silhouette and
 // the glass thickens there, so a smaller orb still reads crisply against any tile
 // and from the far chase camera. One shared program for every shell (fixed cache
