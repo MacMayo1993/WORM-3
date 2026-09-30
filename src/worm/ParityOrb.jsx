@@ -3,7 +3,7 @@ import { prefersReducedMotion } from '../utils/device.js';
 import { wormExpansion } from './wormExpansion.js';
 import { WormPointLight } from './WormLighting.jsx';
 import { createOrbBatches } from './orbBatches.js';
-import { createParityCageGeometry } from './parityCage.js';
+import { PARITY_ORB_GEOMETRIES } from './parityOrbGeometries.js';
 import { getOrbMaterials } from './orbMaterials.js';
 import { createOrbVisibility } from './orbVisibility.js';
 // src/worm/ParityOrb.jsx
@@ -13,13 +13,14 @@ import { createOrbVisibility } from './orbVisibility.js';
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { createParityMobiusGeometry } from './parityGeometry.js';
 import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { fxBudget } from './healerWorm/fxBudget.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
+import { PARITY_ORB_SCALE } from './healerWorm/constants.js';
+import { createOrbBeacons, orbProximity, orbPerkInto, beaconPoseInto } from './orbBeacon.js';
 
 // Orbs float this far above the tile surface so they're visible from any angle
 const HOVER_ABOVE = 0.28;
@@ -35,6 +36,16 @@ const _scratchPos = new THREE.Vector3();
 const _scratchBob = new THREE.Vector3();
 const _rainbowColor = new THREE.Color();
 const _tunnelOrbScratch = new THREE.Vector3();
+const _head = new THREE.Vector3();
+const _rootInverse = new THREE.Matrix4();
+const _tile = new THREE.Vector3();
+const _tileNormal = new THREE.Vector3();
+const _perk = { scale: 1, spin: 1 };
+const _beacon = {};
+// Beacon ring diameters (world units) for an orb on its tile.
+// The band sits at 70% of this radius: just inside a sticker's edge, clear of the gem.
+const BEACON_DIAMETER = 0.98;
+const BEACON_LIFT = 0.012; // just off the sticker so it never z-fights the tile
 
 // ── Orb type definitions — foundation for power-up variants ─────────────────
 // 'parity' is the standard collectible. Reserved slots for future power-ups.
@@ -46,45 +57,8 @@ export const ORB_TYPES = {
 };
 
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
-// Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
-const _orbGeos = {
-  normal: {
-    shell:        new THREE.SphereGeometry(0.21, 32, 32),          // smooth glassy, iridescent gem shell
-    innerCore:    new THREE.SphereGeometry(0.115, 20, 20),         // bright energy core seen through the shell
-    innerGlow:    new THREE.SphereGeometry(0.30, 24, 18),          // soft additive inner halo (smooth, not faceted)
-    core:         createParityMobiusGeometry(0.24, 0.08),                           // Möbius strip — smaller accent ring, antipodal color
-    ringA:        new THREE.TorusGeometry(0.370, 0.011, 6, 18),    // orbit rings sit just outside the strip
-    ringB:        new THREE.TorusGeometry(0.370 * 0.92, 0.009, 6, 18),
-    electron:     new THREE.SphereGeometry(0.042, 7, 7),
-    glow:         new THREE.SphereGeometry(0.52, 40, 28),          // outer ambient aura — smooth round glow (was octagonal at 8 segs)
-    parityCage:   new THREE.TorusGeometry(0.30, 0.012, 10, 48),    // smooth great-circle halo (was a diamond octahedron)
-    parityCage2:  new THREE.TorusGeometry(0.30, 0.010, 10, 48),    // cross-tilted second halo
-    parityNode:   new THREE.SphereGeometry(0.055, 14, 12),         // antipodal pair at opposite poles
-    parityAxis:   new THREE.CylinderGeometry(0.010, 0.010, 0.54, 12),
-  },
-  target: {
-    shell:        new THREE.SphereGeometry(0.27, 36, 36),          // larger smooth gem for target
-    innerCore:    new THREE.SphereGeometry(0.15, 24, 24),
-    innerGlow:    new THREE.SphereGeometry(0.40, 24, 18),
-    core:         createParityMobiusGeometry(0.30, 0.10),                           // Möbius strip, antipodal color
-    ringA:        new THREE.TorusGeometry(0.460, 0.015, 8, 24),
-    ringB:        new THREE.TorusGeometry(0.460 * 0.92, 0.012, 8, 24),
-    ringC:        new THREE.TorusGeometry(0.460 * 1.08, 0.010, 8, 24),
-    electron:     new THREE.SphereGeometry(0.052, 8, 8),
-    electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
-    glow:         new THREE.SphereGeometry(0.66, 40, 28),          // outer ambient aura — smooth round glow (was decagonal at 10 segs)
-    lockRing:     new THREE.TorusGeometry(0.56, 0.03, 8, 36),
-    parityCage:   new THREE.TorusGeometry(0.38, 0.015, 10, 56),
-    parityCage2:  new THREE.TorusGeometry(0.38, 0.012, 10, 56),
-    parityNode:   new THREE.SphereGeometry(0.068, 14, 12),
-    parityAxis:   new THREE.CylinderGeometry(0.012, 0.012, 0.68, 12),
-  },
-};
-
-// Shared cage geometry keeps the three additive pieces in one per-orb draw.
-for (const [variant, geometry] of Object.entries(_orbGeos)) {
-  geometry.cage = createParityCageGeometry(geometry, variant === 'target');
-}
+// Built once at PARITY_ORB_SCALE in parityOrbGeometries.js, shared by every orb.
+const _orbGeos = PARITY_ORB_GEOMETRIES;
 
 // SingleOrb renders geometry and registers refs with the parent OrbAnimator.
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
@@ -137,6 +111,7 @@ function SingleOrbImpl({
   const isGlowWormRef = useRef(isGlowWorm); isGlowWormRef.current = isGlowWorm;
   const typeRef       = useRef(type);       typeRef.current       = type;
   const styledBandRef = useRef(false); styledBandRef.current = !!bandMaterial;
+  const gemColorRef   = useRef(gemColor);   gemColorRef.current   = gemColor;
 
   useEffect(() => {
     registerAnim(orbKey, {
@@ -167,6 +142,8 @@ function SingleOrbImpl({
       get poles()         { return poleRefs.current; },
       get styledBand()    { return styledBandRef.current; },
       timeOffset, shower, reducedDetail, age: 0, reveal: null, arrived: false,
+      near: 0, spin: 0,
+      get color()         { return gemColorRef.current; },
     });
     return () => unregisterAnim(orbKey);
   }, [orbKey, timeOffset, shower, reducedDetail, registerAnim, unregisterAnim]);
@@ -208,8 +185,8 @@ function SingleOrbImpl({
           all curves — no diamond, no hard edges. */}
       <group ref={parityMarkRef} rotation={[Math.PI / 4, 0, Math.PI / 4]}>
         <mesh name="ParityOrbCageBatch" geometry={g.cage} material={mat.cage} />
-        <mesh ref={el => { poleRefs.current[0] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeGem} position={[0, isTarget ? 0.34 : 0.27, 0]} />
-        <mesh ref={el => { poleRefs.current[1] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeBand} position={[0, isTarget ? -0.34 : -0.27, 0]} />
+        <mesh ref={el => { poleRefs.current[0] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeGem} position={[0, (isTarget ? 0.34 : 0.27) * PARITY_ORB_SCALE, 0]} />
+        <mesh ref={el => { poleRefs.current[1] = el; }} visible={false} geometry={g.parityNode} material={mat.nodeBand} position={[0, (isTarget ? -0.34 : -0.27) * PARITY_ORB_SCALE, 0]} />
       </group>
 
       {/* Möbius strip — the orb's own face, in that face's colour AND its tile
@@ -306,6 +283,7 @@ const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
 export default function ParityOrbs({
   orbs, size, explosionFactor = 0,
   mode = 'surface', targetTunnelId = null, isGlowWorm = false, wormMode = false,
+  focusRef = null,
 }) {
   const isTunnelMode = mode === 'tunnel';
 
@@ -315,6 +293,9 @@ export default function ParityOrbs({
   const visibility = useMemo(() => createOrbVisibility(), []);
   const batches = useMemo(() => createOrbBatches(), []);
   useEffect(() => () => batches.dispose(), [batches]);
+  // Every orb's tile beacon, in one additive draw (orbBeacon.js).
+  const beacons = useMemo(() => createOrbBeacons(), []);
+  useEffect(() => () => beacons.dispose(), [beacons]);
   const registerAnim   = useCallback((key, refs) => { animMapRef.current.set(key, refs); }, []);
   const unregisterAnim = useCallback((key) => { animMapRef.current.get(key)?.reveal?.dispose(); animMapRef.current.delete(key); }, []);
 
@@ -324,6 +305,14 @@ export default function ParityOrbs({
     const cull = !useGameStore.getState().showAntipodalPiP;
     if (cull) visibility.begin(state.camera, orbRootRef.current);
     batches.begin(orbRootRef.current);
+    beacons.begin();
+    // The worm's head in the orbs' own frame, so each orb can perk up as it nears.
+    const focus = focusRef?.current;
+    if (focus && orbRootRef.current) {
+      _rootInverse.copy(orbRootRef.current.matrixWorld).invert();
+      _head.copy(focus).applyMatrix4(_rootInverse);
+    }
+    const frameDelta = Math.min(delta, 0.05);
 
     for (const refs of animMapRef.current.values()) {
       const {
@@ -347,6 +336,8 @@ export default function ParityOrbs({
 
       if (cubie) {
         _scratchBob.set(bn[0], bn[1], bn[2]).applyQuaternion(cubie.quaternion);
+        _tileNormal.copy(_scratchBob);
+        _tile.copy(cubie.position).addScaledVector(_scratchBob, SURFACE_OFFSET + BEACON_LIFT);
         _scratchPos.copy(cubie.position).addScaledVector(_scratchBob, SURFACE_OFFSET + HOVER_ABOVE);
         if (elevated) _scratchPos.addScaledVector(_scratchBob, 1.2);
         const bobAmt = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
@@ -356,6 +347,8 @@ export default function ParityOrbs({
         const base = wormMode && gridX >= 0
           ? getSegmentWorldPos({ x: gridX, y: gridY, z: gridZ, dirKey }, size, wormExpansion.amount) : position;
         const elevatedLift = wormMode && gridX >= 0 && elevated ? 1.2 : 0;
+        _tileNormal.set(bn[0], bn[1], bn[2]);
+        _tile.set(base[0], base[1], base[2]).addScaledVector(_tileNormal, BEACON_LIFT);
         const _bob = elevatedLift + HOVER_ABOVE + Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
         group.position.set(
           base[0] + bn[0] * _bob,
@@ -370,21 +363,45 @@ export default function ParityOrbs({
       }
       // Advance off-screen arrivals too: camera moves never replay the entrance.
       if (!refs.arrived) {
-        refs.reveal ??= createOrbReveal(group, { radius: isTarget ? 0.75 : 0.6, reducedMotion: reducedMotion.current });
+        refs.reveal ??= createOrbReveal(group, { radius: (isTarget ? 0.75 : 0.6) * PARITY_ORB_SCALE, reducedMotion: reducedMotion.current });
         refs.arrived = !refs.reveal.update(arrival);
       }
 
       // Keep placement current even when hidden so turning slices and camera
       // moves bring the complete orb back immediately. Off-screen parts skip
       // their individual animation and render-list traversal.
-      group.visible = !cull || visibility.contains(group.position, isTarget ? 1.1 : 0.85);
+      group.visible = !cull || visibility.contains(group.position, (isTarget ? 1.1 : 0.85) * PARITY_ORB_SCALE);
       if (!group.visible) continue;
+
+      // ── Anticipation: the orb perks up as the worm's head closes in ────────
+      // Eased toward its target so the swell never snaps, and the spin runs on an
+      // accumulated phase so speeding it up never jumps the rotation.
+      const nearTarget = focus && !refs.shower ? orbProximity(group.position.distanceTo(_head)) : 0;
+      refs.near += (nearTarget - refs.near) * Math.min(1, frameDelta * 8);
+      orbPerkInto(_perk, refs.near, reducedMotion.current);
+      refs.spin += frameDelta * _perk.spin;
+      const spinTime = refs.spin + timeOffset;
+      group.scale.setScalar(_perk.scale);
+
+      // ── Tile beacon: which tile collects this orb ──────────────────────────
+      if (!refs.shower && !isTunnelMode) {
+        beaconPoseInto(_beacon, time, refs.near, arrival, reducedMotion.current);
+        // Parse the orb's colour once per change, not every frame.
+        if (refs.beaconHex !== refs.color) {
+          refs.beaconHex = refs.color;
+          (refs.beaconColor ??= new THREE.Color()).set(refs.color);
+        }
+        const color = refs.beaconColor;
+        beacons.add(_tile, _tileNormal, BEACON_DIAMETER * _beacon.ringScale, color, _beacon.ringIntensity);
+        if (_beacon.pingVisible) beacons.add(_tile, _tileNormal, BEACON_DIAMETER * _beacon.pingScale, color, _beacon.pingIntensity);
+      }
 
       // ── Crystal core spin ──────────────────────────────────────────────────
       if (core) {
-        core.rotation.y = time * (isTarget ? 1.7 : 1.0);
+        core.rotation.y = spinTime * (isTarget ? 1.7 : 1.0);
         core.rotation.x = Math.sin(time * 1.4) * 0.2;
-        core.scale.setScalar(1 + Math.sin(time * (isTarget ? 5.2 : 3.8)) * (isTarget ? 0.18 : 0.10));
+        // A slow breath, not a flutter: the old ±10% at 3.8 Hz read as jitter.
+        core.scale.setScalar(1 + Math.sin(time * (isTarget ? 5.2 : 2.4)) * (isTarget ? 0.18 : 0.05));
       }
 
       if (outline && core) {
@@ -397,12 +414,12 @@ export default function ParityOrbs({
       if (innerCore) {
         innerCore.rotation.y = -time * 2.5;
         innerCore.rotation.z =  time * 1.8;
-        innerCore.scale.setScalar(1 + Math.sin(time * 6.0) * 0.30);
+        innerCore.scale.setScalar(1 + Math.sin(time * 3.2) * 0.14);
       }
 
       // ── Sphere body — gentle breathing pulse ───────────────────────────────
       if (shell) {
-        shell.scale.setScalar(1 + Math.sin(time * (isTarget ? 4.0 : 3.0)) * (isTarget ? 0.10 : 0.07));
+        shell.scale.setScalar(1 + Math.sin(time * (isTarget ? 4.0 : 2.0)) * (isTarget ? 0.10 : 0.035));
       }
 
       // ── Inner glow — pulses offset from outer glow ─────────────────────────
@@ -413,16 +430,16 @@ export default function ParityOrbs({
 
       // ── Orbit system ───────────────────────────────────────────────────────
       if (orbitSystem) {
-        orbitSystem.rotation.y = time * (isTarget ? 2.6 : 1.8);
+        orbitSystem.rotation.y = spinTime * (isTarget ? 2.6 : 1.8);
         orbitSystem.rotation.x = Math.sin(time * 0.8) * 0.65;
         orbitSystem.rotation.z = Math.cos(time * 0.55) * 0.5;
       }
 
-      if (ringA) ringA.rotation.z = time * 1.5;
-      if (ringB) ringB.rotation.x = time * 1.2;
+      if (ringA) ringA.rotation.z = spinTime * 1.5;
+      if (ringB) ringB.rotation.x = spinTime * 1.2;
       if (isTarget && ringC) ringC.rotation.y = time * 1.35;
       if (parityMark) {
-        parityMark.rotation.y = -time * (isTarget ? 1.15 : 0.8);
+        parityMark.rotation.y = -spinTime * (isTarget ? 1.15 : 0.8);
         parityMark.rotation.z = Math.PI / 4 + Math.sin(time * 1.4) * 0.12;
         parityMark.scale.setScalar(1 + Math.sin(time * 4.2) * 0.045);
       }
@@ -541,6 +558,7 @@ export default function ParityOrbs({
       }
     }
     batches.end();
+    beacons.end();
   });
 
   const orbData = useMemo(() => {
@@ -588,6 +606,7 @@ export default function ParityOrbs({
   return (
     <group ref={orbRootRef}>
       <primitive object={batches.group} />
+      <primitive object={beacons.mesh} />
       {orbData.map((data) => (
         <SingleOrb
           key={data.key}

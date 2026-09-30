@@ -832,7 +832,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <OrbFlashSystem worm={worm} />
             <SpecialFlashSystem worm={worm} />
             {wormAlive && <MagnetFX worm={worm} />}
-            <PowerupOrbs size={size} />
+            <PowerupOrbs size={size} worm={worm} />
             <SpecialOrbs size={size} hidden={wormInTunnel} />
             <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} worm={worm} />
             <SeveredTail severedRef={severedRef} />

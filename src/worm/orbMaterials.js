@@ -1,5 +1,21 @@
 import * as THREE from 'three';
 
+// A lit rim on the glass shell: the gem's own colour blooms at its silhouette and
+// the glass thickens there, so a smaller orb still reads crisply against any tile
+// and from the far chase camera. One shared program for every shell (fixed cache
+// key); orbReveal chains its dissolve on top of this patch.
+export const ORB_RIM_STRENGTH = 1.35;
+function addOrbRim(material) {
+  material.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  float orbRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.4);
+  totalEmissiveRadiance += emissive * orbRim * ${ORB_RIM_STRENGTH.toFixed(2)};
+  diffuseColor.a = mix(diffuseColor.a, 1.0, orbRim * 0.55);`);
+  };
+  material.customProgramCacheKey = () => 'parity-orb-rim';
+  return material;
+}
+
 // Shared shader variants stay resident across respawns. Uniform animation uses
 // the global clock, and elevated/glow states get separate sets so they cannot
 // recolor ordinary pickups. Mesh transforms retain their individual phases.
@@ -11,12 +27,12 @@ export function getOrbMaterials(gemColor, bandColor, isTarget, elevated = false,
   const basic = (color, opacity, extra) =>
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false, ...extra });
   const set = {
-    shell: new THREE.MeshPhysicalMaterial({
+    shell: addOrbRim(new THREE.MeshPhysicalMaterial({
       color: gemColor, emissive: gemColor, emissiveIntensity: isTarget ? 0.85 : 0.6,
       metalness: 0, roughness: 0.06, iridescence: 1, iridescenceIOR: 1.4,
       clearcoat: 1, clearcoatRoughness: 0.08,
-      transparent: true, opacity: 0.78, depthWrite: false, toneMapped: false
-    }),
+      transparent: true, opacity: 0.72, depthWrite: false, toneMapped: false
+    })),
     innerCore: new THREE.MeshStandardMaterial({
       color: gemColor, emissive: gemColor, emissiveIntensity: isTarget ? 2.6 : 2.0,
       metalness: 0, roughness: 0.1, toneMapped: false
