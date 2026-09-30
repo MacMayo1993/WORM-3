@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { wormBuffs } from './wormBuffs.js';
 import { JUMP_RESCUE_SECONDS } from './healerWorm/constants.js';
 
-export default function JumpRescueCue() {
+export default function JumpRescueCue({ caution = false }) {
   const meter = useRef(null);
   useEffect(() => {
     let frame;
@@ -14,7 +14,7 @@ export default function JumpRescueCue() {
     return () => cancelAnimationFrame(frame);
   }, []);
   return <span className="worm-jump-rescue-cue" role="alert">
-    Body ahead — jump!
+    {caution ? 'Edge ahead — left, right or jump!' : 'Body ahead — jump!'}
     <span className="worm-jump-rescue-meter" aria-hidden="true"><span ref={meter} /></span>
   </span>;
 }

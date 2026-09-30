@@ -3,6 +3,8 @@
 // React state since the consumer does its own requestAnimationFrame.
 export const tunnelState = {
   active: false,
+  fallOpening: null, // a caution-tape death opens only its entry tile
+
   occupiedTunnelIds: new Set(), // head and recorded trailing passages
   portalTunnel: null, // current passage, retained while its tail clears the exit
   t: 0,            // tunnelTraversalT: entry arm (0–0.4), core (0.4–0.6), exit arm (0.6–1)

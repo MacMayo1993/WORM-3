@@ -102,7 +102,7 @@ const EXPECTED_KEYS = [
   'victory', 'visualMode', 'wormActiveTunnelColors', 'wormAlive',
   'wormBodyTiles', 'wormBoostState', 'wormCameraHorizon', 'wormCharacter', 'wormColor',
   'wormControlMode', 'wormCountdownStep', 'wormDeathDetails', 'wormElementalTheme', 'wormViewPower', 'wormGamePhase',
-  'wormHat', 'wormHealedCount', 'wormHealerMode', 'wormHealingProgress', 'wormJumpRescueActive',
+  'wormHat', 'wormHealedCount', 'wormHealerMode', 'wormHealingProgress', 'wormJumpRescueActive', 'wormRescueKind',
   'wormOrbShowerActive', 'wormMagnetActive', 'wormMagnetSeq', 'wormOnFlippedTile', 'wormOrbCount',
   'wormOrbFlash', 'wormOrbInventory', 'wormPaused', 'wormPhase',
   'wormPowerups', 'wormExplodeActive', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs',

@@ -1,3 +1,4 @@
+import CautionFallFX from './healerWorm/CautionFallFX.jsx';
 import { PickupMaterialProvider } from './healerWorm/PickupMaterials.jsx';
 import WormEffectWarmup from './healerWorm/WormEffectWarmup.jsx';
 import { WormLighting } from './WormLighting.jsx';
@@ -804,6 +805,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <group ref={reflectionSource} visible={wormAlive}>
                 <WormBody worm={worm} size={size} /><WormFace worm={worm} size={size} />
             </group>
+            <CautionFallFX worm={worm} body={reflectionSource} />
             <WormEffectWarmup body={reflectionSource} />
             {wormAlive && <RocketExhaust worm={worm} size={size} />}
             {wormAlive && <JumpLandingMarker worm={worm} size={size} />}

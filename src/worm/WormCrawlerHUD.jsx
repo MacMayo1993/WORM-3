@@ -375,7 +375,7 @@ const STEER_KEYS = [
 ];
 
 /** One steering key. Both corners are the same key mirrored. */
-function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
+function SteerKey({ side, wormAlive, wormColor: _wormColor, vars, rescue = false }) {
     const [dir, intent, label] = STEER_KEYS.find(([d]) => d === side);
     return (
         <div style={STEER_CLUSTER_STYLE}>
@@ -391,7 +391,7 @@ function SteerKey({ side, wormAlive, wormColor: _wormColor, vars }) {
                 }}
                 onClick={e => { if (e.detail === 0 && wormAlive) { feel('uiKey'); callWormTurn(intent); } }}
                 disabled={!wormAlive}
-                className="worm-hud-key worm-steer worm-steer-key"
+                className={`worm-hud-key worm-steer worm-steer-key${rescue ? ' worm-jump-rescue' : ''}`}
                 style={{ ...vars, color: TEXT }}
                 aria-label={label}
             >
@@ -1184,6 +1184,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     ensureHudStyle();
     const combatMode = useGameStore(s => s.wormCombatMode);
     const jumpRescue = useGameStore(s => s.wormJumpRescueActive && !s.wormPaused && s.wormAlive);
+    const rescueKind = useGameStore(s => s.wormRescueKind);
+    const cautionRescue = jumpRescue && rescueKind === 'caution';
     const enemiesEnabled = useGameStore(s => s.wormEnemiesEnabled);
     const runId = useGameStore(s => s.wormRunId);
     const demoLesson = useGameStore(s => s.demoMode && s.demoStep === 'worm-traversal');
@@ -1357,21 +1359,21 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>}
                 {combatMode ? <CombatCard onRetry={onRetry} onHome={onHome} /> : demoLesson ? <WormDemoLessonCard /> : null}
                 {phase === 'crawling' && (!storyId || storyStarted) && <div style={THUMB_TRAY_STYLE}>
-                    <SteerKey side="left" wormAlive={controlsEnabled && !jumpRescue} wormColor={wormColor} vars={steerVars} />
+                    <SteerKey side="left" wormAlive={controlsEnabled && (!jumpRescue || cautionRescue)} wormColor={wormColor} vars={steerVars} rescue={cautionRescue} />
 
                     {/* Middle: signature and primary actions share the measured dock */}
                     <div className="worm-action-center" style={ACTION_CLUSTER_STYLE}>
                         {combatMode ? <CombatFireButton /> : demoLesson ? lesson.id === 'signature' && <SignatureButton /> : enemiesEnabled ? <AmbientCombatActions /> : <SignatureButton />}
                         <div className="worm-primary-actions">
                             <div className="worm-jump-slot">
-                                {jumpRescue && <JumpRescueCue />}
+                                {jumpRescue && <JumpRescueCue caution={cautionRescue} />}
                                 <button
                                     onPointerDown={handleJumpAction}
                                     onClick={e => { if (e.detail === 0) handleJumpAction(); }}
 
                                     className={`worm-hud-key worm-action worm-jump${jumpRescue ? ' worm-jump-rescue' : isPortalReady ? ' worm-jump-ready' : ''}`}
                                     style={isPortalReady ? jumpReadyStyle : jumpIdleStyle}
-                                    aria-label={jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Jump onto the raised tunnel" : "Jump over body or vault an edge"}
+                                    aria-label={cautionRescue ? 'Jump now to clear the caution tape' : jumpRescue ? 'Jump now to clear your body' : isPortalReady ? "Jump onto the raised tunnel" : "Jump over body or vault an edge"}
                                     disabled={!controlsEnabled}
                                 >
                                     <JumpIcon size={19} />
@@ -1382,7 +1384,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         </div>
                     </div>
 
-                    <SteerKey side="right" wormAlive={controlsEnabled && !jumpRescue} wormColor={wormColor} vars={steerVars} />
+                    <SteerKey side="right" wormAlive={controlsEnabled && (!jumpRescue || cautionRescue)} wormColor={wormColor} vars={steerVars} rescue={cautionRescue} />
                 </div>}
 
             </div>}

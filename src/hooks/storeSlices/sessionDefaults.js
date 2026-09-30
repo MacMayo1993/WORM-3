@@ -80,6 +80,7 @@ export const makeWormSessionDefaults = () => ({
   wormDeathDetails: null,
   wormPaused: false,
   wormJumpRescueActive: false,
+  wormRescueKind: null,
   wormTimeAlive: 0,
   wormTunnelCount: 0,
   wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },

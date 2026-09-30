@@ -214,6 +214,7 @@ export default function WormChaseCamera({ worm, size }) {
     const cameraRunRef = useRef(null);
     const surfaceNearRef = useRef(camera.near);
     const rocketShakeTime = useRef(0);          // clock for the rocket's camera rumble
+    const fallCamera = useRef({ position: new THREE.Vector3(), target: new THREE.Vector3(), aim: new THREE.Object3D() });
 
     // This camera is the app's shared one, and the chase view leaves it wide
     // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
@@ -225,6 +226,7 @@ export default function WormChaseCamera({ worm, size }) {
         const restoreNear = surfaceNearRef.current;
         const restoreUp = camera.up.clone();
         return () => {
+            tunnelState.fallOpening = null;
             camera.fov = restoreFov;
             camera.near = restoreNear;
             camera.up.copy(restoreUp);
@@ -265,6 +267,27 @@ export default function WormChaseCamera({ worm, size }) {
         // reset the smoothing refs mid-crawl.
         const horizonMode = gameState.wormCameraHorizon ?? 'face';
         const phase = worm.phase.current;
+        const fall = worm.cautionFall?.current;
+        tunnelState.fallOpening = fall ?? null;
+        if (fall) {
+            // A fixed view through the one opening: settle once and watch the
+            // body fall/dissolve, without orbiting or chasing it through walls.
+            tunnelState.active = false;
+            const shot = fallCamera.current;
+            shot.position.copy(fall.mouth).addScaledVector(fall.normal, 1.65).addScaledVector(fall.approach, -0.45);
+            shot.target.copy(fall.mouth).addScaledVector(fall.normal, -0.55);
+            const blend = 1 - Math.exp(-Math.min(delta, 0.05) * 8);
+            camera.position.lerp(shot.position, blend);
+            shot.aim.position.copy(camera.position);
+            shot.aim.up.copy(fall.approach);
+            shot.aim.lookAt(shot.target);
+            camera.quaternion.slerp(shot.aim.quaternion, blend);
+            camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+            camPosRef.current.copy(camera.position);
+            lookAtRef.current.copy(shot.target);
+            camUpRef.current.copy(camera.up);
+            return;
+        }
         const near = phase !== 'crawling' && worm.activeTunnel.current
             ? Math.min(surfaceNearRef.current, TUNNEL_CAM_NEAR) : surfaceNearRef.current;
         if (camera.near !== near) {

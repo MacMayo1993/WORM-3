@@ -32,7 +32,10 @@ import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, setLiveRotation, resetLiveRotation, syncRotationFrame } from '../worm/liveRotation.js';
 import { createOpeningTurn, advanceOpeningTurn } from '../worm/healerWorm/openingRotation.js';
-const jumpRescueActive = () => useGameStore.getState().wormJumpRescueActive;
+const jumpRescueActive = () => {
+  const state = useGameStore.getState();
+  return state.wormJumpRescueActive || state.wormPhase === 'falling';
+};
 // Scratch layer/angle lists handed to setLiveRotation every frame — it copies out
 // of them, so they are reused rather than reallocated per frame.
 const _liveLayers = [];
@@ -153,7 +156,8 @@ const CubeAssembly = React.memo(({
   useLayoutEffect(() => { exteriorPortals.apply(exteriorRef.current); });
   useFrame(({ camera }) => {
     const state = useGameStore.getState();
-    exteriorPortals.update(state.wormHealerMode ? tunnelState.portalTunnel : null, size, wormExpansion.amount);
+    exteriorPortals.update(state.wormHealerMode ? tunnelState.portalTunnel : null, size, wormExpansion.amount,
+      state.wormHealerMode ? tunnelState.fallOpening : null);
     if (exteriorRef.current) exteriorRef.current.visible = !state.wormHealerMode ||
       !tunnelCameraInside(camera.position, size, state.wormPhase, tunnelState.portalTunnel);
   }, -0.24); // after the chase camera (-0.25), before tile batches sample visibility
@@ -169,7 +173,7 @@ const CubeAssembly = React.memo(({
   // Freeze an in-flight layer synchronously with the rescue transition. A React
   // render alone can arrive after GSAP has advanced another gameplay frame.
   useEffect(() => useGameStore.subscribe(
-    s => s.wormJumpRescueActive,
+    s => s.wormJumpRescueActive || s.wormPhase === 'falling',
     held => gsapAnimRef.current?.paused(held)
   ), []);
   const initializedMoveRef = useRef(null);

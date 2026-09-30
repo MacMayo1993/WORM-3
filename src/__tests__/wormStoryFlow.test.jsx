@@ -247,6 +247,7 @@ it('expires with a clear cause and resets the deadline on retry', () => {
 function seek(target, done) {
   let steered = '';
   for (let n = 0; n < 10000 && !done() && state().wormAlive; n++) {
+    if (state().wormRescueKind === 'caution') { act(() => worm.queueTurn('jump')); frame(); continue; }
     const here = tileKey(worm.pos.current);
     if (here === tileKey(target) && worm.phase.current === 'crawling' && !worm.isJumping.current) {
       const { x, y, z, dirKey } = target;
@@ -282,6 +283,7 @@ function seek(target, done) {
 function travelUntil(done) {
   let steered = '';
   for (let n = 0; n < 10000 && !done() && state().wormAlive; n++) {
+    if (state().wormRescueKind === 'caution') { act(() => worm.queueTurn('jump')); frame(); continue; }
     const here = tileKey(worm.pos.current);
     if (worm.phase.current === 'crawling' && steered !== here) {
       const blocked = new Set(getActiveTunnels(state().cubies, state().size).flatMap(t => [tileKey(t.entry), tileKey(t.exit)]));

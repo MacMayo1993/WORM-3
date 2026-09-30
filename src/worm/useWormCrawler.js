@@ -258,7 +258,7 @@ export function useWormCrawler(size, cubies) {
 
             // ── effects ─────────────────────────────────────────────────────────
             feel: (event, opts) => feedbackRef.current.emit(event, opts),
-            onJumpRescue: active => useGameStore.setState({ wormJumpRescueActive: active }),
+            onJumpRescue: (active, kind = 'body') => useGameStore.setState({ wormJumpRescueActive: active, wormRescueKind: active ? kind : null }),
             onDeath: (details, timeAlive) => {
                 const ending = useGameStore.getState();
                 ending.finishWormXp(false, ending.wormRunId);
@@ -520,7 +520,7 @@ export function useWormCrawler(size, cubies) {
                 wormSessionOrbs: 0, wormTunnelCount: 0, wormHealedCount: 0, wormHealingProgress: {},
                 // A retry can interrupt a rescue or a tunnel ride. Reset the
                 // HUD mirrors with the sim, or stale rescue UI disables steering.
-                wormPhase: 'crawling', wormAlive: true, wormPaused: true, wormJumpRescueActive: false,
+                wormPhase: 'crawling', wormAlive: true, wormPaused: true, wormJumpRescueActive: false, wormRescueKind: null,
                 wormActiveTunnelColors: null, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
                 wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormElementalTheme: null, wormViewPower: null, wormSpecialNotice: null,
                 wormBoostState: 'ready', wormOrbFlash: null, demoWormSteered: false, demoWormTarget: practice.target,
@@ -731,7 +731,7 @@ export function useWormCrawler(size, cubies) {
             wormHealingProgress: {},
             wormHealedCount: 0,
             wormAlive: true,
-            wormJumpRescueActive: false,
+            wormJumpRescueActive: false, wormRescueKind: null,
             showWormDeathMenu: false,
             wormDeathDetails: null,
             wormPhase: 'crawling',
@@ -760,7 +760,7 @@ export function useWormCrawler(size, cubies) {
         resetWormBuffs();
         resetWormSegments();
         resetWormPress();
-        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormViewPower: null, wormJumpRescueActive: false });
+        useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormViewPower: null, wormJumpRescueActive: false, wormRescueKind: null });
     }, []);
 
     // When a cube rotation commits, transform the whole sim (worm, powerups, trails,
@@ -873,6 +873,7 @@ export function useWormCrawler(size, cubies) {
             healFocusTile: f('healFocusTile'),
             cutFocusT: f('cutFocusT'),
             jumpRescueHeld: f('jumpRescueHeld'),
+            cautionFall: f('cautionFall'),
             cutFocusPos: f('cutFocusPos'),
             cutFocusSlice: f('cutFocusSlice'),
             elementalFocusT: f('elementalFocusT'),

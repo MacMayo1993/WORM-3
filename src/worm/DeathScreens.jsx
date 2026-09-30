@@ -39,6 +39,7 @@ import {
 
 // ─── Death-cause classification ───────────────────────────────────────────────
 function classifyDeath(reason) {
+    if (reason === 'caution-fall') return 'fallen';
     if (reason === 'story-timeout') return 'time-up';
     if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted') return 'event-horizon';
     if (reason === 'slice-rotation') return 'sliced';
@@ -55,6 +56,12 @@ function classifyDeath(reason) {
 //   SLICED is steel-white and filling a button with it left white label text on
 //   a near-white field. That screen borrows the red from the slice hazard.
 const DEATHS = {
+    fallen: {
+        eyebrow: 'Missed the ledge', title: 'Fell into the cube',
+        blurb: 'At the caution tape, press left, right or jump before time runs out.',
+        accent: '#ffe58a', accentSoft: 'rgba(255,229,138,0.45)', deep: '#705019',
+        titleSize: 'clamp(26px, min(9vw, 8vh), 64px)',
+    },
     unknown: {
         title: 'Run ended', blurb: 'Try again for another run.',
         accent: '#f87171', accentSoft: 'rgba(248,113,113,0.45)', deep: '#7f1d1d',
