@@ -1121,16 +1121,17 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
 
                 </details>
                 {/* Secondary navigation */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'clamp(10px, 2vh, 14px)' }}>
+                <div className="worm-pause-actions">
                     <button disabled={inTunnel} onClick={() => useGameStore.getState().setShowCutawayLens(true)} style={{ ...LIST_BTN_STYLE, opacity: inTunnel ? 0.5 : 1 }}>
                         <span aria-hidden="true">⌕</span><span>{inTunnel ? 'Cutaway available on the surface' : 'Inspect inside the cube'}</span>
                     </button>
                     {onToggleAntipodal && (
                         <button
                             onClick={onToggleAntipodal}
+                            aria-pressed={antipodalActive}
                             style={{
                                 ...LIST_BTN_STYLE,
-                                ...(antipodalActive ? { background: `${blue}33`, borderColor: ARCADE_INK_STRONG, color: ARCADE_INK, boxShadow: `0 2px 0 ${ARCADE_INK_STRONG}`, transform: 'translateY(2px)' } : {}),
+                                ...(antipodalActive ? { background: `${blue}33`, borderColor: ARCADE_INK_STRONG, color: ARCADE_INK } : {}),
                             }}
                         >
                             <span aria-hidden="true">⊕</span>
