@@ -150,10 +150,8 @@ function SingleOrbImpl({
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Shower beads keep the bright round gem, in the antipodal colour like every
-  // orb body (on reduced-detail boards the band is dropped too). After
-  // assembly they join one shared opaque draw per color, so a rain of dozens
-  // does not multiply the full pickup's transparent rings and glass layers.
+  // Use the simple gem only when the shared effects budget requests it.
+  // Shower pickups use the same parity silhouette as permanent pickups.
   if (reducedDetail) {
     return (
       <group ref={orbGroupRef} visible={false} position={[position[0], position[1], position[2]]}>
@@ -623,7 +621,7 @@ export default function ParityOrbs({
           isGlowWorm={isGlowWorm}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}
-          reducedDetail={data.shower || (fxBudget(size).orbDetail === 'reduced' && !isTunnelMode)}
+          reducedDetail={fxBudget(size).orbDetail === 'reduced' && !isTunnelMode}
         />
       ))}
     </group>
