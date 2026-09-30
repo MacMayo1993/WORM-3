@@ -48,6 +48,7 @@ import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
+import NumberLabel from './NumberLabel.jsx';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -1267,6 +1268,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   };
 
   const isSudokube = mode === 'sudokube';
+  const lightweightNumbers = isSudokube && wormHealerMode && (isMobile || perfReducedFX);
   const isGlass = mode === 'glass';
 
   // Biome mode: city identity tracks flip parity.
@@ -1332,7 +1334,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const _styleKey = biomeEnabled ? cityFace : meta?.orig;
   // Dead (capped) tiles render flat gray with no decorative style, so a board of
   // spent tiles reads as spent and the surviving pair actually stands out.
-  const tileStyle = isDead
+  const tileStyle = isDead || lightweightNumbers
     ? 'solid'
     : biomeGroundTexture
     ? 'solid'
@@ -1384,7 +1386,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
   }, [useShaderStyle, tileStyle, baseColor, antipodalHex]);
 
-  const backTileStyle = isDead ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
+  const backTileStyle = isDead || lightweightNumbers ? 'solid' : (manifoldStyles?.[ANTIPODAL_COLOR[meta?.curr]] || 'solid');
   const instanceBack = wormHealerMode && surfaceCtx && !useGlassStyle && backTileStyle === 'solid';
   const backMaterial = useMemo(() => {
     if (!antipodalHex) return null;
@@ -1443,7 +1445,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     instancedSlotValid &&
     !hollow &&
     !isGlass &&
-    !isSudokube &&
+    (!isSudokube || lightweightNumbers) &&
     !biomeEnabled &&
     !currTexture &&
     tileStyle === 'solid' &&
@@ -2026,11 +2028,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           reason as the heal seal above. */}
       <HealParticles ref={healParticlesRef} />
 
-      {overlay && (
+      {overlay && (lightweightNumbers && /^\d+$/.test(String(overlay)) ? <NumberLabel value={overlay} /> : (
         <Text position={[0, 0, 0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
           {overlay}
         </Text>
-      )}
+      ))}
 
       {!isDead && !presentation && chaosLevel > 0 && !wormHealerMode && (isChaosFocused || isWinnerTile) && (
         <mesh position={[0, 0, 0.018]}>
