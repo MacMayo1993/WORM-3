@@ -905,7 +905,11 @@ function tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey) {
     for (const drop of taken) {
         sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
         sim.lastOrbTime = sim.timeAlive;
-        for (const orb of drop.payload) applyOrbPickupGrowth(sim, ctx, orb.color, orb.faceId, ORB_SEGMENT_GROWTH, true);
+        // Each orb restores exactly the segments its cut removed (cutWormTail).
+        for (const orb of drop.payload) {
+            const segments = orb.segments ?? ORB_SEGMENT_GROWTH;
+            if (segments > 0) applyOrbPickupGrowth(sim, ctx, orb.color, orb.faceId, segments, true);
+        }
         sim.pendingOrbFlash = { color: drop.color, pos: sim.curWorldPos.toArray(), combo: sim.orbCombo };
         if (sim.pendingOrbAttractions.length < MAX_ORB_ATTRACTION_FX) {
             sim.pendingOrbAttractions.push({

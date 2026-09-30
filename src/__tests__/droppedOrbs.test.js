@@ -81,8 +81,14 @@ const lost = n => ({
 
 describe('grouping lost orbs', () => {
   it('gives each lost orb its own drop when there are few', () => {
-    const groups = groupLostOrbs([1, 2, 3], ['#a', '#b', '#c']);
-    expect(groups).toEqual([[{ faceId: 1, color: '#a' }], [{ faceId: 2, color: '#b' }], [{ faceId: 3, color: '#c' }]]);
+    const groups = groupLostOrbs([1, 2, 3], ['#a', '#b', '#c'], MAX_DROPS_PER_CUT, [1, 3, 3]);
+    expect(groups).toEqual([
+      [{ faceId: 1, color: '#a', segments: 1 }], [{ faceId: 2, color: '#b', segments: 3 }], [{ faceId: 3, color: '#c', segments: 3 }]
+    ]);
+  });
+
+  it('defaults to a whole orb when the removed segments are unknown', () => {
+    expect(groupLostOrbs([1], ['#a'])).toEqual([[{ faceId: 1, color: '#a', segments: ORB_SEGMENT_GROWTH }]]);
   });
 
   it('packs a long loss into the cap without losing an orb, keeping runs together', () => {
@@ -222,6 +228,29 @@ describe('taking dropped orbs back', () => {
     expect(sim.pendingOrbAttractions.some(fx => fx.color === '#ff0000')).toBe(true);
   });
 
+  it('gives back only the segments a mid-orb cut removed: 13 cut to 12 recovers to 13, not 15', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const probe = makeSim();
+    stepUntilCommit(probe, makeCtx());
+    // The state after a cut through the middle of the only orb's trio: two of its
+    // three segments are still on the body, the orb itself (its colour) is lost.
+    sim.tailLength = BASE_TAIL_LENGTH + 2;
+    const [payload] = groupLostOrbs([1], ['#ff0000'], MAX_DROPS_PER_CUT, [1]);
+    sim.droppedOrbs.push({ ...probe.pos, id: 'drop-partial', ttl: 3, color: '#ff0000', from: null, delay: 0, payload });
+    stepUntilCommit(sim, ctx);
+    expect(sim.tailLength).toBe(BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH);
+    expect(sim.orbPickupColors).toEqual(['#ff0000']);
+    const [pickup] = eventsOf(ctx, 'pickup');
+    expect(pickup.args[4]).toBe(1); // segments restored, which the store adds to the reserve
+  });
+
+  it('carries each lost orb\'s removed segments into its drop', () => {
+    const sim = makeSim();
+    scatterDroppedOrbs(sim, SIZE, makeCtx(), { origin: { x: 2, y: 2, z: 4, dirKey: 'PZ' }, ...lost(3), segments: [2, 3, 3] });
+    expect(sim.droppedOrbs.flatMap(d => d.payload.map(o => o.segments)).sort()).toEqual([2, 3, 3]);
+  });
+
   it('lets the magnet pull them in from a distance', () => {
     const sim = makeSim();
     sim.droppedOrbs.push({ x: 2, y: 2, z: 4, dirKey: 'PZ', id: 'a' }, { x: 0, y: 0, z: 4, dirKey: 'PZ', id: 'b' });
@@ -289,5 +318,5 @@ describe('dropped orb motion', () => {
 
 it('keeps the base body out of the drop: only carried orbs come back', () => {
   expect(BASE_TAIL_LENGTH).toBeGreaterThan(0);
-  expect(groupLostOrbs([], ['#a']).flat()).toEqual([{ faceId: 0, color: '#a' }]);
+  expect(groupLostOrbs([], ['#a']).flat()).toEqual([{ faceId: 0, color: '#a', segments: ORB_SEGMENT_GROWTH }]);
 });

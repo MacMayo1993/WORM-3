@@ -186,7 +186,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             if (best) best.ring = true;
             froms.push(best ? best.pos.slice() : at);
         }
-        worm.dropOrbs?.({ origin, faceIds: lost.faceIds, colors: lost.colors, froms, at });
+        worm.dropOrbs?.({ origin, faceIds: lost.faceIds, colors: lost.colors, segments: lost.segments, froms, at });
     };
     // Early-turn crossing watch for the hazard turn in flight (see sliceCrossing.js).
     const turnWatchRef = useRef(null);

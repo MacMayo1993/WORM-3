@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady } from '../worm/healerWorm/economy.js';
+import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady, splitRemovedSegments } from '../worm/healerWorm/economy.js';
 import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH, HEAL_COST, WORMHOLE_MAX_TRAVERSALS } from '../worm/healerWorm/constants.js';
 
 // Fresh inventory helper: faceId → count, all six faces present like the store default.
@@ -204,5 +204,32 @@ describe('computeOrbDeposit (prism wildcard)', () => {
     const sumAfter = Object.values(result.nextInventory).reduce((s, v) => s + v, 0);
     expect(sumBefore - sumAfter).toBe(result.n);
     for (const v of Object.values(result.nextInventory)) expect(v).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ─── splitRemovedSegments ─────────────────────────────────────────────────────
+describe('splitRemovedSegments', () => {
+  it('gives the orb a cut went through only what it lost', () => {
+    // Tail 13 cut to 12: the one orb is lost, but only one of its segments.
+    expect(splitRemovedSegments(1, 1)).toEqual([1]);
+    // A cut through the first lost orb, then two whole orbs behind it.
+    expect(splitRemovedSegments(1 + 2 * ORB_SEGMENT_GROWTH, 3)).toEqual([1, ORB_SEGMENT_GROWTH, ORB_SEGMENT_GROWTH]);
+  });
+
+  it('gives whole orbs their full trio when the cut falls on an orb boundary', () => {
+    expect(splitRemovedSegments(3 * ORB_SEGMENT_GROWTH, 3)).toEqual([3, 3, 3]);
+  });
+
+  it('keeps extra tip segments with the first lost orb, so the split always sums to the loss', () => {
+    for (const [total, count] of [[11, 3], [2, 3], [0, 2], [40, 5], [7, 1]]) {
+      const split = splitRemovedSegments(total, count);
+      expect(split).toHaveLength(count);
+      expect(split.reduce((a, b) => a + b, 0)).toBe(total);
+      for (const n of split) expect(n).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('is empty when no orb was lost', () => {
+    expect(splitRemovedSegments(2, 0)).toEqual([]);
   });
 });
