@@ -1,4 +1,5 @@
 import { wormExpansion, publishWormExpansion } from './wormExpansion.js';
+import { scatterDroppedOrbs } from './healerWorm/droppedOrbs.js';
 import { getStableKey } from './wormLogic.js';
 import { characterOrbCount } from './characterAbilities.js';
 import { orbsCarried } from './healerWorm/economy.js';
@@ -371,13 +372,15 @@ export function useWormCrawler(size, cubies) {
                 }));
             },
             onTailShed: (inventory, orbCount) => useGameStore.setState({ wormOrbInventory: inventory, wormBodyTiles: orbCount }),
-            onOrbPickup: (faceId, orbCount, color, combo, segments = ORB_SEGMENT_GROWTH) => {
+            // `recovered`: a dropped orb taken back after a cut. It restores the body and
+            // its reserve, but it is not a new pickup for the run's tally or story goals.
+            onOrbPickup: (faceId, orbCount, color, combo, segments = ORB_SEGMENT_GROWTH, recovered = false) => {
                 const practice = storyPracticeRef.current;
-                if (practice?.runId === useGameStore.getState().wormRunId && faceId) practice.colors.add(faceId);
+                if (!recovered && practice?.runId === useGameStore.getState().wormRunId && faceId) practice.colors.add(faceId);
                 useGameStore.setState((state) => ({
-                    ...wormEventChanges(state, 'orbs', (state.wormSessionOrbs ?? 0) + 1, faceId, state.wormRunId),
+                    ...(recovered ? {} : wormEventChanges(state, 'orbs', (state.wormSessionOrbs ?? 0) + 1, faceId, state.wormRunId)),
                     wormBodyTiles: orbCount,
-                    wormSessionOrbs: (state.wormSessionOrbs ?? 0) + 1,
+                    wormSessionOrbs: (state.wormSessionOrbs ?? 0) + (recovered ? 0 : 1),
                     // Drives the HUD's screen-edge confirmation flash. `seq` is what the
                     // HUD keys its animation off, so two pickups of the same colour still
                     // replay it. A magnet sweep collects several orbs inside one tick and
@@ -844,6 +847,10 @@ export function useWormCrawler(size, cubies) {
             orbShowerT: f('orbShowerT'),
             magnetT: f('magnetT'),
             pendingOrbAttractionsRef: f('pendingOrbAttractions'),
+            droppedOrbs: f('droppedOrbs'),
+            pendingDropDissolves: f('pendingDropDissolves'),
+            // Scatter a cut tail's orbs around the cut (droppedOrbs.js).
+            dropOrbs: (drop) => scatterDroppedOrbs(simRef.current, sizeRef.current, ctxRef.current, drop),
             specials: f('specials'),
             pendingSpecialFlashRef: f('pendingSpecialFlash'),
             headInterpPos: f('headInterpPos'),

@@ -48,13 +48,14 @@ import {
     BASE_TAIL_LENGTH,
     BODY_BALL_SPACING,
     CUT_FOCUS_DURATION,
+    ORB_SEGMENT_GROWTH,
 } from './healerWorm/constants.js';
 import { shPush, ttAt } from './circularBuffers.js';
 import { feel, setFeelEnabled } from '../utils/feel.js';
 import { EARN_ORB_COLLECT } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
 import { shAt } from './circularBuffers.js';
-import { rideLiveRotation, resolveSliceHits, cutWormTail } from './wormHelpers.js';
+import { rideLiveRotation, resolveSliceHits, cutWormTail, parseTileKey } from './wormHelpers.js';
 import { armTurnWatch, stepTurnWatch } from './healerWorm/sliceCrossing.js';
 import { useWormCrawler } from './useWormCrawler.js';
 import WormChaseCamera from './WormChaseCamera.jsx';
@@ -86,6 +87,7 @@ import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
 import { rotationClock, resetRotationClock } from './healerWorm/rotationClockBridge.js';
 import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
 import { ThunkEffect, SeveredTail, CollisionGlow } from './healerWorm/impactFx.jsx';
+import { DroppedOrbs } from './healerWorm/DroppedOrbs.jsx';
 import { sampleSeveredTail, wormdKindForDeath } from './healerWorm/wormdFx.js';
 import { buildWormScramble, invertWormScramble } from './healerWorm/scramble.js';
 
@@ -156,8 +158,35 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             : Math.max(BASE_TAIL_LENGTH, Math.round((typeof cut === 'object' ? cut.cutTrailIdx : cut) / BODY_BALL_SPACING));
         const sev = severedRef.current;
         sev.count = sampleSeveredTail(worm, fromBead, sev.pieces);
+        for (let i = 0; i < sev.count; i++) sev.pieces[i].ring = false;
         sev.orbColors = worm.orbPickupColorsRef.current.slice();
         sev.active = sev.count > 0;
+    };
+    // A cut the worm survives: sever the tail, then burst the orbs it carried out
+    // of their severed beads onto nearby tiles, Sonic-ring style, to be taken back
+    // before they crumble (droppedOrbs.js, DroppedOrbs.jsx).
+    const severAndScatter = (cut, at) => {
+        const trail = worm.tileTrail.current;
+        const idx = Math.min(typeof cut === 'object' ? cut.cutTrailIdx : cut, trail.count - 1);
+        const origin = parseTileKey(ttAt(trail, Math.max(0, idx)), {});
+        captureSeveredTail(cut);
+        const lost = cutWormTail(worm, cut);
+        if (!lost?.faceIds.length && !lost?.colors.length) return;
+        // Lost orb j rode the middle bead of its trio; it bursts out of the severed
+        // piece nearest that bead, which then stays hidden (it became the orb).
+        const sev = severedRef.current;
+        const orbsLeft = worm.orbPickupColorsRef.current.length;
+        const froms = [];
+        for (let j = 0; j < lost.colors.length; j++) {
+            const bead = BASE_TAIL_LENGTH + (orbsLeft + j) * ORB_SEGMENT_GROWTH + 1;
+            let best = null;
+            for (let i = 0; i < sev.count; i++) {
+                if (!best || Math.abs(sev.pieces[i].bead - bead) < Math.abs(best.bead - bead)) best = sev.pieces[i];
+            }
+            if (best) best.ring = true;
+            froms.push(best ? best.pos.slice() : at);
+        }
+        worm.dropOrbs?.({ origin, faceIds: lost.faceIds, colors: lost.colors, froms, at });
     };
     // Early-turn crossing watch for the hazard turn in flight (see sliceCrossing.js).
     const turnWatchRef = useRef(null);
@@ -181,8 +210,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex: layer, impactPosition: hitPos, ...details });
             return true;
         }
-        captureSeveredTail(hit);
-        cutWormTail(worm, hit);
+        severAndScatter(hit, hitPos);
         worm.feel('cut');
         // Cue the chase camera to swing out to the slice shot for the WORM'D beat,
         // then ease back to the chase (see WormChaseCamera / sliceShot.js).
@@ -624,8 +652,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                             deathThunkFiredRef.current = true;
                             worm.killWorm({ reason: 'bomb', bombId: bomb.id });
                         } else {
-                            captureSeveredTail(hit.cutTrailIdx);
-                            cutWormTail(worm, hit.cutTrailIdx);
+                            severAndScatter(hit.cutTrailIdx, hitPos);
                             worm.cutFocusT.current = CUT_FOCUS_DURATION;
                             worm.cutFocusPos.current = hitPos;
                             worm.cutFocusSlice.current = null; // a blast, not a layer
@@ -809,6 +836,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <SpecialOrbs size={size} hidden={wormInTunnel} />
             <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} worm={worm} />
             <SeveredTail severedRef={severedRef} />
+            <DroppedOrbs worm={worm} size={size} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />
         </PickupMaterialProvider></WormLighting>

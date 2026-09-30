@@ -80,6 +80,32 @@ export function addFrameDissolve(material, uniforms) {
   return patch(material, uniforms, '(uDissolveFrame * modelMatrix * vec4(transformed, 1.0)).xyz', 'frame-dissolve');
 }
 
+/**
+ * The same crumble for an InstancedMesh whose instances each go on their own
+ * clock: the front is a per-instance `aDissolve` attribute (0 = whole, 1 = gone)
+ * instead of a uniform, and the field is sampled in the piece's own frame,
+ * scaled by `fieldScale` so a unit-sized piece crumbles at the intro cube's grain,
+ * top first. Used by a cut tail's dropped orbs (worm/healerWorm/DroppedOrbs.jsx).
+ * The caller adds the attribute: geometry.setAttribute('aDissolve', new InstancedBufferAttribute(…, 1)).
+ */
+export function addInstanceDissolve(material, fieldScale = 1.7) {
+  const field = FIELD.replace('uniform float uDissolve;', 'varying float vDissolveFront;');
+  const discard = DISCARD.replace(/uDissolve/g, 'vDissolveFront');
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = 'attribute float aDissolve;\nvarying float vDissolveFront;\nvarying vec3 vDissolvePos;\n' +
+      shader.vertexShader.replace('#include <project_vertex>',
+        `#include <project_vertex>\n  vDissolvePos = transformed * ${fieldScale.toFixed(3)};\n  vDissolveFront = aDissolve;`);
+    let fragment = field + shader.fragmentShader.replace('#include <clipping_planes_fragment>', discard);
+    fragment = fragment.includes('#include <emissivemap_fragment>')
+      ? fragment.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n  totalEmissiveRadiance += ${EDGE};`)
+      : fragment.replace('#include <dithering_fragment>', `gl_FragColor.rgb += ${EDGE};\n  #include <dithering_fragment>`);
+    shader.fragmentShader = fragment;
+  };
+  material.customProgramCacheKey = () => `instance-dissolve:${fieldScale}`;
+  material.needsUpdate = true;
+  return material;
+}
+
 // Pickups run the same field backwards. They include custom tile/element shaders,
 // so inject at main() instead of assuming built-in material chunks are present.
 // Preserve the source material's shader patch and its program-cache identity.

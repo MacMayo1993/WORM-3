@@ -145,6 +145,7 @@ import {
 } from './constants.js';
 
 import { advanceTunnelHead, tunnelTailCleared } from './tunnelTrail.js';
+import { ageDroppedOrbs, takeDroppedOrbsAt } from './droppedOrbs.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
 const _bakeAxis = new THREE.Vector3();
@@ -335,6 +336,8 @@ export function makeWormSim(size) {
         pendingHealBurst: null,
         healPauseT: 0,            // seconds the crawl is frozen to show a ring-heal pop
         healFocusTile: null,      // the surrounded tile the camera pushes in on during that pause
+        droppedOrbs: [],          // a cut tail's orbs, scattered to be taken back (droppedOrbs.js)
+        pendingDropDissolves: [], // expired dropped orbs, for the renderer to crumble
         cutFocusT: 0,             // seconds remaining of the "WORM'D" body-cut camera beat
         cutFocusPos: null,        // world-space impact point the camera swings out to watch
         cutFocusSlice: null,      // { axis, layer } that made the cut, so the camera frames it (null: a bomb)
@@ -470,6 +473,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.pendingOrbFlash = null;
     sim.pendingSpecialFlash = null;
     sim.pendingOrbAttractions = [];
+    sim.droppedOrbs = [];
+    sim.pendingDropDissolves = [];
     sim.orbCombo = 0;
     sim.lastOrbTime = -999;
 
@@ -876,7 +881,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     ctx.onTunnelEnter(tunnel);
 }
 
-function applyOrbPickupGrowth(sim, ctx, color, faceId, segments = ORB_SEGMENT_GROWTH) {
+function applyOrbPickupGrowth(sim, ctx, color, faceId, segments = ORB_SEGMENT_GROWTH, recovered = false) {
     sim.tailLength = Math.min(sim.tailLength + segments, MAX_TAIL);
     sim.orbPickupColors.push(color);
     sim.orbPickupFaceIds.push(faceId);
@@ -884,7 +889,38 @@ function applyOrbPickupGrowth(sim, ctx, color, faceId, segments = ORB_SEGMENT_GR
     // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
     // Colour and combo ride along so the HUD can confirm the pickup on screen at the
     // same intensity the pickup sound plays at.
-    ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength), color, sim.orbCombo, segments);
+    ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength), color, sim.orbCombo, segments, recovered);
+}
+
+// Take back dropped orbs (a cut tail's scattered orbs, see droppedOrbs.js) on the
+// head's tile, or inside the magnet's reach. Each gives back exactly the orbs it
+// carried — their own colours, not the tile's — and counts as a recovery, not a
+// new pickup, for the run's orb tally and story goals.
+function tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey) {
+    if (sim.droppedOrbs.length === 0) return;
+    const reach = sim.magnetT > 0 ? collectManifoldRing(x, y, z, dirKey, size, MAGNET_RADIUS, _magnetReach) : null;
+    const headKey = `${x},${y},${z},${dirKey}`;
+    const taken = takeDroppedOrbsAt(sim, headKey, reach);
+    if (!taken) return;
+    for (const drop of taken) {
+        sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
+        sim.lastOrbTime = sim.timeAlive;
+        for (const orb of drop.payload) applyOrbPickupGrowth(sim, ctx, orb.color, orb.faceId, ORB_SEGMENT_GROWTH, true);
+        sim.pendingOrbFlash = { color: drop.color, pos: sim.curWorldPos.toArray(), combo: sim.orbCombo };
+        if (sim.pendingOrbAttractions.length < MAX_ORB_ATTRACTION_FX) {
+            sim.pendingOrbAttractions.push({
+                id: `att-${sim.attractionSeq++}`,
+                from: getStickerWorldPos(drop.x, drop.y, drop.z, drop.dirKey, size, sim.expansionAmount),
+                to: sim.curWorldPos.toArray(),
+                color: drop.color,
+                gulp: `${drop.x},${drop.y},${drop.z},${drop.dirKey}` === headKey,
+                x: drop.x, y: drop.y, z: drop.z,
+                elevated: false,
+                dirKey: drop.dirKey,
+            });
+        }
+        ctx.feel('orb', { combo: sim.orbCombo });
+    }
 }
 
 /**
@@ -1829,6 +1865,7 @@ const PHASE_HANDLERS = {
                 const destMidRotation = restReadProtectsTile(sim.restRead, x, y, z);
                 if (!destMidRotation) {
                     tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
+                    tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey);
                     trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
                 }
 
@@ -2296,6 +2333,8 @@ export function stepWormSim(sim, delta, size, ctx) {
         if (!ctx.isDemoLesson?.() && !ctx.isCombatMode?.() && !ctx.isStoryMode?.() && sim.elementalSpawnTimer <= 0) {
             spawnElementalOffering(sim, size, ctx);
         }
+        // A cut tail's dropped orbs only wait while the worm can go and get them.
+        if (sim.droppedOrbs.length > 0) ageDroppedOrbs(sim, delta);
         if (sim.specials.length > 0) {
             let expired = false;
             for (let i = sim.specials.length - 1; i >= 0; i--) {
@@ -2513,6 +2552,12 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         ctx.onPowerupsChanged(pu.slice());
     }
 
+    // Dropped orbs ride the turn like any other pickup.
+    if (sim.droppedOrbs.length) {
+        const drops = sim.droppedOrbs;
+        for (let i = 0; i < drops.length; i++) drops[i] = rotateByOwnLayer(drops[i]);
+    }
+
     // Rotate special orbs the same way, so a rocket/magnet stays on its tile through
     // the hazard turn (rotateTilePosition carries type/ttl/id across on the copy).
     if (sim.specials.length) {
@@ -2624,6 +2669,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     if (headProtected && sim.phase === 'crawling') {
         const { x, y, z, dirKey } = sim.pos;
         tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
+        tryPickupDroppedAt(sim, size, ctx, x, y, z, dirKey);
         trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
         const landed = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         const landedFlipped = !!(landed && landed.curr !== landed.orig);

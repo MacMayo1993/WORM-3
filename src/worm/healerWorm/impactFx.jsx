@@ -267,6 +267,8 @@ export function SeveredTail({ severedRef }) {
                 piece.rank = st.count > 1 ? i / (st.count - 1) : 0;
                 piece.spin[0] = (rand() - 0.5) * 1.4; piece.spin[1] = (rand() - 0.5) * 1.4; piece.spin[2] = (rand() - 0.5) * 1.4;
                 piece.color.set(severedBeadColor(src.bead, pending.orbColors, baseColor));
+                // A bead that burst into a dropped orb (DroppedOrbs) is not drawn here.
+                piece.hidden = !!src.ring;
             }
         }
         if (!st.active) {
@@ -280,7 +282,7 @@ export function SeveredTail({ severedRef }) {
             const piece = st.pieces[i];
             severedPieceInto(_sevPose, piece, st.t, st.reduced);
             _sevDummy.position.set(_sevPose.x, _sevPose.y, _sevPose.z);
-            _sevDummy.scale.setScalar(Math.max(0, _sevPose.scale) * WORM_BODY_RADIUS * (1 - piece.rank * 0.35));
+            _sevDummy.scale.setScalar(piece.hidden ? 0 : Math.max(0, _sevPose.scale) * WORM_BODY_RADIUS * (1 - piece.rank * 0.35));
             _sevDummy.updateMatrix();
             mesh.setMatrixAt(i, _sevDummy.matrix);
             _sevCol.copy(piece.color).lerp(_sevWhite, _sevPose.flash * 0.8);
