@@ -60,22 +60,31 @@ it.each([false, true])('raises real cubies, grows the band and lands after forma
     sim.pos = { x: 1, y: 1, z: 2, dirKey: 'PZ' }; sim.headInterpPos.set(0, 0, 1.52);
     const ctx = { getCubies: () => cubies, getTunnelEntry: () => 'pad', feel: () => {},
       isPaused: () => false, getSpeed: () => 2, getGamePhase: () => 'active', getControlMode: () => 'non-oriented',
-      getWormholeInterval: () => 9999, resolveTunnel: () => null };
+      getWormholeInterval: () => 9999,
+      resolveTunnel: () => ({ tunnel: { entry: { x: 1, y: 1, z: 2, dirKey: 'PZ' }, exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' } }, tunnelKey: 'a|b' }) };
     startJump(sim, ctx, 3, { allowDive: false });
-    expect(sim.padFlight.duration).toBeGreaterThan(1.9);
-    for (let i = 0; i < 59; i++) { frame(); stepWormSim(sim, 1 / 60, 3, ctx); }
-    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1 + WORM_PIECE_POP / 2, 5);
-    expect(materials[0].uniforms.uGrowT.value).toBeCloseTo(.5, 5);
+    // A jump at a pad still forming hurries its rise rather than floating for
+    // the rest of the two seconds; the piece and band still finish first.
+    const flightTime = sim.padFlight.duration;
+    expect(flightTime).toBeLessThan(1);
+    for (let i = 0; i < Math.round(flightTime * 30); i++) { frame(); stepWormSim(sim, 1 / 60, 3, ctx); }
+    const rising = refs[0].getWorldPosition(new THREE.Vector3()).z, grown = materials[0].uniforms.uGrowT.value;
+    // Twins rise in step (the exit sits the same distance out along -Z).
+    expect(-refs[1].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(rising, 5);
+    expect(rising).toBeGreaterThan(1.001);
+    expect(rising).toBeLessThan(1 + WORM_PIECE_POP);
+    expect(grown).toBeGreaterThan(.02);
+    expect(grown).toBeLessThan(1);
     expect(sim.padFlight).toBeTruthy();
     const point = raisedPortalPosition(1, 1, 2, 'PZ', 3, useGameStore.getState());
-    expect(point[2]).toBeCloseTo(1 + WORM_PIECE_POP / 2 + .52 + WORM_PAD_HEIGHT, 5);
+    expect(point[2]).toBeCloseTo(rising + .52 + WORM_PAD_HEIGHT, 5);
     const marker = store.getState().scene.getObjectByName('practice-target');
     if (demoMode) expect(marker.position.z).toBeCloseTo(point[2] + .035, 5);
     else expect(marker).toBeUndefined();
     await act(async () => useGameStore.setState({ wormPaused: true }));
     for (let i = 0; i < 30; i++) frame();
-    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1 + WORM_PIECE_POP / 2, 5);
-    expect(materials[0].uniforms.uGrowT.value).toBeCloseTo(.5, 5);
+    expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(rising, 5);
+    expect(materials[0].uniforms.uGrowT.value).toBeCloseTo(grown, 5);
     await act(async () => useGameStore.setState({ wormPaused: false }));
     for (let i = 0; i < 65; i++) { frame(); if (sim.padFlight) stepWormSim(sim, 1 / 60, 3, ctx); }
     expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeCloseTo(1 + WORM_PIECE_POP, 8);

@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeStepHistory, shPush, shAt } from '../worm/circularBuffers.js';
 import { advanceTunnelHead, tunnelTailCleared, tunnelTailReach } from '../worm/healerWorm/tunnelTrail.js';
-import { getTunnelWorldPosInto, getWindWorldPosInto } from '../worm/wormLogic.js';
-import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
+import { getTunnelWorldPosInto, getWindWorldPosInto, PAD_COIL_DIAMETER } from '../worm/wormLogic.js';
+import { FACE_NORMALS, DIR_FORWARD } from '../worm/healerWorm/constants.js';
 import { BORE_MOUTH } from '../utils/tunnelPath.js';
 
 const tunnel = {
@@ -170,7 +170,7 @@ describe('continuous worm tunnel trail', () => {
 
 
 describe('raised-pad mouth loops', () => {
-    it.each([3, 7, 15])('loops once above every face and reverses exactly on exit at size %i', size => {
+    it.each([3, 7, 15])('coils once on every face, sinks only over the aperture and reverses exactly on exit at size %i', size => {
         for (const [dirKey, normal] of Object.entries(FACE_NORMALS)) {
             const mid = Math.floor(size / 2), entry = { x: mid, y: mid, z: mid, dirKey };
             entry[normal.x ? 'x' : normal.y ? 'y' : 'z'] = normal.x + normal.y + normal.z > 0 ? size - 1 : 0;
@@ -186,15 +186,44 @@ describe('raised-pad mouth loops', () => {
                 expect(point.distanceTo(previous)).toBeLessThan(.12);
                 const relative = point.clone().sub(surface), lateral = relative.clone().projectOnPlane(normal).length();
                 lateralMax = Math.max(lateralMax, lateral);
-                if (lateral > .001) expect(relative.dot(normal)).toBeGreaterThanOrEqual(0);
+                // Below the landing height only over the open mouth, never through the pad.
+                if (lateral > BORE_MOUTH / 2) expect(relative.dot(normal)).toBeGreaterThanOrEqual(0);
                 advanceTunnelHead(a, 'windup', progress, size); a.tunnelProgress = progress;
                 advanceTunnelHead(b, 'windout', progress, size); b.tunnelProgress = progress;
                 forward.push(a.headInterpPos.clone()); reverse.push(b.headInterpPos.clone());
                 previous = point;
             }
-            expect(lateralMax).toBeCloseTo(.38, 4);
+            expect(lateralMax).toBeCloseTo(PAD_COIL_DIAMETER, 4);
             expect(previous.distanceTo(mouth)).toBeLessThan(1e-10);
             for (let i = 0; i <= 120; i++) expect(forward[i].distanceTo(reverse[120 - i])).toBeLessThan(1e-8);
+        }
+    });
+
+    it.each([3, 5, 15])('leaves along the landing heading and turns straight down into the mouth at size %i', size => {
+        for (const [dirKey, normal] of Object.entries(FACE_NORMALS)) {
+            const mid = Math.floor(size / 2), entry = { x: mid, y: mid, z: mid, dirKey };
+            entry[normal.x ? 'x' : normal.y ? 'y' : 'z'] = normal.x + normal.y + normal.z > 0 ? size - 1 : 0;
+            for (const dir of ['up', 'down', 'left', 'right']) {
+                const heading = new THREE.Vector3().fromArray(DIR_FORWARD[dirKey][dir]);
+                const route = { entry, exit: { ...entry }, padExpansion: .5, padHeight: .5,
+                    entryHeading: heading.toArray(), exitHeading: heading.clone().negate().toArray() };
+                const at = (side, s) => getWindWorldPosInto(new THREE.Vector3(), route, side, s, size);
+                const launch = at('entry', 1e-4).sub(at('entry', 0)).normalize();
+                expect(launch.dot(heading)).toBeGreaterThan(0.999);
+                const plunge = at('entry', 1).sub(at('entry', 1 - 1e-4)).normalize();
+                expect(plunge.dot(normal)).toBeLessThan(-0.999);
+                // The exit runs the same coil backwards and departs along the heading.
+                const departure = at('exit', 0).sub(at('exit', 1e-4)).normalize();
+                expect(departure.dot(heading)).toBeGreaterThan(0.999);
+                // Speed never spikes: at most the landing pace in any 1/120 of the coil.
+                let previous = at('entry', 0), longest = 0;
+                for (let i = 1; i <= 120; i++) {
+                    const point = at('entry', i / 120);
+                    longest = Math.max(longest, point.distanceTo(previous));
+                    previous = point;
+                }
+                expect(longest).toBeLessThan(0.016);
+            }
         }
     });
 

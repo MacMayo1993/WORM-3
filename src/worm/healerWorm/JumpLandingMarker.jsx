@@ -15,6 +15,14 @@ export function JumpLandingMarker({ worm, size }) {
         mesh.visible = worm.phase.current === 'crawling' && worm.isJumping.current
             && !liveRotation.active && !worm.restRead.current;
         if (!mesh.visible) return;
+        const flight = worm.padFlight?.current;
+        if (flight) {
+            // A pad flight lands on the pad top, not on the surface-jump tile.
+            mesh.position.copy(flight.end).addScaledVector(flight.endNormal, 0.02);
+            mesh.quaternion.setFromUnitVectors(Z, flight.endNormal);
+            mesh.scale.setScalar(0.8 + 0.2 * (1 - flight.t));
+            return;
+        }
         const tile = jumpLandingTile(worm.pos.current, worm.moveDir.current, size,
             worm.interpT.current, worm.jumpT.current, worm.jumpSpan.current);
         const normal = FACE_NORMALS[tile.dirKey];

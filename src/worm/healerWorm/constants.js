@@ -125,7 +125,9 @@ export const MAX_TAIL = 1200;
 
 // Short handoff at each aperture; body extrusion follows distance, not this timer.
 export const TUNNEL_HANDOFF_SECONDS = 0.2;
-export const TUNNEL_ORBIT_SECONDS = 0.4;
+// A raised pad's coil and sink (getWindWorldPosInto): long enough that the coil
+// runs at landing pace and the camera can swing over the mouth without a snap.
+export const TUNNEL_ORBIT_SECONDS = 0.8;
 export const tunnelHandoffSeconds = tunnel => tunnel?.padHeight > 0 ? TUNNEL_ORBIT_SECONDS : TUNNEL_HANDOFF_SECONDS;
 export const tunnelArmSeconds = tunnel => TUNNEL_ARM_SECONDS - tunnelHandoffSeconds(tunnel);
 // Preserve the phase parameter for camera/face consumers: surface=0, mouth=1.

@@ -12,6 +12,7 @@ export function advancePlatformFormation(spring, raised, delta, reduced = false)
     spring.formationFrom = spring.lift;
     spring.formationElapsed = 0;
     spring.formationDuration = (raised ? PLATFORM_FORMATION_SECONDS : .65) * Math.abs(target - spring.lift);
+    spring.rushed = false;
   }
   spring.formationElapsed = reduced ? spring.formationDuration
     : Math.min(spring.formationDuration, spring.formationElapsed + Math.max(0, Math.min(delta, .05)));
@@ -20,6 +21,21 @@ export function advancePlatformFormation(spring, raised, delta, reduced = false)
   spring.velocity = 0;
   spring.formationProgress = t;
   spring.formationRemaining = raised ? spring.formationDuration - spring.formationElapsed : 0;
+}
+
+// A jump aimed at a platform that is still rising: finish the rise within
+// `seconds` by running the same ease from where it is now at a faster rate, so
+// the piece surges up to meet the worm but never jumps. The Möbius band follows
+// a hurried rise (`rushed`) instead of its own two-second clock.
+export function rushPlatformFormation(spring, seconds) {
+  if (!spring || spring.formationTarget !== 1 || !(spring.formationDuration > 0)) return false;
+  const t = spring.formationElapsed / spring.formationDuration;
+  if (t >= 1 || spring.formationDuration - spring.formationElapsed <= seconds) return false;
+  spring.formationDuration = seconds / (1 - t);
+  spring.formationElapsed = t * spring.formationDuration;
+  spring.formationRemaining = seconds;
+  spring.rushed = true;
+  return true;
 }
 
 export function livePlatformFormation(tile, size) {

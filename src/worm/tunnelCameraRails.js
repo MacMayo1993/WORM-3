@@ -36,6 +36,18 @@ export const TUNNEL_CAM_NEAR = 0.002;
 export const portalDist = (size) => 0.6 + size * 0.02;
 export const portalUp = (size) => 1.3 + size * 0.32;
 
+// A raised landing's shot while the worm coils on its pad: high enough to hold
+// the whole coil, a little behind the landing heading, and with that heading as
+// screen-up so the pitch down from the chase needs no roll.
+const WINDUP_CAM_LIFT = 0.45;
+const WINDUP_CAM_BACK = 0.5;
+export function windupPoseInto(out, mouth, normal, heading, size) {
+  out.cam.copy(mouth).addScaledVector(normal, portalDist(size) + WINDUP_CAM_LIFT).addScaledVector(heading, -WINDUP_CAM_BACK);
+  out.look.copy(mouth);
+  out.up.copy(heading);
+  return out;
+}
+
 // Handoff at the actual core dock, shared with the simulation and effects.
 export const ENTER_END_T = ARM_A_END;
 
@@ -277,13 +289,44 @@ const _exitRail = makeTunnelCamPose();
 const _exitOutside = makeTunnelCamPose();
 const _exitSideRail = new THREE.Vector3();
 const _entryRide = makeTunnelCamPose();
+const _entryStart = makeTunnelCamPose();
+const _entryRideUp = new THREE.Vector3();
 const _entryLateral = new THREE.Vector3();
+const _rollAxis = new THREE.Vector3();
+const _rollA = new THREE.Vector3();
+const _rollB = new THREE.Vector3();
+const _rollC = new THREE.Vector3();
+
+/**
+ * Signed turn about `to`'s view axis that carries its screen-up onto `from`'s.
+ * Opposite ups have no preferred side, so that case always turns the same way
+ * and the sign cannot flicker from frame to frame.
+ */
+function rollBetween(from, to) {
+  _rollAxis.subVectors(to.look, to.cam).normalize();
+  _rollA.copy(from.up).addScaledVector(_rollAxis, -from.up.dot(_rollAxis));
+  _rollB.copy(to.up).addScaledVector(_rollAxis, -to.up.dot(_rollAxis));
+  if (_rollA.lengthSq() < 1e-8 || _rollB.lengthSq() < 1e-8) return 0;
+  _rollA.normalize(); _rollB.normalize();
+  const angle = Math.atan2(_rollAxis.dot(_rollC.crossVectors(_rollB, _rollA)), _rollB.dot(_rollA));
+  return Math.abs(angle) > Math.PI - 1e-3 ? Math.PI : angle;
+}
+
+// The band's screen-up can differ from the approach's by up to a half turn.
+// The dive keeps the approach's up and the lens rolls onto the band over the
+// rest of the entry arm, inside the tunnel, instead of spinning at the mouth.
+const ENTRY_ROLL_START = 0.12;
 
 /** Dive along route distance, so corner-tile tunnels use their own opening too. */
 export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
   const p = THREE.MathUtils.clamp(progress, 0, 1);
   const tHead = tunnelTraversalT('entering', p);
+  tunnelCamPoseInto(_entryStart, tunnel, tunnelTraversalT('entering', 0), size);
+  const settle = rollBetween(from, _entryStart);
   tunnelCamPoseInto(_entryRide, tunnel, tHead, size);
+  _entryRideUp.copy(_entryRide.up);
+  const remaining = settle * (1 - THREE.MathUtils.smoothstep(p, ENTRY_ROLL_START, 1));
+  if (remaining) _entryRide.up.applyAxisAngle(_rollAxis.subVectors(_entryRide.look, _entryRide.cam).normalize(), remaining);
   const blend = diveProgress(p);
   blendTunnelPosesInto(out, from, _entryRide, blend);
   _entryLateral.subVectors(from.cam, _camPath.vStart);
@@ -293,8 +336,10 @@ export function tunnelEntryPoseInto(out, tunnel, progress, size, from) {
     cameraArcForHead(_camPath, tHead, size), blend);
   _poseDir.subVectors(out.look, out.cam);
   cameraArcPointInto(out.cam, _camPath, arc);
-  out.cam.addScaledVector(_entryLateral, diveEase(-arc / Math.max(0.1, height * 0.5)));
-  out.cam.addScaledVector(cameraLiftInto(_cameraLift, _entryRide.up, tHead), cameraRideHeight(out.cam, arc, tHead, size) * blend);
+  // Centre on the mouth over the whole descent, so an offset approach (the
+  // raised pad's shot sits behind the heading) never slides in at the last moment.
+  out.cam.addScaledVector(_entryLateral, diveEase(-arc / Math.max(0.1, height)));
+  out.cam.addScaledVector(cameraLiftInto(_cameraLift, _entryRideUp, tHead), cameraRideHeight(out.cam, arc, tHead, size) * blend);
   out.look.copy(out.cam).add(_poseDir);
   return out;
 }
