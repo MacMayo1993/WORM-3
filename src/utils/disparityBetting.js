@@ -1,4 +1,4 @@
-import { resolveColors } from './colorSchemes.js';
+import { PALETTE_FACE_NAMES, resolveColors } from './colorSchemes.js';
 // src/utils/disparityBetting.js
 // Disparity Parity Roulette — bet types, resolution logic, and payout math.
 
@@ -20,6 +20,7 @@ export const ANTIPODAL_PAIRS = [
 ];
 
 // UI colors follow the chosen palette while all bets retain stable face/pair IDs.
+// Presets name their own colours; photo palettes fall back to a hue name.
 function colorName(hex) {
   const value = String(hex).replace('#', '');
   const full = value.length === 3 ? [...value].map(c => c + c).join('') : value;
@@ -38,8 +39,8 @@ function colorName(hex) {
 
 export function bettingPalette(settings = {}) {
   const colors = resolveColors(settings, settings.biomeMode?.faceAssignment);
-  const standard = !settings.colorScheme || settings.colorScheme === 'standard';
-  const names = Object.fromEntries(Object.keys(FACE_INFO).map(id => [id, standard ? FACE_INFO[id].name : colorName(colors[id])]));
+  const named = PALETTE_FACE_NAMES[settings.colorScheme || 'standard'];
+  const names = Object.fromEntries(Object.keys(FACE_INFO).map(id => [id, named ? named[id] : colorName(colors[id])]));
   const faces = Object.fromEntries(Object.entries(FACE_INFO).map(([id, face]) => [id, {
     ...face, hex: colors[id],
     // Similar colors are legal in custom palettes; keep their identities distinguishable.

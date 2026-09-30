@@ -7,7 +7,7 @@ vi.mock('../components/screens/wizardSteps/CubePlate.jsx', () => ({ default: ({ 
     <button onClick={onPrev}>Previous palette</button><button onClick={onNext}>Next palette</button></div> }));
 vi.mock('../components/screens/wizardSteps/shared.jsx', async importOriginal => ({
   ...await importOriginal(),
-  WIZARD_SCHEME_KEYS: ['standard', 'neon', 'pastel'], Checkmark: () => <i />, LockPip: () => <i />,
+  WIZARD_SCHEME_KEYS: ['standard', 'neon', 'pastel', 'lava'], Checkmark: () => <i />, LockPip: () => <i />,
   sizeTier: () => ({ name: 'Classic' }), bgOptionFor: () => null,
 }));
 import PaletteStep from '../components/screens/wizardSteps/PaletteStep.jsx';
@@ -31,7 +31,9 @@ it('selects owned palettes and keeps locked swatches colored without allowing pu
   expect(cos.select).toHaveBeenCalledTimes(1);
 });
 it('filters families, gives an empty state for unowned families, and preserves photo upload', () => {
-  act(() => button('Soft').click());
+  act(() => button('Essentials').click());
+  expect([...host.querySelectorAll('.palette-card-heading')].map(h => h.textContent)).toEqual(['Classic', 'Pastel']);
+  act(() => button('Nature').click());
   expect(host.querySelectorAll('.palette-card')).toHaveLength(1);
   act(() => host.querySelector('input').click());
   expect(host.querySelectorAll('.palette-card')).toHaveLength(0);

@@ -1,7 +1,7 @@
 .palette-browser { color: var(--palette-ink); }
 .palette-filters { display: flex; gap: 5px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: thin; }
 .palette-filters button { flex: 0 0 auto; border: 1px solid var(--palette-border); border-radius: 24px; background: var(--palette-card); color: var(--palette-ink); padding: 8px 12px; min-height: 44px; font: inherit; font-size: 12px; cursor: pointer; }
-.palette-filters button[aria-pressed="true"] { background: var(--palette-ink); border-color: var(--palette-ink); color: var(--palette-card); }
+.palette-browser .palette-filters button[aria-pressed="true"] { background: var(--palette-ink); border-color: var(--palette-ink); color: var(--palette-card); }
 .palette-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 6px; color: var(--palette-muted); font-size: 12px; }
 .palette-toolbar label { display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; }
 .palette-toolbar input { accent-color: var(--palette-accent); width: 16px; height: 16px; }

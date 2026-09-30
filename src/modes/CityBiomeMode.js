@@ -9,13 +9,15 @@ export const FACE_CITIES = {
   6: 'solarArcology',   // Face 6 = NY = Yellow
 };
 
+// pulseColor doubles as the City Biome palette's face colour, so the six stay as
+// far apart as any preset (the volcano's red and the Colosseum's sandstone most of all).
 export const CITY_CONFIG = {
-  frozenCitadel:   { label: 'Frozen Citadel',   tileStyle: 'ice',    pulseColor: '#B8E4FF', pulseHex: 0xB8E4FF },
-  deepStation:     { label: 'Deep Station',      tileStyle: 'water',  pulseColor: '#00CED1', pulseHex: 0x00CED1, bgColor: '#0a3d5c' },
-  volcanicFoundry: { label: 'Volcanic Foundry',  tileStyle: 'lava',   pulseColor: '#FF4500', pulseHex: 0xFF4500 },
-  solarArcology:   { label: 'Solar Arcology',    tileStyle: 'pulse',  pulseColor: '#FFD700', pulseHex: 0xFFD700, bgColor: '#87CEEB' },
+  frozenCitadel:   { label: 'Frozen Citadel',   tileStyle: 'ice',    pulseColor: '#C6E9FF', pulseHex: 0xC6E9FF },
+  deepStation:     { label: 'Deep Station',      tileStyle: 'water',  pulseColor: '#00C2C6', pulseHex: 0x00C2C6, bgColor: '#0a3d5c' },
+  volcanicFoundry: { label: 'Volcanic Foundry',  tileStyle: 'lava',   pulseColor: '#E11D16', pulseHex: 0xE11D16 },
+  solarArcology:   { label: 'Solar Arcology',    tileStyle: 'pulse',  pulseColor: '#FFDC3C', pulseHex: 0xFFDC3C, bgColor: '#87CEEB' },
   bioDome:         { label: 'Bio-Dome',          tileStyle: 'grass',  pulseColor: '#39FF14', pulseHex: 0x39FF14 },
-  neuralHub:       { label: 'Colosseum',          tileStyle: 'pulse',  pulseColor: '#E07320', pulseHex: 0xE07320, bgColor: '#E07320' },
+  neuralHub:       { label: 'Colosseum',          tileStyle: 'pulse',  pulseColor: '#EB9136', pulseHex: 0xEB9136, bgColor: '#E07320' },
 };
 
 // Antipodal face pairs
