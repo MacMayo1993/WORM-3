@@ -14,9 +14,12 @@ export default function CautionFallFX({ worm, body }) {
             active.current = fall;
             uniforms.uDissolve.value = 0;
             if (fall && body.current) {
-                // Align the intro's top-to-bottom grain with the inward fall.
-                const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), fall.normal);
+                // Consume the leading end first as it is pulled onto the tile.
+                // The previous normal-aligned field hid the head inside the cube
+                // before its grain became visible on the surface body.
+                const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), fall.approach);
                 uniforms.uDissolveFrame.value.compose(fall.mouth, rotation, new THREE.Vector3(1, 1, 1)).invert();
+                uniforms.uDissolveFrame.value.elements[13] += 1.4;
                 restore.current = createCautionDissolve(body.current, uniforms);
             }
         }

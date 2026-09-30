@@ -214,7 +214,7 @@ export default function WormChaseCamera({ worm, size }) {
     const cameraRunRef = useRef(null);
     const surfaceNearRef = useRef(camera.near);
     const rocketShakeTime = useRef(0);          // clock for the rocket's camera rumble
-    const fallCamera = useRef({ position: new THREE.Vector3(), target: new THREE.Vector3(), aim: new THREE.Object3D() });
+    const fallCamera = useRef({ position: new THREE.Vector3(), target: new THREE.Vector3(), direction: new THREE.Vector3() });
 
     // This camera is the app's shared one, and the chase view leaves it wide
     // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
@@ -270,19 +270,24 @@ export default function WormChaseCamera({ worm, size }) {
         const fall = worm.cautionFall?.current;
         tunnelState.fallOpening = fall ?? null;
         if (fall) {
-            // A fixed view through the one opening: settle once and watch the
-            // body fall/dissolve, without orbiting or chasing it through walls.
+            // Stay outside, framing the approach AND taped opening. Fit the
+            // narrower viewport dimension so the phone shot cannot crop the tug.
             tunnelState.active = false;
             const shot = fallCamera.current;
-            shot.position.copy(fall.mouth).addScaledVector(fall.normal, 1.65).addScaledVector(fall.approach, -0.45);
-            shot.target.copy(fall.mouth).addScaledVector(fall.normal, -0.55);
+            const halfFov = THREE.MathUtils.degToRad(camera.fov) / 2;
+            const narrowFov = Math.min(halfFov, Math.atan(Math.tan(halfFov) * camera.aspect));
+            const radius = fall.start.distanceTo(fall.mouth) * 0.5 + 0.8;
+            const distance = radius / Math.sin(narrowFov * 0.85);
+            shot.target.lerpVectors(fall.start, fall.mouth, 0.5);
+            shot.direction.copy(fall.normal).multiplyScalar(0.9).addScaledVector(fall.approach, -0.5).normalize();
+            shot.position.copy(shot.target).addScaledVector(shot.direction, distance);
             const blend = 1 - Math.exp(-Math.min(delta, 0.05) * 8);
             camera.position.lerp(shot.position, blend);
-            shot.aim.position.copy(camera.position);
-            shot.aim.up.copy(fall.approach);
-            shot.aim.lookAt(shot.target);
-            camera.quaternion.slerp(shot.aim.quaternion, blend);
-            camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+            // Object3D.lookAt aims +Z; a camera looks down -Z. Copying an
+            // Object3D quaternion turned the old death shot toward the backdrop.
+            // Smooth the roll using the camera basis, then keep aim on the action.
+            aimCamera(camera, camera.position, shot.target, fall.approach, blend);
+            frameSurfaceCamera(camera, 0, shot.target);
             camPosRef.current.copy(camera.position);
             lookAtRef.current.copy(shot.target);
             camUpRef.current.copy(camera.up);
