@@ -491,15 +491,24 @@ describe('resolveSliceHits', () => {
   };
 
   it('lets a death on the second plane beat a cut on the first', () => {
-    // Head on row 2 (trapped: its body leaves the plane → death). Body runs through
+    // Head just stepped onto row 2 mid-turn (a crossing → death). Body runs through
     // row 1 into row 0, which reports a cut. Evaluating plane 0 first used to win.
     const worm = wormWithBody(
       { x: 1, y: 2, z: 2, dirKey: 'PZ' },
       [{ x: 1, y: 1, z: 2, dirKey: 'PZ' }, { x: 1, y: 0, z: 2, dirKey: 'PZ' }]
     );
-    expect(resolveSliceHits(worm, 'row', [0, 2])).toMatchObject({ type: 'death', sliceIndex: 2 });
+    expect(resolveSliceHits(worm, 'row', [0, 2], undefined, { entering: true })).toMatchObject({ type: 'death', sliceIndex: 2 });
     // And the order of the planes cannot change the outcome.
-    expect(resolveSliceHits(worm, 'row', [2, 0])).toMatchObject({ type: 'death', sliceIndex: 2 });
+    expect(resolveSliceHits(worm, 'row', [2, 0], undefined, { entering: true })).toMatchObject({ type: 'death', sliceIndex: 2 });
+  });
+
+  it('only cuts a head riding a turning plane, at the seam nearest the head', () => {
+    const worm = wormWithBody(
+      { x: 1, y: 2, z: 2, dirKey: 'PZ' },
+      [{ x: 1, y: 1, z: 2, dirKey: 'PZ' }, { x: 1, y: 0, z: 2, dirKey: 'PZ' }]
+    );
+    expect(resolveSliceHits(worm, 'row', [0, 2])).toMatchObject({ type: 'cut', cutTrailIdx: 1, sliceIndex: 2 });
+    expect(resolveSliceHits(worm, 'row', [2, 0])).toMatchObject({ type: 'cut', cutTrailIdx: 1, sliceIndex: 2 });
   });
 
   it('takes the cut nearest the head when several planes cut', () => {

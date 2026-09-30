@@ -29,8 +29,15 @@ export function bodyPathHeadInto(out, worm, transit = false) {
 /** Find the first separation along the occupied path, not along visited tiles.
  * Called once when a new turn starts, before any slice transform is applied.
  * Includes the live-head/history bracket and clips sparse brackets analytically.
+ *
+ * The head-side body always survives the seam: a head riding the turning layer
+ * keeps the part of the body on the layer and sheds the rest, exactly as a head
+ * on stationary ground sheds the part inside the layer. Only a head caught
+ * crossing the seam dies — `entering` (the head stepped onto the layer after the
+ * turn began) or a seam so close behind the head that the retained body is
+ * shorter than the intrinsic base (the head was straddling it as the turn fired).
  */
-export function findSlicePathHit(worm, axis, layer, size) {
+export function findSlicePathHit(worm, axis, layer, size, { entering = false } = {}) {
   const history = worm.stepHistory?.current;
   if (!history?.count || !worm.headInterpPos?.current || !worm.currentNormal?.current) return null;
   const coord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
@@ -42,8 +49,8 @@ export function findSlicePathHit(worm, axis, layer, size) {
   const planes = [low, high];
   let a = bodyPathHeadInto(head, worm);
   const headOnLayer = a[coord] >= low && a[coord] <= high;
-  // The outward cap rides the slab. A seam behind it can shed a tail without
-  // killing a viable head-side body, just like a head on stationary ground.
+  // The outward cap rides the slab, so stepping onto it from the band is not a
+  // crossing into the turning layer's side seam.
   const headOnOuterCap = (layer === 0 && worm.currentNormal.current[coord] < -0.9) ||
     (layer === size - 1 && worm.currentNormal.current[coord] > 0.9);
   const reach = bodyDistanceAt(worm, worm.tailLength.current - 1);
@@ -84,8 +91,9 @@ export function findSlicePathHit(worm, axis, layer, size) {
         (worm.isJumping?.current && (worm.jumpLift?.() ?? 0) > 0.45);
       // Survivors must retain the intrinsic body used by pickup/deposit accounting.
       // Below that base, rebuilding pickups would credit inventory without carried orbs.
+      const crossedIn = entering && headOnLayer && !headOnOuterCap && !protectedHead;
       return {
-        type: (headOnLayer && !headOnOuterCap && !protectedHead) || keepCount < BASE_TAIL_LENGTH ? 'death' : 'cut',
+        type: crossedIn || keepCount < BASE_TAIL_LENGTH ? 'death' : 'cut',
         cutDistance, keepCount, historyIndex: i, historyT: t,
         cutPosition: [a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t],
         headOnLayer,

@@ -94,7 +94,7 @@ const DEATHS = {
     sliced: {
         eyebrow: 'Slice collision',
         title: 'Sliced',
-        blurb: 'A rotating slice caught you mid-crawl.',
+        blurb: 'You crossed a layer while it was turning. Riding one only costs your tail.',
         accent: '#e2e8f0',
         accentSoft: 'rgba(226,232,240,0.40)',
         deep: '#7f1d1d',

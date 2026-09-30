@@ -276,7 +276,7 @@ it('publishes the impact effect once for a death caused during the live rotation
   worm.tick.mockImplementationOnce(() => worm.killWorm(details));
   tick();
   const effect = React.Children.toArray(tree.props.children.props.children).find(child => child.type === ThunkEffect).props.thunkRef;
-  expect(effect.current).toMatchObject({ active: true, text: "WORM'D", pos: [1,2,3] });
+  expect(effect.current).toMatchObject({ active: true, kind: 'sliced', pos: [1,2,3] });
   effect.current.active = false;
   tick(5);
   expect(effect.current.active).toBe(false);
@@ -311,6 +311,8 @@ it('resolves a head that steps onto the turning layer early in the hazard tween'
   stepOnto(turn);
   tick();
   expect(resolveSliceHits).toHaveBeenCalledTimes(2);
+  // Stepping onto the turning layer is the crossing that kills, not riding it.
+  expect(resolveSliceHits.mock.calls[1][4]).toEqual({ entering: true });
   expect(useGameStore.getState().wormAlive).toBe(false);
   expect(useGameStore.getState().wormDeathDetails).toMatchObject({ reason: 'slice-rotation', axis: turn.axis,
     sliceIndex: turn.layer, liveCrossing: true });

@@ -135,7 +135,29 @@ describe('physical slice cuts', () => {
     expect(checkWormHitBySlice(worm, 'col', 3, 7).type).toBe('cut');
   });
 
-  it('retains death priority while locating the sever on the trapped head layer', () => {
+  it('sheds only the off-layer tail when the head rides the turning layer', () => {
+    // Head on col 1 (x = -2), body runs 1.5 units along the layer before leaving it.
+    const { sim, worm } = fixture([
+      new THREE.Vector3(-2, 0, 3.6), new THREE.Vector3(-2, 1.5, 3.6), new THREE.Vector3(1, 1.5, 3.6),
+    ]);
+    const hit = checkWormHitBySlice(worm, 'col', 1, 7);
+    expect(hit.headOnLayer).toBe(true);
+    expect(hit.type).toBe('cut');
+    expect(hit.cutDistance).toBeCloseTo(2);
+    expect(hit.cutPosition[0]).toBeCloseTo(-1.5);
+    cutWormTail(worm, hit);
+    expect(sim.tailLength).toBe(hit.keepCount);
+    expect(checkWormHitBySlice(worm, 'col', 1, 7)).toBeNull();
+  });
+
+  it('kills a head that steps onto the turning layer mid-turn', () => {
+    const { worm } = fixture([
+      new THREE.Vector3(-2, 0, 3.6), new THREE.Vector3(-2, 1.5, 3.6), new THREE.Vector3(1, 1.5, 3.6),
+    ]);
+    expect(checkWormHitBySlice(worm, 'col', 1, 7, { entering: true }).type).toBe('death');
+  });
+
+  it('kills a head caught right across the seam, locating the sever there', () => {
     const { worm } = fixture(line(500));
     const a = resolveSliceHits(worm, 'col', [3, 1], 7);
     const b = resolveSliceHits(worm, 'col', [1, 3], 7);

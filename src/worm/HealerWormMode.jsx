@@ -85,7 +85,8 @@ import {
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
 import { rotationClock, resetRotationClock } from './healerWorm/rotationClockBridge.js';
 import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
-import { ThunkEffect, CollisionGlow } from './healerWorm/impactFx.jsx';
+import { ThunkEffect, SeveredTail, CollisionGlow } from './healerWorm/impactFx.jsx';
+import { sampleSeveredTail, wormdKindForDeath } from './healerWorm/wormdFx.js';
 import { buildWormScramble, invertWormScramble } from './healerWorm/scramble.js';
 
 const SPAWN_DURATION = 0.75;
@@ -143,6 +144,21 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const warningProgressRef = useRef(0);     // 0→1 through warning window
     const liveDeathRef = useRef(null);
     const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
+    // The hazard code fires its own shout for the deaths it causes; the death
+    // watch below only covers the rest (tail bites, the void, portal crawlers).
+    const deathThunkFiredRef = useRef(false);
+    const severedRef = useRef({ active: false, pieces: [], count: 0, orbColors: [] });
+    // Snapshot the beads a cut is about to remove so SeveredTail can pop them off
+    // the cube. Must run before cutWormTail trims the history they live on.
+    const captureSeveredTail = (cut) => {
+        const fromBead = typeof cut === 'object' && Number.isFinite(cut.cutDistance)
+            ? cut.keepCount
+            : Math.max(BASE_TAIL_LENGTH, Math.round((typeof cut === 'object' ? cut.cutTrailIdx : cut) / BODY_BALL_SPACING));
+        const sev = severedRef.current;
+        sev.count = sampleSeveredTail(worm, fromBead, sev.pieces);
+        sev.orbColors = worm.orbPickupColorsRef.current.slice();
+        sev.active = sev.count > 0;
+    };
     // Early-turn crossing watch for the hazard turn in flight (see sliceCrossing.js).
     const turnWatchRef = useRef(null);
 
@@ -152,18 +168,20 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const applySliceHit = (hit, axis, fallbackSlice, details = null) => {
         const hitPos = hit.cutPosition ?? worm.headInterpPos.current.toArray();
         const cutColors = worm.orbPickupColorsRef.current.slice(0, 5);
-        thunkRef.current = {
-            active: true,
-            pos: hitPos,
-            colors: cutColors.length ? cutColors : ['#ffdd44', '#ff8800'],
-        };
+        const fatal = hit.type === 'death';
+        thunkRef.current = { active: true, pos: hitPos, kind: fatal ? 'sliced' : 'cut', colors: cutColors };
         const layer = hit.sliceIndex ?? fallbackSlice;
-        if (hit.type === 'death') {
-            if (Number.isFinite(hit.cutDistance)) cutWormTail(worm, hit);
+        if (fatal) {
+            deathThunkFiredRef.current = true;
+            if (Number.isFinite(hit.cutDistance)) {
+                captureSeveredTail(hit);
+                cutWormTail(worm, hit);
+            }
             // The plane that actually caught the worm, not the anchor.
             worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex: layer, impactPosition: hitPos, ...details });
             return true;
         }
+        captureSeveredTail(hit);
         cutWormTail(worm, hit);
         worm.feel('cut');
         // Cue the chase camera to swing out to the slice shot for the WORM'D beat,
@@ -272,11 +290,19 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             autoTimerRef.current >= rotationInterval - AUTO_ROTATE_WARNING - 0.2 });
 
         const deathState = useGameStore.getState();
-        if (deathState.wormAlive) liveDeathRef.current = null;
-        else if (deathState.wormDeathDetails?.liveCrossing && liveDeathRef.current !== deathState.wormDeathDetails) {
-            liveDeathRef.current = deathState.wormDeathDetails;
-            thunkRef.current = { active: true, pos: deathState.wormDeathDetails.impactPosition,
-                colors: ['#ffdd44', '#ff4444'], text: "WORM'D" };
+        if (deathState.wormAlive) { liveDeathRef.current = null; deathThunkFiredRef.current = false; }
+        else if (deathState.wormDeathDetails && liveDeathRef.current !== deathState.wormDeathDetails) {
+            // A death the sim decided on its own (a live seam crossing, a tail bite,
+            // the void) gets its shout here; hazard kills already fired theirs.
+            const details = deathState.wormDeathDetails;
+            liveDeathRef.current = details;
+            const kind = wormdKindForDeath(details.reason);
+            if (kind && !deathThunkFiredRef.current) {
+                deathThunkFiredRef.current = true;
+                thunkRef.current = { active: true, kind,
+                    pos: details.impactPosition ?? worm.headInterpPos.current.toArray(),
+                    colors: worm.orbPickupColorsRef.current.slice(0, 5) };
+            }
         }
 
         // While a slice the worm sits on is mid-rotation during live play, ride it so the
@@ -431,7 +457,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const step = stepTurnWatch(watch, worm, store.rotationEpoch);
             if (step === 'done') turnWatchRef.current = null;
             else if (step === 'crossed') {
-                const hit = resolveSliceHits(worm, watch.axis, watch.layers, size);
+                // Stepping onto the turning layer is a crossing (fatal); stepping off it
+                // leaves the body on the layer behind, which is only a tail cut.
+                const hit = resolveSliceHits(worm, watch.axis, watch.layers, size, { entering: watch.headOn });
                 if (hit && applySliceHit(hit, watch.axis, watch.layers[0], { liveCrossing: true })) {
                     turnWatchRef.current = null;
                     return;
@@ -591,10 +619,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                             ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)
                             : null;
                         const hitPos = histEntry ? histEntry.pos.toArray() : worm.headInterpPos.current.toArray();
-                        thunkRef.current = { active: true, pos: hitPos, colors: ['#ff7b2e', '#ffd23f'] };
+                        thunkRef.current = { active: true, pos: hitPos, kind: hit.type === 'death' ? 'blasted' : 'blast-cut' };
                         if (hit.type === 'death') {
+                            deathThunkFiredRef.current = true;
                             worm.killWorm({ reason: 'bomb', bombId: bomb.id });
                         } else {
+                            captureSeveredTail(hit.cutTrailIdx);
                             cutWormTail(worm, hit.cutTrailIdx);
                             worm.cutFocusT.current = CUT_FOCUS_DURATION;
                             worm.cutFocusPos.current = hitPos;
@@ -778,6 +808,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <PowerupOrbs size={size} />
             <SpecialOrbs size={size} hidden={wormInTunnel} />
             <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} worm={worm} />
+            <SeveredTail severedRef={severedRef} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />
         </PickupMaterialProvider></WormLighting>

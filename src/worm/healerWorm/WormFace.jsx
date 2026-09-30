@@ -79,10 +79,11 @@ export function WormFace({ worm, size }) {
     const reducedMotion = useMemo(() => prefersReducedMotion(), []);
     const facePulse = useRef(0);
     const previousOrbs = useRef(0);
+    const koTime = useRef(0); // seconds since death; runs while the game clock is frozen
 
     const runId = useGameStore(s => s.wormRunId);
     useEffect(() => {
-        faceTime.current = 0; facePulse.current = 0; previousOrbs.current = 0;
+        faceTime.current = 0; facePulse.current = 0; previousOrbs.current = 0; koTime.current = 0;
         faceOpacityRef.current = 1;
     }, [runId]);
 
@@ -190,6 +191,7 @@ export function WormFace({ worm, size }) {
         if (wormCharacterId === 'wiggle' && worm.wiggleHeadPosition) _faceHeadPos.copy(worm.wiggleHeadPosition);
         const dt = state.wormPaused || !state.wormAlive ? 0 : Math.min(delta, 0.05);
         faceTime.current += dt;
+        koTime.current = state.wormAlive ? 0 : koTime.current + Math.min(delta, 0.05);
         const count = worm.orbPickupColorsRef.current.length;
         if (count > previousOrbs.current) facePulse.current = 1;
         previousOrbs.current = count;
@@ -259,6 +261,7 @@ export function WormFace({ worm, size }) {
             headRadiusFor(wormCharacterId) * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1), reducedMotion ? 0 : faceTime.current, !!inTransit, wormCharacterId);
         animateWormFace(_faceParts, wormCharacterId, faceTime.current, {
             pulse: facePulse.current, transit: !!inTransit, reducedMotion,
+            ko: state.wormAlive ? 0 : Math.min(1, koTime.current / 0.25), koTime: koTime.current,
         });
 
         poseCharacterAccents(accents.group, _faceHeadPos, _faceForward, normal, headRadiusFor(wormCharacterId) * (worm.pickupHeadScale ?? 1) * (worm.tunnelHeadScale ?? 1));
