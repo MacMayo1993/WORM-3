@@ -162,6 +162,90 @@ it('waits for a boost burst and freezes lessons during pause', () => {
   frames(50); expect(worm.pos.current).toEqual(pos); expect(state().wormBoostState).toBe('active'); expect(state().demoWormComplete).toBe(false);
   act(() => state().setWormPaused(false)); until(() => state().demoWormComplete);
 });
+
+it('shows the full caution death before unlocking Next, then resets into rescue practice', () => {
+  lesson('caution-fall');
+  expect(host.textContent).toContain('Replay');
+  expect(host.querySelector('.worm-jump').disabled).toBe(true);
+  expect([...host.querySelectorAll('.worm-steer-key')].every(b => b.disabled)).toBe(true);
+  input('turnLeft'); input('jump'); input('boost'); frames(3);
+  expect(worm.moveDir.current).toBe('up');
+  expect(worm.isJumping.current).toBe(false);
+  until(() => state().wormRescueKind === 'caution');
+  expect(host.querySelector('[role="alert"]').textContent).toContain('Watch');
+  input('jump'); input('right');
+  until(() => state().wormPhase === 'falling');
+  expect(state().demoWormComplete).toBe(false);
+  frames(15);
+  expect(worm.cautionFall.current.dissolve).toBeGreaterThan(0);
+  expect(worm.cautionFall.current.dissolve).toBeLessThan(1);
+  expect(state().demoWormComplete).toBe(false);
+  const elapsed = worm.cautionFall.current.elapsed;
+  act(() => host.querySelector('[aria-label="Pause"]').click()); frames(50);
+  expect(worm.cautionFall.current.elapsed).toBe(elapsed);
+  act(() => host.querySelector('.worm-pause-resume').click());
+  until(() => state().demoWormComplete);
+  expect(state().wormDeathDetails.reason).toBe('caution-fall');
+  expect(state().wormAlive).toBe(false);
+  expect(worm.cautionFall.current.dissolve).toBe(1);
+  expect(state().demoWormCompleted).toContain('caution-fall');
+  expect(host.textContent).toContain('Demonstration complete');
+  expect(document.activeElement.textContent).toBe('Next');
+  act(() => document.activeElement.click()); frame(); frame();
+  expect(WORM_DEMO_LESSONS[state().demoWormLessonIndex].id).toBe('caution-rescue');
+  expect(worm.cautionFall.current).toBeNull();
+  expect(state()).toMatchObject({ wormAlive: true, wormPaused: true, demoWormComplete: false, wormRescueKind: null });
+  act(() => state().startWormDemoLesson());
+  expect(host.querySelector('.worm-jump').disabled).toBe(false);
+});
+
+it.each(['left', 'right', 'jump'])('requires a live caution cue and a successful %s rescue', action => {
+  lesson('caution-rescue');
+  input('turnLeft'); frames(5);
+  expect(state().demoWormComplete).toBe(false);
+  act(() => state().restartWormDemoLesson()); frame(); frame();
+  act(() => state().startWormDemoLesson());
+  until(() => state().wormRescueKind === 'caution');
+  const button = action === 'jump' ? host.querySelector('.worm-jump')
+    : host.querySelectorAll('.worm-steer-key')[action === 'left' ? 0 : 1];
+  expect(button.disabled).toBe(false);
+  act(() => button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  frame();
+  expect(state().wormJumpRescueActive).toBe(false);
+  if (action === 'jump') {
+    expect(worm.isJumping.current).toBe(true);
+    expect(state().demoWormComplete).toBe(false);
+  }
+  until(() => state().demoWormComplete);
+  expect(state().wormAlive).toBe(true);
+  expect(worm.cautionFall.current).toBeNull();
+  expect(state().demoWormCompleted).toContain('caution-rescue');
+});
+
+it('keeps a missed practice rescue incomplete and offers a clean retry', () => {
+  lesson('caution-rescue');
+  until(() => !state().wormAlive);
+  expect(state().demoWormComplete).toBe(false);
+  expect(state().wormDeathDetails.reason).toBe('caution-fall');
+  expect(host.textContent).toContain('one-second cue');
+  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'Try again').click()); frame(); frame();
+  expect(worm.cautionFall.current).toBeNull();
+  act(() => state().startWormDemoLesson());
+  until(() => state().wormRescueKind === 'caution');
+  input('left'); until(() => state().demoWormComplete);
+});
+
+it('can replay or leave the watched fall without stranding the next lesson', () => {
+  lesson('caution-fall'); until(() => state().wormPhase === 'falling');
+  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'Replay').click()); frame(); frame();
+  expect(state()).toMatchObject({ wormAlive: true, demoWormComplete: false, demoWormStarted: false });
+  expect(worm.cautionFall.current).toBeNull();
+  expect(host.textContent).toContain('Watch it');
+  act(() => state().startWormDemoLesson()); until(() => state().demoWormComplete);
+  act(() => state().restartWormDemoLesson()); frame(); frame();
+  act(() => state().startWormDemoLesson()); until(() => state().demoWormComplete);
+  expect(state().demoWormCompleted.filter(id => id === 'caution-fall')).toHaveLength(1);
+});
 it.each(['tunnel', 'heal'])('finishes %s only after the tail exits and preserves the correct deposit outcome', id => {
   lesson(id);
   if (id === 'heal') {
@@ -190,8 +274,8 @@ it('retries healing during the tunnel ride with fresh charges and working contro
   until(() => state().demoWormComplete, 1600);
   expect(state().wormHealedCount).toBe(1);
 });
-it('walks under a raised tunnel without entering and can retry the jump route', () => {
-  lesson('tunnel'); frames(90);
+it('meets the caution tape on a grounded tunnel approach and can retry the jump route', () => {
+  lesson('tunnel'); until(() => state().wormRescueKind === 'caution');
   expect(state().wormTunnelCount).toBe(0); expect(state().demoWormComplete).toBe(false);
   act(() => state().restartWormDemoLesson()); frame(); frame();
   act(() => state().startWormDemoLesson()); input('jump');
@@ -293,6 +377,7 @@ it('covers every elemental orb and keeps the store lesson count in sync', () => 
   expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'jump') + 1].id).toBe('body-jump');
   expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'body-jump') + 1].id).toBe('double-jump');
   expect(WORM_DEMO_LESSONS[WORM_DEMO_LESSONS.findIndex(l => l.id === 'double-jump') + 1].id).toBe('boost');
+  expect(WORM_DEMO_LESSONS.slice(6, 9).map(l => l.id)).toEqual(['caution-fall', 'caution-rescue', 'tunnel']);
   for (const id of ELEMENTAL_TYPES) expect(WORM_DEMO_LESSONS.some(l => l.id === id)).toBe(true);
 });
 

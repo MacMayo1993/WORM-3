@@ -15,7 +15,8 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   resetWormSim(sim, size, { orbCount: 0, wormholeInterval: 9999 });
   const c = Math.floor(size / 2);
   const ring = ['surround', 'bomb'].includes(lesson.id);
-  const portal = ['tunnel', 'heal'].includes(lesson.id);
+  const caution = ['caution-fall', 'caution-rescue'].includes(lesson.id);
+  const portal = caution || ['tunnel', 'heal'].includes(lesson.id);
   const target = { x: c, y: ring ? c : Math.min(size - 2, 3), z: size - 1, dirKey: 'PZ' };
   // Start within the live two-tile jump aim window. One deliberate press can
   // reach the pad, even while its two-second formation is still playing.
@@ -31,7 +32,7 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
     target.y = 2;
   }
   let cubies = makeCubies(size);
-  if (['tunnel', 'heal', 'surround'].includes(lesson.id)) {
+  if (portal || lesson.id === 'surround') {
     cubies = flipStickerPair(cubies, size, target.x, target.y, target.z, target.dirKey, buildManifoldGridMap(cubies, size));
   }
   const inventory = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
@@ -64,7 +65,7 @@ export function stageWormPractice(sim, size, lesson, orbColor = face => FACE_COL
   if (['rocket', 'magnet', 'orb-shower', 'water', 'fire', 'grass', 'ice', 'lightning'].includes(lesson.id)) {
     sim.specials = [{ x: c, y: 2, z: size - 1, dirKey: 'PZ', type: lesson.id, id: `demo-${lesson.id}`, ttl: 9999, maxTtl: 9999 }];
   }
-  const marked = ring || ['tunnel', 'heal', 'body-jump'].includes(lesson.id) ? { ...target, ring } : null;
+  const marked = ring || portal || lesson.id === 'body-jump' ? { ...target, ring } : null;
   return { cubies, inventory, target: marked, sawJump: false, jumps: 0, sawBoost: false, sawRocket: false, sawShower: false, elementTime: 0, airborne: false, crossedThisJump: false, bodyJumps: 0 };
 }
 
@@ -99,6 +100,25 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
       progress = `${practice.jumps} / 2 jumps`;
       break;
     case 'boost': done = practice.sawBoost && sim.boostActiveT <= 0; break;
+    case 'caution-fall':
+      // Observing this one intentional death is the goal. Never unlock Next
+      // at timeout: let the real simulation, camera and dissolve finish first.
+      done = !sim.alive && state.wormDeathDetails?.reason === 'caution-fall' && sim.cautionFall?.dissolve === 1;
+      progress = sim.cautionFall ? 'Watch the worm pull through the tape and dissolve'
+        : sim.cautionRescue ? 'Watch the one-second rescue timer run out' : 'Approaching the taped edge…';
+      break;
+    case 'caution-rescue':
+      if (sim.cautionRescue) practice.cautionHeading = sim.moveDir;
+      if (practice.cautionHeading && !sim.cautionRescue && !sim.cautionFall && sim.alive) {
+        practice.cautionJump ||= !!sim.padFlight;
+        done = practice.cautionJump
+          ? !sim.isJumping && (sim.onRaisedPlatform || state.wormTunnelCount > 0)
+          : sim.moveDir !== practice.cautionHeading;
+      }
+      progress = practice.cautionJump ? 'Tape cleared — land on the pad'
+        : sim.cautionRescue ? 'LEFT, RIGHT or JUMP — save the worm now'
+          : 'Keep straight until the caution-tape cue appears';
+      break;
     case 'tunnel':
     case 'heal':
       done = state.wormTunnelCount > 0 && sim.phase === 'crawling' && state.wormPhase === 'crawling' && sim.tunnelPassages.length === 0 && (lesson.id !== 'heal' || sim.healed > 0);

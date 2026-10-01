@@ -593,7 +593,8 @@ export function useWormCrawler(size, cubies) {
             if (c.won && !state.wormPaused) useGameStore.setState({ wormPaused: true, wormTimeAlive: Math.floor(sim.timeAlive) });
         }
 
-        if (demo && state.demoWormStarted && demoPracticeRef.current?.attempt === attempt && !state.wormPaused && sim.alive && !state.demoWormComplete) {
+        if (demo && state.demoWormStarted && demoPracticeRef.current?.attempt === attempt && !state.wormPaused &&
+            (sim.alive || lesson.id === 'caution-fall') && !state.demoWormComplete) {
             const result = readWormPractice(sim, demoPracticeRef.current, lesson, useGameStore.getState(), sizeRef.current, delta);
             if (result.done || result.progress !== state.demoWormProgress) {
                 useGameStore.setState({ demoWormProgress: result.progress,
@@ -675,6 +676,9 @@ export function useWormCrawler(size, cubies) {
         }
         if (dir === 'fire-stop') { if (c) c.fireHeld = false; return; }
         if (state.wormPaused || !sim.alive) return;
+        // Watch-only lessons use the real simulation while withholding player
+        // movement. Pause and lesson Replay/Next remain available in the HUD.
+        if (wormDemoActive(state) && !state.demoWormFinished && wormDemoLesson(state).preview) return;
         if (sim.jumpRescueT > 0) { queueTurnSim(sim, dir); return; }
         if (dir === 'fire' || dir === 'fire-start') {
             if (c?.started && (!c.ambient || c.encounter) && !c.won && sim.alive && !state.wormPaused && !c.held && sim.phase === 'crawling') { c.fireRequested = true; if (dir === 'fire-start') c.fireHeld = true; }
