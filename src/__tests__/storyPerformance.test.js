@@ -24,9 +24,9 @@ describe('local story offerings', () => {
     expect(storySurfaceTile({ pos: tiles[0] }, size, cubies, new Set(tiles.map(tileKey)))).toBeUndefined();
   });
   it.each([27,30])('stops level %i offerings at its three authored elements', id => {
-    const p = { mechanics: { explodes: 1, magnetOrbs: 4 }, elements: new Set(['water','fire']) };
+    const p = { mechanics: { explodes: 1, magnetOrbs: 4 }, elements: new Set(['water','fire']), collectedElements: new Set(['water','fire']) };
     expect(nextStoryPower(p, storyLevel(id))).toBe('grass');
-    p.elements.add('grass');
+    p.elements.add('grass'); p.collectedElements.add('grass');
     expect(nextStoryPower(p, storyLevel(id))).toBeNull();
   });
 });

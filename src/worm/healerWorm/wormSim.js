@@ -1200,7 +1200,7 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = fals
     // Claiming an element is a choice: grabbing one wipes the rest of the offering
     // off the board until the next spawn cycle. Rocket/magnet are untouched.
     if (isElementalType(claimed.type)) {
-        ctx.onStoryMechanic?.('elementPickups');
+        ctx.onStoryMechanic?.('elementPickups', claimed.type);
         for (let i = sim.specials.length - 1; i >= 0; i--) {
             if (isElementalType(sim.specials[i].type)) sim.specials.splice(i, 1);
         }

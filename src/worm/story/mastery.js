@@ -22,6 +22,9 @@ const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
 export function recordStoryMechanic(practice, key, id) {
   if (practice && key === 'grassLaunch') { practice.grassJump = true; return; }
   if (!practice || !['ringHeals', 'magnetOrbs', 'bombs', 'elementPickups'].includes(key)) return;
+  // Pickup variety is separate from elemental mastery actions. Repeated
+  // pickups still count toward quantity quests, but each element counts once.
+  if (key === 'elementPickups' && STORY_ELEMENTS.includes(id)) practice.collectedElements.add(id);
   if (key === 'bombs') {
     if (id == null || practice.bombIds.has(id)) return;
     practice.bombIds.add(id);
@@ -77,6 +80,9 @@ export function nextStoryPower(p, level) {
   if ((p.mechanics.elementPickups ?? 0) < (m.elementPickups ?? 0)) {
     for (const type of STORY_ELEMENTS.slice(0, m.elementPickups)) needs.add(type);
   }
+  if (p.collectedElements.size < (m.uniqueElements ?? 0)) {
+    for (const type of STORY_ELEMENTS.slice(0, m.uniqueElements)) if (!p.collectedElements.has(type)) needs.add(type);
+  }
   for (const type of STORY_ELEMENTS.slice(0, m.elements ?? 0)) if (!p.elements.has(type)) needs.add(type);
   const last = STORY_POWER_CYCLE.indexOf(p.lastPower);
   for (let offset = 1; offset <= STORY_POWER_CYCLE.length; offset++) {
@@ -113,7 +119,7 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   const canOfferView = !type && level.id >= 21 && !p.viewOffered;
   const displayedType = sim.specials[0]?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
     : sim.viewPowerT > 0 ? sim.viewPower : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : null);
-  const hint = offered => level.mechanics?.elementPickups && STORY_ELEMENTS.includes(offered)
+  const hint = offered => (level.mechanics?.elementPickups || level.mechanics?.uniqueElements) && STORY_ELEMENTS.includes(offered)
     ? 'Steer onto the marked elemental orb to collect it' : getViewPowerDef(offered)?.description ?? HINTS[offered];
   p.powerHint = displayedType ? hint(displayedType) : null;
   if ((!type && !canOfferView) || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;

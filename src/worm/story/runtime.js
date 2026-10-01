@@ -144,7 +144,7 @@ export function stageStory(sim, size, level, character) {
   const practice = { ...base, pendingMouths, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
     elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
-    bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), elementTime: 0, powerSeq: 0, bombIds: new Set() };
+    bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), elementTime: 0, powerSeq: 0, bombIds: new Set() };
   return practice;
 }
 
@@ -203,7 +203,7 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
   if (level.kind === 'jump') trackPracticeBodyJump(sim, practice, state.size);
   updateMastery(sim, practice, level, delta);
   return {
-    ...practice.mechanics, elements: practice.elements.size, powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
+    ...practice.mechanics, elements: practice.elements.size, uniqueElements: practice.collectedElements.size, powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
     alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts,
     orbs: state.wormSessionOrbs, colors: practice.colors.size, healed: sim.healed, uniqueTunnels: practice.tunnels.size,
     tailClear: sim.phase === 'crawling' && sim.tunnelPassages.length === 0 && sim.healPauseT <= 0,

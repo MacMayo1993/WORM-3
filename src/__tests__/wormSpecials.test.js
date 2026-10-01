@@ -419,7 +419,7 @@ describe('claiming a special', () => {
     expect(sim.interpT).toBe(progress);
     expect(sim.stepAcc).toBe(accumulator);
     expect(eventsOf(ctx, 'elemental')).toHaveLength(1);
-    expect(eventsOf(ctx, 'storyMechanic')).toEqual([{ type: 'storyMechanic', args: ['elementPickups'] }]);
+    expect(eventsOf(ctx, 'storyMechanic')).toEqual([{ type: 'storyMechanic', args: ['elementPickups', type] }]);
   });
 
   it.each(['magnet', 'jump', 'both'])('leaves nearby elements alone with %s assistance', assist => {
