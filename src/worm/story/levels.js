@@ -87,7 +87,7 @@ export const WORM_STORY_LEVELS = [
 
   // ── Chapter 3 · Strange Views ────────────────────────────────────────────
   // The cube stops looking like a cube: hollow frames, bare wireframe, bricks,
-  // biomes, the far-side window and Random's constant remix.
+  // biomes and the far-side window, each with a stable tile style.
   { id: 21, title: 'Hollow Hills', subtitle: 'Every piece is an open frame.', cubeSize: 5,
     goal: 'Collect 20 orbs, including all 6 colors, on a hollow 5×5 cube.',
     kind: 'orbs', target: 20, colors: 6, speed: 2.33, par: 85, limit: 150, points: 35 },
@@ -98,7 +98,7 @@ export const WORM_STORY_LEVELS = [
     goal: 'Land 4 jumps over your own body and collect 12 orbs on a 4×4 brick cube.',
     kind: 'jump', target: 4, orbs: 12, speed: 2.1, par: 110, limit: 190,
     reward: ['hat_acorn', 'hat_toadstool'], rewardLabel: 'Choose a hat', fallback: 150 },
-  { id: 24, title: 'Biome Crossing', subtitle: 'Lava, grass, ice and water faces.', cubeSize: 6,
+  { id: 24, title: 'Biome Crossing', subtitle: 'Biome colors on one flowing tile style.', cubeSize: 6,
     goal: 'Collect 3 elemental orbs, 18 orbs and heal 3 pairs on a 6×6 Biome cube while layers turn. Steer onto each marked elemental orb to claim it.',
     kind: 'mastery', target: 3, orbs: 18, speed: 2.4, rotateEvery: 14, par: 300, limit: 460,
     mechanics: { elementPickups: 3 }, points: 40 },
@@ -106,8 +106,8 @@ export const WORM_STORY_LEVELS = [
     goal: 'Heal 4 tunnel pairs, collect 20 orbs and survive 4 turns on a 5×5 cube. The far-side window shows the opposite face. Clear your tail to finish.',
     kind: 'restore', target: 4, orbs: 20, rotations: 4, speed: 2.4, rotateEvery: 13, par: 205, limit: 340,
     reward: ['scheme_eclipse', 'scheme_midnight'], rewardLabel: 'Choose a palette', fallback: 150 },
-  { id: 26, title: 'Remix', subtitle: 'The colors and tiles change every 10 seconds.', cubeSize: 5,
-    goal: 'Collect 18 orbs and survive 6 layer turns on a 5×5 cube in Random mode. The look changes; the faces do not.',
+  { id: 26, title: 'Prism Turns', subtitle: 'A steady look on a turning cube.', cubeSize: 5,
+    goal: 'Collect 18 orbs and survive 6 layer turns on a 5×5 cube with one consistent tile style.',
     kind: 'rotation', target: 6, orbs: 18, speed: 2.4, rotateEvery: 11, par: 125, limit: 220, points: 40 },
   { id: 27, title: 'Neon Storm', subtitle: 'Master three elements under neon light.', cubeSize: 6,
     goal: 'Master water, fire and grass, collect 20 orbs and heal 3 pairs on a 6×6 neon cube.',
@@ -123,8 +123,8 @@ export const WORM_STORY_LEVELS = [
     goal: 'Surround a tunnel to heal it, use your ability once, disarm 1 bomb, defeat 2 enemies, collect 24 orbs and restore 4 pairs on a 7×7 cube in Numbers view. Tunnel deposits seal after the surround and ability tasks.',
     kind: 'mastery', target: 4, orbs: 24, speed: 2.47, rotateEvery: 14, par: 355, limit: 540,
     mechanics: { ringHeals: 1, signatures: 1, bombs: 1, kills: 2 }, points: 45 },
-  { id: 30, title: 'Kaleidoscope', subtitle: 'Every view at once, and it keeps changing.', cubeSize: 6,
-    goal: 'Collect 3 different elemental orb types (water, fire and grass), ride out an explosion, land 2 double jumps and catch 4 remote orbs with a magnet. Each type counts once on pickup. Collect 30 orbs, survive 6 turns and heal 5 pairs on a 6×6 cube in Random mode.',
+  { id: 30, title: 'Kaleidoscope', subtitle: 'One clear view for a colorful challenge.', cubeSize: 6,
+    goal: 'Collect 3 different elemental orb types (water, fire and grass), ride out an explosion, land 2 double jumps and catch 4 remote orbs with a magnet. Each type counts once on pickup. Collect 30 orbs, survive 6 turns and heal 5 pairs on a 6×6 cube with one consistent tile style.',
     kind: 'mastery', target: 5, orbs: 30, rotations: 6, speed: 2.55, rotateEvery: 11, par: 490, limit: 730,
     mechanics: { uniqueElements: 3, explodes: 1, doubleJumps: 2, magnetOrbs: 4 },
     reward: ['skin_void', 'skin_sunset'], rewardLabel: 'Choose a champion skin', fallback: 300 },
@@ -166,8 +166,8 @@ export const WORM_STORY_LEVELS = [
   { id: 39, title: 'Mega Crawl', subtitle: 'Fifteen layers. The largest cube there is.', cubeSize: 15,
     goal: 'Collect 40 orbs, including all 6 colors, on the 15×15 mega cube.',
     kind: 'orbs', target: 40, colors: 6, speed: 2.62, par: 355, limit: 570, points: 75 },
-  { id: 40, title: 'Worm Eternal', subtitle: 'Every size of trouble, every trick, one remixing cube.', cubeSize: 10,
-    goal: 'Master all 5 elements, ride out 2 explosions, boost twice, land 2 double jumps and a rocket flight, catch 4 remote orbs, surround a tunnel, use your ability twice, disarm 2 bombs and defeat 6 enemies. Collect 40 orbs, survive 10 turns and restore all 6 pairs on a 10×10 cube in Random mode. Surround and ability tasks unlock tunnel sealing.',
+  { id: 40, title: 'Worm Eternal', subtitle: 'Every size of trouble, every trick, one final cube.', cubeSize: 10,
+    goal: 'Master all 5 elements, ride out 2 explosions, boost twice, land 2 double jumps and a rocket flight, catch 4 remote orbs, surround a tunnel, use your ability twice, disarm 2 bombs and defeat 6 enemies. Collect 40 orbs, survive 10 turns and restore all 6 pairs on a 10×10 cube with one consistent tile style. Surround and ability tasks unlock tunnel sealing.',
     kind: 'mastery', target: 6, orbs: 40, rotations: 10, speed: 2.55, rotateEvery: 10, par: 650, limit: 975,
     mechanics: { ringHeals: 1, signatures: 2, boosts: 2, doubleJumps: 2, rockets: 1, magnetOrbs: 4, explodes: 2, elements: 5, bombs: 2, kills: 6 },
     reward: ['skin_mono', 'skin_cherry'], rewardLabel: 'Choose a grandmaster skin', fallback: 500 },
@@ -178,7 +178,7 @@ export const STORY_CHAPTER_SIZE = 10;
 export const WORM_STORY_CHAPTERS = [
   { id: 1, title: 'Hatchling', blurb: 'Learn to crawl, jump, heal and fight on a classic six-color cube.' },
   { id: 2, title: 'Every Size', blurb: 'From the 2×2 pocket cube to 8×8, in grid, number, glass, chrome and neon views.' },
-  { id: 3, title: 'Strange Views', blurb: 'Hollow frames, bare wireframe, bricks, biomes, the far side and Random’s remix.' },
+  { id: 3, title: 'Strange Views', blurb: 'Hollow frames, bare wireframe, bricks, biome colors and the far side—with one tile style per level.' },
   { id: 4, title: 'Grand Crawl', blurb: 'Nine, ten and fifteen layers. Every view and power, on shorter clocks.' },
 ].map(chapter => ({ ...chapter, levels: WORM_STORY_LEVELS.filter(level => storyChapterId(level.id) === chapter.id) }));
 export function storyChapterId(id) { return Math.ceil(id / STORY_CHAPTER_SIZE); }
