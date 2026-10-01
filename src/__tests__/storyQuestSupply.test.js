@@ -62,7 +62,7 @@ it('level 30 offers Explode second and all three elements without requiring magn
   for (let i = 0; i < 10; i++) { expect(reoffer()).toBe(true); offered.push(sim.specials[0].type); }
   expect(offered).toEqual([...POOLS[30], ...POOLS[30]]);
   p.mechanics.explodes = 1; p.mechanics.magnetOrbs = 4;
-  p.elements.add('fire');
+  p.collectedElements.add('fire');
   for (const type of ['water', 'grass', 'water', 'grass']) {
     expect(reoffer()).toBe(true); expect(sim.specials[0].type).toBe(type);
   }

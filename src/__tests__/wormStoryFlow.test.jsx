@@ -356,6 +356,31 @@ it('offers level 30 Explode after a missed magnet and publishes the new quest ma
   expect(practice.mechanics.magnetOrbs ?? 0).toBe(0);
   expect(state().wormStoryResult).toBeNull();
 });
+it('publishes level 30 distinct element credit from real pickups and resets it on retry', () => {
+  const metricsSpy = vi.spyOn(storyRuntime, 'storyMetrics');
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 29 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(30); frame();
+  const [sim, practice] = metricsSpy.mock.calls.at(-1);
+  // Leave the other goals incomplete; isolate pickup credit from mastery and
+  // the offer delay while using the real crawler, event bridge and HUD store.
+  for (const [type, expected] of [['water', 1], ['water', 1], ['fire', 2], ['grass', 3]]) {
+    sim.elementalT = 0; sim.elementalFocusT = 0; sim.elementalType = null;
+    practice.powerDelay = 100;
+    const target = { ...sim.pos, type, id: `credit-${type}-${expected}`, ttl: 20, maxTtl: 20 };
+    sim.specials = [target];
+    seek(target, () => sim.elementalFocusT > 0);
+    frame();
+    expect(state().wormStoryChecklist.goals.find(g => g.key === 'uniqueElements')).toMatchObject({
+      value: expected, target: 3, done: expected === 3,
+    });
+    expect(practice.elements.size).toBe(0);
+    expect(state().wormStoryResult).toBeNull();
+  }
+  begin(30); frame();
+  expect(state().wormStoryChecklist.goals.find(g => g.key === 'uniqueElements').value).toBe(0);
+});
 it('enables Story enemies independently of the Free Play option and rejects stale bomb events', () => {
   act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: 39 }, (_, i) => [i+1, 1])), claimed: {} } } }));
   begin(40); frame();

@@ -3,7 +3,7 @@ import { makeWormSim } from '../worm/healerWorm/wormSim.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { stageStory, storyMetrics } from '../worm/story/runtime.js';
 import { recordStoryMechanic, offerStoryPower, nextStoryPower } from '../worm/story/mastery.js';
-import { storyLevel, storyOutcome, nextStoryLevel, sanitizeStoryProgress } from '../worm/story/levels.js';
+import { storyLevel, storyOutcome, storyChecklist, nextStoryLevel, sanitizeStoryProgress } from '../worm/story/levels.js';
 import { getActiveTunnels } from '../worm/wormLogic.js';
 import { makeStoryCombat, stepStoryCombat } from '../worm/story/combat.js';
 import { surfacePose } from '../worm/combat/portalCombat.js';
@@ -129,6 +129,29 @@ it('finishes level eight with two collected elements without waiting for mastery
   expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).not.toBeNull();
   expect(nextStoryPower(p, level)).toBeNull();
   expect(stageStory(sim, level.cubeSize ?? 5, level).mechanics).toEqual({});
+});
+it('counts distinct elemental pickups for level 30 without hidden mastery actions', () => {
+  const { sim, p, level, read } = setup(30);
+  p.mechanics = { explodes: 1, doubleJumps: 2, magnetOrbs: 4 };
+  const won = { alive: true, elapsed: 200, cuts: 0, orbs: 30, rotations: 6, healed: 5,
+    remaining: 0, tailClear: true, landed: true, rotationSettled: true };
+  for (const [type, expected] of [['water', 1], ['water', 1], ['fire', 2], ['grass', 3]]) {
+    recordStoryMechanic(p, 'elementPickups', type);
+    const metrics = { ...read(), ...won };
+    expect(metrics.uniqueElements).toBe(expected);
+    expect(metrics.elements).toBe(0);
+    expect(storyChecklist(level, metrics).find(g => g.key === 'uniqueElements')).toMatchObject({
+      label: 'Collect different elements', value: expected, target: 3, done: expected === 3,
+    });
+    expect(storyOutcome(level, metrics) !== null).toBe(expected === 3);
+  }
+  expect(nextStoryPower(p, level)).toBeNull();
+  expect(stageStory(sim, level.cubeSize, level).collectedElements.size).toBe(0);
+});
+it('does not credit ordinary colors or other special powers as distinct elements', () => {
+  const { p, read } = setup(30);
+  for (const type of [undefined, 1, 'red', 'magnet', 'rocket', 'explode']) recordStoryMechanic(p, 'elementPickups', type);
+  expect(read().uniqueElements).toBe(0);
 });
 it('deduplicates disarms and resets every mastery counter on retry', () => {
   const { sim, p, level } = setup();

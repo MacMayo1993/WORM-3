@@ -124,9 +124,9 @@ export const WORM_STORY_LEVELS = [
     kind: 'mastery', target: 4, orbs: 24, speed: 2.47, rotateEvery: 14, par: 355, limit: 540,
     mechanics: { ringHeals: 1, signatures: 1, bombs: 1, kills: 2 }, points: 45 },
   { id: 30, title: 'Kaleidoscope', subtitle: 'Every view at once, and it keeps changing.', cubeSize: 6,
-    goal: 'Master 3 elements (water, fire and grass), ride out an explosion, land 2 double jumps and catch 4 remote orbs with a magnet. Collect 30 orbs, survive 6 turns and heal 5 pairs on a 6×6 cube in Random mode.',
+    goal: 'Collect 3 different elemental orb types (water, fire and grass), ride out an explosion, land 2 double jumps and catch 4 remote orbs with a magnet. Each type counts once on pickup. Collect 30 orbs, survive 6 turns and heal 5 pairs on a 6×6 cube in Random mode.',
     kind: 'mastery', target: 5, orbs: 30, rotations: 6, speed: 2.55, rotateEvery: 11, par: 490, limit: 730,
-    mechanics: { elements: 3, explodes: 1, doubleJumps: 2, magnetOrbs: 4 },
+    mechanics: { uniqueElements: 3, explodes: 1, doubleJumps: 2, magnetOrbs: 4 },
     reward: ['skin_void', 'skin_sunset'], rewardLabel: 'Choose a champion skin', fallback: 300 },
 
   // ── Chapter 4 · Grand Crawl ──────────────────────────────────────────────
@@ -191,7 +191,7 @@ export const isChapterFinale = id => storyChapterIndex(id) === STORY_CHAPTER_SIZ
 export const storyLaunchSettings = level => ({ storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: (level.cubeSize ?? 5) >= 15,
   wormSpeed: level.speed, wormOrbCount: 1, wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
 export const STORY_MECHANIC_LABELS = { boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
-  magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements mastered', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated' };
+  magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements mastered', uniqueElements: 'different elements collected', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated' };
 // A repeating authored cycle spans all axes and includes central layers. Retain
 // the normal warning and collision transaction; never steer hazards at the head.
 export const storyRotationCycle = size => [
@@ -258,7 +258,7 @@ export function storyChecklist(level, metrics = {}) {
   const targets = { ...level.mechanics, [primary]: level.target };
   for (const key of ['orbs', 'colors', 'rotations']) if (level[key]) targets[key] = level[key];
   const labels = { boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
-    magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
+    magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', uniqueElements: 'Collect different elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
     signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
     orbs: 'Collect orbs', colors: "Collect each color", uniqueTunnels: "Cross tunnel pairs",
     bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };
