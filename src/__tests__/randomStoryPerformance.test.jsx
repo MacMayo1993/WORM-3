@@ -33,7 +33,7 @@ it('does not remix behind Mobi before Worm mode exists, then starts a full play 
   expect(useGameStore.getState().randomStyleTick).toBe(initial.randomStyleTick + 1);
 });
 
-it.each([26, 30, 40])('uses lightweight shaders from the first frame of Random chapter %s', id => {
+it.each([26, 30, 40])('keeps former Random level %s on a stable lightweight style across devices', id => {
   device.mobile = true;
   expect(Object.values(storyAppearance(id).manifoldStyles)).toEqual(Array(6).fill('solid'));
   device.mobile = false;
@@ -48,6 +48,29 @@ afterEach(() => {
   useGameStore.setState({ randomMode: false, wormHealerMode: false, wormPaused: false, perfReducedFX: false });
   device.mobile = false;
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+});
+
+it.each(Object.keys(STORY_WORLDS).map(Number))('keeps level %i styles and palette unchanged through ten remix intervals', id => {
+  vi.useFakeTimers(); globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  useGameStore.setState({ randomMode: true, wormHealerMode: true, wormPaused: false,
+    showMainMenu: false, showSettings: false, showWelcome: false, showTutorial: false,
+    wormStoryVisualBase: null, wormStoryViewBase: null });
+  const original = useGameStore.getState();
+  useGameStore.setState(storyVisualChanges(original, id));
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  act(() => root.render(<Harness />));
+  const before = useGameStore.getState();
+  act(() => vi.advanceTimersByTime(100000));
+  const after = useGameStore.getState();
+  expect(after.randomMode).toBe(false);
+  expect(after.randomStyleTick).toBe(before.randomStyleTick);
+  expect(after.settings).toBe(before.settings);
+  expect(new Set(Object.values(after.settings.manifoldStyles)).size).toBe(1);
+  // Leaving a level restores the player's actual Random setting and look.
+  act(() => root.unmount()); root = null;
+  useGameStore.setState(storyVisualChanges(after, null));
+  expect(useGameStore.getState().randomMode).toBe(true);
+  expect(useGameStore.getState().settings.manifoldStyles).toEqual(original.settings.manifoldStyles);
 });
 
 it.each(['mobile', 'reduced effects'])('bounds shader variety across a full Remix run on %s', tier => {

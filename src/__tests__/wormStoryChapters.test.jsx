@@ -50,10 +50,10 @@ describe('the new chapters use the whole cube', () => {
     expect([...new Set(later.map(level => level.cubeSize ?? 5))].sort((a, b) => a - b)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 15]);
   });
 
-  it('covers every visual mode, the hollow frame, Random, Biome and the far-side window', () => {
+  it('covers stable visual modes, the hollow frame, Biome and the far-side window', () => {
     const views = later.map(level => STORY_WORLDS[level.id].view);
     expect(new Set(views.map(view => view.visualMode ?? 'classic'))).toEqual(new Set(VISUAL_MODES));
-    for (const flag of ['hollowMode', 'randomMode', 'biome', 'farSide']) expect(views.some(view => view[flag])).toBe(true);
+    for (const flag of ['hollowMode', 'biome', 'farSide']) expect(views.some(view => view[flag])).toBe(true);
   });
 
   it('covers every objective type and every mechanic, including explode', () => {
@@ -194,7 +194,7 @@ describe('level views', () => {
   const init = id => state().initWormMode(undefined, undefined, null, null, null, null, false, false, id);
 
   it.each([[12, { visualMode: 'grid' }], [14, { visualMode: 'glass' }], [16, { visualMode: 'classic' }],
-    [21, { hollowMode: true }], [22, { visualMode: 'wireframe' }], [26, { randomMode: true }],
+    [21, { hollowMode: true }], [22, { visualMode: 'wireframe' }], [26, { randomMode: false }],
     [38, { visualMode: 'sudokube', showAntipodalPiP: true }], [1, { visualMode: 'classic', hollowMode: false }]])(
     'level %i applies its view and restores the player’s own on exit', (id, expected) => {
       init(id);
@@ -210,10 +210,10 @@ describe('level views', () => {
     expect(state().visualMode).toBe('neon');
   });
 
-  it('dresses the Biome level in Biome’s palette and elemental tiles without its city renderer, and does not save them', () => {
+  it('dresses the Biome level in its palette and a single water style without its city renderer', () => {
     init(24);
     expect(state().settings).toMatchObject({ colorScheme: 'biome', biomeMode: { enabled: false, faceAssignment: null } });
-    expect(Object.values(state().settings.manifoldStyles)).toEqual(expect.arrayContaining(['lava', 'grass', 'ice', 'water']));
+    expect(Object.values(state().settings.manifoldStyles)).toEqual(Array(6).fill('water'));
     expect(storyAppearance(24).colorScheme).toBe('biome');
     state().clearDisparityGame();
     expect(state().settings.colorScheme).toBe('sunset');

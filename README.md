@@ -204,7 +204,7 @@ Chapter 1 uses **6×6 boards with classic solid-color tiles** throughout, lettin
 | --- | --- | --- |
 | **Hatchling** | 1–10 | Crawl, collect, cross tunnels, jump the body, survive turns, heal, use powers, and fight. |
 | **Every Size** | 11–20 | Pocket cubes through 8×8; numbered, glass, chrome, and neon views; explosion and flight. |
-| **Strange Views** | 21–30 | Hollow frames, wireframe, bricks, biome faces, the far-side window, and Random remixing. |
+| **Strange Views** | 21–30 | Hollow frames, wireframe, bricks, biome colors, and the far-side window; one consistent tile style per level. |
 | **Grand Crawl** | 31–40 | 9×9, 10×10, and 15×15 terrain; combinations of traversal, powers, combat, and restoration. |
 
 ### Level catalog
@@ -236,13 +236,13 @@ These summaries describe the main skill; the in-game checklist gives exact count
 | 21 | Hollow Hills | 5×5 | Collect every color on an open-frame cube. |
 | 22 | Ghost Frame | 5×5 | Navigate four pairs in Wireframe view. |
 | 23 | Brick by Brick | 4×4 | Land body jumps on a toy-brick cube. |
-| 24 | Biome Crossing | 6×6 | Collect three elements and heal across biome-styled faces. |
+| 24 | Biome Crossing | 6×6 | Collect three elements and heal on a water-style cube with biome colors. |
 | 25 | The Far Side | 5×5 | Restore pairs with the opposite-face window available. |
-| 26 | Remix | 5×5 | Collect and survive while Random changes the appearance. |
+| 26 | Prism Turns | 5×5 | Collect and survive layer turns with a stable tile style. |
 | 27 | Neon Storm | 6×6 | Master water, fire, and nature. |
 | 28 | Shatterglass | 7×7 | Combine glass, explosion, and rocket flight. |
 | 29 | Number Siege | 7×7 | Ring healing, signatures, bombs, and enemies on numbered tiles. |
-| 30 | Kaleidoscope | 6×6 | Element mastery, explosion, jumps, magnet, and Random. |
+| 30 | Kaleidoscope | 6×6 | Three distinct elemental pickups, explosion, jumps, and magnet on a stable cube. |
 | 31 | Nine Lives | 9×9 | Collect 36 orbs and every color. |
 | 32 | Tenfold Tunnels | 10×10 | Cross six different pairs on a large board. |
 | 33 | Knife Edge | 2×2 | Survive repeated turns on a pocket cube in Gap view. |
@@ -252,7 +252,7 @@ These summaries describe the main skill; the in-game checklist gives exact count
 | 37 | Brick Blast | 10×10 | Three explosions and two rocket landings. |
 | 38 | Mirror Numbers | 7×7 | Restore six pairs with numbers and the far-side window. |
 | 39 | Mega Crawl | 15×15 | Collect 40 orbs and every color on the largest board. |
-| 40 | Worm Eternal | 10×10 | All five elements, movement powers, signatures, combat, and full restoration in Random mode. |
+| 40 | Worm Eternal | 10×10 | All five elements, movement powers, signatures, combat, and full restoration with one consistent tile style. |
 
 A valid clear awards one star, finishing at or below the target time adds one, and completing without a cut adds one: **up to three stars**. Required landings, settled rotations, and tail clearance are part of completion. Some mastery stages require ring-heal/signature tasks before ordinary deposits can finish sealing the remaining tunnels.
 

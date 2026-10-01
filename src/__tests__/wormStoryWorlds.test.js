@@ -21,7 +21,7 @@ beforeEach(() => {
   });
 });
 
-it('keeps Chapter 1 on plain six-color cubes and introduces varied materials in later chapters', () => {
+it('uses one consistent tile style per level, with plain six-color cubes in Chapter 1', () => {
   const worlds = Object.values(STORY_WORLDS);
   expect(worlds).toHaveLength(WORM_STORY_LEVELS.length);
   for (const chapter of WORM_STORY_CHAPTERS) {
@@ -37,14 +37,13 @@ it('keeps Chapter 1 on plain six-color cubes and introduces varied materials in 
   }
   // Chapter one keeps its original one-route-per-level layout.
   expect(new Set(WORM_STORY_CHAPTERS[0].levels.map(level => STORY_WORLDS[level.id].route)).size).toBe(10);
-  const later = WORM_STORY_LEVELS.filter(level => level.id > 10).map(level => STORY_WORLDS[level.id]);
-  expect(new Set(later.map(w => JSON.stringify(w.styles))).size).toBe(later.length);
   expect(new Set(worlds.map(w => w.name)).size).toBe(worlds.length);
   for (const level of WORM_STORY_LEVELS) {
     const world = STORY_WORLDS[level.id];
     expect(COLOR_SCHEMES[world.palette]).toBeTruthy();
     expect(BACKGROUNDS.some(bg => bg.id === world.background)).toBe(true);
     expect(Object.keys(world.styles)).toHaveLength(6);
+    expect(new Set(Object.values(world.styles)).size).toBe(1);
     for (const style of Object.values(world.styles)) expect(TILE_STYLES[style]).toBeTruthy();
   }
 });
@@ -75,8 +74,10 @@ it('applies and reapplies each look on launch, retry, and next level without sav
   for (const level of WORM_STORY_LEVELS) {
     state().applyWormStoryLook(level.id); // intro preview
     expect(state().settings).toMatchObject(storyAppearance(level.id));
+    expect(state().randomMode).toBe(false);
     init(level.id); init(level.id);
     expect(state().settings).toMatchObject(storyAppearance(level.id));
+    expect(state().randomMode).toBe(false);
     expect(JSON.parse(localStorage.getItem('worm3_settings'))).toEqual(original);
   }
   state().setSettings({ ...state().settings, sfx: false });
