@@ -2,6 +2,7 @@ import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAcce
 import { safeAccessories } from '../worm/handmadeAccessoriesData.js';
 import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormPreviewMotion.js';
 import { wormPreviewTargetOptions } from './wormPreviewTargets.js';
+import { observePreviewContext, previewContextAvailable } from './previewContext.js';
 // WormPreviewRenderer.js
 // Renders worm thumbnails — the character picker's plate, the store's skin and
 // hat cards — using the *same* geometry and materials as the worm you steer in
@@ -66,6 +67,7 @@ const RIGHT = new THREE.Vector3(0, 0, 1);
 // ─── Renderer state ───────────────────────────────────────────────────────────
 
 let renderer = null;
+let stopObservingContext = null;
 let _usingShared = false;
 const _targets = new Map();   // 'w×h' → { scene, out } render targets
 const _buffers = new Map();   // 'w×h' → { pixels: Uint8Array, image: ImageData }
@@ -337,6 +339,7 @@ function _studioScene() {
 }
 
 let _envTried = false;
+let _environmentTarget = null;
 function _ensureEnvironment() {
   if (_envTried || !renderer?.extensions || !renderer.getContext?.()) return;
   _envTried = true;
@@ -348,7 +351,8 @@ function _ensureEnvironment() {
   try {
     pmrem = new THREE.PMREMGenerator(renderer);
     const studio = _studioScene();
-    scene.environment = pmrem.fromScene(studio, 0.02).texture;
+    _environmentTarget = pmrem.fromScene(studio, 0.02);
+    scene.environment = _environmentTarget.texture;
     studio.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); });
   } catch (error) {
     console.warn('Worm preview reflections unavailable', error);
@@ -389,12 +393,31 @@ function _encoder() {
 
 /** Called by TilePreviewHost (inside the R3F Canvas) to inject the main renderer. */
 export function setWormSharedRenderer(gl) {
-  if (renderer) return;
+  if (renderer === gl && _usingShared) return;
+  stopObservingContext?.();
   if (fallbackTimer !== null) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+  if (animFrameId !== null) cancelAnimationFrame(animFrameId);
+  animFrameId = null;
+  lastTimestamp = null;
+  if (renderer && !_usingShared) renderer.dispose();
   renderer = gl;
   _usingShared = true;
-  _initScene();
-  for (const info of registry.values()) info.dirty = true;
+  resetPreviewTargets();
+  if (!scene) _initScene();
+  stopObservingContext = observePreviewContext(gl, resetPreviewTargets);
+}
+
+function resetPreviewTargets() {
+  for (const target of _targets.values()) { target.scene.dispose(); target.out.dispose(); }
+  _targets.clear();
+  _buffers.clear();
+  _sceneTargetOptions = null;
+  _environmentTarget?.dispose();
+  _environmentTarget = null;
+  _envTried = false;
+  if (scene) scene.environment = null;
+  if (_encode) _encode.material.uniforms.tMap.value = null;
+  for (const info of registry.values()) { info.dirty = true; info.nextFrame = 0; }
 }
 
 function ensureOwnRenderer() {
@@ -770,16 +793,14 @@ function _geometry(name, args) {
 
 function renderToCanvas(opts, time, targetCanvas) {
   if (_usingShared) {
-    if (!renderer) return;
-    const glCtx = renderer.getContext?.();
-    if (!glCtx || glCtx.isContextLost?.()) return;
+    if (!previewContextAvailable(renderer)) return false;
   } else {
     ensureOwnRenderer();
     if (!renderer) return;
   }
 
   const width = targetCanvas.width, height = targetCanvas.height;
-  if (!width || !height) return;
+  if (!width || !height) return false;
   _ensureEnvironment();
   _frameCamera(opts.framing, opts.characterId, width / height);
   characterStage.visible = opts.framing === 'character';
@@ -796,18 +817,23 @@ function renderToCanvas(opts, time, targetCanvas) {
     const prevTarget = renderer.getRenderTarget();
     const prevAlpha = renderer.getClearAlpha();
     const prevAutoClear = renderer.autoClear;
-    renderer.setRenderTarget(target.scene);
-    renderer.setClearAlpha(0);
-    renderer.clear();
-    renderer.render(scene, renderCamera);
-    const encode = _encoder();
-    encode.material.uniforms.tMap.value = target.scene.texture;
-    renderer.setRenderTarget(target.out);
-    renderer.render(encode.scene, encode.camera);
-    renderer.readRenderTargetPixels(target.out, 0, 0, width, height, buf.pixels);
-    renderer.setRenderTarget(prevTarget);
-    renderer.setClearAlpha(prevAlpha);
-    renderer.autoClear = prevAutoClear;
+    try {
+      renderer.setRenderTarget(target.scene);
+      renderer.setClearAlpha(0);
+      renderer.clear();
+      renderer.render(scene, renderCamera);
+      const encode = _encoder();
+      encode.material.uniforms.tMap.value = target.scene.texture;
+      renderer.setRenderTarget(target.out);
+      renderer.render(encode.scene, encode.camera);
+      if (!previewContextAvailable(renderer)) return false;
+      renderer.readRenderTargetPixels(target.out, 0, 0, width, height, buf.pixels);
+    } finally {
+      renderer.setRenderTarget(prevTarget);
+      renderer.setClearAlpha(prevAlpha);
+      renderer.autoClear = prevAutoClear;
+    }
+    if (!previewContextAvailable(renderer)) return false;
     buf.image.data.set(buf.pixels);
     ctx.putImageData(buf.image, 0, 0);
   } else {
@@ -817,6 +843,7 @@ function renderToCanvas(opts, time, targetCanvas) {
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(renderer.domElement, 0, 0, width, height);
   }
+  return true;
 }
 
 // Direct hero rendering: no render target, pixel readback or 2D canvas copy.
@@ -825,7 +852,8 @@ const _directViewport = new THREE.Vector4();
 const _directScissor = new THREE.Vector4();
 const _directClear = new THREE.Color();
 export function drawDirectWormPreview(gl, opts, time) {
-  if (!scene) setWormSharedRenderer(gl);
+  setWormSharedRenderer(gl);
+  if (!previewContextAvailable(gl)) return;
   _ensureEnvironment();
   _frameCamera(opts.framing, opts.characterId);
   characterStage.visible = opts.framing === 'character';
@@ -884,7 +912,7 @@ export function tickWormPreviews(delta) {
     const poseTime = characterStage ? info.age : simTime;
     if (info.dirty) {
       if (!info.animated && staticBudget-- <= 0) continue;
-      renderToCanvas(info.opts, poseTime, info.canvas);
+      if (!renderToCanvas(info.opts, poseTime, info.canvas)) continue;
       info.dirty = false;
       info.nextFrame = simTime + step;
       continue;
