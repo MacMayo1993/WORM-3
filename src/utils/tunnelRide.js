@@ -125,11 +125,36 @@ export function tunnelCameraFrameInto(out, path, arc) {
 }
 
 const frame = makeTunnelRideFrame();
+const coreEntryRing = (path, segments) => Math.max(1, Math.min(segments - 3, Math.round(path.armALen / path.total * segments)));
+const coreExitRing = (path, segments, entry) => Math.max(entry + 2, Math.min(segments - 1, Math.round((path.total - path.armBLen) / path.total * segments)));
+
+// WORM bands end at each core dock. Keep the full sampled path for the rider,
+// but never submit the crossing's faces: a shader-only box cut can leave parts
+// of the swept strip outside the box at off-centre docks or during core zoom.
+// All strips here have a fixed number of indexed faces per longitudinal ring.
+export function omitTunnelCoreFaces(geometry, path, segments) {
+  const entry = coreEntryRing(path, segments), exit = coreExitRing(path, segments, entry);
+  let gap = geometry.userData.tunnelCoreGap;
+  if (!gap) {
+    gap = geometry.userData.tunnelCoreGap = { source: geometry.index.array.slice() };
+  }
+  if (gap.entry === entry && gap.exit === exit) return;
+  gap.entry = entry; gap.exit = exit;
+  const perRing = gap.source.length / segments;
+  const firstCount = entry * perRing, secondStart = exit * perRing;
+  geometry.index.array.set(gap.source.subarray(0, firstCount));
+  geometry.index.array.set(gap.source.subarray(secondStart), firstCount);
+  const count = firstCount + gap.source.length - secondStart;
+  // Normal generation visits the full index buffer, even past drawRange.
+  geometry.index.array.fill(0, count);
+  geometry.index.needsUpdate = true;
+  geometry.setDrawRange(0, count);
+}
+
 // Keep both docking cross-sections in the mesh even on large cubes, where the
 // miniature occupies less than one uniform segment of the complete route.
 export function tunnelRideSampleArc(path, index, segments) {
-  const dockA = Math.max(1, Math.min(segments - 3, Math.round(path.armALen / path.total * segments)));
-  const dockB = Math.max(dockA + 2, Math.min(segments - 1, Math.round((path.total - path.armBLen) / path.total * segments)));
+  const dockA = coreEntryRing(path, segments), dockB = coreExitRing(path, segments, dockA);
   if (index <= dockA) return index / dockA * path.armALen;
   const endCore = path.total - path.armBLen;
   if (index <= dockB) return path.armALen + (index - dockA) / (dockB - dockA) * (endCore - path.armALen);
