@@ -1,6 +1,6 @@
 import { tunnelCoreClipUniforms } from './tunnelCoreClip.js';
 import { vertexShader, fragmentShader, bumperVertexShader, bumperFragmentShader } from './mobiusTunnelShaders.js';
-import { fillTunnelRideGeometry, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
+import { fillTunnelRideGeometry, omitTunnelCoreFaces, tunnelRideCoreArc, TUNNEL_RIDE_WIDTH } from '../utils/tunnelRide.js';
 import TunnelTileSurface from './TunnelTileSurface.jsx';
 import { makeTunnelVeil, fillTunnelVeil, veilVertexShader, veilFragmentShader } from './tunnelRibbonVeil.js';
 import { PLATFORM_FORMATION_SECONDS, platformFormationHeld } from '../worm/platformFormation.js';
@@ -483,6 +483,12 @@ const MobiusTunnel = ({
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;
       geo.attributes.aDistance.needsUpdate = true;
+      if (wormMode) {
+        omitTunnelCoreFaces(geo, _tunnelPath, segments);
+        omitTunnelCoreFaces(leftGeo, _tunnelPath, segments);
+        omitTunnelCoreFaces(rightGeo, _tunnelPath, segments);
+        if (veilGeo) omitTunnelCoreFaces(veilGeo, _tunnelPath, segments);
+      }
       geo.computeVertexNormals();
       if (veilGeo) fillTunnelVeil(veilGeo, geo, leftGeo, _tunnelPath, segments, _tileGuard);
       leftGeo.attributes.position.needsUpdate    = true;
