@@ -809,12 +809,17 @@ export function getWormholeHealRing(tile, size, out = new Set()) {
   return out;
 }
 
-/** Return the first tunnel whose entry or exit is fully encircled by the body. */
-export function findCoveredWormholeRing(tunnels, occupiedTileKeys, size) {
-  if (!tunnels || !occupiedTileKeys || occupiedTileKeys.size === 0) return null;
+/** Collect each surrounded pair once, against the same pre-heal board state. */
+export function findCoveredWormholeRings(tunnels, occupiedTileKeys, size, cubies = null) {
+  const hits = [];
+  if (!tunnels || !occupiedTileKeys || occupiedTileKeys.size === 0) return hits;
+  const seen = new Set();
   for (const record of tunnels) {
     const tunnel = record?.tunnel ?? record;
     if (!tunnel?.entry || !tunnel?.exit) continue;
+    const pairKey = [tunnel.entry, tunnel.exit]
+      .map(t => `${t.x},${t.y},${t.z},${t.dirKey}`).sort().join('|');
+    if (seen.has(pairKey)) continue;
     for (const mouth of [tunnel.entry, tunnel.exit]) {
       const ringKeys = getWormholeHealRingKeys(mouth, size);
       // At a cube vertex, two face-local diagonal routes can identify the same
@@ -823,11 +828,29 @@ export function findCoveredWormholeRing(tunnels, occupiedTileKeys, size) {
       // folded 3x3 neighbourhood instead (already de-duped in the cached key list).
       if (ringKeys.length === 0) continue;
       let covered = true;
-      for (const key of ringKeys) if (!occupiedTileKeys.has(key)) { covered = false; break; }
-      if (covered) return { ...record, tunnel, mouth };
+      let required = 0;
+      for (const key of ringKeys) {
+        const [x, y, z, dirKey] = key.split(',');
+        const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+        // Adjacent holes are not walkable floor and need no body coverage.
+        if (sticker && sticker.curr !== sticker.orig) continue;
+        required++;
+        if (!occupiedTileKeys.has(key)) { covered = false; break; }
+      }
+      // A mouth boxed in entirely by holes must not heal without a surround.
+      if (covered && required > 0) {
+        hits.push({ ...record, tunnel, mouth });
+        seen.add(pairKey);
+        break;
+      }
     }
   }
-  return null;
+  return hits;
+}
+
+/** Compatibility helper for callers interested in only the first match. */
+export function findCoveredWormholeRing(tunnels, occupiedTileKeys, size, cubies = null) {
+  return findCoveredWormholeRings(tunnels, occupiedTileKeys, size, cubies)[0] ?? null;
 }
 
 /**

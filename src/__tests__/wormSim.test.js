@@ -34,7 +34,7 @@ import {
   SURFACE_JUMP_HEIGHT,
   TUNNEL_ORBIT_SECONDS,
 } from '../worm/healerWorm/constants.js';
-import { makeCubies } from '../game/cubeState.js';
+import { makeCubies, healSticker } from '../game/cubeState.js';
 import * as THREE from 'three';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { inchCrawlAdvance, advanceInchGaitState } from '../worm/healerWorm/inchGait.js';
@@ -157,6 +157,55 @@ describe('ring healing waits for visible tile contact', () => {
     expect(sim.healPauseT).toBeGreaterThan(0);
     advance(0.1);
     expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+  });
+
+  it.each([false, true])('clears adjacent covered pairs in one contact batch (reverse: %s)', reverse => {
+    const { sim, ctx, advance } = setup();
+    const size = 5;
+    const first = ctx.getActiveTunnels()[0];
+    const second = { tunnelKey: 'ring-2', tunnel: {
+      entry: { x: 3, y: 3, z: 4, dirKey: 'PZ' },
+      exit: { x: 1, y: 1, z: 0, dirKey: 'NZ' },
+    } };
+    const records = reverse ? [second, first] : [first, second];
+    let cubies = makeCubies(size);
+    for (const { tunnel } of records) for (const t of [tunnel.entry, tunnel.exit]) {
+      const st = cubies[t.x][t.y][t.z].stickers[t.dirKey];
+      st.curr = st.orig === 1 ? 4 : 1;
+    }
+    ctx.getCubies = () => cubies;
+    ctx.getActiveTunnels = () => records; // Deliberately retain stale lookup records.
+    const originalHeal = ctx.applyHeal;
+    ctx.applyHeal = (entry, exit, ...args) => {
+      originalHeal(entry, exit, ...args);
+      for (const t of [entry, exit]) {
+        cubies = healSticker(cubies, size, t.x, t.y, t.z, t.dirKey);
+      }
+    };
+    ctx.onStoryMechanic = key => ctx.events.push({ type: key, args: [] });
+    const holes = new Set(records.flatMap(r => [tileKey(r.tunnel.entry), tileKey(r.tunnel.exit)]));
+    const ring = new Set(records.flatMap(r => [...getWormholeHealRing(r.tunnel.entry, size)]));
+    const body = [...ring].filter(key => !holes.has(key));
+    ttReset(sim.tileTrail, body[0]);
+    body.slice(1).forEach(key => ttPush(sim.tileTrail, key));
+    sim.tailLength = 200;
+    for (const { tunnelKey } of records) {
+      sim.tunnelUseCounts.set(tunnelKey, 2);
+      sim.voidTunnelKeys.add(tunnelKey);
+    }
+    advance(0.99);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    advance(0.02);
+    expect(eventsOf(ctx, 'heal').map(e => e.args[3])).toEqual([1, 2]);
+    expect(eventsOf(ctx, 'heal').every(e => e.args[2].length === 2)).toBe(true);
+    expect(eventsOf(ctx, 'ringHeals')).toHaveLength(2);
+    expect(eventsOf(ctx, 'feel').filter(e => e.args[0] === 'heal')).toHaveLength(1);
+    expect(sim.healed).toBe(2);
+    expect(sim.tunnelUseCounts.size).toBe(0);
+    expect(sim.voidTunnelKeys.size).toBe(0);
+    expect(sim.healPauseT).toBeGreaterThan(0);
+    advance(0.1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(2);
   });
 
   it('rechecks coverage if the tail is shortened before contact', () => {
