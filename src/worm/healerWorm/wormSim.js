@@ -64,7 +64,7 @@ import {
     restReadProtectsTile,
     rotateMoveDir,
     collectManifoldRing,
-    findCoveredWormholeRing,
+    findCoveredWormholeRings,
 } from '../wormLogic.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
@@ -1109,8 +1109,8 @@ const _specialReach = new Set();
 const _specialClaimExclusion = new Set();
 const _ringOccupied = new Set();
 
-// Heal a tunnel when the currently visible body simultaneously covers all eight
-// cells around either mouth. Occupancy comes from the logical trail, not the
+// Heal every tunnel whose non-flipped neighbours are simultaneously covered
+// around either mouth. Occupancy comes from the logical trail, not the
 // footprint spring, whose intentional rebound would otherwise count departed tiles.
 function tryWormholeRingHeal(sim, size, ctx) {
     // The logical trail includes the destination before the head reaches it.
@@ -1139,36 +1139,39 @@ function tryWormholeRingHeal(sim, size, ctx) {
     // already includes index 0 (the head); older logical visits are not coverage.
     const occupiedCount = bodyCoverageCount(sim.tailLength, sim.tileTrail.count, size, sim.expansionAmount);
     for (let i = 0; i < occupiedCount; i++) _ringOccupied.add(ttAt(sim.tileTrail, i));
-    const hit = findCoveredWormholeRing(tunnels, _ringOccupied, size);
-    if (!hit || (hit.tunnelKey && sim.ringHealedTunnelKeys.has(hit.tunnelKey))) return false;
-
-    const { tunnel, tunnelKey } = hit;
-    if (tunnelKey) sim.ringHealedTunnelKeys.add(tunnelKey);
     const cubies = ctx.getCubies();
-    const entryStableKey = getStableKey(
-        tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, cubies
-    );
-    const exitStableKey = getStableKey(
-        tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, cubies
-    );
-    sim.healFired = true;
-    sim.healed += 1;
-    // Deposits can be keyed from either traversal direction. Ring healing seals the
-    // whole pair, so retire partial progress stored against both stable endpoints.
-    ctx.applyHeal(tunnel.entry, tunnel.exit, [entryStableKey, exitStableKey].filter(Boolean), sim.healed);
-    releaseMobiTunnel(sim, tunnel);
-    ctx.onStoryMechanic?.('ringHeals');
-    sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
-    // Hold the worm still for a beat so the tile visibly pops out and heals — the reward
-    // for surrounding it, and the only way it reads on a mega board where the tile is tiny.
-    sim.healPauseT = HEAL_PAUSE_DURATION;
-    sim.healFocusTile = hit.mouth; // the tile the camera pushes in on during the pause
-    if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, hit.mouth);
-    if (tunnelKey) {
-        sim.tunnelUseCounts.delete(tunnelKey);
-        sim.voidTunnelKeys.delete(tunnelKey);
-        if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
+    // Resolve the whole batch before applyHeal changes a neighbouring hole into
+    // uncovered floor. Already-fired records must not block later eligible pairs.
+    const hits = findCoveredWormholeRings(tunnels, _ringOccupied, size, cubies)
+        .filter(hit => !hit.tunnelKey || !sim.ringHealedTunnelKeys.has(hit.tunnelKey));
+    if (hits.length === 0) return false;
+    for (const hit of hits) {
+        const { tunnel, tunnelKey } = hit;
+        if (tunnelKey) sim.ringHealedTunnelKeys.add(tunnelKey);
+        const entryStableKey = getStableKey(
+            tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, cubies
+        );
+        const exitStableKey = getStableKey(
+            tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, cubies
+        );
+        sim.healFired = true;
+        sim.healed += 1;
+        // Retire deposits from both traversal directions for every sealed pair.
+        ctx.applyHeal(tunnel.entry, tunnel.exit, [entryStableKey, exitStableKey].filter(Boolean), sim.healed);
+        releaseMobiTunnel(sim, tunnel);
+        ctx.onStoryMechanic?.('ringHeals');
+        if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, hit.mouth);
+        if (tunnelKey) {
+            sim.tunnelUseCounts.delete(tunnelKey);
+            sim.voidTunnelKeys.delete(tunnelKey);
+            if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
+        }
     }
+    // All pairs pop together, with one camera focus, pause and feedback beat.
+    const first = hits[0];
+    sim.pendingHealBurst = { exitTile: first.tunnel.exit, entryTile: first.tunnel.entry };
+    sim.healPauseT = HEAL_PAUSE_DURATION;
+    sim.healFocusTile = first.mouth;
     ctx.feel('heal');
     return true;
 }
