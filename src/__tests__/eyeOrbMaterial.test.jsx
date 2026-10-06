@@ -21,6 +21,16 @@ it('draws the eye on the flat sticker, like every other style', () => {
   expect(getTileStyleMaterial('eyeball', '#3377cc', false, null, '#ee9933')).toBe(eye);
 });
 
+it('builds its ray frame from the visible facet, not from vertex normals', () => {
+  // Back faces of DoubleSide walls carry normals facing away, and any carrier
+  // can arrive with bad normals; the frame must still face the viewer.
+  const src = getTileStyleMaterial('eyeball', '#3377cc').userData.styleFragmentShader;
+  expect(src).toContain('vec3 Ng = cross(dpdx, dpdy);');
+  expect(src).toMatch(/vec3 N = agree > 0\.5 \? normalize\(vWorldNormal\) : agree < -0\.5 \? -normalize\(vWorldNormal\) : Ng;/);
+  // A carrier that repeats the tile gets one eye per cell.
+  expect(src).toContain('fract(vUv)');
+});
+
 it('keeps carried eyes on the same material as world pickups', () => {
   const palette = createMobiOrbPalette({ manifoldStyles: { 3: 'eyeball' } });
   const { bandColor, gemColor, bandMaterial } = palette[6];

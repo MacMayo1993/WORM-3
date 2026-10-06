@@ -259,22 +259,37 @@ export const eyeTileFragmentShader = `
     // ─── Sticker frame, from screen derivatives (uniform control flow) ───────
     vec3 dpdx = dFdx(vWorldPos), dpdy = dFdy(vWorldPos);
     vec2 duvx = dFdx(vUv), duvy = dFdy(vUv);
-    vec3 N = normalize(vWorldNormal);
+    // The normal facing the viewer. cross(dP/dx, dP/dy) is the facet's own,
+    // on the side being seen, whatever the mesh's vertex normals say (the back
+    // of a DoubleSide wall, or two-sided geometry whose normals cancel). The
+    // smooth vertex normal is used only where it agrees, oriented the same way,
+    // so curved carriers keep a continuous frame; this also keeps the frame's
+    // determinant positive, which the unnormalised T and B below rely on.
+    vec3 Ng = cross(dpdx, dpdy);
+    Ng /= max(length(Ng), 1e-20);
+    float agree = dot(vWorldNormal, Ng);
+    vec3 N = agree > 0.5 ? normalize(vWorldNormal) : agree < -0.5 ? -normalize(vWorldNormal) : Ng;
     vec3 p2 = cross(dpdy, N), p1 = cross(N, dpdx);
     vec3 T = p2 * duvx.x + p1 * duvy.x;
     vec3 B = p2 * duvx.y + p1 * duvy.y;
-    T /= max(length(T), 1e-10);
-    B /= max(length(B), 1e-10);
+    // T and B share one scale, so their lengths compare uv per unit of world
+    // length along each axis: a cell stretched on its carrier (orb bands) is
+    // traced as the same stretched eye from every angle. Equal on stickers.
+    float su = length(T), sv = length(B);
+    T /= max(su, 1e-10);
+    B /= max(sv, 1e-10);
     eyePx = max(length(duvx), length(duvy));
 
-    float seed = eyeHash(tileHome.xy * 1.37 + vec2(tileHome.z * 2.1, tileFace * 0.73));
+    // Carriers that repeat the tile (orb bands) get an eye per cell.
+    vec2 cell = floor(vUv);
+    float seed = eyeHash(tileHome.xy * 1.37 + vec2(tileHome.z * 2.1, tileFace * 0.73) + cell * 3.1);
     // Left and right eyes: mirror the whole scene, light and gaze included.
     float mirror = seed > 0.5 ? -1.0 : 1.0;
     T *= mirror;
-    vec2 p = (vUv - 0.5) * vec2(mirror, 1.0);
+    vec2 p = (fract(vUv) - 0.5) * vec2(mirror, 1.0);
 
     vec3 V = normalize(cameraPosition - vWorldPos);
-    vec3 rd = -vec3(dot(V, T), dot(V, B), dot(V, N));
+    vec3 rd = -vec3(dot(V, T) * su, dot(V, B) * sv, dot(V, N) * sqrt(su * sv));
     rd.z = min(rd.z, -0.12);
     rd = normalize(rd);
     vec3 ro = vec3(p, 0.0);
