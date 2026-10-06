@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { afterEach, expect, it, vi } from 'vitest';
 import ParityOrbs from '../worm/ParityOrb.jsx';
 import { PARITY_ORB_GEOMETRIES } from '../worm/parityOrbGeometries.js';
-import { getTileStyleMaterial, clearMaterialCache } from '../3d/styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, clearMaterialCache, sharedUniforms, updateSharedGaze } from '../3d/styles/TileStyleMaterials.jsx';
 import { createMobiOrbPalette } from '../worm/mobiOrbAppearance.js';
 import { baseVertexShader } from '../3d/styles/shaders/shaderBase.js';
 
@@ -29,6 +29,17 @@ it('builds its ray frame from the visible facet, not from vertex normals', () =>
   expect(src).toMatch(/vec3 N = agree > 0\.5 \? normalize\(vWorldNormal\) : agree < -0\.5 \? -normalize\(vWorldNormal\) : Ng;/);
   // A carrier that repeats the tile gets one eye per cell.
   expect(src).toContain('fract(vUv)');
+});
+
+it('watches the shared gaze target (the worm in WORM runs) and falls back to the camera', () => {
+  const eye = getTileStyleMaterial('eyeball', '#3377cc');
+  expect(eye.userData.styleFragmentShader).toContain('uniform vec4 gazeTarget;');
+  // Shared by reference, so CubeAssembly's one write per frame reaches every eye.
+  expect(eye.uniforms.gazeTarget).toBe(sharedUniforms.gazeTarget);
+  updateSharedGaze(1, 2, 3, true);
+  expect(eye.uniforms.gazeTarget.value.toArray()).toEqual([1, 2, 3, 1]);
+  updateSharedGaze(1, 2, 3, false);
+  expect(eye.uniforms.gazeTarget.value.w).toBe(0);
 });
 
 it('keeps carried eyes on the same material as world pickups', () => {

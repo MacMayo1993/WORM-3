@@ -38,6 +38,9 @@ export const sharedUniforms = {
   // Monotonically increasing accumulator driven by spin energy so the dice
   // style settles to a new random orientation after every layer rotation.
   diceRoll: { value: 0 },
+  // Where eye-like styles look: xyz a world point, w = 1 while there is one (the
+  // worm's head in WORM runs). With w = 0 they look at the camera.
+  gazeTarget: { value: new THREE.Vector4(0, 0, 0, 0) },
   // Per-cell dice roll state. `cellRoll` is a data texture (R channel) holding
   // how many times each grid cell has been rotated through; the dice style folds
   // it into its face hash so a returning cell never repeats while non-rotated
@@ -72,6 +75,11 @@ export function updateSharedSpin(energy, axis, slice) {
   sharedUniforms.spin.value = energy < 0 ? 0 : energy > 1 ? 1 : energy;
   sharedUniforms.spinAxis.value = axis;
   sharedUniforms.spinSlice.value = slice;
+}
+
+// Point the gaze at a world position, or release it to the camera (call from useFrame).
+export function updateSharedGaze(x, y, z, on) {
+  sharedUniforms.gazeTarget.value.set(x, y, z, on ? 1 : 0);
 }
 
 // Accumulate dice roll from spin energy (call from useFrame).
@@ -303,6 +311,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     spinAxis: sharedUniforms.spinAxis,
     spinSlice: sharedUniforms.spinSlice,
     diceRoll: sharedUniforms.diceRoll,
+    gazeTarget: sharedUniforms.gazeTarget,
     cellRoll: sharedUniforms.cellRoll,
     cellGridN: sharedUniforms.cellGridN,
     cellK: sharedUniforms.cellK,

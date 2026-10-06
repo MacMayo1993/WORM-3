@@ -28,6 +28,9 @@ export const eyeTileFragmentShader = `
   uniform float spin;
   uniform float spinAxis;
   uniform float spinSlice;
+  // What the eyes watch: xyz a world point, w 1 while there is one (the worm's
+  // head in WORM runs, from CubeAssembly). Otherwise they watch the camera.
+  uniform vec4 gazeTarget;
   uniform vec3 tileHome;
   uniform float tileFace;
   varying vec2 vUv;
@@ -41,6 +44,14 @@ export const eyeTileFragmentShader = `
   // One pixel in sticker units, measured where derivatives are defined (the
   // top of main) for antialiasing inside the branches below.
   float eyePx;
+  // The sticker's frame (unit axes, and uv per world length along each) and
+  // the eye's level axes within it, set at the top of main for toEye/toWorld.
+  vec3 eyeT, eyeB, eyeN, eyeScale;
+  vec2 eyeRight, eyeUp;
+  // The gaze's vertical part. The lids ride with it, as real ones do: the
+  // upper follows the iris closely and the lower about half as far, so a look
+  // up or down keeps the iris framed instead of rolling it under a lid.
+  float lidGaze;
 
   const float PI = 3.14159265;
   // Sticker units per eye unit.
@@ -100,11 +111,11 @@ export const eyeTileFragmentShader = `
   float lidS(vec2 p) { return (p.x - EYE_C.x) / FISSURE_W; }
   float lowerLid(float s) {
     float b = max(1.0 - s * s, 0.0);
-    return EYE_C.y + 0.016 * s - 0.098 * b * (1.0 + 0.12 * s);
+    return EYE_C.y + 0.016 * s - 0.098 * b * (1.0 + 0.12 * s) + 0.11 * lidGaze * b;
   }
   float upperLid(float s, float open) {
     float b = max(1.0 - s * s, 0.0);
-    float up = EYE_C.y + 0.016 * s + 0.118 * pow(b, 0.85) * (1.0 - 0.16 * s);
+    float up = EYE_C.y + 0.016 * s + 0.118 * pow(b, 0.85) * (1.0 - 0.16 * s) + 0.22 * lidGaze * b;
     // Closed, the upper margin passes just below the lower one: no sliver of eye.
     return mix(lowerLid(s) - 0.003, up, open);
   }
@@ -266,7 +277,19 @@ export const eyeTileFragmentShader = `
     return cover * smoothstep(-1.02, -0.82, s) * (1.0 - smoothstep(0.98, 1.1, s));
   }
 
+  // A world vector in the eye's frame (x right and y up as the viewer sees
+  // them, z out of the sticker, in uv-scaled units), and back.
+  vec3 toEye(vec3 w) {
+    vec2 uv = vec2(dot(w, eyeT) * eyeScale.x, dot(w, eyeB) * eyeScale.y);
+    return vec3(dot(uv, eyeRight), dot(uv, eyeUp), dot(w, eyeN) * eyeScale.z);
+  }
+  vec3 toWorld(vec3 e) {
+    vec2 uv = e.x * eyeRight + e.y * eyeUp;
+    return eyeT * (uv.x / eyeScale.x) + eyeB * (uv.y / eyeScale.y) + eyeN * (e.z / eyeScale.z);
+  }
+
   void main() {
+    lidGaze = 0.0;
     // ─── Sticker frame, from screen derivatives (uniform control flow) ───────
     vec3 dpdx = dFdx(vWorldPos), dpdy = dFdy(vWorldPos);
     vec2 duvx = dFdx(vUv), duvy = dFdy(vUv);
@@ -290,23 +313,37 @@ export const eyeTileFragmentShader = `
     T /= max(su, 1e-10);
     B /= max(sv, 1e-10);
     eyePx = max(length(duvx), length(duvy)) / EYE_SCALE;
+    eyeT = T; eyeB = B; eyeN = N;
+    eyeScale = vec3(su, sv, sqrt(su * sv));
 
     // Carriers that repeat the tile (orb bands) get an eye per cell.
     vec2 cell = floor(vUv);
     float seed = eyeHash(tileHome.xy * 1.37 + vec2(tileHome.z * 2.1, tileFace * 0.73) + cell * 3.1);
-    // Left and right eyes: mirror the whole scene, light and gaze included.
-    float mirror = seed > 0.5 ? -1.0 : 1.0;
-    T *= mirror;
-    vec2 pTile = (fract(vUv) - 0.5) * vec2(mirror, 1.0);
+
+    // Level with the viewer: the eye's up is the camera's up as it lies on the
+    // sticker, however the sticker has been turned, so every eye on the cube is
+    // upright on screen. The eyehole turns with it (its widest reach, 0.47, fits
+    // inside the sticker at any angle). Left and right eyes mirror across it.
+    vec3 camRight = vec3(viewMatrix[0].x, viewMatrix[1].x, viewMatrix[2].x);
+    vec3 camUp = vec3(viewMatrix[0].y, viewMatrix[1].y, viewMatrix[2].y);
+    vec2 rightUv = vec2(dot(camRight, T) * su, dot(camRight, B) * sv);
+    vec2 upUv = vec2(dot(camUp, T) * su, dot(camUp, B) * sv);
+    if (dot(upUv, upUv) < 1e-4 * dot(rightUv, rightUv)) upUv = vec2(-rightUv.y, rightUv.x);
+    eyeUp = normalize(upUv);
+    eyeRight = vec2(eyeUp.y, -eyeUp.x);
+    if (dot(eyeRight, rightUv) < 0.0) eyeRight = -eyeRight;
+    eyeRight *= seed > 0.5 ? -1.0 : 1.0;
+    vec2 uvTile = fract(vUv) - 0.5;
+    vec2 pTile = vec2(dot(uvTile, eyeRight), dot(uvTile, eyeUp));
     vec2 p = pTile / EYE_SCALE;
 
     vec3 V = normalize(cameraPosition - vWorldPos);
-    vec3 rd = -vec3(dot(V, T) * su, dot(V, B) * sv, dot(V, N) * sqrt(su * sv));
+    vec3 rd = normalize(toEye(-V));
     rd.z = min(rd.z, -0.12);
     rd = normalize(rd);
     vec3 ro = vec3(p, 0.0);
-    vec3 L = normalize(vec3(dot(KEY, T), dot(KEY, B), dot(KEY, N)));
-    vec3 LF = normalize(vec3(dot(FILL, T), dot(FILL, B), dot(FILL, N)));
+    vec3 L = normalize(toEye(KEY));
+    vec3 LF = normalize(toEye(FILL));
     float keyOn = smoothstep(-0.05, 0.25, L.z);
 
     // ─── Life: blinks, a wince while this layer turns, and where it looks ────
@@ -317,24 +354,33 @@ export const eyeTileFragmentShader = `
     float turning = spin * (1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice)));
     open *= 1.0 - 0.72 * clamp(turning, 0.0, 1.0);
 
-    vec3 toCam = normalize(cameraPosition - vTileCenter);
-    vec3 look = vec3(dot(toCam, T), dot(toCam, B), dot(toCam, N));
+    // Watch the worm while there is one (pursuit, wherever it crawls on the
+    // cube), else the viewer.
+    float following = step(0.5, gazeTarget.w);
+    vec3 watched = following > 0.5 ? gazeTarget.xyz : cameraPosition;
+    vec3 look = normalize(toEye(watched - vTileCenter));
     look = normalize(vec3(look.xy, max(look.z, 0.2)));
-    // Hold a fixation for a few seconds, then saccade: mostly to the viewer,
-    // sometimes to somewhere else.
+    // Hold a fixation for a few seconds, then saccade: mostly to what is being
+    // watched, sometimes (never while following the worm) somewhere else.
     float fix = phase / (2.4 + 2.2 * seed);
     float epoch = floor(fix);
     vec3 gA = vec3(0.0), gB = vec3(0.0);
     for (int k = 0; k < 2; k++) {
       float e = epoch - 1.0 + float(k);
       vec2 jit = vec2(eyeHash(vec2(e, seed)), eyeHash(vec2(seed, e + 3.0))) - 0.5;
-      float away = step(0.78, eyeHash(vec2(e + 9.0, seed)));
+      float away = step(0.78, eyeHash(vec2(e + 9.0, seed))) * (1.0 - following);
       vec3 target = normalize(look + vec3(jit * mix(0.05, 0.42, away), 0.0));
       if (k == 0) gA = target; else gB = target;
     }
     vec3 g = normalize(mix(gA, gB, smoothstep(0.0, 0.035, fract(fix))));
-    float limit = 0.56;
-    if (length(g.xy) > limit) g = normalize(vec3(normalize(g.xy) * limit, sqrt(1.0 - limit * limit)));
+    // Eyes turn about 43° to the sides but only about 25° up or down (further,
+    // and the iris rolls under a lid and the eye reads as shut).
+    vec2 reach = g.xy / vec2(0.68, 0.42);
+    if (dot(reach, reach) > 1.0) {
+      vec2 xy = g.xy / length(reach);
+      g = vec3(xy, sqrt(max(1.0 - dot(xy, xy), 0.0)));
+    }
+    lidGaze = g.y;
     vec3 gu = normalize(cross(vec3(0.0, 1.0, 0.0), g));
     vec3 gv = cross(g, gu);
 
@@ -472,7 +518,7 @@ export const eyeTileFragmentShader = `
         lit += caustic * shadow * 0.6;
         // Wet: the whole visible eye reflects the room; the cornea most.
         vec3 r = reflect(rd, n);
-        vec3 rw = normalize(T * r.x + B * r.y + N * r.z);
+        vec3 rw = normalize(toWorld(r));
         float fres = 0.02 + 0.98 * pow(1.0 - clamp(dot(-rd, n), 0.0, 1.0), 5.0);
         vec3 env = envReflect(rw) * mix(0.5, 1.0, ao);
         // The conjunctiva is wet but rougher than the cornea: a dimmer, smaller share.
