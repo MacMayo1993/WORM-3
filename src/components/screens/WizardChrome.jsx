@@ -5,7 +5,7 @@ import { wormMenuFeedback } from './wormMenuFeedback.js';
 
 import React from 'react';
 import { useDialogBehavior } from '../ui/Panel.jsx';
-import { UI_FONT, PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BG_MUTED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_SHADOW, PAPER_CARD_SHADOW, PAPER_BACKDROP_BLUR, PAPER_TEXT_FAINT, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
+import { UI_FONT, PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BG_MUTED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_SHADOW, PAPER_CARD_SHADOW, PAPER_BACKDROP_BLUR, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_XL, Z } from '../../utils/uiTheme.js';
 import { modeTheme } from '../../utils/modeThemes.js';
 import { ARCADE_PAPER, ARCADE_CARD, ARCADE_INK, ARCADE_INK_STRONG, ARCADE_MUTED, ARCADE_LINE, ARCADE_LINE_SOFT,
   ARCADE_GRID_SIZE, ARCADE_KEY_SHADOW, ARCADE_PRIMARY_SHADOW, ARCADE_CARD_SHADOW, DISPLAY_FONT, HEADING_FONT } from '../../utils/uiTheme.js';
@@ -192,42 +192,6 @@ export function wizardLayout(accent, _accentShadow = `${accent}99`, mobile = isM
       lineHeight: 1.35
     },
 
-    // Families of the open category (tile styles), as one scrolling row. They
-    // were a column of rail sub-rows; a row is what a phone has space for.
-    chipRow: {
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 7,
-      padding: `10px ${GUTTER}px`,
-      overflowX: 'auto',
-      overscrollBehaviorX: 'contain',
-      WebkitOverflowScrolling: 'touch',
-      scrollbarWidth: 'none'
-    },
-
-    chip: active => ({
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 5,
-      flexShrink: 0,
-      minHeight: TOUCH_TARGET,
-      padding: '7px 14px',
-      borderRadius: 10,
-      border: `2px solid ${active ? ARCADE_INK_STRONG : ARCADE_LINE_SOFT}`,
-      background: active ? 'color-mix(in srgb, var(--mode-accent) 22%, #fffcf1)' : ARCADE_CARD,
-      color: active ? ARCADE_INK : ARCADE_INK_STRONG,
-      boxShadow: active ? `0 2px 0 ${ARCADE_INK_STRONG}` : `0 3px 0 ${ARCADE_LINE_SOFT}`,
-      font: `800 11px/1.2 ${HEADING_FONT}`,
-      letterSpacing: '0.06em',
-      textTransform: 'uppercase',
-      whiteSpace: 'nowrap',
-      fontFamily: 'inherit',
-      cursor: 'pointer',
-      WebkitTapHighlightColor: 'transparent',
-      transition: 'background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease'
-    }),
-
     // The rail's job, laid on its side. Scrolls horizontally when a mode has more
     // categories than fit — six on a 360px phone is the worst case.
     categoryBar: {
@@ -411,39 +375,6 @@ export function WizardIcon({ name, size = 17, color = 'currentColor' }) {
 }
 
 /**
- * The families of the open category, as a scrolling row of chips.
- *
- * Only the tile-style category has any: seven of them, which used to be a
- * horizontally scrolling pill row *inside* the panel (a phone showed four and hid
- * the rest behind a swipe you had no reason to try), then rail sub-rows, and are
- * now the row directly under the specimen — where the thing they change is the
- * next thing on screen.
- */
-export function WizardChipRow({ styles, families, activeChild, onSelect, label }) {
-  if (!families?.length) return null;
-  return (
-    <div role="group" aria-label={label} style={styles.chipRow}>
-      {families.map(child => {
-        const active = child.key === activeChild;
-        return (
-          <button
-            key={child.key}
-            type="button"
-            aria-pressed={active}
-            className="ui-focusable"
-            onClick={() => { wormMenuFeedback(); onSelect(child.key); }}
-            style={styles.chip(active)}
-          >
-            {child.label}
-            {child.locked > 0 && <LockPip size={9} color={active ? WIZ_TEXT : WIZ_TEXT_FAINT} />}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
  * Every category the wizard offers, across the sheet, with the value it currently
  * holds written under its name.
  *
@@ -456,7 +387,7 @@ export function WizardChipRow({ styles, families, activeChild, onSelect, label }
  * stop, and arrow keys additionally move between categories and take the
  * selection with them.
  */
-export function WizardCategoryBar({ styles, categories, active, onSelect, accent, mobile }) {
+export function WizardCategoryBar({ styles, categories, active, onSelect, accent, mobile, barRef }) {
   const tabs = React.useRef([]);
 
   const focus = index => {
@@ -476,7 +407,7 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
   };
 
   return (
-    <nav aria-label="Setup categories" style={styles.categoryBar}>
+    <nav ref={barRef} aria-label="Setup categories" style={styles.categoryBar}>
       {categories.map((cat, i) => {
         const isActive = i === active;
         return (
@@ -529,12 +460,11 @@ export function WizardCategoryBar({ styles, categories, active, onSelect, accent
 }
 
 /**
- * The shared setup sheet. Tile styles place categories and family chips before
- * the specimen; other steps retain their preview-first layout.
+ * The shared setup sheet. Tile styles keep the specimen above the category bar;
+ * other steps put the bar first.
  *
  * A wizard builds its `categories` — each `{ key, icon, label, title, subtitle,
- * summary, hero, content }`, plus `children`/`activeChild`/`onSelectChild` for a
- * category with families — and hands them over. Everything else here is the same
+ * summary, hero, content }` — and hands them over. Everything else here is the same
  * for all four, which is exactly why it lives here: the four hand-copied shells
  * this replaced had already drifted on sheet height, gutters and footer padding.
  *
@@ -559,17 +489,33 @@ export function WizardShell({
   children
 }) {
   const scrollRef = React.useRef(null);
+  const barRef = React.useRef(null);
   const dialogRef = React.useRef(null);
   const onDialogKeyDown = useDialogBehavior(dialogRef, onBack);
   React.useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
+  // The category bar sticks to the top of the scroll area. Anything that sticks
+  // under it (the tile families' sidebar) needs the bar's height, and the
+  // scroll area's, to stay within what is on screen.
+  React.useLayoutEffect(() => {
+    const scroller = scrollRef.current, bar = barRef.current;
+    if (!scroller || !bar) return undefined;
+    const publish = () => {
+      scroller.style.setProperty('--wizard-bar-h', `${bar.offsetHeight}px`);
+      scroller.style.setProperty('--wizard-scroll-h', `${scroller.clientHeight}px`);
+    };
+    publish();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(publish);
+    observer.observe(bar);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, []);
   const theme = modeTheme(mode);
   // The carousel's face colour for this mode drives the primary key and the
   // selection tint; the shell's own lines and ink are the arcade neutrals.
   const modeVars = arcadeModeVars(mode);
   const cat = categories[active];
   const last = active === categories.length - 1;
-  // Keep the cube above the setup selector and its style-family controls.
-  const isStyle = cat.key === 'style';
   const specimen = cat.hero ? <div style={styles.hero}>{cat.hero}</div> : null;
   const categoryBar = (
     <WizardCategoryBar
@@ -579,6 +525,7 @@ export function WizardShell({
       onSelect={onSelect}
       accent={accent}
       mobile={mobile}
+      barRef={barRef}
     />
   );
 
@@ -604,17 +551,7 @@ export function WizardShell({
           <ModeArtwork mode={theme.art} />
         </header>
         {specimen}
-        {isStyle && categoryBar}
-
-        <WizardChipRow
-          styles={styles}
-          families={cat.children}
-          activeChild={cat.activeChild}
-          onSelect={cat.onSelectChild}
-          label={`${cat.label} groups`}
-        />
-
-        {!isStyle && categoryBar}
+        {categoryBar}
 
         <div style={{ ...styles.body, overflowY: 'visible', maskImage: 'none', WebkitMaskImage: 'none' }} id={WIZARD_PANEL_ID} role="region" aria-label={cat.label}>
           <div style={{ paddingBottom: '24px' }}>{cat.content}</div>
@@ -650,22 +587,5 @@ export function WizardShell({
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * Small padlock, matching the one the pickers use for unbought cosmetics.
- *
- * Deliberately not the one in wizardSteps/shared.jsx: that module reaches the
- * tile-preview renderer and Three.js behind it, and WizardChrome is imported by
- * the store, level select, and pack screens, which have no business paying for
- * that. Eight lines of SVG is the cheaper duplicate.
- */
-function LockPip({ size = 10, color = PAPER_TEXT_FAINT }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" style={{ display: 'block', flexShrink: 0 }} aria-hidden="true">
-      <path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
-      <rect x="3.2" y="7" width="9.6" height="7" rx="2" fill={color} />
-    </svg>
   );
 }
