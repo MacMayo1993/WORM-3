@@ -18,7 +18,10 @@
 // or a right eye, and each face has its own skin tone.
 //
 // Units: the sticker spans [-0.5, 0.5]² in uv, its surface at z = 0 and +z
-// toward the viewer. A standalone template, so the build compacts it.
+// toward the viewer. The eye is modelled in eye units, EYE_SCALE times smaller,
+// so it fills the tile; the eyehole is laid out in sticker units, close to the
+// edge, leaving the face's colour as a rim and in the corners. A standalone
+// template, so the build compacts it.
 export const eyeTileFragmentShader = `
   uniform vec3 baseColor;
   uniform float time;
@@ -40,6 +43,8 @@ export const eyeTileFragmentShader = `
   float eyePx;
 
   const float PI = 3.14159265;
+  // Sticker units per eye unit.
+  const float EYE_SCALE = 1.3;
   const float EYE_R = 0.285;
   const vec3 EYE_C = vec3(0.0, -0.005, -0.345);
   const float IRIS_SIN = 0.49;
@@ -51,10 +56,11 @@ export const eyeTileFragmentShader = `
   const float LID_R = 0.33;
   const float FISSURE_W = 0.305;
   const float MASK_T = 0.018;
-  // The eyehole: an almond (the intersection of two circles) wider than the
-  // eye, so the lids, lashes and corners show inside it.
-  const float HOLE_R = 0.4413;
-  const float HOLE_C = 0.1863;
+  // The eyehole, in sticker units: a full almond (the intersection of two
+  // circles, 0.94 wide and 0.8 tall) that takes in the lids, the corners, the
+  // brow above and the cheek below.
+  const float HOLE_R = 0.4762;
+  const float HOLE_C = 0.0762;
   // CUBE_LIGHT_RIG key and fill directions, normalised.
   const vec3 KEY = vec3(0.3714, 0.5571, 0.7428);
   const vec3 FILL = vec3(-0.7715, 0.1543, 0.6172);
@@ -78,9 +84,14 @@ export const eyeTileFragmentShader = `
     return mix(b, a, h) + k * h * (1.0 - h);
   }
 
+  // Distance to the eyehole's edge in sticker units (negative inside)...
+  float maskHole(vec2 t) {
+    t.y -= EYE_C.y * EYE_SCALE;
+    return max(length(t - vec2(0.0, -HOLE_C)), length(t - vec2(0.0, HOLE_C))) - HOLE_R;
+  }
+  // ...and the same edge for points of the eye scene, in eye units.
   float holeSdf(vec2 p) {
-    p.y -= EYE_C.y;
-    return max(length(p - vec2(0.0, -HOLE_C)), length(p - vec2(0.0, HOLE_C))) - HOLE_R;
+    return maskHole(p * EYE_SCALE) / EYE_SCALE;
   }
 
   // Lid margins across the fissure, s from -1 (inner corner) to 1 (outer). The
@@ -278,7 +289,7 @@ export const eyeTileFragmentShader = `
     float su = length(T), sv = length(B);
     T /= max(su, 1e-10);
     B /= max(sv, 1e-10);
-    eyePx = max(length(duvx), length(duvy));
+    eyePx = max(length(duvx), length(duvy)) / EYE_SCALE;
 
     // Carriers that repeat the tile (orb bands) get an eye per cell.
     vec2 cell = floor(vUv);
@@ -286,7 +297,8 @@ export const eyeTileFragmentShader = `
     // Left and right eyes: mirror the whole scene, light and gaze included.
     float mirror = seed > 0.5 ? -1.0 : 1.0;
     T *= mirror;
-    vec2 p = (fract(vUv) - 0.5) * vec2(mirror, 1.0);
+    vec2 pTile = (fract(vUv) - 0.5) * vec2(mirror, 1.0);
+    vec2 p = pTile / EYE_SCALE;
 
     vec3 V = normalize(cameraPosition - vWorldPos);
     vec3 rd = -vec3(dot(V, T) * su, dot(V, B) * sv, dot(V, N) * sqrt(su * sv));
@@ -327,10 +339,10 @@ export const eyeTileFragmentShader = `
     vec3 gv = cross(g, gu);
 
     // ─── The mask: the sticker in the face's colour, rounding into the hole ──
-    float hd = holeSdf(p);
+    float hd = maskHole(pTile);
     float haa = max(fwidth(hd), 0.002);
-    float bevel = 1.0 - smoothstep(0.0, 0.03, hd);
-    vec2 hg = normalize(vec2(holeSdf(p + vec2(0.002, 0.0)) - hd, holeSdf(p + vec2(0.0, 0.002)) - hd) + 1e-6);
+    float bevel = 1.0 - smoothstep(0.0, 0.025, hd);
+    vec2 hg = normalize(vec2(maskHole(pTile + vec2(0.002, 0.0)) - hd, maskHole(pTile + vec2(0.0, 0.002)) - hd) + 1e-6);
     vec3 mn = normalize(vec3(hg * bevel * 1.4, 1.0));
     vec3 maskCol = baseColor * (0.8 + 0.2 * max(dot(mn, L), 0.0) / max(L.z, 0.3));
     maskCol *= 1.0 - 0.35 * pow(bevel, 3.0);
