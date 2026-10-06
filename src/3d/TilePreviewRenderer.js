@@ -55,14 +55,17 @@ let stopObservingContext = null;
 let scene = null;
 let camera = null;
 let mesh = null;
+let flatGeometry = null;
+let eyeGeometry = null;
 
 function _initScene() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d1117);
   camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 10);
   camera.position.z = 1;
-  const geo = new THREE.PlaneGeometry(1, 1);
-  mesh = new THREE.Mesh(geo, null);
+  flatGeometry = new THREE.PlaneGeometry(1, 1);
+  eyeGeometry = new THREE.PlaneGeometry(1, 1, 24, 24);
+  mesh = new THREE.Mesh(flatGeometry, null);
   scene.add(mesh);
 }
 
@@ -143,6 +146,7 @@ function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
     savedTime = mat.uniforms.time.value;
     mat.uniforms.time.value = simTime;
   }
+  mesh.geometry = styleKey === 'eyeball' ? eyeGeometry : flatGeometry;
   mesh.material = mat;
   mesh.onBeforeRender = bindPreviewIdentity;
 
