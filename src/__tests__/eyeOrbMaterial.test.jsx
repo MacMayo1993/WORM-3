@@ -4,55 +4,49 @@ import * as THREE from 'three';
 import { afterEach, expect, it, vi } from 'vitest';
 import ParityOrbs from '../worm/ParityOrb.jsx';
 import { PARITY_ORB_GEOMETRIES } from '../worm/parityOrbGeometries.js';
-import { getTileStyleMaterial, clearMaterialCache, sharedUniforms, warmUpDefaultStyles, warmUpAllStyles } from '../3d/styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, clearMaterialCache, sharedUniforms, updateSharedGaze } from '../3d/styles/TileStyleMaterials.jsx';
 import { createMobiOrbPalette } from '../worm/mobiOrbAppearance.js';
-import { baseVertexShader, eyeballBulgeVertexShader } from '../3d/styles/shaders/shaderBase.js';
+import { baseVertexShader } from '../3d/styles/shaders/shaderBase.js';
 
 extend(THREE);
 afterEach(clearMaterialCache);
 
-it.each([true, false])('isolates eye relief from curved surfaces regardless of cache order (surface first: %s)', surfaceFirst => {
-  const get = surfaceOnly => getTileStyleMaterial('eyeball', '#3377cc', false, null, '#ee9933', { surfaceOnly });
-  const first = get(surfaceFirst);
-  const second = get(!surfaceFirst);
-  const tile = get(false), band = get(true);
-  expect(first).not.toBe(second);
-  expect(tile.vertexShader).toBe(eyeballBulgeVertexShader);
-  expect(band.vertexShader).toBe(baseVertexShader);
-  expect(band.fragmentShader).toBe(tile.fragmentShader);
-  expect(band.uniforms.baseColor.value.equals(tile.uniforms.baseColor.value)).toBe(true);
-  expect(band.uniforms.antipodalColor.value.equals(tile.uniforms.antipodalColor.value)).toBe(true);
-  expect(band.uniforms.time).toBe(sharedUniforms.time);
-  expect(get(true)).toBe(band);
-  expect(get(false)).toBe(tile);
-  const dispose = vi.spyOn(band, 'dispose');
-  clearMaterialCache();
-  expect(dispose).toHaveBeenCalledOnce();
+// The eye's depth is ray-traced in its fragment shader on a flat surface, so it
+// needs no relief geometry of its own: tiles, orb bands and carried eyes all
+// share one material and one compiled program, and no authored mesh is bent.
+it('draws the eye on the flat sticker, like every other style', () => {
+  const eye = getTileStyleMaterial('eyeball', '#3377cc', false, null, '#ee9933');
+  expect(eye.vertexShader).toBe(baseVertexShader);
+  expect(eye.userData.styleFragmentShader).toContain('sphereHit');
+  expect(getTileStyleMaterial('eyeball', '#3377cc', false, null, '#ee9933')).toBe(eye);
 });
 
-it('continues sharing materials and GPU programs for styles without relief', () => {
-  for (const style of ['carbonFiber', 'glass', 'opConcentric']) {
-    const tile = getTileStyleMaterial(style, '#3377cc', false, null, '#ee9933');
-    const band = getTileStyleMaterial(style, '#3377cc', false, null, '#ee9933', { surfaceOnly: true });
-    expect(band).toBe(tile);
-  }
+it('builds its ray frame from the visible facet, not from vertex normals', () => {
+  // Back faces of DoubleSide walls carry normals facing away, and any carrier
+  // can arrive with bad normals; the frame must still face the viewer.
+  const src = getTileStyleMaterial('eyeball', '#3377cc').userData.styleFragmentShader;
+  expect(src).toContain('vec3 Ng = cross(dpdx, dpdy);');
+  expect(src).toMatch(/vec3 N = agree > 0\.5 \? normalize\(vWorldNormal\) : agree < -0\.5 \? -normalize\(vWorldNormal\) : Ng;/);
+  // A carrier that repeats the tile gets one eye per cell.
+  expect(src).toContain('fract(vUv)');
 });
 
-it('keeps carried eyes on the same safe material as world pickups', () => {
+it('watches the shared gaze target (the worm in WORM runs) and falls back to the camera', () => {
+  const eye = getTileStyleMaterial('eyeball', '#3377cc');
+  expect(eye.userData.styleFragmentShader).toContain('uniform vec4 gazeTarget;');
+  // Shared by reference, so CubeAssembly's one write per frame reaches every eye.
+  expect(eye.uniforms.gazeTarget).toBe(sharedUniforms.gazeTarget);
+  updateSharedGaze(1, 2, 3, true);
+  expect(eye.uniforms.gazeTarget.value.toArray()).toEqual([1, 2, 3, 1]);
+  updateSharedGaze(1, 2, 3, false);
+  expect(eye.uniforms.gazeTarget.value.w).toBe(0);
+});
+
+it('keeps carried eyes on the same material as world pickups', () => {
   const palette = createMobiOrbPalette({ manifoldStyles: { 3: 'eyeball' } });
   const { bandColor, gemColor, bandMaterial } = palette[6];
-  expect(bandMaterial).toBe(getTileStyleMaterial('eyeball', bandColor, false, null, gemColor, { surfaceOnly: true }));
+  expect(bandMaterial).toBe(getTileStyleMaterial('eyeball', bandColor, false, null, gemColor));
   expect(bandMaterial.vertexShader).toBe(baseVertexShader);
-});
-
-it.each([warmUpDefaultStyles, warmUpAllStyles])('precompiles the curved eye program as well as raised tiles', warm => {
-  const renderer = { compile: vi.fn(scene => {
-    const eyes = scene.children.filter(o => o.material.fragmentShader?.includes('eyeNoise'));
-    expect(eyes.some(o => o.material.vertexShader === baseVertexShader)).toBe(true);
-    expect(eyes.some(o => o.material.vertexShader === eyeballBulgeVertexShader)).toBe(true);
-  }) };
-  warm(renderer, new THREE.PerspectiveCamera(), ['#3377cc'], ['eyeball']);
-  expect(renderer.compile).toHaveBeenCalledOnce();
 });
 
 it.each([[3, false], [3, true], [5, false]])('keeps the actual %s board eye orb band on its authored geometry (target: %s)', async (size, target) => {
@@ -79,8 +73,6 @@ it.each([[3, false], [3, true], [5, false]])('keeps the actual %s board eye orb 
     expect(bands[0].material.vertexShader).toBe(baseVertexShader);
     expect(bands[0].material.fragmentShader).toContain('eyeNoise');
     expect(geometry.attributes.position.array).toEqual(positions);
-    expect(getTileStyleMaterial('eyeball', orb.color, false, null, orb.antipodalColor).vertexShader)
-      .toBe(eyeballBulgeVertexShader);
   } finally {
     await act(async () => root.unmount());
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;

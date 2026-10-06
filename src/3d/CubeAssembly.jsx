@@ -24,7 +24,7 @@ import { ignitionTileAt } from '../game/chaosIgnition.js';
 import { feel } from '../utils/feel.js';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
-import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateSharedGaze, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import CameraFlipKick from './CameraFlipKick.jsx';
@@ -43,6 +43,7 @@ const _liveLayers = [];
 const _liveAngles = [];
 import { tunnelCameraInside } from '../worm/tunnelVisibility.js';
 import { liveCubies } from '../worm/liveCubies.js';
+import { wormSegments } from '../worm/wormSegments.js';
 import InspectionViews from './InspectionViews.jsx';
 import { getManifoldGridId } from '../game/gridIds.js';
 import { recordChaosHealing } from '../game/chaosExperience.js';
@@ -997,6 +998,10 @@ const CubeAssembly = React.memo(({
       }
       updateSharedSpin(spinEnergyRef.current, latchedSpinAxisRef.current, latchedSpinSliceRef.current);
       updateDiceRoll(dt, spinEnergyRef.current);
+      // Eye tiles watch the worm's head while one is on the cube (WormBody
+      // publishes it every frame; resets, deaths and unmount clear it).
+      const seg = wormSegments.positions;
+      updateSharedGaze(seg[0], seg[1], seg[2], wormSegments.count > 0);
     }
 
 
