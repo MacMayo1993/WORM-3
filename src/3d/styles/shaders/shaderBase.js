@@ -28,12 +28,9 @@ export const baseVertexShader = `${STICKER_FINISH_VARYINGS}
   }
 `;
 
-// Eyeball-style vertex shader: same varyings as baseVertexShader, but displaces
-// the (tessellated) sticker plane outward along its normal so the eye physically
-// bulges off the cube face — a sphere-cap dome over the eyeball plus a broader
-// flesh mound, both falling to zero before the tile edge so seams stay flush.
-// Requires a subdivided plane (StickerPlane swaps in one for the eyeball style);
-// on a 1×1-segment plane the corner vertices sit past the profile and it stays flat.
+// Fixed globe relief. Its footprint and height scale with the sticker so the
+// same surface works on game tiles, previews, and the smaller core stickers.
+// A smoothed skirt seats the globe in the tile without a vertical rim.
 export const eyeballBulgeVertexShader = `${STICKER_FINISH_VARYINGS}
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -42,17 +39,33 @@ export const eyeballBulgeVertexShader = `${STICKER_FINISH_VARYINGS}
   varying vec3 vWorldPos;
   varying vec3 vWorldNormal;
 
+  float eyeRelief(vec2 p) {
+    float r = length(p);
+    // Rounded cap with a continuous slope at the socket edge. A clipped
+    // sphere's near-vertical rim made the coat sparkle along triangle edges.
+    float cap = max(1.0 - (r * r) / (0.435 * 0.435), 0.0);
+    return 0.28 * cap * cap;
+  }
+
   void main() {
     vUv = uv;
-    vNormal = normalize(normalMatrix * normal);
+    vec2 p = uv - 0.5;
+    // All callers supply a square XY plane. Recover its width, with a safe
+    // center-vertex fallback (the center has zero relief gradient).
+    float width = abs(p.x) > 0.001 ? abs(position.x / p.x)
+                : abs(p.y) > 0.001 ? abs(position.y / p.y) : 0.85;
+    float height = eyeRelief(p);
+    vec3 displaced = position + normal * height * width;
+    const float e = 0.001;
+    vec2 slope = vec2(eyeRelief(p + vec2(e, 0.0)) - eyeRelief(p - vec2(e, 0.0)),
+                      eyeRelief(p + vec2(0.0, e)) - eyeRelief(p - vec2(0.0, e))) / (2.0 * e);
+    vec3 reliefNormal = normalize(vec3(-slope, 1.0));
+    vNormal = normalize(normalMatrix * reliefNormal);
     vTileCenter = modelMatrix[3].xyz;
     vWorldNormal = normalize(mat3(modelMatrix) * normal);
-    float du = length(uv - 0.5);
-    float ball = sqrt(max(1.0 - pow(du / 0.36, 2.0), 0.0));
-    float mound = 1.0 - smoothstep(0.16, 0.44, du);
-    vec3 displaced = position + normal * (ball * 0.055 + mound * 0.045);
     vec4 worldPos = modelMatrix * vec4(displaced, 1.0);
     vWorldPos = worldPos.xyz;${stickerFinishVertex('displaced')}
+    vStickerNormal = normalize(mat3(modelMatrix) * reliefNormal);
     vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
     vViewPosition = -mvPosition.xyz;
     gl_Position = projectionMatrix * mvPosition;
