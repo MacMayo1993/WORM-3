@@ -11,7 +11,9 @@ import { useFrame } from '@react-three/fiber';
 import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
-import { isMobile } from '../utils/device.js';
+import { isMobile, prefersReducedMotion } from '../utils/device.js';
+import { tileDisplayAngle, advanceTileDisplayAngle, hasHomeAlignment } from './tileHomeAlignment.js';
+import { liveRotation } from '../worm/liveRotation.js';
 import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { feel } from '../utils/feel.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
@@ -298,6 +300,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     [rotX, rotY, rotZ]
   );
   const groupRef = useRef();
+  const backOrientationRef = useRef();
   const innerGroupRef = useRef(); // inner UV-rotation group — used for InstancedMesh world matrix
   const meshRef = useRef();
   const cityGroupRef = useRef();
@@ -495,6 +498,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const stickerGridIdRef = useRef(stickerGridId);
   stickerGridIdRef.current = stickerGridId;
   useLayoutEffect(() => presentation ? undefined : registerInspectionSurface(stickerGridId, innerGroupRef.current), [stickerGridId, presentation]);
+  // Front, antipodal back and attached decorations share one presentation angle.
+  // This is independent of the outer flip/squish and the cubelet's rigid turn.
+  const reduceHomeMotion = prefersReducedMotion();
+  const displayAngle = tileDisplayAngle(meta, reduceHomeMotion);
+  const applyArtworkAngle = (angle) => {
+    if (innerGroupRef.current) innerGroupRef.current.rotation.z = angle;
+    if (backOrientationRef.current) backOrientationRef.current.rotation.z = -angle;
+    if (cityGroupRef.current) cityGroupRef.current.rotation.z = angle;
+  };
+  useLayoutEffect(() => {
+    applyArtworkAngle(tileDisplayAngle(meta, reduceHomeMotion));
+    if (hasHomeAlignment(meta)) activateSticker(stickerGridId);
+  }, [meta, stickerGridId, reduceHomeMotion]);
+
   // Per-sticker dynamic selectors — subscribe only to this sticker's own derived values.
   // When disparityDeathByGridId grows (a tile dies) Zustand re-runs all selectors, but
   // only the sticker whose primitive return value actually changed triggers a re-render.
@@ -799,6 +816,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [biomeEnabled]);
 
   tickImplRef.current = (state, delta) => {
+    // Settle before another rigid turn starts. There is never a second rotation
+    // competing with the layer animation, including during a live drag.
+    applyArtworkAngle(advanceTileDisplayAngle(meta, state.clock.elapsedTime * 1000,
+      reduceHomeMotion || liveRotation.active || !!useGameStore.getState().animState));
+    const alignmentBusy = hasHomeAlignment(meta);
     // Death implosion animation — -1 = idle (not started), 0..1 = playing, ≥1 = done
     // Check this FIRST: pure ref reads, no meta prop access, has its own early return.
     if (deathAnimT.current >= 0 && deathAnimT.current < 1 && groupRef.current) {
@@ -882,7 +904,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
     // wormhole keeps the loop alive so the indicator ring pulses while the tile is in disparity.
-    const anyActive = pressBusy || spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || (wormhole && !isSudokube);
+    const anyActive = alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || (wormhole && !isSudokube);
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
@@ -1585,14 +1607,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           at 80% scale so the interior reads as distinct from the front face. It sits
           just behind the solid sticker's 0.016 thickness, or the sticker's back would hide it. */}
       {antipodalHex && (
-        instanceBack ? <TileSurfaceInstance name="sticker-antipodal-back" geometry={_sharedStickerGeo} material={backMaterial}
-          color={isDead ? '#555555' : antipodalHex} position={[0, 0, -0.018]} rotation={[0, Math.PI, -(meta?.uvTurns ?? 0) * Math.PI / 2]} scale={[0.8, 0.8, 1]} />
-        : <mesh name="sticker-antipodal-back" onBeforeRender={bindStyleIdentity} material={backMaterial} position={[0, 0, -0.018]} rotation={[0, Math.PI, -(meta?.uvTurns ?? 0) * Math.PI / 2]} scale={[0.8, 0.8, 1]} dispose={null}>
+        <group ref={backOrientationRef} position={[0, 0, -0.018]} rotation={[0, Math.PI, -displayAngle]} scale={[0.8, 0.8, 1]}>
+        {instanceBack ? <TileSurfaceInstance name="sticker-antipodal-back" geometry={_sharedStickerGeo} material={backMaterial}
+          color={isDead ? '#555555' : antipodalHex} />
+        : <mesh name="sticker-antipodal-back" onBeforeRender={bindStyleIdentity} material={backMaterial} dispose={null}>
           <primitive object={_sharedStickerGeo} attach="geometry" />
-        </mesh>
+        </mesh>}
+        </group>
       )}
 
-      <group ref={innerGroupRef} rotation={[0, 0, (meta?.uvTurns ?? 0) * Math.PI / 2]}>
+      <group ref={innerGroupRef} rotation={[0, 0, displayAngle]}>
         {/* Background quad — full-square mesh 1 mm behind the disc-clipped main sticker
             so the white '#ffffff' texture-tint does not bleed through the transparent disc
             corners on textured tiles.  Only rendered when a texture is active; plain
@@ -1793,13 +1817,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* City Biome buildings — kept mounted during rotation so they don't pop/glitch */}
       {biomeEnabled && !isDead && stableCity && (
-        <group ref={cityGroupRef}>
+        <group ref={cityGroupRef} rotation={[0, 0, displayAngle]}>
           {(() => {
             // Stable seed: derived from the sticker's ORIGINAL face + original cubie position.
             // meta.orig and meta.origPos are written once at cube creation and never mutate,
             // so this index never changes regardless of rotations or manifold crossings.
-            // This preserves non-orientability — the geometry carries its orientation through
-            // all transformations rather than snapping back to a canonical direction.
+            // Identity stays fixed; the parent carries transported artwork
+            // orientation and the home-manifold settling animation together.
             const origP = meta?.origPos;
             const stableIndex = origP
               ? origP.x * 25 + origP.y * 5 + origP.z
@@ -2079,6 +2103,7 @@ function stickerPropsAreEqual(prev, next) {
   if (prev.overlay !== next.overlay) return false;
   const pm = prev.meta, nm = next.meta;
   if (pm === nm) return true;
+  if (hasHomeAlignment(nm)) return false;
   if (!pm || !nm) return pm === nm;
   if (pm.curr !== nm.curr || pm.flips !== nm.flips) return false;
   if (pm.orig !== nm.orig || pm.origDir !== nm.origDir) return false;

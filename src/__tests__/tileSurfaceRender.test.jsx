@@ -77,7 +77,16 @@ it('keeps tile accessory batches on the raised/rotating tile and restores glass/
       expect(mesh.material.uniforms.tileFace.value).toBe(meta.orig);
       expect(mesh.material.uniformsNeedUpdate).toBe(true);
     }
-    expect(patternedBack.rotation.z).toBeCloseTo(-Math.PI / 2);
+    // Artwork rotation lives on the shared back wrapper, also used by batches.
+    // Check the composed transform so this catches a missing/doubled rotation.
+    const expectedBack = new THREE.Matrix4().compose(
+      new THREE.Vector3(0, 0, -0.018),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, -Math.PI / 2)),
+      new THREE.Vector3(0.8, 0.8, 1),
+    );
+    scene.updateMatrixWorld(true);
+    const actualBack = patternedBack.parent.matrix.clone().multiply(patternedBack.matrix);
+    actualBack.elements.forEach((value, i) => expect(value).toBeCloseTo(expectedBack.elements[i], 8));
 
     await act(async () => useGameStore.setState({ settings }));
     await render(); await frame(); check('sticker-antipodal-back');

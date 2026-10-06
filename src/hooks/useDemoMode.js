@@ -3,7 +3,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from './useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
-import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { rotateAlignedSlice } from '../game/tileOrientation.js';
 import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { checkRubiksSolved } from '../game/winDetection.js';
 import { clearRefractory } from '../game/refractoryMap.js';
@@ -316,7 +316,7 @@ export function useDemoMode({
       store.setShowAntipodalPiP(false);
       let tourState = makeCubies(targetSize);
       for (const { axis, sliceIndex, dir } of config.scrambleSequence || []) {
-        tourState = rotateSliceCubies(tourState, targetSize, axis, sliceIndex, dir);
+        tourState = rotateAlignedSlice(tourState, targetSize, axis, sliceIndex, dir);
       }
       setRotatedCubies(tourState);
       store.resetGame();
@@ -361,7 +361,7 @@ export function useDemoMode({
     let state = makeCubies(config.cubeSize);
     if (config.scrambleSequence) {
       for (const { axis, sliceIndex, dir } of config.scrambleSequence) {
-        state = rotateSliceCubies(state, config.cubeSize, axis, sliceIndex, dir);
+        state = rotateAlignedSlice(state, config.cubeSize, axis, sliceIndex, dir);
       }
     }
     if (config.flipSequence) {

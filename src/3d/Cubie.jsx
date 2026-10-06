@@ -1,3 +1,4 @@
+import { hasHomeAlignment } from './tileHomeAlignment.js';
 import { wormExpansion } from '../worm/wormExpansion.js';
 import { advancePlatformFormation, platformFormationHeld } from '../worm/platformFormation.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
@@ -605,6 +606,7 @@ function cubiePropsAreEqual(prev, next) {
     if (!ps || !ns) return false;
     if (ps.curr !== ns.curr || ps.flips !== ns.flips) return false;
     if ((ps.uvTurns ?? 0) !== (ns.uvTurns ?? 0)) return false;
+    if (ps !== ns && hasHomeAlignment(ns)) return false;
     // Two same-colour stickers can exchange grid slots during a rotation. Their
     // visible state is identical, but their animation registration and manifold
     // identity are not. Treating them as equal strands StickerPlane with stale

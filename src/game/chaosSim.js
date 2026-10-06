@@ -8,7 +8,7 @@
 // The `now` option injects the clock used for death timestamps, letting a
 // harness run rounds in virtual time.
 
-import { rotateSliceCubies } from './cubeRotation.js';
+import { applyTileMove } from './tileOrientation.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getManifoldGridId, faceRCFor, getStickerWorldPos } from './gridIds.js';
 import {
@@ -680,10 +680,8 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
 
   // ─── External state changes ─────────────────────────────────────────────────
 
-  const rotateSlice = ({ axis, sliceIndex, dir, numTurns }) => {
-    for (let i = 0; i < (numTurns ?? 1); i++) {
-      state = rotateSliceCubies(state, size, axis, sliceIndex, dir);
-    }
+  const rotateSlice = (move) => {
+    state = applyTileMove(state, size, move).cubies;
     manifoldMapCache = null;
     neighborCache = null;
     rebuildLivingStickers();

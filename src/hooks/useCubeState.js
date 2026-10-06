@@ -8,7 +8,8 @@ import { currentExplosion } from '../worm/wormExpansion.js';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useGameStore, selectEffectiveFlipCap, MAX_UNDO_HISTORY } from './useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
-import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { applyTileMove, rotateAlignedSlice } from '../game/tileOrientation.js';
+import { recordHomeAlignments } from '../3d/tileHomeAlignment.js';
 import { flipStickerPair, canFlipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker as healStickerState } from '../game/cubeState.js';
@@ -123,13 +124,16 @@ export function useCubeState() {
   // Apply rotation to cubies — single atomic setState (1 re-render instead of 3)
   const rotateSlice = useCallback((axis, sliceIndex, dir) => {
     feel('cubeTurn', { combo: sliceIndex });
-    useGameStore.setState((state) => ({
-      cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
-      rotationEpoch: state.rotationEpoch + 1,
-      lastRotation: { axis, sliceIndex, dir },
-      moves: state.moves + 1,
-      moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-MAX_UNDO_HISTORY),
-    }));
+    useGameStore.setState((state) => {
+      const result = recordHomeAlignments(applyTileMove(state.cubies, size, { axis, sliceIndex, dir }));
+      return {
+        cubies: result.cubies,
+        rotationEpoch: state.rotationEpoch + 1,
+        lastRotation: { axis, sliceIndex, dir },
+        moves: state.moves + 1,
+        moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-MAX_UNDO_HISTORY),
+      };
+    });
   }, [size]);
 
   // Pending first-flip highlight timer — when the player's very first flip is
@@ -351,7 +355,7 @@ export function useCubeState() {
       const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
       const slice = Math.floor(Math.random() * size);
       const dir = Math.random() > 0.5 ? 1 : -1;
-      state = rotateSliceCubies(state, size, ax, slice, dir);
+      state = rotateAlignedSlice(state, size, ax, slice, dir);
     }
     setRotatedCubies(state);
     resetGame();
