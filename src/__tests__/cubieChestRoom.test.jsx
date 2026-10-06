@@ -7,6 +7,7 @@ vi.mock('../3d/WormPreviewCanvas.jsx', () => ({ default: () => <div aria-label="
 vi.mock('../3d/TilePreviewRenderer.js', () => ({ registerTilePreview: vi.fn(() => 1), updateTilePreview: vi.fn(), unregisterTilePreview: vi.fn() }));
 vi.mock('../3d/CubePreviewCanvas.jsx', () => ({ default: () => <div aria-label="Cube preview" /> }));
 import { STORE_ITEMS } from '../utils/storeCatalog.js';
+import { TILE_STYLE_SECTIONS } from '../utils/tileStyleCatalog.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress, readPlayerSave } from '../progression/model.js';
 import { newChestWallet, CHEST_TIERS, CHEST_MODES } from '../economy/chests.js';
@@ -113,7 +114,8 @@ it('reveals immediately with reduced motion while keeping the paid result', () =
 it('renders only the selected tile family and switches its preview', () => {
   act(() => root.render(<ParityStoreScreen onClose={close} />));
   act(() => button('Tiles').click());
-  expect(host.querySelectorAll('nav[aria-label="Tile families"] button')).toHaveLength(7);
+  // One tab per catalogue family, however many the catalogue grows to.
+  expect(host.querySelectorAll('nav[aria-label="Tile families"] button')).toHaveLength(TILE_STYLE_SECTIONS.length);
   const initial = host.querySelectorAll('.store-card').length;
   act(() => button('Surreal').click());
   expect(host.querySelectorAll('.store-card')).toHaveLength(6);

@@ -20,6 +20,7 @@ import { useShallow } from 'zustand/react/shallow';
 import StickerPlane from './StickerPlane.jsx';
 import MergedLedEdges from './MergedLedEdges.jsx';
 import { hollowFrameGeometry } from './hollowFrameGeometry.js';
+import { STICKER_POS, STICKER_ROT } from './stickerFrames.js';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import {
@@ -58,25 +59,6 @@ function getHollowBeamMaterial(visualMode) {
   _hollowBeamMaterials[visualMode] = mat;
   return mat;
 }
-
-// Stable sticker position/rotation arrays (allocated once, never recreated).
-// Prevents StickerPlane from re-rendering due to new array references.
-const STICKER_POS = {
-  PZ: [0, 0, 0.51],
-  NZ: [0, 0, -0.51],
-  PX: [0.51, 0, 0],
-  NX: [-0.51, 0, 0],
-  PY: [0, 0.51, 0],
-  NY: [0, -0.51, 0],
-};
-const STICKER_ROT = {
-  PZ: [0, 0, 0],
-  NZ: [0, Math.PI, 0],
-  PX: [0, Math.PI / 2, 0],
-  NX: [0, -Math.PI / 2, 0],
-  PY: [-Math.PI / 2, 0, 0],
-  NY: [Math.PI / 2, 0, 0],
-};
 
 // Lego stud: a single molded stud centered on each face. The face group's +Y axis is
 // rotated to the outward normal, then the stud is built up the local +Y axis.

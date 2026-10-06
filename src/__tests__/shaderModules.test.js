@@ -12,6 +12,7 @@ import { nonEuclideanShaders } from '../3d/styles/shaders/nonEuclideanShaders.js
 import { impossibleShaders } from '../3d/styles/shaders/impossibleShaders.js';
 import { livingIllusionShaders } from '../3d/styles/shaders/livingIllusionShaders.js';
 import { surrealShaders } from '../3d/styles/shaders/surrealShaders.js';
+import { craftedShaders } from '../3d/styles/shaders/craftedShaders.js';
 import { isAnimatedStyle, ANTIPODAL_STYLES } from '../3d/styles/TileStyleMaterials.jsx';
 import { isAnimatedPreviewStyle } from '../3d/TilePreviewRenderer.js';
 import { TILE_STYLE_SECTIONS, ALL_TILE_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
@@ -32,6 +33,7 @@ const modules = [
   ['impossibleShaders', impossibleShaders],
   ['surrealShaders', surrealShaders],
   ['livingIllusionShaders', livingIllusionShaders],
+  ['craftedShaders', craftedShaders],
 ];
 
 const allShaders = Object.assign({}, ...modules.map(([, mod]) => mod));
@@ -90,19 +92,28 @@ describe('shader modules', () => {
 describe('tile style catalog', () => {
   const sectionKeys = TILE_STYLE_SECTIONS.flatMap(s => s.keys);
 
-  // 'solar' is listed and sold but has never had a fragment shader, so it falls
-  // back to 'solid'. Pre-existing; listed here so the check below still guards
-  // everything else instead of being deleted.
-  const KNOWN_MISSING_SHADER = new Set(['solar']);
-
   it('every catalog key has a shader, a label and a store entry', () => {
+    // A key without a shader silently falls back to 'solid' — which is how
+    // 'solar' was sold as a plain tile.
     const priced = new Set(STORE_TILES.map(t => t.tileKey));
     for (const key of sectionKeys) {
-      if (!KNOWN_MISSING_SHADER.has(key)) {
-        expect(allShaders[key], `${key} has no fragment shader`).toBeTruthy();
-      }
+      expect(allShaders[key], `${key} has no fragment shader`).toBeTruthy();
       expect(TILE_STYLES[key]?.label, `${key} has no label`).toBeTruthy();
       expect(priced.has(key), `${key} is not sold in the store`).toBe(true);
+    }
+  });
+
+  it('every style animates exactly when its fragment shader reads time', () => {
+    // Play and previews share one registry. A shader that samples `time` without
+    // being registered renders one frame and freezes in previews; a registered
+    // static one burns a per-frame update for nothing.
+    // Grass's shader is still: the blades mounted over it (GrassBlades) sway.
+    const ANIMATED_BY_VOLUME = new Set(['grass']);
+    for (const [key, shader] of Object.entries(allShaders)) {
+      const usesTime = /\btime\b/.test(shader.replace(/uniform\s+float\s+time\s*;/g, ''));
+      const animated = usesTime || ANIMATED_BY_VOLUME.has(key);
+      expect(isAnimatedStyle(key), `${key}: shader/animated-set mismatch`).toBe(animated);
+      expect(isAnimatedPreviewStyle(key), `${key}: shader/preview-set mismatch`).toBe(animated);
     }
   });
 

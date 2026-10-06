@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../3d/styles/TileStyleMaterials.jsx', () => ({
-  sharedUniforms: { time: { value: 17 } },
+  sharedUniforms: { time: { value: 17 }, cellK: { value: 0 } },
   getTileStyleMaterial: (_style, color) => ({
     uniforms: { time: { value: 17 } },
     previewPixel: Number.parseInt(color.slice(1, 3), 16),

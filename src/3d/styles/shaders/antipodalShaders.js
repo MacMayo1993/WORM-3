@@ -260,17 +260,29 @@ export const antipodalShaders = {
       gl_FragColor = vec4(color, 1.0);
     }
   `,
+  // Three ribbons twisting along the tile: each one narrows as cos(twist) and
+  // the stripes printed along it squeeze with it, so a flat band reads as a
+  // turning surface. Front in the partner colour, back in the face's own.
   opRibbonTwist: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
     varying vec2 vUv;
     void main() {
-      float y = 0.5 + sin((vUv.x - 0.5) * 18.0) * 0.18;
-      float ribbon = smoothstep(0.15, 0.12, abs(vUv.y - y));
-      float cut = step(0.65, fract(vUv.x * 6.0));
-      float mask = ribbon * cut;
-      vec3 color = mix(baseColor, antipodalColor, mask);
-      gl_FragColor = vec4(color, 1.0);
+      float row = floor(vUv.y * 3.0);
+      float y = fract(vUv.y * 3.0) - 0.5;
+      float cw = cos(vUv.x * 7.854 + row * 1.3);
+      float hw = 0.36 * abs(cw);
+      float aa = fwidth(y);
+      float inside = 1.0 - smoothstep(hw - aa, hw + aa, abs(y));
+      float s = sin(y / max(hw, 0.001) * 7.854);
+      float stripes = smoothstep(-0.2 - fwidth(s), 0.2 + fwidth(s), s);
+      stripes = mix(0.5, stripes, smoothstep(0.08, 0.3, abs(cw)));
+      vec3 front = mix(antipodalColor, mix(antipodalColor, vec3(1.0), 0.4), stripes);
+      vec3 back = mix(baseColor * 0.42, baseColor * 0.72, stripes);
+      vec3 ribbon = (cw > 0.0 ? front : back) * (0.62 + 0.38 * abs(cw));
+      float lines = smoothstep(0.42, 0.5, abs(fract(vUv.y * 21.0) - 0.5));
+      vec3 bg = baseColor * (1.0 - 0.18 * lines);
+      gl_FragColor = vec4(mix(bg, ribbon, inside), 1.0);
     }
   `,
   opPinwheel: `

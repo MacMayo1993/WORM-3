@@ -138,6 +138,10 @@ const TILE_PRICES = {
   // Surreal — full painted scenes with their own weather.
   bowlerRain: 200, dayOverNight: 225, skyCurtain: 200,
   paintedWindow: 250, falseReflection: 225, skyBird: 200,
+  // Crafted — still materials, priced with the classic patterns; kintsugi's
+  // moving glint and the slab-continuous pictures sit a step higher.
+  marble: 125, terrazzo: 100, kintsugi: 175, cloisonne: 150, marquetry: 150, washi: 100,
+  denim: 100, knit: 125, motherOfPearl: 150, damascus: 150, mosaic: 150, leather: 100,
 };
 
 export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({

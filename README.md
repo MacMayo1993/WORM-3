@@ -377,7 +377,7 @@ The cutaway lens supports touch dragging and arrow keys; Escape closes it. Openi
 
 Palettes can be chosen from the catalog, edited face by face, or extracted from an uploaded image. Settings also support mapping uploaded images onto individual faces. Palette colors remain attached to stable face IDs.
 
-Tile styles are GPU-rendered materials, often animated or reactive. Apply styles per face, combine them with a palette, or use Random Mix. The catalog has seven families:
+Tile styles are GPU-rendered materials, often animated or reactive. Apply styles per face, combine them with a palette, or use Random Mix. The catalog has eight families:
 
 | Family | Examples and behavior |
 | --- | --- |
@@ -388,6 +388,9 @@ Tile styles are GPU-rendered materials, often animated or reactive. Apply styles
 | **Non-Euclidean** | Poincaré disk, hyperbolic weave, RP² geodesics, circle inversion, Hopf-fiber motifs, and Droste spirals. |
 | **Impossible** | Impossible triangles, endless stairs, forks, Necker flips, Möbius bands, and interlocking forms. |
 | **Surreal** | Bowler rain, day over night, sky curtains, painted windows, false reflections, and sky birds. |
+| **Crafted** | Marble, terrazzo, kintsugi, cloisonné, marquetry, washi paper, denim, knit, mother of pearl, Damascus steel, mosaic, and tooled leather, each dyed in the face color. |
+
+**Face slabs**: most Crafted styles, plus Stained Glass and Penrose, are cut from one piece per face. Each sticker shows the part that belongs at its solved home, so a solved face reads as one slab of marble, one window or one mosaic picture, and a scrambled face shows the pieces out of place.
 
 **Depth chambers** use view-dependent parallax to make a flat tile read as a recessed container. Orb Chamber contains a ball; Liquid Tank a waterline and caustic floor; Dice a turning die; Sand Chamber a gravity-responsive pile; Lava Lamp moving blobs. Reactive materials use tile orientation and rotation energy so the slice being turned can slosh, tumble, or settle. Compass, Spirit Level, and Snow Globe provide further orientation-sensitive examples.
 

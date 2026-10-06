@@ -17,6 +17,8 @@
 
 import * as THREE from 'three';
 import { getTileStyleMaterial, sharedUniforms } from './styles/TileStyleMaterials.jsx';
+import { FACE_PLANE_AXES } from './styles/shaders/craftGlsl.js';
+import { bindTileStyleIdentity } from './tileStyleIdentity.js';
 import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
 import { ALL_TILE_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
 import { observePreviewContext, previewContextAvailable } from './previewContext.js';
@@ -65,6 +67,19 @@ let rig = null;               // built lazily, rebuilt when the piece count chan
 const _flatGeo = new THREE.PlaneGeometry(1, 1);
 const _bulgeGeo = new THREE.PlaneGeometry(1, 1, 12, 12);
 
+// The solved home of the sticker in column `col`, row `row` of a face, so
+// styles cut from one slab per face (craftGlsl.js) show that face whole here,
+// as they do on a solved play cube. The tiles below lay out in the face's own
+// u/v, which FACE_PLANE_AXES maps back to grid axes.
+function _homeForCell(face, col, row, n) {
+  const k = (n - 1) / 2;
+  const home = { x: k + face.axis[0] * k, y: k + face.axis[1] * k, z: k + face.axis[2] * k };
+  const [u, v] = FACE_PLANE_AXES[face.id];
+  home[u[1]] = k + (u[0] === '-' ? -1 : 1) * (col - k);
+  home[v[1]] = k + (v[0] === '-' ? -1 : 1) * (row - k);
+  return home;
+}
+
 function _buildRig(n) {
   const group = new THREE.Group();
 
@@ -88,6 +103,7 @@ function _buildRig(n) {
         const tile = new THREE.Mesh(_flatGeo, null);
         tile.position.set((col + 0.5) * cell - CUBE_SPAN / 2, (row + 0.5) * cell - CUBE_SPAN / 2, 0);
         tile.scale.setScalar(cell * STICKER_FILL);
+        tile.onBeforeRender = bindTileStyleIdentity(_homeForCell(face, col, row, n), face.id);
         faceGroup.add(tile);
         tiles.push(tile);
       }
@@ -256,6 +272,9 @@ function renderToCanvas(opts, time, targetCanvas) {
   // that clock itself and puts back whatever the caller had.
   const savedTime = sharedUniforms.time.value;
   sharedUniforms.time.value = time;
+  // Likewise the board size, which slab styles centre their picture on.
+  const savedK = sharedUniforms.cellK.value;
+  sharedUniforms.cellK.value = (n - 1) / 2;
 
   const ctx = targetCanvas.getContext('2d');
 
@@ -300,6 +319,7 @@ function renderToCanvas(opts, time, targetCanvas) {
     return true;
   } finally {
     sharedUniforms.time.value = savedTime;
+    sharedUniforms.cellK.value = savedK;
   }
 }
 

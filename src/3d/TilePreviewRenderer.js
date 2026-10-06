@@ -1,7 +1,6 @@
 import { bindTileStyleIdentity } from './tileStyleIdentity.js';
 const bindPreviewIdentity = bindTileStyleIdentity(null, 0);
 import { prefersReducedMotion, isMobile } from '../utils/device.js';
-import { LIVING_SURFACE_KEYS } from '../utils/livingSurfaceCatalog.js';
 // TilePreviewRenderer.js
 // Renders tile-style preview thumbnails using the shared R3F renderer so no
 // second WebGL context is ever created (which would crash on mobile).
@@ -14,34 +13,15 @@ import { LIVING_SURFACE_KEYS } from '../utils/livingSurfaceCatalog.js';
 
 import * as THREE from 'three';
 import { getTileStyleMaterial } from './styles/TileStyleMaterials.jsx';
+import { isAnimatedStyle } from './styles/animatedStyles.js';
 import { observePreviewContext, previewContextAvailable } from './previewContext.js';
 
 const PREVIEW_SIZE = 64;
 
-// Styles that animate while selected, hovered or focused
-const ANIMATED_STYLE_SET = new Set([
-  ...LIVING_SURFACE_KEYS,
-  'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
-  'holographic', 'pulse', 'lava', 'galaxy', 'circuit',
-  'grass', 'ice', 'sand', 'water', 'neural',
-  'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave',
-  'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
-  'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
-  'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
-  'compass', 'spiritLevel', 'snowGlobe', 'lichtenberg', 'rainGlass', 'pond',
-  'sundial', 'crystalGrowth', 'cymatics', 'turing',
-  'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
-  // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
-  'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',
-  'lightCone', 'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
-  // Impossible (triangle, fork and interlockingWings are static — they stay out)
-  'endlessStairs', 'neckerFlip', 'mobiusBand',
-  // Surreal (all six carry their own weather)
-  'bowlerRain', 'dayOverNight', 'skyCurtain', 'paintedWindow', 'falseReflection', 'skyBird',
-]);
-
+// Styles that animate while selected, hovered or focused: the same list play
+// uses, so a new style is registered once for both.
 export function isAnimatedPreviewStyle(styleKey) {
-  return ANIMATED_STYLE_SET.has(styleKey);
+  return isAnimatedStyle(styleKey);
 }
 
 // ── Renderer state ────────────────────────────────────────────────────────────

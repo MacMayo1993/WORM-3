@@ -18,6 +18,8 @@ import { nonEuclideanShaders } from './shaders/nonEuclideanShaders.js';
 import { impossibleShaders } from './shaders/impossibleShaders.js';
 import { livingIllusionShaders } from './shaders/livingIllusionShaders.js';
 import { surrealShaders } from './shaders/surrealShaders.js';
+import { craftedShaders, CRAFTED_ANTIPODAL_KEYS } from './shaders/craftedShaders.js';
+export { isAnimatedStyle } from './animatedStyles.js';
 
 // Shared time uniform updated by useFrame in parent
 export const sharedUniforms = {
@@ -148,12 +150,13 @@ const fragmentShaders = {
   ...surrealShaders,
   ...livingIllusionShaders,
   ...livingSurfaceShaders,
+  ...craftedShaders,
 };
 
 // Dev-time guard: silent key collisions from spread merges are very hard to debug.
 // This throws immediately at module load so the problem is impossible to miss.
 if (import.meta.env.DEV) {
-  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders, nonEuclideanShaders, impossibleShaders, surrealShaders, livingIllusionShaders, livingSurfaceShaders];
+  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders, nonEuclideanShaders, impossibleShaders, surrealShaders, livingIllusionShaders, livingSurfaceShaders, craftedShaders];
   const _seen = new Map();
   for (const mod of _shaderModules) {
     for (const key of Object.keys(mod)) {
@@ -227,13 +230,14 @@ export function getVolumeResource(key, create) {
 // hold the two in sync.
 export const ANTIPODAL_STYLES = new Set([
   ...LIVING_SURFACE_KEYS,
+  ...CRAFTED_ANTIPODAL_KEYS,
   'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
   'polkaDots', 'zigzag', 'checkerboard', 'diagStripes',
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
   'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
   'waveform', 'dnaHelix', 'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
-  'compass', 'turing',
+  'compass', 'turing', 'stainedGlass',
 ]);
 
 /**
@@ -355,35 +359,6 @@ export function getGlassMaterial(colorHex) {
 export function clearMaterialCache() {
   materialCache.forEach(mat => mat.dispose());
   materialCache.clear();
-}
-
-// Module-level Set: O(1) lookup instead of allocating an array + O(N) includes
-// every time isAnimatedStyle is called (which happens per sticker per render).
-const ANIMATED_STYLES = new Set([
-  ...LIVING_SURFACE_KEYS,
-  'liquidCheckers', 'velvetFolds', 'dreamMarble', 'paradoxWeave',
-  'holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural',
-  'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave',
-  'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
-  'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
-  'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
-  'compass', 'spiritLevel', 'snowGlobe', 'lichtenberg', 'rainGlass', 'pond',
-  'sundial', 'crystalGrowth', 'cymatics', 'turing',
-  'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
-  // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
-  'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',
-  'lightCone', 'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
-  // Impossible (triangle, fork and interlockingWings are static — they stay out)
-  'endlessStairs', 'neckerFlip', 'mobiusBand',
-  // Surreal (all six carry their own weather)
-  'bowlerRain', 'dayOverNight', 'skyCurtain', 'paintedWindow', 'falseReflection', 'skyBird',
-]);
-
-/**
- * Check if a style needs time updates (animated)
- */
-export function isAnimatedStyle(style) {
-  return ANIMATED_STYLES.has(style);
 }
 
 // ─── Shader warm-up ──────────────────────────────────────────────────────────
