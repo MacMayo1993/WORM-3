@@ -12,7 +12,7 @@ import { resetLiveRotation } from '../worm/liveRotation.js';
 vi.mock('../3d/BiomeGroundTextures.js', () => ({ BIOME_GROUND_TEXTURES: {} }));
 extend(THREE);
 
-it('animates an unchanged center identity on front and back, then settles before a queued move', async () => {
+it('holds the transported pose through a slow commit, animates both faces, and settles before a queued move', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   const clock = vi.spyOn(performance, 'now').mockReturnValue(1000);
@@ -36,19 +36,22 @@ it('animates an unchanged center identity on front and back, then settles before
   });
   try {
     await render(home[1][1][2].stickers.PZ);
-    const result = recordHomeAlignments(applyTileMove(home, 3, { axis: 'depth', sliceIndex: 2, dir: 1 }), 1000);
+    const result = recordHomeAlignments(applyTileMove(home, 3, { axis: 'depth', sliceIndex: 2, dir: 1 }));
+    clock.mockReturnValue(1000 + HOME_ALIGNMENT_MS * 10); // slow React commit
     await render(result.cubies[1][1][2].stickers.PZ);
     const front = store.getState().scene.getObjectByName('sticker-front');
     const back = store.getState().scene.getObjectByName('sticker-antipodal-back');
     expect(front.parent.rotation.z).toBeCloseTo(Math.PI / 2);
     expect(back.parent.rotation.z).toBeCloseTo(-Math.PI / 2);
     const frontScale = front.parent.scale.clone();
-    clock.mockReturnValue(1000 + HOME_ALIGNMENT_MS / 2);
-    act(() => runActiveStickers({ clock: { elapsedTime: 1 } }, 0.11));
+    act(() => runActiveStickers({ clock: { elapsedTime: 10 } }, 0.016));
+    expect(front.parent.rotation.z).toBeCloseTo(Math.PI / 2);
+    expect(back.parent.rotation.z).toBeCloseTo(-Math.PI / 2);
+    act(() => runActiveStickers({ clock: { elapsedTime: 10 + HOME_ALIGNMENT_MS / 2000 } }, 0.11));
     expect(front.parent.rotation.z).toBeCloseTo(Math.PI / 16);
     expect(back.parent.rotation.z).toBeCloseTo(-Math.PI / 16);
     act(() => useGameStore.setState({ animState: { axis: 'row', sliceIndex: 2, dir: 1 } }));
-    act(() => runActiveStickers({ clock: { elapsedTime: 1.1 } }, 0.016));
+    act(() => runActiveStickers({ clock: { elapsedTime: 10.15 } }, 0.016));
     expect(front.parent.rotation.z).toBe(0);
     expect(back.parent.rotation.z).toBeCloseTo(0);
     expect(front.parent.scale).toEqual(frontScale);

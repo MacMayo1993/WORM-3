@@ -12,7 +12,7 @@ import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
-import { tileDisplayAngle, hasHomeAlignment } from './tileHomeAlignment.js';
+import { tileDisplayAngle, advanceTileDisplayAngle, hasHomeAlignment } from './tileHomeAlignment.js';
 import { liveRotation } from '../worm/liveRotation.js';
 import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { feel } from '../utils/feel.js';
@@ -501,14 +501,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Front, antipodal back and attached decorations share one presentation angle.
   // This is independent of the outer flip/squish and the cubelet's rigid turn.
   const reduceHomeMotion = prefersReducedMotion();
-  const displayAngle = tileDisplayAngle(meta, performance.now(), reduceHomeMotion);
+  const displayAngle = tileDisplayAngle(meta, reduceHomeMotion);
   const applyArtworkAngle = (angle) => {
     if (innerGroupRef.current) innerGroupRef.current.rotation.z = angle;
     if (backOrientationRef.current) backOrientationRef.current.rotation.z = -angle;
     if (cityGroupRef.current) cityGroupRef.current.rotation.z = angle;
   };
   useLayoutEffect(() => {
-    applyArtworkAngle(tileDisplayAngle(meta, performance.now(), reduceHomeMotion));
+    applyArtworkAngle(tileDisplayAngle(meta, reduceHomeMotion));
     if (hasHomeAlignment(meta)) activateSticker(stickerGridId);
   }, [meta, stickerGridId, reduceHomeMotion]);
 
@@ -818,7 +818,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   tickImplRef.current = (state, delta) => {
     // Settle before another rigid turn starts. There is never a second rotation
     // competing with the layer animation, including during a live drag.
-    applyArtworkAngle(tileDisplayAngle(meta, performance.now(),
+    applyArtworkAngle(advanceTileDisplayAngle(meta, state.clock.elapsedTime * 1000,
       reduceHomeMotion || liveRotation.active || !!useGameStore.getState().animState));
     const alignmentBusy = hasHomeAlignment(meta);
     // Death implosion animation — -1 = idle (not started), 0..1 = playing, ≥1 = done

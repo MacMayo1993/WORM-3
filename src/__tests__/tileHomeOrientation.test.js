@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { applyTileMove, inverseTileMove, isOnHomeManifold } from '../game/tileOrientation.js';
-import { recordHomeAlignments, tileDisplayAngle, clearHomeAlignments, HOME_ALIGNMENT_MS } from '../3d/tileHomeAlignment.js';
+import { recordHomeAlignments, tileDisplayAngle, advanceTileDisplayAngle, clearHomeAlignments, HOME_ALIGNMENT_MS } from '../3d/tileHomeAlignment.js';
 import { createChaosSim } from '../game/chaosSim.js';
 import { checkRubiksSolved } from '../game/winDetection.js';
 
@@ -75,16 +75,19 @@ it('settles along the shortest arc, finishes on interruption, and never replays 
   const result = applyTileMove(makeCubies(3), 3, { ...move, dir: -1 });
   const reset = result.orientationResets[0];
   const meta = result.cubies[reset.x][reset.y][reset.z].stickers[reset.face];
-  recordHomeAlignments(result, 100);
-  const angle = tileDisplayAngle(meta, 100);
+  recordHomeAlignments(result);
+  const angle = advanceTileDisplayAngle(meta, 100);
   expect(Math.abs(angle)).toBe(Math.PI / 2);
-  expect(tileDisplayAngle(meta, 100 + HOME_ALIGNMENT_MS / 2)).toBeCloseTo(angle / 8);
-  expect(tileDisplayAngle(JSON.parse(JSON.stringify(meta)), 100)).toBe(0);
-  expect(tileDisplayAngle(meta, 110, true)).toBe(0);
-  expect(tileDisplayAngle(meta, 120)).toBe(0);
-  recordHomeAlignments(result, 200);
+  expect(advanceTileDisplayAngle(meta, 100 + HOME_ALIGNMENT_MS / 2)).toBeCloseTo(angle / 8);
+  expect(tileDisplayAngle(JSON.parse(JSON.stringify(meta)))).toBe(0);
+  expect(advanceTileDisplayAngle(meta, 110, true)).toBe(0);
+  expect(advanceTileDisplayAngle(meta, 120)).toBe(0);
+  recordHomeAlignments(result);
+  expect(advanceTileDisplayAngle(meta, 1000)).toBe(angle);
+  expect(advanceTileDisplayAngle(meta, 1000 + HOME_ALIGNMENT_MS)).toBe(0);
+  recordHomeAlignments(result);
   clearHomeAlignments();
-  expect(tileDisplayAngle(meta, 200)).toBe(0);
+  expect(advanceTileDisplayAngle(meta, 200)).toBe(0);
 });
 
 it('keeps the worker simulation equal to the main state for half-turns, opposing layers, and undo', () => {
