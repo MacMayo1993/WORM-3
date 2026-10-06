@@ -6,54 +6,60 @@ import { eyeTileFragmentShader } from './eyeTileShader.js';
 //                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing,
 //                         orbChamber, liquidTank, dice, sandChamber, lavaLamp, eyeball
 
+import { CRAFT_GLSL, BORDERS_GLSL } from './craftGlsl.js';
+
 export const newStyleShaders = {
-  // Stained Glass - cathedral leaded glass with radial + concentric segments
+  // Stained Glass - a leaded window cut across the whole face: panes in shades
+  // of the face colour with a few of the partner colour and pale amber, each
+  // glowing brighter at its heart, held in lead came of an even width. A solved
+  // face is one window.
   stainedGlass: `
     uniform vec3 baseColor;
-    varying vec2 vUv;
-
-    float sgHash(vec2 p) {
-      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-    }
-
+    uniform vec3 antipodalColor;
+  ` + CRAFT_GLSL + BORDERS_GLSL + `
     void main() {
-      vec2 uv = vUv - 0.5;
-      float angle  = atan(uv.y, uv.x);
-      float radius = length(uv);
-
-      float segments = 8.0;
-      float segA     = (angle + 3.14159265) / 6.28318530 * segments;
-      float segId    = floor(segA);
-      float segFract = fract(segA);
-
-      float radialLead = smoothstep(0.04, 0.008, min(segFract, 1.0 - segFract));
-      float ring1Lead  = smoothstep(0.018, 0.003, abs(radius - 0.22));
-      float ring2Lead  = smoothstep(0.018, 0.003, abs(radius - 0.40));
-      float lead = clamp(radialLead + ring1Lead + ring2Lead, 0.0, 1.0);
-
-      float ringId = step(0.22, radius) + step(0.40, radius);
-      float tint   = sgHash(vec2(segId, ringId));
-
-      vec3 col      = mix(baseColor * (0.62 + tint * 0.72), baseColor * 1.45, tint * 0.36);
-      vec3 leadCol  = vec3(0.07, 0.06, 0.05);
-      gl_FragColor  = vec4(mix(col, leadCol, lead), 1.0);
+      vec2 p = crSlab() * 2.2;
+      vec3 pane = crBorder(p + 0.15 * vec2(crNoise(p * 2.0), crNoise(p * 2.0 + 3.0)));
+      float h = crHash(pane.yz), pick = crHash(pane.yz + 7.1);
+      vec3 glass = baseColor * (0.68 + 0.5 * h);
+      if (pick > 0.8) glass = antipodalColor * (0.78 + 0.32 * h);
+      else if (pick > 0.68) glass = mix(baseColor, vec3(1.0, 0.94, 0.78), 0.6);
+      glass *= 0.72 + 0.42 * smoothstep(0.0, 0.35, pane.x);
+      glass *= 0.9 + 0.14 * crNoise(p * 18.0 + h * 9.0);
+      float lead = crLine(pane.x, 0.05);
+      float bead = 1.0 - clamp(pane.x / 0.05, 0.0, 1.0);
+      vec3 came = vec3(0.08, 0.075, 0.07) * (1.0 + 1.6 * bead);
+      gl_FragColor = vec4(mix(glass, came, lead), 1.0);
     }
   `,
 
-  // Fingerprint - concentric friction-ridge whorls from an offset core
+  // Fingerprint - an inked print: a spiralled whorl round the core blending
+  // into arches over it (where the two ridge fields disagree, ridges fork and
+  // end, as real minutiae do), with broken ridges and pores. Every tile's print
+  // is different.
   fingerprint: `
     uniform vec3 baseColor;
-    varying vec2 vUv;
-
+  ` + CRAFT_GLSL + `
     void main() {
-      vec2 core    = vec2(0.42, 0.47);
-      float r      = length(vUv - core) * 9.5;
-      float ridge  = sin(r * 3.14159) * 0.5 + 0.5;
-      float pattern = smoothstep(0.28, 0.72, ridge);
-
-      vec3 ridgeCol  = baseColor * 1.12;
-      vec3 valleyCol = baseColor * 0.22;
-      gl_FragColor   = vec4(mix(valleyCol, ridgeCol, pattern), 1.0);
+      float seed = crHash(tileHome.xy * 1.3 + vec2(tileHome.z, tileFace) * 2.7);
+      vec2 core = vec2(0.47, 0.5) + (crHash2(vec2(seed, 3.0)) - 0.5) * 0.12;
+      float tilt = (seed - 0.5) * 0.8;
+      vec2 p = mat2(cos(tilt), -sin(tilt), sin(tilt), cos(tilt)) * (vUv - core);
+      p += 0.03 * (vec2(crNoise(vUv * 7.0 + seed * 10.0), crNoise(vUv * 7.0 + 4.0 + seed * 10.0)) - 0.5);
+      float r = length(p / vec2(0.8, 1.0));
+      float turn = atan(p.y, p.x) / 6.28318 * (seed > 0.5 ? 1.0 : -1.0);
+      float whorl = r * 26.0 + turn;
+      float arch = (p.y + 0.55 * sqrt(p.x * p.x + 0.004) * smoothstep(-0.2, 0.1, p.y)) * 26.0;
+      float phase = mix(whorl, arch, smoothstep(0.16, 0.3, r));
+      float s = sin(phase * 6.28318);
+      float fw = fwidth(s);
+      float ink = smoothstep(0.05 - fw, 0.05 + fw, s);
+      ink *= smoothstep(0.18, 0.32, crNoise(vUv * 13.0 + seed * 20.0));
+      ink *= 1.0 - step(0.93, crHash(floor(vUv * 85.0) + seed)) * 0.8;
+      vec2 o = (vUv - core) / vec2(0.82, 1.0);
+      ink *= 1.0 - smoothstep(0.4, 0.48, length(o));
+      vec3 paper = mix(baseColor, vec3(1.0), 0.5);
+      gl_FragColor = vec4(mix(paper, baseColor * 0.42, ink), 1.0);
     }
   `,
 
@@ -100,23 +106,56 @@ export const newStyleShaders = {
     }
   `,
 
-  // Penrose - 5-fold quasicrystal tiling (golden-ratio wave interference)
+  // Penrose - a true P3 tiling of thick and thin rhombi across the whole face,
+  // grown from a sun of ten Robinson triangles by golden-ratio deflation (the
+  // two triangles of a rhombus are shaded apart so it reads folded). Aperiodic:
+  // no two tiles of a solved face show the same patch.
   penrose: `
     uniform vec3 baseColor;
-    varying vec2 vUv;
-
+  ` + CRAFT_GLSL + `
+    float pnCross(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
+    bool pnInside(vec2 p, vec2 a, vec2 b, vec2 c) {
+      float d1 = pnCross(b - a, p - a), d2 = pnCross(c - b, p - b), d3 = pnCross(a - c, p - c);
+      return !((d1 < 0.0 || d2 < 0.0 || d3 < 0.0) && (d1 > 0.0 || d2 > 0.0 || d3 > 0.0));
+    }
+    float pnSegment(vec2 p, vec2 a, vec2 b) {
+      vec2 pa = p - a, ba = b - a;
+      return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+    }
     void main() {
-      vec2 uv = (vUv - 0.5) * 7.0;
-      float p = 0.0;
-      for (float i = 0.0; i < 5.0; i++) {
-        float a = i * 1.25663706; // 2π/5
-        p += sin(dot(uv, vec2(cos(a), sin(a))) * 1.6180339887);
+      const float PHI = 1.6180339887;
+      vec2 p = crFacePlane();
+      float R = crFaceHalf() * 1.5;
+      float steps = ceil(log(R / 0.42) / log(PHI));
+      float i = floor(mod(atan(p.y, p.x) + 0.31415927, 6.2831853) / 0.62831853);
+      vec2 A = vec2(0.0);
+      vec2 B = R * vec2(cos((2.0 * i - 1.0) * 0.31415927), sin((2.0 * i - 1.0) * 0.31415927));
+      vec2 C = R * vec2(cos((2.0 * i + 1.0) * 0.31415927), sin((2.0 * i + 1.0) * 0.31415927));
+      if (mod(i, 2.0) < 0.5) { vec2 t = B; B = C; C = t; }
+      // Robinson triangles (kind, A, B, C): A is the apex, B-C the diagonal the
+      // triangle shares with its mirror half; only C-A and A-B are tile edges.
+      float kind = 0.0;
+      for (int it = 0; it < 8; it++) {
+        if (float(it) >= steps) break;
+        vec2 a2, b2, c2;
+        if (kind < 0.5) {
+          vec2 P = A + (B - A) / PHI;
+          if (pnInside(p, C, P, B)) { a2 = C; b2 = P; c2 = B; }
+          else { a2 = P; b2 = C; c2 = A; kind = 1.0; }
+        } else {
+          vec2 Q = B + (A - B) / PHI;
+          vec2 S = B + (C - B) / PHI;
+          if (pnInside(p, S, C, A)) { a2 = S; b2 = C; c2 = A; }
+          else if (pnInside(p, Q, S, B)) { a2 = Q; b2 = S; c2 = B; }
+          else { a2 = S; b2 = Q; c2 = A; kind = 0.0; }
+        }
+        A = a2; B = b2; C = c2;
       }
-      float thresh = smoothstep(-0.4, 0.4, p);
-      float edge   = smoothstep(0.06, 0.018, abs(fract(p * 0.5) - 0.5));
-      vec3 col     = mix(baseColor * 0.28, baseColor, thresh);
-      col          = mix(col, baseColor * 0.07, edge);
-      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+      float fold = pnCross(B - A, C - A) > 0.0 ? 1.0 : 0.88;
+      vec3 col = (kind > 0.5 ? baseColor : mix(baseColor, vec3(1.0), 0.45)) * fold;
+      float d = min(pnSegment(p, C, A), pnSegment(p, A, B));
+      col = mix(col, baseColor * 0.25, crLine(d, 0.018));
+      gl_FragColor = vec4(col, 1.0);
     }
   `,
 

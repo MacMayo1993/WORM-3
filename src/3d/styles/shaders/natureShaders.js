@@ -1,5 +1,6 @@
-// Nature / organic tile shaders: lava, galaxy, glass, comic, grass, ice, sand, water, wood
+// Nature / organic tile shaders: lava, galaxy, glass, comic, grass, ice, sand, water, wood, solar
 import { shaderUtils } from './shaderBase.js';
+import { CRAFT_GLSL } from './craftGlsl.js';
 
 export const natureShaders = {
   // Lava - molten flow
@@ -407,6 +408,57 @@ export const natureShaders = {
       color = mix(color, color * 1.14, grain * 0.18);
 
       gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Solar - the photosphere: granules boiling up between dark lanes, the hottest
+  // cores running white, and on about half the tiles (every preview) a drifting
+  // sunspot with a filamented penumbra. Temperature is a ramp through the face's
+  // own colour.
+  solar: `
+    uniform vec3 baseColor;
+    uniform float time;
+  ` + CRAFT_GLSL + `
+    // Granules: Voronoi cells whose centres wander; x = distance to the centre,
+    // y = distance to the lane between cells.
+    vec2 solarGranules(vec2 p, float t) {
+      vec2 n = floor(p), f = fract(p);
+      float d1 = 8.0, d2 = 8.0;
+      for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+          vec2 g = vec2(float(i), float(j));
+          vec2 o = 0.5 + 0.38 * sin(t * 0.5 + 6.28318 * crHash2(n + g));
+          vec2 r = g + o - f;
+          float d = dot(r, r);
+          if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+        }
+      }
+      return vec2(sqrt(d1), sqrt(d2) - sqrt(d1));
+    }
+    void main() {
+      float seed = crHash(tileHome.xy * 1.7 + vec2(tileHome.z * 3.1, tileFace));
+      vec2 warp = vec2(crNoise(vUv * 3.0 + time * 0.05), crNoise(vUv * 3.0 - time * 0.04 + 5.0)) - 0.5;
+      vec2 gr = solarGranules(vUv * 8.5 + warp * 1.3, time);
+      float granule = smoothstep(0.0, 0.32, gr.y) * (1.0 - 0.5 * gr.x);
+      float heat = 0.22 + 0.58 * granule + 0.14 * crNoise(vUv * 22.0 + time * 0.3);
+      heat += 0.22 * (crFbm(vUv * 2.2 + time * 0.02) - 0.5);
+      vec2 c = 0.3 + 0.4 * crHash2(vec2(seed, 1.0));
+      c += 0.035 * vec2(sin(time * 0.07 + seed * 6.0), cos(time * 0.05 + seed * 4.0));
+      vec2 d = vUv - c;
+      float rr = length(d) / (0.09 + 0.05 * seed);
+      float a = atan(d.y, d.x);
+      float fil = 0.5 + 0.5 * sin(a * 26.0 + crNoise(vec2(a * 4.0, rr * 3.0 - time * 0.1)) * 5.0);
+      float spot = tileFace < 0.5 ? 1.0 : step(0.45, seed);
+      float pen = (1.0 - smoothstep(0.85, 1.5, rr)) * spot;
+      float umb = (1.0 - smoothstep(0.35, 0.55, rr)) * spot;
+      heat = mix(heat, 0.22 + 0.22 * fil * smoothstep(0.4, 1.1, rr), pen);
+      heat = mix(heat, 0.05, umb);
+      heat += 0.18 * spot * smoothstep(1.4, 1.7, rr) * (1.0 - smoothstep(1.7, 2.4, rr)) * granule;
+      heat = clamp(heat, 0.0, 1.0);
+      vec3 cool = baseColor * 0.26;
+      vec3 hot = mix(baseColor, vec3(1.0, 0.96, 0.84), 0.5);
+      vec3 col = heat < 0.6 ? mix(cool, baseColor, heat / 0.6) : mix(baseColor, hot, (heat - 0.6) / 0.4);
+      gl_FragColor = vec4(col, 1.0);
     }
   `,
 };

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../../utils/colorSchemes.js';
-import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS, ALL_TILE_STYLE_KEYS } from '../../../utils/tileStyleCatalog.js';
+import { TILE_STYLE_SECTIONS, ALL_TILE_STYLE_KEYS } from '../../../utils/tileStyleCatalog.js';
 import { useGameStore } from '../../../hooks/useGameStore.js';
 import {
   registerTilePreview,
@@ -120,12 +120,10 @@ export function TilesPanel({ settings, onSettingsChange }) {
 
   return (
     <>
-      <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
-      <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
-      <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
-      <StyleGrid keys={NON_EUCLIDEAN_STYLE_KEYS} label="Non-Euclidean" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
-      <StyleGrid keys={IMPOSSIBLE_STYLE_KEYS} label="Impossible" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
-      <StyleGrid keys={SURREAL_STYLE_KEYS} label="Surreal" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
+      {/* One grid per catalogue family, so a family added there shows up here. */}
+      {TILE_STYLE_SECTIONS.map(section => (
+        <StyleGrid key={section.key} keys={section.keys} label={section.label} globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
+      ))}
 
       {/* Randomize — assigns a unique style to each of the 6 faces */}
       <section className="settings-section">
@@ -158,36 +156,13 @@ export function TilesPanel({ settings, onSettingsChange }) {
                   value={faceStyle}
                   onChange={e => applyToFace(faceId, e.target.value)}
                 >
-                  <optgroup label="Classic">
-                    {CLASSIC_STYLE_KEYS.filter(tileOwned).map(k => (
-                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Antipodal Op Art">
-                    {ANTIPODAL_STYLE_KEYS.filter(tileOwned).map(k => (
-                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Living">
-                    {LIVING_STYLE_KEYS.filter(tileOwned).map(k => (
-                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Non-Euclidean">
-                    {NON_EUCLIDEAN_STYLE_KEYS.filter(tileOwned).map(k => (
-                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Impossible">
-                    {IMPOSSIBLE_STYLE_KEYS.filter(tileOwned).map(k => (
-                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Surreal">
-                    {SURREAL_STYLE_KEYS.filter(tileOwned).map(k => (
-                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
-                    ))}
-                  </optgroup>
+                  {TILE_STYLE_SECTIONS.map(section => (
+                    <optgroup key={section.key} label={section.label}>
+                      {section.keys.filter(tileOwned).map(k => (
+                        <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
             );

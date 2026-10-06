@@ -53,6 +53,14 @@ export const SURREAL_STYLE_KEYS = [
   'paintedWindow', 'falseReflection', 'skyBird',
 ];
 
+// Crafted — real-world sticker materials (stone, glass, metal, fibre, wood,
+// shell) dyed in the face's colour. Most are cut from one slab per face, so a
+// solved face reads as a single piece. See craftedShaders.js.
+export const CRAFTED_STYLE_KEYS = [
+  'marble', 'terrazzo', 'kintsugi', 'cloisonne', 'marquetry', 'washi',
+  'denim', 'knit', 'motherOfPearl', 'damascus', 'mosaic', 'leather',
+];
+
 export const TILE_STYLE_SECTIONS = [
   { key: 'classic', label: 'Classic', keys: CLASSIC_STYLE_KEYS },
   { key: 'antipodal', label: 'Antipodal Op Art', keys: ANTIPODAL_STYLE_KEYS },
@@ -61,6 +69,7 @@ export const TILE_STYLE_SECTIONS = [
   { key: 'nonEuclidean', label: 'Non-Euclidean', keys: NON_EUCLIDEAN_STYLE_KEYS },
   { key: 'impossible', label: 'Impossible', keys: IMPOSSIBLE_STYLE_KEYS },
   { key: 'surreal', label: 'Surreal', keys: SURREAL_STYLE_KEYS },
+  { key: 'crafted', label: 'Crafted', keys: CRAFTED_STYLE_KEYS },
 ];
 
 // The canonical pool for features that operate across the whole catalogue

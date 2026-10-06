@@ -249,7 +249,7 @@ export const TILE_STYLES = {
   neural:      { label: 'Neural',       cost: 'med', type: '3d' },
   solar:       { label: 'Solar',        cost: 'med', type: 'animated' },
   // New styles
-  stainedGlass: { label: 'Stained Glass', cost: 'low', type: 'pattern' },
+  stainedGlass: { label: 'Stained Glass', cost: 'med', type: 'pattern' },
   fingerprint:  { label: 'Fingerprint',   cost: 'low', type: 'pattern' },
   topographic:  { label: 'Topographic',   cost: 'low', type: 'pattern' },
   mandelbrot:   { label: 'Mandelbrot',    cost: 'low', type: 'procedural' },
@@ -316,6 +316,19 @@ export const TILE_STYLES = {
   paintedWindow:   { label: 'Painted Window',   cost: 'med', type: 'animated' },
   falseReflection: { label: 'False Reflection', cost: 'med', type: 'animated' },
   skyBird:         { label: 'Sky Bird',         cost: 'med', type: 'animated' },
+  // Crafted
+  marble:        { label: 'Marble',          cost: 'low', type: 'procedural' },
+  terrazzo:      { label: 'Terrazzo',        cost: 'low', type: 'procedural' },
+  kintsugi:      { label: 'Kintsugi',        cost: 'med', type: 'animated' },
+  cloisonne:     { label: 'Cloisonné',       cost: 'low', type: 'pattern' },
+  marquetry:     { label: 'Marquetry',       cost: 'low', type: 'pattern' },
+  washi:         { label: 'Washi Paper',     cost: 'low', type: 'procedural' },
+  denim:         { label: 'Denim',           cost: 'low', type: 'pattern' },
+  knit:          { label: 'Knit',            cost: 'low', type: 'pattern' },
+  motherOfPearl: { label: 'Mother of Pearl', cost: 'low', type: 'procedural' },
+  damascus:      { label: 'Damascus Steel',  cost: 'low', type: 'procedural' },
+  mosaic:        { label: 'Mosaic',          cost: 'low', type: 'pattern' },
+  leather:       { label: 'Tooled Leather',  cost: 'low', type: 'procedural' },
 };
 
 export const DEFAULT_SETTINGS = {

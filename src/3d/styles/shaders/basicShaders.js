@@ -74,26 +74,37 @@ export const basicShaders = {
     }
   `,
 
-  // Carbon Fiber - woven pattern
+  // Carbon Fiber - 2×2 twill of tows dyed in the face colour. Each tow is a
+  // bundle of fibres with its own anisotropic sheen, so the over-and-under
+  // checker flashes as the tile turns against the light.
   carbonFiber: `
     uniform vec3 baseColor;
     varying vec2 vUv;
+    varying vec3 vWorldPos;
 
     void main() {
-      vec2 uv = vUv * 8.0;
+      vec2 g = vUv * 9.0;
+      vec2 cell = floor(g), f = fract(g);
+      // A tow passes over two and under two, stepping one each row.
+      float alongX = step(mod(cell.x + cell.y, 4.0), 1.5);
+      float across = alongX > 0.5 ? f.y : f.x;
+      float along = alongX > 0.5 ? g.x : g.y;
+      float bulge = sin(across * 3.14159);
+      float fibres = 0.86 + 0.14 * sin(across * 44.0 + sin(along * 3.0) * 0.6);
 
-      // Woven pattern
-      float weave1 = step(0.5, fract(uv.x)) * step(0.5, fract(uv.y + 0.5 * floor(uv.x)));
-      float weave2 = step(0.5, fract(uv.x + 0.5)) * step(0.5, fract(uv.y + 0.5 * floor(uv.x + 0.5)));
-      float pattern = weave1 + weave2 * 0.5;
+      vec3 dp1 = dFdx(vWorldPos), dp2 = dFdy(vWorldPos);
+      vec2 du1 = dFdx(vUv), du2 = dFdy(vUv);
+      vec3 T = normalize(dp1 * du2.y - dp2 * du1.y);
+      vec3 B = normalize(dp2 * du1.x - dp1 * du2.x);
+      vec3 v = normalize(cameraPosition - vWorldPos);
+      vec3 H = normalize(normalize(vec3(4.0, 6.0, 8.0)) + v);
+      float th = dot(alongX > 0.5 ? T : B, H);
+      float sheen = pow(sqrt(max(0.0, 1.0 - th * th)), 36.0);
 
-      vec3 darkColor = baseColor * 0.3;
-      vec3 color = mix(darkColor, baseColor, pattern * 0.7 + 0.3);
-
-      // Subtle sheen
-      color += vec3(0.05) * (1.0 - abs(vUv.x - 0.5) * 2.0);
-
-      gl_FragColor = vec4(color, 1.0);
+      vec3 col = baseColor * (0.2 + 0.26 * bulge) * fibres;
+      col += mix(baseColor, vec3(1.0), 0.45) * sheen * (0.2 + 0.4 * bulge);
+      col *= 0.8 + 0.2 * smoothstep(0.0, 0.12, min(f.x, f.y) * (1.0 - max(f.x, f.y)) * 4.0 + 0.04);
+      gl_FragColor = vec4(col, 1.0);
     }
   `,
 

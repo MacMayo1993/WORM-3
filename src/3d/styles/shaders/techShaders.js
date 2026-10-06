@@ -45,37 +45,54 @@ export const techShaders = {
     }
   `,
 
-  // Holographic - rainbow iridescence
+  // Holographic - a foil sticker: a lattice of embossed four-point stars, every
+  // star and every background diamond with its own diffraction grating, so
+  // neighbouring cells flash different colours as the tile turns against the
+  // camera; glitter twinkles on top. The face colour stays the ground.
   holographic: `
     uniform vec3 baseColor;
     uniform float time;
     varying vec2 vUv;
-    varying vec3 vNormal;
-    varying vec3 vViewPosition;
+    varying vec3 vWorldPos;
+    varying vec3 vWorldNormal;
+
+    float hgHash(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+    vec3 hgSpectrum(float x) {
+      return clamp(abs(mod(x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+    }
 
     void main() {
-      vec3 viewDir = normalize(vViewPosition);
-      vec3 normal = normalize(vNormal);
+      // The view's slant across the foil, in the tile's own uv frame.
+      vec3 dp1 = dFdx(vWorldPos), dp2 = dFdy(vWorldPos);
+      vec2 du1 = dFdx(vUv), du2 = dFdy(vUv);
+      vec3 T = normalize(dp1 * du2.y - dp2 * du1.y);
+      vec3 B = normalize(dp2 * du1.x - dp1 * du2.x);
+      vec3 v = normalize(cameraPosition - vWorldPos);
+      vec2 slant = vec2(dot(v, T), dot(v, B));
 
-      // View-dependent color shift
-      float fresnel = 1.0 - abs(dot(viewDir, normal));
+      vec2 g = vUv * 4.0;
+      vec2 cell = floor(g + 0.5);
+      vec2 c = g - cell;
+      vec2 ac = abs(c);
+      float star = min(ac.x, ac.y) * 2.6 + max(ac.x, ac.y) * 0.55;
+      float inStar = 1.0 - smoothstep(0.3 - fwidth(star), 0.3 + fwidth(star), star);
+      float region = inStar > 0.5 ? hgHash(cell) : hgHash(cell + vec2(c.x > 0.0 ? 7.0 : 3.0, c.y > 0.0 ? 11.0 : 5.0));
+      float ang = region * 3.14159;
+      vec2 grating = vec2(cos(ang), sin(ang));
+      float phase = dot(slant, grating) * 2.6 + dot(vUv, grating) * 0.6 + region + time * 0.05;
+      vec3 rainbow = hgSpectrum(fract(phase));
 
-      // Rainbow based on UV and time
-      float hue = fract(vUv.x * 2.0 + vUv.y + time * 0.3);
-      vec3 rainbow;
-      rainbow.r = abs(hue * 6.0 - 3.0) - 1.0;
-      rainbow.g = 2.0 - abs(hue * 6.0 - 2.0);
-      rainbow.b = 2.0 - abs(hue * 6.0 - 4.0);
-      rainbow = clamp(rainbow, 0.0, 1.0);
+      vec3 col = mix(baseColor, rainbow * mix(0.85, 1.1, inStar), mix(0.14, 0.36, inStar));
+      col *= 1.0 + 0.35 * (1.0 - smoothstep(0.0, 0.06, abs(star - 0.3)));
 
-      // Blend base color with rainbow
-      vec3 color = mix(baseColor, rainbow, fresnel * 0.6);
-
-      // Sparkle
-      float sparkle = pow(fresnel, 4.0) * 0.5;
-      color += vec3(sparkle);
-
-      gl_FragColor = vec4(color, 1.0);
+      vec2 gl = floor(vUv * 90.0);
+      float sparkle = step(0.965, hgHash(gl)) * pow(0.5 + 0.5 * sin(time * 2.0 + hgHash(gl + 3.0) * 30.0 + slant.x * 40.0), 8.0);
+      col += vec3(sparkle * 0.8);
+      gl_FragColor = vec4(col, 1.0);
     }
   `,
 
