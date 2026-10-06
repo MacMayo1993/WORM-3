@@ -7,6 +7,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useAnimation } from '../hooks/useAnimation.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { isOnHomeManifold } from '../game/tileOrientation.js';
 import { buildWormScramble } from '../worm/healerWorm/scramble.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
@@ -81,7 +82,14 @@ it.each([3, 10, 15])('finishes the real size-%i shuffle queue exactly once with 
     return layers.reduce((cubies, layer, i) => rotateSliceCubies(cubies, size, move.axis, layer,
       move.sliceDirs?.[i] ?? move.dir), board);
   }, initial);
-  expect(useGameStore.getState().cubies).toEqual(expected);
+  // Home alignment changes artwork history, but not a single physical piece,
+  // colour or flip. Compare those against independent rigid-move playback.
+  const withoutOrientation = cube => JSON.parse(JSON.stringify(cube, (key, value) => key === 'uvTurns' ? undefined : value));
+  const actual = useGameStore.getState().cubies;
+  expect(withoutOrientation(actual)).toEqual(withoutOrientation(expected));
+  for (const cell of actual.flat(2)) for (const [face, tile] of Object.entries(cell.stickers)) {
+    if (isOnHomeManifold(tile, face)) expect(tile.uvTurns ?? 0).toBe(0);
+  }
   expect(useGameStore.getState().animState).toBeNull();
   expect(useGameStore.getState().pendingMove).toBeNull();
   expect(useGameStore.getState().moves).toBe(before.moves);

@@ -48,7 +48,7 @@
 import { makeRng } from './antipodalRandomizer.js';
 import { buildMoveTable, encodeBoard, solveCost } from './parSolver.js';
 import { makeCubies } from '../game/cubeState.js';
-import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { rotateAlignedSlice } from '../game/tileOrientation.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { createLevel, createLevelPack, GAME_MODES, WIN_CONDITIONS, BACKGROUNDS, DIFFICULTY, LEVEL_TAGS } from './schema.js';
 import { levelsManager } from './LevelsManager.js';
@@ -165,7 +165,7 @@ export function buildDailyScramble(dateKey, turns = DAILY_SCRAMBLE_TURNS, attemp
 function scrambledBoard(scramble) {
   let state = makeCubies(DAILY_CUBE_SIZE);
   for (const { axis, sliceIndex, dir } of scramble) {
-    state = rotateSliceCubies(state, DAILY_CUBE_SIZE, axis, sliceIndex, dir);
+    state = rotateAlignedSlice(state, DAILY_CUBE_SIZE, axis, sliceIndex, dir);
   }
   return state;
 }

@@ -8,22 +8,9 @@
 import { useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
-import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { applyTileMove } from '../game/tileOrientation.js';
+import { recordHomeAlignments, clearHomeAlignments } from '../3d/tileHomeAlignment.js';
 import { feel } from '../utils/feel.js';
-
-// Apply a move to the cube state. A move may turn one layer, or several parallel
-// layers at once — each with its OWN direction (the worm hazard turns two
-// non-adjacent planes in opposite directions). `sliceIndices`/`sliceDirs` are
-// parallel arrays; when absent, fall back to the scalar `sliceIndex`/`dir`.
-function applyMove(cubies, size, axis, sliceIndex, dir, sliceIndices, sliceDirs, numTurns = 1) {
-  let c = cubies;
-  const layers = sliceIndices?.length ? sliceIndices : [sliceIndex];
-  const dirs = sliceDirs?.length ? sliceDirs : layers.map(() => dir);
-  for (let li = 0; li < layers.length; li++) {
-    for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, size, axis, layers[li], dirs[li]);
-  }
-  return c;
-}
 
 /**
  * Hook for animation management
@@ -58,8 +45,9 @@ export function useAnimation() {
   const shuffleIdRef = useRef(0);
 
   // Start a new animation (atomic: animState and pendingMove set in one render)
-  const startAnimation = useCallback((axis, dir, sliceIndex, isUndo = false, sliceIndices = null, sliceDirs = null) => {
-    const move = { axis, dir, sliceIndex, isUndo, sliceIndices, sliceDirs };
+  const startAnimation = useCallback((axis, dir, sliceIndex, isUndo = false, sliceIndices = null, sliceDirs = null, orientationResets = null) => {
+    clearHomeAlignments();
+    const move = { axis, dir, sliceIndex, isUndo, sliceIndices, sliceDirs, orientationResets };
     pendingMoveRef.current = move;
     useGameStore.setState({
       animState: { axis, dir, sliceIndex, sliceIndices, sliceDirs, t: 0 },
@@ -72,6 +60,7 @@ export function useAnimation() {
   // onDone is called after all moves complete.
   const startAnimatedShuffle = useCallback((moves, onDone) => {
     if (!moves || !moves.length) { onDone?.(); return; }
+    clearHomeAlignments();
     // Bump the shuffle ID to cancel any pending setTimeout from a prior shuffle.
     const sid = ++shuffleIdRef.current;
     shuffleQueueRef.current = moves.slice(1);
@@ -84,6 +73,7 @@ export function useAnimation() {
 
   // Cancel any in-flight animated shuffle. Safe to call at any time.
   const cancelShuffle = useCallback(() => {
+    clearHomeAlignments();
     shuffleIdRef.current += 1; // Invalidate pending setTimeout callbacks
     isShufflingRef.current = false;
     shuffleQueueRef.current = [];
@@ -105,9 +95,9 @@ export function useAnimation() {
         // Do NOT increment moves or add to history — useUndo already handled both.
         feel('cubeTurn', { combo: sliceIndex });
         useGameStore.setState((state) => ({
-          cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
+          cubies: applyTileMove(state.cubies, size, pm).cubies,
           rotationEpoch: state.rotationEpoch + 1,
-          lastRotation: { axis, sliceIndex, dir },
+          lastRotation: { ...pm },
           animState: null,
           pendingMove: null,
         }));
@@ -127,9 +117,9 @@ export function useAnimation() {
         // vibrate(12) that used to sit here also bypassed the haptics setting.
         feel('cubeShuffleTurn', { combo: sliceIndex });
         useGameStore.setState((state) => ({
-          cubies: applyMove(state.cubies, size, axis, sliceIndex, dir, sliceIndices, sliceDirs),
+          cubies: recordHomeAlignments(applyTileMove(state.cubies, size, pm)).cubies,
           rotationEpoch: state.rotationEpoch + 1,
-          lastRotation: { axis, sliceIndex, sliceIndices, sliceDirs, dir },
+          lastRotation: { axis, sliceIndex, sliceIndices, sliceDirs, dir, numTurns: pm.numTurns ?? 1 },
           animState: null,
           pendingMove: null,
         }));
@@ -160,13 +150,13 @@ export function useAnimation() {
       const numTurns = pm.numTurns ?? 1;
       feel('cubeTurn', { combo: sliceIndex });
       useGameStore.setState((state) => {
-        const c = applyMove(state.cubies, size, axis, sliceIndex, dir, sliceIndices, sliceDirs, numTurns);
+        const result = recordHomeAlignments(applyTileMove(state.cubies, size, pm));
         return {
-          cubies: c,
+          cubies: result.cubies,
           rotationEpoch: state.rotationEpoch + 1,
           lastRotation: { axis, sliceIndex, sliceIndices, sliceDirs, dir, numTurns },
           moves: state.moves + numTurns,
-          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
+          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, sliceIndices, sliceDirs, numTurns, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-10),
           animState: null,
           pendingMove: null,
         };
@@ -198,14 +188,13 @@ export function useAnimation() {
       // render can fire between cubies, moves, and history updates.
       feel('cubeTurn', { combo: sliceIndex });
       useGameStore.setState((state) => {
-        let c = state.cubies;
-        for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, state.size, axis, sliceIndex, dir);
+        const result = recordHomeAlignments(applyTileMove(state.cubies, state.size, { axis, sliceIndex, dir, numTurns }));
         return {
-          cubies: c,
+          cubies: result.cubies,
           rotationEpoch: state.rotationEpoch + 1,
           lastRotation: { axis, sliceIndex, dir, numTurns },
           moves: state.moves + numTurns,
-          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
+          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, orientationResets: result.orientationResets, timestamp: Date.now() }].slice(-10),
         };
       });
     }

@@ -17,7 +17,7 @@
 // cube, which is not the puzzle the level describes.
 
 import { makeCubies } from '../game/cubeState.js';
-import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { applyTileMove, rotateAlignedSlice } from '../game/tileOrientation.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 
 const AXES = ['row', 'col', 'depth'];
@@ -60,9 +60,7 @@ export function buildLevelStartState(level, size, { random = Math.random, levelN
     // data emits one entry per quarter turn: getLevelPar counts entries, so a
     // numTurns:2 kept as one entry would score par 1 for a two-move fix.
     for (const { axis, sliceIndex, dir, numTurns } of scrambleSequence) {
-      for (let t = 0; t < (numTurns ?? 1); t++) {
-        state = rotateSliceCubies(state, size, axis, sliceIndex, dir);
-      }
+      state = applyTileMove(state, size, { axis, sliceIndex, dir, numTurns }).cubies;
     }
   } else if (!hasAuthoredSetup(level)) {
     const count = randomScrambleDepth(level, levelNumber);
@@ -70,7 +68,7 @@ export function buildLevelStartState(level, size, { random = Math.random, levelN
       const axis = AXES[Math.floor(random() * 3)];
       const slice = Math.floor(random() * size);
       const dir = random() > 0.5 ? 1 : -1;
-      state = rotateSliceCubies(state, size, axis, slice, dir);
+      state = rotateAlignedSlice(state, size, axis, slice, dir);
     }
   }
 

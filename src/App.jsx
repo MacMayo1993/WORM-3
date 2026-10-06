@@ -31,7 +31,7 @@ import { EARN_DAILY_CHALLENGE } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { setFeelEnabled } from './utils/feel.js';
 import { makeCubies } from './game/cubeState.js';
-import { rotateSliceCubies } from './game/cubeRotation.js';
+import { rotateAlignedSlice } from './game/tileOrientation.js';
 import { flipStickerPair } from './game/manifoldLogic.js';
 import { getManifoldMap } from './game/manifoldMapStore.js';
 import { clearRefractory } from './game/refractoryMap.js';
@@ -1200,7 +1200,7 @@ export default function WORM3() {
         const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
         const slice = Math.floor(Math.random() * size);
         const dir = Math.random() > 0.5 ? 1 : -1;
-        state = rotateSliceCubies(state, size, ax, slice, dir);
+        state = rotateAlignedSlice(state, size, ax, slice, dir);
       }
       return count;
     };

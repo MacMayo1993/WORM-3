@@ -23,7 +23,7 @@ preloadFont(
   () => {}
 );
 import { makeCubies } from '../../game/cubeState.js';
-import { rotateSliceCubies } from '../../game/cubeRotation.js';
+import { rotateAlignedSlice } from '../../game/tileOrientation.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
 import { STICKER_OFFSET, createCubieGeometry, createStickerGeometry, rubiksFinish } from '../../3d/rubiksPiece.js';
 import { isMobile, prefersReducedMotion } from '../../utils/device.js';
@@ -192,7 +192,7 @@ const ShufflingCube = ({ onFlip }) => {
     let cubies = makeCubies(3);
     for (let i = 0; i < 12; i++) {
       const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
-      cubies = rotateSliceCubies(cubies, 3, m.ax, m.sl, m.d);
+      cubies = rotateAlignedSlice(cubies, 3, m.ax, m.sl, m.d);
     }
     return { cubies: flipMenuCenters(cubies), rotating: null };
   });
@@ -242,7 +242,7 @@ const ShufflingCube = ({ onFlip }) => {
         );
       }
       if (progress >= 1) {
-        const newCubies = rotateSliceCubies(cubies, 3, rotating.ax, rotating.sl, rotating.d);
+        const newCubies = rotateAlignedSlice(cubies, 3, rotating.ax, rotating.sl, rotating.d);
         nextSpawnAt.current = t + PAUSE_DUR;
         pipelineRef.current = 'idle';
         setCubeState({ cubies: newCubies, rotating: null });

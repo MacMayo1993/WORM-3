@@ -1,5 +1,5 @@
 import { makeCubies } from '../game/cubeState.js';
-import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { applyTileMove } from '../game/tileOrientation.js';
 import { parseAlgorithm } from './algorithms.js';
 
 // A single fixed grip throughout: yellow U, white D, red F. Practice boards
@@ -62,9 +62,7 @@ export function readCourseProgress() {
   } catch { return []; }
 }
 export function applyCourseMove(cubies, move) {
-  let next = cubies;
-  for (let i = 0; i < (move.numTurns ?? 1); i++) next = rotateSliceCubies(next, 3, move.axis, move.sliceIndex, move.dir);
-  return next;
+  return applyTileMove(cubies, 3, move).cubies;
 }
 export function courseHome() {
   let cube = makeCubies(3);

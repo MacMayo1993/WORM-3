@@ -7,7 +7,8 @@
 import { useCallback } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, unflipStickerPair, canUnflipStickerPair } from '../game/manifoldLogic.js';
-import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { applyTileMove, inverseTileMove } from '../game/tileOrientation.js';
+import { clearHomeAlignments } from '../3d/tileHomeAlignment.js';
 
 /**
  * Hook for undo functionality.
@@ -34,11 +35,13 @@ export function useUndo(startAnimation) {
     if (lastMove.type === 'rotation') {
       const { axis, dir, sliceIndex } = lastMove;
       const turns = lastMove.numTurns ?? 1;
+      const inverse = inverseTileMove(lastMove);
+      clearHomeAlignments();
 
       if (turns === 1) {
         // Single-turn: use the animation path so the visual snaps back smoothly.
         // isUndo:true tells handleAnimComplete to skip moves/history tracking.
-        startAnimation(axis, -dir, sliceIndex, true);
+        startAnimation(axis, -dir, sliceIndex, true, inverse.sliceIndices, inverse.sliceDirs, inverse.orientationResets);
         // Remove from history and decrement move counter now — handleAnimComplete
         // handles the cubie update later when the animation finishes.
         popFromHistory();
@@ -48,12 +51,11 @@ export function useUndo(startAnimation) {
         // No animation pass — the visual snaps immediately, matching how the
         // forward move was applied in onMove's numTurns > 1 branch.
         useGameStore.setState((state) => {
-          let c = state.cubies;
-          for (let i = 0; i < turns; i++) c = rotateSliceCubies(c, state.size, axis, sliceIndex, -dir);
+          const c = applyTileMove(state.cubies, state.size, inverse).cubies;
           return {
             cubies: c,
             rotationEpoch: state.rotationEpoch + 1,
-            lastRotation: { axis, sliceIndex, dir: -dir, numTurns: turns },
+            lastRotation: inverse,
             moves: Math.max(0, state.moves - turns),
             moveHistory: state.moveHistory.slice(0, -1),
           };
