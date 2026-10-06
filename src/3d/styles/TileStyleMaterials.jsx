@@ -5,7 +5,7 @@ import { LIVING_SURFACE_KEYS } from '../../utils/livingSurfaceCatalog.js';
 // Uses GPU-based procedural textures to avoid memory overhead
 
 import * as THREE from 'three';
-import { baseVertexShader, eyeballBulgeVertexShader } from './shaders/shaderBase.js';
+import { baseVertexShader } from './shaders/shaderBase.js';
 import { withStickerFinish } from './shaders/stickerFinish.js';
 import { basicShaders } from './shaders/basicShaders.js';
 import { techShaders } from './shaders/techShaders.js';
@@ -236,7 +236,7 @@ export const ANTIPODAL_STYLES = new Set([
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
   'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
-  'waveform', 'dnaHelix', 'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
+  'waveform', 'dnaHelix', 'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp',
   'compass', 'turing', 'stainedGlass',
 ]);
 
@@ -248,9 +248,8 @@ export const ANTIPODAL_STYLES = new Set([
  * @param {object} texture - unused (reserved)
  * @param {string|null} antipodalHex - hex color of the antipodal face (for antipodal patterns).
  *   When null for an antipodal-style, a hue-shifted contrast color is derived automatically.
- * @param {object} options - surfaceOnly keeps authored curved geometry intact.
  */
-export function getTileStyleMaterial(style, colorHex, useTexture = false, texture = null, antipodalHex = null, { surfaceOnly = false } = {}) {
+export function getTileStyleMaterial(style, colorHex, useTexture = false, texture = null, antipodalHex = null) {
   // Texture path — cached by texture.uuid so repeated calls don't allocate a new
   // GPU program each time.  MeshStandardMaterial is evicted and disposed by the
   // same LRU logic as the shader materials below.
@@ -279,10 +278,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   const antipodalSuffix = ANTIPODAL_STYLES.has(safeStyle)
     ? (antipodalHex ? `_${antipodalHex}` : '_derived')
     : '';
-  // Eye relief assumes a square XY sticker. Curved users (orb bands) need the
-  // same pattern with their own positions/normals, without mutating tile materials.
-  const flatEye = safeStyle === 'eyeball' && surfaceOnly;
-  const cacheKey = `${safeStyle}_${safeColorHex}${antipodalSuffix}${flatEye ? '_surface' : ''}`;
+  const cacheKey = `${safeStyle}_${safeColorHex}${antipodalSuffix}`;
   const cached = _matCacheGet(cacheKey);
   if (cached) return cached;
 
@@ -326,8 +322,9 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
 
   const material = new THREE.ShaderMaterial({
     uniforms,
-    // Eyeball tiles displace a tessellated plane so the eye bulges off the face
-    vertexShader: safeStyle === 'eyeball' && !flatEye ? eyeballBulgeVertexShader : baseVertexShader,
+    // Every style draws on the flat sticker. Depth (the eye in its socket, the
+    // chambers) is ray-traced in the fragment shader, so any surface can wear it.
+    vertexShader: baseVertexShader,
     // Every style, glass included, wears the menu cube's sticker finish (stickerFinish.js).
     fragmentShader: withStickerFinish(styleShader),
     side: isGlass ? THREE.DoubleSide : THREE.FrontSide,
@@ -389,11 +386,6 @@ export function warmUpDefaultStyles(renderer, camera, colorHexArray, extraStyles
   const geo = new THREE.PlaneGeometry(0.1, 0.1);
   const styles = new Set([...DEFAULT_WARMUP_STYLES, ...extraStyles]);
   for (const style of styles) {
-    // The curved orb surface needs a different eye vertex program. Compile it
-    // with the tiles so rounding a corner to an eye face cannot cause a hitch.
-    if (style === 'eyeball' && colorHexArray.length) {
-      scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHexArray[0], false, null, null, { surfaceOnly: true })));
-    }
     for (let i = 0; i < colorHexArray.length; i++) {
       scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHexArray[i])));
       // Antipodal styles bake the partner color into the material — warm the
@@ -422,9 +414,6 @@ export function warmUpAllStyles(renderer, camera, colorHexArray) {
   const scene = new THREE.Scene();
   const geo = new THREE.PlaneGeometry(0.1, 0.1);
   for (const style of Object.keys(fragmentShaders)) {
-    if (style === 'eyeball' && colorHexArray.length) {
-      scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHexArray[0], false, null, null, { surfaceOnly: true })));
-    }
     for (const colorHex of colorHexArray) {
       scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHex)));
     }

@@ -19,7 +19,7 @@ export function createMobiOrbPalette(settings) {
     const style = settings?.manifoldStyles?.[ANTIPODAL_COLOR[face || 1]] || 'solid';
     const bandMaterial = style === 'solid'
       ? getOrbMaterials(gemColor, bandColor, false).band
-      : getTileStyleMaterial(style, bandColor, false, null, gemColor, { surfaceOnly: true });
+      : getTileStyleMaterial(style, bandColor, false, null, gemColor);
     return { bandColor, gemColor, bandMaterial, gasGem: new THREE.Color(gemColor), gasBand: new THREE.Color(bandColor) };
   });
 }

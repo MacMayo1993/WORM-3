@@ -126,7 +126,7 @@ function VoidCore({ cubieRefs = null }) {
       const key = `${id}-${style}`;
       byColor.set(id, {
         key, id, style,
-        geometry: new THREE.PlaneGeometry(CORE_STICKER, CORE_STICKER, style === 'eyeball' ? 12 : 1, style === 'eyeball' ? 12 : 1),
+        geometry: new THREE.PlaneGeometry(CORE_STICKER, CORE_STICKER),
         material: withPortalCutout(createCoreTileStyle(style, faceColors[id], faceColors[ANTIPODAL_COLOR[id]], tunnelCoreScale(size)),
           passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
       });

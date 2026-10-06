@@ -57,9 +57,6 @@ const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
 // outline and glossy coat (rubiksPiece.js), thin enough to keep every overlay in front.
 const _playStickerGeo = createPlayStickerGeometry();
 const _playFinish = rubiksFinish(isMobile).sticker;
-// Tessellated plane for styles whose vertex shader displaces the surface — the
-// eyeball bulge needs interior vertices to bend (a 1×1-segment plane stays flat).
-const _bulgeStickerGeo = new THREE.PlaneGeometry(0.85, 0.85, 24, 24);
 // Slightly larger plane for the worm-mode rim glow — extends the halo beyond the tile edge.
 const _wormRimGlowGeo = new THREE.PlaneGeometry(1.05, 1.05);
 const _wormApertureGeo = new THREE.PlaneGeometry(0.76, 0.76);
@@ -1372,9 +1369,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // and Sudokube's white number tile included) gets the rounded, clear-coated sticker;
   // only a loaded face texture keeps the flat quad it is sliced across.
   const plainSticker = !useGlassStyle && !useShaderStyle && !renderTexture;
-  // Every shader style but the eyeball (which domes a tessellated plane) sits on the play
-  // sticker, as does glass. Neither takes a face texture, so needs no per-tile UV slice.
-  const roundedStyle = !hollow && (useGlassStyle || (useShaderStyle && tileStyle !== 'eyeball'));
+  // Every shader style sits on the play sticker, as does glass. Neither takes a face
+  // texture, so needs no per-tile UV slice.
+  const roundedStyle = !hollow && (useGlassStyle || useShaderStyle);
   const styleMaterial = useMemo(() => {
     if (!useShaderStyle) return null;
     // Ensure we have a valid color string
@@ -1618,7 +1615,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         {!isInstanceable && <mesh name="sticker-front" onBeforeRender={bindStyleIdentity} ref={meshRef}
           {...(useGlassStyle && glassMaterial ? { material: glassMaterial }
             : useShaderStyle && styleMaterial ? { material: styleMaterial } : {})}
-          key={hollow ? 'frame' : plainSticker ? 'sticker' : useGlassStyle ? 'glass' : roundedStyle ? 'styled' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
+          key={hollow ? 'frame' : plainSticker ? 'sticker' : useGlassStyle ? 'glass' : roundedStyle ? 'styled' : 'plane'}>
           {hollow ? (
             <primitive object={_hollowStickerGeo} attach="geometry" />
           ) : plainSticker ? (
@@ -1630,9 +1627,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           ) : faceRow != null ? (
             // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
             <planeGeometry ref={geoRef} args={[0.85, 0.85]} />
-          ) : useShaderStyle && tileStyle === 'eyeball' ? (
-            // Eyeball style: tessellated plane so the bulge vertex shader can dome it.
-            <primitive object={_bulgeStickerGeo} attach="geometry" />
           ) : (
             // No texture atlas — share the module-level geometry to avoid per-sticker alloc.
             <primitive object={_sharedStickerGeo} attach="geometry" />

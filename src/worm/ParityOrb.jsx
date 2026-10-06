@@ -71,10 +71,11 @@ function SingleOrbImpl({
 }) {
   // The band wears the manifold the orb sits on; the gem wears its antipodal partner.
   const { gem: gemColor, band: bandColor } = orbColorRoles(color, antipodalColor);
-  // Share sticker materials where possible, but never apply planar eye relief
-  // to the curved Möbius band. 'solid' keeps the emissive band below instead.
+  // The stickers' own material — same shader, same defines, so it shares their
+  // already-compiled program and never links a new one mid-run. 'solid' has no
+  // pattern worth carrying, so it keeps the emissive band below instead.
   const bandMaterial = useMemo(
-    () => (!shower && styleKey && styleKey !== 'solid' ? getTileStyleMaterial(styleKey, bandColor, false, null, gemColor, { surfaceOnly: true }) : null),
+    () => (!shower && styleKey && styleKey !== 'solid' ? getTileStyleMaterial(styleKey, bandColor, false, null, gemColor) : null),
     [shower, styleKey, bandColor, gemColor]
   );
   const mat = useMemo(() => getOrbMaterials(gemColor, bandColor, isTarget, elevated, isGlowWorm), [gemColor, bandColor, isTarget, elevated, isGlowWorm]);

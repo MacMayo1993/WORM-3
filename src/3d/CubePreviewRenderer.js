@@ -62,10 +62,8 @@ let rig = null;               // built lazily, rebuilt when the piece count chan
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
-// One plane per sticker. `eyeball` displaces its surface in the vertex shader, so
-// it needs interior vertices to bend — the same split StickerPlane makes.
+// One plane per sticker.
 const _flatGeo = new THREE.PlaneGeometry(1, 1);
-const _bulgeGeo = new THREE.PlaneGeometry(1, 1, 12, 12);
 
 // The solved home of the sticker in column `col`, row `row` of a face, so
 // styles cut from one slab per face (craftGlsl.js) show that face whole here,
@@ -219,10 +217,8 @@ function _dressCube(opts) {
     const colorHex = colors[face.id] || COLOR_SCHEMES.standard[face.id];
     const antiHex = colors[ANTIPODE[face.id]] || COLOR_SCHEMES.standard[ANTIPODE[face.id]];
     const material = getTileStyleMaterial(style, colorHex, false, null, antiHex);
-    const geo = style === 'eyeball' ? _bulgeGeo : _flatGeo;
     for (const tile of face.tiles) {
       tile.material = material;
-      if (tile.geometry !== geo) tile.geometry = geo;
     }
   }
 }

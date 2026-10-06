@@ -35,6 +35,10 @@ export const stickerFinishVertex = (pos = 'position') => `
 // Colours the style reads. Each uniform keeps its name for the JS side; inside the
 // shader every use is redirected to a display-space copy set before the style runs.
 const FINISH_COLORS = ['baseColor', 'antipodalColor'];
+// A style that draws something other than sticker plastic (the eye's skin and
+// wet globe) declares `float tileCoat;` and sets it per pixel: 1 keeps the
+// clearcoat, 0 leaves only the rig's shading. It starts at 1 each pixel.
+const TILE_COAT = /\bfloat\s+tileCoat\s*;/;
 const MAIN = /void\s+main\s*\(\s*(?:void)?\s*\)/g;
 
 const FINISH_GLSL = `
@@ -45,7 +49,8 @@ vec3 stickerToDisplay(vec3 c) {
 }
 // The studio rig: ambient plus key and fill, normalised so a tile facing the
 // key reads at its own colour and one turned away settles about a fifth darker.
-vec3 stickerFinish(vec3 col) {
+// coatAmount scales the clearcoat (see TILE_COAT below).
+vec3 stickerFinish(vec3 col, float coatAmount) {
   vec3 n = normalize(vStickerNormal);
   if (!gl_FrontFacing) n = -n;
   vec3 v = normalize(cameraPosition - vStickerPos);
@@ -62,8 +67,9 @@ vec3 stickerFinish(vec3 col) {
   vec3 coat = vec3(1.0, 0.97, 0.94) * (pow(kh, 140.0) * 0.55 + pow(kh, 18.0) * 0.05)
             + vec3(0.9, 0.93, 1.0) * (pow(rh, 90.0) * 0.3)
             + vec3(0.2) * fres;
-  return col + coat;
+  return col + coat * coatAmount;
 }
+vec3 stickerFinish(vec3 col) { return stickerFinish(col, 1.0); }
 `;
 
 /**
@@ -85,12 +91,13 @@ export function withStickerFinish(fragmentShader) {
       .replace(new RegExp(`uniform\\s+vec3\\s+${name}Shown\\s*;`), `uniform vec3 ${name};\nvec3 ${name}Shown;`);
     shown.push(name);
   }
+  const coated = TILE_COAT.test(src);
   return `${FINISH_GLSL}
 ${src}
 void main() {
-${shown.map((name) => `  ${name}Shown = stickerToDisplay(${name});`).join('\n')}
+${shown.map((name) => `  ${name}Shown = stickerToDisplay(${name});`).join('\n')}${coated ? '\n  tileCoat = 1.0;' : ''}
   tileStyleMain();
-  gl_FragColor.rgb = stickerFinish(gl_FragColor.rgb);
+  gl_FragColor.rgb = ${coated ? 'stickerFinish(gl_FragColor.rgb, tileCoat)' : 'stickerFinish(gl_FragColor.rgb)'};
 }
 `;
 }
