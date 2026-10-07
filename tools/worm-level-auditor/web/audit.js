@@ -1,4 +1,10 @@
 export const ELEMENTS = ['water','fire','grass','ice','lightning'];
+export function requiredPowerCycles(level) {
+  const m=level.mechanics??{};
+  // Budget repeated quantities too: one elemental pickup per offer, and at
+  // most four quest catches supported by each magnet offer in offerStoryPower.
+  return Math.max(2,m.explodes??0,m.rockets??0,m.elementPickups??0,Math.ceil((m.magnetOrbs??0)/4));
+}
 export function assess(record, character='glow', scenario={}) {
   const level=record.config, stage=record.stages[character], powerPool=stage.powerCycle.filter(x=>!(scenario.disabledPowers??[]).includes(x));
   const initial=scenario.initialOrbs??stage.initialOrbs, recurring=scenario.recurring!==false;
@@ -48,7 +54,7 @@ export function assess(record, character='glow', scenario={}) {
     return {...o,available,detail,state};
   });
   const missedCycles=scenario.missedCycles??2, cycleLength=powerPool.length;
-  const cycles=Math.max(2,level.mechanics?.explodes??0,level.mechanics?.rockets??0);
+  const cycles=requiredPowerCycles(level);
   const powerBudget=cycleLength?record.timing.opening+missedCycles*cycleLength*(record.timing.lifetime+record.timing.cooldown)+cycles*cycleLength*(record.timing.elementDuration+4+record.timing.cooldown):0;
   if(cycleLength&&powerBudget>=limit)findings.push({key:'timing',severity:'undersupplied',message:'Conservative power-offer model uses '+powerBudget+'s of the '+limit+'s limit; routing, combat and tunnels are excluded.'});
   if(!stage.refillSixColors&&recurring)findings.push({key:'refill',severity:'impossible',message:'Runtime refill did not restore six colors after depletion.'});
