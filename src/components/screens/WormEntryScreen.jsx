@@ -25,6 +25,15 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   const wormSkin = useGameStore(s => s.wormSkin);
   const [selected, setSelected] = useState(() => nextStoryLevel(progress).id);
   const root = useRef(null);
+  const chapterTabs = useRef(null);
+  useEffect(() => {
+    const nav = chapterTabs.current, active = nav?.querySelector('[aria-pressed="true"]');
+    if (!active) return;
+    // Reveal the resumed chapter without scrolling the entire level sheet.
+    if (active.offsetLeft < nav.scrollLeft) nav.scrollLeft = active.offsetLeft;
+    else if (active.offsetLeft + active.offsetWidth > nav.scrollLeft + nav.clientWidth)
+      nav.scrollLeft = active.offsetLeft + active.offsetWidth - nav.clientWidth;
+  }, [page, selected]);
   const back = () => { wormMenuFeedback(); if (page === 'choice') onCancel(); else setPage('choice'); };
   useEffect(() => {
     const prior = document.activeElement;
@@ -101,7 +110,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
       <div className="worm-entry-scroll">
         <header className="worm-entry-heading"><h1 id="worm-entry-title">Levels</h1></header>
         <>
-          <div className="worm-chapter-tabs" role="group" aria-label="Chapters">{WORM_STORY_CHAPTERS.map(item => {
+          <div ref={chapterTabs} className="worm-chapter-tabs" role="group" aria-label="Chapters">{WORM_STORY_CHAPTERS.map(item => {
             const open = storyUnlocked(progress, item.levels[0].id);
             const stars = item.levels.reduce((n, l) => n + storyStars(progress, l.id), 0);
             return <button key={item.id} type="button" disabled={!open} aria-pressed={item.id === chapter.id}
@@ -111,7 +120,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
             </button>;
           })}</div>
           <p className="worm-chapter-blurb">{chapter.blurb}</p>
-          <div className="worm-chapter-progress"><span>Chapter {chapter.id} stars</span><strong>{chapterStars} / {chapter.levels.length * 3} ★</strong><progress value={chapterStars} max={chapter.levels.length * 3} aria-label="Chapter stars" /></div>
+          <div className="worm-chapter-progress"><span>Chapter {chapter.id} of {WORM_STORY_CHAPTERS.length}</span><strong>{chapterStars} / {chapter.levels.length * 3} ★</strong><progress value={chapterStars} max={chapter.levels.length * 3} aria-label="Chapter stars" /></div>
           <div className="worm-level-grid">{chapter.levels.map(item => {
             const unlocked = storyUnlocked(progress, item.id), stars = storyStars(progress, item.id);
             return <button key={item.id} disabled={!unlocked} title={item.title} aria-pressed={selected === item.id} aria-label={`Level ${item.id}: ${item.title}${unlocked ? `, ${stars} stars` : ', locked'}`} onClick={() => { wormMenuFeedback(); setSelected(item.id); }} className={selected === item.id ? 'selected' : ''}

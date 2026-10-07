@@ -18,6 +18,16 @@ const POOLS = {
   30: ['magnet', 'explode', 'water', 'fire', 'grass'], 36: ['water', 'fire', 'grass', 'ice'],
   37: ['explode', 'rocket'], 40: ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'],
 };
+// Generated quests specify the same canonical inventory; keep the authored table above fixed.
+for (const level of WORM_STORY_LEVELS.filter(level => level.id > 40)) {
+  const m = level.mechanics ?? {}, required = new Set();
+  if (m.magnetOrbs) required.add('magnet');
+  if (m.explodes) required.add('explode');
+  if (m.rockets) required.add('rocket');
+  const count = Math.max(m.elements ?? 0, m.uniqueElements ?? 0, m.elementPickups ?? 0);
+  for (const element of ['water', 'fire', 'grass', 'ice', 'lightning'].slice(0, count)) required.add(element);
+  if (required.size) POOLS[level.id] = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'].filter(type => required.has(type));
+}
 beforeEach(() => resetLiveRotation());
 function setup(id, character = 'classic') {
   const level = storyLevel(id), size = level.cubeSize, sim = makeWormSim(size);

@@ -1,3 +1,5 @@
+import { WORM_GENERATED_WORLDS } from './generated.js';
+
 // Each level uses one authored tile style on all six faces. Face colors keep
 // their gameplay meaning, while previews, retries and play share a stable look.
 // Alternate cube views and backgrounds still give each level its own setting.
@@ -55,6 +57,7 @@ export const STORY_WORLDS = {
   38: world('Mirror Numbers', 'noire', 'nebula', 'mobiusBand', 'orbit', { visualMode: 'sudokube', farSide: true }),
   39: world('Mega Crawl', 'standard', 'fireplace', 'apollonian', 'lanes'),
   40: world('Eternal Crown', 'gemstone', 'shanghai', 'solid', 'orbit'),
+  ...WORM_GENERATED_WORLDS,
 };
 
 // Face-local paths on the authored 5x5 footprint. Larger stages keep these

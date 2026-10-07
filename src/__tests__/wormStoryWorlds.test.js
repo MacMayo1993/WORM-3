@@ -26,14 +26,15 @@ it('uses one consistent tile style per level, with plain six-color cubes in Chap
   expect(worlds).toHaveLength(WORM_STORY_LEVELS.length);
   for (const chapter of WORM_STORY_CHAPTERS) {
     const own = chapter.levels.map(level => STORY_WORLDS[level.id]);
-    expect(new Set(own.map(w => w.background)).size).toBe(own.length);
+    // Authored chapters retain their curated, one-world-per-level catalog.
+    if (chapter.id <= 4) expect(new Set(own.map(w => w.background)).size).toBe(own.length);
     if (chapter.id === 1) {
       for (const look of own) {
         expect(look.palette).toBe('standard');
         expect(Object.values(look.styles)).toEqual(Array(6).fill('solid'));
         expect(look.view).toEqual({});
       }
-    } else expect(new Set(own.map(w => w.palette)).size).toBe(own.length);
+    } else if (chapter.id <= 4) expect(new Set(own.map(w => w.palette)).size).toBe(own.length);
   }
   // Chapter one keeps its original one-route-per-level layout.
   expect(new Set(WORM_STORY_CHAPTERS[0].levels.map(level => STORY_WORLDS[level.id].route)).size).toBe(10);
