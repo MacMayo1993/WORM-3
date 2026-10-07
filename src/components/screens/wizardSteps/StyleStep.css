@@ -1,0 +1,56 @@
+/* StyleStep.css — the tile style browser, laid out like the store: tile
+   families down a sidebar, the open family's styles beside it.
+   The sidebar sticks under the wizard's category bar and scrolls on its own
+   when it is taller than the space left (WizardShell publishes the bar's and the
+   scroll area's heights as --wizard-bar-h and --wizard-scroll-h), so another
+   family is one tap away however far down a long grid you are. Selection wears the wizard's own
+   pressed look (modeWizard.css: ink outline over the mode's tint). */
+
+.style-browser { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 18px; align-items: start; color: var(--arcade-ink); }
+
+.style-browser-rail { position: sticky; top: calc(var(--wizard-bar-h, 0px) + 10px); z-index: 1; display: flex; flex-direction: column; gap: 3px; max-height: calc(var(--wizard-scroll-h, 100dvh) - var(--wizard-bar-h, 0px) - 20px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 2px 12px 4px 2px; border-right: 1px solid var(--arcade-line-soft); }
+.style-browser-family { flex-shrink: 0; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 7px 8px 7px 10px; border: 0; border-bottom: 1px solid var(--arcade-line-soft); border-radius: 10px 10px 0 0; background: transparent; color: var(--arcade-ink); font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color 0.15s ease, box-shadow 0.15s ease; }
+.style-browser-family > span:not(.style-browser-cover) { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.style-browser-family strong { font: 700 12px/1.2 var(--heading-font); overflow-wrap: anywhere; }
+.style-browser-family small { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--arcade-muted); font-variant-numeric: tabular-nums; }
+.style-browser-family b { margin-left: auto; padding-left: 2px; font-size: 18px; font-weight: 400; opacity: 0.45; }
+@media (hover: hover) { .style-browser-family:not([aria-pressed="true"]):hover { background: #ffffff99; } }
+.style-browser-family[aria-pressed="true"] { border-radius: 10px; border-bottom-color: transparent; box-shadow: 0 2px 0 var(--arcade-ink-strong); }
+.style-browser-family[aria-pressed="true"] b { opacity: 0.9; }
+
+/* The family's cover: one of its tiles in the cube's front colour, framed like
+   the store's category squares (a dark padding rather than a border, which the
+   wizard recolours). */
+.style-browser-cover { flex-shrink: 0; box-sizing: border-box; width: 28px; height: 28px; padding: 2px; border-radius: 7px; overflow: hidden; background: var(--arcade-ink-strong); box-shadow: 0 2px 0 var(--arcade-line-soft); }
+.style-browser-cover canvas { width: 100%; height: 100%; border-radius: 4px !important; }
+.style-browser-cover--faces { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
+.style-browser-cover--faces i { border-radius: 1px; }
+
+/* Per Face is a different kind of choice from a family, so it sits apart. */
+.style-browser-perface { flex-shrink: 0; margin-top: 12px; border-top: 1px solid var(--arcade-line-soft); }
+
+.style-browser-panel { min-width: 0; }
+.style-browser-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 4px 0 12px; }
+.style-browser-heading h2 { margin: 0; font: 400 20px/1.1 var(--display-font); text-transform: uppercase; color: var(--arcade-ink); overflow-wrap: anywhere; }
+.style-browser-heading small { white-space: nowrap; font-size: 11px; color: var(--arcade-muted); font-variant-numeric: tabular-nums; }
+.style-browser-note { margin: -4px 0 12px; font-size: 11px; line-height: 1.5; color: var(--arcade-muted); }
+
+.style-browser-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.style-browser-faces { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; }
+
+@media (max-width: 600px) {
+  .style-browser { grid-template-columns: 108px minmax(0, 1fr); gap: 10px; }
+  .style-browser-rail { padding-right: 6px; }
+  .style-browser-family { gap: 6px; min-height: 48px; padding: 7px 4px 7px 6px; }
+  .style-browser-family strong { font-size: 11px; }
+  .style-browser-family small { font-size: 9px; }
+  .style-browser-family b { display: none; }
+  .style-browser-cover { width: 22px; height: 22px; border-radius: 6px; }
+  .style-browser-heading h2 { font-size: 16px; }
+  .style-browser-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .style-browser-faces { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .style-browser-family { transition: none; }
+}
