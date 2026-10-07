@@ -360,8 +360,9 @@ const MobiusTunnel = ({
   useFrame((_state, delta) => {
     const state = useGameStore.getState();
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
-    // Keep every tail-occupied track; unrelated ribbons cannot cross the ride.
-    if (groupRef.current) groupRef.current.visible = !wormMode || !tunnelState.active || occupied;
+    // Keep the whole live network visible from the interior. Core clipping and
+    // the near-camera cutout protect the ride without hiding other connections.
+    if (groupRef.current) groupRef.current.visible = true;
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
     uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
     if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;

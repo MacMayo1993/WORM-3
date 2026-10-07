@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeCorePassage, updateCorePassage, coreOpeningRadius, CORE_PASSAGE_EXTENT } from '../3d/corePassage.js';
-import { makeInteriorPortals, syncInteriorPortals } from '../worm/healerWorm/interiorPortals.js';
+import { makeInteriorPortals, syncInteriorPortals, INTERIOR_PORTAL_CAPACITY } from '../worm/healerWorm/interiorPortals.js';
 import { tunnelPathArcPointInto } from '../utils/tunnelPath.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
+import { MAX_ACTIVE_TUNNEL_PAIRS } from '../worm/healerWorm/constants.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { CORE_ZOOM_MARGIN, CORE_INTERIOR_FILL } from '../3d/antipodalCore.js';
 
@@ -60,4 +61,27 @@ describe('interior portal openings', () => {
       expect(portals.mouths.every(mesh => !mesh.visible)).toBe(true);
     } finally { portals.dispose(); }
   });
+});
+
+it('opens every live pair plus a retained current passage and closes retired mouths', () => {
+  const portals = makeInteriorPortals();
+  const routes = Array.from({ length: MAX_ACTIVE_TUNNEL_PAIRS + 1 }, (_, x) => ({
+    entry: { x, y: 14, z: 0, dirKey: 'PY' },
+    exit: { x: 14 - x, y: 0, z: 14, dirKey: 'NY' },
+    padHeight: WORM_PAD_HEIGHT,
+  }));
+  try {
+    syncInteriorPortals(portals, routes, 15, 0);
+    expect(portals.uniforms.uInteriorCount.value).toBe(INTERIOR_PORTAL_CAPACITY);
+    expect(portals.mouths.filter(m => m.visible)).toHaveLength(routes.length * 2);
+    const centers = portals.mouths.map(m => m.position.toArray().join(','));
+    expect(new Set(centers).size).toBe(routes.length * 2);
+    syncInteriorPortals(portals, routes.slice(0, 2), 15, 0);
+    expect(portals.uniforms.uInteriorCount.value).toBe(4);
+    expect(portals.mouths.filter(m => m.visible)).toHaveLength(4);
+    syncInteriorPortals(portals, [], 15, 0);
+    expect(portals.uniforms.uInteriorOpen.value).toBe(0);
+    expect(portals.uniforms.uInteriorCount.value).toBe(0);
+    expect(portals.mouths.every(m => !m.visible)).toBe(true);
+  } finally { portals.dispose(); }
 });

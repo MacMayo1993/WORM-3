@@ -3,8 +3,11 @@ import { buildTunnelPathForTunnel } from '../wormLogic.js';
 import { makeTunnelPath, tunnelPathArcPointInto, tunnelPathArcTangentInto } from '../../utils/tunnelPath.js';
 import { cubeExpansionScale } from '../../game/cubeWorldGeometry.js';
 import { SURFACE_OFFSET } from '../../utils/constants.js';
+import { MAX_ACTIVE_TUNNEL_PAIRS } from './constants.js';
 
 export const INTERIOR_PORTAL_RADIUS = 0.325;
+// Every live WORM pair plus the current route if it healed while the tail exits.
+export const INTERIOR_PORTAL_CAPACITY = (MAX_ACTIVE_TUNNEL_PAIRS + 1) * 2;
 const Z = new THREE.Vector3(0, 0, 1);
 const sample = new THREE.Vector3();
 
@@ -27,12 +30,13 @@ export function interiorPortalFrameInto(center, axis, path, side, half) {
 }
 
 export const interiorPortalGLSL = `
-uniform float uInteriorOpen;
-uniform vec3 uInteriorCenters[2], uInteriorAxes[2], uInteriorNormals[2];
+uniform float uInteriorOpen, uInteriorCount;
+uniform vec3 uInteriorCenters[${INTERIOR_PORTAL_CAPACITY}], uInteriorAxes[${INTERIOR_PORTAL_CAPACITY}], uInteriorNormals[${INTERIOR_PORTAL_CAPACITY}];
 float portalDistance(vec3 point) {
   if (uInteriorOpen < 0.5) return 1000.0;
   float gap = 1000.0;
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < ${INTERIOR_PORTAL_CAPACITY}; i++) {
+    if (float(i) >= uInteriorCount) break;
     vec3 offset = point - uInteriorCenters[i];
     float along = dot(offset, uInteriorAxes[i]);
     float radial = length(offset - along * uInteriorAxes[i]);
@@ -69,12 +73,13 @@ export function makeInteriorPortals() {
   geometry.translate(0, 0, 0.125);
   const uniforms = {
     uInteriorOpen: { value: 0 },
-    uInteriorCenters: { value: [new THREE.Vector3(), new THREE.Vector3()] },
-    uInteriorAxes: { value: [new THREE.Vector3(), new THREE.Vector3()] },
-    uInteriorNormals: { value: [new THREE.Vector3(), new THREE.Vector3()] }
+    uInteriorCount: { value: 0 },
+    uInteriorCenters: { value: Array.from({ length: INTERIOR_PORTAL_CAPACITY }, () => new THREE.Vector3()) },
+    uInteriorAxes: { value: Array.from({ length: INTERIOR_PORTAL_CAPACITY }, () => new THREE.Vector3()) },
+    uInteriorNormals: { value: Array.from({ length: INTERIOR_PORTAL_CAPACITY }, () => new THREE.Vector3()) }
   };
   const time = { value: 0 };
-  const mouths = [0, 1].map(side => {
+  const mouths = Array.from({ length: INTERIOR_PORTAL_CAPACITY }, (_, side) => {
     const material = new THREE.ShaderMaterial({
       uniforms: { uColor: { value: new THREE.Color() }, uTime: time },
       vertexShader: mouthVertex, fragmentShader: mouthFragment, side: THREE.DoubleSide
@@ -82,6 +87,7 @@ export function makeInteriorPortals() {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = `tunnel-interior-mouth-${side}`;
     mesh.frustumCulled = false;
+    mesh.visible = false;
     return mesh;
   });
   return {
@@ -90,21 +96,28 @@ export function makeInteriorPortals() {
   };
 }
 
-export function syncInteriorPortals(portals, tunnel, size, expansion) {
-  portals.uniforms.uInteriorOpen.value = tunnel ? 1 : 0;
-  for (const mouth of portals.mouths) mouth.visible = !!tunnel;
-  if (!tunnel) return;
-  const { entry: a, exit: b } = tunnel;
-  const signature = `${size}:${expansion}:${a.x},${a.y},${a.z},${a.dirKey}:${b.x},${b.y},${b.z},${b.dirKey}:${tunnel.padExpansion ?? expansion}:${tunnel.padHeight ?? 0}`;
+export function syncInteriorPortals(portals, routes, size, expansion) {
+  const tunnels = Array.isArray(routes) ? routes : routes ? [routes] : [];
+  const count = Math.min(tunnels.length * 2, INTERIOR_PORTAL_CAPACITY);
+  portals.uniforms.uInteriorOpen.value = count ? 1 : 0;
+  portals.uniforms.uInteriorCount.value = count;
+  for (let i = 0; i < portals.mouths.length; i++) portals.mouths[i].visible = i < count;
+  const signature = `${size}:${expansion}:` + tunnels.map(tunnel => {
+    const { entry: a, exit: b } = tunnel;
+    return `${a.x},${a.y},${a.z},${a.dirKey}:${b.x},${b.y},${b.z},${b.dirKey}:${tunnel.padExpansion ?? expansion}:${tunnel.padHeight ?? 0}`;
+  }).join('|');
   if (signature === portals.signature) return;
   portals.signature = signature;
-  const path = buildTunnelPathForTunnel(portals.path, tunnel, size, expansion);
   const half = (size - 1) / 2 * cubeExpansionScale(size, expansion) + SURFACE_OFFSET;
-  for (let side = 0; side < 2; side++) {
-    const center = portals.uniforms.uInteriorCenters.value[side], axis = portals.uniforms.uInteriorAxes.value[side];
-    interiorPortalFrameInto(center, axis, path, side, half);
-    portals.uniforms.uInteriorNormals.value[side].copy(side === 0 ? path.nStart : path.nEnd);
-    portals.mouths[side].position.copy(center);
-    portals.mouths[side].quaternion.setFromUnitVectors(Z, axis);
+  for (let i = 0; i < count / 2; i++) {
+    const path = buildTunnelPathForTunnel(portals.path, tunnels[i], size, expansion);
+    for (let side = 0; side < 2; side++) {
+      const index = i * 2 + side;
+      const center = portals.uniforms.uInteriorCenters.value[index], axis = portals.uniforms.uInteriorAxes.value[index];
+      interiorPortalFrameInto(center, axis, path, side, half);
+      portals.uniforms.uInteriorNormals.value[index].copy(side === 0 ? path.nStart : path.nEnd);
+      portals.mouths[index].position.copy(center);
+      portals.mouths[index].quaternion.setFromUnitVectors(Z, axis);
+    }
   }
 }
