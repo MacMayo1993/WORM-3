@@ -59,8 +59,8 @@
 }
 .mode-wizard button:focus-visible,.mode-wizard input:focus-visible,.mode-wizard summary:focus-visible,
 .cube-path-screen button:focus-visible { outline:3px solid var(--mode-accent); outline-offset:3px; }
-.mode-wizard :is(.mode-wizard-count,.worm-chapter-progress,.worm-level-number,.worm-path-kicker) { color:var(--mode-ink); }
-.mode-wizard [aria-pressed="true"]:not([role="tab"]),.mode-wizard .worm-level-grid .selected {
+.mode-wizard :is(.mode-wizard-count,.worm-path-kicker) { color:var(--mode-ink); }
+.mode-wizard [aria-pressed="true"]:not([role="tab"]) {
   outline:2px solid var(--mode-accent); outline-offset:-2px;
 }
 .mode-wizard .worm-profile { --wardrobe-line:var(--mode-accent); }
@@ -93,7 +93,7 @@
 .mode-paper-selector *, .mode-paper-selector *::before, .mode-paper-selector *::after {
   border-color: var(--arcade-line-soft) !important;
 }
-.mode-wizard [aria-pressed="true"]:not([role="tab"]),.mode-wizard .worm-level-grid .selected {
+.mode-wizard [aria-pressed="true"]:not([role="tab"]) {
   outline: 3px solid var(--arcade-ink-strong); outline-offset: -3px;
   background-color: color-mix(in srgb, var(--mode-accent) 16%, var(--arcade-card));
 }

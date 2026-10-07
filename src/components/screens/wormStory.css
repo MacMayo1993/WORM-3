@@ -21,34 +21,8 @@
 .worm-path-cta { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:auto; border-top:1px solid var(--wiz-border); padding-top:17px; font-size:13px; font-weight:800; }
 .worm-path-cta b { font-size:23px; color:var(--mode-accent); }
 .worm-entry-foot { text-align:center; font-size:11px; color:var(--wiz-text-muted); padding:27px 0 0; }
-.worm-chapter-tabs { display:flex; overflow-x:auto; position:relative; gap:8px; margin:0 0 12px; padding:2px 2px 8px; scrollbar-width:thin; }
-.worm-chapter-tabs button { flex:0 0 175px; display:flex; flex-direction:column; gap:3px; align-items:flex-start; text-align:left; min-height:64px; padding:10px 12px; border:1px solid var(--wiz-border); border-radius:12px; background:var(--wiz-surface); color:var(--wiz-text); font:inherit; cursor:pointer; }
-.worm-chapter-tabs button small { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--wiz-text-muted); }
-.worm-chapter-tabs button strong { font-size:13px; line-height:1.2; }
-.worm-chapter-tabs button span { font-size:11px; color:var(--mode-accent); }
-.worm-chapter-tabs button.selected { border-color:var(--mode-accent); box-shadow:inset 0 0 0 1px var(--mode-accent); }
-.worm-chapter-tabs button:disabled { opacity:.5; cursor:default; }
-.worm-chapter-blurb { font-size:12px; line-height:1.5; color:var(--wiz-text-muted); margin:0 0 12px; }
-.worm-level-board { margin:-4px 0 12px; font-weight:700; color:var(--wiz-text)!important; }
-@media(max-width:600px) { .worm-chapter-tabs button { flex-basis:150px; } }
-.worm-chapter-progress { display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; font-size:11px; color:var(--mode-accent); }
-.worm-chapter-progress progress { width:100%; height:6px; accent-color:var(--mode-accent); }
-.worm-level-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:22px 0; }
-.worm-level-grid button { border:1px solid var(--wiz-border); border-radius:12px; background:var(--wiz-surface); color:var(--wiz-text); padding:15px 12px; text-align:left; display:flex; flex-direction:column; gap:8px; }
-.worm-level-grid button.selected { border-color:var(--mode-accent); background:#009b4815; }
-.worm-level-grid button:disabled { opacity:.5; cursor:default; }
-.worm-level-number { color:var(--mode-accent); font-family:var(--story-display,'Bungee',sans-serif); font-size:22px; }
-.worm-level-grid small { font-size:10px; color:var(--wiz-text-muted); }
-.worm-level-detail { border:1px solid var(--wiz-border); background:var(--wiz-surface); border-radius:16px; padding:22px; }
-.worm-level-profile { margin-top:18px; }
-.worm-entry-nav button,.worm-level-grid button,.worm-story-primary { transition:transform .1s,box-shadow .1s; }
-.worm-entry-nav button:active,.worm-level-grid button:enabled:active,.worm-story-primary:active { transform:translateY(2px); box-shadow:inset 0 2px 5px #0004; }
-.worm-level-detail>h2 { font-family:var(--story-display,'Bungee',sans-serif); margin:12px 0; font-size:24px; }
-.worm-level-detail p,.worm-level-detail>small { color:var(--wiz-text-muted); font-size:12px; line-height:1.6; }
-.worm-level-detail>strong { font-size:14px; line-height:1.6; display:block; }
-.worm-level-detail ul { list-style:none; padding:0; font-size:12px; color:var(--wiz-text-muted); line-height:1.9; }
-.worm-level-reward { border-top:1px solid var(--wiz-border); padding-top:16px; display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; font-size:12px; }
-.worm-level-reward span { font-size:10px; color:var(--mode-accent); letter-spacing:.1em; }
+.worm-entry-nav button,.worm-story-primary { transition:transform .1s,box-shadow .1s; }
+.worm-entry-nav button:active,.worm-story-primary:active { transform:translateY(2px); box-shadow:inset 0 2px 5px #0004; }
 .worm-story-primary { border:0; border-bottom:4px solid #354d3c; border-radius:12px; width:100%; min-height:50px; padding:12px 16px; background:#009B48; color:#122025; font-weight:800!important; display:flex; justify-content:space-between; margin:18px 0 8px; }
 .worm-story-card { pointer-events:auto; border:1px solid #ffffff30; border-radius:12px; padding:10px 14px; color:#f5f4e9; background:#162428f5; font-family:var(--ui-font,system-ui); }
 .worm-story-card strong { display:block; font-size:13px; }
@@ -73,7 +47,7 @@
  .worm-path-split { gap:9px; }.worm-path-card { padding:15px 11px; border-radius:13px; }
  .worm-path-art { height:135px; }.worm-path-kicker { font-size:8px; letter-spacing:.07em; }
  .worm-path-card h2 { font-size:22px; }.worm-path-card p { font-size:13px; }.worm-path-tags { font-size:10px; margin-bottom:18px; }
- .worm-path-cta { font-size:11px; }.worm-level-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.worm-level-detail { padding:16px; }
+ .worm-path-cta { font-size:11px; }
 }
 @media(prefers-reduced-motion:reduce) { .worm-path-card { transition:none; }.worm-path-card:hover { transform:none; } }
 
@@ -131,15 +105,7 @@
 .worm-entry-choice .worm-path-cta { font-family:var(--ui-font,system-ui); font-size:clamp(16px,3vw,21px); font-weight:750; }
 .worm-entry-choice .worm-entry-scroll { gap:16px; }
 .worm-entry-heading { padding:10px 0 18px; text-align:left; }
-.worm-entry-heading h1,.worm-level-detail>h2 { font-family:var(--heading-font,system-ui); font-weight:750; letter-spacing:-.04em; }
-.worm-level-grid { grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin:18px 0; }
-.worm-level-grid button { align-items:center; justify-content:center; padding:10px 3px; gap:5px; min-height:68px; box-shadow:0 3px 0 #091417; }
-.worm-level-grid button.selected { background:var(--mode-accent); color:#122025; border-color:var(--mode-accent); }
-.worm-level-grid button.selected .worm-level-number,.worm-level-grid button.selected small { color:inherit; }
-.worm-level-number { font:750 22px/1.1 var(--ui-font,system-ui); }
-.worm-level-goals { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-.worm-level-goals li { display:flex; align-items:center; gap:10px; font-size:12px; line-height:1.3; }
-.worm-level-goals b { font-size:22px; font-weight:700; color:var(--mode-accent); min-width:24px; }
+.worm-entry-heading h1 { font-family:var(--heading-font,system-ui); font-weight:750; letter-spacing:-.04em; }
 .worm-story-result-sheet { text-align:center; }
 .worm-story-result h2 { font:750 clamp(28px,7vw,40px)/1.1 var(--heading-font,system-ui); letter-spacing:-.04em; }
 .worm-story-result-stars { display:flex; justify-content:center; gap:8px; letter-spacing:0; }
@@ -154,11 +120,6 @@
 .worm-entry-choice .worm-path-free .worm-path-illustration { color:#354d3c; }
 @media(max-width:380px) { .worm-entry-choice .worm-path-illustration { height:clamp(116px,20dvh,154px); } }
 @media(max-height:520px) { .worm-entry-choice .worm-path-illustration { height:88px; margin-bottom:6px; } }
-.worm-world-preview { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; margin:14px 0; }
-.worm-world-preview.is-compact { display:block; width:36px; height:36px; margin:0; }
-.worm-world-tile { display:block; aspect-ratio:1; overflow:hidden; border-radius:7px; border:1px solid #ffffff40; box-shadow:0 2px 0 #0004; }
-.worm-level-grid button { background:linear-gradient(145deg,color-mix(in srgb,var(--world-color) 28%,transparent),transparent),var(--wiz-surface); }
-.worm-level-grid button.selected { background:linear-gradient(145deg,color-mix(in srgb,var(--world-color) 40%,transparent),transparent),var(--wiz-surface); color:var(--wiz-text); box-shadow:0 0 0 2px var(--mode-accent),0 3px 0 #091417; }
 
 /* Arcade look (see components/ui/arcadeTheme.css): the story result sits on the
    carousel's translucent graph paper, and every story key is a carousel key. */
@@ -185,7 +146,4 @@
 .worm-story-check { color:var(--arcade-muted); }
 .worm-story-checklist .is-complete { color:#1f6b3a; }
 .worm-story-loading { background:var(--arcade-paper); color:var(--arcade-ink); }
-.worm-level-grid button { box-shadow:0 4px 0 var(--arcade-line); }
-.worm-level-grid button.selected { box-shadow:0 0 0 3px var(--arcade-ink-strong),0 4px 0 var(--arcade-line); }
-.worm-world-tile { border-color:#26372d33; }
 .worm-story-briefing { border:2px solid var(--hud-border); border-radius:20px; box-shadow:0 5px 0 var(--hud-border); }

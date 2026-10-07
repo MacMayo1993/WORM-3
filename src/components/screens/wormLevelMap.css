@@ -1,0 +1,308 @@
+/* wormLevelMap.css — WORM's Levels page as a game's world map.
+ *
+ * A chapter is a "world": a ribbon in one of the cube's face colours (--world,
+ * from chapterWorldColor), a strip of chapter medallions, and a board where the
+ * ten stages sit on a winding trail (StoryChapterMap). The chosen stage's
+ * briefing sits beside the map on wide screens and below it on phones, with the
+ * Play key always in reach. Same arcade parts as the rest of the game: ivory
+ * paper and cards on a hard ledge, black-plastic bezels round glossy stickers.
+ *
+ * Note `.mode-wizard *` forces every border colour, so rims here are drawn
+ * with box-shadow instead of border.
+ */
+
+/* ── Frame ─────────────────────────────────────────────────────────────── */
+.worm-entry.worm-levels .worm-entry-sheet { width: min(1180px, 100%); height: 100%; max-height: 100%; border-radius: 26px; }
+.worm-entry.worm-levels .worm-entry-nav { gap: 12px; }
+.worm-levels-title {
+  margin: 0; padding-left: 14px; border-left: 2px solid;
+  color: var(--arcade-ink); font: 400 clamp(18px, 2.6vw, 24px)/1 var(--display-font); letter-spacing: .02em; text-transform: uppercase;
+}
+.worm-entry.worm-levels .worm-entry-nav > .worm-levels-total {
+  display: inline-flex; align-items: baseline; gap: 5px; margin-left: auto; padding: 7px 14px 7px 11px; border-radius: 999px;
+  background: var(--arcade-card); box-shadow: inset 0 0 0 2px var(--arcade-line), 0 3px 0 var(--arcade-line);
+  color: var(--arcade-ink); font: 800 16px/1 var(--heading-font); font-variant-numeric: tabular-nums;
+}
+.worm-levels-total b { color: #f2b705; font-size: 17px; text-shadow: 0 1px 0 var(--arcade-ink-strong); }
+.worm-levels-total small { color: var(--arcade-muted); font-size: 12px; }
+
+.worm-levels-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 20px 0; }
+.worm-levels-world { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── World banner ──────────────────────────────────────────────────────── */
+.worm-world-banner { display: flex; align-items: center; justify-content: center; gap: 28px; }
+.worm-world-arrow {
+  flex: none; display: grid; place-items: center; width: 46px; height: 46px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--arcade-card); color: var(--arcade-ink-strong);
+  box-shadow: inset 0 0 0 2px var(--arcade-line), 0 4px 0 var(--arcade-line), inset 0 2px 0 #fff;
+  transition: translate .08s ease, box-shadow .08s ease;
+}
+.worm-world-arrow svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.worm-world-arrow:enabled:active { translate: 0 3px; box-shadow: inset 0 0 0 2px var(--arcade-line), 0 1px 0 var(--arcade-line); }
+.worm-world-arrow:disabled { opacity: .35; cursor: default; }
+.worm-world-ribbon {
+  position: relative; flex: 0 1 460px; min-width: 0; padding: 9px 26px 11px; text-align: center;
+  background: var(--world); color: var(--world-ink); border-radius: 10px;
+  box-shadow: inset 0 0 0 3px #19191c, inset 0 5px 0 #ffffff40, 0 5px 0 #050506;
+  animation: worm-ribbon-in .45s cubic-bezier(.2, .9, .3, 1.3) both;
+}
+/* Swallowtails, folded behind the band. */
+.worm-world-ribbon::before, .worm-world-ribbon::after {
+  content: ''; position: absolute; z-index: -1; top: 12px; width: 30px; height: 100%;
+  background: color-mix(in srgb, var(--world) 72%, #000); clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 34% 50%);
+  box-shadow: inset 0 0 0 3px #19191c;
+}
+.worm-world-ribbon::before { left: -20px; }
+.worm-world-ribbon::after { right: -20px; transform: scaleX(-1); }
+.worm-world-ribbon small { display: block; font: 800 10px/1.2 var(--heading-font); letter-spacing: .16em; text-transform: uppercase; opacity: .85; }
+.worm-world-ribbon strong {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 400 clamp(19px, 3.2vw, 28px)/1.15 var(--display-font); letter-spacing: .03em; text-transform: uppercase;
+  -webkit-text-stroke: 4px #111; paint-order: stroke fill; color: #fff; text-shadow: 0 3px 0 #111;
+}
+
+/* ── Chapter medallions ────────────────────────────────────────────────── */
+.worm-levels .worm-chapter-tabs {
+  display: flex; justify-content: safe center; gap: 10px; overflow-x: auto; margin: 0; padding: 14px 12px 16px; scrollbar-width: none;
+}
+.worm-levels .worm-chapter-tabs::-webkit-scrollbar { display: none; }
+.worm-levels .worm-chapter-tabs button {
+  position: relative; flex: none; display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 12px;
+  background: var(--medal); color: var(--medal-ink); outline: none;
+  box-shadow: 0 0 0 3px #19191c, 0 5px 0 2px #050506, inset 0 3px 0 #ffffff55, inset 0 -3px 4px #0003;
+  transition: translate .12s ease, scale .16s cubic-bezier(.2, .8, .3, 1.4);
+}
+.worm-levels .worm-chapter-tabs button strong {
+  font: 400 17px/1 var(--display-font); color: #fff; -webkit-text-stroke: 3.5px #111; paint-order: stroke fill;
+}
+.worm-levels .worm-chapter-tabs button strong svg { display: block; width: 18px; height: 18px; fill: #8a8977; stroke: #8a8977; }
+.worm-levels .worm-chapter-tabs button i {
+  position: absolute; z-index: 1; top: -8px; right: -6px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+  background: #f2b705; color: #19191c; font: 900 11px/1 var(--heading-font); font-style: normal; box-shadow: 0 0 0 2px #19191c;
+}
+.worm-levels .worm-chapter-tabs button[aria-pressed="true"] {
+  z-index: 2; outline: none; background-color: var(--medal); scale: 1.14; translate: 0 -2px;
+  box-shadow: 0 0 0 3px #19191c, 0 0 0 6px #fffcf1, 0 0 0 8px var(--arcade-ink-strong), 0 7px 0 6px #050506, inset 0 3px 0 #ffffff55;
+}
+.worm-levels .worm-chapter-tabs button:disabled { background: #e2dfcf; box-shadow: 0 0 0 3px #b9b7a5, 0 4px 0 2px #b9b7a5; cursor: default; opacity: 1; }
+@media (hover: hover) { .worm-levels .worm-chapter-tabs button:enabled:not([aria-pressed="true"]):hover { translate: 0 -2px; } }
+
+/* ── Map board ─────────────────────────────────────────────────────────── */
+.worm-map-board {
+  position: relative; isolation: isolate; overflow: hidden; border-radius: 24px; padding: 14px 18px 14px;
+  background-color: color-mix(in srgb, var(--world) 8%, #fffcf1);
+  background-image: radial-gradient(ellipse at 50% 42%, #fffdf5e6, transparent 70%), var(--arcade-grid);
+  background-size: 100% 100%, var(--arcade-grid-size);
+  box-shadow: inset 0 0 0 3px var(--arcade-ink-strong), 0 6px 0 var(--arcade-ink-strong), 0 18px 34px #354d3c26;
+  animation: worm-board-in .35s ease-out both;
+}
+/* Mini cubes drift in the margins of the world. */
+.worm-map-board::before, .worm-map-board::after {
+  content: ''; position: absolute; z-index: -1; width: 14px; height: 14px; border-radius: 4px;
+  background: color-mix(in srgb, var(--world) 45%, transparent); rotate: 18deg; animation: worm-drift 7s ease-in-out infinite alternate;
+}
+.worm-map-board::before {
+  top: 52%; left: 3%;
+  box-shadow: 46cqw 2px 0 -3px color-mix(in srgb, var(--world) 30%, transparent), 88cqw 18px 0 1px color-mix(in srgb, var(--world) 25%, transparent);
+}
+.worm-map-board::after { bottom: 14%; left: 40%; width: 10px; height: 10px; animation-duration: 9s; animation-direction: alternate-reverse;
+  box-shadow: 30cqw -40px 0 3px color-mix(in srgb, var(--world) 28%, transparent), -22cqw -110px 0 -1px color-mix(in srgb, var(--world) 35%, transparent);
+}
+.worm-map-board { container-type: inline-size; }
+
+.worm-map { --node: clamp(46px, 11.5cqw, 76px); position: relative; aspect-ratio: 100 / 68; margin: 0 auto; }
+.worm-map-trail { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.worm-map-trail path { fill: none; stroke-linecap: round; }
+.worm-map-road { stroke: #fffcf1; stroke-width: calc(var(--node) * .3); filter: drop-shadow(0 3px 0 color-mix(in srgb, var(--world) 30%, #c6c5ac)); }
+.worm-map-dashes { stroke: #bdbba6; stroke-width: 3.5; stroke-dasharray: 1 10; }
+/* Cleared stretches of trail are a worm's beads, in the world's colour. */
+.worm-map-beads { stroke: var(--world); stroke-width: calc(var(--node) * .17); stroke-dasharray: .1 calc(var(--node) * .24);
+  filter: drop-shadow(0 0 0 #19191c) drop-shadow(0 2px 0 #19191c); }
+
+/* ── Stage nodes ───────────────────────────────────────────────────────── */
+.worm-levels .worm-map-node {
+  position: absolute; width: var(--node); height: var(--node); padding: 0; border: 0; background: none; outline: none;
+  translate: -50% -50%; color: var(--arcade-ink); cursor: pointer;
+  animation: worm-node-pop .5s cubic-bezier(.2, .9, .3, 1.45) backwards; animation-delay: calc(var(--i) * 45ms + 120ms);
+  transition: scale .18s cubic-bezier(.2, .8, .3, 1.5);
+}
+.worm-levels .worm-map-node[aria-pressed="true"] { outline: none; background: none; scale: 1.14; z-index: 2; }
+.worm-levels .worm-map-node.is-finale { width: calc(var(--node) * 1.24); height: calc(var(--node) * 1.24); }
+@media (hover: hover) { .worm-levels .worm-map-node:enabled:not([aria-pressed="true"]):hover { scale: 1.07; } }
+.worm-levels .worm-map-node:enabled:active { scale: .95; }
+.worm-levels .worm-map-node:disabled { cursor: default; opacity: 1; }
+.worm-levels .worm-map-node:focus-visible { outline: none; }
+.worm-levels .worm-map-node:focus-visible .worm-map-sticker { outline: 3px solid var(--arcade-focus); outline-offset: 6px; }
+
+.worm-map-sticker {
+  position: relative; display: block; box-sizing: border-box; width: 100%; height: 100%; padding: 4px; border-radius: 28%;
+  background: linear-gradient(180deg, #2c2c31, #141416 45%);
+  box-shadow: 0 5px 0 #050506, 0 10px 18px #0003, inset 0 1px 0 #ffffff24;
+}
+.worm-map-sticker .worm-world-preview.is-compact { width: 100%; height: 100%; }
+.worm-map-sticker .worm-world-tile { width: 100%; height: 100%; border: 0; border-radius: 22%; box-shadow: inset 0 2px 1px #fff9, inset 0 -3px 4px #0004; }
+/* The sticker's gloss, over the tile art. */
+.worm-map-sticker::after {
+  content: ''; position: absolute; inset: 4px; border-radius: 22%; pointer-events: none;
+  background: radial-gradient(120% 95% at 22% 12%, #ffffff8c 0 12%, #fff0 44%), linear-gradient(172deg, #ffffff33, #fff0 40%, #0000 62%, #0000002e);
+}
+.worm-map-node[aria-pressed="true"] .worm-map-sticker {
+  box-shadow: 0 0 0 4px #fffcf1, 0 0 0 7px var(--arcade-ink-strong), 0 9px 0 4px #050506, 0 16px 26px #0004;
+}
+.worm-map-node.is-finale .worm-map-sticker { background: linear-gradient(180deg, #f8d34a, #c48a00 55%); box-shadow: 0 5px 0 #6a4b00, 0 10px 18px #0003, inset 0 0 0 2px #19191c; }
+.worm-map-node.is-finale[aria-pressed="true"] .worm-map-sticker { box-shadow: 0 0 0 4px #fffcf1, 0 0 0 7px var(--arcade-ink-strong), 0 9px 0 4px #6a4b00, 0 16px 26px #0004, inset 0 0 0 2px #19191c; }
+.worm-map-node.is-locked .worm-world-preview { filter: grayscale(.9) brightness(.82) contrast(.8); opacity: .75; }
+.worm-map-lock { position: absolute; inset: 0; z-index: 1; width: 46%; height: 46%; margin: auto; fill: #fffcf1; stroke: #fffcf1; filter: drop-shadow(0 2px 0 #19191c) drop-shadow(0 0 1px #19191c); }
+
+/* "2-4" plate under each stage. */
+.worm-levels .worm-map-code {
+  position: absolute; left: 50%; bottom: calc(var(--node) * -.2); translate: -50% 0; z-index: 1; padding: 3px 8px 2px; border-radius: 999px;
+  background: #fffcf1; color: var(--arcade-ink); white-space: nowrap; box-shadow: 0 0 0 2px var(--arcade-ink-strong), 0 2px 0 2px var(--arcade-ink-strong);
+  font: 400 clamp(10px, 2.2cqw, 13px)/1.1 var(--display-font); letter-spacing: .04em;
+}
+.worm-map-node[aria-pressed="true"] .worm-map-code { background: var(--arcade-ink-strong); color: #fffcf1; }
+.worm-map-node.is-locked .worm-map-code { color: var(--arcade-muted); box-shadow: 0 0 0 2px #b9b7a5; }
+
+/* Three stars in an arc over a stage. */
+.worm-map-stars { position: absolute; left: 50%; bottom: calc(100% + 3px); translate: -50% 0; display: flex; align-items: flex-end; gap: 1px; }
+.worm-map-stars svg { width: clamp(13px, 3cqw, 19px); height: clamp(13px, 3cqw, 19px); fill: #e4e1d0; stroke: #a9a792; stroke-width: 1.6; stroke-linejoin: round; }
+.worm-map-stars svg:nth-child(2) { translate: 0 -5px; }
+.worm-map-stars svg[data-on] { fill: #f2b705; stroke: #19191c; filter: drop-shadow(0 1.5px 0 #19191c); }
+
+/* The next stage to play calls out. */
+.worm-map-node.is-next::before {
+  content: ''; position: absolute; inset: -7px; border-radius: 32%; box-shadow: 0 0 0 4px var(--world);
+  animation: worm-node-ping 1.5s ease-out infinite; pointer-events: none;
+}
+.worm-map-new {
+  position: absolute; top: -9px; right: calc(var(--node) * -.32); z-index: 2; padding: 3px 7px 2px; border-radius: 7px; rotate: 12deg;
+  background: #C41E3A; color: #fff; box-shadow: 0 0 0 2px #19191c, 0 3px 0 2px #19191c;
+  font: 400 11px/1.1 var(--display-font); letter-spacing: .04em; text-transform: uppercase; animation: worm-new-wiggle 2.4s ease-in-out infinite;
+}
+.worm-map-crown { position: absolute; left: 50%; bottom: calc(100% + 22px); translate: -50% 0; width: 36px; fill: #f2b705; stroke: #19191c; stroke-width: 2; stroke-linejoin: round; filter: drop-shadow(0 2px 0 #19191c); }
+.worm-map-crown circle { fill: #C41E3A; }
+
+/* Your worm stands on the chosen stage. */
+.worm-map-pin { position: absolute; left: 50%; bottom: calc(100% + 30px); translate: -50% 0; z-index: 3; width: clamp(36px, 8cqw, 50px); pointer-events: none;
+  animation: worm-pin-bob 1.1s ease-in-out infinite alternate; }
+.worm-map-pin svg { display: block; width: 100%; overflow: visible; filter: drop-shadow(0 0 0 #19191c) drop-shadow(1.5px 0 0 #19191c) drop-shadow(-1.5px 0 0 #19191c) drop-shadow(0 2.5px 0 #19191c); }
+.worm-map-pin i { position: absolute; left: 50%; top: 100%; width: 0; height: 0; translate: -50% 1px;
+  border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 9px solid #19191c; border-left-color: transparent !important; border-right-color: transparent !important; border-top-color: #19191c !important; }
+
+/* Chapter footer on the board. */
+.worm-levels .worm-chapter-progress { display: flex; align-items: center; gap: 14px; margin-top: calc(var(--node, 60px) * .2 + 8px); color: var(--arcade-ink); }
+.worm-levels .worm-chapter-blurb { flex: 1; margin: 0; color: var(--arcade-muted); font: 600 13px/1.45 var(--ui-font); }
+.worm-chapter-meter { flex: none; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 6px; min-width: 130px; }
+.worm-chapter-meter b { color: #f2b705; font-size: 18px; text-shadow: 0 1.5px 0 #19191c; }
+.worm-chapter-meter strong { font: 800 15px/1 var(--heading-font); font-variant-numeric: tabular-nums; }
+.worm-chapter-meter progress {
+  grid-column: 1 / -1; width: 100%; height: 10px; border: 0; border-radius: 999px; overflow: hidden; -webkit-appearance: none; appearance: none;
+  background: #e4e1d0; box-shadow: inset 0 0 0 2px var(--arcade-ink-strong);
+}
+.worm-chapter-meter progress::-webkit-progress-bar { background: #e4e1d0; border-radius: 999px; box-shadow: inset 0 0 0 2px var(--arcade-ink-strong); }
+.worm-chapter-meter progress::-webkit-progress-value { background: #f2b705; border-radius: 999px; box-shadow: inset 0 0 0 2px var(--arcade-ink-strong); }
+.worm-chapter-meter progress::-moz-progress-bar { background: #f2b705; border-radius: 999px; }
+
+/* ── Stage briefing ────────────────────────────────────────────────────── */
+.worm-levels .worm-level-detail {
+  margin: 18px 0 0; padding: 20px 20px 18px; border-radius: 22px; color: var(--arcade-ink); background: var(--arcade-card);
+  box-shadow: inset 0 0 0 2px var(--arcade-line), inset 0 8px 0 var(--world), var(--arcade-card-shadow);
+  animation: worm-stage-in .3s ease-out both;
+}
+.worm-stage-ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.worm-levels .worm-stage-ribbon .worm-path-kicker {
+  padding: 5px 11px 4px; border-radius: 999px; background: var(--world); color: var(--world-ink);
+  box-shadow: 0 0 0 2px #19191c; font: 800 11px/1.2 var(--heading-font); letter-spacing: .1em; text-transform: uppercase;
+}
+.worm-stage-ribbon em { padding: 5px 10px 4px; border-radius: 999px; background: #f2b705; color: #19191c; box-shadow: 0 0 0 2px #19191c;
+  font: 400 11px/1.2 var(--display-font); font-style: normal; letter-spacing: .06em; text-transform: uppercase; }
+.worm-levels .worm-level-detail > h2 { margin: 12px 0 2px; color: var(--arcade-ink); font: 400 clamp(24px, 3vw, 32px)/1.08 var(--display-font); letter-spacing: .01em; text-transform: uppercase; }
+.worm-stage-subtitle { margin: 0 0 12px; color: var(--arcade-muted); font: 600 14px/1.4 var(--ui-font); }
+
+.worm-stage-stars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.worm-stage-stars > span { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px 9px; border-radius: 14px; text-align: center;
+  background: #f4f0e1; box-shadow: inset 0 0 0 2px var(--arcade-line-soft); }
+.worm-stage-stars b { font-size: 26px; line-height: 1; color: #dcd9c6; text-shadow: 0 2px 0 #c6c5ac; }
+.worm-stage-stars [data-earned] { background: #fff6d6; box-shadow: inset 0 0 0 2px #e9cf72; }
+.worm-stage-stars [data-earned] b { color: #f2b705; text-shadow: 0 2px 0 #19191c; animation: worm-star-pop .4s cubic-bezier(.2, .9, .3, 1.6) both; }
+.worm-stage-stars [data-earned]:nth-child(2) b { animation-delay: .08s; }
+.worm-stage-stars [data-earned]:nth-child(3) b { animation-delay: .16s; }
+.worm-stage-stars small { color: var(--arcade-muted); font: 700 11px/1.25 var(--heading-font); }
+
+.worm-stage-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.worm-stage-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px 6px 8px; border-radius: 999px; background: #fffcf1;
+  box-shadow: inset 0 0 0 2px var(--arcade-line); color: var(--arcade-ink); font: 800 12px/1.2 var(--heading-font); }
+.worm-stage-chip svg { width: 16px; height: 16px; fill: none; stroke: var(--arcade-ink-strong); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.worm-levels .worm-level-board { margin: 0; color: inherit !important; font-weight: inherit; }
+.worm-levels .worm-story-limit { margin: 0; }
+
+.worm-levels .worm-level-detail .worm-world-preview { display: flex; gap: 6px; margin: 14px 0 4px; }
+.worm-levels .worm-level-detail .worm-world-tile { width: 40px; height: 40px; border: 0; border-radius: 10px; background-clip: padding-box; box-shadow: 0 0 0 2px #19191c, 0 3px 0 2px #19191c; }
+
+.worm-stage-heading { display: flex; align-items: center; gap: 10px; margin: 16px 0 6px; color: var(--arcade-ink); font: 400 13px/1 var(--display-font); letter-spacing: .08em; text-transform: uppercase; }
+.worm-stage-heading::after { content: ''; flex: 1; height: 2px; background: var(--arcade-line-soft); }
+.worm-stage-goal { margin: 0 0 10px; color: var(--arcade-muted); font: 500 13px/1.5 var(--ui-font); }
+.worm-levels .worm-level-goals { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.worm-levels .worm-level-goals li { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 14px; background: #f7f3e4;
+  box-shadow: inset 0 0 0 2px var(--arcade-line-soft); color: var(--arcade-ink); font: 700 12.5px/1.25 var(--heading-font); }
+.worm-levels .worm-level-goals b { flex: none; display: grid; place-items: center; min-width: 34px; height: 34px; padding: 0 4px; box-sizing: border-box; border-radius: 10px;
+  background: var(--world); color: #fff; -webkit-text-stroke: 3px #111; paint-order: stroke fill; box-shadow: 0 0 0 2px #19191c, 0 3px 0 2px #19191c, inset 0 2px 0 #ffffff55;
+  font: 400 15px/1 var(--display-font); }
+
+.worm-levels .worm-level-reward { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 10px 14px 10px 10px; border: 0; border-radius: 16px;
+  background: #fff6d6; box-shadow: inset 0 0 0 2px #e9cf72; }
+.worm-stage-chest svg { display: block; width: 38px; height: 34px; fill: #f2b705; stroke: #19191c; stroke-width: 2; stroke-linejoin: round; filter: drop-shadow(0 2px 0 #19191c); }
+.worm-stage-chest path:last-child { fill: #fffcf1; }
+.worm-levels .worm-level-reward small { display: block; color: #8a6a00; font: 800 10px/1.2 var(--heading-font); letter-spacing: .12em; text-transform: uppercase; }
+.worm-levels .worm-level-reward strong { display: block; color: var(--arcade-ink); font: 800 14px/1.3 var(--heading-font); }
+.worm-levels .worm-level-profile { margin-top: 16px; }
+
+/* ── Play ──────────────────────────────────────────────────────────────── */
+.worm-stage-play { position: sticky; bottom: 0; z-index: 4; padding: 14px 0 max(14px, env(safe-area-inset-bottom));
+  background: linear-gradient(#f8f4e800, #f8f4e8f2 34%); }
+.worm-levels .worm-stage-play .worm-story-primary { margin: 0; }
+.worm-stage-play .piece-face { justify-content: center !important; gap: 14px; }
+.worm-stage-play-code { padding: 4px 9px 3px; border-radius: 999px; background: #0003; color: #fff; font: 400 13px/1 var(--display-font); letter-spacing: .05em; }
+.worm-stage-play b.piece-trailer { margin-left: auto; }
+.worm-stage-play .piece-trailer:first-child { margin-left: 4px; }
+
+/* ── Wide screens: map and briefing side by side, Play under the briefing ── */
+@media (min-width: 900px) and (min-height: 600px) {
+  .worm-levels-body {
+    display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(330px, 1fr); grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "world card" "world play"; gap: 0 22px; overflow: hidden; padding: 16px 22px 0;
+  }
+  .worm-levels-world { grid-area: world; min-height: 0; overflow-y: auto; padding: 2px 6px 22px; margin: 0 -6px; scrollbar-width: thin; }
+  .worm-levels .worm-level-detail { grid-area: card; min-height: 0; overflow-y: auto; margin: 0; scrollbar-width: thin; }
+  .worm-stage-play { grid-area: play; position: static; background: none; padding: 12px 0 20px; }
+}
+@media (max-width: 600px) {
+  .worm-levels-body { padding: 10px 10px 0; }
+  .worm-levels-title { display: none; }
+  .worm-world-banner { gap: 8px; }
+  .worm-world-arrow { width: 40px; height: 40px; }
+  .worm-world-ribbon { padding: 7px 14px 9px; }
+  .worm-world-ribbon::before, .worm-world-ribbon::after { display: none; }
+  .worm-levels .worm-chapter-tabs { justify-content: flex-start; }
+  .worm-map-board { padding: 10px 8px 12px; border-radius: 20px; }
+  .worm-map { aspect-ratio: 100 / 86; }
+  .worm-levels .worm-chapter-progress { flex-direction: column; align-items: stretch; gap: 8px; padding: 0 6px; }
+  .worm-levels .worm-level-detail { padding: 16px 14px 14px; }
+  .worm-stage-stars small { font-size: 10px; }
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────── */
+@keyframes worm-node-pop { from { opacity: 0; scale: .3; } }
+@keyframes worm-node-ping { from { opacity: .9; scale: 1; } to { opacity: 0; scale: 1.35; } }
+@keyframes worm-pin-bob { from { translate: -50% 0; } to { translate: -50% -7px; } }
+@keyframes worm-new-wiggle { 0%, 70%, 100% { rotate: 12deg; } 78% { rotate: -4deg; } 86% { rotate: 18deg; } 93% { rotate: 8deg; } }
+@keyframes worm-ribbon-in { from { opacity: 0; scale: .85; } }
+@keyframes worm-board-in { from { opacity: .4; translate: 0 8px; } }
+@keyframes worm-stage-in { from { opacity: 0; translate: 10px 0; } }
+@keyframes worm-star-pop { from { scale: 0; rotate: -40deg; } }
+@keyframes worm-drift { to { translate: 0 -14px; rotate: 52deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .worm-levels .worm-map-node, .worm-map-pin, .worm-map-new, .worm-map-node.is-next::before, .worm-world-ribbon, .worm-map-board,
+  .worm-map-board::before, .worm-map-board::after, .worm-levels .worm-level-detail, .worm-stage-stars [data-earned] b { animation: none; }
+  .worm-levels .worm-map-node, .worm-levels .worm-chapter-tabs button, .worm-world-arrow { transition: none; }
+}

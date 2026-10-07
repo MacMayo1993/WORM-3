@@ -77,7 +77,7 @@ it.each(['Levels →', 'Free Play →'])('launches %s with the shared profile in
   click('Customize ✎'); click('Book Worm'); click('Color'); click('Royal'); click('Hats'); click('Crown');
   await act(async () => { button(path).click(); await import('../components/screens/WormModeSetupWizard.jsx'); });
   expect(preview()).toBe('book/royal/crown');
-  if (path.startsWith('Levels')) click('Play level →');
+  if (path.startsWith('Levels')) click('Play level 1-1 →');
   else {
     // Editing within Free Play must also update the shared profile.
     click('Classic');
