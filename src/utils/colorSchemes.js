@@ -302,6 +302,10 @@ export const TILE_STYLES = {
   gyroidSlice:     { label: 'Gyroid Slice',     cost: 'low', type: 'animated' },
   hopfFibers:      { label: 'Hopf Fibers',      cost: 'low', type: 'animated' },
   drosteSpiral:    { label: 'Droste Spiral',    cost: 'low', type: 'animated' },
+  modularTiling:   { label: 'Modular Tiling',   cost: 'med', type: 'animated' },
+  horocycleFlow:   { label: 'Horocycles',       cost: 'low', type: 'animated' },
+  sphericalTiling: { label: 'Spherical Triangles', cost: 'low', type: 'animated' },
+  hyperbolicParallels: { label: 'Hyperbolic Parallels', cost: 'med', type: 'animated' },
   // Impossible objects
   impossibleTriangle: { label: 'Impossible Triangle', cost: 'med', type: 'procedural' },
   endlessStairs:      { label: 'Endless Stairs',      cost: 'med', type: 'animated' },
@@ -309,6 +313,12 @@ export const TILE_STYLES = {
   neckerFlip:         { label: 'Necker Flip',         cost: 'low', type: 'animated' },
   mobiusBand:         { label: 'Möbius Band',         cost: 'med', type: 'animated' },
   interlockingWings:  { label: 'Interlocking Wings',  cost: 'low', type: 'procedural' },
+  impossibleCube:     { label: 'Impossible Cube',     cost: 'med', type: 'procedural' },
+  cubeTriangle:       { label: 'Cube Triangle',       cost: 'med', type: 'procedural' },
+  perpetualFall:      { label: 'Perpetual Waterfall', cost: 'med', type: 'animated' },
+  schroderStairs:     { label: 'Schröder Stairs',     cost: 'low', type: 'animated' },
+  amesRoom:           { label: 'Ames Room',           cost: 'low', type: 'animated' },
+  rubinVase:          { label: 'Rubin Vase',          cost: 'low', type: 'animated' },
   // Surreal
   bowlerRain:      { label: 'Bowler Rain',      cost: 'med', type: 'animated' },
   dayOverNight:    { label: 'Day Over Night',   cost: 'med', type: 'animated' },
@@ -316,6 +326,12 @@ export const TILE_STYLES = {
   paintedWindow:   { label: 'Painted Window',   cost: 'med', type: 'animated' },
   falseReflection: { label: 'False Reflection', cost: 'med', type: 'animated' },
   skyBird:         { label: 'Sky Bird',         cost: 'med', type: 'animated' },
+  floatingRock:    { label: 'Floating Rock',    cost: 'med', type: 'animated' },
+  moonInFront:     { label: 'Moon in Front',    cost: 'med', type: 'animated' },
+  giantApple:      { label: 'Giant Apple',      cost: 'med', type: 'animated' },
+  sunwardShadow:   { label: 'Sunward Shadow',   cost: 'med', type: 'animated' },
+  meltingClock:    { label: 'Melting Clock',    cost: 'med', type: 'animated' },
+  indoorCloud:     { label: 'Indoor Cloud',     cost: 'med', type: 'animated' },
   // Crafted
   marble:        { label: 'Marble',          cost: 'low', type: 'procedural' },
   terrazzo:      { label: 'Terrazzo',        cost: 'low', type: 'procedural' },
@@ -329,6 +345,10 @@ export const TILE_STYLES = {
   damascus:      { label: 'Damascus Steel',  cost: 'low', type: 'procedural' },
   mosaic:        { label: 'Mosaic',          cost: 'low', type: 'pattern' },
   leather:       { label: 'Tooled Leather',  cost: 'low', type: 'procedural' },
+  shibori:       { label: 'Shibori',         cost: 'low', type: 'pattern' },
+  hammeredMetal: { label: 'Hammered Metal',  cost: 'low', type: 'procedural' },
+  delftTile:     { label: 'Delft Tile',      cost: 'low', type: 'pattern' },
+  caneWebbing:   { label: 'Cane Webbing',    cost: 'low', type: 'pattern' },
 };
 
 export const DEFAULT_SETTINGS = {

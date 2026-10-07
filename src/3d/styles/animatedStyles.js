@@ -24,10 +24,14 @@ const ANIMATED_STYLES = new Set([
   // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
   'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',
   'lightCone', 'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
-  // Impossible (triangle, fork and interlockingWings are static — they stay out)
+  'modularTiling', 'horocycleFlow', 'sphericalTiling', 'hyperbolicParallels',
+  // Impossible (the triangle, fork, wings, impossible cube and cube triangle are
+  // static — they stay out)
   'endlessStairs', 'neckerFlip', 'mobiusBand',
-  // Surreal (all six carry their own weather)
+  'perpetualFall', 'schroderStairs', 'amesRoom', 'rubinVase',
+  // Surreal (every one carries its own weather)
   'bowlerRain', 'dayOverNight', 'skyCurtain', 'paintedWindow', 'falseReflection', 'skyBird',
+  'floatingRock', 'moonInFront', 'giantApple', 'sunwardShadow', 'meltingClock', 'indoorCloud',
 ]);
 
 /** Whether a style needs time updates (animated). */
