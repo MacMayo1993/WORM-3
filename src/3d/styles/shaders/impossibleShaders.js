@@ -8,10 +8,17 @@
 //   neckerFlip          the bistable cube, committing to each reading in turn
 //   mobiusBand          one surface, one edge, and a walker who returns mirrored
 //   interlockingWings   a regular division of the plane with no gaps and no overlaps
+//   impossibleCube      Escher's crate: an honest frame with one crossing put back wrong
+//   cubeTriangle        Reutersvärd's nine cubes, closed by the camera like the tribar
+//   perpetualFall       a level aqueduct whose water drops a storey and comes home
+//   schroderStairs      a staircase that turns into an overhang without a line moving
+//   amesRoom            a slanted room that photographs square, and the giants it makes
+//   rubinVase           a vase cut from the space between two faces, or the reverse
 //
-// Two of these are not illusions at all. The tribar and the endless staircase
-// are drawn here by ray-casting an honest solid object under an orthographic
-// camera on the body diagonal — the same trick the physical sculptures use.
+// Several of these are not illusions at all. The tribar, the endless staircase,
+// the cube triangle and the waterfall are drawn here by ray-casting an honest
+// solid object under an orthographic camera on the body diagonal — the same
+// trick the physical sculptures use.
 // Orthographic projection along (1,1,1) cannot distinguish two points that
 // differ by a multiple of (1,1,1), so a chain of beams whose two free ends are
 // separated by exactly such a vector reads as closed. The object is real; only
@@ -20,6 +27,8 @@
 // screen-space, and that impossibility is the point.
 //
 // Every shader takes `baseColor` (the face colour) and, when animated, `time`.
+// The shared helpers are joined in with + rather than interpolated, so the
+// build's shader compaction still strips every template's comments.
 
 // Shared isometric rig. The camera sits on the +(1,1,1) diagonal looking back
 // down it, so the three world axes land on screen 120° apart and the world's z
@@ -80,7 +89,7 @@ export const impossibleShaders = {
   impossibleTriangle: `
     uniform vec3 baseColor;
     varying vec2 vUv;
-    ${ISO_RIG}
+    ` + ISO_RIG + `
 
     void main() {
       vec2 sc = (vUv - 0.5) * 5.9 + vec2(-1.25, -1.35);
@@ -125,7 +134,7 @@ export const impossibleShaders = {
     uniform vec3 baseColor;
     uniform float time;
     varying vec2 vUv;
-    ${ISO_RIG}
+    ` + ISO_RIG + `
 
     void main() {
       vec2 sc = (vUv - 0.5) * 6.6 + vec2(-0.85, -1.15);
@@ -186,7 +195,7 @@ export const impossibleShaders = {
   impossibleFork: `
     uniform vec3 baseColor;
     varying vec2 vUv;
-    ${FLAT_SDF}
+    ` + FLAT_SDF + `
 
     const float IF_YA = 0.60;    // outer silhouette
     const float IF_YB = 0.30;    // inner edges of the outer prongs (right half only)
@@ -259,7 +268,7 @@ export const impossibleShaders = {
     uniform vec3 baseColor;
     uniform float time;
     varying vec2 vUv;
-    ${FLAT_SDF}
+    ` + FLAT_SDF + `
 
     const float NK_H = 0.50;    // half-side of each square
     const float NK_D = 0.28;    // how far the back square is offset
@@ -437,6 +446,564 @@ export const impossibleShaders = {
       vec2 e = min(f, 1.0 - f);
       float seam = 1.0 - smoothstep(0.008, 0.030, min(e.x, e.y));
       col = mix(col, baseColor * 0.10, seam * 0.8);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Impossible Cube — Escher's crate. Twelve square beams make an honest cube
+  // frame, ray-cast as a solid under an orthographic camera that looks down
+  // from the front, right and above, off the body diagonal, so the back square
+  // sits up and to the right of the front one. From there exactly two back
+  // edges cross two front ones on screen: the back-left post crosses the front
+  // top beam, and the back bottom beam crosses the front-right post. Each
+  // crossing on its own is a vote for one Necker reading of which square is
+  // nearer. The shader tells the truth at the low crossing and swaps the depth
+  // order at the high one, so the two votes disagree and no cube can satisfy
+  // both. Everything else — every joint, face and shadow tone — is the real
+  // solid; the lie is one depth comparison, and only where it is visible.
+  impossibleCube: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+    ` + ISO_RIG + `
+
+    // Only front, right and top can face this camera.
+    float icTone(vec3 n) {
+      return n.z > 0.5 ? 1.04 : (n.y < -0.5 ? 0.70 : 0.42);
+    }
+
+    void main() {
+      vec3 F = normalize(vec3(-0.55, 1.0, -0.70));   // looking back, left and down
+      vec3 R = normalize(vec3(F.y, -F.x, 0.0));      // level screen +x
+      vec3 U = cross(R, F);                          // screen +y, z leaning up
+
+      vec2 sc = (vUv - 0.5) * 6.3 + vec2(2.04, 1.59);
+      vec3 ro = R * sc.x + U * sc.y - F * 24.0;
+
+      const float S = 3.0;    // centre-line side of the frame
+      const float W = 0.32;   // half thickness of a beam
+
+      float t = 1e9;
+      vec3 n = vec3(0.0);
+      float id = 0.0;
+      // Along x: front bottom, front top, back bottom, back top.
+      isoBox(ro, F, vec3(-W, -W, -W),         vec3(S + W, W, W),         t, n, id, 1.0);
+      isoBox(ro, F, vec3(-W, -W, S - W),      vec3(S + W, W, S + W),     t, n, id, 2.0);
+      isoBox(ro, F, vec3(-W, S - W, -W),      vec3(S + W, S + W, W),     t, n, id, 3.0);
+      isoBox(ro, F, vec3(-W, S - W, S - W),   vec3(S + W, S + W, S + W), t, n, id, 4.0);
+      // Along y: the four edges running front to back.
+      isoBox(ro, F, vec3(-W, -W, -W),         vec3(W, S + W, W),         t, n, id, 5.0);
+      isoBox(ro, F, vec3(-W, -W, S - W),      vec3(W, S + W, S + W),     t, n, id, 6.0);
+      isoBox(ro, F, vec3(S - W, -W, -W),      vec3(S + W, S + W, W),     t, n, id, 7.0);
+      isoBox(ro, F, vec3(S - W, -W, S - W),   vec3(S + W, S + W, S + W), t, n, id, 8.0);
+      // Along z: three of the four posts.
+      isoBox(ro, F, vec3(-W, -W, -W),         vec3(W, W, S + W),         t, n, id, 9.0);
+      isoBox(ro, F, vec3(S - W, -W, -W),      vec3(S + W, W, S + W),     t, n, id, 10.0);
+      isoBox(ro, F, vec3(S - W, S - W, -W),   vec3(S + W, S + W, S + W), t, n, id, 11.0);
+
+      // The back-left post is tested on its own, so its one lie can be told.
+      float tP = 1e9;
+      vec3 nP = vec3(0.0);
+      float idP = 0.0;
+      isoBox(ro, F, vec3(-W, S - W, -W), vec3(W, S + W, S + W), tP, nP, idP, 12.0);
+
+      // Wherever the post and the front top beam both lie under this pixel, the
+      // post is put in front. The two share no point in space and overlap on
+      // screen only at their crossing, so this one comparison is the whole lie.
+      bool lie = abs(id - 2.0) < 0.5 && tP < 1.0e8;
+      if (tP < t || lie) { t = tP; n = nP; id = idP; }
+
+      // Creases and silhouettes, taken in uniform control flow: a jump in the
+      // normal is an edge between faces, a jump in depth is an occluding edge —
+      // which is what outlines the swapped crossing exactly as an honest one.
+      float crease = clamp(length(fwidth(n)) * 2.2, 0.0, 1.0);
+      float step_ = smoothstep(0.03, 0.30, fwidth(t));
+
+      vec3 col = baseColor * (0.13 - 0.05 * length(vUv - 0.5));
+      if (t < 1.0e8) {
+        vec3 hit = ro + F * t;
+        float grad = 0.90 + 0.12 * clamp(hit.z / S, 0.0, 1.0);
+        col = baseColor * icTone(n) * grad;
+        col = mix(col, baseColor * 0.05, max(crease, step_) * 0.85);
+      }
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Cube Triangle — Reutersvärd's nine cubes, 1934, two decades before the
+  // Penroses drew the tribar. Separate cubes, each a little apart from the next,
+  // are laid along the tribar's chain: three steps along x, three along y, three
+  // up z. The chain starts at the origin and ends at (3,3,3)·step — a multiple
+  // of the view direction — so the last cube, the one nearest the camera,
+  // lands exactly over where the first would be. Every cube is real and so is
+  // every gap between them; the camera closes the triangle.
+  cubeTriangle: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+    ` + ISO_RIG + `
+
+    void main() {
+      vec2 sc = (vUv - 0.5) * 4.4 + vec2(-1.06, -1.22);
+      vec3 ro = ISO_R * sc.x + ISO_U * sc.y - ISO_F * 24.0;
+
+      const float SP = 1.0;    // centre-to-centre step along the chain
+      const float HC = 0.42;   // half side of a cube; the rest of a step is gap
+
+      float t = 1e9;
+      vec3 n = vec3(0.0);
+      float id = -1.0;
+      for (int i = 0; i < 9; i++) {
+        float fi = float(i);
+        vec3 c = fi < 2.5 ? vec3(SP * (fi + 1.0), 0.0, 0.0)
+               : fi < 5.5 ? vec3(3.0 * SP, SP * (fi - 2.0), 0.0)
+                          : vec3(3.0 * SP, 3.0 * SP, SP * (fi - 5.0));
+        isoBox(ro, ISO_F, c - HC, c + HC, t, n, id, fi);
+      }
+
+      float crease = clamp(length(fwidth(n)) * 2.2, 0.0, 1.0);
+      float step_ = smoothstep(0.03, 0.30, fwidth(t));
+
+      vec3 col = baseColor * (0.13 - 0.05 * length(vUv - 0.5));
+      if (t < 1.0e8) {
+        vec3 hit = ro + ISO_F * t;
+        col = baseColor * isoTone(n);
+        // A soft bevel light along each cube's top edges, so separate blocks
+        // read as blocks rather than as a cut-out band.
+        vec3 c = hit - (floor(hit / SP + 0.5) * SP);
+        float rim = smoothstep(HC - 0.08, HC, max(max(abs(c.x), abs(c.y)), abs(c.z)));
+        col *= 1.0 - 0.10 * rim;
+        col = mix(col, baseColor * 0.05, max(crease, step_) * 0.85);
+      }
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Perpetual Waterfall — Escher's 1961 aqueduct as an honest solid. Four level
+  // channels run +x OUT, +y OUT, -x BACK, -y BACK, and then the water falls H.
+  // Because BACK = OUT + H, the chain's net displacement is (-H, -H, -H): a
+  // multiple of the view direction, so the foot of the fall lands, on screen,
+  // exactly on the head of the first channel — H nearer the camera and H higher
+  // than where the water actually arrives. Every channel is level and the water
+  // in each is truly flowing; the drop is real; only the return is the
+  // camera's. The loop runs uphill by the one height the eye cannot measure.
+  perpetualFall: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+    ` + ISO_RIG + `
+
+    const float H = 1.8;       // the drop
+    const float OUT = 2.0;     // run of the two outbound channels (+x, then +y)
+    const float BACK = 3.8;    // run of the two return channels: BACK = OUT + H,
+                               // so the loop closes on (-H, -H, -H), the view axis
+    const float PF_W = 0.48;   // half width of a channel's masonry
+    const float PF_WI = 0.32;  // half width of the water inside it
+    const float PF_D = 0.42;   // depth of masonry under the water line
+
+    float pfHash(float x) { return fract(sin(x * 91.7 + 3.1) * 43758.5453); }
+
+    // Nearest point on one channel's centre line: x = distance to it, y = how
+    // far downstream it lies, measured from the head of the first channel.
+    vec2 pfSeg(vec2 p, vec2 a, vec2 b, float s0, vec2 best) {
+      vec2 ba = b - a;
+      float len = length(ba);
+      float h = clamp(dot(p - a, ba) / (len * len), 0.0, 1.0);
+      float d = length(p - a - ba * h);
+      return d < best.x ? vec2(d, s0 + h * len) : best;
+    }
+
+    vec2 pfFlow(vec2 p) {
+      vec2 a1 = vec2(OUT, 0.0);
+      vec2 a2 = vec2(OUT, OUT);
+      vec2 a3 = vec2(OUT - BACK, OUT);            // (-H, OUT)
+      vec2 a4 = vec2(OUT - BACK, OUT - BACK);     // (-H, -H): the lip of the fall
+      vec2 best = vec2(1e9, 0.0);
+      best = pfSeg(p, vec2(0.0), a1, 0.0, best);
+      best = pfSeg(p, a1, a2, OUT, best);
+      best = pfSeg(p, a2, a3, 2.0 * OUT, best);
+      best = pfSeg(p, a3, a4, 2.0 * OUT + BACK, best);
+      return best;
+    }
+
+    void main() {
+      vec2 sc = (vUv - 0.5) * 5.8 + vec2(0.64, -0.30);
+      vec3 ro = ISO_R * sc.x + ISO_U * sc.y - ISO_F * 24.0;
+
+      float t = 1e9;
+      vec3 n = vec3(0.0);
+      float id = -1.0;
+      // The channels, all with their water at z = 0.
+      isoBox(ro, ISO_F, vec3(-PF_W, -PF_W, -PF_D),
+                        vec3(OUT + PF_W, PF_W, 0.0), t, n, id, 0.0);
+      isoBox(ro, ISO_F, vec3(OUT - PF_W, -PF_W, -PF_D),
+                        vec3(OUT + PF_W, OUT + PF_W, 0.0), t, n, id, 1.0);
+      isoBox(ro, ISO_F, vec3(OUT - BACK - PF_W, OUT - PF_W, -PF_D),
+                        vec3(OUT + PF_W, OUT + PF_W, 0.0), t, n, id, 2.0);
+      // The last channel stops short so the water can pour off its end.
+      isoBox(ro, ISO_F, vec3(-H - PF_W, -H + PF_WI, -PF_D),
+                        vec3(-H + PF_W, OUT + PF_W, 0.0), t, n, id, 3.0);
+      // The fall itself: a column of water, H tall, under the lip.
+      isoBox(ro, ISO_F, vec3(-H - PF_WI, -H - PF_WI, -H),
+                        vec3(-H + PF_WI, -H + PF_WI, -0.04), t, n, id, 4.0);
+      // Piers under three corners, running down out of the picture.
+      isoBox(ro, ISO_F, vec3(OUT - 0.28, -0.28, -12.0),
+                        vec3(OUT + 0.28, 0.28, -PF_D), t, n, id, 5.0);
+      isoBox(ro, ISO_F, vec3(OUT - 0.28, OUT - 0.28, -12.0),
+                        vec3(OUT + 0.28, OUT + 0.28, -PF_D), t, n, id, 6.0);
+      isoBox(ro, ISO_F, vec3(-H - 0.28, OUT - 0.28, -12.0),
+                        vec3(-H + 0.28, OUT + 0.28, -PF_D), t, n, id, 7.0);
+
+      float crease = clamp(length(fwidth(n)) * 2.2, 0.0, 1.0);
+      float step_ = smoothstep(0.03, 0.30, fwidth(t));
+
+      vec3 hit = ro + ISO_F * min(t, 60.0);
+      vec2 fl = pfFlow(hit.xy);
+      float aa = fwidth(fl.x) + 1e-4;
+
+      vec3 col = baseColor * (0.12 - 0.04 * length(vUv - 0.5));
+      if (t < 1.0e8) {
+        vec3 stone = baseColor * isoTone(n) * 0.80;
+        // Courses of stone on the piers and channel sides.
+        stone *= 1.0 - 0.10 * smoothstep(0.80, 0.95, fract(hit.z * 2.4));
+        col = stone;
+
+        vec3 water = mix(baseColor, vec3(1.0), 0.30);
+        vec3 foam = mix(baseColor, vec3(1.0), 0.80);
+
+        if (id < 3.5 && n.z > 0.5) {
+          // Running water: chevrons drifting downstream, bowed by the slower
+          // water near the walls.
+          float ph = fl.y * 2.6 + fl.x * 3.2 - time * 1.6;
+          float rip = smoothstep(0.55, 0.95, sin(ph * 6.2831853) * 0.5 + 0.5);
+          vec3 w = mix(water, foam, rip * 0.55);
+          // Churn where the fall arrives — on screen, at the first channel's head.
+          float land = 1.0 - smoothstep(0.05, 0.65, length(hit.xy));
+          float fizz = pfHash(floor(hit.x * 14.0) + floor(hit.y * 14.0) * 31.0 + floor(time * 9.0));
+          w = mix(w, foam, land * (0.55 + 0.45 * fizz));
+          float wet = 1.0 - smoothstep(PF_WI - aa, PF_WI + aa, fl.x);
+          col = mix(baseColor * 0.86, w, wet);
+          // A dark waterline where water meets stone.
+          col = mix(col, baseColor * 0.10, (1.0 - smoothstep(0.0, 0.035 + aa, abs(fl.x - PF_WI))) * 0.7);
+        } else if (id > 3.5 && id < 4.5) {
+          // The falling sheet: streaks dropping at the pace of the flow above.
+          float across = n.x > 0.5 ? hit.y : hit.x;
+          float lane = floor(across * 11.0);
+          float st = fract(hit.z * 1.1 + time * 1.9 + pfHash(lane));
+          float streak = smoothstep(0.0, 0.25, st) * (1.0 - smoothstep(0.35, 0.75, st));
+          col = mix(water * (n.z > 0.5 ? 1.0 : (n.x > 0.5 ? 0.92 : 0.78)), foam, streak * 0.75);
+        }
+        col = mix(col, baseColor * 0.05, max(crease, step_) * 0.85);
+      }
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Schröder Stairs — Schröder's 1858 staircase. A zigzag profile, the same
+  // zigzag shifted along one oblique depth edge, and walls closing each end:
+  // read with the zigzag nearer, it is a flight of stairs seen from above, its
+  // side wall below and the wall it climbs behind; read with the shifted copy
+  // nearer, the same parallelograms are the underside of a stepped ceiling seen
+  // from below, with the wall it hangs from above. The drawing is the picture
+  // of both solids, exactly — depth inverted through the paper — so nothing in
+  // the lines can choose. Only the light does: on a timer, treads lit and
+  // risers dark, then risers lit and the treads turned to soffits in shadow.
+  schroderStairs: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+    ` + FLAT_SDF + `
+
+    const float SS_S = 0.30;     // rise and run of one step
+    const float SS_A = 0.46;     // the depth edge is (-SS_A, SS_A)
+    const float SS_N = 4.0;      // steps
+
+    void main() {
+      vec2 p = (vUv - 0.5) * 2.0;
+      vec2 P0 = vec2(-0.37, -0.83);          // foot of the first riser
+      vec2 D = vec2(-SS_A, SS_A);
+      float top = SS_N * SS_S;
+      float px = fwidth(p.x);
+
+      // The depth edge is square to the stair's diagonal, so u = x + y names
+      // the point of the zigzag a pixel lies over and v = y - x how far it sits
+      // along the depth edge from that point.
+      vec2 q = p - P0;
+      float u = q.x + q.y;
+      float v = q.y - q.x;
+      float m = mod(u, 2.0 * SS_S);
+      float vz = SS_S - abs(m - SS_S);        // the zigzag, in (u, v)
+      float w = (v - vz) / (2.0 * SS_A);      // 0 on the front zigzag, 1 on the back
+      float riser = step(m, SS_S);
+
+      float inFig = step(0.0, u) * step(u, 2.0 * top);
+      float band = inFig * step(0.0, w) * step(w, 1.0);
+      float low = inFig * step(w, 0.0) * step(0.0, q.y) * step(q.x, top);
+      float upp = inFig * step(1.0, w) * step(-SS_A, q.x) * step(q.y, top + SS_A);
+
+      // Bistable, so it switches rather than dissolves: long holds, quick turns.
+      float ph = fract(time * 0.105 + 0.27);
+      float tri = ph < 0.5 ? ph * 2.0 : (1.0 - ph) * 2.0;
+      float k = smoothstep(0.42, 0.58, tri);
+
+      // Stairs (k = 0): treads lit, risers half lit, the stair's side wall
+      // below, the wall it climbs behind. Overhang (k = 1): risers lit, treads
+      // become soffits in shadow, the overhang's side wall above, wall below.
+      // Each reading darkens toward its own far edge.
+      float wf = clamp(w, 0.0, 1.0);
+      float tread = mix(1.04 - 0.16 * wf, 0.30 + 0.10 * wf, k);
+      float rise = mix(0.62 - 0.10 * wf, 0.84 - 0.14 * (1.0 - wf), k);
+      float face = mix(tread, rise, riser);
+      float tone = 0.15;
+      tone = mix(tone, face, band);
+      tone = mix(tone, mix(0.48, 0.22, k), low);
+      tone = mix(tone, mix(0.24, 0.50, k), upp);
+      vec3 col = baseColor * tone;
+
+      // ── the ink: never moves ──────────────────────────────────────────────
+      float d = 1e9;
+      for (int i = 0; i < 4; i++) {
+        vec2 a = P0 + vec2(float(i) * SS_S);
+        vec2 b = a + vec2(0.0, SS_S);
+        vec2 c = b + vec2(SS_S, 0.0);
+        d = min(d, ipSeg(p, a, b));
+        d = min(d, ipSeg(p, b, c));
+        d = min(d, ipSeg(p, a + D, b + D));
+        d = min(d, ipSeg(p, b + D, c + D));
+        d = min(d, ipSeg(p, a, a + D));
+        d = min(d, ipSeg(p, b, b + D));
+      }
+      vec2 P8 = P0 + vec2(top);
+      d = min(d, ipSeg(p, P8, P8 + D));
+      d = min(d, ipSeg(p, P0, P0 + vec2(top, 0.0)));           // floor of the stair's side
+      d = min(d, ipSeg(p, P0 + vec2(top, 0.0), P8));             // its far end
+      d = min(d, ipSeg(p, P0 + D, P0 + D + vec2(0.0, top)));     // the other wall's end
+      d = min(d, ipSeg(p, P0 + D + vec2(0.0, top), P8 + D));     // and its top
+      float lw = max(0.010, px * 0.65);
+      col = mix(col, baseColor * 0.05, 1.0 - smoothstep(lw - px * 0.5, lw + px * 0.5, d));
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Ames Room — the room Adelbert Ames built in 1946, honestly. Look through
+  // the peephole (the eye at the origin, looking down +z) at an ordinary
+  // rectangular room whose back wall stands at depth Z0. Now slide every
+  // surface point along its own eye ray, A -> t·A: the picture cannot change.
+  // Choose t so the slid back wall is the slanted plane z + b·x = a. For the
+  // apparent wall point A = (x, y, Z0) that means t·Z0 + b·t·x = a, so
+  //     t = a / (Z0 + b·x),
+  // and with a = Z0 the centre stays put, the left corner (x < 0) runs away
+  // and the right corner comes in. The floor, ceiling and side walls are slid
+  // the same way, so the checkerboard is the picture of square tiles even
+  // though the real ones are not square. A person of true height h standing
+  // at that wall point is at true depth t·Z0 and subtends h / (t·Z0) — exactly
+  // what a person of height h/t would subtend at Z0. So in the square room the
+  // eye believes in, the apparent scale is 1/t = 1 + (b/Z0)·x: the same person
+  // is small in the far corner and a giant in the near one. Two identical
+  // people stand against the back wall; one walks the length of it and back.
+  amesRoom: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+    ` + FLAT_SDF + `
+
+    const float AR_Z0 = 2.0;    // apparent depth of the back wall
+    const float AR_XW = 1.15;   // half width of the room
+    const float AR_YF = 0.78;   // floor, below the eye
+    const float AR_YC = 0.88;   // ceiling, above the eye
+    const float AR_B = 0.55;    // b·XW/Z0: how far the slant scales the corners
+    const float AR_H = 0.92;    // apparent height of a person at the centre
+
+    float arCapsule(vec2 p, vec2 a, vec2 b, float r) {
+      return ipSeg(p, a, b) - r;
+    }
+
+    // A person, in units of their own height, feet at the origin. 'stride'
+    // swings the legs apart and the arms against them.
+    float arPerson(vec2 q, float stride) {
+      float d = length(q - vec2(0.0, 0.885)) - 0.100;                   // head
+      d = min(d, ipBox(q - vec2(0.0, 0.62), vec2(0.085, 0.14)) - 0.045); // body
+      d = min(d, arCapsule(q, vec2(-0.035, 0.44), vec2(-0.035 - stride, 0.03), 0.040));
+      d = min(d, arCapsule(q, vec2( 0.035, 0.44), vec2( 0.035 + stride, 0.03), 0.040));
+      d = min(d, arCapsule(q, vec2(-0.115, 0.74), vec2(-0.13 + stride * 0.7, 0.46), 0.032));
+      d = min(d, arCapsule(q, vec2( 0.115, 0.74), vec2( 0.13 - stride * 0.7, 0.46), 0.032));
+      return d;
+    }
+
+    void main() {
+      vec2 s = (vUv - 0.5) * 2.0;   // the picture plane at unit distance
+      float px = fwidth(s.x);
+
+      // First surface along the eye ray (s, 1) from inside the box.
+      float tx = AR_XW / max(abs(s.x), 1e-4);
+      float ty = s.y < 0.0 ? AR_YF / max(-s.y, 1e-4) : AR_YC / max(s.y, 1e-4);
+      float t = min(min(tx, ty), AR_Z0);
+      vec3 P = vec3(s, 1.0) * t;
+
+      // Floor coordinates for every pixel, so their derivatives are taken in
+      // uniform control flow; only floor pixels use them.
+      float tf = AR_YF / max(-s.y, 0.02);
+      vec2 fq = vec2(s.x * tf, tf) / (AR_XW / 3.0);
+      vec2 fw = fwidth(fq);
+
+      vec3 col;
+      if (t >= AR_Z0 - 1e-4) {
+        // Back wall: plaster lit from the window, a skirting along its foot.
+        col = baseColor * (0.84 + 0.10 * P.y);
+        vec2 wq = P.xy - vec2(0.0, 0.10);
+        float win = ipBox(wq, vec2(0.30, 0.30));
+        vec3 sky = mix(baseColor, vec3(1.0), 0.55 + 0.25 * wq.y);
+        float bars = min(abs(wq.x), abs(wq.y)) - 0.018;
+        sky = mix(sky, baseColor * 0.35, 1.0 - smoothstep(0.0, 0.012, bars));
+        col = mix(col, sky, 1.0 - smoothstep(-0.006, 0.006, win));
+        col = mix(col, baseColor * 0.30, 1.0 - smoothstep(0.0, 0.024, abs(win)));
+        col = mix(col, baseColor * 0.55, step(P.y, -AR_YF + 0.07));
+      } else if (ty <= tx) {
+        if (s.y < 0.0) {
+          // Floor: square tiles, filtered so the far rows grey out instead of
+          // shimmering.
+          vec2 g = fract(fq) - 0.5;
+          vec2 e = smoothstep(vec2(-0.5) + fw, vec2(-0.5) + 2.0 * fw, -abs(g) + vec2(0.0));
+          float chk = mod(floor(fq.x) + floor(fq.y), 2.0);
+          float blur = clamp(max(fw.x, fw.y) * 1.6, 0.0, 1.0);
+          chk = mix(chk, 0.5, blur);
+          col = baseColor * mix(0.26, 1.0, chk);
+          col *= 0.86 + 0.14 * smoothstep(0.6, AR_Z0, P.z);
+          col = mix(col, col * 0.85, (1.0 - e.x * e.y) * (1.0 - blur));
+        } else {
+          col = baseColor * (0.40 + 0.10 * smoothstep(0.8, AR_Z0, P.z));   // ceiling
+        }
+      } else {
+        // Side walls, a dado rail running to the vanishing point.
+        col = baseColor * (s.x < 0.0 ? 0.72 : 0.58);
+        col *= 0.84 + 0.16 * smoothstep(0.8, AR_Z0, P.z);
+        col = mix(col, baseColor * 0.38, 1.0 - smoothstep(0.0, 0.02, abs(P.y + 0.30)));
+      }
+
+      // The room's edges: the back wall's frame and the four corner lines,
+      // which run from its corners toward the vanishing point at the centre.
+      vec2 bw = vec2(AR_XW, 0.5 * (AR_YC + AR_YF)) / AR_Z0;
+      vec2 bc = vec2(0.0, 0.5 * (AR_YC - AR_YF)) / AR_Z0;
+      float edge = abs(ipBox(s - bc, bw));
+      vec2 c1 = vec2(AR_XW, -AR_YF), c2 = vec2(AR_XW, AR_YC);
+      float outside = step(0.0, ipBox(s - bc, bw));
+      vec2 sa = abs(s);
+      vec2 cc = s.y < 0.0 ? c1 : c2;
+      float diag = abs(sa.x * abs(cc.y) - abs(s.y) * cc.x) / length(cc);
+      edge = min(edge, mix(1e9, diag, outside));
+      col = mix(col, baseColor * 0.12, (1.0 - smoothstep(px * 0.4, px * 1.4, edge)) * 0.8);
+
+      // Two identical people against the back wall. Scale 1/t = 1 + (b/Z0)·x.
+      vec2 B = s * AR_Z0;                               // apparent back-wall coords
+      float xs = AR_XW * 0.80;                          // the one who stays, near corner
+      float ph = 0.5 - 0.5 * cos(time * 0.30);
+      float xw = AR_XW * mix(-0.84, 0.40, ph);          // the one who walks
+      float ms = 1.0 + AR_B * xs / AR_XW;
+      float mw = 1.0 + AR_B * xw / AR_XW;
+      float strideW = 0.07 * sin(xw * 10.0 / mw) * smoothstep(0.0, 0.10, sin(time * 0.30) * sin(time * 0.30));
+      vec2 qs = (B - vec2(xs, -AR_YF)) / (AR_H * ms);
+      vec2 qw = (B - vec2(xw, -AR_YF)) / (AR_H * mw);
+      float dS = arPerson(qs, 0.0) * AR_H * ms;
+      float dW = arPerson(qw, strideW) * AR_H * mw;
+      // Contact shadows on the floor at their feet.
+      float sh = exp(-qs.x * qs.x * 30.0 - qs.y * qs.y * 900.0) + exp(-qw.x * qw.x * 30.0 - qw.y * qw.y * 900.0);
+      col *= 1.0 - 0.45 * clamp(sh, 0.0, 1.0);
+      float pa = px * AR_Z0;
+      float fig = 1.0 - smoothstep(-pa, pa, min(dS, dW));
+      col = mix(col, baseColor * 0.08, fig);
+
+      // The peephole: one eye, one point of view, and nothing else to check by.
+      float r = length(s);
+      col *= mix(0.30, 1.0, 1.0 - smoothstep(1.05, 1.36, r));
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Rubin Vase — Edgar Rubin's figure and ground, 1915. One curve, mirrored:
+  // read from inside, it is the side of a vase; read from outside, the profile
+  // of a face — brow, nose, lips, chin — looking at its twin. A boundary can
+  // only belong to one region at a time (the figure owns its edge, the ground
+  // runs on behind it), so the eye picks a side, holds it, and then gives it up.
+  // The shader does the same on a timer: it models the vase as a glazed pot and
+  // lets the faces lie flat as shadow, then models the faces and lets the vase
+  // become the gap between them. The line itself never moves.
+  rubinVase: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    float rvBump(float y, float c, float s) {
+      float q = (y - c) / s;
+      return exp(-q * q);
+    }
+
+    // The head's broad shape behind the profile: forehead sloping back above,
+    // the jaw giving way to the throat below. The vase's half width, unbumped.
+    float rvSkull(float y) {
+      return 0.35 + 0.27 * smoothstep(0.45, 1.05, y) + 0.21 * smoothstep(-0.36, -0.62, y);
+    }
+
+    // Half width of the vase at height y: the facial profile, read sideways.
+    float rvHalf(float y) {
+      float w = rvSkull(y);
+      w -= 0.035 * rvBump(y, 0.52, 0.06);                 // brow
+      w += 0.025 * rvBump(y, 0.42, 0.035);                // the bridge's hollow
+      float nose = (y - 0.20) / (y > 0.20 ? 0.16 : 0.05);
+      w -= 0.21 * exp(-nose * nose);                      // nose: long bridge, short underside
+      w -= 0.075 * rvBump(y, 0.02, 0.040);                // upper lip
+      w -= 0.060 * rvBump(y, -0.11, 0.038);               // lower lip
+      w -= 0.070 * rvBump(y, -0.34, 0.065);               // chin
+      return w;
+    }
+
+    void main() {
+      vec2 p = (vUv - 0.5) * 1.75 + vec2(0.0, 0.17);
+      float px = fwidth(p.x);
+
+      float w = rvHalf(p.y);
+      float dw = (rvHalf(p.y + 0.004) - rvHalf(p.y - 0.004)) / 0.008;
+      float e = (abs(p.x) - w) / sqrt(1.0 + dw * dw);   // > 0 in a face
+      float vase = 1.0 - smoothstep(-px * 0.7, px * 0.7, e);
+
+      float ph = fract(time * 0.095 + 0.62);
+      float tri = ph < 0.5 ? ph * 2.0 : (1.0 - ph) * 2.0;
+      float k = smoothstep(0.42, 0.58, tri);              // 0: vase, 1: faces
+
+      vec3 ground = baseColor * 0.12;
+
+      // The vase as a lathe-turned pot: a cylinder's light across it, a
+      // highlight running down one side, a lip ring and a foot ring.
+      float u = clamp(p.x / max(w, 0.05), -1.0, 1.0);
+      float nz = sqrt(max(1.0 - u * u, 0.0));
+      float lam = 0.40 + 0.66 * max(dot(vec3(u, 0.0, nz), normalize(vec3(-0.55, 0.0, 0.83))), 0.0);
+      vec3 vaseLit = baseColor * lam;
+      vaseLit = mix(vaseLit, vec3(1.0), 0.50 * rvBump(u, -0.50, 0.075));
+      float rings = min(abs(p.y - 0.86), abs(p.y + 0.56));
+      vaseLit = mix(vaseLit, baseColor * 0.42, (1.0 - smoothstep(0.0, 0.016 + px, rings)) * 0.7 * nz);
+
+      // The faces: skin turning away at the profile, a lit cheek, a closed
+      // eye under its brow — all laid out from the head's broad shape, so the
+      // fine profile appears only at the edge.
+      float hx = abs(p.x) - rvSkull(p.y);                 // depth into the head
+      float rim = smoothstep(0.0, 0.10, max(e, 0.0));
+      float skin = 0.62 + 0.30 * rim - 0.12 * smoothstep(0.20, 0.50, hx);
+      skin += 0.14 * rvBump(hx, 0.17, 0.10) * rvBump(p.y, 0.06, 0.12);
+      vec3 faceLit = baseColor * skin;
+      vec2 eye = vec2(hx - 0.14, p.y - 0.37);
+      float lid = abs(length(eye * vec2(1.0, 2.4)) - 0.05) - 0.003;
+      float eyeMark = (1.0 - smoothstep(0.0, 0.008 + px, lid)) * step(eye.y, 0.0);
+      vec2 bq = vec2(hx - 0.12, p.y - 0.43);
+      float brow = abs(length(bq * vec2(1.0, 2.8)) - 0.075) - 0.003;
+      eyeMark = max(eyeMark, (1.0 - smoothstep(0.0, 0.008 + px, brow)) * step(0.0, bq.y) * 0.55);
+      faceLit = mix(faceLit, baseColor * 0.30, eyeMark);
+
+      vec3 vaseCol = mix(vaseLit, ground, k);
+      vec3 faceCol = mix(ground, faceLit, k);
+      vec3 col = mix(faceCol, vaseCol, vase);
+
+      // The one line both readings share.
+      col = mix(col, baseColor * 0.06, (1.0 - smoothstep(0.0, px * 1.2, abs(e))) * 0.5);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }

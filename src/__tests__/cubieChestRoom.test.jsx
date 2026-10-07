@@ -117,9 +117,10 @@ it('renders only the selected tile family and switches its preview', () => {
   // One tab per catalogue family, however many the catalogue grows to.
   expect(host.querySelectorAll('nav[aria-label="Tile families"] button')).toHaveLength(TILE_STYLE_SECTIONS.length);
   const initial = host.querySelectorAll('.store-card').length;
+  const surreal = TILE_STYLE_SECTIONS.find(s => s.key === 'surreal').keys.length;
   act(() => button('Surreal').click());
-  expect(host.querySelectorAll('.store-card')).toHaveLength(6);
-  expect(initial).toBeGreaterThan(6);
+  expect(host.querySelectorAll('.store-card')).toHaveLength(surreal);
+  expect(initial).not.toBe(surreal);
   expect(host.querySelector('.catalogue-grid-heading').textContent).toContain('Surreal');
   const first = host.querySelector('.catalogue-preview h3').textContent;
   act(() => host.querySelector('[aria-label="Next item"]').click());

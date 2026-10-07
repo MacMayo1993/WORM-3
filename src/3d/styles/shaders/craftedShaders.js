@@ -347,6 +347,219 @@ const bodies = {
       gl_FragColor = vec4(col, 1.0);
     }
   `],
+
+  // Shibori: itajime — cotton folded both ways into a packet, clamped at one
+  // corner between square boards and dipped in the face's dye. Unfolded, the
+  // board is a soft undyed square on every other crossing of the folds, its edge
+  // feathered where dye wicked along the threads and darkened where it pooled.
+  // The open folds took the most dye, the pressed creases the least, and inner
+  // layers of the packet less than the outer ones.
+  shibori: [false, false, [], `
+    float shBoard(vec2 q, float r, float k) {
+      vec2 d = abs(q) - vec2(r - k);
+      return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - k;
+    }
+    void main() {
+      vec2 p = crSlab();
+      vec2 u = p / 0.45 + 0.16 * vec2(crNoise(p * 0.8 + 3.0), crNoise(p * 0.8 + 8.0));
+      vec2 sq = floor(u * 0.5 + 0.5);
+      float an = (crHash(sq + 4.1) - 0.5) * 0.14;
+      vec2 q = mat2(cos(an), sin(an), -sin(an), cos(an)) * (u - 2.0 * sq);
+      vec2 a = abs(q);
+      float warp = crFbm(p * 3.0 + 1.7) - 0.5;
+      float wickV = crNoise(vec2(p.x * 90.0, p.y * 6.0));
+      float wickH = crNoise(vec2(p.x * 6.0, p.y * 90.0));
+      float wick = mix(wickH, wickV, step(a.x, a.y));
+      float d = shBoard(q, 0.44 + 0.06 * crHash(sq), 0.14) + warp * 0.18 + wick * 0.06;
+      float resist = 1.0 - smoothstep(-0.1, 0.05, d);
+      float ex = abs(u.x - floor(u.x + 0.5)), ey = abs(u.y - floor(u.y + 0.5));
+      float e = min(ex, ey);
+      float along = ex < ey ? u.y : u.x + 3.7;
+      float creaseW = 0.03 + 0.06 * crNoise(vec2(along * 2.2, e * 3.0) + 5.0);
+      float crease = (1.0 - smoothstep(0.0, creaseW, e)) * smoothstep(0.15, 0.6, crNoise(vec2(along * 1.3, 2.0)));
+      float layer = mod(floor(u.x) + floor(u.y), 2.0);
+      float dye = 0.6 + 0.36 * crFbm(p * 1.4 + 2.0) + 0.3 * smoothstep(0.45, 1.0, max(a.x, a.y)) - 0.1 * layer;
+      float halo = exp(-max(d, 0.0) / 0.2) * (0.6 + 0.6 * wick);
+      float amt = dye * (1.0 - resist) * (1.0 - 0.4 * halo);
+      amt += resist * 0.2 * crFbm(p * 6.0 + 9.0);
+      amt += 0.28 * exp(-abs(d - 0.04) / 0.05) * (1.0 - 0.6 * resist);
+      amt += 0.12 * exp(-e / 0.1) * (1.0 - resist);
+      amt *= 1.0 - 0.5 * crease;
+      vec3 cotton = vec3(0.95, 0.93, 0.88);
+      float lum = dot(baseColor, vec3(0.299, 0.587, 0.114));
+      vec3 dye1 = baseColor * (0.92 - 0.2 * lum);
+      vec3 col = mix(cotton, dye1, smoothstep(0.0, 0.9, amt));
+      col = mix(col, baseColor * (0.58 - 0.16 * lum), smoothstep(0.85, 1.25, amt) * 0.85);
+      vec2 tw = p * 60.0;
+      float weave = sin(tw.x * 3.14159) * sin(tw.y * 3.14159);
+      float fade = 1.0 - smoothstep(0.25, 0.7, fwidth(tw.x));
+      col *= 1.0 + 0.06 * weave * fade;
+      col *= 0.95 + 0.07 * crNoise(vec2(p.x * 3.0, p.y * 55.0));
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `],
+
+  // Hammered metal: a sheet planished by hand, every blow a round, shallow bowl
+  // whose rim steepens, the bowls overlapping in curved ridges. Each dent mirrors
+  // the studio: a bright crescent on the wall facing the key light, a dark one
+  // opposite and a pinpoint glint; the anodised colour drifts from blow to blow.
+  hammeredMetal: [false, false, [], `
+    vec4 hmDents(vec2 p) {
+      vec2 n = floor(p), f = fract(p);
+      float best = 0.0, id = 0.0;
+      vec2 slope = vec2(0.0);
+      for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+          vec2 g = vec2(float(i), float(j));
+          vec2 r = g + 0.12 + 0.76 * crHash2(n + g) - f;
+          float rho = 0.56 + 0.2 * crHash(n + g + 7.3);
+          float q = length(r) / rho;
+          float h = (q * q - 1.0) * rho * rho;
+          if (h < best) { best = h; slope = r / rho * (0.24 + 0.42 * q * q); id = crHash(n + g + 2.9); }
+        }
+      }
+      return vec4(slope, best, id);
+    }
+    void main() {
+      vec2 p = crSlab() * 3.1;
+      vec4 dn = hmDents(p);
+      vec3 n = normalize(vec3(dn.xy, 1.0));
+      vec3 key = normalize(vec3(-0.55, 0.62, 0.56));
+      float diff = max(dot(n, key), 0.0);
+      float spec = pow(max(dot(n, normalize(key + vec3(0.0, 0.0, 1.0))), 0.0), 90.0);
+      vec3 r = reflect(vec3(0.0, 0.0, -1.0), n);
+      float t = dot(r.xy, vec2(-0.55, 0.83));
+      float box = smoothstep(0.2, 0.6, t);
+      float dark = smoothstep(0.15, 0.7, -t);
+      vec3 metal = baseColor * (0.9 + 0.18 * dn.w);
+      metal = mix(metal, metal * vec3(1.08, 0.98, 0.9), crFbm(p * 0.25));
+      metal *= 0.97 + 0.04 * crNoise(vec2(p.x * 26.0, p.y * 2.0));
+      vec3 col = metal * (0.6 + 0.42 * box - 0.26 * dark + 0.14 * diff);
+      col += mix(metal, vec3(1.0), 0.6) * (spec * 0.6 + box * 0.08);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `],
+
+  // Delft tile: tin-glazed earthenware painted by hand in the face's colour —
+  // a tulip in a double ring, and a quarter lily in each corner that meets its
+  // neighbours' as one ornament. Fine dark outlines filled with a pale, streaky
+  // wash that pooled here and there; the partner colour flames the tulip and
+  // dots the corners. Fine crackle in the glaze, which thins at the rim.
+  delftTile: [true, false, [CHIPS_GLSL], `
+    float dfEll(vec2 q, vec2 c, float an, vec2 r) {
+      q -= c;
+      float cs = cos(an), sn = sin(an);
+      q = vec2(cs * q.x + sn * q.y, -sn * q.x + cs * q.y);
+      return (length(q / r) - 1.0) * min(r.x, r.y);
+    }
+    void main() {
+      vec2 p = vUv - 0.5;
+      vec2 seed = tileHome.xy * 3.1 + tileHome.z * 1.7 + tileFace;
+      vec2 hp = p + 0.004 * vec2(crNoise(p * 18.0 + seed), crNoise(p * 18.0 + seed + 4.0));
+      float r = length(hp), ang = atan(hp.y, hp.x);
+      float head = min(dfEll(hp, vec2(0.0, 0.06), 0.0, vec2(0.055, 0.115)),
+                       min(dfEll(hp, vec2(-0.05, 0.035), 0.5, vec2(0.05, 0.1)),
+                           dfEll(hp, vec2(0.05, 0.035), -0.5, vec2(0.05, 0.1))));
+      vec2 sp = vec2(hp.x - 0.018 * sin(hp.y * 14.0), max(abs(hp.y + 0.13) - 0.1, 0.0));
+      float stem = length(sp) - 0.011;
+      float leaves = min(dfEll(hp, vec2(-0.075, -0.14), 0.85, vec2(0.032, 0.095)),
+                         dfEll(hp, vec2(0.07, -0.12), -0.8, vec2(0.028, 0.085)));
+      float band = abs(r - 0.35) - 0.02;
+      vec2 c = 0.5 - abs(hp);
+      vec2 dg = vec2(c.x + c.y, c.x - c.y) * 0.7071;
+      float lily = dfEll(dg, vec2(0.15, 0.0), 0.0, vec2(0.095, 0.036));
+      lily = min(lily, min(dfEll(c, vec2(0.0, 0.15), 0.0, vec2(0.03, 0.055)), dfEll(c, vec2(0.15, 0.0), 0.0, vec2(0.055, 0.03))));
+      lily = min(lily, abs(length(c) - 0.1) - 0.011);
+      float shapes = min(min(min(head, leaves), stem), min(band, lily));
+      float flame = min(dfEll(hp, vec2(0.0, 0.075), 0.0, vec2(0.016, 0.07)), length(c) - 0.05);
+      float aa = fwidth(r) * 1.2;
+      float fill = 1.0 - smoothstep(-aa, aa, shapes);
+      float streak = crNoise(vec2(r * 80.0, ang * 5.0) + seed);
+      float pool = smoothstep(0.45, 0.9, crNoise(hp * 22.0 + seed + 2.0));
+      float wash = fill * (0.48 + 0.2 * streak + 0.28 * pool * exp(shapes / 0.02));
+      wash = max(wash, (1.0 - smoothstep(-aa, aa, band)) * (0.78 + 0.14 * streak));
+      float lum = dot(baseColor, vec3(0.299, 0.587, 0.114));
+      vec3 pigment = baseColor * (1.0 - 0.32 * lum);
+      vec3 glaze = vec3(0.96, 0.95, 0.91) * (0.96 + 0.05 * crFbm(p * 5.0 + seed));
+      vec3 col = mix(glaze, pigment, wash);
+      col = mix(col, pigment * 0.5, crLine(shapes, 0.005) * 0.9);
+      float accent = 1.0 - smoothstep(-aa, aa, flame);
+      col = mix(col, mix(glaze, antipodalColor, 0.85 + 0.15 * streak), accent);
+      col = mix(col, antipodalColor * 0.55, crLine(flame, 0.004) * 0.8);
+      float crackle = crChips(p * 9.0 + seed).x;
+      col *= 1.0 - 0.07 * (1.0 - smoothstep(0.0, 0.01 + fwidth(crackle), crackle));
+      float sq = max(abs(p.x), abs(p.y));
+      col = mix(col, col * vec3(0.9, 0.84, 0.76), smoothstep(0.465, 0.5, sq));
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `],
+
+  // Cane webbing: chair cane in the seven-step weave — pairs of strands across
+  // and down, two diagonal families threaded over and under them, leaving the
+  // octagonal holes the dark backing shows through. Each glossy strand is
+  // rounded and streaked with fibre; at every crossing the one beneath ducks
+  // into shadow. The weave runs on across a solved face.
+  caneWebbing: [false, false, [], `
+    vec2 cwPair(float g, float hw) {
+      float sub = g - (g < 0.0 ? -0.104 : 0.104);
+      return vec2(sub / hw, abs(sub));
+    }
+    float cwOver(float hi, float hj, float mj) {
+      return hj > hi ? 1.0 - mj : 1.0;
+    }
+    float cwNear(float d, float hw) {
+      return 1.0 - smoothstep(hw, hw + 0.12, d);
+    }
+    vec3 cwCane(float s, float along, float seed, float lightSide, float shade) {
+      float prof = sqrt(max(0.0, 1.0 - s * s));
+      float fibre = crNoise(vec2(along * 2.5, s * 3.5 + seed * 17.0));
+      float lit = 0.5 + 0.45 * prof + 0.18 * s * lightSide;
+      vec3 c = baseColor * lit * (0.82 + 0.26 * fibre);
+      c += mix(baseColor, vec3(1.0), 0.6) * exp(-pow((s + 0.35 * lightSide) / 0.22, 2.0)) * 0.32;
+      return c * (1.0 - 0.6 * shade);
+    }
+    void main() {
+      vec2 slab = crSlab();
+      vec2 w = slab * 2.35;
+      float aa = length(fwidth(w)) * 0.6;
+      float gx = w.x - floor(w.x + 0.5), gy = w.y - floor(w.y + 0.5);
+      float a1 = w.x - w.y - 0.5, a2 = w.x + w.y - 0.5;
+      float g1 = (a1 - floor(a1 + 0.5)) * 0.7071, g2 = (a2 - floor(a2 + 0.5)) * 0.7071;
+      float hwP = 0.084, hwD = 0.074, pairHalf = 0.19;
+      vec2 sv = cwPair(gx, hwP), sh = cwPair(gy, hwP);
+      float mV = 1.0 - smoothstep(hwP - aa, hwP + aa, sv.y);
+      float mH = 1.0 - smoothstep(hwP - aa, hwP + aa, sh.y);
+      float m1 = 1.0 - smoothstep(hwD - aa, hwD + aa, abs(g1));
+      float m2 = 1.0 - smoothstep(hwD - aa, hwD + aa, abs(g2));
+      float par = mod(floor(w.x + 0.5) + floor(w.y + 0.5), 2.0) < 0.5 ? 0.5 : -0.5;
+      float hV = 2.0 + par * step(abs(gy), 0.25);
+      float hH = 2.0 - par * step(abs(gx), 0.25);
+      float nearV = step(abs(gx), abs(gy));
+      float h1 = mix(1.0, 3.0, nearV), h2 = mix(3.0, 1.0, nearV);
+      float vV = mV * cwOver(hV, hH, mH) * cwOver(hV, h1, m1) * cwOver(hV, h2, m2);
+      float vH = mH * cwOver(hH, hV, mV) * cwOver(hH, h1, m1) * cwOver(hH, h2, m2);
+      float v1 = m1 * cwOver(h1, hV, mV) * cwOver(h1, hH, mH) * cwOver(h1, h2, m2);
+      float v2 = m2 * cwOver(h2, hV, mV) * cwOver(h2, hH, mH) * cwOver(h2, h1, m1);
+      float pV = cwNear(abs(gx), pairHalf), pH = cwNear(abs(gy), pairHalf);
+      float p1 = cwNear(abs(g1), hwD), p2 = cwNear(abs(g2), hwD);
+      float shV = max(max(step(hV, hH) * pH, step(hV, h1) * p1), step(hV, h2) * p2);
+      float shH = max(max(step(hH, hV) * pV, step(hH, h1) * p1), step(hH, h2) * p2);
+      float sh1 = max(max(step(h1, hV) * pV, step(h1, hH) * pH), step(h1, h2) * p2);
+      float sh2 = max(max(step(h2, hV) * pV, step(h2, hH) * pH), step(h2, h1) * p1);
+      vec3 cV = cwCane(sv.x, w.y, floor(w.x + 0.5) + step(0.0, gx) * 0.5, -1.0, shV);
+      vec3 cH = cwCane(sh.x, w.x, floor(w.y + 0.5) + step(0.0, gy) * 0.5 + 3.0, 1.0, shH);
+      vec3 c1 = cwCane(g1 / hwD, w.x + w.y, floor(a1 + 0.5) + 7.0, 1.0, sh1);
+      vec3 c2 = cwCane(g2 / hwD, w.x - w.y, floor(a2 + 0.5) + 11.0, -1.0, sh2);
+      float prox = max(max(pV, pH), max(p1, p2));
+      vec3 backing = baseColor * 0.1 + vec3(0.015);
+      backing *= 1.0 - 0.6 * prox;
+      float bare = (1.0 - mV) * (1.0 - mH) * (1.0 - m1) * (1.0 - m2);
+      vec3 col = cV * vV + cH * vH + c1 * v1 + c2 * v2;
+      col *= 0.88 + 0.22 * crFbm(slab * 0.6 + 4.0);
+      col += backing * bare;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `],
 };
 
 // [usesAntipodal, animated, helpers, body]

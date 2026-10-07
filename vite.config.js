@@ -90,6 +90,11 @@ export default defineConfig({
           // gameplay/screens. Cache this dependency-free data independently so
           // adding authored worlds does not inflate the main application chunk.
           if (/\/src\/worm\/story\/(levels|worlds)\.js$/.test(id)) return 'worm-story-data';
+          // Tile-style GLSL is string data, and the catalogue grows a family at a
+          // time; its own chunk keeps that growth out of the main application
+          // chunk. The sticker finish (which reads the light rig) and the modules
+          // built on it stay with the app, so this chunk never imports back into it.
+          if (/\/src\/3d\/styles\/shaders\/(?!shaderBase|stickerFinish|basicShaders|natureShaders|techShaders)\w+\.js$/.test(id)) return 'tile-shaders';
           // Shared CJS helpers must not live in the optional solver chunk.
           if (id.includes('commonjsHelpers')) return 'vendor-react';
           if (!id.includes('node_modules')) return;
