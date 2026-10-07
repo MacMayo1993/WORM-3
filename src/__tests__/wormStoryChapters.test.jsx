@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WORM_STORY_LEVELS, WORM_STORY_CHAPTERS, STORY_MECHANIC_LABELS, storyChapterId, storyChapterIndex,
   isChapterFinale, storyLaunchSettings, storyLevel, storyUnlocked, storyChecklist } from '../worm/story/levels.js';
 import { STORY_WORLDS, storyView, storyAppearance } from '../worm/story/worlds.js';
-import { stageStory, storyBodyPath, storyMouths } from '../worm/story/runtime.js';
+import { stageStory, replenishStoryOrbs, storyBodyPath, storyMouths } from '../worm/story/runtime.js';
 import { nextStoryPower, updateMastery, offerStoryPower } from '../worm/story/mastery.js';
 import { makeWormSim, resetWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 import { getActiveTunnels } from '../worm/wormLogic.js';
@@ -27,12 +27,12 @@ const stage = (level, character = 'classic') => {
 const VISUAL_MODES = ['classic', 'grid', 'sudokube', 'wireframe', 'glass', 'chrome', 'neon', 'gap', 'lego'];
 
 describe('chapter structure', () => {
-  it('groups forty levels into four chapters of ten, numbered 1-10, 11-20, 21-30, 31-40', () => {
-    expect(WORM_STORY_LEVELS.map(level => level.id)).toEqual(Array.from({ length: 40 }, (_, i) => i + 1));
+  it('groups 120 consecutive levels into twelve chapters of ten', () => {
+    expect(WORM_STORY_LEVELS.map(level => level.id)).toEqual(Array.from({ length: 120 }, (_, i) => i + 1));
     expect(WORM_STORY_CHAPTERS.map(chapter => chapter.levels.map(level => level.id))).toEqual(
-      [0, 1, 2, 3].map(c => Array.from({ length: 10 }, (_, i) => c * 10 + i + 1)));
+      Array.from({ length: 12 }, (_, c) => Array.from({ length: 10 }, (_, i) => c * 10 + i + 1)));
     expect([storyChapterId(10), storyChapterId(11), storyChapterIndex(14), storyChapterIndex(40)]).toEqual([1, 2, 4, 10]);
-    expect(WORM_STORY_LEVELS.filter(level => isChapterFinale(level.id)).map(level => level.id)).toEqual([10, 20, 30, 40]);
+    expect(WORM_STORY_LEVELS.filter(level => isChapterFinale(level.id)).map(level => level.id)).toEqual(Array.from({ length: 12 }, (_, i) => (i + 1) * 10));
   });
 
   it('unlocks a chapter only when the previous chapter is finished', () => {
@@ -40,6 +40,10 @@ describe('chapter structure', () => {
     expect(storyUnlocked(cleared(10), 11)).toBe(true);
     expect(storyUnlocked(cleared(29), 31)).toBe(false);
     expect(storyUnlocked(cleared(30), 31)).toBe(true);
+    expect(storyUnlocked(cleared(39), 41)).toBe(false);
+    expect(storyUnlocked(cleared(40), 41)).toBe(true);
+    expect(storyUnlocked(cleared(118), 120)).toBe(false);
+    expect(storyUnlocked(cleared(119), 120)).toBe(true);
   });
 });
 
@@ -69,7 +73,7 @@ describe('the new chapters use the whole cube', () => {
       expect(goals.at(-1)).toBe(Math.max(...goals));
     }
     const finale = storyLevel(40);
-    expect(finale.limit).toBe(Math.max(...WORM_STORY_LEVELS.map(level => level.limit)));
+    expect(finale.limit).toBe(Math.max(...WORM_STORY_LEVELS.filter(level => level.id <= 40).map(level => level.limit)));
   });
 });
 
@@ -88,7 +92,7 @@ describe('mini cube precision stages', () => {
     for (const { size, sim, staged } of [normal, classic]) {
       const tiles = 6 * size * size;
       expect(sim.powerups.length / tiles).toBeLessThanOrEqual(0.6);
-      expect(sim.powerups.length).toBeGreaterThan(level.orbs ?? (level.kind === 'orbs' ? level.target : 0));
+      if (level.id <= 40) expect(sim.powerups.length).toBeGreaterThan(level.orbs ?? (level.kind === 'orbs' ? level.target : 0));
       for (const face of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
         const pickups = sim.powerups.filter(orb => orb.dirKey === face);
         expect(pickups.length).toBeGreaterThanOrEqual(2);
@@ -98,7 +102,7 @@ describe('mini cube precision stages', () => {
         }
       }
       expect(sim.specials).toHaveLength(0);
-      expect(getActiveTunnels(staged.cubies, size)).toHaveLength(level.kind === 'tunnel' ? Math.min(2,level.target) : 0);
+      expect(getActiveTunnels(staged.cubies, size)).toHaveLength(['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? Math.min(2,level.target) : 0);
     }
   });
   it('retains the later pocket stage as a harder rotation challenge', () => {
@@ -115,8 +119,8 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
     const pairs = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
     expect(tunnels).toHaveLength(Math.min(2,pairs));
     expect(tunnels.length + staged.pendingMouths.length).toBe(pairs);
-    // The opening route already holds enough for the goal before refills.
-    expect(sim.powerups.length).toBeGreaterThanOrEqual(Math.max(level.orbs ?? 0, level.kind === 'orbs' ? level.target : 0));
+    // Authored opening inventories are unchanged; new routes may rely on real refills.
+    if (level.id <= 40) expect(sim.powerups.length).toBeGreaterThanOrEqual(Math.max(level.orbs ?? 0, level.kind === 'orbs' ? level.target : 0));
     const colors = new Set(sim.powerups.map(orb => staged.cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].curr));
     expect(colors.size).toBe(6);
     const body = new Set(storyBodyPath(size, level).map(([x, y]) => `${x},${y},${size - 1},PZ`));
@@ -127,6 +131,13 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
       for (const axis of ['x', 'y', 'z']) expect(orb[axis]).toBeGreaterThanOrEqual(0), expect(orb[axis]).toBeLessThan(size);
     }
     for (const [x, y] of storyBodyPath(size, level)) expect(x >= 0 && x < size && y >= 0 && y < size).toBe(true);
+  });
+
+  it('restores all six colors after depletion, even when the target exceeds opening inventory', () => {
+    const { size, sim, staged } = stage(level);
+    sim.powerups = []; sim.specials = []; staged.orbRefillDelay = 0;
+    expect(replenishStoryOrbs(sim, staged, { cubies: staged.cubies }, size, 0.1)).toBe(true);
+    expect(new Set(sim.powerups.map(orb => staged.cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].orig)).size).toBe(6);
   });
 
   it('keeps tunnel mouths clear of the head and its body', () => {
@@ -244,7 +255,7 @@ describe('chapter UI', () => {
     const complete = vi.fn(), unlockTwelve = () => useGameStore.setState({ playerProgress: cleared(11) });
     act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={() => {}} initialPage="story" />));
     const tabs = [...host.querySelectorAll('.worm-chapter-tabs button')];
-    expect(tabs.map(tab => tab.disabled)).toEqual([false, false, true, true]);
+    expect(tabs.map(tab => tab.disabled)).toEqual([false, false, ...Array(10).fill(true)]);
     // Resumes on the first unplayed level, which is the start of chapter two.
     expect(host.querySelector('.worm-level-grid [aria-pressed="true"]').getAttribute('aria-label')).toContain('Pocket Crawl');
     expect([...host.querySelectorAll('.worm-level-grid button')]).toHaveLength(10);
@@ -258,7 +269,18 @@ describe('chapter UI', () => {
     expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 12, cubeSize: 3, megaMode: false }));
   });
 
-  it.each([[14, 'Level complete', 'Next level'], [20, 'Chapter complete', 'Start chapter 3'], [40, 'Story complete', 'Levels']])(
+  it.each([[40, 41, 5], [119, 120, 12]])('resumes a %i-level save and launches generated level %i in chapter %i', (completed, id, chapter) => {
+    useGameStore.setState({ playerProgress: cleared(completed), ownedItems: [], parityPoints: 0 });
+    const complete = vi.fn();
+    act(() => root.render(<WormEntryScreen onComplete={complete} onCancel={() => {}} initialPage="story" />));
+    expect(host.querySelector('.worm-chapter-tabs [aria-pressed="true"]').getAttribute('aria-label')).toContain(`Chapter ${chapter}:`);
+    expect(host.querySelector('.worm-level-grid [aria-pressed="true"]').getAttribute('aria-label')).toContain(`Level ${id}:`);
+    click('Play level');
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: id, cubeSize: storyLevel(id).cubeSize,
+      perFaceStyles: STORY_WORLDS[id].styles, ...storyAppearance(id) }));
+  });
+
+  it.each([[14, 'Level complete', 'Next level'], [20, 'Chapter complete', 'Start chapter 3'], [40, 'Chapter complete', 'Start chapter 5'], [110, 'Chapter complete', 'Start chapter 12'], [120, 'Story complete', 'Levels']])(
     'titles the level %i result and offers the right next step', (id, heading, primary) => {
       const next = vi.fn(), levels = vi.fn();
       useGameStore.setState({ wormStoryResult: { levelId: id, stars: 2, seconds: 100, xp: 50, points: 30 } });
@@ -268,6 +290,6 @@ describe('chapter UI', () => {
       const button = host.querySelector('.worm-story-primary');
       expect(button.textContent).toContain(primary);
       act(() => button.click());
-      expect((id === 40 ? levels : next)).toHaveBeenCalledOnce();
+      expect((id === 120 ? levels : next)).toHaveBeenCalledOnce();
     });
 });

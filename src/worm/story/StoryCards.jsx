@@ -8,7 +8,7 @@ import { storyLevel, storyChecklist, storyStars, WORM_STORY_LEVELS, storyChapter
 import { feel, resumeFeel } from '../../utils/feel.js';
 import '../../components/screens/wormStory.css';
 
-// "Chapter 2 · Level 4 / 10": levels are numbered 1-40 globally but read within their chapter.
+// "Chapter 2 · Level 4 / 10": levels are numbered globally but read within their chapter.
 const chapterLine = id => `Chapter ${storyChapterId(id)} · Level ${storyChapterIndex(id)} / ${STORY_CHAPTER_SIZE}`;
 
 export function StoryRewardChoices({ level }) {

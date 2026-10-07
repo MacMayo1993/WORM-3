@@ -1,3 +1,5 @@
+import { WORM_GENERATED_LEVELS, WORM_GENERATED_CHAPTERS } from './generated.js';
+
 // Authored chapter one. Cosmetic IDs are shared with the existing Parity Store.
 export const WORM_STORY_LEVELS = [
   { id: 1, cubeSize: 6, title: 'First Crawl', subtitle: 'The whole cube is your route.',
@@ -171,6 +173,7 @@ export const WORM_STORY_LEVELS = [
     kind: 'mastery', target: 6, orbs: 40, rotations: 10, speed: 2.55, rotateEvery: 10, par: 650, limit: 975,
     mechanics: { ringHeals: 1, signatures: 2, boosts: 2, doubleJumps: 2, rockets: 1, magnetOrbs: 4, explodes: 2, elements: 5, bombs: 2, kills: 6 },
     reward: ['skin_mono', 'skin_cherry'], rewardLabel: 'Choose a grandmaster skin', fallback: 500 },
+  ...WORM_GENERATED_LEVELS,
 ];
 // Ten levels to a chapter. Unlocks stay linear across chapter boundaries: the
 // first level of a chapter opens when the last level of the one before is cleared.
@@ -180,6 +183,7 @@ export const WORM_STORY_CHAPTERS = [
   { id: 2, title: 'Every Size', blurb: 'From the 2×2 pocket cube to 8×8, in grid, number, glass, chrome and neon views.' },
   { id: 3, title: 'Strange Views', blurb: 'Hollow frames, bare wireframe, bricks, biome colors and the far side—with one tile style per level.' },
   { id: 4, title: 'Grand Crawl', blurb: 'Nine, ten and fifteen layers. Every view and power, on shorter clocks.' },
+  ...WORM_GENERATED_CHAPTERS,
 ].map(chapter => ({ ...chapter, levels: WORM_STORY_LEVELS.filter(level => storyChapterId(level.id) === chapter.id) }));
 export function storyChapterId(id) { return Math.ceil(id / STORY_CHAPTER_SIZE); }
 export const storyChapter = id => WORM_STORY_CHAPTERS.find(chapter => chapter.id === storyChapterId(id)) ?? null;

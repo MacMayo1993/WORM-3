@@ -168,7 +168,11 @@ it('keeps six-level saves and claims intact, resumes at seven, and carries chapt
   const complete = { wormStory: { stars: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i+1, 3])) } };
   expect(nextStoryLevel(complete).id).toBe(11);
   const all = { wormStory: { stars: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [i+1, 3])) } };
-  expect(nextStoryLevel(all).id).toBe(40);
+  expect(nextStoryLevel(all).id).toBe(41);
+  const saved = sanitizeStoryProgress(all.wormStory);
+  expect(saved.stars).toEqual(all.wormStory.stars);
+  const full = { wormStory: { stars: Object.fromEntries(Array.from({ length: 120 }, (_, i) => [i+1, 3])) } };
+  expect(nextStoryLevel(full).id).toBe(120);
 });
 
 const head = { x: 0, y: 0, z: 4, dirKey: 'PZ' };

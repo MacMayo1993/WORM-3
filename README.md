@@ -4,7 +4,7 @@
 
 WORM³ combines a twistable 3D cube, antipodal tile flips, and a real-time worm game on the same changing surface. Turn a layer to move pieces, flip a tile and its linked partner, jump onto a raised wormhole, crawl through the cube, and heal the route behind you. The cube is both the puzzle and the level.
 
-The project includes arcade survival, a 40-level WORM campaign, cube puzzles, a guided solving course, Chaos prediction rounds, a constantly remixing visual mode, and an unlockable collection of characters and cosmetics. It runs in the browser with mouse, keyboard, and touch controls.
+The project includes arcade survival, a 120-level WORM campaign, cube puzzles, a guided solving course, Chaos prediction rounds, a constantly remixing visual mode, and an unlockable collection of characters and cosmetics. It runs in the browser with mouse, keyboard, and touch controls.
 
 [Play WORM³](https://macmayo1993.github.io/WORM-3/)
 
@@ -16,7 +16,7 @@ The project includes arcade survival, a 40-level WORM campaign, cube puzzles, a 
 - [WORM movement, healing, and survival](#worm-movement-healing-and-survival)
 - [Powers and elemental effects](#powers-and-elemental-effects)
 - [Playable worms and signature abilities](#playable-worms-and-signature-abilities)
-- [WORM Story: all 40 levels](#worm-story-all-40-levels)
+- [WORM Story: 120 levels](#worm-story-120-levels)
 - [Cube campaigns, daily puzzles, and teaching](#cube-campaigns-daily-puzzles-and-teaching)
 - [Chaos and Disparity](#chaos-and-disparity)
 - [Progression, missions, and the store](#progression-missions-and-the-store)
@@ -82,7 +82,7 @@ The main cube carousel has six destinations: **WORM, FLIP CUBE, TEACH, CHAOS, RA
 | Mode or destination | How it plays | Current scope |
 | --- | --- | --- |
 | **WORM — Free Play** | Collect orbs, survive changing terrain, traverse and heal wormholes, and restore the cube. | Sizes **2×2 through 10×10**, plus **15×15 Mega**; Easy, Medium, and Hard presets; optional portal enemies. |
-| **WORM — Story** | Complete timed objectives introducing movement, healing, powers, enemies, and unusual worlds. | **40 levels in four chapters**, with stars and rewards. |
+| **WORM — Story** | Complete timed objectives introducing movement, healing, powers, enemies, and unusual worlds. | **120 levels in twelve chapters**, with stars and rewards. |
 | **WORM — guided practice** | Learn steering, jumps, tunnel travel, healing, and related actions through the introduction's practice sequence. | Scripted teaching targets rather than a normal free-play run. |
 | **Portal Combat (preview)** | Survive three enemy waves or seal the portal; shoot parity projectiles and use elemental attacks. | WORM setup option; a **5×5** arena with no rotating slices. |
 | **FLIP CUBE** | A customizable cube puzzle with turns, antipodal flips, shuffle/reset/undo, and optional views or overlays. | Sizes **2×2 through 10×10**. |
@@ -194,9 +194,9 @@ Characters have different silhouettes, faces, body animation, and signature beha
 
 Abilities require an eligible surface state and respect pauses, airborne actions, live turns, transit, and individual restrictions. The signature control shows availability and the reason an action must wait.
 
-## WORM Story: all 40 levels
+## WORM Story: 120 levels
 
-WORM Story is a separate action campaign from the cube puzzle packs. Four ten-level chapters have linear unlocks. Each level supplies a preflight checklist, live objectives, a time limit, a target time, and an authored scene.
+WORM Story is a separate action campaign from the cube puzzle packs. Twelve ten-level chapters have linear unlocks. The first 40 authored levels are followed by 80 seeded levels. Each level supplies a preflight checklist, live objectives, a time limit, a target time, and a fixed world setting.
 
 Chapter 1 uses **6×6 boards with classic solid-color tiles** throughout, letting players learn the mechanics before decorative surfaces become part of the challenge. Ordinary orbs replenish during the stages. Later chapters introduce sizes, materials, views, powers, and combinations of objectives.
 
@@ -207,7 +207,24 @@ Chapter 1 uses **6×6 boards with classic solid-color tiles** throughout, lettin
 | **Strange Views** | 21–30 | Hollow frames, wireframe, bricks, biome colors, and the far-side window; one consistent tile style per level. |
 | **Grand Crawl** | 31–40 | 9×9, 10×10, and 15×15 terrain; combinations of traversal, powers, combat, and restoration. |
 
-### Level catalog
+### Generated chapters 5–12
+
+| Chapter | Levels | Name |
+| --- | --- | --- |
+| 5 | 41–50 | Electric Garden |
+| 6 | 51–60 | Aurora Odyssey |
+| 7 | 61–70 | Crystal Crown |
+| 8 | 71–80 | Copper Frontier |
+| 9 | 81–90 | Lunar Spiral |
+| 10 | 91–100 | Neon Relay |
+| 11 | 101–110 | Lunar Circuit |
+| 12 | 111–120 | Copper Horizon |
+
+Each new chapter mixes collection, tunnels, body jumps, rotations, healing, elemental pickups, Explode/Rocket quests, combat, and a summit. Small boards receive compatible objectives. Ordinary food and required powers recur; opening inventory is not a lifetime pickup allowance. Existing 40-level saves continue at level 41, and the campaign ends at level 120. Supply and completion predicates are checked against the game runtime; complete player runs still need playtesting.
+
+The repeatable recipe, exact configurations, worlds, and chapter metadata are in [generated.js](src/worm/story/generated.js). See the [campaign workshop](tools/worm-level-auditor/README.md) for local auditing, editing, import/export, and regeneration.
+
+### Authored levels 1–40
 
 These summaries describe the main skill; the in-game checklist gives exact counts and completion requirements.
 
@@ -271,7 +288,7 @@ Rewards include Parity Points and choices of hats, palettes, skins, trails, or a
 
 The mixed-move par solver minimizes **turns + finishing flips**. It searches turn sequences and evaluates the remaining paired flips at each candidate arrangement, rather than assuming the original scramble length is optimal. The algebraic flip-only decoder is a related tool with different assumptions; its formula is not substituted for the complete mixed-move puzzle cost.
 
-The former **Life Journey** campaign definitions remain as legacy content. They are not the active Topological Descent pack and are not the 40-level WORM Story campaign.
+The former **Life Journey** campaign definitions remain as legacy content. They are not the active Topological Descent pack and are not the WORM Story campaign.
 
 ### TEACH and Solve
 
@@ -463,7 +480,7 @@ WORM³ uses React 18, Vite 5, Three.js, React Three Fiber/Drei, post-processing,
 | Cube and materials | [3d/](src/3d/), [manifold/](src/manifold/) | Cubies, stickers, raised platforms, tunnels, shaders, scene effects. |
 | WORM simulation | [HealerWormMode.jsx](src/worm/HealerWormMode.jsx), [wormSim.js](src/worm/healerWorm/wormSim.js), [wormLogic.js](src/worm/wormLogic.js) | Run lifecycle, crawling, jumps, transit, body history, collisions, healing, powers. |
 | Characters and combat | [wormCharacterData.js](src/worm/wormCharacterData.js), [signatures.js](src/worm/healerWorm/signatures.js), [combat/](src/worm/combat/) | Abilities, enemies, projectiles, elements, waves. |
-| WORM Story | [story/levels.js](src/worm/story/levels.js), [story/worlds.js](src/worm/story/worlds.js), [story/](src/worm/story/) | Forty levels, chapters, objectives, worlds, rewards. |
+| WORM Story | [story/levels.js](src/worm/story/levels.js), [story/worlds.js](src/worm/story/worlds.js), [story/](src/worm/story/) | 120 levels, chapters, objectives, worlds, rewards; generated definitions in [story/generated.js](src/worm/story/generated.js). |
 | Cube campaigns | [levels/](src/levels/), [parSolver.js](src/levels/parSolver.js) | Packs, generation, exact mixed-move par search, daily challenges, records. |
 | Teaching | [teach/](src/teach/) | Course, notation, algorithms, stage detection, solving guidance. |
 | Chaos | [chaosSim.js](src/game/chaosSim.js), [chaosWorker.js](src/workers/chaosWorker.js), [chaos/](src/chaos/) | Off-thread cascade simulation, match HUD, forecasts/results. |
@@ -483,6 +500,8 @@ Use **Node.js 20** and **npm 10+**. The repository pins the toolchain through `.
 npm ci
 npm run dev
 ```
+
+For the local WORM level auditor and generator, run `npm run worm:tools` and open <http://127.0.0.1:4174/>. Regenerate the shipped campaign with `npm run worm:generate`, or check it without writing with `npm run worm:generate -- --check`. Tool files stay outside the game's public assets and normal production build.
 
 Vite starts on port 5173. With the default base path, open `http://localhost:5173/WORM-3/`.
 

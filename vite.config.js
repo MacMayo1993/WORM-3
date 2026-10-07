@@ -89,7 +89,7 @@ export default defineConfig({
           // Story definitions are shared by startup progress/settings and lazy
           // gameplay/screens. Cache this dependency-free data independently so
           // adding authored worlds does not inflate the main application chunk.
-          if (/\/src\/worm\/story\/(levels|worlds)\.js$/.test(id)) return 'worm-story-data';
+          if (/\/src\/worm\/story\/(levels|worlds|generated)\.js$/.test(id)) return 'worm-story-data';
           // Tile-style GLSL is string data, and the catalogue grows a family at a
           // time; its own chunk keeps that growth out of the main application
           // chunk. The sticker finish (which reads the light rig) and the modules
