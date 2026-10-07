@@ -6,12 +6,17 @@ it('starts production players with Classic and a one-time twenty-gem wallet', as
   expect(s.ownedItems).toContain('character_classic'); expect(s.ownedItems).not.toContain('character_mobi');
   expect(s.chestWallet.gems).toBe(20); expect(s.wormCharacter).toBe('classic');
 });
-it.each([false, true])('keeps existing character access during migration even with damaged settings: %s', async broken => {
-  localStorage.setItem('worm3_player_progress_v1', JSON.stringify({ version: 1, progress: { xp: 0 }, points: 80, ownedItems: ['skin_royal'] }));
+const clearedLevels = n => ({ stars: Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, 1])), claimed: {} });
+it.each([false, true])('re-locks worms granted before levels earned them, even with damaged settings: %s', async broken => {
+  localStorage.setItem('worm3_player_progress_v1', JSON.stringify({ version: 1, progress: { xp: 0, wormStory: clearedLevels(23) }, points: 80,
+    ownedItems: ['skin_royal', 'character_mobi', 'character_prism', 'trail_comet'] }));
   localStorage.setItem('worm3_character', 'mobi');
   if (broken) localStorage.setItem('worm3_settings', '{');
   const { persistedState: s } = await import('../hooks/storeSlices/persistedState.js');
-  expect(s.ownedItems).toContain('character_mobi'); expect(s.ownedItems).toContain('character_prism'); expect(s.ownedItems).toContain('skin_royal');
+  // 23 levels cleared earns Classic, Inch Worm and Glow Worm.
+  expect(s.ownedItems.filter(id => id.startsWith('character_')).sort()).toEqual(['character_classic', 'character_glow', 'character_inch']);
+  expect(s.ownedItems).toContain('skin_royal'); expect(s.ownedItems).not.toContain('trail_comet');
+  expect(s.wormCharacter).toBe('classic');
   expect(s.chestWallet.gems).toBe(20);
 });
 it('keeps an empty gem wallet empty and rejects an unowned saved character', async () => {

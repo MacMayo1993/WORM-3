@@ -5,7 +5,7 @@ import { HANDMADE_HATS, WORM_ACCESSORIES } from '../worm/handmadeAccessoriesData
 
 import { SCHEME_LABELS, TILE_STYLES } from './colorSchemes.js';
 import { WORM_CHARACTERS } from '../worm/wormCharacterData.js';
-import { WORM_TRAILS } from '../worm/wormCosmeticsData.js';
+import { characterUnlockLevels } from '../worm/wormUnlocks.js';
 
 // ── Worm Skins ────────────────────────────────────────────────────────────────
 export const STORE_SKINS = [
@@ -39,26 +39,6 @@ export const STORE_HATS = [
   { id: 'hat_wizard', type: 'hat', category: 'hats', hatId: 'wizard', label: 'Wizard',  price: 200 },
   { id: 'hat_grad',   type: 'hat', category: 'hats', hatId: 'grad',   label: 'Grad Cap', price: 200 },
 ];
-
-// ── Trails ────────────────────────────────────────────────────────────────────
-const TRAIL_PRICES = {
-  classic: 0,
-  comet: 200, bubble: 200,
-  circuit: 250, ember: 250,
-  frost: 200, nebula: 250,
-  prism: 300,
-};
-
-export const STORE_TRAILS = WORM_TRAILS.map(t => ({
-  id: `trail_${t.id}`,
-  type: 'trail',
-  category: 'trails',
-  trailId: t.id,
-  label: t.label,
-  price: TRAIL_PRICES[t.id] ?? 200,
-  body: t.body,
-  glow: t.glow,
-}));
 
 // ── Color Schemes ─────────────────────────────────────────────────────────────
 // standard and custom are always free.
@@ -161,7 +141,11 @@ export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({
 }));
 
 // ── Combined catalog ──────────────────────────────────────────────────────────
-export const STORE_CHARACTERS = WORM_CHARACTERS.map(c => ({ id: `character_${c.id}`, type: 'character', category: 'characters', characterId: c.id, label: c.label, price: c.id === 'classic' ? 0 : 1000 }));
+// Worms are earned by clearing WORM levels (see worm/wormUnlocks.js), never
+// bought or rolled: they sit in the catalog only so ownership has one id format.
+// Classic's price 0 makes it default-owned; the rest are never offered for sale.
+export const STORE_CHARACTERS = WORM_CHARACTERS.map(c => ({ id: `character_${c.id}`, type: 'character', category: 'characters', characterId: c.id, label: c.label,
+  price: c.id === 'classic' ? 0 : null, unlockLevels: characterUnlockLevels(c.id) }));
 
 export const STORE_ACCESSORIES = WORM_ACCESSORIES.map(item => ({ ...item, id: `accessory_${item.id}`, accessoryId: item.id, type: 'accessory', category: 'accessories' }));
 
@@ -170,7 +154,6 @@ export const STORE_ITEMS = [
   ...STORE_CHARACTERS,
   ...STORE_SKINS,
   ...STORE_HATS,
-  ...STORE_TRAILS,
   ...STORE_SCHEMES,
   ...STORE_TILES,
 ];
@@ -187,7 +170,6 @@ export const getStoreItem = (id) => STORE_ITEMS.find(i => i.id === id) ?? null;
 
 export const getSkins   = () => STORE_SKINS;
 export const getHats    = () => STORE_HATS;
-export const getTrails  = () => STORE_TRAILS;
 export const getSchemes = () => STORE_SCHEMES;
 export const getTiles   = () => STORE_TILES;
 

@@ -11,7 +11,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { SURFACE_OFFSET } from '../../utils/constants.js';
 import { liveCubies } from '../liveCubies.js';
 import { ttAt } from '../circularBuffers.js';
-import { getSkin, getTrail } from '../wormCosmeticsData.js';
+import { getSkin } from '../wormCosmeticsData.js';
 import { liveRotation } from '../liveRotation.js';
 import { FACE_NORMALS, BODY_BALL_SPACING } from './constants.js';
 import { fxBudget } from './fxBudget.js';
@@ -122,11 +122,7 @@ export function WormTrail({ abilityTrail = false, worm, size }) {
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormShowTrail = useGameStore(s => s.wormShowTrail ?? true);
     const skin = getSkin(wormSkinId);
-    // A trail's body/glow are null for "Classic", which paints the trail in the
-    // equipped skin's colors — the look every save already has. Any other
-    // equipped trail overrides both colors regardless of skin.
-    const wormTrailId = useGameStore(s => s.wormTrail ?? 'classic');
-    const equippedTrail = getTrail(wormTrailId);
+    // The stroke is painted in the equipped skin's colors.
     // Parsed once per palette change, not once per daub. Each daub used to run
     // THREE.Color.set(hexString) — a regex parse of the same two strings — and the
     // frame paints up to TRAIL_DAUB_CAP daubs plus TRAIL_GLOW_CAP halos, so the
@@ -137,8 +133,8 @@ export function WormTrail({ abilityTrail = false, worm, size }) {
         trailColorsRef.current = { bodyHex: null, glowHex: null, body: new THREE.Color(), glow: new THREE.Color() };
     }
     {
-        const bodyHex = equippedTrail.body ?? skin.body;
-        const glowHex = equippedTrail.glow ?? skin.glow;
+        const bodyHex = skin.body;
+        const glowHex = skin.glow;
         const tc = trailColorsRef.current;
         if (tc.bodyHex !== bodyHex) { tc.bodyHex = bodyHex; tc.body.set(bodyHex); }
         if (tc.glowHex !== glowHex) { tc.glowHex = glowHex; tc.glow.set(glowHex); }

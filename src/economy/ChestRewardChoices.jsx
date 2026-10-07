@@ -15,12 +15,6 @@ function RewardPreview({ item }) {
     return <CubePreviewCanvas px={88} size={3} animated={false} interactive={false}
       colors={COLOR_SCHEMES[item.schemeKey] ?? COLOR_SCHEMES.standard} tileStyle={item.tileKey ?? 'solid'} />;
   }
-  if (item.type === 'trail') {
-    return <svg width="88" height="88" viewBox="0 0 88 88" aria-hidden="true">
-      {[0, 1, 2, 3, 4, 5, 6].map(i => <circle key={i} cx={12 + i * 10} cy={44 + Math.sin(i) * 13}
-        r={9 - i} fill={item.body ?? item.glow ?? '#a8db82'} opacity={1 - i * .1} />)}
-    </svg>;
-  }
   return <WormPreviewCanvas size={88} characterId={item.characterId ?? 'classic'}
     accessories={accessoryPreviewEquipment(item)} skinId={item.skinId ?? 'slime'} hatId={item.hatId ?? 'none'} framing={item.type === 'accessory' ? accessoryFraming(item.slot) : item.type === 'hat' ? 'head' : 'body'} />;
 }

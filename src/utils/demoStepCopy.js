@@ -30,7 +30,7 @@ export const STEP_COPY = {
   'chaos-forecast': 'Which color pair will last? Pick one, then tap where the storm strikes first. Flips wear tiles out, and worn-out twins drop out together. Tap damaged tiles to heal them.',
   // Random remixes the look only (useRandomMode); the rules never change.
   'random-showcase': 'Feeling curious? Random remixes the colors and tile looks every ten seconds while you solve. Only the look changes; the puzzle stays the same.',
-  'cosmetic-reward': 'Let’s visit the Store. Spend Parity Points on new worms with their own signature moves, trails, hats, palettes, and tiles—or save them. WORM runs, Chaos rounds, and first solves earn more.'
+  'cosmetic-reward': 'Let’s visit the Store. Spend Parity Points on skins, hats, palettes, and tiles—or save them. New worms, each with a signature move, unlock as you clear WORM levels. WORM runs, Chaos rounds, and first solves earn more.'
 };
 
 // These modes need a briefing before their timers or launch controls begin.

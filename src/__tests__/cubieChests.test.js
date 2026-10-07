@@ -90,15 +90,18 @@ it('uses catalog prices, rejects negative/non-finite money, and equips only owne
   expect(state().parityPoints).toBe(200);
   expect(state().buyItem('missing', -100)).toBe(false);
   expect(state().buyItem('skin_royal', -100)).toBe(true); expect(state().parityPoints).toBe(50);
+  // Worms are earned by clearing levels, never bought.
+  expect(state().buyItem('character_mobi', 0)).toBe(false); expect(state().ownedItems).not.toContain('character_mobi');
   useGameStore.setState({ wormCharacter: 'classic' }); state().setWormCharacter('mobi'); expect(state().wormCharacter).toBe('classic');
   useGameStore.setState({ ownedItems: [...state().ownedItems, 'character_mobi'] });
   state().setWormCharacter('mobi'); expect(state().wormCharacter).toBe('mobi');
 });
-it('persists a mythic choice before granting the selected character exactly once', () => {
+it('persists a mythic choice before granting the selected item exactly once, never offering a worm', () => {
   vi.spyOn(crypto, 'getRandomValues').mockImplementation(array => { array[0] = Math.floor(.995 * 4294967296); return array; });
   const { receipt } = state().rollCubieChest('single');
   expect(receipt.tier).toBe(5); expect(receipt.reward.kind).toBe('choice');
   expect(receipt.reward.itemIds).toHaveLength(3);
+  expect(receipt.reward.itemIds.some(id => id.startsWith('character_'))).toBe(false);
   const itemId = receipt.reward.itemIds[1];
   expect(readPlayerSave().ownedItems).not.toContain(itemId);
   expect(state().chooseChestReward(receipt.id, itemId).error).toBeTruthy();
@@ -110,8 +113,7 @@ it('persists a mythic choice before granting the selected character exactly once
   expect(readPlayerSave().ownedItems).toContain(itemId);
   expect(state().chooseChestReward(receipt.id, receipt.reward.itemIds[0]).error).toBeTruthy();
   expect(readPlayerSave().ownedItems).not.toContain(receipt.reward.itemIds[0]);
-  const character = itemId.replace('character_', ''); state().setWormCharacter(character);
-  expect(state().wormCharacter).toBe(character); expect(state().chestWallet.gems).toBe(10);
+  expect(state().chestWallet.gems).toBe(10);
 });
 
 it.each([1, 2, 3, 4, 5])('offers three unique unowned cosmetics in tier %i, filling any remaining slots with owned cosmetics', tier => {

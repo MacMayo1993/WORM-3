@@ -1,6 +1,7 @@
 import { characterXpMultiplier } from '../characterAbilities.js';
 import { addXp } from '../../progression/model.js';
 import { storyLevel, storyStars, storyUnlocked, storyOutcome } from './levels.js';
+import { grantCharacterUnlocks } from '../wormUnlocks.js';
 
 export function completeStoryChanges(state, runId, metrics) {
   const level = storyLevel(state.wormStoryLevel);
@@ -18,9 +19,13 @@ export function completeStoryChanges(state, runId, metrics) {
     stars: { ...state.playerProgress.wormStory?.stars, [level.id]: Math.max(old, result.stars) },
   } };
   const grant = addXp(progress, xp, 'worm');
+  // Every tenth level cleared earns the next worm.
+  const ownedItems = grantCharacterUnlocks(state.ownedItems, grant.progress);
+  const unlocked = ownedItems.slice(state.ownedItems.length).find(id => id.startsWith('character_'));
   return {
-    playerProgress: grant.progress, parityPoints: state.parityPoints + points + grant.points,
-    wormStoryResult: { ...result, levelId: level.id, xp, points: points + grant.points, first: !old },
+    playerProgress: grant.progress, parityPoints: state.parityPoints + points + grant.points, ownedItems,
+    wormStoryResult: { ...result, levelId: level.id, xp, points: points + grant.points, first: !old,
+      ...(unlocked ? { unlockedCharacter: unlocked.slice('character_'.length) } : {}) },
     wormPaused: true, wormGamePhase: 'solved', wormTimeAlive: result.seconds,
     xpRun: state.xpRun ? { ...state.xpRun, completed: true } : null,
   };

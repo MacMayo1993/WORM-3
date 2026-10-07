@@ -164,7 +164,8 @@ export const createDisparitySlice = (set, get) => ({
   ownedItems: persistedState.ownedItems,
   buyItem: (itemId, _price) => {
     const item = getStoreItem(itemId);
-    if (!item) return false;
+    // Worms are earned by clearing levels, never bought.
+    if (!item || item.type === 'character' || !Number.isSafeInteger(item.price)) return false;
     const price = item.price;
     const state = get();
     if (state.ownedItems.includes(itemId)) return true; // already owned

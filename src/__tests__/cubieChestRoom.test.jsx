@@ -58,25 +58,26 @@ it('retains a paid result and releases the animation lock when leaving early', (
   expect(close).toHaveBeenCalledOnce();
 });
 
-it('opens chests from the actual store and returns to equip a newly owned worm', () => {
+it('opens chests from the actual store and returns to equip a newly owned skin', () => {
   act(() => root.render(<ParityStoreScreen onClose={close} />));
   act(() => button('Cubie chests').click()); expect(host.querySelector('#chest-title').textContent).toBe('Cubie chests');
   act(() => button('Store').click());
-  act(() => useGameStore.setState({ ownedItems: [...state().ownedItems, 'character_mobi'] }));
-  act(() => button('Worms').click());
-  act(() => button('MOBI').click()); act(() => button('Equip').click());
-  expect(state().wormCharacter).toBe('mobi');
+  act(() => useGameStore.setState({ ownedItems: [...state().ownedItems, 'skin_royal'] }));
+  act(() => button('Skins').click());
+  act(() => button('Royal').click()); act(() => button('Equip').click());
+  expect(state().wormSkin).toBe('royal');
 });
 
 it('switches catalogue categories, filters ownership, and previews without spending', () => {
   act(() => root.render(<ParityStoreScreen onClose={close} />));
   const categories = host.querySelector('nav[aria-label="Store categories"]');
   expect([...categories.querySelectorAll('.catalogue-category')].map(b => b.querySelector('strong').textContent))
-    .toEqual(['Worms', 'Trails', 'Skins', 'Accessories', 'Hats', 'Palettes', 'Tiles']);
-  act(() => button('MOBI').click());
-  expect(host.querySelector('.catalogue-preview h3').textContent).toBe('MOBI');
-  act(() => button('MOBI').click());
+    .toEqual(['Skins', 'Accessories', 'Hats', 'Palettes', 'Tiles']);
+  act(() => button('Royal').click());
+  expect(host.querySelector('.catalogue-preview h3').textContent).toBe('Royal');
+  act(() => button('Royal').click());
   expect(state().parityPoints).toBe(100);
+  act(() => useGameStore.setState({ ownedItems: [...state().ownedItems, 'skin_slime'] }));
   act(() => button('Owned only').click());
   expect(host.querySelectorAll('.store-card')).toHaveLength(1);
   act(() => button('Hats').click());

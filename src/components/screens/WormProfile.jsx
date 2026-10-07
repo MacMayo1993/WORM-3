@@ -1,7 +1,8 @@
 import { accessoryFraming, ACCESSORY_SLOTS, WORM_ACCESSORIES, EMPTY_ACCESSORIES } from '../../worm/handmadeAccessoriesData.js';
 import React, { useId, useRef, useState } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { WORM_CHARACTERS, getWormCharacter } from '../../worm/wormCharacterData.js';
+import { getWormCharacter } from '../../worm/wormCharacterData.js';
+import { characterUnlockLevels, WORM_UNLOCK_ORDER } from '../../worm/wormUnlocks.js';
 import { WORM_SKINS, WORM_HATS, getSkin, getHat } from '../../worm/wormCosmeticsData.js';
 import { RUBIKS_CLASSIC } from '../../utils/constants.js';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
@@ -10,7 +11,8 @@ import './wormProfile.css';
 
 const SLOT_ICONS = { face: '◉', neck: '⋈', body: '▧', tail: '〰' };
 const CATEGORIES = [
-  { id: 'character', label: 'Worm', icon: '∿', title: 'Choose your crawler', items: WORM_CHARACTERS },
+  // Worms appear in the order levels unlock them.
+  { id: 'character', label: 'Worm', icon: '∿', title: 'Choose your crawler', items: WORM_UNLOCK_ORDER.map(getWormCharacter) },
   { id: 'skin', label: 'Color', icon: '◐', title: 'Find your color', items: WORM_SKINS },
   { id: 'hat', label: 'Hats', icon: '♧', title: 'Top it off', items: WORM_HATS },
   ...ACCESSORY_SLOTS.map(slot => ({ id: slot, icon: SLOT_ICONS[slot], label: slot[0].toUpperCase() + slot.slice(1),
@@ -166,7 +168,7 @@ export default function WormProfile({ defaultExpanded = false }) {
                     {!owned && <b className="worm-profile-lock">🔒</b>}
                   </span>
                   <strong>{item.label}</strong>
-                  <small>{!owned ? 'In the Store' : equipped ? 'Equipped' : category === 'character' ? item.type : 'Equip'}</small>
+                  <small>{!owned ? category === 'character' ? `Clear ${characterUnlockLevels(item.id)} levels` : 'In the Store' : equipped ? 'Equipped' : category === 'character' ? item.type : 'Equip'}</small>
                 </button>;
               })}
             </div>
