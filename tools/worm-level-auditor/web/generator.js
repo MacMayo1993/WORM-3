@@ -1,4 +1,4 @@
-import {ELEMENTS} from './audit.js';
+import {ELEMENTS,requiredPowerCycles} from './audit.js';
 export const GENERATOR_VERSION=1;
 export const DEFAULT_SETTINGS={total:120,seed:'worm-100-plus',profile:'balanced',pace:'standard',sizes:[3,4,5,6,7,8,9,10],combat:true,mastery:true};
 export const SUPPORTED_SIZES=[2,3,4,5,6,7,8,9,10,15];
@@ -20,7 +20,7 @@ export function requiredPowerCycle(level){
 }
 export function modeledPowerBudget(level,misses=2){
  const n=requiredPowerCycle(level).length;
- return n?10+misses*n*23+Math.max(2,level.mechanics?.explodes??0,level.mechanics?.rockets??0)*n*17:0;
+ return n?10+misses*n*23+requiredPowerCycles(level)*n*17:0;
 }
 export function levelGoal(level){
  const tasks=[],m=level.mechanics??{};
