@@ -11,7 +11,7 @@ export default function StoryWorldPreview({ levelId, compact = false }) {
     {(compact ? [1] : [1,2,3,4,5,6]).map(face => <span key={face}
       className="worm-world-tile" title={TILE_STYLES[world.styles[face]].label}
       style={{ backgroundColor: colors[face] }}>
-      <TilePreviewCanvas styleKey={world.styles[face]} colorHex={colors[face]} size={compact ? 40 : 72}
+      <TilePreviewCanvas styleKey={world.styles[face]} colorHex={colors[face]} size={compact ? 96 : 72}
         canvasStyle={{ width: '100%', height: '100%', borderRadius: 0 }} />
     </span>)}
   </div>;

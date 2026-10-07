@@ -122,7 +122,7 @@
 
 /* WORM's Levels page header and play key, in the same pieces. */
 .worm-entry.worm-levels .worm-entry-nav { padding: 10px 16px; justify-content: flex-start; gap: 14px; }
-.worm-entry.worm-levels .worm-entry-nav > span:last-child { display: inline-flex; font-size: 28px; }
+.worm-entry.worm-levels .worm-entry-nav > .worm-levels-brand { display: inline-flex; font-size: 28px; }
 .worm-entry.worm-levels .worm-entry-nav .piece-icon { min-height: 48px; padding: 0; color: #354d3c; background: #fffcf1; }
 .worm-entry.worm-levels .worm-story-primary.piece {
   min-height: 68px;
