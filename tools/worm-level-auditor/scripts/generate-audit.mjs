@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import {WORM_STORY_LEVELS, storyChecklist, storyOutcome} from '../../../src/worm/story/levels.js';
+import {WORM_STORY_LEVELS,WORM_STORY_CHAPTERS, storyChecklist, storyOutcome} from '../../../src/worm/story/levels.js';
 import {stageStory,replenishStoryOrbs,STORY_ORB_REFILL_INTERVAL} from '../../../src/worm/story/runtime.js';
 import {offerStoryPower,nextStoryPower,STORY_POWER_OPENING_DELAY,STORY_POWER_COOLDOWN,STORY_POWER_LIFETIME} from '../../../src/worm/story/mastery.js';
 import {makeWormSim,tileKey} from '../../../src/worm/healerWorm/wormSim.js';
@@ -81,6 +81,7 @@ const records=WORM_STORY_LEVELS.map(level=>{
 const checks={levels:records.length,stages:records.length*2,powerPlacementAttempts:records.reduce((n,r)=>n+r.stages.glow.offered.length+r.stages.classic.offered.length,0),completionAssertions:records.reduce((n,r)=>n+r.completionContract.tests,0),refillChecks:records.length*2};
 const sourceHashes=Object.fromEntries(sourcePaths.map(path=>[path,crypto.createHash('sha256').update(sources[path].content).digest('hex')]));
 const snapshotId=crypto.createHash('sha256').update(JSON.stringify(sourceHashes)).digest('hex');
-const data={schemaVersion:1,repository:repo,branch,commit,commitDate,auditedAt:new Date().toISOString(),snapshot:true,snapshotId,dirty:!!git('status','--porcelain'),records,sources,checks,sourceHashes};
+const chapters=WORM_STORY_CHAPTERS.map(({id,title,blurb})=>({id,title,blurb}));
+const data={chapters,schemaVersion:1,repository:repo,branch,commit,commitDate,auditedAt:new Date().toISOString(),snapshot:true,snapshotId,dirty:!!git('status','--porcelain'),records,sources,checks,sourceHashes};
 fs.writeFileSync(new URL('../dist/data.json',import.meta.url),JSON.stringify(data));
 console.log(JSON.stringify({result:'passed',...checks,level30:records[29].stages.glow.powerCycle}));

@@ -11,7 +11,7 @@ export function assess(record, character='glow', scenario={}) {
     const key=o.key, target=o.target;
     if(key==='orbs') {
       available=recurring?'Recurring':String(initial);
-      detail=initial+' initially staged; refill restores up to one orb per missing color every 1.5 active seconds.';
+      detail=initial+' initially staged; refill restores up to one orb per missing color every 1.5 active seconds.'+(target>initial?' This quest needs at least '+(target-initial)+' pickups beyond the opening inventory.':'');
       if(!recurring&&target>initial)fail('No refill: '+target+' required exceeds '+initial+' supplied.');
       if(totalCap!==null&&target>totalCap)fail('Lifetime allowance '+totalCap+' is below the '+target+' pickup target.');
     } else if(key==='colors') {
@@ -61,8 +61,9 @@ export function filterRecords(records,filters,reviews={}) {
   return records.filter(r=>{
     const l=r.config, a=assess(r,filters.character??'glow'), review=reviews[l.id];
     const text=[l.id,l.title,l.goal,l.kind,...r.objectives.map(o=>o.key),...a.powerPool].join(' ').toLowerCase();
-    return (!search||text.includes(search))&&(!filters.chapter||Math.ceil(l.id/10)===+filters.chapter)&&(!filters.size||l.cubeSize===+filters.size)&&
-      (!filters.quest||r.objectives.some(o=>filters.quest==='elemental'?['elements','uniqueElements','elementPickups'].includes(o.key):filters.quest==='explode'?o.key==='explodes':o.key===filters.quest))&&
+    const goal=l.orbs??(l.kind==='orbs'?l.target:0);
+    return (!filters.scope||(filters.scope==='generated'?l.id>40:l.id<=40))&&(!search||text.includes(search))&&(!filters.chapter||Math.ceil(l.id/10)===+filters.chapter)&&(!filters.size||l.cubeSize===+filters.size)&&
+      (!filters.quest||(filters.quest==='refill'?goal>a.initial:r.objectives.some(o=>filters.quest==='elemental'?['elements','uniqueElements','elementPickups'].includes(o.key):filters.quest==='explode'?o.key==='explodes':o.key===filters.quest)))&&
       (!filters.status||(filters.status==='flagged'?!!review?.flag:filters.status==='playtest'?a.rows.some(o=>o.state==='playtest'):a.status===filters.status));
   });
 }
