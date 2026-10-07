@@ -131,17 +131,23 @@ const TILE_PRICES = {
   poincareDisk: 200, hyperbolicWeave: 225, apollonian: 200, circleInversion: 150,
   rp2Geodesics: 250, solFlow: 175, nilTwist: 175, lightCone: 200,
   metricBalls: 150, gyroidSlice: 175, hopfFibers: 200, drosteSpiral: 200,
+  modularTiling: 200, horocycleFlow: 175, sphericalTiling: 175, hyperbolicParallels: 225,
   // Impossible objects — the tribar and endless staircase ray-cast a real solid
   // per fragment, the priciest of the set.
   impossibleTriangle: 225, endlessStairs: 250, impossibleFork: 150,
   neckerFlip: 150, mobiusBand: 225, interlockingWings: 175,
+  impossibleCube: 200, cubeTriangle: 200, perpetualFall: 250,
+  schroderStairs: 150, amesRoom: 225, rubinVase: 150,
   // Surreal — full painted scenes with their own weather.
   bowlerRain: 200, dayOverNight: 225, skyCurtain: 200,
   paintedWindow: 250, falseReflection: 225, skyBird: 200,
+  floatingRock: 225, moonInFront: 200, giantApple: 200,
+  sunwardShadow: 200, meltingClock: 225, indoorCloud: 200,
   // Crafted — still materials, priced with the classic patterns; kintsugi's
   // moving glint and the slab-continuous pictures sit a step higher.
   marble: 125, terrazzo: 100, kintsugi: 175, cloisonne: 150, marquetry: 150, washi: 100,
   denim: 100, knit: 125, motherOfPearl: 150, damascus: 150, mosaic: 150, leather: 100,
+  shibori: 100, hammeredMetal: 125, delftTile: 150, caneWebbing: 125,
 };
 
 export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({

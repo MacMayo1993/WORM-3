@@ -204,6 +204,12 @@ describe('non-Euclidean shaders', () => {
     const weave = [...nonEuclideanShaders.hyperbolicWeave.matchAll(/_([DR])\s*=\s*([\d.]+)/g)];
     const w = Object.fromEntries(weave.map(([, n, v]) => [n, parseFloat(v)]));
     expect(w.D ** 2).toBeCloseTo(w.R ** 2 + 1, 4);
+
+    // The line the parallels are drawn against is a geodesic only on the same
+    // condition, and its ideal endpoints sit on the rim only then.
+    const parallels = [...nonEuclideanShaders.hyperbolicParallels.matchAll(/HP_([DR])\s*=\s*([\d.]+)/g)];
+    const l = Object.fromEntries(parallels.map(([, n, v]) => [n, parseFloat(v)]));
+    expect(l.D ** 2).toBeCloseTo(l.R ** 2 + 1, 4);
   });
 });
 
@@ -241,7 +247,7 @@ describe('impossible & surreal shaders', () => {
     }
   });
 
-  it('the impossible tribar and staircase close their loop on the view diagonal', () => {
+  it('the impossible tribar, staircase and waterfall close their loop on the view diagonal', () => {
     // Both are real solids: the illusion is that an open chain of beams reads as
     // closed because its two free ends differ by a multiple of the (1,1,1) view
     // direction, which orthographic projection along that axis cannot resolve.
@@ -252,6 +258,14 @@ describe('impossible & surreal shaders', () => {
     const OUT = parseFloat(stair.match(/float OUT\s*=\s*([\d.]+)/)[1]);
     const BACK = parseFloat(stair.match(/float BACK\s*=\s*([\d.]+)/)[1]);
     expect(OUT - BACK).toBeCloseTo(4 * H, 4);
+
+    // The waterfall's level channels run +x OUT, +y OUT, −x BACK, −y BACK and
+    // then drop H, which closes on (−H, −H, −H) only when BACK = OUT + H.
+    const fall = impossibleShaders.perpetualFall;
+    const fH = parseFloat(fall.match(/float H\s*=\s*([\d.]+)/)[1]);
+    const fOUT = parseFloat(fall.match(/float OUT\s*=\s*([\d.]+)/)[1]);
+    const fBACK = parseFloat(fall.match(/float BACK\s*=\s*([\d.]+)/)[1]);
+    expect(fBACK - fOUT).toBeCloseTo(fH, 4);
   });
 });
 

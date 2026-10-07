@@ -385,10 +385,10 @@ Tile styles are GPU-rendered materials, often animated or reactive. Apply styles
 | **Antipodal Op Art** | Dots, checkerboards, stripes, pinwheels, twisted ribbons, and interference patterns combining a face color with its antipodal partner. |
 | **Living** | Water, grass, ice, lava, galaxy, plasma, neural/circuit patterns, liquid chrome, and reactive chambers. |
 | **Living Surfaces** | Organic surfaces including breathing scales, coral polyps, mycelium veins, and chromatic cilia. |
-| **Non-Euclidean** | Poincaré disk, hyperbolic weave, RP² geodesics, circle inversion, Hopf-fiber motifs, and Droste spirals. |
-| **Impossible** | Impossible triangles, endless stairs, forks, Necker flips, Möbius bands, and interlocking forms. |
-| **Surreal** | Bowler rain, day over night, sky curtains, painted windows, false reflections, and sky birds. |
-| **Crafted** | Marble, terrazzo, kintsugi, cloisonné, marquetry, washi paper, denim, knit, mother of pearl, Damascus steel, mosaic, and tooled leather, each dyed in the face color. |
+| **Non-Euclidean** | Poincaré disk, hyperbolic weave, the modular tiling, horocycles, hyperbolic parallels, spherical triangles, RP² geodesics, circle inversion, Hopf-fiber motifs, and Droste spirals. |
+| **Impossible** | Impossible triangles and cubes, a triangle of cubes, endless stairs, a perpetual waterfall, an Ames room, forks, Necker flips, Schröder stairs, Rubin's vase, Möbius bands, and interlocking forms. |
+| **Surreal** | Bowler rain, day over night, sky curtains, painted windows, false reflections, sky birds, a floating rock, a moon in front of the trees, a giant apple, a sunward shadow, a melting clock, and an indoor cloud. |
+| **Crafted** | Marble, terrazzo, kintsugi, cloisonné, marquetry, washi paper, denim, knit, mother of pearl, Damascus steel, mosaic, tooled leather, shibori, hammered metal, Delft tile, and cane webbing, each dyed in the face color. |
 
 **Face slabs**: most Crafted styles, plus Stained Glass and Penrose, are cut from one piece per face. Each sticker shows the part that belongs at its solved home, so a solved face reads as one slab of marble, one window or one mosaic picture, and a scrambled face shows the pieces out of place.
 

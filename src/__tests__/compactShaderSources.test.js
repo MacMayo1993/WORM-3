@@ -1,4 +1,5 @@
 import { it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { parseAst } from 'rollup/parseAst';
 import { compactGLSL, compactShaderSources } from '../../scripts/compact-shader-sources.mjs';
 it('preserves directive line boundaries and separates tokens around block comments', () => {
@@ -10,4 +11,13 @@ it('compacts only standalone shader templates and leaves interpolated comments u
   expect(out.code).toContain('`void main() {\n}`');
   expect(out.code).toContain('`// note ${a}\nvoid main(){}`');
   expect(() => parseAst(out.code)).not.toThrow();
+});
+
+it('keeps the family shader modules free of interpolated templates', () => {
+  // An interpolated template ships with its comments and indentation, which is
+  // how two families of GLSL once pushed the main chunk over its size ceiling.
+  for (const name of ['impossibleShaders', 'surrealShaders', 'nonEuclideanShaders', 'craftedShaders']) {
+    const source = readFileSync(`src/3d/styles/shaders/${name}.js`, 'utf8');
+    expect(source, name).not.toContain('${');
+  }
 });

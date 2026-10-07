@@ -35,6 +35,7 @@ export const NON_EUCLIDEAN_STYLE_KEYS = [
   'poincareDisk', 'hyperbolicWeave', 'apollonian', 'circleInversion',
   'rp2Geodesics', 'solFlow', 'nilTwist', 'lightCone',
   'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
+  'modularTiling', 'horocycleFlow', 'sphericalTiling', 'hyperbolicParallels',
 ];
 
 // Impossible objects — figures a flat drawing accepts and a solid world refuses.
@@ -43,6 +44,8 @@ export const NON_EUCLIDEAN_STYLE_KEYS = [
 export const IMPOSSIBLE_STYLE_KEYS = [
   'impossibleTriangle', 'endlessStairs', 'impossibleFork',
   'neckerFlip', 'mobiusBand', 'interlockingWings',
+  'impossibleCube', 'cubeTriangle', 'perpetualFall',
+  'schroderStairs', 'amesRoom', 'rubinVase',
 ];
 
 // Surreal — ordinary scenes with exactly one rule of the world withdrawn, each
@@ -51,6 +54,8 @@ export const IMPOSSIBLE_STYLE_KEYS = [
 export const SURREAL_STYLE_KEYS = [
   'bowlerRain', 'dayOverNight', 'skyCurtain',
   'paintedWindow', 'falseReflection', 'skyBird',
+  'floatingRock', 'moonInFront', 'giantApple',
+  'sunwardShadow', 'meltingClock', 'indoorCloud',
 ];
 
 // Crafted — real-world sticker materials (stone, glass, metal, fibre, wood,
@@ -59,6 +64,7 @@ export const SURREAL_STYLE_KEYS = [
 export const CRAFTED_STYLE_KEYS = [
   'marble', 'terrazzo', 'kintsugi', 'cloisonne', 'marquetry', 'washi',
   'denim', 'knit', 'motherOfPearl', 'damascus', 'mosaic', 'leather',
+  'shibori', 'hammeredMetal', 'delftTile', 'caneWebbing',
 ];
 
 export const TILE_STYLE_SECTIONS = [
