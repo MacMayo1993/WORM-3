@@ -23,7 +23,7 @@ test('starts a WORM free-play run', async ({ page }) => {
   for (const control of ['Turn left', 'Turn right', 'Boost']) await expect(page.getByRole('button', { name: control, exact: true })).toBeVisible();
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.waitForTimeout(5000);   // the run is live: the sim, camera and orbs get a few seconds to throw
-  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
 });
 
 // The selector draws a dozen thumbnails through one shared renderer. A regression
