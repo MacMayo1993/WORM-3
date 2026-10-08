@@ -3,8 +3,10 @@
 // Geometry lives in wormHatParts.js (shared with the preview renderer);
 // data (skins, hats, helpers) lives in wormCosmeticsData.js.
 
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { getHatParts } from './wormHatParts.js';
+import { buildCraftModel, disposeCraftModel } from './wormAccessories.js';
+import { isHandmadeHat } from './handmadeAccessoriesData.js';
 
 // Geometry elements by spec name — the imperative builder in
 // WormPreviewRenderer.js switches over the same set.
@@ -22,6 +24,11 @@ const GEOMETRY = {
 // `scale` = head sphere radius in world units.
 // React.memo: type and scale rarely change, so skip re-renders when parent re-renders at 30fps.
 const WormHat3D = React.memo(function WormHat3D({ type, scale = 0.28 }) {
+  // The handmade hats are the accessories' craft models (merged by colour,
+  // inked, animated by poseHandmadeHat); the older felt hats stay per-part.
+  const craft = useMemo(() => (isHandmadeHat(type) ? buildCraftModel(type) : null), [type]);
+  useEffect(() => () => { if (craft) disposeCraftModel(craft); }, [craft]);
+  if (craft) return <primitive object={craft} scale={scale} dispose={null} />;
   const parts = getHatParts(type, scale);
   if (parts.length === 0) return null;
 

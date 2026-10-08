@@ -10,6 +10,7 @@ export const HANDMADE_HATS = [
   { id: 'leafBeret', label: 'Leaf Beret', price: 125 },
   { id: 'sprout', label: 'Sprout', price: 100 },
 ];
+export const isHandmadeHat = id => HANDMADE_HATS.some(item => item.id === id);
 export const WORM_ACCESSORIES = [
   { id: 'bottlecapGlasses', slot: 'face', label: 'Bottle-cap Glasses', price: 150 },
   { id: 'yarnMustache', slot: 'face', label: 'Yarn Mustache', price: 100 },
