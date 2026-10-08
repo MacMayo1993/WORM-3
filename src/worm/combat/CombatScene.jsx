@@ -122,8 +122,8 @@ function Crawler({ slot, slots }) {
     shell.current.scale.set(e.type === 'scout' ? 0.7 : 1,e.type === 'scout' ? 1.15 : 1,1);
     for (const mesh of shell.current.children) {
       mesh.material.color.set(e.type === 'brute' ? '#55446f' : e.type === 'scout' ? '#8d512c' : '#813b61');
-      mesh.material.emissive.set(e.hitFlash > 0 ? '#ffffff' : frozen ? '#58b9ff' : e.burn > 0 ? '#ff6633' : def.color);
-      mesh.material.emissiveIntensity = e.hitFlash > 0 ? 1.8 : e.burn > 0 ? 0.8 : useGameStore.getState().wormCharacter === 'glow' ? 0.75 : 0.18;
+      mesh.material.emissive.set(e.hitFlash > 0 ? '#ffffff' : e.scorch > 0 ? '#8eefff' : frozen ? '#58b9ff' : e.burn > 0 ? '#ff6633' : def.color);
+      mesh.material.emissiveIntensity = e.hitFlash > 0 ? 1.8 : e.scorch > 0 ? 1.5 : e.burn > 0 ? 0.8 : useGameStore.getState().wormCharacter === 'glow' ? 0.75 : 0.18;
     }
     accents.current.children.forEach(mesh => mesh.material.color.set(frozen ? '#c9f4ff' : def.color));
     legs.current.children.forEach((joint,i) => {
@@ -267,7 +267,7 @@ function Burst({ slot }) {
     place(ref.current,b,c.size,0.28);
     const t = 1-b.life/0.55;
     ref.current.scale.setScalar(0.2+t*1.2);
-    for (const child of ref.current.children) { child.material.opacity = 1-t; child.material.color.set(b.kind === 'hit' ? '#ff7759' : b.kind === 'lightning' ? '#d39bff' : b.kind === 'impact' ? '#fff4cd' : '#bdfce3'); }
+    for (const child of ref.current.children) { child.material.opacity = 1-t; child.material.color.set(b.kind === 'hit' ? '#ff7759' : b.kind === 'lightning' ? '#d39bff' : b.kind === 'light' ? '#8eefff' : b.kind === 'slam' ? '#c6ec86' : b.kind === 'impact' ? '#fff4cd' : '#bdfce3'); }
   });
   return <group ref={ref} visible={false}>
     <mesh><ringGeometry args={[0.7,0.76,24]} /><meshBasicMaterial transparent depthWrite={false} toneMapped={false} /></mesh>

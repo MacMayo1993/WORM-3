@@ -17,6 +17,7 @@ import { tunnelTraversalT } from '../utils/tunnelPath.js';
 import { WORM_LIFT, WORM_HEAD_RADIUS } from '../worm/healerWorm/constants.js';
 import { advanceInchGaitState, inchGaitInto, inchBodyRadius } from '../worm/healerWorm/inchGait.js';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
+import { SPRING_COIL_SECONDS } from '../worm/characterAbilities.js';
 
 let frame, tree;
 vi.mock('@react-three/fiber', () => ({ useFrame: callback => { frame = callback; } }));
@@ -116,6 +117,33 @@ it('renders actual head clearance beneath the Inch humps throughout a crossing',
   }
 });
 
+it("rears the Inch Worm into a loop behind a ducked head while Spring coils, then lets go", () => {
+  act(() => {
+    useGameStore.setState({ wormCharacter: 'inch', wormAccessories: {} });
+    root.render(<Harness worm={worm} />);
+  });
+  React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
+  sim.tailLength = 60;
+  advanceInchGaitState(sim.bodyGait, 1, sim.tailLength, 10);
+  Object.assign(sim.bodyGait, { enabled: true, move: 0 });
+  surfaceRoute([new THREE.Vector3(1.4, 0, 1.58), new THREE.Vector3(-1.4, 0, 1.58)]);
+  const rest = renderPoints();
+  sim.signature.charge = SPRING_COIL_SECONDS * 0.05;            // the coil nearly full
+  const coiled = renderPoints();
+  expect(coiled[0].z).toBeLessThan(rest[0].z - 0.03);            // the head ducks
+  let rise = 0;
+  for (let i = 3; i <= 11; i++) rise = Math.max(rise, coiled[i].z - rest[i].z);
+  expect(rise).toBeGreaterThan(0.25);                            // a loop reared up behind it...
+  expect(coiled[7].x).toBeGreaterThan(rest[7].x);                // ...and hauled toward the head
+  for (let i = 16; i < 40; i++) expect(coiled[i].distanceTo(rest[i])).toBeLessThan(1e-6);   // the rest of the body does not notice
+  sim.signature.charge = SPRING_COIL_SECONDS * 0.5;
+  const half = renderPoints();
+  expect(half[7].z - rest[7].z).toBeGreaterThan(0.1); expect(half[7].z).toBeLessThan(coiled[7].z);   // it builds, it does not snap
+  sim.signature.charge = 0;
+  const after = renderPoints();
+  for (let i = 0; i < 40; i++) expect(after[i].distanceTo(rest[i])).toBeLessThan(1e-6);   // and the launch lets all of it go
+});
+
 it('gives a newly spawned Wiggle ten connected, distinct segments instead of a pile at the head', () => {
   selectWiggle();
   resetWormSim(sim, 3, { orbCount: 0, wormholeInterval: 9999 });
@@ -129,16 +157,53 @@ it('gives a newly spawned Wiggle ten connected, distinct segments instead of a p
   }
 });
 
-it('keeps a short Wiggle connected through a tight U-turn without folding across the other leg', () => {
+// The Dancer's whole point is its S: it must visibly out-swing the Classic worm's ripple
+// (commit 499d9a7 once left it at 0.032 against Classic's 0.08), and each bead has to
+// lean into the wave it rides, or a wide wave reads as beads sliding sideways.
+it('swings the Wiggle body wider than the Classic worm, with every bead pointing along the wave', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  const swing = character => {
+    act(() => {
+      useGameStore.setState({ wormCharacter: character, wormAccessories: {} });
+      root.render(<Harness worm={worm} />);
+    });
+    React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
+    sim.tailLength = 25;
+    surfaceRoute([new THREE.Vector3(1.4, 0, 1.58), new THREE.Vector3(-1.4, 0, 1.58)]);
+    let peak = 0, points = [];
+    for (let frameIndex = 0; frameIndex < 90; frameIndex++) {
+      points = renderPoints();
+      for (const p of points) peak = Math.max(peak, Math.abs(p.y));
+    }
+    return { peak, points };
+  };
+  const classic = swing('classic').peak;
+  const { peak, points } = swing('wiggle');
+  expect(peak).toBeGreaterThan(0.1);
+  expect(peak).toBeGreaterThan(classic * 1.4);
+  // Compare each bead's own forward axis (local -Z) with the rendered centreline's tangent.
+  const rotation = new THREE.Matrix4(), matrix = new THREE.Matrix4();
+  for (let i = 2; i < points.length - 2; i++) {
+    mesh.getMatrixAt(i, matrix); rotation.extractRotation(matrix);
+    const forward = new THREE.Vector3(0, 0, -1).applyMatrix4(rotation);
+    const tangent = points[i - 1].clone().sub(points[i + 1]).normalize();
+    expect(forward.dot(tangent), `bead ${i}`).toBeGreaterThan(0.96);
+  }
+});
+
+// The legs of a U-turn on the grid are at least ~0.7 apart (tiles either side of a cube
+// edge; a tile apart on one face). The 0.3 case is a stress test no route can reach:
+// the 0.13 wave is about as wide as a bead, so the two legs may graze but never pass through.
+it.each([[0.35, 0.18], [0.15, 0.16]])('keeps a short Wiggle connected through a U-turn with legs %s either side without folding across the other leg', (half, apart) => {
   selectWiggle(); sim.tailLength = 22;
-  surfaceRoute([[0.8, 0.15], [-0.2, 0.15], [-0.2, -0.15], [0.8, -0.15]]
+  surfaceRoute([[0.8, half], [-0.2, half], [-0.2, -half], [0.8, -half]]
     .map(([x, y]) => new THREE.Vector3(x, y, 1.58)));
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
   for (let frameIndex = 0; frameIndex < 100; frameIndex++) {
     const points = renderPoints();
     for (let i = 1; i < points.length; i++) {
       expect(points[i].distanceTo(points[i - 1])).toBeLessThan(0.14);
-      for (let j = 0; j < i - 3; j++) expect(points[i].distanceTo(points[j])).toBeGreaterThan(0.18);
+      for (let j = 0; j < i - 3; j++) expect(points[i].distanceTo(points[j])).toBeGreaterThan(apart);
     }
   }
 });

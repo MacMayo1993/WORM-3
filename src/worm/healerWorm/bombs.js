@@ -115,6 +115,16 @@ export function isBombDisarmed(bomb, occupiedKeys, size) {
 }
 
 /**
+ * Did Spring's landing cover the bomb? Stomping beside a bomb defuses it as surely as
+ * ringing it with the body does.
+ * @param {{tile:object}} bomb
+ * @param {Set<string>|null} slamKeys - tile keys within the landing's slam radius
+ */
+export function isBombSlammed(bomb, slamKeys) {
+  return !!slamKeys && slamKeys.has(tileKeyOf(bomb.tile));
+}
+
+/**
  * Resolve what a detonating blast does to the worm.
  *
  * Mirrors checkWormHitBySlice: the head (trail index 0) inside the blast is an

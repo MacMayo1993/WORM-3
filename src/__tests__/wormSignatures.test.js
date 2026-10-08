@@ -1,4 +1,7 @@
-import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../worm/healerWorm/constants.js';
+import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH, SURFACE_JUMP_TILE_SPAN } from '../worm/healerWorm/constants.js';
+import { SPRING_SPAN, SPRING_HEIGHT, SPRING_COOLDOWN, SPRING_SLAM_WINDOW } from '../worm/characterAbilities.js';
+import { makeGrowthOrb } from '../worm/healerWorm/orbSpawning.js';
+import { collectManifoldRing, getNextSurfacePosition } from '../worm/wormLogic.js';
 import { Vector3 } from 'three';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from '../worm/healerWorm/wiggleSweep.js';
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -116,17 +119,95 @@ describe('signature input and lifecycle', () => {
 });
 
 describe('Inch: Spring Loaded', () => {
-  it('holds position for the wind-up, then launches the longer arc', () => {
+  it('coils while it keeps crawling, then launches the long arc', () => {
     const { sim, ctx } = world('inch');
-    const pos = { ...sim.pos }, interp = sim.interpT;
+    run(sim, ctx, 1.1);
+    const from = sim.headInterpPos.clone();
     activate(sim, ctx);
     expect(sim.signature.charge).toBeGreaterThan(0);
-    expect(sim.pos).toEqual(pos); expect(sim.interpT).toBe(interp);
-    run(sim, ctx, 0.2);
-    expect(sim.isJumping).toBe(true); expect(sim.jumpSpan).toBe(2.2);
-    expect(sim.jumpHeight).toBe(1.8); expect(sim.signature.cooldown).toBeGreaterThan(23);
-    const jumpT = sim.jumpT; startJump(sim, ctx, SIZE); expect(sim.jumpT).toBe(jumpT);
-    run(sim, ctx, 3.5); expect(sim.isJumping).toBe(false); expect(sim.signature.active).toBe(0);
+    run(sim, ctx, 0.15);
+    expect(sim.headInterpPos.distanceTo(from)).toBeGreaterThan(0.1);          // the worm is not frozen for the wind-up
+    expect(sim.isJumping).toBe(false);
+    run(sim, ctx, 0.3);
+    expect(sim.isJumping).toBe(true); expect(Math.abs(sim.jumpSpan - SPRING_SPAN)).toBeLessThan(0.6);   // a whole number of tiles, near SPRING_SPAN
+    expect(sim.jumpHeight).toBe(SPRING_HEIGHT);
+    expect(SPRING_SPAN).toBeGreaterThan(3); expect(SPRING_HEIGHT).toBeGreaterThan(2);   // beats the free double jump (about 2.4 tiles, 1.3 high)
+    expect(sim.signature.cooldown).toBeGreaterThan(SPRING_COOLDOWN - 1); expect(sim.signature.cooldown).toBeLessThanOrEqual(SPRING_COOLDOWN);
+    expect(sim.jumpCount).toBe(1);                              // one jump spent, one left
+    run(sim, ctx, 6); expect(sim.isJumping).toBe(false); expect(sim.signature.active).toBe(0);
+  });
+  it('lets a jump press during the coil release the leap at once', () => {
+    const { sim, ctx } = world('inch');
+    activate(sim, ctx); expect(sim.signature.charge).toBeGreaterThan(0);
+    startJump(sim, ctx, SIZE);
+    expect(sim.isJumping).toBe(true); expect(sim.jumpSpan).toBeGreaterThan(3);
+    expect(sim.signature.charge).toBe(0); expect(sim.signature.active).toBe(1);
+  });
+  it('falls back to the ordinary hop, spending nothing, if the landing stopped being clear mid-coil', () => {
+    const { sim, ctx, cubies } = world('inch');
+    activate(sim, ctx);
+    const p = signatureAvailability(sim, SIZE, ctx, true).target;
+    cubies[p.x][p.y][p.z].stickers[p.dirKey].curr = 4;
+    startJump(sim, ctx, SIZE);
+    expect(sim.isJumping).toBe(true); expect(sim.jumpSpan).toBeLessThan(2);          // an ordinary hop, never a swallowed press
+    expect(sim.signature.charge).toBe(0); expect(sim.signature.cooldown).toBe(0); expect(sim.signature.active).toBe(0);
+    expect(signatureReadout(sim, SIZE, ctx).notice).toContain('wormhole');
+  });
+  it('keeps the follow-up jump: a press in the air is a second jump, and a third does nothing', () => {
+    const { sim, ctx } = world('inch');
+    activate(sim, ctx); run(sim, ctx, 0.4);
+    expect(sim.isJumping).toBe(true); expect(sim.jumpSpan).toBeGreaterThan(3);
+    startJump(sim, ctx, SIZE);
+    expect(sim.jumpCount).toBe(2); expect(sim.jumpSpan).toBe(SURFACE_JUMP_TILE_SPAN);   // the ordinary double jump, climbing on
+    expect(sim.signature.active).toBe(1);
+    const t = sim.jumpT; startJump(sim, ctx, SIZE); expect(sim.jumpT).toBe(t);
+    run(sim, ctx, 6);
+    expect(sim.isJumping).toBe(false); expect(sim.signature.active).toBe(0); expect(sim.alive).toBe(true);
+  });
+  it('lands on the tile it promised, whenever in a step it launches, over a cube edge and back', () => {
+    for (let lead = 1.0; lead < 2.06; lead += 0.05) {
+      const { sim, ctx } = world('inch');
+      run(sim, ctx, lead); activate(sim, ctx); run(sim, ctx, 0.4);
+      const { x, y, z, dirKey } = sim.signature.target;
+      for (let i = 0; i < 400 && !sim.signature.slam; i++) step(sim, ctx);
+      expect(sim.signature.slam.tile, `launched after ${lead.toFixed(2)}s`).toEqual({ x, y, z, dirKey });
+    }
+  });
+  it('lands with a slam: a window other systems read once, then gone', () => {
+    const { sim, ctx } = world('inch');
+    run(sim, ctx, 1.1); activate(sim, ctx); run(sim, ctx, 0.4);
+    expect(sim.signature.slam).toBeNull(); expect(sim.signature.slamT).toBe(0);
+    for (let i = 0; i < 400 && !sim.signature.slam; i++) step(sim, ctx);
+    expect(sim.signature.slam.seq).toBe(1);
+    expect(sim.signature.slamT).toBeLessThanOrEqual(SPRING_SLAM_WINDOW);
+    expect(sim.signature.slamT).toBeGreaterThan(SPRING_SLAM_WINDOW - 0.2);
+    step(sim, ctx); expect(sim.slamResolved).toBe(1);
+    run(sim, ctx, 1); expect(sim.signature.slamT).toBe(0);
+    expect(sim.signature.slam.seq).toBe(1);                     // one landing, one slam
+  });
+  it('grabs the orbs within two tiles of the landing, and only those', () => {
+    const { sim, ctx } = world('inch');
+    run(sim, ctx, 1.1); activate(sim, ctx); run(sim, ctx, 0.4);
+    const target = sim.signature.target;
+    // Off the flight line, so only the slam can have taken them.
+    const line = new Set(); let t = sim.pos, d = sim.moveDir;
+    for (let i = 0; i < 8; i++) { line.add(`${t.x},${t.y},${t.z},${t.dirKey}`); const n = getNextSurfacePosition(t, d, SIZE); if (!n) break; t = n; d = n.moveDir ?? d; }
+    const within = collectManifoldRing(target.x, target.y, target.z, target.dirKey, SIZE, 2);
+    const near = [...within].filter(k => !line.has(k)).slice(0, 3);
+    const nearer = new Set(collectManifoldRing(target.x, target.y, target.z, target.dirKey, SIZE, 3));
+    const far = [...nearer].filter(k => !within.has(k) && !line.has(k))[0];
+    const orb = key => { const [x, y, z, dirKey] = key.split(','); return makeGrowthOrb({ x: +x, y: +y, z: +z, dirKey }); };
+    sim.powerups.length = 0;
+    for (const k of [...near, far]) sim.powerups.push(orb(k));
+    const before = eventsOf(ctx, 'pickup').length;
+    for (let i = 0; i < 400 && !sim.signature.slam; i++) step(sim, ctx);
+    step(sim, ctx);
+    expect(near.length).toBe(3);
+    expect(eventsOf(ctx, 'pickup').length - before).toBe(3);
+    expect(sim.signature.notice).toContain('Slam');
+    expect(sim.signature.notice).toContain('3 orbs');
+    // The far one was left where it was (the worm never drove over it).
+    expect(sim.powerups.some(p => `${p.x},${p.y},${p.z},${p.dirKey}` === far)).toBe(true);
   });
   it('rejects a flipped landing without spending a charge', () => {
     const { sim, ctx, cubies } = world('inch');
@@ -139,7 +220,7 @@ describe('Inch: Spring Loaded', () => {
   it('revalidates the landing if a cube turn begins during the charge', () => {
     const { sim, ctx } = world('inch'); activate(sim, ctx);
     liveRotation.active = true;
-    run(sim, ctx, 0.2);
+    run(sim, ctx, 0.4);
     expect(sim.isJumping).toBe(false); expect(sim.signature.cooldown).toBe(0);
   });
   it('blocks occupied landings but ignores old trail outside the visible body', () => {

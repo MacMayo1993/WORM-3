@@ -1,6 +1,7 @@
 import { ENEMIES, WAVES, ELEMENTS, ELEMENT_ORDER, ELEMENT_DURATION } from './combatDefs.js';
 import { DIR_FORWARD } from '../healerWorm/constants.js';
 import { getNextSurfacePosition } from '../wormLogic.js';
+import { springSlamTiles } from '../healerWorm/jumpLanding.js';
 import { getAllSurfaceTiles } from '../healerWorm/surfaceTiles.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { ENEMY_DISSOLVE_HOLD, MAX_DISSOLVING } from './enemyDissolve.js';
@@ -8,6 +9,12 @@ import { ENEMY_DISSOLVE_HOLD, MAX_DISSOLVING } from './enemyDissolve.js';
 export const COMBAT = Object.freeze({ magazine: 3, recharge: 1.4, fireInterval: 0.32,
   health: 3, maxEnemies: 4, warning: 2.5, spawnInterval: 6, enemySpeed: 0.425,
   shotSpeed: 8, range: 7, aimCos: Math.cos(Math.PI / 9), invulnerability: 1.6 });
+// The Glow Worm's painted trail is a wall of light: an enemy that runs into a lit tile is
+// burned and thrown back, and one standing in the light burns for as long as it stays.
+// A crawler or dasher (1 hp) dies on the first touch; a brute (3 hp) takes three.
+export const LIGHT = Object.freeze({ touch: 1, burn: 1.6, stun: 0.55 });
+// Spring's landing: every enemy in the 3x3 around it takes a hit and is stunned and thrown back.
+export const SLAM = Object.freeze({ damage: 1, stun: 1.4 });
 export const combatBridge = { current: null };
 export const combatKey = p => `${p.x},${p.y},${p.z},${p.dirKey}`;
 const normals = { PX: [1,0,0], NX: [-1,0,0], PY: [0,1,0], NY: [0,-1,0], PZ: [0,0,1], NZ: [0,0,-1] };
@@ -65,7 +72,7 @@ export function makeCombat(size, portal) {
     wave: 0, waveSpawned: 0, wavesCleared: 0, intermission: 0, endReason: null,
     element: null, elementT: 0, score: 0, combo: 0, bestCombo: 0, lastKill: -Infinity,
     killsByType: { crawler: 0, scout: 0, brute: 0 }, damageTaken: 0, fireHeld: false,
-    kills: 0, shotsFired: 0, shotsHit: 0, dropsCollected: 0, seq: 0,
+    kills: 0, shotsFired: 0, shotsHit: 0, lightHits: 0, slamHits: 0, slamSeen: 0, dropsCollected: 0, seq: 0,
     enemies: [], dying: [], shots: [], bursts: [], drops: [], arcs: [], spawnTimer: COMBAT.warning,
     muzzle: null, portalOpen: true, lockedId: null, aim: null, aimHeld: false, fireRequested: false, held: false };
 }
@@ -176,6 +183,43 @@ function hitEnemy(c, shot, enemy, player) {
     }
   }
 }
+// One tile back, away from the player and (when given) off the light.
+function throwBack(c, enemy, player, lit) {
+  let back = null, distance = -1;
+  for (const next of graph(c.size).get(combatKey(enemy.tile)) || []) {
+    if (lit?.has(combatKey(next))) continue;
+    const length = surfaceRoute(next, player.head, c.size)?.length ?? 0;
+    if (length > distance) { back = next; distance = length; }
+  }
+  if (back) { enemy.next = back; enemy.t = 0; enemy.knockback = true; }
+}
+// The enemy ran into the light: hurt, thrown back and stunned, so the wall holds it for a
+// beat and then it tries again.
+function singe(c, enemy, player, lit) {
+  burst(c, enemy.next ?? enemy.tile, 'light');
+  enemy.next = null; enemy.t = 0;
+  c.lightHits++;
+  damageEnemy(c, enemy, LIGHT.touch);
+  if (!c.enemies.includes(enemy)) return;
+  enemy.stun = Math.max(enemy.stun || 0, LIGHT.stun); enemy.scorch = 0.4;
+  throwBack(c, enemy, player, lit);
+}
+// Spring touched down at `at`: whatever is within reach is hit, stunned and thrown back.
+function slam(c, at, player, lit) {
+  const reach = springSlamTiles(at, c.size);
+  for (const enemy of [...c.enemies]) {
+    if (enemy.emerging > 0) continue;
+    const near = enemy.next && enemy.t >= 0.5 ? enemy.next : enemy.tile;
+    if (!reach.has(combatKey(near))) continue;
+    c.slamHits++;
+    burst(c, near, 'slam');
+    enemy.next = null; enemy.t = 0; enemy.knockback = false;
+    damageEnemy(c, enemy, SLAM.damage);
+    if (!c.enemies.includes(enemy)) continue;
+    enemy.stun = Math.max(enemy.stun || 0, SLAM.stun);
+    throwBack(c, enemy, player, lit);
+  }
+}
 /** Advance every defeated enemy's crumble; drop it once its last fleck lands. */
 export function stepEnemyDissolves(c, dt) {
   if (!c?.dying?.length) return;
@@ -229,7 +273,10 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
       c.spawnTimer = wave.interval;
     }
   }
+  const lit = c.enemies.length ? player.lit?.() ?? null : null;
+  if (player.slam && player.slam.seq !== c.slamSeen) { c.slamSeen = player.slam.seq; slam(c,player.slam.tile,player,lit); }
   for (const enemy of [...c.enemies]) {
+    enemy.scorch = Math.max(0,(enemy.scorch || 0)-dt);
     if (enemy.burn > 0) {
       const burnTime = Math.min(dt,enemy.burn); enemy.burn -= burnTime;
       damageEnemy(c,enemy,burnTime*0.75);
@@ -237,6 +284,11 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
     }
     enemy.hitFlash = Math.max(0,(enemy.hitFlash || 0)-dt);
     if (enemy.emerging > 0) { enemy.emerging = Math.max(0, enemy.emerging-dt); continue; }
+    if (lit?.has(combatKey(enemy.tile))) {
+      enemy.scorch = 0.25;
+      damageEnemy(c,enemy,LIGHT.burn*dt);
+      if (!c.enemies.includes(enemy)) continue;
+    }
     if (enemy.knockback) {
       enemy.t += dt*6;
       if (enemy.t >= 1) { enemy.tile = enemy.next; enemy.next = null; enemy.t = 0; enemy.knockback = false; }
@@ -249,6 +301,8 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
       enemy.stun = Math.max(0,enemy.stun-dt); continue;
     }
     if (!enemy.next) enemy.next = surfaceRoute(enemy.tile, player.head, c.size)?.[0] || null;
+    // The wall holds a step until it is half across; past that the enemy is in it and burns.
+    if (enemy.next && lit && enemy.t < 0.5 && lit.has(combatKey(enemy.next))) { singe(c,enemy,player,lit); continue; }
     if (enemy.next) {
       const dash = enemy.type === 'scout' ? (enemy.dashClock < 0.45 ? 0 : enemy.dashClock < 0.95 ? 2.4 : 1) : 1;
       enemy.t += dt * (ENEMIES[enemy.type]?.speed ?? COMBAT.enemySpeed) * dash;

@@ -8,12 +8,12 @@ import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelS
 import { makeTunnelBodyProfile, blendTunnelBodyProfile, fitTunnelBodyInto, tunnelBodyDistance } from './tunnelBodyFit.js';
 import { MOBI_RADIUS } from '../mobiModel.js';
 import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
-import { SPRING_CHARGE } from './signatures.js';
+import { SPRING_COIL_SECONDS } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
 import { createCharacterGeometry, applyCharacterFinish, prismColor, characterSegmentPattern } from '../wormCharacterVisuals.js';
 import { wormBodyTaper } from '../wormCharacterFinish.js';
-import { WIGGLE_BODY_SCALE, wiggleBodyOffset } from '../wiggleBody.js';
+import { WIGGLE_BODY_SCALE, wiggleBodyOffset, wiggleBodySlope, limitWiggleGap } from '../wiggleBody.js';
 // src/worm/healerWorm/WormBody.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import { useEffect, useMemo, useRef } from 'react';
@@ -86,6 +86,9 @@ const _bodyHeadPos = new THREE.Vector3();
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
 const _wiggleForward = new THREE.Vector3();
+// How much of the body Spring's coil gathers, and how far that loop rears and is hauled.
+const SPRING_COIL_BEADS = 14, SPRING_COIL_RISE = 0.32, SPRING_COIL_HAUL = 0.07;
+const _wigglePrev = new THREE.Vector3(); // the bead ahead, before surface clearance
 const _bodyCloneNormal = new THREE.Vector3();
 const _bodySegForward = new THREE.Vector3();
 const _bodySideVec = new THREE.Vector3();
@@ -450,6 +453,7 @@ export function WormBody({ worm, size }) {
         }
 
         beginWormSegments();
+        let wigglePrevValid = false;
         if (_isWiggle) _wiggleForward.fromArray(DIR_FORWARD[worm.pos.current.dirKey][worm.moveDir.current]);
         const skinDetail = _isWiggle ? getSkinFX(wormSkinId).bump?.amp ?? 0 : 0;
         for (let i = 0; i < visibleCount; i++) {
@@ -486,6 +490,7 @@ export function WormBody({ worm, size }) {
                 if (_isWiggle) {
                     bodyFrameInto(_bookBasisMat, _wiggleForward, _bodyNormal, _bookX, _bookY, _bookZ);
                     _wormDummy.quaternion.setFromRotationMatrix(_bookBasisMat);
+                    _wigglePrev.copy(_bodyHeadPos); wigglePrevValid = !_bodyTransit && orbitT === 0; // the head is not lifted by a rocket flight, the beads are
                 }
                 // Book Worm draws its head as the orb above, so the spine box
                 // must not also be drawn here — two heads, one inside the other.
@@ -549,6 +554,12 @@ export function WormBody({ worm, size }) {
                             ? wiggleBodyOffset(targetDist, reducedPickupMotion ? 0 : time)
                             : Math.sin(targetDist * 0.8 / BODY_BALL_SPACING - time * 6) * 0.08 * Math.sin(fade * Math.PI);
                         _bodyClonePos.addScaledVector(_bodySideVec, wiggle * (1 - flightBlend));
+                        // Point the bead along the wave it rides, not the straight path under it.
+                        if (_isWiggle && !segmentTransit) {
+                            _bodySegForward.addScaledVector(_bodySideVec, -wiggleBodySlope(targetDist, reducedPickupMotion ? 0 : time) * (1 - flightBlend)).normalize();
+                            if (wigglePrevValid) limitWiggleGap(_bodyClonePos, _wigglePrev);
+                            _wigglePrev.copy(_bodyClonePos); wigglePrevValid = true;
+                        } else if (_isWiggle) wigglePrevValid = false;
                         // Inch Worm: ride up off the surface along the normal wherever the
                         // wave has bunched the body, so each compression reads as a hump —
                         // taller with every orb carried.
@@ -577,7 +588,13 @@ export function WormBody({ worm, size }) {
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
                         _bodyClonePos.addScaledVector(_bodySideVec,
                             wiggleBodyOffset(targetDist, reducedPickupMotion ? 0 : time) * (1 - flightBlend));
-                    } else _bodySegForward.set(0, 0, 0);
+                        _bodySegForward.addScaledVector(_bodySideVec, -wiggleBodySlope(targetDist, reducedPickupMotion ? 0 : time) * (1 - flightBlend)).normalize();
+                        if (wigglePrevValid) limitWiggleGap(_bodyClonePos, _wigglePrev);
+                        _wigglePrev.copy(_bodyClonePos); wigglePrevValid = true;
+                    } else {
+                        _bodySegForward.set(0, 0, 0);
+                        if (_isWiggle) wigglePrevValid = false;
+                    }
                 }
 
                 const stroke = tunnelSwimInto(tunnelStroke.current, i, tLen, time, swimWeight, reducedPickupMotion);
@@ -662,10 +679,17 @@ export function WormBody({ worm, size }) {
                 if (i === 0) _wormDummy.scale.multiplyScalar(worm.pickupHeadScale);
                 else _wormDummy.scale.multiplyScalar(1 + 0.12 * pickupWave + 0.22 * tailPop);
             }
-            if (_isInch && worm.signature.current.charge > 0) {
-                const compression = Math.sin((1 - worm.signature.current.charge / SPRING_CHARGE) * Math.PI * 0.5);
-                _wormDummy.scale.multiplyScalar(1 + compression * 0.2);
-                _wormDummy.position.addScaledVector(i === 0 ? _bodyNormal : _bodyCloneNormal, -compression * 0.025);
+            if (_isInch && !segmentTransit && worm.signature.current.charge > 0) {
+                // Spring's coil: the head ducks, a loop is reared up behind it and hauled toward
+                // the head, as an inchworm gathers itself before a leap. Overlaid on the gait.
+                const coil = Math.sin((1 - worm.signature.current.charge / SPRING_COIL_SECONDS) * Math.PI * 0.5);
+                _wormDummy.scale.multiplyScalar(1 + coil * 0.22);
+                if (i === 0) _wormDummy.position.addScaledVector(_bodyNormal, -coil * 0.04);
+                else if (i <= SPRING_COIL_BEADS) {
+                    const hump = Math.sin(Math.PI * i / (SPRING_COIL_BEADS + 1));
+                    _wormDummy.position.addScaledVector(_bodyCloneNormal, coil * SPRING_COIL_RISE * hump);
+                    if (_bodySegForward.lengthSq() > 0) _wormDummy.position.addScaledVector(_bodySegForward, coil * SPRING_COIL_HAUL * hump);
+                }
             }
             _wormDummy.scale.multiplyScalar(wormBodyTaper(i, sweep ? visibleCount : tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);

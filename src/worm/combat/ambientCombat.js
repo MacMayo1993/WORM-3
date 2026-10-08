@@ -79,8 +79,11 @@ export function stepAmbientCombat(c, delta, player, tunnels, onHit) {
   }
   c.element = player.elementT > 0 ? player.element || null : null; c.elementT = player.elementT || 0;
   let touched = false;
+  const lightBefore = c.lightHits, slamBefore = c.slamHits;
   stepCombat(c,dt,{...player,portalOpen:true,canFinish:false},health => { touched = true; c.notice = `Shield hit · ${health}/3 left. Heal a tunnel to repair.`; c.noticeT = 4; onHit?.(health); });
   // One contact per encounter; the remaining shields last for the run. Healing
   // restores one. No surprise repeated bites while the worm is turning away.
+  if (c.lightHits > lightBefore && !touched) { c.notice = 'The light burns it'; c.noticeT = 2.5; }
+  else if (c.slamHits > slamBefore && !touched) { c.notice = 'The slam stuns it'; c.noticeT = 2.5; }
   if (touched || (c.warning === 0 && c.enemies.length === 0)) retreat(c,true);
 }

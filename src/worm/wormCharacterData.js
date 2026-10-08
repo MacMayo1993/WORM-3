@@ -25,7 +25,7 @@ export const WORM_CHARACTERS = [
     type: 'Brute',
     subtitle: 'Ribbed caterpillar with soft feelers',
     stats: { speed: 30, healing: 85, agility: 35, glow: 10 },
-    special: 'Spring Loaded — Spring forward in a long jump. Land on a clear tile.',
+    special: 'Spring Loaded — Coil and leap four tiles. The landing slams: bombs beside it are defused, orbs within two tiles are yours and enemies are stunned. Land on a clear tile; you can still jump once more in the air.',
   },
   {
     id: 'glow',
@@ -33,7 +33,7 @@ export const WORM_CHARACTERS = [
     type: 'Scout',
     subtitle: 'Bioluminescent trail crawler',
     stats: { speed: 90, healing: 40, agility: 80, glow: 100 },
-    special: 'Light Trail — Paint behind your tail for 8 seconds; the trail stays for 12 more seconds. Enemies glow brighter.',
+    special: 'Light Trail — Paint behind your tail for 8 seconds; the trail stays for 12 more seconds. Enemies that run into it are burned and thrown back.',
   },
   {
     id: 'book',
