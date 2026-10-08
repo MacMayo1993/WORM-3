@@ -51,7 +51,7 @@ import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
-import NumberLabel from './NumberLabel.jsx';
+import NumberLabel, { GridLabel } from './NumberLabel.jsx';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -2053,7 +2053,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           reason as the heal seal above. */}
       <HealParticles ref={healParticlesRef} />
 
-      {overlay && (lightweightNumbers && /^\d+$/.test(String(overlay)) ? <NumberLabel value={overlay} /> : (
+      {overlay && (mode === 'grid' ? <GridLabel value={overlay} /> : isSudokube && /^\d+$/.test(String(overlay)) ? <NumberLabel value={overlay} /> : (
         <Text position={[0, 0, 0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
           {overlay}
         </Text>
