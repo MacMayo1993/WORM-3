@@ -51,7 +51,7 @@ import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
-import NumberLabel, { GridLabel } from './NumberLabel.jsx';
+import NumberLabel, { GridLabel, CanvasLabel } from './NumberLabel.jsx';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -1879,16 +1879,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               tile is ranked (disparity mode). Billboard keeps the text facing the
               camera as the cube is orbited. */}
           <Billboard position={[0, 0, 0.27]}>
-            <Text position={[0, deadRank != null ? 0.12 : 0.05, 0]} fontSize={0.075} color={antipodalColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={2} depthTest={false}>
-              RIP
-            </Text>
-            <Text position={[0, deadRank != null ? 0 : -0.05, 0]} fontSize={0.04} color={antipodalColor} anchorX="center" anchorY="middle" renderOrder={2} depthTest={false}>
-              {stickerGridIdRef.current}
-            </Text>
+            <CanvasLabel value="RIP" position={[0, deadRank != null ? 0.12 : 0.05, 0]} fontSize={0.075} color={antipodalColor} renderOrder={2} depthTest={false} />
+            <CanvasLabel value={stickerGridIdRef.current} position={[0, deadRank != null ? 0 : -0.05, 0]} fontSize={0.04} color={antipodalColor} renderOrder={2} depthTest={false} />
             {deadRank != null && (
-              <Text position={[0, -0.13, 0]} fontSize={0.062} color={antipodalColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={2} depthTest={false}>
-                #{deadRank}
-              </Text>
+              <CanvasLabel value={`#${deadRank}`} position={[0, -0.13, 0]} fontSize={0.062} color={antipodalColor} renderOrder={2} depthTest={false} />
             )}
           </Billboard>
           {/* Ghost worms orbit mid-tombstone height */}

@@ -64,3 +64,19 @@ it('retains individual tile frustum culling and restores tiles for a second came
   camera.lookAt(0, 0, -5); pool.update(camera); expect(mesh.visible).toBe(true);
   pool.dispose(); geometry.dispose(); material.dispose();
 });
+
+it('keeps foreground labels in their own render-order batch', () => {
+  const scene = new THREE.Group(), pool = createSurfaceBatches();
+  const geometry = new THREE.PlaneGeometry(), material = new THREE.MeshBasicMaterial();
+  const normal = new THREE.Group(), foreground = new THREE.Group();
+  foreground.renderOrder = 2;
+  scene.add(pool.group, normal, foreground);
+  pool.register(normal, geometry, material);
+  pool.register(foreground, geometry, material);
+  pool.update();
+  expect(pool.group.children.map(mesh => [mesh.renderOrder, mesh.count])).toEqual([[0, 1], [2, 1]]);
+  foreground.renderOrder = 0;
+  pool.update();
+  expect(pool.group.children.map(mesh => [mesh.renderOrder, mesh.count])).toEqual([[0, 2], [2, 0]]);
+  pool.dispose(); geometry.dispose(); material.dispose();
+});

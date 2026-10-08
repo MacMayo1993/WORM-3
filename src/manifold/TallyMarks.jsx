@@ -1,5 +1,6 @@
 import React from 'react';
-import { Line, Text } from '@react-three/drei';
+import { Line } from '@react-three/drei';
+import { CanvasLabel } from '../3d/NumberLabel.jsx';
 
 const TallyMarks = ({ flips, radius, origColor }) => {
   // Calculate full cycles and half cycles
@@ -110,16 +111,12 @@ const TallyMarks = ({ flips, radius, origColor }) => {
 
       {/* Show flip count as small text for higher counts (keeps marks within tile) */}
       {flips > 6 && (
-        <Text
+        <CanvasLabel
+          value={`×${flips}`}
           position={[0, -radius * 0.6, 0.005]}
           fontSize={0.06}
           color={tallyColor}
-          anchorX="center"
-          anchorY="middle"
-          fontWeight="bold"
-        >
-          ×{flips}
-        </Text>
+        />
       )}
     </group>
   );
