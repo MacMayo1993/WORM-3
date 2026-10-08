@@ -10,7 +10,7 @@ export default function WormDemoLessonCard({ onRetry }) {
   const s = useGameStore(useShallow(s => ({ demoWormLessonIndex: s.demoWormLessonIndex, complete: s.demoWormComplete, started: s.demoWormStarted, prepared: s.demoWormPrepared, start: s.startWormDemoLesson,
     progress: s.demoWormProgress, alive: s.wormAlive, paused: s.wormPauseMenuOpen,
     details: s.wormDeathDetails, phase: s.wormGamePhase, finished: s.demoWormFinished,
-    retry: s.restartWormDemoLesson, next: s.nextWormDemoLesson })));
+    retry: s.restartWormDemoLesson, next: s.nextWormDemoLesson, skip: s.skipWormDemoLesson })));
   const lesson = wormDemoLesson(s);
   const retryRef = useRef(null), nextRef = useRef(null);
   useEffect(() => {
@@ -40,6 +40,7 @@ export default function WormDemoLessonCard({ onRetry }) {
     <div className="worm-demo-actions">
       <button ref={retryRef} disabled={!dead && !s.started && !s.prepared} className={dead || !s.started ? 'arcade-primary' : 'arcade-key'} onClick={!s.started && !dead ? s.start : onRetry ?? s.retry}>{lesson.preview ? !s.started && !dead ? 'Watch it' : 'Replay' : dead ? 'Try again' : !s.started ? 'Try it' : 'Retry'}</button>
       <button ref={nextRef} disabled={!s.complete} className={s.complete ? 'arcade-primary' : 'arcade-key'} onClick={s.next}>{last ? 'Next: Flip Cube' : 'Next'}</button>
+      <button className="arcade-key" onClick={() => s.skip(index)}>Skip Exercise</button>
     </div>
   </section>;
 }

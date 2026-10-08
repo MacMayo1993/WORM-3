@@ -551,7 +551,7 @@ const ensureDemoShellStyle = () => {
   document.head.appendChild(style);
 };
 
-const DemoProgressBar = ({ currentStep }) => {
+const DemoProgressBar = ({ currentStep, onSkipStep, onExit }) => {
   ensureDemoShellStyle();
   // Worm mode's glance strip owns the top edge — dock the pill at the bottom there.
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
@@ -561,21 +561,24 @@ const DemoProgressBar = ({ currentStep }) => {
   const progress = current / total;
 
   return (
-    <div className={`demo-progress-pill${wormHealerMode ? ' demo-progress-pill--bottom' : ''}`}>
+    <div className={`demo-progress-pill${wormHealerMode && !onSkipStep ? ' demo-progress-pill--bottom' : ''}`}
+      style={onSkipStep ? { pointerEvents: 'auto', gap: 6, padding: '4px 8px', zIndex: 12000, maxWidth: 'calc(100vw - 24px)' } : undefined}>
       <span className="demo-progress-label">DEMO</span>
-      <div className="demo-progress-track" role="progressbar" aria-label="Demo progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
+      <div className="demo-progress-track" style={onSkipStep ? { width: 24, flexShrink: 0 } : undefined} role="progressbar" aria-label="Demo progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
         <div className="demo-progress-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <span className="demo-progress-count">
         {current} / {total}
       </span>
+      {onSkipStep && <button type="button" className="demo-coach-pill-btn" style={{ minHeight: 44, padding: '6px 10px' }} onClick={onSkipStep}>Skip Step</button>}
+      {onExit && <button type="button" className="demo-coach-pill-btn" style={{ minHeight: 44, padding: '6px 10px' }} onClick={onExit}>Exit Demo</button>}
     </div>
   );
 };
 
 // Most steps need only a setup line. Chaos and Random get a player-paced
 // briefing before the forecast picker or live remixing can start.
-const DemoStepIntro = ({ step, onContinue, onExit }) => {
+const DemoStepIntro = ({ step, onContinue, onSkipStep, onExit }) => {
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
   const lines = STEP_INTRO_LINES[step] || [STEP_COPY[step]].filter(Boolean);
@@ -586,8 +589,10 @@ const DemoStepIntro = ({ step, onContinue, onExit }) => {
       modeName={`Demo ${info.num} · ${info.label}`}
       primaryLabel={step === 'chaos-forecast' ? 'Choose a pair' : step === 'random-showcase' ? 'Start Random' : 'Let’s try it'}
       onComplete={onContinue}
-      skipLabel="Exit Demo"
-      onSkip={onExit}
+      skipLabel="Skip Mobi"
+      onSkip={onContinue}
+      onSkipStep={onSkipStep}
+      onExit={onExit}
       // The in-game top bar is up during the demo — keep the dialogue under it.
       topInset="var(--topbar-h)"
     />
@@ -726,7 +731,7 @@ const TRY_COPY = {
 // An explicit copy override brings Mobi back. Dismissing it clears the hook (onCopySeen)
 // rather than in local state, so the parent knows the blocking panel is gone and
 // can put the bottom nav back.
-const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => {
+const DemoCoach = ({ step, onNext, onSkipStep, onExit, copy: copyOverride, onCopySeen }) => {
   ensureDemoShellStyle();
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const showSettings = useGameStore((s) => s.showSettings);
@@ -747,8 +752,10 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
         modeName={info ? `Step ${info.num} · ${info.label}` : 'Demo'}
         primaryLabel="Got it"
         onComplete={() => onCopySeen?.()}
-        skipLabel="Exit Demo"
-        onSkip={onExit}
+        skipLabel="Skip Mobi"
+        onSkip={() => onCopySeen?.()}
+        onSkipStep={onSkipStep}
+        onExit={onExit}
         topInset="var(--topbar-h)"
       />
     );

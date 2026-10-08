@@ -1,6 +1,7 @@
 import { XpReceipt } from '../../progression/ProgressWidgets.jsx';
 import DemoDialog from './DemoDialog.jsx';
 import React, { useState } from 'react';
+import { useGameStore } from '../../hooks/useGameStore.js';
 import {
   UI_FONT, HEADING_FONT,
   UI_CREAM, UI_MOSS, UI_ACTION_SHADOW,
@@ -23,6 +24,7 @@ const MODES = [
 
 const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit }) => {
   const [expanded, setExpanded] = useState(false);
+  const skipped = useGameStore(s => s.demoSkipped);
   const handlers = { worm: onWorm, story: onStory, freeplay: onFreeplay, chaos: onChaos, random: onRandom, store: onStore };
 
   return (
@@ -50,7 +52,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           color: '#7b6f45', fontSize: 11, fontWeight: 800,
           letterSpacing: '0.18em', textTransform: 'uppercase', margin: '0 0 6px',
         }}>
-          Demo Complete
+          {skipped ? 'Demo Finished' : 'Demo Complete'}
         </p>
         <XpReceipt mode="demo" />
         <h1 style={{
