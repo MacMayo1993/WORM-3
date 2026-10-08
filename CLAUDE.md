@@ -38,6 +38,7 @@ Supported toolchain: **Node 20** (`.nvmrc`, `engines`, CI, devcontainer all agre
 - **Run all tests**: `npm run test`
 - **Run a single test**: `npx vitest run src/__tests__/cubeRotation.test.js`
 - **Coverage scope**: `src/game/**`, `src/utils/**`, `src/levels/**`
+- **Credits**: third-party art is credited from `src/utils/credits.js` (Settings → About) and inventoried in `docs/ASSET_CREDITS.md`; `assetCredits.test.js` fails when a model or environment map is added to `public/` without a credit or an explicit "unverified" entry, and when a credit disagrees with the model's own embedded Sketchfab metadata. The nine biome models are CC BY 4.0, so crediting them is a licence condition.
 - **Globals**: Vitest globals enabled (`describe`, `it`, `expect`, `vi` available without import)
 
 Test files follow the pattern:
