@@ -612,7 +612,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Restart from the face the player actually saw, not the unshown simulation face.
   const displayedFaceRef = useRef(meta?.curr ?? 0);
 
-  // Identity-swap reset (Worm mode only in practice). Worm mode keys StickerPlane by
+  // Identity-swap reset (Worm and Chaos). Worm mode keys StickerPlane by
   // grid slot so it persists across turns — see Cubie's stickerKey — which means a
   // turn can move a DIFFERENT physical piece into this live component rather than
   // remounting it. That is the whole point (remounting ~150 stickers per turn is the
@@ -622,11 +622,18 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // spurious squish) and no overlay lingers from the piece that left. Runs as a
   // layout effect BEFORE the materialColor sync below, so that effect sees the reset
   // prevCurr and paints the incoming color rather than a stale flip-pending color.
-  // In every other mode the physical-identity key forces a remount, so stickerGridId
-  // never changes under a mounted component and this effect is inert after mount.
+  // Chaos keys by slot as well (a slice turns every 1.5 s mid-storm). In every
+  // other mode the physical-identity key forces a remount, so stickerGridId never
+  // changes under a mounted component and this effect is inert after mount.
   const prevGridIdRef = useRef(stickerGridId);
   useLayoutEffect(() => {
     if (prevGridIdRef.current === stickerGridId) return; // mount, or no identity change
+    // The outgoing piece's in-flight flip motion is cut short here, so drop what it
+    // published (as an unmount would): tunnels must not keep shaking its anchor.
+    if (prevGridIdRef.current) {
+      flipBurstMap.delete(prevGridIdRef.current);
+      stickerFlipMotion.delete(prevGridIdRef.current);
+    }
     prevGridIdRef.current = stickerGridId;
     prevCurr.current = meta?.curr ?? 0;
     displayedFaceRef.current = meta?.curr ?? 0;
@@ -654,6 +661,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (spiderPlaneRef.current) spiderPlaneRef.current.visible = false;
     if (healSealRef.current) healSealRef.current.visible = false;
     setShowWormIntro(false); // React bails out when already false — no extra render
+    // Chaos also keys by slot, and its tiles die. The incoming piece is dead or
+    // alive already: take its tombstone as it stands, without replaying the
+    // implosion, and undo any shrink left by an outgoing piece's death mid-way.
+    wasDeadRef.current = isDead;
+    deathAnimT.current = isDead ? 1 : -1;
+    setDeathAnimDone(isDead);
+    if (groupRef.current) groupRef.current.scale.set(1, 1, 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- meta read only on identity change
   }, [stickerGridId]);
 

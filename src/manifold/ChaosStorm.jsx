@@ -302,7 +302,7 @@ function chargePathAt(c, t, out) {
  * Emit `n` points from the scratch buffers as one strip, jittered sideways by
  * `amp` (tapered to zero at both ends so a strip stays pinned to what it joins).
  */
-function emitStrip(writer, n, amp, seed, color, core, xray) {
+function emitStrip(writer, n, amp, seed, color, core) {
   const s = writer.open();
   if (s < 0) return;
   for (let i = 0; i < n; i++) {
@@ -322,7 +322,7 @@ function emitStrip(writer, n, amp, seed, color, core, xray) {
         z += _u.z * j1 + _s.z * j2;
       }
     }
-    writer.point(s, i, x, y, z, _wid[i], _alp[i], color.r, color.g, color.b, core, xray);
+    writer.point(s, i, x, y, z, _wid[i], _alp[i], color.r, color.g, color.b, core);
   }
   writer.close(s, n);
 }
@@ -427,7 +427,7 @@ function tileArcs(ctx, center, normal, color, count, alpha, width, seed, inward)
       _wid[i] = width * (0.55 + 0.45 * Math.sin(Math.PI * f));
       _alp[i] = alpha;
     }
-    emitStrip(ctx.writer, CRAWL_POINTS, 0.07, seed + k * 13, color, 1, 0);
+    emitStrip(ctx.writer, CRAWL_POINTS, 0.07, seed + k * 13, color, 1);
   }
 }
 
@@ -643,7 +643,7 @@ function updateBolt(ctx, b) {
     _wid[i] = width * knot * ends * (0.85 + 0.3 * f) * (1 + 1.6 * tip);
     _alp[i] = Math.min(1, alpha * (1 + 0.8 * tip));
   }
-  emitStrip(ctx.writer, BOLT_POINTS, 0, 0, b.color, core, 0);
+  emitStrip(ctx.writer, BOLT_POINTS, 0, 0, b.color, core);
 
   // The struck tile keeps crackling for a moment after the hit.
   if (b.landed) {
@@ -675,7 +675,7 @@ function updateBolt(ctx, b) {
       _wid[i] = width * 0.42 * (1 - 0.7 * f);
       _alp[i] = alpha * 0.75 * (1 - 0.6 * f);
     }
-    emitStrip(ctx.writer, FORK_POINTS, reach * 0.18, fs + 7, b.color, core * 0.85, 0);
+    emitStrip(ctx.writer, FORK_POINTS, reach * 0.18, fs + 7, b.color, core * 0.85);
   }
 }
 
@@ -754,7 +754,7 @@ function updateCharge(ctx, c) {
   const crackle = ctx.reduced ? 1 : 0.72 + 0.28 * seededRand(c.seed + c.sub * 5.7);
 
   // Sheath: the wormhole itself, lit from the struck mouth up to the front and
-  // hottest right at the front. Also drawn through the cube (x-ray), faintly.
+  // hottest right at the front. Depth-tested: inside the cube it stays inside.
   const sheathW = (overload ? 0.32 : quiet ? 0.1 : 0.17) + c.heat * 0.07;
   for (let i = 0; i < SHEATH_POINTS; i++) {
     const t = i / (SHEATH_POINTS - 1);
@@ -765,7 +765,7 @@ function updateCharge(ctx, c) {
     _alp[i] = glow * Math.min(1, lit * 0.55 * crackle + hot * 1.1);
     _wid[i] = sheathW * (1 + 1.3 * hot);
   }
-  emitStrip(ctx.writer, SHEATH_POINTS, ctx.reduced ? 0 : 0.03, c.seed + c.sub * 11, c.color, quiet ? 0.3 : 0.7, 1);
+  emitStrip(ctx.writer, SHEATH_POINTS, ctx.reduced ? 0 : 0.03, c.seed + c.sub * 11, c.color, quiet ? 0.3 : 0.7);
 
   // Crawling arcs at the surge front — the electricity itself, restless.
   if (_chargeState.arrived && !overload) return;
@@ -782,7 +782,7 @@ function updateCharge(ctx, c) {
       _wid[i] = (overload ? 0.18 : 0.11) * (0.6 + 0.4 * Math.sin(Math.PI * f));
       _alp[i] = glow * (0.5 + 0.5 * f);
     }
-    emitStrip(ctx.writer, ARC_POINTS, ctx.reduced ? 0.02 : overload ? 0.13 : 0.075, c.seed + k * 29 + c.sub * 7, c.color, 1, 1);
+    emitStrip(ctx.writer, ARC_POINTS, ctx.reduced ? 0.02 : overload ? 0.13 : 0.075, c.seed + k * 29 + c.sub * 7, c.color, 1);
   }
 }
 
@@ -813,7 +813,6 @@ export default function ChaosStorm({ cubieRefs, size, onCascadeComplete }) {
   useEffect(() => () => {
     res.stripGeo.dispose();
     res.stripMats.lit.dispose();
-    res.stripMats.xray.dispose();
     res.ctx.sparks.geo.dispose();
     res.sparkMat.dispose();
     res.ringGeo.dispose();
@@ -885,7 +884,6 @@ export default function ChaosStorm({ cubieRefs, size, onCascadeComplete }) {
     <group>
       {/* Positions are written in world space into meshes at the origin, so their
           bounding volumes are meaningless — culling is disabled explicitly. */}
-      <mesh geometry={res.stripGeo} material={res.stripMats.xray} frustumCulled={false} renderOrder={9} raycast={() => null} dispose={null} />
       <mesh geometry={res.stripGeo} material={res.stripMats.lit} frustumCulled={false} renderOrder={10} raycast={() => null} dispose={null} />
       <points geometry={res.ctx.sparks.geo} material={res.sparkMat} frustumCulled={false} renderOrder={11} raycast={() => null} dispose={null} />
       {res.ctx.rings.map((r, i) => (

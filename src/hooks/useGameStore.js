@@ -78,6 +78,16 @@ export const selectEffectiveFlipCap = (state) =>
   state.chaosLevel > 0 ? state.disparityFlipCap : FLIP_CAP;
 
 /**
+ * True while a standalone Chaos round owns the board: the storm is live, or the
+ * player is aiming its first strike. Chaos is watched and healed, not played with
+ * flips, so the player's own flips (tap, keyboard, cube net) are refused. Healing a
+ * damaged tile is not a flip and still goes through. Story levels that run chaos
+ * keep their flips.
+ */
+export const selectChaosFlipLocked = (state) =>
+  !state.wormHealerMode && !state.currentLevelData && (state.chaosLevel > 0 || state.chaosIgnitionPicking);
+
+/**
  * Returns the single active game mode identifier.
  *
  * Priority order matches the original design: worm-healer overrides teach,

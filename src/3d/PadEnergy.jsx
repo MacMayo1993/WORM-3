@@ -129,7 +129,6 @@ export function PadEnergy({ frames, exteriorPortals }) {
   useEffect(() => () => {
     for (const k of ['columnGeo', 'vortexGeo', 'columnMat', 'vortexMat', 'stripGeo', 'sparkMat']) res[k].dispose();
     res.stripMats.lit.dispose();
-    res.stripMats.xray.dispose();
     res.sparks.geo.dispose();
   }, [res]);
 
@@ -164,7 +163,7 @@ export function PadEnergy({ frames, exteriorPortals }) {
           _p.fromArray(_pts, k * 3).applyMatrix4(_m);
           const taper = Math.sin((Math.PI * k) / (ARC_POINTS - 1));
           res.writer.point(s, k, _p.x, _p.y, _p.z, ARC_WIDTH * (0.6 + 0.4 * taper), glow,
-            0.35 + 0.65 * _color.r, 0.35 + 0.65 * _color.g, 0.35 + 0.65 * _color.b, 1, 0);
+            0.35 + 0.65 * _color.r, 0.35 + 0.65 * _color.g, 0.35 + 0.65 * _color.b, 1);
         }
         res.writer.close(s, ARC_POINTS);
       }

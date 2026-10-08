@@ -12,6 +12,18 @@ export const isMobile =
 //
 // Used by the worm's 3D effects — blinking orbs, magnet attraction streaks — which
 // sit outside CSS's reach and so cannot rely on a @media query.
-export const prefersReducedMotion = () =>
-  typeof window !== 'undefined' &&
-  !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+//
+// Frame loops call this (every raised cubie, every ticking sticker), so the
+// MediaQueryList is made once and its live `.matches` read after that: calling
+// matchMedia itself every frame parsed the query anew each time. It is rebuilt only
+// if window.matchMedia is replaced (tests stub it).
+let reducedMotionQuery = null;
+let reducedMotionSource = null;
+export const prefersReducedMotion = () => {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  if (reducedMotionSource !== window.matchMedia) {
+    reducedMotionSource = window.matchMedia;
+    reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  }
+  return !!reducedMotionQuery?.matches;
+};

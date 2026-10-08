@@ -15,7 +15,10 @@ const POP = 1 + CUBE_PIECE_POP;
 // Mark every face so the assertions inspect actual descendant world positions.
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: ({ currentDir, pos }) => <group name={currentDir} position={pos} /> }));
 extend(THREE);
-it.each([[0, 'full'], [3, 'off'], [3, 'subtle']])('pops the whole piece with a transparent tunnel window and returns home (chaos level %i, saved=%s)', async (chaosLevel, flipPads) => {
+// Flip Cube opens a see-through window onto the band under a raised tile. Chaos keeps
+// the body solid: nearly every piece is raised mid-storm, and the windows turned the
+// whole cube to glass with every band and surge inside it shining through.
+it.each([[0, 'full'], [3, 'off'], [3, 'subtle']])('pops the whole piece, windowed outside Chaos, and returns home (chaos level %i, saved=%s)', async (chaosLevel, flipPads) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState();
   useGameStore.setState({ size: 3, explosionT: 0, mirrorMode: false, hollowMode: false, visualMode: 'solid', chaosLevel,
@@ -42,9 +45,15 @@ it.each([[0, 'full'], [3, 'off'], [3, 'subtle']])('pops the whole piece with a t
     const ordinaryFace = raised.current.getObjectByName('PY').getWorldPosition(new THREE.Vector3());
     expect(ordinaryFace.distanceTo(new THREE.Vector3(POP, POP + 0.51, POP))).toBeLessThan(1e-8);
     const body = raised.current.children[0].children.find(o => o.isMesh);
-    expect(body.material.transparent).toBe(true);
-    expect(body.material.depthWrite).toBe(false);
-    expect(body.material.opacity).toBeLessThan(0.2);
+    if (chaosLevel > 0) {
+      expect(body.material.transparent).toBe(false);
+      expect(body.material.depthWrite).toBe(true);
+      expect(body.material.opacity).toBe(1);
+    } else {
+      expect(body.material.transparent).toBe(true);
+      expect(body.material.depthWrite).toBe(false);
+      expect(body.material.opacity).toBeLessThan(0.2);
+    }
     expect(useGameStore.getState().settings.flipPads).toBe(flipPads);
     expect(body.getWorldPosition(new THREE.Vector3()).distanceTo(center)).toBeLessThan(1e-8);
     // Simulate CubeAssembly's live layer transform. The radial offset follows it.

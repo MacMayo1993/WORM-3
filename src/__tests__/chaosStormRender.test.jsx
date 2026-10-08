@@ -34,7 +34,7 @@ const stripVertex = (geo, strip, point) => {
 };
 const stripGeometry = (store) => {
   let geo = null;
-  store.getState().scene.traverse((o) => { if (!geo && o.isMesh && o.geometry.attributes.aXray) geo = o.geometry; });
+  store.getState().scene.traverse((o) => { if (!geo && o.isMesh && o.geometry.attributes.aCore) geo = o.geometry; });
   return geo;
 };
 const usedStrips = (geo) => geo.drawRange.count / ((STRIP_POINTS - 1) * 6);
@@ -217,8 +217,12 @@ describe('ChaosStorm wormhole surges', () => {
     expect(tunnelCharges.get(charge.pairId)).toMatchObject({ fromGridId: charge.from.gridId, kind: 'birth' });
 
     const geo = stripGeometry(store);
-    // The sheath is marked x-ray: most of the surge runs inside the cube.
-    expect(geo.attributes.aXray.array[0]).toBe(1);
+    // The surge runs inside the cube and stays there: one depth-tested strip draw,
+    // no pass that ignores depth and shines through the pieces in front of it.
+    const stripMeshes = [];
+    store.getState().scene.traverse((o) => { if (o.isMesh && o.geometry === geo) stripMeshes.push(o); });
+    expect(stripMeshes).toHaveLength(1);
+    expect(stripMeshes[0].material.depthTest).toBe(true);
     // Its route starts at the struck tile's mouth and ends at the twin's.
     const start = stripVertex(geo, 0, 0);
     const end = stripVertex(geo, 0, STRIP_POINTS - 1);

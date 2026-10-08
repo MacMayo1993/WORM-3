@@ -20,7 +20,7 @@
  */
 
 // Zustand store + derived selectors
-export { useGameStore, getActiveMode } from './useGameStore.js';
+export { useGameStore, getActiveMode, selectChaosFlipLocked } from './useGameStore.js';
 
 // Domain hooks
 export { useCubeState } from './useCubeState.js';

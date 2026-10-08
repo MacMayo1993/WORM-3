@@ -2,7 +2,7 @@
 //
 // Every electric line in the chaos storm — bolt leaders, return strokes, forks,
 // and the surges that run down a wormhole — is a camera-facing strip in ONE
-// merged buffer, drawn in one call (two with the x-ray pass).
+// merged buffer, drawn in one call.
 //
 // The old ChaosWave drew each bolt as a pair of THREE.Line objects. WebGL ignores
 // line width, so a bolt was a one-pixel hairline however hard it was supposed to
@@ -20,7 +20,7 @@ import * as THREE from 'three';
 export const STRIP_POINTS = 16;
 const VERTS_PER_STRIP = STRIP_POINTS * 2;
 const INDICES_PER_STRIP = (STRIP_POINTS - 1) * 6;
-const DYNAMIC_ATTRS = ['position', 'aTangent', 'aColor', 'aWidth', 'aAlpha', 'aCore', 'aXray', 'aAlong'];
+const DYNAMIC_ATTRS = ['position', 'aTangent', 'aColor', 'aWidth', 'aAlpha', 'aCore', 'aAlong'];
 
 const vertexShader = `
   attribute float aSide;
@@ -29,10 +29,8 @@ const vertexShader = `
   attribute vec3  aColor;
   attribute float aAlpha;
   attribute float aCore;
-  attribute float aXray;
   attribute float aAlong;
 
-  uniform float uXrayPass;
   uniform float uScale;   // pixels per world unit at depth 1
   uniform float uMinPx;   // thinnest a live strip may ever draw, in pixels
 
@@ -47,7 +45,7 @@ const vertexShader = `
     vColor = aColor;
     vCore  = aCore;
     vAlong = aAlong;
-    vAlpha = uXrayPass > 0.5 ? aAlpha * aXray : aAlpha;
+    vAlpha = aAlpha;
 
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     // Expand the centreline into a screen-facing ribbon. A zero tangent (a padded
@@ -68,8 +66,6 @@ const vertexShader = `
 `;
 
 const fragmentShader = `
-  uniform float uXrayPass;
-  uniform float uXrayAlpha;
   uniform float uTime;
 
   varying float vSide;
@@ -89,7 +85,6 @@ const fragmentShader = `
     float flow = 0.78 + 0.22 * sin(vAlong * 42.0 - uTime * 75.0);
     vec3  col  = vColor * (body * 1.3 * flow + aura) + vec3(1.0) * core;
     float a    = vAlpha * min(1.0, core + body * 0.8 * flow + aura);
-    if (uXrayPass > 0.5) a *= uXrayAlpha;
     if (a < 0.003) discard;
     gl_FragColor = vec4(col, a);
   }
@@ -110,7 +105,6 @@ export function createStripGeometry(maxStrips) {
   geo.setAttribute('aWidth', attr(verts, 1));
   geo.setAttribute('aAlpha', attr(verts, 1));
   geo.setAttribute('aCore', attr(verts, 1));
-  geo.setAttribute('aXray', attr(verts, 1));
   geo.setAttribute('aAlong', attr(verts, 1));
 
   const side = geo.attributes.aSide.array;
@@ -132,27 +126,24 @@ export function createStripGeometry(maxStrips) {
 }
 
 /**
- * Two materials over the same geometry. The lit pass is depth-tested like any
- * surface effect. The x-ray pass ignores depth and draws only what a strip marks
- * as x-ray (the wormhole surges) at low alpha: a surge spends most of its trip
- * inside the cube, and without this the player would see it vanish into one tile
- * and reappear from another with nothing in between.
+ * The strip material. Depth-tested like any surface effect: a surge that runs
+ * through the cube's interior stays inside it, seen only through the gaps the
+ * lifted pieces open, rather than shining through the solid pieces in front.
  */
 export function createStripMaterials() {
   // uTime and uScale are shared by reference, so the storm updates them once.
   const shared = { uTime: { value: 0 }, uScale: { value: 600 }, uMinPx: { value: 3 } };
-  const make = (xray) => new THREE.ShaderMaterial({
-    uniforms: { ...shared, uXrayPass: { value: xray ? 1 : 0 }, uXrayAlpha: { value: 0.3 } },
+  const lit = new THREE.ShaderMaterial({
+    uniforms: shared,
     vertexShader,
     fragmentShader,
     transparent: true,
     depthWrite: false,
-    depthTest: !xray,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
     toneMapped: false
   });
-  return { lit: make(false), xray: make(true), uniforms: shared };
+  return { lit, uniforms: shared };
 }
 
 /**
@@ -160,7 +151,7 @@ export function createStripMaterials() {
  *
  *   w.begin()
  *   const s = w.open()             // -1 when the pool is full
- *   w.point(s, i, x, y, z, width, alpha, r, g, b, core, xray)
+ *   w.point(s, i, x, y, z, width, alpha, r, g, b, core)
  *   w.close(s, pointCount)         // tangents + degenerate padding
  *   w.end()                        // draw range + upload
  */
@@ -171,7 +162,6 @@ export function createStripWriter(geo, maxStrips) {
   const wid = geo.attributes.aWidth.array;
   const alp = geo.attributes.aAlpha.array;
   const cor = geo.attributes.aCore.array;
-  const xr = geo.attributes.aXray.array;
   const along = geo.attributes.aAlong.array;
   let used = 0;
   let lastUsed = 0;
@@ -180,7 +170,7 @@ export function createStripWriter(geo, maxStrips) {
     get used() { return used; },
     begin() { used = 0; },
     open() { return used < maxStrips ? used++ : -1; },
-    point(s, i, x, y, z, width, alpha, r, g, b, core, xray) {
+    point(s, i, x, y, z, width, alpha, r, g, b, core) {
       if (s < 0 || i < 0 || i >= STRIP_POINTS) return;
       const v = s * VERTS_PER_STRIP + i * 2;
       for (let k = 0; k < 2; k++) {
@@ -191,7 +181,6 @@ export function createStripWriter(geo, maxStrips) {
         wid[vi] = width;
         alp[vi] = alpha;
         cor[vi] = core;
-        xr[vi] = xray;
       }
     },
     close(s, count) {
