@@ -7,6 +7,12 @@ import { test, expect, openGame, press, skipIntro } from './helpers.js';
 // The failing requests show up as console errors; both tests expect them.
 const WORM_ENTRY_CHUNK = '**/assets/WormEntryScreen-*.js';
 
+// The real-world case is a first visit (or a tab that has no worker yet) that straddles
+// a deploy. Once the app's service worker is active it serves every chunk from its
+// exhaustive precache, which Playwright's route() cannot intercept, so a returning
+// player never sees this. Blocking the worker keeps these tests on the case that can happen.
+test.use({ serviceWorkers: 'block' });
+
 const reloadsOf = page => {
   const state = { navigations: 0 };
   page.on('framenavigated', frame => { if (frame === page.mainFrame()) state.navigations++; });
@@ -30,7 +36,7 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(async ({ errors }) => {
   // Refusing a chunk is the point; any *other* error is still a failure.
-  const unexpected = errors.filter(e => !/dynamically imported module|Importing a module script failed|Unable to preload|ERR_FAILED|ERR_BLOCKED_BY_CLIENT|Uncaught \(in promise\)|TypeError: Failed to fetch/.test(e));
+  const unexpected = errors.filter(e => !/dynamically imported module|Importing a module script failed|Unable to preload|ERR_FAILED|ERR_BLOCKED_BY_CLIENT|Uncaught \(in promise\)|TypeError: Failed to fetch|SW registration error/.test(e));
   expect(unexpected, 'unexpected errors').toEqual([]);
 });
 

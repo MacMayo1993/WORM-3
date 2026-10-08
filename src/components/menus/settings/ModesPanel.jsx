@@ -16,7 +16,7 @@ export function ModesPanel() {
       {/* Random Style Mode */}
       <section className="settings-section">
         <h3 className="settings-section-title">Random looks</h3>
-        <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '16px', lineHeight: '1.5' }}>
+        <p style={{ fontSize: '13px', color: 'var(--night-text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
           Every 10 seconds the colors and tile styles reshuffle, and each piece picks its own view (Classic, Grid, Sudoku, Glass, Neon and more) while you play.
         </p>
         <div className="settings-toggles">
@@ -33,7 +33,7 @@ export function ModesPanel() {
       {/* Hollow Void Cube Mode */}
       <section className="settings-section">
         <h3 className="settings-section-title">Hollow cube</h3>
-        <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '16px', lineHeight: '1.5' }}>
+        <p style={{ fontSize: '13px', color: 'var(--night-text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
           Draws every piece as an open frame so you can see through the cube. The glow at the center reacts to flips and Chaos.
         </p>
         <div className="settings-toggles">
@@ -50,7 +50,7 @@ export function ModesPanel() {
       {/* Mirror Blocks Mode */}
       <section className="settings-section">
         <h3 className="settings-section-title">Mirror blocks</h3>
-        <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '16px', lineHeight: '1.5' }}>
+        <p style={{ fontSize: '13px', color: 'var(--night-text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
           Pieces differ in size instead of color. Solve by turning the cube back into a perfect block.
         </p>
         <div className="settings-toggles">

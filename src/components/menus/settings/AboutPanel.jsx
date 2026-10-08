@@ -3,8 +3,10 @@ import {
   CC_BY_4, ENVIRONMENT_CREDITS, ENVIRONMENT_SOURCE, FONT_CREDITS, FONT_LICENSE, MODEL_CHANGES, MODEL_CREDITS, SOFTWARE_CREDITS
 } from '../../../utils/credits.js';
 
-const muted = { fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', lineHeight: '1.5', margin: '0 0 10px' };
-const list = { margin: '0 0 8px', paddingLeft: '18px', fontSize: '13px', color: 'rgba(255, 255, 255, 0.85)', lineHeight: '1.6' };
+// Theme tokens, not literals: this panel sits on the cream paper surface, where the
+// white text the Modes tab used to hard-code (and this tab first copied) is invisible.
+const muted = { fontSize: '13px', color: 'var(--night-text-muted)', lineHeight: '1.5', margin: '0 0 10px' };
+const list = { margin: '0 0 8px', paddingLeft: '18px', fontSize: '13px', color: 'var(--night-text)', lineHeight: '1.6' };
 const link = { color: 'inherit', textDecoration: 'underline' };
 
 const External = ({ href, children }) => <a style={link} href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
