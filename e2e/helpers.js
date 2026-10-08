@@ -62,7 +62,7 @@ export async function openProfile(page) {
 }
 
 /** Walk the Free Play wizard and Mobi's intro until the run's HUD is up. */
-export async function startFreePlay(page) {
+export async function startFreePlay(page, { viewport } = {}) {
   await openWormEntry(page);
   await press(page, /free play/i);
   const wizard = page.getByRole('dialog', { name: 'WORM setup', exact: true });
@@ -87,6 +87,7 @@ export async function startFreePlay(page) {
   await expect(mobi).toBeVisible();
   await mobi.getByRole('button', { name: 'Skip', exact: true }).click();
   await expect(mobi).toBeHidden();
+  if (viewport) await page.setViewportSize(viewport);
   // A visible HUD can still belong to the paused opening scramble. Only an
   // enabled Pause confirms that spawning and the countdown reached live play.
   const pause = page.getByRole('button', { name: 'Pause', exact: true });
