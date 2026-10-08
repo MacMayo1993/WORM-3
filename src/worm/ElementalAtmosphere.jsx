@@ -24,7 +24,6 @@ import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { wormBuffs } from './wormBuffs.js';
 import { getElementalParticleMaterial } from './healerWorm/elementalParticleMaterial.js';
 import ElementalCubeSkin from './ElementalCubeSkin.jsx';
-import ElementalStrikes from './ElementalStrikes.jsx';
 
 // Per-behaviour motion. `vy` is the vertical drift (units/sec, sign = direction),
 // `sway` the horizontal wobble amplitude, `blend` the material blending, and
@@ -121,11 +120,6 @@ function ElementalParticles({ element, kind, color, extent, count }) {
 
 export default function ElementalAtmosphere({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
-  // Fairness gates for the lightning strikes. Subscribed rather than polled because
-  // they change a handful of times per run, not per frame.
-  const paused = useGameStore((s) => s.wormPaused);
-  const gamePhase = useGameStore((s) => s.wormGamePhase);
-  const wormPhase = useGameStore((s) => s.wormPhase);
   const lightRef = useRef();
   const elapsedRef = useRef(0);
 
@@ -177,37 +171,8 @@ export default function ElementalAtmosphere({ size = 3 }) {
           as they move through it. */}
       <hemisphereLight ref={lightRef} color={lightColor} groundColor={lightColor} intensity={0} />
 
-      {/* Lightning's hero beat — bolts arcing out of the charged cube into the
-          worm. Pure staging: no damage, no stun, no simulation writes. Every gate
-          that changes at most a few times a run is passed in here; the ones that
-          change per frame (the claim freeze, the dissolve) are read from the shared
-          envelope inside its own frame loop, where they are still live.
-
-          Gated on `animate`, not `accents`: a strike is one small pooled effect
-          (branches and pool scale down to 1 on the phone tiers below), so it can
-          run wherever motion is allowed — including mobile and mega boards, where
-          `accents` is off — while reduced motion (animate:false) still suppresses
-          it entirely, as the scheduler independently requires. */}
-      {element === 'lightning' && quality.animate && (
-        <ElementalStrikes
-          active
-          enabled={
-            !paused &&
-            gamePhase === 'active' &&
-            // Only while the worm is out on the surface: mid-tunnel it is inside
-            // the cube and there is nothing on screen to hit.
-            wormPhase === 'crawling'
-          }
-          branches={quality.tier === 'high' ? 3 : quality.tier === 'medium' ? 2 : 1}
-          pool={quality.tier === 'high' ? 2 : 1}
-          // Launch the bolts from above the cube's top — `extent` is the particle
-          // envelope radius (≈ cube half-size + margin), so a few units past it puts
-          // the source above the board and off the top of the screen on every size.
-          skyY={extent + 5}
-          color={def.color}
-          accent={def.accent}
-        />
-      )}
+      {/* Lightning's strikes are gameplay now (lightningStorm.js, LightningStrikes.jsx), drawn by
+          the mode: a bolt here that hurt nothing would teach the player to ignore the real ones. */}
 
       {/* Drifting medium around the cube — bubbles/embers/spores/snow. Reduced
           motion and the floor budget both zero the count, which drops the field

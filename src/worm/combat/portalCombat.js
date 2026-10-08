@@ -220,6 +220,23 @@ function slam(c, at, player, lit) {
     throwBack(c, enemy, player, lit);
   }
 }
+/**
+ * Lightning struck: every enemy standing on (or stepping onto) one of `keys` is killed
+ * outright, whatever its hit points. Returns how many fell.
+ */
+export function strikeEnemies(c, keys) {
+  if (!c?.enemies?.length) return 0;
+  let fallen = 0;
+  for (const enemy of [...c.enemies]) {
+    if (enemy.emerging > 0) continue;
+    const near = enemy.next && enemy.t >= 0.5 ? enemy.next : enemy.tile;
+    if (!keys.has(combatKey(near))) continue;
+    burst(c, near, 'lightning');
+    damageEnemy(c, enemy, Infinity);
+    fallen++;
+  }
+  return fallen;
+}
 /** Advance every defeated enemy's crumble; drop it once its last fleck lands. */
 export function stepEnemyDissolves(c, dt) {
   if (!c?.dying?.length) return;

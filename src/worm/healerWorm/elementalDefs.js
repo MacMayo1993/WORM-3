@@ -102,7 +102,7 @@ export const ELEMENTAL_DEFS = {
     // A bolt.
     iconPath: 'M13.6 1.8 4.2 13.4h5.4l-1.2 8.8 9.4-11.6h-5.4z',
     iconAccent: '',
-    description: 'Charges the whole cube — veins of current crawl the seams and bolts strike the worm.',
+    description: 'Marks tiles for lightning. A mark kills a head, cuts off a tail and kills enemies; on a bare tile it opens a charged wormhole.',
   },
 };
 

@@ -21,7 +21,7 @@ export default function WormDemoLessonCard({ onRetry }) {
   const cause = s.details?.cause || s.details?.reason;
   // One line per way a run can end (killWormSim reasons), each naming the rule
   // that ended it and the move that avoids it.
-  const advice = cause === 'bomb' ? 'A bomb blast hit you. Keep clear of the marked blast tiles.'
+  const advice = cause === 'lightning' ? 'Lightning struck you. Move off the marked tile, or jump.' : cause === 'bomb' ? 'A bomb blast hit you. Keep clear of the marked blast tiles.'
     : cause === 'slice-rotation' || cause === 'rotation' ? 'The turning layer caught you. Move clear of its lights.'
     : cause === 'self-collision' || cause === 'self' ? 'You ran into your own body. Steer around it, or press JUMP to hop over it.'
     : cause === 'caution-fall' ? 'The caution-tape timer ran out. Press left, right or jump during the one-second cue to escape.'

@@ -144,6 +144,7 @@ import {
     SPECIAL_SPAWN_RETRY,
     MAX_ORB_ATTRACTION_FX,
     activeTunnelCap,
+    HEAL_COST,
 } from './constants.js';
 
 import { advanceTunnelHead, tunnelTailCleared } from './tunnelTrail.js';
@@ -169,6 +170,9 @@ export const tileKey = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
  * (plus a few owned THREE.Vector3 / ring-buffer instances). One sim per run;
  * reuse across runs via resetWormSim.
  */
+// Heal segments a charged tunnel (see chargedTunnels) pays for the worm that rides it.
+export const CHARGED_TOLL = 2;
+
 export function makeWormSim(size) {
     const sim = {
         // ── Core movement ──────────────────────────────────────────────────────
@@ -298,6 +302,7 @@ export function makeWormSim(size) {
         burrows: makeBurrows(),
         tunnelUseCounts: new Map(),
         voidTunnelKeys: new Set(),
+        chargedTunnels: new Set(),    // tunnels a lightning strike opened: each pays part of its own heal toll
         pendingVoidKill: null,
         currentTunnelStableKey: null, // stable key of the tunnel being traversed
         currentTunnelKey: null,       // canonical key (for use-count cleanup on heal)
@@ -464,6 +469,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.healed = 0;
     sim.tunnelUseCounts = new Map();
     sim.voidTunnelKeys = new Set();
+    sim.chargedTunnels = new Set();
     sim.pendingVoidKill = null;
     sim.currentTunnelStableKey = null;
     sim.currentTunnelKey = null;
@@ -891,7 +897,15 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 
     if (!skipDeposit && stableKey && entryFaceId) {
         const healingProgress = ctx.getHealingProgress() ?? {};
-        const progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
+        let progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
+        // A charged tunnel (opened by lightning) pays part of its own toll: the first
+        // CHARGED_TOLL segments of the heal are free, the worm's orbs and tail untouched.
+        const free = sim.chargedTunnels.has(tunnelKey) ? Math.min(CHARGED_TOLL, HEAL_COST - progress.deposited) : 0;
+        if (free > 0) {
+            progress = { ...progress, deposited: progress.deposited + free };
+            ctx.applyDeposit({ orbsLeft: orbsCarried(sim.tailLength), nextInventory: ctx.getOrbInventory(), nextDeposited: progress.deposited },
+                stableKey, entryFaceId);
+        }
         // Deposit rules (caps + Prism Worm wildcard drain) are pure functions in
         // economy.js; here we only apply the result to the sim + (via ctx) the store.
         const deposit = computeOrbDeposit({
@@ -1191,6 +1205,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
         if (tunnelKey) {
             sim.tunnelUseCounts.delete(tunnelKey);
             sim.voidTunnelKeys.delete(tunnelKey);
+            sim.chargedTunnels.delete(tunnelKey);
             if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
         }
     }
@@ -2535,6 +2550,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             if (tunnelKey) {
                 sim.tunnelUseCounts.delete(tunnelKey);
                 sim.voidTunnelKeys.delete(tunnelKey);
+                sim.chargedTunnels.delete(tunnelKey);
                 if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
             }
             ctx.feel('heal');

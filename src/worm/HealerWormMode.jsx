@@ -9,11 +9,14 @@ import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { storySurfaceTile } from './story/mastery.js';
 import { bodyCoverageCount } from './healerWorm/bodyCoverage.js';
 import { storyLevel, storyRotationCycle } from './story/levels.js';
-import { combatBridge } from './combat/portalCombat.js';
+import { combatBridge, strikeEnemies } from './combat/portalCombat.js';
+import { STORM, makeStorm, beginStorm, clearStorm, tickStorm, pickStrikeTile } from './healerWorm/lightningStorm.js';
+import { getAllSurfaceTiles } from './healerWorm/surfaceTiles.js';
 import CombatScene from './combat/CombatScene.jsx';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import DemoPracticeTargets from './healerWorm/DemoPracticeTargets.jsx';
 import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
+import { LightningStrikes } from './healerWorm/LightningStrikes.jsx';
 import { isHotTile } from './healerWorm/elementalGameplay.js';
 import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
 import BurrowEffects from './healerWorm/BurrowEffects.jsx';
@@ -224,6 +227,75 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         return false;
     };
 
+    // ── Lightning storm ────────────────────────────────────────────────────────
+    // While a Lightning orb's wash is up the sky marks tiles and, STORM.telegraph seconds
+    // later, strikes them (lightningStorm.js decides when and where). A strike on the head
+    // kills, on the body cuts the tail off there, on an enemy kills it, and on a bare tile
+    // flips it into a charged wormhole that carries the worm for free. It is held by the
+    // same things that hold the rest of the sim: pause, tunnels, turns, freeze beats.
+    const runStorm = (store, delta) => {
+        const storm = stormRef.current;
+        if (stormRunRef.current !== store.wormRunId) {
+            stormRunRef.current = store.wormRunId;
+            clearStorm(storm);
+            stormLastTRef.current = 0;
+        }
+        const demo = wormDemoActive(store);
+        const lightning = worm.elementalType.current === 'lightning' && wormBuffs.elementalT > 0;
+        // A fresh orb (or a second one claimed mid-wash) restarts the marks.
+        if (lightning && wormBuffs.elementalT > stormLastTRef.current + 0.5) beginStorm(storm);
+        stormLastTRef.current = lightning ? wormBuffs.elementalT : 0;
+        if (storm.spots.length === 0 && storm.flashes.length === 0 && !lightning) return;
+        const live = worm.phase.current === 'crawling' && !store.animState && worm.tunnelPassages.current.length === 0 &&
+            !worm.padFlight?.current && worm.cutFocusT.current <= 0 && !worm.signature.current.sweep &&
+            (worm.elementalFocusT?.current ?? 0) <= 0 && (worm.healPauseT?.current ?? 0) <= 0;
+        if (!live) return;
+        const rng = worm.rand?.current ?? Math.random;
+        const fired = tickStorm(storm, Math.min(delta, 0.1), {
+            spawning: lightning && !demo,
+            rng,
+            pick: r => {
+                const trail = worm.tileTrail.current;
+                const bodyCount = bodyCoverageCount(worm.tailLength.current, trail.count, size, worm.expansionAmount.current);
+                const body = [];
+                for (let i = 0; i < bodyCount; i++) body.push(ttAt(trail, i));
+                const head = worm.pos.current;
+                const avoid = collectManifoldRing(head.x, head.y, head.z, head.dirKey, size, STORM.headSafeTiles);
+                for (const orb of worm.powerups.current) avoid.add(tileKeyOf(orb));
+                for (const orb of worm.specials.current) avoid.add(tileKeyOf(orb));
+                for (const bomb of bombsRef.current) avoid.add(tileKeyOf(bomb.tile));
+                for (const spot of storm.spots) avoid.add(tileKeyOf(spot.tile));
+                return pickStrikeTile({ tiles: getAllSurfaceTiles(size), body, avoid }, r);
+            },
+        });
+        for (const spot of fired) {
+            if (!useGameStore.getState().wormAlive) break;
+            const key = tileKeyOf(spot.tile);
+            worm.feel('cut');
+            const hit = checkBlastHitWorm(worm, new Set([key]), size);
+            if (hit) {
+                const histEntry = hit.type === 'cut' ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE) : null;
+                const hitPos = histEntry ? histEntry.pos.toArray() : worm.headInterpPos.current.toArray();
+                thunkRef.current = { active: true, pos: hitPos, kind: hit.type === 'death' ? 'struck' : 'struck-cut' };
+                if (hit.type === 'death') {
+                    deathThunkFiredRef.current = true;
+                    worm.killWorm({ reason: 'lightning' });
+                } else {
+                    severAndScatter(hit.cutTrailIdx, hitPos);
+                    worm.cutFocusT.current = CUT_FOCUS_DURATION;
+                    worm.cutFocusPos.current = hitPos;
+                    worm.cutFocusSlice.current = null;
+                }
+            }
+            if (combatBridge.current) strikeEnemies(combatBridge.current, springSlamTiles(spot.tile, size));
+            // Nothing on the tile to hurt: it flips, like any flip, but charged. An orb or a
+            // bomb sitting there is left whole, and a struck worm takes the bolt instead.
+            const crowded = worm.powerups.current.some(o => tileKeyOf(o) === key) ||
+                worm.specials.current.some(o => tileKeyOf(o) === key) || bombsRef.current.some(b => tileKeyOf(b.tile) === key);
+            if (!hit && !crowded) worm.strikeTile(spot.tile);
+        }
+    };
+
     // ── Bomb hazard state ──────────────────────────────────────────────────────
     // Bombs are a separate scheduled hazard, kept in a ref (written from the frame
     // loop, read by <HealerBombs>). Each: { id, tile:{x,y,z,dirKey}, fuse, maxFuse }.
@@ -232,6 +304,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const bombSeqRef    = useRef(0);          // monotonic bomb id source
     const blastApiRef   = useRef(null);       // imperative detonation-flash handle from HealerBombs
     const occupiedTilesRef = useRef(new Set()); // scratch: body-covered tiles, rebuilt each frame
+    // The Lightning orb's storm: marks, flashes and the bookkeeping that starts it. Read by
+    // <LightningStrikes>; written only here, from the frame loop.
+    const stormRef = useRef(null);
+    if (stormRef.current === null) stormRef.current = makeStorm();
+    const stormRunRef = useRef(null);
+    const stormLastTRef = useRef(0);
     const slamTilesRef = useRef({ id: '', keys: new Set() }); // the tiles Spring's last landing covers
     // Bumped whenever the live bomb set gains or loses a member, so <HealerBombs>
     // can notice the change without serialising the id list every frame.
@@ -480,6 +558,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
+        runStorm(store, delta);
         if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
         // A head that changed sides of the turning layer early in the turn is
         // resolved as if it had been there when the turn fired. This must run
@@ -817,7 +896,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 trip reads as a tunnel rather than a ribbon crossing an empty room. */}
             <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
-            <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /></group>
+            <group visible={wormAlive}><ElementalPatches worm={worm} size={size} /><SignatureEffects worm={worm} size={size} /><LightningStrikes stormRef={stormRef} worm={worm} size={size} /></group>
             {/* Keep the equipped body/face and their programs through retries. The
                 hidden scramble frame also prepares their instanced attributes. */}
             <group ref={reflectionSource} visible={wormAlive}>
