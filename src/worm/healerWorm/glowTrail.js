@@ -38,3 +38,20 @@ export function tickGlowTrail(sim, delta) {
   }
   trail.sourceSeq = Math.max(trail.sourceSeq ?? latest, latest);
 }
+
+// A painted tile is a wall of light to the enemies in Portal Combat: it burns what
+// runs into it (portalCombat.js, LIGHT). The wall is exactly what the player can see:
+// it stands while the paint does and is gone when the paint has faded. The returned Set
+// is reused every call, so read it, don't keep it.
+export const LIT_MIN_LIFE = 0.3;
+const _lit = new Set();
+export function litTiles(sim) {
+  const sig = sim.signature, trail = sig?.glowTrail;
+  if (sig?.character !== 'glow' || !trail || !(trail.life > LIT_MIN_LIFE)) return null;
+  _lit.clear();
+  for (let i = 0; i < trail.path.count; i++) {
+    const key = ttAt(trail.path, i);
+    if (key) _lit.add(key);
+  }
+  return _lit.size ? _lit : null;
+}

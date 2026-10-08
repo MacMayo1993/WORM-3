@@ -5,11 +5,16 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
-import { FACE_NORMALS } from './constants.js';
-import { SPRING_CHARGE, SIGNATURES } from './signatures.js';
+import { FACE_NORMALS, WORM_LIFT } from './constants.js';
+import { SPRING_COIL_SECONDS, SPRING_HEIGHT, SIGNATURES } from './signatures.js';
+import { SPRING_SLAM_WINDOW } from '../characterAbilities.js';
+import { springLanding } from './jumpLanding.js';
+import { arcLift } from './jumpArc.js';
+import { surfacePose } from '../combat/portalCombat.js';
 import { ttAt } from '../circularBuffers.js';
 
 const Z = new THREE.Vector3(0, 0, 1);
+const ARC_DOTS = 16;
 function instances(geometry, color, count, reveal = false) {
     const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({
         color, transparent: true, opacity: 0.8, depthWrite: false,
@@ -29,15 +34,17 @@ export function SignatureEffects({ worm, size }) {
         pulse: instances(new THREE.RingGeometry(0.48, 0.5, 48), '#8eefff', 3),
         lock: instances(new THREE.RingGeometry(0.32, 0.39, 4), '#ceacff', 3),
         pages: instances(new THREE.PlaneGeometry(0.46, 0.65), '#ffda91', 3),
+        arc: instances(new THREE.CircleGeometry(0.055, 12), '#c6ec86', ARC_DOTS),
+        route: [],
         pose: new THREE.Object3D(), normal: new THREE.Vector3(), axis: new THREE.Vector3(),
     }), []);
     useEffect(() => () => {
-        for (const mesh of [r.target, r.pulse, r.lock, r.pages]) {
+        for (const mesh of [r.target, r.pulse, r.lock, r.pages, r.arc]) {
             mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose();
         }
     }, [r]);
     useFrame(() => {
-        for (const mesh of [r.target, r.pulse, r.lock, r.pages]) mesh.count = 0;
+        for (const mesh of [r.target, r.pulse, r.lock, r.pages, r.arc]) mesh.count = 0;
         const sig = worm.signature.current;
         const state = useGameStore.getState();
         if (!state.wormAlive || worm.phase.current !== 'crawling'
@@ -76,15 +83,50 @@ export function SignatureEffects({ worm, size }) {
                 for (let i = 0; i < 3; i++) place(r.pulse, sig.fxTile, 0.4 + i * 0.3 + (reduced ? 0 : 0.7 - sig.fxT), 0.08);
             }
         } else if (sig.character === 'inch') {
-            const tile = sig.charge > 0 ? sig.target : sig.preview;
-            if (!liveRotation.active && !worm.restRead.current && !worm.isJumping.current) {
-                r.target.material.color.set(sig.reason ? '#ffbb72' : '#c6ec86');
+            const grounded = !liveRotation.active && !worm.restRead.current && !worm.isJumping.current;
+            const color = sig.reason ? '#ffbb72' : '#c6ec86';
+            if (grounded) {
+                const tile = sig.charge > 0 ? sig.target : sig.preview;
+                r.target.material.color.set(color);
                 place(r.target, tile);
                 if (sig.charge > 0) {
-                    const compressed = 1 - sig.charge / SPRING_CHARGE;
+                    const compressed = 1 - sig.charge / SPRING_COIL_SECONDS;
                     for (let i = 0; i < 3; i++) place(r.target, worm.pos.current, 0.6 + i * 0.18,
                         0.13 + i * 0.12 * (1 - compressed * 0.7));
                 }
+                if (tile) {
+                    // The leap, drawn: dots along the arc it will fly, from the head to the landing.
+                    r.arc.material.color.set(color);
+                    const interpT = worm.interpT.current, from = worm.prevTile.current ?? worm.pos.current;
+                    const { span } = springLanding(worm.pos.current, worm.moveDir.current, size, interpT, r.route);
+                    const path = r.route;                               // pos, then each tile to the landing
+                    for (let j = 1; j <= ARC_DOTS; j++) {
+                        const u = j / (ARC_DOTS + 1), progress = interpT + u * span;
+                        // Progress 0 is the tile the head left, 1 is pos, k + 1 is path[k].
+                        const m = Math.floor(progress), last = path.length - 1;
+                        const a = m < 1 ? from : path[Math.min(m - 1, last)], b = path[Math.min(Math.max(m, 0), last)];
+                        const at = surfacePose(a, b, progress - m, size, WORM_LIFT + arcLift(u, SPRING_HEIGHT));
+                        const { pose: dot, normal } = r;
+                        dot.position.fromArray(at.position);
+                        normal.fromArray(at.normal);
+                        dot.quaternion.setFromUnitVectors(Z, normal);
+                        dot.scale.setScalar(0.7 + 0.5 * Math.sin(Math.PI * u));
+                        dot.updateMatrix();
+                        r.arc.setMatrixAt(r.arc.count++, dot.matrix);
+                    }
+                    r.arc.instanceMatrix.needsUpdate = true;
+                }
+            }
+            // Launch: rings spring out of the tile it left.
+            if (sig.active > 0 && sig.fxT > 0 && sig.fxTile) {
+                r.pulse.material.color.set('#c6ec86'); r.pulse.material.opacity = sig.fxT * 0.7;
+                for (let i = 0; i < 3; i++) place(r.pulse, sig.fxTile, 0.3 + i * 0.28 + (reduced ? 0 : 0.9 - sig.fxT), 0.1);
+            }
+            // Touchdown: the slam's shockwave runs out across the 3x3 it covers and beyond.
+            if (sig.slamT > 0 && sig.slam) {
+                const age = 1 - sig.slamT / SPRING_SLAM_WINDOW;
+                r.pulse.material.color.set('#c6ec86'); r.pulse.material.opacity = 0.8 * (1 - age);
+                for (let i = 0; i < 3; i++) place(r.pulse, sig.slam.tile, reduced ? 1.2 + i * 0.5 : 0.5 + (age * 3.2 + i * 0.55), 0.12 + i * 0.01);
             }
         } else if (sig.character === 'mobi') {
             const tile = sig.mobiTunnel ? sig.target : sig.preview;
@@ -102,5 +144,5 @@ export function SignatureEffects({ worm, size }) {
                 reduced ? 1.4 + i * 0.8 : 0.7 + ((age * 1.8 + i) % 3), 0.12 + i * 0.02);
         }
     });
-    return <>{[r.target, r.pulse, r.lock, r.pages].map((mesh, i) => <primitive key={i} object={mesh} />)}</>;
+    return <>{[r.target, r.pulse, r.lock, r.pages, r.arc].map((mesh, i) => <primitive key={i} object={mesh} />)}</>;
 }

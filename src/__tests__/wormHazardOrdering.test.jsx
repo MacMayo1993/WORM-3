@@ -257,6 +257,27 @@ it('spawns a Story bomb, credits only a full live ring, and suppresses ordinary 
   expect(useGameStore.getState().parityPoints).toBe(coins);
 });
 
+it("Spring's landing defuses the bombs in the 3x3 around it, pays for each, and leaves farther ones ticking", () => {
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  sim.pos = { x: 0, y: 0, z: 2, dirKey: 'PZ' };
+  const beside = { id: 21, tile: { x: 1, y: 1, z: 2, dirKey: 'PZ' }, fuse: 4, maxFuse: 5 };     // diagonal: inside the 3x3
+  const under = { id: 22, tile: { x: 0, y: 0, z: 2, dirKey: 'PZ' }, fuse: 4, maxFuse: 5 };
+  const far = { id: 23, tile: { x: 2, y: 2, z: 2, dirKey: 'PZ' }, fuse: 4, maxFuse: 5 };       // two tiles off
+  props.bombsRef.current.push(beside, under, far);
+  const coins = useGameStore.getState().parityPoints;
+  tick();                                                      // no landing yet
+  expect(props.bombsRef.current).toHaveLength(3);
+  sim.signature.slam = { seq: 1, tile: { ...sim.pos } }; sim.signature.slamT = 0.5;
+  tick();
+  expect(props.bombsRef.current).toEqual([far]);
+  expect(useGameStore.getState().parityPoints).toBe(coins + 2 * 12);
+  expect(worm.feel).toHaveBeenCalledWith('heal');
+  sim.signature.slamT = 0;                                     // the window closed: a bomb that spawns now is safe from it
+  const late = { id: 24, tile: { x: 1, y: 0, z: 2, dirKey: 'PZ' }, fuse: 4, maxFuse: 5 };
+  props.bombsRef.current.push(late); tick();
+  expect(props.bombsRef.current).toContain(late);
+});
+
 it('Book freezes only the layer countdown and resumes the same pending turn', () => {
   tick(80);
   const remaining = rotationClock.remaining;

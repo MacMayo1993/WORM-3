@@ -1,10 +1,13 @@
-import { BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN, GLOW_TRAIL_SECONDS, MOBI_REENTRY_SECONDS } from '../characterAbilities.js';
+import {
+  BOOK_PAUSE_SECONDS, CLASSIC_ORB_CALL_SECONDS, CLASSIC_ORB_CALL_COOLDOWN, GLOW_TRAIL_SECONDS, MOBI_REENTRY_SECONDS,
+  SPRING_COIL_SECONDS, SPRING_SPAN, SPRING_HEIGHT, SPRING_COOLDOWN, SPRING_SLAM_WINDOW
+} from '../characterAbilities.js';
 import { makeWiggleSweep, WIGGLE_DURATION } from './wiggleSweep.js';
 import { getStableKey } from '../wormLogic.js';
 import { BODY_BALL_SPACING } from './constants.js';
 import { ttAt } from '../circularBuffers.js';
 import { liveRotation } from '../liveRotation.js';
-import { jumpLandingTile } from './jumpLanding.js';
+import { springLanding } from './jumpLanding.js';
 import { makeGlowTrail } from './glowTrail.js';
 
 export const SIGNATURES = {
@@ -12,15 +15,14 @@ export const SIGNATURES = {
   book: { name: 'Time Out', short: 'Pause', cooldown: 30, duration: BOOK_PAUSE_SECONDS, color: '#ffda91', hint: 'Pause layer turns for 5 seconds. Earn 25% more XP.' },
   prism: { name: 'Spectrum', short: 'Spectrum', passive: true, cooldown: 0, duration: 0, color: '#ffd2fb', hint: 'Every orb color can heal every wormhole tunnel.' },
   wiggle: { name: 'Tail Wipers', short: 'Wiggle', cooldown: 12, duration: WIGGLE_DURATION, color: '#ffb5d7', hint: 'Sweep your tail three tiles left and right twice, collecting orbs. Steering locks until finished.' },
-  inch: { name: 'Spring Loaded', short: 'Spring', cooldown: 24, duration: 0, color: '#c6ec86', hint: 'Long spring jump. Landing must be clear.' },
-  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Paint behind your tail for 8 seconds. The trail stays for 12 more seconds. Enemies glow brighter.' },
+  inch: { name: 'Spring Loaded', short: 'Spring', cooldown: SPRING_COOLDOWN, duration: 0, color: '#c6ec86', hint: 'Coil and leap four tiles. The landing slams: bombs beside it are defused, orbs within two tiles are yours and enemies are stunned. Landing must be clear; you can still jump once more in the air.' },
+  glow: { name: 'Light Trail', short: 'Trail', cooldown: 22, duration: GLOW_TRAIL_SECONDS, color: '#8eefff', hint: 'Paint behind your tail for 8 seconds. The trail stays for 12 more seconds, and enemies that run into it are burned and thrown back.' },
   mobi: { name: 'Create Wormhole', short: 'Tunnel', cooldown: 0, duration: 0, color: '#ceacff', hint: 'Open a tunnel beneath you without spending orbs. No re-entry for 10 seconds. Heal it before creating another.' },
 };
-export const SPRING_CHARGE = 0.24;
-export const SPRING_SPAN = 2.2;
-export const SPRING_HEIGHT = 1.8;
+// Spring's numbers live in characterAbilities.js; re-exported for the effects and the body.
+export { SPRING_COIL_SECONDS, SPRING_SPAN, SPRING_HEIGHT };
 export const signatureKey = p => p ? `${p.x},${p.y},${p.z},${p.dirKey}` : '';
-export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, sweep: null, mobiTunnel: null, mobiOpening: false, glowTrail: null, fxT: 0, fxTile: null });
+export const makeSignature = () => ({ character: null, cooldown: 0, charge: 0, active: 0, target: null, preview: null, reason: '', notice: '', noticeT: 0, seq: 0, charges: 0, heading: null, sweep: null, mobiTunnel: null, mobiOpening: false, glowTrail: null, fxT: 0, fxTile: null, slam: null, slamT: 0, landing: null });
 const stickerAt = (ctx, p) => ctx.getCubies()?.[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
 
 // The restriction follows sticker identity when either mouth rotates to another face.
@@ -35,7 +37,7 @@ export function releaseMobiTunnel(sim, tunnel) {
 }
 
 function targetFor(sim, size, ctx, character) {
-  if (character === 'inch') return jumpLandingTile(sim.pos, sim.moveDir, size, sim.interpT, 0.001, SPRING_SPAN);
+  if (character === 'inch') return springLanding(sim.pos, sim.moveDir, size, sim.interpT).tile;
   return sim.pos;
 }
 
@@ -90,7 +92,7 @@ export function activateSignature(sim, size, ctx) {
   sig.target = { ...available.target };
   sig.seq++; sig.fxTile = { ...sim.pos }; sig.fxT = 0.7;
   sig.notice = def.name; sig.noticeT = 1.8;
-  if (sig.character === 'inch') sig.charge = SPRING_CHARGE;
+  if (sig.character === 'inch') sig.charge = SPRING_COIL_SECONDS;
   else { sig.active = def.duration; sig.cooldown = def.cooldown; }
   if (sig.character === 'glow') sig.glowTrail = makeGlowTrail();
   if (sig.character === 'classic') {
@@ -113,6 +115,39 @@ export function activateSignature(sim, size, ctx) {
   return true;
 }
 
+// The end of the coil, or a jump press during it. A landing that stopped being clear while
+// the worm crawled on costs nothing: the notice says why, no cooldown starts and the
+// coil is over. Returns whether the leap launched.
+export function launchSpring(sim, size, ctx) {
+  const sig = sim.signature;
+  const available = signatureAvailability(sim, size, ctx, true);
+  sig.charge = 0;
+  if (available.reason) { sig.notice = available.reason; sig.noticeT = 1.8; sig.target = null; return false; }
+  sig.target = { ...available.target };
+  sig.cooldown = SIGNATURES.inch.cooldown;
+  sig.active = 1;
+  sig.fxTile = { ...sim.pos }; sig.fxT = 0.7;
+  // One jump is spent, one is left: the leap does not take the ordinary double jump with it.
+  sim.isJumping = true; sim.jumpT = 0.001; sim.jumpCount = 1; sim.jumpBase = 0;
+  sim.jumpSpan = springLanding(sim.pos, sim.moveDir, size, sim.interpT).span; sim.jumpHeight = SPRING_HEIGHT;
+  sim.pendingTunnelTrigger = null;
+  ctx.feel('jump');
+  return true;
+}
+
+// Touchdown. The slam is a window the rest of the game reads: wormSim takes the orbs, the
+// bomb loop defuses, combat stuns (all keyed on `slam.seq`, so each landing is taken once).
+function landSpring(sim, ctx) {
+  const sig = sim.signature;
+  sig.active = 0;
+  const tile = sig.landing ?? { ...sim.pos };
+  sig.landing = null;
+  sig.slam = { seq: (sig.slam?.seq ?? 0) + 1, tile };
+  sig.slamT = SPRING_SLAM_WINDOW;
+  sig.fxTile = { ...tile }; sig.fxT = 0.7;
+  ctx.feel('rocketLand');
+}
+
 export function tickSignature(sim, delta, size, ctx) {
   const sig = sim.signature;
   if (sig.character !== (ctx.getCharacter?.() ?? 'classic')) {
@@ -121,23 +156,17 @@ export function tickSignature(sim, delta, size, ctx) {
   if (sim.phase !== 'crawling' || !['active', 'finalHealing'].includes(ctx.getGamePhase())) return false;
   sig.noticeT = Math.max(0, sig.noticeT - delta);
   sig.fxT = Math.max(0, sig.fxT - delta);
+  sig.slamT = Math.max(0, sig.slamT - delta);
   if (sig.charge > 0) {
     sig.charge = Math.max(0, sig.charge - delta);
-    if (sig.charge > 0) return true;
-    const available = signatureAvailability(sim, size, ctx, true);
-    if (available.reason) { sig.notice = available.reason; sig.noticeT = 1.8; sig.target = null; return false; }
-    sig.target = { ...available.target };
-    sig.cooldown = SIGNATURES.inch.cooldown;
-    sig.active = 1;
-    sim.isJumping = true; sim.jumpT = 0.001; sim.jumpCount = 1; sim.jumpBase = 0;
-    sim.jumpSpan = SPRING_SPAN; sim.jumpHeight = SPRING_HEIGHT;
-    sim.pendingTunnelTrigger = null;
-    ctx.feel('jump');
+    // The worm keeps crawling while its body gathers; the leap comes when the coil is done.
+    if (sig.charge > 0) return false;
+    launchSpring(sim, size, ctx);
   }
   sig.cooldown = Math.max(0, sig.cooldown - delta);
   if (sig.mobiTunnel) sig.mobiTunnel.reentryT = Math.max(0, sig.mobiTunnel.reentryT - delta);
   if (sig.character === 'inch') {
-    if (sig.active && !sim.isJumping) { sig.active = 0; ctx.feel('rocketLand'); }
+    if (sig.active && !sim.isJumping) landSpring(sim, ctx);
   } else if (sig.active > 0 && !['prism', 'wiggle'].includes(sig.character)) {
     sig.active = Math.max(0, sig.active - delta);
   }

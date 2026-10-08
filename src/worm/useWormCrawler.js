@@ -17,6 +17,7 @@ import { stageWormPractice, readWormPractice } from './healerWorm/demoPractice.j
 import { tunnelReadout } from './healerWorm/tunnelReadout.js';
 import { tunnelEntryRule } from './healerWorm/padEntry.js';
 import { signatureReadout } from './healerWorm/signatures.js';
+import { litTiles } from './healerWorm/glowTrail.js';
 import { liveRotation } from './liveRotation.js';
 // src/worm/useWormCrawler.js
 //
@@ -546,7 +547,7 @@ export function useWormCrawler(size, cubies) {
         }
         const combatHeld = state.wormPaused || document.hidden || sim.jumpRescueT > 0 || !sim.alive || sim.phase !== 'crawling' ||
             sim.tunnelPassages.length > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 ||
-            sim.elementalFocusT > 0 || sim.signature.charge > 0 || !!sim.signature.sweep || sim.rocketActive || liveRotation.active ||
+            sim.elementalFocusT > 0 || !!sim.signature.sweep || sim.rocketActive || liveRotation.active ||
             state.wormGamePhase !== 'active';
         // Snapshot before stepping: the reveal's final tick reaches zero but
         // still returns without advancing gameplay, so Story must hold it too.
@@ -558,7 +559,7 @@ export function useWormCrawler(size, cubies) {
             const c = sim.combat;
             c.held = combatHeld || sim.jumpRescueHeld || sim.phase !== 'crawling' || sim.tunnelPassages.length > 0 || !sim.alive;
             const previousKills = c.kills, previousShots = c.shotsFired, previousDrops = c.dropsCollected;
-            const previousHits = c.shotsHit, previousAmmo = c.ammo;
+            const previousHits = c.shotsHit, previousAmmo = c.ammo, previousLight = c.lightHits, previousSlam = c.slamHits;
             const combatPlayer = {
                 head: sim.pos, heading: sim.moveDir, position: sim.headInterpPos.toArray(),
                 // The destination tile is committed before the visible head finishes
@@ -571,6 +572,10 @@ export function useWormCrawler(size, cubies) {
                 rotating: liveRotation.active, hazardBusy: !!hazards.busy,
                 element: sim.elementalType, elementT: sim.elementalT,
                 lockedTile: null,
+                // The Glow Worm's painted trail, read only while an enemy is on the board.
+                lit: () => litTiles(sim),
+                // Spring's touchdown, for the few tenths of a second it stands.
+                slam: sim.signature.slamT > 0 ? sim.signature.slam : null,
             };
             const onContact = health => {
                 if (health <= 0) killWormSim(sim, ctxRef.current, { reason: 'portal-crawler' });
@@ -586,7 +591,7 @@ export function useWormCrawler(size, cubies) {
             if (sim.alive) {
                 if (c.shotsFired > previousShots) ctxRef.current.feel('shot');
                 if (c.kills > previousKills) ctxRef.current.feel('enemyDown');
-                else if (c.shotsHit > previousHits) ctxRef.current.feel('shotHit');
+                else if (c.shotsHit > previousHits || c.lightHits > previousLight || c.slamHits > previousSlam) ctxRef.current.feel('shotHit');
                 if (c.dropsCollected > previousDrops) ctxRef.current.feel('orb');
                 else if (previousAmmo === 0 && c.ammo > 0) ctxRef.current.feel('recharge');
             }

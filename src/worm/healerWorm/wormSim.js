@@ -10,7 +10,8 @@ import { EXPLODE_DURATION } from '../wormExpansion.js';
 import { cubeGridIndex } from '../../game/cubeWorldGeometry.js';
 import { bodyCoverageCount } from './bodyCoverage.js';
 import { wiggleOffset, wigglePointInto, WIGGLE_DURATION } from './wiggleSweep.js';
-import { makeSignature, activateSignature, tickSignature, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
+import { makeSignature, activateSignature, tickSignature, launchSpring, isParityLocked, releaseMobiTunnel, refractPickup } from './signatures.js';
+import { SPRING_GRAB_TILES } from '../characterAbilities.js';
 import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
 import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
@@ -265,6 +266,7 @@ export function makeWormSim(size) {
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         elementalPatches: new Map(),
+        slamResolved: 0,   // the last Spring landing whose orbs were taken (signature.slam.seq)
         waterMomentum: 0,
         viewPower: null,
         viewPowerT: 0,
@@ -433,6 +435,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.elementalPatches.clear();
+    sim.slamResolved = 0;
     sim.waterMomentum = 0;
     sim.viewPower = null;
     sim.viewPowerT = 0;
@@ -502,7 +505,12 @@ export const jumpLiftOf = (sim) => sim.isJumping && !sim.padFlight
 
 export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     if (sim.signature.sweep || sim.padFlight) return;
-    if (sim.phase !== 'crawling' || (sim.signature.character === 'inch' && sim.signature.active > 0)) return;
+    if (sim.phase !== 'crawling') return;
+    // A jump press while the Spring is coiling lets it go now. If the landing is no longer
+    // clear the coil is spent and this becomes the ordinary hop it would have been (a jump
+    // rescue must never be swallowed by a leap that cannot land). Once the leap is airborne
+    // a press is the follow-up jump: Spring uses one of the two jumps, not both.
+    if (sim.signature.charge > 0 && launchSpring(sim, size, ctx)) return;
     if (!liveRotation.active && !sim.restRead && startPlatformJump(sim, size, ctx, allowDive)) return;
     const grounded = !sim.isJumping;
     // A deliberate dive reads only settled tile contents. Never resolve the
@@ -1079,6 +1087,25 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
 // Sample both space and time so quick sweeps cannot skip an orb between frames.
 const _sweepPoint = new THREE.Vector3();
 const _sweepOrb = new THREE.Vector3();
+// Spring's touchdown takes every orb within SPRING_GRAB_TILES of the landing (bombs and enemies
+// read the same `signature.slam` window in the bomb loop and in combat). Once per landing.
+const _slamReach = new Set();
+function resolveSpringSlam(sim, size, ctx) {
+    const slam = sim.signature.slam;
+    if (!slam || slam.seq === sim.slamResolved) return;
+    sim.slamResolved = slam.seq;
+    const { x, y, z, dirKey } = slam.tile;
+    collectManifoldRing(x, y, z, dirKey, size, SPRING_GRAB_TILES, _slamReach);
+    let grabbed = 0;
+    for (const orb of [...sim.powerups]) {
+        if (!_slamReach.has(`${orb.x},${orb.y},${orb.z},${orb.dirKey}`)) continue;
+        grabbed++;
+        tryPickupPowerupAt(sim, size, ctx, orb.x, orb.y, orb.z, orb.dirKey, true);
+    }
+    sim.signature.notice = grabbed ? `Slam · ${grabbed} orb${grabbed > 1 ? 's' : ''}` : 'Slam';
+    sim.signature.noticeT = 1.8;
+}
+
 function tickWiggleSweep(sim, delta, size, ctx) {
     const sweep = sim.signature.sweep;
     const oldTime = sweep.elapsed;
@@ -2148,7 +2175,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     sim.bodyGait.enabled = ctx.getCharacter?.() === 'inch';
     const paused = ctx.isPaused();
     if (sim.phase === 'crawling' &&
-        (paused || sim.signature.charge > 0 || sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0)) {
+        (paused || sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.elementalFocusT > 0)) {
         // The render bridge applies the slice's ABSOLUTE angle after each tick.
         // A frozen tick must still restore the unrotated surface pose, otherwise
         // corner riding rotates yesterday's output again on every display frame.
@@ -2255,6 +2282,7 @@ export function stepWormSim(sim, delta, size, ctx) {
         sim.currentNormal.copy(evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos));
         return;
     }
+    resolveSpringSlam(sim, size, ctx);
 
 
     // ── Speed boost: drain the active window, then run the cooldown, publishing
@@ -2442,6 +2470,9 @@ export function stepWormSim(sim, delta, size, ctx) {
         // jump distance. Rocket overdrive no longer changes the ordinary jump arc.
         sim.jumpT += (delta / STEP_SEC) / sim.jumpSpan;
         if (sim.jumpT >= 1) {
+            // Spring's slam belongs where the worm came down, not where it has crawled to by
+            // the time the signature clock notices it is on the ground.
+            if (sim.signature.active > 0 && sim.signature.character === 'inch') sim.signature.landing = { ...sim.pos };
             if (sim.elementalType === 'grass' && sim.elementalT > 0 && !liveRotation.active && !sim.restRead) {
                 addElementalPatch(sim, sim.pos, 'grass');
             }

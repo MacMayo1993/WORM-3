@@ -17,6 +17,7 @@ import { tunnelTraversalT } from '../utils/tunnelPath.js';
 import { WORM_LIFT, WORM_HEAD_RADIUS } from '../worm/healerWorm/constants.js';
 import { advanceInchGaitState, inchGaitInto, inchBodyRadius } from '../worm/healerWorm/inchGait.js';
 import { liveRotation, setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
+import { SPRING_COIL_SECONDS } from '../worm/characterAbilities.js';
 
 let frame, tree;
 vi.mock('@react-three/fiber', () => ({ useFrame: callback => { frame = callback; } }));
@@ -114,6 +115,33 @@ it('renders actual head clearance beneath the Inch humps throughout a crossing',
       expect(gap, `frame ${frameIndex}, bead ${bead}`).toBeGreaterThan(0.006);
     }
   }
+});
+
+it("rears the Inch Worm into a loop behind a ducked head while Spring coils, then lets go", () => {
+  act(() => {
+    useGameStore.setState({ wormCharacter: 'inch', wormAccessories: {} });
+    root.render(<Harness worm={worm} />);
+  });
+  React.Children.toArray(tree.props.children).find(child => child.type === 'instancedMesh').ref.current = mesh;
+  sim.tailLength = 60;
+  advanceInchGaitState(sim.bodyGait, 1, sim.tailLength, 10);
+  Object.assign(sim.bodyGait, { enabled: true, move: 0 });
+  surfaceRoute([new THREE.Vector3(1.4, 0, 1.58), new THREE.Vector3(-1.4, 0, 1.58)]);
+  const rest = renderPoints();
+  sim.signature.charge = SPRING_COIL_SECONDS * 0.05;            // the coil nearly full
+  const coiled = renderPoints();
+  expect(coiled[0].z).toBeLessThan(rest[0].z - 0.03);            // the head ducks
+  let rise = 0;
+  for (let i = 3; i <= 11; i++) rise = Math.max(rise, coiled[i].z - rest[i].z);
+  expect(rise).toBeGreaterThan(0.25);                            // a loop reared up behind it...
+  expect(coiled[7].x).toBeGreaterThan(rest[7].x);                // ...and hauled toward the head
+  for (let i = 16; i < 40; i++) expect(coiled[i].distanceTo(rest[i])).toBeLessThan(1e-6);   // the rest of the body does not notice
+  sim.signature.charge = SPRING_COIL_SECONDS * 0.5;
+  const half = renderPoints();
+  expect(half[7].z - rest[7].z).toBeGreaterThan(0.1); expect(half[7].z).toBeLessThan(coiled[7].z);   // it builds, it does not snap
+  sim.signature.charge = 0;
+  const after = renderPoints();
+  for (let i = 0; i < 40; i++) expect(after[i].distanceTo(rest[i])).toBeLessThan(1e-6);   // and the launch lets all of it go
 });
 
 it('gives a newly spawned Wiggle ten connected, distinct segments instead of a pile at the head', () => {

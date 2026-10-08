@@ -4,6 +4,7 @@ import WormEffectWarmup from './healerWorm/WormEffectWarmup.jsx';
 import { WormLighting } from './WormLighting.jsx';
 import { CoreWormReflections } from './healerWorm/CoreWormReflections.jsx';
 import { holdsRotationTimer } from './characterAbilities.js';
+import { springSlamTiles } from './healerWorm/jumpLanding.js';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { storySurfaceTile } from './story/mastery.js';
 import { bodyCoverageCount } from './healerWorm/bodyCoverage.js';
@@ -82,6 +83,8 @@ import {
     bombCap,
     computeBlastTiles,
     isBombDisarmed,
+    isBombSlammed,
+    tileKeyOf,
     checkBlastHitWorm,
 } from './healerWorm/bombs.js';
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
@@ -229,6 +232,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const bombSeqRef    = useRef(0);          // monotonic bomb id source
     const blastApiRef   = useRef(null);       // imperative detonation-flash handle from HealerBombs
     const occupiedTilesRef = useRef(new Set()); // scratch: body-covered tiles, rebuilt each frame
+    const slamTilesRef = useRef({ id: '', keys: new Set() }); // the tiles Spring's last landing covers
     // Bumped whenever the live bomb set gains or loses a member, so <HealerBombs>
     // can notice the change without serialising the id list every frame.
     const bombMembershipRef = useRef(0);
@@ -599,6 +603,20 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // the existing array rather than collected into a new one — this runs on
             // every active frame, and the list it was rebuilding is almost always
             // unchanged.
+            // Spring's landing defuses every bomb within a tile of where it touched down. The
+            // covered tiles are worked out once per landing and read for as long as its window stands.
+            const slamSig = worm.signature.current;
+            let slamTiles = null;
+            if (slamSig.slamT > 0 && slamSig.slam) {
+                const slamRef = slamTilesRef.current;
+                // A retry restarts the sequence at 1, so the tile is part of what makes a landing new.
+                const slamId = `${slamSig.slam.seq}|${tileKeyOf(slamSig.slam.tile)}`;
+                if (slamRef.id !== slamId) {
+                    springSlamTiles(slamSig.slam.tile, size, slamRef.keys);
+                    slamRef.id = slamId;
+                }
+                slamTiles = slamRef.keys;
+            }
             if (bombsRef.current.length > 0) {
                 const bombs = bombsRef.current;
                 let kept = 0;
@@ -608,7 +626,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     // bombs without disarms, damage or rewards after a fatal hit.
                     if (!useGameStore.getState().wormAlive) { bombs[kept++] = bomb; continue; }
                     // Disarm: body fully encircles the bomb — reward and remove it.
-                    if (isBombDisarmed(bomb, occupied, size)) {
+                    if (isBombDisarmed(bomb, occupied, size) || isBombSlammed(bomb, slamTiles)) {
                         blastApiRef.current?.disarm(bomb);
                         if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
                         else if (store.wormStoryLevel) worm.recordStoryBomb?.(bomb.id);

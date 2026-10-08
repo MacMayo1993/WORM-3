@@ -8,7 +8,7 @@ import { tunnelHeadPulse, tunnelSwimInto, offsetTunnelSwimInto } from './tunnelS
 import { makeTunnelBodyProfile, blendTunnelBodyProfile, fitTunnelBodyInto, tunnelBodyDistance } from './tunnelBodyFit.js';
 import { MOBI_RADIUS } from '../mobiModel.js';
 import { createMobiOrbPalette, mobiCarriedFace } from '../mobiOrbAppearance.js';
-import { SPRING_CHARGE } from './signatures.js';
+import { SPRING_COIL_SECONDS } from './signatures.js';
 import { ELEMENTAL_EXPERIENCE, elementalBodyWave } from './elementalExperience.js';
 import { pickupPulse, advancePickupPulses, enqueuePickupPulse, pickupGulpScale } from './pickupPulse.js';
 import { createCharacterGeometry, applyCharacterFinish, prismColor, characterSegmentPattern } from '../wormCharacterVisuals.js';
@@ -86,6 +86,8 @@ const _bodyHeadPos = new THREE.Vector3();
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
 const _wiggleForward = new THREE.Vector3();
+// How much of the body Spring's coil gathers, and how far that loop rears and is hauled.
+const SPRING_COIL_BEADS = 14, SPRING_COIL_RISE = 0.32, SPRING_COIL_HAUL = 0.07;
 const _wigglePrev = new THREE.Vector3(); // the bead ahead, before surface clearance
 const _bodyCloneNormal = new THREE.Vector3();
 const _bodySegForward = new THREE.Vector3();
@@ -677,10 +679,17 @@ export function WormBody({ worm, size }) {
                 if (i === 0) _wormDummy.scale.multiplyScalar(worm.pickupHeadScale);
                 else _wormDummy.scale.multiplyScalar(1 + 0.12 * pickupWave + 0.22 * tailPop);
             }
-            if (_isInch && worm.signature.current.charge > 0) {
-                const compression = Math.sin((1 - worm.signature.current.charge / SPRING_CHARGE) * Math.PI * 0.5);
-                _wormDummy.scale.multiplyScalar(1 + compression * 0.2);
-                _wormDummy.position.addScaledVector(i === 0 ? _bodyNormal : _bodyCloneNormal, -compression * 0.025);
+            if (_isInch && !segmentTransit && worm.signature.current.charge > 0) {
+                // Spring's coil: the head ducks, a loop is reared up behind it and hauled toward
+                // the head, as an inchworm gathers itself before a leap. Overlaid on the gait.
+                const coil = Math.sin((1 - worm.signature.current.charge / SPRING_COIL_SECONDS) * Math.PI * 0.5);
+                _wormDummy.scale.multiplyScalar(1 + coil * 0.22);
+                if (i === 0) _wormDummy.position.addScaledVector(_bodyNormal, -coil * 0.04);
+                else if (i <= SPRING_COIL_BEADS) {
+                    const hump = Math.sin(Math.PI * i / (SPRING_COIL_BEADS + 1));
+                    _wormDummy.position.addScaledVector(_bodyCloneNormal, coil * SPRING_COIL_RISE * hump);
+                    if (_bodySegForward.lengthSq() > 0) _wormDummy.position.addScaledVector(_bodySegForward, coil * SPRING_COIL_HAUL * hump);
+                }
             }
             _wormDummy.scale.multiplyScalar(wormBodyTaper(i, sweep ? visibleCount : tLen, wormCharacterId));
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
