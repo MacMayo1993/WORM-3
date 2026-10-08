@@ -18,6 +18,9 @@ test('boots to the main menu', async ({ page }) => {
 });
 
 test('starts a WORM free-play run', async ({ page }) => {
+  // Keep a desktop width but fewer software-rendered pixels. The opening
+  // scramble needs rendered frames to complete; a tall canvas can starve it on CI.
+  await page.setViewportSize({ width: 1024, height: 320 });
   await startFreePlay(page);
   await expect(page.getByRole('button', { name: /^Collect \d+ orbs: 0 of \d+/ })).toBeVisible();
   for (const control of ['Turn left', 'Turn right', 'Boost']) await expect(page.getByRole('button', { name: control, exact: true })).toBeVisible();
