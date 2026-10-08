@@ -12,7 +12,7 @@ import { prefersReducedMotion, isMobile } from '../utils/device.js';
 import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { RoundedBox } from '@react-three/drei';
+import { cubieBodyGeometry } from './cubieBodyGeometry.js';
 import * as THREE from 'three';
 import { COLORS, FACE_COLORS } from '../utils/constants.js';
 import { getEdgeFlags } from '../game/cubeUtils.js';
@@ -103,7 +103,7 @@ function LegoStud({ dir, color, enableShadows = true }) {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, omitBody = false, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode: storedMirrorMode, visualMode, explosionFactor, settings, flipPads, randomMode, randomStyleTick, perfReducedFX, wormViewPower, effectiveFlipCap } = useGameStore(
+  const { hollowMode, mirrorMode: storedMirrorMode, visualMode, explosionFactor, settings, flipPads, randomMode, randomStyleTick, perfReducedFX, wormViewPower, effectiveFlipCap, chaosLive } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
@@ -116,13 +116,18 @@ const Cubie = React.forwardRef(function Cubie({
       randomStyleTick: s.randomStyleTick,
       perfReducedFX: s.perfReducedFX,
       effectiveFlipCap: selectEffectiveFlipCap(s),
+      chaosLive: s.chaosLevel > 0,
     }))
   );
   const enableShadows = !perfReducedFX;
   const cubePads = useGameStore(flipCubePadsEnabled) && !wormMode;
   const wormPads = wormMode;
   const wormRunId = useGameStore(s => wormMode ? s.wormRunId : 0);
-  const raisedWindow = (wormPads || cubePads) && cubieHasFlippedFace(cubie, effectiveFlipCap);
+  // A raised piece's see-through shell shows the band under its lifted tile. In
+  // Chaos nearly every piece is raised, so the shells turned the whole cube to
+  // glass and every band, cord and surge inside it shone through. Chaos keeps
+  // solid bodies: its bands show only through the gaps the lifted pieces open.
+  const raisedWindow = (wormPads || (cubePads && !chaosLive)) && cubieHasFlippedFace(cubie, effectiveFlipCap);
   // Hollow's 12-beam-per-cubie representation would create more than 14,000
   // meshes on a 15×15 shell. Mega disables that view and keeps its optimized chassis.
   const powerView = wormMode ? getViewPowerDef(wormViewPower)?.view : null;
@@ -223,7 +228,9 @@ const Cubie = React.forwardRef(function Cubie({
     // storm that makes the 15x15 Mega board lag at the end of every rotation.
     // StickerPlane re-syncs its physical identity in place (see its stickerGridId
     // handling), so ref-bleed is still prevented without the remount.
-    if (wormMode) return `${dirKey}-slot-${cubie.x}-${cubie.y}-${cubie.z}-${size}`;
+    // Chaos keys by slot too: the round turns a slice every 1.5 s while the storm
+    // runs, and remounting every sticker in it was the hitch on each turn.
+    if (wormMode || chaosLive) return `${dirKey}-slot-${cubie.x}-${cubie.y}-${cubie.z}-${size}`;
     // All other modes keep the physical-piece identity key, which forces the remount
     // that resets meta-derived refs when a turn swaps which sticker fills this slot.
     const m = meta(dirKey);
@@ -538,9 +545,12 @@ const Cubie = React.forwardRef(function Cubie({
         // bar across the water, the moss and the fire's lava cracks. Drawing bodies
         // first fixes that. Raised WORM pieces keep a translucent shell without
         // writing depth, revealing the band underneath their lifted tile.
-        <RoundedBox args={[bodySize, bodySize, bodySize]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows} renderOrder={wormMode ? -1 : 0}>
+        // The rounded box is shared per size (cubieBodyGeometry): a piece changes
+        // body size whenever a flip changes its look, and rebuilding it was a hitch.
+        <mesh onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows} renderOrder={wormMode ? -1 : 0}>
+          <primitive object={cubieBodyGeometry(bodySize)} attach="geometry" />
           {coatBody ? <meshPhysicalMaterial {...bodyMatProps} {...CLASSIC_BODY_COAT} /> : <meshStandardMaterial {...bodyMatProps} />}
-        </RoundedBox>
+        </mesh>
       )}
 
       {/* LED edges for wireframe + neon (skip in hollow/mirror mode).

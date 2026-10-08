@@ -65,6 +65,9 @@ const MID_FADE_FULL = 12;  // at or above this many: full fade
 
 const REBUILD_EPS_SQ = 1e-4;
 
+// Rewritten whenever a strand moves. aSide is fixed per vertex at creation.
+const DYNAMIC_ATTRS = ['position', 'aTangent', 'aColor', 'aT', 'aWidth', 'aHeat', 'aCharge', 'aFront'];
+
 // Cords recede while the worm is inside a tunnel so the active ribbon reads.
 const IDLE_OPACITY = 1.0;
 const DIM_OPACITY  = 0.28;
@@ -230,6 +233,10 @@ function createCordGeometry(maxStrands) {
   geo.setAttribute('aCharge',  new THREE.BufferAttribute(new Float32Array(vertCount),     1));
   geo.setAttribute('aFront',   new THREE.BufferAttribute(new Float32Array(vertCount),     1));
 
+  const side = geo.attributes.aSide.array;
+  for (let v = 0; v < vertCount; v++) side[v] = v % 2 === 0 ? -1 : 1;
+  for (const name of DYNAMIC_ATTRS) geo.attributes[name].setUsage(THREE.DynamicDrawUsage);
+
   const indices = new Uint32Array(maxStrands * INDICES_PER_STRAND);
   let w = 0;
   for (let k = 0; k < maxStrands; k++) {
@@ -256,7 +263,7 @@ function createCordGeometry(maxStrands) {
 const cordPath = makeTunnelPath();
 const cordPoint = new THREE.Vector3(), cordTangent = new THREE.Vector3();
 function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWidth, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0, charge = 0, front = 0) {
-  const { pos, tan, col, side, tt, wid, heatArr, chargeArr, frontArr } = attrs;
+  const { pos, tan, col, tt, wid, heatArr, chargeArr, frontArr } = attrs;
   const halfSegs = CORD_SEGS / 2;
   const base = slot * VERTS_PER_STRAND;
 
@@ -295,7 +302,6 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWi
       pos[p3] = cx; pos[p3 + 1] = cy; pos[p3 + 2] = cz;
       tan[p3] = nx; tan[p3 + 1] = ny; tan[p3 + 2] = nz;
       col[p3] = c.r; col[p3 + 1] = c.g; col[p3 + 2] = c.b;
-      side[vi]    = sgn === 0 ? -1 : 1;
       tt[vi]      = t;
       wid[vi]     = w;
       heatArr[vi] = heat;
@@ -313,6 +319,8 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
   // buffer upload entirely on frames where nothing moved.
   const lastEndpointsRef = useRef(new Float32Array(0));
   const forceRebuildRef  = useRef(true);
+  // Slots drawn last upload, so a strand that drops out is overwritten once.
+  const uploadedSlotsRef = useRef(0);
 
   const geo = useMemo(() => createCordGeometry(maxStrands), [maxStrands]);
 
@@ -320,7 +328,6 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
     pos:     geo.attributes.position.array,
     tan:     geo.attributes.aTangent.array,
     col:     geo.attributes.aColor.array,
-    side:    geo.attributes.aSide.array,
     tt:      geo.attributes.aT.array,
     wid:     geo.attributes.aWidth.array,
     heatArr: geo.attributes.aHeat.array,
@@ -446,15 +453,19 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
     }
 
     if (moved) {
-      geo.attributes.position.needsUpdate = true;
-      geo.attributes.aTangent.needsUpdate = true;
-      geo.attributes.aColor.needsUpdate   = true;
-      geo.attributes.aSide.needsUpdate    = true;
-      geo.attributes.aT.needsUpdate       = true;
-      geo.attributes.aWidth.needsUpdate   = true;
-      geo.attributes.aHeat.needsUpdate    = true;
-      geo.attributes.aCharge.needsUpdate  = true;
-      geo.attributes.aFront.needsUpdate   = true;
+      // Upload only the live slots. The buffers are sized for MAX_TUNNELS, and
+      // sending the whole pool every frame while pads bounce was ~0.5 MB a frame
+      // for the twenty-odd cords a storm actually draws.
+      const span = Math.max(slot, uploadedSlotsRef.current) * VERTS_PER_STRAND;
+      if (span > 0) {
+        for (const name of DYNAMIC_ATTRS) {
+          const a = geo.attributes[name];
+          a.clearUpdateRanges();
+          a.addUpdateRange(0, span * a.itemSize);
+          a.needsUpdate = true;
+        }
+      }
+      uploadedSlotsRef.current = slot;
       forceRebuildRef.current = false;
     }
 

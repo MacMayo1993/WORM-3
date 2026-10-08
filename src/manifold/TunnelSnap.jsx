@@ -131,7 +131,7 @@ function buildGeometry() {
 }
 
 /** One dying pair. */
-const SnapCord = ({ death, cubieRefs }) => {
+const SnapCord = ({ death, cubieRefs, xray }) => {
   const groupRef  = useRef();
   const shardsRef = useRef();
   const doneRef   = useRef(false);
@@ -278,6 +278,11 @@ const SnapCord = ({ death, cubieRefs }) => {
     // obvious with depthTest disabled). Losing a pair is the most consequential
     // thing that can happen to it, and this marker lasts under a second and fades,
     // so it is drawn as event feedback rather than as world geometry.
+    //
+    // Chaos is the exception (xray false): there pairs die by the dozen, the
+    // storm's overload blast already marks both tiles, and a stream of snaps drawn
+    // through the solid cube read as bands shining out of it. In Chaos the snap is
+    // depth-tested like the living tunnels and shows only through the gaps.
     <group ref={groupRef} renderOrder={9000}>
       {/* World-space positions in a mesh at the origin — see MobiusTunnel. */}
       <mesh geometry={geo} frustumCulled={false} renderOrder={9000}>
@@ -288,7 +293,7 @@ const SnapCord = ({ death, cubieRefs }) => {
           side={THREE.DoubleSide}
           transparent
           depthWrite={false}
-          depthTest={false}
+          depthTest={!xray}
         />
       </mesh>
       <points ref={shardsRef} geometry={shardGeo} frustumCulled={false} renderOrder={9001}>
@@ -297,7 +302,7 @@ const SnapCord = ({ death, cubieRefs }) => {
           transparent
           opacity={0.95}
           depthWrite={false}
-          depthTest={false}
+          depthTest={!xray}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
         />
@@ -308,11 +313,12 @@ const SnapCord = ({ death, cubieRefs }) => {
 
 const TunnelSnap = ({ deaths, cubieRefs }) => {
   const entries = useMemo(() => Object.entries(deaths || {}), [deaths]);
+  const xray = useGameStore((s) => !(s.chaosLevel > 0 && !s.wormHealerMode));
   if (!entries.length) return null;
   return (
     <group>
       {entries.map(([pairId, death]) => (
-        <SnapCord key={pairId} death={death} cubieRefs={cubieRefs} />
+        <SnapCord key={pairId} death={death} cubieRefs={cubieRefs} xray={xray} />
       ))}
     </group>
   );

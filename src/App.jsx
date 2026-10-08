@@ -42,6 +42,7 @@ import { resolveWizardTileStyles } from './utils/wizardTileStyles.js';
 import { useShallow } from 'zustand/react/shallow';
 import {
   useGameStore,
+  selectChaosFlipLocked,
   useCubeState,
   useGameSession,
   useAnimation,
@@ -1004,7 +1005,8 @@ export default function WORM3() {
   }, [setShowTutorial, markTutorialDone]);
 
   const onTapFlip = useCallback((pos, dirKey) => {
-    if (useGameStore.getState().teachCourseActive) return;
+    const s = useGameStore.getState();
+    if (s.teachCourseActive || selectChaosFlipLocked(s)) return;
     flipSticker(pos, dirKey);
   }, [flipSticker]);
   onTapFlipRef.current = onTapFlip;

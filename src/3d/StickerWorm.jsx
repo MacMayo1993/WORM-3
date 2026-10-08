@@ -1,84 +1,133 @@
 // src/3d/StickerWorm.jsx
 // Worm creature for disparity / wormhole visualization.
 // Lies flat on the tile surface and undulates with a travelling sine wave.
-// Uses shared module-level geometries so no per-instance GPU allocations occur.
-import { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+//
+// A worm is two draws: its five body beads merged into one mesh, bobbing in the
+// vertex shader, and its five soft glows merged into another. It used to be ten
+// meshes with a useFrame each, and Chaos puts up to four worms on every flipped
+// tile plus two round every tombstone — on a 4×4 storm that was ~650 draws a
+// frame, the largest single cost in the scene. Geometry is cached per look and
+// both materials are shared, so a worm allocates nothing and is never disposed.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-const _wormGeoHead = new THREE.SphereGeometry(0.028, 10, 10);
-const _wormGeoSeg1 = new THREE.SphereGeometry(0.024, 8, 8);
-const _wormGeoSeg2 = new THREE.SphereGeometry(0.022, 8, 8);
-const _wormGeoSeg3 = new THREE.SphereGeometry(0.020, 8, 8);
-const _wormGeoTail = new THREE.SphereGeometry(0.016, 8, 8);
-const _wormGlowGeo = new THREE.SphereGeometry(0.045, 10, 10);
+// Head → tail: bead radius, height off the tile, colour. Spacing scales with the
+// worm; the beads themselves do not (as before).
+const BEADS = [
+  { r: 0.028, z: 0.026, color: '#f2c38b', seg: [10, 10] },
+  { r: 0.024, z: 0.024, color: '#dda15e', seg: [8, 8] },
+  { r: 0.022, z: 0.023, color: '#bc6c25', seg: [8, 8] },
+  { r: 0.020, z: 0.022, color: '#a05c20', seg: [8, 8] },
+  { r: 0.016, z: 0.021, color: '#8f4e1b', seg: [8, 8] }
+];
+const GLOW_R = 0.045;
+const GLOW_Z = 0.018;
+const GLOW_COLOR = '#ffe6c6';
+const FREQ = 4.2;
+const SEG_LAG = 0.7;
+const AMP = 0.028;
 
-const StickerWorm = ({ position, rotation, scale = 1 }) => {
-    const headRef = useRef();
-    const seg1Ref = useRef();
-    const seg2Ref = useRef();
-    const seg3Ref = useRef();
-    const tailRef = useRef();
+const _uTime = { value: 0 };
 
-    // One worm rides every disparate tile, so this list was an array literal plus a
-    // forEach closure per tile per frame. Built once per mount instead.
-    const segRefs = useRef(null);
-    if (segRefs.current === null) segRefs.current = [headRef, seg1Ref, seg2Ref, seg3Ref, tailRef];
+const bodyMaterial = new THREE.ShaderMaterial({
+  uniforms: { uTime: _uTime },
+  vertexShader: `
+    attribute vec3 aColor;
+    attribute float aSeg;
+    attribute float aPhase;
+    attribute float aAmp;
+    uniform float uTime;
+    varying vec3 vColor;
+    void main() {
+      vColor = aColor;
+      vec3 p = position;
+      p.y += sin(uTime * ${FREQ.toFixed(1)} - aSeg * ${SEG_LAG.toFixed(1)} + aPhase) * aAmp;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vColor;
+    void main() {
+      gl_FragColor = vec4(vColor, 1.0);
+      #include <colorspace_fragment>
+    }
+  `,
+  toneMapped: false
+});
 
-    useFrame(({ clock }) => {
-        const time = clock.elapsedTime;
-        const freq = 4.2;
-        const amp = 0.028 * scale;
-        const refs = segRefs.current;
-        for (let i = 0; i < refs.length; i++) {
-            const ref = refs[i];
-            if (!ref.current) continue;
-            ref.current.position.y = Math.sin(time * freq - i * 0.70 + rotation) * amp;
-        }
-    });
+// Soft additive glow so ghost worms read clearly above busy tile art. RGBA vertex
+// colours carry each glow's own opacity (head brighter than the body).
+const glowMaterial = new THREE.MeshBasicMaterial({
+  vertexColors: true,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  toneMapped: false
+});
 
-    const sp = 0.034 * scale; // spacing between segments along body axis
+function fill(geo, name, size, values) {
+  const n = geo.attributes.position.count;
+  const arr = new Float32Array(n * size);
+  for (let i = 0; i < n; i++) for (let k = 0; k < size; k++) arr[i * size + k] = values[k];
+  geo.setAttribute(name, new THREE.BufferAttribute(arr, size));
+}
 
-    return (
-        // rotation = angle of this worm's orbit position; +PI/2 = tangent direction.
-        <group position={position} rotation={[0, 0, rotation + Math.PI / 2]}>
-            <mesh ref={headRef} position={[sp * 2, 0, 0.026]} renderOrder={4}>
-                <primitive object={_wormGeoHead} attach="geometry" />
-                <meshBasicMaterial color="#f2c38b" toneMapped={false} />
-            </mesh>
-            <mesh ref={seg1Ref} position={[sp, 0, 0.024]} renderOrder={4}>
-                <primitive object={_wormGeoSeg1} attach="geometry" />
-                <meshBasicMaterial color="#dda15e" toneMapped={false} />
-            </mesh>
-            <mesh ref={seg2Ref} position={[0, 0, 0.023]} renderOrder={4}>
-                <primitive object={_wormGeoSeg2} attach="geometry" />
-                <meshBasicMaterial color="#bc6c25" toneMapped={false} />
-            </mesh>
-            <mesh ref={seg3Ref} position={[-sp, 0, 0.022]} renderOrder={4}>
-                <primitive object={_wormGeoSeg3} attach="geometry" />
-                <meshBasicMaterial color="#a05c20" toneMapped={false} />
-            </mesh>
-            <mesh ref={tailRef} position={[-sp * 2, 0, 0.021]} renderOrder={4}>
-                <primitive object={_wormGeoTail} attach="geometry" />
-                <meshBasicMaterial color="#8f4e1b" toneMapped={false} />
-            </mesh>
+const _color = new THREE.Color();
+const bodyCache = new Map();
+const glowCache = new Map();
 
-            {/* Soft additive glow so ghost worms read clearly above busy tile art */}
-            {[sp * 2, sp, 0, -sp, -sp * 2].map((x, i) => (
-                <mesh key={i} position={[x, 0, 0.018]} renderOrder={3}>
-                    <primitive object={_wormGlowGeo} attach="geometry" />
-                    <meshBasicMaterial
-                        color="#ffe6c6"
-                        transparent
-                        opacity={i === 0 ? 0.24 : 0.14}
-                        blending={THREE.AdditiveBlending}
-                        depthWrite={false}
-                        toneMapped={false}
-                    />
-                </mesh>
-            ))}
-        </group>
-    );
-};
+/** Five beads along local +X (head first), phase and amplitude baked per vertex. */
+function bodyGeometry(scale, phase) {
+  const key = `${scale}|${phase}`;
+  let geo = bodyCache.get(key);
+  if (geo) return geo;
+  const sp = 0.034 * scale;
+  geo = mergeGeometries(BEADS.map((b, i) => {
+    const g = new THREE.SphereGeometry(b.r, b.seg[0], b.seg[1]);
+    g.deleteAttribute('normal');
+    g.deleteAttribute('uv');
+    g.translate(sp * (2 - i), 0, b.z);
+    _color.set(b.color);
+    fill(g, 'aColor', 3, [_color.r, _color.g, _color.b]);
+    fill(g, 'aSeg', 1, [i]);
+    fill(g, 'aPhase', 1, [phase]);
+    fill(g, 'aAmp', 1, [AMP * scale]);
+    return g;
+  }));
+  bodyCache.set(key, geo);
+  return geo;
+}
+
+function glowGeometry(scale) {
+  let geo = glowCache.get(scale);
+  if (geo) return geo;
+  const sp = 0.034 * scale;
+  _color.set(GLOW_COLOR);
+  geo = mergeGeometries(BEADS.map((_, i) => {
+    const g = new THREE.SphereGeometry(GLOW_R, 10, 10);
+    g.deleteAttribute('normal');
+    g.deleteAttribute('uv');
+    g.translate(sp * (2 - i), 0, GLOW_Z);
+    fill(g, 'color', 4, [_color.r, _color.g, _color.b, i === 0 ? 0.24 : 0.14]);
+    return g;
+  }));
+  glowCache.set(scale, geo);
+  return geo;
+}
+
+// Every worm reads one clock. Setting it from the first body drawn each frame is
+// cheaper than a useFrame per worm, and nothing is spent on worms off screen.
+function tickClock() {
+  _uTime.value = performance.now() / 1000;
+}
+
+const StickerWorm = ({ position, rotation, scale = 1 }) => (
+  // rotation = angle of this worm's orbit position; +PI/2 = tangent direction.
+  <group position={position} rotation={[0, 0, rotation + Math.PI / 2]}>
+    <mesh geometry={bodyGeometry(scale, rotation)} material={bodyMaterial} renderOrder={4} onBeforeRender={tickClock}
+      raycast={() => null} dispose={null} />
+    <mesh geometry={glowGeometry(scale)} material={glowMaterial} renderOrder={3} raycast={() => null} dispose={null} />
+  </group>
+);
 
 export default StickerWorm;
