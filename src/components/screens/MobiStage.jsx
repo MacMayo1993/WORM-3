@@ -25,6 +25,16 @@ if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
     @keyframes mobiSheetOut { to { transform: translateY(12px); opacity: 0; } }
     @keyframes mobiTalk { 0%,100% { transform: translateY(0) rotate(0); } 30% { transform: translateY(-5px) rotate(-1deg); } 65% { transform: translateY(-2px) rotate(.6deg); } }
     @keyframes mobiCaret { 0%,100% { opacity: 1; } 50% { opacity: .2; } }
+    .mobi-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; flex-wrap: wrap; flex-shrink: 0; }
+    .mobi-footer-actions { display: flex; gap: 10px; align-items: center; }
+    @media (max-height: 520px) {
+      .demo-mobi-dialog:has(.demo-toolbar) .mobi-sheet { min-height: 0 !important; max-height: calc(100dvh - 180px) !important; padding-top: 8px !important; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)) !important; }
+    }
+    @media (max-width: 480px) {
+      .demo-mobi-dialog .mobi-footer { flex-direction: column; align-items: stretch; gap: 10px; }
+      .demo-mobi-dialog .mobi-footer-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+      .demo-mobi-dialog .mobi-footer-actions > button { padding-left: 8px !important; padding-right: 8px !important; }
+    }
     @media (prefers-reduced-motion: reduce) { .mobi-stage * { animation: none !important; } }
   `;
   document.head.appendChild(s);
@@ -110,7 +120,7 @@ export default function MobiStage({ line, lineKey, index = 0, count = 1, tag, me
         }} />
     </div>
 
-    <div onClick={e => e.stopPropagation()} style={{
+    <div className="mobi-sheet" onClick={e => e.stopPropagation()} style={{
       position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 2, pointerEvents: 'auto',
       minHeight: 'min(clamp(170px, 25vh, 236px), 65dvh)', maxHeight: 'calc(100dvh - 100px)',
       display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
@@ -150,14 +160,14 @@ export default function MobiStage({ line, lineKey, index = 0, count = 1, tag, me
         </p>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12, flexWrap: 'wrap', flexShrink: 0 }}>
+      <div className="mobi-footer">
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} aria-hidden="true">
           {Array.from({ length: count }, (_, i) => <span key={i} style={{
             width: i === index ? 20 : 8, height: 8, borderRadius: 4, border: `2px solid ${ARCADE_INK_STRONG}`,
             background: i <= index ? WORM.accent : 'transparent', boxSizing: 'border-box', transition: 'width .3s'
           }} />)}
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>{actions}</div>
+        <div className="mobi-footer-actions">{actions}</div>
       </div>
     </div>
   </div>;

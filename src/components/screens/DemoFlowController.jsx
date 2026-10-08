@@ -1,4 +1,5 @@
 import DemoDialog from './DemoDialog.jsx';
+import DemoProgressBar from './DemoProgressBar.jsx';
 import { WORM_DEMO_LESSON_COUNT } from '../../game/wormDemoState.js';
 import { WORM_DIFFICULTIES } from '../../worm/wormDifficulty.js';
 import { useDemoTarget } from './useDemoTarget.js';
@@ -40,54 +41,6 @@ const ensureDemoShellStyle = () => {
   const style = document.createElement('style');
   style.id = DEMO_SHELL_STYLE_ID;
   style.textContent = `
-    .demo-progress-pill {
-      position: fixed;
-      top: max(10px, env(safe-area-inset-top, 10px));
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 11000;
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      padding: 7px 14px;
-      border-radius: 999px;
-      background: rgba(250, 246, 235, 0.88);
-      border: 1px solid rgba(89, 109, 74, 0.24);
-      box-shadow: 0 8px 24px rgba(43, 53, 35, 0.16);
-      color: #27351f;
-      backdrop-filter: var(--paper-blur, none);
-      font-family: ${UI_FONT};
-      pointer-events: none;
-    }
-
-    .demo-progress-label {
-      color: #657156;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.11em;
-    }
-
-    .demo-progress-track {
-      width: 86px;
-      height: 5px;
-      background: rgba(92, 111, 76, 0.18);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    .demo-progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #7b8f5a, #b88f4a);
-      border-radius: 999px;
-      transition: width 0.4s ease;
-    }
-
-    .demo-progress-count {
-      color: #35452a;
-      font-size: 11px;
-      font-weight: 800;
-    }
-
     .demo-intro-root {
       position: fixed;
       inset: 0;
@@ -365,28 +318,20 @@ const ensureDemoShellStyle = () => {
        the crowded top bar, and at equal specificity source order decides. */
     .demo-coach-pill {
       position: fixed;
-      top: calc(max(10px, env(safe-area-inset-top, 10px)) + 44px);
+      top: calc(env(safe-area-inset-top, 0px) + 140px);
       left: 50%;
       transform: translateX(-50%);
       z-index: 11000;
     }
 
     @media (max-width: 640px) {
-      /* Phone bars are crowded: the pill sat on top of the mode label and the
-         bar's icons. Drop it just below the bar instead of over it. */
-      .demo-progress-pill {
-        top: calc(var(--topbar-h, 44px) + env(safe-area-inset-top, 0px) + 6px);
-        padding: 6px 12px;
-        background: rgba(250, 247, 238, 0.92);
-      }
-
       /* Everything else that stacks below the pill moves down with it. */
       .demo-coach-pill {
-        top: calc(var(--topbar-h, 44px) + env(safe-area-inset-top, 0px) + 52px);
+        top: calc(env(safe-area-inset-top, 0px) + 134px);
       }
 
       .demo-tour-card--top {
-        top: calc(var(--topbar-h, 44px) + env(safe-area-inset-top, 0px) + 52px);
+        top: calc(env(safe-area-inset-top, 0px) + 134px);
       }
 
       .demo-intro-root {
@@ -410,14 +355,7 @@ const ensureDemoShellStyle = () => {
       }
     }
 
-    /* Worm mode owns the top edge with its glance strip — dock the pill at the
-       bottom, above the thumb tray. Declared last so it wins over the mobile
-       media-query top override. */
-    .demo-progress-pill--bottom {
-      top: auto;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
-    }
-
+    /* Keep WORM coaching above the thumb tray. */
     .demo-coach-pill--bottom {
       top: auto;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 144px);
@@ -551,31 +489,6 @@ const ensureDemoShellStyle = () => {
   document.head.appendChild(style);
 };
 
-const DemoProgressBar = ({ currentStep, onSkipStep, onExit }) => {
-  ensureDemoShellStyle();
-  // Worm mode's glance strip owns the top edge — dock the pill at the bottom there.
-  const wormHealerMode = useGameStore((s) => s.wormHealerMode);
-  const idx = DEMO_STEPS.findIndex(s => s.id === currentStep);
-  const total = DEMO_STEPS.length - 1;
-  const current = currentStep === 'end' ? total : idx + 1;
-  const progress = current / total;
-
-  return (
-    <div className={`demo-progress-pill${wormHealerMode && !onSkipStep ? ' demo-progress-pill--bottom' : ''}`}
-      style={onSkipStep ? { pointerEvents: 'auto', gap: 6, padding: '4px 8px', zIndex: 12000, maxWidth: 'calc(100vw - 24px)' } : undefined}>
-      <span className="demo-progress-label">DEMO</span>
-      <div className="demo-progress-track" style={onSkipStep ? { width: 24, flexShrink: 0 } : undefined} role="progressbar" aria-label="Demo progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
-        <div className="demo-progress-fill" style={{ width: `${progress * 100}%` }} />
-      </div>
-      <span className="demo-progress-count">
-        {current} / {total}
-      </span>
-      {onSkipStep && <button type="button" className="demo-coach-pill-btn" style={{ minHeight: 44, padding: '6px 10px' }} onClick={onSkipStep}>Skip Step</button>}
-      {onExit && <button type="button" className="demo-coach-pill-btn" style={{ minHeight: 44, padding: '6px 10px' }} onClick={onExit}>Exit Demo</button>}
-    </div>
-  );
-};
-
 // Most steps need only a setup line. Chaos and Random get a player-paced
 // briefing before the forecast picker or live remixing can start.
 const DemoStepIntro = ({ step, onContinue, onSkipStep, onExit }) => {
@@ -585,6 +498,7 @@ const DemoStepIntro = ({ step, onContinue, onSkipStep, onExit }) => {
   return (
     <MobiIntroScreen
       key={step}
+      demoStep={step}
       lines={lines}
       modeName={`Demo ${info.num} · ${info.label}`}
       primaryLabel={step === 'chaos-forecast' ? 'Choose a pair' : step === 'random-showcase' ? 'Start Random' : 'Let’s try it'}
@@ -748,6 +662,7 @@ const DemoCoach = ({ step, onNext, onSkipStep, onExit, copy: copyOverride, onCop
     return (
       <MobiIntroScreen
         key={copyOverride}
+        demoStep={step}
         lines={[copyOverride]}
         modeName={info ? `Step ${info.num} · ${info.label}` : 'Demo'}
         primaryLabel="Got it"

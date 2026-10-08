@@ -1,4 +1,5 @@
 import DemoDialog from './DemoDialog.jsx';
+import DemoProgressBar from './DemoProgressBar.jsx';
 // src/components/screens/MobiIntroScreen.jsx
 /**
  * MobiIntroScreen — Civ 6-style dialogue: full-width panel at bottom,
@@ -78,7 +79,7 @@ export const MOBI_LINES_RANDOM = [
 //                  bar's height). Dialogues that play while the in-game HUD is
 //                  up pass this so the bar stays above the dim + blur instead
 //                  of being buried under it.
-const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, onSkipStep, onExit, topInset }) => {
+const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, onSkipStep, onExit, topInset, demoStep }) => {
   const [index, setIndex]           = useState(0);
   const [isDismissing, setDismissing] = useState(false);
   const isLast = index === lines.length - 1;
@@ -148,11 +149,10 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
         WebkitBackdropFilter: isDismissing ? 'none' : PAPER_BACKDROP_BLUR,
         transition: 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease',
       }} />
-      {(onSkipStep || onExit) && <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 3,
-        display: 'flex', flexWrap: 'wrap', gap: 8, pointerEvents: isDismissing ? 'none' : 'auto' }}>
-        {onSkipStep && <MobiKey disabled={isDismissing} onClick={() => finish(onSkipStep)}>Skip Step</MobiKey>}
-        {onExit && <MobiKey disabled={isDismissing} onClick={() => finish(onExit)}>Exit Demo</MobiKey>}
-      </div>}
+      {(onSkipStep || onExit) && <DemoProgressBar currentStep={demoStep}
+        disabled={isDismissing}
+        onSkipStep={onSkipStep ? () => finish(onSkipStep) : undefined}
+        onExit={onExit ? () => finish(onExit) : undefined} />}
       <MobiStage
         line={lines[index]}
         lineKey={index}

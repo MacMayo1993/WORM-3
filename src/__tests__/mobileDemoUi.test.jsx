@@ -5,7 +5,7 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
 import DemoDialog from '../components/screens/DemoDialog.jsx';
 import DemoEndScreen from '../components/screens/DemoEndScreen.jsx';
-import { DemoControlTour, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoCoach, CONTROL_TOUR_KEYS } from '../components/screens/DemoFlowController.jsx';
+import { DemoControlTour, DemoStepIntro, DemoProgressBar, DemoStepHint, DemoFlipProgress, DemoCoach, CONTROL_TOUR_KEYS } from '../components/screens/DemoFlowController.jsx';
 import DemoForecastPicker from '../components/screens/DemoForecastPicker.jsx';
 import BottomNavBar from '../components/menus/BottomNavBar.jsx';
 import DisparityHUD from '../components/overlays/DisparityHUD.jsx';
@@ -147,4 +147,34 @@ it('publishes pause-menu ownership and provides a 48px pause target', () => {
   act(() => resume.click());
   expect(useGameStore.getState().wormPauseMenuOpen).toBe(false);
   expect(useGameStore.getState().wormPaused).toBe(false);
+});
+
+
+it('places demo controls below the actual HUD and remeasures after rotation', () => {
+  let bottom = 72;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    return { bottom: this.classList.contains('top-app-bar') ? bottom : 0 };
+  });
+  const skip = vi.fn(), exit = vi.fn();
+  render(<><div className="top-app-bar" /><DemoProgressBar currentStep="view-showcase" onSkipStep={skip} onExit={exit} /></>);
+  const bar = host.querySelector('[aria-label="Demo controls"]');
+  expect(bar.style.top).toBe('84px');
+  bottom = 48;
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(bar.style.top).toBe('60px');
+  const buttons = bar.querySelectorAll('button');
+  act(() => buttons[0].click()); act(() => buttons[1].click());
+  expect(skip).toHaveBeenCalledTimes(1); expect(exit).toHaveBeenCalledTimes(1);
+  expect(bar.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('7');
+});
+
+it('keeps step progress and both navigation actions inside Mobi’s active dialog', () => {
+  render(<DemoStepIntro step="chaos-forecast" onContinue={() => {}} onSkipStep={() => {}} onExit={() => {}} />);
+  const dialog = host.querySelector('[role="dialog"]');
+  const bar = dialog.querySelector('[aria-label="Demo controls"]');
+  expect(host.querySelectorAll('[aria-label="Demo progress"]')).toHaveLength(1);
+  expect(bar.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('9');
+  expect([...bar.querySelectorAll('button')].map(button => button.textContent)).toEqual(['Skip Step', 'Exit Demo']);
+  expect(bar.closest('[inert]')).toBeNull();
+  expect(dialog.querySelector('.mobi-footer-actions').textContent).toContain('Skip Mobi');
 });
