@@ -46,6 +46,11 @@ export default function WormPreviewCanvas({
   companion,
   style,
 }) {
+  // Callers build `accessories` inline, so its identity changes on every render
+  // while its contents rarely do. Key the effects on the contents.
+  const accessoryKey = accessories ? JSON.stringify(accessories) : '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableAccessories = useMemo(() => accessories, [accessoryKey]);
   const settings = useGameStore(s => s.settings);
   const palette = useMemo(() => resolveColors(settings || {}), [settings]);
   const canvasRef = useRef(null);
@@ -55,14 +60,14 @@ export default function WormPreviewCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (direct) {
-      const entry = registerDirectWormPreview(canvas, { characterId, skinId, hatId, accessories, palette, animated, framing, companion });
+      const entry = registerDirectWormPreview(canvas, { characterId, skinId, hatId, accessories: stableAccessories, palette, animated, framing, companion });
       idRef.current = entry;
       return () => { unregisterDirectWormPreview(entry); idRef.current = null; };
     }
     const px = Math.min(maxRenderPixels, Math.round(size * renderScale(maxPixelRatio)));
     canvas.width = px;
     canvas.height = Math.max(1, Math.round(px / aspect));
-    idRef.current = registerWormPreview(canvas, { characterId, skinId, hatId, accessories, palette, animated, framing, companion });
+    idRef.current = registerWormPreview(canvas, { characterId, skinId, hatId, accessories: stableAccessories, palette, animated, framing, companion });
     return () => {
       if (idRef.current !== null) unregisterWormPreview(idRef.current);
       idRef.current = null;
@@ -72,8 +77,8 @@ export default function WormPreviewCanvas({
   }, [size, aspect, maxPixelRatio, maxRenderPixels, direct]);
 
   useEffect(() => {
-    if (idRef.current !== null) (direct ? updateDirectWormPreview : updateWormPreview)(idRef.current, { characterId, skinId, hatId, accessories, palette, animated, framing, companion });
-  }, [characterId, skinId, hatId, accessories, palette, animated, framing, companion, direct]);
+    if (idRef.current !== null) (direct ? updateDirectWormPreview : updateWormPreview)(idRef.current, { characterId, skinId, hatId, accessories: stableAccessories, palette, animated, framing, companion });
+  }, [characterId, skinId, hatId, stableAccessories, palette, animated, framing, companion, direct]);
 
   const Surface = direct ? 'div' : 'canvas';
   return (

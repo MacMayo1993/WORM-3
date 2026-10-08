@@ -1,5 +1,5 @@
-import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody, poseHeadAccessories, poseHandmadeHat, buildCraftModel } from '../worm/wormAccessories.js';
-import { safeAccessories, isHandmadeHat } from '../worm/handmadeAccessoriesData.js';
+import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody, poseHeadAccessories, poseHandmadeHat, buildCraftModel, disposeCraftModel } from '../worm/wormAccessories.js';
+import { safeAccessories, isHandmadeHat, ACCESSORY_SLOTS } from '../worm/handmadeAccessoriesData.js';
 import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormPreviewMotion.js';
 import { wormPreviewTargetOptions } from './wormPreviewTargets.js';
 import { observePreviewContext, previewContextAvailable } from './previewContext.js';
@@ -55,6 +55,14 @@ const SPACING = 0.09;
 const INCH_SPACING = INCH_BALL_SPACING;
 const previewGait = { dist: 0, arch: 0 };
 const SEGMENTS = 9;          // head + 8 beads — a readable stretch of worm
+// A cover (cape, quilt) lays one piece per body segment; the preview worm only has eight.
+const PREVIEW_COVER_CAPACITY = 16;
+const PREVIEW_BODY_COVER = 5;
+const PREVIEW_BODY_COVER_MOBI = 2;   // MOBI's blocks are three segments apart, so each cover piece spans three
+// The selector draws a dozen outfits and hats in turn through one rig. Keep the
+// last few built instead of rebuilding for every thumbnail.
+const RIG_CACHE_MAX = 16;
+const HAT_CACHE_MAX = 24;
 // Face features and the hat seat come from the shared layout (wormFaceLayout),
 // which is also what the played worm uses.
 
@@ -167,12 +175,12 @@ function _buildRig() {
   hatGroup.name = 'worm-hat';
   group.add(hatGroup);
 
-  const accessories = createAccessoryRig({});
+  const accessories = createAccessoryRig({}, PREVIEW_COVER_CAPACITY);
   group.add(accessories.root);
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, accessories, accessoryKey: null, disposeEyes, characterGeometries, accents, mobi, mobiTails, beads, books, halos, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, skinKey: null };
+  return { group, accessories, accessoryKey: null, accessoryCache: new Map(), hatCache: new Map(), disposeEyes, characterGeometries, accents, mobi, mobiTails, beads, books, halos, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -514,12 +522,24 @@ const _pbBasisMat = new THREE.Matrix4();
 function _poseWorm(opts, time) {
   const { characterId, skinId, hatId } = opts;
   const equipment = safeAccessories(opts.accessories);
-  const accessoryKey = JSON.stringify(equipment);
+  const accessoryKey = ACCESSORY_SLOTS.map(slot => equipment[slot]).join('|');
   if (rig.accessoryKey !== accessoryKey) {
-    rig.group.remove(rig.accessories.root); rig.accessories.dispose();
-    rig.accessories = createAccessoryRig(equipment); rig.group.add(rig.accessories.root);
+    rig.group.remove(rig.accessories.root);
+    if (rig.accessoryKey !== null) {
+      rig.accessoryCache.set(rig.accessoryKey, rig.accessories);
+      if (rig.accessoryCache.size > RIG_CACHE_MAX) {
+        const [oldest, stale] = rig.accessoryCache.entries().next().value;
+        rig.accessoryCache.delete(oldest); stale.dispose();
+      }
+    } else rig.accessories.dispose();
+    const cached = rig.accessoryCache.get(accessoryKey);
+    rig.accessoryCache.delete(accessoryKey);
+    rig.accessories = cached ?? createAccessoryRig(equipment, PREVIEW_COVER_CAPACITY);
+    rig.group.add(rig.accessories.root);
     rig.accessoryKey = accessoryKey;
   }
+  // The thumbnail crop shows about five beads; a cover runs only as far as the picture does.
+  rig.accessories.coverLimit = opts.framing === 'body' ? (characterId === 'mobi' ? PREVIEW_BODY_COVER_MOBI : PREVIEW_BODY_COVER) : Infinity;
   beginAccessoryBody(rig.accessories);
   const headOnly = opts.framing === 'head';
   const roaming = opts.framing === 'character';
@@ -734,37 +754,53 @@ function _poseWorm(opts, time) {
     UP, headScale, time, false, characterId);
   finishAccessoryBody(rig.accessories,time,false,skin.body,opts.palette);
 
-  // Hat — rebuilt only when the hat changes, then parked above the head.
-  if (rig.hatKey !== `${hatId}|${characterId}`) {
-    rig.hatGroup.traverse(part => { part.geometry?.dispose(); part.material?.dispose(); });
+  // Hat — swapped only when the hat changes, then parked above the head. Built
+  // hats are kept (a hat grid cycles through a dozen of them), and the oldest
+  // is released once there are more than a grid needs.
+  const hatKey = `${hatId}|${characterId}`;
+  if (rig.hatKey !== hatKey) {
+    if (rig.hatKey !== null) {
+      rig.hatCache.set(rig.hatKey, [...rig.hatGroup.children]);
+      if (rig.hatCache.size > HAT_CACHE_MAX) {
+        const [oldest, children] = rig.hatCache.entries().next().value;
+        rig.hatCache.delete(oldest);
+        for (const child of children) child.userData.motions ? disposeCraftModel(child) : child.traverse(part => { part.geometry?.dispose(); part.material?.dispose(); });
+      }
+    }
     rig.hatGroup.clear();
+    rig.hatKey = null;
     const hatRadius = (isMobi ? MOBI_RADIUS : headScale) * FACE_LAYOUT.hatScale;
-    // Handmade hats are the accessories' craft models, so they carry the same
-    // ink outline and motion as they do in the game.
-    if (isHandmadeHat(hatId)) {
+    const cached = rig.hatCache.get(hatKey);
+    if (cached) {
+      rig.hatCache.delete(hatKey);
+      if (cached.length) rig.hatGroup.add(...cached);
+    } else if (isHandmadeHat(hatId)) {
+      // Handmade hats are the accessories' craft models, so they carry the same
+      // ink outline and motion as they do in the game.
       const craft = buildCraftModel(hatId);
       craft.scale.setScalar(hatRadius);
       rig.hatGroup.add(craft);
     } else if (hatId && hatId !== 'none' && !getHatParts) {
       requestHatParts();
       return;
+    } else {
+      for (const part of getHatParts ? getHatParts(hatId, hatRadius) : []) {
+        const [geoName, args] = part.geo;
+        const geo = _geometry(geoName, args);
+        const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+          color: part.mat.color,
+          emissive: part.mat.emissive ?? 0x000000,
+          emissiveIntensity: part.mat.emissiveIntensity ?? 1,
+          roughness: part.mat.roughness ?? 1,
+          metalness: part.mat.metalness ?? 0,
+        }));
+        mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+        if (part.rot) mesh.rotation.set(part.rot[0], part.rot[1], part.rot[2]);
+        if (part.scale) mesh.scale.set(part.scale[0], part.scale[1], part.scale[2]);
+        rig.hatGroup.add(mesh);
+      }
     }
-    for (const part of !isHandmadeHat(hatId) && getHatParts ? getHatParts(hatId, hatRadius) : []) {
-      const [geoName, args] = part.geo;
-      const geo = _geometry(geoName, args);
-      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-        color: part.mat.color,
-        emissive: part.mat.emissive ?? 0x000000,
-        emissiveIntensity: part.mat.emissiveIntensity ?? 1,
-        roughness: part.mat.roughness ?? 1,
-        metalness: part.mat.metalness ?? 0,
-      }));
-      mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
-      if (part.rot) mesh.rotation.set(part.rot[0], part.rot[1], part.rot[2]);
-      if (part.scale) mesh.scale.set(part.scale[0], part.scale[1], part.scale[2]);
-      rig.hatGroup.add(mesh);
-    }
-    rig.hatKey = `${hatId}|${characterId}`;
+    rig.hatKey = hatKey;
   }
   // The shared rig may have just shown another character's oriented hat.
   if(!isMobi) rig.hatGroup.quaternion.identity();
@@ -977,9 +1013,16 @@ export function registerWormPreview(canvas, opts) {
   return id;
 }
 
+const sameEquipment = (a, b) => a === b || ACCESSORY_SLOTS.every(slot => (a?.[slot] ?? 'none') === (b?.[slot] ?? 'none'));
+// A parent that re-renders hands every thumbnail a fresh options object; only
+// a change that would draw something different may cost a redraw.
+export const wormPreviewLooksAlike = (a, b) => a.characterId === b.characterId && a.skinId === b.skinId && a.hatId === b.hatId && a.framing === b.framing
+  && !!a.animated === !!b.animated && a.palette === b.palette && a.companion === b.companion && sameEquipment(a.accessories, b.accessories);
+
 export function updateWormPreview(id, opts) {
   const info = registry.get(id);
   if (!info) return;
+  if (wormPreviewLooksAlike(info.opts, opts)) return;
   if (info.opts.characterId !== opts.characterId || info.opts.framing !== opts.framing) info.age = 0;
   info.opts = { ...opts };
   info.animated = !!opts.animated;

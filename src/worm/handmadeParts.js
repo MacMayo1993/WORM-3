@@ -79,10 +79,15 @@ export function getHandmadeParts(id, s = 1) {
     parts.push({ geo: [geo, args], pos: pos.map(v => v * s), mat, rot, scale, role });
     return parts[parts.length - 1];
   };
-  const ball = (r, p, c, scale, rot, finish) => add('sphere', [r*s, 14, 10], p, c, rot, scale, undefined, finish);
+  // Segment counts follow the part's size: a stitch or a crimp never needs the
+  // 140 vertices of a bowl, and previews draw dozens of these at once.
+  const ball = (r, p, c, scale, rot, finish) => add('sphere', [r*s, r < .16 ? 8 : r < .4 ? 10 : 14, r < .16 ? 6 : r < .4 ? 7 : 10], p, c, rot, scale, undefined, finish);
   const box = (d, p, c, rot, finish) => add('box', d.map(v => v*s), p, c, rot, undefined, undefined, finish);
-  const cyl = (r1, r2, h, p, c, rot, finish) => add('cylinder', [r1*s,r2*s,h*s,18],p,c,rot,undefined,undefined,finish);
-  const ring = (r,t,p,c,rot,role,finish,arc=Math.PI*2) => add('torus',[r*s,t*s,8,24,arc],p,c,rot,undefined,role,finish);
+  const cyl = (r1, r2, h, p, c, rot, finish) => add('cylinder', [r1*s,r2*s,h*s,Math.max(r1,r2) < .16 ? 8 : Math.max(r1,r2) < .5 ? 12 : 16],p,c,rot,undefined,undefined,finish);
+  const ring = (r,t,p,c,rot,role,finish,arc=Math.PI*2) => add('torus',[r*s,t*s,t < .08 ? 5 : 7,r < .4 ? 14 : 22,arc],p,c,rot,undefined,role,finish);
+  // A closed curved slab wrapped over a bead (see craftGeometry.js), for the
+  // pieces of a garment that runs the length of the body.
+  const arch = (radius, thickness, length, arc, c, finish) => add('arch', [radius*s, thickness*s, length*s, arc, 10], [0,0,0], c, undefined, undefined, undefined, finish);
   // A round rod from one point to another (temple arms, cords).
   const rod = (from, to, r, c, finish) => {
     _a.fromArray(from); _b.fromArray(to);
@@ -125,6 +130,27 @@ export function getHandmadeParts(id, s = 1) {
     rigs[name] = { pivot: pivot.map(v => v * s), ...motion };
   };
   const tag = (role) => { parts[parts.length - 1].role = role; };
+  // A garment that runs the length of the body (cape, quilt, button trail) is
+  // modelled as the piece that wraps ONE segment; the rig lays one per body
+  // segment, so it grows with the worm. `cover` describes how the run behaves:
+  // `gap` is the bead spacing the piece was drawn for (in bead radii), `stretch`
+  // (default on) lengthens a piece over a wider gap, which a button must not, `taper`
+  // narrows the last `tail` segments down to `min`, and `ripple` is the pitch
+  // wave that travels down it. `pick` says which pieces carry a part: 'all'
+  // (default), 'first', 'last', or 'n:c' for every n-th piece from c.
+  const cover = (meta) => Object.defineProperty(parts, 'cover', { value: meta });
+  // Pieces that differ only by colour share one hull: the last part added is
+  // outlined once, for the pieces in `selector`, or (null) not at all.
+  const outlineAs = (selector) => {
+    const part = parts[parts.length - 1];
+    if (selector) part.hullSel = selector; else part.noOutline = true;
+  };
+  const noOutline = () => { parts[parts.length - 1].noOutline = true; };
+  const pick = (selector, fn) => {
+    const start = parts.length;
+    fn();
+    for (let i = start; i < parts.length; i++) parts[i].sel = selector;
+  };
   const stitches = (x,y,z,n=5,axis='x') => {
     for(let i=0;i<n;i++) box([0.05,0.07,0.12], [x+(axis==='x'?i*.16:0),y,z+(axis==='z'?i*.16:0)],cream,[0,.3,-.2]);
   };
@@ -248,22 +274,29 @@ export function getHandmadeParts(id, s = 1) {
       }
     });
   } else if(id==='buttonTrail') {
-    grow(2.4, [0,1,0], () => {
-      cyl(.4,.4,.13,[.04,1.0,0],teal,undefined,'gloss');
-      ring(.3,.045,[.04,1.075,0],'#e9fbff',[Math.PI/2,0,0],undefined,'gloss');
-      for(const x of [-.1,.1])for(const z of [-.1,.1])ball(.06,[.04+x,1.08,z],ink,[1,.3,1]);
-      box([.03,.025,.3],[.04,1.09,0],gold,[0,.75,0]);
-      box([.03,.025,.3],[.04,1.09,0],gold,[0,-.75,0]);
+    // A button sewn on every other segment, alternating teal and coral, down the
+    // whole back: the trail gets longer as the worm does.
+    cover({ gap: .86, stretch: false, taper: null, ripple: { pitch: .05, freq: 3.4, wave: .5 } });
+    [[0, teal], [2, '#ff7a59']].forEach(([c, color], i) => pick(`4:${c}`, () => {
+      cyl(.62,.62,.18,[0,1.04,0],color,undefined,'gloss');
+      // Both colours stand on the same body, so one hull (on the first) serves both.
+      outlineAs(i ? null : '2:0');
+    }));
+    pick('2:0', () => {
+      ring(.5,.06,[0,1.14,0],'#fff6e4',[Math.PI/2,0,0],undefined,'gloss');
+      noOutline();
+      for(const x of [-.14,.14])for(const z of [-.14,.14])ball(.07,[x,1.16,z],ink,[1,.3,1]);
+      box([.04,.03,.4],[0,1.17,0],'#fff6e4',[0,.78,0]);
+      box([.04,.03,.4],[0,1.17,0],'#fff6e4',[0,-.78,0]);
     });
   } else if(id==='leafCape') {
-    // An autumn maple leaf draped over the back, fluttering in the worm's wake.
-    ring(1,.07,[0,0,-.28],woodDark);
-    rig('cape',[0,1.1,.0],{ sway:[.1,0,.05], freq:2.6 },()=>grow(1.45,[0,1,.3],()=>{
-      ball(.92,[0,.96,.55],autumn,[.82,.16,1.5],undefined,'leaf');
-      for(const side of [-1,1]) ball(.5,[side*.5,.97,.28],autumnDark,[.8,.15,.95],[0,side*.5,side*.05],'leaf');
-      box([.05,.04,2.15],[0,1.08,.56],gold);
-      for(const side of [-1,1])for(let i=0;i<4;i++)box([.55,.03,.045],[side*.26,1.08,.0+i*.34],gold,[0,side*.6,0]);
-    }));
+    // An autumn cloak that runs down the back, one overlapping leaf scale per body
+    // segment, so it lengthens as the worm grows and narrows to a point at the tail.
+    cover({ gap: .86, taper: { tail: 6, min: .42 }, ripple: { pitch: .04, freq: 3.1, wave: .55 } });
+    // Alternate pieces ride a hair higher, so where they overlap the upper one always wins (no z-fighting).
+    [[0, autumn], [1, '#f0852f']].forEach(([c, color], i) => pick(`2:${c}`, () => { arch(1.1 + c * .07,.12,1.34,2.55,color,'leaf'); outlineAs(i ? null : 'all'); }));
+    pick('all', () => { box([.08,.07,1.2],[0,1.25,0],gold); noOutline(); });
+    pick('first', () => { ring(1.0,.07,[0,0,0],woodDark); ball(.22,[0,1.0,-.6],gold,undefined,undefined,'metal'); });
   } else if(id==='fireflyJar') {
     // Wire cage round a clear jar, a warm glow and emissive fireflies that
     // circle inside it: no extra lights.
@@ -398,15 +431,15 @@ export function getHandmadeParts(id, s = 1) {
       ball(.06,[0,1.06,-.17],red);
     });
   } else if(id==='quiltPatches') {
-    // A 2x2 patchwork square in four bright cloths, stitched round the edge.
-    grow(2.0, [0,1,0], () => {
-      box([1.02,.05,1.02],[.13,.97,0],ink,[0,.25,-.13]);
-      [[-.25,-.25,red],[.25,-.25,gold],[-.25,.25,teal],[.25,.25,plum]].forEach(([dx,dz,c])=>{
-        box([.46,.09,.46],[.13+dx*.97,1.0,dz*.97-.03],c,[0,.25,-.13]);
-      });
-      stitches(-.2,1.08,-.38,4);
-      stitches(-.12,1.08,.3,4);
-      ball(.08,[.13,1.09,-.02],cream,[1,.45,1]);
+    // A patchwork quilt over the back: one stitched patch per body segment, cycling
+    // red, gold, teal and plum, so the quilt grows with the worm.
+    cover({ gap: .86, taper: { tail: 4, min: .55 }, ripple: { pitch: .035, freq: 3.0, wave: .45 } });
+    [red, gold, teal, plum].forEach((color, c) => pick(`4:${c}`, () => { arch(1.1 + (c % 2) * .04,.12,.98,2.2,color); outlineAs(c ? null : 'all'); }));
+    pick('all', () => {
+      for(const z of [-.42,.42]) for(const phi of [-.62,-.21,.21,.62]) {
+        box([.14,.05,.07],[1.18*Math.sin(phi),1.18*Math.cos(phi),z],cream,[0,0,-phi]);
+      }
+      ball(.15,[0,1.2,0],cream,[1,.55,1],undefined,'gloss');
     });
   } else if(id==='ribbonTail') {
     ring(.8,.09,[0,0,.1],cream);

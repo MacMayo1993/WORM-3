@@ -20,12 +20,11 @@ it('offers all twenty-six handmade models through the real catalog and reward po
     expect(STORE_ITEMS.filter(x=>x.id===id)).toHaveLength(1);
     if(!item.slot) expect(WORM_HATS.some(h=>h.id===item.id)).toBe(true);
     const model=buildCraftModel(item.id);
-    // At most six colour/finish draws, plus one ink outline per moving part.
+    // A handful of colour/finish draws plus the ink outlines, however long the worm.
     const meshes=[];model.traverse(o=>{ if(o.isMesh)meshes.push(o); });
-    const rigs=model.children.filter(c=>c.isGroup).length;
     expect(meshes.length).toBeGreaterThan(0);
     expect(meshes.filter(m=>m.userData.role!=='outline').length).toBeLessThanOrEqual(8);
-    expect(meshes.length).toBeLessThanOrEqual(8+1+rigs);
+    expect(meshes.length).toBeLessThanOrEqual(12);
     model.traverse(mesh=>{ if(!mesh.isMesh)return;
       expect([...mesh.geometry.attributes.position.array].every(Number.isFinite)).toBe(true);
       mesh.geometry.dispose();mesh.material.dispose();
