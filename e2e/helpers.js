@@ -36,21 +36,27 @@ export async function skipIntro(page) {
   await expect(page.locator('button:visible', { hasText: /^\s*play\b/i }).first()).toBeVisible();
 }
 
-export async function openGame(page) {
-  await page.goto('/');
+/**
+ * Load the game and get to the main menu. `unlock` opens the store and the campaign
+ * (the repo's opt-in `?unlockall=1`): a production build otherwise locks every
+ * cosmetic behind progress, so a test could look at the closet but not wear anything.
+ * The relative URL keeps the app's /WORM-3/ base instead of resolving to the host root.
+ */
+export async function openGame(page, { unlock = false } = {}) {
+  await page.goto(unlock ? './?unlockall=1' : './');
   await skipIntro(page);
 }
 
 /** Main menu → Play → Play WORM. Loads the WORM entry screen, a lazy chunk. */
-export async function openWormEntry(page) {
-  await openGame(page);
+export async function openWormEntry(page, options) {
+  await openGame(page, options);
   await press(page, /^\s*play\b/i);
   await press(page, /play worm/i);
 }
 
 /** Main menu → WORM → Customize: the worm profile editor with its closet of pieces. */
 export async function openProfile(page) {
-  await openWormEntry(page);
+  await openWormEntry(page, { unlock: true });
   await press(page, /customize/i);
   await expect(page.getByRole('tab', { name: /^worm/i })).toBeVisible();
 }

@@ -28,22 +28,30 @@ test('starts a WORM free-play run', async ({ page }) => {
 
 // The selector draws a dozen thumbnails through one shared renderer. A regression
 // there (a parent re-render starving the later ones, a rig that fails to build)
-// leaves some blank while every unit test passes.
-for (const { tab, min, tag } of [
-  { tab: 'Body', min: 8, tag: '' },
-  { tab: 'Hats', min: 10, tag: '' },
-  { tab: 'Tail', min: 4, tag: '' },
-  { tab: 'Body', min: 8, tag: ' @phone' }
-]) {
-  test(`every ${tab.toLowerCase()} piece in the selector draws${tag}`, async ({ page }) => {
-    await openProfile(page);
-    await page.getByRole('tab', { name: new RegExp(`^${tab}`, 'i') }).click();
-    await expect.poll(async () => {
-      const coverage = await previewCoverage(page);
-      return coverage.length >= min ? coverage.filter(share => share < 0.02).length : -1;   // -1: not all thumbnails mounted yet
-    }, { timeout: 60_000, message: `${tab} thumbnails drawn` }).toBe(0);
-    // Each picks an item and the hero stage redraws without error.
-    await press(page, new RegExp(tab === 'Hats' ? 'toadstool' : tab === 'Tail' ? 'pinwheel' : 'leaf cape', 'i'));
-    await page.waitForTimeout(1500);
-  });
+// leaves some blank while every unit test passes. Each tab is checked for a full set
+// of drawn thumbnails, then an item is worn so the hero stage redraws too.
+const CLOSET_TABS = [
+  { tab: 'Body', min: 8, wear: /leaf cape/i },
+  { tab: 'Hats', min: 10, wear: /toadstool/i },
+  { tab: 'Tail', min: 4, wear: /pinwheel/i }
+];
+
+async function expectThumbnailsDrawn(page, { tab, min, wear }) {
+  await page.getByRole('tab', { name: new RegExp(`^${tab}`, 'i') }).click();
+  await expect.poll(async () => {
+    const coverage = await previewCoverage(page);
+    return coverage.length >= min ? coverage.filter(share => share < 0.02).length : -1;   // -1: not all thumbnails mounted yet
+  }, { timeout: 90_000, message: `${tab} thumbnails drawn` }).toBe(0);
+  await press(page, wear);
+  await expect(page.locator('.worm-profile-option[aria-pressed="true"]', { hasText: wear })).toBeVisible();
 }
+
+test('every piece in the selector closet draws', async ({ page }) => {
+  await openProfile(page);
+  for (const entry of CLOSET_TABS) await expectThumbnailsDrawn(page, entry);
+});
+
+test('every body piece in the selector draws on a phone @phone', async ({ page }) => {
+  await openProfile(page);
+  await expectThumbnailsDrawn(page, CLOSET_TABS[0]);
+});
