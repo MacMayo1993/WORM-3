@@ -62,17 +62,39 @@ export async function openProfile(page) {
 }
 
 /** Walk the Free Play wizard and Mobi's intro until the run's HUD is up. */
-export async function startFreePlay(page) {
+export async function startFreePlay(page, { viewport } = {}) {
   await openWormEntry(page);
   await press(page, /free play/i);
-  await press(page, /^\s*continue/i);
-  const pause = page.getByRole('button', { name: 'Pause', exact: true });
-  // Setup pages, then Mobi's intro; each ends in a primary key labelled Next, Play or Launch.
-  for (let step = 0; step < 12 && !(await pause.isVisible()); step++) {
-    await page.locator('button:visible', { hasText: /^\s*(next|play|launch)/i }).last().click();
-    await page.waitForTimeout(1500);
+  const wizard = page.getByRole('dialog', { name: 'WORM setup', exact: true });
+  // Confirm each transition before advancing again. The old generic Next loop
+  // could start another click after Launch and wait forever for a vanished key,
+  // even after the HUD appeared. Mobi's Next also finishes speech before advancing.
+  for (const category of ['Character', 'Scene', 'Colors', 'Style', 'Gameplay']) {
+    const panel = wizard.getByRole('region', { name: category, exact: true });
+    await expect(panel).toBeVisible();
+    if (category === 'Scene') {
+      // A shipped panorama keeps this startup check independent of the heavy
+      // procedural Black Hole shader and third-party environment downloads.
+      await panel.getByRole('button', { name: /Desert/ }).click();
+    }
+    if (category === 'Gameplay') {
+      await panel.getByRole('button', { name: 'Easy', exact: true }).click();
+      await panel.getByRole('switch', { name: 'Portal enemies', exact: true }).uncheck();
+    }
+    await wizard.locator('.mode-wizard-primary').click();
   }
+  const mobi = page.getByRole('dialog', { name: /WORM FREE PLAY.*Mobi/ });
+  await expect(mobi).toBeVisible();
+  await mobi.getByRole('button', { name: 'Skip', exact: true }).click();
+  await expect(mobi).toBeHidden();
+  if (viewport) await page.setViewportSize(viewport);
+  // A visible HUD can still belong to the paused opening scramble. Only an
+  // enabled Pause confirms that spawning and the countdown reached live play.
+  const pause = page.getByRole('button', { name: 'Pause', exact: true });
   await expect(pause).toBeVisible();
+  // Twenty render-clock turns can take over two minutes on software GL. Leave
+  // enough of the existing four-minute test budget for the scramble and countdown.
+  await expect(pause).toBeEnabled({ timeout: 180_000 });
 }
 
 /**
