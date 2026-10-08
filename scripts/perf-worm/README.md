@@ -2,12 +2,12 @@
 
 Drives a real WORM free-play run in headless Chromium and reports per-frame CPU cost, draw calls, GPU uploads, shader compiles and React commits. Every number in `docs/worm-mode-performance-audit-2026-09-27.md` came from these scripts, so a fix can be checked against the same measurement.
 
-Nothing here ships: `scripts/` is outside the bundle and ESLint's scope, and Playwright is not a project dependency.
+Nothing here ships: `scripts/` is outside the bundle and ESLint's scope. This harness takes Playwright from `$PLAYWRIGHT` (below) so it can use a different version from the one `npm run e2e` pins; `@playwright/test` is a devDependency for the browser smoke tests in `e2e/`, not for this.
 
 ## Setup
 
 ```bash
-# Playwright in a scratch directory (it is not a devDependency)
+# Playwright in a scratch directory (separate from the e2e devDependency)
 mkdir -p /tmp/pw && (cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1)
 export PLAYWRIGHT=/tmp/pw/node_modules/playwright/index.mjs
 export CHROMIUM=/opt/pw-browsers/chromium   # the container's browser; omit to use Playwright's own

@@ -92,6 +92,50 @@ jobs:
         with:
           path: './dist'
 
+  # Real-browser smoke tests against the production build: the unit suite is jsdom,
+  # so it cannot see a blank canvas, a thumbnail that never draws, or a page that
+  # dies on load. Software-rendered WebGL makes this the slowest job, so it runs
+  # beside the others rather than ahead of them.
+  #
+  # It does not gate `deploy` yet: a brand-new browser suite should earn that by
+  # running green for a while. To make it a release gate, add `e2e` to the
+  # `needs:` of the deploy job (and/or require it in branch protection).
+  e2e:
+    name: Browser smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npm run e2e:install
+
+      - name: Build
+        run: npm run build
+
+      - name: Run browser tests
+        run: npm run e2e
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   deploy:
     name: Deploy
     environment:
