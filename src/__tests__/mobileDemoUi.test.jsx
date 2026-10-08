@@ -16,7 +16,7 @@ let host, root;
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-  useGameStore.setState({ wormAlive: true, wormGamePhase: 'active', demoWormLessonIndex: 0, demoWormComplete: false, demoWormFinished: false, wormPauseMenuOpen: false, wormHealerMode: false });
+  useGameStore.setState({ demoSkipped: false, wormAlive: true, wormGamePhase: 'active', demoWormLessonIndex: 0, demoWormComplete: false, demoWormFinished: false, wormPauseMenuOpen: false, wormHealerMode: false });
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.useRealTimers(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
 const render = node => act(() => root.render(node));
@@ -54,12 +54,14 @@ it('traps focus in the dialog and gives Escape one close action', () => {
   expect(document.activeElement).toBe(buttons[0]);
   act(() => buttons[0].dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))); expect(close).toHaveBeenCalledTimes(1);
 });
-it('requires the exercise goal before Next and offers no skip or early finish', () => {
+it('requires the exercise goal before Next and provides an explicit Skip Exercise', () => {
   render(<DemoWormControlHint />);
   expect(host.querySelectorAll('.worm-demo-card')).toHaveLength(1);
   expect(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBe('0');
   expect([...host.querySelectorAll('button')].find(b => b.textContent === 'Next').disabled).toBe(true);
-  expect(host.textContent).not.toMatch(/Skip|End practice|Finish practice/);
+  const skip = [...host.querySelectorAll('button')].find(b => b.textContent === 'Skip Exercise');
+  expect(skip.disabled).toBe(false);
+  expect(host.textContent).not.toMatch(/End practice|Finish practice/);
 });
 it('continues after healing and preserves Next if the player dies after reaching the goal', () => {
   useGameStore.setState({ demoWormLessonIndex: WORM_DEMO_LESSONS.findIndex(l => l.id === 'heal'), demoWormComplete: true, demoWormStarted: true });

@@ -523,13 +523,27 @@ export function useDemoMode({
     setDemoStepIntroVisible(true);
   }, []);
 
-  const advanceDemoStep = useCallback((fromStep) => {
+  const advanceDemoStep = useCallback((fromStep, { skipped = false } = {}) => {
     const store = useGameStore.getState();
-    if (store.demoStep !== fromStep) return;
-    if (fromStep === 'worm-traversal' && !store.demoWormFinished) return;
+    if (!store.demoMode || store.demoStep !== fromStep || fromStep === 'end') return;
+    if (fromStep === 'worm-traversal' && !store.demoWormFinished && !skipped) return;
     // A stale coach click must never advance the lesson while the player is
     // choosing a palette or tile style in the Settings modal.
-    if (fromStep === 'make-it-yours' && store.showSettings) return;
+    if (fromStep === 'make-it-yours' && store.showSettings && !skipped) return;
+    if (skipped) {
+      // Closing Chaos results emits the normal dismissal subscription. Hold
+      // that path while the explicit skip performs its own single transition.
+      demoRewardPendingRef.current = true;
+      cancelShuffle();
+      cancelDisparityRun();
+      store.clearDisparityGame();
+      useGameStore.setState({ demoSkipped: true, wormPauseMenuOpen: false });
+      demoRewardPendingRef.current = false;
+      demoForecastPickRef.current = null;
+      setDemoRewardStamp(null);
+      setDemoCelebrationStep(null);
+      setDemoColdOpenVisible(false);
+    }
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     setDemoFlipProgress(null);
@@ -538,6 +552,9 @@ export function useDemoMode({
     setDemoFlipSpotlight(false);
     setDemoHintStep(null);
     setDemoCoachCopy(null);
+    demoFlipPhaseRef.current = null;
+    babySolveArmedRef.current = false;
+    learnSolveArmedRef.current = false;
     if (fromStep === 'control-tour') {
       setDemoTourIndex(-1);
       closeNavSheet?.();
@@ -566,6 +583,9 @@ export function useDemoMode({
       settingsStepEntryRef.current = null;
     }
     if (fromStep === 'view-showcase') {
+      // Restore the lens's saved position and any flipped pair before leaving
+      // a view early. Generic flags alone cannot undo that beat's staging.
+      VIEW_SHOWCASE_SEQUENCE[demoShowcaseSubStep]?.cleanup(useGameStore.getState());
       store.setVisualMode('classic');
       store.setExploded(false);
       store.setHollowMode(false);
@@ -576,15 +596,20 @@ export function useDemoMode({
       setDemoViewSpotlight(false);
     }
     const nextStep = nextDemoStep(fromStep);
-    if (nextStep === 'end') store.recordDiscoveryXp('introduction');
+    setDemoStepIntroVisible(false);
+    if (nextStep === 'end' && !useGameStore.getState().demoSkipped) store.recordDiscoveryXp('introduction');
     store.setDemoStep(nextStep);
     // Pre-stage plain cube steps so the intro dialogue blurs the upcoming
     // scene. Other types (worm/chaos/showcase/random) start on Continue —
     // pre-staging them would kick off gameplay or overlays behind the blur.
     if (DEMO_LEVEL_CONFIGS[nextStep]?.type === 'cube') applyDemoStepConfig(nextStep);
     if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers, restoreStagedLook, cancelDisparityRun, restoreWormCharacter, applyDemoStepConfig, closeNavSheet]);
+  }, [clearDemoWatchTimers, restoreStagedLook, cancelDisparityRun, cancelShuffle, restoreWormCharacter, applyDemoStepConfig, closeNavSheet, demoShowcaseSubStep]);
   advanceDemoStepRef.current = advanceDemoStep;
+
+  const handleDemoSkipStep = useCallback((step) => {
+    advanceDemoStep(step, { skipped: true });
+  }, [advanceDemoStep]);
 
   const handleDemoStepContinue = useCallback(() => {
     setDemoStepIntroVisible(false);
@@ -1031,6 +1056,10 @@ export function useDemoMode({
   useEffect(() => {
     if (!demoMode || demoStep !== 'worm-traversal' || !demoWormFinished) return;
     useGameStore.getState().setWormPaused(true);
+    if (useGameStore.getState().demoWormSkipped.length) {
+      advanceDemoStepRef.current?.('worm-traversal', { skipped: true });
+      return;
+    }
     celebrateStep('worm-traversal');
   }, [demoMode, demoStep, demoWormFinished, celebrateStep]);
 
@@ -1078,6 +1107,7 @@ export function useDemoMode({
     onTapFlipRef,
     handleStartDemo,
     handleDemoStepContinue,
+    handleDemoSkipStep,
     advanceDemoStep,
     handleDemoReplay,
     handleDemoFreeplay,

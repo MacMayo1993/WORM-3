@@ -585,7 +585,7 @@ export default function WORM3() {
     demoStepIntroVisible, demoTryVisible, demoForecastVisible, demoCoachCopy,
     handleDemoCoachCopySeen, demoHintStep,
     onTapFlipRef,
-    handleStartDemo, handleDemoStepContinue, advanceDemoStep,
+    handleStartDemo, handleDemoStepContinue, handleDemoSkipStep, advanceDemoStep,
     handleDemoReplay, handleDemoFreeplay, handleExitDemo,
     handleDemoForecastPick, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext,
@@ -614,6 +614,7 @@ export default function WORM3() {
 
   // The demo's floating pills stand down while a full modal owns the screen.
   const wormPauseMenuOpen = useGameStore(s => s.wormPauseMenuOpen);
+  const showDemoResults = useGameStore(s => s.showDisparityWinner);
   const demoChromeQuiet = showStore || showSettings || showHelp || wormPauseMenuOpen;
 
   // Home during the demo is a real exit, not just a screen change: without this
@@ -1579,7 +1580,12 @@ export default function WORM3() {
           `demoChromeQuiet` is the one gate every floating demo pill respects: a
           full modal (Settings, Help, Store) owns the screen while it is open,
           and the demo opens Settings itself during the "Make It Yours" step. */}
-      {demoMode && demoStep !== 'worm-traversal' && !demoColdOpenVisible && !demoChromeQuiet && <DemoProgressBar currentStep={demoStep} />}
+      {demoMode && demoStep !== 'worm-traversal' && !demoColdOpenVisible && !demoChromeQuiet &&
+        (demoStepIntroVisible || demoCoachCopy || demoForecastVisible || demoCelebrationStep || showDemoResults || demoStep === 'end') &&
+        <DemoProgressBar currentStep={demoStep} />}
+      {demoMode && demoStep !== 'end' && !demoColdOpenVisible && !demoStepIntroVisible && !demoCoachCopy &&
+        !demoForecastVisible && !demoCelebrationStep && !demoChromeQuiet && !showDemoResults &&
+        <DemoProgressBar currentStep={demoStep} onSkipStep={() => handleDemoSkipStep(demoStep)} onExit={handleExitDemo} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
       {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
@@ -1590,15 +1596,17 @@ export default function WORM3() {
           lines={MOBI_LINES_DEMO_INTRO}
           modeName="Demo"
           primaryLabel="Let's Go ▶"
-          skipLabel="Skip Intro ▶"
+          skipLabel="Skip Mobi"
           onComplete={handleDemoColdOpenContinue}
           onSkip={handleDemoColdOpenContinue}
+          onSkipStep={() => handleDemoSkipStep(demoStep)}
+          onExit={handleExitDemo}
           topInset="var(--topbar-h)"
         />
       </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit
         style={{ position: 'relative', zIndex: Z.INTRO }}>
-        <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onExit={handleExitDemo} />
+        <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkipStep={() => handleDemoSkipStep(demoStep)} onExit={handleExitDemo} />
       </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoForecastVisible && !demoChromeQuiet)} freezeOnExit
         style={{ position: 'relative', zIndex: Z.DEMO }}>
@@ -1608,11 +1616,12 @@ export default function WORM3() {
           onCopySeen={handleDemoCoachCopySeen}
           onNext={demoStep === 'chaos-forecast' ? handleDemoDisparityDismiss : () => advanceDemoStep(demoStep)}
           onExit={handleExitDemo}
+          onSkipStep={() => handleDemoSkipStep(demoStep)}
         />
       </ScreenTransition>
       {demoMode && demoForecastVisible && (
         <Suspense fallback={null}>
-          <DemoForecastPicker onPick={handleDemoForecastPick} onExit={handleExitDemo} />
+          <DemoForecastPicker onPick={handleDemoForecastPick} onSkipStep={() => handleDemoSkipStep(demoStep)} onExit={handleExitDemo} />
         </Suspense>
       )}
       {/* Per-step gesture hint — stays up for the whole hands-on phase so the

@@ -16,7 +16,7 @@ import MobiStage, { MobiKey, useMobiSpeech } from './MobiStage.jsx';
 export const MOBI_LINES_DEMO_INTRO = [
   "Aloha! I'm Mobi. Let’s start WORM³ by learning to steer a worm.",
   "Collect orbs, jump over your body, and ride tunnels to heal the cube.",
-  "We’ll practice each move, then work through the cube, its controls, and every other section together.",
+  "Go at your pace. Skip Mobi skips my instructions; Skip Step moves to the next section.",
 ];
 
 // Worm mode intro. Kept short and literal: a first-timer needs to know the
@@ -78,7 +78,7 @@ export const MOBI_LINES_RANDOM = [
 //                  bar's height). Dialogues that play while the in-game HUD is
 //                  up pass this so the bar stays above the dim + blur instead
 //                  of being buried under it.
-const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, topInset }) => {
+const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, onSkipStep, onExit, topInset }) => {
   const [index, setIndex]           = useState(0);
   const [isDismissing, setDismissing] = useState(false);
   const isLast = index === lines.length - 1;
@@ -148,6 +148,11 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
         WebkitBackdropFilter: isDismissing ? 'none' : PAPER_BACKDROP_BLUR,
         transition: 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease',
       }} />
+      {(onSkipStep || onExit) && <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 3,
+        display: 'flex', flexWrap: 'wrap', gap: 8, pointerEvents: isDismissing ? 'none' : 'auto' }}>
+        {onSkipStep && <MobiKey disabled={isDismissing} onClick={() => finish(onSkipStep)}>Skip Step</MobiKey>}
+        {onExit && <MobiKey disabled={isDismissing} onClick={() => finish(onExit)}>Exit Demo</MobiKey>}
+      </div>}
       <MobiStage
         line={lines[index]}
         lineKey={index}

@@ -77,11 +77,13 @@ export const createModesSlice = (set, _get) => ({
   ...newWormDemo(),
   demoMode: false,
   demoStep: null,
+  demoSkipped: false,
   wormPauseMenuOpen: false,
 
   startDemo: () => set({
     xpActivityRuns: {},
     demoMode: true,
+    demoSkipped: false,
     wormPauseMenuOpen: false,
     ...newWormDemo(),
     demoStep: 'worm-traversal',
@@ -93,11 +95,18 @@ export const createModesSlice = (set, _get) => ({
   nextWormDemoLesson: () => set(s => !wormDemoActive(s) || !s.demoWormComplete || s.demoWormFinished ? {} : s.demoWormLessonIndex + 1 >= WORM_DEMO_LESSON_COUNT
     ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null }
     : { demoWormLessonIndex: s.demoWormLessonIndex + 1, demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true }),
+  skipWormDemoLesson: index => set(s => !wormDemoActive(s) || s.demoWormFinished || s.wormPauseMenuOpen || index !== s.demoWormLessonIndex ? {} : ({
+    demoSkipped: true, demoWormSkipped: [...new Set([...s.demoWormSkipped, index])],
+    demoWormComplete: false, demoWormProgress: '', demoWormHazardCleared: null, demoWormTarget: null,
+    demoWormStarted: false, demoWormPrepared: false, wormAlive: true, wormPaused: true, showWormDeathMenu: false,
+    ...(index + 1 >= WORM_DEMO_LESSON_COUNT ? { demoWormFinished: true } : { demoWormLessonIndex: index + 1 }),
+  })),
   finishWormDemo: () => set(s => wormDemoActive(s) && s.demoWormComplete && s.demoWormLessonIndex === WORM_DEMO_LESSON_COUNT - 1
     ? { demoWormFinished: true, wormPaused: true, demoWormTarget: null } : {}),
   exitDemo: () => set({
     ...newWormDemo(),
     demoMode: false,
+    demoSkipped: false,
     demoStep: null,
     showMainMenu: true,
   }),
