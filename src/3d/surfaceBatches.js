@@ -46,13 +46,14 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
           sphere.copy(geometry.boundingSphere).applyMatrix4(anchor.matrixWorld);
           if (!frustum.intersectsSphere(sphere)) continue;
         }
-        const key = `${geometry.uuid}:${material.uuid}:${!!colorRef}`;
+        const key = `${geometry.uuid}:${material.uuid}:${!!colorRef}:${anchor.renderOrder}`;
         let batch = batches.get(key);
         if (!batch) {
           const mesh = new THREE.InstancedMesh(geometry, materialFor(material), capacity);
           mesh.name = `TileSurfaceBatch:${anchor.name || geometry.type}`;
           mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
           mesh.frustumCulled = false;
+          mesh.renderOrder = anchor.renderOrder;
           mesh.raycast = () => {};
           batch = { mesh, count: 0, owners: [] };
           batches.set(key, batch);
