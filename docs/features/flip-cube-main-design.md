@@ -462,7 +462,7 @@ Decided 2026-09-26: R1 and R2 are in scope now; R3 comes later, after the §5.3 
 
 ### 5.4 Fairness gates
 
-The gates copy `strikeScheduler.js`:
+The gates copy the Lightning storm's (`lightningStorm.js` and the `runStorm` gates in `HealerWormMode.jsx`):
 
 - Never during countdown, pause, tunnel transit, death or victory, the elemental focus freeze, or a jump-rescue hold.
 - Under reduced motion, show a static belt tint only.

@@ -70,7 +70,7 @@ import { resetWormSegments } from './wormSegments.js';
 import { ttAt } from './circularBuffers.js';
 import { getSkin } from './wormCosmeticsData.js';
 import { wormPress, pressTile, tickWormPress, resetWormPress, pressedTileCount } from './tilePressBridge.js';
-import { BODY_BALL_SPACING } from './healerWorm/constants.js';
+import { BODY_BALL_SPACING, activeTunnelCap } from './healerWorm/constants.js';
 
 // ── Tile press: the worm's weight, handed to the cube's stickers ──────────────
 // The body lies along the tiles in sim.tileTrail (index 0 = the head's tile), and
@@ -697,6 +697,22 @@ export function useWormCrawler(size, cubies) {
         killWormSim(simRef.current, ctxRef.current, details);
     }, []);
 
+    // Lightning landed on `tile`: a bare tile flips into a wormhole (when the board is under
+    // its tunnel cap) and a hole already there is struck too. Either way the tunnel is left
+    // charged, so riding it pays part of its heal toll. Returns the tunnel, or null when nothing opened.
+    const strikeTile = useCallback(tile => {
+        const sim = simRef.current;
+        const ctx = ctxRef.current;
+        let resolved = ctx.resolveTunnel(tile.x, tile.y, tile.z, tile.dirKey);
+        if (!resolved) {
+            if (activeTunnelsRef.current.length >= activeTunnelCap(sizeRef.current)) return null;
+            resolved = ctx.createMobiTunnel(tile);
+        }
+        if (!resolved) return null;
+        sim.chargedTunnels.add(resolved.tunnelKey);
+        return resolved;
+    }, []);
+
     const jumpLift = useCallback(() => jumpLiftOf(simRef.current), []);
 
     // ── Run reset (retry / new setup / size change) ─────────────────────────────
@@ -874,6 +890,19 @@ export function useWormCrawler(size, cubies) {
             orbPickupFaceIdsRef: f('orbPickupFaceIds'),
             colorEpochRef: f('colorEpoch'),
             voidTunnelKeysRef: f('voidTunnelKeys'),
+            chargedTunnels: f('chargedTunnels'),
+            rand: f('rand'),
+            elementalType: f('elementalType'),
+            powerups: f('powerups'),
+            // The open tunnels a strike charged; a key whose tunnel is gone (healed, expired) is dropped.
+            chargedMouths: () => {
+                const charged = simRef.current.chargedTunnels;
+                if (!charged.size) return null;
+                const open = activeTunnelsRef.current;
+                for (const key of charged) if (!open.some(hit => hit.tunnelKey === key)) charged.delete(key);
+                return open.filter(hit => charged.has(hit.tunnelKey));
+            },
+            strikeTile,
             tunnelUseCountsRef: f('tunnelUseCounts'),
             willHealRef: f('willHeal'),
             healFiredRef: f('healFired'),

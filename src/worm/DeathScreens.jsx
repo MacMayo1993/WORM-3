@@ -44,6 +44,7 @@ function classifyDeath(reason) {
     if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted') return 'event-horizon';
     if (reason === 'slice-rotation') return 'sliced';
     if (reason === 'bomb') return 'blasted';
+    if (reason === 'lightning') return 'struck';
     if (reason === 'portal-crawler') return 'overrun';
     if (reason === 'self-collision') return 'tail-bite';
     return 'unknown';
@@ -108,6 +109,15 @@ const DEATHS = {
         btnFrom: '#dc2626',
         btnTo: '#7f1d1d',
         titleSize: 'clamp(34px, min(12vw, 11vh), 84px)',
+    },
+    struck: {
+        eyebrow: 'Marked tile',
+        title: 'Struck by lightning',
+        blurb: 'The storm marks a tile before it strikes. Get off it, or jump.',
+        accent: '#a78bfa',
+        accentSoft: 'rgba(139,92,246,0.45)',
+        deep: '#312e81',
+        titleSize: 'clamp(30px, min(10vw, 9vh), 76px)',
     },
     blasted: {
         eyebrow: 'Direct hit',

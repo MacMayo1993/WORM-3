@@ -33,6 +33,14 @@ export const WORMD_STYLES = {
     word: 'KA-BOOM!', sub: "WORM'D", fill: '#fff3c4', ink: '#7c2d12', burst: '#f97316',
     sparks: ['#ff7b2e', '#ffd23f', '#ffffff'], duration: 4.2, fatal: true
   },
+  'struck-cut': {
+    word: 'ZAP-CUT!', sub: 'TAIL LOST', fill: '#f3ecff', ink: '#312e81', burst: '#8b5cf6',
+    sparks: ['#c4b5fd', '#ffffff'], duration: 2.0, fatal: false
+  },
+  struck: {
+    word: 'ZAPPED!', sub: "WORM'D", fill: '#ffffff', ink: '#312e81', burst: '#7c3aed',
+    sparks: ['#c4b5fd', '#a5b4fc', '#ffffff'], duration: 4.2, fatal: true
+  },
   bite: {
     word: 'CHOMP!', sub: 'TAIL BITE', fill: '#ffe14d', ink: '#7f1d1d', burst: '#f87171',
     sparks: ['#ff4444', '#ffdd44'], duration: 4.2, fatal: true
@@ -51,6 +59,7 @@ export const WORMD_STYLES = {
 export function wormdKindForDeath(reason) {
   if (reason === 'slice-rotation') return 'sliced';
   if (reason === 'bomb') return 'blasted';
+  if (reason === 'lightning') return 'struck';
   if (reason === 'self' || reason === 'self-collision') return 'bite';
   if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted') return 'void';
   if (reason === 'portal-crawler') return 'overrun';
