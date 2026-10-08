@@ -13,6 +13,8 @@ import { STORY_WORLDS, storyAppearance, storyViewLabel } from '../../worm/story/
 import { getSkin } from '../../worm/wormCosmeticsData.js';
 import WormProfile from './WormProfile.jsx';
 import StoryChapterMap from './StoryChapterMap.jsx';
+import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
+import { nextCharacterUnlock } from '../../worm/wormUnlocks.js';
 import { wormMenuFeedback } from './wormMenuFeedback.js';
 import './modeWizard.css';
 import './wormStory.css';
@@ -112,6 +114,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   const levelStars = storyStars(progress, level.id), finale = isChapterFinale(level.id);
   const totalStars = WORM_STORY_CHAPTERS.reduce((n, item) => n + item.levels.reduce((m, l) => m + storyStars(progress, l.id), 0), 0);
   const totalMax = WORM_STORY_CHAPTERS.reduce((n, item) => n + item.levels.length * 3, 0);
+  const nextWorm = nextCharacterUnlock(progress);
   const clock = `${Math.floor(level.limit / 60)}:${String(level.limit % 60).padStart(2, '0')}`;
   const starRules = ['Finish before time runs out', `Finish within ${level.par}s`, 'No tail cuts'];
   return <div ref={root} className="mode-wizard worm-entry worm-levels" role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
@@ -153,6 +156,11 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
               <span className="worm-chapter-meter"><b aria-hidden="true">★</b><strong>{chapterStars} / {chapter.levels.length * 3}</strong>
                 <progress value={chapterStars} max={chapter.levels.length * 3} aria-label="Chapter stars" /></span>
             </div>
+            {nextWorm && <p className="worm-next-worm" role="note">
+              <span className="worm-next-worm-preview" aria-hidden="true"><WormPreviewCanvas size={44} characterId={nextWorm.character.id} skinId="slime" hatId="none" framing="body" /></span>
+              <span><small>Next worm</small><strong>{nextWorm.character.label}</strong></span>
+              <em>{nextWorm.remaining === 1 ? '1 more level' : `${nextWorm.remaining} more levels`}</em>
+            </p>}
           </div>
         </div>
         <section className="worm-level-detail" aria-label="Selected level" key={level.id}>

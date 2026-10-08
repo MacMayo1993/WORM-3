@@ -67,11 +67,6 @@ export const createWormSlice = (set, get) => ({
     try { localStorage.setItem('worm3_hat', id); } catch { }
     set({ wormHat: id });
   },
-  wormTrail: persistedState.wormTrail ?? 'classic',
-  setWormTrail: (id) => {
-    try { localStorage.setItem('worm3_trail', id); } catch { }
-    set({ wormTrail: id });
-  },
   wormCharacter: persistedState.wormCharacter ?? 'classic',
   setWormCharacter: (id) => {
     if (!WORM_CHARACTERS.some(c => c.id === id) || (!get().ownedItems.includes(`character_${id}`) && !get().demoMode)) return false;

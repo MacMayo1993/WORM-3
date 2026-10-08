@@ -17,7 +17,7 @@ beforeEach(() => {
   abilityTrail = false;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   resetLiveRotation();
-  useGameStore.setState({ wormShowTrail: true, wormSkin: 'slime', wormTrail: 'classic', wormCharacter: 'classic', cubiePops: {}, rotationEpoch: 0 });
+  useGameStore.setState({ wormShowTrail: true, wormSkin: 'slime', wormCharacter: 'classic', cubiePops: {}, rotationEpoch: 0 });
   liveCubies.size = 3;
   liveCubies.refs = Array.from({ length: 27 }, (_, i) => {
     const obj = new THREE.Object3D();

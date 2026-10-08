@@ -147,3 +147,12 @@
 .worm-story-checklist .is-complete { color:#1f6b3a; }
 .worm-story-loading { background:var(--arcade-paper); color:var(--arcade-ink); }
 .worm-story-briefing { border:2px solid var(--hud-border); border-radius:20px; box-shadow:0 5px 0 var(--hud-border); }
+
+/* A worm earned by clearing ten more levels, announced on the result sheet. */
+.worm-story-unlock { display:flex; align-items:center; gap:14px; margin:14px 0 4px; padding:10px 14px 10px 10px; border-radius:18px; text-align:left;
+  background:#fff6d6; box-shadow:inset 0 0 0 2px #e9cf72, 0 4px 0 #e9cf72; animation:screen-arrive .45s ease-out both; }
+.worm-story-unlock canvas { flex:none; border-radius:14px; }
+.worm-story-unlock small { display:block; color:#8a6a00; font:800 10px/1.2 var(--heading-font); letter-spacing:.12em; text-transform:uppercase; }
+.worm-story-unlock strong { display:block; color:var(--arcade-ink); font:400 22px/1.15 var(--display-font); text-transform:uppercase; }
+.worm-story-unlock em { display:block; color:var(--arcade-muted); font:700 12px/1.3 var(--heading-font); font-style:normal; }
+@media(prefers-reduced-motion:reduce) { .worm-story-unlock { animation:none; } }

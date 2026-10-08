@@ -86,7 +86,7 @@ const EXPECTED_KEYS = [
   'setWormHealerMode', 'setWormHealingProgress', 'setWormOnFlippedTile', 'setWormOrbCount',
   'setWormOrbInventory', 'setWormPaused', 'setWormPhase', 'setWormPowerups',
   'setWormSessionOrbs', 'setWormShowTrail', 'setWormSkin', 'setWormSpecials',
-  'setWormSpeed', 'setWormTimeAlive', 'setWormTrail', 'setWormTunnelCount',
+  'setWormSpeed', 'setWormTimeAlive', 'setWormTunnelCount',
   'setWormholeInterval', 'settings', 'showAntipodalPiP', 'showCursor',
   'showCutscene', 'showDevConsole', 'showDisparityWinner', 'showFirstFlipCaption',
   'showFirstFlipTutorial', 'showHelp', 'showLeaderboard', 'showLevelSelect',
@@ -107,7 +107,7 @@ const EXPECTED_KEYS = [
   'wormOrbFlash', 'wormOrbInventory', 'wormPaused', 'wormPhase',
   'wormPowerups', 'wormExplodeActive', 'wormRocketActive', 'wormRunId', 'wormSessionOrbs',
   'wormShowTrail', 'wormSkin', 'wormSpecialNotice', 'wormSpecials',
-  'wormSpeed', 'wormTimeAlive', 'wormTrail', 'wormTunnelCount',
+  'wormSpeed', 'wormTimeAlive', 'wormTunnelCount',
   'wormholeInterval'
 ];
 

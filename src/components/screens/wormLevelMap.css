@@ -306,3 +306,12 @@
   .worm-map-board::before, .worm-map-board::after, .worm-levels .worm-level-detail, .worm-stage-stars [data-earned] b { animation: none; }
   .worm-levels .worm-map-node, .worm-levels .worm-chapter-tabs button, .worm-world-arrow { transition: none; }
 }
+
+/* The next worm the player is clearing levels toward (worm/wormUnlocks.js). */
+.worm-next-worm { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; padding: 6px 14px 6px 6px; border-radius: 16px;
+  background: #fff6d6; box-shadow: inset 0 0 0 2px #e9cf72; color: var(--arcade-ink); }
+.worm-next-worm-preview { flex: none; width: 44px; height: 44px; overflow: hidden; border-radius: 12px; background: #fffcf1; box-shadow: inset 0 0 0 2px #e9cf72; }
+.worm-next-worm-preview canvas { display: block; }
+.worm-next-worm small { display: block; color: #8a6a00; font: 800 10px/1.2 var(--heading-font); letter-spacing: .12em; text-transform: uppercase; }
+.worm-next-worm strong { display: block; font: 400 15px/1.2 var(--display-font); text-transform: uppercase; }
+.worm-next-worm em { margin-left: auto; color: var(--arcade-muted); font: 800 12px/1.2 var(--heading-font); font-style: normal; white-space: nowrap; }

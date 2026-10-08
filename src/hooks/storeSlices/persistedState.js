@@ -10,7 +10,8 @@ import { readPlayerSave, newProgress } from '../../progression/model.js';
 
 import { DEFAULT_SETTINGS } from '../../utils/colorSchemes.js';
 import { newChestWallet } from '../../economy/chests.js';
-import { DEFAULT_OWNED, ALL_ITEMS_OWNED, STORE_CHARACTERS } from '../../utils/storeCatalog.js';
+import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../../utils/storeCatalog.js';
+import { syncCharacterUnlocks } from '../../worm/wormUnlocks.js';
 import { UNLOCK_ALL } from '../../utils/testUnlock.js';
 import { STARTING_BANKROLL } from '../../utils/economyConstants.js';
 
@@ -43,6 +44,9 @@ const migrateSettings = (rawSettings, version) => {
   return settings;
 };
 
+// Trails were retired from the game, so their ids are dropped from old saves.
+const ownedForProgress = (items, progress) => [...new Set(syncCharacterUnlocks(items.filter(id => !id.startsWith('trail_')), progress))];
+
 // Load persisted state from localStorage
 const loadPersistedState = () => {
   const playerSave = readPlayerSave();
@@ -57,7 +61,6 @@ const loadPersistedState = () => {
     const parsedSettings = settings ? JSON.parse(settings) : null;
     const wormSkin = localStorage.getItem('worm3_skin') || 'slime';
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
-    const wormTrail = localStorage.getItem('worm3_trail') || 'classic';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     // Shape-checked on read: this is player-writable storage, and a malformed
     // entry must not be able to put NaN through the carousel's stat row.
@@ -93,11 +96,11 @@ const loadPersistedState = () => {
       if (Array.isArray(rawOwned)) storedOwned = rawOwned;
     } catch { /* corrupted owned-items entry — fall back to defaults */ }
     if (playerSave) storedOwned = playerSave.ownedItems;
-    // Characters were free before chests. Keep existing players' access.
-    if (playerSave?.legacyCharacters || (!playerSave && (settings || localStorage.getItem(OWNED_ITEMS_KEY)))) storedOwned = [...storedOwned, ...STORE_CHARACTERS.map(c => c.id)];
+    // Worms come from clearing levels alone: whatever a save bought, rolled or
+    // was granted before, it holds exactly the worms its progress has earned.
     const ownedItems = DEV_FREE_ECONOMY
       ? [...ALL_ITEMS_OWNED]
-      : [...new Set([...DEFAULT_OWNED, ...storedOwned])];
+      : ownedForProgress([...DEFAULT_OWNED, ...storedOwned], playerSave?.progress);
     const safeParityPoints = DEV_FREE_ECONOMY ? Math.max(parityPoints, 10000) : parityPoints;
     const betStreak = Math.max(0, parseInt(localStorage.getItem(BET_STREAK_KEY) ?? '0', 10) || 0);
 
@@ -106,7 +109,6 @@ const loadPersistedState = () => {
     let accessorySave = {};
     try { accessorySave = JSON.parse(localStorage.getItem('worm3_accessories') || '{}'); } catch { /* Ignore only the damaged accessory key. */ }
     const safeHat   = ownedItems.includes(`hat_${wormHat}`) ? wormHat : 'none';
-    const safeTrail = ownedItems.includes(`trail_${wormTrail}`) ? wormTrail : 'classic';
 
     // Guard: reset color scheme if not owned
     const migratedSettings = migrateSettings(parsedSettings, settingsVersion);
@@ -134,7 +136,6 @@ const loadPersistedState = () => {
       wormSkin: safeSkin,
       wormHat: safeHat,
       wormAccessories: safeAccessories(accessorySave, ownedItems),
-      wormTrail: safeTrail,
       wormCharacter: ownedItems.includes(`character_${wormCharacter}`) ? wormCharacter : 'classic',
       wormShowTrail,
       wormCameraHorizon,
@@ -155,13 +156,12 @@ const loadPersistedState = () => {
       wormSkin: 'slime',
       wormHat: 'none',
       wormAccessories: EMPTY_ACCESSORIES,
-      wormTrail: 'classic',
       wormCharacter: 'classic',
       wormShowTrail: true,
       wormCameraHorizon: 'face',
       parityPoints: playerSave?.points ?? STARTING_BANKROLL, // storage unavailable — new-player experience
       modePlays: {},
-      ownedItems: [...new Set([...DEFAULT_OWNED, ...(playerSave?.ownedItems ?? []), ...(playerSave?.legacyCharacters ? STORE_CHARACTERS.map(c => c.id) : [])])],
+      ownedItems: DEV_FREE_ECONOMY ? [...ALL_ITEMS_OWNED] : ownedForProgress([...DEFAULT_OWNED, ...(playerSave?.ownedItems ?? [])], playerSave?.progress),
       betStreak: 0,
     };
   }
