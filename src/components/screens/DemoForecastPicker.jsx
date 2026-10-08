@@ -1,4 +1,5 @@
 import DemoDialog from './DemoDialog.jsx';
+import DemoProgressBar from './DemoProgressBar.jsx';
 import React, { useState } from 'react';
 import {
   UI_FONT, HEADING_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT, UI_ACTION_SHADOW,
@@ -32,14 +33,7 @@ export default function DemoForecastPicker({ onPick, onSkipStep, onExit }) {
       backdropFilter: 'var(--paper-blur, none)',
       fontFamily: UI_FONT, textAlign: 'center', padding: 24,
     }}>
-      {(onExit || onSkipStep) && <div style={{ position: 'sticky', top: 0, zIndex: 1, alignSelf: 'stretch',
-        display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', flexShrink: 0, marginBottom: 12, pointerEvents: 'none' }}>
-        {[['Skip Step', onSkipStep], ['Exit Demo', onExit]].filter(([, action]) => action).map(([label, action]) => <button key={label} type="button" onClick={action} style={{
-          minHeight: 52, padding: '12px 22px', borderRadius: 999, border: `2px solid ${UI_MOSS_LIGHT}`,
-          background: UI_MOSS, color: UI_CREAM, fontFamily: UI_FONT, fontSize: 14, fontWeight: 800,
-          cursor: 'pointer', touchAction: 'manipulation', pointerEvents: 'auto',
-        }}>{label}</button>)}
-      </div>}
+      {(onExit || onSkipStep) && <DemoProgressBar currentStep="chaos-forecast" inline onSkipStep={onSkipStep} onExit={onExit} />}
       <p style={{
         color: UI_GOLD, fontSize: 12, fontWeight: 800,
         letterSpacing: '0.16em', textTransform: 'uppercase', margin: '0 0 8px',

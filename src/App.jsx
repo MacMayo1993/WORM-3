@@ -1581,7 +1581,8 @@ export default function WORM3() {
           full modal (Settings, Help, Store) owns the screen while it is open,
           and the demo opens Settings itself during the "Make It Yours" step. */}
       {demoMode && demoStep !== 'worm-traversal' && !demoColdOpenVisible && !demoChromeQuiet &&
-        (demoStepIntroVisible || demoCoachCopy || demoForecastVisible || demoCelebrationStep || showDemoResults || demoStep === 'end') &&
+        !demoStepIntroVisible && !demoCoachCopy && !demoForecastVisible &&
+        (demoCelebrationStep || showDemoResults || demoStep === 'end') &&
         <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoStep !== 'end' && !demoColdOpenVisible && !demoStepIntroVisible && !demoCoachCopy &&
         !demoForecastVisible && !demoCelebrationStep && !demoChromeQuiet && !showDemoResults &&
@@ -1593,6 +1594,7 @@ export default function WORM3() {
       <ScreenTransition show={!!(demoMode && demoColdOpenVisible)} freezeOnExit
         style={{ position: 'relative', zIndex: Z.INTRO }}>
         <MobiIntroScreen
+          demoStep={demoStep}
           lines={MOBI_LINES_DEMO_INTRO}
           modeName="Demo"
           primaryLabel="Let's Go ▶"
