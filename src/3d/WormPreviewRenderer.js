@@ -220,6 +220,8 @@ function _frameCamera(framing, characterId, aspect = 1) {
   // and the craft pieces are drawn large enough to read, so pull back a little.
   if (characterId === 'inch' && framing === 'body') camera.zoom = 0.72;
   if (characterId === 'mobi' && framing === 'body') camera.zoom = 0.78;
+  // The Dancer's S swings a body piece well off the spine, so its closeup pulls back too.
+  if (characterId === 'wiggle' && framing === 'body') camera.zoom = 0.74;
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
   // Yaw the worm rather than orbit the camera: the face reads best turned a
