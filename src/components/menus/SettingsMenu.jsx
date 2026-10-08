@@ -4,6 +4,7 @@ import { ColorsPanel } from './settings/ColorsPanel.jsx';
 import { TilesPanel } from './settings/TilesPanel.jsx';
 import { ScenePanel } from './settings/ScenePanel.jsx';
 import { ModesPanel } from './settings/ModesPanel.jsx';
+import { AboutPanel } from './settings/AboutPanel.jsx';
 import { useDialogBehavior } from '../ui/index.js';
 
 const TABS = [
@@ -11,7 +12,8 @@ const TABS = [
   { id: 'tiles', label: 'Tiles' },
   { id: 'scene', label: 'Scene' },
   { id: 'capture', label: 'Capture' },
-  { id: 'modes', label: 'Modes' }
+  { id: 'modes', label: 'Modes' },
+  { id: 'about', label: 'About' }
 ];
 
 const SettingsMenu = ({ onClose, settings, onSettingsChange, faceImages = {}, onFaceImage }) => {
@@ -90,6 +92,9 @@ const SettingsMenu = ({ onClose, settings, onSettingsChange, faceImages = {}, on
           )}
           {activeTab === 'modes' && (
             <ModesPanel />
+          )}
+          {activeTab === 'about' && (
+            <AboutPanel />
           )}
         </div>
       </div>

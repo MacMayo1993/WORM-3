@@ -19,6 +19,8 @@ npm run test                     # Run tests once (vitest run)
 npm run test:watch               # Watch mode tests
 npm run test:coverage            # Tests with V8 coverage report
 npm run bundle:check             # Per-asset + initial-route bundle budgets
+npm run e2e                      # Browser smoke tests (Playwright, needs `npm run build` first)
+npm run e2e:install              # One-time: download Playwright's Chromium (or set CHROMIUM=/path/to/chrome)
 npm run ci                       # Full CI pipeline: lint → test → build → bundle:check
 ```
 
@@ -38,6 +40,8 @@ Supported toolchain: **Node 20** (`.nvmrc`, `engines`, CI, devcontainer all agre
 - **Run all tests**: `npm run test`
 - **Run a single test**: `npx vitest run src/__tests__/cubeRotation.test.js`
 - **Coverage scope**: `src/game/**`, `src/utils/**`, `src/levels/**`
+- **Browser tests**: `e2e/*.e2e.js` (Playwright, config in `playwright.config.js`) run the production build in real Chromium: the app boots, a WORM run starts, every selector thumbnail draws, and a deleted lazy chunk recovers instead of leaving a blank page. The unit suite is jsdom and cannot see those. WebGL is software-rendered, so they assert that things appear and nothing throws, never frame rates. The `e2e` CI job does not gate deploy yet.
+- **Credits**: third-party art is credited from `src/utils/credits.js` (Settings → About) and inventoried in `docs/ASSET_CREDITS.md`; `assetCredits.test.js` fails when a model or environment map is added to `public/` without a credit or an explicit "unverified" entry, and when a credit disagrees with the model's own embedded Sketchfab metadata. The nine biome models are CC BY 4.0, so crediting them is a licence condition.
 - **Globals**: Vitest globals enabled (`describe`, `it`, `expect`, `vi` available without import)
 
 Test files follow the pattern:
