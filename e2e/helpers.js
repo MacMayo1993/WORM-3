@@ -92,7 +92,9 @@ export async function startFreePlay(page, { viewport } = {}) {
   // enabled Pause confirms that spawning and the countdown reached live play.
   const pause = page.getByRole('button', { name: 'Pause', exact: true });
   await expect(pause).toBeVisible();
-  await expect(pause).toBeEnabled({ timeout: 120_000 });
+  // Twenty render-clock turns can take over two minutes on software GL. Leave
+  // enough of the existing four-minute test budget for the scramble and countdown.
+  await expect(pause).toBeEnabled({ timeout: 180_000 });
 }
 
 /**
