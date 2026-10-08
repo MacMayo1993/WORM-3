@@ -1,11 +1,12 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { WORM_HATS } from '../worm/wormCosmeticsData.js';
 import { HANDMADE_HATS, WORM_ACCESSORIES, safeAccessories, EMPTY_ACCESSORIES } from '../worm/handmadeAccessoriesData.js';
 import { STORE_ITEMS, getStoreItem } from '../utils/storeCatalog.js';
 import { chestItemTier } from '../economy/chests.js';
-import { createAccessoryRig, buildCraftModel, poseHeadAccessories, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody } from '../worm/wormAccessories.js';
+import { createAccessoryRig, buildCraftModel, disposeCraftModel, animateCraftModel, poseHandmadeHat, poseHeadAccessories, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody } from '../worm/wormAccessories.js';
+import { getHandmadeParts } from '../worm/handmadeParts.js';
 import { layoutWormFace } from '../worm/wormFaceLayout.js';
 
 const initial = useGameStore.getState();
@@ -19,8 +20,12 @@ it('offers all twenty-six handmade models through the real catalog and reward po
     expect(STORE_ITEMS.filter(x=>x.id===id)).toHaveLength(1);
     if(!item.slot) expect(WORM_HATS.some(h=>h.id===item.id)).toBe(true);
     const model=buildCraftModel(item.id);
-    expect(model.children.length).toBeGreaterThan(0);
-    expect(model.children.length).toBeLessThanOrEqual(6);
+    // At most six colour/finish draws, plus one ink outline per moving part.
+    const meshes=[];model.traverse(o=>{ if(o.isMesh)meshes.push(o); });
+    const rigs=model.children.filter(c=>c.isGroup).length;
+    expect(meshes.length).toBeGreaterThan(0);
+    expect(meshes.filter(m=>m.userData.role!=='outline').length).toBeLessThanOrEqual(8);
+    expect(meshes.length).toBeLessThanOrEqual(8+1+rigs);
     model.traverse(mesh=>{ if(!mesh.isMesh)return;
       expect([...mesh.geometry.attributes.position.array].every(Number.isFinite)).toBe(true);
       mesh.geometry.dispose();mesh.material.dispose();
@@ -88,4 +93,105 @@ it('centres glasses and goggles on the eyes the face layout draws', () => {
     expect(middle.distanceTo(expected),`${id}: lenses centred on the eyes`).toBeLessThan(.08);
     rig.dispose();
   }
+});
+
+// The point of the craft pass: a piece is a few dozen pixels across on a bead
+// of any colour in front of any scene, so it has to be big, edged, lit and not
+// the worm's own green. These hold every piece to that.
+describe('craft pieces stay readable', () => {
+  const everyPiece=[...HANDMADE_HATS,...WORM_ACCESSORIES];
+  const meshesOf=model=>{ const out=[]; model.traverse(o=>{ if(o.isMesh)out.push(o); }); return out; };
+
+  it('stands well proud of the bead it is worn on', () => {
+    for(const item of everyPiece) {
+      const model=buildCraftModel(item.id);
+      const size=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+      // A bead is two radii across; no piece is smaller than that.
+      expect(Math.max(size.x,size.y,size.z),`${item.id} is too small to read`).toBeGreaterThanOrEqual(1.6);
+      disposeCraftModel(model);
+    }
+  });
+
+  it('carries an ink outline hull behind its opaque parts and none round clear glass', () => {
+    for(const item of everyPiece) {
+      const model=buildCraftModel(item.id), meshes=meshesOf(model);
+      const hulls=meshes.filter(m=>m.userData.role==='outline');
+      expect(hulls.length,`${item.id} has no outline`).toBeGreaterThan(0);
+      for(const hull of hulls) {
+        expect(hull.material.side).toBe(THREE.BackSide);
+        expect(hull.material.transparent).toBe(false);
+        expect(hull.raycast()).toBeNull();
+        expect([...hull.geometry.attributes.position.array].every(Number.isFinite)).toBe(true);
+      }
+      // Lenses keep one clear pane each and are never ringed in ink.
+      if(item.id==='bottlecapGlasses'||item.id==='buttonGoggles') expect(meshes.filter(m=>m.material.transparent)).toHaveLength(1);
+      disposeCraftModel(model);
+    }
+  });
+
+  it('keeps a small emissive floor on every opaque part so it never goes muddy in a dark scene', () => {
+    for(const item of everyPiece) {
+      for(const part of getHandmadeParts(item.id)) {
+        if(part.mat.transparent) continue;
+        expect(part.mat.emissiveIntensity,`${item.id}: ${part.mat.color} has no glow`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('never dresses a leaf in the worm\'s own green', () => {
+    const hue=hex=>{ const c=new THREE.Color(hex), hsl={}; c.getHSL(hsl); return {h:hsl.h*360,s:hsl.s}; };
+    for(const id of ['leafCape','leafBeret']) {
+      for(const part of getHandmadeParts(id)) {
+        const {h,s}=hue(part.mat.color);
+        expect(h>=70&&h<=170&&s>.3,`${id}: ${part.mat.color} is green`).toBe(false);
+      }
+    }
+  });
+
+  it('moves with the clock and sits still when the clock is frozen', () => {
+    const rotation=(model,name)=>model.getObjectByName(`rig-${name}`).rotation;
+    const pinwheel=buildCraftModel('paperPinwheel');
+    animateCraftModel(pinwheel,0);
+    expect(rotation(pinwheel,'blades').z).toBe(0);
+    animateCraftModel(pinwheel,.4);
+    expect(rotation(pinwheel,'blades').z).toBeCloseTo(2.2);
+    animateCraftModel(pinwheel,0);
+    expect(rotation(pinwheel,'blades').z).toBe(0);
+
+    const key=buildCraftModel('windupKey');
+    animateCraftModel(key,1);
+    expect(rotation(key,'key').y).toBeCloseTo(2.4);
+
+    const jar=buildCraftModel('fireflyJar');
+    const flies=jar.userData.flies;
+    expect(flies).toHaveLength(2);
+    animateCraftModel(jar,0);
+    const lit=flies.map(f=>f.mesh.material.emissiveIntensity);
+    animateCraftModel(jar,.9);
+    expect(flies.map(f=>f.mesh.material.emissiveIntensity)).not.toEqual(lit);
+    expect(lit.every(v=>v>0)).toBe(true);
+    for(const model of [pinwheel,key,jar]) disposeCraftModel(model);
+  });
+
+  it('turns the worn pieces through the rig while a pad of equipment is posed', () => {
+    const rig=createAccessoryRig({tail:'paperPinwheel'});
+    const origin=new THREE.Vector3(),forward=new THREE.Vector3(1,0,0),up=new THREE.Vector3(0,1,0);
+    const blades=()=>rig.entries[0].model.getObjectByName('rig-blades').rotation.z;
+    beginAccessoryBody(rig);poseBodyAccessories(rig,1,origin,forward,up,.1,0,false);finishAccessoryBody(rig,0,false);
+    expect(blades()).toBe(0);
+    beginAccessoryBody(rig);poseBodyAccessories(rig,1,origin,forward,up,.1,.5,false);finishAccessoryBody(rig,.5,false);
+    expect(blades()).toBeGreaterThan(0);
+    rig.dispose();
+  });
+
+  it('animates a handmade hat through the same craft model', () => {
+    const group=new THREE.Group(),model=buildCraftModel('sprout');
+    group.add(model);
+    const leaves=model.getObjectByName('rig-leaves');
+    poseHandmadeHat(group,'sprout',new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),0);
+    expect(leaves.rotation.z).toBe(0);
+    poseHandmadeHat(group,'sprout',new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),.5);
+    expect(leaves.rotation.z).not.toBe(0);
+    disposeCraftModel(model);
+  });
 });

@@ -1,5 +1,5 @@
-import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody, poseHeadAccessories, poseHandmadeHat } from '../worm/wormAccessories.js';
-import { safeAccessories } from '../worm/handmadeAccessoriesData.js';
+import { createAccessoryRig, beginAccessoryBody, poseBodyAccessories, finishAccessoryBody, poseHeadAccessories, poseHandmadeHat, buildCraftModel } from '../worm/wormAccessories.js';
+import { safeAccessories, isHandmadeHat } from '../worm/handmadeAccessoriesData.js';
 import { previewPathPoint, PREVIEW_CRAWL_SPEED, nextPreviewFrame } from './wormPreviewMotion.js';
 import { wormPreviewTargetOptions } from './wormPreviewTargets.js';
 import { observePreviewContext, previewContextAvailable } from './previewContext.js';
@@ -208,8 +208,10 @@ function _frameCamera(framing, characterId, aspect = 1) {
   camera.zoom = characterId === 'mobi' && (framing === 'head' || framing === 'portrait') ? 0.68 : 1;
   // Keep the larger Dancer head and its hats inside the existing closeups.
   if (characterId === 'wiggle' && (framing === 'head' || framing === 'portrait')) camera.zoom = HEAD_SCALE / WORM_HEAD_RADIUS;
-  // Inch's walkable arches carry backpacks higher and closer to this camera.
-  if (characterId === 'inch' && framing === 'body') camera.zoom = 0.8;
+  // Inch's walkable arches carry backpacks higher and closer to this camera,
+  // and the craft pieces are drawn large enough to read, so pull back a little.
+  if (characterId === 'inch' && framing === 'body') camera.zoom = 0.72;
+  if (characterId === 'mobi' && framing === 'body') camera.zoom = 0.78;
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
   // Yaw the worm rather than orbit the camera: the face reads best turned a
@@ -734,13 +736,20 @@ function _poseWorm(opts, time) {
 
   // Hat — rebuilt only when the hat changes, then parked above the head.
   if (rig.hatKey !== `${hatId}|${characterId}`) {
-    rig.hatGroup.children.forEach(part => { part.geometry.dispose(); part.material.dispose(); });
+    rig.hatGroup.traverse(part => { part.geometry?.dispose(); part.material?.dispose(); });
     rig.hatGroup.clear();
-    if (hatId && hatId !== 'none' && !getHatParts) {
+    const hatRadius = (isMobi ? MOBI_RADIUS : headScale) * FACE_LAYOUT.hatScale;
+    // Handmade hats are the accessories' craft models, so they carry the same
+    // ink outline and motion as they do in the game.
+    if (isHandmadeHat(hatId)) {
+      const craft = buildCraftModel(hatId);
+      craft.scale.setScalar(hatRadius);
+      rig.hatGroup.add(craft);
+    } else if (hatId && hatId !== 'none' && !getHatParts) {
       requestHatParts();
       return;
     }
-    for (const part of getHatParts ? getHatParts(hatId, (isMobi ? MOBI_RADIUS : headScale) * FACE_LAYOUT.hatScale) : []) {
+    for (const part of !isHandmadeHat(hatId) && getHatParts ? getHatParts(hatId, hatRadius) : []) {
       const [geoName, args] = part.geo;
       const geo = _geometry(geoName, args);
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
