@@ -175,3 +175,27 @@ describe('chaosStormEvents — determinism and keys', () => {
     expect(stormMeshIndex({ x: 2, y: 1, z: 0 }, 3)).toBe(2 * 9 + 1 * 3 + 0);
   });
 });
+
+describe('chaosStormEvents — colours', () => {
+  it('names the face each flipped tile turns into, so bolts and surges wear its colour', () => {
+    const { cubies, map } = board();
+    // A red (PZ) tile struck by a hop flips to orange; its surge carries orange too.
+    const { events } = chaosStormEvents({
+      cascades: [{ fromTile: [1, 1, 2, 'PZ'], toTile: [2, 1, 2, 'PZ'] }],
+      flips: [[2, 1, 2, 'PZ']],
+      ignition: [0, 2, 1, 'PY']
+    }, cubies, SIZE, map, CAP);
+    const by = (type) => events.find((e) => e.type === type);
+    expect(by('bolt').face).toBe(4);
+    expect(by('charge').face).toBe(4);
+    // White (PY) flips to yellow.
+    expect(by('ignition').face).toBe(6);
+  });
+
+  it('follows a tile already flipped: its next flip turns it back', () => {
+    const { cubies, map } = board();
+    cubies[2][1][2].stickers.PZ = { ...cubies[2][1][2].stickers.PZ, curr: 4, flips: 1 };
+    const { events } = chaosStormEvents({ flips: [[2, 1, 2, 'PZ']] }, cubies, SIZE, map, CAP);
+    expect(events[0].face).toBe(1);
+  });
+});

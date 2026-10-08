@@ -34,6 +34,7 @@ import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { SURFACE_OFFSET, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import { buildManifoldGridMap } from '../game/manifoldLogic.js';
+import { resolveColors } from '../utils/colorSchemes.js';
 import { stormMeshIndex } from '../game/chaosStormEvents.js';
 import { effectiveFlipPads } from '../game/raisedCubie.js';
 import { makeTunnelPath, buildTunnelPathInto, tunnelPathArcPointInto, tunnelDockForMeshInto } from '../utils/tunnelPath.js';
@@ -99,6 +100,9 @@ const RIPPLE_DELAY_MS = 45;
 const RIPPLE_SHARE = 0.38;
 
 // ── Palette ───────────────────────────────────────────────────────────────────
+// Bolts and surges wear the colour of the tile they flip (event.face, looked up
+// in the round's own palette). These are the fallbacks for an event that names no
+// face; overloads and recoveries keep their own warning colours.
 const C_BOLT = new THREE.Color('#4b8dff');
 const C_BOLT_CROSS = new THREE.Color('#2fe2ff');
 const C_HOT = new THREE.Color('#b27dff');
@@ -447,6 +451,23 @@ function blast(ctx, loc, pos, normal, color, seed) {
   shake(ctx, 0.09, 0.34);
 }
 
+/**
+ * Write a face's palette colour into `out`. The palette is resolved once per
+ * settings object, so a round costs one lookup however many bolts it fires.
+ */
+function faceColor(ctx, face, out) {
+  if (face == null) return false;
+  const settings = ctx.settings;
+  if (ctx.paletteFor !== settings) {
+    ctx.paletteFor = settings;
+    ctx.palette = resolveColors(settings, settings?.biomeMode?.faceAssignment) || null;
+  }
+  const hex = ctx.palette?.[face];
+  if (!hex) return false;
+  out.set(hex);
+  return true;
+}
+
 function retire(ctx, b) {
   b.live = false;
   if (b.cascadeId != null) ctx.complete?.(b.cascadeId);
@@ -495,7 +516,10 @@ function ingestBolt(ctx, ev) {
   b.sparked = false;
   b.restrikes = 0;
   b.born = ctx.nowMs;
-  if (hero) b.color.copy(C_BIRTH).lerp(C_WHITE, 0.25);
+  // The flipped tile's colour. Heat runs it toward white-hot rather than shifting
+  // its hue, so a red tile's lightning stays red however close it is to its cap.
+  if (faceColor(ctx, ev.face, b.color)) b.color.lerp(C_WHITE, hero ? 0.2 : Math.min(0.35, b.heat * 0.3));
+  else if (hero) b.color.copy(C_BIRTH).lerp(C_WHITE, 0.25);
   else b.color.copy(b.crossFace ? C_BOLT_CROSS : C_BOLT).lerp(C_HOT, Math.min(0.8, ctx.levelHeat * 0.45 + b.heat * 0.4));
 }
 
@@ -524,9 +548,15 @@ function ingestCharge(ctx, ev) {
   c.started = false;
   c.arrived = false;
   c.born = ctx.nowMs;
-  c.charge = c.to ? setTunnelCharge(ev.pairId, ev.from.gridId, ctx.nowMs, kind) : null;
-  c.color.copy(kind === 'overload' ? C_OVERLOAD : kind === 'recover' ? C_RECOVER : kind === 'birth' ? C_BIRTH : C_SURGE);
-  if (kind === 'surge') c.color.lerp(C_HOT, Math.min(0.75, c.heat * 0.6 + ctx.levelHeat * 0.2));
+  // A flip's surge is the flipped tile's colour; overloads and drains keep theirs.
+  const flip = kind === 'surge' || kind === 'birth';
+  if (flip && faceColor(ctx, ev.face, c.color)) c.color.lerp(C_WHITE, kind === 'birth' ? 0.2 : Math.min(0.3, c.heat * 0.3));
+  else {
+    c.color.copy(kind === 'overload' ? C_OVERLOAD : kind === 'recover' ? C_RECOVER : kind === 'birth' ? C_BIRTH : C_SURGE);
+    if (kind === 'surge') c.color.lerp(C_HOT, Math.min(0.75, c.heat * 0.6 + ctx.levelHeat * 0.2));
+  }
+  // The tunnel renderers light the same span in the same colour.
+  c.charge = c.to ? setTunnelCharge(ev.pairId, ev.from.gridId, ctx.nowMs, kind, c.color) : null;
 }
 
 // ── Per-frame updates ─────────────────────────────────────────────────────────
@@ -831,6 +861,7 @@ export default function ChaosStorm({ cubieRefs, size, onCascadeComplete }) {
     ctx.dt = Math.min(delta, 0.05);
     ctx.nowMs = performance.now();
     ctx.cubies = store.cubies;
+    ctx.settings = store.settings;
     ctx.cap = selectEffectiveFlipCap(store);
     ctx.padsOn = effectiveFlipPads(store) !== 'off' && !store.wormHealerMode;
     ctx.lowFx = !!store.perfReducedFX;

@@ -17,6 +17,7 @@ import { pushChaosStormEvents, clearChaosStorm, tunnelCharges } from '../manifol
 import { cubieKicks, clearCubieKicks } from '../3d/cubieKick.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 import { STRIP_POINTS } from '../manifold/stormStrips.js';
+import { resolveColors } from '../utils/colorSchemes.js';
 
 extend(THREE);
 
@@ -236,5 +237,32 @@ describe('ChaosStorm wormhole surges', () => {
     for (let i = 0; i < 40; i++) step(store);
     expect(tunnelCharges.size).toBe(0);
     expect(usedStrips(geo)).toBe(0);
+  });
+});
+
+describe('ChaosStorm colours', () => {
+  const palette = () => {
+    const s = useGameStore.getState().settings;
+    return resolveColors(s, s?.biomeMode?.faceAssignment);
+  };
+  const stripColor = (geo, strip) => new THREE.Color().fromArray(geo.attributes.aColor.array, strip * STRIP_POINTS * 2 * 3);
+
+  it('draws a hop in the colour of the tile it flips, and its surge lights the tunnel in that colour', async () => {
+    const store = await mount();
+    const { events } = chaosStormEvents({
+      cascades: [{ fromTile: [1, 1, 2, 'PZ'], toTile: [2, 1, 2, 'PZ'] }],
+      flips: [[2, 1, 2, 'PZ']]
+    }, cubies, SIZE, map, 6);
+    pushChaosStormEvents(events);
+    step(store);
+    const geo = stripGeometry(store);
+    // Red flips to orange: hue of every strip is the orange tile's, at most lifted toward white.
+    const orange = new THREE.Color(palette()[4]);
+    const hsl = (c) => c.getHSL({});
+    for (let s = 0; s < usedStrips(geo); s++) {
+      expect(Math.abs(hsl(stripColor(geo, s)).h - hsl(orange).h)).toBeLessThan(0.02);
+    }
+    const charge = tunnelCharges.get(events.find((e) => e.type === 'charge').pairId);
+    expect(Math.abs(new THREE.Color(charge.r, charge.g, charge.b).getHSL({}).h - hsl(orange).h)).toBeLessThan(0.02);
   });
 });
