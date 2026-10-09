@@ -28,7 +28,7 @@ it.each([7, 8, 9, 10])('authors level %i with enough matching orbs and real heal
 });
 it('requires every final-level mechanic, a safe landing, tail clearance and settled rotation', () => {
   const level = storyLevel(10);
-  const won = { ...level.mechanics, alive: true, elapsed: 200, cuts: 0, orbs: 24, rotations: 4, healed: 3, remaining: 0, tailClear: true, landed: true, rotationSettled: true };
+  const won = { ...level.mechanics, alive: true, elapsed: 200, cuts: 0, peakLength: 100, orbs: 24, rotations: 4, healed: 3, remaining: 0, tailClear: true, landed: true, rotationSettled: true };
   expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
   for (const [key, target] of Object.entries(level.mechanics)) expect(storyOutcome(level, { ...won, [key]: target - 1 })).toBeNull();
   for (const key of ['alive', 'tailClear', 'landed', 'rotationSettled']) expect(storyOutcome(level, { ...won, [key]: false })).toBeNull();
@@ -47,7 +47,7 @@ it('stages the Stage 9 body on the 6x6 exterior and completes with one bomb and 
     if (i > 0) expect(point.pos.distanceTo(shAt(sim.stepHistory, i - 1).pos)).toBeCloseTo(0.02, 8);
   }
   expect(ttAt(sim.tileTrail, 0)).toBe('3,0,5,PZ');
-  const won = { alive: true, elapsed: 200, cuts: 0, orbs: 24, healed: 4, remaining: 0,
+  const won = { alive: true, elapsed: 200, cuts: 0, peakLength: 100, orbs: 24, healed: 4, remaining: 0,
     tailClear: true, landed: true, rotationSettled: true, ringHeals: 1, signatures: 2, bombs: 1, kills: 1 };
   expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
   expect(storyOutcome(level, { ...won, bombs: 0 })).toBeNull();
@@ -114,7 +114,7 @@ it('finishes level eight with two collected elements without waiting for mastery
   expect(offerStoryPower(sim, p, level, level.cubeSize ?? 5, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toBe('fire');
   expect(read().elementPickups).toBeUndefined();
-  const won = { alive: true, elapsed: 80, cuts: 0, orbs: 24, healed: 3, remaining: 0,
+  const won = { alive: true, elapsed: 80, cuts: 0, peakLength: 100, orbs: 24, healed: 3, remaining: 0,
     tailClear: true, landed: true, rotationSettled: true };
   recordStoryMechanic(p, 'elementPickups');
   expect(storyOutcome(level, { ...won, elementPickups: read().elementPickups })).toBeNull();
@@ -133,7 +133,7 @@ it('finishes level eight with two collected elements without waiting for mastery
 it('counts distinct elemental pickups for level 30 without hidden mastery actions', () => {
   const { sim, p, level, read } = setup(30);
   p.mechanics = { explodes: 1, doubleJumps: 2, magnetOrbs: 4 };
-  const won = { alive: true, elapsed: 200, cuts: 0, orbs: 30, rotations: 6, healed: 5,
+  const won = { alive: true, elapsed: 200, cuts: 0, peakLength: 100, orbs: 30, rotations: 6, healed: 5,
     remaining: 0, tailClear: true, landed: true, rotationSettled: true };
   for (const [type, expected] of [['water', 1], ['water', 1], ['fire', 2], ['grass', 3]]) {
     recordStoryMechanic(p, 'elementPickups', type);

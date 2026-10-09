@@ -91,7 +91,7 @@ it('requires cross-face routing for 18 orbs and all six colors, then resets on r
   expect(state()).toMatchObject({ wormPaused: true, wormAlive: true });
   expect(state().wormBodyTiles).toBe(initialLength + state().wormSessionOrbs);
   expect(state().wormSessionOrbs).toBeGreaterThanOrEqual(18);
-  begin(1); expect(state().wormSessionOrbs).toBe(0); expect(state().wormPowerups).toHaveLength(24);
+  begin(1); expect(state().wormSessionOrbs).toBe(0); expect(state().wormPowerups).toHaveLength(60);
 });
 it('opens at most two tunnel pairs and replaces cleared routes until all four are crossed', () => {
   begin(2);
@@ -133,7 +133,7 @@ it('crosses all three mini-cube tunnel pairs and clears the tail with the sparse
     stars: Object.fromEntries(Array.from({ length: 11 }, (_, i) => [i + 1, 1])), claimed: {},
   } } }));
   begin(12);
-  expect(state().wormPowerups).toHaveLength(18);
+  expect(state().wormPowerups).toHaveLength(24);
   for (let i=0; i<storyLevel(12).target; i++) {
     const tunnel = getActiveTunnels(state().cubies,state().size)[0];
     const before = state().wormTunnelCount;
@@ -194,7 +194,7 @@ it('publishes replenished orbs after the collection quota and holds refills whil
   expect(state().wormPowerups).toHaveLength(6);
   expect(state().wormStoryResult).toBeNull(); // healing and turns still need resources
   begin(6);
-  expect(state().wormPowerups).toHaveLength(36);
+  expect(state().wormPowerups).toHaveLength(60);
 });
 it('cannot win Moving Ground by waiting out six turns without collecting the orbs', () => {
   begin(4); frame();
@@ -314,7 +314,14 @@ it.each([2, 5, 6])('can collect the resources and heal every authored pair for l
     travelUntil(() => state().wormHealedCount >= pair + 1);
   }
   expect(getActiveTunnels(state().cubies, state().size)).toHaveLength(0);
-  if (id === 2) expect(state().wormStoryResult).not.toBeNull();
+  if (id === 2) {
+    // Healing can spend food before the peak-length target. Claim the clear.
+    if (!state().wormStoryResult) {
+      expect(state().wormStoryChecklist.canFinish).toBe(true);
+      act(() => state().finishWormStory()); frame();
+    }
+    expect(state().wormStoryResult).not.toBeNull();
+  }
   if (id === 6) expect(state().wormStoryResult).toBeNull(); // turns + 30 orbs still required
 });
 

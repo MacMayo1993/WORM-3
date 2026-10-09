@@ -1,3 +1,4 @@
+import StoryStarRequirements from '../../worm/story/StoryStarRequirements.jsx';
 import { wizardPaperBackground } from './WizardChrome.jsx';
 import WormWordmark from '../branding/WormWordmark.jsx';
 import WormPathArtwork from '../ui/WormPathArtwork.jsx';
@@ -116,7 +117,6 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
   const totalMax = WORM_STORY_CHAPTERS.reduce((n, item) => n + item.levels.length * 3, 0);
   const nextWorm = nextCharacterUnlock(progress);
   const clock = `${Math.floor(level.limit / 60)}:${String(level.limit % 60).padStart(2, '0')}`;
-  const starRules = ['Finish before time runs out', `Finish within ${level.par}s`, 'No tail cuts'];
   return <div ref={root} className="mode-wizard worm-entry worm-levels" role="dialog" aria-modal="true" aria-labelledby="worm-entry-title"
     style={{ '--mode-accent': MODE_THEMES.worm.accent, '--mode-ink': MODE_THEMES.worm.shadow, '--story-display': HEADING_FONT,
       '--world': world.color, '--world-ink': world.ink, fontFamily: UI_FONT, zIndex: Z.MODAL }}>
@@ -168,8 +168,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
             {finale && <em>Finale</em>}</div>
           <h2>{level.title}</h2>
           {level.subtitle && <p className="worm-stage-subtitle">{level.subtitle}</p>}
-          <div className="worm-stage-stars" aria-label={`${levelStars} of 3 stars earned`}>{starRules.map((rule, n) =>
-            <span key={rule} data-earned={n < levelStars || undefined}><b aria-hidden="true">★</b><small>{rule}</small></span>)}</div>
+          <StoryStarRequirements level={level} earnedStars={levelStars} />
           <div className="worm-stage-chips">
             <span className="worm-stage-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 21 7.3v9.4L12 21.5 3 16.7V7.3zM3 7.3l9 4.8 9-4.8M12 12.1v9.4" /></svg><span className="worm-level-board">{size}×{size} cube{view ? ` · ${view}` : ''}</span></span>
             <span className="worm-stage-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8.5" /><path d="M12 8.5V13l3 2M9.5 2.5h5" /></svg><span className="worm-story-limit">{clock} to finish</span></span>

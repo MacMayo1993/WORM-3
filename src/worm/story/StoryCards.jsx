@@ -1,3 +1,5 @@
+import { storyGrowthTarget } from './starGoals.js';
+import StoryStarRequirements from './StoryStarRequirements.jsx';
 import ModeArtwork from '../../components/ui/ModeArtwork.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -77,7 +79,7 @@ export function StoryObjectiveCard({ compact = false }) {
     const shown = live?.settling || !expanded ? [] : open.slice(0, TRACKER_ROWS);
     const hidden = open.length - shown.length;
     const toggle = () => setExpanded(value => { writeTrackerPref(!value); return !value; });
-    const headline = recent ? `✓ ${recent.label}`
+    const headline = live?.canFinish ? `Tasks complete · grow to ${live.starGoals.target} for ★★★` : recent ? `✓ ${recent.label}`
       : expanded ? `Tasks ${completed}/${goals.length}`
         : live?.settling ? 'Land and clear your tail to finish'
           : next ? `${next.label} ${next.value}/${next.target}` : `Tasks ${completed}/${goals.length}`;
@@ -97,6 +99,13 @@ export function StoryObjectiveCard({ compact = false }) {
         <span className="worm-story-tracker-chevron" aria-hidden="true">{expanded ? '▴' : '▾'}</span>
         <span className="worm-hud-sr" role="status">{recent ? `${recent.label} complete.` : ''}</span>
       </button>
+      {live?.starGoals && <div className="worm-story-growth" aria-label="Three-star growth progress">
+        <span>★★★ Best length <b>{live.starGoals.peakLength}/{live.starGoals.target}</b></span>
+        <span>{live.starGoals.grown ? '✓' : 'segments'}</span>
+      </div>}
+      {live?.canFinish && <button type="button" className="worm-story-finish" onClick={() => useGameStore.getState().finishWormStory()}>
+        Finish with {live.starGoals.stars} stars
+      </button>}
       {expanded && <ul className="worm-story-live">
         {live?.settling ? <li className="is-settling"><span className="worm-story-live-label">Land and clear your tail to finish</span></li>
           : shown.map(goal => <li key={goal.key} aria-label={`${goal.label}: ${goal.value} of ${goal.target}`}>
@@ -106,6 +115,7 @@ export function StoryObjectiveCard({ compact = false }) {
           </li>)}
         {!live?.settling && hidden > 0 && <li className="worm-story-live-more">+{hidden} more · full list in Pause</li>}
       </ul>}
+      {expanded && <p className="worm-story-star-hint">★★★ Within {level.par}s · no tail cuts · reach {live?.starGoals?.target ?? storyGrowthTarget(level)} segments. All star rules in Pause.</p>}
       {expanded && live?.hint && !live.settling ? <p className="worm-story-live-hint">{live.hint}</p> : null}
     </section>;
   }
@@ -116,6 +126,7 @@ export function StoryObjectiveCard({ compact = false }) {
       <span className="worm-story-check" aria-hidden="true">{goal.done ? '✓' : '○'}</span>
       <span className="worm-story-task">{goal.label}</span><b aria-hidden="true">{goal.value}/{goal.target}</b>
     </li>)}</ul>
+    <StoryStarRequirements level={level} progress={live?.starGoals} />
     <p className="worm-story-clock">{state.started ? `${live?.seconds ?? level.limit}s left` : `Time limit: ${level.limit}s`}
       {!state.started && level.rotateEvery ? ` · Turn every ${level.rotateEvery}s` : ''}</p>
     {live?.settling ? <p role="status">Clear your tail and land to finish.</p> : live?.hint ? <p className="worm-story-power-hint">{live.hint}</p> : null}
@@ -161,6 +172,7 @@ export function StoryResult({ onNext, onRetry, onLevels }) {
         <span><small>New worm unlocked</small><strong>{getWormCharacter(result.unlockedCharacter).label}</strong>
           <em>{getWormCharacter(result.unlockedCharacter).type} · equip it from Your Worm</em></span>
       </div>}
+      <StoryStarRequirements level={level} result={result} />
       <StoryRewardChoices level={level} />
       <button className="worm-story-primary" onClick={last ? onLevels : onNext}>{primary} <span>→</span></button>
       <button className="worm-story-secondary" onClick={onRetry}>Play again</button><button className="worm-story-secondary" onClick={onLevels}>Levels</button>

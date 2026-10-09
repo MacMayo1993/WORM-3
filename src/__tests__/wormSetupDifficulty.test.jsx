@@ -54,7 +54,7 @@ for (const [name, Wizard, category, sizes] of [
 }
 
 it.each([
-  ['Easy', 2, 12, 20], ['Medium', 2.75, 10, 10], ['Hard', 3.5, 8, 5],
+  ['Easy', 2, 18, 20], ['Medium', 2.75, 16, 10], ['Hard', 3.5, 14, 5],
 ])('starts %s with the selected size and complete difficulty settings', (label, speed, orbs, interval) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement('div'); document.body.appendChild(host);

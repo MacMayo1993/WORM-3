@@ -4,7 +4,7 @@ import { newProgress, readPlayerSave, sanitizeProgress } from '../progression/mo
 import { storyLevel, storyOutcome, storyUnlocked } from '../worm/story/levels.js';
 import { getStoreItem } from '../utils/storeCatalog.js';
 const state = () => useGameStore.getState();
-const won = { alive: true, elapsed: 10, cuts: 0, orbs: 18, colors: 6 };
+const won = { alive: true, elapsed: 10, cuts: 0, peakLength: 100, orbs: 18, colors: 6 };
 function start(id = 1) {
   state().initWormMode(undefined, undefined, 3.5, 1, 30, null, true, true, id);
   useGameStore.setState({ wormStoryReady: true, wormGamePhase: 'active' });

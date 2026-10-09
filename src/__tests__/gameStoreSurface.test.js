@@ -15,6 +15,7 @@ const EXPECTED_KEYS = [
   'showCutawayLens', 'setShowCutawayLens', 'toggleCutawayLens',
   'captureMode', 'setCaptureMode',
   'wormStoryLevel', 'wormStoryStarted', 'wormStoryReady', 'wormStoryTarget', 'wormStoryProgress', 'wormStoryChecklist', 'wormStoryResult', 'startWormStory', 'completeWormStory', 'claimWormStoryReward',
+  'finishWormStory', 'wormStoryFinishRequested',
   'wormStoryVisualBase', 'wormStoryViewBase', 'applyWormStoryLook',
   'chaosIgnition', 'chaosIgnitionPicking', 'setChaosIgnition', 'setChaosIgnitionPicking',
   'chaosExperience', 'chaosFocusFaces', 'chaosRecord', 'setChaosFocusFaces', 'startChaosExperience', 'recordChaosTick', 'finishChaosExperience',

@@ -1,8 +1,8 @@
 // One choice configures the complete run; cube size remains independent.
 export const WORM_DIFFICULTIES = [
-  { id: 'easy', label: 'Easy', settings: { wormSpeed: 2, wormOrbCount: 12, wormholeInterval: 20 } },
-  { id: 'medium', label: 'Medium', settings: { wormSpeed: 2.75, wormOrbCount: 10, wormholeInterval: 10 } },
-  { id: 'hard', label: 'Hard', settings: { wormSpeed: 3.5, wormOrbCount: 8, wormholeInterval: 5 } },
+  { id: 'easy', label: 'Easy', settings: { wormSpeed: 2, wormOrbCount: 18, wormholeInterval: 20 } },
+  { id: 'medium', label: 'Medium', settings: { wormSpeed: 2.75, wormOrbCount: 16, wormholeInterval: 10 } },
+  { id: 'hard', label: 'Hard', settings: { wormSpeed: 3.5, wormOrbCount: 14, wormholeInterval: 5 } },
 ];
 
 // Preset counts describe a 3×3. Grow with edge length, not surface area.

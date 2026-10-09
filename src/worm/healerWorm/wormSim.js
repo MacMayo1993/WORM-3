@@ -323,6 +323,7 @@ export function makeWormSim(size) {
 
         // ── Body / trails ──────────────────────────────────────────────────────
         tailLength: BASE_TAIL_LENGTH,
+        peakTailLength: BASE_TAIL_LENGTH,
         powerups: [],
         stepHistory: makeStepHistory(MAX_TAIL * STEPS_PER_TILE),
         tileTrail: makeTileTrail(MAX_TAIL),
@@ -461,6 +462,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.cautionFall = null;
     sim.selfCollisionGraceSteps = 0;
     sim.tailLength = BASE_TAIL_LENGTH;
+    sim.peakTailLength = BASE_TAIL_LENGTH;
     sim.orbPickupColors = [];
     sim.orbPickupFaceIds = [];
     sim.colorEpoch++;
@@ -955,6 +957,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
 
 function applyOrbPickupGrowth(sim, ctx, color, faceId, segments = ORB_SEGMENT_GROWTH, recovered = false) {
     sim.tailLength = Math.min(sim.tailLength + segments, MAX_TAIL);
+    sim.peakTailLength = Math.max(sim.peakTailLength ?? 0, sim.tailLength);
     sim.orbPickupColors.push(color);
     sim.orbPickupFaceIds.push(faceId);
     sim.colorEpoch++;
