@@ -1360,13 +1360,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     </div>
 
                 </div>
-                {!combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD />}
-
-                <div className="worm-hud-status-row">
-                    {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
-                    {!combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
+                <div className="worm-hud-status-row worm-hud-telemetry">
+                    {!combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD compact />}
                     {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} />}
                 </div>
+                {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
+                {!combatMode && !demoLesson && !storyId && phase === 'crawling' && <WormMissionCard onInspect={handlePause} />}
             </div>
 
             {/* ── Zone 3: Thumb Tray — steer in the corners, act in the middle ── */}

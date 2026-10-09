@@ -25,7 +25,7 @@ const CALM = '#1f8a4c';
 const HOT = '#c26a00';
 const CRITICAL = '#c41e3a';
 
-export default function RotationCountdownHUD() {
+export default function RotationCountdownHUD({ compact = false }) {
   const { wormHealerMode, wormGamePhase, wormAlive, wormPaused, wormPhase } = useGameStore(
     useShallow(s => ({
       wormHealerMode: s.wormHealerMode ?? false,
@@ -84,23 +84,23 @@ export default function RotationCountdownHUD() {
       // The wording stays put and the colour escalates: a label that rewrites
       // itself next to a number that is already moving is one moving thing too
       // many at the moment the player most needs to read it.
-      if (label) label.textContent = held ? 'Rotation held' : 'Rotation in';
+      if (label) label.textContent = compact ? (held ? 'Turn held' : 'Turn in') : (held ? 'Rotation held' : 'Rotation in');
     };
     rafRef.current = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [running]);
+  }, [running, compact]);
 
   if (!running) return null;
 
   return (
     <div
-      className="worm-rotation-clock" ref={rootRef}
+      className={`worm-rotation-clock${compact ? ' is-compact' : ''}`} ref={rootRef}
       aria-hidden="true"
       style={{
         display: 'none',
         alignItems: 'center',
-        gap: 9,
-        padding: '5px 10px',
+        gap: compact ? 5 : 9,
+        padding: compact ? '4px 8px' : '5px 10px',
         minHeight: 30,
         flexShrink: 0,
         boxSizing: 'border-box',
@@ -116,9 +116,9 @@ export default function RotationCountdownHUD() {
       <span
         ref={labelRef}
         style={{
-          fontSize: 11,
+          fontSize: compact ? 9 : 11,
           fontWeight: 800,
-          letterSpacing: '0.14em',
+          letterSpacing: compact ? '0.04em' : '0.14em',
           textTransform: 'uppercase',
           color: GAME_HUD.muted,
           whiteSpace: 'nowrap'
@@ -127,19 +127,19 @@ export default function RotationCountdownHUD() {
         Rotation in
       </span>
 
-      <div style={{ width: BAR_W, flex: '1 1 auto', minWidth: 0, height: 4, borderRadius: 999, background: '#26372d1f', overflow: 'hidden' }}>
+      <div style={{ width: compact ? 32 : BAR_W, flex: '1 1 auto', minWidth: 0, height: 4, borderRadius: 999, background: '#26372d1f', overflow: 'hidden' }}>
         <div ref={fillRef} style={{ width: '100%', height: '100%', borderRadius: 999, background: CALM }} />
       </div>
 
       <span
         ref={secondsRef}
         style={{
-          fontSize: 14,
+          fontSize: compact ? 12 : 14,
           fontWeight: 800,
           fontFamily: MONO_FONT,
           fontVariantNumeric: 'tabular-nums',
           color: CALM,
-          minWidth: 48,
+          minWidth: compact ? 36 : 48,
           flexShrink: 0,
           textAlign: 'right'
         }}
