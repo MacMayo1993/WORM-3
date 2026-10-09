@@ -171,10 +171,11 @@ describe('elemental offering placement', () => {
     for (const e of els) expect(blocked.has(tileKey(e))).toBe(false);
   });
 
-  it('claiming one element wipes every other orb in the offering', () => {
-    // The offering is a choice: taking one element costs you the other four until
-    // the next spawn cycle. Driven through the real claim path (an orb sitting on
-    // the worm's own tile) rather than by calling startElemental directly.
+  it('a first claim leaves the offering up; the claim that fuses a pair wipes the rest', () => {
+    // Taking one element leaves the others on the board, so the player can go for a
+    // second and fuse the two. The claim that makes the pair takes the offering with
+    // it. Driven through the real claim path (an orb sitting on the worm's own tile)
+    // rather than by calling startElemental directly.
     const sim = makeSim();
     const ctx = makeCtx();
     const els = spawnOffering(sim, ctx);
@@ -191,6 +192,19 @@ describe('elemental offering placement', () => {
     }
 
     expect(sim.elementalType).toBe(target.type);
+    const left = sim.specials.filter(o => isElementalType(o.type));
+    expect(left.length).toBe(els.length - 1);
+
+    // Claim a second element mid-wash: the pair fuses and the offering is gone.
+    const second = left[0];
+    // Long enough to sit out the first claim's frozen camera beat.
+    for (let i = 0; i < 200 && !sim.elementalPair; i++) {
+      second.x = sim.pos.x; second.y = sim.pos.y; second.z = sim.pos.z; second.dirKey = sim.pos.dirKey;
+      stepWormSim(sim, 0.05, SIZE, ctx);
+    }
+    // The magnet's reach may take any leftover first; whichever it is fuses.
+    expect(left.map(o => o.type)).toContain(sim.elementalType);
+    expect(sim.elementalPair).toBe(target.type);
     expect(sim.specials.filter(o => isElementalType(o.type))).toHaveLength(0);
   });
 });

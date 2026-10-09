@@ -14,7 +14,10 @@ import { makeSignature, activateSignature, tickSignature, launchSpring, isParity
 import { SPRING_GRAB_TILES } from '../characterAbilities.js';
 import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
-import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches } from './elementalGameplay.js';
+import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
+    CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
+import { hasElement, activeFusion, claimElement } from './elementalFusion.js';
+import { springSlamTiles } from './jumpLanding.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState, inchGaitInto, inchBodyRadius } from './inchGait.js';
 import { arcLift } from './jumpArc.js';
@@ -274,14 +277,20 @@ export function makeWormSim(size) {
         waterMomentum: 0,
         viewPower: null,
         viewPowerT: 0,
-        elementalType: null,      // active elemental wash ('water'|'fire'|'grass'|'ice'|null)
-        elementalT: 0,            // seconds of elemental wash remaining
+        elementalType: null,      // active elemental wash: the newest claim ('water'|'fire'|'grass'|'ice'|'lightning'|null)
+        elementalPair: null,      // the element it is fused with, or null (elementalFusion.js); read both through hasElement
+        elementalT: 0,            // seconds of elemental wash remaining (shared by a fused pair)
         elementalMaxT: 0,         // duration of the active wash, for the HUD's fill
         elementalFocusT: 0,       // seconds remaining of the claim camera beat (pull out to the overview)
         // The tile the wash was claimed on, {x,y,z,dirKey}. Render-only: the cube
         // skin sweeps the element outward from here across the six faces instead of
         // having it appear everywhere at once. Nothing in the simulation reads it.
         elementalOrigin: null,
+        springLaunch: false,      // this jump left from a spring pad (Wildfire bursts where it lands)
+        // A fusion's one-shot beat for the mode to resolve against enemies and draw, keyed
+        // on seq like signature.slam: { seq, kind: 'wildfire', tile }. Read once per seq.
+        fusionBurst: null,
+        fusionSeq: 0,
         landingGraceT: 0,         // post-rocket window where a landing can't kill
         // Injected RNG — every random draw in the special system goes through this so
         // tests can make spawn type and placement deterministic. Set once at
@@ -445,10 +454,13 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.viewPower = null;
     sim.viewPowerT = 0;
     sim.elementalType = null;
+    sim.elementalPair = null;
     sim.elementalT = 0;
     sim.elementalMaxT = 0;
     sim.elementalFocusT = 0;
     sim.elementalOrigin = null;
+    sim.springLaunch = false;
+    sim.fusionBurst = null;
     sim.landingGraceT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -547,9 +559,13 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
         sim.jumpHeight = 1.5;
         // An in-progress corner keeps its existing path; changing it mid-step would snap.
     }
-    if (grounded && !sim.restRead && !liveRotation.active && consumeSpring(sim)) {
-        sim.jumpSpan = 2.2;
-        sim.jumpHeight = 1.8;
+    if (grounded) sim.springLaunch = false;
+    const pad = grounded && !sim.restRead && !liveRotation.active ? consumeSpring(sim) : null;
+    if (pad) {
+        // Thunderpad: a pad the storm charged launches rocket-high.
+        sim.jumpSpan = pad.charged ? CHARGED_SPRING_SPAN : 2.2;
+        sim.jumpHeight = pad.charged ? CHARGED_SPRING_HEIGHT : 1.8;
+        sim.springLaunch = true;
         ctx.onStoryMechanic?.('grassLaunch');
     }
     ctx.feel('jump');
@@ -667,13 +683,16 @@ export function startMagnet(sim, ctx) {
 }
 
 /**
- * Start — or replace — an elemental wash and its associated movement effect
- * while handing the renderer an element to bathe the cube in
- * for ELEMENTAL_DURATION seconds. Claiming a second element simply swaps the
- * active one, so the cube never shows two elements at once.
+ * Start an elemental wash, or fuse one into the wash already up, handing the renderer
+ * the element(s) to bathe the cube in for ELEMENTAL_DURATION seconds. A second
+ * element claimed mid-wash FUSES with it: both run, the pair's combo kicks in, and the
+ * clock refreshes for both. A third replaces the older of the two (claimElement in
+ * elementalFusion.js).
  */
 export function startElemental(sim, ctx, type) {
-    sim.elementalType = type;
+    const next = claimElement(sim.elementalT > 0 ? sim.elementalType : null, sim.elementalPair, type);
+    sim.elementalType = next.type;
+    sim.elementalPair = next.pair;
     sim.elementalT = ELEMENTAL_DURATION;
     sim.elementalMaxT = ELEMENTAL_DURATION;
     // Where the element enters the world. The orb is claimed by the head, so the
@@ -686,7 +705,8 @@ export function startElemental(sim, ctx, type) {
     // cube transform, then eases back to the chase (WormChaseCamera reads this).
     sim.elementalFocusT = ELEMENTAL_FOCUS_DURATION;
     ctx.feel(ELEMENTAL_EXPERIENCE[type]?.sound ?? 'orb');
-    ctx.onElementalTheme(type, ELEMENTAL_DURATION);
+    if (next.fused) ctx.onStoryMechanic?.('elementFusion', activeFusion(sim));
+    ctx.onElementalTheme(type, ELEMENTAL_DURATION, sim.elementalPair);
 }
 
 /** Apply a claimed special orb's effect. */
@@ -748,7 +768,7 @@ function tickCautionRescue(sim, delta, size, ctx) {
             sim.moveDir = turnWorm(sim.moveDir, input);
             sim.lastTurnDir = input;
             sim.tilesSinceTurn = 0;
-            sim.waterMomentum = 0;
+            if (turnShedsMomentum(sim)) sim.waterMomentum = 0;
             sim.pendingSelfCollision = null;
             // One departing step lets the player get clear of this edge before
             // the usual body-contact rules resume.
@@ -1242,12 +1262,16 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = fals
     const [claimed] = sim.specials.splice(idx, 1);
     evaluatePosAndNormal(sim, sim.interpT, _evalHPos);
     sim.pendingSpecialFlash = { type: claimed.type, pos: _evalHPos.toArray() };
-    // Claiming an element is a choice: grabbing one wipes the rest of the offering
-    // off the board until the next spawn cycle. Rocket/magnet are untouched.
+    // The first element of an offering leaves the rest on the board: crawl to another
+    // while the wash is up and the two fuse. The claim that makes a pair wipes what is
+    // left, so an offering fuses once. Rocket/magnet are untouched.
     if (isElementalType(claimed.type)) {
         ctx.onStoryMechanic?.('elementPickups', claimed.type);
-        for (let i = sim.specials.length - 1; i >= 0; i--) {
-            if (isElementalType(sim.specials[i].type)) sim.specials.splice(i, 1);
+        const fuses = claimElement(sim.elementalT > 0 ? sim.elementalType : null, sim.elementalPair, claimed.type).fused;
+        if (fuses) {
+            for (let i = sim.specials.length - 1; i >= 0; i--) {
+                if (isElementalType(sim.specials[i].type)) sim.specials.splice(i, 1);
+            }
         }
         // ...and it buys a quiet spell. On the spawn clock alone the next offering
         // arrived a breath after the wash ended, so there was always an orb on the
@@ -1703,7 +1727,7 @@ const PHASE_HANDLERS = {
                         }
                     }
                     if (sim.moveDir !== previousDirection) {
-                        sim.waterMomentum *= 0.35;
+                        if (turnShedsMomentum(sim)) sim.waterMomentum *= 0.35;
                         ctx.onSteer?.();
                     }
                 }
@@ -1893,7 +1917,7 @@ const PHASE_HANDLERS = {
                 sim.prevDirKey = sim.pos.dirKey;
                 // Snapshot the tile we're leaving as the interpolation source so a
                 // mid-step slice rotation can ride/commit it correctly.
-                if (sim.elementalType === 'fire' && sim.elementalT > 0 && !sim.isJumping && !liveRotation.active && !sim.restRead) {
+                if (hasElement(sim, 'fire') && !sim.isJumping && !liveRotation.active && !sim.restRead) {
                     addElementalPatch(sim, sim.pos, 'fire');
                 }
                 sim.prevTile = { x: sim.pos.x, y: sim.pos.y, z: sim.pos.z, dirKey: sim.pos.dirKey };
@@ -2352,8 +2376,9 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.elementalT = 0;
             sim.elementalMaxT = 0;
             sim.elementalType = null;
+            sim.elementalPair = null;
             sim.elementalOrigin = null;
-            ctx.onElementalTheme(null, 0);
+            ctx.onElementalTheme(null, 0, null);
         }
     }
 
@@ -2392,7 +2417,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     const rocketBase = Math.min(boostMult, ROCKET_SPEED_MULT);
     const handoff = 1 - (sim.rocketBoostHandoffT ?? 0) / ROCKET_BOOST_HANDOFF;
     const groundBlend = handoff * handoff * (3 - 2 * handoff);
-    const groundSpeed = boostMult * (1 + 0.25 * sim.waterMomentum);
+    const groundSpeed = boostMult * (1 + waterSpeedBonus(sim) * sim.waterMomentum);
     const speedMult = sim.rocketActive
         ? rocketBase + (ROCKET_SPEED_MULT - rocketBase) * throttle
         : rocketBase + (groundSpeed - rocketBase) * groundBlend;
@@ -2488,7 +2513,19 @@ export function stepWormSim(sim, delta, size, ctx) {
             // Spring's slam belongs where the worm came down, not where it has crawled to by
             // the time the signature clock notices it is on the ground.
             if (sim.signature.active > 0 && sim.signature.character === 'inch') sim.signature.landing = { ...sim.pos };
-            if (sim.elementalType === 'grass' && sim.elementalT > 0 && !liveRotation.active && !sim.restRead) {
+            const settled = !liveRotation.active && !sim.restRead;
+            // Wildfire: a spring leap comes down in a burst of flame. The 3x3 burns (a
+            // hot route, like the fire trail) and the mode kills the enemies in it.
+            if (sim.springLaunch && settled && activeFusion(sim) === 'wildfire') {
+                for (const key of springSlamTiles(sim.pos, size)) {
+                    const [x, y, z, dirKey] = key.split(',');
+                    addElementalPatch(sim, { x: +x, y: +y, z: +z, dirKey }, 'fire');
+                }
+                sim.fusionBurst = { seq: ++sim.fusionSeq, kind: 'wildfire', tile: { ...sim.pos } };
+                ctx.feel('cut');
+            }
+            sim.springLaunch = false;
+            if (hasElement(sim, 'grass') && settled) {
                 addElementalPatch(sim, sim.pos, 'grass');
             }
             sim.jumpT = 0;

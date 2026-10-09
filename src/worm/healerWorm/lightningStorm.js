@@ -19,6 +19,7 @@ export const STORM = Object.freeze({
   flash: 0.6,          // seconds a landed strike stays on screen
   bodyShare: 0.4,      // share of marks aimed at the worm's own body
   headSafeTiles: 2,    // never aimed this close to the head, or ahead of it
+  padShare: 0.5,       // Thunderpad: share of marks aimed at a spring pad when one is free
   retry: 0.1           // seconds before trying again when no tile could be found
 });
 
@@ -85,10 +86,15 @@ export function tickStorm(storm, delta, { spawning, pick, rng }) {
  * @param {Array<object>} args.tiles every surface tile
  * @param {Array<string>} args.body body tile keys, head first (index 0)
  * @param {Set<string>} args.avoid keys never to mark (head zone, orbs, specials, bombs, open marks)
+ * @param {Array<object>} [args.pads] Thunderpad: spring pad tiles the storm aims for first
  * @param {() => number} rng
  */
-export function pickStrikeTile({ tiles, body, avoid }, rng) {
+export function pickStrikeTile({ tiles, body, avoid, pads = null }, rng) {
   const key = t => `${t.x},${t.y},${t.z},${t.dirKey}`;
+  if (pads?.length) {
+    const free = pads.filter(t => !avoid.has(key(t)));
+    if (free.length && rng() < STORM.padShare) return free[Math.floor(rng() * free.length)];
+  }
   if (body.length > 0 && rng() < STORM.bodyShare) {
     const hittable = body.filter(k => k && !avoid.has(k));
     if (hittable.length) {

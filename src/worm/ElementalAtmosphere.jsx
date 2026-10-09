@@ -120,10 +120,13 @@ function ElementalParticles({ element, kind, color, extent, count }) {
 
 export default function ElementalAtmosphere({ size = 3 }) {
   const element = useGameStore((s) => s.wormElementalTheme);
+  // A fused pair: both elements wash over the cube at once (elementalFusion.js).
+  const partner = useGameStore((s) => s.wormElementalPartner);
   const lightRef = useRef();
   const elapsedRef = useRef(0);
 
   const def = element ? getElementalDef(element) : null;
+  const partnerDef = def && partner ? getElementalDef(partner) : null;
 
   // Device budget: how many particles this machine can afford, and whether the
   // viewer has asked for no motion at all. Fixed per mount — none of its inputs
@@ -144,7 +147,12 @@ export default function ElementalAtmosphere({ size = 3 }) {
   // Particle envelope large enough to surround the whole cube.
   const extent = size * 0.75 + 1.6;
 
-  const lightColor = useMemo(() => (def ? new THREE.Color(def.color) : new THREE.Color('#fff')), [def]);
+  // A fusion lights the cube halfway between its two elements.
+  const lightColor = useMemo(() => {
+    if (!def) return new THREE.Color('#fff');
+    const c = new THREE.Color(def.color);
+    return partnerDef ? c.lerp(new THREE.Color(partnerDef.color), 0.5) : c;
+  }, [def, partnerDef]);
 
 
   useFrame((_, delta) => {
@@ -165,7 +173,10 @@ export default function ElementalAtmosphere({ size = 3 }) {
   return (
     <group>
       {/* The element laid on the cube itself — the main event. */}
-      {def && <ElementalCubeSkin size={size} />}
+      {def && <ElementalCubeSkin size={size} element={element} />}
+      {/* The fused partner's skin over the same cube. Shells sit at their own depths
+          (water 0.105, ice 0.075, charge 0.016), so two never share a surface. */}
+      {partnerDef && <ElementalCubeSkin size={size} element={partner} />}
 
       {/* Element-coloured fill light — the worm and cube pick up the element's hue
           as they move through it. */}
@@ -184,6 +195,17 @@ export default function ElementalAtmosphere({ size = 3 }) {
           color={element === 'fire' ? def.color : def.accent}
           extent={extent}
           count={quality.particleCount}
+        />
+      )}
+      {/* The partner's medium at half density, so a fusion costs one and a half fields. */}
+      {partnerDef && quality.particleCount > 1 && (
+        <ElementalParticles
+          key={`partner-${partner}`}
+          element={partner}
+          kind={partnerDef.particle}
+          color={partner === 'fire' ? partnerDef.color : partnerDef.accent}
+          extent={extent}
+          count={Math.floor(quality.particleCount / 2)}
         />
       )}
     </group>

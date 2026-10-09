@@ -142,6 +142,7 @@
 .worm-buff-name { font-size:9px; text-transform:capitalize; }
 .worm-element-medal { width:24px; height:24px; display:grid; place-items:center; flex-shrink:0; }
 .worm-element-medal>svg { position:absolute; }
+.worm-element-partner { width:18px; height:18px; margin-left:-6px; border-radius:50%; background:color-mix(in srgb, var(--power-color) 28%, transparent); box-shadow:0 0 0 1.5px var(--power-color); }
 .worm-buff-meter { position:absolute; bottom:0; left:0; height:3px; background:var(--power-color); transform-origin:left; }
 .worm-momentum-meter { width:100%; transform:scaleX(0); }
 .worm-buffs-detailed { display:flex; flex-direction:column; overflow:visible; text-align:left; margin:12px 0; }

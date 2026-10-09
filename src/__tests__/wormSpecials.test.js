@@ -309,7 +309,7 @@ describe('elemental offering', () => {
     expect(tileKey(elems[0])).toBe(tileKey(centers[0]));
   });
 
-  it('grabbing one element wipes the rest of the offering', () => {
+  it('grabbing one element leaves the rest of the offering up for a fusion', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specialTimer = 9999;
@@ -324,7 +324,9 @@ describe('elemental offering', () => {
     stepUntilCommit(sim, ctx);
     run(sim, ctx, 1, 0.01);
     expect(sim.elementalType).toBe('water'); // the one grabbed starts its wash
-    expect(sim.specials).toHaveLength(0);    // the other three are wiped
+    expect(sim.elementalPair).toBeNull();
+    // The rest stay on the board: crawling onto one while the wash is up fuses it.
+    expect(sim.specials.map(s => s.type).sort()).toEqual(['fire', 'grass', 'ice']);
   });
 
   it('goes quiet for a while after an element is actually claimed', () => {

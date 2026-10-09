@@ -67,6 +67,8 @@ export const makeWormSessionDefaults = () => ({
   // ElementalAtmosphere overlay and the HUD's element pill. Remaining seconds
   // ride the wormBuffs bridge, not the store.
   wormElementalTheme: null,
+  // The element fused with wormElementalTheme (elementalFusion.js), or null.
+  wormElementalPartner: null,
   wormViewPower: null,
   // { kind: 'spawn'|'expire', type, seq } — drives the HUD's special notice toast.
   wormSpecialNotice: null,

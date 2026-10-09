@@ -1,3 +1,4 @@
+import { hasElement } from '../healerWorm/elementalFusion.js';
 import { drawViewPower, getViewPowerDef } from '../healerWorm/viewPowerups.js';
 import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { tileKey } from '../healerWorm/wormSim.js';
@@ -44,7 +45,7 @@ export function updateMastery(sim, p, level, delta) {
   else if (p.boosting && sim.phase === 'crawling') { add(p, 'boosts'); p.boosting = false; }
   if (sim.isJumping && !sim.rocketActive && !p.flying) {
     p.doubleJump ||= sim.jumpCount >= 2;
-    if (sim.elementalT > 0 && sim.elementalType === 'ice') p.iceJump = true;
+    if (hasElement(sim, 'ice')) p.iceJump = true;
   }
   if (sim.rocketActive) { p.flying = true; p.doubleJump = false; p.grassJump = false; p.iceJump = false; }
   // An explosion counts once the cube has closed again with the worm still on it.
