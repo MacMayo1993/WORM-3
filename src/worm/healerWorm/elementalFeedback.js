@@ -1,3 +1,15 @@
+import { fusionEffect } from './elementalFusion.js';
+
+export function fusionFeedback(recipe, buffs) {
+    const effect = fusionEffect(recipe);
+    if (effect) return elementalFeedback(recipe.catalyst, buffs, effect);
+    // Recipes without a special rule still combine two real mechanics. Name
+    // both rather than quietly showing only the newest element's feedback.
+    const effects = { water: 'Water momentum', fire: 'Fire trail', grass: 'Nature spring pads', ice: 'Ice sliding', lightning: 'Lightning strikes' };
+    const fraction = [recipe.base, recipe.catalyst].includes('water') ? elementalFeedback('water', buffs).fraction : 0;
+    return { text: `${effects[recipe.base]} + ${effects[recipe.catalyst]}`, fraction };
+}
+
 export function elementalFeedback(type, buffs, fusion = null) {
     const momentum = buffs.rocketActive ? 0 : Math.max(0, Math.min(1, buffs.waterMomentum || 0));
     // A fused pair's own rule leads the readout (elementalFusion.js).

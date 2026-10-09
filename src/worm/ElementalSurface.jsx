@@ -31,7 +31,7 @@ import * as THREE from 'three';
 import { sharedUniforms } from '../3d/styles/TileStyleMaterials.jsx';
 import { attachCellAttributes } from './healerWorm/elementalCells.js';
 import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
-import { GLSL_WORM, uWormHead, uWormBody, uClaimOrigin, uCubeHalf } from './healerWorm/elementalUniforms.js';
+import { GLSL_WORM, uWormHead, uWormBody, uCubeHalf } from './healerWorm/elementalUniforms.js';
 
 export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2 };
 
@@ -546,8 +546,8 @@ const fragmentShader = /* glsl */ `
 const _matCache = new Map();
 /**
  * One material per element. The colour and accent come from the element's
- * definition; the envelope, the worm and the claim origin are shared uniform
- * objects the skin's frame loop writes once per frame.
+ * definition; each element keeps its own envelope and claim origin, while the
+ * worm uniforms are shared across layers.
  */
 export function getElementalSurfaceMaterial(element, colorHex, accentHex, highDetail = true) {
   const mode = SURFACE_MODE[element] ?? 0;
@@ -565,7 +565,8 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex, highDe
         uAccent: { value: new THREE.Color(accentHex) },
         uWormHead,
         uWormBody,
-        uClaimOrigin,
+        // A fused layer keeps its own original sweep as the second arrives.
+        uClaimOrigin: { value: new THREE.Vector4() },
         uCubeHalf
       },
       vertexShader,

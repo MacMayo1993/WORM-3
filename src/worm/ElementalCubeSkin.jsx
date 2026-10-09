@@ -44,12 +44,12 @@ import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { resolveElementalRenderer } from './healerWorm/elementalRenderers.js';
 import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
-import { elementalEnvelope } from './healerWorm/elementalLifecycle.js';
+import { elementalEnvelope, advanceElementalLayer } from './healerWorm/elementalLifecycle.js';
 import { cellEdgeMask, cellSeed, cellSweepDelay, resolveSweepOrigin } from './healerWorm/elementalSeeds.js';
 import { buildElementalCells } from './healerWorm/elementalCells.js';
 import { wormBuffs } from './wormBuffs.js';
 import { readLiveTile } from './wormHelpers.js';
-import { publishWormUniforms, uClaimOrigin, uCubeHalf } from './healerWorm/elementalUniforms.js';
+import { publishWormUniforms, uCubeHalf } from './healerWorm/elementalUniforms.js';
 import { getWormStickerWorldPos } from './wormExpansion.js';
 import ElementalGrassSkin from './ElementalGrassSkin.jsx';
 import ElementalFireSkin from './ElementalFireSkin.jsx';
@@ -123,6 +123,7 @@ function buildCellData(cells) {
 // element (ElementalAtmosphere). Without it, the newest element in the store.
 export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
   const storeElement = useGameStore((s) => s.wormElementalTheme);
+  const fused = useGameStore((s) => !!s.wormElementalPartner);
   const element = elementProp === undefined ? storeElement : elementProp;
   const def = element ? getElementalDef(element) : null;
   // An unknown element resolves to null and the skin draws nothing rather than
@@ -142,12 +143,13 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
 
   // Every skin writes one matrix per cover cell into its single instanced mesh.
   const instRef = useRef(null);
-  const elapsedRef = useRef(0);
+  const clockRef = useRef({ elapsed: 0, claim: undefined, origin: null });
+  const claimPoint = useRef(new THREE.Vector4());
   const lastElementRef = useRef(null);
   const lastOriginRef = useRef(undefined);
   if (lastElementRef.current !== element) {
     lastElementRef.current = element;
-    elapsedRef.current = 0;
+    clockRef.current = { elapsed: 0, claim: undefined, origin: null };
     instRef.current = null;
     lastOriginRef.current = undefined;
   }
@@ -155,30 +157,29 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
   useFrame((_, delta) => {
     if (!Skin) return;
     if (useGameStore.getState().wormPaused) return;
-    if (lastOriginRef.current !== wormBuffs.elementalOrigin) elapsedRef.current = 0;
-    elapsedRef.current += Math.min(delta, 0.1);
+    const clock = advanceElementalLayer(clockRef.current, wormBuffs.elementalOrigin, fused, delta);
     // One envelope, shared with the fill light and the particles. wormBuffs mirrors
     // the sim clock, so it freezes on pause and during tunnel transit.
-    const env = elementalEnvelope({ element, elapsed: elapsedRef.current, remaining: wormBuffs.elementalT });
+    const env = elementalEnvelope({ element, elapsed: clock.elapsed, remaining: wormBuffs.elementalT });
 
     // The claim sweep's starting point. The sim snapshots the tile the orb was
     // taken on and never mutates it, so an identity check is enough to notice a new
     // claim — this recomputes once per wash, not per frame.
-    if (lastOriginRef.current !== wormBuffs.elementalOrigin) {
-      lastOriginRef.current = wormBuffs.elementalOrigin;
+    if (lastOriginRef.current !== clock.origin) {
+      lastOriginRef.current = clock.origin;
       // Under reduced motion nothing travels across the cube: every cell arrives
       // together, as one uniform fade and grow, instead of a front sweeping out
       // from the claimed tile.
-      const origin = quality.animate ? wormBuffs.elementalOrigin : null;
+      const origin = quality.animate ? clock.origin : null;
       writeSweep(cells, cellData.sweep, origin);
       const attr = instRef.current?.geometry?.getAttribute?.('aSweep');
       if (attr) attr.needsUpdate = true;
       // The same origin as a world point, for the shell skins' continuous flood.
       if (origin) {
         const wp = getWormStickerWorldPos(origin.x, origin.y, origin.z, origin.dirKey, size, 0);
-        uClaimOrigin.value.set(wp[0], wp[1], wp[2], 1);
+        claimPoint.current.set(wp[0], wp[1], wp[2], 1);
       } else {
-        uClaimOrigin.value.set(0, 0, 0, 0);
+        claimPoint.current.set(0, 0, 0, 0);
       }
     }
     uCubeHalf.value = size / 2;
@@ -223,7 +224,8 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
       const u = mats[m]?.uniforms;
       if (!u) continue;
       if (u.uEnv) u.uEnv.value.set(env.intensity, env.claim, env.release, quality.animate ? 1 : 0);
-      if (u.uElapsed) u.uElapsed.value = quality.animate ? elapsedRef.current : 0;
+      if (u.uElapsed) u.uElapsed.value = quality.animate ? clock.elapsed : 0;
+      if (u.uClaimOrigin) u.uClaimOrigin.value.copy(claimPoint.current);
     }
   });
 

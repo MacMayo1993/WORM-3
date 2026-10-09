@@ -31,6 +31,20 @@ export const ELEMENTAL_FADE_IN = 0.55;
 /** Seconds of dissolve at the end of a wash — matched across skin, light, particles. */
 export const ELEMENTAL_FADE_OUT = 1.25;
 
+// Each keyed skin owns this clock. A fusion refreshes the shared duration but
+// keeps an existing layer's sweep and age; only a newly added element grows in.
+export function advanceElementalLayer(clock, origin, fused, delta) {
+  if (clock.claim !== origin) {
+    if (!fused || clock.claim === undefined) {
+      clock.elapsed = 0;
+      clock.origin = origin;
+    }
+    clock.claim = origin;
+  }
+  clock.elapsed += Math.min(Math.max(delta, 0), 0.1);
+  return clock;
+}
+
 /** Smoothstep. Kept here so every consumer eases identically. */
 export const smoothstep01 = (t) => {
   const x = t <= 0 ? 0 : t >= 1 ? 1 : t;

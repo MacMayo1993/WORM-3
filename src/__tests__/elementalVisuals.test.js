@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   elementalEnvelope,
+  advanceElementalLayer,
   smoothstep01,
   ELEMENTAL_FADE_IN,
   ELEMENTAL_FADE_OUT,
@@ -41,6 +42,25 @@ import { ELEMENTAL_TYPES, getElementalDef } from '../worm/healerWorm/elementalDe
 import { ELEMENTAL_DURATION, ELEMENTAL_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
 
 describe('elemental lifecycle envelope', () => {
+  it('keeps the first layer fully present as a second element begins its own sweep', () => {
+    const first = { x: 1 }, second = { x: 2 };
+    const water = { elapsed: 0, claim: undefined, origin: null };
+    for (let i = 0; i < 30; i++) advanceElementalLayer(water, first, false, 0.1);
+    advanceElementalLayer(water, second, true, 0.1);
+    expect(water.origin).toBe(first);
+    expect(elementalEnvelope({ element: 'water', elapsed: water.elapsed, remaining: 10 }).claim).toBe(1);
+    const fire = advanceElementalLayer({ elapsed: 0, claim: undefined }, second, true, 0.1);
+    expect(fire.origin).toBe(second);
+    expect(fire.elapsed).toBe(0.1);
+    expect(elementalEnvelope({ element: 'fire', elapsed: fire.elapsed, remaining: 10 }).intensity).toBeLessThan(1);
+    // Reversing the recipe keeps both established layers; a standalone refresh
+    // still gets the ordinary pickup reveal.
+    advanceElementalLayer(water, first, true, 0.1);
+    expect(water.elapsed).toBeGreaterThan(3);
+    advanceElementalLayer(water, second, false, 0.1);
+    expect(water.elapsed).toBe(0.1);
+    expect(water.origin).toBe(second);
+  });
   const full = (o) => elementalEnvelope({ remaining: ELEMENTAL_DURATION, ...o });
 
   it('rises from nothing on claim and reaches full strength after the fade-in', () => {

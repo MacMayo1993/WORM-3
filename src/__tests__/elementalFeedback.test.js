@@ -1,6 +1,14 @@
 import { it, expect } from 'vitest';
-import { elementalFeedback, patchOpacity, springStretch } from '../worm/healerWorm/elementalFeedback.js';
+import { elementalFeedback, fusionFeedback, patchOpacity, springStretch } from '../worm/healerWorm/elementalFeedback.js';
+import { getFusion } from '../worm/healerWorm/elementalFusion.js';
 import { wormBuffs, resetWormBuffs } from '../worm/wormBuffs.js';
+it('explains fusion-specific benefits and both base mechanics for combinations without a bonus rule', () => {
+  expect(fusionFeedback(getFusion('water', 'ice'), { waterMomentum: 1 }).text).toContain('+40%');
+  expect(fusionFeedback(getFusion('ice', 'water'), { waterMomentum: 1 }).text).toContain('+40%');
+  expect(fusionFeedback(getFusion('water', 'fire'), {}).text).toContain('Puts out bombs');
+  expect(fusionFeedback(getFusion('fire', 'water'), {}).text).toContain('Obsidian');
+  expect(fusionFeedback(getFusion('water', 'grass'), {}).text).toBe('Water momentum + Nature spring pads');
+});
 it('shows actual water gain and does not claim a water boost during rocket override', () => {
   expect(elementalFeedback('water', { waterMomentum: 0.8 }).text).toContain('+20%');
   expect(elementalFeedback('water', { waterMomentum: 1, rocketActive: true }).fraction).toBe(0);

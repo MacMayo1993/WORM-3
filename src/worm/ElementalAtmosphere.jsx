@@ -24,6 +24,7 @@ import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { wormBuffs } from './wormBuffs.js';
 import { getElementalParticleMaterial } from './healerWorm/elementalParticleMaterial.js';
 import ElementalCubeSkin from './ElementalCubeSkin.jsx';
+import FusionAura from './healerWorm/FusionAura.jsx';
 
 // Per-behaviour motion. `vy` is the vertical drift (units/sec, sign = direction),
 // `sway` the horizontal wobble amplitude, `blend` the material blending, and
@@ -127,6 +128,7 @@ export default function ElementalAtmosphere({ size = 3 }) {
 
   const def = element ? getElementalDef(element) : null;
   const partnerDef = def && partner ? getElementalDef(partner) : null;
+  const layers = partnerDef ? [partner, element] : def ? [element] : [];
 
   // Device budget: how many particles this machine can afford, and whether the
   // viewer has asked for no motion at all. Fixed per mount — none of its inputs
@@ -140,8 +142,8 @@ export default function ElementalAtmosphere({ size = 3 }) {
   // cleanly rather than snapping to full strength.
   const lastElementRef = useRef(null);
   if (lastElementRef.current !== element) {
+    if (!partnerDef || !lastElementRef.current) elapsedRef.current = 0;
     lastElementRef.current = element;
-    elapsedRef.current = 0;
   }
 
   // Particle envelope large enough to surround the whole cube.
@@ -173,10 +175,10 @@ export default function ElementalAtmosphere({ size = 3 }) {
   return (
     <group>
       {/* The element laid on the cube itself — the main event. */}
-      {def && <ElementalCubeSkin size={size} element={element} />}
-      {/* The fused partner's skin over the same cube. Shells sit at their own depths
-          (water 0.105, ice 0.075, charge 0.016), so two never share a surface. */}
-      {partnerDef && <ElementalCubeSkin size={size} element={partner} />}
+      {layers.map(type => <ElementalCubeSkin key={type} size={size} element={type} />)}
+      {/* Keyed layers retain the first element when it becomes the partner.
+          Shells sit at their own depths; the aura marks the combined state. */}
+      {partnerDef && <FusionAura key={`${partner}>${element}`} base={partner} catalyst={element} animate={quality.animate} />}
 
       {/* Element-coloured fill light — the worm and cube pick up the element's hue
           as they move through it. */}
@@ -185,29 +187,19 @@ export default function ElementalAtmosphere({ size = 3 }) {
       {/* Lightning's strikes are gameplay now (lightningStorm.js, LightningStrikes.jsx), drawn by
           the mode: a bolt here that hurt nothing would teach the player to ignore the real ones. */}
 
-      {/* Drifting medium around the cube — bubbles/embers/spores/snow. Reduced
+      {/* Split one particle budget between both elements. Reduced
           motion and the floor budget both zero the count, which drops the field
           entirely rather than animating an empty buffer. */}
-      {def && quality.particleCount > 0 && (
+      {quality.particleCount > 0 && layers.map(type => (
         <ElementalParticles
-          element={element}
-          kind={def.particle}
-          color={element === 'fire' ? def.color : def.accent}
+          key={type}
+          element={type}
+          kind={getElementalDef(type).particle}
+          color={type === 'fire' ? getElementalDef(type).color : getElementalDef(type).accent}
           extent={extent}
-          count={quality.particleCount}
+          count={Math.floor(quality.particleCount / layers.length)}
         />
-      )}
-      {/* The partner's medium at half density, so a fusion costs one and a half fields. */}
-      {partnerDef && quality.particleCount > 1 && (
-        <ElementalParticles
-          key={`partner-${partner}`}
-          element={partner}
-          kind={partnerDef.particle}
-          color={partner === 'fire' ? partnerDef.color : partnerDef.accent}
-          extent={extent}
-          count={Math.floor(quality.particleCount / 2)}
-        />
-      )}
+      ))}
     </group>
   );
 }

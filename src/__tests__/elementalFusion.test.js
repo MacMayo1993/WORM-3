@@ -79,6 +79,18 @@ describe('fusion catalogue', () => {
 });
 
 describe('claiming into a fusion', () => {
+  it.each(Object.values(ORDERED_FUSIONS))('$label retains both mechanics and emits a fusion cue only on a new pairing', recipe => {
+    const sim = makeSim(), ctx = makeCtx(), sounds = [];
+    ctx.feel = sound => sounds.push(sound);
+    startElemental(sim, ctx, recipe.base);
+    expect(sounds).not.toContain('elementFusion');
+    startElemental(sim, ctx, recipe.catalyst);
+    expect(sounds.at(-1)).toBe('elementFusion');
+    expect(hasElement(sim, recipe.base)).toBe(true);
+    expect(hasElement(sim, recipe.catalyst)).toBe(true);
+    startElemental(sim, ctx, recipe.catalyst);
+    expect(sounds.filter(sound => sound === 'elementFusion')).toHaveLength(1);
+  });
   it('fuses a second element, refreshes on a repeat, and lets a third replace the older', () => {
     expect(claimElement(null, null, 'water')).toEqual({ type: 'water', pair: null, fused: false });
     expect(claimElement('water', null, 'fire')).toEqual({ type: 'fire', pair: 'water', fused: true });

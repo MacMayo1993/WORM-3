@@ -17,7 +17,7 @@ import { SIGNATURES } from './healerWorm/signatures.js';
 import JumpRescueCue from './JumpRescueCue.jsx';
 import { XpRunSummary } from '../progression/ProgressWidgets.jsx';
 import WormMissionCard, { WormReplayLabel } from './WormMissionCard.jsx';
-import { elementalFeedback } from './healerWorm/elementalFeedback.js';
+import { elementalFeedback, fusionFeedback } from './healerWorm/elementalFeedback.js';
 // src/worm/WormCrawlerHUD.jsx
 // Mobile-first "Antipodal HUD" for WORM Chase-Cam Mode.
 // Three-zone layout: Glance Strip (top, info-only) · Game Scene · Thumb Tray (bottom, all controls).
@@ -35,7 +35,7 @@ import { callWormTurn } from './wormTurnBridge.js';
 import { wormBuffs } from './wormBuffs.js';
 import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
-import { getFusion, fusionEffect, fusionRecipeLabel, ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
+import { getFusion, fusionRecipeLabel, ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
 import { wormClock } from './wormClock.js';
 import { feel, resumeFeel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
@@ -824,7 +824,7 @@ function BuffStrip({ detailed = false, onInspect }) {
             // A pair with no rule of its own reads as its water half, if it has one, so
             // the momentum readout survives a fusion.
             const lead = elementalPartner === 'water' ? 'water' : elementalTheme;
-            const feedback = elementalFeedback(lead, wormBuffs, fusionEffect(fusion));
+            const feedback = fusion ? fusionFeedback(fusion, wormBuffs) : elementalFeedback(lead, wormBuffs);
             if (feedbackRef.current && feedbackRef.current.textContent !== feedback.text) feedbackRef.current.textContent = feedback.text;
             if (momentumRef.current) momentumRef.current.style.transform = `scaleX(${feedback.fraction})`;
             raf = requestAnimationFrame(paint);
@@ -898,7 +898,8 @@ function BuffStrip({ detailed = false, onInspect }) {
             </button>
             {detailed && <p>{magnetDef.description}</p>}
         </div>}
-        {elemDef && <div className="worm-buff-item">
+        {elemDef && <div className={`worm-buff-item${fusion ? ' is-fusion' : ''}`}
+            style={fusion ? { '--fusion-base': partnerDef.color, '--fusion-catalyst': elemDef.color } : undefined}>
             <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
                 style={{ '--power-color': elemDef.color }}
                 title={fusion ? fusionRecipeLabel(fusion) : elemDef.label}
@@ -907,7 +908,7 @@ function BuffStrip({ detailed = false, onInspect }) {
                 {partnerDef && <span className="worm-element-medal worm-element-partner" aria-hidden="true" style={{ '--power-color': partnerDef.color }}>
                     <SpecialIcon type={elementalPartner} size={12} />
                 </span>}
-                {partnerDef && <span aria-hidden="true">→</span>}
+                {partnerDef && <span aria-hidden="true">+</span>}
                 <span className="worm-element-medal" aria-hidden="true">
                     <svg width="24" height="24" viewBox="0 0 22 22">
                         <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="#26372d22" strokeWidth="2" />
@@ -916,11 +917,15 @@ function BuffStrip({ detailed = false, onInspect }) {
                     </svg>
                     <SpecialIcon type={elementalTheme} size={12} />
                 </span>
-                <span className="worm-buff-name">{elemLabel}</span>
+                <span className="worm-buff-name">{fusion && <small className="worm-fusion-label">Fusion active</small>}{elemLabel}</span>
                 <span ref={elemSecondsRef} aria-hidden="true" />
                 {hasWater && <span className="worm-buff-meter worm-momentum-meter" ref={momentumRef} aria-hidden="true" />}
             </button>
-            {detailed && <div className="worm-power-detail">{fusion && <strong>{fusionRecipeLabel(fusion)}</strong>}<p>{elemDescription}</p><p ref={feedbackRef} /></div>}
+            {fusion && !detailed && <div className="worm-fusion-live" key={fusion.id}>
+                <span role="status">{partnerDef.label} → {elemDef.label} · Both active</span>
+                <strong ref={feedbackRef}>{fusionFeedback(fusion, wormBuffs).text}</strong>
+            </div>}
+            {detailed && <div className="worm-power-detail">{fusion && <strong>{fusionRecipeLabel(fusion)} · Both elements active</strong>}<p>{elemDescription}</p><p ref={feedbackRef} /></div>}
             {preview && (detailed
                 ? <p className="worm-fusion-preview">Next pickup — {fusionRecipeLabel(preview)}. {preview.description}</p>
                 : <button type="button" className="worm-fusion-preview" onClick={onInspect} title={preview.description}>

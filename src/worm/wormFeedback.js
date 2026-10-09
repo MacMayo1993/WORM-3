@@ -4,6 +4,7 @@ import { feel, noise, tone, stopFeel } from '../utils/feel.js';
 const notes = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66];
 const level = value => Math.min(6, Math.max(0, Number.isFinite(value) ? value : 0));
 export const WORM_HAPTICS = {
+  elementFusion: [24, 35, 24, 45, 48],
   orb: combo => [16 + level(combo) * 2, 24, 9],
   dive: [24, 32, 12, 38, 22],
   tunnelRush: [8, 38, 12], tunnelFold: [10, 32, 10], tunnelRelease: [12, 25, 18],
@@ -16,6 +17,13 @@ export const WORM_HAPTICS = {
 
 const thump = (freq = 130, gain = 0.24) => tone({ freq, freqTo: 55, dur: 0.10, gain });
 const WORM_SFX = {
+  elementFusion() {
+    // Two voices converge, then resolve into a chord: a combination, not another
+    // ordinary pickup. All voices use the existing mute/pause lifecycle.
+    tone({ freq: 330, freqTo: 660, dur: 0.23, type: 'triangle', gain: 0.2 });
+    tone({ freq: 990, freqTo: 660, dur: 0.23, gain: 0.15 });
+    for (const freq of [523.25, 659.25, 783.99]) tone({ freq, dur: 0.42, gain: 0.12, when: 0.23 });
+  },
   orb(combo = 0) {
     const f = notes[Math.floor(level(combo))];
     thump(170, 0.22);
@@ -64,7 +72,7 @@ const WORM_SFX = {
   },
 };
 const vocabulary = { sfx: WORM_SFX, haptics: WORM_HAPTICS };
-const priorities = { death: 5, cut: 4, shieldHit: 4, heal: 4, dive: 3, exit: 3,
+const priorities = { death: 5, cut: 4, shieldHit: 4, heal: 4, elementFusion: 3, dive: 3, exit: 3,
   enemyDown: 3, shotHit: 2, orb: 2, shot: 1, recharge: 0 };
 
 /** Per-run arbitration. Uses the game clock: no timers or catch-up buzzes. */
