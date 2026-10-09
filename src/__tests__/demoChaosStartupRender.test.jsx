@@ -89,9 +89,15 @@ it.each([false, true])('renders demo Chaos through the first deaths and final pa
     expect(labels()).toContain('#52');
     expect(textRender).not.toHaveBeenCalled();
     const batches = pool.group.children.filter(o => o.count > 0 && o.material.map?.isCanvasTexture);
-    expect(batches.every(o => o.renderOrder === 2 && o.material.depthTest === false)).toBe(true);
+    // Epitaphs are engraved on the plaque and depth-tested like the stone, not drawn
+    // over the cube from behind it.
+    expect(batches.every(o => o.material.depthTest === true)).toBe(true);
     expect(batches.length).toBeGreaterThan(0);
     expect(batches.length).toBeLessThanOrEqual(17);
+    // Every grave on the cube is one instanced draw of the shared tombstone.
+    const graves = pool.group.children.filter(o => o.count > 0 && o.name === 'TileSurfaceBatch:Tombstone');
+    expect(graves).toHaveLength(1);
+    expect(graves[0].count).toBe(52);
     await act(async () => useGameStore.getState().setDisparityWinner({ pair }));
     await settle();
     expect(store.getState().scene).toBe(scene);

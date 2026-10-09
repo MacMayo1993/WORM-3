@@ -7,8 +7,7 @@ import { effectiveFlipPads } from '../game/raisedCubie.js';
 import { flipPose } from '../utils/flipPose.js';
 import { chaosFlipPose, CHAOS_FLIP_DURATION } from './chaosFlipPose.js';
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Text, Billboard } from '@react-three/drei';
+import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
 import { isMobile, prefersReducedMotion } from '../utils/device.js';
@@ -52,6 +51,7 @@ import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
 import NumberLabel, { GridLabel, CanvasLabel } from './NumberLabel.jsx';
+import { getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombRiseScale, TOMB_LEAN, TOMB_PLAQUE_FRONT, TOMB_STONE_PIVOT } from './tombstone.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -234,22 +234,6 @@ const wormFootprintFragmentShader = `
     gl_FragColor = vec4(col, alpha);
   }
 `;
-
-// Ghost worms that lazily orbit a dead tile's tombstone.
-// The orbit group sits at mid-tombstone height so the worms circle the stone body.
-function TombstoneGhost() {
-  const orbitRef = useRef();
-  useFrame(({ clock }) => {
-    if (orbitRef.current) orbitRef.current.rotation.z = clock.elapsedTime * 0.45;
-  });
-  const r = 0.30;
-  return (
-    <group ref={orbitRef} position={[0, 0, 0.22]}>
-      <StickerWorm position={[r, 0, 0]} rotation={0} scale={1.3} />
-      <StickerWorm position={[-r, 0, 0]} rotation={Math.PI} scale={1.3} />
-    </group>
-  );
-}
 
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir, surfaceTileKey, presentation = null }) {
   // Static game config — set once at game start, rarely changes during active play.
@@ -465,6 +449,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Death animation: -1 = not started (idle), 0–1 = imploding, 1 = done (show headstone)
   // Start at 1 so tiles that load already-dead show headstone immediately without animation.
   const deathAnimT = useRef(isDead ? 1 : -1);
+  // The grave rising out of the ground after the implosion: -1 idle, 0..1 rising.
+  const tombRiseT = useRef(-1);
+  const tombRef = useRef(null);
   const wasDeadRef = useRef(isDead);
   const [deathAnimDone, setDeathAnimDone] = useState(isDead);
   // Post-flip worm intro timer: counts down from 6 after each flip animation ends.
@@ -666,6 +653,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // implosion, and undo any shrink left by an outgoing piece's death mid-way.
     wasDeadRef.current = isDead;
     deathAnimT.current = isDead ? 1 : -1;
+    tombRiseT.current = -1;
+    if (tombRef.current) tombRef.current.scale.set(1, 1, 1);
     setDeathAnimDone(isDead);
     if (groupRef.current) groupRef.current.scale.set(1, 1, 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- meta read only on identity change
@@ -848,8 +837,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // Animation done: restore scale to 1 so the headstone (child of group) renders normally
         groupRef.current.scale.set(1, 1, 1);
         setDeathAnimDone(true);
+        // The grave rises once the tile has gone; reduced motion places it at once.
+        tombRiseT.current = reduceHomeMotion ? -1 : 0;
       }
       return; // skip other animations while dying
+    }
+    if (tombRiseT.current >= 0) {
+      tombRiseT.current = Math.min(1, tombRiseT.current + delta / 0.65);
+      const node = tombRef.current;
+      if (node) { const [xy, z] = tombRiseScale(tombRiseT.current); node.scale.set(xy, xy, z); }
+      if (tombRiseT.current >= 1) tombRiseT.current = -1;
     }
 
     // Compute flip state once — hasFlips guards wormhole so meta?.flips is only
@@ -915,7 +912,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
     // wormhole keeps the loop alive so the indicator ring pulses while the tile is in disparity.
-    const anyActive = alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || (wormhole && !isSudokube);
+    const anyActive = tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || (wormhole && !isSudokube);
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
@@ -1867,40 +1864,29 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </mesh>
       )}
 
-      {/* Dead tile tombstone — stands perpendicular to the tile face (tall dimension = local Z = outward) */}
+      {/* Dead tile's grave (src/3d/tombstone.js): mound, plinth, a leaning arched
+          marble headstone in the tile's own colour, a black granite plaque with a gold
+          epitaph, a glowing rune border, a candle and two circling spirits. One shared geometry and material through the
+          tile-surface batches, so the whole graveyard is a single draw. The epitaph is
+          engraved on the plaque (batched glyphs, depth-tested), no billboard. */}
       {chaosLevel > 0 && isDead && deathAnimDone && (
-        <group position={[0, 0, 0.01]}>
-          {/* Base slab — sits on the tile surface, wide in X, thick in Y, thin in Z */}
-          <mesh position={[0, 0, 0.025]}>
-            <boxGeometry args={[0.38, 0.14, 0.05]} />
-            <meshStandardMaterial color={origColor} roughness={0.9} metalness={0.05} />
-          </mesh>
-          {/* Stone body — wide in X (0.28), thick in Y (0.12), tall in Z (0.34) */}
-          {/* Z range: 0.05 → 0.39  (rises outward from tile face) */}
-          <mesh position={[0, 0, 0.22]}>
-            <boxGeometry args={[0.28, 0.12, 0.34]} />
-            <meshStandardMaterial color={origColor} roughness={0.75} metalness={0.1} />
-          </mesh>
-          {/* Arch cap — half-cylinder, default axis=Y (the thin dim), semicircle in XZ plane.
-              thetaStart=-PI/2, thetaLength=PI  →  arc goes from -X through +Z to +X
-              (the +Z peak is the top of the arch, outward from tile)  */}
-          <mesh position={[0, 0, 0.39]}>
-            <cylinderGeometry args={[0.14, 0.14, 0.12, 20, 1, false, -Math.PI / 2, Math.PI]} />
-            <meshStandardMaterial color={origColor} roughness={0.75} metalness={0.1} />
-          </mesh>
-          {/* Epitaph — RIP + tile ID engraved on the headstone (replaces the old
-              cross, which mis-rendered as a "T"). Death rank is added only when the
-              tile is ranked (disparity mode). Billboard keeps the text facing the
-              camera as the cube is orbited. */}
-          <Billboard position={[0, 0, 0.27]}>
-            <CanvasLabel value="RIP" position={[0, deadRank != null ? 0.12 : 0.05, 0]} fontSize={0.075} color={antipodalColor} renderOrder={2} depthTest={false} />
-            <CanvasLabel value={stickerGridIdRef.current} position={[0, deadRank != null ? 0 : -0.05, 0]} fontSize={0.04} color={antipodalColor} renderOrder={2} depthTest={false} />
-            {deadRank != null && (
-              <CanvasLabel value={`#${deadRank}`} position={[0, -0.13, 0]} fontSize={0.062} color={antipodalColor} renderOrder={2} depthTest={false} />
-            )}
-          </Billboard>
-          {/* Ghost worms orbit mid-tombstone height */}
-          <TombstoneGhost />
+        <group
+          ref={(node) => {
+            tombRef.current = node;
+            // Mounting mid-rise: start from the rise's current size, not full height.
+            if (node && tombRiseT.current >= 0) { const [xy, z] = tombRiseScale(tombRiseT.current); node.scale.set(xy, xy, z); }
+          }}
+          position={[0, 0, 0.01]}
+          rotation={[0, 0, tombYaw(stickerGridIdRef.current ?? '')]}
+        >
+          <TileSurfaceInstance name="Tombstone" geometry={getTombstoneGeometry()} material={getTombstoneMaterial()} color={origColor} />
+          <group position={TOMB_STONE_PIVOT} rotation={[TOMB_LEAN, 0, 0]}>
+            <group position={[0, TOMB_PLAQUE_FRONT - 0.002, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <CanvasLabel value="RIP" position={[0, 0.205, 0]} fontSize={0.07} color={EPITAPH_INK} />
+              {deadRank != null && <CanvasLabel value={`#${deadRank}`} position={[0, 0.14, 0]} fontSize={0.05} color={EPITAPH_INK} />}
+              <CanvasLabel value={stickerGridIdRef.current} position={[0, deadRank != null ? 0.095 : 0.12, 0]} fontSize={0.034} color={EPITAPH_INK} />
+            </group>
+          </group>
         </group>
       )}
 
