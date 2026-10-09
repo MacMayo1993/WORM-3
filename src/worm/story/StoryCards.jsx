@@ -1,7 +1,6 @@
-import { storyGrowthTarget } from './starGoals.js';
 import StoryStarRequirements from './StoryStarRequirements.jsx';
 import ModeArtwork from '../../components/ui/ModeArtwork.jsx';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStoreItem } from '../../utils/storeCatalog.js';
@@ -30,14 +29,6 @@ export function StoryRewardChoices({ level }) {
   </div>;
 }
 
-// How many unfinished tasks the in-play tracker lists before "+N more".
-const TRACKER_ROWS = 3;
-const TRACKER_PREF_KEY = 'worm3_story_tracker_collapsed';
-// Collapsed by default: on a phone the list covered a quarter of the screen.
-// The header still names the next task, so nothing has to be paused to read it.
-const readTrackerPref = () => { try { return localStorage.getItem(TRACKER_PREF_KEY) === '0'; } catch { return false; } };
-const writeTrackerPref = expanded => { try { localStorage.setItem(TRACKER_PREF_KEY, expanded ? '0' : '1'); } catch { /* private mode */ } };
-
 export function StoryObjectiveCard({ compact = false }) {
   const state = useGameStore(useShallow(s => ({ id: s.wormStoryLevel, started: s.wormStoryStarted,
     result: s.wormStoryResult, checklist: s.wormStoryChecklist, runId: s.wormRunId, alive: s.wormAlive, paused: s.wormPaused })));
@@ -46,8 +37,33 @@ export function StoryObjectiveCard({ compact = false }) {
   const goals = live?.goals ?? (level ? storyChecklist(level) : []);
   const previous = useRef(null);
   const [celebration, setCelebration] = useState(null);
-  const [expanded, setExpanded] = useState(readTrackerPref);
+  const [expandedRun, setExpandedRun] = useState(null);
+  const trackerRef = useRef(null);
+  const toggleRef = useRef(null);
+  const detailsId = useId();
   const runKey = `${state.runId}:${state.id}`;
+  const expanded = expandedRun === runKey && !state.paused;
+  useEffect(() => {
+    if (state.paused) setExpandedRun(null);
+  }, [state.paused]);
+  useEffect(() => {
+    if (!compact || !expanded) return;
+    const dismiss = event => {
+      if (!trackerRef.current?.contains(event.target)) setExpandedRun(null);
+    };
+    const escape = event => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      setExpandedRun(null);
+      toggleRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', dismiss);
+    window.addEventListener('keydown', escape, true);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('keydown', escape, true);
+    };
+  }, [compact, expanded]);
   useEffect(() => {
     if (!compact) return;
     const done = new Set((live?.goals ?? []).filter(goal => goal.done).map(goal => goal.key));
@@ -70,55 +86,42 @@ export function StoryObjectiveCard({ compact = false }) {
   const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const recent = celebration?.runKey === runKey ? celebration : null;
   if (compact) {
-    // Unfinished tasks stay on screen during play, in authored order, so the
-    // player never has to pause to learn what is left. Collapsed, the header
-    // itself names the next task; expanded adds the next few below it. The full
-    // checklist is always in the pause menu.
-    const open = goals.filter(goal => !goal.done);
-    const next = open[0];
-    const shown = live?.settling || !expanded ? [] : open.slice(0, TRACKER_ROWS);
-    const hidden = open.length - shown.length;
-    const toggle = () => setExpanded(value => { writeTrackerPref(!value); return !value; });
-    const headline = live?.canFinish ? `Tasks complete · grow to ${live.starGoals.target} for ★★★` : recent ? `✓ ${recent.label}`
-      : expanded ? `Tasks ${completed}/${goals.length}`
-        : live?.settling ? 'Land and clear your tail to finish'
-          : next ? `${next.label} ${next.value}/${next.target}` : `Tasks ${completed}/${goals.length}`;
-    return <section className={`worm-story-tracker${expanded ? '' : ' is-collapsed'}`} aria-label="Level tasks">
-      <button type="button" className={`worm-story-glance worm-hud-chip${recent ? ' worm-task-confirmed' : ''}${live?.settling ? ' is-settling' : ''}`}
-        onClick={toggle} aria-expanded={expanded}
-        aria-label={`Level ${level.id}: ${level.title}. ${completed} of ${goals.length} tasks complete.${next && !live?.settling ? ` Next: ${next.label}, ${next.value} of ${next.target}.` : ''} ${seconds} seconds left. ${expanded ? 'Hide' : 'Show'} task list.`}
-        title={level.title}>
-        <span className="worm-story-glance-level">L{level.id}{!expanded && <small>{completed}/{goals.length}</small>}</span>
-        <span className="worm-story-glance-progress">
-          <span>{headline}</span>
-          <span className="worm-story-goal-bars" aria-hidden="true">{goals.map(goal => <i key={goal.key} data-done={goal.done}>
-            <i style={{ transform: `scaleX(${Math.max(0, Math.min(1, goal.value / goal.target))})` }} />
-          </i>)}</span>
-        </span>
-        <span className="worm-story-glance-clock" data-urgent={seconds <= 30}>{clock}</span>
-        <span className="worm-story-tracker-chevron" aria-hidden="true">{expanded ? '▴' : '▾'}</span>
+    const next = goals.find(goal => !goal.done);
+    const headline = live?.canFinish ? 'Tasks complete' : recent ? `✓ ${recent.label}`
+      : live?.settling ? 'Land and clear your tail to finish'
+        : next ? `${next.label} ${next.value}/${next.target}` : `Tasks ${completed}/${goals.length}`;
+    return <section ref={trackerRef} className={`worm-story-tracker${expanded ? '' : ' is-collapsed'}`} aria-label="Level tasks">
+      <div className={`worm-story-summary${recent ? ' worm-task-confirmed' : ''}`}>
+        <span className="worm-story-glance-level" title={level.title}>L{level.id}</span>
+        <span className="worm-story-next" title={headline}>{headline}</span>
+        <span className="worm-story-glance-clock" data-urgent={seconds <= 30} aria-label={`${seconds} seconds left`}>{clock}</span>
+        {live?.canFinish && <button type="button" className="worm-story-finish" aria-label={`Finish with ${live.starGoals.stars} stars`} onClick={() => useGameStore.getState().finishWormStory()}>
+          Finish · {live.starGoals.stars}★
+        </button>}
+        <button ref={toggleRef} type="button" className="worm-story-glance worm-hud-chip"
+          onClick={() => setExpandedRun(expanded ? null : runKey)} aria-expanded={expanded} aria-controls={detailsId}
+          aria-label={`Level ${level.id}: ${level.title}. ${completed} of ${goals.length} tasks complete.${next && !live?.settling ? ` Next: ${next.label}, ${next.value} of ${next.target}.` : ''} ${expanded ? 'Hide' : 'Show'} goals and star requirements.`}>
+          <span>Goals <b>{completed}/{goals.length}</b></span>
+          <span className="worm-story-tracker-chevron" aria-hidden="true">{expanded ? '▴' : '▾'}</span>
+        </button>
         <span className="worm-hud-sr" role="status">{recent ? `${recent.label} complete.` : ''}</span>
-      </button>
-      {live?.starGoals && <div className="worm-story-growth" aria-label="Three-star growth progress">
-        <span>★★★ Best length <b>{live.starGoals.peakLength}/{live.starGoals.target}</b></span>
-        <span>{live.starGoals.grown ? '✓' : 'segments'}</span>
-      </div>}
-      {live?.canFinish && <button type="button" className="worm-story-finish" onClick={() => useGameStore.getState().finishWormStory()}>
-        Finish with {live.starGoals.stars} stars
-      </button>}
-      {expanded && <ul className="worm-story-live">
-        {live?.settling ? <li className="is-settling"><span className="worm-story-live-label">Land and clear your tail to finish</span></li>
-          : shown.map(goal => <li key={goal.key} aria-label={`${goal.label}: ${goal.value} of ${goal.target}`}>
+      </div>
+      {expanded && <div id={detailsId} className="worm-story-details" role="region" aria-label="Goals and star requirements" tabIndex={0}>
+        <strong className="worm-story-details-title">L{level.id} · {level.title}</strong>
+        {live?.settling && <p className="worm-story-live-hint">Land and clear your tail to finish</p>}
+        <ul className="worm-story-live" aria-label="Task checklist">
+          {goals.map(goal => <li key={goal.key} data-done={goal.done} aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
             <span className="worm-story-live-label">{goal.label}</span>
             <b aria-hidden="true">{goal.value}/{goal.target}</b>
             <i className="worm-story-live-bar" aria-hidden="true"><i style={{ transform: `scaleX(${Math.max(0, Math.min(1, goal.value / goal.target))})` }} /></i>
           </li>)}
-        {!live?.settling && hidden > 0 && <li className="worm-story-live-more">+{hidden} more · full list in Pause</li>}
-      </ul>}
-      {expanded && <p className="worm-story-star-hint">★★★ Within {level.par}s · no tail cuts · reach {live?.starGoals?.target ?? storyGrowthTarget(level)} segments. All star rules in Pause.</p>}
-      {expanded && live?.hint && !live.settling ? <p className="worm-story-live-hint">{live.hint}</p> : null}
+        </ul>
+        <StoryStarRequirements level={level} progress={live?.starGoals} />
+        {live?.hint && !live.settling && <p className="worm-story-live-hint">{live.hint}</p>}
+      </div>}
     </section>;
   }
+
   return <section className="worm-story-card" aria-label="Story objective">
     <small>{chapterLine(level.id)}</small><strong>{level.title}</strong>
     <ul className="worm-story-checklist" aria-label="Level tasks">{goals.map(goal => <li key={goal.key} className={goal.done ? 'is-complete' : ''}
