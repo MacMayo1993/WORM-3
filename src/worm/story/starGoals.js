@@ -33,6 +33,6 @@ export function storyStarRules(level) {
 
 // Allow a food hunt after the tasks are done, while a third star is attainable.
 // At par expiry (or after a cut), finish normally instead of forcing a wait.
-export function shouldFinishStory(level, metrics, outcome, requested = false) {
-  return !!outcome && (requested || outcome.stars === 3 || metrics.cuts > 0 || metrics.elapsed >= level.par);
+export function shouldFinishStory(level, metrics, outcome) {
+  return !!outcome && (outcome.stars === 3 || metrics.cuts > 0 || metrics.elapsed >= level.par);
 }

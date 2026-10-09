@@ -36,8 +36,7 @@ it('offers a finish button while growth is attainable, then finishes at three st
   const level = storyLevel(2), metrics = { ...completed(level), elapsed: 50, peakLength: 10 };
   const outcome = storyOutcome(level, metrics);
   expect(shouldFinishStory(level, metrics, outcome)).toBe(false);
-  expect(shouldFinishStory(level, metrics, outcome, true)).toBe(true);
-  expect(shouldFinishStory(level, metrics, null, true)).toBe(false);
+  expect(shouldFinishStory(level, metrics, null)).toBe(false);
   for (const patch of [{ peakLength: storyGrowthTarget(level) }, { elapsed: level.par }, { cuts: 1 }]) {
     const changed = { ...metrics, ...patch };
     expect(shouldFinishStory(level, changed, storyOutcome(level, changed))).toBe(true);

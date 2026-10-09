@@ -30,9 +30,14 @@ export const createWormSlice = (set, get) => ({
   startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && !s.wormStoryStarted && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen
     ? { wormStoryStarted: true, wormPaused: true, wormGamePhase: 'countdown', wormCountdownStep: 3 } : s),
   completeWormStory: (runId, metrics) => set(s => completeStoryChanges(s, runId, metrics)),
-  finishWormStory: () => set(s => s.wormStoryStarted && s.wormAlive && !s.wormPaused && !s.wormStoryResult &&
-    s.wormStoryChecklist?.runId === s.wormRunId && s.wormStoryChecklist?.canFinish
-    ? { wormStoryFinishRequested: true } : s),
+  finishWormStory: () => set(s => {
+    const offer = s.wormStoryChecklist;
+    if (!offer?.canFinish || !offer.finishMetrics || offer.runId !== s.wormRunId ||
+        offer.levelId !== s.wormStoryLevel) return s;
+    // Claim exactly what the button offered and pause in the same transaction.
+    // Waiting for another crawler tick can lose the clear to a collision or par.
+    return completeStoryChanges(s, offer.runId, offer.finishMetrics);
+  }),
   claimWormStoryReward: (id, choice) => set(s => claimStoryChanges(s, id, choice)),
   setWormHealerMode: (v) => set(s => ({ wormHealerMode: v, ...(!v ? storyVisualChanges(s, null) : {}) })),
 
