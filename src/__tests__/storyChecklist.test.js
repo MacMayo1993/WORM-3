@@ -18,3 +18,13 @@ it.each(WORM_STORY_LEVELS)('matches the completion requirements for level $id', 
   }
   expect(storyChecklist(level, metrics).every(g => g.done)).toBe(true);
 });
+
+it.each(WORM_STORY_LEVELS.filter(level => level.kind === 'mastery'))('level $id finishes its listed tasks without requiring old tail routes or extra tunnels', level => {
+  const metrics = { alive: true, elapsed: 1, cuts: 0, peakLength: 456, remaining: 2,
+    tailClear: false, landed: true, onSurface: true, healSettled: true, rotationSettled: true };
+  for (const goal of storyChecklist(level)) metrics[goal.key] = goal.target;
+  expect(storyOutcome(level, metrics)).not.toBeNull();
+  for (const held of [{ landed: false }, { healSettled: false }, { rotationSettled: false }, { alive: false }, { elapsed: level.limit + 1 }]) {
+    expect(storyOutcome(level, { ...metrics, ...held })).toBeNull();
+  }
+});

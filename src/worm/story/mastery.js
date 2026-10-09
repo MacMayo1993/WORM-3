@@ -3,10 +3,19 @@ import { drawViewPower, getViewPowerDef } from '../healerWorm/viewPowerups.js';
 import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { tileKey } from '../healerWorm/wormSim.js';
 import { ttAt } from '../circularBuffers.js';
-import { BODY_BALL_SPACING, MAGNET_RADIUS, WORM_MOVEMENT_SPEED_SCALE } from '../healerWorm/constants.js';
+import { BODY_BALL_SPACING, MAGNET_RADIUS, WORM_MOVEMENT_SPEED_SCALE, ELEMENTAL_DURATION } from '../healerWorm/constants.js';
 import { collectManifoldRing, getNextSurfacePosition } from '../wormLogic.js';
 
 export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning'];
+// Identity goals name a prefix, so unrelated pickups/mastery cannot substitute
+// for a missing authored element. Keep raw sets for effects and pickup history.
+export const storyElementCount = (elements, target = STORY_ELEMENTS.length) =>
+  STORY_ELEMENTS.slice(0, target).filter(type => elements.has(type)).length;
+const storyElementPool = level => {
+  const m = level.mechanics ?? {};
+  const count = Math.max(m.uniqueElements ?? 0, m.elements ?? 0, m.elementPickups ?? 0);
+  return count ? STORY_ELEMENTS.slice(0, count) : STORY_ELEMENTS;
+};
 export const STORY_POWER_OPENING_DELAY = 10;
 export const STORY_POWER_COOLDOWN = 3;
 export const STORY_POWER_LIFETIME = 20;
@@ -90,9 +99,7 @@ export function nextStoryPower(p, level) {
   if ((p.mechanics.elementPickups ?? 0) < (m.elementPickups ?? 0)) {
     for (const type of STORY_ELEMENTS.slice(0, m.elementPickups)) needs.add(type);
   }
-  if (p.collectedElements.size < (m.uniqueElements ?? 0)) {
-    for (const type of STORY_ELEMENTS.slice(0, m.uniqueElements)) if (!p.collectedElements.has(type)) needs.add(type);
-  }
+  for (const type of STORY_ELEMENTS.slice(0, m.uniqueElements ?? 0)) if (!p.collectedElements.has(type)) needs.add(type);
   for (const type of STORY_ELEMENTS.slice(0, m.elements ?? 0)) if (!p.elements.has(type)) needs.add(type);
   const last = STORY_POWER_CYCLE.indexOf(p.lastPower);
   for (let offset = 1; offset <= STORY_POWER_CYCLE.length; offset++) {
@@ -140,10 +147,9 @@ export function fusionReachableTiles(sim, size, cubies, speed) {
   return reachable;
 }
 
-// One marked offering at a time; missed powers return on the next fair cycle.
-// Other powers wait until the current effect ends; explicit fusion objectives
-// alone can request a timed catalyst during an elemental wash. Quest magnet orbs replenish
-// only while remote catches are still outstanding.
+// Later levels offer two distinct elements together for optional fusion practice.
+// Authored fusion lessons retain their ordered, timed catalyst guidance. Other
+// powers wait for the current effect to end; missed powers return next cycle.
 export function offerStoryPower(sim, p, level, size, cubies) {
   // Required lesson powers always take priority. Optional transformations wait
   // until Chapter 2 has taught the alternate views in their authored levels.
@@ -162,12 +168,17 @@ export function offerStoryPower(sim, p, level, size, cubies) {
     return true;
   }
   let type = partnerRecipe?.catalyst ?? nextStoryPower(p, level);
+  const elementPool = storyElementPool(level);
   const canOfferView = !type && level.id >= 21 && !p.viewOffered;
+  if (!type && !canOfferView && level.id >= 21) {
+    type = elementPool[(elementPool.indexOf(p.lastPower) + 1) % elementPool.length];
+  }
   const displayedType = sim.specials[0]?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
     : sim.viewPowerT > 0 ? sim.viewPower : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : null);
   const hint = offered => {
     const recipe = partnerRecipe ?? recipes.find(r => r.base === offered);
     if (recipe) return `${fusionRecipeLabel(recipe)} · ${partnerRecipe ? 'Collect the marked partner before the timer ends.' : 'Collect the first element, then follow the marked partner.'}`;
+    if (sim.specials.length > 1 && STORY_ELEMENTS.includes(offered)) return 'Two elements are available. Collect both before the first effect ends to fuse them; pickup order changes the result.';
     return (level.mechanics?.elementPickups || level.mechanics?.uniqueElements) && STORY_ELEMENTS.includes(offered)
     ? 'Steer onto the marked elemental orb to collect it' : getViewPowerDef(offered)?.description ?? HINTS[offered];
   };
@@ -196,6 +207,19 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   const lifetime = partnerRecipe ? sim.elementalT : STORY_POWER_LIFETIME;
   sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: lifetime, maxTtl: lifetime,
     ...(partnerRecipe ? { fusionBase: partnerRecipe.base } : {}) }];
+  if (level.id >= 21 && !recipes.length && STORY_ELEMENTS.includes(type)) {
+    const next = nextStoryPower({ ...p, lastPower: type }, level);
+    const second = elementPool.includes(next) && next !== type ? next
+      : elementPool.find(element => element !== type);
+    const pairBlocked = new Set([...blocked, tileKey(tile)]);
+    const pairReachable = fusionReachableTiles({ ...sim, pos: tile, elementalT: ELEMENTAL_DURATION }, size, cubies, level.speed);
+    const secondTile = storySurfaceTile(sim, size, cubies, new Set([...pairBlocked, ...sim.powerups.map(tileKey)]), pairReachable)
+      ?? storySurfaceTile(sim, size, cubies, pairBlocked, pairReachable);
+    if (second && secondTile) {
+      sim.powerups = sim.powerups.filter(orb => tileKey(orb) !== tileKey(secondTile));
+      sim.specials.push({ ...secondTile, type: second, id: `story-${level.id}-${p.powerSeq++}`, ttl: lifetime, maxTtl: lifetime });
+    }
+  }
   p.lastPower = type;
   p.powerDelay = STORY_POWER_COOLDOWN;
   p.powerHint = hint(type);

@@ -26,12 +26,13 @@ it.each([7, 8, 9, 10])('authors level %i with enough matching orbs and real heal
   for (const color of [1,2,3,4,5,6]) expect(sim.powerups.filter(t => p.cubies[t.x][t.y][t.z].stickers[t.dirKey].curr === color).length).toBeGreaterThanOrEqual(4);
   expect(sim.specials.length).toBeLessThanOrEqual(1);
 });
-it('requires every final-level mechanic, a safe landing, tail clearance and settled rotation', () => {
+it('requires every final-level mechanic, a safe landing, settled healing and rotation', () => {
   const level = storyLevel(10);
   const won = { ...level.mechanics, alive: true, elapsed: 200, cuts: 0, peakLength: 100, orbs: 24, rotations: 4, healed: 3, remaining: 0, tailClear: true, landed: true, rotationSettled: true };
   expect(storyOutcome(level, won)).toMatchObject({ stars: 3 });
   for (const [key, target] of Object.entries(level.mechanics)) expect(storyOutcome(level, { ...won, [key]: target - 1 })).toBeNull();
-  for (const key of ['alive', 'tailClear', 'landed', 'rotationSettled']) expect(storyOutcome(level, { ...won, [key]: false })).toBeNull();
+  expect(storyOutcome(level, { ...won, tailClear: false, remaining: 1 })).toMatchObject({ stars: 3 });
+  for (const key of ['alive', 'healSettled', 'landed', 'rotationSettled']) expect(storyOutcome(level, { ...won, [key]: false })).toBeNull();
   expect(storyOutcome(level, { ...won, elapsed: level.limit + 1 })).toBeNull();
 });
 it('stages the Stage 9 body on the 6x6 exterior and completes with one bomb and enemy', () => {
@@ -216,7 +217,8 @@ it('offers one optional view in later Story levels without replacing required po
   expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(true);
   expect(sim.specials[0].type).toMatch(/^view-/);
   sim.specials = []; p.powerDelay = 0;
-  expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(false);
+  expect(offerStoryPower(sim, p, level, size, p.cubies)).toBe(true);
+  expect(sim.specials.map(orb => orb.type)).toEqual(['water', 'fire']);
   const early = setup(7); early.sim.specials = []; early.p.powerDelay = 0;
   early.p.mechanics = { ...early.level.mechanics };
   expect(offerStoryPower(early.sim, early.p, early.level, early.level.cubeSize ?? 5, early.p.cubies)).toBe(false);

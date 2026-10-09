@@ -152,9 +152,8 @@ describe('elemental offering placement', () => {
     expect(new Set(els.map(e => e.dirKey)).size).toBe(els.length);
   });
 
-  it('offers what fits when faces are occupied rather than failing outright', () => {
-    // Occupancy fallback: the placement skips a taken face centre. Block all but one
-    // and the offering must come up short rather than crash or double up a tile.
+  it('keeps multiple elements available when face centres are occupied', () => {
+    // Occupied centres use safe nearby tiles rather than losing fusion partners.
     const sim = makeSim();
     // A real cube behind the ctx: with almost every face centre blocked the worm
     // will crawl onto one of the blockers, and the pickup path reads live stickers.
@@ -166,7 +165,7 @@ describe('elemental offering placement', () => {
     // of the blockers and eat them.
     sim.elementalSpawnTimer = 0;
     const els = spawnOffering(sim, ctx);
-    expect(els).toHaveLength(1);
+    expect(els).toHaveLength(ELEMENTAL_OFFER_COUNT);
     const blocked = new Set(blockedTiles.map(tileKey));
     for (const e of els) expect(blocked.has(tileKey(e))).toBe(false);
   });

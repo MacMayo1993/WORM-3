@@ -133,12 +133,12 @@ it('keeps the next task visible and puts every task and star rule behind the Goa
 it('replaces the next task with the finishing instruction once every task is done', () => {
   localStorage.removeItem('worm3_story_tracker_collapsed');
   const runId = useGameStore.getState().wormRunId;
-  useGameStore.setState({ wormStoryLevel: 2, wormStoryReady: true, wormStoryStarted: true, wormStoryChecklist: { runId, levelId: 2, seconds: 60, settling: true,
+  useGameStore.setState({ wormStoryLevel: 2, wormStoryReady: true, wormStoryStarted: true, wormStoryChecklist: { runId, levelId: 2, seconds: 60, settling: true, settlingHint: 'Your tail is still leaving a tunnel',
     goals: [{ key: 'uniqueTunnels', label: 'Cross tunnel pairs', value: 4, target: 4, done: true }] } });
   renderPhase('crawling');
-  expect(host.querySelector('.worm-story-next').textContent).toContain('Land and clear your tail to finish');
+  expect(host.querySelector('.worm-story-next').textContent).toContain('Your tail is still leaving a tunnel');
   act(() => host.querySelector('.worm-story-glance').click());
-  expect(host.querySelector('.worm-story-details .worm-story-live-hint').textContent).toBe('Land and clear your tail to finish');
+  expect(host.querySelector('.worm-story-details .worm-story-live-hint').textContent).toBe('Your tail is still leaving a tunnel');
   expect(host.querySelectorAll('.worm-story-live li')).toHaveLength(1);
 });
 

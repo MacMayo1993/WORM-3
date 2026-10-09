@@ -502,3 +502,37 @@ it('Classic can complete level 9’s two-use ability task through real queued ac
   expect(goal()).toMatchObject({ value: 2, target: 2, done: true });
   frame(); expect(goal().value).toBe(2);
 });
+
+
+it('awards level 35 after all six tasks with a long tail still following an old tunnel', () => {
+  act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 34 }, (_, i) => [i + 1, 1])), claimed: {},
+  } } }));
+  begin(35);
+  const level = storyLevel(35);
+  // Retained body geometry is still passing through a tunnel the head has left.
+  // It must not add a seventh task to the six completed checklist objectives.
+  worm.tunnelPassages.current.push({ tunnelKey: 'old-route', exitDistance: worm.stepHistory.current.distance,
+    heal: null, clearFrame: false });
+  act(() => useGameStore.setState({ wormSessionOrbs: level.orbs }));
+  const readMetrics = storyRuntime.storyMetrics;
+  vi.spyOn(storyRuntime, 'storyMetrics').mockImplementation((sim, practice, ...args) => {
+    sim.healed = level.target;
+    sim.tailLength = 456;
+    sim.peakTailLength = 456;
+    sim.combat.kills = level.mechanics.kills;
+    practice.mechanics = { ...level.mechanics };
+    practice.elapsed = 246;
+    return readMetrics(sim, practice, ...args);
+  });
+  frame();
+  expect(state().wormStoryChecklist.goals).toHaveLength(6);
+  expect(state().wormStoryChecklist.goals.every(goal => goal.done)).toBe(true);
+  expect(worm.tunnelPassages.current).toHaveLength(1);
+  expect(state().wormStoryResult).toMatchObject({ levelId: 35, stars: 3 });
+  expect(state()).toMatchObject({ wormAlive: true, wormPaused: true, wormGamePhase: 'solved' });
+  const before = { pos: { ...worm.pos.current }, time: worm.timeAliveRef.current };
+  frame();
+  expect(worm.pos.current).toEqual(before.pos);
+  expect(worm.timeAliveRef.current).toBe(before.time);
+});

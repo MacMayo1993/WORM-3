@@ -233,22 +233,19 @@ export const MAGNET_DURATION = 8;
 export const MAGNET_RADIUS = 2;
 // Elemental orbs (water / fire / grass / ice) — a claimed element bathes the whole
 // cube in its atmosphere for ELEMENTAL_DURATION seconds. Longer than the buffs
-// because it is a scene mood rather than a moment-to-moment advantage; a second
-// element claimed while one is running simply replaces it.
+// because it is a scene mood as well as a gameplay effect. A second distinct
+// element claimed during the wash fuses with the first.
 export const ELEMENTAL_DURATION = 10;
 // Elemental orbs spawn on their OWN track, separate from the rocket/magnet special
 // clock. Every interval the board is offered ELEMENTAL_OFFER_COUNT orbs, drawn at
-// random from the elements and placed on different face centres; grabbing one
-// claims that element and wipes the rest of the offering. The lifetime is a hair
+// random from the elements and placed on different faces; grabbing the first
+// preserves the others for a fusion. The lifetime is a hair
 // under the interval so an un-taken offering fades out cleanly before the next one
 // appears.
 export const ELEMENTAL_SPAWN_INTERVAL = 12; // seconds between elemental offerings
 export const ELEMENTAL_LIFETIME = 11;       // seconds an un-taken offering stays on the board
-// How many of the elements are offered at once. Offering every element every time
-// made the choice a menu — and with one on each face, wherever the worm was there
-// was an orb near it. Two is a choice between two things, and leaves most of the
-// cube without an orb on it.
-export const ELEMENTAL_OFFER_COUNT = 2;
+// Three distinct elements give two possible catalysts after the first pickup.
+export const ELEMENTAL_OFFER_COUNT = 3;
 // Quiet spell after an element is actually claimed, measured from the claim.
 // The spawn clock alone put the next offering on the board a couple of seconds
 // after a wash ended, so the cube was almost never without orbs on it; a claim now
