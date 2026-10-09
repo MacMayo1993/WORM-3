@@ -143,6 +143,27 @@ describe('ring healing waits for visible tile contact', () => {
     return { sim, ctx, next, advance };
   }
 
+  it('does not credit a surrounded pair again when its pending traversal tail clears', () => {
+    const { sim, ctx, advance } = setup();
+    const { tunnel, tunnelKey } = ctx.getActiveTunnels()[0];
+    const passage = { tunnel, tunnelKey, exitDistance: sim.stepHistory.distance,
+      heal: { tunnel, tunnelKey, stableKey: 'pending' }, clearFrame: false };
+    sim.tunnelPassages.push(passage);
+    advance(1.01);
+    expect(sim.healed).toBe(1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+    expect(passage.heal).toBeNull();
+    expect(sim.tunnelPassages).toContain(passage); // keep the visual body route
+    ctx.getActiveTunnels = () => [];
+    sim.healPauseT = 0;
+    sim.stepHistory.distance += tunnelTailReach(sim.tailLength) + 1;
+    stepWormSim(sim, 0, 5, ctx);
+    stepWormSim(sim, 0, 5, ctx);
+    expect(sim.tunnelPassages).toHaveLength(0);
+    expect(sim.healed).toBe(1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(1);
+  });
+
   it.each([1, 4])('heals at the tile center, not logical entry or the border, at speed %s', speed => {
     const { sim, ctx, next, advance } = setup(speed);
     expect(tileKey(sim.pos)).toBe(tileKey(next));

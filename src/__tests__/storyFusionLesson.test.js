@@ -124,3 +124,28 @@ it('audits ordered supply and budgets repeated fusion quantities', () => {
   expect(assess(record, 'glow', { disabledPowers: ['fire'] }).status).toBe('impossible');
   expect(assess({ ...record, config: { ...level, mechanics: { steamFusions: 200 } } }).status).toBe('undersupplied');
 });
+
+it.each([30, 35, 40])('offers a simultaneous reachable pair for fusion practice in level %i', id => {
+  const { sim, p, level, size, offer, claim } = setup(id);
+  // Finish non-element power tasks and the optional view; unrelated tasks can
+  // still be outstanding while the player experiments with elemental recipes.
+  p.mechanics = { magnetOrbs: 999, explodes: 999, rockets: 999 };
+  p.viewOffered = true;
+  expect(offer()).toBe(true);
+  expect(sim.specials).toHaveLength(2);
+  const [first, second] = sim.specials;
+  expect(first.type).not.toBe(second.type);
+  expect(tileKey(first)).not.toBe(tileKey(second));
+  expect(fusionReachableTiles({ ...sim, pos: first, elementalT: 10 }, size, p.cubies, level.speed).has(tileKey(second))).toBe(true);
+  for (const orb of sim.specials) expect(sim.powerups.map(tileKey)).not.toContain(tileKey(orb));
+  expect(p.powerHint).toContain('Two elements');
+  expect(offer()).toBe(false); // no duplicates on subsequent frames
+  expect(p.powerHint).toContain('Two elements');
+  claim();
+  expect(sim.specials).toHaveLength(1);
+  sim.elementalFocusT = 0;
+  claim();
+  expect(sim.elementalPair).toBe(first.type);
+  expect(sim.elementalType).toBe(second.type);
+  expect(p.mechanics.elementPickups).toBe(2);
+});

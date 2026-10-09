@@ -98,7 +98,7 @@ export function StoryObjectiveCard({ compact = false }) {
   if (compact) {
     const next = goals.find(goal => !goal.done);
     const headline = live?.canFinish ? 'Tasks complete' : recent ? `✓ ${recent.label}`
-      : live?.settling ? 'Land and clear your tail to finish'
+      : live?.settling ? (live.settlingHint ?? 'Finishing the current action')
         : next ? `${next.label} ${next.value}/${next.target}` : `Tasks ${completed}/${goals.length}`;
     return <section ref={trackerRef} className={`worm-story-tracker${expanded ? '' : ' is-collapsed'}`} aria-label="Level tasks">
       <div className={`worm-story-summary${recent ? ' worm-task-confirmed' : ''}`}>
@@ -118,7 +118,7 @@ export function StoryObjectiveCard({ compact = false }) {
       </div>
       {expanded && <div id={detailsId} className="worm-story-details" role="region" aria-label="Goals and star requirements" tabIndex={0}>
         <strong className="worm-story-details-title">L{level.id} · {level.title}</strong>
-        {live?.settling && <p className="worm-story-live-hint">Land and clear your tail to finish</p>}
+        {live?.settling && <p className="worm-story-live-hint">{live.settlingHint ?? 'Finishing the current action'}</p>}
         <ul className="worm-story-live" aria-label="Task checklist">
           {goals.map(goal => <li key={goal.key} data-done={goal.done} aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
             <span className="worm-story-live-label">{goal.label}</span>
@@ -143,7 +143,7 @@ export function StoryObjectiveCard({ compact = false }) {
     <StoryStarRequirements level={level} progress={live?.starGoals} />
     <p className="worm-story-clock">{state.started ? `${live?.seconds ?? level.limit}s left` : `Time limit: ${level.limit}s`}
       {!state.started && level.rotateEvery ? ` · Turn every ${level.rotateEvery}s` : ''}</p>
-    {live?.settling ? <p role="status">Clear your tail and land to finish.</p> : live?.hint ? <p className="worm-story-power-hint">{live.hint}</p> : null}
+    {live?.settling ? <p role="status">{live.settlingHint ?? 'Finishing the current action'}</p> : live?.hint ? <p className="worm-story-power-hint">{live.hint}</p> : null}
   </section>;
 }
 

@@ -67,3 +67,27 @@ it('keeps idle HUD snapshots stable but publishes objective, timer, hint, cleara
   metrics.rotationSettled = true;
   expect(storyHudSnapshot(hud, level, metrics, 1, storyOutcome(level, metrics)).checklist.settling).toBe(false);
 });
+
+it('changes the completion hint immediately as each real transition settles', () => {
+  const level = storyLevel(35);
+  const metrics = { ...level.mechanics, healed: level.target, orbs: level.orbs,
+    alive: true, elapsed: 246, cuts: 0, peakLength: 456, remaining: 2, tailClear: false,
+    onSurface: false, landed: false, healSettled: false, rotationSettled: false };
+  let hud = null;
+  for (const [changes, expected] of [
+    [{}, 'Return to the surface to finish'],
+    [{ onSurface: true }, 'Land to finish'],
+    [{ landed: true }, 'Let the healing animation finish'],
+    [{ healSettled: true }, 'Wait for the layer turn to finish'],
+    [{ rotationSettled: true }, null],
+  ]) {
+    Object.assign(metrics, changes);
+    const next = storyHudSnapshot(hud, level, metrics, 1, storyOutcome(level, metrics));
+    expect(next).not.toBe(hud); // same timer and counters; reason alone changed
+    expect(next.checklist.settlingHint).toBe(expected);
+    expect(next.checklist.canFinish).toBe(expected === null);
+    hud = next;
+  }
+  expect(hud.progress).toContain('Tasks complete');
+  expect(hud.progress).not.toContain('Clear your tail');
+});

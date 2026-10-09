@@ -45,6 +45,7 @@ import {
 import { SPECIAL_TYPES, isElementalType, ELEMENTAL_TYPES } from '../worm/healerWorm/specialDefs.js';
 import {
   ELEMENTAL_OFFER_COUNT,
+  ELEMENTAL_DURATION,
   ELEMENTAL_CLAIM_COOLDOWN,
   ELEMENTAL_SPAWN_INTERVAL
 } from '../worm/healerWorm/constants.js';
@@ -254,7 +255,7 @@ describe('special orb spawning', () => {
 });
 
 describe('elemental offering', () => {
-  it('offers two of the elements, drawn at random, never the whole set', () => {
+  it('offers three distinct elements together', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specialTimer = 9999;        // isolate: no buff spawns
@@ -262,7 +263,7 @@ describe('elemental offering', () => {
     run(sim, ctx, 0.05);            // exactly one step — the worm barely moves
     const elems = sim.specials.filter(s => isElementalType(s.type));
     expect(elems).toHaveLength(ELEMENTAL_OFFER_COUNT);
-    // Two DIFFERENT elements — a choice, not the same orb twice.
+    expect(ELEMENTAL_OFFER_COUNT).toBe(3);
     expect(new Set(elems.map(s => s.type)).size).toBe(ELEMENTAL_OFFER_COUNT);
     for (const e of elems) expect(ELEMENTAL_TYPES).toContain(e.type);
   });
@@ -281,20 +282,23 @@ describe('elemental offering', () => {
     expect(seen.size).toBeGreaterThan(ELEMENTAL_OFFER_COUNT);
   });
 
-  it('places every offered orb on the centre tile of a different face', () => {
+  it('places every offered orb near the centre of a different face', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specialTimer = 9999;
     sim.elementalSpawnTimer = 0;
     run(sim, ctx, 0.05);
     const elems = sim.specials.filter(s => isElementalType(s.type));
-    const centers = new Set(faceCenterTiles(SIZE).map(tileKey));
-    for (const e of elems) expect(centers.has(tileKey(e))).toBe(true);
+    for (const e of elems) {
+      const center = faceCenterTiles(SIZE).find(tile => tile.dirKey === e.dirKey);
+      expect((e.x - center.x) ** 2 + (e.y - center.y) ** 2 + (e.z - center.z) ** 2).toBeLessThanOrEqual(1);
+      expect(tileKey(e)).not.toBe(tileKey(sim.pos));
+    }
     // One per manifold face — no two elements share a face.
     expect(new Set(elems.map(e => e.dirKey)).size).toBe(elems.length);
   });
 
-  it('skips a face whose centre is already taken', () => {
+  it('uses nearby free tiles when face centres are already taken', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specialTimer = 9999;
@@ -305,8 +309,8 @@ describe('elemental offering', () => {
     sim.elementalSpawnTimer = 0;
     run(sim, ctx, 0.05);
     const elems = sim.specials.filter(s => isElementalType(s.type));
-    expect(elems).toHaveLength(1);
-    expect(tileKey(elems[0])).toBe(tileKey(centers[0]));
+    expect(elems).toHaveLength(ELEMENTAL_OFFER_COUNT);
+    for (const orb of elems) expect(sim.powerups.map(tileKey)).not.toContain(tileKey(orb));
   });
 
   it('grabbing one element leaves the rest of the offering up for a fusion', () => {
@@ -327,6 +331,19 @@ describe('elemental offering', () => {
     expect(sim.elementalPair).toBeNull();
     // The rest stay on the board: crawling onto one while the wash is up fuses it.
     expect(sim.specials.map(s => s.type).sort()).toEqual(['fire', 'grass', 'ice']);
+  });
+
+  it('gives a nearly expired partner a full fusion window after the first pickup', () => {
+    const sim = makeSim(), ctx = makeCtx({ getSpeed: () => 3 });
+    sim.specialTimer = sim.elementalSpawnTimer = 9999;
+    const partner = { ...special(0, 0, 4, 'PZ', 'fire'), ttl: 1, maxTtl: 1 };
+    sim.specials = [special(2, 3, 4, 'PZ', 'water'), partner];
+    stepUntilCommit(sim, ctx);
+    run(sim, ctx, 1, 0.01);
+    expect(sim.elementalType).toBe('water');
+    expect(sim.specials).toContain(partner);
+    expect(partner.ttl).toBe(ELEMENTAL_DURATION);
+    expect(partner.maxTtl).toBe(ELEMENTAL_DURATION);
   });
 
   it('goes quiet for a while after an element is actually claimed', () => {

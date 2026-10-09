@@ -233,11 +233,27 @@ export function storyOutcome(level, metrics) {
     : level.kind === 'tunnel' ? metrics.uniqueTunnels >= level.target && metrics.tailClear
     : level.kind === 'jump' ? metrics.bodyJumps >= level.target && metrics.landed
     : level.kind === 'rotation' ? metrics.rotations >= level.target && metrics.rotationSettled
+    // Mastery levels ask for a fixed number of heals. Already-earned task credit
+    // must not gain extra requirements from retained tail routes or new tunnels.
+    : level.kind === 'mastery' ? metrics.healed >= level.target && metrics.rotationSettled && metrics.healSettled !== false
     : metrics.healed >= level.target && metrics.remaining === 0 && metrics.tailClear && metrics.rotationSettled;
   if (!complete) return null;
   const goals = storyStarGoals(level, metrics);
   return { stars: goals.stars, seconds: Math.ceil(metrics.elapsed), peakLength: goals.peakLength,
     starGoals: { fast: goals.fast, clean: goals.clean, grown: goals.grown } };
+}
+
+// Explain the actual physical transition, rather than calling every completion
+// delay a tail-clearance problem. Called only after the checklist is complete.
+export function storyFinishHint(level, metrics) {
+  const needsTail = ['tunnel', 'collector', 'restore'].includes(level.kind);
+  if (metrics.onSurface === false && (needsTail || level.mechanics)) return 'Return to the surface to finish';
+  if ((level.mechanics || level.kind === 'jump') && !metrics.landed) return 'Land to finish';
+  if (metrics.healSettled === false && (needsTail || level.mechanics)) return 'Let the healing animation finish';
+  if (needsTail && !metrics.tailClear) return 'Your tail is still leaving a tunnel';
+  if (['rotation', 'collector', 'restore', 'mastery'].includes(level.kind) && !metrics.rotationSettled) return 'Wait for the layer turn to finish';
+  if (['collector', 'restore'].includes(level.kind) && metrics.remaining > 0) return `Heal ${metrics.remaining} remaining tunnel ${metrics.remaining === 1 ? 'pair' : 'pairs'}`;
+  return null;
 }
 
 export function storyProgressText(level, metrics) {
@@ -246,7 +262,7 @@ export function storyProgressText(level, metrics) {
     const goals = [...Object.entries(level.mechanics), ['healed', level.target], ['orbs', level.orbs], ...(level.rotations ? [['rotations', level.rotations]] : [])];
     const missing = goals.filter(([key, target]) => (metrics[key] ?? 0) < target);
     const next = missing[0];
-    return `${goals.length - missing.length}/${goals.length} goals · ${next ? count(metrics[next[0]], next[1], STORY_MECHANIC_LABELS[next[0]] ?? { healed: 'pairs healed', orbs: 'orbs', rotations: 'turns' }[next[0]]) : 'Clear your tail and land'}${metrics.powerHint ? ` · ${metrics.powerHint}` : ''} · ${Math.max(0, Math.ceil(level.limit - metrics.elapsed))}s left`;
+    return `${goals.length - missing.length}/${goals.length} goals · ${next ? count(metrics[next[0]], next[1], STORY_MECHANIC_LABELS[next[0]] ?? { healed: 'pairs healed', orbs: 'orbs', rotations: 'turns' }[next[0]]) : storyFinishHint(level, metrics) ?? 'Tasks complete'}${metrics.powerHint ? ` · ${metrics.powerHint}` : ''} · ${Math.max(0, Math.ceil(level.limit - metrics.elapsed))}s left`;
   }
   const parts = [count(level.kind === 'orbs' ? metrics.orbs : level.kind === 'tunnel' ? metrics.uniqueTunnels
     : level.kind === 'jump' ? metrics.bodyJumps : level.kind === 'rotation' ? metrics.rotations : metrics.healed,

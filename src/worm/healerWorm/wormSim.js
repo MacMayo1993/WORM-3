@@ -78,7 +78,7 @@ import {
     makeStepHistory, shPush, shAt, shReset, shMarkRestRead, shReleaseRestRead,
     makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace,
 } from '../circularBuffers.js';
-import { isSurfaceTilePos, randomFreeTile } from './surfaceTiles.js';
+import { isSurfaceTilePos, randomFreeTile, getAllSurfaceTiles } from './surfaceTiles.js';
 import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady, orbCreditFace } from './economy.js';
 import { rotationClock } from './rotationClockBridge.js';
 import { chooseSafeLane, isTileOnLane } from './safeLane.js';
@@ -1229,6 +1229,12 @@ function tryWormholeRingHeal(sim, size, ctx) {
         );
         sim.healFired = true;
         sim.healed += 1;
+        // A surround can seal a pair while a previous traversal's tail still
+        // occupies it. Keep that visual route, but retire its queued heal so
+        // clearing the tail cannot credit the same pair (and rewards) twice.
+        for (const passage of sim.tunnelPassages) {
+            if (passage.heal && ((tunnelKey && passage.heal.tunnelKey === tunnelKey) || passage.tunnel === tunnel)) passage.heal = null;
+        }
         // Retire deposits from both traversal directions for every sealed pair.
         ctx.applyHeal(tunnel.entry, tunnel.exit, [entryStableKey, exitStableKey].filter(Boolean), sim.healed);
         releaseMobiTunnel(sim, tunnel);
@@ -1284,6 +1290,15 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = fals
         if (fuses) {
             for (let i = sim.specials.length - 1; i >= 0; i--) {
                 if (isElementalType(sim.specials[i].type)) sim.specials.splice(i, 1);
+            }
+        } else {
+            // A late first pickup still gets a full fusion window. Rendering
+            // and expiration share the refreshed lifetime.
+            for (const orb of sim.specials) {
+                if (isElementalType(orb.type)) {
+                    orb.ttl = Math.max(orb.ttl, ELEMENTAL_DURATION);
+                    orb.maxTtl = Math.max(orb.maxTtl ?? 0, orb.ttl);
+                }
             }
         }
         // ...and it buys a quiet spell. On the spawn clock alone the next offering
@@ -1434,9 +1449,8 @@ export function faceCenterTiles(size) {
 
 /**
  * Put an elemental OFFERING on the board: one orb of each element, each on the
- * CENTRE tile of a different manifold face. The player crawls to the one they
- * want; the rest are wiped on that claim (see trySpecialPickupAt), or fade on
- * their own before the next offering.
+ * different manifold face, preferring its centre. The first claim leaves the
+ * others available for a fusion; the second distinct claim clears the offering.
  *
  * Face centres rather than the scored neighbourhood placement spawnSpecial uses:
  * an element re-skins the whole cube, so it should be a landmark you navigate to
@@ -1445,9 +1459,8 @@ export function faceCenterTiles(size) {
  * ELEMENTAL_OFFER_COUNT of them are drawn each cycle so most faces stay empty.
  *
  * Leftovers from a previous offering are cleared first, so the board never carries
- * two offerings at once. Faces whose centre is taken (a parity orb, a live buff,
- * the worm's own body or its live claim reach) are skipped, so an offering can be
- * short if the board is busy.
+ * two offerings at once. Occupied centres fall back to nearby safe tiles on the
+ * same face, so dense growth-orb supplies do not reduce every offering to one.
  *
  * @returns {number} how many elemental orbs were actually placed
  */
@@ -1461,6 +1474,7 @@ function spawnElementalOffering(sim, size, ctx) {
     const occupiedKeys = new Set(
         [...sim.powerups, ...sim.specials, sim.pos].map(tileKeyOf)
     );
+    if (sim.prevTile) occupiedKeys.add(tileKeyOf(sim.prevTile));
     // Exclude the worm's live claim reach so an orb isn't swallowed on the tick it
     // appears (same reasoning as spawnSpecial).
     const claimRadius = Math.max(
@@ -1477,8 +1491,8 @@ function spawnElementalOffering(sim, size, ctx) {
     for (const key of bodyTrailKeys(sim)) occupiedKeys.add(key);
     // A face centre that is currently a wormhole mouth is not a place to leave an
     // offering — the worm falls in rather than picking it up.
-    const centers = ELEMENTAL_FACES.map((f) => ({ tile: faceCenterTile(f, size) }));
-    for (const key of tunnelMouthKeys(centers, ctx)) occupiedKeys.add(key);
+    const surface = getAllSurfaceTiles(size);
+    for (const key of tunnelMouthKeys(surface.map(tile => ({ tile })), ctx)) occupiedKeys.add(key);
 
     // Shuffle the faces so the same element does not always land on the same face.
     const faces = ELEMENTAL_FACES.slice();
@@ -1501,11 +1515,15 @@ function spawnElementalOffering(sim, size, ctx) {
     let placed = 0;
     let faceIdx = 0;
     for (const type of offered) {
-        // Walk on to the next face until one has a free centre — one orb per face.
+        // Keep one orb per face, using the nearest free tile to its centre.
         let tile = null;
         while (faceIdx < faces.length) {
-            const candidate = faceCenterTile(faces[faceIdx++], size);
-            if (!occupiedKeys.has(tileKeyOf(candidate))) { tile = candidate; break; }
+            const face = faces[faceIdx++];
+            const center = faceCenterTile(face, size);
+            const candidates = surface.filter(candidate => candidate.dirKey === face.dirKey && !occupiedKeys.has(tileKeyOf(candidate)));
+            const distance = candidate => (candidate.x - center.x) ** 2 + (candidate.y - center.y) ** 2 + (candidate.z - center.z) ** 2;
+            candidates.sort((a, b) => distance(a) - distance(b));
+            if (candidates.length) { tile = candidates[0]; break; }
         }
         if (!tile) break; // no faces left — offer what fits
         occupiedKeys.add(tileKeyOf(tile));

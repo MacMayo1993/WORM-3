@@ -209,6 +209,7 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
     ...practice.mechanics, elements: practice.elements.size, uniqueElements: practice.collectedElements.size, powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
     alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts, peakLength: practice.peakLength,
     orbs: state.wormSessionOrbs, colors: practice.colors.size, healed: sim.healed, uniqueTunnels: practice.tunnels.size,
+    onSurface: sim.phase === 'crawling', healSettled: sim.healPauseT <= 0,
     tailClear: sim.phase === 'crawling' && sim.tunnelPassages.length === 0 && sim.healPauseT <= 0,
     nextTarget: level.kind === 'tunnel' ? activeTunnels.find(record => !practice.tunnels.has(record.tunnel.pairId))?.tunnel.entry ?? null : null,
     bodyJumps: practice.bodyJumps, landed: !sim.isJumping && sim.phase === 'crawling',
