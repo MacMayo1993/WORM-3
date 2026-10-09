@@ -14,7 +14,7 @@ import { ttPush } from '../worm/circularBuffers.js';
 const POOLS = {
   7: ['magnet', 'rocket'], 8: ['water', 'fire'], 17: ['rocket'], 18: ['explode'],
   20: ['magnet', 'explode', 'water', 'rocket', 'fire'],
-  24: ['water', 'fire', 'grass'], 27: ['water', 'fire', 'grass'], 28: ['explode', 'rocket'],
+  24: ['water', 'fire'], 27: ['water', 'fire', 'grass'], 28: ['explode', 'rocket'],
   30: ['magnet', 'explode', 'water', 'fire', 'grass'], 36: ['water', 'fire', 'grass', 'ice'],
   37: ['explode', 'rocket'], 40: ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'],
 };

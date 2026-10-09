@@ -9,63 +9,67 @@
 // two. Every element check reads `hasElement`, never `elementalType` alone, or the
 // partner's half of a fusion silently switches off.
 //
-// Every pair has a name and a look (both cube skins at once). Four pairs carry a rule
-// of their own (`rule: true`); the rest are both elements at full strength until
-// their twist lands.
+// All 20 ordered recipes have stable identities. Shipped rules and explicit
+// fallbacks are separate, so planned names never silently select another rule.
 //
 // Pure, like elementalDefs.js: no React, no Three, no store.
 
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
 
-/** The fusion of a pair, keyed by the two element ids in alphabetical order. */
-export const FUSION_DEFS = {
-  'fire+water': {
-    id: 'steam', label: 'Steam', rule: true,
-    description: 'Your fire trail turns to steam: enemies that step on it are scalded and stunned, and a bomb sitting on it is put out.',
-  },
-  'ice+water': {
-    id: 'slipstream', label: 'Slipstream', rule: true,
-    description: 'Turning no longer sheds water momentum, and a full head of steam is worth 40% extra speed instead of 25%.',
-  },
-  'fire+grass': {
-    id: 'wildfire', label: 'Wildfire', rule: true,
-    description: 'Land a spring leap and the ground around you bursts into flame, killing enemies in the 3x3 and leaving it burning.',
-  },
-  'grass+lightning': {
-    id: 'thunderpad', label: 'Thunderpad', rule: true,
-    description: 'The storm aims for your spring pads. A struck pad is charged, and a leap from it launches rocket-high.',
-  },
-  'lightning+water': { id: 'conductor', label: 'Conductor', rule: false, description: 'Water and lightning at full strength together.' },
-  'grass+water': { id: 'bloom', label: 'Bloom', rule: false, description: 'Water and nature at full strength together.' },
-  'fire+ice': { id: 'frostfire', label: 'Frostfire', rule: false, description: 'Fire and ice at full strength together.' },
-  'fire+lightning': { id: 'plasma', label: 'Plasma', rule: false, description: 'Fire and lightning at full strength together.' },
-  'grass+ice': { id: 'frostbloom', label: 'Frostbloom', rule: false, description: 'Ice and nature at full strength together.' },
-  'ice+lightning': { id: 'static', label: 'Static', rule: false, description: 'Ice and lightning at full strength together.' },
-};
+// Recipe identity is ordered. `fallback` names the shipped effect used until a
+// recipe's own rule lands; the HUD always explains the effect actually running.
+const recipes = [
+  ['water', 'fire', 'steam', 'Steam', 'Your steaming trail scalds and stuns enemies and puts out bombs.'],
+  ['fire', 'water', 'quench', 'Quench', 'Your trail becomes obsidian for 8 seconds: it blocks blasts without speeding bomb fuses. Turns on obsidian keep water momentum.'],
+  ['water', 'ice', 'slipstream', 'Slipstream', 'Turns keep water momentum; full momentum gives 40% extra speed.'],
+  ['fire', 'grass', 'wildfire', 'Wildfire', 'Land a spring leap to ignite the surrounding 3×3 and defeat enemies there.'],
+  ['grass', 'lightning', 'thunderpad', 'Thunderpad', 'Lightning charges spring pads for rocket-high leaps.'],
+  ['water', 'grass', 'bloom', 'Bloom'],
+  ['water', 'lightning', 'conductor', 'Conductor'],
+  ['fire', 'ice', 'coldfire', 'Coldfire'],
+  ['fire', 'lightning', 'plasma', 'Plasma'],
+  ['grass', 'water', 'geyser', 'Geyser'],
+  ['grass', 'fire', 'emberseed', 'Emberseed', null, 'wildfire'],
+  ['grass', 'ice', 'ski-jump', 'Ski Jump'],
+  ['ice', 'water', 'frozen-wake', 'Frozen Wake', null, 'slipstream'],
+  ['ice', 'fire', 'meltdown', 'Meltdown'],
+  ['ice', 'grass', 'frostbloom', 'Frostbloom'],
+  ['ice', 'lightning', 'static', 'Static'],
+  ['lightning', 'water', 'current', 'Current'],
+  ['lightning', 'fire', 'firestorm', 'Firestorm'],
+  ['lightning', 'ice', 'cryostorm', 'Cryostorm'],
+  ['lightning', 'grass', 'grounded', 'Grounded', null, 'thunderpad'],
+];
+export const ORDERED_FUSIONS = Object.fromEntries(recipes.map(([base, catalyst, id, label, description, fallback = null]) => [
+  `${base}>${catalyst}`, { base, catalyst, id, label, rule: !!description, fallback,
+    description: description ?? (fallback
+      ? `Currently uses ${recipes.find(r => r[2] === fallback)[3]}: ${recipes.find(r => r[2] === fallback)[4]}`
+      : `${ELEMENTAL_DEFS[base].label} and ${ELEMENTAL_DEFS[catalyst].label} base effects together; no additional fusion effect yet.`) },
+]));
 
-/** The order-free key of a pair, or null when it is not two different elements. */
-export function fusionKey(a, b) {
-  if (!a || !b || a === b || !ELEMENTAL_DEFS[a] || !ELEMENTAL_DEFS[b]) return null;
-  return a < b ? `${a}+${b}` : `${b}+${a}`;
+/** Arguments are chronological: first pickup, then second pickup. */
+export function fusionKey(base, catalyst) {
+  if (!base || !catalyst || base === catalyst || !ELEMENTAL_DEFS[base] || !ELEMENTAL_DEFS[catalyst]) return null;
+  return `${base}>${catalyst}`;
 }
-
-/** The fusion two elements make, or null. */
-export const getFusion = (a, b) => FUSION_DEFS[fusionKey(a, b)] ?? null;
+export const getFusion = (base, catalyst) => ORDERED_FUSIONS[fusionKey(base, catalyst)] ?? null;
+export const fusionEffect = recipe => recipe?.rule ? recipe.id : recipe?.fallback ?? null;
+export const fusionRecipeLabel = recipe => `${ELEMENTAL_DEFS[recipe.base].label} → ${ELEMENTAL_DEFS[recipe.catalyst].label}: ${recipe.label}`;
 
 /** Whether `type` is one of the elements washing over the cube right now. */
 export function hasElement(sim, type) {
   return !!sim && sim.elementalT > 0 && (sim.elementalType === type || sim.elementalPair === type);
 }
 
-/** The active fusion's id ('steam', 'slipstream', …), or null when one element (or none) is up. */
+/** The shipped effect ID, including fallbacks; null if no extra rule is active. */
 export function activeFusion(sim) {
   if (!sim || !(sim.elementalT > 0)) return null;
-  return getFusion(sim.elementalType, sim.elementalPair)?.id ?? null;
+  return fusionEffect(getFusion(sim.elementalPair, sim.elementalType));
 }
 
 /** Same question from the render side, which sees the two element ids and the clock. */
 export function fusionOf(element, partner, remaining = 1) {
-  return remaining > 0 ? getFusion(element, partner)?.id ?? null : null;
+  return remaining > 0 ? fusionEffect(getFusion(partner, element)) : null;
 }
 
 /**
@@ -81,8 +85,8 @@ export function claimElement(active, pair, claimed) {
   if (!active) return { type: claimed, pair: null, fused: false };
   // The same element again only refreshes the wash; the pair it is in stays.
   if (claimed === active) return { type: claimed, pair, fused: false };
-  // The partner reclaimed: same two elements, now newest-first the other way round.
-  if (claimed === pair) return { type: claimed, pair: active, fused: false };
+  // Reclaiming the base changes the ordered recipe and earns fusion credit.
+  if (claimed === pair) return { type: claimed, pair: active, fused: true };
   // A new element fuses with the newest one; a third replaces the older.
   return { type: claimed, pair: active, fused: true };
 }

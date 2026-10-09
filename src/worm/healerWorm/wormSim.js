@@ -15,9 +15,9 @@ import { makeSignature, activateSignature, tickSignature, launchSpring, isParity
 import { SPRING_GRAB_TILES } from '../characterAbilities.js';
 import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
-import { addElementalPatch, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
+import { addElementalPatch, quenchTrail, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
     CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
-import { hasElement, activeFusion, claimElement } from './elementalFusion.js';
+import { hasElement, activeFusion, claimElement, getFusion } from './elementalFusion.js';
 import { springSlamTiles } from './jumpLanding.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState, inchGaitInto, inchBodyRadius } from './inchGait.js';
@@ -714,7 +714,8 @@ export function startElemental(sim, ctx, type) {
     // cube transform, then eases back to the chase (WormChaseCamera reads this).
     sim.elementalFocusT = ELEMENTAL_FOCUS_DURATION;
     ctx.feel(ELEMENTAL_EXPERIENCE[type]?.sound ?? 'orb');
-    if (next.fused) ctx.onStoryMechanic?.('elementFusion', activeFusion(sim));
+    if (activeFusion(sim) === 'quench') quenchTrail(sim);
+    if (next.fused) ctx.onStoryMechanic?.('elementFusion', getFusion(sim.elementalPair, sim.elementalType).id);
     ctx.onElementalTheme(type, ELEMENTAL_DURATION, sim.elementalPair);
 }
 

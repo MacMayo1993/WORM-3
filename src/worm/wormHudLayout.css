@@ -253,3 +253,9 @@
   .worm-story-summary { gap:5px; padding-left:6px; font-size:10px; }
   .worm-story-summary .worm-story-glance { font-size:10px; padding-inline:5px; }
 }
+.worm-fusion-preview { display: block; max-width: 100%; border: 0; background: transparent; padding: 3px 5px; font: inherit; font-size: 11px; color: inherit; text-align: left; cursor: pointer; }
+.worm-fusion-guide { margin: 8px 0; text-align: left; font-size: 12px; }
+.worm-fusion-guide summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.worm-fusion-guide ul { max-height: 35vh; overflow-y: auto; margin: 6px 0; padding-left: 18px; }
+.worm-fusion-guide li { margin-bottom: 10px; }
+.worm-fusion-guide li span { display: block; margin-top: 3px; }

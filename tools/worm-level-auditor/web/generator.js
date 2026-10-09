@@ -14,6 +14,7 @@ export function seededRandom(seed){
 }
 export function requiredPowerCycle(level){
  const m=level.mechanics??{},types=new Set();
+ if(m.steamFusions||m.quenchFusions){types.add('water');types.add('fire');}
  if(m.magnetOrbs)types.add('magnet');if(m.explodes)types.add('explode');if(m.rockets)types.add('rocket');
  for(const e of ELEMENTS.slice(0,Math.max(m.elementPickups??0,m.uniqueElements??0,m.elements??0)))types.add(e);
  return CYCLE.filter(x=>types.has(x));
@@ -33,7 +34,7 @@ export function levelGoal(level){
  if(level.colors)tasks.push('collect all '+level.colors+' colors');
  if(level.rotations)tasks.push('survive '+level.rotations+' layer turns');
  for(const [key,count] of Object.entries(m)){
-  const phrase={boosts:'finish '+count+' boosts',doubleJumps:'land '+count+' double jumps',rockets:'land '+count+' rocket flights',magnetOrbs:'catch '+count+' remote orbs with a magnet',explodes:'ride out '+count+' explosions',elementPickups:'collect '+count+' elemental orbs',uniqueElements:'collect '+count+' different elemental types ('+ELEMENTS.slice(0,count).join(', ')+')',elements:'master '+count+' elements ('+ELEMENTS.slice(0,count).join(', ')+')',ringHeals:'surround '+count+' tunnels',signatures:'use your ability '+count+' times',bombs:'disarm '+count+' bombs',kills:'defeat '+count+' enemies'}[key];
+  const phrase={steamFusions:'make '+count+' Steam fusions (Water → Fire)',quenchFusions:'make '+count+' Quench fusions (Fire → Water)',boosts:'finish '+count+' boosts',doubleJumps:'land '+count+' double jumps',rockets:'land '+count+' rocket flights',magnetOrbs:'catch '+count+' remote orbs with a magnet',explodes:'ride out '+count+' explosions',elementPickups:'collect '+count+' elemental orbs',uniqueElements:'collect '+count+' different elemental types ('+ELEMENTS.slice(0,count).join(', ')+')',elements:'master '+count+' elements ('+ELEMENTS.slice(0,count).join(', ')+')',ringHeals:'surround '+count+' tunnels',signatures:'use your ability '+count+' times',bombs:'disarm '+count+' bombs',kills:'defeat '+count+' enemies'}[key];
   if(phrase)tasks.push(phrase);
  }
  const finish=['tunnel','collector','restore','mastery'].includes(level.kind)?' Clear your tail to finish.':level.kind==='jump'?' Empty jumps do not count.':'';

@@ -35,7 +35,7 @@ import { callWormTurn } from './wormTurnBridge.js';
 import { wormBuffs } from './wormBuffs.js';
 import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
-import { getFusion } from './healerWorm/elementalFusion.js';
+import { getFusion, fusionEffect, fusionRecipeLabel, ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
 import { wormClock } from './wormClock.js';
 import { feel, resumeFeel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
@@ -783,7 +783,9 @@ function BuffStrip({ detailed = false, onInspect }) {
     const magnetSeq = useGameStore(s => s.wormMagnetSeq ?? 0);
     const elementalTheme = useGameStore(s => s.wormElementalTheme ?? null);
     const elementalPartner = useGameStore(s => s.wormElementalPartner ?? null);
-    const fusion = elementalTheme ? getFusion(elementalTheme, elementalPartner) : null;
+    const fusion = elementalTheme ? getFusion(elementalPartner, elementalTheme) : null;
+    const specials = useGameStore(s => s.wormSpecials);
+    const preview = (specials ?? []).map(orb => getFusion(elementalTheme, orb.type)).find(Boolean);
     const fillRef = useRef(null);
     const secondsRef = useRef(null);
     const elemFillRef = useRef(null);
@@ -822,7 +824,7 @@ function BuffStrip({ detailed = false, onInspect }) {
             // A pair with no rule of its own reads as its water half, if it has one, so
             // the momentum readout survives a fusion.
             const lead = elementalPartner === 'water' ? 'water' : elementalTheme;
-            const feedback = elementalFeedback(lead, wormBuffs, fusion?.rule ? fusion.id : null);
+            const feedback = elementalFeedback(lead, wormBuffs, fusionEffect(fusion));
             if (feedbackRef.current && feedbackRef.current.textContent !== feedback.text) feedbackRef.current.textContent = feedback.text;
             if (momentumRef.current) momentumRef.current.style.transform = `scaleX(${feedback.fraction})`;
             raf = requestAnimationFrame(paint);
@@ -899,8 +901,13 @@ function BuffStrip({ detailed = false, onInspect }) {
         {elemDef && <div className="worm-buff-item">
             <button type="button" className="worm-hud-chip worm-buff-chip" onClick={onInspect} disabled={detailed}
                 style={{ '--power-color': elemDef.color }}
-                aria-label={fusion ? `${fusion.label} fusion of ${partnerDef.label} and ${elemDef.label} active` : `${elemDef.label} element active`}
+                title={fusion ? fusionRecipeLabel(fusion) : elemDef.label}
+                aria-label={fusion ? `${fusionRecipeLabel(fusion)} active` : `${elemDef.label} element active`}
                 aria-haspopup={detailed ? undefined : 'dialog'}>
+                {partnerDef && <span className="worm-element-medal worm-element-partner" aria-hidden="true" style={{ '--power-color': partnerDef.color }}>
+                    <SpecialIcon type={elementalPartner} size={12} />
+                </span>}
+                {partnerDef && <span aria-hidden="true">→</span>}
                 <span className="worm-element-medal" aria-hidden="true">
                     <svg width="24" height="24" viewBox="0 0 22 22">
                         <circle cx="11" cy="11" r={ELEM_RING_R} fill="none" stroke="#26372d22" strokeWidth="2" />
@@ -909,16 +916,30 @@ function BuffStrip({ detailed = false, onInspect }) {
                     </svg>
                     <SpecialIcon type={elementalTheme} size={12} />
                 </span>
-                {partnerDef && <span className="worm-element-medal worm-element-partner" aria-hidden="true" style={{ '--power-color': partnerDef.color }}>
-                    <SpecialIcon type={elementalPartner} size={12} />
-                </span>}
                 <span className="worm-buff-name">{elemLabel}</span>
                 <span ref={elemSecondsRef} aria-hidden="true" />
                 {hasWater && <span className="worm-buff-meter worm-momentum-meter" ref={momentumRef} aria-hidden="true" />}
             </button>
-            {detailed && <div className="worm-power-detail"><p>{elemDescription}</p><p ref={feedbackRef} /></div>}
+            {detailed && <div className="worm-power-detail">{fusion && <strong>{fusionRecipeLabel(fusion)}</strong>}<p>{elemDescription}</p><p ref={feedbackRef} /></div>}
+            {preview && (detailed
+                ? <p className="worm-fusion-preview">Next pickup — {fusionRecipeLabel(preview)}. {preview.description}</p>
+                : <button type="button" className="worm-fusion-preview" onClick={onInspect} title={preview.description}>
+                    Next: {getElementalDef(preview.catalyst).label} → {preview.label} <span aria-hidden="true">ⓘ</span>
+                  </button>)}
         </div>}
     </div>;
+}
+
+// Kept in Pause so recipe discovery does not expand the live checklist.
+export function FusionGuide() {
+    return <details className="worm-fusion-guide">
+        <summary>Elemental recipes · pickup order matters</summary>
+        <p>Collect a second element before the timer ends. Both last 10 seconds from that pickup. Collecting the older element reverses the recipe; repeating the newest only refreshes it.</p>
+        <ul>{Object.values(ORDERED_FUSIONS).map(recipe => <li key={recipe.id}>
+            <strong>{fusionRecipeLabel(recipe)}</strong>
+            <span>{recipe.description}</span>
+        </li>)}</ul>
+    </details>;
 }
 
 // ─── Special spawn / expiry notice ───────────────────────────────────────────
@@ -1060,7 +1081,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                 {storyId && <StoryObjectiveCard />}
                 <WormMissionCard summary />
                 <details className="screen-disclosure"><summary>Abilities & tunnels</summary>
-                  <BuffStrip detailed /><TunnelNeedsCard /><SignatureGuide />
+                  <BuffStrip detailed /><FusionGuide /><TunnelNeedsCard /><SignatureGuide />
                 </details>
                 <details className="screen-disclosure"><summary>Run rewards</summary>
                   <ParityWallet /><XpRunSummary mode="worm" />

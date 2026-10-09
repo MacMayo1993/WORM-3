@@ -1,15 +1,18 @@
 export const patchVertex = `
  attribute float patchAlpha;
+ attribute float patchVariant;
+ varying float vVariant;
  attribute float patchCharge;
  varying float vAlpha;
  varying float vCharge;
  varying vec2 vUv;
  void main() {
-   vAlpha=patchAlpha; vCharge=patchCharge; vUv=uv;
+   vVariant=patchVariant; vAlpha=patchAlpha; vCharge=patchCharge; vUv=uv;
    gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);
  }
 `;
 export const shieldFragment = `
+ varying float vVariant;
  varying float vAlpha;
  varying vec2 vUv;
  void main() {
@@ -21,6 +24,14 @@ export const shieldFragment = `
    float heat=1.0-smoothstep(0.085,0.12,length(p-vec2(0.0,0.03)));
    vec3 color=mix(vec3(0.025,0.13,0.15),vec3(0.62,0.96,1.0),rim);
    color=mix(color,vec3(1.0,0.73,0.27),heat);
+   if(vVariant>0.5 && vVariant<1.5) {
+     // Obsidian: a dark faceted plate with a violet rim, no hot centre.
+     float facet=step(0.0,p.x+p.y)*0.13;
+     color=mix(vec3(0.10+facet,0.08+facet,0.20+facet),vec3(0.72,0.64,0.95),rim);
+   } else if(vVariant>1.5) {
+     // Steam keeps the shield silhouette and a pale, cool centre.
+     color=mix(vec3(0.35,0.67,0.74),vec3(0.91,0.99,1.0),max(rim,heat));
+   }
    gl_FragColor=vec4(color,mask*vAlpha);
  }
 `;

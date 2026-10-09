@@ -3,7 +3,7 @@ export function requiredPowerCycles(level) {
   const m=level.mechanics??{};
   // Budget repeated quantities too: one elemental pickup per offer, and at
   // most four quest catches supported by each magnet offer in offerStoryPower.
-  return Math.max(2,m.explodes??0,m.rockets??0,m.elementPickups??0,Math.ceil((m.magnetOrbs??0)/4));
+  return Math.max(2,2*((m.steamFusions??0)+(m.quenchFusions??0)),m.explodes??0,m.rockets??0,m.elementPickups??0,Math.ceil((m.magnetOrbs??0)/4));
 }
 export function assess(record, character='glow', scenario={}) {
   const level=record.config, stage=record.stages[character], powerPool=stage.powerCycle.filter(x=>!(scenario.disabledPowers??[]).includes(x));
@@ -25,6 +25,11 @@ export function assess(record, character='glow', scenario={}) {
       detail='All six sticker colors measured in the staged inventory and again after full depletion.';
       if(target>stage.colorCount||initial===0&&!recurring)fail('Required color coverage is not supplied.');
       if(totalCap!==null&&totalCap<target)fail('Lifetime allowance cannot include every required color.');
+    } else if(['steamFusions','quenchFusions'].includes(key)) {
+      available=powerPool.includes('water')&&powerPool.includes('fire')?'Ordered base + timed partner':'Missing element';
+      detail='Collect '+(key==='steamFusions'?'Water → Fire':'Fire → Water')+' during one elemental window. Missed partners expire; the base can be offered again. Route execution needs a playtest.';
+      state='playtest';
+      if(!powerPool.includes('water')||!powerPool.includes('fire'))fail('Both water and fire are required for this fusion.');
     } else if(['elements','uniqueElements','elementPickups'].includes(key)) {
       available=distinct.length+' types · repeats';
       detail=key==='elements'?'Mastery requires actions: water momentum, fire trail, grass spring launch, ice jump/landing, lightning survival. Pickup alone earns no mastery credit.':key==='uniqueElements'?'Distinct types count once on pickup. Duplicate pickups do not advance variety.':'Any elemental pickup earns quantity credit; distinct types are not required by this objective.';
@@ -69,7 +74,7 @@ export function filterRecords(records,filters,reviews={}) {
     const text=[l.id,l.title,l.goal,l.kind,...r.objectives.map(o=>o.key),...a.powerPool].join(' ').toLowerCase();
     const goal=l.orbs??(l.kind==='orbs'?l.target:0);
     return (!filters.scope||(filters.scope==='generated'?l.id>40:l.id<=40))&&(!search||text.includes(search))&&(!filters.chapter||Math.ceil(l.id/10)===+filters.chapter)&&(!filters.size||l.cubeSize===+filters.size)&&
-      (!filters.quest||(filters.quest==='refill'?goal>a.initial:r.objectives.some(o=>filters.quest==='elemental'?['elements','uniqueElements','elementPickups'].includes(o.key):filters.quest==='explode'?o.key==='explodes':o.key===filters.quest)))&&
+      (!filters.quest||(filters.quest==='refill'?goal>a.initial:r.objectives.some(o=>filters.quest==='elemental'?['elements','uniqueElements','elementPickups','steamFusions','quenchFusions'].includes(o.key):filters.quest==='explode'?o.key==='explodes':o.key===filters.quest)))&&
       (!filters.status||(filters.status==='flagged'?!!review?.flag:filters.status==='playtest'?a.rows.some(o=>o.state==='playtest'):a.status===filters.status));
   });
 }

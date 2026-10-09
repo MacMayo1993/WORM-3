@@ -5,6 +5,8 @@ import { getWormStickerWorldPos as getStickerWorldPos } from '../wormExpansion.j
 import { prefersReducedMotion } from '../../utils/device.js';
 import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { FACE_NORMALS } from './constants.js';
+import { wormBuffs } from '../wormBuffs.js';
+import { fusionOf } from './elementalFusion.js';
 import { ELEMENTAL_PATCH_LIMIT } from './elementalGameplay.js';
 import { patchOpacity, springStretch } from './elementalFeedback.js';
 import { patchVertex, shieldFragment, springFragment } from './elementalPatchShaders.js';
@@ -18,6 +20,7 @@ class SpringCurve extends THREE.Curve {
 }
 function patchMesh(geometry, fragmentShader) {
     geometry.setAttribute('patchAlpha', new THREE.InstancedBufferAttribute(new Float32Array(ELEMENTAL_PATCH_LIMIT), 1));
+    geometry.setAttribute('patchVariant', new THREE.InstancedBufferAttribute(new Float32Array(ELEMENTAL_PATCH_LIMIT), 1));
     geometry.setAttribute('patchCharge', new THREE.InstancedBufferAttribute(new Float32Array(ELEMENTAL_PATCH_LIMIT), 1));
     const material = new THREE.ShaderMaterial({ vertexShader: patchVertex, fragmentShader, transparent: true,
         depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
@@ -41,6 +44,7 @@ export function ElementalPatches({ worm, size }) {
     useFrame(() => {
         resources.fire.count = resources.grass.count = 0;
         const reduced = prefersReducedMotion();
+        const steam = fusionOf(worm.elementalType?.current, worm.elementalPair?.current, wormBuffs.elementalT) === 'steam';
         for (const patch of worm.elementalPatches.current.values()) {
             const mesh = patch.type === 'fire' ? resources.fire : resources.grass;
             const index = mesh.count++;
@@ -56,11 +60,13 @@ export function ElementalPatches({ worm, size }) {
             pose.quaternion.setFromUnitVectors(Z, normal);
             pose.scale.set(1, 1, patch.type === 'grass' ? springStretch(patch.ttl, reduced) : 1);
             pose.updateMatrix(); mesh.setMatrixAt(index, pose.matrix);
+            mesh.geometry.attributes.patchVariant.setX(index, patch.obsidian ? 1 : steam && patch.type === 'fire' ? 2 : 0);
             mesh.geometry.attributes.patchAlpha.setX(index, patchOpacity(patch.ttl));
             mesh.geometry.attributes.patchCharge.setX(index, patch.charged ? 1 : 0);
         }
         for (const mesh of [resources.fire, resources.grass]) {
             mesh.instanceMatrix.needsUpdate = true;
+            mesh.geometry.attributes.patchVariant.needsUpdate = true;
             mesh.geometry.attributes.patchAlpha.needsUpdate = true;
             mesh.geometry.attributes.patchCharge.needsUpdate = true;
         }

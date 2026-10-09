@@ -101,10 +101,10 @@ export const WORM_STORY_LEVELS = [
     goal: 'Land 4 jumps over your own body and collect 12 orbs on a 4×4 brick cube.',
     kind: 'jump', target: 4, orbs: 12, speed: 2.1, par: 110, limit: 190,
     reward: ['hat_acorn', 'hat_toadstool'], rewardLabel: 'Choose a hat', fallback: 150 },
-  { id: 24, title: 'Biome Crossing', subtitle: 'Biome colors on one flowing tile style.', cubeSize: 6,
-    goal: 'Collect 3 elemental orbs, 18 orbs and heal 3 pairs on a 6×6 Biome cube while layers turn. Steer onto each marked elemental orb to claim it.',
+  { id: 24, title: 'Elemental Alchemy', subtitle: 'Same elements. Reverse the order. Change the effect.', cubeSize: 6,
+    goal: 'Make Steam (Water → Fire) and Quench (Fire → Water). Collect each marked partner before the elemental timer ends. Steam puts out bombs; Quench leaves a protective obsidian trail. Collect 18 orbs and heal 3 pairs.',
     kind: 'mastery', target: 3, orbs: 18, speed: 2.4, rotateEvery: 14, par: 300, limit: 460,
-    mechanics: { elementPickups: 3 }, points: 40 },
+    mechanics: { steamFusions: 1, quenchFusions: 1 }, points: 40 },
   { id: 25, title: 'The Far Side', subtitle: 'Watch where your twins land.', cubeSize: 5,
     goal: 'Heal 4 tunnel pairs, collect 20 orbs and survive 4 turns on a 5×5 cube. The far-side window shows the opposite face. Clear your tail to finish.',
     kind: 'restore', target: 4, orbs: 20, rotations: 4, speed: 2.4, rotateEvery: 13, par: 205, limit: 340,
@@ -195,7 +195,7 @@ export const isChapterFinale = id => storyChapterIndex(id) === STORY_CHAPTER_SIZ
 // same way (the 15×15 board also needs Mega's lighter effects tier).
 export const storyLaunchSettings = level => ({ storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: (level.cubeSize ?? 5) >= 15,
   wormSpeed: level.speed, wormOrbCount: 1, wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
-export const STORY_MECHANIC_LABELS = { boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
+export const STORY_MECHANIC_LABELS = { steamFusions: 'Steam fusions (Water → Fire)', quenchFusions: 'Quench fusions (Fire → Water)', boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
   magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements mastered', uniqueElements: 'different elements collected', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated' };
 // A repeating authored cycle spans all axes and includes central layers. Retain
 // the normal warning and collision transaction; never steer hazards at the head.
@@ -264,7 +264,7 @@ export function storyChecklist(level, metrics = {}) {
   const primary = { orbs: 'orbs', tunnel: 'uniqueTunnels', jump: 'bodyJumps', rotation: 'rotations' }[level.kind] ?? 'healed';
   const targets = { ...level.mechanics, [primary]: level.target };
   for (const key of ['orbs', 'colors', 'rotations']) if (level[key]) targets[key] = level[key];
-  const labels = { boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
+  const labels = { steamFusions: 'Make Steam: Water → Fire', quenchFusions: 'Make Quench: Fire → Water', boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
     magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', uniqueElements: 'Collect different elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
     signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
     orbs: 'Collect orbs', colors: "Collect each color", uniqueTunnels: "Cross tunnel pairs",
