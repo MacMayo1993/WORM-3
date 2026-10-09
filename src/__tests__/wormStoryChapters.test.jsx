@@ -5,7 +5,7 @@ import { WORM_STORY_LEVELS, WORM_STORY_CHAPTERS, STORY_MECHANIC_LABELS, storyCha
   isChapterFinale, storyLaunchSettings, storyLevel, storyUnlocked, storyChecklist } from '../worm/story/levels.js';
 import { STORY_WORLDS, storyView, storyAppearance } from '../worm/story/worlds.js';
 import { stageStory, replenishStoryOrbs, storyBodyPath, storyMouths } from '../worm/story/runtime.js';
-import { nextStoryPower, updateMastery, offerStoryPower } from '../worm/story/mastery.js';
+import { nextStoryPower, updateMastery, offerStoryPower, STORY_ELEMENTS } from '../worm/story/mastery.js';
 import { makeWormSim, resetWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 import { getActiveTunnels } from '../worm/wormLogic.js';
 import { getStoreItem } from '../utils/storeCatalog.js';
@@ -169,7 +169,12 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
       sim.powerups = sim.powerups.filter(orb => orb.dirKey !== sim.pos.dirKey);
       offerStoryPower(sim, staged, level, size, staged.cubies);
     }
-    expect(sim.specials).toHaveLength(1);
+    // From level 21 an elemental offer may come with a distinct elemental partner.
+    const paired = level.id >= 21 && STORY_ELEMENTS.includes(sim.specials[0]?.type);
+    expect(sim.specials.length).toBeGreaterThanOrEqual(1);
+    expect(sim.specials.length).toBeLessThanOrEqual(paired ? 2 : 1);
+    if (sim.specials.length === 2) expect(STORY_ELEMENTS).toContain(sim.specials[1].type);
+    expect(new Set(sim.specials.map(orb => orb.type)).size).toBe(sim.specials.length);
   });
 
   it('states every numeric target in its goal text and pays in real store items', () => {

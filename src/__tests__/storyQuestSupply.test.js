@@ -1,7 +1,7 @@
 import { beforeEach, expect, it } from 'vitest';
 import { WORM_STORY_LEVELS, storyLevel } from '../worm/story/levels.js';
 import { stageStory, replenishStoryOrbs } from '../worm/story/runtime.js';
-import { offerStoryPower, nextStoryPower, STORY_POWER_COOLDOWN, STORY_POWER_LIFETIME, STORY_POWER_OPENING_DELAY } from '../worm/story/mastery.js';
+import { offerStoryPower, nextStoryPower, STORY_ELEMENTS, STORY_POWER_COOLDOWN, STORY_POWER_LIFETIME, STORY_POWER_OPENING_DELAY } from '../worm/story/mastery.js';
 import { makeWormSim, tileKey } from '../worm/healerWorm/wormSim.js';
 import { makeGrowthOrb } from '../worm/healerWorm/orbSpawning.js';
 import { getAllSurfaceTiles } from '../worm/healerWorm/surfaceTiles.js';
@@ -29,6 +29,18 @@ for (const level of WORM_STORY_LEVELS.filter(level => level.id > 40)) {
   if (required.size) POOLS[level.id] = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'].filter(type => required.has(type));
 }
 beforeEach(() => resetLiveRotation());
+// One marked power, plus (from level 21) a distinct elemental partner when the
+// first is an element, so fusions can be practised. The partner never changes
+// which power the quest cycle offers first.
+function expectOffer(sim, level) {
+  expect(sim.specials.length).toBeGreaterThanOrEqual(1);
+  expect(sim.specials.length).toBeLessThanOrEqual(level.id >= 21 && STORY_ELEMENTS.includes(sim.specials[0].type) ? 2 : 1);
+  if (sim.specials.length === 2) {
+    expect(STORY_ELEMENTS).toContain(sim.specials[1].type);
+    expect(sim.specials[1].type).not.toBe(sim.specials[0].type);
+    expect(tileKey(sim.specials[1])).not.toBe(tileKey(sim.specials[0]));
+  }
+}
 function setup(id, character = 'classic') {
   const level = storyLevel(id), size = level.cubeSize, sim = makeWormSim(size);
   sim.rand = () => 0.42;
@@ -52,7 +64,7 @@ it.each(WORM_STORY_LEVELS)('level $id supplies six colors, every tunnel and recu
       const offered = [];
       for (let i = 0; i < pool.length; i++) {
         expect(reoffer()).toBe(true); // includes the original dense opening layout
-        expect(sim.specials).toHaveLength(1);
+        expectOffer(sim, level);
         offered.push(sim.specials[0].type);
       }
       expect(offered).toEqual(pool);
