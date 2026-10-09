@@ -66,7 +66,7 @@ const MID_FADE_FULL = 12;  // at or above this many: full fade
 const REBUILD_EPS_SQ = 1e-4;
 
 // Rewritten whenever a strand moves. aSide is fixed per vertex at creation.
-const DYNAMIC_ATTRS = ['position', 'aTangent', 'aColor', 'aT', 'aWidth', 'aHeat', 'aCharge', 'aFront'];
+const DYNAMIC_ATTRS = ['position', 'aTangent', 'aColor', 'aT', 'aWidth', 'aHeat', 'aCharge', 'aFront', 'aSurgeColor'];
 
 // Cords recede while the worm is inside a tunnel so the active ribbon reads.
 const IDLE_OPACITY = 1.0;
@@ -95,6 +95,8 @@ const _coreCenter = new THREE.Vector3();
 const _colorA    = new THREE.Color();
 const _colorB    = new THREE.Color();
 const _charge    = { active: false, front: 0, glow: 0, arrived: false };
+// The colour a surge carries (the flipped tile's); electric blue when none is given.
+const _surgeColor = { r: 0.42, g: 0.78, b: 1 };
 // Half-space pair keeping each cord behind the two stickers it hangs off.
 const _tileGuard = makeTileGuard();
 
@@ -107,6 +109,7 @@ const vertexShader = `
   attribute float aHeat;      // flips / effective flip cap
   attribute float aCharge;    // chaos surge brightness; sign = which end it entered
   attribute float aFront;     // how far the surge has run, 0 → 1 from its entry end
+  attribute vec3  aSurgeColor; // the flipped tile's colour the surge carries
 
   varying float vSide;
   varying float vT;
@@ -114,8 +117,10 @@ const vertexShader = `
   varying float vHeat;
   varying float vCharge;
   varying float vFront;
+  varying vec3  vSurgeColor;
 
   void main() {
+    vSurgeColor = aSurgeColor;
     vSide   = aSide;
     vT      = aT;
     vColor  = aColor;
@@ -150,6 +155,7 @@ const fragmentShader = `
   varying float vHeat;
   varying float vCharge;
   varying float vFront;
+  varying vec3  vSurgeColor;
 
   void main() {
     // A chaos surge running through this cord. It crosses the core intact —
@@ -195,14 +201,14 @@ const fragmentShader = `
 
     float alpha = (0.42 + vHeat * 0.38) * midFade * edgeFade * uOpacity;
 
-    // Electrified span: everything behind the surge front crackles blue-white,
-    // and the front itself burns white as it travels tile → core → twin.
+    // Electrified span: everything behind the surge front crackles in the flipped
+    // tile's colour, and the front itself burns white as it travels tile → core → twin.
     if (glow > 0.001) {
       float along   = vCharge > 0.0 ? vT : 1.0 - vT;
       float lit     = 1.0 - smoothstep(vFront - 0.03, vFront + 0.03, along);
       float head    = exp(-pow((along - vFront) / 0.07, 2.0));
       float arc     = 0.62 + 0.38 * sin(uTime * 57.0 + vT * 93.0 + vSide * 3.0);
-      vec3  electric = mix(vec3(0.42, 0.78, 1.0), vec3(1.0), head);
+      vec3  electric = mix(vSurgeColor, vec3(1.0), head);
       float amount  = glow * max(lit * arc * 0.85, head);
       col   = mix(col, electric * 1.7, clamp(amount, 0.0, 1.0));
       alpha = max(alpha, glow * (lit * 0.7 * arc + head) * edgeFade * uOpacity);
@@ -232,6 +238,7 @@ function createCordGeometry(maxStrands) {
   geo.setAttribute('aHeat',    new THREE.BufferAttribute(new Float32Array(vertCount),     1));
   geo.setAttribute('aCharge',  new THREE.BufferAttribute(new Float32Array(vertCount),     1));
   geo.setAttribute('aFront',   new THREE.BufferAttribute(new Float32Array(vertCount),     1));
+  geo.setAttribute('aSurgeColor', new THREE.BufferAttribute(new Float32Array(vertCount * 3), 3));
 
   const side = geo.attributes.aSide.array;
   for (let v = 0; v < vertCount; v++) side[v] = v % 2 === 0 ? -1 : 1;
@@ -262,8 +269,8 @@ function createCordGeometry(maxStrands) {
  */
 const cordPath = makeTunnelPath();
 const cordPoint = new THREE.Vector3(), cordTangent = new THREE.Vector3();
-function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWidth, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0, charge = 0, front = 0) {
-  const { pos, tan, col, tt, wid, heatArr, chargeArr, frontArr } = attrs;
+function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWidth, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0, charge = 0, front = 0, surge = _surgeColor) {
+  const { pos, tan, col, tt, wid, heatArr, chargeArr, frontArr, surgeArr } = attrs;
   const halfSegs = CORD_SEGS / 2;
   const base = slot * VERTS_PER_STRAND;
 
@@ -307,6 +314,7 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, dockWi
       heatArr[vi] = heat;
       chargeArr[vi] = charge;
       frontArr[vi]  = front;
+      surgeArr[p3] = surge.r; surgeArr[p3 + 1] = surge.g; surgeArr[p3 + 2] = surge.b;
     }
   }
 }
@@ -333,6 +341,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
     heatArr: geo.attributes.aHeat.array,
     chargeArr: geo.attributes.aCharge.array,
     frontArr: geo.attributes.aFront.array,
+    surgeArr: geo.attributes.aSurgeColor.array,
   }), [geo]);
   // Last surge value written per slot, so a cord is rewritten on the frame its
   // charge ends as well as while it runs.
@@ -418,6 +427,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
         front = _charge.front;
         if (charge === 0) charge = 1e-4;
       }
+      const surgeColor = surge?.r != null ? surge : _surgeColor;
       if (charge !== 0 || chargeCache[slot] !== 0) moved = true;
       chargeCache[slot] = charge;
 
@@ -447,7 +457,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands, raisedPresenta
         _colorB.set(t.color2);
         // Anchors after flip motion, so a shaking tile carries its guard plane.
         setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
-        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, tunnelDockWidth(size) * coreZoom, _colorA, _colorB, heat, _tileGuard, flipP1, flipP2, charge, front);
+        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, tunnelDockWidth(size) * coreZoom, _colorA, _colorB, heat, _tileGuard, flipP1, flipP2, charge, front, surgeColor);
       }
       slot++;
     }

@@ -66,6 +66,13 @@ function twinLoc(cubies, size, manifoldMap, x, y, z, dirKey) {
   return at ? tileLoc(cubies, size, at.x, at.y, at.z, at.dirKey) : null;
 }
 
+/**
+ * The face a flip turns this tile into: the colour the storm wears for it. Bolts
+ * and surges take the colour of the tile they flip, so the lightning reads as that
+ * tile's charge running through the cube rather than one generic blue.
+ */
+const flipFace = (loc) => (loc ? ANTIPODAL_COLOR[loc.curr] ?? loc.curr ?? null : null);
+
 const fromTuple = (cubies, size, t) => (Array.isArray(t) && t.length >= 4 ? tileLoc(cubies, size, t[0], t[1], t[2], t[3]) : null);
 
 /**
@@ -89,7 +96,7 @@ export function chaosStormEvents(payload, cubies, size, manifoldMap, cap, { seed
 
   // ── The first strike: the tile the player picked takes a bolt out of the sky ─
   const ignition = fromTuple(cubies, size, payload?.ignition);
-  if (ignition) events.push({ type: 'ignition', to: ignition, heat: 0, seed: nextSeed() });
+  if (ignition) events.push({ type: 'ignition', to: ignition, face: flipFace(ignition), heat: 0, seed: nextSeed() });
 
   // ── Bolts: one per chain hop between different cubies ──────────────────────
   const cascades = payload?.cascades ?? [];
@@ -110,6 +117,9 @@ export function chaosStormEvents(payload, cubies, size, manifoldMap, cap, { seed
       fromPos: c.from ?? null,
       toPos: c.to ?? null,
       crossFace: !!c.crossFace,
+      // The hop flips the tile it lands on; a bolt drawn only from frozen
+      // positions falls back to its source tile's colour.
+      face: flipFace(to ?? from),
       // How close the struck tile is to its cap — hot tiles take hotter bolts.
       heat: to ? Math.min(1, (to.flips + 1) / safeCap) : 0,
       seed: nextSeed()
@@ -138,6 +148,7 @@ export function chaosStormEvents(payload, cubies, size, manifoldMap, cap, { seed
       pairId,
       from,
       to,
+      face: flipFace(from),
       heat: Math.min(1, (from.flips + 1) / safeCap),
       seed: nextSeed()
     });

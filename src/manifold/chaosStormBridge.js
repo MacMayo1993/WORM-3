@@ -50,7 +50,7 @@ export function clearChaosStorm() {
 // renderers (RestingCords, MobiusTunnel) light the same span in step by reading
 // this map with the same clock.
 
-/** pairId → { startMs, fromGridId, travelMs, lingerMs, strength, kind } */
+/** pairId → { startMs, fromGridId, travelMs, lingerMs, strength, kind, r, g, b } */
 export const tunnelCharges = new Map();
 
 export const CHARGE_TIMING = {
@@ -60,10 +60,15 @@ export const CHARGE_TIMING = {
   overload: { travelMs: 230, lingerMs: 520, strength: 1 }
 };
 
-export function setTunnelCharge(pairId, fromGridId, startMs, kind = 'surge') {
+// The surge's colour (linear RGB, e.g. a THREE.Color): the flipped tile's, so the
+// cord it runs down lights up in that tile's colour. Defaults to electric blue.
+const SURGE_BLUE = { r: 0.42, g: 0.78, b: 1 };
+
+export function setTunnelCharge(pairId, fromGridId, startMs, kind = 'surge', color = SURGE_BLUE) {
   if (!pairId) return null;
   const t = CHARGE_TIMING[kind] ?? CHARGE_TIMING.surge;
-  const charge = { startMs, fromGridId, travelMs: t.travelMs, lingerMs: t.lingerMs, strength: t.strength, kind };
+  const c = color ?? SURGE_BLUE;
+  const charge = { startMs, fromGridId, travelMs: t.travelMs, lingerMs: t.lingerMs, strength: t.strength, kind, r: c.r, g: c.g, b: c.b };
   tunnelCharges.set(pairId, charge);
   return charge;
 }
