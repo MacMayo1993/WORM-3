@@ -75,6 +75,30 @@ it.each([6, 15])('batches a 144-pickup shower on a %s board while keeping its pa
     expect(food.reduce((n, o) => n + o.count, 0)).toBe(90 * 4);
     expect(new Set(food.map(o => o.geometry))).toEqual(new Set([g.shell, g.core, g.ringA, g.ringB]));
 
+    // Reward cascades stay instanced even in flight; animation reads the sim's
+    // clock, so pause freezes the burst and a settled orb remains collectible.
+    const cascadeOrigin = { x: 0, y: 0, z: size - 1, dirKey: 'PZ' };
+    const rewards = getAllSurfaceTiles(size).filter(p => p.dirKey === 'PZ').slice(1, 5).map((p, i) => ({
+      ...p, spawnId: `cascade-${i}`, color: colors[i], antipodalColor: colors[i + 1],
+      cascade: { origin: cascadeOrigin, age: 0, kind: 'bomb' },
+    }));
+    await render(rewards);
+    advance(1);
+    expect(visibleMeshes(store.scene).length).toBeLessThanOrEqual(17);
+    expect(visibleMeshes(store.scene).filter(o => o.geometry === g.shell).every(o => o.isInstancedMesh)).toBe(true);
+    let proxy;
+    store.scene.traverse(o => { if (!proxy && o.isMesh && !o.isInstancedMesh && o.geometry === g.shell) proxy = o; });
+    const launched = proxy.parent.position.clone();
+    advance(20);
+    // Bobbing of the destination has no effect at flight=0.
+    expect(proxy.parent.position.distanceTo(launched)).toBeLessThan(1e-8);
+    for (const orb of rewards) orb.cascade.age = 0.325;
+    advance(1);
+    expect(proxy.parent.position.distanceTo(launched)).toBeGreaterThan(0.5);
+    for (const orb of rewards) orb.cascade.age = 0.65;
+    advance(1);
+    expect(visibleMeshes(store.scene).length).toBeLessThanOrEqual(17);
+
     // Removing shower pickups clears their batches; ordinary pickups retain
     // their full glass shell and transparent ring/glow rendering.
     await render([{ ...orbs[0], spawnId: 'ordinary', shower: false }]);

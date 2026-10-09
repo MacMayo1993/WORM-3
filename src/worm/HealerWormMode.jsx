@@ -429,7 +429,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             return;
         }
         const rotationInterval = story?.rotateEvery || ACTIVE_ROTATE_INTERVAL;
-        worm.tick(delta, { busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
+        worm.tick(delta, { bombTiles: bombsRef.current.map(b => b.tile), busy: bombsRef.current.length > 0 || warningProgressRef.current > 0 ||
             autoTimerRef.current >= rotationInterval - AUTO_ROTATE_WARNING - 0.2 });
 
         const deathState = useGameStore.getState();
@@ -743,6 +743,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     if (isBombDisarmed(bomb, occupied, size) || isBombSlammed(bomb, slamTiles) ||
                         (steam && isHotTile(worm.elementalPatches.current, bomb.tile))) {
                         blastApiRef.current?.disarm(bomb);
+                        worm.rewardBombDisarm(bomb.tile);
                         if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
                         else if (store.wormStoryLevel) worm.recordStoryBomb?.(bomb.id);
                         else useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);

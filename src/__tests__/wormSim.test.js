@@ -1,3 +1,4 @@
+import { CASCADE_FLIGHT } from '../worm/healerWorm/orbCascade.js';
 import { tickExpansion } from '../worm/healerWorm/expansion.js';
 import { EXPLODE_AMOUNT, EXPLODE_TRANSITION } from '../worm/wormExpansion.js';
 // Deterministic tests for the worm simulation core (healerWorm/wormSim.js).
@@ -199,6 +200,8 @@ describe('ring healing waits for visible tile contact', () => {
     expect(eventsOf(ctx, 'heal').map(e => e.args[3])).toEqual([1, 2]);
     expect(eventsOf(ctx, 'heal').every(e => e.args[2].length === 2)).toBe(true);
     expect(eventsOf(ctx, 'ringHeals')).toHaveLength(2);
+    expect(sim.orbCascades.every(r => r.kind === 'surround')).toBe(true);
+    expect(sim.orbCascades.reduce((n, r) => n + r.remaining, 0) + sim.powerups.filter(p => p.cascade).length).toBe(18);
     expect(eventsOf(ctx, 'feel').filter(e => e.args[0] === 'heal')).toHaveLength(1);
     expect(sim.healed).toBe(2);
     expect(sim.tunnelUseCounts.size).toBe(0);
@@ -841,6 +844,7 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(reachedWindout).toBe(true);
     expect(eventsOf(ctx, 'heal')).toHaveLength(0);
     expect(sim.tunnelPassages[0]?.heal?.tunnel).toBe(tunnel);
+    expect(sim.orbCascades).toHaveLength(0);
 
     // The head regains control while the body keeps following the tunnel history.
     expect(runUntil(sim, ctx, () => sim.phase === 'crawling')).toBe(true);
@@ -860,6 +864,8 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(eventsOf(ctx, 'heal')).toHaveLength(1);
     expect(sim.healed).toBe(1);
     expect(sim.healFired).toBe(true);
+    expect(sim.orbCascades).toHaveLength(0);
+    expect(sim.powerups.some(p => p.cascade)).toBe(false);
     expect(sim.pendingHealBurst).toEqual({ exitTile: tunnel.exit, entryTile: tunnel.entry });
     // Healed tunnel's traversal bookkeeping is dropped
     expect(sim.tunnelUseCounts.has(tunnelKey)).toBe(false);
@@ -982,6 +988,19 @@ describe('flipped tiles and tunnel traversal', () => {
 });
 
 describe('orb pickup', () => {
+  it.each([false, true])('collects a settled cascade orb once with normal growth (story=%s)', story => {
+    const sim = makeSim();
+    const cubies = makeCubies(SIZE);
+    const ctx = makeCtx({ isStoryMode: () => story, getCubies: () => cubies });
+    const tile = { x: 1, y: 2, z: 2, dirKey: 'PZ' };
+    sim.powerups = [{ ...tile, type: 'apple', cascade: { origin: tile, kind: 'bomb', age: CASCADE_FLIGHT } }];
+    const before = sim.tailLength;
+    run(sim, ctx, 1.05);
+    expect(sim.tailLength).toBe(before + ORB_SEGMENT_GROWTH);
+    expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
+    expect(sim.powerups).toHaveLength(0);
+  });
+
   it('grows the tail and reports the pickup when crawling over an orb', () => {
     const cubies = makeCubies(SIZE);
     const sim = makeSim();
@@ -997,6 +1016,21 @@ describe('orb pickup', () => {
 });
 
 describe('applyRotationToSim', () => {
+  it('rotates queued cascade origins and in-flight pickups with their own slice', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const origin = { x: 0, y: 0, z: 2, dirKey: 'PZ' };
+    sim.orbCascades = [{ kind: 'bomb', origin, remaining: 8 }];
+    sim.powerups = [{ x: 0, y: 2, z: 2, dirKey: 'PZ', type: 'apple',
+      spawnId: 'test-cascade', cascade: { origin, age: 0.2, kind: 'bomb' } }];
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', sliceIndex: 2, dir: 1 }, {
+      inOpeningScramble: false, paused: true,
+    });
+    expect(sim.orbCascades[0].origin).toEqual({ x: 2, y: 0, z: 2, dirKey: 'PZ' });
+    expect(sim.powerups[0]).toMatchObject({ x: 0, y: 0, z: 2, dirKey: 'PZ', spawnId: 'test-cascade' });
+    expect(sim.powerups[0].cascade).toMatchObject({ origin: sim.orbCascades[0].origin, age: 0.2 });
+  });
+
   it('carries the worm, its heading, and its trail through a slice turn', () => {
     const sim = makeSim();
     const ctx = makeCtx();

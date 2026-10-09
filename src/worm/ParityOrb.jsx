@@ -1,3 +1,5 @@
+import { CASCADE_FLIGHT } from './healerWorm/orbCascade.js';
+import { readLiveTile } from './wormHelpers.js';
 import { createOrbReveal, orbRevealProgress, orbRainLift } from './orbReveal.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { wormExpansion } from './wormExpansion.js';
@@ -32,6 +34,8 @@ const BOB_NORMALS = {
 };
 
 // Scratch vectors — never allocated during render
+const _cascadeOrigin = new THREE.Vector3();
+const _cascadeNormal = new THREE.Vector3();
 const _scratchPos = new THREE.Vector3();
 const _scratchBob = new THREE.Vector3();
 const _rainbowColor = new THREE.Color();
@@ -65,7 +69,7 @@ const _orbGeos = PARITY_ORB_GEOMETRIES;
 function SingleOrbImpl({
   position, color = '#ffd700', antipodalColor = '#ffd700', styleKey = 'solid',
   collected = false, isTarget = false, elevated = false,
-  dirKey = 'PY', orbKey, type = 'parity', shower = false, compact = false,
+  dirKey = 'PY', orbKey, type = 'parity', shower = false, compact = false, cascade = null,
   registerAnim, unregisterAnim,
   gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false, reducedDetail = false,
 }) {
@@ -139,12 +143,12 @@ function SingleOrbImpl({
       get type()          { return typeRef.current; },
       get poles()         { return poleRefs.current; },
       get styledBand()    { return styledBandRef.current; },
-      timeOffset, shower, compact, reducedDetail, age: 0, reveal: null, arrived: false,
+      timeOffset, shower, compact, cascade, reducedDetail, age: 0, reveal: null, arrived: !!cascade,
       near: 0, spin: 0,
       get color()         { return gemColorRef.current; },
     });
     return () => unregisterAnim(orbKey);
-  }, [orbKey, timeOffset, shower, compact, reducedDetail, registerAnim, unregisterAnim]);
+  }, [orbKey, timeOffset, shower, compact, cascade, reducedDetail, registerAnim, unregisterAnim]);
 
   if (collected) return null;
 
@@ -267,6 +271,7 @@ const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
   a.type === b.type &&
   a.shower === b.shower &&
   a.compact === b.compact &&
+  a.cascade === b.cascade &&
   a.collected === b.collected &&
   a.isTarget === b.isTarget &&
   a.elevated === b.elevated &&
@@ -369,6 +374,17 @@ export default function ParityOrbs({
         );
       }
 
+      if (refs.cascade && refs.cascade.age < CASCADE_FLIGHT && !reducedMotion.current) {
+        const flight = refs.cascade.age / CASCADE_FLIGHT;
+        const origin = refs.cascade.origin;
+        if (!readLiveTile(origin, _cascadeOrigin, _cascadeNormal)) {
+          _cascadeOrigin.fromArray(getSegmentWorldPos(origin, size, wormExpansion.amount));
+          _cascadeNormal.set(...(BOB_NORMALS[origin.dirKey] || BOB_NORMALS.PY));
+        }
+        _cascadeOrigin.addScaledVector(_cascadeNormal, HOVER_ABOVE);
+        group.position.lerpVectors(_cascadeOrigin, group.position, 1 - (1 - flight) ** 2);
+        group.position.addScaledVector(_tileNormal, Math.sin(Math.PI * flight) * 1.4);
+      }
       if (refs.shower && arrival < 1) {
         if (!cubie) _scratchBob.set(...bn);
         group.position.addScaledVector(_scratchBob, orbRainLift(arrival, reducedMotion.current));
@@ -612,6 +628,7 @@ export default function ParityOrbs({
         type:           orb.type           || 'parity',
         key,
         shower: !!orb.shower,
+        cascade: orb.cascade ?? null,
         isTarget:  isTunnelMode && orb.tunnelId === targetTunnelId,
         elevated:  orb.elevated || false,
         gridX:     orb.x  ?? -1,
@@ -636,7 +653,8 @@ export default function ParityOrbs({
           dirKey={data.dirKey}
           type={data.type}
           shower={data.shower}
-          compact={wormMode && orbs.length > 24 && !isTunnelMode && !data.shower}
+          cascade={data.cascade}
+          compact={!!data.cascade || (wormMode && orbs.length > 24 && !isTunnelMode && !data.shower)}
           isTarget={data.isTarget}
           elevated={data.elevated}
           gridX={data.gridX}
