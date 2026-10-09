@@ -1,7 +1,7 @@
 import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { characterOrbCount } from '../characterAbilities.js';
 import { getAllSurfaceTiles, randomUnflippedTile } from '../healerWorm/surfaceTiles.js';
-import { updateMastery, STORY_POWER_OPENING_DELAY } from './mastery.js';
+import { updateMastery, storyElementCount, STORY_POWER_OPENING_DELAY } from './mastery.js';
 import { stageWormPractice } from '../healerWorm/demoPractice.js';
 import { flipStickerPair, buildManifoldGridMap, findAntipodalStickerByGrid } from '../../game/manifoldLogic.js';
 import { ttAt } from '../circularBuffers.js';
@@ -206,7 +206,10 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
   if (level.kind === 'jump') trackPracticeBodyJump(sim, practice, state.size);
   updateMastery(sim, practice, level, delta);
   return {
-    ...practice.mechanics, elements: practice.elements.size, uniqueElements: practice.collectedElements.size, powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
+    ...practice.mechanics,
+    elements: storyElementCount(practice.elements, level.mechanics?.elements),
+    uniqueElements: storyElementCount(practice.collectedElements, level.mechanics?.uniqueElements),
+    powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
     alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts, peakLength: practice.peakLength,
     orbs: state.wormSessionOrbs, colors: practice.colors.size, healed: sim.healed, uniqueTunnels: practice.tunnels.size,
     onSurface: sim.phase === 'crawling', healSettled: sim.healPauseT <= 0,

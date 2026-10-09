@@ -1,7 +1,7 @@
 import { beforeEach, expect, it } from 'vitest';
-import { storyLevel, storyOutcome, storyChecklist } from '../worm/story/levels.js';
+import { WORM_STORY_LEVELS, storyLevel, storyOutcome, storyChecklist } from '../worm/story/levels.js';
 import { stageStory, storyMetrics } from '../worm/story/runtime.js';
-import { offerStoryPower, recordStoryMechanic, updateMastery, fusionReachableTiles } from '../worm/story/mastery.js';
+import { STORY_ELEMENTS, nextStoryPower, offerStoryPower, recordStoryMechanic, updateMastery, fusionReachableTiles } from '../worm/story/mastery.js';
 import { makeWormSim, startElemental, tileKey } from '../worm/healerWorm/wormSim.js';
 import { activeFusion } from '../worm/healerWorm/elementalFusion.js';
 import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
@@ -148,4 +148,44 @@ it.each([30, 35, 40])('offers a simultaneous reachable pair for fusion practice 
   expect(sim.elementalPair).toBe(first.type);
   expect(sim.elementalType).toBe(second.type);
   expect(p.mechanics.elementPickups).toBe(2);
+});
+
+const prefixLevels = WORM_STORY_LEVELS.filter(level => level.id >= 21 &&
+  [3, 4].includes(level.mechanics?.uniqueElements ?? level.mechanics?.elements));
+it.each(prefixLevels)('level $id keeps the last required element in the fusion offering', level => {
+  const { sim, p, offer } = setup(level.id);
+  const key = level.mechanics.uniqueElements ? 'uniqueElements' : 'elements';
+  const required = STORY_ELEMENTS.slice(0, level.mechanics[key]);
+  p.mechanics = { ...level.mechanics };
+  p.collectedElements = new Set(required.slice(0, -1));
+  p.elements = new Set(required.slice(0, -1));
+  expect(offer()).toBe(true);
+  expect(sim.specials).toHaveLength(2);
+  expect(sim.specials[0].type).toBe(required.at(-1));
+  expect(sim.specials[1].type).not.toBe(required.at(-1));
+  for (const orb of sim.specials) expect(required).toContain(orb.type);
+  // Taking only the companion must not complete the remaining identity goal.
+  recordStoryMechanic(p, 'elementPickups', sim.specials[1].type);
+  p.elements.add(sim.specials[1].type);
+  expect(nextStoryPower(p, level)).toBe(required.at(-1));
+});
+
+it.each(prefixLevels)('level $id rejects unrelated elements as substitutes for its authored prefix', level => {
+  const { sim, p, size } = setup(level.id);
+  const key = level.mechanics.uniqueElements ? 'uniqueElements' : 'elements';
+  const count = level.mechanics[key], required = STORY_ELEMENTS.slice(0, count);
+  p.mechanics = { ...level.mechanics };
+  sim.combat = { kills: level.mechanics.kills ?? 0 };
+  p.collectedElements = new Set([...required.slice(0, -1), STORY_ELEMENTS[count]]);
+  p.elements = new Set(p.collectedElements);
+  const read = () => storyMetrics(sim, p, level, { size, rotationEpoch: 0, wormSessionOrbs: 0 }, [], 0);
+  const won = { alive: true, elapsed: 1, landed: true, tailClear: true, rotationSettled: true, remaining: 0,
+    healed: level.target, orbs: level.orbs, rotations: level.rotations ?? 0 };
+  expect(read()[key]).toBe(count - 1);
+  expect(storyOutcome(level, { ...read(), ...won })).toBeNull();
+  expect(nextStoryPower(p, level)).toBe(required.at(-1));
+  recordStoryMechanic(p, 'elementPickups', required.at(-1));
+  p.elements.add(required.at(-1));
+  expect(read()[key]).toBe(count);
+  expect(storyOutcome(level, { ...read(), ...won })).not.toBeNull();
 });
