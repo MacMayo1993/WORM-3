@@ -36,6 +36,11 @@ it('opens with Story on the left and Free Play on the right, without launching e
   expect(cards.map(card => card.querySelector('.worm-path-cta').firstChild.textContent.trim())).toEqual(['Levels', 'Free Play']);
   expect(complete).not.toHaveBeenCalled();
   click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
+  const rules = host.querySelector('[aria-label="Star requirements"]');
+  expect(rules.querySelectorAll('li')).toHaveLength(3);
+  expect(rules.textContent).toContain('125s');
+  expect(rules.textContent).toContain('70s OR');
+  expect(rules.textContent).toContain('AND reach 46 body segments');
   expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
   click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 6, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
     colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));

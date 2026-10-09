@@ -17,7 +17,7 @@ const MOUTHS = [[1,2,4,'PZ'], [4,2,1,'PX'], [1,4,2,'PY'], [3,2,4,'PZ'], [4,2,3,'
 // Smallest board the authored 5×5 templates fit. Below it, trails, mouths and
 // routes are generated to the face instead of shifted off its edge.
 const TEMPLATE_SIZE = 5;
-export const STORY_ORB_REFILL_INTERVAL = 1.5;
+export const STORY_ORB_REFILL_INTERVAL = 0.75;
 
 // Face-local (u, v) on PZ, in board coordinates. The head spawns at (c, 0)
 // heading up column c (see stageWormPractice); every trail keeps that column
@@ -97,7 +97,8 @@ export function stageStory(sim, size, level, character) {
   // Route-trial pairs can seal after traversal without losing their recorded credit.
   sim.powerups = [];
   const cells = STORY_ORB_ROUTES[STORY_WORLDS[level.id].route];
-  const orbsPerFace = Math.max(level.orbsPerFace ?? cells.length, level.mechanics?.ringHeals ? 6 : 0);
+  const density = size <= 3 ? (size === 2 ? 2 : 4) : Math.min(10, Math.ceil(size * size * 0.3));
+  const orbsPerFace = Math.min(10, Math.max(level.orbsPerFace ?? cells.length, density, level.mechanics?.ringHeals ? 6 : 0));
   for (const dirKey of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
     // A tunnel may occupy a route tile. Fill locally with distinct safe cells
     // to retain the full matching-color supply on every face.
@@ -118,6 +119,7 @@ export function stageStory(sim, size, level, character) {
     }
   }
   seedPracticeBody(sim, size, body);
+  sim.peakTailLength = sim.tailLength;
   if (level.kind === 'jump') {
     const row = size >= TEMPLATE_SIZE ? 2 : size - 1;
     base.target = { x: Math.floor(size / 2), y: row, z: edge, dirKey: 'PZ' };
@@ -142,7 +144,7 @@ export function stageStory(sim, size, level, character) {
     orbTargets[color] = (orbTargets[color] ?? 0) + 1;
   }
   const practice = { ...base, pendingMouths, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
-    elapsed: 0, powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
+    elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), elementTime: 0, powerSeq: 0, bombIds: new Set() };
   return practice;
@@ -200,11 +202,12 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
   const cutting = sim.cutFocusT > 0;
   if (cutting && !practice.wasCut) practice.cuts++;
   practice.wasCut = cutting;
+  practice.peakLength = Math.max(practice.peakLength ?? 0, Math.floor(sim.tailLength), Math.floor(sim.peakTailLength ?? 0));
   if (level.kind === 'jump') trackPracticeBodyJump(sim, practice, state.size);
   updateMastery(sim, practice, level, delta);
   return {
     ...practice.mechanics, elements: practice.elements.size, uniqueElements: practice.collectedElements.size, powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
-    alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts,
+    alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts, peakLength: practice.peakLength,
     orbs: state.wormSessionOrbs, colors: practice.colors.size, healed: sim.healed, uniqueTunnels: practice.tunnels.size,
     tailClear: sim.phase === 'crawling' && sim.tunnelPassages.length === 0 && sim.healPauseT <= 0,
     nextTarget: level.kind === 'tunnel' ? activeTunnels.find(record => !practice.tunnels.has(record.tunnel.pairId))?.tunnel.entry ?? null : null,

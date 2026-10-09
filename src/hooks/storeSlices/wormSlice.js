@@ -30,6 +30,9 @@ export const createWormSlice = (set, get) => ({
   startWormStory: () => set(s => s.wormHealerMode && s.wormStoryLevel && s.wormStoryReady && !s.wormStoryStarted && s.wormAlive && !s.wormStoryResult && s.wormGamePhase === 'active' && !s.wormPauseMenuOpen
     ? { wormStoryStarted: true, wormPaused: true, wormGamePhase: 'countdown', wormCountdownStep: 3 } : s),
   completeWormStory: (runId, metrics) => set(s => completeStoryChanges(s, runId, metrics)),
+  finishWormStory: () => set(s => s.wormStoryStarted && s.wormAlive && !s.wormPaused && !s.wormStoryResult &&
+    s.wormStoryChecklist?.runId === s.wormRunId && s.wormStoryChecklist?.canFinish
+    ? { wormStoryFinishRequested: true } : s),
   claimWormStoryReward: (id, choice) => set(s => claimStoryChanges(s, id, choice)),
   setWormHealerMode: (v) => set(s => ({ wormHealerMode: v, ...(!v ? storyVisualChanges(s, null) : {}) })),
 
@@ -41,7 +44,7 @@ export const createWormSlice = (set, get) => ({
   setWormSpeed: (v) => set(s => s.wormStoryLevel ? s : { wormSpeed: v }),
   wormBoostState: 'ready',
   setWormBoostState: (v) => set({ wormBoostState: v }),
-  wormOrbCount: 5,
+  wormOrbCount: 16,
   setWormOrbCount: (v) => set({ wormOrbCount: Math.max(1, Math.min(MAX_WORM_ORBS, Math.round(v))) }),
   wormholeInterval: 10,
   setWormholeInterval: (v) => set({ wormholeInterval: Math.max(2, Math.min(30, Number(v))) }),

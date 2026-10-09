@@ -156,3 +156,12 @@
 .worm-story-unlock strong { display:block; color:var(--arcade-ink); font:400 22px/1.15 var(--display-font); text-transform:uppercase; }
 .worm-story-unlock em { display:block; color:var(--arcade-muted); font:700 12px/1.3 var(--heading-font); font-style:normal; }
 @media(prefers-reduced-motion:reduce) { .worm-story-unlock { animation:none; } }
+.worm-star-requirements { padding:10px 12px; margin:10px 0; border:1px solid currentColor; border-radius:12px; text-align:left; font-size:12px; line-height:1.4; }
+.worm-star-requirements ol { list-style:none; margin:6px 0; padding:0; display:grid; gap:7px; }
+.worm-star-requirements li { display:grid; grid-template-columns:42px minmax(0,1fr); gap:8px; }
+.worm-star-requirements li b { color:#ba8500; letter-spacing:1px; }
+.worm-star-requirements li[data-earned="true"] b { color:#da9b00; }
+.worm-star-requirements p { margin:8px 0 0; font-size:12px; }
+.worm-star-requirements small { font-size:11px; }
+.worm-story-growth { display:flex; justify-content:space-between; gap:8px; padding:5px 10px; border-radius:10px; color:#fff5d5; background:#182b2ef0; font-size:11px; line-height:1.4; }
+.worm-story-finish { pointer-events:auto; min-height:44px; width:100%; padding:8px; border:1px solid #d8b653; border-radius:10px; background:#fff1b5; color:#142425; font:inherit; font-size:12px; cursor:pointer; touch-action:manipulation; }

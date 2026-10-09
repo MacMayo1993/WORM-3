@@ -64,6 +64,17 @@ it.each([6, 15])('batches a 144-pickup shower on a %s board while keeping its pa
     const g = PARITY_ORB_GEOMETRIES.normal;
     expect(new Set(settled.map(o => o.geometry))).toEqual(new Set([g.shell, g.core, g.ringA, g.ringB]));
 
+    // A dense ordinary food field uses the same bounded four-piece batches.
+    await render(orbs.slice(0, 90).map(orb => ({ ...orb, shower: false, spawnId: `food-${orb.spawnId}` })));
+    advance(60);
+    const allFood = visibleMeshes(store.scene);
+    expect(allFood.length).toBeLessThanOrEqual(25); // 24 parity batches + one shared beacon
+    const food = allFood.filter(o => [g.shell, g.core, g.ringA, g.ringB].includes(o.geometry));
+    expect(food).toHaveLength(24);
+    expect(food.every(o => o.isInstancedMesh && !o.material.transparent)).toBe(true);
+    expect(food.reduce((n, o) => n + o.count, 0)).toBe(90 * 4);
+    expect(new Set(food.map(o => o.geometry))).toEqual(new Set([g.shell, g.core, g.ringA, g.ringB]));
+
     // Removing shower pickups clears their batches; ordinary pickups retain
     // their full glass shell and transparent ring/glow rendering.
     await render([{ ...orbs[0], spawnId: 'ordinary', shower: false }]);

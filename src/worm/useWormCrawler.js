@@ -4,6 +4,7 @@ import { getStableKey } from './wormLogic.js';
 import { characterOrbCount } from './characterAbilities.js';
 import { orbsCarried } from './healerWorm/economy.js';
 import { storyLevel, storyOutcome } from './story/levels.js';
+import { shouldFinishStory } from './story/starGoals.js';
 import { storyHudSnapshot } from './story/hudSnapshot.js';
 import { offerStoryPower, recordStoryMechanic } from './story/mastery.js';
 import { makeStoryCombat, stepStoryCombat } from './story/combat.js';
@@ -638,7 +639,7 @@ export function useWormCrawler(size, cubies) {
             if (story.kind === 'tunnel' && live.wormStoryTarget !== metrics.nextTarget) useGameStore.setState({ wormStoryTarget: metrics.nextTarget });
             if (story.kind === 'jump' && metrics.bodyJumps > 0 && live.wormStoryTarget) useGameStore.setState({ wormStoryTarget: null });
             if (!sim.jumpRescueHeld) {
-                if (outcome) live.completeWormStory(state.wormRunId, metrics);
+                if (shouldFinishStory(story, metrics, outcome, live.wormStoryFinishRequested)) live.completeWormStory(state.wormRunId, metrics);
                 else if (metrics.elapsed >= story.limit) killWormSim(sim, ctxRef.current, { reason: 'story-timeout', levelId: story.id });
             }
         }

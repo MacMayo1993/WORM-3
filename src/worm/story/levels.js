@@ -1,3 +1,4 @@
+import { storyStarGoals } from './starGoals.js';
 import { WORM_GENERATED_LEVELS, WORM_GENERATED_CHAPTERS } from './generated.js';
 
 // Authored chapter one. Cosmetic IDs are shared with the existing Parity Store.
@@ -234,7 +235,9 @@ export function storyOutcome(level, metrics) {
     : level.kind === 'rotation' ? metrics.rotations >= level.target && metrics.rotationSettled
     : metrics.healed >= level.target && metrics.remaining === 0 && metrics.tailClear && metrics.rotationSettled;
   if (!complete) return null;
-  return { stars: 1 + Number(metrics.elapsed <= level.par) + Number(metrics.cuts === 0), seconds: Math.ceil(metrics.elapsed) };
+  const goals = storyStarGoals(level, metrics);
+  return { stars: goals.stars, seconds: Math.ceil(metrics.elapsed), peakLength: goals.peakLength,
+    starGoals: { fast: goals.fast, clean: goals.clean, grown: goals.grown } };
 }
 
 export function storyProgressText(level, metrics) {

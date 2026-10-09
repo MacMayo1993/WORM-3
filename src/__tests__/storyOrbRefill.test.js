@@ -32,7 +32,7 @@ it('launches all ten Chapter 1 levels on 6x6 and gives the finale four achievabl
   expect(storyChecklist(level).map(({ key, target }) => [key, target])).toEqual([
     ['kills', 1], ['healed', 3], ['orbs', 24], ['rotations', 4],
   ]);
-  const metrics = { alive: true, elapsed: 200, cuts: 0, kills: 1, healed: 3, orbs: 24, rotations: 4,
+  const metrics = { alive: true, elapsed: 200, cuts: 0, peakLength: 100, kills: 1, healed: 3, orbs: 24, rotations: 4,
     remaining: 0, tailClear: true, landed: true, rotationSettled: true };
   expect(storyOutcome(level, metrics)).toMatchObject({ stars: 3 });
   for (const key of ['kills', 'healed', 'orbs', 'rotations']) expect(storyOutcome(level, { ...metrics, [key]: metrics[key] - 1 })).toBeNull();
@@ -44,7 +44,7 @@ it.each(['glow', 'classic'])('keeps all six colors available after repeatedly ex
   expect(pulse()).toBe(false); // no density growth while nothing has been picked up
   for (let round = 0; round < 10; round++) {
     sim.powerups = [];
-    for (let tick = 0; tick < 14; tick++) expect(refill()).toBe(false);
+    for (let tick = 0; tick < Math.ceil(STORY_ORB_REFILL_INTERVAL / 0.1) - 1; tick++) expect(refill()).toBe(false);
     expect(sim.powerups).toHaveLength(0);
     expect(refill()).toBe(true);
     expect(Object.values(colors())).toEqual([1, 1, 1, 1, 1, 1]);

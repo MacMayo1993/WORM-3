@@ -51,7 +51,7 @@ export const INITIAL_POS = (size) => {
     return { x: c, y: c, z: size - 1, dirKey: 'PZ' };
 };
 
-export const DEFAULT_POWERUP_COUNT = 5;
+export const DEFAULT_POWERUP_COUNT = 16;
 export const ORB_SEGMENT_GROWTH = 3; // every orb adds exactly 3 visual balls
 export const STEPS_PER_TILE = 50; // sub-steps recorded per tile (0.02 resolution)
 // Surface distance between visible body balls — MUST match WormBody's placement.

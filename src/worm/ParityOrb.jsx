@@ -65,7 +65,7 @@ const _orbGeos = PARITY_ORB_GEOMETRIES;
 function SingleOrbImpl({
   position, color = '#ffd700', antipodalColor = '#ffd700', styleKey = 'solid',
   collected = false, isTarget = false, elevated = false,
-  dirKey = 'PY', orbKey, type = 'parity', shower = false,
+  dirKey = 'PY', orbKey, type = 'parity', shower = false, compact = false,
   registerAnim, unregisterAnim,
   gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false, reducedDetail = false,
 }) {
@@ -75,8 +75,8 @@ function SingleOrbImpl({
   // already-compiled program and never links a new one mid-run. 'solid' has no
   // pattern worth carrying, so it keeps the emissive band below instead.
   const bandMaterial = useMemo(
-    () => (!shower && styleKey && styleKey !== 'solid' ? getTileStyleMaterial(styleKey, bandColor, false, null, gemColor) : null),
-    [shower, styleKey, bandColor, gemColor]
+    () => (!shower && !compact && styleKey && styleKey !== 'solid' ? getTileStyleMaterial(styleKey, bandColor, false, null, gemColor) : null),
+    [shower, compact, styleKey, bandColor, gemColor]
   );
   const mat = useMemo(() => getOrbMaterials(gemColor, bandColor, isTarget, elevated, isGlowWorm), [gemColor, bandColor, isTarget, elevated, isGlowWorm]);
   const orbGroupRef    = useRef();
@@ -139,21 +139,21 @@ function SingleOrbImpl({
       get type()          { return typeRef.current; },
       get poles()         { return poleRefs.current; },
       get styledBand()    { return styledBandRef.current; },
-      timeOffset, shower, reducedDetail, age: 0, reveal: null, arrived: false,
+      timeOffset, shower, compact, reducedDetail, age: 0, reveal: null, arrived: false,
       near: 0, spin: 0,
       get color()         { return gemColorRef.current; },
     });
     return () => unregisterAnim(orbKey);
-  }, [orbKey, timeOffset, shower, reducedDetail, registerAnim, unregisterAnim]);
+  }, [orbKey, timeOffset, shower, compact, reducedDetail, registerAnim, unregisterAnim]);
 
   if (collected) return null;
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
-  // Dense showers retain the current gem, Möbius band and crossed orbit rings,
+  // Dense food fields and showers retain the gem, Möbius band and crossed orbit rings,
   // but use four opaque proxies. After their entrance these become shared
   // instanced draws per colour pair, with no per-orb transparent layers.
-  if (shower) {
+  if (shower || compact) {
     return (
       <group ref={orbGroupRef} visible={false} position={[position[0], position[1], position[2]]}>
         <mesh ref={shellRef} visible={false} geometry={g.shell} material={mat.reduced} />
@@ -266,6 +266,7 @@ const SingleOrb = React.memo(SingleOrbImpl, (a, b) => (
   a.dirKey === b.dirKey &&
   a.type === b.type &&
   a.shower === b.shower &&
+  a.compact === b.compact &&
   a.collected === b.collected &&
   a.isTarget === b.isTarget &&
   a.elevated === b.elevated &&
@@ -557,7 +558,7 @@ export default function ParityOrbs({
       group.updateWorldMatrix(false, true);
       // Arriving parts dissolve in one common orb frame. Once formed, put the
       // opaque pieces back into their shared draw calls.
-      if (refs.shower) {
+      if (refs.shower || refs.compact) {
         for (const part of [shell, core, ringA, ringB]) {
           part.visible = !refs.arrived;
           if (refs.arrived) batches.add(part);
@@ -635,6 +636,7 @@ export default function ParityOrbs({
           dirKey={data.dirKey}
           type={data.type}
           shower={data.shower}
+          compact={wormMode && orbs.length > 24 && !isTunnelMode && !data.shower}
           isTarget={data.isTarget}
           elevated={data.elevated}
           gridX={data.gridX}
