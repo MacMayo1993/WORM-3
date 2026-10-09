@@ -21,6 +21,9 @@ export function storyHudSnapshot(previous, level, metrics, runId, outcome) {
   return {
     tailClear: metrics.tailClear,
     progress: storyProgressText(level, metrics),
-    checklist: { runId, levelId: level.id, goals, seconds, hint, settling, starGoals, canFinish },
+    checklist: { runId, levelId: level.id, goals, seconds, hint, settling, starGoals, canFinish,
+      // Retain the qualified inputs alongside the displayed rating. Copy them
+      // so later simulation updates cannot change the result being offered.
+      finishMetrics: canFinish ? { ...metrics } : null },
   };
 }

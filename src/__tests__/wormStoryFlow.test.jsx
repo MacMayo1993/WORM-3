@@ -5,6 +5,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useWormCrawler } from '../worm/useWormCrawler.js';
 import { makeCubies } from '../game/cubeState.js';
 import * as storyRuntime from '../worm/story/runtime.js';
+import * as wormSimulation from '../worm/healerWorm/wormSim.js';
 import { ELEMENTAL_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
 import { storyLevel } from '../worm/story/levels.js';
 import { newProgress } from '../progression/model.js';
@@ -59,6 +60,47 @@ beforeEach(() => {
   act(() => root.render(<Harness />));
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); state().clearDisparityGame(); vi.restoreAllMocks(); delete globalThis.IS_REACT_ACT_ENVIRONMENT; });
+it.each([false, true])('claims the displayed result before a fatal next tick when Finish is clicked: %s', finish => {
+  begin(1);
+  const level = storyLevel(1);
+  const metrics = { alive: true, elapsed: level.par - 0.01, cuts: 0, peakLength: 10, orbs: 18, colors: 6 };
+  vi.spyOn(storyRuntime, 'storyMetrics').mockReturnValue(metrics);
+  frame();
+  expect(state().wormStoryResult).toBeNull();
+  expect(state().wormStoryChecklist).toMatchObject({ canFinish: true, starGoals: { stars: 2 } });
+  // Without a click, this next active simulation tick kills the worm. With a
+  // click, the same tick must observe the pause already committed by Finish.
+  const step = wormSimulation.stepWormSim;
+  const collision = vi.fn((sim, ctx) => wormSimulation.killWormSim(sim, ctx, { reason: 'self-body' }));
+  vi.spyOn(wormSimulation, 'stepWormSim').mockImplementation((sim, dt, size, ctx) => {
+    if (!ctx.isPaused()) collision(sim, ctx);
+    return step(sim, dt, size, ctx);
+  });
+  // A later time/cut would reduce the offered rating. The copied offer must
+  // retain its original inputs even if the simulation's metrics are reused.
+  metrics.elapsed = level.par + 0.01; metrics.cuts = 1;
+  const before = { pos: { ...worm.pos.current }, time: worm.timeAliveRef.current };
+  if (finish) {
+    act(() => state().finishWormStory());
+    expect(state()).toMatchObject({ wormPaused: true, wormAlive: true, wormGamePhase: 'solved',
+      wormStoryResult: { stars: 2, seconds: level.par, starGoals: { fast: true, clean: true } } });
+  }
+  frame();
+  if (finish) {
+    expect(collision).not.toHaveBeenCalled();
+    expect(worm.pos.current).toEqual(before.pos);
+    expect(worm.timeAliveRef.current).toBe(before.time);
+    expect(state().wormAlive).toBe(true);
+    const result = state().wormStoryResult, points = state().parityPoints, xp = state().playerProgress.xp;
+    act(() => state().finishWormStory()); frame();
+    expect(state().wormStoryResult).toBe(result);
+    expect(state().parityPoints).toBe(points); expect(state().playerProgress.xp).toBe(xp);
+  } else {
+    expect(collision).toHaveBeenCalledOnce();
+    expect(state().wormAlive).toBe(false);
+    expect(state().wormStoryResult).toBeNull();
+  }
+});
 it('stages the fresh level before paint when retrying a previous tunnel run', () => {
   begin(2);
   worm.phase.current = 'tunnel';
@@ -318,7 +360,9 @@ it.each([2, 5, 6])('can collect the resources and heal every authored pair for l
     // Healing can spend food before the peak-length target. Claim the clear.
     if (!state().wormStoryResult) {
       expect(state().wormStoryChecklist.canFinish).toBe(true);
-      act(() => state().finishWormStory()); frame();
+      act(() => state().finishWormStory());
+      expect(state().wormStoryResult).not.toBeNull(); // no simulation tick needed
+      frame();
     }
     expect(state().wormStoryResult).not.toBeNull();
   }

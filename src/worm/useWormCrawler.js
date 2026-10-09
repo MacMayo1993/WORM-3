@@ -643,7 +643,7 @@ export function useWormCrawler(size, cubies) {
             if (story.kind === 'tunnel' && live.wormStoryTarget !== metrics.nextTarget) useGameStore.setState({ wormStoryTarget: metrics.nextTarget });
             if (story.kind === 'jump' && metrics.bodyJumps > 0 && live.wormStoryTarget) useGameStore.setState({ wormStoryTarget: null });
             if (!sim.jumpRescueHeld) {
-                if (shouldFinishStory(story, metrics, outcome, live.wormStoryFinishRequested)) live.completeWormStory(state.wormRunId, metrics);
+                if (shouldFinishStory(story, metrics, outcome)) live.completeWormStory(state.wormRunId, metrics);
                 else if (metrics.elapsed >= story.limit) killWormSim(sim, ctxRef.current, { reason: 'story-timeout', levelId: story.id });
             }
         }

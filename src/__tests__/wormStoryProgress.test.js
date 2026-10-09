@@ -3,6 +3,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress, readPlayerSave, sanitizeProgress } from '../progression/model.js';
 import { storyLevel, storyOutcome, storyUnlocked } from '../worm/story/levels.js';
 import { getStoreItem } from '../utils/storeCatalog.js';
+import { storyHudSnapshot } from '../worm/story/hudSnapshot.js';
 const state = () => useGameStore.getState();
 const won = { alive: true, elapsed: 10, cuts: 0, peakLength: 100, orbs: 18, colors: 6 };
 function start(id = 1) {
@@ -15,6 +16,21 @@ function start(id = 1) {
 beforeEach(() => {
   state().clearDisparityGame();
   useGameStore.setState({ playerProgress: newProgress(), parityPoints: 0, ownedItems: [], demoMode: false });
+});
+it.each(['stale run', 'wrong level', 'missing metrics', 'unqualified metrics', 'no offer', 'paused', 'dead'])('rejects Finish with %s', invalid => {
+  start();
+  const level = storyLevel(1), metrics = { ...won, peakLength: 10 };
+  const offer = storyHudSnapshot(null, level, metrics, state().wormRunId, storyOutcome(level, metrics)).checklist;
+  if (invalid === 'stale run') { start(); }
+  if (invalid === 'wrong level') offer.levelId = 2;
+  if (invalid === 'missing metrics') offer.finishMetrics = null;
+  if (invalid === 'unqualified metrics') offer.finishMetrics = { ...metrics, orbs: 0 };
+  if (invalid === 'no offer') offer.canFinish = false;
+  useGameStore.setState({ wormStoryChecklist: offer,
+    ...(invalid === 'paused' ? { wormPaused: true } : {}), ...(invalid === 'dead' ? { wormAlive: false } : {}) });
+  state().finishWormStory();
+  expect(state().wormStoryResult).toBeNull();
+  expect(state().parityPoints).toBe(0); expect(state().playerProgress.xp).toBe(0);
 });
 it('locks future levels, fixes story rules, and restores ordinary Free Play runs', () => {
   const id = state().wormRunId;
