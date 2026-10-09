@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
 import {
-  getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombRiseScale, TOMB_REGION
+  getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombSeed, tombRiseScale, TOMB_REGION
 } from '../3d/tombstone.js';
+import { createSurfaceBatches } from '../3d/surfaceBatches.js';
 
 describe('Chaos tombstone', () => {
   it('is one shared geometry carrying every part of the grave', () => {
@@ -24,7 +25,7 @@ describe('Chaos tombstone', () => {
     const mat = getTombstoneMaterial();
     expect(getTombstoneMaterial()).toBe(mat);
     expect(mat.transparent).toBe(false);
-    expect(mat.customProgramCacheKey()).toBe('chaos-tombstone-v4');
+    expect(mat.customProgramCacheKey()).toBe('chaos-tombstone-v5');
     // The shader hooks it relies on are all present in three's standard material.
     const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader };
     mat.onBeforeCompile(shader);
@@ -37,6 +38,11 @@ describe('Chaos tombstone', () => {
     // stone the grey fallback.
     expect(shader.fragmentShader).toMatch(/#ifdef USE_COLOR\s+vec3 tileCol = vColor;/);
     expect(shader.fragmentShader).not.toContain('#ifdef USE_INSTANCING_COLOR');
+    // The phase comes from the grave's own seed, never from its moving transform:
+    // a self-solve slice turn moves instanceMatrix every frame.
+    expect(shader.vertexShader).toContain('attribute float aInstanceSeed');
+    expect(shader.vertexShader).toContain('vPhase = aInstanceSeed * 6.2831853');
+    expect(shader.vertexShader).not.toContain('instanceMatrix[3]');
   });
 
   it('engraves the epitaph in gold on the black plaque', () => {
@@ -56,5 +62,85 @@ describe('Chaos tombstone', () => {
     const peak = Math.max(...Array.from({ length: 20 }, (_, i) => tombRiseScale(i / 19)[1]));
     expect(peak).toBeGreaterThan(1.02);
     expect(tombRiseScale(1)).toEqual([1, 1]);
+  });
+
+  it('gives each grave a stable seed in 0..1 from its grid id', () => {
+    expect(tombSeed('M1-005')).toBe(tombSeed('M1-005'));
+    expect(tombSeed('M1-005')).not.toBe(tombSeed('M2-005'));
+    for (const id of ['M1-001', 'M3-017', 'M6-024', '']) {
+      expect(tombSeed(id)).toBeGreaterThanOrEqual(0);
+      expect(tombSeed(id)).toBeLessThan(1);
+    }
+  });
+
+  it('keeps each grave\'s seed through a slice turn in the batches', () => {
+    const scene = new THREE.Group(), layer = new THREE.Group();
+    const pool = createSurfaceBatches(16);
+    scene.add(layer, pool.group);
+    const ids = ['M1-001', 'M1-002', 'M1-003'], anchors = ids.map((_, i) => {
+      const anchor = new THREE.Group(); anchor.position.set(i, 0, 1.5); layer.add(anchor); return anchor;
+    });
+    anchors.forEach((anchor, i) => pool.register(anchor, getTombstoneGeometry(), getTombstoneMaterial(), { current: '#ff0000' }, { current: tombSeed(ids[i]) }));
+    const seeds = () => {
+      scene.updateMatrixWorld(true); pool.update();
+      return [...pool.group.children[0].geometry.attributes.aInstanceSeed.array.slice(0, 3)];
+    };
+    const before = seeds();
+    expect(before).toEqual(ids.map(id => Math.fround(tombSeed(id))));
+    for (const angle of [0.1, 0.7, Math.PI / 2]) { layer.rotation.x = angle; expect(seeds()).toEqual(before); }
+    // The batch reads the shared geometry's buffers and never writes into them.
+    const mesh = pool.group.children[0];
+    expect(mesh.geometry.attributes.position).toBe(getTombstoneGeometry().attributes.position);
+    expect(getTombstoneGeometry().attributes.aInstanceSeed).toBeUndefined();
+    pool.dispose();
+    expect(getTombstoneGeometry().attributes.position).toBeDefined();
+  });
+});
+
+describe('Chaos tombstone motion', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
+
+  async function freshTomb(osReduced) {
+    // Like a browser, every matchMedia call is its own list, and a list nobody listens
+    // to may still report the old value while the change event fires.
+    const queries = [];
+    const makeQuery = () => {
+      const query = { matches: osReduced, listeners: [], addEventListener: (type, fn) => query.listeners.push(fn), removeEventListener() {} };
+      queries.push(query);
+      return query;
+    };
+    vi.stubGlobal('matchMedia', makeQuery);
+    window.matchMedia = globalThis.matchMedia;
+    vi.resetModules();
+    const tomb = await import('../3d/tombstone.js');
+    const { useGameStore } = await import('../hooks/useGameStore.js');
+    const setReduced = (on) => useGameStore.setState(state => ({ settings: { ...state.settings, reducedMotion: on } }));
+    const osChange = (on) => {
+      for (const query of queries.filter(q => q.listeners.length)) { query.matches = on; query.listeners.forEach(fn => fn({ matches: on })); }
+      for (const query of queries) query.matches = on;
+    };
+    return { tomb, setReduced, osChange };
+  }
+
+  it('stops when the in-app setting asks, even with the system preference off', async () => {
+    const { tomb, setReduced } = await freshTomb(false);
+    setReduced(true);
+    const uniforms = tomb.getTombstoneMaterial().userData.tombUniforms;
+    expect(uniforms.uMotion.value).toBe(0);
+    setReduced(false);
+    expect(uniforms.uMotion.value).toBe(1);
+    setReduced(true);
+    expect(uniforms.uMotion.value).toBe(0);
+  });
+
+  it('follows the system preference changing after the first grave', async () => {
+    const { tomb, setReduced, osChange } = await freshTomb(false);
+    setReduced(false);
+    const uniforms = tomb.getTombstoneMaterial().userData.tombUniforms;
+    expect(uniforms.uMotion.value).toBe(1);
+    osChange(true);
+    expect(uniforms.uMotion.value).toBe(0);
+    osChange(false);
+    expect(uniforms.uMotion.value).toBe(1);
   });
 });

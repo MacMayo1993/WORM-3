@@ -20,8 +20,12 @@
 //
 // Everything that moves (the rune's pulse, the candle's flicker, the spirits'
 // orbit) is animated in the vertex and fragment shaders from the shared tile clock,
-// with a per-grave phase taken from the instance's position, so no grave needs a
-// frame callback. The tile's colour arrives as the instance colour.
+// so no grave needs a frame callback. Each grave's phase comes from a stable seed
+// (`tombSeed` of its grid id, the batches' aInstanceSeed), never from the instance
+// matrix: that moves with every self-solve slice turn, and a phase hashed from it
+// made the spirits, rune and flame jump every frame of the turn. The motion stops
+// under reduced motion, the in-app setting or the system's, and follows either
+// changing mid-round (`uMotion`). The tile's colour arrives as the instance colour.
 //
 // Pure module state: built once, never disposed (one geometry, one material).
 
@@ -30,6 +34,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { sharedUniforms } from './styles/TileStyleMaterials.jsx';
 import { prefersReducedMotion } from '../utils/device.js';
+import { useGameStore } from '../hooks/useGameStore.js';
 
 // Which part of the grave a vertex belongs to; the shader shades each its own way.
 export const TOMB_REGION = Object.freeze({ stone: 0, earth: 1, plaque: 2, rune: 3, spirit: 4, flame: 5, wax: 6, marble: 7 });
@@ -141,6 +146,9 @@ function buildGrave() {
 
 const vertexHead = /* glsl */ `
 attribute float aRegion;
+#ifdef USE_INSTANCING
+attribute float aInstanceSeed;
+#endif
 uniform float uTime;
 uniform float uMotion;
 varying float vRegion;
@@ -153,8 +161,7 @@ const vertexBody = /* glsl */ `
 vRegion = aRegion;
 vObj = position;
 #ifdef USE_INSTANCING
-  vec3 ip = instanceMatrix[3].xyz;
-  vPhase = fract(sin(dot(ip, vec3(12.9898, 78.233, 37.719))) * 43758.5453) * 6.2831853;
+  vPhase = aInstanceSeed * 6.2831853;
 #else
   vPhase = 0.0;
 #endif
@@ -268,16 +275,45 @@ export function getTombstoneGeometry() {
   return geometry ??= buildGrave();
 }
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+let motionWatched = false;
+let motionQuery = null;
+
+/** 1 while graves may move, 0 under reduced motion (the in-app setting or the system's). */
+function tombMotion() {
+  // Read the query the change listener sits on: when the system preference flips,
+  // another MediaQueryList (device.js's cached one) can still report the old value.
+  const osReduced = motionQuery ? motionQuery.matches : prefersReducedMotion();
+  return useGameStore.getState().settings?.reducedMotion || osReduced ? 0 : 1;
+}
+
+/** Re-reads both reduced-motion preferences into the shared material's uniform. */
+export function syncTombstoneMotion() {
+  if (material) material.userData.tombUniforms.uMotion.value = tombMotion();
+}
+
+// The material and its uniform are singletons, so a value read once at creation
+// would stick for the session: follow the setting and the system preference instead.
+function watchTombMotion() {
+  if (motionWatched) return;
+  motionWatched = true;
+  useGameStore.subscribe(state => !!state.settings?.reducedMotion, syncTombstoneMotion);
+  motionQuery = (typeof window !== 'undefined' ? window.matchMedia?.(REDUCED_MOTION_QUERY) : null) ?? null;
+  motionQuery?.addEventListener?.('change', syncTombstoneMotion);
+}
+
 /** The one grave material, shared by every tombstone. Opaque, so it batches. */
 export function getTombstoneMaterial() {
   if (material) return material;
   material = new THREE.MeshStandardMaterial({ roughness: 0.82, metalness: 0.04 });
   const uniforms = {
     uTime: sharedUniforms.time,
-    uMotion: { value: prefersReducedMotion() ? 0 : 1 },
+    uMotion: { value: 1 },
     uFallbackColor: { value: new THREE.Color('#777777') }
   };
   material.userData.tombUniforms = uniforms;
+  watchTombMotion();
+  syncTombstoneMotion();
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = vertexHead + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n${vertexBody}`);
@@ -287,12 +323,19 @@ export function getTombstoneMaterial() {
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\n${metalnessFragment}`)
       .replace('#include <emissivemap_fragment>', emissiveFragment);
   };
-  material.customProgramCacheKey = () => 'chaos-tombstone-v4';
+  material.customProgramCacheKey = () => 'chaos-tombstone-v5';
   return material;
 }
 
 /** The epitaph is gold leaf on the black granite plaque, whatever the tile's colour. */
 export const EPITAPH_INK = '#f2d27a';
+
+/** A grave's animation phase in 0..1, stable for its grid id (fed to aInstanceSeed). */
+export function tombSeed(gridId = '') {
+  let h = 2166136261;
+  for (let i = gridId.length - 1; i >= 0; i--) h = Math.imul(h ^ gridId.charCodeAt(i), 16777619);
+  return (h >>> 0) / 4294967296;
+}
 
 /** A grave's own slight turn on its tile, from its grid id, so a row of them is not a parade. */
 export function tombYaw(gridId = '') {

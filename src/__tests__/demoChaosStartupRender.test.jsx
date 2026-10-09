@@ -98,6 +98,9 @@ it.each([false, true])('renders demo Chaos through the first deaths and final pa
     const graves = pool.group.children.filter(o => o.count > 0 && o.name === 'TileSurfaceBatch:Tombstone');
     expect(graves).toHaveLength(1);
     expect(graves[0].count).toBe(52);
+    // Every grave carries its own animation seed, not one hashed from its moving matrix.
+    const seeds = graves[0].geometry.attributes.aInstanceSeed.array.slice(0, 52);
+    expect(new Set(seeds).size).toBeGreaterThan(40);
     await act(async () => useGameStore.getState().setDisparityWinner({ pair }));
     await settle();
     expect(store.getState().scene).toBe(scene);
