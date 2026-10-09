@@ -12,7 +12,7 @@ const MODES = [
   {
     id: 'worm',
     name: 'WORM',
-    blurb: 'Steer a worm, collect orbs, and heal the cube.',
+    blurb: 'Grow, heal, and follow Mobi’s way home. Choose Levels for the story.',
     primary: true,
   },
   { id: 'story', name: 'Teach', blurb: 'Learn a complete beginner cube method.' },

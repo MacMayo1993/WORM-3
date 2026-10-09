@@ -127,6 +127,8 @@
 .worm-story-result-sheet { color:var(--arcade-ink); background:var(--arcade-card); border:2px solid var(--arcade-line); border-radius:24px; box-shadow:inset 0 6px 0 #009B48,var(--arcade-card-shadow); }
 .worm-story-result h2 { font:400 clamp(26px,7vw,38px)/1.05 var(--display-font); letter-spacing:.01em; text-transform:uppercase; color:var(--arcade-ink); }
 .worm-story-result p,.worm-story-result small { color:var(--arcade-muted); }
+.worm-story-mobi { text-align:left; line-height:1.5; }
+.worm-story-mobi b { color:inherit; font-family:var(--heading-font,system-ui); font-weight:800; margin-right:.35em; }
 .worm-story-result .screen-stat-row>div { border-right-color:var(--arcade-line-soft); }
 .worm-story-result .screen-stat-row strong { color:var(--arcade-ink); font-family:var(--heading-font); font-weight:800; }
 .worm-story-result .screen-stat-row span { color:var(--arcade-muted); opacity:1; font:800 10px/1.3 var(--heading-font); letter-spacing:.07em; text-transform:uppercase; }

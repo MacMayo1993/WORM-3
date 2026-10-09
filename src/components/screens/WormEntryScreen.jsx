@@ -8,7 +8,7 @@ import { WORM_STORY_CHAPTERS, nextStoryLevel, storyStars, storyUnlocked, storyCh
 import { chapterWorldColor, stageCode } from '../../worm/story/levelMapLayout.js';
 import { MODE_THEMES } from '../../utils/modeThemes.js';
 import { HEADING_FONT, UI_FONT, Z } from '../../utils/uiTheme.js';
-import { StoryRewardChoices } from '../../worm/story/StoryCards.jsx';
+import { StoryMobiNote, StoryRewardChoices } from '../../worm/story/StoryCards.jsx';
 import StoryWorldPreview from '../../worm/story/StoryWorldPreview.jsx';
 import { STORY_WORLDS, storyAppearance, storyViewLabel } from '../../worm/story/worlds.js';
 import { getSkin } from '../../worm/wormCosmeticsData.js';
@@ -176,6 +176,7 @@ export default function WormEntryScreen({ onComplete, onCancel, initialSettings,
           </div>
           <StoryWorldPreview levelId={level.id} />
           <h3 className="worm-stage-heading">Mission</h3>
+          <StoryMobiNote levelId={level.id} />
           <p className="worm-stage-goal">{level.goal}</p>
           <ul className="worm-level-goals" aria-label="Level goals">{storyChecklist(level).map(goal => <li key={goal.key}><b>{goal.target}</b><span>{goal.label}</span></li>)}</ul>
           <div className="worm-level-reward"><span className="worm-stage-chest" aria-hidden="true"><svg viewBox="0 0 32 28"><path d="M3 12h26v13H3z" /><path d="M3 12V9a6 6 0 0 1 6-6h14a6 6 0 0 1 6 6v3" /><path d="M13 10h6v6h-6z" /></svg></span>

@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormEntryScreen from '../components/screens/WormEntryScreen.jsx';
 import DeathScreen from '../worm/DeathScreens.jsx';
-import { StoryResult } from '../worm/story/StoryCards.jsx';
+import { StoryObjectiveCard, StoryResult } from '../worm/story/StoryCards.jsx';
+import { storyNarrative } from '../worm/story/narrative.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress } from '../progression/model.js';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
@@ -71,6 +72,40 @@ it('offers Next, Replay and chapter navigation from completion', () => {
   expect(host.querySelector('[aria-label="3 out of 3 stars"]')).not.toBeNull();
   click('Next level'); click('Play again'); click('Levels');
   expect(next).toHaveBeenCalledOnce(); expect(retry).toHaveBeenCalledOnce(); expect(levels).toHaveBeenCalledOnce();
+});
+
+it('presents the selected mission briefing alongside its real objectives, without revealing its ending', () => {
+  useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
+    stars: Object.fromEntries(Array.from({ length: 19 }, (_, i) => [i + 1, 1])), claimed: {}
+  } } });
+  show({ initialPage: 'story' });
+  expect(host.querySelector('[aria-label="Mobi’s briefing"]').textContent).toContain(storyNarrative(20).briefing);
+  expect(host.textContent).not.toContain(storyNarrative(20).debrief);
+  expect(host.querySelector('[aria-label="Level goals"]').textContent).toContain('Collect orbs');
+  click('Play level');
+  expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 20, cubeSize: 8 });
+});
+
+it('keeps narrative in the briefing and pause card, out of the live compact tracker', () => {
+  useGameStore.setState({ wormStoryLevel: 1, wormStoryStarted: false, wormStoryResult: null,
+    wormAlive: true, wormStoryChecklist: null, wormPaused: false });
+  act(() => root.render(<StoryObjectiveCard />));
+  expect(host.textContent).toContain(storyNarrative(1).briefing);
+  expect(host.querySelector('[aria-label="Level tasks"]')).not.toBeNull();
+  act(() => useGameStore.setState({ wormStoryStarted: true }));
+  act(() => root.render(<StoryObjectiveCard compact />));
+  expect(host.querySelector('[aria-label="Mobi’s briefing"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Level tasks"]')).not.toBeNull();
+});
+
+it('reveals the chapter discovery on success and leaves later levels without placeholder lore', () => {
+  for (const id of [10, 20, 21]) {
+    act(() => useGameStore.setState({ wormStoryResult: { levelId: id, stars: 1, seconds: 200, xp: 50, points: 0 } }));
+    act(() => root.render(<StoryResult onNext={vi.fn()} onLevels={vi.fn()} onRetry={vi.fn()} />));
+    const note = host.querySelector('[aria-label="Mobi’s field notes"]');
+    if (id <= 20) expect(note.textContent).toContain(storyNarrative(id).debrief);
+    else expect(note).toBeNull();
+  }
 });
 
 it('explains the hard deadline before play and distinguishes timeout from a collision', () => {

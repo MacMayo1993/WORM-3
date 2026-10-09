@@ -16,14 +16,14 @@
 export const STEP_COPY = {
   // The step completes only when the cube is solved again, so the goal is part
   // of the line — "try a twist" alone left players twisting with no finish.
-  'baby-cube': 'Let’s start small. Watch two turns, then twist the cube back until every face is one color.',
+  'baby-cube': 'We can mend the Flip Cube by turning it, too. Watch two turns, then twist the cube back until every face is one color.',
   'learn-to-solve': 'Stuck? I can help. Follow the gold layer guide, one turn at a time.',
   'control-tour': 'Let’s find your controls. Tap each highlighted button to see what it does.',
-  'twin-paradox': 'Every tile has a twin on the opposite side. Turn on Flip, then tap a tile to move the pair together.',
-  'flip-gateway': 'Send nine tile pairs through the middle, then bring them back. Start with the face in front of you.',
-  'view-showcase': 'Let’s look at the same cube in a few different ways. Use Next to explore each view.',
+  'twin-paradox': 'My world had twins long before the war. Every tile has a twin on the opposite side. Turn on Flip, then tap a tile to move the pair together.',
+  'flip-gateway': 'These were our doorways. Send nine tile pairs through the middle, then bring them back. Start with the face in front of you.',
+  'view-showcase': 'There is more to this cube than its surface. Use Next to explore different views of the same cube.',
   'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings to preview your look. Press Next: Chaos when you’re ready. Your choices stay saved.',
-  'worm-traversal': 'Start with WORM: steer, collect orbs, and jump onto raised flip pads. Complete each practice exercise, then continue through Flip Cube, the controls, views, Settings, Chaos, Random, and the Store.',
+  'worm-traversal': 'Let’s learn to repair the old routes. Steer, collect orbs to grow, and jump onto raised flip pads. Complete each practice exercise, then explore Flip Cube and the other modes.',
   // The round's live HUD keeps its rules behind "Inspect match", so the setup
   // line carries the three the player acts on: aim the first strike, flips wear
   // tiles out in twin pairs, and taps heal.
@@ -37,7 +37,7 @@ export const STEP_COPY = {
 // Each page explains one part of the mode and waits for the player's Next tap.
 export const STEP_INTRO_LINES = {
   'chaos-forecast': [
-    'Chaos is a survival round. A storm flips tiles and spreads across the cube. The last surviving twin pair wins; you can watch the storm or help your favorites survive.',
+    'Chaos shows how quickly damage can spread. A storm flips tiles across the cube. The last surviving twin pair wins; you can watch the storm or help your favorites survive.',
     'Each tile has a twin on the opposite side. Every flip uses some of their life. At the flip limit, worn-out twins drop out together. Watch the live counters to see which colors are still in the round.',
     'First, choose the color pair you think will win. This demo prediction is free. After confirming your pick, tap a tile to choose where the storm strikes first; the countdown then starts the round.',
     'During the storm, tap a damaged tile to heal it and send a healing wave through connected damaged tiles. Lost tiles cannot return. Healing can change the winner, so act before your pair disappears!',

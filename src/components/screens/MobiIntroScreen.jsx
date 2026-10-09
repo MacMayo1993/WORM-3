@@ -15,17 +15,19 @@ import MobiStage, { MobiKey, useMobiSpeech } from './MobiStage.jsx';
 
 // Demo cold open starts with WORM; the cube lessons follow its practice sequence.
 export const MOBI_LINES_DEMO_INTRO = [
-  "Aloha! I'm Mobi. Let’s start WORM³ by learning to steer a worm.",
-  "Collect orbs, jump over your body, and ride tunnels to heal the cube.",
+  "Aloha! I'm Mobi. This Flip Cube slipped out of WORM³, my home, and landed here scrambled.",
+  "Great Worm War 3 left its routes damaged. Help me heal the cube and keep my way home open.",
+  "First, let’s steer a worm. Collect orbs to grow, jump over your body, and ride tunnels to heal them.",
   "Go at your pace. Skip Mobi skips my instructions; Skip Step moves to the next section.",
 ];
 
 // Worm mode intro. Kept short and literal: a first-timer needs to know the
-// controls and the goal, not the lore. Steering is relative ("Turn left/right"
+// controls and the goal, with one sentence about Mobi's way home. Steering is relative ("Turn left/right"
 // from the worm's heading — see WormCrawlerHUD's STEER_KEYS), so the copy frames
 // it as riding the worm's head. Each line names one concrete thing to do:
 // steer, collect, heal, survive.
 export const MOBI_LINES_WORM = [
+  "The war left these routes damaged. Every repair helps keep my way home open.",
   "Tap Left or Right to steer. Collect orbs to heal wormholes.",
   "Jump onto a flip pad to ride its tunnel and spend your orbs on healing.",
   "Jump over your body or steer around it.",
