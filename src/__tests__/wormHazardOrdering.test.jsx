@@ -1,3 +1,4 @@
+import { queueOrbCascade } from '../worm/healerWorm/orbCascade.js';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -51,6 +52,7 @@ beforeEach(() => {
     orbPickupColorsRef: 'orbPickupColors', orbPickupFaceIdsRef: 'orbPickupFaceIds',
     colorEpochRef: 'colorEpoch', timeAliveRef: 'timeAlive',
   })) worm[alias] = worm[key];
+  worm.rewardBombDisarm = tile => queueOrbCascade(sim, 'bomb', tile);
   worm.tick = vi.fn(); worm.queueTurn = vi.fn(); worm.feel = vi.fn();
   worm.killWorm = details => killWormSim(sim, {
     feel: worm.feel,
@@ -160,6 +162,7 @@ it('stops damage and slice dispatch after a fatal bomb on the rotation frame', (
   expect(useGameStore.getState().wormAlive).toBe(false);
   expect(useGameStore.getState().wormDeathDetails).toEqual({ reason: 'bomb', bombId: 1 });
   expect(checkBlastHitWorm).toHaveBeenCalledTimes(1);
+  expect(sim.orbCascades).toHaveLength(0);
   expect(bombProps.bombsRef.current).toEqual([second]);
   expect(second.fuse).toBe(0.001);
   expect(rotate).not.toHaveBeenCalled();
@@ -253,6 +256,9 @@ it('spawns a Story bomb, credits only a full live ring, and suppresses ordinary 
   const coins = useGameStore.getState().parityPoints;
   ttPush(sim.tileTrail, ring.at(-1)); tick();
   expect(worm.recordStoryBomb).toHaveBeenCalledExactlyOnceWith(bomb.id);
+  expect(sim.orbCascades).toEqual([{ kind: 'bomb', origin: bomb.tile, remaining: 12 }]);
+  tick();
+  expect(sim.orbCascades).toHaveLength(1);
   expect(props.bombsRef.current).toHaveLength(0);
   expect(useGameStore.getState().parityPoints).toBe(coins);
 });

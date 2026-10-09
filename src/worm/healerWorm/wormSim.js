@@ -1,3 +1,4 @@
+import { queueOrbCascade, tickOrbCascades, CASCADE_FLIGHT } from './orbCascade.js';
 import { makeGrowthOrb, startOrbShower, tickOrbShower } from './orbSpawning.js';
 import { raisedWormExpansion } from '../../game/raisedCubie.js';
 import { padEntryDecision } from './padEntry.js';
@@ -264,6 +265,9 @@ export function makeWormSim(size) {
         rocketT: 0,
         rocketFlight: 0, // launch/landing progress, independent of refreshed fuel
         rocketBoostHandoffT: 0, // crawling seconds left to restore ground speed
+        orbCascades: [],
+        orbCascadeDelay: 0,
+        orbCascadeBombTiles: [],
         orbShowerT: 0,
         orbShowerDelay: 0,
         orbShowerFace: 0,
@@ -435,6 +439,9 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.rocketT = 0;
     sim.rocketFlight = 0;
     sim.rocketBoostHandoffT = 0;
+    sim.orbCascades = [];
+    sim.orbCascadeDelay = 0;
+    sim.orbCascadeBombTiles = [];
     sim.orbShowerT = 0;
     sim.orbShowerDelay = 0;
     sim.orbShowerFace = 0;
@@ -1052,6 +1059,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
 
     for (let puIdx = 0; puIdx < sim.powerups.length; puIdx++) {
         const pickedUp = sim.powerups[puIdx];
+        if (pickedUp.cascade && pickedUp.cascade.age < CASCADE_FLIGHT) continue;
         const puKey = `${pickedUp.x},${pickedUp.y},${pickedUp.z},${pickedUp.dirKey}`;
         if (reach ? !reach.has(puKey) : puKey !== headKey) continue;
 
@@ -1093,7 +1101,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey, sweepContact = fals
             });
         }
         ctx.feel('orb', { combo: sim.orbCombo });
-        if (ctx.isStoryMode?.() || pickedUp.shower) sim.powerups.splice(puIdx--, 1);
+        if (ctx.isStoryMode?.() || pickedUp.shower || pickedUp.cascade) sim.powerups.splice(puIdx--, 1);
         else sim.powerups[puIdx] = makeGrowthOrb(respawnTile(size, [...sim.powerups, ...sim.specials, sim.pos]));
         collectedAny = true;
     }
@@ -1204,6 +1212,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
         ctx.applyHeal(tunnel.entry, tunnel.exit, [entryStableKey, exitStableKey].filter(Boolean), sim.healed);
         releaseMobiTunnel(sim, tunnel);
         ctx.onStoryMechanic?.('ringHeals');
+        queueOrbCascade(sim, 'surround', hit.mouth);
         if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, hit.mouth);
         if (tunnelKey) {
             sim.tunnelUseCounts.delete(tunnelKey);
@@ -2232,6 +2241,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // and heals in view. The pop/particle FX are store- and clock-driven, so they play on
     // through the freeze. Clamp delta first so a hitch can't skip most of the pause.
     if (sim.healPauseT > 0) {
+        tickOrbCascades(sim, Math.min(delta, MAX_TICK_DELTA), size, ctx);
         sim.healPauseT = Math.max(0, sim.healPauseT - Math.min(delta, MAX_TICK_DELTA));
         return;
     }
@@ -2324,6 +2334,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             }
         }
     }
+    tickOrbCascades(sim, delta, size, ctx);
     tickOrbShower(sim, delta, size, ctx);
 
     // ── Magnet: drain the reach window. Frozen outside crawling for the same reason
@@ -2676,10 +2687,15 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
             prov.txnId === liveRotation.completedTxnId;
     };
 
+    for (const reward of sim.orbCascades) reward.origin = rotateByOwnLayer(reward.origin);
+
     // Rotate powerups — each by its own plane's direction, then publish once.
     if (sim.powerups.length) {
         const pu = sim.powerups;
-        for (let i = 0; i < pu.length; i++) pu[i] = rotateByOwnLayer(pu[i]);
+        for (let i = 0; i < pu.length; i++) {
+            pu[i] = rotateByOwnLayer(pu[i]);
+            if (pu[i].cascade) pu[i].cascade.origin = rotateByOwnLayer(pu[i].cascade.origin);
+        }
         ctx.onPowerupsChanged(pu.slice());
     }
 

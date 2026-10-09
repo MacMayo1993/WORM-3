@@ -1,3 +1,4 @@
+import { queueOrbCascade } from './healerWorm/orbCascade.js';
 import { wormExpansion, publishWormExpansion } from './wormExpansion.js';
 import { scatterDroppedOrbs } from './healerWorm/droppedOrbs.js';
 import { getStableKey } from './wormLogic.js';
@@ -553,6 +554,7 @@ export function useWormCrawler(size, cubies) {
         // Snapshot before stepping: the reveal's final tick reaches zero but
         // still returns without advancing gameplay, so Story must hold it too.
         const elementalRevealHeld = sim.elementalFocusT > 0;
+        sim.orbCascadeBombTiles = hazards.bombTiles ?? [];
         withPersistenceBatch(() => stepWormSim(sim, delta, sizeRef.current, ctxRef.current));
         burrowBridge.current = sim.burrows;
         feedbackRef.current.tunnel(sim.phase, sim.tunnelProgress, sim.alive);
@@ -844,6 +846,7 @@ export function useWormCrawler(size, cubies) {
                 return p?.runId === s.wormRunId && (p.mechanics.bombs ?? 0) < (storyLevel(s.wormStoryLevel)?.mechanics?.bombs ?? 0);
             },
             recordStoryBomb: id => ctxRef.current.onStoryMechanic('bombs', id),
+            rewardBombDisarm: tile => queueOrbCascade(simRef.current, 'bomb', tile),
             signature: f('signature'),
             elementalPatches: f('elementalPatches'),
             pos: f('pos'),
