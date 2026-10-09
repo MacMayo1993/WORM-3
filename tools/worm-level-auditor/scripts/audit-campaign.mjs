@@ -87,7 +87,10 @@ for (const level of WORM_STORY_LEVELS) {
     const { sim, p } = setup(level, 'glow', 'counters'), m = level.mechanics ?? {};
     const tick = () => updateMastery(sim, p, level, .1);
     for (const [key, count] of Object.entries(m)) {
-      if (['elementPickups', 'uniqueElements'].includes(key)) {
+      if (['steamFusions', 'quenchFusions'].includes(key)) {
+        for (let i = 0; i < count; i++) recordStoryMechanic(p, 'elementFusion', key === 'steamFusions' ? 'steam' : 'quench');
+        assert.equal(p.mechanics[key], count);
+      } else if (['elementPickups', 'uniqueElements'].includes(key)) {
         for (let i = 0; i < count; i++) recordStoryMechanic(p, 'elementPickups', STORY_ELEMENTS[i % STORY_ELEMENTS.length]);
         const distinct = p.collectedElements.size;
         recordStoryMechanic(p, 'elementPickups', 'water'); assert.equal(p.collectedElements.size, distinct);

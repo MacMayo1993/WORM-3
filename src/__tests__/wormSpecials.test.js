@@ -57,7 +57,7 @@ import {
   countOrbsWithin,
 } from '../worm/healerWorm/specialSpawn.js';
 import { wormBuffs, buffReadout, resetWormBuffs } from '../worm/wormBuffs.js';
-import { collectManifoldRing } from '../worm/wormLogic.js';
+import { collectManifoldRing, getNextSurfacePosition } from '../worm/wormLogic.js';
 import { makeCubies } from '../game/cubeState.js';
 import { checkWormHitBySlice } from '../worm/wormHelpers.js';
 import { makeTileTrail, ttReset, ttPush } from '../worm/circularBuffers.js';
@@ -1467,4 +1467,22 @@ describe('Orb Shower', () => {
     expect(sim.tailLength).toBeGreaterThan(tail);
     expect(sim.powerups).toHaveLength(0);
   });
+});
+
+
+it('claims Steam then Quench through real centered pickups and records each ordered recipe once', () => {
+  const sim = makeSim(), ctx = makeCtx({ getSpeed: () => 2 });
+  sim.tailLength = 0;
+  for (const [i, type] of ['water', 'fire', 'water'].entries()) {
+    const tile = getNextSurfacePosition(sim.pos, sim.moveDir, SIZE);
+    sim.specials = [{ ...tile, type, ttl: 20, id: `ordered-${i}` }];
+    for (let frame = 0; frame < 500 && eventsOf(ctx, 'elemental').length < i + 1; frame++) stepWormSim(sim, 0.02, SIZE, ctx);
+    expect(sim.alive).toBe(true);
+    expect(sim.elementalType).toBe(type);
+    expect(eventsOf(ctx, 'elemental')).toHaveLength(i + 1);
+    expect(sim.specials).toHaveLength(0);
+  }
+  const fusions = eventsOf(ctx, 'storyMechanic').filter(e => e.args[0] === 'elementFusion');
+  expect(fusions.map(e => e.args[1])).toEqual(['steam', 'quench']);
+  expect(sim.elementalPair).toBe('fire');
 });

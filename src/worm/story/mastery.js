@@ -1,9 +1,9 @@
-import { hasElement } from '../healerWorm/elementalFusion.js';
+import { hasElement, getFusion, fusionRecipeLabel } from '../healerWorm/elementalFusion.js';
 import { drawViewPower, getViewPowerDef } from '../healerWorm/viewPowerups.js';
 import { makeGrowthOrb } from '../healerWorm/orbSpawning.js';
 import { tileKey } from '../healerWorm/wormSim.js';
 import { ttAt } from '../circularBuffers.js';
-import { BODY_BALL_SPACING, MAGNET_RADIUS } from '../healerWorm/constants.js';
+import { BODY_BALL_SPACING, MAGNET_RADIUS, WORM_MOVEMENT_SPEED_SCALE } from '../healerWorm/constants.js';
 import { collectManifoldRing, getNextSurfacePosition } from '../wormLogic.js';
 
 export const STORY_ELEMENTS = ['water', 'fire', 'grass', 'ice', 'lightning'];
@@ -17,10 +17,17 @@ const HINTS = { rocket: 'Rocket: steer the flight and land', magnet: 'Magnet: pu
   explode: 'Explode: the cube spreads apart for 12 seconds. Keep crawling until it closes',
   water: 'Water: build momentum in a straight line', fire: 'Fire: leave a trail for 3 seconds',
   grass: 'Grass: land, then jump from your spring patch', ice: 'Ice: jump to steer, then land', lightning: 'Lightning: survive the storm for 4 seconds' };
+export const STORY_FUSION_GOALS = { steamFusions: getFusion('water', 'fire'), quenchFusions: getFusion('fire', 'water') };
+const pendingFusions = (p, level) => Object.entries(STORY_FUSION_GOALS).filter(([key]) => (p.mechanics[key] ?? 0) < (level.mechanics?.[key] ?? 0)).map(([, recipe]) => recipe);
 const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
 
 // Events originate after a successful pickup/disarm/heal, never from button input.
 export function recordStoryMechanic(practice, key, id) {
+  if (practice && key === 'elementFusion') {
+    const goal = Object.keys(STORY_FUSION_GOALS).find(k => STORY_FUSION_GOALS[k].id === id);
+    if (goal) add(practice, goal);
+    return;
+  }
   if (practice && key === 'grassLaunch') { practice.grassJump = true; return; }
   if (!practice || !['ringHeals', 'magnetOrbs', 'bombs', 'elementPickups'].includes(key)) return;
   // Pickup variety is separate from elemental mastery actions. Repeated
@@ -62,19 +69,21 @@ export function updateMastery(sim, p, level, delta) {
   if (sig.seq > (p.signatureSeq ?? 0) && (sig.character !== 'inch' || sig.active > 0)) {
     add(p, 'signatures'); p.signatureSeq = sig.seq;
   }
-  if (p.element !== sim.elementalType || sim.elementalT <= 0) p.elementTime = 0;
-  p.element = sim.elementalType;
-  if (sim.elementalT > 0 && sim.elementalFocusT <= 0 && sim.phase === 'crawling') {
-    p.elementTime += Math.min(Math.max(delta, 0), 0.1);
-    if (p.element === 'water' && p.elementTime >= 3 && sim.waterMomentum > 0.75) p.elements.add('water');
-    if (p.element === 'fire' && p.elementTime >= 3 && [...sim.elementalPatches.values()].some(patch => patch.type === 'fire')) p.elements.add('fire');
-    if (p.element === 'lightning' && p.elementTime >= 4) p.elements.add('lightning');
+  p.elementTimes ??= {};
+  for (const type of STORY_ELEMENTS) {
+    if (!hasElement(sim, type)) { p.elementTimes[type] = 0; continue; }
+    if (sim.elementalFocusT > 0 || sim.phase !== 'crawling') continue;
+    const time = p.elementTimes[type] = (p.elementTimes[type] ?? 0) + Math.min(Math.max(delta, 0), 0.1);
+    if (type === 'water' && time >= 3 && sim.waterMomentum > 0.75) p.elements.add('water');
+    if (type === 'fire' && time >= 3 && [...sim.elementalPatches.values()].some(patch => patch.type === 'fire')) p.elements.add('fire');
+    if (type === 'lightning' && time >= 4) p.elements.add('lightning');
   }
 }
 export function nextStoryPower(p, level) {
   const m = level.mechanics;
   if (!m) return null;
   const needs = new Set();
+  for (const recipe of pendingFusions(p, level)) { needs.add(recipe.base); needs.add(recipe.catalyst); }
   for (const [key, type] of [['magnetOrbs', 'magnet'], ['explodes', 'explode'], ['rockets', 'rocket']]) {
     if ((p.mechanics[key] ?? 0) < (m[key] ?? 0)) needs.add(type);
   }
@@ -92,7 +101,7 @@ export function nextStoryPower(p, level) {
   }
   return null;
 }
-export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
+export function storySurfaceTile(sim, size, cubies, occupied = new Set(), reachable = null) {
   const { x, y, z, dirKey } = sim.pos;
   const axes = dirKey.endsWith('X') ? ['y', 'z'] : dirKey.endsWith('Y') ? ['x', 'z'] : ['x', 'y'];
   const u = sim.pos[axes[0]], v = sim.pos[axes[1]];
@@ -105,26 +114,66 @@ export function storySurfaceTile(sim, size, cubies, occupied = new Set()) {
       if (distanceSq < minDistanceSq || distanceSq > 9) continue;
       const tile = { x, y, z, dirKey, [axes[0]]: a, [axes[1]]: b };
       const sticker = cubies[tile.x]?.[tile.y]?.[tile.z]?.stickers[dirKey];
-      if (sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile))) return tile;
+      if (sticker && sticker.curr === sticker.orig && !occupied.has(tileKey(tile)) && (!reachable || reachable.has(tileKey(tile)))) return tile;
     }
   }
 }
+// A partner must have a short surface route around current body/tunnel obstacles.
+// Keep two steps of reaction time and cap the search at six steps. Food is safe
+// to cross; a dense food route can still trade a slot for the required catalyst.
+export function fusionReachableTiles(sim, size, cubies, speed) {
+  const steps = Math.min(6, Math.max(0, Math.floor(sim.elementalT * speed * WORM_MOVEMENT_SPEED_SCALE) - 2));
+  const body = new Set();
+  for (let i = 0; i < Math.min(sim.tileTrail.count, Math.ceil(sim.tailLength * BODY_BALL_SPACING)); i++) body.add(ttAt(sim.tileTrail, i));
+  const reachable = new Set([tileKey(sim.pos)]), queue = [{ tile: sim.pos, depth: 0 }];
+  for (let i = 0; i < queue.length; i++) {
+    const { tile, depth } = queue[i];
+    if (depth >= steps) continue;
+    for (const direction of ['up', 'right', 'down', 'left']) {
+      const next = getNextSurfacePosition(tile, direction, size);
+      if (!next) continue;
+      const key = tileKey(next), sticker = cubies[next.x]?.[next.y]?.[next.z]?.stickers[next.dirKey];
+      if (!sticker || sticker.curr !== sticker.orig || body.has(key) || reachable.has(key)) continue;
+      reachable.add(key); queue.push({ tile: next, depth: depth + 1 });
+    }
+  }
+  return reachable;
+}
+
 // One marked offering at a time; missed powers return on the next fair cycle.
-// A completed power is not replaced until its effect ends, so elements never
-// overwrite an unfinished flight or spring jump. Quest magnet orbs replenish
+// Other powers wait until the current effect ends; explicit fusion objectives
+// alone can request a timed catalyst during an elemental wash. Quest magnet orbs replenish
 // only while remote catches are still outstanding.
 export function offerStoryPower(sim, p, level, size, cubies) {
   // Required lesson powers always take priority. Optional transformations wait
   // until Chapter 2 has taught the alternate views in their authored levels.
-  let type = nextStoryPower(p, level);
+  const recipes = pendingFusions(p, level);
+  // A catalyst is the only exception to the normal one-power-at-a-time rule.
+  // It belongs to this wash and expires with it, so a missed partner cannot
+  // silently become the first half of a different recipe.
+  const partnerRecipe = sim.elementalT >= 3
+    ? recipes.find(recipe => recipe.base === sim.elementalType) : null;
+  if (sim.specials.some(orb => orb.fusionBase &&
+      (!(sim.elementalT > 0) || orb.fusionBase !== sim.elementalType))) {
+    sim.specials = sim.specials.filter(orb => !orb.fusionBase);
+    p.powerDelay = STORY_POWER_COOLDOWN;
+    // Publish the removal through the same bridge as a new offer.
+    p.powerHint = 'Fusion window ended. Follow the next marked base orb to try again.';
+    return true;
+  }
+  let type = partnerRecipe?.catalyst ?? nextStoryPower(p, level);
   const canOfferView = !type && level.id >= 21 && !p.viewOffered;
   const displayedType = sim.specials[0]?.type ?? (sim.rocketActive ? 'rocket' : sim.magnetT > 0 ? 'magnet'
     : sim.viewPowerT > 0 ? sim.viewPower : sim.elementalT > 0 ? sim.elementalType : sim.explodeT > 0 || sim.expansionAmount > 0 ? 'explode' : null);
-  const hint = offered => (level.mechanics?.elementPickups || level.mechanics?.uniqueElements) && STORY_ELEMENTS.includes(offered)
+  const hint = offered => {
+    const recipe = partnerRecipe ?? recipes.find(r => r.base === offered);
+    if (recipe) return `${fusionRecipeLabel(recipe)} · ${partnerRecipe ? 'Collect the marked partner before the timer ends.' : 'Collect the first element, then follow the marked partner.'}`;
+    return (level.mechanics?.elementPickups || level.mechanics?.uniqueElements) && STORY_ELEMENTS.includes(offered)
     ? 'Steer onto the marked elemental orb to collect it' : getViewPowerDef(offered)?.description ?? HINTS[offered];
+  };
   p.powerHint = displayedType ? hint(displayedType) : null;
-  if ((!type && !canOfferView) || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || sim.elementalT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
-  if ((p.powerDelay ?? STORY_POWER_OPENING_DELAY) > 0) return false;
+  if ((!type && !canOfferView) || sim.specials.length || sim.rocketActive || sim.isJumping || sim.magnetT > 0 || sim.viewPowerT > 0 || (sim.elementalT > 0 && !partnerRecipe) || sim.elementalFocusT > 0 || sim.explodeT > 0 || sim.expansionAmount > 0 || sim.phase !== 'crawling') return false;
+  if (!partnerRecipe && (p.powerDelay ?? STORY_POWER_OPENING_DELAY) > 0) return false;
   const blocked = new Set([tileKey(sim.pos)]);
   if (sim.prevTile) blocked.add(tileKey(sim.prevTile));
   // A pickup is a deliberate turn, never a surprise on the next straight steps.
@@ -139,11 +188,14 @@ export function offerStoryPower(sim, p, level, size, cubies) {
   const occupied = new Set([...blocked, ...sim.powerups.map(tileKey)]);
   // A dense food route must not lock out a required power. Trade one ordinary
   // orb's slot if necessary; the normal color refill restores that food later.
-  const tile = storySurfaceTile(sim, size, cubies, occupied) ?? (type ? storySurfaceTile(sim, size, cubies, blocked) : null);
+  const reachable = partnerRecipe ? fusionReachableTiles(sim, size, cubies, level.speed) : null;
+  const tile = storySurfaceTile(sim, size, cubies, occupied, reachable) ?? (type ? storySurfaceTile(sim, size, cubies, blocked, reachable) : null);
   if (!tile) return false;
   if (canOfferView) { type = drawViewPower(sim.specialPicker, sim.rand); p.viewOffered = true; }
   sim.powerups = sim.powerups.filter(orb => tileKey(orb) !== tileKey(tile));
-  sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: STORY_POWER_LIFETIME, maxTtl: STORY_POWER_LIFETIME }];
+  const lifetime = partnerRecipe ? sim.elementalT : STORY_POWER_LIFETIME;
+  sim.specials = [{ ...tile, type, id: `story-${level.id}-${p.powerSeq++}`, ttl: lifetime, maxTtl: lifetime,
+    ...(partnerRecipe ? { fusionBase: partnerRecipe.base } : {}) }];
   p.lastPower = type;
   p.powerDelay = STORY_POWER_COOLDOWN;
   p.powerHint = hint(type);

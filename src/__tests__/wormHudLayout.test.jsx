@@ -279,3 +279,25 @@ it('shares the rotation countdown row with effects outside the pause and invento
   act(() => vi.advanceTimersByTime(20));
   expect(clock.textContent).toContain('2.1s');
 });
+
+it('previews the ordered next pickup and keeps the full recipe guide inside Pause', () => {
+  useGameStore.setState({ wormElementalTheme: 'water', wormElementalPartner: null,
+    wormSpecials: [{ type: 'fire', id: 'partner' }] });
+  wormBuffs.elementalT = 8; wormBuffs.elementalMaxT = 10;
+  renderPhase('crawling');
+  expect(host.querySelector('.worm-fusion-preview').textContent).toContain('Fire → Steam');
+  expect(host.querySelector('.worm-fusion-guide')).toBeNull();
+  act(() => host.querySelector('.worm-fusion-preview').click());
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  const guide = host.querySelector('.worm-fusion-guide');
+  expect(guide.open).toBe(false);
+  expect(guide.querySelectorAll('li')).toHaveLength(20);
+  expect(guide.textContent).toContain('Water → Fire: Steam');
+  expect(guide.textContent).toContain('Fire → Water: Quench');
+  expect(guide.textContent).toContain('Currently uses Slipstream');
+  act(() => useGameStore.setState({ wormElementalTheme: 'water', wormElementalPartner: 'fire', wormSpecials: [] }));
+  expect(host.querySelector('.worm-power-detail').textContent).toContain('Fire → Water: Quench');
+  expect(host.querySelector('.worm-power-detail').textContent).toContain('without speeding bomb fuses');
+  act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null, wormSpecials: [] }));
+  wormBuffs.elementalT = 0;
+});

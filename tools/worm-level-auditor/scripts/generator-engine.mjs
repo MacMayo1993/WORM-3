@@ -8,7 +8,7 @@ import {ELEMENTAL_DURATION,MAGNET_RADIUS} from '../../../src/worm/healerWorm/con
 import {STORY_WORLDS,STORY_ORB_ROUTES} from '../../../src/worm/story/worlds.js';
 import {assess} from '../web/audit.js';
 import {requiredPowerCycle,SUPPORTED_SIZES} from '../web/generator.js';
-const mechanicKeys=['boosts','doubleJumps','rockets','magnetOrbs','explodes','elements','uniqueElements','elementPickups','ringHeals','signatures','bombs','kills'];
+const mechanicKeys=['steamFusions','quenchFusions','boosts','doubleJumps','rockets','magnetOrbs','explodes','elements','uniqueElements','elementPickups','ringHeals','signatures','bombs','kills'];
 const worlds=Object.values(STORY_WORLDS),palettes=new Set(worlds.map(w=>w.palette)),backgrounds=new Set(worlds.map(w=>w.background)),styles=new Set(worlds.flatMap(w=>Object.values(w.styles)));
 const positive=n=>Number.isInteger(n)&&n>0&&n<=200;
 export function schemaErrors(candidate){

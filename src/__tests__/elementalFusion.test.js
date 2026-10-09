@@ -4,13 +4,13 @@
 // Thunderpad).
 import { describe, it, expect } from 'vitest';
 import {
-  FUSION_DEFS, fusionKey, getFusion, hasElement, activeFusion, fusionOf, claimElement
+  ORDERED_FUSIONS, fusionEffect, fusionKey, getFusion, hasElement, activeFusion, fusionOf, claimElement
 } from '../worm/healerWorm/elementalFusion.js';
 import { ELEMENTAL_TYPES } from '../worm/healerWorm/elementalDefs.js';
 import { makeWormSim, resetWormSim, stepWormSim, startElemental, startJump } from '../worm/healerWorm/wormSim.js';
 import {
   addElementalPatch, chargeSpringPad, steamTiles, waterSpeedBonus, turnShedsMomentum, iceHoldsTurn,
-  tickElementalGameplay, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT
+  tickElementalGameplay, isHotTile, isObsidianTile, isFirebreakTile, rotateElementalPatches, ELEMENTAL_PATCH_LIMIT, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT
 } from '../worm/healerWorm/elementalGameplay.js';
 import { pickStrikeTile } from '../worm/healerWorm/lightningStorm.js';
 import { elementalFeedback } from '../worm/healerWorm/elementalFeedback.js';
@@ -54,23 +54,27 @@ function fused(a, b) {
 }
 
 describe('fusion catalogue', () => {
-  it('names every pair of the five elements exactly once', () => {
+  it('names all twenty ordered pairs exactly once', () => {
     const keys = new Set();
     for (const a of ELEMENTAL_TYPES) for (const b of ELEMENTAL_TYPES) if (a !== b) keys.add(fusionKey(a, b));
-    expect([...keys].sort()).toEqual(Object.keys(FUSION_DEFS).sort());
-    expect(keys.size).toBe(10);
-    expect(getFusion('water', 'fire')).toBe(getFusion('fire', 'water'));
+    expect([...keys].sort()).toEqual(Object.keys(ORDERED_FUSIONS).sort());
+    expect(keys.size).toBe(20);
+    expect(getFusion('water', 'fire').id).toBe('steam');
+    expect(getFusion('fire', 'water').id).toBe('quench');
     expect(fusionKey('water', 'water')).toBeNull();
     expect(fusionKey('water', 'rocket')).toBeNull();
   });
 
-  it('gives the four first-pass fusions rules of their own', () => {
-    const ruled = Object.values(FUSION_DEFS).filter(f => f.rule).map(f => f.id).sort();
-    expect(ruled).toEqual(['slipstream', 'steam', 'thunderpad', 'wildfire']);
-    expect(getFusion('fire', 'water').id).toBe('steam');
-    expect(getFusion('ice', 'water').id).toBe('slipstream');
-    expect(getFusion('grass', 'fire').id).toBe('wildfire');
-    expect(getFusion('lightning', 'grass').id).toBe('thunderpad');
+  it('separates shipped rules from explicit reverse-order fallbacks', () => {
+    const ruled = Object.values(ORDERED_FUSIONS).filter(f => f.rule).map(f => f.id).sort();
+    expect(ruled).toEqual(['quench', 'slipstream', 'steam', 'thunderpad', 'wildfire']);
+    expect(getFusion('fire', 'water').id).toBe('quench');
+    expect(getFusion('ice', 'water').id).toBe('frozen-wake');
+    expect(fusionEffect(getFusion('ice', 'water'))).toBe('slipstream');
+    expect(getFusion('grass', 'fire').id).toBe('emberseed');
+    expect(fusionEffect(getFusion('grass', 'fire'))).toBe('wildfire');
+    expect(getFusion('lightning', 'grass').id).toBe('grounded');
+    expect(fusionEffect(getFusion('lightning', 'grass'))).toBe('thunderpad');
   });
 });
 
@@ -79,7 +83,7 @@ describe('claiming into a fusion', () => {
     expect(claimElement(null, null, 'water')).toEqual({ type: 'water', pair: null, fused: false });
     expect(claimElement('water', null, 'fire')).toEqual({ type: 'fire', pair: 'water', fused: true });
     expect(claimElement('fire', 'water', 'fire')).toEqual({ type: 'fire', pair: 'water', fused: false });
-    expect(claimElement('fire', 'water', 'water')).toEqual({ type: 'water', pair: 'fire', fused: false });
+    expect(claimElement('fire', 'water', 'water')).toEqual({ type: 'water', pair: 'fire', fused: true });
     // Water was the older of the two, so ice replaces it and fuses with fire.
     expect(claimElement('fire', 'water', 'ice')).toEqual({ type: 'ice', pair: 'fire', fused: true });
   });
@@ -143,7 +147,7 @@ describe('Slipstream (water + ice)', () => {
 
 describe('Steam (water + fire)', () => {
   it('turns the fire trail into a wall that joins the Glow Worm\'s light', () => {
-    const { sim } = fused('fire', 'water');
+    const { sim } = fused('water', 'fire');
     const a = { x: 0, y: 2, z: 4, dirKey: 'PZ' }, b = { x: 1, y: 2, z: 4, dirKey: 'PZ' };
     addElementalPatch(sim, a, 'fire');
     addElementalPatch(sim, b, 'grass');
@@ -213,5 +217,67 @@ describe('Wildfire (fire + nature)', () => {
     sim.jumpT = 0.9999;
     stepWormSim(sim, 0.05, SIZE, ctx);
     expect(sim.fusionBurst).toBeNull();
+  });
+});
+
+
+describe('Quench (Fire → Water)', () => {
+  it('converts existing fire and lays persistent obsidian without hot-tile effects', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startElemental(sim, ctx, 'fire');
+    addElementalPatch(sim, sim.pos, 'fire');
+    expect(isHotTile(sim.elementalPatches, sim.pos)).toBe(true);
+    startElemental(sim, ctx, 'water');
+    expect(activeFusion(sim)).toBe('quench');
+    expect(sim.elementalPatches.get(key(sim.pos))).toMatchObject({ obsidian: true, ttl: 8 });
+    expect(isFirebreakTile(sim.elementalPatches, sim.pos)).toBe(true);
+    expect(isHotTile(sim.elementalPatches, sim.pos)).toBe(false);
+    expect(steamTiles(sim)).toBeNull();
+    expect(turnShedsMomentum(sim)).toBe(false);
+    expect(waterSpeedBonus(sim)).toBe(0.25);
+    const other = { ...sim.pos, x: 0 };
+    addElementalPatch(sim, other, 'fire');
+    expect(isObsidianTile(sim.elementalPatches, other)).toBe(true);
+    sim.elementalT = 0;
+    tickElementalGameplay(sim, 3.1);
+    expect(isFirebreakTile(sim.elementalPatches, sim.pos)).toBe(true);
+    expect(turnShedsMomentum(sim)).toBe(true);
+    tickElementalGameplay(sim, 5);
+    expect(sim.elementalPatches.size).toBe(0);
+  });
+
+  it('only preserves turns on obsidian, and reversing the pair changes the effect once', () => {
+    const { sim, ctx } = fused('fire', 'water');
+    expect(turnShedsMomentum(sim)).toBe(true);
+    addElementalPatch(sim, sim.pos, 'fire');
+    expect(turnShedsMomentum(sim)).toBe(false);
+    startElemental(sim, ctx, 'fire');
+    expect(activeFusion(sim)).toBe('steam');
+    expect(turnShedsMomentum(sim)).toBe(true);
+    expect(steamTiles(sim)).toBeNull(); // old obsidian does not suddenly become hot
+    addElementalPatch(sim, sim.pos, 'fire');
+    expect(isHotTile(sim.elementalPatches, sim.pos)).toBe(true);
+    expect(steamTiles(sim).has(key(sim.pos))).toBe(true);
+    startElemental(sim, ctx, 'fire'); // catalyst refresh: no duplicate objective
+    expect(ctx.events.filter(e => e[1] === 'elementFusion').map(e => e[2])).toEqual(['quench', 'steam']);
+  });
+
+  it('holds its lifetime on pause and through focus, rotates with the tile, and stays bounded', () => {
+    const { sim, ctx } = fused('fire', 'water');
+    addElementalPatch(sim, sim.pos, 'fire');
+    const pad = sim.elementalPatches.get(key(sim.pos));
+    ctx.isPaused = () => true;
+    stepWormSim(sim, 0.1, SIZE, ctx);
+    expect(pad.ttl).toBe(8);
+    ctx.isPaused = () => false;
+    stepWormSim(sim, 0.1, SIZE, ctx); // claim focus still holds it
+    expect(pad.ttl).toBe(8);
+    rotateElementalPatches(sim, tile => ({ ...tile, x: 0 }));
+    expect(isObsidianTile(sim.elementalPatches, { ...sim.pos, x: 0 })).toBe(true);
+    for (let i = 0; i < 50; i++) addElementalPatch(sim, { x: i % 5, y: Math.floor(i / 5) % 5, z: 4, dirKey: i < 25 ? 'PZ' : 'NZ' }, 'fire');
+    expect(sim.elementalPatches.size).toBe(ELEMENTAL_PATCH_LIMIT);
+    resetWormSim(sim, SIZE, { orbCount: 0 });
+    expect(sim.elementalPatches.size).toBe(0);
+    expect(activeFusion(sim)).toBeNull();
   });
 });

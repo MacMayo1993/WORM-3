@@ -2,6 +2,7 @@ export function elementalFeedback(type, buffs, fusion = null) {
     const momentum = buffs.rocketActive ? 0 : Math.max(0, Math.min(1, buffs.waterMomentum || 0));
     // A fused pair's own rule leads the readout (elementalFusion.js).
     if (fusion === 'slipstream') return { text: `Slipstream +${Math.round(momentum * 40)}% · Turns keep momentum`, fraction: momentum };
+    if (fusion === 'quench') return { text: 'Obsidian blocks blasts · Turns on it keep momentum', fraction: momentum };
     if (fusion === 'steam') return { text: 'Steam trail scalds enemies · Puts out bombs', fraction: 0 };
     if (fusion === 'wildfire') return { text: buffs.springReady ? 'SPRING READY · Landing bursts into flame' : `${buffs.springCount || 0} springs · Spring landings burn`, fraction: buffs.springReady ? 1 : 0 };
     if (fusion === 'thunderpad') return { text: buffs.springReady ? 'SPRING READY · A struck pad launches rocket-high' : 'Lightning charges your spring pads', fraction: buffs.springReady ? 1 : 0 };

@@ -6,7 +6,8 @@ export const ELEMENTAL_PATCH_LIMIT = 32;
 export function addElementalPatch(sim, tile, type) {
     const key = keyOf(tile);
     sim.elementalPatches.delete(key);
-    sim.elementalPatches.set(key, { ...tile, type, ttl: type === 'fire' ? 3 : 8 });
+    const obsidian = type === 'fire' && activeFusion(sim) === 'quench';
+    sim.elementalPatches.set(key, { ...tile, type, ...(obsidian ? { obsidian: true } : {}), ttl: type === 'fire' && !obsidian ? 3 : 8 });
     while (sim.elementalPatches.size > ELEMENTAL_PATCH_LIMIT) {
         sim.elementalPatches.delete(sim.elementalPatches.keys().next().value);
     }
@@ -54,7 +55,15 @@ export function chargeSpringPad(patches, tileOrKey) {
 export const waterSpeedBonus = sim => (activeFusion(sim) === 'slipstream' ? 0.4 : 0.25);
 
 /** Whether a turn costs the worm its water momentum. Slipstream keeps it. */
-export const turnShedsMomentum = sim => activeFusion(sim) !== 'slipstream';
+export const turnShedsMomentum = sim => activeFusion(sim) !== 'slipstream'
+    && !(activeFusion(sim) === 'quench' && isObsidianTile(sim.elementalPatches, sim.pos));
+
+/** Quench converts the hot trail already on the board as well as future steps. */
+export function quenchTrail(sim) {
+    for (const patch of sim.elementalPatches.values()) {
+        if (patch.type === 'fire' && patch.ttl > 0) { patch.obsidian = true; patch.ttl = 8; }
+    }
+}
 
 const _steam = new Set();
 /**
@@ -65,7 +74,7 @@ const _steam = new Set();
 export function steamTiles(sim, also = null) {
     if (activeFusion(sim) !== 'steam') return also;
     _steam.clear();
-    for (const [key, patch] of sim.elementalPatches) if (patch.type === 'fire' && patch.ttl > 0) _steam.add(key);
+    for (const [key, patch] of sim.elementalPatches) if (patch.type === 'fire' && !patch.obsidian && patch.ttl > 0) _steam.add(key);
     if (also) for (const key of also) _steam.add(key);
     return _steam.size ? _steam : null;
 }
@@ -77,8 +86,14 @@ export function iceHoldsTurn(sim, delta, stepSec) {
 
 export function isHotTile(patches, tile) {
     const patch = patches.get(typeof tile === 'string' ? tile : keyOf(tile));
-    return patch?.type === 'fire' && patch.ttl > 0;
+    return patch?.type === 'fire' && !patch.obsidian && patch.ttl > 0;
 }
+
+export function isObsidianTile(patches, tile) {
+    const patch = patches.get(typeof tile === 'string' ? tile : keyOf(tile));
+    return patch?.type === 'fire' && !!patch.obsidian && patch.ttl > 0;
+}
+export const isFirebreakTile = (patches, tile) => isHotTile(patches, tile) || isObsidianTile(patches, tile);
 
 export function rotateElementalPatches(sim, rotate) {
     const patches = [...sim.elementalPatches.values()];

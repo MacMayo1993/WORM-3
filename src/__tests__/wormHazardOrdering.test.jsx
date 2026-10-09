@@ -12,6 +12,8 @@ import { setLiveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { COUNTDOWN_STEP_DURATION } from '../worm/healerWorm/constants.js';
 import { stageStory } from '../worm/story/runtime.js';
 import { storyLevel } from '../worm/story/levels.js';
+import { wormBuffs } from '../worm/wormBuffs.js';
+import { addElementalPatch } from '../worm/healerWorm/elementalGameplay.js';
 import { feel } from '../utils/feel.js';
 
 let frameCb, worm, tree;
@@ -41,6 +43,8 @@ const tick = (count = 1, delta = 0.1) => act(() => { for (let i = 0; i < count; 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  wormBuffs.elementalT = 0;
+  checkBlastHitWorm.mockImplementation(() => ({ type: 'death' }));
   isBombDisarmed.mockImplementation(() => false);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   sim = makeWormSim(3);
@@ -70,6 +74,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  wormBuffs.elementalT = 0;
   resetLiveRotation();
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
@@ -396,4 +401,34 @@ it('completes the demo rotation only after the warned live layer has committed',
   act(() => useGameStore.setState({ rotationEpoch: 1 }));
   expect(result().done).toBe(true);
   tick(200); expect(rotate).toHaveBeenCalledTimes(1);
+});
+
+
+it.each(['steam', 'quench'])('%s applies its own bomb rule and pays disarms once', effect => {
+  const props = React.Children.toArray(tree.props.children.props.children).find(child => child.type === HealerBombs).props;
+  sim.elementalPair = effect === 'steam' ? 'water' : 'fire';
+  sim.elementalType = effect === 'steam' ? 'fire' : 'water';
+  sim.elementalT = wormBuffs.elementalT = 10;
+  addElementalPatch(sim, sim.pos, 'fire');
+  const bomb = { id: 50, tile: { ...sim.pos }, fuse: 4, maxFuse: 5 };
+  props.bombsRef.current.push(bomb);
+  const coins = useGameStore.getState().parityPoints;
+  tick();
+  if (effect === 'steam') {
+    expect(props.bombsRef.current).toHaveLength(0);
+    expect(useGameStore.getState().parityPoints).toBe(coins + 12);
+    tick();
+    expect(useGameStore.getState().parityPoints).toBe(coins + 12);
+  } else {
+    expect(props.bombsRef.current).toEqual([bomb]);
+    expect(bomb.fuse).toBeCloseTo(3.9); // ordinary 1× fuse, not hot-tile 3×
+    expect(useGameStore.getState().parityPoints).toBe(coins);
+    checkBlastHitWorm.mockReturnValue(null);
+    bomb.fuse = 0.01;
+    tick();
+    expect(checkBlastHitWorm).toHaveBeenCalledTimes(1);
+    const blast = checkBlastHitWorm.mock.calls[0][1];
+    expect(blast.has(`${sim.pos.x},${sim.pos.y},${sim.pos.z},${sim.pos.dirKey}`)).toBe(false);
+    expect(blast.size).toBeGreaterThan(0); // neighbouring unprotected tiles still burn
+  }
 });

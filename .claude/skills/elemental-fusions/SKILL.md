@@ -68,7 +68,7 @@ Every fusion keeps both base effects on; the rule below is added on top.
 
 | Order | Name | Rule | Status |
 |---|---|---|---|
-| Fire → Water | **Quench** | The fire trail sets into obsidian: tiles last 8 s instead of 3 s and stay a firebreak, but no longer speed up bomb fuses; crawling on obsidian keeps full water momentum through turns. | Planned (Steam until built) |
+| Fire → Water | **Quench** | The fire trail sets into obsidian: tiles last 8 s instead of 3 s and stay a firebreak, but no longer speed up bomb fuses; crawling on obsidian keeps full water momentum through turns. | Live |
 | Fire → Ice | **Coldfire** | The trail burns blue: enemies that touch it freeze (`enemy.freeze` 2.2 s, as the ice shot does) instead of burning, and the trail lasts 5 s. | Planned |
 | Fire → Nature | **Wildfire** | A spring landing sets its 3x3 alight (fire patches) and kills the enemies in it (`sim.fusionBurst` → `strikeEnemies`). | Live |
 | Fire → Lightning | **Plasma** | A strike on a bare tile also leaves an 8 s fire patch, and marks never land on your fire trail (it repels them; add the trail to the storm's `avoid` set). | Planned |
@@ -100,19 +100,30 @@ Every fusion keeps both base effects on; the rule below is added on top.
 | Lightning → Ice | **Cryostorm** | Marks charge twice as long (2.8 s telegraph) and strike as a freeze: enemies in a 5x5 freeze, and the head and body are cut, not killed (a struck head loses its tail instead). | Planned |
 | Lightning → Nature | **Grounded** | A strike grows a spring pad on its tile instead of flipping it, and a mark on the body grows a pad there instead of cutting the tail. | Planned (Thunderpad until built) |
 
-The four that share a pair with a live rule fall back to it today, because the code is
-keyed by the unordered pair: Fire → Water runs Steam, Nature → Fire runs Wildfire,
-Lightning → Nature runs Thunderpad, Ice → Water runs Slipstream. The other twelve
-run both base effects and nothing else.
+Recipes are keyed by order in `ORDERED_FUSIONS`. Nature → Fire currently borrows Wildfire,
+Lightning → Nature borrows Thunderpad, and Ice → Water borrows Slipstream through
+explicit `fallback` fields. Their own IDs and descriptions remain distinct. The other
+twelve planned recipes run both base effects and nothing else. Fire → Water now runs
+Quench: existing fire patches and newly laid trail gain `obsidian: true`, last 8 seconds,
+and stay firebreaks without hot-tile fuse acceleration or Steam disarms.
+
+Level 24 teaches Steam and Quench with `steamFusions` / `quenchFusions` objectives.
+The Story scheduler offers a needed catalyst during the base wash, after the focus
+shot, only on a short reachable surface route. Partners expire with that wash; missed
+recipes retry. Other Story lessons retain sequential offerings. Free Play still uses
+two-orb offerings and its existing cooldown; repeated mid-wash reversals are taught
+by the Story lesson, not an unlimited Free Play supply. A base reclaim posts a new
+ordered recipe event; a catalyst refresh posts none. Pause contains the recipe guide,
+and the live power chip previews the available next recipe.
 
 ## Implementing a planned fusion
 
-1. **Key by order.** Today `FUSION_DEFS` is keyed by the sorted pair (`fusionKey`).
-   Move to `ORDERED_FUSIONS` keyed `base>catalyst` with all 20 entries. Make
-   `activeFusion(sim)` read `` `${sim.elementalPair}>${sim.elementalType}` `` and
-   `fusionOf(element, partner)` take `(base = partner, catalyst = element)`. Keep a
-   `fallback` field on each planned entry naming the live id it borrows, so nothing
-   that works today stops working while the reverse is being built.
+1. **Keep identity separate from the live effect.** `getFusion(base, catalyst)` and
+   `fusionKey(base, catalyst)` are chronological and return ordered definitions/keys.
+   `activeFusion(sim)` and `fusionOf(element, partner)` return the shipped **effect**
+   ID via `fusionEffect`, including an explicit fallback. Implementing a planned rule
+   means adding its description, setting `rule`, and clearing its fallback. Do not
+   change the recipe ID or accidentally activate both the new rule and its fallback.
 2. **Put the rule where the base effect already lives** (table above), behind
    `activeFusion(sim) === '<id>'`. Do not branch on `elementalType` alone.
 3. **Reuse the hooks that exist; don't add a parallel system:**
@@ -151,7 +162,7 @@ run both base effects and nothing else.
 - **Bounded:** patch counts stay under `ELEMENTAL_PATCH_LIMIT`, and no per-frame
   React state.
 - **Reduced motion:** gameplay is unchanged; drop the motion-only flourishes.
-- **The demo is untouched:** offerings don't spawn in demo or story lessons.
+- **The demo is untouched:** ambient offerings don't spawn in demos or Story. Story uses its own controlled quest scheduler, with partners only for explicit fusion objectives.
 
 ## Tests to add per fusion
 
