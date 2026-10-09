@@ -18,6 +18,7 @@ class SpringCurve extends THREE.Curve {
 }
 function patchMesh(geometry, fragmentShader) {
     geometry.setAttribute('patchAlpha', new THREE.InstancedBufferAttribute(new Float32Array(ELEMENTAL_PATCH_LIMIT), 1));
+    geometry.setAttribute('patchCharge', new THREE.InstancedBufferAttribute(new Float32Array(ELEMENTAL_PATCH_LIMIT), 1));
     const material = new THREE.ShaderMaterial({ vertexShader: patchVertex, fragmentShader, transparent: true,
         depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
     const mesh = new THREE.InstancedMesh(geometry, material, ELEMENTAL_PATCH_LIMIT);
@@ -56,10 +57,12 @@ export function ElementalPatches({ worm, size }) {
             pose.scale.set(1, 1, patch.type === 'grass' ? springStretch(patch.ttl, reduced) : 1);
             pose.updateMatrix(); mesh.setMatrixAt(index, pose.matrix);
             mesh.geometry.attributes.patchAlpha.setX(index, patchOpacity(patch.ttl));
+            mesh.geometry.attributes.patchCharge.setX(index, patch.charged ? 1 : 0);
         }
         for (const mesh of [resources.fire, resources.grass]) {
             mesh.instanceMatrix.needsUpdate = true;
             mesh.geometry.attributes.patchAlpha.needsUpdate = true;
+            mesh.geometry.attributes.patchCharge.needsUpdate = true;
         }
     });
     // R3F never auto-disposes primitives. Keep the actual mesh disposal method

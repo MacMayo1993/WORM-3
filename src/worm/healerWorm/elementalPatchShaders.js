@@ -1,9 +1,11 @@
 export const patchVertex = `
  attribute float patchAlpha;
+ attribute float patchCharge;
  varying float vAlpha;
+ varying float vCharge;
  varying vec2 vUv;
  void main() {
-   vAlpha=patchAlpha; vUv=uv;
+   vAlpha=patchAlpha; vCharge=patchCharge; vUv=uv;
    gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);
  }
 `;
@@ -24,9 +26,12 @@ export const shieldFragment = `
 `;
 export const springFragment = `
  varying float vAlpha;
+ varying float vCharge;
  varying vec2 vUv;
  void main() {
    vec3 color=mix(vec3(0.22,0.53,0.15),vec3(0.78,1.0,0.53),0.5+0.5*cos(vUv.y*6.283185));
+   // Thunderpad: a pad the storm struck is charged, lightning violet with a white core.
+   color=mix(color,mix(vec3(0.66,0.55,0.98),vec3(0.94,0.97,1.0),0.5+0.5*cos(vUv.y*18.85)),vCharge);
    gl_FragColor=vec4(color,vAlpha);
  }
 `;

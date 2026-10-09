@@ -64,7 +64,7 @@ describe('elemental gameplay', () => {
         rotateElementalPatches(sim, () => destination);
         expect([...sim.elementalPatches.values()][0]).toEqual({ ...destination, type: 'grass', ttl: 6 });
         sim.pos = destination;
-        expect(consumeSpring(sim)).toBe(true);
-        expect(consumeSpring(sim)).toBe(false);
+        expect(consumeSpring(sim)).toMatchObject({ type: 'grass' });
+        expect(consumeSpring(sim)).toBeNull();
     });
 });

@@ -119,8 +119,11 @@ function buildCellData(cells) {
   return { cell, extent, edges, sweep: new Float32Array(n) };
 }
 
-export default function ElementalCubeSkin({ size = 3 }) {
-  const element = useGameStore((s) => s.wormElementalTheme);
+// `element` picks which element this skin draws; a fused pair mounts one skin per
+// element (ElementalAtmosphere). Without it, the newest element in the store.
+export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
+  const storeElement = useGameStore((s) => s.wormElementalTheme);
+  const element = elementProp === undefined ? storeElement : elementProp;
   const def = element ? getElementalDef(element) : null;
   // An unknown element resolves to null and the skin draws nothing rather than
   // silently borrowing another element's look.

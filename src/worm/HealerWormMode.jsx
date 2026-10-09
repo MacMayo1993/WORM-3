@@ -17,7 +17,8 @@ import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import DemoPracticeTargets from './healerWorm/DemoPracticeTargets.jsx';
 import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
 import { LightningStrikes } from './healerWorm/LightningStrikes.jsx';
-import { isHotTile } from './healerWorm/elementalGameplay.js';
+import { isHotTile, chargeSpringPad } from './healerWorm/elementalGameplay.js';
+import { fusionOf } from './healerWorm/elementalFusion.js';
 import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
 import BurrowEffects from './healerWorm/BurrowEffects.jsx';
 // src/worm/HealerWormMode.jsx
@@ -241,7 +242,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             stormLastTRef.current = 0;
         }
         const demo = wormDemoActive(store);
-        const lightning = worm.elementalType.current === 'lightning' && wormBuffs.elementalT > 0;
+        const element = worm.elementalType.current, partner = worm.elementalPair?.current ?? null;
+        const lightning = (element === 'lightning' || partner === 'lightning') && wormBuffs.elementalT > 0;
+        // Thunderpad: the storm aims for spring pads, and a struck pad is charged, not flipped.
+        const thunder = fusionOf(element, partner, wormBuffs.elementalT) === 'thunderpad';
         // A fresh orb (or a second one claimed mid-wash) restarts the marks.
         if (lightning && wormBuffs.elementalT > stormLastTRef.current + 0.5) beginStorm(storm);
         stormLastTRef.current = lightning ? wormBuffs.elementalT : 0;
@@ -265,7 +269,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 for (const orb of worm.specials.current) avoid.add(tileKeyOf(orb));
                 for (const bomb of bombsRef.current) avoid.add(tileKeyOf(bomb.tile));
                 for (const spot of storm.spots) avoid.add(tileKeyOf(spot.tile));
-                return pickStrikeTile({ tiles: getAllSurfaceTiles(size), body, avoid }, r);
+                let pads = null;
+                if (thunder) {
+                    pads = [];
+                    for (const pad of worm.elementalPatches.current.values()) if (pad.type === 'grass' && !pad.charged) pads.push(pad);
+                }
+                return pickStrikeTile({ tiles: getAllSurfaceTiles(size), body, avoid, pads }, r);
             },
         });
         for (const spot of fired) {
@@ -292,8 +301,31 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // bomb sitting there is left whole, and a struck worm takes the bolt instead.
             const crowded = worm.powerups.current.some(o => tileKeyOf(o) === key) ||
                 worm.specials.current.some(o => tileKeyOf(o) === key) || bombsRef.current.some(b => tileKeyOf(b.tile) === key);
-            if (!hit && !crowded) worm.strikeTile(spot.tile);
+            if (!hit && !crowded && !(thunder && chargeSpringPad(worm.elementalPatches.current, key))) worm.strikeTile(spot.tile);
         }
+    };
+
+    // ── Fusion bursts ──────────────────────────────────────────────────────────
+    // A fusion's one-shot beat from the sim (sim.fusionBurst, read once per seq).
+    // Wildfire: a spring leap came down in flame — the 3x3 already burns in the sim;
+    // here its enemies die and the blast's flames go up over it.
+    const fusionSeenRef = useRef(0);
+    const runFusionBurst = () => {
+        const burst = worm.fusionBurst?.current;
+        if (!burst || burst.seq === fusionSeenRef.current) return;
+        fusionSeenRef.current = burst.seq;
+        if (burst.kind !== 'wildfire') return;
+        const keys = springSlamTiles(burst.tile, size);
+        if (combatBridge.current) strikeEnemies(combatBridge.current, keys);
+        const flames = [];
+        for (const key of keys) {
+            const [x, y, z, dirKey] = key.split(',');
+            const wp = getStickerWorldPos(+x, +y, +z, dirKey, size, 0);
+            const n = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+            const u = DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
+            flames.push({ pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay: 0 });
+        }
+        blastApiRef.current?.spawn(flames);
     };
 
     // ── Bomb hazard state ──────────────────────────────────────────────────────
@@ -559,6 +591,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
         runStorm(store, delta);
+        runFusionBurst();
         if (combatBridge.current?.ambient && combatBridge.current.encounter) { rotationClock.held = true; return; }
         // A head that changed sides of the turning layer early in the turn is
         // resolved as if it had been there when the turn fired. This must run
@@ -696,6 +729,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 }
                 slamTiles = slamRef.keys;
             }
+            // Steam: a bomb sitting on the steaming trail is put out, like a disarm.
+            const steam = fusionOf(worm.elementalType.current, worm.elementalPair?.current ?? null, wormBuffs.elementalT) === 'steam';
             if (bombsRef.current.length > 0) {
                 const bombs = bombsRef.current;
                 let kept = 0;
@@ -705,7 +740,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     // bombs without disarms, damage or rewards after a fatal hit.
                     if (!useGameStore.getState().wormAlive) { bombs[kept++] = bomb; continue; }
                     // Disarm: body fully encircles the bomb — reward and remove it.
-                    if (isBombDisarmed(bomb, occupied, size) || isBombSlammed(bomb, slamTiles)) {
+                    if (isBombDisarmed(bomb, occupied, size) || isBombSlammed(bomb, slamTiles) ||
+                        (steam && isHotTile(worm.elementalPatches.current, bomb.tile))) {
                         blastApiRef.current?.disarm(bomb);
                         if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
                         else if (store.wormStoryLevel) worm.recordStoryBomb?.(bomb.id);
