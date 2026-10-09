@@ -51,7 +51,7 @@ import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
 import NumberLabel, { GridLabel, CanvasLabel } from './NumberLabel.jsx';
-import { getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombRiseScale, TOMB_LEAN, TOMB_PLAQUE_FRONT, TOMB_STONE_PIVOT } from './tombstone.js';
+import { getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombSeed, tombRiseScale, TOMB_LEAN, TOMB_PLAQUE_FRONT, TOMB_STONE_PIVOT } from './tombstone.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -838,7 +838,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         groupRef.current.scale.set(1, 1, 1);
         setDeathAnimDone(true);
         // The grave rises once the tile has gone; reduced motion places it at once.
-        tombRiseT.current = reduceHomeMotion ? -1 : 0;
+        tombRiseT.current = reduceHomeMotion || useGameStore.getState().settings?.reducedMotion ? -1 : 0;
       }
       return; // skip other animations while dying
     }
@@ -1879,7 +1879,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           position={[0, 0, 0.01]}
           rotation={[0, 0, tombYaw(stickerGridIdRef.current ?? '')]}
         >
-          <TileSurfaceInstance name="Tombstone" geometry={getTombstoneGeometry()} material={getTombstoneMaterial()} color={origColor} />
+          <TileSurfaceInstance name="Tombstone" geometry={getTombstoneGeometry()} material={getTombstoneMaterial()} color={origColor}
+            seed={tombSeed(stickerGridIdRef.current ?? '')} />
           <group position={TOMB_STONE_PIVOT} rotation={[TOMB_LEAN, 0, 0]}>
             <group position={[0, TOMB_PLAQUE_FRONT - 0.002, 0]} rotation={[Math.PI / 2, 0, 0]}>
               <CanvasLabel value="RIP" position={[0, 0.205, 0]} fontSize={0.07} color={EPITAPH_INK} />
