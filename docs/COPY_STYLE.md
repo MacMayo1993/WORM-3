@@ -18,5 +18,8 @@ Use an arcade hierarchy: bold mode names and outcome titles, decisive controls, 
 - **Flip Cube** names the object; **FLIP CUBE** names the solve mode on its title plate.
 - **flip pad** means a raised, flipped tile. Say **twin** and **straight through the middle**.
 - **WORM³** is the game and Mobi's home world. The lost cube premise ties healing to keeping his way home open.
+- **Great Worm War 3** damaged the routes and weaponized existing twins, tunnels, and layer turns; it did not create the world's geometry. Mobi remains warm and practical, with occasional signs that he recognizes the old routes.
+- The demo and WORM levels 1–20 introduce the aftermath: **The Broken Way Home**, then **The Old Routes**. Level 10 reveals deliberate damage; level 20 questions why the routes were sealed from inside. Later revelations remain unwritten. The Rumbler remains a stowaway, not an established war villain.
+- WORM mission briefings and success notes live in `src/worm/story/narrative.js`, keyed by level ID, outside generated level packs. Show them on the map, preflight/pause card, and results only. Keep the live tracker, counts, costs, star requirements, and control instructions literal. A traversal heal spends charges; do not describe it as an orb reward.
 - Describe a control only once it is active in that mode. WORM keeps its current entry instructions until the new route is enabled.
 - Wear warnings must include a legible static cue; movement and colour are supporting cues.

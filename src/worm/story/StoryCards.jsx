@@ -10,10 +10,20 @@ import { storyLevel, storyChecklist, storyStars, WORM_STORY_LEVELS, storyChapter
 import { feel, resumeFeel } from '../../utils/feel.js';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import { getWormCharacter } from '../wormCharacterData.js';
+import { storyNarrative } from './narrative.js';
 import '../../components/screens/wormStory.css';
 
 // "Chapter 2 · Level 4 / 10": levels are numbered globally but read within their chapter.
 const chapterLine = id => `Chapter ${storyChapterId(id)} · Level ${storyChapterIndex(id)} / ${STORY_CHAPTER_SIZE}`;
+
+// A brief line in existing reading surfaces, never another modal or live HUD row.
+export function StoryMobiNote({ levelId, complete = false }) {
+  const story = storyNarrative(levelId);
+  if (!story) return null;
+  return <p className="worm-story-mobi" aria-label={complete ? 'Mobi’s field notes' : 'Mobi’s briefing'}>
+    <b>Mobi</b>{' '}{complete ? story.debrief : story.briefing}
+  </p>;
+}
 
 export function StoryRewardChoices({ level }) {
   const { progress, owned, claim } = useGameStore(useShallow(s => ({ progress: s.playerProgress, owned: s.ownedItems, claim: s.claimWormStoryReward })));
@@ -121,6 +131,7 @@ export function StoryObjectiveCard({ compact = false }) {
   }
   return <section className="worm-story-card" aria-label="Story objective">
     <small>{chapterLine(level.id)}</small><strong>{level.title}</strong>
+    <StoryMobiNote levelId={level.id} />
     <ul className="worm-story-checklist" aria-label="Level tasks">{goals.map(goal => <li key={goal.key} className={goal.done ? 'is-complete' : ''}
       aria-label={`${goal.label}: ${goal.value} of ${goal.target}${goal.done ? ', complete' : ''}`}>
       <span className="worm-story-check" aria-hidden="true">{goal.done ? '✓' : '○'}</span>
@@ -166,7 +177,9 @@ export function StoryResult({ onNext, onRetry, onLevels }) {
   return <div ref={ref} className="worm-story-result" role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" style={{ zIndex: Z.MODAL, fontFamily: UI_FONT }}>
     <div className="worm-story-result-sheet"><ModeArtwork mode="success" className="screen-results-art" /><small>{chapterLine(level.id)}</small><h2 id="worm-story-result-title">{heading}</h2>
       <div className="worm-story-result-stars" aria-label={`${result.stars} out of 3 stars`}>{[0,1,2].map(i => <span key={i} data-earned={i < result.stars} style={{ '--star-index': i }} aria-hidden="true">★</span>)}</div>
-      <p>{level.title}</p><div className="screen-stat-row"><div><strong>{result.seconds}s</strong><span>Time</span></div><div><strong>+{result.xp}</strong><span>XP</span></div><div><strong>+{result.points}</strong><span>Parity Points</span></div></div>
+      <p>{level.title}</p>
+      <StoryMobiNote levelId={level.id} complete />
+      <div className="screen-stat-row"><div><strong>{result.seconds}s</strong><span>Time</span></div><div><strong>+{result.xp}</strong><span>XP</span></div><div><strong>+{result.points}</strong><span>Parity Points</span></div></div>
       {result.unlockedCharacter && <div className="worm-story-unlock" role="status">
         <WormPreviewCanvas size={84} characterId={result.unlockedCharacter} skinId="slime" hatId="none" framing="body" />
         <span><small>New worm unlocked</small><strong>{getWormCharacter(result.unlockedCharacter).label}</strong>

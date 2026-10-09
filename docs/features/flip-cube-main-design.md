@@ -471,6 +471,25 @@ The gates copy the Lightning storm's (`lightningStorm.js` and the `runStorm` gat
 
 ## 6. Mobi, WORM³ and the Flip Cube
 
+### Story opening extension — 2026-10-08
+
+The demo and WORM levels 1–20 now frame the lost cube through the aftermath of
+**Great Worm War 3**. Twins and tunnels predate the war; armies used the existing
+routes and layer turns as weapons. The cube escaped damaged, and helping Mobi
+repair it keeps his way home open.
+
+Chapter 1, **The Broken Way Home**, teaches repair and ends with Mobi recognizing
+deliberate damage. Chapter 2, **The Old Routes**, traces the network across cube
+sizes and ends with a question: why were the routes sealed from inside after the
+ceasefire? Mobi remembers courier routes, but his full role and the later war
+revelations remain open. The Rumbler's stowaway premise is unchanged.
+
+Authored briefings and success notes live in `src/worm/story/narrative.js`, separate
+from generated packs. Existing mission, briefing/pause, and result surfaces carry
+the lines; live gameplay gains no story overlay or interruption. Objective counts,
+star rules, rewards, saves, and level layouts are unchanged. The older draft lines
+in §6.3 remain historical suggestions; current dialogue banks are authoritative.
+
 ### 6.1 Premise: the lost cube (decided)
 
 The Flip Cube slipped out of WORM³ and landed here scrambled, and something from its underside, the Rumbler, came along. Healing the Flip Cube keeps Mobi's way home open. That one reason ties together the heal loop in every mode, the Rumbler, and the story chapters. The alternative, Mobi as a visitor showing off his world, was set aside.
