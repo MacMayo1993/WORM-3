@@ -25,13 +25,8 @@ export const uWormBody = { value: Array.from({ length: WORM_POINTS }, () => new 
 // stretch nearest the head is what an effect would hide; the far tail is off-screen.
 const BODY_REACH = 16;
 
-/**
- * Where the wash entered the world: xyz is the claimed tile's world position, w is
- * 1 while there is one. Shell skins flood outward from it continuously in world
- * space — per-cell delays would make neighbouring cells disagree about how deep the
- * water is along a shared edge, and crack the shell open.
- */
-export const uClaimOrigin = { value: new THREE.Vector4(0, 0, 0, 0) };
+// Claim origins belong to each skin material: fused elements keep independent
+// sweeps. Only the worm positions and cube dimensions are shared across layers.
 /** Half the cube's edge length, world units — how far a flood has to reach. */
 export const uCubeHalf = { value: 1.5 };
 

@@ -713,7 +713,7 @@ export function startElemental(sim, ctx, type) {
     // camera pulls out to the opening-overview framing for a moment to show the
     // cube transform, then eases back to the chase (WormChaseCamera reads this).
     sim.elementalFocusT = ELEMENTAL_FOCUS_DURATION;
-    ctx.feel(ELEMENTAL_EXPERIENCE[type]?.sound ?? 'orb');
+    ctx.feel(next.fused ? 'elementFusion' : ELEMENTAL_EXPERIENCE[type]?.sound ?? 'orb');
     if (activeFusion(sim) === 'quench') quenchTrail(sim);
     if (next.fused) ctx.onStoryMechanic?.('elementFusion', getFusion(sim.elementalPair, sim.elementalType).id);
     ctx.onElementalTheme(type, ELEMENTAL_DURATION, sim.elementalPair);

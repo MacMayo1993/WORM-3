@@ -43,6 +43,17 @@ function suspendedInput(event, afterSound = () => {}) {
 }
 
 describe('audio and motor lifecycle', () => {
+  it('gives fusion a converging chord and distinct haptic pattern, cancellable on pause', () => {
+    const feedback = createWormFeedback();
+    feedback.emit('elementFusion');
+    expect(sources).toHaveLength(5);
+    expect(sources[0].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(660, 10.23);
+    expect(sources[1].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(660, 10.23);
+    expect(navigator.vibrate).toHaveBeenLastCalledWith([24, 35, 24, 45, 48]);
+    feedback.hold(true);
+    sources.forEach(source => expect(source.stop).toHaveBeenLastCalledWith());
+    expect(navigator.vibrate).toHaveBeenLastCalledWith(0);
+  });
   it.each(['pointerdown', 'keydown', 'touchstart'])('plays tone and noise from the first %s after async unlock', async event => {
     const settle = suspendedInput(event);
     expect(context.resume).toHaveBeenCalledOnce();

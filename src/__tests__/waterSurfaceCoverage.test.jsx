@@ -13,6 +13,15 @@ import { getElementalSurfaceGeo, getElementalSurfaceMaterial, WATER_HEIGHT } fro
 import { wormBuffs, resetWormBuffs } from '../worm/wormBuffs.js';
 import { readLiveTile } from '../worm/wormHelpers.js';
 
+it('keeps each fused surface layer sweep origin independent', () => {
+  const water = getElementalSurfaceMaterial('water', '#00aaff', '#88eeff');
+  const ice = getElementalSurfaceMaterial('ice', '#aabbff', '#ffffff');
+  expect(water.uniforms.uClaimOrigin).not.toBe(ice.uniforms.uClaimOrigin);
+  water.uniforms.uClaimOrigin.value.set(1, 2, 3, 1);
+  ice.uniforms.uClaimOrigin.value.set(4, 5, 6, 1);
+  expect(water.uniforms.uClaimOrigin.value.toArray()).toEqual([1, 2, 3, 1]);
+});
+
 it.each([3, 5, 15])('keeps water coverage continuous through claim and expiry on a %s cube', size => {
   resetWormBuffs(); readLiveTile.mockReturnValue(false);
   wormBuffs.elementalT = 10;

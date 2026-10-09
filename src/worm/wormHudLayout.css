@@ -259,3 +259,11 @@
 .worm-fusion-guide ul { max-height: 35vh; overflow-y: auto; margin: 6px 0; padding-left: 18px; }
 .worm-fusion-guide li { margin-bottom: 10px; }
 .worm-fusion-guide li span { display: block; margin-top: 3px; }
+.worm-buff-item.is-fusion { flex:1 0 min(280px,100%); max-width:100%; }
+.is-fusion .worm-buff-chip { width:100%; justify-content:flex-start; color:var(--hud-text); background:linear-gradient(110deg,color-mix(in srgb,var(--fusion-base) 22%,var(--hud-surface)),color-mix(in srgb,var(--fusion-catalyst) 22%,var(--hud-surface))); border-color:var(--fusion-base); }
+.is-fusion .worm-element-partner { width:24px; height:24px; margin-left:0; }
+.is-fusion .worm-buff-name { flex:1; text-align:left; font-size:12px; }
+.worm-fusion-label { display:block; font-size:8px; letter-spacing:.08em; text-transform:uppercase; }
+.worm-fusion-live { padding:4px 7px; font-size:11px; line-height:1.35; color:var(--hud-text); background:var(--hud-surface); border-radius:0 0 8px 8px; border-left:2px solid var(--fusion-base); border-right:2px solid var(--fusion-catalyst); }
+.worm-fusion-live span,.worm-fusion-live strong { display:block; overflow-wrap:anywhere; }
+.worm-fusion-live span { font-size:9px; opacity:.8; }

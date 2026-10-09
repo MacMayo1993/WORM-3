@@ -20,7 +20,7 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   useGameStore.setState({ demoMode: false, wormHealerMode: true, wormAlive: true,
     wormStoryLevel: null, wormStoryStarted: false, wormStoryChecklist: null, wormStoryResult: null, wormCombatMode: false, wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
-    wormElementalTheme: null, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false,
+    wormElementalTheme: null, wormElementalPartner: null, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false,
     wormMission: { title: 'Collect 3 face orbs', target: 3, progress: 0, reward: 30, xp: 60, sequence: 5 },
     wormRunAchievements: [] });
   wormBuffs.signature = { character: 'inch', ready: true, seconds: 0, fraction: 1 };
@@ -299,5 +299,23 @@ it('previews the ordered next pickup and keeps the full recipe guide inside Paus
   expect(host.querySelector('.worm-power-detail').textContent).toContain('Fire → Water: Quench');
   expect(host.querySelector('.worm-power-detail').textContent).toContain('without speeding bomb fuses');
   act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null, wormSpecials: [] }));
+  wormBuffs.elementalT = 0;
+});
+
+it('shows both fused elements and their live benefit without opening Pause', () => {
+  wormBuffs.elementalT = 10; wormBuffs.elementalMaxT = 10; wormBuffs.waterMomentum = 1;
+  useGameStore.setState({ wormElementalTheme: 'ice', wormElementalPartner: 'water', wormSpecials: [] });
+  renderPhase('crawling');
+  const fusion = () => host.querySelector('.worm-buff-item.is-fusion');
+  expect(fusion().textContent).toContain('Fusion active');
+  expect(fusion().textContent).toContain('Slipstream');
+  expect(fusion().textContent).toContain('Water → Ice · Both active');
+  expect(fusion().textContent).toContain('+40%');
+  expect(fusion().querySelectorAll('.worm-element-medal')).toHaveLength(2);
+  expect(host.querySelector('.worm-pause-card')).toBeNull();
+  act(() => useGameStore.setState({ wormElementalTheme: 'grass', wormElementalPartner: 'water' }));
+  expect(fusion().textContent).toContain('Water momentum + Nature spring pads');
+  act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null }));
+  expect(fusion()).toBeNull();
   wormBuffs.elementalT = 0;
 });
