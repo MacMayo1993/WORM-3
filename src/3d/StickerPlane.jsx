@@ -1,4 +1,4 @@
-import { spiderVertexShader, spiderFragmentShader, neonBorderVertexShader, neonBorderFragmentShader, eyelidVertexShader, eyelidFragmentShader, spinRevealVertexShader, spinRevealFragmentShader, hazardCrackVertexShader, hazardCrackFragmentShader, seamLeakFragmentShader, wormRimGlowFragmentShader, wormApertureFragmentShader, wispyRingVertexShader, wispyRingFragmentShader } from './stickerPortalShaders.js';
+import { spiderVertexShader, spiderFragmentShader, neonBorderVertexShader, eyelidVertexShader, eyelidFragmentShader, spinRevealVertexShader, spinRevealFragmentShader } from './stickerPortalShaders.js';
 import { bindTileStyleIdentity } from './tileStyleIdentity.js';
 import { burrowSticker } from '../worm/burrowBridge.js';
 import { FlipPadOffset } from './PadSprings.jsx';
@@ -46,12 +46,10 @@ import AntipodalGlowFill from './AntipodalGlowFill.jsx';
 import { fireFlipImpulse } from './flipImpulse.js';
 import { blinkCountForFlips, blinkFlipRate, blinkPhase, blinkBounce, BLINK_BASE_DUR } from './parityBlink.js';
 import HealParticles from './HealParticles.jsx';
-import ParityBreakthrough from './ParityBreakthrough.jsx';
-import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
 import NumberLabel, { GridLabel, CanvasLabel } from './NumberLabel.jsx';
-import { getFlipPortalGeometry, getFlipPortalMaterial, flipPortalData, flipPortalStart, PORTAL_TOP } from './flipPortal.js';
+import { getFlipPortalGeometry, getFlipPortalMaterial, flipPortalData, flipPortalStart, forgetFlipPortalOpening, PORTAL_TOP } from './flipPortal.js';
 import { getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombSeed, tombRiseScale, TOMB_LEAN, TOMB_PLAQUE_FRONT, TOMB_STONE_PIVOT } from './tombstone.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
@@ -60,11 +58,7 @@ const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
 // outline and glossy coat (rubiksPiece.js), thin enough to keep every overlay in front.
 const _playStickerGeo = createPlayStickerGeometry();
 const _playFinish = rubiksFinish(isMobile).sticker;
-// Slightly larger plane for the worm-mode rim glow — extends the halo beyond the tile edge.
-const _wormRimGlowGeo = new THREE.PlaneGeometry(1.05, 1.05);
-const _wormApertureGeo = new THREE.PlaneGeometry(0.76, 0.76);
-// Neon worm-border plane — sits in the grid-line channel just outside the sticker so the
-// glowing square outline traces the tile's own perimeter (like the neon view mode).
+// Shared footprint plane reaches the grid channel just outside the sticker.
 const _neonBorderGeo = new THREE.PlaneGeometry(0.94, 0.94);
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
@@ -290,22 +284,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   const spiderPlaneRef = useRef();
   const spiderMatRef = useRef();
-  const crackMatRef = useRef();
-  const seamLeakMatRef = useRef();
   const [spiderUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
     uTime: sharedUniforms.time, // shared tile clock, so a sleeping tile's ghost still pulses
     uBurst: { value: 1.0 }, // Always fully active for ghost tiles
-  }));
-  const [crackUniforms] = React.useState(() => ({
-    uColor: { value: new THREE.Color('#ffffff') },
-    uTime: { value: 0 },
-    uIntensity: { value: 0 },
-  }));
-  const [seamLeakUniforms] = React.useState(() => ({
-    uColor: { value: new THREE.Color('#ffffff') },
-    uTime: { value: 0 },
-    uIntensity: { value: 0 },
   }));
   // Whether the current in-progress flip is a disparity (eyelid) flip.
   const isDisparityFlipRef = useRef(false);
@@ -333,40 +315,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uTime: { value: 0.0 },
     uDissolve: { value: 0.0 },
   }));
-  // Persistent wispy ring — replaces static color rings on all tiles
-  const wispyRingMatRef = useRef();
+  // Burrowing tiles hide the portal and its count until their mouth opens.
   const burrowDecorRef = useRef();
-  const burrowBorderRef = useRef();
-  const [wispyRingUniforms] = React.useState(() => ({
-    uColor: { value: new THREE.Color() },
-    uAntiColor: { value: new THREE.Color() },
-    uTime: wispyTime, // shared reference — updated once per frame externally
-    uLens: { value: 0.0 },
-    uFlipRatio: { value: 0.0 }, // flips / flipCap — drives glow strength + pulse speed
-  }));
-  // Neon worm-border — glowing square outline with light-worms chasing around it.
-  // Replaces the old solid parity ring. Shares wispyTime so it animates every frame.
-  const neonBorderMatRef = useRef();
-  const [neonBorderUniforms] = React.useState(() => ({
-    uColor: { value: new THREE.Color() },
-    uTime: wispyTime, // shared reference — updated once per frame externally
-    uFlipRatio: { value: 0.0 },
-  }));
-  // Worm-mode rim glow — heartbeat ring on flipped tiles in worm healer mode
-  const wormRimGroupRef = useRef();
-  const wormRimMatRef = useRef();
-  const wormApertureMatRef = useRef();
-  const [wormRimUniforms] = React.useState(() => ({
-    uColor: { value: new THREE.Color() },
-    uTime: { value: 0 },
-    uIntensity: { value: 0 },
-  }));
-  const [wormApertureUniforms] = React.useState(() => ({
-    uColor: { value: new THREE.Color() },
-    uTime: { value: 0 },
-    uIntensity: { value: 0 },
-    uDanger: { value: 0 },
-  }));
   // Worm footprint — the tile's grid square lit up while the worm's weight is on it.
   // The group carries the lit square down with the tile; the sticker itself sinks on
   // innerGroupRef (see the press block in tickImpl).
@@ -392,14 +342,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   useEffect(() => {
     return () => {
       spiderMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
-      crackMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
-      seamLeakMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       eyelidMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       spinRevealMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
-      wispyRingMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
-      neonBorderMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
-      wormRimMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
-      wormApertureMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       footprintMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
     };
   }, []);
@@ -455,10 +399,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const tombRef = useRef(null);
   const wasDeadRef = useRef(isDead);
   const [deathAnimDone, setDeathAnimDone] = useState(isDead);
-  // Post-flip worm intro timer: counts down from 6 after each flip animation ends.
-  // Keeps worm(s) visible for 6 seconds even if isWormhole becomes false quickly.
-  const wormIntroT = useRef(0);
-  const [showWormIntro, setShowWormIntro] = useState(false);
   // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
   const ringFlashRef = useRef(0);
   // Heal seal animation: -1 = idle, 0→1 = playing
@@ -635,7 +575,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     flashT.current = 1;
     hitstopT.current = 0;
     healTRef.current = -1;
-    wormIntroT.current = 0;
     ringFlashRef.current = 0;
     prevRawP.current = 0;
     blinkBounceRef.current = 0;
@@ -648,7 +587,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (spinRevealRef.current) spinRevealRef.current.visible = false;
     if (spiderPlaneRef.current) spiderPlaneRef.current.visible = false;
     if (healSealRef.current) healSealRef.current.visible = false;
-    setShowWormIntro(false); // React bails out when already false — no extra render
     // Chaos also keys by slot, and its tiles die. The incoming piece is dead or
     // alive already: take its tombstone as it stands, without replaying the
     // implosion, and undo any shrink left by an outgoing piece's death mid-way.
@@ -710,11 +648,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         flipShockwaveRef.current?.setProgress(1);
       }
       prevRawP.current = 0;
-      // The emerging sticker worm is WORM's; a cube-mode flip opens a portal instead.
-      if (wormHealerMode) {
-        wormIntroT.current = 6.0;
-        setShowWormIntro(true);
-      }
       // Disparity flip (odd flip count → tile enters wormhole state) → eyelid blink.
       // Normal flip → spinning rim reveal.
       isDisparityFlipRef.current = flips % 2 === 1;
@@ -862,7 +795,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     const showWormholeHazardFx = !isDead && wormhole && (!burrow || burrow.openness > 0.05);
     const showBurrowDecor = !burrow || burrow.openness > 0.05;
     if (burrowDecorRef.current) burrowDecorRef.current.visible = showBurrowDecor;
-    if (burrowBorderRef.current) burrowBorderRef.current.visible = showBurrowDecor;
     if (burrow && !showWormholeHazardFx && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) groupRef.current.position.set(...pos);
 
     const needsGhostUpdate = showGhostTile && spiderMatRef.current && (
@@ -919,7 +851,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // A cube-mode portal animates in its shader: unless the legacy tremor runs, a
     // flipped tile sleeps like any other once its flip has played.
     const wormholeFrames = (wormHealerMode || flipPads === 'off') && wormhole && !isSudokube;
-    const anyActive = tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || (showWormholeHazardFx && wormholeFrames) || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || wormholeFrames;
+    const anyActive = tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || (showWormholeHazardFx && wormholeFrames) || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || wormholeFrames;
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
@@ -1186,12 +1118,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
     }
 
-    // Post-flip worm intro countdown — keeps worm(s) visible for 6 s after each flip.
-    if (wormIntroT.current > 0) {
-      wormIntroT.current = Math.max(0, wormIntroT.current - delta);
-      if (wormIntroT.current <= 0) setShowWormIntro(false);
-    }
-
     // Flip shockwave — advance here (active-registry gated) rather than in a
     // per-sticker useFrame. ~0.45 s burst, then idles transparent at 1.
     if (shockT.current < 1) {
@@ -1227,46 +1153,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       if (ringFlashRef.current > 0) {
         ringFlashRef.current = Math.max(0, ringFlashRef.current - delta * 3);
         ringRef.current.material.opacity = 0.85 + ringFlashRef.current * 0.05;
-      }
-    }
-
-    if (crackMatRef.current) {
-      crackMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      crackMatRef.current.uniforms.uIntensity.value = showWormholeHazardFx && !isDead ? 0.85 : 0;
-      crackMatRef.current.uniforms.uColor.value.set(antipodalColor);
-    }
-
-    if (seamLeakMatRef.current) {
-      seamLeakMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      seamLeakMatRef.current.uniforms.uIntensity.value = showWormholeHazardFx && !isDead ? 0.9 : 0;
-      seamLeakMatRef.current.uniforms.uColor.value.set(antipodalColor);
-    }
-
-    // Worm-mode rim glow: heartbeat pulse + Z-bounce ("other side pressing through").
-    if (wormRimMatRef.current) {
-      const wormRimActive = wormHealerMode && showWormholeHazardFx;
-      wormRimMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      wormRimMatRef.current.uniforms.uIntensity.value = wormRimActive
-        ? 0.6 + Math.min(meta?.flips ?? 1, 5) * 0.08
-        : 0;
-      wormRimMatRef.current.uniforms.uColor.value.set(antipodalColor);
-    }
-    if (wormApertureMatRef.current) {
-      const apertureActive = wormHealerMode && showWormholeHazardFx;
-      wormApertureMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      wormApertureMatRef.current.uniforms.uIntensity.value = apertureActive ? 1 : 0;
-      wormApertureMatRef.current.uniforms.uDanger.value = effectiveFlipCap > 0
-        ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap)
-        : 0;
-      wormApertureMatRef.current.uniforms.uColor.value.set(antipodalColor);
-    }
-    if (wormRimGroupRef.current) {
-      if (wormHealerMode && showWormholeHazardFx) {
-        const bt = (state.clock.elapsedTime * 1.8) % 1.0;
-        const bounce = bt < 0.12 ? (bt / 0.12) * 0.055 : Math.pow(1.0 - (bt - 0.12) / 0.88, 2.5) * 0.055;
-        wormRimGroupRef.current.position.z = bounce;
-      } else {
-        wormRimGroupRef.current.position.z = 0;
       }
     }
 
@@ -1564,29 +1450,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.material = newMat;
       }
     }
-    // Keep wispy ring colors and lens flag in sync with tile state
-    if (wispyRingMatRef.current) {
-      wispyRingMatRef.current.uniforms.uColor.value.set(materialColor);
-      wispyRingMatRef.current.uniforms.uAntiColor.value.set(antipodalHexRef.current ?? materialColor);
-      wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
-      wispyRingMatRef.current.uniforms.uFlipRatio.value = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
-    }
-    // Keep neon worm-border color + speed/heat in sync with tile state.
-    if (neonBorderMatRef.current) {
-      neonBorderMatRef.current.uniforms.uColor.value.set(antipodalHexRef.current ?? materialColor);
-      neonBorderMatRef.current.uniforms.uFlipRatio.value = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
-    }
   }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
-  // Cube modes draw a displaced tile as one batched flip portal (flipPortal.js);
-  // WORM keeps its aperture and the older decoration under it.
-  const legacyFlipDecor = wormHealerMode;
-  const showFlipPortal = !legacyFlipDecor && !isDead && !isSudokube && isWormhole;
+  // Worm and cube modes share the same batched, animated portal face.
+  // The surface batch applies the traversal/death bore to this face as well.
+  const showFlipPortal = !isDead && !isSudokube && isWormhole;
+  // Healing removes the old opening time. If the same tile is flipped again at
+  // count one it must pop afresh, while turns/view changes keep a live portal open.
+  useLayoutEffect(() => {
+    if (!isWormhole || isDead) forgetFlipPortalOpening(stickerGridId);
+  }, [isWormhole, isDead, stickerGridId]);
 
   const trackerRadius = Math.min(0.25, 0.06 + (meta?.flips ?? 0) * 0.012);
   const origColor = meta?.orig ? fc[meta.orig] : COLORS.black;
-  const antipodalColor = meta?.orig ? fc[ANTIPODAL_COLOR[meta.orig]] : COLORS.black;
 
   // Check if colors are white - don't show white indicators on non-white tiles
   const currIsWhite = meta?.curr === 3;
@@ -1599,14 +1476,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       {/* A static surface marking stays legible when bloom and moving portal
           effects wash out. Raised hazard fences still identify deadly portals. */}
       {wormHealerMode && !isDead && !isSudokube && <TileBoundary flipped={isWormhole} />}
-      {/* The flipped face: a bevelled lens onto the antipodal tunnel, home colour at
-          the far end. One instanced draw for every portal on the cube, animated in
-          its shader, so a flipped tile needs no frame callback of its own. */}
-      {showFlipPortal && (
-        <TileSurfaceInstance name="FlipPortal" geometry={getFlipPortalGeometry()} material={getFlipPortalMaterial()}
-          color={baseColor} seed={flipPortalStart(stickerGridId, meta?.flips ?? 0)}
-          data={flipPortalData(origColor, meta?.flips ?? 0, effectiveFlipCap)} />
-      )}
       {/* Ghost spider web on the back of flipped tiles. Mounted only once a tile has
           any flip history — a never-flipped tile can never show it, so on a 15×15
           Mega shell the ~1,300 untouched tiles skip this mesh (and every transient
@@ -1792,39 +1661,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </mesh>
       )}
 
-      {/* Neon worm-border — replaces the old solid parity ring. A glowing SQUARE outline
-          traced on the tile's own perimeter (like the neon view mode), with bright
-          light-worms chasing one another around it. They wiggle as they slither and race
-          faster as the tile nears its flip cap. Shown only while the tile is displaced
-          (odd parity). Additive so it reads as neon over the dark cube frame.
-          NOTE: ringRef stays declared — the flip midpoint/pulse code still references
-          ringRef.current under null guards, so those branches simply no-op. */}
-      {legacyFlipDecor && !isDead && !isSudokube && isWormhole && (
-        <mesh ref={burrowBorderRef} position={[0, 0, 0.006]} renderOrder={2}>
-          <primitive object={_neonBorderGeo} attach="geometry" />
-          <shaderMaterial
-            ref={neonBorderMatRef}
-            vertexShader={neonBorderVertexShader}
-            fragmentShader={neonBorderFragmentShader}
-            uniforms={neonBorderUniforms}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </mesh>
-      )}
-
       {/* Worm footprint — the tile's grid square lit up under the worm's weight, in the
           worm's own skin colour. Mounted for every tile in worm mode and left invisible
           until something stands on it: the alternative is mounting a mesh mid-crawl on
           the exact frame it first needs to be seen, which is a shader compile in the
-          middle of a step. Sits a hair below the parity border's z so a flipped tile the
-          worm is standing on shows both without them fighting.
+          middle of a step. Lift the footprint above the portal lip on flipped tiles
+          so its contact cue remains visible.
           Normal blending, not additive: the inner shadow is the half of this that makes a
           tile look pressed rather than merely lit, and additive cannot darken. */}
       {wormHealerMode && !isDead && (
         <group ref={footprintGroupRef} visible={false}>
-          <mesh position={[0, 0, 0.005]} renderOrder={2}>
+          <mesh position={[0, 0, showFlipPortal ? PORTAL_TOP + 0.003 : 0.005]} renderOrder={2}>
             <primitive object={_neonBorderGeo} attach="geometry" />
             <shaderMaterial
               ref={footprintMatRef}
@@ -1909,7 +1756,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </group>
       )}
 
-      <group ref={burrowDecorRef}>
+      <group ref={burrowDecorRef} name="FlippedTileDecor">
+      {/* The flipped face: a bevelled lens onto the antipodal tunnel, home colour at
+          the far end. One instanced draw for every portal on the cube, animated in
+          its shader, so a flipped tile needs no frame callback of its own. */}
+      {showFlipPortal && (
+        <TileSurfaceInstance name="FlipPortal" geometry={getFlipPortalGeometry()} material={getFlipPortalMaterial()}
+          color={baseColor} seed={flipPortalStart(stickerGridId, meta?.flips ?? 0)}
+          data={flipPortalData(origColor, meta?.flips ?? 0, effectiveFlipCap)} />
+      )}
+
       {/* Tally Marks - skip if origColor is white on non-white tile */}
       {/* A portal shows its pressure itself; it keeps only the ×N count past six. */}
       {!isDead && !isSudokube && hasFlipHistory && !(showFlipPortal && (meta?.flips ?? 0) <= 6) && !(origIsWhite && !currIsWhite) && (
@@ -1920,109 +1776,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           origColor={origColor}
         />
       )}
-
-      {/* Wispy spinning ring — only shown after the tile has been flipped at least once */}
-      {legacyFlipDecor && !isDead && !isSudokube && hasFlipHistory && (
-        <mesh position={[0, 0, 0.007]} renderOrder={1}>
-          <primitive object={_sharedStickerGeo} attach="geometry" />
-          <shaderMaterial
-            ref={wispyRingMatRef}
-            vertexShader={wispyRingVertexShader}
-            fragmentShader={wispyRingFragmentShader}
-            uniforms={wispyRingUniforms}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </mesh>
-      )}
-
-      {legacyFlipDecor && !isDead && !isSudokube && (isWormhole || showWormIntro) && (
-        <>
-          {/* Parity breakthrough — original color trying to push through.
-              LOD: skip at flips === 1 (6–8 blended meshes saved for the very first wormhole frame). */}
-          {isWormhole && !chaosFlip && (meta?.flips ?? 1) >= 2 && <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />}
-
-          {isWormhole && <mesh position={[0, 0, 0.018]} renderOrder={2}>
-            <primitive object={_sharedStickerGeo} attach="geometry" />
-            <shaderMaterial
-              ref={crackMatRef}
-              vertexShader={hazardCrackVertexShader}
-              fragmentShader={hazardCrackFragmentShader}
-              uniforms={crackUniforms}
-              transparent
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>}
-
-          {isWormhole && <mesh position={[0, 0, -0.009]} scale={[1.08, 1.08, 1]} renderOrder={1}>
-            <primitive object={_sharedStickerGeo} attach="geometry" />
-            <shaderMaterial
-              ref={seamLeakMatRef}
-              vertexShader={hazardCrackVertexShader}
-              fragmentShader={seamLeakFragmentShader}
-              uniforms={seamLeakUniforms}
-              transparent
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-              side={THREE.DoubleSide}
-            />
-          </mesh>}
-
-          {/* Worm-mode rim glow — heartbeat ring that makes healing targets easy to spot.
-              The group's Z position is animated in useFrame (heartbeat bounce) so the whole
-              effect "pops" forward rhythmically, as if the antipodal face is pressing through. */}
-          {isWormhole && wormHealerMode && (
-            <group ref={wormRimGroupRef}>
-              <mesh position={[0, 0, 0.021]} renderOrder={2} geometry={_wormApertureGeo}>
-                <shaderMaterial
-                  ref={wormApertureMatRef}
-                  vertexShader={hazardCrackVertexShader}
-                  fragmentShader={wormApertureFragmentShader}
-                  uniforms={wormApertureUniforms}
-                  transparent
-                  depthWrite={false}
-                />
-              </mesh>
-              <mesh position={[0, 0, 0.022]} renderOrder={3}>
-                <primitive object={_wormRimGlowGeo} attach="geometry" />
-                <shaderMaterial
-                  ref={wormRimMatRef}
-                  vertexShader={hazardCrackVertexShader}
-                  fragmentShader={wormRimGlowFragmentShader}
-                  uniforms={wormRimUniforms}
-                  transparent
-                  depthWrite={false}
-                  blending={THREE.AdditiveBlending}
-                />
-              </mesh>
-            </group>
-          )}
-
-          {/* WORM creatures around active vortex — also shown for 6 s after any flip. */}
-          {/* During the non-wormhole intro a single worm emerges from the tile centre. */}
-          {Array.from({ length: (showWormIntro && !isWormhole) ? 1 : Math.max(1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
-            const count = (showWormIntro && !isWormhole) ? 1 : Math.max(1, Math.min(meta?.flips ?? 0, 4));
-            const angle = (i / count) * Math.PI * 2;
-            const radius = showWormIntro && !isWormhole ? 0 : (count <= 4 ? 0.25 : 0.28);
-            const x = Math.cos(angle) * radius;
-            const y = Math.sin(angle) * radius;
-            const scale = (showWormIntro && !isWormhole)
-              ? 1.0
-              : (count <= 4 ? 0.7 + (i % 2) * 0.1 : 0.6);
-            return (
-              <StickerWorm
-                key={i}
-                position={[x, y, 0]}
-                rotation={angle}
-                scale={scale}
-              />
-            );
-          })}
-        </>
-      )}
-
       </group>
 
       {/* Flip burst effects. Each fires only on a flip or animated heal transition,

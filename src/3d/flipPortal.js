@@ -334,6 +334,11 @@ export function flipPortalStart(identity, flips, now = sharedUniforms.time.value
   return start;
 }
 
+/** A healed tile can open again with the same flip count on its next infection. */
+export function forgetFlipPortalOpening(identity) {
+  openings.delete(identity);
+}
+
 /** Forgets every portal's opening (tests, and a fresh cube). */
 export function resetFlipPortalOpenings() {
   openings.clear();
