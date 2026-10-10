@@ -194,10 +194,10 @@ export function applyBioluminescence(material, glowHex, isGlow) {
     return;
   }
   material.emissive.set(glowHex);
-  // Well above the 0.22 the skin profiles use: this has to carry the character on
-  // its own now, and it is what the halo used to be doing.
-  material.emissiveIntensity = 0.85;
+  // Keep the body luminous even at the pulse's trough; the separate soft halo
+  // carries that light beyond the silhouette without washing out its features.
+  material.emissiveIntensity = 1.2;
   // Breathe, so it reads as alive rather than as a flat repaint. Overwrites any
   // pulse the skin set, which is intentional — the character wins over the skin.
-  material.userData.pulse = { base: 0.85, amp: 0.22, speed: 2.4 };
+  material.userData.pulse = { base: 1.2, amp: 0.16, speed: 2.4 };
 }

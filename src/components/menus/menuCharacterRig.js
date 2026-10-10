@@ -62,6 +62,7 @@ export function createMenuCharacterRig(character) {
     holder.add(body);
     if (character === 'glow' && i % 2 === 0) {
       const halo = makeWormHaloSprite(); own(halo.material);
+      halo.visible = true;
       halo.material.color.set(skin.glow); halo.scale.setScalar(.42); holder.add(halo);
     }
     return { holder, material, book: null };
