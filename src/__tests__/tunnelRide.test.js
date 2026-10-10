@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { makeTunnelCenterline, buildTunnelCenterlineInto } from '../worm/wormLogic.js';
-import { makeTunnelRideFrame, tunnelRideFrameInto, TUNNEL_RIDE_CLEARANCE, TUNNEL_RIDE_WIDTH, fillTunnelRideGeometry, tunnelRideCoreArc, tunnelRideTwistAt, tunnelRideSampleArc } from '../utils/tunnelRide.js';
+import { makeTunnelRideFrame, tunnelRideFrameInto, TUNNEL_RIDE_CLEARANCE, TUNNEL_RIDE_SEAT, TUNNEL_RIDE_WIDTH, fillTunnelRideGeometry, tunnelRideCoreArc, tunnelRideTwistAt, tunnelRideSampleArc } from '../utils/tunnelRide.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { tunnelDockWidth } from '../utils/tunnelPath.js';
 
@@ -57,7 +57,7 @@ describe('Möbius surface riding', () => {
         expect(clearance).toBeGreaterThanOrEqual(-1e-10);
         expect(clearance).toBeLessThanOrEqual(TUNNEL_RIDE_CLEARANCE + 1e-10);
         const dockDistance = Math.max(0, path.armALen - arc, arc - (path.total - path.armBLen));
-        if (arc >= 0.25 && path.total - arc >= 0.25 && dockDistance >= 0.35) expect(clearance).toBeCloseTo(TUNNEL_RIDE_CLEARANCE, 8);
+        if (arc >= 0.25 && path.total - arc >= 0.25 && dockDistance >= TUNNEL_RIDE_SEAT) expect(clearance).toBeCloseTo(TUNNEL_RIDE_CLEARANCE, 8);
       }
     }
   });

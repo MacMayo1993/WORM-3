@@ -14,6 +14,9 @@ import { WORM_PIECE_POP, WORM_PAD_HEIGHT, WORM_PLATFORM_LANDING_HEIGHT, wormRais
 import { makeTunnelCenterline, buildTunnelCenterlineInto, getWindWorldPosInto } from '../worm/wormLogic.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
+import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import { tunnelDockWidth } from '../utils/tunnelPath.js';
+import { coreOpeningBandWidth } from '../3d/corePassage.js';
 import { makeWormSim, resetWormSim, startJump, stepWormSim } from '../worm/healerWorm/wormSim.js';
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
 extend(THREE);
@@ -198,6 +201,48 @@ it('updates both endpoint colors and rails without moving or rebuilding the band
     expect(uniforms.uColorB.value.getHexString()).toBe('009b48');
     expect(meshes.map(o => o.geometry.attributes.position.version)).toEqual(versions);
   } finally {
+    await act(async () => root.unmount()); useGameStore.setState(before, true);
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});
+
+it('widens the ridden band to the core opening without moving its route', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const before = useGameStore.getState(), bridge = { ...tunnelState };
+  useGameStore.setState({ wormHealerMode: true, demoMode: false, settings: { ...before.settings, reducedMotion: true } });
+  const refs = [new THREE.Object3D(), new THREE.Object3D()];
+  refs[0].position.set(-2, 0, 0); refs[1].position.set(2, 0, 0);
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas); root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
+  try {
+    let store;
+    await act(async () => { store = root.render(<MobiusTunnel meshIdx1={0} meshIdx2={1} dirKey1="NX" dirKey2="PX"
+      cubieRefs={refs} flips={1} color1="#3973e8" color2="#38c875" gridId1="a" gridId2="b" tunnelId="a|b" />); });
+    store.getState().advance(1 / 60);
+    let spine;
+    store.getState().scene.traverse(o => { if (o.material?.uniforms?.uGrowT && o.geometry.attributes.uv && !spine) spine = o; });
+    const read = () => {
+      const p = spine.geometry.attributes.position, mids = [];
+      let crossing = 0;
+      for (let i = 0; i < p.count; i += 2) {
+        const l = new THREE.Vector3().fromBufferAttribute(p, i), r = new THREE.Vector3().fromBufferAttribute(p, i + 1);
+        // Between the two docks the band keeps its dock width.
+        if (i / 2 === Math.floor(p.count / 4)) crossing = l.distanceTo(r);
+        mids.push(l.lerp(r, .5));
+      }
+      return { crossing, mids };
+    };
+    const size = useGameStore.getState().size, idle = read();
+    expect(idle.crossing).toBeCloseTo(tunnelDockWidth(size), 4);
+    Object.assign(tunnelState, { active: true, activeTunnelId: 'a|b', coreZoom: 4, coreZoomAnchor: new THREE.Vector3(-.2125, 0, 0) });
+    store.getState().advance(1 / 60);
+    const ridden = read();
+    expect(ridden.crossing).toBeCloseTo(coreOpeningBandWidth(size, 4), 4);
+    ridden.mids.forEach((mid, i) => expect(mid.distanceTo(idle.mids[i])).toBeLessThan(1e-6));
+  } finally {
+    Object.assign(tunnelState, bridge);
     await act(async () => root.unmount()); useGameStore.setState(before, true);
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }

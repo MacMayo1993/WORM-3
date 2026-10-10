@@ -34,6 +34,7 @@ import { createPlayStickerGeometry } from './rubiksPiece.js';
 import { CLASSIC_BODY_SIZE } from './cubeViewStyles.js';
 import { createCoreTileStyle } from './coreTileStyle.js';
 import { withPortalCutout } from './portalCutout.js';
+import { makeCoreLightningUniforms, setCoreLightningSize, withCoreLightning } from './coreLightning.js';
 import { makeCorePassage, updateCorePassage, coreRoomCutoutGLSL, CORE_MIRROR_HALF, coreOpeningRadius } from './corePassage.js';
 import { createCoreReflection, createCoreMirrorRoom } from './coreMirrorRoom.js';
 import { wormExpansion, currentExplosion } from '../worm/wormExpansion.js';
@@ -51,6 +52,7 @@ import {
 } from './antipodalCore.js';
 
 const LIGHT_BASE = new THREE.Color('#9aacc8');
+const BOLT_BASE = new THREE.Color(0.36, 0.42, 1.0);
 const WHITE = new THREE.Color(1, 1, 1);
 const _tint = new THREE.Color();
 const _color = new THREE.Color();
@@ -95,12 +97,17 @@ function VoidCore({ cubieRefs = null }) {
 
   const glow = useMemo(() => ({ value: 0.08 }), []);
   const passage = useMemo(() => makeCorePassage(), []);
+  // The seams between the core's pieces are live lightning (coreLightning.js).
+  const lightning = useMemo(() => makeCoreLightningUniforms(), []);
+  useLayoutEffect(() => setCoreLightningSize(lightning, size, tunnelCoreScale(size)), [lightning, size]);
   const parts = useMemo(() => ({
     body: new THREE.BoxGeometry(CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE, CLASSIC_BODY_SIZE),
     sticker: createPlayStickerGeometry(CORE_STICKER),
-    bodyMaterial: withPortalCutout(createCoreBodyMaterial(isMobile, mode), passage.uniforms, coreRoomCutoutGLSL, 'core-room', true),
-    stickerMaterial: withPortalCutout(createCoreStickerMaterial(glow, isMobile), passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
-  }), [glow, mode, passage]);
+    bodyMaterial: withPortalCutout(withCoreLightning(createCoreBodyMaterial(isMobile, mode), lightning),
+      passage.uniforms, coreRoomCutoutGLSL, 'core-room', true),
+    stickerMaterial: withPortalCutout(withCoreLightning(createCoreStickerMaterial(glow, isMobile), lightning, { haloOnly: true }),
+      passage.uniforms, coreRoomCutoutGLSL, 'core-room', true)
+  }), [glow, mode, passage, lightning]);
   useEffect(() => () => Object.values(parts).forEach(p => p.dispose()), [parts]);
   const antiverse = useMemo(() => createAntiverse(size), [size]);
   useEffect(() => () => antiverse.dispose(), [antiverse]);
@@ -270,6 +277,11 @@ function VoidCore({ cubieRefs = null }) {
     }
     f.tintMix *= Math.exp(-dt * 1.2);
     glow.value = (wormMode ? 0.12 : 0.08) + f.flash * 0.25;
+    // The seams' lightning runs on the game clock: it holds with pause, a dead
+    // worm and reduced motion, and surges with each flip in that flip's colour.
+    if (!still && !(wormMode && (state.wormPaused || !state.wormAlive))) lightning.uCoreBoltTime.value += dt;
+    lightning.uCoreBoltGain.value = (0.55 + 0.45 * charge) * (1 + f.flash * 0.8);
+    lightning.uCoreBoltColor.value.copy(BOLT_BASE).lerp(f.tint, 0.6 * f.tintMix);
 
     // The approach zoom: while a WORM ride closes on the core, grow it about the
     // tile the worm is diving into, then let it go once the rider is through.

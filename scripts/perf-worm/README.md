@@ -20,7 +20,7 @@ npx vite build --config scripts/perf-worm/vite.perf.config.mjs     # → dist-pe
 npx vite preview --config scripts/perf-worm/vite.perf.config.mjs --port 4173
 ```
 
-That config is the deploy config, unminified (so profiles keep function names) with `window.__store` exposed. The dev server works too (`npm run dev`, default `--url`), and its component names are the easiest to read.
+That config is the deploy config, unminified (so profiles keep function names) with `window.__store` exposed. It also exposes `window.__tunnelState`, the live worm sim and its context (`window.__wormSimRef`, `window.__wormCtxRef`) and `window.__beginTunnelTransition`, so a probe can start a real tunnel ride and film it. The dev server works too (`npm run dev`, default `--url`), and its component names are the easiest to read.
 
 ## Modes
 

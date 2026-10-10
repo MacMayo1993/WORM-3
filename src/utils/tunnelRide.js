@@ -8,6 +8,9 @@ export const TUNNEL_RIDE_CLEARANCE = 0.115;
 // The worm's floor at its widest, where the ride leaves a tile: room for the
 // body (a bead is TUNNEL_RIDE_CLEARANCE across its radius) and a little more.
 export const TUNNEL_RIDE_WIDTH = 0.36;
+// Arc length over which the floor rises from one bead radius below the route to
+// the route itself at a core dock.
+export const TUNNEL_RIDE_SEAT = 0.6;
 // The aperture is already wider than this gauge. Pinching the floor to zero
 // at the mouth left the first body beads hanging over an invisible track.
 export const tunnelRideWidthAt = (path, arc, dockWidth, mouthWidth = TUNNEL_RIDE_WIDTH) =>
@@ -99,8 +102,10 @@ export function tunnelRideFrameInto(out, path, arc, twist = tunnelRideTwistAt(pa
   const mouth = THREE.MathUtils.smoothstep(Math.min(s, path.total - s), 0, 0.25);
   // Seat the ribbon on its actual core tile. A fixed bead-radius offset here
   // displaced small-board bands onto neighboring stickers (or off the cube).
+  // The floor eases onto the centreline over a long stretch, so it is already
+  // centred as it reaches the core's opening instead of swerving in at its rim.
   const dockDistance = Math.max(0, path.armALen - s, s - (path.total - path.armBLen));
-  const seat = THREE.MathUtils.smoothstep(dockDistance, 0, 0.35);
+  const seat = THREE.MathUtils.smoothstep(dockDistance, 0, TUNNEL_RIDE_SEAT);
   out.floor.copy(out.center).addScaledVector(out.normal, -TUNNEL_RIDE_CLEARANCE * mouth * seat);
   return out;
 }

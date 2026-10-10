@@ -29,6 +29,7 @@ import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 import { makeCautionOpeningUniforms, syncCautionOpening } from '../worm/healerWorm/cautionOpening.js';
 import { makeTunnelEnergyUniforms, tunnelEnergySeed } from './tunnelEnergy.js';
+import { coreOpeningBandWidth } from '../3d/corePassage.js';
 
 // Keep the WORM network readable throughout a ride. The occupied lane is
 // highlighted; all other possible routes keep their normal idle brightness.
@@ -415,10 +416,12 @@ const MobiusTunnel = ({
     tunnelCorePoseInto(_midB, coreZoom, tunnelState.coreZoomAnchor);
     tunnelCorePoseInto(_coreCenter.set(0, 0, 0), coreZoom, tunnelState.coreZoomAnchor);
 
-    // Unoccupied bands follow the enlarged core; occupied bands keep the same
-    // width as well as the same route until their last body segment clears.
+    // Unoccupied bands follow the enlarged core. Occupied bands keep their route
+    // until the last body segment clears; the one being ridden widens with the
+    // opening it dives into, so it fills the hole instead of entering as a sliver.
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
-    const dockW = tunnelDockWidth(state.size) * coreZoom;
+    const dockW = isActive && wormMode ? coreOpeningBandWidth(state.size, tunnelState.coreZoom ?? 1)
+      : tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
 
     const moved = tileFlipping ||
