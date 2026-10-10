@@ -290,16 +290,19 @@ export default function WormChaseCamera({ worm, size }) {
         const fall = worm.cautionFall?.current;
         tunnelState.fallOpening = fall ?? null;
         if (fall) {
-            // Stay outside, framing the approach AND taped opening. Fit the
-            // narrower viewport dimension so the phone shot cannot crop the tug.
+            // First frame the approach, then look straight down the opening.
+            // An oblique surface shot hides a deep fall behind the tile's lip.
             tunnelState.active = false;
             const shot = fallCamera.current;
             const halfFov = THREE.MathUtils.degToRad(camera.fov) / 2;
             const narrowFov = Math.min(halfFov, Math.atan(Math.tan(halfFov) * camera.aspect));
             const radius = fall.start.distanceTo(fall.mouth) * 0.5 + 0.8;
             const distance = radius / Math.sin(narrowFov * 0.85);
-            shot.target.lerpVectors(fall.start, fall.mouth, 0.5);
-            shot.direction.copy(fall.normal).multiplyScalar(0.9).addScaledVector(fall.approach, -0.5).normalize();
+            const peek = THREE.MathUtils.smoothstep(fall.elapsed, 0.2, 1.15);
+            shot.target.lerpVectors(fall.start, fall.mouth, 0.5 + peek * 0.5)
+                .addScaledVector(fall.normal, -fall.depth * 0.3 * peek);
+            shot.direction.copy(fall.normal).multiplyScalar(0.9)
+                .addScaledVector(fall.approach, -0.5 * (1 - peek)).normalize();
             shot.position.copy(shot.target).addScaledVector(shot.direction, distance);
             const blend = 1 - Math.exp(-Math.min(delta, 0.05) * 8);
             camera.position.lerp(shot.position, blend);

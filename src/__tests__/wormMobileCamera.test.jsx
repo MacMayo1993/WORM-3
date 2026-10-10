@@ -16,6 +16,7 @@ import { TUNNEL_CAM_NEAR } from '../worm/tunnelCameraRails.js';
 import { WORM_PAD_HEIGHT, wormRaisedAmount } from '../game/raisedCubie.js';
 import { makeCautionFall, cautionFallPoint, CAUTION_FALL_SECONDS } from '../worm/healerWorm/cautionRescue.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import { CAUTION_OPENING_RADIUS } from '../worm/healerWorm/cautionOpening.js';
 
 const scene = vi.hoisted(() => ({ frame: null, camera: null, size: null, mobile: true }));
 vi.mock('@react-three/fiber', () => ({
@@ -103,6 +104,17 @@ it.each([[412, 915], [915, 412], [1280, 800]])('keeps the caution-tape pull in v
         expect(ndc.z).toBeLessThan(1);
       }
       expect(scene.camera.position.clone().sub(fall.mouth).dot(fall.normal)).toBeGreaterThan(0.5);
+      if (fall.elapsed >= 1.6) {
+        // On-screen is insufficient: the sightline to the falling head must
+        // pass through the small bore rather than through the opaque tile lip.
+        const ray = worm.headInterpPos.current.clone().sub(scene.camera.position);
+        for (const height of [0, 0.655]) {
+          const plane = fall.mouth.clone().addScaledVector(fall.normal, height);
+          const distance = plane.clone().sub(scene.camera.position).dot(fall.normal) / ray.dot(fall.normal);
+          const radial = scene.camera.position.clone().addScaledVector(ray, distance).sub(plane).projectOnPlane(fall.normal);
+          expect(radial.length()).toBeLessThan(CAUTION_OPENING_RADIUS - 0.16);
+        }
+      }
     }
     expect(tunnelState.fallOpening).toBe(fall);
     const held = scene.camera.position.clone();

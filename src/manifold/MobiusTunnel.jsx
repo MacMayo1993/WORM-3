@@ -27,6 +27,7 @@ import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
+import { makeCautionOpeningUniforms, syncCautionOpening } from '../worm/healerWorm/cautionOpening.js';
 
 // Keep the WORM network readable throughout a ride. The occupied lane is
 // highlighted; all other possible routes keep their normal idle brightness.
@@ -292,6 +293,7 @@ const MobiusTunnel = ({
   }), []);
 
   // Keep uniform objects stable; endpoint changes update colors in place.
+  const cautionUniforms = useMemo(() => makeCautionOpeningUniforms(), []);
   const uniforms = useMemo(() => ({
     uColorA:      { value: new THREE.Color(color1) },
     uColorB:      { value: new THREE.Color(color2) },
@@ -310,6 +312,7 @@ const MobiusTunnel = ({
     uSolitonProgress: { value: -1.0 },
     uSolitonAmp:      { value: 0.0 },
     ...tunnelCoreClipUniforms,
+    ...cautionUniforms,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -322,6 +325,7 @@ const MobiusTunnel = ({
     uCameraClearance: uniforms.uCameraClearance,
     uGrowT: uniforms.uGrowT,
     ...tunnelCoreClipUniforms,
+    ...cautionUniforms,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -334,6 +338,7 @@ const MobiusTunnel = ({
     uCameraClearance: uniforms.uCameraClearance,
     uGrowT: uniforms.uGrowT,
     ...tunnelCoreClipUniforms,
+    ...cautionUniforms,
     ...whipUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -357,6 +362,7 @@ const MobiusTunnel = ({
 
   useFrame((_state, delta) => {
     const state = useGameStore.getState();
+    syncCautionOpening(cautionUniforms, wormMode ? tunnelState.fallOpening : null);
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
     // All active connections remain in the interior highway. The shader clears
     // only fragments near the lens instead of removing whole alternate routes.

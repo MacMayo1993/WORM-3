@@ -104,7 +104,7 @@ export function readWormPractice(sim, practice, lesson, state, size, delta) {
       // Observing this one intentional death is the goal. Never unlock Next
       // at timeout: let the real simulation, camera and dissolve finish first.
       done = !sim.alive && state.wormDeathDetails?.reason === 'caution-fall' && sim.cautionFall?.dissolve === 1;
-      progress = sim.cautionFall ? 'Watch the worm pull through the tape and dissolve'
+      progress = sim.cautionFall ? 'Watch the worm fall into the cube, then dissolve'
         : sim.cautionRescue ? 'Watch the one-second rescue timer run out' : 'Approaching the taped edge…';
       break;
     case 'caution-rescue':

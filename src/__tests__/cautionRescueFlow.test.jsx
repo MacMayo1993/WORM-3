@@ -82,7 +82,7 @@ it('ignores held Space, then shows falling before death and clears it on retry',
   expect(state().wormPhase).toBe('falling');
   expect(state().wormAlive).toBe(true);
   expect(host.querySelector('[role="alert"]')).toBeNull();
-  for (let i=0; i<120; i++) frame();
+  for (let i=0; i<220; i++) frame();
   expect(state().wormDeathDetails).toMatchObject({reason:'caution-fall'});
   expect(state().wormAlive).toBe(false);
   act(() => state().initWormMode());

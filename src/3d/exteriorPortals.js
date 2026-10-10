@@ -4,12 +4,14 @@ import { makeTunnelPath, tunnelPathArcPointInto } from '../utils/tunnelPath.js';
 import { buildTunnelPathForTunnel } from '../worm/wormLogic.js';
 import { interiorPortalFrameInto, INTERIOR_PORTAL_RADIUS } from '../worm/healerWorm/interiorPortals.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
+import { CAUTION_OPENING_RADIUS, CAUTION_OPENING_TOP } from '../worm/healerWorm/cautionOpening.js';
 
 const SAMPLES = 9;
 // Bore through the lifted tile, plastic underside and resting shell, using
 // exactly the same circular radius as the inner entry/exit mouths.
 export const exteriorPortalGLSL = `
 uniform float uExteriorOpen;
+uniform float uExteriorRadius;
 uniform vec3 uExteriorPoints[${SAMPLES * 2}];
 float portalDistance(vec3 point) {
   if (uExteriorOpen < 0.5) return 1000.0;
@@ -27,7 +29,7 @@ float portalDistance(vec3 point) {
     radial = offset - edge * clamp(dot(offset, edge) / max(dot(edge, edge), 0.000001), 0.0, 1.0);
     distanceSq = min(distanceSq, dot(radial, radial));
   }
-  return sqrt(distanceSq) - ${INTERIOR_PORTAL_RADIUS};
+  return sqrt(distanceSq) - uExteriorRadius;
 }`;
 
 // A program is keyed by its source, never by uniform values, so a copy patched
@@ -35,7 +37,7 @@ float portalDistance(vec3 point) {
 // warm-up compiles such copies of the effects that only mount when a tile flips;
 // unpatched copies were warming programs the cube never uses, and the first flip
 // of a run linked two dozen programs in one frame.
-const warmupUniforms = { uExteriorOpen: { value: 0 },
+const warmupUniforms = { uExteriorOpen: { value: 0 }, uExteriorRadius: { value: INTERIOR_PORTAL_RADIUS },
   uExteriorPoints: { value: Array.from({ length: SAMPLES * 2 }, () => new THREE.Vector3()) } };
 export function exteriorPortalWarmupMaterial(source) {
   const material = source.clone();
@@ -44,7 +46,7 @@ export function exteriorPortalWarmupMaterial(source) {
 }
 
 export function createExteriorPortals() {
-  const uniforms = { uExteriorOpen: { value: 0 },
+  const uniforms = { uExteriorOpen: { value: 0 }, uExteriorRadius: { value: INTERIOR_PORTAL_RADIUS },
     uExteriorPoints: { value: Array.from({ length: SAMPLES * 2 }, () => new THREE.Vector3()) } };
   const path = makeTunnelPath(), center = new THREE.Vector3(), axis = new THREE.Vector3();
   const materials = new Map(), owned = new Set(), originals = new Map();
@@ -100,6 +102,7 @@ export function createExteriorPortals() {
     },
     update(tunnel, size, expansion, fall = null) {
       uniforms.uExteriorOpen.value = tunnel || fall ? 1 : 0;
+      uniforms.uExteriorRadius.value = fall ? CAUTION_OPENING_RADIUS : INTERIOR_PORTAL_RADIUS;
       if (fall) {
         if (snapshot?.fall === fall) return;
         snapshot = { fall };
@@ -107,7 +110,7 @@ export function createExteriorPortals() {
         // it into both shader slots so no unrelated exit tile opens up.
         for (let side = 0; side < 2; side++) for (let i = 0; i < SAMPLES; i++) {
           uniforms.uExteriorPoints.value[side * SAMPLES + i].copy(fall.mouth)
-            .addScaledVector(fall.normal, THREE.MathUtils.lerp(0.8, -fall.depth - 0.3, i / (SAMPLES - 1)));
+            .addScaledVector(fall.normal, THREE.MathUtils.lerp(CAUTION_OPENING_TOP, -fall.depth - 0.3, i / (SAMPLES - 1)));
         }
         return;
       }
