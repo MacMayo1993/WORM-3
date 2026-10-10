@@ -19,7 +19,7 @@ import CubeAssembly from './CubeAssembly.jsx';
 import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import NebulaEnvironment from './NebulaEnvironment.jsx';
 import { BACKGROUNDS, getBackgroundUrl, STORY_ENVIRONMENTS } from '../utils/backgrounds.js';
-import LayerHighlight from '../teach/LayerHighlight.jsx';
+import TurnGuide from '../teach/TurnGuide.jsx';
 import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
@@ -305,22 +305,26 @@ export default function GameScene({
         />
 
         {teachModeActive && layerHighlight && (
-          <LayerHighlight
+          <TurnGuide
             axis={layerHighlight.axis}
             sliceIndex={layerHighlight.sliceIndex}
             dir={layerHighlight.dir}
             size={size}
+            reduced={isMobile || perfReducedFX || size > 7}
+            turning={!!animState}
           />
         )}
 
         {/* The demo's learn-to-solve cameo drives the same store channel as the
             Solve panel, without mounting the panel itself. */}
         {(solveModeActive || demoLearnGuide) && kociembaLayerHighlight && (
-          <LayerHighlight
+          <TurnGuide
             axis={kociembaLayerHighlight.axis}
             sliceIndex={kociembaLayerHighlight.sliceIndex}
             dir={kociembaLayerHighlight.dir}
             size={size}
+            reduced={isMobile || perfReducedFX || size > 7}
+            turning={!!animState}
           />
         )}
 
