@@ -28,6 +28,8 @@ import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 import { makeCautionOpeningUniforms, syncCautionOpening } from '../worm/healerWorm/cautionOpening.js';
+import { makeTunnelEnergyUniforms, tunnelEnergySeed } from './tunnelEnergy.js';
+import { coreOpeningBandWidth } from '../3d/corePassage.js';
 
 // Keep the WORM network readable throughout a ride. The occupied lane is
 // highlighted; all other possible routes keep their normal idle brightness.
@@ -92,12 +94,14 @@ const _surge         = { active: false, front: 0, glow: 0, arrived: false };
  * arm, so |2t − 1| is how far along the arm from the dock it is).
  * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
+// Each exposed arm owns half the ribbon parameter, but not half the route length.
+// Compute before Float32 UV storage rounds the distinct exit dock to 0.5.
+const ribbonArcAt = (path, t) => (t <= 0.5 ? t * 2 * path.armALen : path.total - (1 - t) * 2 * path.armBLen);
+
 function fillRibbon(posArray, uvArray, distanceArray, path, axis, perpStart, segs, mouthW, dockW, guard, flipP1 = 0, flipP2 = 0) {
   for (let i = 0; i <= segs; i++) {
     const t = tunnelRibbonSampleU(i, segs);
-    // Each exposed arm owns half the UV range, but not half the route length.
-    // Compute before Float32 UV storage rounds the distinct exit dock to 0.5.
-    const arc = t <= 0.5 ? t * 2 * path.armALen : path.total - (1 - t) * 2 * path.armBLen;
+    const arc = ribbonArcAt(path, t);
     // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
     let w       = 0.5 * tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW) * flipWidthPulse(t, flipP1, flipP2);
 
@@ -129,7 +133,8 @@ function fillRibbon(posArray, uvArray, distanceArray, path, axis, perpStart, seg
 }
 
 /**
- * Fill left and right bumper geometry buffers, including aTripFrac (t along ribbon).
+ * Fill left and right bumper geometry buffers, including aTripFrac (t along ribbon)
+ * and aDistance (arc length from tile A, matching the spine's).
  *
  * Each bumper is a thin wall that rises from a ribbon edge in the direction of the
  * ribbon's surface normal (= segTangent × perpCurrent).  Because perpCurrent rotates
@@ -138,11 +143,12 @@ function fillRibbon(posArray, uvArray, distanceArray, path, axis, perpStart, seg
  * demonstrating RP2 non-orientability.
  */
 function fillBumpers(
-  leftPosArr, rightPosArr, leftHFArr, rightHFArr, leftTFArr, rightTFArr,
+  leftPosArr, rightPosArr, leftHFArr, rightHFArr, leftTFArr, rightTFArr, leftDistArr, rightDistArr,
   path, axis, perpStart, segs, mouthW, dockW, guard
 ) {
   for (let i = 0; i <= segs; i++) {
     const t = tunnelRibbonSampleU(i, segs);
+    const arc = ribbonArcAt(path, t);
     const gauge = tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW);
     let w       = gauge / 2;
     let bh      = RAIL_RATIO * gauge;
@@ -204,6 +210,7 @@ function fillBumpers(
     rightHFArr[base]           = 0;   rightTFArr[base]            = t;
     rightPosArr[(base+1)*3]    = rtx; rightPosArr[(base+1)*3 + 1] = rty; rightPosArr[(base+1)*3 + 2] = rtz;
     rightHFArr[base + 1]       = 1;   rightTFArr[base + 1]        = t;
+    leftDistArr[base] = leftDistArr[base + 1] = rightDistArr[base] = rightDistArr[base + 1] = arc;
   }
 }
 
@@ -227,17 +234,28 @@ function createRibbonGeos(segs, continuous = false) {
   geo.setAttribute('aDistance', new THREE.BufferAttribute(new Float32Array(vertCount), 1));
   geo.setIndex(mainIndices);
 
-  // Bumper geometries — include aTripFrac (t along ribbon) for the flip-point highlight
-  function makeBumperGeo() {
-    const bg = new THREE.BufferGeometry();
-    bg.setAttribute('position',    new THREE.BufferAttribute(new Float32Array(vertCount * 3), 3));
-    bg.setAttribute('aHeightFrac', new THREE.BufferAttribute(new Float32Array(vertCount),     1));
-    bg.setAttribute('aTripFrac',   new THREE.BufferAttribute(new Float32Array(vertCount),     1));
-    bg.setIndex([...bumpIndices]);
+  // Both rails are drawn as ONE mesh (one draw, one material) over shared
+  // buffers; leftGeo/rightGeo are the CPU-side halves the fills write into, views
+  // onto the same memory, so the route code keeps addressing each rail on its own.
+  const railGeo = new THREE.BufferGeometry();
+  const railPos = new Float32Array(vertCount * 2 * 3);
+  const railHeight = new Float32Array(vertCount * 2), railTrip = new Float32Array(vertCount * 2);
+  const railDistance = new Float32Array(vertCount * 2);
+  railGeo.setAttribute('position',    new THREE.BufferAttribute(railPos, 3));
+  railGeo.setAttribute('aHeightFrac', new THREE.BufferAttribute(railHeight, 1));
+  railGeo.setAttribute('aTripFrac',   new THREE.BufferAttribute(railTrip, 1));
+  railGeo.setAttribute('aDistance',   new THREE.BufferAttribute(railDistance, 1));
+  railGeo.setIndex([...bumpIndices, ...bumpIndices.map(i => i + vertCount)]);
+  function railHalf(side) {
+    const start = side * vertCount, bg = new THREE.BufferGeometry();
+    bg.setAttribute('position',    new THREE.BufferAttribute(railPos.subarray(start * 3, (start + vertCount) * 3), 3));
+    bg.setAttribute('aHeightFrac', new THREE.BufferAttribute(railHeight.subarray(start, start + vertCount), 1));
+    bg.setAttribute('aTripFrac',   new THREE.BufferAttribute(railTrip.subarray(start, start + vertCount), 1));
+    bg.setAttribute('aDistance',   new THREE.BufferAttribute(railDistance.subarray(start, start + vertCount), 1));
     return bg;
   }
 
-  return { geo, leftGeo: makeBumperGeo(), rightGeo: makeBumperGeo() };
+  return { geo, leftGeo: railHalf(0), rightGeo: railHalf(1), railGeo };
 }
 
 /**
@@ -280,7 +298,7 @@ const MobiusTunnel = ({
   const lastDockARef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastDockBRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
 
-  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(segments, ribbonMode), [segments, ribbonMode]);
+  const { geo, leftGeo, rightGeo, railGeo } = useMemo(() => createRibbonGeos(segments, ribbonMode), [segments, ribbonMode]);
   const veilGeo = useMemo(() => detailed ? makeTunnelVeil(segments, ribbonMode) : null, [segments, ribbonMode, detailed]);
 
   // Whip uniforms are created once and spread BY REFERENCE into the ribbon and
@@ -291,6 +309,10 @@ const MobiusTunnel = ({
     uWhipAmp:   { value: 0.0 },
     uWhipPhase: { value: 0.0 },
   }), []);
+
+  // The band's charge (tunnelEnergy.js), shared by reference with rails and veil.
+  const energyUniforms = useMemo(() => makeTunnelEnergyUniforms(), []);
+  energyUniforms.uEnergySeed.value = tunnelEnergySeed(tunnelId ?? gridId1 ?? '');
 
   // Keep uniform objects stable; endpoint changes update colors in place.
   const cautionUniforms = useMemo(() => makeCautionOpeningUniforms(), []);
@@ -314,9 +336,10 @@ const MobiusTunnel = ({
     ...tunnelCoreClipUniforms,
     ...cautionUniforms,
     ...whipUniforms,
+    ...energyUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const bumperUniformsL = useMemo(() => ({
+  const railUniforms = useMemo(() => ({
     uColorA: uniforms.uColorA,
     uColorB: uniforms.uColorB,
     uRideCore: uniforms.uRideCore,
@@ -324,22 +347,11 @@ const MobiusTunnel = ({
     uRideMode: uniforms.uRideMode,
     uCameraClearance: uniforms.uCameraClearance,
     uGrowT: uniforms.uGrowT,
+    uTime: uniforms.uTime,
     ...tunnelCoreClipUniforms,
     ...cautionUniforms,
     ...whipUniforms,
-  }), []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const bumperUniformsR = useMemo(() => ({
-    uColorA: uniforms.uColorA,
-    uColorB: uniforms.uColorB,
-    uRideCore: uniforms.uRideCore,
-    uOpacity: { value: 0.93 },
-    uRideMode: uniforms.uRideMode,
-    uCameraClearance: uniforms.uCameraClearance,
-    uGrowT: uniforms.uGrowT,
-    ...tunnelCoreClipUniforms,
-    ...cautionUniforms,
-    ...whipUniforms,
+    ...energyUniforms,
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -348,13 +360,13 @@ const MobiusTunnel = ({
     const cB = dead ? '#444444' : color2;
     uniforms.uColorA.value.set(cA);
     uniforms.uColorB.value.set(cB);
-  }, [color1, color2, flips, flipCap, uniforms, bumperUniformsL, bumperUniformsR]);
+  }, [color1, color2, flips, flipCap, uniforms]);
 
   useEffect(() => {
     lastStartRef.current.set(Infinity, Infinity, Infinity);
-    const g = geo, lg = leftGeo, rg = rightGeo;
-    return () => { g.dispose(); lg.dispose(); rg.dispose(); };
-  }, [geo, leftGeo, rightGeo]);
+    const g = geo, lg = leftGeo, rg = rightGeo, rl = railGeo;
+    return () => { g.dispose(); lg.dispose(); rg.dispose(); rl.dispose(); };
+  }, [geo, leftGeo, rightGeo, railGeo]);
   useEffect(() => {
     lastStartRef.current.set(Infinity, Infinity, Infinity);
     return () => veilGeo?.dispose();
@@ -412,10 +424,12 @@ const MobiusTunnel = ({
     tunnelCorePoseInto(_midB, coreZoom, tunnelState.coreZoomAnchor);
     tunnelCorePoseInto(_coreCenter.set(0, 0, 0), coreZoom, tunnelState.coreZoomAnchor);
 
-    // Unoccupied bands follow the enlarged core; occupied bands keep the same
-    // width as well as the same route until their last body segment clears.
+    // Unoccupied bands follow the enlarged core. Occupied bands keep their route
+    // until the last body segment clears; the one being ridden widens with the
+    // opening it dives into, so it fills the hole instead of entering as a sliver.
     const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
-    const dockW = tunnelDockWidth(state.size) * coreZoom;
+    const dockW = isActive && wormMode ? coreOpeningBandWidth(state.size, tunnelState.coreZoom ?? 1)
+      : tunnelDockWidth(state.size) * coreZoom;
     const mouthW = wormMode ? TUNNEL_RIDE_WIDTH : tunnelMouthWidth(state.size);
 
     const moved = tileFlipping ||
@@ -437,6 +451,7 @@ const MobiusTunnel = ({
       // core tiles beneath them, crossing through the centre. Everything below sweeps this.
       buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _midA, _midB, _coreCenter);
       uniforms.uPatternRepeats.value = _tunnelPath.total / mouthW;
+      energyUniforms.uTunnelLength.value = _tunnelPath.total || 1;
       uniforms.uTileCenterA.value.copy(_wPos1);
       uniforms.uTileCenterB.value.copy(_wPos2);
 
@@ -479,6 +494,8 @@ const MobiusTunnel = ({
           rightGeo.attributes.aHeightFrac.array,
           leftGeo.attributes.aTripFrac.array,
           rightGeo.attributes.aTripFrac.array,
+          leftGeo.attributes.aDistance.array,
+          rightGeo.attributes.aDistance.array,
           _tunnelPath,
           _axis, _perpBase,
           RIBBON_SEGS, mouthW, dockW, _tileGuard
@@ -489,12 +506,11 @@ const MobiusTunnel = ({
       geo.attributes.aDistance.needsUpdate = true;
       geo.computeVertexNormals();
       if (veilGeo) fillTunnelVeil(veilGeo, geo, leftGeo, _tunnelPath, segments, _tileGuard);
-      leftGeo.attributes.position.needsUpdate    = true;
-      leftGeo.attributes.aHeightFrac.needsUpdate  = true;
-      leftGeo.attributes.aTripFrac.needsUpdate    = true;
-      rightGeo.attributes.position.needsUpdate   = true;
-      rightGeo.attributes.aHeightFrac.needsUpdate = true;
-      rightGeo.attributes.aTripFrac.needsUpdate   = true;
+      // The halves are views onto the drawn rail's buffers: upload those.
+      railGeo.attributes.position.needsUpdate    = true;
+      railGeo.attributes.aHeightFrac.needsUpdate = true;
+      railGeo.attributes.aTripFrac.needsUpdate   = true;
+      railGeo.attributes.aDistance.needsUpdate   = true;
     }
 
     // Dim system:
@@ -514,9 +530,15 @@ const MobiusTunnel = ({
 
     // Subtle opacity pulse, scaled by dim factor
     pulseT.current += delta * 1.5;
-    uniforms.uOpacity.value        = (0.90 + Math.sin(pulseT.current) * 0.04) * dim;
-    bumperUniformsL.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
-    bumperUniformsR.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
+    uniforms.uOpacity.value     = (0.90 + Math.sin(pulseT.current) * 0.04) * dim;
+    railUniforms.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
+
+    // The charge recedes with the band when another tunnel is being ridden, and
+    // eases while the lens is inside this one, so it never fights the worm.
+    energyUniforms.uEnergyGain.value = openness * (isActive ? 0.6 : Math.min(1, dimRef.current / WORM_IDLE_OPACITY));
+    // Drawn to the flipped tile: the rebound runs to the mouths on flipped tiles.
+    const anyFlipped = active1 || active2;
+    energyUniforms.uEnergyDrawn.value.set(active1 || !anyFlipped ? 1 : 0, active2 || !anyFlipped ? 1 : 0);
 
     // Tunnel birth: grow-in from both portal ends toward centre (first flip only)
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
@@ -627,24 +649,10 @@ const MobiusTunnel = ({
         <TunnelTileSurface geometry={geo} style={style2} color={color2} antiColor={color1} uniforms={uniforms} side={1} rideMode={ribbonMode} />
       </>}
 
-      {/* Both WORM rails follow the strip's endpoint colors through the core. */}
-      <mesh geometry={leftGeo} frustumCulled={false}>
+      {/* Both rails in one draw; they follow the strip's endpoint colors through the core. */}
+      <mesh name="tunnel-rails" geometry={railGeo} frustumCulled={false}>
         <shaderMaterial
-          uniforms={bumperUniformsL}
-          vertexShader={bumperVertexShader}
-          fragmentShader={bumperFragmentShader}
-          extensions={{ derivatives: true }}
-          side={THREE.DoubleSide}
-          transparent={!ribbonMode}
-          depthWrite={ribbonMode}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* Right guard rail */}
-      <mesh geometry={rightGeo} frustumCulled={false}>
-        <shaderMaterial
-          uniforms={bumperUniformsR}
+          uniforms={railUniforms}
           vertexShader={bumperVertexShader}
           fragmentShader={bumperFragmentShader}
           extensions={{ derivatives: true }}

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { tunnelFinishGLSL } from './tunnelFinish.js';
 import { tunnelCameraClearanceGLSL } from './tunnelCameraClearance.js';
 import { veilVertexShader, veilFragmentShader } from './tunnelRibbonVeil.js';
+import { tunnelEnergyGLSL } from './tunnelEnergy.js';
 
 // Vertex shader: pass UV + world position through to fragment.
 // vWorldPos feeds the fresnel silhouette glow (needs a view direction).
@@ -64,6 +65,7 @@ export const fragmentShader = `
   varying vec3 vWorldPos, vSurfaceNormal;
   ${tunnelFinishGLSL}
   ${tunnelCameraClearanceGLSL}
+  ${tunnelEnergyGLSL}
   void main() {
     clearTunnelCamera(vWorldPos);
     float leftFront = uGrowT * 0.5, rightFront = 1.0 - leftFront;
@@ -71,7 +73,12 @@ export const fragmentShader = `
     float core = uRideMode > 0.5 ? uRideCore : 0.5;
     float aa = max(fwidth(vUv.y), 0.00001);
     vec3 base = mix(uColorA, uColorB, smoothstep(core - aa, core + aa, vUv.y));
+    // Opposite charges: each half leans toward its partner's colour at the core.
+    float bleed;
+    vec3 energy = tunnelEnergy(vUv.y, core, vUv.x, vDistance, uTime, uColorA, uColorB, bleed);
+    base = mix(base, vUv.y < core ? uColorB : uColorA, bleed * 0.5);
     vec3 color = tunnelSatin(base, vSurfaceNormal, normalize(cameraPosition - vWorldPos), vUv, vDistance, uTime);
+    color += energy;
     float pulse = exp(-pow((vUv.y - uSolitonProgress) / 0.055, 2.0)) * uSolitonAmp;
     float idle = min(abs(vUv.y - uIdlePadProgress), abs(vUv.y - (1.0 - uIdlePadProgress)));
     pulse += exp(-pow(idle / 0.055, 2.0)) * uIdlePadAmp;
@@ -92,13 +99,16 @@ export const bumperVertexShader = `
 
   attribute float aHeightFrac;
   attribute float aTripFrac;
+  attribute float aDistance;
   varying  float vHeightFrac;
   varying  float vTripFrac;
+  varying  float vDistance;
   varying vec3 vCameraPoint;
 
   void main() {
     vHeightFrac = aHeightFrac;
     vTripFrac   = aTripFrac;
+    vDistance   = aDistance;
 
     // Same whip displacement as the ribbon, driven by the SAME uniform objects
     // (shared by reference below) — otherwise the guard rails would stay put
@@ -117,17 +127,24 @@ export const bumperVertexShader = `
 // Pearly lips follow the same half-twist and endpoint colors as the spine.
 export const bumperFragmentShader = `
   uniform vec3 uColorA, uColorB;
-  uniform float uRideCore, uOpacity, uRideMode, uGrowT;
-  varying float vHeightFrac, vTripFrac;
+  uniform float uRideCore, uOpacity, uRideMode, uGrowT, uTime;
+  varying float vHeightFrac, vTripFrac, vDistance;
   varying vec3 vCameraPoint;
   ${rideColorShader}
   ${tunnelCameraClearanceGLSL}
+  ${tunnelEnergyGLSL}
   void main() {
     clearTunnelCamera(vCameraPoint);
     if (vTripFrac > uGrowT * 0.5 && vTripFrac < 1.0 - uGrowT * 0.5) discard;
     vec3 base = rideColor(vTripFrac);
     vec3 lip = mix(base, vec3(0.9, 0.96, 1.0), 0.38);
     vec3 color = mix(base * 0.6, lip * 0.9, smoothstep(0.4, 1.0, vHeightFrac));
+    // The rails are the field's conduits: the same charge, carried a little hotter.
+    // vTripFrac is not arc length off the ride (each arm owns half of it), so the
+    // chevrons read the same arc distance as the spine they run beside.
+    float bleed;
+    float core = uRideMode > 0.5 ? uRideCore : 0.5;
+    color += tunnelEnergy(vTripFrac, core, 0.5, vDistance, uTime, uColorA, uColorB, bleed) * 1.35;
     gl_FragColor = vec4(color, uRideMode > 0.5 ? 1.0 : uOpacity * 0.85);
     #include <colorspace_fragment>
   }

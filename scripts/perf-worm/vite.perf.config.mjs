@@ -16,6 +16,12 @@ export default {
         if (id.endsWith('/src/game/cubeState.js')) return `${code}\nwindow.__perfMakeCubies = makeCubies;\n`;
         if (id.endsWith('/src/game/manifoldLogic.js')) return `${code}\nwindow.__perfTopology = { buildManifoldGridMap, flipStickerPair };\n`;
         if (id.endsWith('/src/worm/wormExpansion.js')) return `${code}\nwindow.__wormExpansion = wormExpansion;\n`;
+        // Ride probes: the bridge, the live sim and its context, and a way into a tunnel.
+        if (id.endsWith('/src/worm/tunnelProgressBridge.js')) return `${code}\nwindow.__tunnelState = tunnelState;\n`;
+        if (id.endsWith('/src/worm/healerWorm/wormSim.js')) return `${code}\nwindow.__beginTunnelTransition = beginTunnelTransition;\n`;
+        if (id.endsWith('/src/worm/useWormCrawler.js')) {
+          return code.replace('const ctxRef = useRef(null);', 'const ctxRef = useRef(null); window.__wormSimRef = simRef; window.__wormCtxRef = ctxRef;');
+        }
         if (!id.endsWith('/src/hooks/useGameStore.js')) return null;
         return `${code}\nif (typeof window !== 'undefined') window.__store = useGameStore;\n`;
       }

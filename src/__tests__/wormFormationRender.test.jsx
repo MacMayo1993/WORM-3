@@ -14,6 +14,9 @@ import { WORM_PIECE_POP, WORM_PAD_HEIGHT, WORM_PLATFORM_LANDING_HEIGHT, wormRais
 import { makeTunnelCenterline, buildTunnelCenterlineInto, getWindWorldPosInto } from '../worm/wormLogic.js';
 import { makeTunnelRideFrame, tunnelRideFrameInto } from '../utils/tunnelRide.js';
 import { raisedPortalPosition } from '../worm/raisedPortalPosition.js';
+import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import { tunnelDockWidth } from '../utils/tunnelPath.js';
+import { coreOpeningBandWidth } from '../3d/corePassage.js';
 import { makeWormSim, resetWormSim, startJump, stepWormSim } from '../worm/healerWorm/wormSim.js';
 vi.mock('../3d/StickerPlane.jsx', () => ({ default: () => null }));
 extend(THREE);
@@ -53,7 +56,7 @@ it.each([false, true])('raises real cubies, grows the band and lands after forma
     expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeLessThan(1.001);
     const materials = [];
     store.getState().scene.traverse(o => { if (o.material?.uniforms?.uGrowT) materials.push(o.material); });
-    expect(materials).toHaveLength(4); // Spine, two lips, and one open veil.
+    expect(materials).toHaveLength(3); // Spine, both lips in one draw, and one open veil.
     for (const material of materials) expect(material.uniforms.uGrowT).toBe(materials[0].uniforms.uGrowT);
     expect(materials[0].uniforms.uGrowT.value).toBeLessThan(.02);
     const sim = makeWormSim(3); resetWormSim(sim, 3, { orbCount: 0, wormholeInterval: 9999 });
@@ -167,8 +170,23 @@ it('updates both endpoint colors and rails without moving or rebuilding the band
     store.getState().advance(1 / 60);
     const meshes = [];
     store.getState().scene.traverse(o => { if (o.material?.uniforms?.uRideCore) meshes.push(o); });
-    expect(meshes).toHaveLength(4); // The veil shares live colors without a geometry rebuild too.
+    expect(meshes).toHaveLength(3); // The veil shares live colors without a geometry rebuild too.
     const uniforms = meshes[0].material.uniforms;
+    // Spine, rails and veil share one charge, so the field moves as one band.
+    for (const mesh of meshes) {
+      expect(mesh.material.uniforms.uEnergyGain).toBe(uniforms.uEnergyGain);
+      expect(mesh.material.uniforms.uEnergySeed).toBe(uniforms.uEnergySeed);
+      expect(mesh.material.fragmentShader).toContain('tunnelEnergy(');
+    }
+    // Both lips are one draw: each rail's half of the merged buffer is filled.
+    const rails = meshes.find(o => o.name === 'tunnel-rails');
+    const railPos = rails.geometry.attributes.position, half = railPos.count / 2;
+    const span = from => new THREE.Box3().setFromBufferAttribute(
+      new THREE.BufferAttribute(railPos.array.subarray(from * 3, (from + half) * 3), 3)).getSize(new THREE.Vector3()).length();
+    expect(span(0)).toBeGreaterThan(0.5);
+    expect(span(half)).toBeGreaterThan(0.5);
+    expect(rails.geometry.index.count).toBeGreaterThan(0);
+    expect(Math.max(...rails.geometry.index.array)).toBeGreaterThanOrEqual(half);
     const versions = meshes.map(o => o.geometry.attributes.position.version);
     for (const mesh of meshes) {
       expect(mesh.material.uniforms.uColorA).toBe(uniforms.uColorA);
@@ -182,6 +200,94 @@ it('updates both endpoint colors and rails without moving or rebuilding the band
     expect(uniforms.uColorA.value.getHexString()).toBe('0051a2');
     expect(uniforms.uColorB.value.getHexString()).toBe('009b48');
     expect(meshes.map(o => o.geometry.attributes.position.version)).toEqual(versions);
+  } finally {
+    await act(async () => root.unmount()); useGameStore.setState(before, true);
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});
+
+it('widens the ridden band to the core opening without moving its route', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const before = useGameStore.getState(), bridge = { ...tunnelState };
+  useGameStore.setState({ wormHealerMode: true, demoMode: false, settings: { ...before.settings, reducedMotion: true } });
+  const refs = [new THREE.Object3D(), new THREE.Object3D()];
+  refs[0].position.set(-2, 0, 0); refs[1].position.set(2, 0, 0);
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas); root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
+  try {
+    let store;
+    await act(async () => { store = root.render(<MobiusTunnel meshIdx1={0} meshIdx2={1} dirKey1="NX" dirKey2="PX"
+      cubieRefs={refs} flips={1} color1="#3973e8" color2="#38c875" gridId1="a" gridId2="b" tunnelId="a|b" />); });
+    store.getState().advance(1 / 60);
+    let spine;
+    store.getState().scene.traverse(o => { if (o.material?.uniforms?.uGrowT && o.geometry.attributes.uv && !spine) spine = o; });
+    const read = () => {
+      const p = spine.geometry.attributes.position, mids = [];
+      let crossing = 0;
+      for (let i = 0; i < p.count; i += 2) {
+        const l = new THREE.Vector3().fromBufferAttribute(p, i), r = new THREE.Vector3().fromBufferAttribute(p, i + 1);
+        // Between the two docks the band keeps its dock width.
+        if (i / 2 === Math.floor(p.count / 4)) crossing = l.distanceTo(r);
+        mids.push(l.lerp(r, .5));
+      }
+      return { crossing, mids };
+    };
+    const size = useGameStore.getState().size, idle = read();
+    expect(idle.crossing).toBeCloseTo(tunnelDockWidth(size), 4);
+    Object.assign(tunnelState, { active: true, activeTunnelId: 'a|b', coreZoom: 4, coreZoomAnchor: new THREE.Vector3(-.2125, 0, 0) });
+    store.getState().advance(1 / 60);
+    const ridden = read();
+    expect(ridden.crossing).toBeCloseTo(coreOpeningBandWidth(size, 4), 4);
+    ridden.mids.forEach((mid, i) => expect(mid.distanceTo(idle.mids[i])).toBeLessThan(1e-6));
+  } finally {
+    Object.assign(tunnelState, bridge);
+    await act(async () => root.unmount()); useGameStore.setState(before, true);
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});
+
+it.each([false, true])('gives the rails the spine\'s arc distance on a lopsided tunnel (ride=%s)', async ride => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const before = useGameStore.getState();
+  useGameStore.setState({ wormHealerMode: ride, demoMode: false, size: 5,
+    settings: { ...before.settings, reducedMotion: true } });
+  // Two tiles at different distances from the core, so the arms differ in length.
+  const size = 5, k = (size - 1) / 2, cells = [{ x: 0, y: 2, z: 2, dirKey: 'NX' }, { x: 4, y: 4, z: 0, dirKey: 'PX' }];
+  const refs = [];
+  for (const c of cells) {
+    const mesh = new THREE.Object3D();
+    mesh.position.set(c.x - k, c.y - k, c.z - k);
+    refs[c.x * size * size + c.y * size + c.z] = mesh;
+  }
+  const index = c => c.x * size * size + c.y * size + c.z;
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas); root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
+  try {
+    let store;
+    await act(async () => { store = root.render(<MobiusTunnel meshIdx1={index(cells[0])} meshIdx2={index(cells[1])}
+      dirKey1="NX" dirKey2="PX" cubieRefs={refs} flips={1} color1="#3973e8" color2="#38c875" gridId1="a" gridId2="b" tunnelId="a|b" />); });
+    store.getState().advance(1 / 60);
+    let spine, rails;
+    store.getState().scene.traverse(o => {
+      if (o.name === 'tunnel-rails') rails = o;
+      else if (o.material?.uniforms?.uGrowT && o.geometry.attributes.uv && !spine) spine = o;
+    });
+    const spineArc = spine.geometry.attributes.aDistance.array;
+    const railArc = rails.geometry.attributes.aDistance.array, trip = rails.geometry.attributes.aTripFrac.array;
+    const half = railArc.length / 2, total = spineArc[spineArc.length - 1];
+    // The arms really are unequal: half the ribbon parameter is not half the route.
+    const mid = trip.findIndex(t => Math.abs(t - 0.5) < 1e-6);
+    if (!ride) expect(Math.abs(railArc[mid] - total / 2)).toBeGreaterThan(0.05);
+    for (let i = 0; i < half; i++) {
+      // Rail vertex i sits beside spine sample floor(i / 2), on both rails.
+      const arc = spineArc[Math.floor(i / 2) * 2];
+      expect(railArc[i]).toBeCloseTo(arc, 5);
+      expect(railArc[half + i]).toBeCloseTo(arc, 5);
+    }
   } finally {
     await act(async () => root.unmount()); useGameStore.setState(before, true);
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;

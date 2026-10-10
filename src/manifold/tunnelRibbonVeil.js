@@ -2,6 +2,7 @@ import { tunnelCameraClearanceGLSL } from './tunnelCameraClearance.js';
 import * as THREE from 'three';
 import { tileRoom } from './tunnelTileGuard.js';
 import { tunnelFinishGLSL } from './tunnelFinish.js';
+import { tunnelEnergyGLSL } from './tunnelEnergy.js';
 
 // Two open, curled sides swept from the existing ribbon edges. They inherit
 // its half-twist, never close into a tube, and add one draw to a focus tunnel.
@@ -104,6 +105,7 @@ export const veilFragmentShader = `
   varying vec3 vNormal;
   ${tunnelFinishGLSL}
   ${tunnelCameraClearanceGLSL}
+  ${tunnelEnergyGLSL}
   void main() {
     if (vUv.y > uGrowT * 0.5 && vUv.y < 1.0 - uGrowT * 0.5) discard;
     float core = uRideMode > 0.5 ? uRideCore : 0.5;
@@ -120,7 +122,12 @@ export const veilFragmentShader = `
     n /= max(length(n), 0.00001);
     float fresnel = pow(1.0 - abs(dot(n, normalize(cameraPosition - vWorldPos))), 2.0);
     vec3 color = base * 0.65 + pearl * (0.24 + ribs * 0.25 + spiral * 0.18 + rim * 0.2 + pulse * 0.3);
-    float alpha = (0.07 + ribs * 0.3 + spiral * 0.16 + rim * 0.32 + fresnel * 0.10 + pulse * 0.12)
+    // The curls are the field around the band: they light up as the charge passes.
+    float bleed;
+    vec3 energy = tunnelEnergy(vUv.y, core, vRibbonU, vDistance, uTime, uColorA, uColorB, bleed);
+    color += energy;
+    float alpha = (0.07 + ribs * 0.3 + spiral * 0.16 + rim * 0.32 + fresnel * 0.10 + pulse * 0.12
+      + dot(energy, vec3(0.3)) * 0.6)
       * uOpacity * vEnvelope * smoothstep(0.0, 0.12, vUv.x);
     alpha *= tunnelCameraVisibility(vWorldPos);
     if (alpha < 0.008) discard;

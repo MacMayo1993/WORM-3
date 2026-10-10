@@ -9,6 +9,10 @@ const LEG_SAMPLES = [0, 24, 8, 8, 24];
 export const CORE_PASSAGE_POINTS = 65;
 // Leave a narrow rim inside one displayed sticker, on every board size.
 export const coreOpeningRadius = (size, zoom = 1) => tunnelDockWidth(size) * zoom * .45;
+// The ridden band plugs into that opening as the core swells: it widens with the
+// hole (leaving a rim) instead of arriving as a sliver of the unzoomed tile, and
+// never narrows below its own tile's width. Width only — the route never moves.
+export const coreOpeningBandWidth = (size, zoom = 1) => Math.max(tunnelDockWidth(size), coreOpeningRadius(size, zoom) * 2 * .85);
 export const CORE_MIRROR_HALF = TUNNEL_MINI_FACE_R * 0.9;
 // Maximum face extent after zooming about any dock. Outer throats are always
 // beyond the core; omit them and crop long shoulders to this bounded region.
