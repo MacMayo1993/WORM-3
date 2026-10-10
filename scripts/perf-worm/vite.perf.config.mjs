@@ -18,6 +18,9 @@ export default {
         if (id.endsWith('/src/worm/wormExpansion.js')) return `${code}\nwindow.__wormExpansion = wormExpansion;\n`;
         // Ride probes: the bridge, the live sim and its context, and a way into a tunnel.
         if (id.endsWith('/src/worm/tunnelProgressBridge.js')) return `${code}\nwindow.__tunnelState = tunnelState;\n`;
+        if (id.endsWith('/src/worm/liveCubies.js')) return `${code}\nwindow.__liveCubies = liveCubies;\n`;
+        // Flip probes: the same flip a tap makes, without the pointer path.
+        if (id.endsWith('/src/hooks/useCubeState.js')) return code.replace(/\n {2}return \{\n/, '\n  if (typeof window !== "undefined") window.__flipSticker = flipSticker;\n  return {\n');
         if (id.endsWith('/src/worm/healerWorm/wormSim.js')) return `${code}\nwindow.__beginTunnelTransition = beginTunnelTransition;\n`;
         if (id.endsWith('/src/worm/useWormCrawler.js')) {
           return code.replace('const ctxRef = useRef(null);', 'const ctxRef = useRef(null); window.__wormSimRef = simRef; window.__wormCtxRef = ctxRef;');

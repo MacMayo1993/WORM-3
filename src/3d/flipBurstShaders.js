@@ -1,11 +1,18 @@
 // Original flip burst shaders, also used by the resident WORM warm-up.
 import * as THREE from 'three';
 
+// The chips are one InstancedMesh: each must be placed by its own instance matrix.
+// Without it every chip drew as the full 1x1 plane over the tile, a solid slab of
+// the new colour that hid the flip until it faded.
 export const particleVertex = `
   varying vec2 vUv;
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 local = vec4(position, 1.0);
+    #ifdef USE_INSTANCING
+      local = instanceMatrix * local;
+    #endif
+    gl_Position = projectionMatrix * modelViewMatrix * local;
   }
 `;
 
@@ -83,20 +90,24 @@ export const flashFragment = `
   uniform float uProgress; // 0 = birth (peak), 1 = spent (transparent)
   varying vec2 vUv;
 
+  // A glint, not a bloom: a small hot core and two thin streaks. A full-tile white
+  // bloom here read as the whole sticker flashing and broke the flip's motion.
+  float glint(vec2 q) {
+    float core = exp(-dot(q, q) / 0.0025);
+    float streaks = exp(-abs(q.y) * 90.0 - abs(q.x) * 5.0) + exp(-abs(q.x) * 90.0 - abs(q.y) * 5.0);
+    return core + streaks * 0.7;
+  }
+
   void main() {
     vec2 p = (vUv - 0.5) * 1.35;
     float fade = pow(1.0 - uProgress, 1.5);
 
     // Chromatic split: channels separate hard at birth, converge as it dissipates.
     float split = 0.11 * (1.0 - uProgress);
-    float rC = 1.0 - smoothstep(0.0, 0.58, length(p * (1.0 + split)));
-    float gC = 1.0 - smoothstep(0.0, 0.58, length(p));
-    float bC = 1.0 - smoothstep(0.0, 0.58, length(p * (1.0 - split)));
-
-    vec3 col = vec3(rC, gC, bC);
-    float a = fade * max(rC, max(gC, bC));
+    vec3 col = vec3(glint(p * (1.0 + split)), glint(p), glint(p * (1.0 - split)));
+    float a = fade * max(col.r, max(col.g, col.b)) * 0.85;
     if (a < 0.004) discard;
-    gl_FragColor = vec4(col * 1.9, clamp(a, 0.0, 1.0));
+    gl_FragColor = vec4(col * 1.6, clamp(a, 0.0, 1.0));
   }
 `;
 

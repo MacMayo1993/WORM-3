@@ -1,8 +1,10 @@
 // src/3d/AntipodalGlowFill.jsx
-// Antipodal glow fill — the crossing beat. An outer edge ring collapses inward
-// while a bright core fills outward, reading as the tile being drawn through the
-// manifold rather than merely recoloured. Sits under the shockwave, which throws
-// its ring the other way; together they read as "pulled in, punched out".
+// Antipodal glow fill — the crossing beat. Two thin rings of the new colour are
+// drawn in from the tile's rim toward its centre, reading as the tile being pulled
+// through the manifold rather than merely recoloured. Sits under the shockwave,
+// which throws its ring the other way; together they read as "pulled in, punched
+// out". Only lines move across the tile: it never fills with a flat wash, which
+// read as the whole sticker flashing one colour and broke the action.
 //
 // PASSIVE, like FlipShockwave/FlipFlash: this component owns no useFrame. Every
 // sticker on the cube mounts one (150 of them on a 5×5), so a per-instance frame
@@ -14,14 +16,12 @@ import React, { useRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 
 // Shared across every instance — no per-sticker geometry allocation.
-const _sharedOuterRingGeometry = new THREE.RingGeometry(0.4, 0.5, 16);
-const _sharedMainRingGeometry = new THREE.RingGeometry(0.2, 0.45, 16);
-const _sharedInnerCircleGeometry = new THREE.CircleGeometry(0.48, 16);
+const _sharedOuterRingGeometry = new THREE.RingGeometry(0.45, 0.5, 32);
+const _sharedMainRingGeometry = new THREE.RingGeometry(0.39, 0.45, 32);
 
 const AntipodalGlowFill = React.forwardRef((_props, ref) => {
   const groupRef = useRef();
   const ringRef = useRef();
-  const innerGlowRef = useRef();
   const outerRingRef = useRef();
 
   // Materials are per-instance (each tile fades on its own schedule) but are
@@ -34,23 +34,17 @@ const AntipodalGlowFill = React.forwardRef((_props, ref) => {
     color: '#ffffff', transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
   }));
-  const [innerMat] = React.useState(() => new THREE.MeshBasicMaterial({
-    color: '#ffffff', transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  }));
 
   React.useEffect(() => () => {
     outerMat.dispose();
     ringMat.dispose();
-    innerMat.dispose();
-  }, [outerMat, ringMat, innerMat]);
+  }, [outerMat, ringMat]);
 
   useImperativeHandle(ref, () => ({
     trigger(color) {
       if (color) {
         outerMat.color.set(color);
         ringMat.color.set(color);
-        innerMat.color.set(color);
       }
       if (groupRef.current) groupRef.current.visible = true;
     },
@@ -59,41 +53,33 @@ const AntipodalGlowFill = React.forwardRef((_props, ref) => {
       if (p >= 1) {
         outerMat.opacity = 0;
         ringMat.opacity = 0;
-        innerMat.opacity = 0;
         if (groupRef.current) groupRef.current.visible = false;
         return;
       }
       const snappy = 1 - Math.pow(1 - p, 3);
 
-      // Main ring collapses inward, pulsing as it goes.
+      // Main ring is drawn in from the rim, pulsing, and fades before it reaches
+      // the centre, so it stays a line and never piles up into a disc.
       if (ringRef.current) {
-        const ringScale = Math.max(0.01, 1 - snappy);
+        const ringScale = Math.max(0.01, 1 - snappy * 0.7);
         ringRef.current.scale.set(ringScale, ringScale, 1);
-        const glowPulse = Math.sin(p * Math.PI * 4) * 0.3 + 0.7;
-        ringMat.opacity = (1 - snappy * 0.3) * glowPulse * 0.9;
+        const glowPulse = Math.sin(p * Math.PI * 4) * 0.25 + 0.75;
+        ringMat.opacity = (1 - snappy) * glowPulse * 0.6;
       }
 
       // Outer edge ring rushes in from just beyond the tile border.
       if (outerRingRef.current) {
-        const edgeScale = Math.max(0.01, 1.1 - snappy * 0.8);
+        const edgeScale = Math.max(0.01, 1.1 - snappy * 0.6);
         outerRingRef.current.scale.set(edgeScale, edgeScale, 1);
-        outerMat.opacity = (1 - snappy) * 0.6;
-      }
-
-      // Core fills outward and fades — brightest at the crossing midpoint.
-      if (innerGlowRef.current) {
-        const fillScale = snappy * 0.95;
-        innerGlowRef.current.scale.set(fillScale, fillScale, 1);
-        innerMat.opacity = Math.sin(p * Math.PI) * 0.7;
+        outerMat.opacity = (1 - snappy) * 0.45;
       }
     },
-  }), [outerMat, ringMat, innerMat]);
+  }), [outerMat, ringMat]);
 
   return (
     <group ref={groupRef} position={[0, 0, 0.025]} visible={false} renderOrder={11}>
       <mesh ref={outerRingRef} geometry={_sharedOuterRingGeometry} material={outerMat} scale={[0, 0, 0]} />
       <mesh ref={ringRef} geometry={_sharedMainRingGeometry} material={ringMat} scale={[0, 0, 0]} />
-      <mesh ref={innerGlowRef} position={[0, 0, -0.005]} geometry={_sharedInnerCircleGeometry} material={innerMat} scale={[0, 0, 0]} />
     </group>
   );
 });

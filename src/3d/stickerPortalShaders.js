@@ -299,11 +299,11 @@ export const neonBorderFragmentShader = `
 `;
 
 // ─── Eyelid blink overlay ─────────────────────────────────────────────────────
-// Fires on disparity (odd-flip) transitions.
-// The FROM-color mesh stays fully visible underneath; this overlay covers the full
-// tile disc with the TO color at ~0.5 alpha (NormalBlending), so both colors are
-// simultaneously visible — the quantum superposition / 50-50 blend moment.
-// The scale.y eyelid squish and the lid-edge gleam ride on top of that blend.
+// Fires on disparity (odd-flip) transitions. The sticker itself changes colour
+// while the lids are shut (StickerPlane swaps it at the crossing), so this overlay
+// only draws light on it: the lid-edge gleam, a pinpoint at the shut seam and an
+// iris ring opening outward. It once also laid the new colour over the whole tile
+// at half alpha, a flat 50/50 wash that then snapped to the new colour at the end.
 export const eyelidVertexShader = `
   varying vec2 vUv;
   void main() {
@@ -314,7 +314,7 @@ export const eyelidVertexShader = `
 
 export const eyelidFragmentShader = `
   uniform vec3  uColorTo;  // current visible face color in Chaos
-  uniform float uClean;    // Chaos: edge gleam only, no full-face color blending
+  uniform float uClean;    // Chaos: edge gleam only, no pinpoint or iris
   uniform float uProgress; // 1 = fully open, 0 = fully closed (= flipSquish)
   uniform float uTime;
   varying vec2 vUv;
@@ -324,10 +324,6 @@ export const eyelidFragmentShader = `
     float dist = length(uv);
     float inDisc = 1.0 - smoothstep(0.43, 0.50, dist);
     float closed  = 1.0 - uProgress;  // 1 when squished shut, 0 when open
-
-    // Full-disc base at 0.5 alpha: overlaid on the FROM-color mesh via NormalBlending
-    // this gives exactly a 50/50 mix — both states visible simultaneously.
-    float baseAlpha = 0.50 * inDisc * (1.0 - uClean);
 
     // Eyelid edge gleam — bright band at top and bottom rim, intensifies as lids close.
     float topBot  = abs(abs(uv.y) - 0.41);
@@ -343,7 +339,7 @@ export const eyelidFragmentShader = `
     float irisR = uProgress * 0.44;
     float iris  = (1.0 - smoothstep(0.0, 0.045, abs(dist - irisR))) * uProgress * inDisc;
 
-    float alpha = clamp(baseAlpha + lidEdge * lidBright + (core * 1.1 + iris * 0.55) * (1.0 - uClean) + shimmer,
+    float alpha = clamp(lidEdge * lidBright + (core * 1.1 + iris * 0.55) * (1.0 - uClean) + shimmer,
                         0.0, 0.95);
 
     if (alpha < 0.001) discard;
