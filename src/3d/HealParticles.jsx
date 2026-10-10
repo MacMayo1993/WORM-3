@@ -15,11 +15,17 @@ const _baseHealColor = new THREE.Color();
 
 const HEAL_PARTICLE_COUNT = 40;
 
+// One InstancedMesh: each sparkle is placed by its own instance matrix, or every
+// one draws as the full plane over the tile (see particleVertex in flipBurstShaders.js).
 const VERTEX_SHADER = `
   varying vec2 vUv;
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 local = vec4(position, 1.0);
+    #ifdef USE_INSTANCING
+      local = instanceMatrix * local;
+    #endif
+    gl_Position = projectionMatrix * modelViewMatrix * local;
   }
 `;
 

@@ -6,7 +6,7 @@ import { registerInspectionSurface } from './inspectionBridge.js';
 import { effectiveFlipPads } from '../game/raisedCubie.js';
 import { flipPose } from '../utils/flipPose.js';
 import { chaosFlipPose, CHAOS_FLIP_DURATION } from './chaosFlipPose.js';
-import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useMemo, useReducer, useState } from 'react';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { createPlayStickerGeometry, rubiksFinish } from './rubiksPiece.js';
@@ -49,7 +49,7 @@ import HealParticles from './HealParticles.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
 import NumberLabel, { GridLabel, CanvasLabel } from './NumberLabel.jsx';
-import { getFlipPortalGeometry, getFlipPortalMaterial, flipPortalData, flipPortalStart, forgetFlipPortalOpening, PORTAL_TOP } from './flipPortal.js';
+import { getFlipPortalGeometry, getFlipPortalMaterial, flipPortalData, flipPortalStart, forgetFlipPortalOpening, FLIP_PORTAL_OPEN_SEED, PORTAL_TOP } from './flipPortal.js';
 import { getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombSeed, tombRiseScale, TOMB_LEAN, TOMB_PLAQUE_FRONT, TOMB_STONE_PIVOT } from './tombstone.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
@@ -384,6 +384,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // mesh and reveal FX mounted across that state change; refs alone cannot influence
   // the render-time instancing decision.
   const [keepFlipMeshMounted, setKeepFlipMeshMounted] = useState(false);
+  // A tile flipping home keeps its portal until it is squeezed shut (the crossing),
+  // so the portal closes with the tile instead of vanishing as the flip begins.
+  // A ref, not state: the render where the flip lands already shows the portal (it is
+  // still pending there), so only its removal needs a render, forced at the crossing.
+  const portalClosingRef = useRef(false);
+  const [, rerenderPortal] = useReducer(n => n + 1, 0);
+  const endPortalClosing = () => {
+    if (!portalClosingRef.current) return;
+    portalClosingRef.current = false;
+    rerenderPortal();
+  };
   // Track if we're currently in a flip animation - prevents race condition
   // between React state updates and Three.js imperative rendering
   const isFlipping = useRef(false);
@@ -568,6 +579,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     prevFlips.current = meta?.flips ?? 0;
     isFlipping.current = false;
     setKeepFlipMeshMounted(false);
+    portalClosingRef.current = false;
     spinT.current = 0;
     shakeT.current = 0;
     shockT.current = 1;
@@ -651,6 +663,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Disparity flip (odd flip count → tile enters wormhole state) → eyelid blink.
       // Normal flip → spinning rim reveal.
       isDisparityFlipRef.current = flips % 2 === 1;
+      portalClosingRef.current = curr === meta?.orig;
       // One blink per flip the tile is carrying (capped), and the flip timer is
       // stretched to fit them: the first blink keeps its normal length, the extra
       // ones are quicker. Normal flips stay a single 0.5 s beat exactly as before.
@@ -661,8 +674,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       if (spinRevealRef.current) spinRevealRef.current.visible = false;
       if (eyelidOverlayRef.current) eyelidOverlayRef.current.visible = false;
       if (isDisparityFlipRef.current) {
-        // Outside Chaos, the overlay shows TO color at 0.5 alpha (NormalBlending) over the FROM mesh.
-        // Both colors simultaneously visible = superposition blend.
+        // The overlay draws only light (gleam, seam pinpoint, iris); the sticker itself
+        // changes colour at the crossing, while the lids are shut.
         if (eyelidOverlayRef.current && eyelidMatRef.current && flipToColor.current) {
           eyelidMatRef.current.uniforms.uClean.value = preserveFlipStyle ? 1 : 0;
           eyelidMatRef.current.uniforms.uColorTo.value.set(preserveFlipStyle ? flipFromColor.current : flipToColor.current);
@@ -924,6 +937,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           if (eyelidMatRef.current && flipToColor.current) {
             eyelidMatRef.current.uniforms.uColorTo.value.set(flipToColor.current);
           }
+        } else if (isDisparityFlipRef.current) {
+          // Recolour the sticker while it is squeezed shut, as homing flips do and
+          // Chaos does above: it re-opens in its new colour. Holding the old colour
+          // under a half-alpha wash until the end read as a flat flash, then a snap.
+          displayedFaceRef.current = meta?.curr ?? 0;
+          if (isInstancedRef.current && baseColorRef.current) instanceColorRef.current.setStyle(baseColorRef.current);
+          const mat = meshRef.current?.material;
+          if (mat?.color && !mat.uniforms?.baseColor) {
+            const finalTex = currTextureRef.current;
+            mat.map = finalTex || null;
+            mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
+            mat.needsUpdate = true;
+          }
         }
         hitstopT.current = quietFlip ? 0 : 0.05; // ~3 frames
         // Swap the shader-style mesh to the antipodal (TO) style while it's squished
@@ -1004,6 +1030,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         }
         // Midpoint: switch rim glow and mesh to TO color.
         if (atCrossing) {
+          // Shut: the portal that was squeezing closed with the tile goes now.
+          endPortalClosing();
           if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
             spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
             spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
@@ -1036,6 +1064,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         isFlipping.current = false;
         displayedFaceRef.current = meta?.curr ?? 0;
         setKeepFlipMeshMounted(false);
+        endPortalClosing();
         // Hide overlays and commit the final face color/texture to the mesh.
         if (spinRevealRef.current) spinRevealRef.current.visible = false;
         if (eyelidOverlayRef.current) eyelidOverlayRef.current.visible = false;
@@ -1461,6 +1490,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   useLayoutEffect(() => {
     if (!isWormhole || isDead) forgetFlipPortalOpening(stickerGridId);
   }, [isWormhole, isDead, stickerGridId]);
+  // Flipping home: hold the portal it is leaving, fully open, until the tile shuts.
+  const closingPortal = !isDead && !isSudokube && !isWormhole && !!meta?.orig && meta.curr === meta.orig
+    && (portalClosingRef.current || hasPendingFlipAnimation);
 
   const trackerRadius = Math.min(0.25, 0.06 + (meta?.flips ?? 0) * 0.012);
   const origColor = meta?.orig ? fc[meta.orig] : COLORS.black;
@@ -1760,10 +1792,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       {/* The flipped face: a bevelled lens onto the antipodal tunnel, home colour at
           the far end. One instanced draw for every portal on the cube, animated in
           its shader, so a flipped tile needs no frame callback of its own. */}
-      {showFlipPortal && (
+      {(showFlipPortal || closingPortal) && (
         <TileSurfaceInstance name="FlipPortal" geometry={getFlipPortalGeometry()} material={getFlipPortalMaterial()}
-          color={baseColor} seed={flipPortalStart(stickerGridId, meta?.flips ?? 0)}
-          data={flipPortalData(origColor, meta?.flips ?? 0, effectiveFlipCap)} />
+          color={closingPortal ? fc[ANTIPODAL_COLOR[meta.orig]] : baseColor}
+          seed={closingPortal ? FLIP_PORTAL_OPEN_SEED : flipPortalStart(stickerGridId, meta?.flips ?? 0)}
+          data={flipPortalData(origColor, closingPortal ? Math.max(1, (meta?.flips ?? 0) - 1) : meta?.flips ?? 0, effectiveFlipCap)} />
       )}
 
       {/* Tally Marks - skip if origColor is white on non-white tile */}

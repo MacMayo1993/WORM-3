@@ -86,9 +86,12 @@ it.each([3, 15])('shares Flip Cube portals in size-%s Worm, through burrows, tur
     // Numbers retains its white numbered surface, just as Flip Cube does.
     await render('turned-slot', 'sudokube'); await frame(); expect(portalBatches()).toHaveLength(0);
     await render('turned-slot'); await frame(); expect(portalBatches()[0].geometry.attributes.aInstanceSeed.array[0]).toBe(seed);
-    // Healing retires the face; the next count-one flip pops open afresh.
+    // Healing retires the face (it closes with the tile, then is gone once the
+    // tile has squeezed shut); the next count-one flip pops open afresh.
     meta = { ...base, flips: 0, curr: base.orig };
-    await render('turned-slot'); await frame(); expect(portalBatches()).toHaveLength(0);
+    await render('turned-slot'); await frame(); expect(portalBatches()).toHaveLength(1);
+    for (let i = 0; i < 40; i++) await frame();
+    expect(portalBatches()).toHaveLength(0);
     sharedUniforms.time.value = 30;
     meta = { ...base, flips: 1, curr: ANTIPODAL_COLOR[base.orig] };
     await render('turned-slot'); await frame();

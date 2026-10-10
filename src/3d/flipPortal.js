@@ -131,7 +131,10 @@ vOpen = pOpen;
 float pU = pOpen - 1.0;
 float pPop = pOpen <= 0.0 ? 0.0 : 1.0 + 2.70158 * pU * pU * pU + 1.70158 * pU * pU; // easeOutBack
 transformed.xy *= max(pPop, 1e-4);
-transformed.z *= clamp(pOpen * 1.6, 1e-4, 1.0);
+// The frame rises out of the sticker as it opens. The floor keeps its height: it
+// sits only a hair above the sticker face, and flattened onto it the two fought
+// for depth, so the opening lens read as a flat slab of the sticker's colour.
+if (aRegion < 0.5) transformed.z *= clamp(pOpen * 1.6, 1e-4, 1.0);
 
 mat4 pModel = modelMatrix;
 #ifdef USE_INSTANCING
@@ -243,8 +246,11 @@ if (pFloor) {
 // One light sweep crosses every portal on the cube in world space.
 float pPh = fract(dot(vWorldP, vec3(0.6, 0.72, 0.35)) * 0.16 - pT * 0.11) - 0.5;
 pE += mix(pCurHue, vec3(1.0), 0.6) * exp(-pPh * pPh / 0.0006) * (pFloor ? 0.32 : 0.22);
-// The pop of the opening.
-pE += mix(pCurHue, vec3(1.0), 0.5) * sin(vOpen * 3.14159265) * 1.4;
+// The opening: the lens irises out from the centre (the pop in the vertex stage)
+// with a rim of the new colour on its leading edge. Lighting the whole lens here
+// read as the tile flashing one flat colour, which broke the flip's motion.
+float pLead = max(abs(vObj.x), abs(vObj.y)) / ${glf(PORTAL_OUTER)};
+pE += pCurHue * exp(-(1.0 - pLead) * (1.0 - pLead) / 0.012) * sin(vOpen * 3.14159265) * 1.2;
 totalEmissiveRadiance = pE;
 `;
 
@@ -340,6 +346,13 @@ export function flipPortalStart(identity, flips, now = sharedUniforms.time.value
   openings.set(identity, { flips, start });
   return start;
 }
+
+/**
+ * A seed for a portal that is already fully open: a start in the far past. A tile
+ * flipping home keeps its portal like this until the tile is squeezed shut, so the
+ * portal closes with it instead of vanishing on the frame the flip begins.
+ */
+export const FLIP_PORTAL_OPEN_SEED = -1e6;
 
 /** A healed tile can open again with the same flip count on its next infection. */
 export function forgetFlipPortalOpening(identity) {
