@@ -1,3 +1,4 @@
+vi.mock('../utils/device.js', async original => ({ ...(await original()), prefersReducedMotion: () => true }));
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

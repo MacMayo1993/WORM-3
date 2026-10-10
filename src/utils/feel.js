@@ -339,6 +339,15 @@ const SFX = {
     burst(0.025, 0.16, 'highpass', 2600);
     sweep(190, 130, 0.045, 0.09, 'square');
   },
+  storyComplete() {
+    tone({ freq: 392, dur: 0.35, gain: 0.12 });
+    tone({ freq: 587.33, dur: 0.45, gain: 0.09, when: 0.08 });
+  },
+  storyStar(index = 0) {
+    const freq = [659.25, 783.99, 987.77][Math.min(2, Math.max(0, index))];
+    tone({ freq, dur: 0.28, gain: 0.13 });
+    tone({ freq: freq * 2, dur: 0.18, gain: 0.04, when: 0.03 });
+  },
   storyTask() {
     sweep(520, 780, 0.08, 0.09, 'sine');
   },
@@ -452,6 +461,8 @@ const HAPTICS = {
   // Short enough to read as the key itself rather than as something happening.
   uiKey: 10,
   storyTask: [10, 35, 15],
+  storyComplete: [15, 40, 25],
+  storyStar: 14,
 
   // ── The cube itself ─────────────────────────────────────────────────────────
   // Light enough to sit under a fast sequence of turns without buzzing the hand.

@@ -1,5 +1,4 @@
 import StoryStarRequirements from './StoryStarRequirements.jsx';
-import ModeArtwork from '../../components/ui/ModeArtwork.jsx';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -7,10 +6,11 @@ import { getStoreItem } from '../../utils/storeCatalog.js';
 import { UI_FONT, Z } from '../../utils/uiTheme.js';
 import { storyLevel, storyChecklist, storyStars, WORM_STORY_LEVELS, storyChapterId, storyChapterIndex, isChapterFinale, STORY_CHAPTER_SIZE } from './levels.js';
 import { feel, resumeFeel } from '../../utils/feel.js';
-import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
+import { prefersReducedMotion } from '../../utils/device.js';
 import { getWormCharacter } from '../wormCharacterData.js';
 import { storyNarrative } from './narrative.js';
 import '../../components/screens/wormStory.css';
+import './storyCompletion.css';
 
 // "Chapter 2 · Level 4 / 10": levels are numbered globally but read within their chapter.
 const chapterLine = id => `Chapter ${storyChapterId(id)} · Level ${storyChapterIndex(id)} / ${STORY_CHAPTER_SIZE}`;
@@ -156,42 +156,100 @@ export function StoryStartButton() {
   </button>;
 }
 
-export function StoryResult({ onNext, onRetry, onLevels }) {
+// Pause/rewards are committed by the simulation before this presentation starts.
+// Leave the live victory camera visible, then award stars and enable navigation.
+const STAR_FIRST_MS = 1000;
+const STAR_STEP_MS = 300;
+export function StoryResult(props) {
   const result = useGameStore(s => s.wormStoryResult);
-  const ref = useRef(null);
-  useEffect(() => {
-    const prior = document.activeElement;
-    ref.current?.querySelector('button:not(:disabled)')?.focus();
-    const key = e => {
-      if (e.key !== 'Tab') return;
-      const buttons = [...(ref.current?.querySelectorAll('button:not(:disabled)') || [])];
-      const first = buttons[0], last = buttons.at(-1);
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
-    };
-    window.addEventListener('keydown', key);
-    return () => { window.removeEventListener('keydown', key); prior?.focus?.(); };
-  }, []);
+  const runId = useGameStore(s => s.wormRunId);
   const level = storyLevel(result?.levelId);
   if (!result || !level) return null;
+  return <StoryCompletion key={`${runId}:${level.id}`} {...props} result={result} level={level} />;
+}
+
+function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
+  const [reducedMotion] = useState(prefersReducedMotion);
+  const [ready, setReady] = useState(reducedMotion);
+  const [leaving, setLeaving] = useState(false);
+  const ref = useRef(null), exitTimer = useRef(null), navigating = useRef(false);
   const last = level.id === WORM_STORY_LEVELS.at(-1).id, finale = isChapterFinale(level.id);
   const heading = last ? 'Story complete' : finale ? 'Chapter complete' : 'Level complete';
   const primary = last ? 'Levels' : finale ? `Start chapter ${storyChapterId(level.id) + 1}` : 'Next level';
-  return <div ref={ref} className="worm-story-result" role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" style={{ zIndex: Z.MODAL, fontFamily: UI_FONT }}>
-    <div className="worm-story-result-sheet"><ModeArtwork mode="success" className="screen-results-art" /><small>{chapterLine(level.id)}</small><h2 id="worm-story-result-title">{heading}</h2>
-      <div className="worm-story-result-stars" aria-label={`${result.stars} out of 3 stars`}>{[0,1,2].map(i => <span key={i} data-earned={i < result.stars} style={{ '--star-index': i }} aria-hidden="true">★</span>)}</div>
-      <p>{level.title}</p>
-      <StoryMobiNote levelId={level.id} complete />
-      <div className="screen-stat-row"><div><strong>{result.seconds}s</strong><span>Time</span></div><div><strong>+{result.xp}</strong><span>XP</span></div><div><strong>+{result.points}</strong><span>Parity Points</span></div></div>
-      {result.unlockedCharacter && <div className="worm-story-unlock" role="status">
-        <WormPreviewCanvas size={84} characterId={result.unlockedCharacter} skinId="slime" hatId="none" framing="body" />
-        <span><small>New worm unlocked</small><strong>{getWormCharacter(result.unlockedCharacter).label}</strong>
-          <em>{getWormCharacter(result.unlockedCharacter).type} · equip it from Your Worm</em></span>
-      </div>}
-      <StoryStarRequirements level={level} result={result} />
-      <StoryRewardChoices level={level} />
-      <button className="worm-story-primary" onClick={last ? onLevels : onNext}>{primary} <span>→</span></button>
-      <button className="worm-story-secondary" onClick={onRetry}>Play again</button><button className="worm-story-secondary" onClick={onLevels}>Levels</button>
+  const stars = Math.max(1, Math.min(3, result.stars));
+  const readyAt = STAR_FIRST_MS + (stars - 1) * STAR_STEP_MS + 450;
+  const narrative = storyNarrative(level.id);
+
+  useEffect(() => {
+    if (reducedMotion) { feel('storyComplete'); return; }
+    const timers = [setTimeout(() => feel('storyComplete'), 150)];
+    for (let i = 0; i < stars; i++) {
+      timers.push(setTimeout(() => feel('storyStar', { combo: i }), STAR_FIRST_MS + i * STAR_STEP_MS));
+    }
+    timers.push(setTimeout(() => setReady(true), readyAt));
+    return () => timers.forEach(clearTimeout);
+  }, [reducedMotion, stars, readyAt]);
+
+  useEffect(() => {
+    const prior = document.activeElement;
+    ref.current?.focus();
+    const key = e => {
+      if (e.key !== 'Tab') return;
+      const controls = [...(ref.current?.querySelectorAll('button, summary') || [])]
+        .filter(el => !el.disabled && !el.closest('[inert]') && (!el.closest('details:not([open])') || el.tagName === 'SUMMARY'));
+      const first = controls[0], lastControl = controls.at(-1);
+      if (!first) { e.preventDefault(); ref.current?.focus(); }
+      else if (e.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) { e.preventDefault(); lastControl.focus(); }
+      else if (!e.shiftKey && (document.activeElement === lastControl || document.activeElement === ref.current)) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', key);
+    return () => {
+      clearTimeout(exitTimer.current);
+      window.removeEventListener('keydown', key);
+      if (prior?.isConnected) prior.focus?.();
+    };
+  }, []);
+  useEffect(() => { if (ready) ref.current?.querySelector('.worm-story-primary')?.focus({ preventScroll: true }); }, [ready]);
+
+  const navigate = action => {
+    if (!ready || navigating.current || !action) return;
+    navigating.current = true;
+    setLeaving(true);
+    feel('uiKey');
+    if (reducedMotion) action();
+    else exitTimer.current = setTimeout(action, 180);
+  };
+
+  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-leaving={leaving}
+    role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" tabIndex={-1}
+    style={{ zIndex: Z.CELEBRATION, fontFamily: UI_FONT, '--result-ready': `${readyAt}ms` }}>
+    <div className="story-completion-wave" aria-hidden="true" />
+    <div className="worm-story-result-sheet story-completion-card">
+      <small className="story-completion-level">{chapterLine(level.id)}</small>
+      <h2 id="worm-story-result-title">{heading}</h2>
+      <div className="story-completion-award">
+        <div className="story-completion-sparks" aria-hidden="true">{Array.from({ length: 16 }, (_, i) =>
+          <i key={i} style={{ '--spark-angle': `${i * 22.5}deg`, '--spark-delay': `${STAR_FIRST_MS + Math.min(i % 3, stars - 1) * STAR_STEP_MS}ms` }} />)}</div>
+        <div className="story-completion-stars" role="img" aria-label={`${stars} out of 3 stars`}>
+          {[0, 1, 2].map(i => <div key={i} className="story-completion-star" data-earned={i < stars}
+            style={{ '--star-delay': `${STAR_FIRST_MS + i * STAR_STEP_MS}ms` }} aria-hidden="true">
+            <svg viewBox="0 0 100 100"><path d="M50 5 63.6 32.5 94 36.9 72 58.3 77.2 88.5 50 74.2 22.8 88.5 28 58.3 6 36.9 36.4 32.5Z" /></svg>
+          </div>)}
+        </div>
+        <p className="story-completion-verdict" role="status">{ready ? `${stars} ${stars === 1 ? 'star' : 'stars'} earned` : '\u00a0'}</p>
+      </div>
+      <div className="story-completion-extras" inert={!ready || leaving ? '' : undefined}>
+        {result.unlockedCharacter && <p className="story-completion-unlock"><span>New worm unlocked</span><strong>{getWormCharacter(result.unlockedCharacter).label}</strong></p>}
+        <StoryRewardChoices level={level} />
+        {narrative && <details className="story-completion-notes"><summary tabIndex={0}>Mobi’s field notes</summary><StoryMobiNote levelId={level.id} complete /></details>}
+      </div>
+      <div className="story-completion-actions">
+        <button className="worm-story-primary" disabled={!ready || leaving} onClick={() => navigate(last ? onLevels : onNext)}>{primary} <span aria-hidden="true">→</span></button>
+        <div className="story-completion-secondary">
+          <button className="worm-story-secondary" disabled={!ready || leaving} onClick={() => navigate(onRetry)}>Play again</button>
+          {!last && <button className="worm-story-secondary" disabled={!ready || leaving} onClick={() => navigate(onLevels)}>Levels</button>}
+        </div>
+      </div>
     </div>
   </div>;
 }
