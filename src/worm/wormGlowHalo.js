@@ -38,6 +38,7 @@ import * as THREE from 'three';
  * the property that also makes it safe — nothing with a hard edge is ever drawn.
  */
 export const HALO_SCALE = 8.0;
+const HALO_OPACITY = 0.95;
 
 const _cache = { tex: undefined, mat: null, geo: null };
 
@@ -117,7 +118,9 @@ const fragmentShader = /* glsl */`
   varying vec2 vUv;
   void main() {
     float a = texture2D(uTex, vUv).a;
-    gl_FragColor = vec4(uColor * a, a * uOpacity);
+    // AdditiveBlending multiplies RGB by source alpha. Applying the falloff to
+    // RGB too squares it, extinguishing the soft light outside the body.
+    gl_FragColor = vec4(uColor, a * uOpacity);
   }
 `;
 
@@ -132,7 +135,7 @@ export function getWormHaloMaterial() {
       uniforms: {
         uTex: { value: getWormHaloTexture() },
         uColor: { value: new THREE.Color('#ffffff') },
-        uOpacity: { value: 0.85 },
+        uOpacity: { value: HALO_OPACITY },
         uScale: { value: HALO_SCALE }
       },
       vertexShader,
@@ -156,7 +159,7 @@ export function makeWormHaloSprite() {
     map: getWormHaloTexture(),
     color: 0xffffff,
     transparent: true,
-    opacity: 0.85,
+    opacity: HALO_OPACITY,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false
