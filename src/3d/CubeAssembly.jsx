@@ -25,6 +25,7 @@ import { ignitionTileAt } from '../game/chaosIgnition.js';
 import { feel } from '../utils/feel.js';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
+import { warmFlipPortal } from './flipPortal.js';
 import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateSharedGaze, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
@@ -183,7 +184,7 @@ const CubeAssembly = React.memo(({
   ), []);
   const initializedMoveRef = useRef(null);
   const animProgressRef = useRef({ value: 0 });
-  const { camera, gl } = useThree();
+  const { camera, gl, scene } = useThree();
   const [dragStart, setDragStart] = useState(null);
   const dragStartRef = useRef(null); // Ref version for immediate access in listeners
   const longPressTimerRef = useRef(null);
@@ -746,6 +747,8 @@ const CubeAssembly = React.memo(({
     // each face never pays a material-creation/compile stall mid-game.
     const equippedStyles = Object.values(settings?.manifoldStyles ?? {});
     warmUpDefaultStyles(gl, camera, colors, equippedStyles);
+    // Cube modes open a flip portal on the first flip; compile it now, not then.
+    if (!state.wormHealerMode && state.visualMode !== 'sudokube') warmFlipPortal(gl, camera, scene);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional one-shot on mount
 
   // Camera auto-zoom: push camera out while explosion animates so the cube stays in view.

@@ -22,7 +22,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, sharedUniforms, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { TileSurfaceInstance, useTileSurfaceInstances } from './TileSurfaceInstances.jsx';
 import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
@@ -51,6 +51,7 @@ import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
 import TileBoundary from './TileBoundary.jsx';
 import NumberLabel, { GridLabel, CanvasLabel } from './NumberLabel.jsx';
+import { getFlipPortalGeometry, getFlipPortalMaterial, flipPortalData, flipPortalStart, PORTAL_TOP } from './flipPortal.js';
 import { getTombstoneGeometry, getTombstoneMaterial, EPITAPH_INK, tombYaw, tombSeed, tombRiseScale, TOMB_LEAN, TOMB_PLAQUE_FRONT, TOMB_STONE_PIVOT } from './tombstone.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
@@ -293,7 +294,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const seamLeakMatRef = useRef();
   const [spiderUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
-    uTime: { value: 0 },
+    uTime: sharedUniforms.time, // shared tile clock, so a sleeping tile's ghost still pulses
     uBurst: { value: 1.0 }, // Always fully active for ghost tiles
   }));
   const [crackUniforms] = React.useState(() => ({
@@ -709,8 +710,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         flipShockwaveRef.current?.setProgress(1);
       }
       prevRawP.current = 0;
-      wormIntroT.current = 6.0;
-      setShowWormIntro(true);
+      // The emerging sticker worm is WORM's; a cube-mode flip opens a portal instead.
+      if (wormHealerMode) {
+        wormIntroT.current = 6.0;
+        setShowWormIntro(true);
+      }
       // Disparity flip (odd flip count → tile enters wormhole state) → eyelid blink.
       // Normal flip → spinning rim reveal.
       isDisparityFlipRef.current = flips % 2 === 1;
@@ -912,7 +916,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
     // wormhole keeps the loop alive so the indicator ring pulses while the tile is in disparity.
-    const anyActive = tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || (wormhole && !isSudokube);
+    // A cube-mode portal animates in its shader: unless the legacy tremor runs, a
+    // flipped tile sleeps like any other once its flip has played.
+    const wormholeFrames = (wormHealerMode || flipPads === 'off') && wormhole && !isSudokube;
+    const anyActive = tombRiseT.current >= 0 || alignmentBusy || pressBusy || spinT.current > 0 || shakeT.current > 0 || (showWormholeHazardFx && wormholeFrames) || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || wormholeFrames;
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
@@ -926,7 +933,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       spiderMatRef.current.uniforms.uColor.value.set(antipodalHexRef.current ?? baseColorRef.current);
       if (wormhole) {
         // Actively spinning disparate tile
-        spiderMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
         spiderMatRef.current.uniforms.uBurst.value = 1.0;
       } else {
         // Dormant stamp -- stop time, dim it out slightly
@@ -1573,6 +1579,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation, useGlassStyle, glassMaterial, baseColor]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
+  // Cube modes draw a displaced tile as one batched flip portal (flipPortal.js);
+  // WORM keeps its aperture and the older decoration under it.
+  const legacyFlipDecor = wormHealerMode;
+  const showFlipPortal = !legacyFlipDecor && !isDead && !isSudokube && isWormhole;
 
   const trackerRadius = Math.min(0.25, 0.06 + (meta?.flips ?? 0) * 0.012);
   const origColor = meta?.orig ? fc[meta.orig] : COLORS.black;
@@ -1589,6 +1599,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       {/* A static surface marking stays legible when bloom and moving portal
           effects wash out. Raised hazard fences still identify deadly portals. */}
       {wormHealerMode && !isDead && !isSudokube && <TileBoundary flipped={isWormhole} />}
+      {/* The flipped face: a bevelled lens onto the antipodal tunnel, home colour at
+          the far end. One instanced draw for every portal on the cube, animated in
+          its shader, so a flipped tile needs no frame callback of its own. */}
+      {showFlipPortal && (
+        <TileSurfaceInstance name="FlipPortal" geometry={getFlipPortalGeometry()} material={getFlipPortalMaterial()}
+          color={baseColor} seed={flipPortalStart(stickerGridId, meta?.flips ?? 0)}
+          data={flipPortalData(origColor, meta?.flips ?? 0, effectiveFlipCap)} />
+      )}
       {/* Ghost spider web on the back of flipped tiles. Mounted only once a tile has
           any flip history — a never-flipped tile can never show it, so on a 15×15
           Mega shell the ~1,300 untouched tiles skip this mesh (and every transient
@@ -1781,7 +1799,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           (odd parity). Additive so it reads as neon over the dark cube frame.
           NOTE: ringRef stays declared — the flip midpoint/pulse code still references
           ringRef.current under null guards, so those branches simply no-op. */}
-      {!isDead && !isSudokube && isWormhole && (
+      {legacyFlipDecor && !isDead && !isSudokube && isWormhole && (
         <mesh ref={burrowBorderRef} position={[0, 0, 0.006]} renderOrder={2}>
           <primitive object={_neonBorderGeo} attach="geometry" />
           <shaderMaterial
@@ -1893,8 +1911,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       <group ref={burrowDecorRef}>
       {/* Tally Marks - skip if origColor is white on non-white tile */}
-      {!isDead && !isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
+      {/* A portal shows its pressure itself; it keeps only the ×N count past six. */}
+      {!isDead && !isSudokube && hasFlipHistory && !(showFlipPortal && (meta?.flips ?? 0) <= 6) && !(origIsWhite && !currIsWhite) && (
         <TallyMarks
+          labelOnly={showFlipPortal}
           flips={meta?.flips ?? 0}
           radius={trackerRadius}
           origColor={origColor}
@@ -1902,7 +1922,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       )}
 
       {/* Wispy spinning ring — only shown after the tile has been flipped at least once */}
-      {!isDead && !isSudokube && hasFlipHistory && (
+      {legacyFlipDecor && !isDead && !isSudokube && hasFlipHistory && (
         <mesh position={[0, 0, 0.007]} renderOrder={1}>
           <primitive object={_sharedStickerGeo} attach="geometry" />
           <shaderMaterial
@@ -1917,7 +1937,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </mesh>
       )}
 
-      {!isDead && !isSudokube && (isWormhole || showWormIntro) && (
+      {legacyFlipDecor && !isDead && !isSudokube && (isWormhole || showWormIntro) && (
         <>
           {/* Parity breakthrough — original color trying to push through.
               LOD: skip at flips === 1 (6–8 blended meshes saved for the very first wormhole frame). */}
@@ -2062,7 +2082,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       )}
       {/* Per-tile health bar — Disparity Mode always; standard mode once a tile has flips (approaching FLIP_CAP death) */}
       {!isDead && (meta?.flips ?? 0) > 0 && (
-        <DisparityHealthBar flips={meta?.flips ?? 0} flipCap={effectiveFlipCap} />
+        <DisparityHealthBar flips={meta?.flips ?? 0} flipCap={effectiveFlipCap} z={showFlipPortal ? PORTAL_TOP + 0.002 : undefined} />
       )}
 
     </group>
