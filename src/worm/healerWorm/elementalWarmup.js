@@ -72,6 +72,12 @@ function collectElementalMaterials() {
   return materials;
 }
 
+/** Throwaway carriers for the elemental programs: points, instanced or plain. */
+export function elementalWarmupObjects(geo, materials = collectElementalMaterials()) {
+  return materials.filter(Boolean).map(material => material.userData.elementalPoints ? new THREE.Points(geo, material)
+    : material.userData.elementalInstanced ? new THREE.InstancedMesh(geo, material, 1) : new THREE.Mesh(geo, material));
+}
+
 /**
  * Compile every elemental skin program.
  *
@@ -87,9 +93,7 @@ export function warmUpElementalSkins(renderer, camera, targetScene = null) {
 
   const scene = new THREE.Scene();
   const geo = new THREE.PlaneGeometry(0.1, 0.1);
-  for (const material of materials) {
-    if (material) scene.add(material.userData.elementalPoints ? new THREE.Points(geo, material) : material.userData.elementalInstanced ? new THREE.InstancedMesh(geo, material, 1) : new THREE.Mesh(geo, material));
-  }
+  scene.add(...elementalWarmupObjects(geo, materials));
 
   renderer.compile(scene, camera, targetScene);
 

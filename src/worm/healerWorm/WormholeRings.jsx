@@ -8,7 +8,8 @@ import { liveRotation, liveLayerAngle } from '../liveRotation.js';
 import { WORM_CAUTION_POLE_HEIGHT, WORM_CAUTION_TAPE_TOP } from '../../game/raisedCubie.js';
 // src/worm/healerWorm/WormholeRings.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import React, { useRef } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
+import { ensureInstanceColor } from '../../3d/instanceUploads.js';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getWormTunnelSnapshot } from '../tunnelSnapshot.js';
@@ -134,6 +135,8 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
     const sparkRef = useRef();      // warning electricity when tunnel is one trip from void
+    // Tinted per instance from the first frame they draw; see ensureInstanceColor.
+    useLayoutEffect(() => { [liveRef, sparkRef, moteRef].forEach(ref => ensureInstanceColor(ref.current)); });
     const poleRef = useRef();       // caution poles
     const tapeRef = useRef();       // caution tape strips
     const voidFrameRef = useRef();  // bright square frame on fully voided tiles

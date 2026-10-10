@@ -10,6 +10,7 @@
 // both materials are shared, so a worm allocates nothing and is never disposed.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { stickerWormTime, stickerWormBodyMaterial as bodyMaterial, stickerWormGlowMaterial as glowMaterial, STICKER_WORM_AMP as AMP } from './stickerWormMaterials.js';
 
 // Head → tail: bead radius, height off the tile, colour. Spacing scales with the
 // worm; the beads themselves do not (as before).
@@ -23,47 +24,6 @@ const BEADS = [
 const GLOW_R = 0.045;
 const GLOW_Z = 0.018;
 const GLOW_COLOR = '#ffe6c6';
-const FREQ = 4.2;
-const SEG_LAG = 0.7;
-const AMP = 0.028;
-
-const _uTime = { value: 0 };
-
-const bodyMaterial = new THREE.ShaderMaterial({
-  uniforms: { uTime: _uTime },
-  vertexShader: `
-    attribute vec3 aColor;
-    attribute float aSeg;
-    attribute float aPhase;
-    attribute float aAmp;
-    uniform float uTime;
-    varying vec3 vColor;
-    void main() {
-      vColor = aColor;
-      vec3 p = position;
-      p.y += sin(uTime * ${FREQ.toFixed(1)} - aSeg * ${SEG_LAG.toFixed(1)} + aPhase) * aAmp;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-    }
-  `,
-  fragmentShader: `
-    varying vec3 vColor;
-    void main() {
-      gl_FragColor = vec4(vColor, 1.0);
-      #include <colorspace_fragment>
-    }
-  `,
-  toneMapped: false
-});
-
-// Soft additive glow so ghost worms read clearly above busy tile art. RGBA vertex
-// colours carry each glow's own opacity (head brighter than the body).
-const glowMaterial = new THREE.MeshBasicMaterial({
-  vertexColors: true,
-  transparent: true,
-  blending: THREE.AdditiveBlending,
-  depthWrite: false,
-  toneMapped: false
-});
 
 function fill(geo, name, size, values) {
   const n = geo.attributes.position.count;
@@ -118,7 +78,7 @@ function glowGeometry(scale) {
 // Every worm reads one clock. Setting it from the first body drawn each frame is
 // cheaper than a useFrame per worm, and nothing is spent on worms off screen.
 function tickClock() {
-  _uTime.value = performance.now() / 1000;
+  stickerWormTime.value = performance.now() / 1000;
 }
 
 const StickerWorm = ({ position, rotation, scale = 1 }) => (

@@ -16,6 +16,7 @@ import { MAX_WORM_ORBS } from '../../worm/wormDifficulty.js';
 
 import { makeDisparityRuntimeDefaults, makeWormSessionDefaults } from './sessionDefaults.js';
 import { persistedState } from './persistedState.js';
+import { clampWormCameraZoom, WORM_CAMERA_ZOOM, WORM_CAMERA_ZOOM_KEY } from '../../worm/wormCameraZoom.js';
 
 const WORM_CHARACTER_KEY = 'worm3_character';
 
@@ -101,6 +102,16 @@ export const createWormSlice = (set, get) => ({
     try { localStorage.setItem('worm3_camera_horizon', next); } catch { }
     return { wormCameraHorizon: next };
   }),
+
+  // How far back the chase camera sits, a multiple of the authored framing
+  // (wormCameraZoom.js). Read per frame by WormChaseCamera, so the lens eases to
+  // a new distance without re-rendering anything.
+  wormCameraZoom: persistedState.wormCameraZoom ?? WORM_CAMERA_ZOOM.default,
+  setWormCameraZoom: (value) => {
+    const next = clampWormCameraZoom(value);
+    try { localStorage.setItem(WORM_CAMERA_ZOOM_KEY, String(next)); } catch { /* storage unavailable: keep it for this session */ }
+    set({ wormCameraZoom: next });
+  },
 
   // ── Controls ──────────────────────────────────────────────────────────────
   wormControlMode: 'non-oriented',

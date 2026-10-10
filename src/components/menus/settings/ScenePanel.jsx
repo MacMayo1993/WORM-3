@@ -1,6 +1,7 @@
 import React, { Suspense, useState } from 'react';
 import { BACKGROUNDS } from '../../../utils/backgrounds.js';
 import { useGameStore } from '../../../hooks/useGameStore.js';
+import WormCameraZoomControl from '../../../worm/WormCameraZoomControl.jsx';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({ value: bg.id, label: bg.label }));
 const ProjectiscopeCreator = React.lazy(() => import('../../../projectiscope/ProjectiscopeCreator.jsx'));
@@ -12,6 +13,9 @@ export function ScenePanel({ settings, onSettingsChange }) {
   const update = (key, val) => onSettingsChange({ ...settings, [key]: val });
   return (
     <section className="settings-section">
+      <h3 className="settings-section-title">WORM camera</h3>
+      <p>How far back the camera follows your worm. Further out shows more of a long worm and the orbs around it. The mouse wheel changes it while you crawl.</p>
+      <WormCameraZoomControl label="Distance" />
       <h3 className="settings-section-title">Portal windows</h3>
       <p>Optional live view through one nearby portal. Uses extra graphics power; off by default.</p>
       <div className="settings-radio-group">

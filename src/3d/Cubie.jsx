@@ -13,6 +13,7 @@ import { cubeExpansionScale } from '../game/cubeWorldGeometry.js';
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { cubieBodyGeometry } from './cubieBodyGeometry.js';
+import { useCubieBodyBatches } from './cubieBodyBatchContext.js';
 import * as THREE from 'three';
 import { COLORS, FACE_COLORS } from '../utils/constants.js';
 import { getEdgeFlags } from '../game/cubeUtils.js';
@@ -439,6 +440,19 @@ const Cubie = React.forwardRef(function Cubie({
   const [returningBody, setReturningBody] = useState(false);
   useEffect(() => { if (raised && omitBody) setReturningBody(true); }, [raised, omitBody]);
 
+  // WORM's see-through shells are batched by look. A raised piece's window (0.16
+  // and no depth writes) is its own material and keeps its own mesh.
+  const bodyBatches = useCubieBodyBatches();
+  const showsBody = !mirrorMode && !effectiveHollowMode && !hideBody && !(omitBody && !raised && !returningBody);
+  const batchBody = !!bodyBatches && wormMode && showsBody && !raisedWindow && !coatBody;
+  const bodyRef = useRef(null);
+  const bodyGeometry = cubieBodyGeometry(bodySize);
+  const bodyLook = batchBody ? JSON.stringify(bodyMatProps) : '';
+  useLayoutEffect(() => {
+    if (!batchBody || !bodyRef.current) return undefined;
+    return bodyBatches.register(bodyRef.current, bodyGeometry, JSON.parse(bodyLook));
+  }, [batchBody, bodyBatches, bodyGeometry, bodyLook]);
+
 
   useFrame((_state, delta) => {
     const spring = liftSpring.current;
@@ -547,8 +561,11 @@ const Cubie = React.forwardRef(function Cubie({
         // writing depth, revealing the band underneath their lifted tile.
         // The rounded box is shared per size (cubieBodyGeometry): a piece changes
         // body size whenever a flip changes its look, and rebuilding it was a hitch.
-        <mesh onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows} renderOrder={wormMode ? -1 : 0}>
-          <primitive object={cubieBodyGeometry(bodySize)} attach="geometry" />
+        // A plain WORM body is drawn by the shared batch (CubieBodyBatches.jsx); this
+        // mesh then stays as its invisible anchor and hit target.
+        <mesh ref={bodyRef} onPointerDown={handleDown} visible={!batchBody} castShadow={enableShadows && !batchBody}
+          receiveShadow={enableShadows && !batchBody} renderOrder={wormMode ? -1 : 0}>
+          <primitive object={bodyGeometry} attach="geometry" />
           {coatBody ? <meshPhysicalMaterial {...bodyMatProps} {...CLASSIC_BODY_COAT} /> : <meshStandardMaterial {...bodyMatProps} />}
         </mesh>
       )}

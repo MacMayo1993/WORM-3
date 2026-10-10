@@ -14,6 +14,7 @@ import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../../utils/storeCatalog.js';
 import { syncCharacterUnlocks } from '../../worm/wormUnlocks.js';
 import { UNLOCK_ALL } from '../../utils/testUnlock.js';
 import { STARTING_BANKROLL } from '../../utils/economyConstants.js';
+import { clampWormCameraZoom, WORM_CAMERA_ZOOM, WORM_CAMERA_ZOOM_KEY } from '../../worm/wormCameraZoom.js';
 
 export const SETTINGS_STORAGE_KEY = 'worm3_settings';
 export const SETTINGS_VERSION_KEY = 'worm3_settings_version';
@@ -84,6 +85,8 @@ const loadPersistedState = () => {
     // 'face' rolls the horizon with the face the worm is on; 'level' keeps it
     // world-up. A feel call, so it is a setting rather than a constant.
     const wormCameraHorizon = localStorage.getItem('worm3_camera_horizon') === 'level' ? 'level' : 'face';
+    // How far back the chase camera sits; see wormCameraZoom.js.
+    const wormCameraZoom = clampWormCameraZoom(localStorage.getItem(WORM_CAMERA_ZOOM_KEY));
     // A missing key means a brand-new player: seed the starting bankroll so the
     // betting feature is reachable on day one. (An existing "0" stays 0 — the
     // player spent it; the grant is one-time by construction since every
@@ -139,6 +142,7 @@ const loadPersistedState = () => {
       wormCharacter: ownedItems.includes(`character_${wormCharacter}`) ? wormCharacter : 'classic',
       wormShowTrail,
       wormCameraHorizon,
+      wormCameraZoom,
       parityPoints: safeParityPoints,
       modePlays,
       ownedItems,
@@ -159,6 +163,7 @@ const loadPersistedState = () => {
       wormCharacter: 'classic',
       wormShowTrail: true,
       wormCameraHorizon: 'face',
+      wormCameraZoom: WORM_CAMERA_ZOOM.default,
       parityPoints: playerSave?.points ?? STARTING_BANKROLL, // storage unavailable — new-player experience
       modePlays: {},
       ownedItems: DEV_FREE_ECONOMY ? [...ALL_ITEMS_OWNED] : ownedForProgress([...DEFAULT_OWNED, ...(playerSave?.ownedItems ?? [])], playerSave?.progress),

@@ -22,7 +22,7 @@ import { updateLiveLayerRim } from './liveLayerRim.js';
 
 // ─── 1. Layer rim ─────────────────────────────────────────────────────────────
 
-const rimVertexShader = `
+export const rimVertexShader = `
   attribute float aPhase;
   varying vec2 vUv;
   varying float vPhase;
