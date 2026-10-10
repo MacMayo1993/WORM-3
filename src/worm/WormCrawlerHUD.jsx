@@ -1355,6 +1355,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         '--key-glow': 'transparent',
     };
 
+    // Completion owns the screen, including the short beat over the live cube.
+    // Remove gameplay controls immediately while the simulation is paused.
+    if (wormGamePhase === 'solved' && storyId) return <div className="worm-instrument" style={ROOT_STYLE}>
+        <StoryResult onNext={onStoryNext} onRetry={onRetry} onLevels={onNewGame} />
+    </div>;
+
     return (
         <div className="worm-instrument" data-combat={combatMode || undefined} data-lesson={demoLesson ? lesson.id : undefined} style={ROOT_STYLE}>
 
@@ -1495,8 +1501,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     onNewGame={onNewGame}
                 />
             )}
-
-            {wormGamePhase === 'solved' && storyId && <StoryResult onNext={onStoryNext} onRetry={onRetry} onLevels={onNewGame} />}
 
             {/* ── Death screen ── */}
             {!combatMode && showDeathMenu && !isMinimized && (

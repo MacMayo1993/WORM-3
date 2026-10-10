@@ -1,3 +1,4 @@
+vi.mock('../utils/device.js', async original => ({ ...(await original()), prefersReducedMotion: () => true }));
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -65,13 +66,16 @@ it('resumes at the next unlocked level and lets a completed level claim its rewa
   act(() => choices.querySelector('button').click());
   expect(state().ownedItems).toHaveLength(1); expect(host.querySelector('[role="status"]').textContent).toContain('unlocked');
 });
-it('offers Next, Replay and chapter navigation from completion', () => {
+it.each(['Next level', 'Play again', 'Levels'])('offers %s from the concise completion card', label => {
   const next = vi.fn(), retry = vi.fn(), levels = vi.fn();
   useGameStore.setState({ wormStoryResult: { levelId: 1, stars: 3, seconds: 8, xp: 70, points: 45 } });
   act(() => root.render(<StoryResult onNext={next} onRetry={retry} onLevels={levels} />));
   expect(host.querySelector('[aria-label="3 out of 3 stars"]')).not.toBeNull();
-  click('Next level'); click('Play again'); click('Levels');
-  expect(next).toHaveBeenCalledOnce(); expect(retry).toHaveBeenCalledOnce(); expect(levels).toHaveBeenCalledOnce();
+  expect(host.querySelector('[aria-label="Star requirements"]')).toBeNull();
+  expect(host.querySelector('.screen-stat-row')).toBeNull();
+  expect(host.querySelector('.story-completion-notes').open).toBe(false);
+  click(label);
+  expect(({ 'Next level': next, 'Play again': retry, Levels: levels })[label]).toHaveBeenCalledOnce();
 });
 
 it('presents the selected mission briefing alongside its real objectives, without revealing its ending', () => {

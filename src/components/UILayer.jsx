@@ -299,8 +299,8 @@ export default function UILayer({
         {/* Disparity HUD — RIP death log + winner announcement */}
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <Suspense fallback={null}><DisparityHUD /></Suspense>}
 
-        {/* Healer Worm HUD Overlay */}
-        {wormHealerMode && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} onStoryNext={onWormStoryNext} /></Suspense>}
+        {/* The next briefing replaces the completed run, including its result card. */}
+        {wormHealerMode && !showMobiIntro && !showWormModeWizard && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} onStoryNext={onWormStoryNext} /></Suspense>}
         {/* Held for the whole traversal so the ride stays legible as one continuous
             event across the three camera regimes it cuts between. */}
         <CaptureVisual behindHud><TunnelTransitOverlay /></CaptureVisual>
