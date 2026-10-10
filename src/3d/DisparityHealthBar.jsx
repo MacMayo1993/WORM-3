@@ -39,10 +39,11 @@ function barGeometry(flips, flipCap) {
   return geo;
 }
 
-const DisparityHealthBar = React.memo(function DisparityHealthBar({ flips, flipCap }) {
+// `z` lifts the bar over a flip portal's frame, whose lip would otherwise hide the warning pip.
+const DisparityHealthBar = React.memo(function DisparityHealthBar({ flips, flipCap, z = 0.002 }) {
   if (!(flips > 0) || !(flipCap > 0)) return null;
   return (
-    <mesh position={[0, -0.41, 0.002]} geometry={barGeometry(flips, flipCap)} material={material}
+    <mesh position={[0, -0.41, z]} geometry={barGeometry(flips, flipCap)} material={material}
       raycast={() => null} dispose={null} />
   );
 });

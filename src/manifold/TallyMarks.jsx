@@ -76,13 +76,14 @@ function tallyGeometry(flips, radius, dark) {
   return geo;
 }
 
-const TallyMarks = ({ flips, radius, origColor }) => {
+// `labelOnly` keeps just the ×N count (a flip portal draws the rest of the story).
+const TallyMarks = ({ flips, radius, origColor, labelOnly = false }) => {
   // Dark marks on light colours, light marks on dark colours.
   const dark = LIGHT_TILES.includes(origColor);
   if (flips <= 0) return null;
   return (
     <group position={[0, 0, 0.015]}>
-      <mesh geometry={tallyGeometry(flips, radius, dark)} material={tallyMaterial} raycast={() => null} dispose={null} />
+      {!labelOnly && <mesh geometry={tallyGeometry(flips, radius, dark)} material={tallyMaterial} raycast={() => null} dispose={null} />}
       {/* Show flip count as small text for higher counts (keeps marks within tile) */}
       {flips > 6 && (
         <CanvasLabel

@@ -80,3 +80,27 @@ it('keeps foreground labels in their own render-order batch', () => {
   expect(pool.group.children.map(mesh => [mesh.renderOrder, mesh.count])).toEqual([[0, 2], [2, 0]]);
   pool.dispose(); geometry.dispose(); material.dispose();
 });
+
+it('carries four numbers per instance as aInstanceData, re-uploading only when they change', () => {
+  const scene = new THREE.Group(), pool = createSurfaceBatches();
+  scene.add(pool.group);
+  const geometry = new THREE.PlaneGeometry(), material = new THREE.MeshStandardMaterial();
+  const anchors = [new THREE.Group(), new THREE.Group()], data = [{ current: [1, 2, 3, 4] }, { current: [5, 6, 7, 8] }];
+  const release = anchors.map((anchor, i) => { scene.add(anchor); return pool.register(anchor, geometry, material, null, { current: i }, data[i]); });
+  pool.update();
+  const mesh = pool.group.children[0], attribute = mesh.geometry.attributes.aInstanceData;
+  expect(attribute.itemSize).toBe(4);
+  expect(Array.from(attribute.array.slice(0, 8))).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  // The shared geometry is never written: the batch has its own view of it.
+  expect(geometry.attributes.aInstanceData).toBeUndefined();
+  const version = attribute.version;
+  pool.update(); expect(attribute.version).toBe(version);
+  data[1].current = [5, 6, 7, 9]; pool.update();
+  expect(attribute.version).toBeGreaterThan(version); expect(attribute.array[7]).toBe(9);
+  // A freed slot hands the next entry's data down with it.
+  release[0](); pool.update();
+  expect(mesh.count).toBe(1); expect(Array.from(attribute.array.slice(0, 4))).toEqual([5, 6, 7, 9]);
+  pool.dispose();
+  expect(geometry.attributes.position).toBeDefined();
+  geometry.dispose(); material.dispose();
+});

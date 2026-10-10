@@ -26,16 +26,17 @@ export function TileSurfaceProvider({ children, exteriorPortals }) {
   </Context.Provider>;
 }
 
-// `seed` is a stable number per piece, read by the material as aInstanceSeed
-// (instanced draws only).
-export function TileSurfaceInstance({ geometry, material, color, seed, ...props }) {
+// `seed` is a stable number per piece, read by the material as aInstanceSeed, and
+// `data` four numbers read as aInstanceData (instanced draws only).
+export function TileSurfaceInstance({ geometry, material, color, seed, data, ...props }) {
   const pool = useTileSurfaceInstances(), anchor = useRef();
-  const colorRef = useRef(color), seedRef = useRef(seed);
+  const colorRef = useRef(color), seedRef = useRef(seed), dataRef = useRef(data);
   colorRef.current = color;
   seedRef.current = seed;
-  const hasColor = color !== undefined, hasSeed = seed !== undefined;
-  useLayoutEffect(() => pool?.register(anchor.current, geometry, material, hasColor ? colorRef : null, hasSeed ? seedRef : null),
-    [pool, geometry, material, hasColor, hasSeed]);
+  dataRef.current = data;
+  const hasColor = color !== undefined, hasSeed = seed !== undefined, hasData = data !== undefined;
+  useLayoutEffect(() => pool?.register(anchor.current, geometry, material, hasColor ? colorRef : null, hasSeed ? seedRef : null,
+    hasData ? dataRef : null), [pool, geometry, material, hasColor, hasSeed, hasData]);
   return pool ? <group ref={anchor} {...props} />
     : <mesh geometry={geometry} material={material} dispose={null} {...props} />;
 }
