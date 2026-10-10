@@ -132,7 +132,7 @@ const MobiIntroScreen = ({ lines = [], modeName, _accentColor, onComplete, prima
         // Docked below the top app bar when the caller asks for it, so the bar
         // (and its Home / Settings / far-side buttons) stays legible and
         // reachable above the dialogue rather than under its dim and blur.
-        top: topInset || 0,
+        top: demoStep ? 0 : (topInset || 0),
         // Above all in-game chrome (nav bar, HUD, mobile controls) — a Mobi
         // dialogue is a blocking beat; only demo shell overlays sit higher.
         zIndex: Z.INTRO,

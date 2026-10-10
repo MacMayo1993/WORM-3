@@ -598,6 +598,15 @@ export function useDemoMode({
     const nextStep = nextDemoStep(fromStep);
     setDemoStepIntroVisible(false);
     if (nextStep === 'end' && !useGameStore.getState().demoSkipped) store.recordDiscoveryXp('introduction');
+    if (fromStep === 'chaos-forecast') {
+      // Clearing the Chaos ledger does not repair eliminated sticker state.
+      // Stage a clean preview without starting Random behind its briefing.
+      cancelDisparityRun();
+      store.setChaosLevel(0);
+      store.setRotatedCubies(makeCubies(store.size));
+      store.setFlipMode(false);
+      store.setShowTunnels(false);
+    }
     store.setDemoStep(nextStep);
     // Pre-stage plain cube steps so the intro dialogue blurs the upcoming
     // scene. Other types (worm/chaos/showcase/random) start on Continue —
@@ -884,6 +893,10 @@ export function useDemoMode({
     store.clearDisparityGame();
     store.setChaosLevel(0);
     cancelDisparityRun();
+    // Keep a fresh, colored cube behind the payout and the next briefing.
+    store.setRotatedCubies(makeCubies(store.size));
+    store.setFlipMode(false);
+    store.setShowTunnels(false);
     demoForecastPickRef.current = null;
     demoWatchTimers.current.push(scheduleDemoTimer(() => {
       setDemoRewardStamp(null);

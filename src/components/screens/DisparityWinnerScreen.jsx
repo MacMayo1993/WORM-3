@@ -32,7 +32,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
   const outcome = result?.push ? `${result.wager} PP returned`
     : result?.won ? `Prediction won · +${result.net ?? result.payout - result.wager} PP`
     : result ? `Prediction missed · −${result.wager} PP` : 'Round complete';
-  return <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-results" style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT, ...arcadeModeVars('chaos'), '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'] }} role="dialog" aria-modal="true" aria-labelledby="chaos-result-title">
+  return <div ref={dialogRef} tabIndex={-1} onKeyDown={onDialogKeyDown} className="chaos-ui chaos-results" data-demo={demoNavigation || undefined} style={{ zIndex: Z.FULLSCREEN, fontFamily: UI_FONT, ...arcadeModeVars('chaos'), '--chaos-accent': arcadeModeVars('chaos')['--arcade-accent'] }} role="dialog" aria-modal="true" aria-labelledby="chaos-result-title">
     <div className="chaos-result-sheet">
       {demoNavigation && <nav className="chaos-demo-next" aria-label="Demo navigation">
         <span>Chaos complete</span>

@@ -227,7 +227,7 @@ export default function UILayer({
     || showComingSoon || showMobiusCubelet || showMobiIntro || victory
     // Mobi's level briefing and the finale cutscene are blocking beats — clear
     // the game chrome (top bar, bottom nav, sheet) so nothing crowds him.
-    || showLevelTutorial || showCutscene
+    || showLevelTutorial || showCutscene || showDisparityWinner || demoDialogueVisible
     // Aiming chaos's first strike: the prompt carries the only actions (aim,
     // strike, surprise, leave). Shuffle or Undo here would change the board the
     // round's scripted unshuffle is about to replay.
@@ -243,7 +243,7 @@ export default function UILayer({
             tints the scene without washing out panels or controls. */}
         {showGameHUD && <CaptureVisual behindHud><FlipScreenGlow /></CaptureVisual>}
 
-        {showGameHUD && <TopMenuBar
+        {showGameHUD && !demoMode && <TopMenuBar
           actionSlotRef={setTopBarActionSlot}
           metrics={metrics}
           size={size}
@@ -265,7 +265,7 @@ export default function UILayer({
             Was hardcoded black-on-white monospace, predating the field-guide
             system; now the NIGHT surface, and a real <button> so it is
             reachable by keyboard and announces its move count. */}
-        {!teachMode.courseActive && moveHistory.length > 0 && !isMobile && !demoDialogueVisible && (
+        {showGameHUD && moveHistory.length > 0 && !isMobile && (
           <button
             type="button"
             className="ui-focusable"
@@ -294,10 +294,10 @@ export default function UILayer({
         )}
 
         {/* Floating HUD — auto-fade parity/chaos notifications */}
-        {!teachMode.courseActive && !wormHealerMode && !chaosMode && !disparityWinner && <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />}
+        {showGameHUD && !chaosMode && !disparityWinner && <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />}
 
         {/* Disparity HUD — RIP death log + winner announcement */}
-        {(!wormHealerMode && (chaosMode || disparityWinner)) && <Suspense fallback={null}><DisparityHUD /></Suspense>}
+        {(showGameHUD && (chaosMode || disparityWinner)) && <Suspense fallback={null}><DisparityHUD /></Suspense>}
 
         {/* The next briefing replaces the completed run, including its result card. */}
         {wormHealerMode && !showMobiIntro && !showWormModeWizard && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} onStoryNext={onWormStoryNext} /></Suspense>}
@@ -663,7 +663,7 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      {!teachMode.courseActive && isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !ignitionPicking && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
+      {showGameHUD && !demoMode && isMobile && !showTutorial && (
         <MobileControls
           actionSlot={topBarActionSlot}
           onShowHelp={() => setShowHelp(true)}

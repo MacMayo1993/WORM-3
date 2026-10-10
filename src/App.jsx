@@ -1493,17 +1493,11 @@ export default function WORM3() {
               showMobiusCubelet,
               onOpenModeSelect: () => setShowModeSelect(true),
               // True only while a Mobi dialogue PANEL is presenting — the cold
-              // open, the step intro, or the coach's mid-step aside. Those are
-              // bottom-docked panels, so the HUD (bottom nav bar + undo button)
-              // hides underneath them.
-              //
-              // The coach's ordinary "Next ▶" pill deliberately does NOT count:
-              // it lives at the top of the screen, and the hands-on phase is
-              // exactly when the player needs Reset, Flip and Views under their
-              // thumb — hiding the nav there used to make the demo's own
-              // mechanics unreachable while it was asking the player to try them.
+              // open, instruction cards, results, and reward transitions.
+              // Hands-on coaching leaves the real nav controls available.
               demoDialogueVisible: demoMode && (
                 demoColdOpenVisible || demoStepIntroVisible || (demoTryVisible && !!demoCoachCopy)
+                || demoForecastVisible || !!demoCelebrationStep || !!demoRewardStamp || showDemoResults || demoStep === 'end'
               ),
             }}
             handlers={{
@@ -1588,7 +1582,7 @@ export default function WORM3() {
         <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoStep !== 'end' && !demoColdOpenVisible && !demoStepIntroVisible && !demoCoachCopy &&
         !demoForecastVisible && !demoCelebrationStep && !demoChromeQuiet && !showDemoResults &&
-        <DemoProgressBar currentStep={demoStep} onSkipStep={() => handleDemoSkipStep(demoStep)} onExit={handleExitDemo} />}
+        <DemoProgressBar currentStep={demoStep} belowWormHud={demoStep === 'worm-traversal'} onSkipStep={() => handleDemoSkipStep(demoStep)} onExit={handleExitDemo} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
       {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
