@@ -194,7 +194,7 @@ export function ThunkEffect({ thunkRef }) {
     return (
         <>
             <group ref={groupRef} visible={false}>
-                <Html center distanceFactor={10} wrapperClass="capture-scene-label" zIndexRange={[40, 0]}>
+                <Html center distanceFactor={10} wrapperClass="worm-impact-callout" zIndexRange={[40, 0]}>
                     <div ref={rootRef} style={{
                         position: 'relative', display: 'none', pointerEvents: 'none', userSelect: 'none',
                         whiteSpace: 'nowrap', textAlign: 'center', fontSize: '48px',

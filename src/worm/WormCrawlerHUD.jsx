@@ -10,6 +10,7 @@ import WormDemoLessonCard from '../components/screens/WormDemoLessonCard.jsx';
 import { wormDemoLesson } from '../game/wormDemoLessons.js';
 import './wormHudLayout.css';
 import RotationCountdownHUD from './RotationCountdownHUD.jsx';
+import CaptureVisual from '../components/capture/CaptureVisual.jsx';
 import WormCountdownOverlay from './WormCountdownOverlay.jsx';
 import TunnelNeedsCard from './TunnelNeedsCard.jsx';
 import SignatureButton from './SignatureButton.jsx';
@@ -1358,7 +1359,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         <div className="worm-instrument" data-combat={combatMode || undefined} data-lesson={demoLesson ? lesson.id : undefined} style={ROOT_STYLE}>
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
-            {wormAlive && <OrbPickupFlash />}
+            {wormAlive && <CaptureVisual behindHud><OrbPickupFlash /></CaptureVisual>}
+
+            {captureMode && !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && (
+                <CaptureVisual><div className="capture-rotation-clock"><RotationCountdownHUD compact /></div></CaptureVisual>
+            )}
 
             {/* ── Zone 1: Status bar — glance info + pause, one object ── */}
             <div className="worm-hud-top" aria-hidden={isPaused || undefined} inert={isPaused ? '' : undefined}>
@@ -1392,7 +1397,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
                 </div>
                 <div className="worm-hud-status-row worm-hud-telemetry">
-                    {!combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD compact />}
+                    {!captureMode && !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && <RotationCountdownHUD compact />}
                     {wormAlive && (!demoLesson || ['tunnel', 'heal'].includes(lesson.id)) && <HudContext surface={phase === 'crawling'} demo={false} onInspect={handlePause} />}
                 </div>
                 {!combatMode && !demoLesson && storyId && storyStarted && <StoryObjectiveCard compact />}
@@ -1473,7 +1478,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Countdown overlay ── */}
             {wormGamePhase === 'countdown' && wormCountdownStep !== null && (
-                <WormCountdownOverlay step={wormCountdownStep} />
+                <CaptureVisual><WormCountdownOverlay step={wormCountdownStep} /></CaptureVisual>
             )}
 
             {/* ── Winner screen ── */}

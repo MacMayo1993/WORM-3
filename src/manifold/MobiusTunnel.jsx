@@ -28,10 +28,9 @@ import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 import { tunnelCharges, tunnelChargeState } from './chaosStormBridge.js';
 
-// Opacity multiplier when the worm is traversing a different tunnel.
-// While a traversal is underway, tunnels the worm is NOT in recede to this
-// faint level so the active tunnel reads clearly. When no traversal is
-// underway (WORM_IDLE_OPACITY) every tunnel stays comfortably visible.
+// Keep the WORM network readable throughout a ride. The occupied lane is
+// highlighted; all other possible routes keep their normal idle brightness.
+// Other modes retain the quieter background tier.
 const DIM_OPACITY       = 0.22;
 const WORM_IDLE_OPACITY = 0.75;
 const FULL_OPACITY      = 1.0;
@@ -269,7 +268,6 @@ const MobiusTunnel = ({
   const detailed = useGameStore(s => !s.perfReducedFX);
   const ribbonMode = wormMode || raisedPresentation;
   const styled = style1 !== 'solid' || style2 !== 'solid';
-  const groupRef = useRef();
   const segments = wormMode ? 160 : RIBBON_SEGS;
   const meshRef          = useRef();
   const formationAge = useRef(0);
@@ -360,8 +358,8 @@ const MobiusTunnel = ({
   useFrame((_state, delta) => {
     const state = useGameStore.getState();
     const occupied = tunnelState.activeTunnelId === tunnelId || tunnelState.occupiedTunnelIds.has(tunnelId);
-    // Keep every tail-occupied track; unrelated ribbons cannot cross the ride.
-    if (groupRef.current) groupRef.current.visible = !wormMode || !tunnelState.active || occupied;
+    // All active connections remain in the interior highway. The shader clears
+    // only fragments near the lens instead of removing whole alternate routes.
     uniforms.uRideMode.value = ribbonMode ? 1 : 0;
     uniforms.uCameraClearance.value = wormMode && tunnelState.active ? 1 : 0;
     if (raisedPresentation && (state.settings?.reducedMotion || prefersReducedMotion())) delta = 0;
@@ -495,11 +493,11 @@ const MobiusTunnel = ({
 
     // Dim system:
     //  • worm traversing this tunnel  → full brightness (snaps in)
-    //  • worm traversing another one  → recede to DIM_OPACITY so it doesn't compete
+    //  • worm traversing another one  → retain its readable idle brightness
     //  • no traversal underway        → all tunnels stay at the comfortable idle level
     const targetDim = isActive
       ? FULL_OPACITY
-      : tunnelState.active
+      : tunnelState.active && !wormMode
         ? DIM_OPACITY
         : WORM_IDLE_OPACITY;
     const lerpSpeed = targetDim > dimRef.current ? DIM_LERP_UP : DIM_LERP_DOWN;
@@ -601,7 +599,7 @@ const MobiusTunnel = ({
   });
 
   return (
-    <group ref={groupRef}>
+    <group>
       {/* The solid Möbius spine stays readable inside the intro-inspired open curls.
           frustumCulled is off here: vertex positions are written in world
           space into meshes parented at the origin, so the lazily-computed bounding sphere goes

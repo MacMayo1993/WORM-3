@@ -2,6 +2,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormCrawlerHUD from '../worm/WormCrawlerHUD.jsx';
+import CaptureChrome from '../components/capture/CaptureChrome.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { wormBuffs } from '../worm/wormBuffs.js';
 import { rotationClock } from '../worm/healerWorm/rotationClockBridge.js';
@@ -18,7 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-  useGameStore.setState({ demoMode: false, wormHealerMode: true, wormAlive: true,
+  useGameStore.setState({ captureMode: false, demoMode: false, wormHealerMode: true, wormAlive: true,
     wormStoryLevel: null, wormStoryStarted: false, wormStoryChecklist: null, wormStoryResult: null, wormCombatMode: false, wormGamePhase: 'active', wormPaused: false, wormCharacter: 'inch',
     wormElementalTheme: null, wormElementalPartner: null, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormJumpRescueActive: false,
     wormMission: { title: 'Collect 3 face orbs', target: 3, progress: 0, reward: 30, xp: 60, sequence: 5 },
@@ -154,12 +155,12 @@ it('puts Start level at the bottom, counts down, then shows automatic checked ta
   expect(start.textContent).toContain('Start level');
   act(() => start.click());
   expect(host.querySelector('.worm-story-start')).toBeNull();
-  expect(host.querySelector('.worm-countdown-digit').textContent).toBe('3');
+  expect(document.querySelector('.worm-countdown-digit').textContent).toBe('3');
   expect(useGameStore.getState().wormPaused).toBe(true);
   expect(host.querySelector('[aria-label="Pause"]').disabled).toBe(true);
   // Complete the phase driver's handoff in this DOM-only harness.
   act(() => useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false }));
-  expect(host.querySelector('.worm-countdown')).toBeNull();
+  expect(document.querySelector('.worm-countdown')).toBeNull();
   expect(host.querySelector('.worm-primary-actions')).not.toBeNull();
   act(() => useGameStore.setState({ wormStoryChecklist: { runId, levelId: 7, seconds: 260,
     goals: [{ key: 'boosts', label: 'Finish boosts', value: 2, target: 2, done: true }] } }));
@@ -240,6 +241,33 @@ it('resumes a user pause when starting capture and restores the HUD afterward', 
   expect(host.querySelector('.worm-pause-card')).toBeNull();
   act(() => useGameStore.getState().setCaptureMode(false));
   expect(host.querySelector('[aria-label="Pause"]')).not.toBeNull();
+});
+
+it('records the live rotation warning, pickups and launch countdown while menus stay hidden', () => {
+  useGameStore.setState({ captureMode: true, wormPhase: 'crawling', wormOrbFlash: null });
+  rotationClock.secondsLeft = 1.7;
+  rotationClock.total = 10;
+  rotationClock.warning = 0.8;
+  rotationClock.held = false;
+  act(() => root.render(<CaptureChrome><WormCrawlerHUD phase="crawling" wormAlive /></CaptureChrome>));
+  act(() => vi.advanceTimersByTime(32));
+  const chrome = host.querySelector('.capture-chrome');
+  expect(chrome.hidden).toBe(true);
+  const clock = document.querySelector('.capture-rotation-clock .worm-rotation-clock');
+  expect(clock.textContent).toContain('1.7s');
+  expect(clock.style.display).toBe('flex');
+  expect(clock.closest('[hidden], [inert]')).toBeNull();
+  expect(document.querySelectorAll('.worm-rotation-clock')).toHaveLength(1);
+  act(() => useGameStore.setState({ wormOrbFlash: { color: '#ff9933', seq: 1 } }));
+  expect(document.querySelector('.worm-orb-flash').closest('[hidden], [inert]')).toBeNull();
+  act(() => useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3, wormPaused: true }));
+  expect(document.querySelector('.worm-rotation-clock')).toBeNull();
+  const countdown = document.querySelector('.worm-countdown-digit');
+  expect(countdown.textContent).toBe('3');
+  expect(countdown.closest('[hidden], [inert]')).toBeNull();
+  expect(useGameStore.getState().wormPaused).toBe(true);
+  act(() => root.render(null));
+  expect(document.querySelector('.capture-gameplay-visual')).toBeNull();
 });
 
 it('shows the cube view and sim-driven countdown, then removes it on expiry', () => {

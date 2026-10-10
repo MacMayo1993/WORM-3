@@ -4,6 +4,9 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import CaptureChrome from '../components/capture/CaptureChrome.jsx';
 import CaptureController from '../components/capture/CaptureController.jsx';
 import CapturePanel from '../components/capture/CapturePanel.jsx';
+import CaptureVisual from '../components/capture/CaptureVisual.jsx';
+import RotationPreview from '../components/overlays/RotationPreview.jsx';
+import { chaosCountdownState } from '../hooks/useChaosMode.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { callWormTurn } from '../worm/wormTurnBridge.js';
 vi.mock('../worm/wormTurnBridge.js', () => ({ callWormTurn: vi.fn() }));
@@ -61,6 +64,30 @@ it('Escape restores UI without reaching game handlers; normal controls pass thro
   expect(useGameStore.getState().captureMode).toBe(false);
   expect(document.documentElement.classList.contains('capture-active')).toBe(false);
   window.removeEventListener('keydown', downstream);
+});
+it('keeps gameplay visuals outside hidden chrome without restarting them when capture toggles', () => {
+  const mount = vi.fn(), unmount = vi.fn();
+  function Visual() {
+    useEffect(() => { mount(); return unmount; }, []);
+    return <RotationPreview upcomingRotation={{ axis: 'row', dir: 1, sliceIndex: 1 }} size={3} />;
+  }
+  act(() => root.render(<CaptureChrome><button>Menu</button><CaptureVisual><Visual /></CaptureVisual></CaptureChrome>));
+  const visual = document.querySelector('.capture-gameplay-visual');
+  const preview = visual.querySelector('.rotation-preview');
+  for (const captureMode of [true, false, true]) {
+    set({ captureMode });
+    expect(host.querySelector('.capture-chrome').hidden).toBe(captureMode);
+    expect(visual.closest('[hidden], [inert], [aria-hidden="true"]')).toBeNull();
+    expect(document.querySelector('.rotation-preview')).toBe(preview);
+    chaosCountdownState.countdown = 2400;
+    act(() => vi.advanceTimersByTime(32));
+    expect(preview.querySelector('.preview-countdown-text').textContent).toBe('2.4s');
+  }
+  expect(mount).toHaveBeenCalledOnce();
+  expect(unmount).not.toHaveBeenCalled();
+  act(() => root.render(null));
+  expect(unmount).toHaveBeenCalledOnce();
+  expect(document.querySelector('.capture-gameplay-visual')).toBeNull();
 });
 it('requires a stationary two-finger hold and swallows releases after exiting', () => {
   act(() => root.render(<CaptureController />)); set({ captureMode: true });
