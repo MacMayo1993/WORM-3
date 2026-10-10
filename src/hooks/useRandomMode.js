@@ -55,11 +55,18 @@ export function useRandomMode(suspended = false) {
   const remainingRef = useRef(CYCLE_MS);
   const runId = wormHealerMode ? wormRunId : null;
 
-  // A new run gets a fresh cycle. A ready card keeps its authored look until
-  // ten seconds of play have elapsed; resuming a pause must not remix at once.
+  const freshRunRef = useRef(true);
+  // Reset only for a new run. Menus and intro cards suspend the remaining
+  // active-play time; reopening gameplay must not trigger an extra remix.
   useEffect(() => {
     remainingRef.current = CYCLE_MS;
-    if (!randomMode || !inGame) return;
+    freshRunRef.current = true;
+  }, [randomMode, runId]);
+
+  useEffect(() => {
+    if (!randomMode || !inGame || !freshRunRef.current) return;
+    freshRunRef.current = false;
+    // A paused ready card keeps its authored look for a full first play cycle.
     if (activeRef.current) applyRandomStyle();
   }, [randomMode, inGame, runId]);
 

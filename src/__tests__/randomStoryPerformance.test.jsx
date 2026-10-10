@@ -154,3 +154,27 @@ it('counts only active play time from the ready card and across partial-cycle pa
   act(() => root.unmount()); root = null;
   advance(30000); expect(tick()).toBe(initial + 4);
 });
+
+it.each(['showSettings', 'showMainMenu', 'showWelcome', 'showTutorial', 'suspended'])(
+  'preserves the remaining remix time through %s', gate => {
+    vi.useFakeTimers(); globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    useGameStore.setState({ randomMode: true, wormHealerMode: false, wormPaused: false,
+      showMainMenu: false, showSettings: false, showWelcome: false, showTutorial: false });
+    host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    act(() => root.render(<Harness />));
+    const initial = useGameStore.getState().randomStyleTick;
+    act(() => vi.advanceTimersByTime(6000));
+    const toggle = value => act(() => {
+      if (gate === 'suspended') root.render(<Harness suspended={value} />);
+      else useGameStore.setState({ [gate]: value });
+    });
+    toggle(true);
+    act(() => vi.advanceTimersByTime(45000));
+    toggle(false);
+    expect(useGameStore.getState().randomStyleTick).toBe(initial);
+    act(() => vi.advanceTimersByTime(3999));
+    expect(useGameStore.getState().randomStyleTick).toBe(initial);
+    act(() => vi.advanceTimersByTime(1));
+    expect(useGameStore.getState().randomStyleTick).toBe(initial + 1);
+  }
+);
