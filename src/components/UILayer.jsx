@@ -1,4 +1,5 @@
 import ChaosCountdown from '../chaos/ChaosCountdown.jsx';
+import CaptureVisual from './capture/CaptureVisual.jsx';
 // src/components/UILayer.jsx
 /**
  * UILayer — all DOM overlays rendered after the welcome screen dismisses.
@@ -238,9 +239,9 @@ export default function UILayer({
     <>
       <div className="ui-layer">
         <InspectionLens />
-        {/* Screen-space flip echo. Sits under every HUD element (zIndex 1) so it
+        {/* Screen-space flip echo. Sits under the HUD so it
             tints the scene without washing out panels or controls. */}
-        {showGameHUD && <FlipScreenGlow />}
+        {showGameHUD && <CaptureVisual behindHud><FlipScreenGlow /></CaptureVisual>}
 
         {showGameHUD && <TopMenuBar
           actionSlotRef={setTopBarActionSlot}
@@ -289,7 +290,7 @@ export default function UILayer({
 
         {/* Auto-rotate Preview */}
         {autoRotateEnabled && chaosMode && (
-          <RotationPreview upcomingRotation={upcomingRotation} size={size} />
+          <CaptureVisual><RotationPreview upcomingRotation={upcomingRotation} size={size} /></CaptureVisual>
         )}
 
         {/* Floating HUD — auto-fade parity/chaos notifications */}
@@ -302,9 +303,9 @@ export default function UILayer({
         {wormHealerMode && <Suspense fallback={null}><HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} onStoryNext={onWormStoryNext} /></Suspense>}
         {/* Held for the whole traversal so the ride stays legible as one continuous
             event across the three camera regimes it cuts between. */}
-        <TunnelTransitOverlay />
+        <CaptureVisual behindHud><TunnelTransitOverlay /></CaptureVisual>
 
-        <ChaosCountdown value={disparityCountdown} settings={settings} />
+        <CaptureVisual><ChaosCountdown value={disparityCountdown} settings={settings} /></CaptureVisual>
         {ignitionPicking && (
           <Suspense fallback={null}>
             <ChaosIgnitionPrompt onConfirm={onIgnitionConfirm} onSurprise={onIgnitionSurprise} onLeave={onBackToMainMenu} />
@@ -730,8 +731,7 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      <RandomStyleFlash />
-      <ViewModeFlash />
+      <CaptureVisual behindHud><RandomStyleFlash /><ViewModeFlash /></CaptureVisual>
     </>
   );
 }

@@ -11,7 +11,7 @@ export default function CapturePanel({ viewer = false }) {
       && (!s.demoMode || s.demoStep !== 'worm-traversal' || s.demoWormStarted)))));
   return <section className="settings-section" style={{ fontFamily: UI_FONT, fontSize: TEXT_SM, lineHeight: 1.6 }}>
     <h3 className="settings-section-title">Just the Game</h3>
-    <p>Capture Mode hides menus, scores, hints and notifications in every mode. Your game keeps running.</p>
+    <p>Capture Mode hides menus, scores and controls. Gameplay effects, death and cut animations, and rotation countdowns stay visible. Your game keeps running.</p>
     <p>Use your device’s screen recorder. To bring the UI back, hold two fingers still for one second anywhere on the game, or press Escape.</p>
     {!viewer && <p>Worm: swipe to steer, tap to jump or dive. Swipe up to boost with relative steering; tap with two fingers for your signature move. Hold one finger to fire. Keyboard controls still work.</p>}
     <button type="button" className="capture-start ui-focusable" disabled={!available}

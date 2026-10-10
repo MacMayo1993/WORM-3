@@ -84,6 +84,10 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
       const fixed = positions.array.slice();
       tunnelState.occupiedTunnelIds.clear();
       frame();
+      // This route is now an alternate outcome, not part of the worm's body.
+      // It must remain visible while another route is occupied.
+      expect(ribbon.parent.visible).toBe(true);
+      expect(ribbon.material.uniforms.uCameraClearance.value).toBe(1);
       expect(positions.array.some((v, i) => Math.abs(v - fixed[i]) > 0.1)).toBe(true);
       // Acquiring a still-enlarged track must rebuild it onto the fixed route.
       tunnelState.activeTunnelId = id;
