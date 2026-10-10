@@ -13,7 +13,7 @@ import { makeTunnelRideFrame, tunnelRideFrameInto, tunnelRideSampleArc, TUNNEL_R
 
 extend(THREE);
 
-it.each([3, 6, 15])('keeps the rendered track, rider and camera together through 6x core zoom on size %i', async size => {
+it.each([3, 6, 10, 15])('keeps the rendered track, rider and camera together through 6x core zoom on size %i', async size => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const before = useGameStore.getState(), bridge = { ...tunnelState };
   useGameStore.setState({ size, wormHealerMode: true, wormAlive: true, wormPaused: false });
@@ -59,6 +59,31 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
           }
         }
         expect(maxError).toBeLessThan(1e-6);
+        // Actual submitted triangles, including rails and curls, stop at the
+        // two core docks. The rider's continuous position samples stay intact.
+        for (const mesh of ribbon.parent.children) {
+          const geometry = mesh.geometry;
+          if (!geometry) continue;
+          const count = geometry.drawRange.count;
+          expect(count).toBeLessThan(geometry.index.count);
+          expect(count).toBeGreaterThan(0);
+          const distance = geometry.attributes.aDistance;
+          const trip = geometry.attributes.aTripFrac;
+          let entrance = 0, exit = 0;
+          for (let i = 0; i < count; i += 3) {
+            const arcs = [0, 1, 2].map(j => {
+              const vertex = geometry.index.getX(i + j);
+              return distance ? distance.getX(vertex) : trip.getX(vertex) * path.total;
+            });
+            const beforeCore = Math.max(...arcs) <= path.armALen + 1e-5;
+            const afterCore = Math.min(...arcs) >= path.total - path.armBLen - 1e-5;
+            expect(beforeCore || afterCore).toBe(true);
+            if (beforeCore) entrance++;
+            if (afterCore) exit++;
+          }
+          expect(entrance).toBeGreaterThan(0);
+          expect(exit).toBeGreaterThan(0);
+        }
       };
       // These samples span both arms and the hidden crossing, not just the docks.
       const progress = [0.2, 0.4, 0.5, 0.6, 0.8, 0.95];
