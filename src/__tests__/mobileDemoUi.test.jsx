@@ -150,13 +150,13 @@ it('publishes pause-menu ownership and provides a 48px pause target', () => {
 });
 
 
-it('places demo controls below the actual HUD and remeasures after rotation', () => {
+it('keeps WORM demo controls below its gameplay HUD and remeasures after rotation', () => {
   let bottom = 72;
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
-    return { bottom: this.classList.contains('top-app-bar') ? bottom : 0 };
+    return { bottom: this.classList.contains('worm-hud-top') ? bottom : 0 };
   });
   const skip = vi.fn(), exit = vi.fn();
-  render(<><div className="top-app-bar" /><DemoProgressBar currentStep="view-showcase" onSkipStep={skip} onExit={exit} /></>);
+  render(<><div className="worm-hud-top" /><DemoProgressBar belowWormHud currentStep="view-showcase" onSkipStep={skip} onExit={exit} /></>);
   const bar = host.querySelector('[aria-label="Demo controls"]');
   expect(bar.style.top).toBe('84px');
   bottom = 48;
@@ -177,4 +177,14 @@ it('keeps step progress and both navigation actions inside Mobi’s active dialo
   expect([...bar.querySelectorAll('button')].map(button => button.textContent)).toEqual(['Skip Step', 'Exit Demo']);
   expect(bar.closest('[inert]')).toBeNull();
   expect(dialog.querySelector('.mobi-footer-actions').textContent).toContain('Skip Mobi');
+});
+
+it('uses the top-bar position for cube demo progress, even inside instructions', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ bottom: 72 });
+  render(<><div className="top-app-bar" /><DemoProgressBar currentStep="chaos-forecast" onExit={() => {}} /></>);
+  expect(host.querySelector('.demo-toolbar').style.top).toBe('');
+  render(<DemoForecastPicker onPick={() => {}} onExit={() => {}} />);
+  expect(host.querySelector('.demo-toolbar--inline')).toBeNull();
+  expect(host.querySelector('.demo-forecast-panel').textContent).toContain('Which pair survives?');
+  expect(host.querySelectorAll('[aria-label="Demo progress"]')).toHaveLength(1);
 });

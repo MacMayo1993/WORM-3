@@ -5,11 +5,11 @@ import './demoProgressBar.css';
 
 // The same toolbar lives inside blocking dialogs and above the hands-on scene.
 // Keeping modal actions inside their dialog also keeps them in its focus trap.
-export default function DemoProgressBar({ currentStep, onSkipStep, onExit, disabled = false, inline = false }) {
+export default function DemoProgressBar({ currentStep, onSkipStep, onExit, disabled = false, inline = false, belowWormHud = false }) {
   const [top, setTop] = useState(null);
   useLayoutEffect(() => {
-    if (inline) return undefined;
-    const bars = [...document.querySelectorAll('.top-app-bar, .worm-hud-top')];
+    if (inline || !belowWormHud) { setTop(null); return undefined; }
+    const bars = [...document.querySelectorAll('.worm-hud-top')];
     const measure = () => {
       const bottom = Math.max(0, ...bars.map(bar => bar.getBoundingClientRect().bottom));
       setTop(bottom > 0 ? bottom + 12 : null);
@@ -19,7 +19,7 @@ export default function DemoProgressBar({ currentStep, onSkipStep, onExit, disab
     bars.forEach(bar => observer?.observe(bar));
     window.addEventListener('resize', measure);
     return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
-  }, [inline, currentStep]);
+  }, [inline, belowWormHud, currentStep]);
   const total = DEMO_STEPS.length - 1;
   const index = DEMO_STEPS.findIndex(step => step.id === currentStep);
   const current = currentStep === 'end' ? total : Math.max(1, index + 1);

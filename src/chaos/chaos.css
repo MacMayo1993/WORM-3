@@ -231,3 +231,12 @@
 .chaos-live-event .chaos-glyph { color: #b34700; }
 .chaos-finale { background: #fffcf1f5; color: var(--arcade-ink); border: 2px solid var(--arcade-ink-strong); border-radius: 20px; box-shadow: 0 6px 0 var(--arcade-ink-strong), 0 18px 40px #26372d26; }
 .chaos-detail-button, .chaos-back { color: var(--arcade-ink-strong); }
+
+/* The demo header replaces the game bar; leave its single row clear. */
+.chaos-results[data-demo="true"] {
+  box-sizing: border-box;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 78px);
+}
+.chaos-results[data-demo="true"] .chaos-result-sheet {
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 96px);
+}

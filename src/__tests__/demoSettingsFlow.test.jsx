@@ -199,10 +199,17 @@ it.each(['first strike', 'playing', 'winner reveal', 'results'])(
       expect(document.activeElement).toBe(next);
       expect(host.querySelector('.demo-coach-pill')).toBeNull();
     }
+    // A finished storm leaves spent stickers even after its ledger is cleared.
+    act(() => useGameStore.getState().setRotatedCubies(makeCubies(3).map(plane => plane.map(row => row.map(c => ({ ...c,
+      stickers: Object.fromEntries(Object.entries(c.stickers).map(([dir, sticker]) => [dir, { ...sticker, flips: 6 }]))
+    }))))));
     const coins = useGameStore.getState().parityPoints;
     act(() => { next.click(); next.click(); });
     expect(useGameStore.getState().parityPoints).toBe(coins + (won ? 200 : 50));
     expect(demo.demoTryVisible).toBe(false);
+    expect(useGameStore.getState().cubies).toEqual(makeCubies(3));
+    expect(useGameStore.getState().randomMode).toBe(false);
+    expect(demo.demoRewardStamp.amount).toBe(won ? 200 : 50);
     expect(useGameStore.getState().showDisparityWinner).toBe(false);
     expect(useGameStore.getState().chaosLevel).toBe(0);
     expect(callbacks.cancelDisparityRun).toHaveBeenCalled();
