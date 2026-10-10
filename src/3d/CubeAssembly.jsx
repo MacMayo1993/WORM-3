@@ -735,9 +735,13 @@ const CubeAssembly = React.memo(({
   // warmUpDefaultStyles calls renderer.compile() which triggers GLSL compilation
   // before any user interaction, eliminating the ~200 ms hitch on first style pick.
   useEffect(() => {
+    const state = useGameStore.getState();
+    // Worm uses the same instanced portal face as Flip Cube, including Remix.
+    // Warm it before the constrained-style early return to avoid a first-flip hitch.
+    const portalView = powerView ?? state.visualMode;
+    if (portalView !== 'sudokube') warmFlipPortal(gl, camera, scene);
     // Constrained Remix and Numbers tiles use solid surfaces, including backs.
     // Compiling unused decorative shaders here defeats their startup fallback.
-    const state = useGameStore.getState();
     if (state.wormHealerMode && (state.randomMode || state.visualMode === 'sudokube')
       && (isTouchDevice || state.perfReducedFX)) return;
     const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment);
@@ -747,8 +751,6 @@ const CubeAssembly = React.memo(({
     // each face never pays a material-creation/compile stall mid-game.
     const equippedStyles = Object.values(settings?.manifoldStyles ?? {});
     warmUpDefaultStyles(gl, camera, colors, equippedStyles);
-    // Cube modes open a flip portal on the first flip; compile it now, not then.
-    if (!state.wormHealerMode && state.visualMode !== 'sudokube') warmFlipPortal(gl, camera, scene);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional one-shot on mount
 
   // Camera auto-zoom: push camera out while explosion animates so the cube stays in view.

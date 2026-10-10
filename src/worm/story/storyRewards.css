@@ -1,0 +1,49 @@
+.worm-story-rewards.story-reward-picker { display:block; text-align:center; }
+.story-reward-picker h3 { margin:0 0 12px; font:800 15px/1.3 var(--heading-font,system-ui); color:var(--arcade-ink,#263b2f); }
+.story-reward-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.worm-story-rewards .story-reward-card {
+  display:flex; flex-direction:column; align-items:center; min-width:0; gap:5px; padding:8px;
+  border:1px solid #a9b79c; border-radius:16px; background:#fffdf2; color:#263b2f;
+  box-shadow:0 3px 0 #a9b79c; text-transform:none; letter-spacing:0; overflow:hidden;
+}
+.story-reward-art { display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; min-height:132px; flex:none; border-radius:10px; background:radial-gradient(ellipse,#dde7cf,#f2f0e2 75%); pointer-events:none; }
+.story-reward-art canvas { max-width:100%; height:auto!important; }
+.story-reward-art .palette-swatches { width:86px; height:14px; display:flex; gap:3px; margin:0 0 6px; }
+.story-reward-art .palette-swatches > span { flex:1; border-radius:3px; }
+.story-reward-loading { padding:12px; font:600 11px/1.4 var(--heading-font,system-ui); color:#56624f; }
+.story-reward-card > strong { font-size:14px; line-height:1.25; overflow-wrap:anywhere; }
+.story-reward-card > small { font-size:11px; font-weight:500; color:#63705a; }
+.story-reward-cta { display:block; margin-top:auto; padding:8px 4px 3px; font-size:12px; color:#28663d; }
+.worm-story-rewards .story-reward-card:disabled { opacity:1; background:#f1efe5; border-color:#c9cbbd; box-shadow:none; cursor:default; }
+.story-reward-card:disabled .story-reward-cta { color:#67715f; }
+.story-reward-card:focus-visible { outline:3px solid #168340; outline-offset:2px; }
+.story-reward-card:enabled:hover { border-color:#168340; background:#eff6e7; }
+.worm-story-rewards.story-reward-claimed,.story-reward-character { display:flex; align-items:center; justify-content:center; gap:12px; padding:10px; border-radius:14px; background:#eef1e2; }
+.story-reward-claimed .story-reward-art,.story-reward-character .story-reward-art { width:100px; min-height:100px; }
+.story-reward-claimed p,.story-reward-character p { margin:0; font-size:14px; }
+.story-reward-character { margin:8px 0 16px; }
+/* Keep the rating and navigation visible; the reward area scrolls on short screens. */
+@media(max-width:360px) { .story-reward-grid { gap:8px; }.worm-story-rewards .story-reward-card { padding:6px; }.story-reward-card > strong { font-size:12px; } }
+.story-completion[data-rewards="true"] .story-completion-card { width:min(100%,520px); padding:22px 20px 18px; }
+.story-completion[data-rewards="true"] .story-completion-award { padding-top:16px; }
+.story-completion[data-rewards="true"] .story-completion-star { max-width:70px; }
+.story-completion[data-rewards="true"] p.story-completion-verdict { font-size:22px; min-height:28px; margin:10px 0 6px; }
+@media(min-width:600px) and (max-height:540px) {
+  .story-completion[data-rewards="true"] .story-completion-card { width:min(100%,780px); grid-template-columns:.85fr 1.15fr; grid-template-rows:auto auto 1fr auto; }
+  .story-completion[data-rewards="true"] .story-completion-extras { grid-column:2; grid-row:1 / 5; max-height:none; }
+  .story-completion[data-rewards="true"] .story-completion-actions { grid-column:1; grid-row:4; }
+  .story-completion[data-rewards="true"] .story-completion-star { max-width:54px; }
+  .story-completion[data-rewards="true"] .story-completion-award { padding-top:10px; }
+}
+@media(max-width:599px) and (max-height:700px) {
+  .story-completion[data-rewards="true"] .story-completion-card { padding:16px 14px 12px; }
+  .story-completion[data-rewards="true"] .story-completion-level { font-size:11px; }
+  .story-completion[data-rewards="true"] h2 { font-size:20px; margin:8px 0 4px; }
+  .story-completion[data-rewards="true"] .story-completion-award { padding-top:10px; }
+  .story-completion[data-rewards="true"] .story-completion-star { max-width:48px; }
+  .story-completion[data-rewards="true"] p.story-completion-verdict { font-size:18px; min-height:24px; margin:6px 0 4px; }
+  .story-completion[data-rewards="true"] .story-reward-art { min-height:108px; }
+  .story-completion[data-rewards="true"] .story-reward-art canvas { max-width:96px; }
+  .story-completion[data-rewards="true"] .story-completion-actions { margin-top:8px; }
+  .story-completion[data-rewards="true"] .story-completion-secondary { margin-top:4px; }
+}

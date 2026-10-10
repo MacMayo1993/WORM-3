@@ -5,7 +5,7 @@ import './liveCubeCarousel.css';
 import './mainMenuKeys.css';
 import { fitCarouselCube, carouselTurnScale } from './fitCarouselCube.js';
 import { PlayerLevelBadge } from '../../progression/ProgressWidgets.jsx';
-import { MENU_FLIP_PAIRS, flipMenuCenters } from './menuCenterPortals.js';
+import { MENU_FLIP_PAIRS, MENU_PORTAL_OVERLAY_Z, flipMenuCenters } from './menuCenterPortals.js';
 import CubeGlowWorm from './CubeGlowWorm.jsx';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -69,7 +69,7 @@ function startMenuFlip(now) {
   menuFlip.from = menuFlip.inverted;
   menuFlip.inverted = !menuFlip.inverted;
   // Reduced motion: the colours change in place, with no wave.
-  menuFlip.startT = prefersReducedMotion() ? now - FLIP_SPREAD - FLIP_TIME : now;
+  menuFlip.startT = (prefersReducedMotion() || useGameStore.getState().settings?.reducedMotion) ? now - FLIP_SPREAD - FLIP_TIME : now;
 }
 
 import {
@@ -129,7 +129,10 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
   const turns = useRef({});
   const meshes = useRef({});
   const overlays = useRef({});
+  const portalTurns = useRef({});
   const settledFor = useRef(null);
+  // Slice moves and carousel return can replace faces without starting a tap.
+  React.useLayoutEffect(() => { settledFor.current = null; }, [cubie, hideStickers]);
 
   // The tap's flip wave. Idle frames return at once; each wave is played out
   // here and then settled exactly once.
@@ -148,7 +151,12 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
       // portal glow together, since neither re-renders for a flip.
       const shown = shownColor(sticker.curr, p >= 0.5 ? menuFlip.inverted : menuFlip.from);
       mesh.material = STICKER_MATS[shown];
-      overlays.current[dir]?.setColors(RUBIKS_FACE_COLORS[shown], RUBIKS_FACE_COLORS[ANTIPODAL_COLOR[shown]]);
+      // Keep the lens outside the slab on both halves of its turn. The worm's
+      // navigation anchor shares this correction, so its mouth follows the face.
+      if (portalTurns.current[dir]) portalTurns.current[dir].rotation.x = p >= 0.5 && p < 1 ? Math.PI : 0;
+      const start = Number.isFinite(menuFlip.startT)
+        ? menuFlip.startT + flipWaveOrder(cx + pos[0], cy + pos[1], cz + pos[2]) * FLIP_SPREAD + FLIP_TIME / 2 : -1e6;
+      overlays.current[dir]?.setFace(RUBIKS_FACE_COLORS[shown], sticker.curr !== sticker.orig || shown !== sticker.orig, p >= 0.5 ? start : undefined);
     }
     if (!running) settledFor.current = menuFlip.startT;
   }, -0.35);
@@ -165,17 +173,19 @@ const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
         // A worm has passed through this sticker (flipped an odd number of times):
         // it wears the portal overlay, just above the sticker's dome.
         const isFlipped = sticker.curr !== sticker.orig;
+        const PortalAnchor = isFlipped ? MenuPortalAnchor : 'group';
         return (
           <FlipPadOffset key={dir} meta={sticker} size={3} pos={pos} rot={rot}>
             <group position={pos} rotation={rot}>
               <group ref={el => { turns.current[dir] = el; }}>
                 <mesh ref={el => { meshes.current[dir] = el; }} geometry={PIECE.sticker} material={STICKER_MATS[shown]} />
-                {isFlipped && (
-                  <MenuPortalAnchor dir={dir}>
+                <group ref={el => { portalTurns.current[dir] = el; }}>
+                  <PortalAnchor {...(isFlipped ? { dir } : { position: [0, 0, MENU_PORTAL_OVERLAY_Z] })}>
                     <MenuTileOverlay ref={el => { overlays.current[dir] = el; }}
-                      colorHex={RUBIKS_FACE_COLORS[shown]} antiColorHex={RUBIKS_FACE_COLORS[ANTIPODAL_COLOR[shown]]} />
-                  </MenuPortalAnchor>
-                )}
+                      colorHex={RUBIKS_FACE_COLORS[shown]} homeColorHex={RUBIKS_FACE_COLORS[sticker.orig]}
+                      visible={isFlipped || shown !== sticker.orig} />
+                  </PortalAnchor>
+                </group>
               </group>
             </group>
           </FlipPadOffset>

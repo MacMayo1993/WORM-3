@@ -81,6 +81,7 @@ export function stickerFlip(tile, t, reducedMotion = false) {
   const out = ramp(t, outStart, outStart + FLIP_TIME);
   const back = ramp(t, backStart, backStart + RETURN_TIME);
   return {
+    portalStart: outStart + FLIP_TIME / 2,
     angle: Math.PI * (out + back),
     flipped: (out >= 0.5) !== (back >= 0.5),
     lift: 0.32 * (Math.sin(Math.PI * out) + Math.sin(Math.PI * back))

@@ -629,7 +629,7 @@ const DEMO_LEVEL_CONFIGS = {
 // the player's thumb is already on the cube.
 const TRY_COPY = {
   'baby-cube': 'Twist rows and columns until every face is one color. Drag outside the cube to turn your view. Stuck? <strong>Reset</strong> is in More.',
-  'learn-to-solve': 'Follow the <strong>gold ring</strong> — drag the glowing layer the way the light sweeps. It always knows the way home.',
+  'learn-to-solve': 'Follow the <strong>gold arrows</strong> — drag the outlined layer in the direction they travel.',
   'twin-paradox': 'With Flip on, tap a tile. Its opposite twin moves with it.',
   'flip-gateway': 'Tap nine different pairs to send them across. Then tap the moved tiles to bring them back.',
   'make-it-yours': 'Take a look at your colors, tiles, and background. Use <strong>Edit look</strong> to keep experimenting. Press <strong>Next: Chaos</strong> when you’re ready.',

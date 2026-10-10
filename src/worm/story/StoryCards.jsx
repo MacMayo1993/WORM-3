@@ -1,5 +1,5 @@
 import StoryStarRequirements from './StoryStarRequirements.jsx';
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useId, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStoreItem } from '../../utils/storeCatalog.js';
@@ -11,6 +11,18 @@ import { getWormCharacter } from '../wormCharacterData.js';
 import { storyNarrative } from './narrative.js';
 import '../../components/screens/wormStory.css';
 import './storyCompletion.css';
+import './storyRewards.css';
+
+const StoryRewardPreview = React.lazy(() => import('./StoryRewardPreview.jsx'));
+const rewardType = item => ({ hat: 'Hat', skin: 'Skin', accessory: 'Accessory', scheme: 'Palette', tile: 'Tile style', character: 'Worm' })[item?.type] || 'Item';
+
+function RewardArt({ item, ready = true }) {
+  return <span className="story-reward-art" role="img" aria-label={`${item.label} ${rewardType(item).toLowerCase()} preview`}>
+    {ready && <Suspense fallback={<span className="story-reward-loading">Loading preview…</span>}>
+      <StoryRewardPreview item={item} />
+    </Suspense>}
+  </span>;
+}
 
 // "Chapter 2 · Level 4 / 10": levels are numbered globally but read within their chapter.
 const chapterLine = id => `Chapter ${storyChapterId(id)} · Level ${storyChapterIndex(id)} / ${STORY_CHAPTER_SIZE}`;
@@ -24,19 +36,46 @@ export function StoryMobiNote({ levelId, complete = false }) {
   </p>;
 }
 
-export function StoryRewardChoices({ level }) {
+export function StoryRewardChoices({ level, previewsReady = true }) {
   const { progress, owned, claim } = useGameStore(useShallow(s => ({ progress: s.playerProgress, owned: s.ownedItems, claim: s.claimWormStoryReward })));
+  const claimed = progress.wormStory?.claimed?.[level?.id];
+  const receipt = useRef(null), previousClaim = useRef(claimed);
+  useEffect(() => {
+    if (claimed && claimed !== previousClaim.current) {
+      // A choice can be below the fold; show its confirmation from the top.
+      const scroller = receipt.current?.closest('.story-completion-extras');
+      if (scroller) scroller.scrollTop = 0;
+      receipt.current?.closest('[role="dialog"]')?.focus({ preventScroll: true });
+    }
+    previousClaim.current = claimed;
+  }, [claimed]);
   if (!level?.reward) return null;
-  const claimed = progress.wormStory?.claimed?.[level.id];
-  if (claimed) return <p className="worm-story-rewards" role="status">✓ {claimed === 'points' ? `${level.fallback} points received` : `${getStoreItem(claimed)?.label} unlocked`}</p>;
+  if (claimed === 'points') return <p className="worm-story-rewards" role="status">✓ {level.fallback} points received</p>;
+  if (claimed) {
+    const item = getStoreItem(claimed);
+    return <div ref={receipt} className="worm-story-rewards story-reward-claimed">
+      {item && <RewardArt item={item} ready={previewsReady} />}
+      <p role="status">✓ {item?.label ?? 'Item'} unlocked</p>
+    </div>;
+  }
   const earned = storyStars(progress, level.id) > 0;
   const allOwned = level.reward.every(id => owned.includes(id));
-  return <div className="worm-story-rewards" aria-label={level.rewardLabel}>
-    {allOwned ? <button disabled={!earned} onClick={() => claim(level.id, 'points')}>Claim {level.fallback} points</button>
-      : level.reward.map(id => <button key={id} disabled={!earned || owned.includes(id)} onClick={() => claim(level.id, id)}>
-        {getStoreItem(id)?.label}{owned.includes(id) ? ' · Owned' : earned ? ' · Choose' : ''}
-      </button>)}
-  </div>;
+  return <section className="worm-story-rewards story-reward-picker" aria-label={level.rewardLabel}>
+    <h3>{level.rewardLabel || 'Choose a reward'}</h3>
+    {allOwned ? <button type="button" disabled={!earned} onClick={() => claim(level.id, 'points')}>Claim {level.fallback} points</button>
+      : <div className="story-reward-grid">{level.reward.map(id => {
+        const item = getStoreItem(id), isOwned = owned.includes(id);
+        if (!item) return null;
+        return <button type="button" key={id} className="story-reward-card"
+          disabled={!earned || isOwned} aria-label={`${isOwned ? 'Owned' : earned ? 'Choose' : 'Locked'}: ${item.label}`}
+          onClick={() => claim(level.id, id)}>
+          <RewardArt item={item} ready={previewsReady} />
+          <strong>{item.label}</strong>
+          <small>{rewardType(item)}</small>
+          <span className="story-reward-cta">{isOwned ? 'Owned' : earned ? 'Choose →' : 'Complete level to unlock'}</span>
+        </button>;
+      })}</div>}
+  </section>;
 }
 
 export function StoryObjectiveCard({ compact = false }) {
@@ -220,7 +259,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
     else exitTimer.current = setTimeout(action, 180);
   };
 
-  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-leaving={leaving}
+  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-leaving={leaving} data-rewards={!!level.reward || !!result.unlockedCharacter}
     role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" tabIndex={-1}
     style={{ zIndex: Z.CELEBRATION, fontFamily: UI_FONT, '--result-ready': `${readyAt}ms` }}>
     <div className="story-completion-wave" aria-hidden="true" />
@@ -239,8 +278,11 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
         <p className="story-completion-verdict" role="status">{ready ? `${stars} ${stars === 1 ? 'star' : 'stars'} earned` : '\u00a0'}</p>
       </div>
       <div className="story-completion-extras" inert={!ready || leaving ? '' : undefined}>
-        {result.unlockedCharacter && <p className="story-completion-unlock"><span>New worm unlocked</span><strong>{getWormCharacter(result.unlockedCharacter).label}</strong></p>}
-        <StoryRewardChoices level={level} />
+        {result.unlockedCharacter && <div className="story-completion-unlock story-reward-character">
+          <RewardArt item={getStoreItem(`character_${result.unlockedCharacter}`) ?? { type: 'character', characterId: result.unlockedCharacter, label: getWormCharacter(result.unlockedCharacter).label }} ready={ready} />
+          <p><span>New worm unlocked</span><strong>{getWormCharacter(result.unlockedCharacter).label}</strong></p>
+        </div>}
+        <StoryRewardChoices level={level} previewsReady={ready} />
         {narrative && <details className="story-completion-notes"><summary tabIndex={0}>Mobi’s field notes</summary><StoryMobiNote levelId={level.id} complete /></details>}
       </div>
       <div className="story-completion-actions">
