@@ -23,7 +23,7 @@ void main() {
 // Lit, depth-tested worms inside translucent flared passages. All per-frame
 // geometry and instances reuse buffers; no TubeGeometry rebuilds or allocations.
 export default function IntroTunnels({ time, reducedMotion }) {
-  const root = useRef(), mouths = useRef(), rims = useRef(), bands = useRef();
+  const root = useRef(), bands = useRef();
   const worms = useRef(), whites = useRef(), pupils = useRef();
   const assets = useMemo(() => ({
     materials: PASSAGES.map(() => new THREE.ShaderMaterial({ vertexShader, fragmentShader,
@@ -77,15 +77,6 @@ export default function IntroTunnels({ time, reducedMotion }) {
         }
       }
       positions.needsUpdate = true;
-      for (let end = 0; end < 2; end++) {
-        frame(pair, end);
-        dummy.position.copy(a); dummy.quaternion.setFromUnitVectors(z, tangent);
-        const opening = Math.min(1, Math.max(0, grow * 2 - end)) * pose.passage;
-        stamp(mouths.current, index * 2 + end, opening);
-        // A dark inset with a raised coloured lip, seated on its sticker.
-        dummy.position.setComponent(pair.face.axis, a.getComponent(pair.face.axis) + (end ? -.015 : .015));
-        stamp(rims.current, index * 2 + end, opening, end ? second : first);
-      }
       for (let ring = 0; ring < BANDS; ring++) {
         const u = (ring + 1) / (BANDS + 1);
         frame(pair, u); dummy.position.copy(a); dummy.quaternion.setFromUnitVectors(z, tangent);
@@ -109,19 +100,13 @@ export default function IntroTunnels({ time, reducedMotion }) {
         stamp(pupils.current, index * 2 + eye, .036 * alive);
       }
     });
-    for (const ref of [mouths, rims, bands, worms, whites, pupils]) {
+    for (const ref of [bands, worms, whites, pupils]) {
       ref.current.instanceMatrix.needsUpdate = true;
       if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true;
     }
   });
   return <group ref={root}>
     {PASSAGES.map((_, i) => <mesh key={i} geometry={assets.geometries[i]} material={assets.materials[i]} dispose={null} frustumCulled={false} />)}
-    <instancedMesh ref={mouths} args={[null, null, PASSAGES.length * 2]} frustumCulled={false}>
-      <circleGeometry args={[.32, 32]} /><meshStandardMaterial color="#101729" roughness={.4} side={THREE.DoubleSide} />
-    </instancedMesh>
-    <instancedMesh ref={rims} args={[null, null, PASSAGES.length * 2]} frustumCulled={false}>
-      <torusGeometry args={[.335, .055, 10, 36]} /><meshStandardMaterial roughness={.23} metalness={.25} />
-    </instancedMesh>
     <instancedMesh ref={bands} args={[null, null, PASSAGES.length * BANDS]} frustumCulled={false}>
       <torusGeometry args={[.24, .012, 5, 20]} /><meshStandardMaterial transparent opacity={.55} depthWrite={false} roughness={.3} />
     </instancedMesh>

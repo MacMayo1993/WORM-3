@@ -278,19 +278,16 @@ function watchPortalMotion() {
   motionQuery?.addEventListener?.('change', syncFlipPortalMotion);
 }
 
-/** The one portal material, shared by every flipped tile. Opaque, so it batches. */
-export function getFlipPortalMaterial() {
-  if (material) return material;
-  material = new THREE.MeshStandardMaterial({ roughness: 0.26, metalness: 0.12 });
+/** The shared portal shader with an owned clock. Opaque, so preview faces batch too. */
+export function createFlipPortalMaterial(time = sharedUniforms.time, motion = { value: 1 }) {
+  const material = new THREE.MeshStandardMaterial({ roughness: 0.26, metalness: 0.12 });
   const uniforms = {
-    uTime: sharedUniforms.time,
-    uMotion: { value: 1 },
+    uTime: time,
+    uMotion: motion,
     uFallbackColor: { value: new THREE.Color('#888888') },
     uFallbackData: { value: new THREE.Vector4(1, 1, 1, 0) }
   };
   material.userData.portalUniforms = uniforms;
-  watchPortalMotion();
-  syncFlipPortalMotion();
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = vertexHead + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n${vertexBody}`);
@@ -301,6 +298,16 @@ export function getFlipPortalMaterial() {
       .replace('#include <emissivemap_fragment>', emissiveFragment);
   };
   material.customProgramCacheKey = () => `flip-portal-v1-${LAYERS}`;
+  return material;
+}
+
+/** Gameplay owns one material; previews own their clocks and dispose their materials. */
+export function getFlipPortalMaterial() {
+  if (!material) {
+    material = createFlipPortalMaterial();
+    watchPortalMotion();
+    syncFlipPortalMotion();
+  }
   return material;
 }
 
