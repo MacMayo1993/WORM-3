@@ -277,11 +277,19 @@ function VoidCore({ cubieRefs = null }) {
     }
     f.tintMix *= Math.exp(-dt * 1.2);
     glow.value = (wormMode ? 0.12 : 0.08) + f.flash * 0.25;
-    // The seams' lightning runs on the game clock: it holds with pause, a dead
-    // worm and reduced motion, and surges with each flip in that flip's colour.
-    if (!still && !(wormMode && (state.wormPaused || !state.wormAlive))) lightning.uCoreBoltTime.value += dt;
-    lightning.uCoreBoltGain.value = (0.55 + 0.45 * charge) * (1 + f.flash * 0.8);
-    lightning.uCoreBoltColor.value.copy(BOLT_BASE).lerp(f.tint, 0.6 * f.tintMix);
+    // The seams' lightning runs on the game clock and surges with each flip in that
+    // flip's colour. While held, nothing about it moves: a paused or dead worm keeps
+    // the arcs exactly as they were, and reduced motion shows them steady at the
+    // network's charge, with no surge or tint fading in and out.
+    const held = still || (wormMode && (state.wormPaused || !state.wormAlive));
+    if (!held) {
+      lightning.uCoreBoltTime.value += dt;
+      lightning.uCoreBoltGain.value = (0.55 + 0.45 * charge) * (1 + f.flash * 0.8);
+      lightning.uCoreBoltColor.value.copy(BOLT_BASE).lerp(f.tint, 0.6 * f.tintMix);
+    } else if (still) {
+      lightning.uCoreBoltGain.value = 0.55 + 0.45 * charge;
+      lightning.uCoreBoltColor.value.copy(BOLT_BASE);
+    }
 
     // The approach zoom: while a WORM ride closes on the core, grow it about the
     // tile the worm is diving into, then let it go once the rider is through.

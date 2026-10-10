@@ -99,13 +99,16 @@ export const bumperVertexShader = `
 
   attribute float aHeightFrac;
   attribute float aTripFrac;
+  attribute float aDistance;
   varying  float vHeightFrac;
   varying  float vTripFrac;
+  varying  float vDistance;
   varying vec3 vCameraPoint;
 
   void main() {
     vHeightFrac = aHeightFrac;
     vTripFrac   = aTripFrac;
+    vDistance   = aDistance;
 
     // Same whip displacement as the ribbon, driven by the SAME uniform objects
     // (shared by reference below) — otherwise the guard rails would stay put
@@ -125,7 +128,7 @@ export const bumperVertexShader = `
 export const bumperFragmentShader = `
   uniform vec3 uColorA, uColorB;
   uniform float uRideCore, uOpacity, uRideMode, uGrowT, uTime;
-  varying float vHeightFrac, vTripFrac;
+  varying float vHeightFrac, vTripFrac, vDistance;
   varying vec3 vCameraPoint;
   ${rideColorShader}
   ${tunnelCameraClearanceGLSL}
@@ -137,9 +140,11 @@ export const bumperFragmentShader = `
     vec3 lip = mix(base, vec3(0.9, 0.96, 1.0), 0.38);
     vec3 color = mix(base * 0.6, lip * 0.9, smoothstep(0.4, 1.0, vHeightFrac));
     // The rails are the field's conduits: the same charge, carried a little hotter.
+    // vTripFrac is not arc length off the ride (each arm owns half of it), so the
+    // chevrons read the same arc distance as the spine they run beside.
     float bleed;
     float core = uRideMode > 0.5 ? uRideCore : 0.5;
-    color += tunnelEnergy(vTripFrac, core, 0.5, vTripFrac * uTunnelLength, uTime, uColorA, uColorB, bleed) * 1.35;
+    color += tunnelEnergy(vTripFrac, core, 0.5, vDistance, uTime, uColorA, uColorB, bleed) * 1.35;
     gl_FragColor = vec4(color, uRideMode > 0.5 ? 1.0 : uOpacity * 0.85);
     #include <colorspace_fragment>
   }

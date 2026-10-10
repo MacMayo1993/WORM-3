@@ -123,5 +123,6 @@ export function withCoreLightning(material, uniforms, { haloOnly = false } = {})
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance += coreLightning(${haloOnly ? '1.0' : '0.0'});`);
   };
   material.customProgramCacheKey = () => `${baseKey}-core-lightning${haloOnly ? '-halo' : ''}`;
+  material.userData.coreLightning = uniforms;
   return material;
 }

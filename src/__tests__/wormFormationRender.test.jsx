@@ -247,3 +247,49 @@ it('widens the ridden band to the core opening without moving its route', async 
     delete globalThis.IS_REACT_ACT_ENVIRONMENT;
   }
 });
+
+it.each([false, true])('gives the rails the spine\'s arc distance on a lopsided tunnel (ride=%s)', async ride => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const before = useGameStore.getState();
+  useGameStore.setState({ wormHealerMode: ride, demoMode: false, size: 5,
+    settings: { ...before.settings, reducedMotion: true } });
+  // Two tiles at different distances from the core, so the arms differ in length.
+  const size = 5, k = (size - 1) / 2, cells = [{ x: 0, y: 2, z: 2, dirKey: 'NX' }, { x: 4, y: 4, z: 0, dirKey: 'PX' }];
+  const refs = [];
+  for (const c of cells) {
+    const mesh = new THREE.Object3D();
+    mesh.position.set(c.x - k, c.y - k, c.z - k);
+    refs[c.x * size * size + c.y * size + c.z] = mesh;
+  }
+  const index = c => c.x * size * size + c.y * size + c.z;
+  const canvas = document.createElement('canvas');
+  const gl = { render: vi.fn(), setSize: vi.fn(), setPixelRatio: vi.fn(), domElement: canvas,
+    xr: { addEventListener: vi.fn(), removeEventListener: vi.fn() }, shadowMap: {}, renderLists: { dispose: vi.fn() }, forceContextLoss: vi.fn() };
+  const root = createRoot(canvas); root.configure({ gl, frameloop: 'never', size: { width: 800, height: 600 } });
+  try {
+    let store;
+    await act(async () => { store = root.render(<MobiusTunnel meshIdx1={index(cells[0])} meshIdx2={index(cells[1])}
+      dirKey1="NX" dirKey2="PX" cubieRefs={refs} flips={1} color1="#3973e8" color2="#38c875" gridId1="a" gridId2="b" tunnelId="a|b" />); });
+    store.getState().advance(1 / 60);
+    let spine, rails;
+    store.getState().scene.traverse(o => {
+      if (o.name === 'tunnel-rails') rails = o;
+      else if (o.material?.uniforms?.uGrowT && o.geometry.attributes.uv && !spine) spine = o;
+    });
+    const spineArc = spine.geometry.attributes.aDistance.array;
+    const railArc = rails.geometry.attributes.aDistance.array, trip = rails.geometry.attributes.aTripFrac.array;
+    const half = railArc.length / 2, total = spineArc[spineArc.length - 1];
+    // The arms really are unequal: half the ribbon parameter is not half the route.
+    const mid = trip.findIndex(t => Math.abs(t - 0.5) < 1e-6);
+    if (!ride) expect(Math.abs(railArc[mid] - total / 2)).toBeGreaterThan(0.05);
+    for (let i = 0; i < half; i++) {
+      // Rail vertex i sits beside spine sample floor(i / 2), on both rails.
+      const arc = spineArc[Math.floor(i / 2) * 2];
+      expect(railArc[i]).toBeCloseTo(arc, 5);
+      expect(railArc[half + i]).toBeCloseTo(arc, 5);
+    }
+  } finally {
+    await act(async () => root.unmount()); useGameStore.setState(before, true);
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  }
+});

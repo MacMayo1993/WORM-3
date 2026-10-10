@@ -164,6 +164,7 @@ export function fillTunnelRideGeometry(geo, left, right, path, segments, mouthWi
         rail.attributes.position.setXYZ(i * 2 + h, b.x, b.y, b.z);
         rail.attributes.aHeightFrac.setX(i * 2 + h, h);
         rail.attributes.aTripFrac.setX(i * 2 + h, u);
+        rail.attributes.aDistance?.setX(i * 2 + h, arc);
       }
     }
   }

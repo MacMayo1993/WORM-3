@@ -94,12 +94,14 @@ const _surge         = { active: false, front: 0, glow: 0, arrived: false };
  * arm, so |2t − 1| is how far along the arm from the dock it is).
  * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
+// Each exposed arm owns half the ribbon parameter, but not half the route length.
+// Compute before Float32 UV storage rounds the distinct exit dock to 0.5.
+const ribbonArcAt = (path, t) => (t <= 0.5 ? t * 2 * path.armALen : path.total - (1 - t) * 2 * path.armBLen);
+
 function fillRibbon(posArray, uvArray, distanceArray, path, axis, perpStart, segs, mouthW, dockW, guard, flipP1 = 0, flipP2 = 0) {
   for (let i = 0; i <= segs; i++) {
     const t = tunnelRibbonSampleU(i, segs);
-    // Each exposed arm owns half the UV range, but not half the route length.
-    // Compute before Float32 UV storage rounds the distinct exit dock to 0.5.
-    const arc = t <= 0.5 ? t * 2 * path.armALen : path.total - (1 - t) * 2 * path.armBLen;
+    const arc = ribbonArcAt(path, t);
     // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
     let w       = 0.5 * tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW) * flipWidthPulse(t, flipP1, flipP2);
 
@@ -131,7 +133,8 @@ function fillRibbon(posArray, uvArray, distanceArray, path, axis, perpStart, seg
 }
 
 /**
- * Fill left and right bumper geometry buffers, including aTripFrac (t along ribbon).
+ * Fill left and right bumper geometry buffers, including aTripFrac (t along ribbon)
+ * and aDistance (arc length from tile A, matching the spine's).
  *
  * Each bumper is a thin wall that rises from a ribbon edge in the direction of the
  * ribbon's surface normal (= segTangent × perpCurrent).  Because perpCurrent rotates
@@ -140,11 +143,12 @@ function fillRibbon(posArray, uvArray, distanceArray, path, axis, perpStart, seg
  * demonstrating RP2 non-orientability.
  */
 function fillBumpers(
-  leftPosArr, rightPosArr, leftHFArr, rightHFArr, leftTFArr, rightTFArr,
+  leftPosArr, rightPosArr, leftHFArr, rightHFArr, leftTFArr, rightTFArr, leftDistArr, rightDistArr,
   path, axis, perpStart, segs, mouthW, dockW, guard
 ) {
   for (let i = 0; i <= segs; i++) {
     const t = tunnelRibbonSampleU(i, segs);
+    const arc = ribbonArcAt(path, t);
     const gauge = tunnelGaugeAt(Math.abs(2.0 * t - 1.0), mouthW, dockW);
     let w       = gauge / 2;
     let bh      = RAIL_RATIO * gauge;
@@ -206,6 +210,7 @@ function fillBumpers(
     rightHFArr[base]           = 0;   rightTFArr[base]            = t;
     rightPosArr[(base+1)*3]    = rtx; rightPosArr[(base+1)*3 + 1] = rty; rightPosArr[(base+1)*3 + 2] = rtz;
     rightHFArr[base + 1]       = 1;   rightTFArr[base + 1]        = t;
+    leftDistArr[base] = leftDistArr[base + 1] = rightDistArr[base] = rightDistArr[base + 1] = arc;
   }
 }
 
@@ -235,15 +240,18 @@ function createRibbonGeos(segs, continuous = false) {
   const railGeo = new THREE.BufferGeometry();
   const railPos = new Float32Array(vertCount * 2 * 3);
   const railHeight = new Float32Array(vertCount * 2), railTrip = new Float32Array(vertCount * 2);
+  const railDistance = new Float32Array(vertCount * 2);
   railGeo.setAttribute('position',    new THREE.BufferAttribute(railPos, 3));
   railGeo.setAttribute('aHeightFrac', new THREE.BufferAttribute(railHeight, 1));
   railGeo.setAttribute('aTripFrac',   new THREE.BufferAttribute(railTrip, 1));
+  railGeo.setAttribute('aDistance',   new THREE.BufferAttribute(railDistance, 1));
   railGeo.setIndex([...bumpIndices, ...bumpIndices.map(i => i + vertCount)]);
   function railHalf(side) {
     const start = side * vertCount, bg = new THREE.BufferGeometry();
     bg.setAttribute('position',    new THREE.BufferAttribute(railPos.subarray(start * 3, (start + vertCount) * 3), 3));
     bg.setAttribute('aHeightFrac', new THREE.BufferAttribute(railHeight.subarray(start, start + vertCount), 1));
     bg.setAttribute('aTripFrac',   new THREE.BufferAttribute(railTrip.subarray(start, start + vertCount), 1));
+    bg.setAttribute('aDistance',   new THREE.BufferAttribute(railDistance.subarray(start, start + vertCount), 1));
     return bg;
   }
 
@@ -486,6 +494,8 @@ const MobiusTunnel = ({
           rightGeo.attributes.aHeightFrac.array,
           leftGeo.attributes.aTripFrac.array,
           rightGeo.attributes.aTripFrac.array,
+          leftGeo.attributes.aDistance.array,
+          rightGeo.attributes.aDistance.array,
           _tunnelPath,
           _axis, _perpBase,
           RIBBON_SEGS, mouthW, dockW, _tileGuard
@@ -500,6 +510,7 @@ const MobiusTunnel = ({
       railGeo.attributes.position.needsUpdate    = true;
       railGeo.attributes.aHeightFrac.needsUpdate = true;
       railGeo.attributes.aTripFrac.needsUpdate   = true;
+      railGeo.attributes.aDistance.needsUpdate   = true;
     }
 
     // Dim system:
