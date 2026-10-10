@@ -53,7 +53,7 @@ it.each([false, true])('raises real cubies, grows the band and lands after forma
     expect(refs[0].getWorldPosition(new THREE.Vector3()).z).toBeLessThan(1.001);
     const materials = [];
     store.getState().scene.traverse(o => { if (o.material?.uniforms?.uGrowT) materials.push(o.material); });
-    expect(materials).toHaveLength(4); // Spine, two lips, and one open veil.
+    expect(materials).toHaveLength(3); // Spine, both lips in one draw, and one open veil.
     for (const material of materials) expect(material.uniforms.uGrowT).toBe(materials[0].uniforms.uGrowT);
     expect(materials[0].uniforms.uGrowT.value).toBeLessThan(.02);
     const sim = makeWormSim(3); resetWormSim(sim, 3, { orbCount: 0, wormholeInterval: 9999 });
@@ -167,8 +167,23 @@ it('updates both endpoint colors and rails without moving or rebuilding the band
     store.getState().advance(1 / 60);
     const meshes = [];
     store.getState().scene.traverse(o => { if (o.material?.uniforms?.uRideCore) meshes.push(o); });
-    expect(meshes).toHaveLength(4); // The veil shares live colors without a geometry rebuild too.
+    expect(meshes).toHaveLength(3); // The veil shares live colors without a geometry rebuild too.
     const uniforms = meshes[0].material.uniforms;
+    // Spine, rails and veil share one charge, so the field moves as one band.
+    for (const mesh of meshes) {
+      expect(mesh.material.uniforms.uEnergyGain).toBe(uniforms.uEnergyGain);
+      expect(mesh.material.uniforms.uEnergySeed).toBe(uniforms.uEnergySeed);
+      expect(mesh.material.fragmentShader).toContain('tunnelEnergy(');
+    }
+    // Both lips are one draw: each rail's half of the merged buffer is filled.
+    const rails = meshes.find(o => o.name === 'tunnel-rails');
+    const railPos = rails.geometry.attributes.position, half = railPos.count / 2;
+    const span = from => new THREE.Box3().setFromBufferAttribute(
+      new THREE.BufferAttribute(railPos.array.subarray(from * 3, (from + half) * 3), 3)).getSize(new THREE.Vector3()).length();
+    expect(span(0)).toBeGreaterThan(0.5);
+    expect(span(half)).toBeGreaterThan(0.5);
+    expect(rails.geometry.index.count).toBeGreaterThan(0);
+    expect(Math.max(...rails.geometry.index.array)).toBeGreaterThanOrEqual(half);
     const versions = meshes.map(o => o.geometry.attributes.position.version);
     for (const mesh of meshes) {
       expect(mesh.material.uniforms.uColorA).toBe(uniforms.uColorA);

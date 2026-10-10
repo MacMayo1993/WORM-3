@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import { tunnelFinishGLSL } from './tunnelFinish.js';
+import { tunnelEnergyGLSL } from './tunnelEnergy.js';
 
 const vertexShader = `
   uniform vec3 uTileCenter;
@@ -69,6 +70,7 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
       uniform float uOpacity;
       uniform float uPatternRepeats;
       uniform float uTime;
+      uniform vec3 uColorA, uColorB;
       varying vec2 vUv;
       varying float vDistance;
       varying vec3 vTunnelCameraPoint;
@@ -76,6 +78,7 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
       ${tileShader}
       ${tunnelFinishGLSL}
       ${tunnelCameraClearanceGLSL}
+      ${tunnelEnergyGLSL}
       void main() {
         clearTunnelCamera(vTunnelCameraPoint);
         float core = uRideMode > 0.5 ? uRideCore : 0.5;
@@ -90,6 +93,8 @@ function createTunnelTileMaterial(style, color, antiColor, shared, side, rideMod
         vec3 pearl = mix(baseColor, vec3(0.9, 0.96, 1.0), 0.38);
         float spiral = tunnelSpiral(vDistance, vUv.x, uTime, 0.06);
         gl_FragColor.rgb = mix(gl_FragColor.rgb + pearl * spiral * 0.05, pearl * 0.8, edge * 0.8);
+        float bleed;
+        gl_FragColor.rgb += tunnelEnergy(vUv.y, core, vUv.x, vDistance, uTime, uColorA, uColorB, bleed);
       }
     `,
     side: THREE.DoubleSide,
