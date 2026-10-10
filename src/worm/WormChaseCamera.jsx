@@ -2,6 +2,7 @@ import { nearbyPlatform, makePlatformFrame, framePlatform, resetPlatformFrame } 
 import { OPENING_FOV, openingCameraDistance } from './healerWorm/openingRotation.js';
 import { prefersReducedMotion } from '../utils/device.js';
 import { boundedWormZoom, wormSurfaceFov, wormTunnelFov } from './healerWorm/zoomLimit.js';
+import { clampWormCameraZoom, wheelCameraZoom, desktopHeadFraming } from './wormCameraZoom.js';
 import React, { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -169,7 +170,7 @@ const frameCorrection = new THREE.Quaternion();
 // around the screen. Mobile anchors the visible head at (0, 0); desktop retains
 // its whole-board composition above center. Rotating the existing frame keeps
 // the smoothed horizon and never changes the lens or tunnel clearance.
-export function frameSurfaceCamera(camera, portraitFactor, head = null) {
+export function frameSurfaceCamera(camera, portraitFactor, head = null, anchorY = null) {
     if (head) frameDirection.subVectors(head, camera.position);
     else frameDirection.copy(camera.position).negate();
     if (frameDirection.lengthSq() < 1e-8) return;
@@ -178,13 +179,15 @@ export function frameSurfaceCamera(camera, portraitFactor, head = null) {
     frameCorrection.setFromUnitVectors(frameForward, frameDirection);
     camera.quaternion.premultiply(frameCorrection);
     // A fixed screen-space anchor survives every cube face and horizon roll.
-    const screenY = head ? 0 : THREE.MathUtils.lerp(0.06, 0.12, portraitFactor);
+    const screenY = anchorY ?? (head ? 0 : THREE.MathUtils.lerp(0.06, 0.12, portraitFactor));
     camera.rotateX(-Math.atan(screenY * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))));
     camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
 }
 
+const _desktopAim = new THREE.Vector3();
+
 export default function WormChaseCamera({ worm, size }) {
-    const { camera, size: viewportSize } = useThree();
+    const { camera, gl, size: viewportSize } = useThree();
     const mobile = useIsMobile();
     const platformFrame = useRef(makePlatformFrame());
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
@@ -233,6 +236,23 @@ export default function WormChaseCamera({ worm, size }) {
             camera.updateProjectionMatrix();
         };
     }, [camera]);
+
+    // The mouse wheel sets the same camera distance as the pause-menu slider while
+    // crawling. WORM never zooms the orbit controls, so the wheel is otherwise idle;
+    // a paused run leaves it to the menu's own scrolling.
+    useEffect(() => {
+        const element = gl?.domElement;
+        if (!element) return undefined;
+        const onWheel = event => {
+            const state = useGameStore.getState();
+            if (!state.wormHealerMode || state.wormPaused || state.wormGamePhase !== 'active' || !event.deltaY) return;
+            // Line- and page-mode wheels (Firefox) report far smaller numbers than pixels.
+            const pixels = event.deltaY * (event.deltaMode === 1 ? 33 : event.deltaMode === 2 ? 800 : 1);
+            state.setWormCameraZoom?.(wheelCameraZoom(state.wormCameraZoom, pixels));
+        };
+        element.addEventListener('wheel', onWheel, { passive: true });
+        return () => element.removeEventListener('wheel', onWheel);
+    }, [gl]);
 
     useFrame((_, delta) => {
         // Match the simulation clock after a hitch; never snap the lens on resume.
@@ -497,8 +517,13 @@ export default function WormChaseCamera({ worm, size }) {
         const aspectZoomBoost = THREE.MathUtils.lerp(0, 0.4, portraitFactor);
         const extraZoom = boundedWormZoom(size, CAM_BACK_BASE + aspectZoomBoost * 0.9,
             orbCount, 0);
-        const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
-        const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
+        // The player's camera distance (Pause → Camera) scales the whole surface
+        // framing: height, setback and the portrait rake below, so the pitch is kept
+        // and the lens just stands further off. Read here rather than subscribed, so
+        // a change eases in through the chase smoothing without a re-render.
+        const playerZoom = clampWormCameraZoom(gameState.wormCameraZoom);
+        const camHeight = (CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost) * playerZoom;
+        const camBack = (CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9) * playerZoom;
 
         // Portrait rake: the base chase runs nearly level (~10° below horizontal),
         // which on a tall phone viewport parks the horizon mid-frame and hands half
@@ -507,7 +532,7 @@ export default function WormChaseCamera({ worm, size }) {
         // up the face normal, less setback, and a shorter aim, so the surface ahead
         // (orbs, tunnels, dead tiles) fills the frame instead. Lands ~34° below
         // horizontal at full portrait; desktop landscape is unchanged.
-        const rakeLift = THREE.MathUtils.lerp(0, 1.5, portraitFactor);
+        const rakeLift = THREE.MathUtils.lerp(0, 1.5, portraitFactor) * playerZoom;
         const rakeTuck = THREE.MathUtils.lerp(1, 0.75, portraitFactor);
         const rakeAhead = LOOK_AHEAD * THREE.MathUtils.lerp(1, 0.55, portraitFactor);
 
@@ -781,7 +806,13 @@ export default function WormChaseCamera({ worm, size }) {
                 frameSurfaceCamera(camera, portraitFactor, _mobileHeadWorld);
                 lookAtRef.current.copy(_mobileHeadWorld);
             } else if (!mobile && !rocketLift && !(worm.healPauseT?.current > 0) && !cutBeat) {
-                frameSurfaceCamera(camera, portraitFactor);
+                const headWeight = desktopHeadFraming(size);
+                if (headWeight > 0) {
+                    bodyPathHeadInto(_desktopAim, worm, false);
+                    _desktopAim.multiplyScalar(headWeight); // between the cube's centre and the head
+                    frameSurfaceCamera(camera, portraitFactor, _desktopAim,
+                        THREE.MathUtils.lerp(0.06, 0.12, portraitFactor) * (1 - headWeight));
+                } else frameSurfaceCamera(camera, portraitFactor);
             }
             if (!cutBeat && !(worm.healPauseT?.current > 0)) {
                 bodyPathHeadInto(_mobileHeadWorld, worm, false);

@@ -319,7 +319,11 @@ function PortalBeacon() {
 // Rigs beyond the live cap hold enemies that are still crumbling, so a kill never
 // has to vanish to make room for the next arrival.
 const DISSOLVE_SLOTS = 3;
-export default function CombatScene({ maxEnemies = COMBAT.maxEnemies }) {
+// Memoised: the pools draw from the combat bridge in their frame loops, so a
+// re-render of the WORM scene above (a pickup, a turn) has nothing to give them,
+// and re-rendering ~40 idle rigs on each was most of that commit's cost.
+export default React.memo(CombatScene);
+function CombatScene({ maxEnemies = COMBAT.maxEnemies }) {
   const pool = maxEnemies + DISSOLVE_SLOTS;
   const slots = useRef(null), assigned = useRef(new Map());
   if (!slots.current || slots.current.length !== pool) slots.current = Array(pool).fill(null);

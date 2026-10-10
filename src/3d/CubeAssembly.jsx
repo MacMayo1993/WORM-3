@@ -1,6 +1,7 @@
 import { bumpTileRolls } from './tileStyleIdentity.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { createExteriorPortals } from './exteriorPortals.js';
+import { CubieBodyBatchProvider } from './CubieBodyBatches.jsx';
 import { wormExpansion, currentExplosion, rescaleExpandedCubies } from '../worm/wormExpansion.js';
 import { getViewPowerDef } from '../worm/healerWorm/viewPowerups.js';
 import { bodyMaterialProps } from './cubeViewStyles.js';
@@ -1318,6 +1319,7 @@ const CubeAssembly = React.memo(({
               onComplete={onFlipWaveComplete}
             />
           )}
+          <CubieBodyBatchProvider enabled={wormHealerMode} materialFor={exteriorPortals.materialFor}>
           <group>
             {items.map((it, idx) => {
               // Skip the center cubie on odd-sized cubes — the antipodal core (VoidCore) occupies that space
@@ -1352,6 +1354,7 @@ const CubeAssembly = React.memo(({
               );
             })}
           </group>
+          </CubieBodyBatchProvider>
           {showCursor && cursor && (
             <CursorHighlight />
           )}

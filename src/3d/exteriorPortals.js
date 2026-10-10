@@ -30,6 +30,19 @@ float portalDistance(vec3 point) {
   return sqrt(distanceSq) - ${INTERIOR_PORTAL_RADIUS};
 }`;
 
+// A program is keyed by its source, never by uniform values, so a copy patched
+// against these stand-in uniforms shares the program of every live bore. The WORM
+// warm-up compiles such copies of the effects that only mount when a tile flips;
+// unpatched copies were warming programs the cube never uses, and the first flip
+// of a run linked two dozen programs in one frame.
+const warmupUniforms = { uExteriorOpen: { value: 0 },
+  uExteriorPoints: { value: Array.from({ length: SAMPLES * 2 }, () => new THREE.Vector3()) } };
+export function exteriorPortalWarmupMaterial(source) {
+  const material = source.clone();
+  if (source.isShaderMaterial) material.uniforms = { ...source.uniforms };
+  return withPortalCutout(material, warmupUniforms, exteriorPortalGLSL, 'outer-mouth');
+}
+
 export function createExteriorPortals() {
   const uniforms = { uExteriorOpen: { value: 0 },
     uExteriorPoints: { value: Array.from({ length: SAMPLES * 2 }, () => new THREE.Vector3()) } };

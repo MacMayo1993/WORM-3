@@ -41,6 +41,7 @@ import { feel, resumeFeel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
+import WormCameraZoomControl from './WormCameraZoomControl.jsx';
 import {
     overlayScrimStyle, overlayCardStyle, OVERLAY_CARD_CLASS, StatTiles,
     SETTING_ROW_STYLE, SETTING_LABEL_STYLE, togglePillStyle, segmentStyle,
@@ -1099,7 +1100,7 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     storyId ? [`Chapter ${storyChapterId(storyId)}`, `Level ${storyChapterIndex(storyId)} / ${STORY_CHAPTER_SIZE}`] : ['Next burrow', wormGamePhase === 'finalHealing' ? 'Final' : `${wormholeCountdown.toFixed(1)}s`],
                 ]} />
 
-                <details className="screen-disclosure"><summary>Controls & sound</summary>
+                <details className="screen-disclosure"><summary>Controls, camera & sound</summary>
                 {/* Named speed presets — keep the underlying multipliers out of the UI. */}
                 <div style={{ ...SETTING_ROW_STYLE, marginTop: 'clamp(10px, 2vh, 16px)' }}>
                     <span style={SETTING_LABEL_STYLE}>{storyId ? 'Level speed' : 'Speed'}</span>
@@ -1142,6 +1143,10 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                         {cameraHorizon === 'face' ? 'Follow the face' : 'Keep level'}
                     </button>
                 </div>
+
+                {/* How far back the chase camera stands. Judged against the run
+                    behind the menu; the mouse wheel sets it too while crawling. */}
+                <WormCameraZoomControl labelStyle={SETTING_LABEL_STYLE} style={SETTING_ROW_STYLE} />
 
                 <div style={SETTING_ROW_STYLE}>
                     <span style={SETTING_LABEL_STYLE}>Feel</span>

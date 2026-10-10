@@ -1,4 +1,5 @@
-import { useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
+import { ensureInstanceColor } from '../../3d/instanceUploads.js';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { burrowBridge } from '../burrowBridge.js';
@@ -17,6 +18,7 @@ const edges = [[0, 0.455, 0], [0.455, 0, Math.PI / 2], [0, -0.455, 0], [-0.455, 
 // or particles. Four disappearing edge segments announce a retreat in-world.
 export default function BurrowEffects({ size, hidden = false }) {
     const mesh = useRef();
+    useLayoutEffect(() => ensureInstanceColor(mesh.current), []);
     const scratch = useMemo(() => ({ dummy: new THREE.Object3D(), center: new THREE.Vector3(),
         normal: new THREE.Vector3(), offset: new THREE.Vector3(), rotation: new THREE.Quaternion(),
         faceRotation: new THREE.Quaternion(), turn: new THREE.Quaternion(), color: new THREE.Color(),

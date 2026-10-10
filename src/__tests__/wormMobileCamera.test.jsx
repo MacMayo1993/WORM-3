@@ -320,6 +320,43 @@ it('retains whole-board framing on desktop', () => {
   expect(origin.y).toBeCloseTo(0.06, 6);
 });
 
+it.each([8, 10, 15])('centres the head on a %s cube on desktop, where the cube centre lies far below the surface', size => {
+  scene.mobile = false;
+  scene.size = { width: 1440, height: 900 };
+  scene.camera.aspect = 1440 / 900; scene.camera.updateProjectionMatrix();
+  const worm = makeWorm(size);
+  render(worm, size); tick();
+  useGameStore.setState({ wormGamePhase: 'active' });
+  for (let i = 0; i < 60; i++) tick();
+  expectCentered(worm, size);
+});
+
+it.each([true, false])('stands the chase camera further back as the player zooms out (mobile=%s)', mobile => {
+  const before = useGameStore.getState().wormCameraZoom;
+  scene.mobile = mobile;
+  if (!mobile) {
+    scene.size = { width: 1440, height: 900 };
+    scene.camera.aspect = 1440 / 900; scene.camera.updateProjectionMatrix();
+  }
+  try {
+    const worm = makeWorm(5);
+    useGameStore.setState({ wormCameraZoom: 1 });
+    render(worm, 5); tick();
+    useGameStore.setState({ wormGamePhase: 'active' });
+    for (let i = 0; i < 600; i++) tick();
+    const head = worm.headInterpPos.current;
+    const near = scene.camera.position.distanceTo(head);
+    useGameStore.getState().setWormCameraZoom(2);
+    // Eased, not cut: the next frame has barely moved.
+    tick();
+    expect(scene.camera.position.distanceTo(head)).toBeLessThan(near * 1.2);
+    for (let i = 0; i < 600; i++) tick();
+    expect(scene.camera.position.distanceTo(head) / near).toBeCloseTo(2, 1);
+  } finally {
+    useGameStore.getState().setWormCameraZoom(before);
+  }
+});
+
 it('does not pump the camera out and back on a Mega orb pickup', () => {
   const worm = makeWorm(15);
   render(worm, 15); tick();

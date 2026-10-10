@@ -36,7 +36,8 @@ import { readLiveTile } from '../wormHelpers.js';
 import { prefersReducedMotion, isMobile } from '../../utils/device.js';
 import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME } from './constants.js';
 import { getSpecialDef } from './specialDefs.js';
-import { ElementalBadge, getSoftGlowTexture } from './elementalBadge.jsx';
+import { ElementalBadge } from './elementalBadge.jsx';
+import { getSoftGlowTexture, getOrbTrimMaterials, PARTICLE_KINDS } from './elementalOrbMaterials.js';
 import { getElementalOrbMaterials } from './elementalOrbShader.js';
 
 // One knob for how big the pickup reads. Every part of the orb is authored at
@@ -77,14 +78,6 @@ const MOTES = [
   { r: 0.66, incl: 0.75, phase: 3.0, speed: -0.55 }
 ];
 
-// Per-element drifting matter around the orb, mirroring ElementalAtmosphere's
-// scene-scale field. `vy` is along the face normal (+ = away from the cube).
-const PARTICLE_KINDS = {
-  bubbles: { count: 26, vy: 0.42, sway: 0.1, size: 0.055, opacity: 0.75 },
-  embers: { count: 30, vy: 0.55, sway: 0.09, size: 0.05, opacity: 0.95 },
-  spores: { count: 24, vy: -0.16, sway: 0.14, size: 0.05, opacity: 0.7 },
-  flakes: { count: 26, vy: -0.3, sway: 0.13, size: 0.055, opacity: 0.85 }
-};
 const FIELD_EXTENT = 0.9; // half-height of the box the matter wraps inside
 
 // Frame-loop scratch — shared across orbs, never retained.
@@ -93,42 +86,6 @@ const _norm = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const _quat = new THREE.Quaternion();
 const _billboard = new THREE.Quaternion();
-
-// The orb's non-shader materials, held per element for the same reason the badge's
-// are (see elementalBadge.jsx): R3F disposes JSX-declared materials on unmount, and
-// disposing the last user of a program makes three destroy it, so every offering
-// relinked them. Each entry backs exactly one mesh, so the lifetime fade — which
-// writes material.opacity from the MESH's baseOpacity — keeps a single writer.
-const _trimCache = new Map();
-function getOrbTrimMaterials(element, color, accent, particleSize) {
-  const key = `${element}_${color}_${accent}`;
-  const hit = _trimCache.get(key);
-  if (hit) return hit;
-  const glow = getSoftGlowTexture();
-  const additive = (c, opacity, map) =>
-    new THREE.MeshBasicMaterial({
-      color: c, map: map ?? null, transparent: true, opacity,
-      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
-    });
-  const set = {
-    ringA: additive(accent, 0.34),
-    ringB: additive(color, 0.3),
-    mote: new THREE.SpriteMaterial({
-      map: glow, color: accent, transparent: true, opacity: 0.85,
-      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
-    }),
-    points: new THREE.PointsMaterial({
-      map: glow, color: accent, size: particleSize, sizeAttenuation: true,
-      transparent: true, opacity: 1, blending: THREE.AdditiveBlending,
-      depthWrite: false, toneMapped: false
-    }),
-    countdown: additive(color, 0.45),
-    pool: additive(color, 0.42, glow),
-    shock: additive(accent, 0.8)
-  };
-  _trimCache.set(key, set);
-  return set;
-}
 
 export default function ElementalOrb({ special, size }) {
   const def = getSpecialDef(special.type);

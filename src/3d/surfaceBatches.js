@@ -32,14 +32,6 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
   const tracker = createWorldTransformTracker();
   const inverse = new THREE.Matrix4(), local = new THREE.Matrix4(), color = new THREE.Color();
   const frustum = new THREE.Frustum(), projection = new THREE.Matrix4(), sphere = new THREE.Sphere();
-  let visibility = new WeakMap();
-  function visible(object) {
-    if (!object) return true;
-    if (visibility.has(object)) return visibility.get(object);
-    const value = object.visible && visible(object.parent);
-    visibility.set(object, value);
-    return value;
-  }
   return {
     group,
     register(anchor, geometry, material, colorRef, seedRef = null) {
@@ -50,7 +42,6 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
     },
     update(camera = null) {
       tracker.begin();
-      visibility = new WeakMap();
       const rootVersion = tracker.update(group);
       inverse.copy(group.matrixWorld).invert();
       if (camera) {
@@ -60,14 +51,20 @@ export function createSurfaceBatches(capacity = 2048, materialFor = material => 
       for (const batch of batches.values()) { batch.count = 0; batch.matrixDirty = batch.colorDirty = batch.seedDirty = false; }
       for (const entry of entries) {
         const { anchor, geometry, material, colorRef, seedRef } = entry;
-        if (!anchor.parent || !visible(anchor)) continue;
+        if (!anchor.parent || !tracker.visible(anchor)) continue;
         const version = tracker.update(anchor);
         if (camera) {
           if (!geometry.boundingSphere) geometry.computeBoundingSphere();
           sphere.copy(geometry.boundingSphere).applyMatrix4(anchor.matrixWorld);
           if (!frustum.intersectsSphere(sphere)) continue;
         }
-        const key = `${geometry.uuid}:${material.uuid}:${!!colorRef}:${!!seedRef}:${anchor.renderOrder}`;
+        // Built once per entry (and again only if its draw order changes): a key
+        // per tile per frame was thousands of string concatenations on Mega.
+        if (entry.keyOrder !== anchor.renderOrder) {
+          entry.keyOrder = anchor.renderOrder;
+          entry.key = `${geometry.uuid}:${material.uuid}:${!!colorRef}:${!!seedRef}:${anchor.renderOrder}`;
+        }
+        const key = entry.key;
         let batch = batches.get(key);
         if (!batch) {
           const mesh = new THREE.InstancedMesh(seedRef ? seededGeometry(geometry, capacity) : geometry, materialFor(material), capacity);

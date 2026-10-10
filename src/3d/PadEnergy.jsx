@@ -1,4 +1,4 @@
-import { uploadInstancePrefix, setInstanceCount } from './instanceUploads.js';
+import { uploadInstancePrefix, setInstanceCount, ensureInstanceColor } from './instanceUploads.js';
 // src/3d/PadEnergy.jsx
 //
 // Raised flip pads hover a short hop off the cube on an unstable wormhole: a
@@ -8,7 +8,7 @@ import { uploadInstancePrefix, setInstanceCount } from './instanceUploads.js';
 // four draws (columns, vortices, arcs, sparks). Nothing is allocated per frame
 // and nothing is written back to the game: the sim lands on the rest height.
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createPadStalkGeometry, PAD_BACK_CLEARANCE } from './padStalkGeometry.js';
@@ -125,6 +125,10 @@ export function PadEnergy({ frames, exteriorPortals }) {
       sparkClock: { acc: 0, n: 0 }
     };
   }, [capacity]);
+
+  // Colour buffers up front, so the run-start warm-up compiles the variant the
+  // first lifted pad draws with (see ensureInstanceColor).
+  useLayoutEffect(() => { ensureInstanceColor(columnRef.current); ensureInstanceColor(vortexRef.current); }, [res, capacity]);
 
   useEffect(() => () => {
     for (const k of ['columnGeo', 'vortexGeo', 'columnMat', 'vortexMat', 'stripGeo', 'sparkMat']) res[k].dispose();

@@ -57,3 +57,22 @@ export function createOrbReveal(group, { radius = 0.6, reducedMotion = false } =
     dispose: release,
   };
 }
+
+// Compile arrival variants ahead of the first spawn. Each borrowed variant is
+// compiled and then handed back to its source's pool, so the first real arrival
+// takes an already-linked material instead of linking one in its own frame.
+export function warmOrbReveal(renderer, camera, scene, materials, reducedMotion = false) {
+  const group = new THREE.Group(), geometry = new THREE.PlaneGeometry(0.1, 0.1);
+  // Particle fields carry positions only; a uv attribute on a mapped
+  // PointsMaterial selects a different program.
+  const points = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+  for (const material of materials) {
+    group.add(material.isSpriteMaterial ? new THREE.Sprite(material)
+      : material.isPointsMaterial ? new THREE.Points(points, material) : new THREE.Mesh(geometry, material));
+  }
+  // The settled orb draws with the sources themselves once the arrival ends.
+  renderer.compile(group, camera, scene);
+  const reveal = createOrbReveal(group, { reducedMotion });
+  try { renderer.compile(group, camera, scene); }
+  finally { reveal.dispose(); group.clear(); geometry.dispose(); points.dispose(); }
+}
