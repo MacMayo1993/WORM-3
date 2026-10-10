@@ -177,6 +177,9 @@ it('shows the full caution death before unlocking Next, then resets into rescue 
   until(() => state().wormPhase === 'falling');
   expect(state().demoWormComplete).toBe(false);
   frames(15);
+  expect(worm.cautionFall.current.dissolve).toBe(0);
+  expect(state().demoWormComplete).toBe(false);
+  frames(25);
   expect(worm.cautionFall.current.dissolve).toBeGreaterThan(0);
   expect(worm.cautionFall.current.dissolve).toBeLessThan(1);
   expect(state().demoWormComplete).toBe(false);

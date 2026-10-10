@@ -79,6 +79,20 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     expect(clearance.value).toBe(0);
     expect(halves[0].geometry.attributes.position.version).toBe(intact);
 
+    tunnelState.fallOpening = { mouth: new THREE.Vector3(1, 0, 0), normal: new THREE.Vector3(1, 0, 0), depth: 2.2 };
+    frame();
+    const opening = halves[0].material.uniforms.uCautionOpen;
+    expect(opening.value).toBe(1);
+    for (const part of halves[0].parent.children) {
+      expect(part.material.uniforms.uCautionOpen).toBe(opening);
+      expect(part.material.fragmentShader).toContain('insideCautionOpening');
+    }
+    expect(halves[0].parent.visible).toBe(true); // clear the bore, retain the highway
+    tunnelState.fallOpening = null;
+    frame();
+    expect(opening.value).toBe(0);
+    expect(halves[0].geometry.attributes.position.version).toBe(intact);
+
     const sharedTime = halves[0].material.uniforms.time;
     expect(sharedTime).toBe(halves[1].material.uniforms.time);
     const held = sharedTime.value;

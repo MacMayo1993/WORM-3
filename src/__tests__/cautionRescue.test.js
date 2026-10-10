@@ -3,7 +3,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { makeWormSim, resetWormSim, stepWormSim, queueTurn } from '../worm/healerWorm/wormSim.js';
-import { cautionEntry, cautionFallPoint, CAUTION_FALL_SECONDS, makeCautionFall, tickCautionFall } from '../worm/healerWorm/cautionRescue.js';
+import { cautionEntry, cautionFallPoint, CAUTION_FALL_SECONDS, CAUTION_DISSOLVE_START, CAUTION_DISSOLVE_END, makeCautionFall, tickCautionFall } from '../worm/healerWorm/cautionRescue.js';
+import { CAUTION_OPENING_RADIUS } from '../worm/healerWorm/cautionOpening.js';
 import { FACE_NORMALS } from '../worm/healerWorm/constants.js';
 import { resetLiveRotation, setLiveRotation } from '../worm/liveRotation.js';
 import { wormExpansion } from '../worm/wormExpansion.js';
@@ -81,9 +82,11 @@ it('ignores unrelated inputs and completes the inward fall and dissolve before d
     const aliveTime = s.sim.timeAlive, fall = s.sim.cautionFall;
     for (let i = 0; i < 65; i++) { queueTurn(s.sim, 'jump'); step(s); }
     expect(s.sim.headInterpPos.clone().sub(fall.mouth).dot(fall.normal)).toBeLessThan(0);
+    expect(fall.dissolve).toBe(0); // still solid while dropping below the lip
+    for (let i = 0; i < 30; i++) step(s);
     expect(fall.dissolve).toBeGreaterThan(0);
     expect(fall.dissolve).toBeLessThan(1);
-    for (let i = 0; i < 80; i++) step(s);
+    for (let i = 0; i < 90; i++) step(s);
     expect(s.sim.phase).toBe('dead');
     expect(s.sim.alive).toBe(false);
     expect(s.sim.timeAlive).toBe(aliveTime);
@@ -127,6 +130,7 @@ it('reuses one bounded opening for the fall and closes it after retry', () => {
     const fall = s.sim.cautionFall, portals = createExteriorPortals();
     portals.update(null, size, 0, fall);
     expect(portals.uniforms.uExteriorOpen.value).toBe(1);
+    expect(portals.uniforms.uExteriorRadius.value).toBe(CAUTION_OPENING_RADIUS);
     const points = portals.uniforms.uExteriorPoints.value;
     for (let i = 0; i < 9; i++) expect(points[i].equals(points[i + 9])).toBe(true);
     for (const t of [1, 1.5, CAUTION_FALL_SECONDS]) {
@@ -139,7 +143,7 @@ it('reuses one bounded opening for the fall and closes it after retry', () => {
     portals.dispose();
 });
 
-it.each(Object.keys(FACE_NORMALS))('starts dissolving during the visible pull across the tape on %s', face => {
+it.each(Object.keys(FACE_NORMALS))('keeps the worm solid through the pull and a deep inward drop on %s', face => {
     const s = stage(face);
     s.sim.cautionFall = makeCautionFall(s.sim, s.target, size);
     const fall = s.sim.cautionFall;
@@ -149,10 +153,13 @@ it.each(Object.keys(FACE_NORMALS))('starts dissolving during the visible pull ac
     expect(offset.dot(fall.normal)).toBeGreaterThan(0.1);
     expect(offset.projectOnPlane(fall.normal).length()).toBeLessThan(startGap);
     expect(offset.length()).toBeGreaterThan(0.3);
-    expect(fall.dissolve).toBeGreaterThan(0.1);
-    for (let i = 0; i < 100; i++) tickCautionFall(s.sim, 0.02);
+    expect(fall.dissolve).toBe(0);
+    while (fall.elapsed < CAUTION_DISSOLVE_START - 0.03) tickCautionFall(s.sim, 0.02);
+    expect(fall.dissolve).toBe(0);
+    expect(s.sim.headInterpPos.clone().sub(fall.mouth).dot(fall.normal)).toBeLessThan(-0.8);
+    while (fall.elapsed < CAUTION_FALL_SECONDS) tickCautionFall(s.sim, 0.02);
     expect(fall.dissolve).toBe(1);
-    expect(s.sim.headInterpPos.clone().sub(fall.mouth).dot(fall.normal)).toBeGreaterThan(-0.7);
+    expect(s.sim.headInterpPos.clone().sub(fall.mouth).dot(fall.normal)).toBeLessThan(-1.9);
 });
 
 it('freezes the pull and dissolve while paused and finishes them before the death card', () => {
@@ -162,9 +169,9 @@ it('freezes the pull and dissolve while paused and finishes them before the deat
     s.ctx.isPaused = () => true; step(s, 20);
     expect([fall.elapsed, fall.dissolve, s.sim.headInterpPos.toArray(), s.sim.stepHistory.count]).toEqual(snapshot);
     s.ctx.isPaused = () => false;
-    for (let i = 0; i < 41; i++) step(s, 0.05);
+    while (fall.elapsed < CAUTION_DISSOLVE_END + 0.01) step(s, 0.05);
     expect(fall.dissolve).toBe(1);
     expect(s.sim.alive).toBe(true);
-    for (let i = 0; i < 5; i++) step(s, 0.05);
+    while (fall.elapsed < CAUTION_FALL_SECONDS) step(s, 0.05);
     expect(s.sim.alive).toBe(false);
 });
