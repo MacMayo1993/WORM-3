@@ -14,6 +14,9 @@ import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 import { withPortalCutout } from '../../3d/portalCutout.js';
 import { makeInteriorPortals, syncInteriorPortals, interiorPortalGLSL } from './interiorPortals.js';
 import { prefersReducedMotion } from '../../utils/device.js';
+import { getWormTunnelSnapshot } from '../tunnelSnapshot.js';
+import { WORM_PAD_HEIGHT } from '../../game/raisedCubie.js';
+import { tunnelRouteKey } from './tunnelTubePool.js';
 
 // ─── Tunnel Interior View — all 6 inner faces of the Rubik's cube ────────────
 // During wormhole traversal shows the coloured back-sides of every sticker on
@@ -53,6 +56,7 @@ export function TunnelInteriorView({ worm, size }) {
     const stickerMatsAssigned = useRef(false);
     const materialSnapshot = useRef({ cubies: null, settings: null, cap: null });
     const portalColorSnapshot = useRef({});
+    const networkSnapshot = useRef({});
     const portals = useMemo(() => makeInteriorPortals(), []);
     const ownedMaterials = useMemo(() => new Map(), []);
     useEffect(() => () => {
@@ -132,24 +136,43 @@ export function TunnelInteriorView({ worm, size }) {
         const inTraversal = ['windup', 'entering', 'tunnel', 'exiting', 'windout'].includes(phase);
         const active = inTraversal;
         const tunnel = worm.activeTunnel?.current ?? worm.tunnelPassages?.current?.at(-1)?.tunnel ?? null;
-        syncInteriorPortals(portals, tunnel, size, expansion);
+        const st = useGameStore.getState(), cap = selectEffectiveFlipCap(st);
+        const old = networkSnapshot.current;
+        if (old.cubies !== st.cubies || old.size !== size || old.epoch !== st.rotationEpoch || old.cap !== cap || old.tunnel !== tunnel || old.expansion !== expansion) {
+            // Share the simulation's cached topology; don't scan the cube each frame.
+            const snapshot = getWormTunnelSnapshot(st.cubies, size, st.rotationEpoch);
+            const routes = tunnel ? [tunnel] : [];
+            const seen = new Set(routes.map(tunnelRouteKey));
+            for (const { tunnel: route } of snapshot.tunnels) {
+                const key = tunnelRouteKey(route);
+                if (seen.has(key)) continue;
+                if ([route.entry, route.exit].some(cell =>
+                    (st.cubies[cell.x]?.[cell.y]?.[cell.z]?.stickers?.[cell.dirKey]?.flips ?? cap) >= cap)) continue;
+                seen.add(key);
+                routes.push({ ...route, padHeight: WORM_PAD_HEIGHT, padExpansion: expansion });
+            }
+            networkSnapshot.current = { cubies: st.cubies, size, epoch: st.rotationEpoch, cap, tunnel, expansion, routes };
+        }
+        const routes = inTraversal ? networkSnapshot.current.routes : [];
+        const hasPortals = routes.length > 0;
+        syncInteriorPortals(portals, routes, size, expansion);
 
         // Assign on the first observed transit frame and on actual cube/style
         // changes. Avoids 54+ per-frame GPU state changes while still refreshing
         // backs when a pair heals or the player changes the equipped styles.
-        const st = useGameStore.getState(), cap = selectEffectiveFlipCap(st);
         const changed = materialSnapshot.current.cubies !== st.cubies || materialSnapshot.current.settings !== st.settings || materialSnapshot.current.cap !== cap
-            || materialSnapshot.current.portals !== !!tunnel;
+            || materialSnapshot.current.portals !== hasPortals;
         if (!st.wormPaused && !st.settings?.reducedMotion && !prefersReducedMotion()) portals.time.value += Math.min(delta, 0.05);
         const portalColors = portalColorSnapshot.current;
-        if (tunnel && (portalColors.tunnel !== tunnel || portalColors.cubies !== st.cubies || portalColors.settings !== st.settings)) {
+        if (hasPortals && (portalColors.routes !== routes || portalColors.cubies !== st.cubies || portalColors.settings !== st.settings)) {
             const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
-            for (let side = 0; side < 2; side++) {
-                const cell = side === 0 ? tunnel.entry : tunnel.exit;
+            for (let i = 0; i < portals.uniforms.uInteriorCount.value; i++) {
+                const route = routes[Math.floor(i / 2)];
+                const cell = i % 2 === 0 ? route.entry : route.exit;
                 const sticker = st.cubies?.[cell.x]?.[cell.y]?.[cell.z]?.stickers?.[cell.dirKey];
-                portals.mouths[side].material.uniforms.uColor.value.set(fc[ANTIPODAL_COLOR[sticker?.curr]] ?? '#88ccff');
+                portals.mouths[i].material.uniforms.uColor.value.set(fc[ANTIPODAL_COLOR[sticker?.curr]] ?? '#88ccff');
             }
-            portalColorSnapshot.current = { tunnel, cubies: st.cubies, settings: st.settings };
+            portalColorSnapshot.current = { routes, cubies: st.cubies, settings: st.settings };
         }
         if (inTraversal && (!stickerMatsAssigned.current || changed)) {
             const { cubies, settings } = st;
@@ -170,7 +193,7 @@ export function TunnelInteriorView({ worm, size }) {
                 const antiColorHex = fc[ANTIPODAL_COLOR[antipodalFaceId]] ?? '#ffffff';
                 mesh.onBeforeRender = bindTileStyleIdentity(sticker.origPos, sticker.orig);
                 const source = getTileStyleMaterial(style, colorHex, false, null, antiColorHex);
-                if (tunnel) {
+                if (hasPortals) {
                     usedMaterials.add(source);
                     if (!ownedMaterials.has(source)) {
                         const material = source.clone();
@@ -183,7 +206,7 @@ export function TunnelInteriorView({ worm, size }) {
                 mesh.visible = false; // revealed together once materials are assigned
             }
             stickerMatsAssigned.current = true;
-            materialSnapshot.current = { cubies, settings, cap, portals: !!tunnel };
+            materialSnapshot.current = { cubies, settings, cap, portals: hasPortals };
             ownedMaterials.forEach((material, source) => {
                 if (!usedMaterials.has(source)) { material.dispose(); ownedMaterials.delete(source); }
             });

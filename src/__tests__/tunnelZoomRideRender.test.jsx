@@ -84,6 +84,7 @@ it.each([3, 6, 15])('keeps the rendered track, rider and camera together through
       const fixed = positions.array.slice();
       tunnelState.occupiedTunnelIds.clear();
       frame();
+      expect(ribbon.parent.visible).toBe(true); // Unoccupied live connections remain visible during the ride.
       expect(positions.array.some((v, i) => Math.abs(v - fixed[i]) > 0.1)).toBe(true);
       // Acquiring a still-enlarged track must rebuild it onto the fixed route.
       tunnelState.activeTunnelId = id;

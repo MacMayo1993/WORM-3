@@ -65,7 +65,9 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     const back = scene.getObjectByName('sticker-antipodal-back');
     const inner = scene.getObjectByName('tunnel-interior-0-1-1-NX');
     expect(back.material).toBe(cached);
-    expect(inner.material).toBe(cached);
+    expect(inner.material).not.toBe(cached); // Interior-only openings never patch exterior tile materials.
+    expect(inner.material.uniforms.baseColor).toBe(cached.uniforms.baseColor);
+    expect(inner.material.uniforms.uInteriorCount.value).toBe(2);
     expect(inner.visible).toBe(true);
 
     tunnelState.active = true; tunnelState.activeTunnelId = 'a|b'; frame();
@@ -93,7 +95,8 @@ it('renders a solid core, styled halves, and matching live antipodal backs insid
     expect(disposed).toHaveBeenCalledOnce();
     expect(halves[0].geometry.attributes.position.version).toBe(version);
     expect(back.material).toBe(getTileStyleMaterial('wood', FACE_COLORS[2], false, null, FACE_COLORS[5]));
-    expect(inner.material).toBe(back.material);
+    expect(inner.material.uniforms.baseColor).toBe(back.material.uniforms.baseColor);
+    expect(inner.material.uniforms.uInteriorCount.value).toBe(2);
     expect(scene.getObjectByName('tunnel-styled-half-0').material.name).toBe('tunnel-tile-0-polkaDots');
 
     cubies = flipStickerPair(cubies, 3, 0, 1, 1, 'NX', buildManifoldGridMap(cubies, 3));
