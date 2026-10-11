@@ -11,6 +11,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { applyTileMove } from '../game/tileOrientation.js';
 import { recordHomeAlignments, clearHomeAlignments } from '../3d/tileHomeAlignment.js';
 import { feel } from '../utils/feel.js';
+import { cancelLiveRotation } from '../worm/liveRotation.js';
 
 /**
  * Hook for animation management
@@ -71,14 +72,17 @@ export function useAnimation() {
     useGameStore.setState({ animState: first, pendingMove: first });
   }, []);
 
-  // Cancel any in-flight animated shuffle. Safe to call at any time.
+  // Cancel any in-flight animated shuffle or turn. Safe to call at any time.
   const cancelShuffle = useCallback(() => {
     clearHomeAlignments();
     shuffleIdRef.current += 1; // Invalidate pending setTimeout callbacks
     isShufflingRef.current = false;
     shuffleQueueRef.current = [];
     shuffleDoneRef.current = null;
+    pendingMoveRef.current = null;
     useGameStore.getState().clearAnimation();
+    // The turn is abandoned, so the bridge the worm and orbs read must not keep it live.
+    cancelLiveRotation();
   }, []);
 
   // Handle animation completion

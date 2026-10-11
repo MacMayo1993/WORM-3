@@ -80,8 +80,22 @@ export function ThunkEffect({ thunkRef }) {
     const activeRef = useRef(false);
     const reducedRef = useRef(false);
     const sparksRef = useRef({ list: [], colors: [], count: 0, origin: [0, 0, 0] });
+    const runRef = useRef(useGameStore.getState().wormRunId);
 
     useFrame((_, rawDelta) => {
+        // A shout belongs to the run it was shouted in. Retry while it is still playing
+        // and the new run opens paused (scramble, Story briefing), which holds the
+        // shout's clock: without this it hung frozen over the new board.
+        const runId = useGameStore.getState().wormRunId;
+        if (runRef.current !== runId) {
+            runRef.current = runId;
+            if (thunkRef.current) thunkRef.current.active = false;
+            activeRef.current = false;
+            if (groupRef.current) groupRef.current.visible = false;
+            if (rootRef.current) rootRef.current.style.display = 'none';
+            if (ringRef.current) ringRef.current.visible = false;
+            if (sparkMeshRef.current) sparkMeshRef.current.count = 0;
+        }
         const pending = thunkRef.current;
         if (pending?.active) {
             pending.active = false;
@@ -244,6 +258,7 @@ const _sevPose = { x: 0, y: 0, z: 0, scale: 1, flash: 0 };
 export function SeveredTail({ severedRef }) {
     const meshRef = useRef();
     const stateRef = useRef({ active: false, t: 0, pieces: [], count: 0, reduced: false });
+    const runRef = useRef(useGameStore.getState().wormRunId);
     const skinId = useGameStore(s => s.wormSkin ?? 'slime');
     const baseColor = useMemo(() => getSkin(skinId).body, [skinId]);
 
@@ -251,6 +266,13 @@ export function SeveredTail({ severedRef }) {
         const mesh = meshRef.current;
         if (!mesh) return;
         const st = stateRef.current;
+        // A tail cut off in an earlier run never tumbles over the next one.
+        const runId = useGameStore.getState().wormRunId;
+        if (runRef.current !== runId) {
+            runRef.current = runId;
+            if (severedRef.current) severedRef.current.active = false;
+            st.active = false;
+        }
         const pending = severedRef.current;
         if (pending?.active) {
             pending.active = false;
