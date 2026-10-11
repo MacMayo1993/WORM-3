@@ -392,7 +392,8 @@ export const STORY_LEVEL_DATA = [
     mechanics: { selfPasses: 4, multiHeals: 2, bodyLength: 200 } },
   { id: 112, cubeSize: 3, title: 'Teeth of the Pocket', subtitle: 'Not even the air.',
     kind: 'tunnel', target: 4, rotations: 6, orbsPerFace: 3, speed: 2.4, rotateEvery: 8, par: 455, limit: 695, points: 100,
-    mechanics: { selfPasses: 4, multiHeals: 3, bodyLength: 150 } },
+    // Four pairs on a 3×3: chained double heals allow three, so ask for two and leave one spare.
+    mechanics: { selfPasses: 4, multiHeals: 2, bodyLength: 150 } },
   { id: 113, cubeSize: 9, title: 'Fusion Furnace', subtitle: 'Warm for the first time since the crash.',
     kind: 'mastery', target: 4, orbs: 54, speed: 2.8, rotateEvery: 11, par: 645, limit: 980, points: 100,
     mechanics: { elements: 5, steamFusions: 1, quenchFusions: 1, uniqueFusions: 4 } },
