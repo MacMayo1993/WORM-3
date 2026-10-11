@@ -19,7 +19,7 @@ import MobiStage, { MobiKey, useMobiSpeech } from './MobiStage.jsx';
 export const MOBI_LINES_DEMO_INTRO = [
   "Aloha! I'm Mobi, a Multi-Oriented Block Intelligence from the Projective Plane, where every spot has a twin straight through the middle.",
   "This Flip Cube is my ship. It got me through W³, the Great World Worm War, then crash-landed here scrambled. Help me heal it so we can fly home.",
-  "First, let’s steer a worm. Collect orbs to grow, jump over your body, and ride tunnels to heal them.",
+  "You hatched aboard, and worms are the best healers in the Plane. Let’s start you crawling: collect orbs to grow, jump over your body, and ride tunnels to heal them.",
   "Go at your pace. Skip Mobi skips my instructions; Skip Step moves to the next section.",
 ];
 

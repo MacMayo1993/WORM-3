@@ -830,7 +830,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
     key: 'glass',
     title: 'Glass',
     // The body turns see-through, which puts the antipodal core on show.
-    copy: 'Glass makes the cube see-through. The small cube at the centre shows every tile’s twin.',
+    copy: 'Glass makes the cube see-through. The small cube at the centre is the Core, and it shows every tile’s twin.',
     apply: (s) => s.setVisualMode('glass'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
@@ -874,7 +874,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
     title: 'Tunnels',
     // Every tunnel docks on the core tile beneath its mouth and crosses through
     // the centre (tunnelPath.js), so that is the route the copy names.
-    copy: 'Watch the tunnel run from a tile, through the small cube at the centre, out to its twin. Explode opens the cube so you can see it.',
+    copy: 'Watch the tunnel run from a tile, through the small cube at the centre (the Core), out to its twin. Explode opens the cube so you can see it.',
     // Keep the previous beat's exploded view (the tunnel is invisible inside a
     // closed cube) and flip the front-face center tile so exactly one
     // antipodal tunnel lights up.
@@ -901,7 +901,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'cutaway',
     title: 'Cutaway',
-    copy: 'The cutaway lens looks inside the closed cube: the tunnel docks on the small cube at the centre. Drag the lens to look around.',
+    copy: 'The cutaway lens looks inside the closed cube: the tunnel docks on the small cube at the centre, the Core. Drag the lens to look around.',
     // The closed-cube counterpart of the Tunnels beat: the same single pair,
     // seen through the lens instead of by blowing the cube apart. The lens
     // opens a little low so its caption clears this card at the top of the

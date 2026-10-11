@@ -85,7 +85,9 @@ export function DroppedOrbs({ worm, size }) {
         return { core: coreMesh, ring: ringMesh };
     }, []);
     useEffect(() => () => {
-        for (const mesh of [core, ring]) { mesh.geometry.dispose(); mesh.material.dispose(); mesh.dispose(); }
+        // <primitive dispose={null}> writes `dispose = null` onto the mesh itself,
+        // so release its instance buffers through the class method.
+        for (const mesh of [core, ring]) { mesh.geometry.dispose(); mesh.material.dispose(); THREE.InstancedMesh.prototype.dispose.call(mesh); }
     }, [core, ring]);
 
     const clockRef = useRef(0);

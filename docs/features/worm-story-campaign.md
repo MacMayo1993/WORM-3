@@ -66,6 +66,8 @@ Supply and completion are checked against the runtime: every level stages for bo
 
 Every level has a `briefing` of one to three dialogue cards and a `debrief`. At launch (`handleWormSetupComplete` → `storyLaunchLines`) Mobi speaks the briefing and the literal mission card follows it, at most five cards. Before this change he read only the subtitle and the task list. The map, preflight and pause cards show the briefing as one paragraph (`storyBriefingText`); the result card shows the debrief. Briefings never contain digits; counts stay in the mission sentence. House rules are in `docs/COPY_STYLE.md`.
 
+The guided demo tells the same story in miniature. Its cold open names Mobi, the Projective Plane, the ship and W³. WORM practice is framed as repairs to the crashed ship, the cube steps as its decks and doors, and the view tour ends at the Core. Mobi's send-off on the end screen points to WORM Levels. Copy lives in `MobiIntroScreen.jsx`, `demoStepCopy.js`, `wormDemoLessons.js`, `DemoFlowController.jsx` and `DemoEndScreen.jsx`.
+
 ## 6. Adding or retuning a level
 
 1. Edit the level in `campaign.js` and keep its `par`/`limit` consistent with neighbours of the same chapter.

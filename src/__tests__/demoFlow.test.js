@@ -11,6 +11,7 @@ import { classifyTraversal } from '../worm/healerWorm/economy.js';
 import { makeCubies } from '../game/cubeState.js';
 import { totalFlippedCount } from '../game/demoProgress.js';
 import { inspectionLens } from '../3d/inspectionBridge.js';
+import { MOBI_LINES_DEMO_INTRO, MOBI_LINES_WORM } from '../components/screens/MobiIntroScreen.jsx';
 
 import { DEMO_STEP_IDS as IDS, nextDemoStep as advance } from '../game/demoSequence.js';
 
@@ -260,9 +261,11 @@ describe('demo explains every mode’s rules accurately', () => {
 
   // Every tunnel docks on the antipodal core and crosses the centre, so the
   // beats that show the cube's inside name that small cube, not a bare line.
-  it('Views: Glass, Tunnels and Cutaway name the small cube at the centre', () => {
+  it('Views: Glass, Tunnels and Cutaway name the small cube at the centre as the Core', () => {
     for (const key of ['glass', 'tunnels', 'cutaway']) {
-      expect(VIEW_SHOWCASE_SEQUENCE.find((v) => v.key === key).copy.toLowerCase()).toContain('small cube at the centre');
+      const copy = VIEW_SHOWCASE_SEQUENCE.find((v) => v.key === key).copy;
+      expect(copy.toLowerCase()).toContain('small cube at the centre');
+      expect(copy).toContain('the Core');
     }
   });
 
@@ -296,5 +299,38 @@ describe('demo explains every mode’s rules accurately', () => {
     const grid = VIEW_SHOWCASE_SEQUENCE.find((v) => v.key === 'grid');
     expect(grid.copy.toLowerCase()).toContain('address');
     expect(grid.copy.toLowerCase()).not.toContain('grid lines');
+  });
+});
+
+// The demo tells the same story as WORM Levels (docs/COPY_STYLE.md): Mobi is a
+// Multi-Oriented Block Intelligence from the Projective Plane, the Flip Cube is
+// his ship, and W³ broke it. Older premises must not survive in any demo line.
+describe('demo follows the story canon', () => {
+  const lessonCopy = WORM_DEMO_LESSONS.flatMap((lesson) => [lesson.instruction, lesson.success]);
+  const allDemoCopy = [
+    ...MOBI_LINES_DEMO_INTRO, ...MOBI_LINES_WORM, ...Object.values(STEP_COPY), ...Object.values(STEP_INTRO_LINES).flat(),
+    ...Object.values(TRY_COPY), ...Object.values(STEP_COMPLETE_NOTE), ...lessonCopy,
+    ...VIEW_SHOWCASE_SEQUENCE.map((v) => v.copy), ...CONTROL_TOUR_SEQUENCE.map((b) => b.copy),
+  ];
+
+  it('opens with who Mobi is, where he is from, and what broke his ship', () => {
+    const open = MOBI_LINES_DEMO_INTRO.join(' ');
+    for (const fact of ['Multi-Oriented Block Intelligence', 'Projective Plane', 'Flip Cube is my ship', 'W³', 'Great World Worm War', 'crash']) {
+      expect(open).toContain(fact);
+    }
+    expect(MOBI_LINES_DEMO_INTRO.length).toBeLessThanOrEqual(5);
+  });
+
+  it('keeps no line from the older premises', () => {
+    const STALE = [/slipped out/i, /Great Worm War 3/, /Multi Orientable/i, /old routes/i, /ceasefire/i, /\bour world\b/i, /our doorways/i];
+    for (const line of allDemoCopy) for (const stale of STALE) expect(line, line).not.toMatch(stale);
+  });
+
+  it('frames the WORM practice and the cube steps as repairs to Mobi’s ship', () => {
+    expect(STEP_COPY['worm-traversal']).toMatch(/my ship/);
+    expect(STEP_COPY['baby-cube']).toMatch(/deck of my ship/);
+    expect(STEP_COPY['flip-gateway']).toMatch(/how my ship travels/);
+    expect(WORM_DEMO_LESSONS.find((l) => l.id === 'tunnel').instruction).toContain('the Core');
+    expect(STEP_INTRO_LINES['chaos-forecast'][0]).toContain('W³');
   });
 });
