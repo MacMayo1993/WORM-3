@@ -9,15 +9,15 @@ import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { storySurfaceTile } from './story/mastery.js';
 import { bodyCoverageCount } from './healerWorm/bodyCoverage.js';
 import { storyLevel, storyRotationCycle } from './story/levels.js';
-import { combatBridge, strikeEnemies } from './combat/portalCombat.js';
-import { STORM, makeStorm, beginStorm, clearStorm, tickStorm, pickStrikeTile } from './healerWorm/lightningStorm.js';
+import { combatBridge, strikeEnemies, afflictEnemies, nearestEnemy } from './combat/portalCombat.js';
+import { STORM, makeStorm, beginStorm, clearStorm, tickStorm, pickStrikeTile, addStormFlash } from './healerWorm/lightningStorm.js';
 import { getAllSurfaceTiles } from './healerWorm/surfaceTiles.js';
 import CombatScene from './combat/CombatScene.jsx';
 import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import DemoPracticeTargets from './healerWorm/DemoPracticeTargets.jsx';
 import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
 import { LightningStrikes } from './healerWorm/LightningStrikes.jsx';
-import { isHotTile, isFirebreakTile, chargeSpringPad } from './healerWorm/elementalGameplay.js';
+import { isHotTile, isFirebreakTile, isFrostTile, isMeltTile, chargeSpringPad, CHARGED_PAD_TTL, FUSION } from './healerWorm/elementalGameplay.js';
 import { fusionOf } from './healerWorm/elementalFusion.js';
 import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
 import BurrowEffects from './healerWorm/BurrowEffects.jsx';
@@ -244,10 +244,16 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         const demo = wormDemoActive(store);
         const element = worm.elementalType.current, partner = worm.elementalPair?.current ?? null;
         const lightning = (element === 'lightning' || partner === 'lightning') && wormBuffs.elementalT > 0;
-        // Thunderpad: the storm aims for spring pads, and a struck pad is charged, not flipped.
-        const thunder = fusionOf(element, partner, wormBuffs.elementalT) === 'thunderpad';
+        // A fused storm plays by its fusion's rule (elementalFusion.js):
+        // Thunderpad aims at pads and charges them; Conductor never aims at the body and
+        // forks; Plasma doubles the marks, avoids the fire trail and leaves its tile burning;
+        // Static discharges strikes near the head into speed; Current absorbs a strike on a
+        // fast worm into an arc; Firestorm ignites a cross; Cryostorm charges slowly and
+        // strikes as frost; Grounded grows charged pads instead of flipping or cutting.
+        const fusion = lightning ? fusionOf(element, partner, wormBuffs.elementalT) : null;
+        const thunder = fusion === 'thunderpad';
         // A fresh orb (or a second one claimed mid-wash) restarts the marks.
-        if (lightning && wormBuffs.elementalT > stormLastTRef.current + 0.5) beginStorm(storm);
+        if (lightning && wormBuffs.elementalT > stormLastTRef.current + 0.5) beginStorm(storm, fusion === 'plasma' ? STORM.strikes * 2 : STORM.strikes);
         stormLastTRef.current = lightning ? wormBuffs.elementalT : 0;
         if (storm.spots.length === 0 && storm.flashes.length === 0 && !lightning) return;
         const live = worm.phase.current === 'crawling' && !store.animState && worm.tunnelPassages.current.length === 0 &&
@@ -255,33 +261,79 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             (worm.elementalFocusT?.current ?? 0) <= 0 && (worm.healPauseT?.current ?? 0) <= 0;
         if (!live) return;
         const rng = worm.rand?.current ?? Math.random;
+        const patches = worm.elementalPatches.current;
+        const bodyKeys = () => {
+            const trail = worm.tileTrail.current;
+            const bodyCount = bodyCoverageCount(worm.tailLength.current, trail.count, size, worm.expansionAmount.current);
+            const body = [];
+            for (let i = 0; i < bodyCount; i++) body.push(ttAt(trail, i));
+            return body;
+        };
+        const crowdedAt = key => worm.powerups.current.some(o => tileKeyOf(o) === key) ||
+            worm.specials.current.some(o => tileKeyOf(o) === key) || bombsRef.current.some(b => tileKeyOf(b.tile) === key);
         const fired = tickStorm(storm, Math.min(delta, 0.1), {
             spawning: lightning && !demo,
             rng,
+            telegraph: fusion === 'cryostorm' ? STORM.telegraph * 2 : STORM.telegraph,
             pick: r => {
-                const trail = worm.tileTrail.current;
-                const bodyCount = bodyCoverageCount(worm.tailLength.current, trail.count, size, worm.expansionAmount.current);
-                const body = [];
-                for (let i = 0; i < bodyCount; i++) body.push(ttAt(trail, i));
+                const body = bodyKeys();
                 const head = worm.pos.current;
                 const avoid = collectManifoldRing(head.x, head.y, head.z, head.dirKey, size, STORM.headSafeTiles);
                 for (const orb of worm.powerups.current) avoid.add(tileKeyOf(orb));
                 for (const orb of worm.specials.current) avoid.add(tileKeyOf(orb));
                 for (const bomb of bombsRef.current) avoid.add(tileKeyOf(bomb.tile));
                 for (const spot of storm.spots) avoid.add(tileKeyOf(spot.tile));
+                const spareBody = fusion === 'conductor' || fusion === 'plasma';
+                if (spareBody) for (const k of body) if (k) avoid.add(k);
+                if (fusion === 'plasma') for (const [k, patch] of patches) if (patch.type === 'fire') avoid.add(k);
                 let pads = null;
                 if (thunder) {
                     pads = [];
-                    for (const pad of worm.elementalPatches.current.values()) if (pad.type === 'grass' && !pad.charged) pads.push(pad);
+                    for (const pad of patches.values()) if (pad.type === 'grass' && !pad.charged) pads.push(pad);
                 }
-                return pickStrikeTile({ tiles: getAllSurfaceTiles(size), body, avoid, pads }, r);
+                return pickStrikeTile({ tiles: getAllSurfaceTiles(size), body, avoid, pads, bodyShare: spareBody ? 0 : STORM.bodyShare }, r);
             },
         });
+        const head = worm.pos.current;
+        const nearHead = fusion === 'static' ? collectManifoldRing(head.x, head.y, head.z, head.dirKey, size, 2) : null;
         for (const spot of fired) {
             if (!useGameStore.getState().wormAlive) break;
             const key = tileKeyOf(spot.tile);
+            const reach = springSlamTiles(spot.tile, size);
+            // Static: a strike near the head discharges into the worm as speed. No harm, no flip.
+            if (nearHead?.has(key)) {
+                worm.staticT.current = FUSION.staticBurstT;
+                worm.feel('boost');
+                if (combatBridge.current) strikeEnemies(combatBridge.current, reach);
+                continue;
+            }
+            // Cryostorm: the strike is frost. Nothing on the worm is hurt and nothing flips;
+            // the 3x3 freezes (bombs stop ticking) and enemies within two tiles freeze.
+            if (fusion === 'cryostorm') {
+                worm.feel('heal');
+                for (const k of reach) worm.addPatch(tileOf(k), 'frost');
+                if (combatBridge.current) afflictEnemies(combatBridge.current, collectManifoldRing(spot.tile.x, spot.tile.y, spot.tile.z, spot.tile.dirKey, size, 2), 'freeze', 4);
+                continue;
+            }
             worm.feel('cut');
-            const hit = checkBlastHitWorm(worm, new Set([key]), size);
+            let hit = checkBlastHitWorm(worm, new Set([key]), size);
+            let spared = false;
+            // Current: a worm at full momentum is a moving conductor. The bolt it takes runs
+            // off it into the nearest enemy and the nearest bomb within three tiles.
+            if (hit && fusion === 'current' && (worm.waterMomentum.current ?? 0) >= FUSION.geyserMomentum) {
+                hit = null; spared = true;
+                const near = collectManifoldRing(spot.tile.x, spot.tile.y, spot.tile.z, spot.tile.dirKey, size, 3);
+                const target = combatBridge.current ? nearestEnemy(combatBridge.current, spot.tile, 3) : null;
+                if (target) strikeEnemies(combatBridge.current, new Set([tileKeyOf(target.next && target.t >= 0.5 ? target.next : target.tile)]));
+                const bomb = bombsRef.current.find(b => near.has(tileKeyOf(b.tile)));
+                if (bomb) putOutBomb(bomb, store);
+                worm.feel('boost');
+            }
+            // Grounded: a strike on the body goes into the ground and a pad springs up there.
+            if (hit?.type === 'cut' && fusion === 'grounded') {
+                hit = null; spared = true;
+                worm.addPatch(spot.tile, 'grass', { charged: true, ttl: CHARGED_PAD_TTL });
+            }
             if (hit) {
                 const histEntry = hit.type === 'cut' ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE) : null;
                 const hitPos = histEntry ? histEntry.pos.toArray() : worm.headInterpPos.current.toArray();
@@ -296,13 +348,67 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     worm.cutFocusSlice.current = null;
                 }
             }
-            if (combatBridge.current) strikeEnemies(combatBridge.current, springSlamTiles(spot.tile, size));
+            if (combatBridge.current) strikeEnemies(combatBridge.current, reach);
+            // Firestorm: the strike ignites a cross of fire two tiles each way (a firebreak
+            // that speeds fuses, like the trail), and enemies inside it burn.
+            if (fusion === 'firestorm') {
+                const { keys } = computeBlastTiles({ tile: spot.tile }, size, 2);
+                const flames = [];
+                for (const k of keys) {
+                    const t = tileOf(k);
+                    worm.addPatch(t, 'fire', { ttl: FUSION.firestormTtl });
+                    flames.push(flameAt(t, 0));
+                }
+                blastApiRef.current?.spawn(flames);
+                if (combatBridge.current) afflictEnemies(combatBridge.current, keys, 'burn', 3);
+            }
+            // Plasma: the struck tile keeps burning.
+            if (fusion === 'plasma' && !hit && !crowdedAt(key)) worm.addPatch(spot.tile, 'fire', { ttl: FUSION.plasmaTtl });
             // Nothing on the tile to hurt: it flips, like any flip, but charged. An orb or a
             // bomb sitting there is left whole, and a struck worm takes the bolt instead.
-            const crowded = worm.powerups.current.some(o => tileKeyOf(o) === key) ||
-                worm.specials.current.some(o => tileKeyOf(o) === key) || bombsRef.current.some(b => tileKeyOf(b.tile) === key);
-            if (!hit && !crowded && !(thunder && chargeSpringPad(worm.elementalPatches.current, key))) worm.strikeTile(spot.tile);
+            const crowded = crowdedAt(key);
+            if (hit || spared || crowded) continue;
+            if (fusion === 'grounded') { worm.addPatch(spot.tile, 'grass', { charged: true, ttl: CHARGED_PAD_TTL }); continue; }
+            if (thunder && chargeSpringPad(patches, key)) continue;
+            worm.strikeTile(spot.tile);
+            // Conductor: the bolt forks through the wet ground to a second tile two away.
+            if (fusion === 'conductor') {
+                const ring = collectManifoldRing(spot.tile.x, spot.tile.y, spot.tile.z, spot.tile.dirKey, size, 2);
+                const inner = springSlamTiles(spot.tile, size);
+                const body = new Set(bodyKeys());
+                const headZone = collectManifoldRing(head.x, head.y, head.z, head.dirKey, size, STORM.headSafeTiles);
+                const options = [...ring].filter(k => !inner.has(k) && !body.has(k) && !headZone.has(k) && !crowdedAt(k));
+                if (options.length) {
+                    const fork = tileOf(options[Math.floor(rng() * options.length)]);
+                    addStormFlash(storm, fork);
+                    if (combatBridge.current) strikeEnemies(combatBridge.current, springSlamTiles(fork, size));
+                    worm.strikeTile(fork);
+                }
+            }
         }
+    };
+
+    const tileOf = key => parseTileKey(key, {});
+    // A flame standing on a tile, for the blast renderer.
+    const flameAt = (t, delay) => {
+        const wp = getStickerWorldPos(t.x, t.y, t.z, t.dirKey, size, 0);
+        const n = FACE_NORMALS[t.dirKey] ?? FACE_NORMALS.PZ;
+        const u = DIR_FORWARD[t.dirKey]?.up ?? [0, 1, 0];
+        return { pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay };
+    };
+
+    // A bomb put out by a fusion (Current's arc): the same reward and credit as a disarm.
+    const putOutBomb = (bomb, store) => {
+        const index = bombsRef.current.indexOf(bomb);
+        if (index < 0) return;
+        bombsRef.current.splice(index, 1);
+        bombMembershipRef.current++;
+        blastApiRef.current?.disarm(bomb);
+        worm.rewardBombDisarm(bomb.tile);
+        if (wormDemoActive(store)) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
+        else if (store.wormStoryLevel) worm.recordStoryBomb?.(bomb.id);
+        else useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);
+        worm.feel('heal');
     };
 
     // ── Fusion bursts ──────────────────────────────────────────────────────────
@@ -314,18 +420,20 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         const burst = worm.fusionBurst?.current;
         if (!burst || burst.seq === fusionSeenRef.current) return;
         fusionSeenRef.current = burst.seq;
-        if (burst.kind !== 'wildfire') return;
         const keys = springSlamTiles(burst.tile, size);
+        // Frostbloom: the landing's 3x3 is already frost in the sim; its enemies freeze.
+        if (burst.kind === 'frostbloom') {
+            if (combatBridge.current) afflictEnemies(combatBridge.current, keys, 'freeze', 4);
+            return;
+        }
+        // Wildfire (a spring landing) and Emberseed (a pad withering): the 3x3 already
+        // burns in the sim; here its enemies die and the flames go up over it.
+        if (burst.kind !== 'wildfire' && burst.kind !== 'emberseed') return;
         if (combatBridge.current) strikeEnemies(combatBridge.current, keys);
         const flames = [];
-        for (const key of keys) {
-            const [x, y, z, dirKey] = key.split(',');
-            const wp = getStickerWorldPos(+x, +y, +z, dirKey, size, 0);
-            const n = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
-            const u = DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
-            flames.push({ pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay: 0 });
-        }
+        for (const key of keys) flames.push(flameAt(tileOf(key), 0));
         blastApiRef.current?.spawn(flames);
+        worm.feel('cut');
     };
 
     // ── Bomb hazard state ──────────────────────────────────────────────────────
@@ -740,8 +848,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     // bombs without disarms, damage or rewards after a fatal hit.
                     if (!useGameStore.getState().wormAlive) { bombs[kept++] = bomb; continue; }
                     // Disarm: body fully encircles the bomb — reward and remove it.
+                    // Meltdown: a slide that ends on a bomb's tile melts it out.
                     if (isBombDisarmed(bomb, occupied, size) || isBombSlammed(bomb, slamTiles) ||
-                        (steam && isHotTile(worm.elementalPatches.current, bomb.tile))) {
+                        (steam && isHotTile(worm.elementalPatches.current, bomb.tile)) ||
+                        isMeltTile(worm.elementalPatches.current, bomb.tile)) {
                         blastApiRef.current?.disarm(bomb);
                         worm.rewardBombDisarm(bomb.tile);
                         if (demo) useGameStore.setState({ demoWormHazardCleared: 'bomb' });
@@ -750,7 +860,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                         worm.feel('heal');
                         continue;
                     }
-                    bomb.fuse -= bdelta * (isHotTile(worm.elementalPatches.current, bomb.tile) ? 3 : 1);
+                    // Hot ground burns a fuse three times as fast; frost stops it.
+                    const patches = worm.elementalPatches.current;
+                    bomb.fuse -= bdelta * (isFrostTile(patches, bomb.tile) ? 0 : isHotTile(patches, bomb.tile) ? 3 : 1);
                     if (bomb.fuse > 0) { bombs[kept++] = bomb; continue; }
 
                     // Detonate: shoot fire out along the arms, then resolve the hit.

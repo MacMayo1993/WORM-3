@@ -24,13 +24,22 @@ export const STORM = Object.freeze({
 });
 
 export function makeStorm() {
-  return { spots: [], flashes: [], spawned: 0, timer: 0, seq: 0, fired: [] };
+  return { spots: [], flashes: [], spawned: 0, quota: STORM.strikes, timer: 0, seq: 0, fired: [] };
 }
 
-/** A new orb: its six marks start counting. Marks already charging still strike. */
-export function beginStorm(storm) {
+/**
+ * A new orb: its marks start counting (`strikes` of them; Plasma doubles them). Marks
+ * already charging still strike.
+ */
+export function beginStorm(storm, strikes = STORM.strikes) {
   storm.spawned = 0;
+  storm.quota = strikes;
   storm.timer = STORM.firstDelay;
+}
+
+/** A strike that arcs off another (Conductor's fork): drawn like a landed strike. */
+export function addStormFlash(storm, tile) {
+  storm.flashes.push({ id: ++storm.seq, tile: { x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey }, age: 0 });
 }
 
 export function clearStorm(storm) {
@@ -43,16 +52,17 @@ export function clearStorm(storm) {
  * now). `pick(rng)` chooses a tile for a new mark, or null when there is none.
  * @param {object} storm
  * @param {number} delta seconds, already clamped by the caller
- * @param {{ spawning: boolean, pick: (rng: () => number) => object|null, rng: () => number }} ctx
+ * @param {{ spawning: boolean, pick: (rng: () => number) => object|null, rng: () => number, telegraph?: number }} ctx
+ *   telegraph: seconds a new mark charges (Cryostorm doubles it)
  */
-export function tickStorm(storm, delta, { spawning, pick, rng }) {
+export function tickStorm(storm, delta, { spawning, pick, rng, telegraph = STORM.telegraph }) {
   storm.fired.length = 0;
-  if (spawning && storm.spawned < STORM.strikes) {
+  if (spawning && storm.spawned < (storm.quota ?? STORM.strikes)) {
     storm.timer -= delta;
     if (storm.timer <= 0) {
       const tile = pick(rng);
       if (tile) {
-        storm.spots.push({ id: ++storm.seq, tile: { x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey }, age: 0, delay: STORM.telegraph });
+        storm.spots.push({ id: ++storm.seq, tile: { x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey }, age: 0, delay: telegraph });
         storm.spawned++;
         storm.timer = STORM.gapMin + rng() * (STORM.gapMax - STORM.gapMin);
       } else storm.timer = STORM.retry;
@@ -87,15 +97,16 @@ export function tickStorm(storm, delta, { spawning, pick, rng }) {
  * @param {Array<string>} args.body body tile keys, head first (index 0)
  * @param {Set<string>} args.avoid keys never to mark (head zone, orbs, specials, bombs, open marks)
  * @param {Array<object>} [args.pads] Thunderpad: spring pad tiles the storm aims for first
+ * @param {number} [args.bodyShare] share of marks aimed at the body (Conductor and Plasma: 0)
  * @param {() => number} rng
  */
-export function pickStrikeTile({ tiles, body, avoid, pads = null }, rng) {
+export function pickStrikeTile({ tiles, body, avoid, pads = null, bodyShare = STORM.bodyShare }, rng) {
   const key = t => `${t.x},${t.y},${t.z},${t.dirKey}`;
   if (pads?.length) {
     const free = pads.filter(t => !avoid.has(key(t)));
     if (free.length && rng() < STORM.padShare) return free[Math.floor(rng() * free.length)];
   }
-  if (body.length > 0 && rng() < STORM.bodyShare) {
+  if (body.length > 0 && bodyShare > 0 && rng() < bodyShare) {
     const hittable = body.filter(k => k && !avoid.has(k));
     if (hittable.length) {
       const [x, y, z, dirKey] = hittable[Math.floor(rng() * hittable.length)].split(',');

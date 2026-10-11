@@ -28,9 +28,22 @@ export const shieldFragment = `
      // Obsidian: a dark faceted plate with a violet rim, no hot centre.
      float facet=step(0.0,p.x+p.y)*0.13;
      color=mix(vec3(0.10+facet,0.08+facet,0.20+facet),vec3(0.72,0.64,0.95),rim);
-   } else if(vVariant>1.5) {
+   } else if(vVariant>1.5 && vVariant<2.5) {
      // Steam keeps the shield silhouette and a pale, cool centre.
      color=mix(vec3(0.35,0.67,0.74),vec3(0.91,0.99,1.0),max(rim,heat));
+   } else if(vVariant>2.5 && vVariant<3.5) {
+     // Coldfire: the shield burns blue, a white-blue core in a cobalt plate.
+     color=mix(vec3(0.05,0.14,0.55),vec3(0.55,0.80,1.0),rim);
+     color=mix(color,vec3(0.86,0.95,1.0),heat);
+   } else if(vVariant>3.5) {
+     // Frost: a full pale tile of ice with crystal spokes, not the shield silhouette.
+     vec2 a=abs(p);
+     float edge=0.44-max(a.x,a.y);
+     mask=smoothstep(0.0,0.02,edge);
+     float spokes=max(1.0-smoothstep(0.0,0.025,abs(p.x-p.y)),1.0-smoothstep(0.0,0.025,abs(p.x+p.y)));
+     spokes=max(spokes,max(1.0-smoothstep(0.0,0.02,a.x),1.0-smoothstep(0.0,0.02,a.y)))*step(length(p),0.36);
+     color=mix(vec3(0.58,0.80,0.92),vec3(0.95,0.99,1.0),max(1.0-smoothstep(0.03,0.06,edge),spokes));
+     mask*=0.82;
    }
    gl_FragColor=vec4(color,mask*vAlpha);
  }
@@ -38,9 +51,13 @@ export const shieldFragment = `
 export const springFragment = `
  varying float vAlpha;
  varying float vCharge;
+ varying float vVariant;
  varying vec2 vUv;
  void main() {
    vec3 color=mix(vec3(0.22,0.53,0.15),vec3(0.78,1.0,0.53),0.5+0.5*cos(vUv.y*6.283185));
+   // Emberseed: a pad glowing like a coal, about to burst. Frostbloom: an iced pad.
+   if(vVariant>0.5 && vVariant<1.5) color=mix(vec3(0.75,0.18,0.04),vec3(1.0,0.78,0.30),0.5+0.5*cos(vUv.y*12.566));
+   else if(vVariant>1.5) color=mix(vec3(0.52,0.78,0.95),vec3(0.95,0.99,1.0),0.5+0.5*cos(vUv.y*12.566));
    // Thunderpad: a pad the storm struck is charged, lightning violet with a white core.
    color=mix(color,mix(vec3(0.66,0.55,0.98),vec3(0.94,0.97,1.0),0.5+0.5*cos(vUv.y*18.85)),vCharge);
    gl_FragColor=vec4(color,vAlpha);

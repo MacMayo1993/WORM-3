@@ -20,7 +20,7 @@ import { tunnelReadout } from './healerWorm/tunnelReadout.js';
 import { tunnelEntryRule } from './healerWorm/padEntry.js';
 import { signatureReadout } from './healerWorm/signatures.js';
 import { litTiles } from './healerWorm/glowTrail.js';
-import { steamTiles } from './healerWorm/elementalGameplay.js';
+import { steamTiles, frostTiles, addElementalPatch } from './healerWorm/elementalGameplay.js';
 import { liveRotation } from './liveRotation.js';
 // src/worm/useWormCrawler.js
 //
@@ -270,7 +270,7 @@ export function useWormCrawler(size, cubies) {
                 // screen — clear both the live readout and the store transitions.
                 resetWormBuffs();
                 resetWormSegments();
-                useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null, wormElementalPartner: null, wormViewPower: null });
+                useGameStore.setState({ wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormSpecialNotice: null, wormElementalTheme: null, wormElementalPartner: null, wormFusionNotice: null, wormViewPower: null });
                 if (deathMenuTimer.current) {
                     clearTimeout(deathMenuTimer.current);
                     deathMenuTimer.current = null;
@@ -453,6 +453,9 @@ export function useWormCrawler(size, cubies) {
                     useGameStore.setState({ wormElementalTheme: type ?? null, wormElementalPartner: pair });
                 }
             },
+            onFusion: (key) => useGameStore.setState((state) => ({
+                wormFusionNotice: { key, seq: (state.wormFusionNotice?.seq ?? 0) + 1 },
+            })),
             onSpecialSpawned: (type) => useGameStore.setState((state) => ({
                 wormSpecialNotice: { kind: 'spawn', type, seq: (state.wormSpecialNotice?.seq ?? 0) + 1 },
             })),
@@ -528,7 +531,7 @@ export function useWormCrawler(size, cubies) {
                 // HUD mirrors with the sim, or stale rescue UI disables steering.
                 wormPhase: 'crawling', wormAlive: true, wormPaused: true, wormJumpRescueActive: false, wormRescueKind: null,
                 wormActiveTunnelColors: null, demoWormStarted: false, demoWormPrepared: true, wormOnFlippedTile: false, wormDeathDetails: null,
-                wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormElementalTheme: null, wormElementalPartner: null, wormViewPower: null, wormSpecialNotice: null,
+                wormExplodeActive: false, wormRocketActive: false, wormOrbShowerActive: false, wormMagnetActive: false, wormElementalTheme: null, wormElementalPartner: null, wormFusionNotice: null, wormViewPower: null, wormSpecialNotice: null,
                 wormBoostState: 'ready', wormOrbFlash: null, demoWormSteered: false, demoWormTarget: practice.target,
                 demoWormProgress: '', demoWormHazardCleared: null });
             return; // Let the shared tunnel snapshot observe the staged board first.
@@ -581,6 +584,8 @@ export function useWormCrawler(size, cubies) {
                 // The Glow Worm's painted trail, read only while an enemy is on the board.
                 // Steam's fire trail scalds the same way, so it joins the wall.
                 lit: () => steamTiles(sim, litTiles(sim)),
+                // Fusion frost and Coldfire's blue trail freeze an enemy that steps on them.
+                frost: () => frostTiles(sim),
                 // Spring's touchdown, for the few tenths of a second it stands.
                 slam: sim.signature.slamT > 0 ? sim.signature.slam : null,
             };
@@ -665,6 +670,8 @@ export function useWormCrawler(size, cubies) {
         let springs = 0;
         for (const patch of sim.elementalPatches.values()) if (patch.type === 'grass') springs++;
         wormBuffs.springCount = springs;
+        wormBuffs.meltdownT = sim.meltdownT;
+        wormBuffs.staticT = sim.staticT;
         wormBuffs.explodeT = sim.explodeT;
         wormBuffs.orbShowerT = sim.orbShowerT;
         wormBuffs.magnetT = sim.magnetT;
@@ -758,7 +765,7 @@ export function useWormCrawler(size, cubies) {
             wormOrbShowerActive: false, wormMagnetActive: false,
             wormMagnetSeq: 0,
             wormSpecialNotice: null,
-            wormElementalTheme: null, wormElementalPartner: null, wormViewPower: null,
+            wormElementalTheme: null, wormElementalPartner: null, wormFusionNotice: null, wormViewPower: null,
             wormOrbFlash: null,
             wormBodyTiles: 0,
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
@@ -905,6 +912,8 @@ export function useWormCrawler(size, cubies) {
             elementalType: f('elementalType'),
             elementalPair: f('elementalPair'),
             fusionBurst: f('fusionBurst'),
+            waterMomentum: f('waterMomentum'),
+            staticT: f('staticT'),
             powerups: f('powerups'),
             // The open tunnels a strike charged; a key whose tunnel is gone (healed, expired) is dropped.
             chargedMouths: () => {
@@ -915,6 +924,8 @@ export function useWormCrawler(size, cubies) {
                 return open.filter(hit => charged.has(hit.tunnelKey));
             },
             strikeTile,
+            // A fusion's strike lays a trail tile, frost or pad through the sim's own rule.
+            addPatch: (tile, type, extra = null) => addElementalPatch(simRef.current, tile, type, extra),
             tunnelUseCountsRef: f('tunnelUseCounts'),
             willHealRef: f('willHeal'),
             healFiredRef: f('healFired'),

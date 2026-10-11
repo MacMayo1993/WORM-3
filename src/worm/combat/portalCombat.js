@@ -14,6 +14,8 @@ export const COMBAT = Object.freeze({ magazine: 3, recharge: 1.4, fireInterval: 
 // A crawler or dasher (1 hp) dies on the first touch; a brute (3 hp) takes three.
 export const LIGHT = Object.freeze({ touch: 1, burn: 1.6, stun: 0.55 });
 // Spring's landing: every enemy in the 3x3 around it takes a hit and is stunned and thrown back.
+// Seconds an enemy that steps onto frost stays frozen (the ice shot's freeze).
+const FROST_FREEZE = 2.2;
 export const SLAM = Object.freeze({ damage: 1, stun: 1.4 });
 export const combatBridge = { current: null };
 export const combatKey = p => `${p.x},${p.y},${p.z},${p.dirKey}`;
@@ -237,6 +239,37 @@ export function strikeEnemies(c, keys) {
   }
   return fallen;
 }
+/**
+ * A fusion touched these tiles: every enemy standing on (or stepping onto) one of `keys`
+ * takes `status` ('freeze', 'burn', 'stun' or 'root') for `seconds`. Returns how many.
+ */
+export function afflictEnemies(c, keys, status, seconds) {
+  if (!c?.enemies?.length) return 0;
+  let touched = 0;
+  for (const enemy of c.enemies) {
+    if (enemy.emerging > 0) continue;
+    const near = enemy.next && enemy.t >= 0.5 ? enemy.next : enemy.tile;
+    if (!keys.has(combatKey(near))) continue;
+    enemy[status] = Math.max(enemy[status] || 0, seconds);
+    burst(c, near, status === 'burn' ? 'impact' : 'light');
+    touched++;
+  }
+  return touched;
+}
+/**
+ * The nearest live enemy within `steps` surface steps of `tile`, or null. Current's arc
+ * uses it to find a target.
+ */
+export function nearestEnemy(c, tile, steps) {
+  let best = null, distance = Infinity;
+  for (const enemy of c?.enemies ?? []) {
+    if (enemy.emerging > 0) continue;
+    const route = surfaceRoute(tile, enemy.tile, c.size, steps);
+    const length = route ? route.length : combatKey(tile) === combatKey(enemy.tile) ? 0 : Infinity;
+    if (length < distance) { best = enemy; distance = length; }
+  }
+  return best;
+}
 /** Advance every defeated enemy's crumble; drop it once its last fleck lands. */
 export function stepEnemyDissolves(c, dt) {
   if (!c?.dying?.length) return;
@@ -291,6 +324,9 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
     }
   }
   const lit = c.enemies.length ? player.lit?.() ?? null : null;
+  // Frost (Frozen Wake, Frostbloom, Cryostorm) and Coldfire's blue trail freeze an enemy
+  // that arrives on them.
+  const frost = c.enemies.length ? player.frost?.() ?? null : null;
   if (player.slam && player.slam.seq !== c.slamSeen) { c.slamSeen = player.slam.seq; slam(c,player.slam.tile,player,lit); }
   for (const enemy of [...c.enemies]) {
     enemy.scorch = Math.max(0,(enemy.scorch || 0)-dt);
@@ -323,7 +359,10 @@ export function stepCombat(c, delta, player, onHit = () => {}) {
     if (enemy.next) {
       const dash = enemy.type === 'scout' ? (enemy.dashClock < 0.45 ? 0 : enemy.dashClock < 0.95 ? 2.4 : 1) : 1;
       enemy.t += dt * (ENEMIES[enemy.type]?.speed ?? COMBAT.enemySpeed) * dash;
-      if (enemy.t >= 1) { enemy.tile = enemy.next; enemy.next = null; enemy.t = 0; }
+      if (enemy.t >= 1) {
+        enemy.tile = enemy.next; enemy.next = null; enemy.t = 0;
+        if (frost?.has(combatKey(enemy.tile))) { enemy.freeze = Math.max(enemy.freeze || 0, FROST_FREEZE); burst(c, enemy.tile, 'light'); }
+      }
     }
   }
   // Small substeps keep fast shots from tunneling through a crawler.

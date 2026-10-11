@@ -22,6 +22,8 @@ export const wormBuffs = {
   waterMomentum: 0,
   springReady: false,
   springCount: 0,
+  meltdownT: 0,   // Meltdown's dash and Static's discharge (fusion speed bursts)
+  staticT: 0,
   orbShowerT: 0,
   magnetT: 0,        // seconds of magnet reach remaining
   magnetMaxT: 0,     // duration of the active magnet, for the fill fraction
@@ -65,6 +67,8 @@ export function resetWormBuffs() {
   wormBuffs.waterMomentum = 0;
   wormBuffs.springReady = false;
   wormBuffs.springCount = 0;
+  wormBuffs.meltdownT = 0;
+  wormBuffs.staticT = 0;
   wormBuffs.orbShowerT = 0;
   wormBuffs.magnetT = 0;
   wormBuffs.magnetMaxT = 0;

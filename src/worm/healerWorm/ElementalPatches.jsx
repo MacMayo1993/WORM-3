@@ -8,7 +8,7 @@ import { FACE_NORMALS } from './constants.js';
 import { wormBuffs } from '../wormBuffs.js';
 import { fusionOf } from './elementalFusion.js';
 import { ELEMENTAL_PATCH_LIMIT } from './elementalGameplay.js';
-import { patchOpacity, springStretch } from './elementalFeedback.js';
+import { patchOpacity, springStretch, patchVariant } from './elementalFeedback.js';
 import { patchVertex, shieldFragment, springFragment } from './elementalPatchShaders.js';
 
 const Z = new THREE.Vector3(0, 0, 1);
@@ -46,7 +46,8 @@ export function ElementalPatches({ worm, size }) {
         const reduced = prefersReducedMotion();
         const steam = fusionOf(worm.elementalType?.current, worm.elementalPair?.current, wormBuffs.elementalT) === 'steam';
         for (const patch of worm.elementalPatches.current.values()) {
-            const mesh = patch.type === 'fire' ? resources.fire : resources.grass;
+            // Pads are springs; trail tiles and frost lie flat.
+            const mesh = patch.type === 'grass' ? resources.grass : resources.fire;
             const index = mesh.count++;
             const { pose, normal, axis } = resources;
             normal.copy(FACE_NORMALS[patch.dirKey]);
@@ -60,7 +61,7 @@ export function ElementalPatches({ worm, size }) {
             pose.quaternion.setFromUnitVectors(Z, normal);
             pose.scale.set(1, 1, patch.type === 'grass' ? springStretch(patch.ttl, reduced) : 1);
             pose.updateMatrix(); mesh.setMatrixAt(index, pose.matrix);
-            mesh.geometry.attributes.patchVariant.setX(index, patch.obsidian ? 1 : steam && patch.type === 'fire' ? 2 : 0);
+            mesh.geometry.attributes.patchVariant.setX(index, patchVariant(patch, steam));
             mesh.geometry.attributes.patchAlpha.setX(index, patchOpacity(patch.ttl));
             mesh.geometry.attributes.patchCharge.setX(index, patch.charged ? 1 : 0);
         }

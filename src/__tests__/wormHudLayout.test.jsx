@@ -322,7 +322,8 @@ it('previews the ordered next pickup and keeps the full recipe guide inside Paus
   expect(guide.querySelectorAll('li')).toHaveLength(20);
   expect(guide.textContent).toContain('Water → Fire: Steam');
   expect(guide.textContent).toContain('Fire → Water: Quench');
-  expect(guide.textContent).toContain('Currently uses Slipstream');
+  expect(guide.textContent).toContain('Ice → Water: Frozen Wake');
+  expect(guide.textContent).not.toContain('Currently uses');
   act(() => useGameStore.setState({ wormElementalTheme: 'water', wormElementalPartner: 'fire', wormSpecials: [] }));
   expect(host.querySelector('.worm-power-detail').textContent).toContain('Fire → Water: Quench');
   expect(host.querySelector('.worm-power-detail').textContent).toContain('without speeding bomb fuses');
@@ -342,8 +343,24 @@ it('shows both fused elements and their live benefit without opening Pause', () 
   expect(fusion().querySelectorAll('.worm-element-medal')).toHaveLength(2);
   expect(host.querySelector('.worm-pause-card')).toBeNull();
   act(() => useGameStore.setState({ wormElementalTheme: 'grass', wormElementalPartner: 'water' }));
-  expect(fusion().textContent).toContain('Water momentum + Nature spring pads');
+  expect(fusion().textContent).toContain('Bloom');
+  expect(fusion().textContent).toContain('Rain grows a pad every 4 tiles');
   act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null }));
   expect(fusion()).toBeNull();
+  wormBuffs.elementalT = 0;
+});
+
+it('announces a new fusion with a FUSION banner naming the ordered recipe and its rule', () => {
+  wormBuffs.elementalT = 10; wormBuffs.elementalMaxT = 10;
+  useGameStore.setState({ wormElementalTheme: 'fire', wormElementalPartner: 'ice', wormSpecials: [], wormFusionNotice: null });
+  renderPhase('crawling');
+  expect(host.querySelector('.worm-fusion-banner')).toBeNull();
+  act(() => useGameStore.setState({ wormFusionNotice: { key: 'ice>fire', seq: 1 } }));
+  const banner = host.querySelector('.worm-fusion-banner');
+  expect(banner.textContent).toContain('Ice → Fire');
+  expect(banner.textContent).toContain('Meltdown');
+  expect(banner.textContent).toContain('30% dash');
+  act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null, wormFusionNotice: null }));
+  expect(host.querySelector('.worm-fusion-banner')).toBeNull();
   wormBuffs.elementalT = 0;
 });
