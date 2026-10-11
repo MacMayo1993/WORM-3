@@ -6,10 +6,10 @@
 // (elementalFusion.js). The ignition lands while the claim camera pulls out, so the
 // player sees the cube change as the banner names the recipe.
 //
-// Pure: the sim decides what changes; the mode resolves `sim.fusionBurst` (kind
+// Pure: the sim decides what changes; the mode resolves the posted burst (kind
 // 'ignite') against enemies and draws the flames. Nothing here reads the clock.
 
-import { addElementalPatch, FUSION } from './elementalGameplay.js';
+import { addElementalPatch, postFusionBurst, FUSION } from './elementalGameplay.js';
 import { springSlamTiles } from './jumpLanding.js';
 import { computeBlastTiles } from './bombs.js';
 import { collectManifoldRing } from '../wormLogic.js';
@@ -97,7 +97,7 @@ function lay(sim, keys, type, extra = null) {
 
 /**
  * Set off the ignition of the fusion now active, around the head. Posts
- * `sim.fusionBurst` ({ seq, kind: 'ignite', recipe, hit, flames, tile, tiles }) for
+ * a fusion burst ({ seq, kind: 'ignite', recipe, hit, flames, tile, tiles }) for
  * the mode to resolve once. Without a board size (some tests) only the non-spatial
  * part (momentum, bursts) happens and no tiles are reached.
  * @returns {object|null} the burst posted, or null for an unknown recipe
@@ -108,6 +108,5 @@ export function igniteFusion(sim, recipeId, size = 0) {
   const head = { x: sim.pos.x, y: sim.pos.y, z: sim.pos.z, dirKey: sim.pos.dirKey };
   ignition.boost?.(sim);
   const tiles = size ? ignition.ground(sim, head, size) : [];
-  sim.fusionBurst = { seq: ++sim.fusionSeq, kind: 'ignite', recipe: recipeId, hit: ignition.hit, flames: !!ignition.flames, tile: head, tiles };
-  return sim.fusionBurst;
+  return postFusionBurst(sim, { kind: 'ignite', recipe: recipeId, hit: ignition.hit, flames: !!ignition.flames, tile: head, tiles });
 }

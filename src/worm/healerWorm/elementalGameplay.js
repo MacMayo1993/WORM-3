@@ -4,6 +4,32 @@ import { springSlamTiles } from './jumpLanding.js';
 const keyOf = t => `${t.x},${t.y},${t.z},${t.dirKey}`;
 export const ELEMENTAL_PATCH_LIMIT = 32;
 
+/** Bursts kept for the mode to read. Several can land in one tick; it drains them each frame. */
+export const FUSION_BURST_LIMIT = 16;
+
+/**
+ * Post a fusion's one-shot beat ({ kind, tile, ... }) for the mode to resolve once,
+ * stamped with the next `seq`. Bursts queue rather than replace each other, so a pad
+ * withering and a fusion igniting in the same tick are both resolved. Returns the burst.
+ */
+export function postFusionBurst(sim, burst) {
+    const posted = { seq: ++sim.fusionSeq, ...burst };
+    sim.fusionBursts.push(posted);
+    if (sim.fusionBursts.length > FUSION_BURST_LIMIT) sim.fusionBursts.shift();
+    return posted;
+}
+
+/**
+ * The bursts in `bursts` posted after seq `seen`, oldest first, and the new last-seen
+ * seq. A sim that restarted its count (a fresh run) is read from the start.
+ */
+export function unseenFusionBursts(bursts, seen) {
+    if (!bursts?.length) return { fresh: [], seen };
+    const from = bursts[bursts.length - 1].seq < seen ? 0 : seen;
+    const fresh = bursts.filter(burst => burst.seq > from);
+    return { fresh, seen: fresh.length ? fresh[fresh.length - 1].seq : from };
+}
+
 /** The numbers the fusions' own rules run on (elementalFusion.js names them). */
 export const FUSION = Object.freeze({
     bloomEvery: 4,        // Bloom: a pad grows behind every Nth tile crawled
@@ -79,7 +105,7 @@ export function tickElementalGameplay(sim, delta, size = 0) {
                 const [x, y, z, dirKey] = key.split(',');
                 addElementalPatch(sim, { x: +x, y: +y, z: +z, dirKey }, 'fire');
             }
-            sim.fusionBurst = { seq: ++sim.fusionSeq, kind: 'emberseed', tile: { x: pad.x, y: pad.y, z: pad.z, dirKey: pad.dirKey } };
+            postFusionBurst(sim, { kind: 'emberseed', tile: { x: pad.x, y: pad.y, z: pad.z, dirKey: pad.dirKey } });
         }
     }
     sim.meltdownT = Math.max(0, (sim.meltdownT ?? 0) - delta);

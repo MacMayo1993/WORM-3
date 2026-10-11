@@ -10,7 +10,8 @@ import { makeWormSim, resetWormSim, stepWormSim, startElemental, startJump } fro
 import {
   addElementalPatch, chargeSpringPad, steamTiles, waterSpeedBonus, turnShedsMomentum, iceHoldsTurn,
   tickElementalGameplay, isHotTile, isObsidianTile, isFirebreakTile, rotateElementalPatches, ELEMENTAL_PATCH_LIMIT, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT,
-  isColdTile, isFrostTile, isMeltTile, frostTiles, fusionSpeedBonus, FUSION
+  isColdTile, isFrostTile, isMeltTile, frostTiles, fusionSpeedBonus, FUSION,
+  postFusionBurst, unseenFusionBursts, FUSION_BURST_LIMIT
 } from '../worm/healerWorm/elementalGameplay.js';
 import { pickStrikeTile, makeStorm, beginStorm, tickStorm, STORM } from '../worm/healerWorm/lightningStorm.js';
 import { elementalFeedback } from '../worm/healerWorm/elementalFeedback.js';
@@ -21,6 +22,7 @@ import { novaAt, NOVA } from '../worm/healerWorm/fusionNova.js';
 
 const SIZE = 5;
 const key = (t) => `${t.x},${t.y},${t.z},${t.dirKey}`;
+const lastBurst = sim => sim.fusionBursts.at(-1) ?? null;
 
 function makeCtx() {
   const events = [];
@@ -230,8 +232,8 @@ describe('Wildfire (fire + nature)', () => {
     stepWormSim(sim, 0.05, SIZE, ctx);
     expect(sim.isJumping).toBe(false);
     expect(sim.springLaunch).toBe(false);
-    expect(sim.fusionBurst).toMatchObject({ kind: 'wildfire' });
-    const burning = springSlamTiles(sim.fusionBurst.tile, SIZE);
+    expect(lastBurst(sim)).toMatchObject({ kind: 'wildfire' });
+    const burning = springSlamTiles(lastBurst(sim).tile, SIZE);
     for (const k of burning) expect(sim.elementalPatches.get(k)?.type === 'fire' || sim.elementalPatches.get(k)?.type === 'grass').toBe(true);
   });
 
@@ -241,7 +243,7 @@ describe('Wildfire (fire + nature)', () => {
     sim.isJumping = true;
     sim.jumpT = 0.9999;
     stepWormSim(sim, 0.05, SIZE, ctx);
-    expect(sim.fusionBurst?.kind).not.toBe('wildfire');
+    expect(lastBurst(sim)?.kind).not.toBe('wildfire');
   });
 });
 
@@ -352,7 +354,7 @@ describe('Emberseed (Nature → Fire)', () => {
     const pad = sim.elementalPatches.get(key(sim.pos));
     expect(pad).toMatchObject({ ember: true, ttl: FUSION.emberseedPadTtl });
     tickElementalGameplay(sim, FUSION.emberseedPadTtl + 0.1, SIZE);
-    expect(sim.fusionBurst).toMatchObject({ kind: 'emberseed' });
+    expect(lastBurst(sim)).toMatchObject({ kind: 'emberseed' });
     for (const k of springSlamTiles(sim.pos, SIZE)) expect(isHotTile(sim.elementalPatches, k)).toBe(true);
   });
 
@@ -361,7 +363,7 @@ describe('Emberseed (Nature → Fire)', () => {
     addElementalPatch(sim, sim.pos, 'grass');
     startJump(sim, ctx);
     tickElementalGameplay(sim, 10, SIZE);
-    expect(sim.fusionBurst.kind).toBe('ignite');
+    expect(lastBurst(sim).kind).toBe('ignite');
   });
 });
 
@@ -381,14 +383,14 @@ describe('Frostbloom (Ice → Nature)', () => {
   it('a spring landing freezes its 3x3 and grows an iced pad', () => {
     const { sim, ctx } = fused('ice', 'grass');
     land(sim, ctx);
-    expect(sim.fusionBurst).toMatchObject({ kind: 'frostbloom' });
+    expect(lastBurst(sim)).toMatchObject({ kind: 'frostbloom' });
     const reach = [...springSlamTiles(sim.pos, SIZE)].filter(k => k !== key(sim.pos));
     for (const k of reach) expect(isFrostTile(sim.elementalPatches, k)).toBe(true);
     expect(sim.elementalPatches.get(key(sim.pos))).toMatchObject({ type: 'grass', iced: true, ttl: FUSION.frostbloomPadTtl });
     // Wildfire, not Frostbloom, for the elements' other recipe with Nature.
     const wild = fused('fire', 'grass');
     land(wild.sim, wild.ctx);
-    expect(wild.sim.fusionBurst.kind).toBe('wildfire');
+    expect(lastBurst(wild.sim).kind).toBe('wildfire');
   });
 });
 
@@ -472,17 +474,17 @@ describe('fusion ignition', () => {
     expect(new Set(Object.values(IGNITIONS).map(i => i.text)).size).toBe(20);
     for (const f of recipes) {
       const { sim, ctx } = sizedFuse(f.base, f.catalyst);
-      expect(sim.fusionBurst).toMatchObject({ kind: 'ignite', recipe: f.id, hit: IGNITIONS[f.id].hit });
-      const seq = sim.fusionBurst.seq;
+      expect(lastBurst(sim)).toMatchObject({ kind: 'ignite', recipe: f.id, hit: IGNITIONS[f.id].hit });
+      const seq = lastBurst(sim).seq;
       startElemental(sim, ctx, f.catalyst, SIZE); // a refresh is not a new fusion
-      expect(sim.fusionBurst.seq).toBe(seq);
+      expect(lastBurst(sim).seq).toBe(seq);
     }
   });
 
   it('a lone element never ignites', () => {
     const sim = makeSim();
     startElemental(sim, makeCtx(), 'fire', SIZE);
-    expect(sim.fusionBurst).toBeNull();
+    expect(lastBurst(sim)).toBeNull();
   });
 
   it('lays each recipe\'s own ground around the head', () => {
@@ -493,8 +495,8 @@ describe('fusion ignition', () => {
     expect(at(sizedFuse('grass', 'lightning').sim)).toMatchObject({ type: 'grass', charged: true });
     expect(at(sizedFuse('ice', 'fire').sim)).toMatchObject({ type: 'fire', melt: true });
     const steam = sizedFuse('water', 'fire').sim;
-    expect(steamTiles(steam).size).toBe(steam.fusionBurst.tiles.length);
-    expect(steam.fusionBurst.tiles.length).toBeGreaterThan(9);
+    expect(steamTiles(steam).size).toBe(lastBurst(steam).tiles.length);
+    expect(lastBurst(steam).tiles.length).toBeGreaterThan(9);
     const bloom = sizedFuse('water', 'grass').sim;
     expect([...bloom.elementalPatches.values()].filter(p => p.type === 'grass')).toHaveLength(8);
     expect(at(bloom)).toBeUndefined();
@@ -523,5 +525,47 @@ describe('fusion ignition', () => {
     expect(late.radius).toBeGreaterThan(early.radius);
     expect(late.opacity).toBeLessThan(early.opacity);
     expect(novaAt(0.1 - NOVA.stagger)).toBeNull();
+  });
+});
+
+describe('fusion bursts queue', () => {
+  it('keeps an Emberseed wither and a new fusion posted in the same tick', () => {
+    const sim = makeSim(), ctx = makeCtx();
+    startElemental(sim, ctx, 'grass', SIZE);
+    startElemental(sim, ctx, 'fire', SIZE);   // Emberseed: its ignition lays ember pads
+    const seen = lastBurst(sim).seq;
+    // Same tick: every ember pad withers and bursts, then the worm claims a third element.
+    tickElementalGameplay(sim, FUSION.emberseedPadTtl + 0.1, SIZE);
+    startElemental(sim, ctx, 'ice', SIZE);    // Fire → Ice: Coldfire ignites
+    const { fresh } = unseenFusionBursts(sim.fusionBursts, seen);
+    const kinds = fresh.map(b => b.kind);
+    expect(kinds.filter(k => k === 'emberseed')).toHaveLength(4);
+    expect(kinds.at(-1)).toBe('ignite');
+    expect(fresh.at(-1).recipe).toBe('coldfire');
+  });
+
+  it('reads each burst once, in order, and restarts with a fresh sim', () => {
+    const sim = makeSim();
+    const a = postFusionBurst(sim, { kind: 'wildfire', tile: sim.pos });
+    const b = postFusionBurst(sim, { kind: 'emberseed', tile: sim.pos });
+    let read = unseenFusionBursts(sim.fusionBursts, 0);
+    expect(read.fresh).toEqual([a, b]);
+    expect(unseenFusionBursts(sim.fusionBursts, read.seen).fresh).toEqual([]);
+    const c = postFusionBurst(sim, { kind: 'frostbloom', tile: sim.pos });
+    read = unseenFusionBursts(sim.fusionBursts, read.seen);
+    expect(read.fresh).toEqual([c]);
+    const fresh = makeSim();
+    const d = postFusionBurst(fresh, { kind: 'wildfire', tile: fresh.pos });
+    expect(unseenFusionBursts(fresh.fusionBursts, read.seen).fresh).toEqual([d]);
+    expect(unseenFusionBursts([], 7)).toEqual({ fresh: [], seen: 7 });
+  });
+
+  it('stays bounded and is cleared on reset', () => {
+    const sim = makeSim();
+    for (let i = 0; i < FUSION_BURST_LIMIT + 5; i++) postFusionBurst(sim, { kind: 'wildfire', tile: sim.pos });
+    expect(sim.fusionBursts).toHaveLength(FUSION_BURST_LIMIT);
+    expect(sim.fusionBursts.at(-1).seq).toBe(FUSION_BURST_LIMIT + 5);
+    resetWormSim(sim, SIZE, { orbCount: 0 });
+    expect(sim.fusionBursts).toHaveLength(0);
   });
 });

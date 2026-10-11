@@ -17,7 +17,7 @@ import { wormDemoActive, wormDemoLesson } from '../game/wormDemoLessons.js';
 import DemoPracticeTargets from './healerWorm/DemoPracticeTargets.jsx';
 import { SignatureEffects } from './healerWorm/SignatureEffects.jsx';
 import { LightningStrikes } from './healerWorm/LightningStrikes.jsx';
-import { isHotTile, isFirebreakTile, isFrostTile, isMeltTile, chargeSpringPad, CHARGED_PAD_TTL, FUSION } from './healerWorm/elementalGameplay.js';
+import { isHotTile, isFirebreakTile, isFrostTile, isMeltTile, chargeSpringPad, unseenFusionBursts, CHARGED_PAD_TTL, FUSION } from './healerWorm/elementalGameplay.js';
 import { fusionOf } from './healerWorm/elementalFusion.js';
 import { ElementalPatches } from './healerWorm/ElementalPatches.jsx';
 import BurrowEffects from './healerWorm/BurrowEffects.jsx';
@@ -412,14 +412,16 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     };
 
     // ── Fusion bursts ──────────────────────────────────────────────────────────
-    // A fusion's one-shot beat from the sim (sim.fusionBurst, read once per seq).
-    // Wildfire: a spring leap came down in flame — the 3x3 already burns in the sim;
-    // here its enemies die and the blast's flames go up over it.
+    // Fusion one-shot beats from the sim (sim.fusionBursts, oldest first). Every burst
+    // newer than the last one seen is resolved, in order, so beats posted in the same
+    // tick (a pad withering as a fusion ignites) all land.
     const fusionSeenRef = useRef(0);
     const runFusionBurst = () => {
-        const burst = worm.fusionBurst?.current;
-        if (!burst || burst.seq === fusionSeenRef.current) return;
-        fusionSeenRef.current = burst.seq;
+        const { fresh, seen } = unseenFusionBursts(worm.fusionBursts?.current, fusionSeenRef.current);
+        fusionSeenRef.current = seen;
+        for (const burst of fresh) resolveFusionBurst(burst);
+    };
+    const resolveFusionBurst = burst => {
         // A fusion's ignition (fusionIgnition.js): its ground is already laid in the sim;
         // here the enemies in reach take its hit and fire recipes put flames up.
         if (burst.kind === 'ignite') {

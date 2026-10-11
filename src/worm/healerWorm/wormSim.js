@@ -16,7 +16,7 @@ import { SPRING_GRAB_TILES } from '../characterAbilities.js';
 import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
 import { addElementalPatch, quenchTrail, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
-    fusionSpeedBonus, FUSION, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
+    fusionSpeedBonus, postFusionBurst, FUSION, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
 import { hasElement, activeFusion, claimElement, getFusion } from './elementalFusion.js';
 import { springSlamTiles } from './jumpLanding.js';
 import { igniteFusion } from './fusionIgnition.js';
@@ -292,9 +292,10 @@ export function makeWormSim(size) {
         // having it appear everywhere at once. Nothing in the simulation reads it.
         elementalOrigin: null,
         springLaunch: false,      // this jump left from a spring pad (Wildfire bursts where it lands)
-        // A fusion's one-shot beat for the mode to resolve against enemies and draw, keyed
-        // on seq like signature.slam: { seq, kind: 'wildfire', tile }. Read once per seq.
-        fusionBurst: null,
+        // Fusion one-shot beats for the mode to resolve against enemies and draw, oldest
+        // first: { seq, kind: 'wildfire', tile, ... }. Posted through postFusionBurst and
+        // read once per seq; a queue, so beats landing in the same tick never overwrite.
+        fusionBursts: [],
         fusionSeq: 0,
         fusionTiles: 0,           // Bloom: tiles crawled while it is up, to grow every 4th
         iceHeldTurn: false,       // Meltdown: a turn is waiting on an ice slide
@@ -477,7 +478,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.elementalFocusT = 0;
     sim.elementalOrigin = null;
     sim.springLaunch = false;
-    sim.fusionBurst = null;
+    sim.fusionBursts.length = 0;
     sim.fusionTiles = 0;
     sim.iceHeldTurn = false;
     sim.meltdownT = 0;
@@ -2636,7 +2637,7 @@ export function stepWormSim(sim, delta, size, ctx) {
                     const [x, y, z, dirKey] = key.split(',');
                     addElementalPatch(sim, { x: +x, y: +y, z: +z, dirKey }, 'fire');
                 }
-                sim.fusionBurst = { seq: ++sim.fusionSeq, kind: 'wildfire', tile: { ...sim.pos } };
+                postFusionBurst(sim, { kind: 'wildfire', tile: { ...sim.pos } });
                 ctx.feel('cut');
             }
             // Frostbloom: the leap comes down in a ring of frost. Bombs in the 3x3 stop
@@ -2646,7 +2647,7 @@ export function stepWormSim(sim, delta, size, ctx) {
                     const [x, y, z, dirKey] = key.split(',');
                     addElementalPatch(sim, { x: +x, y: +y, z: +z, dirKey }, 'frost');
                 }
-                sim.fusionBurst = { seq: ++sim.fusionSeq, kind: 'frostbloom', tile: { ...sim.pos } };
+                postFusionBurst(sim, { kind: 'frostbloom', tile: { ...sim.pos } });
                 ctx.feel('heal');
             }
             sim.springLaunch = false;
