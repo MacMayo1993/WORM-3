@@ -16,35 +16,35 @@
 export const STEP_COPY = {
   // The step completes only when the cube is solved again, so the goal is part
   // of the line — "try a twist" alone left players twisting with no finish.
-  'baby-cube': 'We can mend the Flip Cube by turning it, too. Watch two turns, then twist the cube back until every face is one color.',
-  'learn-to-solve': 'Stuck? I can help. Follow the gold layer guide, one turn at a time.',
-  'control-tour': 'Let’s find your controls. Tap each highlighted button to see what it does.',
+  'baby-cube': 'Every size of Flip Cube is a deck of my ship, and this is the smallest. The crash scrambled it, so turning it back is a repair too. Watch two turns, then twist the cube back until every face is one color.',
+  'learn-to-solve': 'Stuck? I can help. Ferry pilots learn this before anything else. Follow the gold layer guide, one turn at a time.',
+  'control-tour': 'Every pilot needs a cockpit. Let’s find your controls: tap each highlighted button to see what it does.',
   'twin-paradox': 'Back home, every spot has a twin. So does every tile on my ship: its twin is on the opposite side. Turn on Flip, then tap a tile to move the pair together.',
-  'flip-gateway': 'These were our doorways. Send nine tile pairs through the middle, then bring them back. Start with the face in front of you.',
-  'view-showcase': 'There is more to this cube than its surface. Use Next to explore different views of the same cube.',
-  'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings to preview your look. Press Next: Chaos when you’re ready. Your choices stay saved.',
-  'worm-traversal': 'Let’s learn to repair the old routes. Steer, collect orbs to grow, and jump onto raised flip pads. Complete each practice exercise, then explore Flip Cube and the other modes.',
+  'flip-gateway': 'Flipping is how my ship travels: every tile is a door. Send nine tile pairs through the middle, then bring them back home. Start with the face in front of you.',
+  'view-showcase': 'There is more to my ship than its surface. Use Next to explore different views of the same cube, all the way in to the Core at its centre.',
+  'make-it-yours': 'It’s your ship now too, so make it yours. Pick colors, tiles, and a background, then close Settings to preview your look. Press Next: Chaos when you’re ready. Your choices stay saved.',
+  'worm-traversal': 'The crash tore doors open all over my ship. Let’s practice repairs: steer, collect orbs to grow, and jump onto raised flip pads. Complete each practice exercise, then explore Flip Cube and the other modes.',
   // The round's live HUD keeps its rules behind "Inspect match", so the setup
   // line carries the three the player acts on: aim the first strike, flips wear
   // tiles out in twin pairs, and taps heal.
-  'chaos-forecast': 'Which color pair will last? Pick one, then tap where the storm strikes first. Flips wear tiles out, and worn-out twins drop out together. Tap damaged tiles to heal them.',
+  'chaos-forecast': 'This is what W³ felt like. Which color pair will last? Pick one, then tap where the storm strikes first. Flips wear tiles out, and worn-out twins drop out together. Tap damaged tiles to heal them.',
   // Random remixes the look only (useRandomMode); the rules never change.
-  'random-showcase': 'Feeling curious? Random remixes the colors and tile looks every ten seconds while you solve. Only the look changes; the puzzle stays the same.',
-  'cosmetic-reward': 'Let’s visit the Store. Spend Parity Points on skins, hats, palettes, and tiles—or save them. New worms, each with a signature move, unlock as you clear WORM levels. WORM runs, Chaos rounds, and first solves earn more.'
+  'random-showcase': 'Feeling curious? My ship never could pick a paint job. Random remixes the colors and tile looks every ten seconds while you solve. Only the look changes; the puzzle stays the same.',
+  'cosmetic-reward': 'Every healer deserves some gear. Let’s visit the Store. Spend Parity Points on skins, hats, palettes, and tiles—or save them. New worms, each with a signature move, unlock as you clear WORM levels. WORM runs, Chaos rounds, and first solves earn more.'
 };
 
 // These modes need a briefing before their timers or launch controls begin.
 // Each page explains one part of the mode and waits for the player's Next tap.
 export const STEP_INTRO_LINES = {
   'chaos-forecast': [
-    'Chaos shows how quickly damage can spread. A storm flips tiles across the cube. The last surviving twin pair wins; you can watch the storm or help your favorites survive.',
+    'Chaos shows how quickly damage can spread. It’s what W³, the war that broke my ship, felt like: a storm flips tiles across the cube. The last surviving twin pair wins; you can watch the storm or help your favorites survive.',
     'Each tile has a twin on the opposite side. Every flip uses some of their life. At the flip limit, worn-out twins drop out together. Watch the live counters to see which colors are still in the round.',
     'First, choose the color pair you think will win. This demo prediction is free. After confirming your pick, tap a tile to choose where the storm strikes first; the countdown then starts the round.',
     'During the storm, tap a damaged tile to heal it and send a healing wave through connected damaged tiles. Lost tiles cannot return. Healing can change the winner, so act before your pair disappears!',
     'When one twin pair remains, the results show who survived. Press Next: Random whenever you’re ready to leave this practice, even during the storm. Full Chaos mode also offers predictions on the last color, winning pair, first color out, or collapse speed.',
   ],
   'random-showcase': [
-    'Random is a cube puzzle with a changing look. Solve it while the palette and tile styles remix every ten seconds. Your goal is still to make every face one color.',
+    'Random is a cube puzzle with a changing look. My ship never could pick a paint job. Solve it while the palette and tile styles remix every ten seconds. Your goal is still to make every face one color.',
     'Individual cubelets can switch between solid, glass, wireframe, numbered, and grid looks. The cube’s size and background stay fixed, so you can focus on following the pieces through each new look.',
     'A remix does not scramble the cube again or undo your moves. Matching pieces still belong together when their colors change. Keep making the same twists you learned earlier; only their appearance changes.',
     'This practice starts with a scrambled 3×3. Try a few turns and watch a remix, or solve the whole cube. After watching a remix, press Next: Store to continue; the look you chose in Settings returns afterward.',
@@ -53,4 +53,4 @@ export const STEP_INTRO_LINES = {
 
 // The one place the demo names the math. Shown as an aside after the player has
 // already felt the mechanic, so the concept lands before the jargon does.
-export const TWIN_ASIDE = 'Mathematicians call those two spots an antipodal pair. "Twins" works fine.';
+export const TWIN_ASIDE = 'Mathematicians call those two spots an antipodal pair. In the Plane we just say twins.';

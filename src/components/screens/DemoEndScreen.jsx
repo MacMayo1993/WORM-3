@@ -12,7 +12,7 @@ const MODES = [
   {
     id: 'worm',
     name: 'WORM',
-    blurb: 'Grow, heal, and follow Mobi’s way home. Choose Levels for the story.',
+    blurb: 'Heal Mobi’s crashed Flip Cube and end W³. Choose Levels for the story.',
     primary: true,
   },
   { id: 'story', name: 'Teach', blurb: 'Learn a complete beginner cube method.' },
@@ -64,6 +64,10 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
         }}>
           Choose a mode
         </h1>
+        {/* Mobi's send-off points at the story, which picks up where the demo's crash leaves off. */}
+        <p className="demo-end-mobi" style={{ color: '#3d4a33', fontSize: 14, lineHeight: 1.45, margin: '0 0 16px' }}>
+          <b>Mobi</b> You’re a natural, partner. The rest of my ship is waiting in WORM Levels, starting right where we crashed.
+        </p>
 
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
