@@ -9,36 +9,38 @@
 // two. Every element check reads `hasElement`, never `elementalType` alone, or the
 // partner's half of a fusion silently switches off.
 //
-// All 20 ordered recipes have stable identities. Shipped rules and explicit
-// fallbacks are separate, so planned names never silently select another rule.
+// All 20 ordered recipes have stable identities and a rule of their own, so the
+// same two elements picked up in the other order do something else entirely.
 //
 // Pure, like elementalDefs.js: no React, no Three, no store.
 
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
 
-// Recipe identity is ordered. `fallback` names the shipped effect used until a
-// recipe's own rule lands; the HUD always explains the effect actually running.
+// Recipe identity is ordered: the first pickup is the base, the second the catalyst.
+// Every recipe has its own rule (see the elemental-fusions skill for where each lives);
+// `fallback` stays in the shape so a future recipe can borrow a shipped rule
+// explicitly, but none does today.
 const recipes = [
   ['water', 'fire', 'steam', 'Steam', 'Your steaming trail scalds and stuns enemies and puts out bombs.'],
-  ['fire', 'water', 'quench', 'Quench', 'Your trail becomes obsidian for 8 seconds: it blocks blasts without speeding bomb fuses. Turns on obsidian keep water momentum.'],
   ['water', 'ice', 'slipstream', 'Slipstream', 'Turns keep water momentum; full momentum gives 40% extra speed.'],
+  ['water', 'grass', 'bloom', 'Bloom', 'Rain grows a spring pad behind every 4th tile you crawl, and pads last 12 seconds.'],
+  ['water', 'lightning', 'conductor', 'Conductor', 'Wet and grounded: marks never aim at your body, and every strike forks to a second tile.'],
+  ['fire', 'water', 'quench', 'Quench', 'Your trail becomes obsidian for 8 seconds: it blocks blasts without speeding bomb fuses. Turns on obsidian keep water momentum.'],
+  ['fire', 'ice', 'coldfire', 'Coldfire', 'Your trail burns blue for 5 seconds: it blocks blasts, never speeds fuses, and freezes enemies that touch it.'],
   ['fire', 'grass', 'wildfire', 'Wildfire', 'Land a spring leap to ignite the surrounding 3×3 and defeat enemies there.'],
+  ['fire', 'lightning', 'plasma', 'Plasma', 'Twice the marks, and they never land on your fire trail. Every strike leaves its tile burning for 8 seconds.'],
+  ['grass', 'water', 'geyser', 'Geyser', 'Spring pads erupt: a launch refills water momentum, and at full momentum the leap goes a tile further and higher.'],
+  ['grass', 'fire', 'emberseed', 'Emberseed', 'Pads last 4 seconds; one you leave behind bursts into a 3×3 of flame that defeats enemies.'],
+  ['grass', 'ice', 'ski-jump', 'Ski Jump', 'Every jump from the ground is a full spring leap, no pad needed, and the landing grows a pad.'],
   ['grass', 'lightning', 'thunderpad', 'Thunderpad', 'Lightning charges spring pads for rocket-high leaps.'],
-  ['water', 'grass', 'bloom', 'Bloom'],
-  ['water', 'lightning', 'conductor', 'Conductor'],
-  ['fire', 'ice', 'coldfire', 'Coldfire'],
-  ['fire', 'lightning', 'plasma', 'Plasma'],
-  ['grass', 'water', 'geyser', 'Geyser'],
-  ['grass', 'fire', 'emberseed', 'Emberseed', null, 'wildfire'],
-  ['grass', 'ice', 'ski-jump', 'Ski Jump'],
-  ['ice', 'water', 'frozen-wake', 'Frozen Wake', null, 'slipstream'],
-  ['ice', 'fire', 'meltdown', 'Meltdown'],
-  ['ice', 'grass', 'frostbloom', 'Frostbloom'],
-  ['ice', 'lightning', 'static', 'Static'],
-  ['lightning', 'water', 'current', 'Current'],
-  ['lightning', 'fire', 'firestorm', 'Firestorm'],
-  ['lightning', 'ice', 'cryostorm', 'Cryostorm'],
-  ['lightning', 'grass', 'grounded', 'Grounded', null, 'thunderpad'],
+  ['ice', 'water', 'frozen-wake', 'Frozen Wake', 'Tiles you leave freeze for 5 seconds: bombs on them stop ticking and enemies that step on them freeze.'],
+  ['ice', 'fire', 'meltdown', 'Meltdown', 'Every slide ends in a 30% dash; the tile you turn on melts, and a bomb on it is put out.'],
+  ['ice', 'grass', 'frostbloom', 'Frostbloom', 'A spring landing freezes its 3×3: enemies freeze, bombs stop ticking, and the pad lasts 12 seconds.'],
+  ['ice', 'lightning', 'static', 'Static', 'Strikes near your head discharge into you: no harm, no flip, a 35% speed burst instead.'],
+  ['lightning', 'water', 'current', 'Current', 'At high water momentum a strike on you is absorbed and arcs on: it defeats the nearest enemy and defuses the nearest bomb.'],
+  ['lightning', 'fire', 'firestorm', 'Firestorm', 'Every strike ignites a cross of fire two tiles each way; enemies inside it burn.'],
+  ['lightning', 'ice', 'cryostorm', 'Cryostorm', 'Marks charge twice as long and strike as frost: no harm to you, no flips; enemies nearby freeze and bombs stop ticking.'],
+  ['lightning', 'grass', 'grounded', 'Grounded', 'Strikes grow charged spring pads instead of flipping tiles, and a strike on your body grows a pad instead of cutting.'],
 ];
 export const ORDERED_FUSIONS = Object.fromEntries(recipes.map(([base, catalyst, id, label, description, fallback = null]) => [
   `${base}>${catalyst}`, { base, catalyst, id, label, rule: !!description, fallback,

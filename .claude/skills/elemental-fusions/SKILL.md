@@ -48,10 +48,7 @@ Reclaiming the base to flip the order is a deliberate skill move. Keep it.
 
 ## The full map (20 ordered pairs)
 
-Status:
-- **Live**: shipped.
-- **Live (shared)**: the pair's other order shares this rule today, until its own rule is built.
-- **Planned**: designed here, not built.
+Status: every recipe below is **Live** (shipped with its own rule).
 
 Every fusion keeps both base effects on; the rule below is added on top.
 
@@ -61,51 +58,61 @@ Every fusion keeps both base effects on; the rule below is added on top.
 |---|---|---|---|
 | Water → Fire | **Steam** | The fire trail steams: enemies stepping onto it are scalded and stunned (joins the light wall via `steamTiles`), and a bomb sitting on it is put out like a disarm. | Live |
 | Water → Ice | **Slipstream** | Turns no longer shed momentum; full momentum is worth +40% instead of +25%. | Live |
-| Water → Nature | **Bloom** | Rain makes things grow: every 4th tile crawled grows a spring pad by itself, no landing needed, and pads last 12 s instead of 8 s. | Planned |
-| Water → Lightning | **Conductor** | The wet worm is grounded: marks never aim at the body (`bodyShare` → 0), and a strike within 2 tiles of the last 6 trail tiles chains to every enemy within 2 tiles of where it landed. | Planned |
+| Water → Nature | **Bloom** | Rain makes things grow: every 4th tile crawled grows a spring pad by itself (`sim.fusionTiles`), no landing needed, and pads last 12 s instead of 8 s. | Live |
+| Water → Lightning | **Conductor** | The wet worm is grounded: marks never aim at the body (body keys join `avoid`, `bodyShare: 0`), and every strike on a bare tile forks to a second tile two away (`addStormFlash`): a second flip and a second 3x3 of enemy kills. | Live |
 
 ### Fire first
 
 | Order | Name | Rule | Status |
 |---|---|---|---|
 | Fire → Water | **Quench** | The fire trail sets into obsidian: tiles last 8 s instead of 3 s and stay a firebreak, but no longer speed up bomb fuses; crawling on obsidian keeps full water momentum through turns. | Live |
-| Fire → Ice | **Coldfire** | The trail burns blue: enemies that touch it freeze (`enemy.freeze` 2.2 s, as the ice shot does) instead of burning, and the trail lasts 5 s. | Planned |
+| Fire → Ice | **Coldfire** | The trail burns blue (`cold: true`, 5 s): still a firebreak, never speeds a fuse (`isHotTile` is false), and enemies arriving on it freeze (`frostTiles` → `player.frost`). | Live |
 | Fire → Nature | **Wildfire** | A spring landing sets its 3x3 alight (fire patches) and kills the enemies in it (`sim.fusionBurst` → `strikeEnemies`). | Live |
-| Fire → Lightning | **Plasma** | A strike on a bare tile also leaves an 8 s fire patch, and marks never land on your fire trail (it repels them; add the trail to the storm's `avoid` set). | Planned |
+| Fire → Lightning | **Plasma** | Twice the marks (`beginStorm(storm, 12)`), never on the fire trail or the body, and each strike on a bare tile leaves it burning for 8 s. | Live |
 
 ### Nature first
 
 | Order | Name | Rule | Status |
 |---|---|---|---|
-| Nature → Water | **Geyser** | Spring pads erupt: a launch keeps water momentum through the leap, and at full momentum the leap is 1 tile longer. | Planned |
-| Nature → Fire | **Emberseed** | Pads you never use burst when they wither: a 3x3 fire burst that kills enemies, like Wildfire's (reuse `fusionBurst`, kind `'emberseed'`). | Planned (Wildfire until built) |
-| Nature → Ice | **Ski Jump** | A spring launch lets you turn once in mid-air, and landing never starts an ice slide (you steer at once). | Planned |
+| Nature → Water | **Geyser** | A pad launch refills water momentum and keeps it through the leap; a launch at ≥ 0.8 momentum goes +1 tile and +0.8 lift. | Live |
+| Nature → Fire | **Emberseed** | Pads last 4 s (`ember: true`, drawn as coals); a pad that withers unused bursts: its 3x3 burns and `fusionBurst` kind `'emberseed'` kills the enemies in it. | Live |
+| Nature → Ice | **Ski Jump** | Every grounded jump (not across a seam) is a full spring leap, no pad needed; Nature's landing pad then chains the next one. | Live |
 | Nature → Lightning | **Thunderpad** | The storm aims `STORM.padShare` (half) of its marks at free spring pads; a struck pad is charged (violet) instead of flipped, and a leap from it uses `CHARGED_SPRING_SPAN`/`HEIGHT`. | Live |
 
 ### Ice first
 
 | Order | Name | Rule | Status |
 |---|---|---|---|
-| Ice → Water | **Frozen Wake** | The water you shed freezes behind you: the last 5 trail tiles freeze enemies that step on them (`enemy.freeze`). | Planned (Slipstream until built) |
-| Ice → Fire | **Meltdown** | Each finished slide ends in a dash: +30% speed for one tile, a fire patch on the tile slid across, and a slide over a bomb's tile puts it out. | Planned |
-| Ice → Nature | **Frostbloom** | A spring landing freezes enemies in its 3x3 (`enemy.freeze`) instead of hurting them; the pad it grows is iced and lasts 12 s. | Planned |
-| Ice → Lightning | **Static** | A sliding head cannot be struck; each mark that lands within 2 tiles while you slide discharges into you as a 1 s speed burst instead of hitting the board. | Planned |
+| Ice → Water | **Frozen Wake** | Every tile the worm leaves becomes frost (type `'frost'`, 5 s): a bomb on frost stops ticking, an enemy arriving on it freezes. | Live |
+| Ice → Fire | **Meltdown** | A turn the ice slide held (`sim.iceHeldTurn`) ends in a dash (+30% for 0.6 s, `fusionSpeedBonus`) and melts the tile it turned on (`melt: true`); a bomb on a melted tile is put out. | Live |
+| Ice → Nature | **Frostbloom** | A spring landing frosts its 3x3 (bombs stop ticking) and `fusionBurst` kind `'frostbloom'` freezes its enemies; the pad grown there is iced and lasts 12 s. | Live |
+| Ice → Lightning | **Static** | A strike within 2 tiles of the head discharges into the worm: no harm, no flip, +35% speed for 1.5 s (`sim.staticT`); enemies in its 3x3 still die. | Live |
 
 ### Lightning first
 
 | Order | Name | Rule | Status |
 |---|---|---|---|
-| Lightning → Water | **Current** | At full water momentum the worm is a lightning rod: a mark aimed at the body is redirected to the nearest enemy within 3 tiles (or fizzles if none). | Planned |
-| Lightning → Fire | **Firestorm** | Every strike ignites a plus-shaped cross (the tile and 2 tiles each way) of fire patches; enemies in it get `enemy.burn` 3 s. | Planned |
-| Lightning → Ice | **Cryostorm** | Marks charge twice as long (2.8 s telegraph) and strike as a freeze: enemies in a 5x5 freeze, and the head and body are cut, not killed (a struck head loses its tail instead). | Planned |
-| Lightning → Nature | **Grounded** | A strike grows a spring pad on its tile instead of flipping it, and a mark on the body grows a pad there instead of cutting the tail. | Planned (Thunderpad until built) |
+| Lightning → Water | **Current** | At ≥ 0.8 water momentum a strike on the head or body is absorbed and arcs on: it kills the nearest enemy within 3 tiles (`nearestEnemy`) and puts out the nearest bomb within 3. | Live |
+| Lightning → Fire | **Firestorm** | Every strike ignites a plus-shaped cross (the tile and 2 tiles each way, `computeBlastTiles`) of 5 s fire patches; enemies in it get `burn` 3 s. | Live |
+| Lightning → Ice | **Cryostorm** | Marks telegraph twice as long (2.8 s) and strike as frost: no harm to the worm, no flip; the 3x3 frosts (bombs stop) and enemies within 2 tiles freeze 4 s. | Live |
+| Lightning → Nature | **Grounded** | A strike on a bare tile grows a charged spring pad instead of flipping it, and a strike on the body grows one there instead of cutting (the head is still telegraphed and still dies). | Live |
 
-Recipes are keyed by order in `ORDERED_FUSIONS`. Nature → Fire currently borrows Wildfire,
-Lightning → Nature borrows Thunderpad, and Ice → Water borrows Slipstream through
-explicit `fallback` fields. Their own IDs and descriptions remain distinct. The other
-twelve planned recipes run both base effects and nothing else. Fire → Water now runs
-Quench: existing fire patches and newly laid trail gain `obsidian: true`, last 8 seconds,
-and stay firebreaks without hot-tile fuse acceleration or Steam disarms.
+Recipes are keyed by order in `ORDERED_FUSIONS`, and all twenty are live with their
+own rule: no recipe borrows its reverse's, so picking the same two elements up in the
+other order always changes what happens. `fallback` is still supported by
+`fusionEffect` for a future recipe that has to borrow a rule, but nothing uses it.
+Every fusion also posts `ctx.onFusion('<base>><catalyst>')`, which the HUD turns into
+the FUSION banner (`FusionBanner` in `WormCrawlerHUD.jsx`) naming the recipe and its rule
+over the claim camera beat.
+
+Shared hooks the newer rules added: patch kinds `'frost'` and the flags `cold`, `melt`,
+`ember`, `iced` (`addElementalPatch`, drawn by `patchVariant` in `ElementalPatches.jsx`);
+`frostTiles(sim)` → `player.frost()` freezes enemies arriving on frost (`portalCombat.js`);
+`afflictEnemies` / `nearestEnemy` for fusion statuses; `isFrostTile` stops a bomb's fuse
+and `isMeltTile` puts it out in the bomb loop; `fusionSpeedBonus` (Meltdown, Static) adds
+to ground speed; the storm takes a quota (`beginStorm`), a `telegraph` and a `bodyShare`;
+the mode lays patches through `worm.addPatch`. All numbers live in `FUSION`
+(`elementalGameplay.js`).
 
 Level 24 teaches Steam and Quench with `steamFusions` / `quenchFusions` objectives.
 The Story scheduler offers a needed catalyst during the base wash, after the focus

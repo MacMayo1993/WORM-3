@@ -16,7 +16,7 @@ import { SPRING_GRAB_TILES } from '../characterAbilities.js';
 import { breakGlowTrail, tickGlowTrail } from './glowTrail.js';
 import { hasLiveDeparture, updateRotationDeparture, setDepartureAxis, departureAxis, departureBodySample } from './rotationDeparture.js';
 import { addElementalPatch, quenchTrail, tickElementalGameplay, consumeSpring, iceHoldsTurn, rotateElementalPatches, waterSpeedBonus, turnShedsMomentum,
-    CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
+    fusionSpeedBonus, FUSION, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
 import { hasElement, activeFusion, claimElement, getFusion } from './elementalFusion.js';
 import { springSlamTiles } from './jumpLanding.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
@@ -295,6 +295,10 @@ export function makeWormSim(size) {
         // on seq like signature.slam: { seq, kind: 'wildfire', tile }. Read once per seq.
         fusionBurst: null,
         fusionSeq: 0,
+        fusionTiles: 0,           // Bloom: tiles crawled while it is up, to grow every 4th
+        iceHeldTurn: false,       // Meltdown: a turn is waiting on an ice slide
+        meltdownT: 0,             // Meltdown: seconds of dash left
+        staticT: 0,               // Static: seconds of discharge speed burst left
         landingGraceT: 0,         // post-rocket window where a landing can't kill
         // Injected RNG — every random draw in the special system goes through this so
         // tests can make spawn type and placement deterministic. Set once at
@@ -472,6 +476,10 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.elementalOrigin = null;
     sim.springLaunch = false;
     sim.fusionBurst = null;
+    sim.fusionTiles = 0;
+    sim.iceHeldTurn = false;
+    sim.meltdownT = 0;
+    sim.staticT = 0;
     sim.landingGraceT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -579,7 +587,22 @@ export function startJump(sim, ctx, size, { allowDive = true } = {}) {
         sim.jumpSpan = pad.charged ? CHARGED_SPRING_SPAN : 2.2;
         sim.jumpHeight = pad.charged ? CHARGED_SPRING_HEIGHT : 1.8;
         sim.springLaunch = true;
+        // Geyser: the pad erupts. A full-momentum launch goes a tile further and higher,
+        // and the leap refills the water it rides on.
+        if (activeFusion(sim) === 'geyser') {
+            if (sim.waterMomentum >= FUSION.geyserMomentum) {
+                sim.jumpSpan += FUSION.geyserSpan;
+                sim.jumpHeight += FUSION.geyserHeight;
+            }
+            sim.waterMomentum = 1;
+        }
         ctx.onStoryMechanic?.('grassLaunch');
+    } else if (grounded && !sim.crossingCorner && !(next && next.dirKey !== sim.pos.dirKey) && activeFusion(sim) === 'ski-jump') {
+        // Ski Jump: the ice is the ramp. Every jump from the ground is a spring leap, and
+        // the landing grows a pad (Nature's own rule), so leaps chain.
+        sim.jumpSpan = 2.2;
+        sim.jumpHeight = 1.8;
+        sim.springLaunch = true;
     }
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
@@ -719,7 +742,11 @@ export function startElemental(sim, ctx, type) {
     sim.elementalFocusT = ELEMENTAL_FOCUS_DURATION;
     ctx.feel(next.fused ? 'elementFusion' : ELEMENTAL_EXPERIENCE[type]?.sound ?? 'orb');
     if (activeFusion(sim) === 'quench') quenchTrail(sim);
-    if (next.fused) ctx.onStoryMechanic?.('elementFusion', getFusion(sim.elementalPair, sim.elementalType).id);
+    if (next.fused) {
+        const recipe = getFusion(sim.elementalPair, sim.elementalType);
+        ctx.onStoryMechanic?.('elementFusion', recipe.id);
+        ctx.onFusion?.(`${recipe.base}>${recipe.catalyst}`);
+    }
     ctx.onElementalTheme(type, ELEMENTAL_DURATION, sim.elementalPair);
 }
 
@@ -1732,6 +1759,7 @@ const PHASE_HANDLERS = {
 
             // Apply pending turn — RELATIVE to current heading
             if (iceHoldsTurn(sim, delta, STEP_SEC)) {
+                if (sim.pendingTurns.length > 0) sim.iceHeldTurn = true;
                 const action = sim.pendingTurns.findIndex(t => t === 'jump' || t === 'boost');
                 if (action > 0) sim.pendingTurns.unshift(sim.pendingTurns.splice(action, 1)[0]);
             }
@@ -1793,8 +1821,16 @@ const PHASE_HANDLERS = {
                     }
                     if (sim.moveDir !== previousDirection) {
                         if (turnShedsMomentum(sim)) sim.waterMomentum *= 0.35;
+                        // Meltdown: the slide ends in a dash, and the tile it ended on
+                        // melts (fire that puts out a bomb sitting there).
+                        if (sim.iceHeldTurn && activeFusion(sim) === 'meltdown') {
+                            sim.meltdownT = FUSION.meltdownDashT;
+                            if (!liveRotation.active && !sim.restRead) addElementalPatch(sim, sim.pos, 'fire', { melt: true });
+                            ctx.feel('boost');
+                        }
                         ctx.onSteer?.();
                     }
+                    if (t !== 'jump' && t !== 'boost') sim.iceHeldTurn = false;
                 }
             }
 
@@ -1984,6 +2020,13 @@ const PHASE_HANDLERS = {
                 // mid-step slice rotation can ride/commit it correctly.
                 if (hasElement(sim, 'fire') && !sim.isJumping && !liveRotation.active && !sim.restRead) {
                     addElementalPatch(sim, sim.pos, 'fire');
+                }
+                if (!sim.isJumping && !liveRotation.active && !sim.restRead) {
+                    const fusion = activeFusion(sim);
+                    // Frozen Wake: the water the worm sheds freezes on every tile it leaves.
+                    if (fusion === 'frozen-wake') addElementalPatch(sim, sim.pos, 'frost');
+                    // Bloom: the rain grows a pad behind every few tiles, no landing needed.
+                    else if (fusion === 'bloom' && ++sim.fusionTiles % FUSION.bloomEvery === 0) addElementalPatch(sim, sim.pos, 'grass');
                 }
                 sim.prevTile = { x: sim.pos.x, y: sim.pos.y, z: sim.pos.z, dirKey: sim.pos.dirKey };
 
@@ -2474,7 +2517,7 @@ export function stepWormSim(sim, delta, size, ctx) {
         }
     }
 
-    tickElementalGameplay(sim, delta);
+    tickElementalGameplay(sim, delta, size);
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
     // Throttle follows the same smooth flight phase as the rendered body.
     // Flight stays capped even with an ordinary boost. Restore ground speed only
@@ -2484,7 +2527,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     const rocketBase = Math.min(boostMult, ROCKET_SPEED_MULT);
     const handoff = 1 - (sim.rocketBoostHandoffT ?? 0) / ROCKET_BOOST_HANDOFF;
     const groundBlend = handoff * handoff * (3 - 2 * handoff);
-    const groundSpeed = boostMult * (1 + waterSpeedBonus(sim) * sim.waterMomentum);
+    const groundSpeed = boostMult * (1 + waterSpeedBonus(sim) * sim.waterMomentum + fusionSpeedBonus(sim));
     const speedMult = sim.rocketActive
         ? rocketBase + (ROCKET_SPEED_MULT - rocketBase) * throttle
         : rocketBase + (groundSpeed - rocketBase) * groundBlend;
@@ -2590,6 +2633,16 @@ export function stepWormSim(sim, delta, size, ctx) {
                 }
                 sim.fusionBurst = { seq: ++sim.fusionSeq, kind: 'wildfire', tile: { ...sim.pos } };
                 ctx.feel('cut');
+            }
+            // Frostbloom: the leap comes down in a ring of frost. Bombs in the 3x3 stop
+            // ticking and the mode freezes the enemies in it; the pad grown below is iced.
+            if (sim.springLaunch && settled && activeFusion(sim) === 'frostbloom') {
+                for (const key of springSlamTiles(sim.pos, size)) {
+                    const [x, y, z, dirKey] = key.split(',');
+                    addElementalPatch(sim, { x: +x, y: +y, z: +z, dirKey }, 'frost');
+                }
+                sim.fusionBurst = { seq: ++sim.fusionSeq, kind: 'frostbloom', tile: { ...sim.pos } };
+                ctx.feel('heal');
             }
             sim.springLaunch = false;
             if (hasElement(sim, 'grass') && settled) {

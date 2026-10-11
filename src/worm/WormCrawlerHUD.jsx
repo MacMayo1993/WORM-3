@@ -991,6 +991,39 @@ function SpecialNotice({ suppressed = false }) {
     );
 }
 
+// ─── Fusion banner ───────────────────────────────────────────────────────────
+// Two elements just fused. The claim camera pulls out to show the cube transform; this
+// names what the pair now does, in the two elements' colours, so a fusion reads as an
+// event and not as another pickup.
+
+const FUSION_BANNER_MS = 3200;
+
+function FusionBanner() {
+    const notice = useGameStore(s => s.wormFusionNotice);
+    const [shown, setShown] = useState(null);
+    const timer = useRef(null);
+    useEffect(() => {
+        if (!notice) { setShown(null); return; }
+        setShown(notice);
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => setShown(null), FUSION_BANNER_MS);
+        return () => clearTimeout(timer.current);
+    }, [notice]);
+    const recipe = shown ? ORDERED_FUSIONS[shown.key] : null;
+    if (!recipe) return null;
+    const base = getElementalDef(recipe.base), catalyst = getElementalDef(recipe.catalyst);
+    return (
+        <div key={shown.seq} className="worm-fusion-banner" role="status" aria-live="assertive"
+            style={{ '--fusion-a': base.color, '--fusion-b': catalyst.color, fontFamily: UI_FONT }}>
+            <span className="worm-fusion-kicker" style={{ fontFamily: HEADING_FONT }}>
+                <SpecialIcon type={recipe.base} size={14} /> {base.label} → {catalyst.label} <SpecialIcon type={recipe.catalyst} size={14} />
+            </span>
+            <span className="worm-fusion-name" style={{ fontFamily: DISPLAY_FONT }}>{recipe.label}</span>
+            <span className="worm-fusion-rule">{recipe.description}</span>
+        </div>
+    );
+}
+
 // ─── Boost button ────────────────────────────────────────────────────────────
 
 function BoostButton({ wormAlive }) {
@@ -1366,6 +1399,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
             {wormAlive && <CaptureVisual behindHud><OrbPickupFlash /></CaptureVisual>}
+            {/* Two elements just fused: named over the claim camera beat, outside the clipped status row. */}
+            {wormAlive && phase === 'crawling' && <FusionBanner />}
 
             {captureMode && !combatMode && (!storyId || storyLevel(storyId)?.rotateEvery) && (!demoLesson || lesson.id === 'rotation') && (
                 <CaptureVisual><div className="capture-rotation-clock"><RotationCountdownHUD compact /></div></CaptureVisual>

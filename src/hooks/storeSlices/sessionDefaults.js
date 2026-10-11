@@ -69,6 +69,8 @@ export const makeWormSessionDefaults = () => ({
   wormElementalTheme: null,
   // The element fused with wormElementalTheme (elementalFusion.js), or null.
   wormElementalPartner: null,
+  // The fusion just made, for the HUD's FUSION banner: { key: 'water>fire', seq }, or null.
+  wormFusionNotice: null,
   wormViewPower: null,
   // { kind: 'spawn'|'expire', type, seq } — drives the HUD's special notice toast.
   wormSpecialNotice: null,

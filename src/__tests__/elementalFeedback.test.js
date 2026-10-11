@@ -2,12 +2,14 @@ import { it, expect } from 'vitest';
 import { elementalFeedback, fusionFeedback, patchOpacity, springStretch } from '../worm/healerWorm/elementalFeedback.js';
 import { getFusion } from '../worm/healerWorm/elementalFusion.js';
 import { wormBuffs, resetWormBuffs } from '../worm/wormBuffs.js';
-it('explains fusion-specific benefits and both base mechanics for combinations without a bonus rule', () => {
+it('explains each ordered fusion by its own rule, never its reverse', () => {
   expect(fusionFeedback(getFusion('water', 'ice'), { waterMomentum: 1 }).text).toContain('+40%');
-  expect(fusionFeedback(getFusion('ice', 'water'), { waterMomentum: 1 }).text).toContain('+40%');
+  expect(fusionFeedback(getFusion('ice', 'water'), { waterMomentum: 1 }).text).toContain('Tiles you leave freeze');
   expect(fusionFeedback(getFusion('water', 'fire'), {}).text).toContain('Puts out bombs');
   expect(fusionFeedback(getFusion('fire', 'water'), {}).text).toContain('Obsidian');
-  expect(fusionFeedback(getFusion('water', 'grass'), {}).text).toBe('Water momentum + Nature spring pads');
+  expect(fusionFeedback(getFusion('water', 'grass'), {}).text).toContain('Rain grows a pad');
+  expect(fusionFeedback(getFusion('ice', 'fire'), { meltdownT: 0.3 }).text).toContain('DASH');
+  expect(fusionFeedback(getFusion('ice', 'lightning'), { staticT: 1 }).text).toContain('DISCHARGE');
 });
 it('shows actual water gain and does not claim a water boost during rocket override', () => {
   expect(elementalFeedback('water', { waterMomentum: 0.8 }).text).toContain('+20%');
@@ -27,7 +29,10 @@ it('disables spring motion when reduced and fades only near expiry', () => {
 });
 it('resets all new HUD mirrors between runs', () => {
   wormBuffs.waterMomentum = 1; wormBuffs.springReady = true; wormBuffs.springCount = 5;
+  wormBuffs.meltdownT = 1; wormBuffs.staticT = 1;
   resetWormBuffs();
+  expect(wormBuffs.meltdownT).toBe(0);
+  expect(wormBuffs.staticT).toBe(0);
   expect(wormBuffs.waterMomentum).toBe(0);
   expect(wormBuffs.springReady).toBe(false);
   expect(wormBuffs.springCount).toBe(0);
