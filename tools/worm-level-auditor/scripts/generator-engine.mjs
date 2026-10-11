@@ -8,7 +8,7 @@ import {ELEMENTAL_DURATION,MAGNET_RADIUS} from '../../../src/worm/healerWorm/con
 import {STORY_WORLDS,STORY_ORB_ROUTES} from '../../../src/worm/story/worlds.js';
 import {assess} from '../web/audit.js';
 import {requiredPowerCycle,SUPPORTED_SIZES} from '../web/generator.js';
-const mechanicKeys=['steamFusions','quenchFusions','boosts','doubleJumps','rockets','magnetOrbs','explodes','elements','uniqueElements','elementPickups','ringHeals','signatures','bombs','kills'];
+const mechanicKeys=['steamFusions','quenchFusions','boosts','doubleJumps','rockets','magnetOrbs','explodes','elements','uniqueElements','elementPickups','ringHeals','signatures','bombs','kills','bodyLength','bodyJumps','selfPasses','multiHeals','fusions','uniqueFusions'];
 const worlds=Object.values(STORY_WORLDS),palettes=new Set(worlds.map(w=>w.palette)),backgrounds=new Set(worlds.map(w=>w.background)),styles=new Set(worlds.flatMap(w=>Object.values(w.styles)));
 const positive=n=>Number.isInteger(n)&&n>0&&n<=200;
 export function schemaErrors(candidate){
@@ -30,7 +30,7 @@ export function schemaErrors(candidate){
   if(!l.mechanics||typeof l.mechanics!=='object'||Array.isArray(l.mechanics))e.push('Mechanics must be an object.');
   else for(const [key,n] of Object.entries(l.mechanics)){
    if(!mechanicKeys.includes(key))e.push('Unsupported mechanic '+key+'.');
-   if(!positive(n))e.push(key+' must be a positive integer.');
+   if(!(key==='bodyLength'?Number.isInteger(n)&&n>10&&n<=1200:positive(n)))e.push(key+' must be a positive integer.');
    if(['elements','uniqueElements'].includes(key)&&n>5)e.push('There are only five supported elemental types.');
    if(key==='ringHeals'&&n>l.target)e.push('Ring-heal target exceeds the staged tunnel pairs.');
   }

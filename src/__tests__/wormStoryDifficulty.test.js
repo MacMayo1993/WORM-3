@@ -14,18 +14,18 @@ function crossing() {
   sim.pos = { ...practice.target };
   sim._curWP.fromArray(getStickerWorldPos(2, 2, 4, 'PZ', 5, 0));
   sim.prevWorldPos = null; sim.interpT = 0.6; sim.isJumping = true; sim.jumpT = 0.5;
-  const read = () => storyMetrics(sim, practice, level, { wormSessionOrbs: 12, rotationEpoch: 0, animState: null }, [], 0.02);
+  const read = () => storyMetrics(sim, practice, level, { wormSessionOrbs: level.orbs, rotationEpoch: 0, animState: null }, [], 0.02);
   return { sim, practice, level, read };
 }
-it('counts four separate landed body clearances, not airborne frames or double-jump resets', () => {
+it('counts every separate landed body clearance, not airborne frames or double-jump resets', () => {
   const { sim, level, read } = crossing();
-  for (let jumps = 0; jumps < 4; jumps++) {
+  for (let jumps = 0; jumps < level.target; jumps++) {
     sim.isJumping = true; sim.jumpT = 0.5;
     for (let frame = 0; frame < 50; frame++) expect(read().bodyJumps).toBe(jumps);
     sim.jumpT = 0.25; expect(read().bodyJumps).toBe(jumps); // same airborne episode
     sim.isJumping = false;
     const metrics = read(); expect(metrics.bodyJumps).toBe(jumps + 1);
-    if (jumps < 3) expect(storyOutcome(level, metrics)).toBeNull();
+    if (jumps < level.target - 1) expect(storyOutcome(level, metrics)).toBeNull();
     else expect(storyOutcome(level, metrics)).toMatchObject({ stars: 3 });
     expect(read().bodyJumps).toBe(jumps + 1); // extra grounded frames do not recount
   }

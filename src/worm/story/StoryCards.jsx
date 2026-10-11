@@ -8,7 +8,7 @@ import { storyLevel, storyChecklist, storyStars, WORM_STORY_LEVELS, storyChapter
 import { feel, resumeFeel } from '../../utils/feel.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { getWormCharacter } from '../wormCharacterData.js';
-import { storyNarrative } from './narrative.js';
+import { storyNarrative, storyBriefingText } from './narrative.js';
 import '../../components/screens/wormStory.css';
 import './storyCompletion.css';
 import './storyRewards.css';
@@ -32,7 +32,7 @@ export function StoryMobiNote({ levelId, complete = false }) {
   const story = storyNarrative(levelId);
   if (!story) return null;
   return <p className="worm-story-mobi" aria-label={complete ? 'Mobi’s field notes' : 'Mobi’s briefing'}>
-    <b>Mobi</b>{' '}{complete ? story.debrief : story.briefing}
+    <b>Mobi</b>{' '}{complete ? story.debrief : storyBriefingText(levelId)}
   </p>;
 }
 

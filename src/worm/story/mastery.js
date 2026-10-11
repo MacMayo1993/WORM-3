@@ -33,12 +33,16 @@ const add = (p, key) => { p.mechanics[key] = (p.mechanics[key] ?? 0) + 1; };
 // Events originate after a successful pickup/disarm/heal, never from button input.
 export function recordStoryMechanic(practice, key, id) {
   if (practice && key === 'elementFusion') {
+    if (!id) return;
+    // Any recipe counts toward fusions; each ordered recipe counts once toward variety.
+    add(practice, 'fusions');
+    (practice.fusionIds ??= new Set()).add(id);
     const goal = Object.keys(STORY_FUSION_GOALS).find(k => STORY_FUSION_GOALS[k].id === id);
     if (goal) add(practice, goal);
     return;
   }
   if (practice && key === 'grassLaunch') { practice.grassJump = true; return; }
-  if (!practice || !['ringHeals', 'magnetOrbs', 'bombs', 'elementPickups'].includes(key)) return;
+  if (!practice || !['ringHeals', 'magnetOrbs', 'bombs', 'elementPickups', 'selfPasses', 'multiHeals'].includes(key)) return;
   // Pickup variety is separate from elemental mastery actions. Repeated
   // pickups still count toward quantity quests, but each element counts once.
   if (key === 'elementPickups' && STORY_ELEMENTS.includes(id)) practice.collectedElements.add(id);
@@ -101,6 +105,11 @@ export function nextStoryPower(p, level) {
   }
   for (const type of STORY_ELEMENTS.slice(0, m.uniqueElements ?? 0)) if (!p.collectedElements.has(type)) needs.add(type);
   for (const type of STORY_ELEMENTS.slice(0, m.elements ?? 0)) if (!p.elements.has(type)) needs.add(type);
+  // Free fusions come from the paired offers: every element in the level's pool
+  // returns, each with a distinct partner beside it, until the brews are made.
+  if ((p.mechanics.fusions ?? 0) < (m.fusions ?? 0) || (p.fusionIds?.size ?? 0) < (m.uniqueFusions ?? 0)) {
+    for (const type of storyElementPool(level)) needs.add(type);
+  }
   const last = STORY_POWER_CYCLE.indexOf(p.lastPower);
   for (let offset = 1; offset <= STORY_POWER_CYCLE.length; offset++) {
     const type = STORY_POWER_CYCLE[(last + offset) % STORY_POWER_CYCLE.length];

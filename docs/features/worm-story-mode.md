@@ -1,5 +1,7 @@
 # WORM Story and Free Play
 
+> **2026-10-11:** the level tables and chapter names below describe the original chapter-one balance. The campaign is now authored end to end with a story arc and new goals; see [worm-story-campaign.md](worm-story-campaign.md) for the current chapters, targets and Mobi's story. The runtime, persistence and validation notes below still apply.
+
 Selecting WORM in the main carousel opens two side-by-side cards: **STORY** on the left and **FREE PLAY** on the right. They use the existing dark wizard surfaces, Bungee headings and WORM green accent; Free Play adds a gold illustration accent. The two-column choice remains on phones. Back/Escape returns within the WORM flow before returning to the mode carousel. Keyboard focus stays inside the selector.
 
 Free Play opens the existing customization wizard. Story opens chapter one, **Hatchling**, with ten sequentially unlocked levels. Any clear unlocks the next level; extra stars are optional. Chapter 1 uses a 6×6 board throughout with an authored pace per level, a ready card to start each attempt, and the existing worm simulation. A failed attempt can be retried, and completion offers Next, Replay and Chapter map.

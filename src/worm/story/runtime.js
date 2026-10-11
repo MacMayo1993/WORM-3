@@ -146,7 +146,7 @@ export function stageStory(sim, size, level, character) {
   const practice = { ...base, pendingMouths, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
     elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
-    bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set() };
+    bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), fusionIds: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set() };
   return practice;
 }
 
@@ -203,14 +203,18 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
   if (cutting && !practice.wasCut) practice.cuts++;
   practice.wasCut = cutting;
   practice.peakLength = Math.max(practice.peakLength ?? 0, Math.floor(sim.tailLength), Math.floor(sim.peakTailLength ?? 0));
-  if (level.kind === 'jump') trackPracticeBodyJump(sim, practice, state.size);
+  if (level.kind === 'jump' || level.mechanics?.bodyJumps) trackPracticeBodyJump(sim, practice, state.size);
   updateMastery(sim, practice, level, delta);
   return {
     ...practice.mechanics,
     elements: storyElementCount(practice.elements, level.mechanics?.elements),
     uniqueElements: storyElementCount(practice.collectedElements, level.mechanics?.uniqueElements),
+    uniqueFusions: practice.fusionIds?.size ?? 0,
     powerHint: practice.powerHint, kills: sim.combat?.kills ?? 0,
     alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts, peakLength: practice.peakLength,
+    // The size goal is the longest body reached this run; deposits shrink the
+    // worm afterwards without taking the credit back.
+    bodyLength: practice.peakLength,
     orbs: state.wormSessionOrbs, colors: practice.colors.size, healed: sim.healed, uniqueTunnels: practice.tunnels.size,
     onSurface: sim.phase === 'crawling', healSettled: sim.healPauseT <= 0,
     tailClear: sim.phase === 'crawling' && sim.tunnelPassages.length === 0 && sim.healPauseT <= 0,

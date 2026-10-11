@@ -631,19 +631,21 @@ export function useWormCrawler(size, cubies) {
             if (!elementalRevealHeld && replenishStoryOrbs(sim, storyPracticeRef.current, live, sizeRef.current, delta)) {
                 useGameStore.setState({ wormPowerups: sim.powerups.slice() });
             }
-            if (story.mechanics) {
-                const target = sim.specials[0] ?? null;
-                if (live.wormStoryTarget !== target) useGameStore.setState({ wormStoryTarget: target });
-            }
             const outcome = storyOutcome(story, metrics);
             const practice = storyPracticeRef.current;
+            // One marker: a pending power first, then the level's own target (an
+            // unvisited pair, or the staged body crossing until the first clearance).
+            if (story.mechanics || story.kind === 'tunnel' || story.kind === 'jump') {
+                const kindTarget = story.kind === 'tunnel' ? metrics.nextTarget
+                    : story.kind === 'jump' && !(metrics.bodyJumps > 0) ? practice.target ?? null : null;
+                const target = (story.mechanics && sim.specials[0]) || kindTarget;
+                if (live.wormStoryTarget !== target) useGameStore.setState({ wormStoryTarget: target });
+            }
             const hud = storyHudSnapshot(practice.hud, story, metrics, state.wormRunId, outcome);
             if (hud !== practice.hud) {
                 practice.hud = hud;
                 useGameStore.setState({ wormStoryProgress: hud.progress, wormStoryChecklist: hud.checklist });
             }
-            if (story.kind === 'tunnel' && live.wormStoryTarget !== metrics.nextTarget) useGameStore.setState({ wormStoryTarget: metrics.nextTarget });
-            if (story.kind === 'jump' && metrics.bodyJumps > 0 && live.wormStoryTarget) useGameStore.setState({ wormStoryTarget: null });
             if (!sim.jumpRescueHeld) {
                 if (shouldFinishStory(story, metrics, outcome)) live.completeWormStory(state.wormRunId, metrics);
                 else if (metrics.elapsed >= story.limit) killWormSim(sim, ctxRef.current, { reason: 'story-timeout', levelId: story.id });

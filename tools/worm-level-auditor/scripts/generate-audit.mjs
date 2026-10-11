@@ -17,7 +17,7 @@ const root=fileURLToPath(new URL('../../../',import.meta.url));
 const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
 const commit=git('rev-parse','HEAD'),branch=git('branch','--show-current'),commitDate=git('show','-s','--format=%cI','HEAD');
 const read=path=>fs.readFileSync(root+path,'utf8');
-const sourcePaths=['src/worm/story/levels.js','src/worm/story/generated.js','src/worm/story/runtime.js','src/worm/story/mastery.js','src/worm/story/worlds.js','src/worm/story/combat.js'];
+const sourcePaths=['src/worm/story/levels.js','src/worm/story/campaign.js','src/worm/story/goalText.js','src/worm/story/runtime.js','src/worm/story/mastery.js','src/worm/story/worlds.js','src/worm/story/combat.js'];
 const sources=Object.fromEntries(sourcePaths.map(path=>[path,{path,content:read(path),url:'https://github.com/'+repo+'/blob/'+commit+'/'+path}]));
 // Relevant integration evidence, with exact original line numbers.
 for(const [path,start,end] of [['src/worm/HealerWormMode.jsx',540,565],['src/worm/useWormCrawler.js',202,232],['src/worm/useWormCrawler.js',606,636],['src/worm/healerWorm/wormSim.js',1178,1212]]){
@@ -63,16 +63,12 @@ const records=WORM_STORY_LEVELS.map(level=>{
  const acceptsComplete=!!storyOutcome(level,ideal);
  const rejectsMissingGoals=objectives.every(o=>!storyOutcome(level,{...ideal,[o.key]:o.target-1}));
  assert.equal(acceptsComplete,true);assert.equal(rejectsMissingGoals,true);
- const sourcePath=level.id>40?'src/worm/story/generated.js':'src/worm/story/levels.js';
+ const sourcePath='src/worm/story/campaign.js';
  const levelLines=sources[sourcePath].content.split('\n');
- const start=level.id>40?levelLines.findIndex(line=>line===`    "id": ${level.id},`)-1:
-   levelLines.findIndex(line=>new RegExp('^  \\{ id: '+level.id+'[, ]').test(line));
+ const start=levelLines.findIndex(line=>new RegExp('^  \\{ id: '+level.id+'[, ]').test(line));
  let end=start+1;
- if(level.id>40){while(end<levelLines.length&&!/^  \},?$/.test(levelLines[end]))end++;end++;}
- else{
-  while(end<levelLines.length&&!/^  \{ id: |^  \.\.\.|^\];/.test(levelLines[end]))end++;
-  while(end>start+1&&(levelLines[end-1].trim()===''||levelLines[end-1].trim().startsWith('//')))end--;
- }
+ while(end<levelLines.length&&!/^  \{ id: |^\];/.test(levelLines[end]))end++;
+ while(end>start+1&&(levelLines[end-1].trim()===''||levelLines[end-1].trim().startsWith('//')))end--;
  assert(start>=0,'Missing exact source for level '+level.id);
  const record={config:level,world:STORY_WORLDS[level.id],objectives,stages,source:{path:sourcePath,startLine:start+1,endLine:end,raw:levelLines.slice(start,end).join('\n'),url:sources[sourcePath].url+'#L'+(start+1)+'-L'+end},completionContract:{acceptsComplete,rejectsMissingGoals,tests:objectives.length+1},timing:{opening:STORY_POWER_OPENING_DELAY,cooldown:STORY_POWER_COOLDOWN,lifetime:STORY_POWER_LIFETIME,elementDuration:ELEMENTAL_DURATION,refill:STORY_ORB_REFILL_INTERVAL}};
  for(const character of ['glow','classic'])assert.equal(assess(record,character).status,'checked','Baseline audit '+level.id);

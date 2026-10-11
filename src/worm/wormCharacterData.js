@@ -7,7 +7,7 @@ export const WORM_CHARACTERS = [
     id: 'mobi',
     label: 'MOBI',
     type: 'Intelligence Unit',
-    subtitle: 'Multi Orientable Block Intelligence',
+    subtitle: 'Multi-Oriented Block Intelligence',
     stats: { speed: 55, healing: 60, agility: 65, glow: 45 },
     special: 'Create Wormhole — Open a tunnel for free. Wait 10 seconds to re-enter. Heal it before making another.',
   },

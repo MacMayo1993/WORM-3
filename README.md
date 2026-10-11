@@ -196,80 +196,33 @@ Abilities require an eligible surface state and respect pauses, airborne actions
 
 ## WORM Story: 120 levels
 
-WORM Story is a separate action campaign from the cube puzzle packs. Twelve ten-level chapters have linear unlocks. The first 40 authored levels are followed by 80 seeded levels. Each level supplies a preflight checklist, live objectives, a time limit, a target time, and a fixed world setting.
+WORM Story is a separate action campaign from the cube puzzle packs: twelve ten-level chapters with linear unlocks, all authored in [story/campaign.js](src/worm/story/campaign.js). Each level has a preflight checklist, live objectives, a time limit, a target time and a fixed world setting.
 
-Chapter 1 uses **6×6 boards with classic solid-color tiles** throughout, letting players learn the mechanics before decorative surfaces become part of the challenge. Ordinary orbs replenish during the stages. Later chapters introduce sizes, materials, views, powers, and combinations of objectives.
+**The story.** MOBI (Multi-Oriented Block Intelligence) is a ferry pilot from the Projective Plane, a world where every spot has a twin straight through the middle. His ship is the Flip Cube. It survived W³, the Great World Worm War, then crash-landed here broken. The player is the worm who hatches aboard, grows, and heals the ship. Along the way Mobi finds out that the World Worm's head came with them, trapped in the Core. Mobi tells the story before each level and reacts after it ([story/narrative.js](src/worm/story/narrative.js)). The mission text stays literal.
 
-| Chapter | Levels | Focus |
-| --- | --- | --- |
-| **Hatchling** | 1–10 | Crawl, collect, cross tunnels, jump the body, survive turns, heal, use powers, and fight. |
-| **Every Size** | 11–20 | Pocket cubes through 8×8; numbered, glass, chrome, and neon views; explosion and flight. |
-| **Strange Views** | 21–30 | Hollow frames, wireframe, bricks, biome colors, and the far-side window; one consistent tile style per level. |
-| **Grand Crawl** | 31–40 | 9×9, 10×10, and 15×15 terrain; combinations of traversal, powers, combat, and restoration. |
-
-### Generated chapters 5–12
-
-| Chapter | Levels | Name |
-| --- | --- | --- |
-| 5 | 41–50 | Electric Garden |
-| 6 | 51–60 | Aurora Odyssey |
-| 7 | 61–70 | Crystal Crown |
-| 8 | 71–80 | Copper Frontier |
-| 9 | 81–90 | Lunar Spiral |
-| 10 | 91–100 | Neon Relay |
-| 11 | 101–110 | Lunar Circuit |
-| 12 | 111–120 | Copper Horizon |
-
-Each new chapter mixes collection, tunnels, body jumps, rotations, healing, elemental pickups, Explode/Rocket quests, combat, and a summit. Small boards receive compatible objectives. Ordinary food and required powers recur; opening inventory is not a lifetime pickup allowance. Existing 40-level saves continue at level 41, and the campaign ends at level 120. Supply and completion predicates are checked against the game runtime; complete player runs still need playtesting.
-
-The repeatable recipe, exact configurations, worlds, and chapter metadata are in [generated.js](src/worm/story/generated.js). See the [campaign workshop](tools/worm-level-auditor/README.md) for local auditing, editing, import/export, and regeneration.
-
-### Authored levels 1–40
-
-These summaries describe the main skill; the in-game checklist gives exact counts and completion requirements.
-
-| # | Level | Size | Main challenge |
+| Chapter | Levels | Story beat | Focus |
 | --- | --- | --- | --- |
-| 1 | First Crawl | 6×6 | Collect 18 orbs and all six colors. |
-| 2 | Through the Looking Glass | 6×6 | Traverse four different pairs and clear the tail. |
-| 3 | Clear Your Tail | 6×6 | Land four body jumps and collect orbs. |
-| 4 | Moving Ground | 6×6 | Collect orbs while surviving six turns. |
-| 5 | Color Collector | 6×6 | Collect every color and heal four pairs while layers turn. |
-| 6 | Restore the Cube | 6×6 | Six pair heals, orb collection, and six turns. |
-| 7 | Full Throttle | 6×6 | Boost, double jump, rocket, magnet, and heal. |
-| 8 | Force of Nature | 6×6 | Collect two elemental orbs and restore three pairs. |
-| 9 | Under Siege | 6×6 | Ring heal, use signatures, disarm a bomb, and defeat an enemy. |
-| 10 | Worm Ascendant | 6×6 | Four goals: 24 orbs, three pair heals, four turns, one enemy. |
-| 11 | Pocket Crawl | 2×2 | Collect all six colors on the smallest board. |
-| 12 | Grid Lines | 3×3 | Cross three pairs in Grid view. |
-| 13 | Numbers Underfoot | 4×4 | Jump the body on numbered tiles. |
-| 14 | Glass Carousel | 3×3 | Collect orbs and survive five turns on glass. |
-| 15 | Chrome Works | 6×6 | Collect colors and heal on a chrome cube. |
-| 16 | Sea of Seven | 7×7 | Restore pairs and survive turns on reef-colored terrain. |
-| 17 | Launch Pad | 4×4 | Boost, double jump, and land a rocket flight. |
-| 18 | Blast Radius | 6×6 | Ride out two Explode powers while collecting and healing. |
-| 19 | Neon Arcade | 8×8 | Cross six different tunnel pairs. |
-| 20 | Size Summit | 8×8 | Explosion, flight, magnet, elements, and a signature. |
-| 21 | Hollow Hills | 5×5 | Collect every color on an open-frame cube. |
-| 22 | Ghost Frame | 5×5 | Navigate four pairs in Wireframe view. |
-| 23 | Brick by Brick | 4×4 | Land body jumps on a toy-brick cube. |
-| 24 | Biome Crossing | 6×6 | Collect three elements and heal on a water-style cube with biome colors. |
-| 25 | The Far Side | 5×5 | Restore pairs with the opposite-face window available. |
-| 26 | Prism Turns | 5×5 | Collect and survive layer turns with a stable tile style. |
-| 27 | Neon Storm | 6×6 | Master water, fire, and nature. |
-| 28 | Shatterglass | 7×7 | Combine glass, explosion, and rocket flight. |
-| 29 | Number Siege | 7×7 | Ring healing, signatures, bombs, and enemies on numbered tiles. |
-| 30 | Kaleidoscope | 6×6 | Three distinct elemental pickups, explosion, jumps, and magnet on a stable cube. |
-| 31 | Nine Lives | 9×9 | Collect 36 orbs and every color. |
-| 32 | Tenfold Tunnels | 10×10 | Cross six different pairs on a large board. |
-| 33 | Knife Edge | 2×2 | Survive repeated turns on a pocket cube in Gap view. |
-| 34 | Chrome Gauntlet | 9×9 | Restore six pairs through repeated turns. |
-| 35 | Hollow Siege | 8×8 | Fight, disarm, and ring-heal on an open frame. |
-| 36 | Ghost Storm | 6×6 | Collect four elemental powers in Wireframe view. |
-| 37 | Brick Blast | 10×10 | Three explosions and two rocket landings. |
-| 38 | Mirror Numbers | 7×7 | Restore six pairs with numbers and the far-side window. |
-| 39 | Mega Crawl | 15×15 | Collect 40 orbs and every color on the largest board. |
-| 40 | Worm Eternal | 10×10 | All five elements, movement powers, signatures, combat, and full restoration with one consistent tile style. |
+| **Crash Landing** | 1–10 | The hatchling and the wreck; the damage was chewed from inside. | 6×6 classic boards: crawl, cross, jump the body, survive turns, heal, powers, a first siege. |
+| **Every Deck** | 11–20 | Every size is a deck of the same ship; the routes were sealed from inside. | 2×2 to 8×8, grid, numbers, glass, chrome and neon views, explosion and flight. |
+| **Strange Views** | 21–30 | The Core bends the decks; Mobi remembers slamming a door on the World Worm. | Hollow, wireframe, bricks, the far side, the first fusions. |
+| **The Grand Crawl** | 31–40 | The story of W³: a worm that didn't recognize its own tail. | 9×9, 10×10 and 15×15 with long bodies and everything combined. |
+| **The Long Body** | 41–50 | Long can mean kind. | Growth targets on every board and the first passes through the Core. |
+| **Pocket Worlds** | 51–60 | The World Worm hides in the smallest decks. | Huge worms on 2×2–4×4 cubes; double heals. |
+| **Weather of War** | 61–70 | It answers with storms. | Fusions of every kind, all five elements mastered. |
+| **The War Machine** | 71–80 | The ship turned into a weapon. | Turns every 9–10 s, blasts, bombs, rockets. |
+| **Siege of the Core** | 81–90 | The crawlers dig in around the Core. | Fights, rings, bombs and abilities on long bodies. |
+| **Mirror Decks** | 91–100 | The World Worm meets its reflection. | Far-side and mirrored views; many passes and double heals. |
+| **The Mega Decks** | 101–110 | Hold its attention; make the ship whole. | 10×10 and 15×15 with 200-segment worms, plus a giant on a 2×2. |
+| **Through the Middle** | 111–120 | Lead it through the Core and end the war. | Every mechanic, the tightest clocks, the longest worms. |
+
+Beyond collecting orbs and colors, crossing pairs, jumping the body, surviving turns, healing, the powers, elements, fights and bombs, later levels ask for:
+
+- **Grow your worm**: reach a body length. Peak length counts, so spending segments on tolls afterwards does not take the credit back.
+- **Pass yourself in the Core**: dive into a tunnel while your tail is still inside one (the same pair from its far end counts). It is credited once the head is crawling again.
+- **Double heals**: seal one pair while a heal on a different pair is still riding in your body, or seal two pairs with one surround.
+- **Fusions** and **different fusions**: collect two elements within one elemental window; pickup order picks the recipe.
+
+Limits and target times come from one workload model shared by every level, with less slack in later chapters. Ordinary food and required powers recur, so the opening inventory is not a lifetime allowance. Supply and completion predicates are checked against the game runtime (tests and the [level auditor](tools/worm-level-auditor/README.md)). Complete player runs still need playtesting on devices.
 
 A valid clear awards one star, finishing at or below the target time adds one, and completing without a cut adds one: **up to three stars**. Required landings, settled rotations, and tail clearance are part of completion. Some mastery stages require ring-heal/signature tasks before ordinary deposits can finish sealing the remaining tunnels.
 
@@ -480,7 +433,7 @@ WORM³ uses React 18, Vite 5, Three.js, React Three Fiber/Drei, post-processing,
 | Cube and materials | [3d/](src/3d/), [manifold/](src/manifold/) | Cubies, stickers, raised platforms, tunnels, shaders, scene effects. |
 | WORM simulation | [HealerWormMode.jsx](src/worm/HealerWormMode.jsx), [wormSim.js](src/worm/healerWorm/wormSim.js), [wormLogic.js](src/worm/wormLogic.js) | Run lifecycle, crawling, jumps, transit, body history, collisions, healing, powers. |
 | Characters and combat | [wormCharacterData.js](src/worm/wormCharacterData.js), [signatures.js](src/worm/healerWorm/signatures.js), [combat/](src/worm/combat/) | Abilities, enemies, projectiles, elements, waves. |
-| WORM Story | [story/levels.js](src/worm/story/levels.js), [story/worlds.js](src/worm/story/worlds.js), [story/](src/worm/story/) | 120 levels, chapters, objectives, worlds, rewards; generated definitions in [story/generated.js](src/worm/story/generated.js). |
+| WORM Story | [story/campaign.js](src/worm/story/campaign.js), [story/levels.js](src/worm/story/levels.js), [story/worlds.js](src/worm/story/worlds.js), [story/narrative.js](src/worm/story/narrative.js) | 120 authored levels in twelve chapters, objectives, worlds, rewards and Mobi's story. |
 | Cube campaigns | [levels/](src/levels/), [parSolver.js](src/levels/parSolver.js) | Packs, generation, exact mixed-move par search, daily challenges, records. |
 | Teaching | [teach/](src/teach/) | Course, notation, algorithms, stage detection, solving guidance. |
 | Chaos | [chaosSim.js](src/game/chaosSim.js), [chaosWorker.js](src/workers/chaosWorker.js), [chaos/](src/chaos/) | Off-thread cascade simulation, match HUD, forecasts/results. |
@@ -501,7 +454,7 @@ npm ci
 npm run dev
 ```
 
-For the local WORM level auditor and generator, run `npm run worm:tools` and open <http://127.0.0.1:4174/>. Regenerate the shipped campaign with `npm run worm:generate`, or check it without writing with `npm run worm:generate -- --check`. Tool files stay outside the game's public assets and normal production build.
+For the local WORM level auditor and draft workshop, run `npm run worm:tools` and open <http://127.0.0.1:4174/>. The shipped campaign is authored by hand in `src/worm/story/campaign.js`; the workshop only drafts and audits. Tool files stay outside the game's public assets and normal production build.
 
 Vite starts on port 5173. With the default base path, open `http://localhost:5173/WORM-3/`.
 

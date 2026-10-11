@@ -21,7 +21,6 @@
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
     "ci": "npm run lint && npm run test && npm run build && npm run bundle:check",
-    "worm:generate": "node tools/worm-level-auditor/scripts/generate-campaign.mjs",
     "worm:tools:build": "node tools/worm-level-auditor/scripts/build.mjs",
     "worm:tools": "npm run worm:tools:build && node tools/worm-level-auditor/scripts/serve.mjs"
   },

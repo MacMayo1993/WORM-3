@@ -14,9 +14,11 @@ import MobiStage, { MobiKey, useMobiSpeech } from './MobiStage.jsx';
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
 // Demo cold open starts with WORM; the cube lessons follow its practice sequence.
+// Canon: MOBI (Multi-Oriented Block Intelligence) flies a Flip Cube out of the
+// Projective Plane; it survived W³, the Great World Worm War, and crashed here.
 export const MOBI_LINES_DEMO_INTRO = [
-  "Aloha! I'm Mobi. This Flip Cube slipped out of WORM³, my home, and landed here scrambled.",
-  "Great Worm War 3 left its routes damaged. Help me heal the cube and keep my way home open.",
+  "Aloha! I'm Mobi, a Multi-Oriented Block Intelligence from the Projective Plane, where every spot has a twin straight through the middle.",
+  "This Flip Cube is my ship. It got me through W³, the Great World Worm War, then crash-landed here scrambled. Help me heal it so we can fly home.",
   "First, let’s steer a worm. Collect orbs to grow, jump over your body, and ride tunnels to heal them.",
   "Go at your pace. Skip Mobi skips my instructions; Skip Step moves to the next section.",
 ];
@@ -27,7 +29,7 @@ export const MOBI_LINES_DEMO_INTRO = [
 // it as riding the worm's head. Each line names one concrete thing to do:
 // steer, collect, heal, survive.
 export const MOBI_LINES_WORM = [
-  "The war left these routes damaged. Every repair helps keep my way home open.",
+  "W³ left my Flip Cube full of torn-open doors. Every one you heal brings my way home closer.",
   "Tap Left or Right to steer. Collect orbs to heal wormholes.",
   "Jump onto a flip pad to ride its tunnel and spend your orbs on healing.",
   "Jump over your body or steer around it.",

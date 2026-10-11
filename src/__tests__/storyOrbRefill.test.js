@@ -26,16 +26,16 @@ function setup(id = 6, character = 'glow') {
   return { size, sim, practice, state, refill, pulse, colors };
 }
 
-it('launches all ten Chapter 1 levels on 6x6 and gives the finale four achievable goals', () => {
+it('launches all ten Chapter 1 levels on 6x6 and gives the finale five achievable goals', () => {
   for (const level of WORM_STORY_LEVELS.slice(0, 10)) expect(storyLaunchSettings(level).cubeSize).toBe(6);
   const level = storyLevel(10);
   expect(storyChecklist(level).map(({ key, target }) => [key, target])).toEqual([
-    ['kills', 1], ['healed', 3], ['orbs', 24], ['rotations', 4],
+    ['kills', 2], ['bodyLength', 80], ['healed', 4], ['orbs', 30], ['rotations', 6],
   ]);
-  const metrics = { alive: true, elapsed: 200, cuts: 0, peakLength: 100, kills: 1, healed: 3, orbs: 24, rotations: 4,
+  const metrics = { alive: true, elapsed: 200, cuts: 0, peakLength: 104, kills: 2, bodyLength: 80, healed: 4, orbs: 30, rotations: 6,
     remaining: 0, tailClear: true, landed: true, rotationSettled: true };
   expect(storyOutcome(level, metrics)).toMatchObject({ stars: 3 });
-  for (const key of ['kills', 'healed', 'orbs', 'rotations']) expect(storyOutcome(level, { ...metrics, [key]: metrics[key] - 1 })).toBeNull();
+  for (const key of ['kills', 'bodyLength', 'healed', 'orbs', 'rotations']) expect(storyOutcome(level, { ...metrics, [key]: metrics[key] - 1 })).toBeNull();
 });
 
 it.each(['glow', 'classic'])('keeps all six colors available after repeatedly exhausting the opening supply (%s)', character => {

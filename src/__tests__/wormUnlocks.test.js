@@ -6,7 +6,7 @@ import { STORE_ITEMS } from '../utils/storeCatalog.js';
 import { chestPool, CHEST_TIERS } from '../economy/chests.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress } from '../progression/model.js';
-import { WORM_STORY_LEVELS } from '../worm/story/levels.js';
+import { WORM_STORY_LEVELS, storyChecklist, storyLevel } from '../worm/story/levels.js';
 
 const cleared = (ids, stars = 1) => ({ ...newProgress(), wormStory: { stars: Object.fromEntries(ids.map(id => [id, stars])), claimed: {} } });
 const firstN = n => cleared(Array.from({ length: n }, (_, i) => i + 1));
@@ -59,7 +59,8 @@ describe('worm unlocks', () => {
 
 describe('clearing levels in play', () => {
   const state = () => useGameStore.getState();
-  const won = { alive: true, elapsed: 10, cuts: 0, orbs: 18, colors: 6 };
+  const won = { alive: true, elapsed: 10, cuts: 0, landed: true,
+    ...Object.fromEntries(storyChecklist(storyLevel(1)).map(goal => [goal.key, goal.target])) };
   beforeEach(() => {
     state().clearDisparityGame();
     useGameStore.setState({ parityPoints: 0, ownedItems: ['character_classic'], demoMode: false, wormCharacter: 'classic' });
