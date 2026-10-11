@@ -87,9 +87,15 @@ it.each([3, 15])('shares Flip Cube portals in size-%s Worm, through burrows, tur
     await render('turned-slot', 'sudokube'); await frame(); expect(portalBatches()).toHaveLength(0);
     await render('turned-slot'); await frame(); expect(portalBatches()[0].geometry.attributes.aInstanceSeed.array[0]).toBe(seed);
     // Healing retires the face (it closes with the tile, then is gone once the
-    // tile has squeezed shut); the next count-one flip pops open afresh.
+    // tile has squeezed shut); the next count-one flip pops open afresh. Until it
+    // shuts, the departing portal keeps its own pressure, not the reset count's.
+    meta = { ...base, flips: 3, curr: ANTIPODAL_COLOR[base.orig] };
+    await render('turned-slot'); for (let i = 0; i < 90; i++) await frame();
     meta = { ...base, flips: 0, curr: base.orig };
     await render('turned-slot'); await frame(); expect(portalBatches()).toHaveLength(1);
+    expect(portalBatches()[0].geometry.attributes.aInstanceData.array[3]).toBeCloseTo(flipPortalData(colors[base.orig], 3, FLIP_CAP)[3], 5);
+    await frame();
+    expect(portalBatches()[0].geometry.attributes.aInstanceData.array[3]).toBeCloseTo(flipPortalData(colors[base.orig], 3, FLIP_CAP)[3], 5);
     for (let i = 0; i < 40; i++) await frame();
     expect(portalBatches()).toHaveLength(0);
     sharedUniforms.time.value = 30;
