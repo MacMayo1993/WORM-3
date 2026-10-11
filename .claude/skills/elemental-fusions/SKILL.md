@@ -67,7 +67,7 @@ Every fusion keeps both base effects on; the rule below is added on top.
 |---|---|---|---|
 | Fire → Water | **Quench** | The fire trail sets into obsidian: tiles last 8 s instead of 3 s and stay a firebreak, but no longer speed up bomb fuses; crawling on obsidian keeps full water momentum through turns. | Live |
 | Fire → Ice | **Coldfire** | The trail burns blue (`cold: true`, 5 s): still a firebreak, never speeds a fuse (`isHotTile` is false), and enemies arriving on it freeze (`frostTiles` → `player.frost`). | Live |
-| Fire → Nature | **Wildfire** | A spring landing sets its 3x3 alight (fire patches) and kills the enemies in it (`sim.fusionBurst` → `strikeEnemies`). | Live |
+| Fire → Nature | **Wildfire** | A spring landing sets its 3x3 alight (fire patches) and kills the enemies in it (a `'wildfire'` fusion burst → `strikeEnemies`). | Live |
 | Fire → Lightning | **Plasma** | Twice the marks (`beginStorm(storm, 12)`), never on the fire trail or the body, and each strike on a bare tile leaves it burning for 8 s. | Live |
 
 ### Nature first
@@ -75,7 +75,7 @@ Every fusion keeps both base effects on; the rule below is added on top.
 | Order | Name | Rule | Status |
 |---|---|---|---|
 | Nature → Water | **Geyser** | A pad launch refills water momentum and keeps it through the leap; a launch at ≥ 0.8 momentum goes +1 tile and +0.8 lift. | Live |
-| Nature → Fire | **Emberseed** | Pads last 4 s (`ember: true`, drawn as coals); a pad that withers unused bursts: its 3x3 burns and `fusionBurst` kind `'emberseed'` kills the enemies in it. | Live |
+| Nature → Fire | **Emberseed** | Pads last 4 s (`ember: true`, drawn as coals); a pad that withers unused bursts: its 3x3 burns and a fusion burst of kind `'emberseed'` kills the enemies in it. | Live |
 | Nature → Ice | **Ski Jump** | Every grounded jump (not across a seam) is a full spring leap, no pad needed; Nature's landing pad then chains the next one. | Live |
 | Nature → Lightning | **Thunderpad** | The storm aims `STORM.padShare` (half) of its marks at free spring pads; a struck pad is charged (violet) instead of flipped, and a leap from it uses `CHARGED_SPRING_SPAN`/`HEIGHT`. | Live |
 
@@ -85,7 +85,7 @@ Every fusion keeps both base effects on; the rule below is added on top.
 |---|---|---|---|
 | Ice → Water | **Frozen Wake** | Every tile the worm leaves becomes frost (type `'frost'`, 5 s): a bomb on frost stops ticking, an enemy arriving on it freezes. | Live |
 | Ice → Fire | **Meltdown** | A turn the ice slide held (`sim.iceHeldTurn`) ends in a dash (+30% for 0.6 s, `fusionSpeedBonus`) and melts the tile it turned on (`melt: true`); a bomb on a melted tile is put out. | Live |
-| Ice → Nature | **Frostbloom** | A spring landing frosts its 3x3 (bombs stop ticking) and `fusionBurst` kind `'frostbloom'` freezes its enemies; the pad grown there is iced and lasts 12 s. | Live |
+| Ice → Nature | **Frostbloom** | A spring landing frosts its 3x3 (bombs stop ticking) and a fusion burst of kind `'frostbloom'` freezes its enemies; the pad grown there is iced and lasts 12 s. | Live |
 | Ice → Lightning | **Static** | A strike within 2 tiles of the head discharges into the worm: no harm, no flip, +35% speed for 1.5 s (`sim.staticT`); enemies in its 3x3 still die. | Live |
 
 ### Lightning first
@@ -123,6 +123,22 @@ by the Story lesson, not an unlimited Free Play supply. A base reclaim posts a n
 ordered recipe event; a catalyst refresh posts none. Pause contains the recipe guide,
 and the live power chip previews the available next recipe.
 
+## Ignition: the moment of fusing
+
+The claim that forms a pair also sets off that recipe's **ignition** around the head
+(`IGNITIONS` in `fusionIgnition.js`, called from `startElemental` with the board
+size). Each ignition has a `boost` (instant: full momentum, Meltdown's dash, Static's
+burst, Slipstream's `surgeT` surge) and a `ground` (the recipe's own patches: a
+two-deep ring of steam/obsidian/blue fire/frost, a 3x3 garden of pads, ember pads on
+the corners, ramps two out, a charged pad underfoot, a three-long fire cross). It
+posts a fusion burst of kind `'ignite'` with `tiles` and `hit` (`freeze`, `kill`,
+`burn` or `stun`), which `runFusionBurst` resolves against enemies once, with blast
+flames for the fire recipes. It lands during the claim camera's pull-out, alongside
+`FusionAura`'s two shockwaves (`fusionNova.js`; dropped under reduced motion) and the
+FUSION banner, which shows the ignition's `text` between the name and the rule. A
+refresh of the newest element is not a fusion and never re-ignites. A new recipe
+needs an `IGNITIONS` entry too (a test checks all twenty).
+
 ## Implementing a planned fusion
 
 1. **Keep identity separate from the live effect.** `getFusion(base, catalyst)` and
@@ -138,9 +154,10 @@ and the live power chip previews the available next recipe.
      `'fire'` or `'grass'`; add fields (like `charged`) rather than new types where
      you can, since `ElementalPatches.jsx` draws by type.
    - enemy effects from the sim side: `steamTiles`-style tile sets through the
-     `lit()` wall (stun and burn on contact), or a one-shot `sim.fusionBurst`
-     (`{ seq, kind, tile }`) that `runFusionBurst` in `HealerWormMode.jsx`
-     resolves once per `seq`.
+     `lit()` wall (stun and burn on contact), or a one-shot fusion burst
+     (`postFusionBurst(sim, { kind, tile })`, queued in `sim.fusionBursts`) that
+     `runFusionBurst` in `HealerWormMode.jsx` resolves once per `seq`. Never write
+     a single burst slot: two beats in one tick would overwrite each other.
    - enemy statuses: `stun`, `freeze`, `root`, `burn` in `portalCombat.js`, and
      `strikeEnemies` for kills.
    - storm: `pickStrikeTile({ tiles, body, avoid, pads })` and the strike
@@ -180,6 +197,7 @@ Steam / Slipstream / Wildfire / Thunderpad blocks:
   different one** (or its documented fallback).
 - The rule fires when its fusion is active and **not** for either element alone or
   for the reverse order.
-- Any sim event (`fusionBurst`, a patch flag) is posted once and read once.
+- Any sim event (a fusion burst, a patch flag) is posted once and read once, and two
+  posted in the same tick are both read.
 - A storm change goes through `pickStrikeTile` with an injected `rng`.
 - Reclaiming the base flips the order and the rule with it.

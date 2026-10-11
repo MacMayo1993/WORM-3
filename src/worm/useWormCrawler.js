@@ -911,7 +911,7 @@ export function useWormCrawler(size, cubies) {
             rand: f('rand'),
             elementalType: f('elementalType'),
             elementalPair: f('elementalPair'),
-            fusionBurst: f('fusionBurst'),
+            fusionBursts: f('fusionBursts'),
             waterMomentum: f('waterMomentum'),
             staticT: f('staticT'),
             powerups: f('powerups'),

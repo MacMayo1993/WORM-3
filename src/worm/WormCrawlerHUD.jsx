@@ -37,6 +37,7 @@ import { wormBuffs } from './wormBuffs.js';
 import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { getFusion, fusionRecipeLabel, ORDERED_FUSIONS } from './healerWorm/elementalFusion.js';
+import { IGNITIONS } from './healerWorm/fusionIgnition.js';
 import { wormClock } from './wormClock.js';
 import { feel, resumeFeel } from '../utils/feel.js';
 import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
@@ -1019,6 +1020,7 @@ function FusionBanner() {
                 <SpecialIcon type={recipe.base} size={14} /> {base.label} → {catalyst.label} <SpecialIcon type={recipe.catalyst} size={14} />
             </span>
             <span className="worm-fusion-name" style={{ fontFamily: DISPLAY_FONT }}>{recipe.label}</span>
+            {IGNITIONS[recipe.id] && <span className="worm-fusion-ignite" style={{ fontFamily: HEADING_FONT }}>{IGNITIONS[recipe.id].text}</span>}
             <span className="worm-fusion-rule">{recipe.description}</span>
         </div>
     );
