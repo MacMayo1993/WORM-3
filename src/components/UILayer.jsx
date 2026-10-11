@@ -222,9 +222,12 @@ export default function UILayer({
     triggerCameraOrbit: s.triggerCameraOrbit,
   })));
 
+  // Chaos ends before its recap opens (the winner gets a short reveal first).
+  // Neither phase should leave live game controls over the completed round.
+  const chaosRoundEnded = !!disparityWinner || showDisparityWinner;
   const hasFullScreenOverlay = showFreeplayWizard || showRandomWizard || showWormModeWizard
     || showModeSelect || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect || showPackSelect
-    || showComingSoon || showMobiusCubelet || showMobiIntro || victory
+    || showComingSoon || showMobiusCubelet || showMobiIntro || victory || chaosRoundEnded
     // Mobi's level briefing and the finale cutscene are blocking beats — clear
     // the game chrome (top bar, bottom nav, sheet) so nothing crowds him.
     || showLevelTutorial || showCutscene
@@ -234,6 +237,10 @@ export default function UILayer({
     || ignitionPicking;
 
   const showGameHUD = !teachMode.courseActive && !wormHealerMode && !showMainMenu && !hasFullScreenOverlay;
+
+  useEffect(() => {
+    if (chaosRoundEnded) setSheetOpen(false);
+  }, [chaosRoundEnded, setSheetOpen]);
 
   return (
     <>
@@ -265,7 +272,7 @@ export default function UILayer({
             Was hardcoded black-on-white monospace, predating the field-guide
             system; now the NIGHT surface, and a real <button> so it is
             reachable by keyboard and announces its move count. */}
-        {!teachMode.courseActive && moveHistory.length > 0 && !isMobile && !demoDialogueVisible && (
+        {!chaosRoundEnded && !teachMode.courseActive && moveHistory.length > 0 && !isMobile && !demoDialogueVisible && (
           <button
             type="button"
             className="ui-focusable"
@@ -289,7 +296,7 @@ export default function UILayer({
         )}
 
         {/* Auto-rotate Preview */}
-        {autoRotateEnabled && chaosMode && (
+        {!chaosRoundEnded && autoRotateEnabled && chaosMode && (
           <CaptureVisual><RotationPreview upcomingRotation={upcomingRotation} size={size} /></CaptureVisual>
         )}
 
@@ -350,7 +357,7 @@ export default function UILayer({
         </ScreenTransition>
 
         {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
-        <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
+        <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard && !chaosRoundEnded} onClose={toggleLeaderboard} />
 
         {/* Bottom Navigation Bar — hidden while a demo dialogue is presenting */}
         {showGameHUD && !demoDialogueVisible && (
@@ -654,7 +661,7 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      <ScreenTransition show={showNetPanel} freezeOnExit>
+      <ScreenTransition show={showNetPanel && !chaosRoundEnded} freezeOnExit>
         <Suspense fallback={null}>
           <CubeNet
             cubies={cubies} size={size} onTapFlip={onTapFlip} flipMode={flipMode}
@@ -663,7 +670,7 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      {!teachMode.courseActive && isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !ignitionPicking && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
+      {!chaosRoundEnded && !teachMode.courseActive && isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !ignitionPicking && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
         <MobileControls
           actionSlot={topBarActionSlot}
           onShowHelp={() => setShowHelp(true)}
@@ -696,11 +703,11 @@ export default function UILayer({
         />
       )}
 
-      {showMobileTouchHint && !showTutorial && !showMainMenu && (
+      {!chaosRoundEnded && showMobileTouchHint && !showTutorial && !showMainMenu && (
         <div className="mobile-touch-hint">Swipe to rotate • Tap tile for options</div>
       )}
 
-      {faceRotationTarget && !isMobile && (
+      {!chaosRoundEnded && faceRotationTarget && !isMobile && (
         <FaceRotationButtons
           onRotateCW={() => onFaceRotate('cw')}
           onRotateCCW={() => onFaceRotate('ccw')}
@@ -708,7 +715,7 @@ export default function UILayer({
         />
       )}
 
-      {selectedTileForRotation && !flipMode && !isMobile && (
+      {!chaosRoundEnded && selectedTileForRotation && !flipMode && !isMobile && (
         <TileRotationSelector
           onRotate={onTileRotation}
           onRotateFaceCW={() => onTileFaceRotation('cw')}
