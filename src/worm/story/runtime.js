@@ -55,18 +55,56 @@ export function storyMouths(size, count) {
     return MOUTHS.slice(0, count).map(([x, y, z, dir]) => [
       dir === 'PX' ? edge : x + offset, dir === 'PY' ? edge : dir === 'PZ' ? y : y + offset, dir === 'PZ' ? edge : z + offset, dir]);
   }
+  return smallBoardMouths(size, count);
+}
+
+// Small boards (below the 5×5 templates). Mouths used to go on the face corners, and
+// on a 3×3 or 4×4 the first three all landed on ONE corner cubie with their twins on
+// the opposite one: the two pairs open together for a double heal sat on the same
+// raised corner piece, so riding out of one dropped the worm beside the other's twin
+// on a neighbouring face of the same piece, a corner jump that had to be planned to
+// the tile. Now a mouth prefers a tile whose cubie shows one face (it rises straight
+// out and can be met from four sides), then an edge piece, and only then a corner;
+// no two mouths, and no mouth and another's twin, share a cubie; and the faces take
+// turns so consecutive pairs sit on different faces.
+function smallBoardMouths(size, count) {
   const edge = size - 1, c = Math.floor(size / 2);
-  const corners = [[edge, edge], [0, edge], [edge, 0], [0, 0]];
-  const local = { PX: corners, PY: corners,
-    // The spawn face keeps the head's column and the body's row/column open.
-    PZ: corners.filter(([u, v]) => u !== c && u !== 0 && v !== 0) };
-  const mouths = [];
-  for (let slot = 0; mouths.length < count && slot < corners.length; slot++) {
-    for (const dir of ['PX', 'PY', 'PZ']) {
-      const cell = local[dir][slot];
-      if (!cell || mouths.length >= count) continue;
-      const [u, v] = cell;
-      mouths.push(dir === 'PX' ? [edge, u, v, dir] : dir === 'PY' ? [u, edge, v, dir] : [u, v, edge, dir]);
+  // The spawn face keeps the head's column, its first row and the body trail open.
+  const body = new Set(storyBodyPath(size, { kind: 'tunnel', id: 0 }).map(([u, v]) => `${u},${v}`));
+  const outer = t => (t === 0 || t === edge ? 1 : 0);
+  const rank = ([u, v]) => outer(u) + outer(v);   // 0 face piece, 1 edge piece, 2 corner
+  const centre = ([u, v]) => Math.abs(u - edge / 2) + Math.abs(v - edge / 2);
+  const cells = dir => {
+    const out = [];
+    for (let u = 0; u < size; u++) for (let v = 0; v < size; v++) {
+      if (dir === 'PZ' && (u === c || u === 0 || v === 0 || body.has(`${u},${v}`))) continue;
+      out.push([u, v]);
+    }
+    return out.sort((a, b) => rank(a) - rank(b) || centre(a) - centre(b) || a[0] - b[0] || a[1] - b[1]);
+  };
+  const at = (dir, [u, v]) => (dir === 'PX' ? [edge, u, v, dir] : dir === 'PY' ? [u, edge, v, dir] : [u, v, edge, dir]);
+  // Interleave the faces within each tier, so the easiest tiles of every face go first.
+  const queues = { PX: cells('PX'), PY: cells('PY'), PZ: cells('PZ') };
+  const candidates = [];
+  for (let tier = 0; tier <= 2; tier++) {
+    const tiers = Object.fromEntries(Object.entries(queues).map(([dir, list]) => [dir, list.filter(cell => rank(cell) === tier)]));
+    const longest = Math.max(...Object.values(tiers).map(list => list.length));
+    for (let i = 0; i < longest; i++) for (const dir of ['PX', 'PY', 'PZ']) if (tiers[dir][i]) candidates.push(at(dir, tiers[dir][i]));
+  }
+  const cubie = (x, y, z) => `${x},${y},${z}`;
+  const mouths = [], chosen = new Set(), used = new Set();
+  // First pass: every mouth and every twin on a cubie of its own. A tiny board that
+  // runs out falls back to sharing cubies rather than offering fewer pairs.
+  for (const strict of [true, false]) {
+    for (const mouth of candidates) {
+      if (mouths.length >= count) break;
+      const [x, y, z, dir] = mouth;
+      const key = `${x},${y},${z},${dir}`;
+      const own = cubie(x, y, z), twin = cubie(edge - x, edge - y, edge - z);
+      if (chosen.has(key) || (strict && (used.has(own) || used.has(twin)))) continue;
+      chosen.add(key);
+      used.add(own); used.add(twin);
+      mouths.push(mouth);
     }
   }
   return mouths;
@@ -143,7 +181,10 @@ export function stageStory(sim, size, level, character) {
     const color = base.cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].orig;
     orbTargets[color] = (orbTargets[color] ?? 0) + 1;
   }
-  const practice = { ...base, pendingMouths, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
+  // Double-heal levels let the next pair open while a heal still rides in the body,
+  // so heals can chain (see replenishStoryTunnel).
+  const chainHeals = !!level.mechanics?.multiHeals;
+  const practice = { ...base, pendingMouths, chainHeals, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
     elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), fusionIds: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set() };
@@ -227,8 +268,21 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
 
 // Introduce one replacement only after the previous tail clears. Stable sticker
 // identities follow cube rotations; never open a mouth under the body or a pickup.
+//
+// A double-heal level is the exception: there the next pair opens as soon as a pair
+// has sealed, even while another heal is still riding in the body. With the old rule
+// two pairs had to be spent on every double heal (the next pair could not open until
+// the second tail had cleared), so a level could never earn more than one per two
+// pairs, several late levels asked for more than that, and the rest allowed no
+// mistakes. Chained, P pairs allow up to P - 1 double heals, and storyNarrative's
+// supply test keeps every level at least one short of that.
+export function storyTunnelPassagesBlock(sim, practice) {
+  if (!sim.tunnelPassages.length) return false;
+  return !(practice.chainHeals && sim.tunnelPassages.every(passage => passage?.heal));
+}
+
 export function replenishStoryTunnel(sim, practice, state, size, activeCount = getActiveTunnels(state.cubies,size).length) {
-  if (!practice.pendingMouths?.length || sim.phase !== 'crawling' || sim.tunnelPassages.length ||
+  if (!practice.pendingMouths?.length || sim.phase !== 'crawling' || storyTunnelPassagesBlock(sim, practice) ||
       sim.healPauseT > 0 || state.animState || liveRotation.active || activeCount >= 2) return null;
   const map = buildManifoldGridMap(state.cubies, size);
   const occupied = new Set([...sim.powerups, ...sim.specials].map(tileKey));
