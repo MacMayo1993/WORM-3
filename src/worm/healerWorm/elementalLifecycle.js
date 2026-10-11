@@ -30,6 +30,8 @@ import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 export const ELEMENTAL_FADE_IN = 0.55;
 /** Seconds of dissolve at the end of a wash — matched across skin, light, particles. */
 export const ELEMENTAL_FADE_OUT = 1.25;
+/** Seconds an outgoing layer takes to dissolve as a fusion's reaction floods in over it. */
+export const RETIRE_SECONDS = 1.6;
 
 // Each keyed skin owns this clock. A fusion refreshes the shared duration but
 // keeps an existing layer's sweep and age; only a newly added element grows in.

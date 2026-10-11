@@ -33,7 +33,7 @@ import { attachCellAttributes } from './healerWorm/elementalCells.js';
 import { GLSL_NOISE, GLSL_CELL_ATTRIBUTES, GLSL_CELL_FRAME, SEAM_HALF, glf } from './healerWorm/elementalGlsl.js';
 import { GLSL_WORM, uWormHead, uWormBody, uCubeHalf } from './healerWorm/elementalUniforms.js';
 
-export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2 };
+export const SURFACE_MODE = { water: 0, ice: 1, lightning: 2, reaction: 3 };
 
 // Water depth above the stickers: a base, four ripple waves and one broad swell.
 // Even when every wave bottoms out together the trough stays above the tile, and
@@ -58,7 +58,7 @@ const SKIRT = 0.25;
 
 // Tessellation per element: [interior segments, skirt segments]. Water needs the
 // most, because its waves and the wrap both have to read as curved.
-const RESOLUTION = { water: [14, 4], ice: [10, 3], lightning: [6, 2] };
+const RESOLUTION = { water: [14, 4], ice: [10, 3], lightning: [6, 2], reaction: [10, 3] };
 
 const _geoCache = new Map();
 /**
@@ -111,6 +111,8 @@ export function getElementalSurfaceGeo() {
 
 const vertexShader = /* glsl */ `
   uniform float uTime;
+  // Reaction coat height above the stickers (fusionLooks.js).
+  uniform float uReactDepth;
   // (intensity, claim, release, animate) — the shared elemental envelope.
   uniform vec4 uEnv;
   uniform vec4 uClaimOrigin;
@@ -128,6 +130,7 @@ const vertexShader = /* glsl */ `
   varying float vDepth;    // shell depth above the stickers here
   varying float vWave;     // water: normalised wave height, -1..1
   varying float vWake;     // water: ripple rings around the worm, -1..1
+  varying float vWormD;    // distance to the worm's body, world units (large with no worm)
 
   #define QUARTER_PI 0.78539816
 
@@ -214,9 +217,17 @@ const vertexShader = /* glsl */ `
   #elif SURFACE_MODE == 1
     // ── Ice: a thick carved layer, stepped a little per plate ──────────────
     depth = ${glf(ICE_DEPTH)} * flood * mix(0.15, 1.0, drain);
-  #else
+  #elif SURFACE_MODE == 2
     // ── Lightning: charge lying on the tiles ───────────────────────────────
     depth = ${glf(CHARGE_DEPTH)} * flood;
+  #else
+    // ── A fusion's reaction coat (fusionLooks.js) ──────────────────────────
+    depth = uReactDepth * flood * mix(0.25, 1.0, drain);
+  #if REACTION_PATTERN == 0 || REACTION_PATTERN == 5
+    // Fog banks and storm clouds billow: the coat heaves in slow world-space swells.
+    depth *= 0.7 + 0.45 * (0.5 + 0.5 * sin(dot(C, vec3(2.1, 1.3, 1.7)) + T * 1.3))
+                 * (0.5 + 0.5 * sin(dot(C, vec3(-1.4, 2.6, 0.9)) - T * 0.9));
+  #endif
   #endif
 
     depth = max(depth, 0.002);
@@ -229,12 +240,14 @@ const vertexShader = /* glsl */ `
     vRim = max(ex * tx, ey * ty);
     vArrive = flood;
     vDepth = depth;
+    vWormD = wormDist(C);
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
 `;
 
 const fragmentShader = /* glsl */ `
   uniform float uTime;
+  uniform float uCubeHalf;
   uniform vec4 uEnv;
   uniform vec3 uColor;
   uniform vec3 uAccent;
@@ -250,6 +263,7 @@ const fragmentShader = /* glsl */ `
   varying float vDepth;
   varying float vWave;
   varying float vWake;
+  varying float vWormD;
 
   ${GLSL_NOISE}
 
@@ -466,7 +480,7 @@ const fragmentShader = /* glsl */ `
     rgb = vec3(0.0);
   #define SPLIT_OUTPUT
 
-  #else
+  #elif SURFACE_MODE == 2
     // ── Lightning ─────────────────────────────────────────────────────────
     // Current runs in the seams — the path of least resistance on a cube is the
     // grid of gaps between tiles. Each seam's line jitters and re-jitters, and
@@ -516,6 +530,134 @@ const fragmentShader = /* glsl */ `
     vec3 bodyCol = vec3(0.012, 0.004, 0.03);
     a = 0.14 + fres * 0.2 + rail * 0.25;
     float fade = smoothstep(0.02, 0.4, vArrive) * (1.0 - smoothstep(0.1, 0.9, uEnv.z));
+    rgb = vec3(0.0);
+  #define SPLIT_OUTPUT
+  #else
+    // ── A fusion's reaction (fusionLooks.js) ──────────────────────────────
+    // Not either element: the pair's own reaction, in its own palette. Each pattern
+    // is its own program (REACTION_PATTERN), so a recipe never pays for another's
+    // noise. As with the elements, the body only dims a tile; colour arrives as
+    // added light, kept off the sticker centres where readability lives.
+    float fres = pow(1.0 - ndv, 2.0);
+    float flatPart = 1.0 - smoothstep(0.0, 0.25, vRim);
+    float seamNear = (1.0 - smoothstep(0.0, 0.14, seamD)) * flatPart;
+    vec3 up = vec3(0.0, 1.0, 0.0);
+    vec3 bodyCol;
+    vec3 light;
+    // The reaction answers the worm crawling through it: near peaks on the body,
+    // wakeRing is a bright band just outside it. Reduced motion zeroes uEnv.w, and
+    // with it every response.
+    float near = exp(-vWormD * vWormD / 0.16) * uEnv.w;
+    float wakeRing = exp(-pow((vWormD - 0.42) / 0.09, 2.0)) * uEnv.w;
+  #if REACTION_PATTERN == 0
+    // MIST — banks of fog boil up off the faces and roll over the rims.
+    vec3 mp = vWorld * 1.5 - up * T * 0.45 + vec3(T * 0.08, 0.0, -T * 0.05);
+    float m1 = fbm3(mp);
+    float m2 = fbm3(vWorld * 3.4 - up * T * 0.9 + vec3(5.1));
+    float dens = smoothstep(0.22, 0.74, m1 * 0.72 + m2 * 0.42);
+    dens = clamp(max(dens, vRim * 0.7) + fres * 0.4, 0.0, 1.0);
+    // The worm parts the fog: a clear lane round its body, the displaced mist
+    // banking up bright along the edge of the wake.
+    dens *= 1.0 - near * 0.85;
+    dens = clamp(dens + wakeRing * 0.35, 0.0, 1.0);
+    bodyCol = mix(uColor * 0.85, vec3(1.0), dens * 0.6);
+    a = dens * 0.74;
+    light = uAccent * pow(m2, 3.0) * 0.18 + vec3(1.0) * fres * 0.18 * dens + vec3(1.0) * wakeRing * 0.12;
+  #elif REACTION_PATTERN == 1
+    // CRUST — the surface cooled into plates; the reaction's heat bleeds through the cracks.
+    vec3 wc = worleyCell(vWorld * 2.7);
+    float crack = 1.0 - smoothstep(0.0, 0.07, wc.y - wc.x);
+    float heat = 0.55 + 0.45 * sin(T * 1.6 + wc.z * 23.0);
+    vec3 tilt = hash33(vec3(wc.z * 61.0, wc.z * 17.0, wc.z * 5.0)) - 0.5;
+    vec3 fn = normalize(n + (tilt - n * dot(tilt, n)) * 0.5);
+    vec3 hh = normalize(keyL + v);
+    float gloss = pow(max(dot(fn, hh), 0.0), 60.0);
+    bodyCol = uColor * (0.75 + 0.5 * wc.z);
+    a = mix(0.42, 0.7, max(fres, vRim)) * (1.0 - crack * 0.6);
+    // Weight on the crust: the cracks under and around the worm flare white-hot.
+    float press = near + wakeRing * 0.5;
+    light = uAccent * crack * heat * (1.5 + press * 2.5) + mix(uAccent, vec3(1.0), 0.6) * crack * near * 1.2
+          + vec3(1.0) * gloss * 0.8 + uAccent * fres * 0.08;
+  #elif REACTION_PATTERN == 2
+    // FLAME — tongues lick up every face toward the sky, rooted in the seams.
+    vec3 fp = vWorld * 2.6 - up * T * 1.7;
+    float flick = fbm3(fp) * 0.75 + vnoise3(fp * 2.3 + 3.0) * 0.35;
+    float rise = clamp(dot(n, up) * 0.5 + 0.5, 0.0, 1.0);
+    // The fire leaps up round the worm, as if it were feeding it.
+    float body = flick + seamNear * 0.32 + vRim * 0.28 + rise * 0.08 + (near * 0.45 + wakeRing * 0.25);
+    float tongue = smoothstep(0.5, 0.82, body);
+    float core = smoothstep(0.74, 0.97, body);
+    bodyCol = uAccent * 0.1;
+    a = 0.18 + tongue * 0.32 + fres * 0.15;
+    light = uColor * tongue * 1.25 + mix(uColor, vec3(1.0), 0.7) * core * 1.4 + uAccent * seamNear * 0.25;
+  #elif REACTION_PATTERN == 3
+    // PLASMA — swirling cells of charged gas, threaded with white-hot filaments.
+    vec3 pp = vWorld * 2.0;
+    pp += vec3(sin(T * 0.7 + pp.z * 1.3), cos(T * 0.6 + pp.x * 1.1), sin(T * 0.5 + pp.y * 1.2)) * 0.35;
+    float f = fbm3(pp + T * 0.22);
+    float fil = ridge(vnoise3(pp * 1.7 + T * 0.55), 12.0) + ridge(vnoise3(pp * 3.2 - T * 0.4), 16.0) * 0.6;
+    // The filaments are drawn to the worm: they thicken and brighten around it.
+    fil *= 1.0 + near * 2.2 + wakeRing * 1.2;
+    bodyCol = uAccent * 0.05;
+    a = 0.16 + fres * 0.25 + fil * 0.12;
+    light = mix(uAccent, uColor, f) * (0.25 + fil * 1.5) * 0.8 + vec3(1.0) * pow(clamp(fil, 0.0, 1.0), 3.0) * 0.55
+          + uColor * fres * 0.35;
+  #elif REACTION_PATTERN == 4
+    // BLOOM — growth packs the seams and flowers open across the faces.
+    vec2 g = vFaceUV * 2.6;
+    vec2 gi = floor(g);
+    vec2 gs = gi + vFaceN.xy * 17.0 + vFaceN.z * 31.0;
+    vec2 d = fract(g) - 0.5 - (hash22(gs) - 0.5) * 0.5;
+    float ang = atan(d.y, d.x) + hash12(gs) * 6.2832;
+    float rr = length(d);
+    float open = smoothstep(0.0, 0.6, uEnv.y) * (0.85 + 0.15 * sin(T * 1.2 + hash12(gs + 1.3) * 6.0));
+    // Flowers burst wide open where the worm passes.
+    open *= 1.0 + (near + wakeRing) * 0.6;
+    float petal = (1.0 - smoothstep(0.24, 0.3, rr / max(0.2, 0.62 + 0.38 * cos(ang * 5.0)) / max(open, 0.05)))
+                * step(0.3, hash12(gs + 7.7));
+    float heart = 1.0 - smoothstep(0.04, 0.065, rr);
+    float growth = smoothstep(0.35, 0.7, vnoise3(vWorld * 9.0)) * seamNear + vRim * 0.5;
+    vec3 hh = normalize(keyL + v);
+    float dew = pow(max(dot(n, hh), 0.0), 90.0) * step(0.7, vnoise3(vWorld * 22.0));
+    bodyCol = mix(uAccent * 0.45, uColor, petal);
+    bodyCol = mix(bodyCol, uAccent, heart * petal);
+    a = clamp(max(growth * 0.85, petal * 0.92), 0.0, 1.0);
+    light = uColor * petal * 0.12 + vec3(1.0) * dew * 1.2 + uAccent * growth * 0.08;
+  #elif REACTION_PATTERN == 5
+    // STORM — clouds churn over the faces, lit from inside by flashes.
+    vec3 sp = vWorld * 1.25 + vec3(T * 0.28, 0.0, -T * 0.2);
+    float c1 = fbm3(sp);
+    float c2 = fbm3(sp * 2.4 - vec3(T * 0.35));
+    float cloud = smoothstep(0.34, 0.8, c1 * 0.65 + c2 * 0.5);
+    // Flashes: each beat lights the cloud from inside at a random point on the cube,
+    // a soft glow that dies away (never a lit block of the grid).
+    float beat = floor(T * 2.2);
+    vec3 flashAt = (hash33(vec3(beat * 1.37, 4.1, 9.7)) - 0.5) * 2.2 * uCubeHalf;
+    float flashOn = step(0.35, hash13(vec3(beat, 2.3, 7.1)));
+    float flash = flashOn * exp(-dot(vWorld - flashAt, vWorld - flashAt) * 0.9) * (1.0 - fract(T * 2.2));
+    // And the storm hunts the worm: every few beats the cloud over it lights up.
+    float hunt = step(0.6, hash13(vec3(beat, 8.8, 1.9))) * (1.0 - fract(T * 2.2));
+    flash = max(flash, hunt * exp(-vWormD * vWormD / 0.35) * uEnv.w);
+    float streak = pow(0.5 + 0.5 * sin(dot(vWorld, vec3(0.6, 9.0, 0.4)) + T * 14.0), 18.0) * cloud;
+    bodyCol = mix(uColor * 0.3, uColor * 0.75, c2);
+    a = cloud * 0.66 + vRim * 0.18;
+    light = uAccent * flash * (0.4 + cloud) * 1.4 + uAccent * pow(c2, 4.0) * 0.25 + uColor * streak * 0.25;
+  #else
+    // FLOW — currents stream across the faces and pour round the edges.
+    float s = vFaceUV.x * 2.0 + vFaceUV.y * 0.7;
+    float warp = vnoise3(vWorld * 3.0 + vec3(0.0, 0.0, T * 0.4)) * 5.0;
+    float streak = pow(0.5 + 0.5 * sin(s * 6.0 - T * 6.5 + warp), 14.0);
+    float lane = ridge(vnoise3(vec3(vFaceUV * 2.4 - vec2(T * 1.5, 0.0), dot(vFaceN, vec3(3.0, 5.0, 7.0)))), 10.0);
+    bodyCol = uColor * 0.2;
+    a = 0.2 + fres * 0.35 + vRim * 0.22;
+    // The current sweeps round the worm like water round a stone, brightest at its sides.
+    light = uAccent * (streak * 0.8 + lane * 0.9) * (1.0 + wakeRing * 1.8) + uColor * (fres * 0.45 + vRim * 0.3)
+          + uAccent * near * 0.25;
+  #endif
+    // The reaction surges in along the claim front and dissolves at the end.
+    float surge = vArrive * (1.0 - vArrive) * 4.0;
+    light += uAccent * surge * 0.4;
+    float fade = smoothstep(0.02, 0.35, vArrive) * (1.0 - smoothstep(0.2, 1.0, uEnv.z));
     rgb = vec3(0.0);
   #define SPLIT_OUTPUT
   #endif
@@ -583,6 +725,52 @@ export function getElementalSurfaceMaterial(element, colorHex, accentHex, highDe
     _matCache.set(key, mat);
   }
   return mat;
+}
+
+const _reactionCache = new Map();
+/**
+ * A fusion's reaction coat: the shell in mode `reaction`, one program per pattern,
+ * one material per recipe (its palette and height). See fusionLooks.js.
+ */
+export function getReactionSurfaceMaterial(recipeId, look, pattern) {
+  let mat = _reactionCache.get(recipeId);
+  if (!mat) {
+    mat = new THREE.ShaderMaterial({
+      defines: { SURFACE_MODE: SURFACE_MODE.reaction, REACTION_PATTERN: pattern },
+      uniforms: {
+        uTime: sharedUniforms.time,
+        uEnv: { value: new THREE.Vector4(1, 1, 0, 1) },
+        uColor: { value: new THREE.Color(look.color) },
+        uAccent: { value: new THREE.Color(look.accent) },
+        uReactDepth: { value: look.depth },
+        uWormHead,
+        uWormBody,
+        uClaimOrigin: { value: new THREE.Vector4() },
+        uCubeHalf
+      },
+      vertexShader,
+      fragmentShader,
+      transparent: true,
+      premultipliedAlpha: true,
+      depthWrite: false,
+      toneMapped: false,
+      extensions: { derivatives: true }
+    });
+    mat.userData.elementalInstanced = true;
+    _reactionCache.set(recipeId, mat);
+  }
+  return mat;
+}
+
+/** The reaction coat over every cover cell: the same shell, the recipe's material. */
+export function ReactionSurfaceSkin({ recipe, look, pattern, count, cellData, meshRef }) {
+  const material = useMemo(() => getReactionSurfaceMaterial(recipe, look, pattern), [recipe, look, pattern]);
+  const geometry = useMemo(
+    () => attachCellAttributes(getShellGeometry(...RESOLUTION.reaction).clone(), cellData),
+    [cellData]
+  );
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <instancedMesh ref={meshRef} args={[geometry, material, count]} frustumCulled={false} raycast={() => null} />;
 }
 
 /**

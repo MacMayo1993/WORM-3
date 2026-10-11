@@ -44,7 +44,7 @@ import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { resolveElementalRenderer } from './healerWorm/elementalRenderers.js';
 import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
-import { elementalEnvelope, advanceElementalLayer } from './healerWorm/elementalLifecycle.js';
+import { elementalEnvelope, advanceElementalLayer, RETIRE_SECONDS } from './healerWorm/elementalLifecycle.js';
 import { cellEdgeMask, cellSeed, cellSweepDelay, resolveSweepOrigin } from './healerWorm/elementalSeeds.js';
 import { buildElementalCells } from './healerWorm/elementalCells.js';
 import { wormBuffs } from './wormBuffs.js';
@@ -53,7 +53,8 @@ import { publishWormUniforms, uCubeHalf } from './healerWorm/elementalUniforms.j
 import { getWormStickerWorldPos } from './wormExpansion.js';
 import ElementalGrassSkin from './ElementalGrassSkin.jsx';
 import ElementalFireSkin from './ElementalFireSkin.jsx';
-import { ElementalSurfaceSkin } from './ElementalSurface.jsx';
+import { ElementalSurfaceSkin, ReactionSurfaceSkin } from './ElementalSurface.jsx';
+import { fusionLookOf, reactionPatternOf } from './healerWorm/fusionLooks.js';
 
 // Renderer key → component. A lookup, like the registry it mirrors.
 const SKINS = {
@@ -72,6 +73,8 @@ const _quat = new THREE.Quaternion();
 const _fix = new THREE.Quaternion();
 const _zWorld = new THREE.Vector3();
 const _matrix = new THREE.Matrix4();
+// Scratch envelope for a retiring layer (no per-frame allocation).
+const _retireEnv = { claim: 1, release: 0, intensity: 1 };
 
 /**
  * Fill each cell's share of the claim sweep, so the element travels outward from
@@ -119,17 +122,21 @@ function buildCellData(cells) {
   return { cell, extent, edges, sweep: new Float32Array(n) };
 }
 
-// `element` picks which element this skin draws; a fused pair mounts one skin per
-// element (ElementalAtmosphere). Without it, the newest element in the store.
-export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
+// `element` picks which element this skin draws. Without it, the newest element in
+// the store. `recipe` draws a fused pair's reaction coat instead (fusionLooks.js):
+// while two elements are fused, ElementalAtmosphere mounts that in place of either
+// element's skin, on the same cells, transforms, sweep and envelope.
+export default function ElementalCubeSkin({ size = 3, element: elementProp, recipe = null, retire = false, onRetired = null }) {
   const storeElement = useGameStore((s) => s.wormElementalTheme);
   const fused = useGameStore((s) => !!s.wormElementalPartner);
-  const element = elementProp === undefined ? storeElement : elementProp;
-  const def = element ? getElementalDef(element) : null;
+  const look = recipe ? fusionLookOf(recipe) : null;
+  const element = look ? null : elementProp === undefined ? storeElement : elementProp;
+  const def = look ?? (element ? getElementalDef(element) : null);
   // An unknown element resolves to null and the skin draws nothing rather than
   // silently borrowing another element's look.
   const renderer = useMemo(() => resolveElementalRenderer(element, getElementalDef), [element]);
-  const Skin = renderer ? SKINS[renderer.key] ?? null : null;
+  const Skin = look ? ReactionSurfaceSkin : renderer ? SKINS[renderer.key] ?? null : null;
+  const layerKey = look ? `reaction:${recipe}` : element;
 
   // Device budget. Read once per mount: the tier only depends on facts that do not
   // change mid-session, and re-resolving it per frame would churn the cell memo.
@@ -146,9 +153,12 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
   const clockRef = useRef({ elapsed: 0, claim: undefined, origin: null });
   const claimPoint = useRef(new THREE.Vector4());
   const lastElementRef = useRef(null);
+  const retireRef = useRef({ t: 0, done: false });
+  // A layer brought back before it finished leaving starts any later exit afresh.
+  if (!retire && retireRef.current.t > 0) retireRef.current = { t: 0, done: false };
   const lastOriginRef = useRef(undefined);
-  if (lastElementRef.current !== element) {
-    lastElementRef.current = element;
+  if (lastElementRef.current !== layerKey) {
+    lastElementRef.current = layerKey;
     clockRef.current = { elapsed: 0, claim: undefined, origin: null };
     instRef.current = null;
     lastOriginRef.current = undefined;
@@ -160,7 +170,23 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
     const clock = advanceElementalLayer(clockRef.current, wormBuffs.elementalOrigin, fused, delta);
     // One envelope, shared with the fill light and the particles. wormBuffs mirrors
     // the sim clock, so it freezes on pause and during tunnel transit.
-    const env = elementalEnvelope({ element, elapsed: clock.elapsed, remaining: wormBuffs.elementalT });
+    let env = elementalEnvelope({ element, elapsed: clock.elapsed, remaining: wormBuffs.elementalT });
+    // A layer being replaced by a fusion's reaction dissolves on its own short clock
+    // (each skin's own release: water drains, ice melts, flames die down, a coat
+    // fades) while the reaction floods in over it, then hands itself back.
+    if (retire) {
+      const r = retireRef.current;
+      r.t += Math.min(delta, 0.1);
+      const k = Math.min(1, r.t / RETIRE_SECONDS);
+      _retireEnv.claim = env.claim;
+      _retireEnv.release = Math.max(env.release, k);
+      _retireEnv.intensity = env.intensity * (1 - k);
+      env = _retireEnv;
+      if (k >= 1 && !r.done) {
+        r.done = true;
+        onRetired?.();
+      }
+    }
 
     // The claim sweep's starting point. The sim snapshots the tile the orb was
     // taken on and never mutates it, so an identity check is enough to notice a new
@@ -236,9 +262,12 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
       // Keyed on everything that changes the instance count or the geometry: an
       // InstancedMesh's capacity is fixed at construction, so a size change has to
       // build a new one rather than resize.
-      key={`${element}-${cells.length}-${quality.tier}-${quality.animate ? 1 : 0}`}
+      key={`${layerKey}-${cells.length}-${quality.tier}-${quality.animate ? 1 : 0}`}
       meshRef={instRef}
       element={element}
+      recipe={recipe}
+      look={look}
+      pattern={look ? reactionPatternOf(recipe) : undefined}
       color={def.color}
       accent={def.accent}
       count={cells.length}

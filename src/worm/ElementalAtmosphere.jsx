@@ -13,7 +13,7 @@
 // version tinted the whole backdrop, which read as "the background changed" rather
 // than "the cube is in the element". The visible element now lives on the cube.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useReducer, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -25,6 +25,9 @@ import { wormBuffs } from './wormBuffs.js';
 import { getElementalParticleMaterial } from './healerWorm/elementalParticleMaterial.js';
 import ElementalCubeSkin from './ElementalCubeSkin.jsx';
 import FusionAura from './healerWorm/FusionAura.jsx';
+import FusionParticles from './healerWorm/FusionParticles.jsx';
+import { getFusion } from './healerWorm/elementalFusion.js';
+import { fusionLookOf } from './healerWorm/fusionLooks.js';
 
 // Per-behaviour motion. `vy` is the vertical drift (units/sec, sign = direction),
 // `sway` the horizontal wobble amplitude, `blend` the material blending, and
@@ -128,7 +131,46 @@ export default function ElementalAtmosphere({ size = 3 }) {
 
   const def = element ? getElementalDef(element) : null;
   const partnerDef = def && partner ? getElementalDef(partner) : null;
-  const layers = partnerDef ? [partner, element] : def ? [element] : [];
+  // Two elements fused are a reaction with its own look (fusionLooks.js), drawn in
+  // place of either element's: Steam boils off clouds, Quench cools to obsidian.
+  const recipe = partnerDef ? getFusion(partner, element)?.id ?? null : null;
+  const look = recipe ? fusionLookOf(recipe) : null;
+  const layers = look ? [] : partnerDef ? [partner, element] : def ? [element] : [];
+  // What is on the cube now: the reaction coat, or the element skin(s).
+  const current = look ? [{ key: `reaction:${recipe}`, recipe }] : layers.map(type => ({ key: type, element: type }));
+
+  // The hand-off. When a fusion forms (or its recipe changes), the layer that was on
+  // the cube is not dropped: it stays mounted, as the SAME instance, and dissolves
+  // through its own release (water drains, ice melts, a coat fades) while the reaction
+  // floods in over it from the claim, so the player watches one turn into the other.
+  // Tracked in a ref during render so the outgoing instance is never unmounted, even
+  // for a frame; each layer reports back when it has finished dissolving.
+  const [, refresh] = useReducer(n => n + 1, 0);
+  const swap = useRef({ keys: '', prev: [], outgoing: [] }).current;
+  const keys = current.map(l => l.key).join('|');
+  if (swap.keys !== keys) {
+    const leaving = current.length ? swap.prev.filter(l => !current.some(c => c.key === l.key)) : [];
+    swap.outgoing = current.length
+      ? [...swap.outgoing.filter(o => !current.some(c => c.key === o.key) && !leaving.some(l => l.key === o.key)), ...leaving].slice(-2)
+      : [];
+    swap.prev = current;
+    swap.keys = keys;
+  }
+  // The fill light's fade ramp restarts whenever what is on the cube changes: a new
+  // element, a fusion forming, or a reclaim reversing the recipe. It is keyed on the
+  // same identity as the layers (the reaction coat and particles remount by recipe and
+  // fade in over ELEMENTAL_FADE_IN), so the light fades in with them instead of
+  // jumping to full under a reaction that is still arriving. Refreshing the newest
+  // element keeps the identity, and the ramp.
+  const lightLayerRef = useRef('');
+  if (keys && lightLayerRef.current !== keys) {
+    elapsedRef.current = 0;
+    lightLayerRef.current = keys;
+  }
+  const retired = key => {
+    swap.outgoing = swap.outgoing.filter(o => o.key !== key);
+    refresh();
+  };
 
   // Device budget: how many particles this machine can afford, and whether the
   // viewer has asked for no motion at all. Fixed per mount — none of its inputs
@@ -138,23 +180,17 @@ export default function ElementalAtmosphere({ size = 3 }) {
     [size]
   );
 
-  // Reset the fade ramp whenever the active element changes so a swap fades in
-  // cleanly rather than snapping to full strength.
-  const lastElementRef = useRef(null);
-  if (lastElementRef.current !== element) {
-    if (!partnerDef || !lastElementRef.current) elapsedRef.current = 0;
-    lastElementRef.current = element;
-  }
 
   // Particle envelope large enough to surround the whole cube.
   const extent = size * 0.75 + 1.6;
 
-  // A fusion lights the cube halfway between its two elements.
+  // A fusion lights the cube in its reaction's own colour.
   const lightColor = useMemo(() => {
     if (!def) return new THREE.Color('#fff');
+    if (look) return new THREE.Color(look.glow);
     const c = new THREE.Color(def.color);
     return partnerDef ? c.lerp(new THREE.Color(partnerDef.color), 0.5) : c;
-  }, [def, partnerDef]);
+  }, [def, partnerDef, look]);
 
 
   useFrame((_, delta) => {
@@ -175,7 +211,21 @@ export default function ElementalAtmosphere({ size = 3 }) {
   return (
     <group>
       {/* The element laid on the cube itself — the main event. */}
-      {layers.map(type => <ElementalCubeSkin key={type} size={size} element={type} />)}
+      {/* One keyed list: the outgoing layer keeps its instance while it dissolves, and a
+          fused pair's reaction coat is keyed by recipe so it sweeps in from its claim. */}
+      {[...swap.outgoing, ...current].map(layer => {
+        const leaving = swap.outgoing.includes(layer);
+        return (
+          <ElementalCubeSkin
+            key={layer.key}
+            size={size}
+            element={layer.element}
+            recipe={layer.recipe ?? null}
+            retire={leaving}
+            onRetired={leaving ? () => retired(layer.key) : null}
+          />
+        );
+      })}
       {/* Keyed layers retain the first element when it becomes the partner.
           Shells sit at their own depths; the aura marks the combined state. */}
       {partnerDef && <FusionAura key={`${partner}>${element}`} base={partner} catalyst={element} animate={quality.animate} />}
@@ -200,6 +250,11 @@ export default function ElementalAtmosphere({ size = 3 }) {
           count={Math.floor(quality.particleCount / layers.length)}
         />
       ))}
+      {/* The reaction boiling off the cube and the worm. A reaction is the show, so it
+          takes the whole budget and a little more. */}
+      {look && quality.particleCount > 0 && (
+        <FusionParticles key={recipe} recipe={recipe} size={size} count={Math.round(quality.particleCount * 1.4)} />
+      )}
     </group>
   );
 }

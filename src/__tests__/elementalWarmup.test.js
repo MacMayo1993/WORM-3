@@ -19,6 +19,7 @@ vi.hoisted(() => {
 
 import { warmUpElementalSkins } from '../worm/healerWorm/elementalWarmup.js';
 import { ELEMENTAL_DEFS } from '../worm/healerWorm/elementalDefs.js';
+import { FUSION_LOOKS } from '../worm/healerWorm/fusionLooks.js';
 
 // A stand-in for WebGLRenderer: warmUpElementalSkins only needs somewhere to send
 // the throwaway scene, and a real GL context is neither available nor relevant to
@@ -32,13 +33,14 @@ const fakeCamera = {};
 const SKIN_MATERIALS = { surface: 1, flames: 6, blades: 3 };
 // Ice alone carries a second, low-detail surface program for phones.
 const DETAIL_VARIANTS = { ice: 1 };
+// Every fusion's reaction adds its coat and its particle material.
 const expectedCount = Object.entries(ELEMENTAL_DEFS).reduce(
   (n, [element, def]) => n + 4 + (SKIN_MATERIALS[def.renderer] ?? 0) + (DETAIL_VARIANTS[element] ?? 0),
   0
-);
+) + Object.keys(FUSION_LOOKS).length * 2;
 
 describe('warmUpElementalSkins', () => {
-  it('warms the orb and skin programs for every element', () => {
+  it('warms the orb and skin programs for every element and every fusion reaction', () => {
     const renderer = fakeRenderer();
     expect(warmUpElementalSkins(renderer, fakeCamera)).toBe(expectedCount);
   });

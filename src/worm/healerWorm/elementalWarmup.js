@@ -19,7 +19,9 @@
 import * as THREE from 'three';
 import { getElementalParticleMaterial } from './elementalParticleMaterial.js';
 import { ELEMENTAL_DEFS } from './elementalDefs.js';
-import { getElementalSurfaceMaterial } from '../ElementalSurface.jsx';
+import { getElementalSurfaceMaterial, getReactionSurfaceMaterial } from '../ElementalSurface.jsx';
+import { FUSION_LOOKS, REACTION_PARTICLES, reactionPatternOf } from './fusionLooks.js';
+import { getFusionParticleMaterial } from './fusionParticleMaterial.js';
 import { getFireMaterials } from '../ElementalFireSkin.jsx';
 import { getNatureMaterials } from '../ElementalGrassSkin.jsx';
 import { getNatureLeafMaterial } from './NatureClaimLeaves.jsx';
@@ -68,6 +70,15 @@ function collectElementalMaterials() {
       default:
         break;
     }
+  }
+  // Every fusion's reaction: its coat (seven programs across the twenty recipes)
+  // and its particles (one program). A fusion lands mid-run, on top of the claim
+  // beat; compiling then is exactly the stall this module exists to prevent.
+  for (const [recipe, look] of Object.entries(FUSION_LOOKS)) {
+    materials.push(getReactionSurfaceMaterial(recipe, look, reactionPatternOf(recipe)));
+    const points = getFusionParticleMaterial(recipe, look, REACTION_PARTICLES[look.particle]);
+    points.userData.elementalPoints = true;
+    materials.push(points);
   }
   return materials;
 }
