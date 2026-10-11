@@ -4,7 +4,7 @@
 // than one per two pairs: four levels asked for more than that, and eight allowed no
 // mistakes at all. And on 3×3/4×4 the two pairs open together sat on one corner cubie,
 // twins on the opposite corner, so finishing one pair meant a planned corner jump onto
-// the other.
+// the other. Passes come from the same chained rides, so the same spare holds for them.
 import { afterEach, describe, it, expect } from 'vitest';
 import { makeWormSim, resetWormSim } from '../worm/healerWorm/wormSim.js';
 import { stageStory, replenishStoryTunnel, storyMouths, storyBodyPath } from '../worm/story/runtime.js';
@@ -27,6 +27,28 @@ describe('double-heal supply', () => {
       expect(TUNNEL_KINDS).toContain(level.kind);
       // Chained, P pairs can give P - 1 double heals; ask for at most P - 2.
       expect(need, `level ${level.id}`).toBeLessThanOrEqual(level.target - 2);
+    }
+  });
+
+  // A pass is the same move as a double heal: diving into the next pair while the
+  // tail is still in the last. P pairs chain P - 1 times, so the same spare applies.
+  // (Re-entering a pair from its far end also counts, but no level should need it.)
+  it('every pass level allows at least one missed pass', () => {
+    for (const level of LEVELS) {
+      const need = level.mechanics?.selfPasses ?? 0;
+      if (need) expect(need, `level ${level.id}`).toBeLessThanOrEqual(level.target - 2);
+    }
+  });
+
+  // On a 2×2 or 3×3 every turn sweeps a third of the deck or more, the tunnels sit a
+  // face apart and a long body fills the board, so chaining is asked for lightly there.
+  it('pocket decks ask for at most two passes and two double heals, with slower turns', () => {
+    for (const level of LEVELS.filter(l => l.cubeSize <= 3)) {
+      const m = level.mechanics ?? {};
+      if (!m.selfPasses && !m.multiHeals) continue;
+      expect(m.selfPasses ?? 0, `level ${level.id}`).toBeLessThanOrEqual(2);
+      expect(m.multiHeals ?? 0, `level ${level.id}`).toBeLessThanOrEqual(2);
+      if (level.rotateEvery) expect(level.rotateEvery, `level ${level.id}`).toBeGreaterThanOrEqual(10);
     }
   });
 
