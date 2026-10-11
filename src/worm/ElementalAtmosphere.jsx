@@ -25,6 +25,9 @@ import { wormBuffs } from './wormBuffs.js';
 import { getElementalParticleMaterial } from './healerWorm/elementalParticleMaterial.js';
 import ElementalCubeSkin from './ElementalCubeSkin.jsx';
 import FusionAura from './healerWorm/FusionAura.jsx';
+import FusionParticles from './healerWorm/FusionParticles.jsx';
+import { getFusion } from './healerWorm/elementalFusion.js';
+import { fusionLookOf } from './healerWorm/fusionLooks.js';
 
 // Per-behaviour motion. `vy` is the vertical drift (units/sec, sign = direction),
 // `sway` the horizontal wobble amplitude, `blend` the material blending, and
@@ -128,7 +131,11 @@ export default function ElementalAtmosphere({ size = 3 }) {
 
   const def = element ? getElementalDef(element) : null;
   const partnerDef = def && partner ? getElementalDef(partner) : null;
-  const layers = partnerDef ? [partner, element] : def ? [element] : [];
+  // Two elements fused are a reaction with its own look (fusionLooks.js), drawn in
+  // place of either element's: Steam boils off clouds, Quench cools to obsidian.
+  const recipe = partnerDef ? getFusion(partner, element)?.id ?? null : null;
+  const look = recipe ? fusionLookOf(recipe) : null;
+  const layers = look ? [] : partnerDef ? [partner, element] : def ? [element] : [];
 
   // Device budget: how many particles this machine can afford, and whether the
   // viewer has asked for no motion at all. Fixed per mount — none of its inputs
@@ -149,12 +156,13 @@ export default function ElementalAtmosphere({ size = 3 }) {
   // Particle envelope large enough to surround the whole cube.
   const extent = size * 0.75 + 1.6;
 
-  // A fusion lights the cube halfway between its two elements.
+  // A fusion lights the cube in its reaction's own colour.
   const lightColor = useMemo(() => {
     if (!def) return new THREE.Color('#fff');
+    if (look) return new THREE.Color(look.glow);
     const c = new THREE.Color(def.color);
     return partnerDef ? c.lerp(new THREE.Color(partnerDef.color), 0.5) : c;
-  }, [def, partnerDef]);
+  }, [def, partnerDef, look]);
 
 
   useFrame((_, delta) => {
@@ -176,6 +184,9 @@ export default function ElementalAtmosphere({ size = 3 }) {
     <group>
       {/* The element laid on the cube itself — the main event. */}
       {layers.map(type => <ElementalCubeSkin key={type} size={size} element={type} />)}
+      {/* A fused pair: the reaction's coat, keyed by recipe so a new reaction sweeps
+          in from its own claim. */}
+      {look && <ElementalCubeSkin key={`reaction:${recipe}`} size={size} recipe={recipe} />}
       {/* Keyed layers retain the first element when it becomes the partner.
           Shells sit at their own depths; the aura marks the combined state. */}
       {partnerDef && <FusionAura key={`${partner}>${element}`} base={partner} catalyst={element} animate={quality.animate} />}
@@ -200,6 +211,11 @@ export default function ElementalAtmosphere({ size = 3 }) {
           count={Math.floor(quality.particleCount / layers.length)}
         />
       ))}
+      {/* The reaction boiling off the cube and the worm. A reaction is the show, so it
+          takes the whole budget and a little more. */}
+      {look && quality.particleCount > 0 && (
+        <FusionParticles key={recipe} recipe={recipe} size={size} count={Math.round(quality.particleCount * 1.4)} />
+      )}
     </group>
   );
 }

@@ -53,7 +53,8 @@ import { publishWormUniforms, uCubeHalf } from './healerWorm/elementalUniforms.j
 import { getWormStickerWorldPos } from './wormExpansion.js';
 import ElementalGrassSkin from './ElementalGrassSkin.jsx';
 import ElementalFireSkin from './ElementalFireSkin.jsx';
-import { ElementalSurfaceSkin } from './ElementalSurface.jsx';
+import { ElementalSurfaceSkin, ReactionSurfaceSkin } from './ElementalSurface.jsx';
+import { fusionLookOf, reactionPatternOf } from './healerWorm/fusionLooks.js';
 
 // Renderer key → component. A lookup, like the registry it mirrors.
 const SKINS = {
@@ -119,17 +120,21 @@ function buildCellData(cells) {
   return { cell, extent, edges, sweep: new Float32Array(n) };
 }
 
-// `element` picks which element this skin draws; a fused pair mounts one skin per
-// element (ElementalAtmosphere). Without it, the newest element in the store.
-export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
+// `element` picks which element this skin draws. Without it, the newest element in
+// the store. `recipe` draws a fused pair's reaction coat instead (fusionLooks.js):
+// while two elements are fused, ElementalAtmosphere mounts that in place of either
+// element's skin, on the same cells, transforms, sweep and envelope.
+export default function ElementalCubeSkin({ size = 3, element: elementProp, recipe = null }) {
   const storeElement = useGameStore((s) => s.wormElementalTheme);
   const fused = useGameStore((s) => !!s.wormElementalPartner);
-  const element = elementProp === undefined ? storeElement : elementProp;
-  const def = element ? getElementalDef(element) : null;
+  const look = recipe ? fusionLookOf(recipe) : null;
+  const element = look ? null : elementProp === undefined ? storeElement : elementProp;
+  const def = look ?? (element ? getElementalDef(element) : null);
   // An unknown element resolves to null and the skin draws nothing rather than
   // silently borrowing another element's look.
   const renderer = useMemo(() => resolveElementalRenderer(element, getElementalDef), [element]);
-  const Skin = renderer ? SKINS[renderer.key] ?? null : null;
+  const Skin = look ? ReactionSurfaceSkin : renderer ? SKINS[renderer.key] ?? null : null;
+  const layerKey = look ? `reaction:${recipe}` : element;
 
   // Device budget. Read once per mount: the tier only depends on facts that do not
   // change mid-session, and re-resolving it per frame would churn the cell memo.
@@ -147,8 +152,8 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
   const claimPoint = useRef(new THREE.Vector4());
   const lastElementRef = useRef(null);
   const lastOriginRef = useRef(undefined);
-  if (lastElementRef.current !== element) {
-    lastElementRef.current = element;
+  if (lastElementRef.current !== layerKey) {
+    lastElementRef.current = layerKey;
     clockRef.current = { elapsed: 0, claim: undefined, origin: null };
     instRef.current = null;
     lastOriginRef.current = undefined;
@@ -236,9 +241,12 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp }) {
       // Keyed on everything that changes the instance count or the geometry: an
       // InstancedMesh's capacity is fixed at construction, so a size change has to
       // build a new one rather than resize.
-      key={`${element}-${cells.length}-${quality.tier}-${quality.animate ? 1 : 0}`}
+      key={`${layerKey}-${cells.length}-${quality.tier}-${quality.animate ? 1 : 0}`}
       meshRef={instRef}
       element={element}
+      recipe={recipe}
+      look={look}
+      pattern={look ? reactionPatternOf(recipe) : undefined}
       color={def.color}
       accent={def.accent}
       count={cells.length}

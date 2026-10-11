@@ -139,6 +139,20 @@ FUSION banner, which shows the ignition's `text` between the name and the rule. 
 refresh of the newest element is not a fusion and never re-ignites. A new recipe
 needs an `IGNITIONS` entry too (a test checks all twenty).
 
+## What a fusion looks like
+
+A pair is drawn as its own reaction, never as its two elements' skins stacked:
+`FUSION_LOOKS` in `fusionLooks.js` gives every recipe a coat pattern (`mist`, `crust`,
+`flame`, `plasma`, `bloom`, `storm`, `flow`), a palette, a fill-light `glow` and a
+particle kind (`steam`, `smoke`, `sparks`, `petals`, `snow`, `plasma`, `embers`,
+`spray`, `frost`, `spores`). `ElementalAtmosphere` mounts `ElementalCubeSkin` with
+`recipe` (the reaction coat, `ReactionSurfaceSkin` in `ElementalSurface.jsx`, shader
+mode 3 with `REACTION_PATTERN`) and `FusionParticles` in place of the element layers.
+The particles erupt off the cube's faces and the worm's body (`wormSegments`) the
+moment the pair forms. A new recipe needs a `FUSION_LOOKS` entry (a test checks all
+twenty, and that every look is distinct and differs from its reverse order); a new
+pattern needs a branch in the shell's fragment stage and is warmed automatically.
+
 ## Implementing a planned fusion
 
 1. **Keep identity separate from the live effect.** `getFusion(base, catalyst)` and
