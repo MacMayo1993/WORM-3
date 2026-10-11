@@ -389,6 +389,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // A ref, not state: the render where the flip lands already shows the portal (it is
   // still pending there), so only its removal needs a render, forced at the crossing.
   const portalClosingRef = useRef(false);
+  // The departing portal's flip count, for its pressure styling: healing resets
+  // meta.flips to zero, so it cannot be derived from the new count.
+  const portalClosingFlipsRef = useRef(0);
   const [, rerenderPortal] = useReducer(n => n + 1, 0);
   const endPortalClosing = () => {
     if (!portalClosingRef.current) return;
@@ -664,6 +667,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Normal flip → spinning rim reveal.
       isDisparityFlipRef.current = flips % 2 === 1;
       portalClosingRef.current = curr === meta?.orig;
+      portalClosingFlipsRef.current = prevFlipCount;
       // One blink per flip the tile is carrying (capped), and the flip timer is
       // stretched to fit them: the first blink keeps its normal length, the extra
       // ones are quicker. Normal flips stay a single 0.5 s beat exactly as before.
@@ -1491,8 +1495,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (!isWormhole || isDead) forgetFlipPortalOpening(stickerGridId);
   }, [isWormhole, isDead, stickerGridId]);
   // Flipping home: hold the portal it is leaving, fully open, until the tile shuts.
-  const closingPortal = !isDead && !isSudokube && !isWormhole && !!meta?.orig && meta.curr === meta.orig
+  // Not gated on isDead: a flip that lands home on the cap kills the tile in the
+  // same render, and its portal must still close with it rather than vanish.
+  const closingPortal = !isSudokube && !isWormhole && !!meta?.orig && meta.curr === meta.orig
     && (portalClosingRef.current || hasPendingFlipAnimation);
+  // Before the flip's effect runs, prevFlips still holds the departing count.
+  const closingFlips = portalClosingRef.current ? portalClosingFlipsRef.current : prevFlips.current;
 
   const trackerRadius = Math.min(0.25, 0.06 + (meta?.flips ?? 0) * 0.012);
   const origColor = meta?.orig ? fc[meta.orig] : COLORS.black;
@@ -1796,7 +1804,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <TileSurfaceInstance name="FlipPortal" geometry={getFlipPortalGeometry()} material={getFlipPortalMaterial()}
           color={closingPortal ? fc[ANTIPODAL_COLOR[meta.orig]] : baseColor}
           seed={closingPortal ? FLIP_PORTAL_OPEN_SEED : flipPortalStart(stickerGridId, meta?.flips ?? 0)}
-          data={flipPortalData(origColor, closingPortal ? Math.max(1, (meta?.flips ?? 0) - 1) : meta?.flips ?? 0, effectiveFlipCap)} />
+          data={flipPortalData(origColor, closingPortal ? Math.max(1, closingFlips) : meta?.flips ?? 0, effectiveFlipCap)} />
       )}
 
       {/* Tally Marks - skip if origColor is white on non-white tile */}

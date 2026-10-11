@@ -134,3 +134,19 @@ it('closes the portal with a tile flipping home instead of dropping it as the fl
   await advance(60);
   expect(named('FlipPortal')).toBe(0);
 });
+
+it('closes the portal with a flip that lands home on the cap, though that flip kills the tile', async () => {
+  const meta = makeCubies(5)[2][2][4].stickers.PZ;
+  const cap = 6;
+  const draw = flips => <StickerPlane meta={{ ...meta, flips, curr: flips % 2 ? 4 : 1 }} pos={[0, 0, 0.51]} faceSize={5} mode="classic" />;
+  await act(async () => { store = root.render(draw(cap - 2)); });
+  await act(async () => root.render(draw(cap - 1)));
+  await advance(90);
+  expect(named('FlipPortal')).toBe(1);
+  await act(async () => root.render(draw(cap)));
+  expect(named('FlipPortal')).toBe(1);
+  await advance(8);
+  expect(named('FlipPortal')).toBe(1);
+  await advance(60);
+  expect(named('FlipPortal')).toBe(0);
+});
