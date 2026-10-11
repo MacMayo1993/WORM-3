@@ -13,7 +13,7 @@
 // version tinted the whole backdrop, which read as "the background changed" rather
 // than "the cube is in the element". The visible element now lives on the cube.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useReducer, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -136,6 +136,30 @@ export default function ElementalAtmosphere({ size = 3 }) {
   const recipe = partnerDef ? getFusion(partner, element)?.id ?? null : null;
   const look = recipe ? fusionLookOf(recipe) : null;
   const layers = look ? [] : partnerDef ? [partner, element] : def ? [element] : [];
+  // What is on the cube now: the reaction coat, or the element skin(s).
+  const current = look ? [{ key: `reaction:${recipe}`, recipe }] : layers.map(type => ({ key: type, element: type }));
+
+  // The hand-off. When a fusion forms (or its recipe changes), the layer that was on
+  // the cube is not dropped: it stays mounted, as the SAME instance, and dissolves
+  // through its own release (water drains, ice melts, a coat fades) while the reaction
+  // floods in over it from the claim, so the player watches one turn into the other.
+  // Tracked in a ref during render so the outgoing instance is never unmounted, even
+  // for a frame; each layer reports back when it has finished dissolving.
+  const [, refresh] = useReducer(n => n + 1, 0);
+  const swap = useRef({ keys: '', prev: [], outgoing: [] }).current;
+  const keys = current.map(l => l.key).join('|');
+  if (swap.keys !== keys) {
+    const leaving = current.length ? swap.prev.filter(l => !current.some(c => c.key === l.key)) : [];
+    swap.outgoing = current.length
+      ? [...swap.outgoing.filter(o => !current.some(c => c.key === o.key) && !leaving.some(l => l.key === o.key)), ...leaving].slice(-2)
+      : [];
+    swap.prev = current;
+    swap.keys = keys;
+  }
+  const retired = key => {
+    swap.outgoing = swap.outgoing.filter(o => o.key !== key);
+    refresh();
+  };
 
   // Device budget: how many particles this machine can afford, and whether the
   // viewer has asked for no motion at all. Fixed per mount — none of its inputs
@@ -183,10 +207,21 @@ export default function ElementalAtmosphere({ size = 3 }) {
   return (
     <group>
       {/* The element laid on the cube itself — the main event. */}
-      {layers.map(type => <ElementalCubeSkin key={type} size={size} element={type} />)}
-      {/* A fused pair: the reaction's coat, keyed by recipe so a new reaction sweeps
-          in from its own claim. */}
-      {look && <ElementalCubeSkin key={`reaction:${recipe}`} size={size} recipe={recipe} />}
+      {/* One keyed list: the outgoing layer keeps its instance while it dissolves, and a
+          fused pair's reaction coat is keyed by recipe so it sweeps in from its claim. */}
+      {[...swap.outgoing, ...current].map(layer => {
+        const leaving = swap.outgoing.includes(layer);
+        return (
+          <ElementalCubeSkin
+            key={layer.key}
+            size={size}
+            element={layer.element}
+            recipe={layer.recipe ?? null}
+            retire={leaving}
+            onRetired={leaving ? () => retired(layer.key) : null}
+          />
+        );
+      })}
       {/* Keyed layers retain the first element when it becomes the partner.
           Shells sit at their own depths; the aura marks the combined state. */}
       {partnerDef && <FusionAura key={`${partner}>${element}`} base={partner} catalyst={element} animate={quality.animate} />}

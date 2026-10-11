@@ -149,7 +149,12 @@ particle kind (`steam`, `smoke`, `sparks`, `petals`, `snow`, `plasma`, `embers`,
 `recipe` (the reaction coat, `ReactionSurfaceSkin` in `ElementalSurface.jsx`, shader
 mode 3 with `REACTION_PATTERN`) and `FusionParticles` in place of the element layers.
 The particles erupt off the cube's faces and the worm's body (`wormSegments`) the
-moment the pair forms. A new recipe needs a `FUSION_LOOKS` entry (a test checks all
+moment the pair forms. The outgoing layer (the base element's skin, or the previous
+reaction when a reclaim reverses the recipe) is not dropped: ElementalAtmosphere keeps it
+mounted with `retire` so it dissolves through its own release over `RETIRE_SECONDS`
+while the reaction floods in, and every coat pattern reacts to the worm (`vWormD`):
+mist parts, crust cracks flare, plasma is drawn to it, flowers open, storm flashes hunt
+it, the flow bends round it. A new recipe needs a `FUSION_LOOKS` entry (a test checks all
 twenty, and that every look is distinct and differs from its reverse order); a new
 pattern needs a branch in the shell's fragment stage and is warmed automatically.
 

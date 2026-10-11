@@ -130,6 +130,7 @@ const vertexShader = /* glsl */ `
   varying float vDepth;    // shell depth above the stickers here
   varying float vWave;     // water: normalised wave height, -1..1
   varying float vWake;     // water: ripple rings around the worm, -1..1
+  varying float vWormD;    // distance to the worm's body, world units (large with no worm)
 
   #define QUARTER_PI 0.78539816
 
@@ -239,6 +240,7 @@ const vertexShader = /* glsl */ `
     vRim = max(ex * tx, ey * ty);
     vArrive = flood;
     vDepth = depth;
+    vWormD = wormDist(C);
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
 `;
@@ -261,6 +263,7 @@ const fragmentShader = /* glsl */ `
   varying float vDepth;
   varying float vWave;
   varying float vWake;
+  varying float vWormD;
 
   ${GLSL_NOISE}
 
@@ -541,6 +544,11 @@ const fragmentShader = /* glsl */ `
     vec3 up = vec3(0.0, 1.0, 0.0);
     vec3 bodyCol;
     vec3 light;
+    // The reaction answers the worm crawling through it: near peaks on the body,
+    // wakeRing is a bright band just outside it. Reduced motion zeroes uEnv.w, and
+    // with it every response.
+    float near = exp(-vWormD * vWormD / 0.16) * uEnv.w;
+    float wakeRing = exp(-pow((vWormD - 0.42) / 0.09, 2.0)) * uEnv.w;
   #if REACTION_PATTERN == 0
     // MIST — banks of fog boil up off the faces and roll over the rims.
     vec3 mp = vWorld * 1.5 - up * T * 0.45 + vec3(T * 0.08, 0.0, -T * 0.05);
@@ -548,9 +556,13 @@ const fragmentShader = /* glsl */ `
     float m2 = fbm3(vWorld * 3.4 - up * T * 0.9 + vec3(5.1));
     float dens = smoothstep(0.22, 0.74, m1 * 0.72 + m2 * 0.42);
     dens = clamp(max(dens, vRim * 0.7) + fres * 0.4, 0.0, 1.0);
+    // The worm parts the fog: a clear lane round its body, the displaced mist
+    // banking up bright along the edge of the wake.
+    dens *= 1.0 - near * 0.85;
+    dens = clamp(dens + wakeRing * 0.35, 0.0, 1.0);
     bodyCol = mix(uColor * 0.85, vec3(1.0), dens * 0.6);
     a = dens * 0.74;
-    light = uAccent * pow(m2, 3.0) * 0.18 + vec3(1.0) * fres * 0.18 * dens;
+    light = uAccent * pow(m2, 3.0) * 0.18 + vec3(1.0) * fres * 0.18 * dens + vec3(1.0) * wakeRing * 0.12;
   #elif REACTION_PATTERN == 1
     // CRUST — the surface cooled into plates; the reaction's heat bleeds through the cracks.
     vec3 wc = worleyCell(vWorld * 2.7);
@@ -562,13 +574,17 @@ const fragmentShader = /* glsl */ `
     float gloss = pow(max(dot(fn, hh), 0.0), 60.0);
     bodyCol = uColor * (0.75 + 0.5 * wc.z);
     a = mix(0.42, 0.7, max(fres, vRim)) * (1.0 - crack * 0.6);
-    light = uAccent * crack * heat * 1.5 + vec3(1.0) * gloss * 0.8 + uAccent * fres * 0.08;
+    // Weight on the crust: the cracks under and around the worm flare white-hot.
+    float press = near + wakeRing * 0.5;
+    light = uAccent * crack * heat * (1.5 + press * 2.5) + mix(uAccent, vec3(1.0), 0.6) * crack * near * 1.2
+          + vec3(1.0) * gloss * 0.8 + uAccent * fres * 0.08;
   #elif REACTION_PATTERN == 2
     // FLAME — tongues lick up every face toward the sky, rooted in the seams.
     vec3 fp = vWorld * 2.6 - up * T * 1.7;
     float flick = fbm3(fp) * 0.75 + vnoise3(fp * 2.3 + 3.0) * 0.35;
     float rise = clamp(dot(n, up) * 0.5 + 0.5, 0.0, 1.0);
-    float body = flick + seamNear * 0.32 + vRim * 0.28 + rise * 0.08;
+    // The fire leaps up round the worm, as if it were feeding it.
+    float body = flick + seamNear * 0.32 + vRim * 0.28 + rise * 0.08 + (near * 0.45 + wakeRing * 0.25);
     float tongue = smoothstep(0.5, 0.82, body);
     float core = smoothstep(0.74, 0.97, body);
     bodyCol = uAccent * 0.1;
@@ -580,6 +596,8 @@ const fragmentShader = /* glsl */ `
     pp += vec3(sin(T * 0.7 + pp.z * 1.3), cos(T * 0.6 + pp.x * 1.1), sin(T * 0.5 + pp.y * 1.2)) * 0.35;
     float f = fbm3(pp + T * 0.22);
     float fil = ridge(vnoise3(pp * 1.7 + T * 0.55), 12.0) + ridge(vnoise3(pp * 3.2 - T * 0.4), 16.0) * 0.6;
+    // The filaments are drawn to the worm: they thicken and brighten around it.
+    fil *= 1.0 + near * 2.2 + wakeRing * 1.2;
     bodyCol = uAccent * 0.05;
     a = 0.16 + fres * 0.25 + fil * 0.12;
     light = mix(uAccent, uColor, f) * (0.25 + fil * 1.5) * 0.8 + vec3(1.0) * pow(clamp(fil, 0.0, 1.0), 3.0) * 0.55
@@ -593,6 +611,8 @@ const fragmentShader = /* glsl */ `
     float ang = atan(d.y, d.x) + hash12(gs) * 6.2832;
     float rr = length(d);
     float open = smoothstep(0.0, 0.6, uEnv.y) * (0.85 + 0.15 * sin(T * 1.2 + hash12(gs + 1.3) * 6.0));
+    // Flowers burst wide open where the worm passes.
+    open *= 1.0 + (near + wakeRing) * 0.6;
     float petal = (1.0 - smoothstep(0.24, 0.3, rr / max(0.2, 0.62 + 0.38 * cos(ang * 5.0)) / max(open, 0.05)))
                 * step(0.3, hash12(gs + 7.7));
     float heart = 1.0 - smoothstep(0.04, 0.065, rr);
@@ -615,6 +635,9 @@ const fragmentShader = /* glsl */ `
     vec3 flashAt = (hash33(vec3(beat * 1.37, 4.1, 9.7)) - 0.5) * 2.2 * uCubeHalf;
     float flashOn = step(0.35, hash13(vec3(beat, 2.3, 7.1)));
     float flash = flashOn * exp(-dot(vWorld - flashAt, vWorld - flashAt) * 0.9) * (1.0 - fract(T * 2.2));
+    // And the storm hunts the worm: every few beats the cloud over it lights up.
+    float hunt = step(0.6, hash13(vec3(beat, 8.8, 1.9))) * (1.0 - fract(T * 2.2));
+    flash = max(flash, hunt * exp(-vWormD * vWormD / 0.35) * uEnv.w);
     float streak = pow(0.5 + 0.5 * sin(dot(vWorld, vec3(0.6, 9.0, 0.4)) + T * 14.0), 18.0) * cloud;
     bodyCol = mix(uColor * 0.3, uColor * 0.75, c2);
     a = cloud * 0.66 + vRim * 0.18;
@@ -627,7 +650,9 @@ const fragmentShader = /* glsl */ `
     float lane = ridge(vnoise3(vec3(vFaceUV * 2.4 - vec2(T * 1.5, 0.0), dot(vFaceN, vec3(3.0, 5.0, 7.0)))), 10.0);
     bodyCol = uColor * 0.2;
     a = 0.2 + fres * 0.35 + vRim * 0.22;
-    light = uAccent * (streak * 0.8 + lane * 0.9) + uColor * (fres * 0.45 + vRim * 0.3);
+    // The current sweeps round the worm like water round a stone, brightest at its sides.
+    light = uAccent * (streak * 0.8 + lane * 0.9) * (1.0 + wakeRing * 1.8) + uColor * (fres * 0.45 + vRim * 0.3)
+          + uAccent * near * 0.25;
   #endif
     // The reaction surges in along the claim front and dissolves at the end.
     float surge = vArrive * (1.0 - vArrive) * 4.0;

@@ -44,7 +44,7 @@ import { isMobile, prefersReducedMotion } from '../utils/device.js';
 import { getElementalDef } from './healerWorm/elementalDefs.js';
 import { resolveElementalRenderer } from './healerWorm/elementalRenderers.js';
 import { resolveElementalQuality } from './healerWorm/elementalQuality.js';
-import { elementalEnvelope, advanceElementalLayer } from './healerWorm/elementalLifecycle.js';
+import { elementalEnvelope, advanceElementalLayer, RETIRE_SECONDS } from './healerWorm/elementalLifecycle.js';
 import { cellEdgeMask, cellSeed, cellSweepDelay, resolveSweepOrigin } from './healerWorm/elementalSeeds.js';
 import { buildElementalCells } from './healerWorm/elementalCells.js';
 import { wormBuffs } from './wormBuffs.js';
@@ -73,6 +73,8 @@ const _quat = new THREE.Quaternion();
 const _fix = new THREE.Quaternion();
 const _zWorld = new THREE.Vector3();
 const _matrix = new THREE.Matrix4();
+// Scratch envelope for a retiring layer (no per-frame allocation).
+const _retireEnv = { claim: 1, release: 0, intensity: 1 };
 
 /**
  * Fill each cell's share of the claim sweep, so the element travels outward from
@@ -124,7 +126,7 @@ function buildCellData(cells) {
 // the store. `recipe` draws a fused pair's reaction coat instead (fusionLooks.js):
 // while two elements are fused, ElementalAtmosphere mounts that in place of either
 // element's skin, on the same cells, transforms, sweep and envelope.
-export default function ElementalCubeSkin({ size = 3, element: elementProp, recipe = null }) {
+export default function ElementalCubeSkin({ size = 3, element: elementProp, recipe = null, retire = false, onRetired = null }) {
   const storeElement = useGameStore((s) => s.wormElementalTheme);
   const fused = useGameStore((s) => !!s.wormElementalPartner);
   const look = recipe ? fusionLookOf(recipe) : null;
@@ -151,6 +153,9 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
   const clockRef = useRef({ elapsed: 0, claim: undefined, origin: null });
   const claimPoint = useRef(new THREE.Vector4());
   const lastElementRef = useRef(null);
+  const retireRef = useRef({ t: 0, done: false });
+  // A layer brought back before it finished leaving starts any later exit afresh.
+  if (!retire && retireRef.current.t > 0) retireRef.current = { t: 0, done: false };
   const lastOriginRef = useRef(undefined);
   if (lastElementRef.current !== layerKey) {
     lastElementRef.current = layerKey;
@@ -165,7 +170,23 @@ export default function ElementalCubeSkin({ size = 3, element: elementProp, reci
     const clock = advanceElementalLayer(clockRef.current, wormBuffs.elementalOrigin, fused, delta);
     // One envelope, shared with the fill light and the particles. wormBuffs mirrors
     // the sim clock, so it freezes on pause and during tunnel transit.
-    const env = elementalEnvelope({ element, elapsed: clock.elapsed, remaining: wormBuffs.elementalT });
+    let env = elementalEnvelope({ element, elapsed: clock.elapsed, remaining: wormBuffs.elementalT });
+    // A layer being replaced by a fusion's reaction dissolves on its own short clock
+    // (each skin's own release: water drains, ice melts, flames die down, a coat
+    // fades) while the reaction floods in over it, then hands itself back.
+    if (retire) {
+      const r = retireRef.current;
+      r.t += Math.min(delta, 0.1);
+      const k = Math.min(1, r.t / RETIRE_SECONDS);
+      _retireEnv.claim = env.claim;
+      _retireEnv.release = Math.max(env.release, k);
+      _retireEnv.intensity = env.intensity * (1 - k);
+      env = _retireEnv;
+      if (k >= 1 && !r.done) {
+        r.done = true;
+        onRetired?.();
+      }
+    }
 
     // The claim sweep's starting point. The sim snapshots the tile the orb was
     // taken on and never mutates it, so an identity check is enough to notice a new
