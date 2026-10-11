@@ -167,6 +167,24 @@ export const resetLiveRotation = () => {
   liveRotation.angle = 0;
 };
 
+/**
+ * A turn that was abandoned, not finished (a retry or a new run while a slice was still
+ * turning). Unlike resetLiveRotation there is no holdover: nothing may keep drawing the
+ * abandoned turn's final angle, and nothing is recorded as completed, so crossing
+ * protection armed under it can never be consumed by the next run's first turn.
+ */
+export function cancelLiveRotation() {
+  liveRotation.active = false;
+  liveRotation.axis = null;
+  liveRotation.sliceIndices.length = 0;
+  liveRotation.angles.length = 0;
+  liveRotation.sliceIndex = 0;
+  liveRotation.angle = 0;
+  liveRotation.completedFrames = 0;
+  liveRotation.completedAxis = null;
+  liveRotation.completedAngle = 0;
+}
+
 /** Gate frame writers against the synchronous store, never a stale React turn. */
 export function syncRotationFrame(authoritativeAnim, initializedAnim) {
   if (!authoritativeAnim) {

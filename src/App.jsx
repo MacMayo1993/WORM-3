@@ -899,6 +899,8 @@ export default function WORM3() {
     useGameStore.getState().setPerfReducedFX(
       adaptiveReducedFXRef.current || megaReducedFXOverrideRef.current
     );
+    // Abandon any turn still in flight from the last run before the board resets.
+    cancelShuffle();
     if (targetSize !== size) {
       changeSize(targetSize);
     } else {
@@ -933,7 +935,7 @@ export default function WORM3() {
         chapterLevel?.id ?? null
       );
     });
-  }, [settings, setSettings, reset, size, changeSize, cancelDisparityRun, launchWithMobi, applyEffectiveDpr]);
+  }, [settings, setSettings, reset, size, changeSize, cancelDisparityRun, launchWithMobi, applyEffectiveDpr, cancelShuffle]);
 
   const handleMobiIntroComplete = useCallback(() => {
     setShowMobiIntro(false);
@@ -955,11 +957,15 @@ export default function WORM3() {
   const handleWormRetry = useCallback(() => {
     useGameStore.getState().clearLevel();
     const wormState = useGameStore.getState();
+    // A death by slice usually leaves the killing turn still in flight. Abandon it
+    // first: left alone it kept the Story board from restaging (the run reset waits
+    // out a live turn) and then committed its quarter turn onto the fresh cube.
+    cancelShuffle();
     // Clear the old board before run subscribers start the new scramble.
     // reset() also clears XP, so it must precede the new run's initialization.
     reset();
     wormState.initWormMode(undefined, undefined, null, null, null, null, wormState.wormCombatMode, wormState.wormEnemiesEnabled, wormState.wormStoryLevel);
-  }, [reset]);
+  }, [reset, cancelShuffle]);
 
   const handleWormNewGame = useCallback(() => {
     setWormEntryPage(useGameStore.getState().wormStoryLevel ? 'story' : 'choice');
