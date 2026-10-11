@@ -1,191 +1,15 @@
 import { storyStarGoals } from './starGoals.js';
-import { WORM_GENERATED_LEVELS, WORM_GENERATED_CHAPTERS } from './generated.js';
+import { STORY_LEVEL_DATA, STORY_CHAPTER_DATA } from './campaign.js';
+import { storyGoalText, TAIL_KINDS } from './goalText.js';
 
-// Authored chapter one. Cosmetic IDs are shared with the existing Parity Store.
-export const WORM_STORY_LEVELS = [
-  { id: 1, cubeSize: 6, title: 'First Crawl', subtitle: 'A scattered world. A small beginning.',
-    goal: 'Collect 18 orbs, including all six colors, before time runs out.',
-    kind: 'orbs', target: 18, colors: 6, speed: 1.5, par: 70, limit: 125, points: 25 },
-  { id: 2, cubeSize: 6, title: 'Through the Looking Glass', subtitle: 'Old doorways through a wounded world.',
-    goal: 'Jump onto raised tunnel tiles to traverse four different pairs. The marker points to an unvisited pair. Clear your tail to finish.',
-    kind: 'tunnel', target: 4, speed: 1.65, par: 95, limit: 165, points: 25 },
-  { id: 3, cubeSize: 6, title: 'Clear Your Tail', subtitle: 'Grow into the repairs ahead.',
-    goal: 'Land four jumps over your own body and collect 12 orbs. Empty jumps do not count.',
-    kind: 'jump', target: 4, orbs: 12, speed: 1.76, par: 105, limit: 180,
-    reward: ['hat_party', 'hat_tophat'], rewardLabel: 'Choose a hat', fallback: 100 },
-  { id: 4, cubeSize: 6, title: 'Moving Ground', subtitle: 'The old machinery is still turning.',
-    goal: 'Collect 18 orbs and survive six layer turns. Turns keep coming until you finish.',
-    kind: 'rotation', target: 6, orbs: 18, speed: 1.88, rotateEvery: 14, par: 130, limit: 205, points: 25 },
-  { id: 5, cubeSize: 6, title: 'Color Collector', subtitle: 'Two ends of the same wound.',
-    goal: 'Collect all six colors and heal four tunnel pairs while layers turn. Clear your tail to finish.',
-    kind: 'collector', target: 4, colors: 6, speed: 2.06, rotateEvery: 14, par: 165, limit: 260,
-    reward: ['scheme_forest', 'scheme_tropical'], rewardLabel: 'Choose a palette', fallback: 100 },
-  { id: 6, cubeSize: 6, title: 'Restore the Cube', subtitle: 'Restore a stretch of the way home.',
-    goal: 'Heal six tunnel pairs, collect 30 orbs and survive six turns. Clear your tail before the clock runs out.',
-    kind: 'restore', target: 6, orbs: 30, rotations: 6, speed: 2.25, rotateEvery: 11, par: 220, limit: 340,
-    reward: ['skin_royal', 'skin_ocean'], rewardLabel: 'Choose a skin', fallback: 150 },
-  { id: 7, cubeSize: 6, title: 'Full Throttle', subtitle: 'The tools of the old couriers.',
-    goal: 'Finish two boosts, land two double jumps and a rocket flight, attract four remote orbs with a magnet, collect 24 orbs and heal two pairs.',
-    kind: 'mastery', target: 2, orbs: 24, speed: 2.25, rotateEvery: 13, par: 230, limit: 380,
-    mechanics: { boosts: 2, doubleJumps: 2, rockets: 1, magnetOrbs: 4 },
-    reward: ['accessory_spoolBackpack', 'accessory_windupKey'], rewardLabel: 'Choose an accessory', fallback: 200 },
-  { id: 8, cubeSize: 6, title: 'Force of Nature', subtitle: 'Life beneath the scars.',
-    goal: 'Pick up 2 elemental orbs. Collect 24 orbs and heal three pairs while layers turn. Steer onto each marked elemental orb to claim it.',
-    kind: 'mastery', target: 3, orbs: 24, speed: 2.25, rotateEvery: 13, par: 300, limit: 475,
-    mechanics: { elementPickups: 2 },
-    reward: ['scheme_aurora', 'scheme_cosmic'], rewardLabel: 'Choose a palette', fallback: 150 },
-  { id: 9, cubeSize: 6, title: 'Under Siege', subtitle: 'A guard left at an abandoned post.',
-    goal: 'Surround a tunnel to heal it, use your ability twice, disarm one bomb by encircling it, defeat one enemy, collect 24 orbs and restore four pairs. Tunnel deposits seal after the surround and ability tasks.',
-    kind: 'mastery', target: 4, orbs: 24, speed: 2.25, rotateEvery: 14, par: 325, limit: 515,
-    mechanics: { ringHeals: 1, signatures: 2, bombs: 1, kills: 1 },
-    reward: ['hat_crown', 'hat_wizard'], rewardLabel: 'Choose a hat', fallback: 150 },
-  { id: 10, cubeSize: 6, title: 'Worm Ascendant', subtitle: 'At the edge of the old routes.',
-    goal: 'Collect 24 orbs, heal three tunnel pairs, survive four layer turns and defeat one enemy. Orbs keep returning; clear your tail to finish.',
-    kind: 'mastery', target: 3, orbs: 24, rotations: 4, speed: 2.25, rotateEvery: 14, par: 220, limit: 380,
-    mechanics: { kills: 1 },
-    reward: ['skin_gold', 'skin_galaxy'], rewardLabel: 'Choose a champion skin', fallback: 300 },
-
-  // ── Chapter 2 · The Old Routes ───────────────────────────────────────────────
-  // The same crawl on every board from the 2×2 pocket cube to 8×8, with the
-  // cube's alternate views (grid, numbers, glass, chrome, neon) and the
-  // explode power introduced along the way.
-  { id: 11, title: 'Pocket Crawl', subtitle: 'The old routes began in small places.', cubeSize: 2,
-    goal: 'Collect 10 orbs, including all 6 colors, on the 2×2 pocket cube.',
-    kind: 'orbs', target: 10, colors: 6, orbsPerFace: 2, speed: 1.2, par: 70, limit: 125, points: 30 },
-  { id: 12, title: 'Grid Lines', subtitle: 'Addresses on a moving world.', cubeSize: 3,
-    goal: 'Jump onto raised tunnel tiles to cross 3 different pairs on a 3×3 cube in Grid view. Clear your tail to finish.',
-    kind: 'tunnel', target: 3, orbsPerFace: 3, speed: 1.5, par: 90, limit: 165, points: 30 },
-  { id: 13, title: 'Numbers Underfoot', subtitle: 'Follow the connections.', cubeSize: 4,
-    goal: 'Land 3 jumps over your own body and collect 10 orbs on a 4×4 cube in Numbers view.',
-    kind: 'jump', target: 3, orbs: 10, speed: 2.03, par: 90, limit: 165,
-    reward: ['hat_beanie', 'hat_flower'], rewardLabel: 'Choose a hat', fallback: 120 },
-  { id: 14, title: 'Glass Carousel', subtitle: 'A station still going through the motions.', cubeSize: 3,
-    goal: 'Collect 12 orbs and survive 5 layer turns on a 3×3 glass cube. Turns come every 13 seconds.',
-    kind: 'rotation', target: 5, orbs: 12, orbsPerFace: 3, speed: 1.58, rotateEvery: 13, par: 110, limit: 190, points: 30 },
-  { id: 15, title: 'Chrome Works', subtitle: 'A workshop turned into a strongpoint.', cubeSize: 6,
-    goal: 'Collect all 6 colors and heal 4 tunnel pairs on a 6×6 chrome cube while layers turn. Clear your tail to finish.',
-    kind: 'collector', target: 4, colors: 6, speed: 2.25, rotateEvery: 14, par: 180, limit: 285,
-    reward: ['scheme_gemstone', 'scheme_noire'], rewardLabel: 'Choose a palette', fallback: 120 },
-  { id: 16, title: 'Sea of Seven', subtitle: 'The pattern reaches across the sea.', cubeSize: 7,
-    goal: 'Heal 5 tunnel pairs, collect 24 orbs and survive 5 turns on a 7×7 cube. Clear your tail to finish.',
-    kind: 'restore', target: 5, orbs: 24, rotations: 5, speed: 2.33, rotateEvery: 13, par: 245, limit: 395, points: 35 },
-  { id: 17, title: 'Launch Pad', subtitle: 'A route Mobi remembers.', cubeSize: 4,
-    goal: 'Finish 2 boosts, land 2 double jumps and 1 rocket flight, collect 14 orbs and heal 2 pairs on a 4×4 cube.',
-    kind: 'mastery', target: 2, orbs: 14, speed: 2.25, par: 165, limit: 285,
-    mechanics: { boosts: 2, doubleJumps: 2, rockets: 1 },
-    reward: ['hat_paperboat', 'hat_thimble'], rewardLabel: 'Choose a hat', fallback: 150 },
-  { id: 18, title: 'Blast Radius', subtitle: 'A fractured surface. Unbroken connections.', cubeSize: 6,
-    goal: 'Ride out 2 explosions, collect 20 orbs and heal 3 pairs on a 6×6 cube. Steer onto the marked explode orb to split the cube.',
-    kind: 'mastery', target: 3, orbs: 20, speed: 2.33, rotateEvery: 15, par: 230, limit: 380,
-    mechanics: { explodes: 2 },
-    reward: ['skin_lava', 'skin_ice'], rewardLabel: 'Choose a skin', fallback: 150 },
-  { id: 19, title: 'Neon Arcade', subtitle: 'Follow the lights inward.', cubeSize: 8,
-    goal: 'Cross 6 different tunnel pairs on an 8×8 neon cube. Clear your tail to finish.',
-    kind: 'tunnel', target: 6, speed: 2.4, par: 205, limit: 340, points: 35 },
-  { id: 20, title: 'Size Summit', subtitle: 'A crossing on the way inward.', cubeSize: 8,
-    goal: 'Ride out an explosion, land a rocket flight, catch 4 remote orbs with a magnet, collect 2 elemental orbs and use your ability once. Collect 30 orbs, survive 6 turns and heal 4 pairs on an 8×8 cube.',
-    kind: 'mastery', target: 4, orbs: 30, rotations: 6, speed: 2.4, rotateEvery: 13, par: 405, limit: 625,
-    mechanics: { explodes: 1, rockets: 1, magnetOrbs: 4, elementPickups: 2, signatures: 1 },
-    reward: ['accessory_knittedScarf', 'accessory_leafCape'], rewardLabel: 'Choose an accessory', fallback: 250 },
-
-  // ── Chapter 3 · Strange Views ────────────────────────────────────────────
-  // The cube stops looking like a cube: hollow frames, bare wireframe, bricks,
-  // biomes and the far-side window, each with a stable tile style.
-  { id: 21, title: 'Hollow Hills', subtitle: 'Every piece is an open frame.', cubeSize: 5,
-    goal: 'Collect 20 orbs, including all 6 colors, on a hollow 5×5 cube.',
-    kind: 'orbs', target: 20, colors: 6, speed: 2.33, par: 85, limit: 150, points: 35 },
-  { id: 22, title: 'Ghost Frame', subtitle: 'No stickers. Only edges and tunnels.', cubeSize: 5,
-    goal: 'Cross 4 different tunnel pairs on a 5×5 wireframe cube. The edges still show each face’s color. Clear your tail to finish.',
-    kind: 'tunnel', target: 4, speed: 2.33, par: 110, limit: 190, points: 35 },
-  { id: 23, title: 'Brick by Brick', subtitle: 'A toy-brick cube with your tail across it.', cubeSize: 4,
-    goal: 'Land 4 jumps over your own body and collect 12 orbs on a 4×4 brick cube.',
-    kind: 'jump', target: 4, orbs: 12, speed: 2.1, par: 110, limit: 190,
-    reward: ['hat_acorn', 'hat_toadstool'], rewardLabel: 'Choose a hat', fallback: 150 },
-  { id: 24, title: 'Elemental Alchemy', subtitle: 'Same elements. Reverse the order. Change the effect.', cubeSize: 6,
-    goal: 'Make Steam (Water → Fire) and Quench (Fire → Water). Collect each marked partner before the elemental timer ends. Steam puts out bombs; Quench leaves a protective obsidian trail. Collect 18 orbs and heal 3 pairs.',
-    kind: 'mastery', target: 3, orbs: 18, speed: 2.4, rotateEvery: 14, par: 300, limit: 460,
-    mechanics: { steamFusions: 1, quenchFusions: 1 }, points: 40 },
-  { id: 25, title: 'The Far Side', subtitle: 'Watch where your twins land.', cubeSize: 5,
-    goal: 'Heal 4 tunnel pairs, collect 20 orbs and survive 4 turns on a 5×5 cube. The far-side window shows the opposite face. Clear your tail to finish.',
-    kind: 'restore', target: 4, orbs: 20, rotations: 4, speed: 2.4, rotateEvery: 13, par: 205, limit: 340,
-    reward: ['scheme_eclipse', 'scheme_midnight'], rewardLabel: 'Choose a palette', fallback: 150 },
-  { id: 26, title: 'Prism Turns', subtitle: 'A steady look on a turning cube.', cubeSize: 5,
-    goal: 'Collect 18 orbs and survive 6 layer turns on a 5×5 cube with one consistent tile style.',
-    kind: 'rotation', target: 6, orbs: 18, speed: 2.4, rotateEvery: 11, par: 125, limit: 220, points: 40 },
-  { id: 27, title: 'Neon Storm', subtitle: 'Master three elements under neon light.', cubeSize: 6,
-    goal: 'Master water, fire and grass, collect 20 orbs and heal 3 pairs on a 6×6 neon cube.',
-    kind: 'mastery', target: 3, orbs: 20, speed: 2.47, rotateEvery: 14, par: 325, limit: 515,
-    mechanics: { elements: 3 },
-    reward: ['accessory_fireflyJar', 'accessory_paintbrushTail'], rewardLabel: 'Choose an accessory', fallback: 200 },
-  { id: 28, title: 'Shatterglass', subtitle: 'Blow the glass cube apart, then fly.', cubeSize: 7,
-    goal: 'Ride out 2 explosions, land a rocket flight, collect 24 orbs and heal 3 pairs on a 7×7 glass cube.',
-    kind: 'mastery', target: 3, orbs: 24, speed: 2.47, rotateEvery: 14, par: 315, limit: 490,
-    mechanics: { explodes: 2, rockets: 1 },
-    reward: ['skin_coral', 'skin_emerald'], rewardLabel: 'Choose a skin', fallback: 200 },
-  { id: 29, title: 'Number Siege', subtitle: 'Fight across a cube of numbers.', cubeSize: 7,
-    goal: 'Surround a tunnel to heal it, use your ability once, disarm 1 bomb, defeat 2 enemies, collect 24 orbs and restore 4 pairs on a 7×7 cube in Numbers view. Tunnel deposits seal after the surround and ability tasks.',
-    kind: 'mastery', target: 4, orbs: 24, speed: 2.47, rotateEvery: 14, par: 355, limit: 540,
-    mechanics: { ringHeals: 1, signatures: 1, bombs: 1, kills: 2 }, points: 45 },
-  { id: 30, title: 'Kaleidoscope', subtitle: 'One clear view for a colorful challenge.', cubeSize: 6,
-    goal: 'Collect 3 different elemental orb types (water, fire and grass), ride out an explosion, land 2 double jumps and catch 4 remote orbs with a magnet. Each type counts once on pickup. Collect 30 orbs, survive 6 turns and heal 5 pairs on a 6×6 cube with one consistent tile style.',
-    kind: 'mastery', target: 5, orbs: 30, rotations: 6, speed: 2.55, rotateEvery: 11, par: 490, limit: 730,
-    mechanics: { uniqueElements: 3, explodes: 1, doubleJumps: 2, magnetOrbs: 4 },
-    reward: ['skin_void', 'skin_sunset'], rewardLabel: 'Choose a champion skin', fallback: 300 },
-
-  // ── Chapter 4 · Grand Crawl ──────────────────────────────────────────────
-  // Nine, ten and fifteen layers; the smallest cube at full speed; every view
-  // and power combined, with shorter clocks and faster turns.
-  { id: 31, title: 'Nine Lives', subtitle: 'Nine layers. Six colors. Keep your tail.', cubeSize: 9,
-    goal: 'Collect 36 orbs, including all 6 colors, on a 9×9 cube.',
-    kind: 'orbs', target: 36, colors: 6, speed: 2.55, par: 180, limit: 300, points: 45 },
-  { id: 32, title: 'Tenfold Tunnels', subtitle: 'Six ways through a ten-layer cube.', cubeSize: 10,
-    goal: 'Cross 6 different tunnel pairs on a 10×10 cube. Clear your tail to finish.',
-    kind: 'tunnel', target: 6, speed: 2.47, par: 230, limit: 380, points: 45 },
-  { id: 33, title: 'Knife Edge', subtitle: 'The pocket cube, turning every 10 seconds.', cubeSize: 2,
-    goal: 'Collect 10 orbs and survive 8 layer turns on a 2×2 cube in Gap view. Turns come every 10 seconds.',
-    kind: 'rotation', target: 8, orbs: 10, orbsPerFace: 2, speed: 1.42, rotateEvery: 10, par: 125, limit: 205,
-    reward: ['hat_halo', 'hat_grad'], rewardLabel: 'Choose a hat', fallback: 200 },
-  { id: 34, title: 'Chrome Gauntlet', subtitle: 'Nine polished layers that never stop turning.', cubeSize: 9,
-    goal: 'Heal 6 tunnel pairs, collect 30 orbs and survive 6 turns on a 9×9 chrome cube. Turns come every 10 seconds. Clear your tail to finish.',
-    kind: 'restore', target: 6, orbs: 30, rotations: 6, speed: 2.47, rotateEvery: 10, par: 355, limit: 540, points: 50 },
-  { id: 35, title: 'Hollow Siege', subtitle: 'Enemies and bombs inside an open frame.', cubeSize: 8,
-    goal: 'Surround a tunnel to heal it, use your ability twice, disarm 2 bombs, defeat 3 enemies, collect 24 orbs and restore 4 pairs on a hollow 8×8 cube. Tunnel deposits seal after the surround and ability tasks.',
-    kind: 'mastery', target: 4, orbs: 24, speed: 2.55, rotateEvery: 14, par: 405, limit: 625,
-    mechanics: { ringHeals: 1, signatures: 2, bombs: 2, kills: 3 },
-    reward: ['skin_toxic', 'skin_bubble'], rewardLabel: 'Choose a skin', fallback: 250 },
-  { id: 36, title: 'Ghost Storm', subtitle: 'Four elements on a cube with no stickers.', cubeSize: 6,
-    goal: 'Collect 4 elemental orbs, 20 orbs and heal 3 pairs on a 6×6 wireframe cube while layers turn every 11 seconds.',
-    kind: 'mastery', target: 3, orbs: 20, speed: 2.55, rotateEvery: 11, par: 340, limit: 515,
-    mechanics: { elementPickups: 4 },
-    reward: ['accessory_buttonGoggles', 'accessory_crookedBow'], rewardLabel: 'Choose an accessory', fallback: 250 },
-  { id: 37, title: 'Brick Blast', subtitle: 'Ten layers of bricks, blown apart three times.', cubeSize: 10,
-    goal: 'Ride out 3 explosions, land 2 rocket flights, collect 30 orbs and heal 4 pairs on a 10×10 brick cube.',
-    kind: 'mastery', target: 4, orbs: 30, speed: 2.47, rotateEvery: 14, par: 450, limit: 675,
-    mechanics: { explodes: 3, rockets: 2 }, points: 60 },
-  { id: 38, title: 'Mirror Numbers', subtitle: 'Numbers on this side. Twins on the far side.', cubeSize: 7,
-    goal: 'Heal 6 tunnel pairs, collect 30 orbs and survive 8 turns on a 7×7 cube in Numbers view with the far-side window open. Turns come every 8 seconds. Clear your tail to finish.',
-    kind: 'restore', target: 6, orbs: 30, rotations: 8, speed: 2.47, rotateEvery: 8, par: 340, limit: 515,
-    reward: ['scheme_inkwell', 'scheme_vaporwave'], rewardLabel: 'Choose a palette', fallback: 250 },
-  { id: 39, title: 'Mega Crawl', subtitle: 'Fifteen layers. The largest cube there is.', cubeSize: 15,
-    goal: 'Collect 40 orbs, including all 6 colors, on the 15×15 mega cube.',
-    kind: 'orbs', target: 40, colors: 6, speed: 2.62, par: 355, limit: 570, points: 75 },
-  { id: 40, title: 'Worm Eternal', subtitle: 'Every size of trouble, every trick, one final cube.', cubeSize: 10,
-    goal: 'Master all 5 elements, ride out 2 explosions, boost twice, land 2 double jumps and a rocket flight, catch 4 remote orbs, surround a tunnel, use your ability twice, disarm 2 bombs and defeat 6 enemies. Collect 40 orbs, survive 10 turns and restore all 6 pairs on a 10×10 cube with one consistent tile style. Surround and ability tasks unlock tunnel sealing.',
-    kind: 'mastery', target: 6, orbs: 40, rotations: 10, speed: 2.55, rotateEvery: 10, par: 650, limit: 975,
-    mechanics: { ringHeals: 1, signatures: 2, boosts: 2, doubleJumps: 2, rockets: 1, magnetOrbs: 4, explodes: 2, elements: 5, bombs: 2, kills: 6 },
-    reward: ['skin_mono', 'skin_cherry'], rewardLabel: 'Choose a grandmaster skin', fallback: 500 },
-  ...WORM_GENERATED_LEVELS,
-];
+// Every level is authored in campaign.js; the mission sentence is derived from
+// its targets so the map, pause card and checklist never disagree.
+export const WORM_STORY_LEVELS = STORY_LEVEL_DATA.map(level => ({ ...level, goal: storyGoalText(level) }));
 // Ten levels to a chapter. Unlocks stay linear across chapter boundaries: the
 // first level of a chapter opens when the last level of the one before is cleared.
 export const STORY_CHAPTER_SIZE = 10;
-export const WORM_STORY_CHAPTERS = [
-  { id: 1, title: 'The Broken Way Home', blurb: 'Great Worm War 3 left the Flip Cube damaged. Grow, heal, and help Mobi recover a way home.' },
-  { id: 2, title: 'The Old Routes', blurb: 'Trace the passages across cubes of every size. The damage follows a pattern Mobi begins to recognize.' },
-  { id: 3, title: 'Strange Views', blurb: 'Hollow frames, bare wireframe, bricks, biome colors and the far side—with one tile style per level.' },
-  { id: 4, title: 'Grand Crawl', blurb: 'Nine, ten and fifteen layers. Every view and power, on shorter clocks.' },
-  ...WORM_GENERATED_CHAPTERS,
-].map(chapter => ({ ...chapter, levels: WORM_STORY_LEVELS.filter(level => storyChapterId(level.id) === chapter.id) }));
+export const WORM_STORY_CHAPTERS = STORY_CHAPTER_DATA
+  .map(chapter => ({ ...chapter, levels: WORM_STORY_LEVELS.filter(level => storyChapterId(level.id) === chapter.id) }));
 export function storyChapterId(id) { return Math.ceil(id / STORY_CHAPTER_SIZE); }
 export const storyChapter = id => WORM_STORY_CHAPTERS.find(chapter => chapter.id === storyChapterId(id)) ?? null;
 // Position within the chapter, 1-10.
@@ -196,7 +20,10 @@ export const isChapterFinale = id => storyChapterIndex(id) === STORY_CHAPTER_SIZ
 export const storyLaunchSettings = level => ({ storyLevel: level.id, cubeSize: level.cubeSize ?? 5, megaMode: (level.cubeSize ?? 5) >= 15,
   wormSpeed: level.speed, wormOrbCount: 1, wormholeInterval: 30, wormCombatMode: false, wormEnemiesEnabled: false });
 export const STORY_MECHANIC_LABELS = { steamFusions: 'Steam fusions (Water → Fire)', quenchFusions: 'Quench fusions (Fire → Water)', boosts: 'boosts finished', doubleJumps: 'double jumps landed', rockets: 'rocket landings',
-  magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements mastered', uniqueElements: 'different elements collected', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated' };
+  magnetOrbs: 'remote magnet catches', explodes: 'explosions ridden out', elements: 'elements mastered', uniqueElements: 'different elements collected', elementPickups: 'elemental orbs collected', ringHeals: 'ring heals', signatures: 'signatures used', bombs: 'bombs disarmed', kills: 'enemies defeated',
+  bodyLength: 'body segments', bodyJumps: 'body jumps', selfPasses: 'passes through the Core', multiHeals: 'double heals', fusions: 'fusions', uniqueFusions: 'different fusions' };
+// Short nouns for the plain progress line, keyed like the checklist.
+const PROGRESS_NOUNS = { ...STORY_MECHANIC_LABELS, orbs: 'orbs', colors: 'colors', rotations: 'turns', uniqueTunnels: 'pairs crossed', healed: 'pairs healed' };
 // A repeating authored cycle spans all axes and includes central layers. Retain
 // the normal warning and collision transaction; never steer hazards at the head.
 export const storyRotationCycle = size => [
@@ -246,7 +73,7 @@ export function storyOutcome(level, metrics) {
 // Explain the actual physical transition, rather than calling every completion
 // delay a tail-clearance problem. Called only after the checklist is complete.
 export function storyFinishHint(level, metrics) {
-  const needsTail = ['tunnel', 'collector', 'restore'].includes(level.kind);
+  const needsTail = TAIL_KINDS.includes(level.kind);
   if (metrics.onSurface === false && (needsTail || level.mechanics)) return 'Return to the surface to finish';
   if ((level.mechanics || level.kind === 'jump') && !metrics.landed) return 'Land to finish';
   if (metrics.healSettled === false && (needsTail || level.mechanics)) return 'Let the healing animation finish';
@@ -256,22 +83,21 @@ export function storyFinishHint(level, metrics) {
   return null;
 }
 
+// One status line from the same checklist the HUD shows. Short lists name every
+// count; long ones summarize and name the next unfinished task.
 export function storyProgressText(level, metrics) {
-  const count = (n, target, label) => `${Math.min(n || 0, target)}/${target} ${label}`;
-  if (level.mechanics) {
-    const goals = [...Object.entries(level.mechanics), ['healed', level.target], ['orbs', level.orbs], ...(level.rotations ? [['rotations', level.rotations]] : [])];
-    const missing = goals.filter(([key, target]) => (metrics[key] ?? 0) < target);
-    const next = missing[0];
-    return `${goals.length - missing.length}/${goals.length} goals · ${next ? count(metrics[next[0]], next[1], STORY_MECHANIC_LABELS[next[0]] ?? { healed: 'pairs healed', orbs: 'orbs', rotations: 'turns' }[next[0]]) : storyFinishHint(level, metrics) ?? 'Tasks complete'}${metrics.powerHint ? ` · ${metrics.powerHint}` : ''} · ${Math.max(0, Math.ceil(level.limit - metrics.elapsed))}s left`;
+  const goals = storyChecklist(level, metrics);
+  const line = goal => `${goal.value}/${goal.target} ${PROGRESS_NOUNS[goal.key]}`;
+  const clock = `${Math.max(0, Math.ceil(level.limit - metrics.elapsed))}s left`;
+  if (goals.length > 4) {
+    const next = goals.find(goal => !goal.done);
+    return [`${goals.filter(goal => goal.done).length}/${goals.length} goals`, next ? line(next) : storyFinishHint(level, metrics) ?? 'Tasks complete',
+      metrics.powerHint, clock].filter(Boolean).join(' · ');
   }
-  const parts = [count(level.kind === 'orbs' ? metrics.orbs : level.kind === 'tunnel' ? metrics.uniqueTunnels
-    : level.kind === 'jump' ? metrics.bodyJumps : level.kind === 'rotation' ? metrics.rotations : metrics.healed,
-  level.target, { orbs: 'orbs', tunnel: 'pairs crossed', jump: 'body jumps', rotation: 'turns', collector: 'pairs healed', restore: 'pairs healed' }[level.kind])];
-  if (level.orbs) parts.push(count(metrics.orbs, level.orbs, 'orbs'));
-  if (level.colors) parts.push(count(metrics.colors, level.colors, 'colors'));
-  if (level.rotations) parts.push(count(metrics.rotations, level.rotations, 'turns'));
-  if (!metrics.tailClear && ['tunnel', 'collector', 'restore'].includes(level.kind)) parts.push('Tail in transit');
-  parts.push(`${Math.max(0, Math.ceil(level.limit - metrics.elapsed))}s left`);
+  const parts = goals.map(line);
+  if (!metrics.tailClear && TAIL_KINDS.includes(level.kind)) parts.push('Tail in transit');
+  if (metrics.powerHint) parts.push(metrics.powerHint);
+  parts.push(clock);
   return parts.join(' · ');
 }
 
@@ -283,6 +109,7 @@ export function storyChecklist(level, metrics = {}) {
   const labels = { steamFusions: 'Make Steam: Water → Fire', quenchFusions: 'Make Quench: Fire → Water', boosts: 'Finish boosts', doubleJumps: 'Land double-jumps', rockets: 'Land a rocket flight',
     magnetOrbs: 'Catch orbs with a magnet', explodes: 'Ride out an explosion', elements: 'Use each element', uniqueElements: 'Collect different elements', elementPickups: 'Pick up elemental orbs', ringHeals: 'Surround a tunnel',
     signatures: 'Use your ability', bombs: 'Disarm bombs', kills: 'Defeat enemies',
+    bodyLength: 'Grow your worm', selfPasses: 'Pass yourself in the Core', multiHeals: 'Double heals', fusions: 'Fuse two elements', uniqueFusions: 'Different fusions',
     orbs: 'Collect orbs', colors: "Collect each color", uniqueTunnels: "Cross tunnel pairs",
     bodyJumps: 'Jump over your body', rotations: 'Survive layer turns', healed: 'Heal tunnel pairs' };
   return Object.entries(targets).map(([key, target]) => {

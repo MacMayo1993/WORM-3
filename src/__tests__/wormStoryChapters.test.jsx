@@ -93,7 +93,7 @@ describe('mini cube precision stages', () => {
     for (const { size, sim, staged } of [normal, classic]) {
       const tiles = 6 * size * size;
       expect(sim.powerups.length / tiles).toBeLessThanOrEqual(0.6);
-      if (level.id <= 40) expect(sim.powerups.length).toBeGreaterThan(level.orbs ?? (level.kind === 'orbs' ? level.target : 0));
+      // A pocket deck cannot hold its whole quota at once; the recurring refill supplies the rest.
       for (const face of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
         const pickups = sim.powerups.filter(orb => orb.dirKey === face);
         expect(pickups.length).toBeGreaterThanOrEqual(2);
@@ -120,8 +120,8 @@ describe.each(WORM_STORY_LEVELS.filter(level => level.id > 10))('level $id: $tit
     const pairs = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
     expect(tunnels).toHaveLength(Math.min(2,pairs));
     expect(tunnels.length + staged.pendingMouths.length).toBe(pairs);
-    // Authored opening inventories are unchanged; new routes may rely on real refills.
-    if (level.id <= 40) expect(sim.powerups.length).toBeGreaterThanOrEqual(Math.max(level.orbs ?? 0, level.kind === 'orbs' ? level.target : 0));
+    // Larger boards stage the early quotas up front; pocket decks and later routes rely on real refills.
+    if (level.id <= 40 && size >= 4) expect(sim.powerups.length).toBeGreaterThanOrEqual(Math.max(level.orbs ?? 0, level.kind === 'orbs' ? level.target : 0));
     const colors = new Set(sim.powerups.map(orb => staged.cubies[orb.x][orb.y][orb.z].stickers[orb.dirKey].curr));
     expect(colors.size).toBe(6);
     const body = new Set(storyBodyPath(size, level).map(([x, y]) => `${x},${y},${size - 1},PZ`));

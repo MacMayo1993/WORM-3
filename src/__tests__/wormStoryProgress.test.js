@@ -1,11 +1,12 @@
 import { beforeEach, it, expect } from 'vitest';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress, readPlayerSave, sanitizeProgress } from '../progression/model.js';
-import { storyLevel, storyOutcome, storyUnlocked } from '../worm/story/levels.js';
+import { storyLevel, storyOutcome, storyUnlocked, storyChecklist } from '../worm/story/levels.js';
 import { getStoreItem } from '../utils/storeCatalog.js';
 import { storyHudSnapshot } from '../worm/story/hudSnapshot.js';
 const state = () => useGameStore.getState();
-const won = { alive: true, elapsed: 10, cuts: 0, peakLength: 100, orbs: 18, colors: 6 };
+const won = { alive: true, elapsed: 10, cuts: 0, peakLength: 100, landed: true,
+  ...Object.fromEntries(storyChecklist(storyLevel(1)).map(goal => [goal.key, goal.target])) };
 function start(id = 1) {
   state().initWormMode(undefined, undefined, 3.5, 1, 30, null, true, true, id);
   useGameStore.setState({ wormStoryReady: true, wormGamePhase: 'active' });
@@ -79,8 +80,8 @@ it('sanitizes old, malformed, and gapped saves without unlocking reward claims',
   expect(sanitizeProgress({ wormStory: { stars: { 1: 3, 2: 4, 3: 1 }, claimed: { 3: 'hat_party' } } }).wormStory).toEqual({ stars: { 1: 3 }, claimed: {} });
 });
 it('requires every physical objective and rejects expiration or old tutorial clears', () => {
-  const complete = { ...won, orbs: 30, colors: 6, uniqueTunnels: 4, bodyJumps: 4, landed: true,
-    rotations: 6, rotationSettled: true, healed: 6, remaining: 0, tailClear: true };
+  const complete = { ...won, orbs: 36, colors: 6, uniqueTunnels: 5, bodyJumps: 5, landed: true,
+    rotations: 8, rotationSettled: true, healed: 6, remaining: 0, tailClear: true };
   for (let id = 1; id <= 6; id++) {
     expect(storyOutcome(storyLevel(id), complete)).toMatchObject({ stars: 3 });
     expect(storyOutcome(storyLevel(id), { ...complete, elapsed: storyLevel(id).limit + 0.01 })).toBeNull();
@@ -91,7 +92,7 @@ it('requires every physical objective and rejects expiration or old tutorial cle
   expect(storyOutcome(storyLevel(4), { ...complete, rotationSettled: false })).toBeNull();
   expect(storyOutcome(storyLevel(5), { ...complete, colors: 5 })).toBeNull();
   expect(storyOutcome(storyLevel(6), { ...complete, remaining: 1 })).toBeNull();
-  expect(storyOutcome(storyLevel(6), { ...complete, orbs: 29 })).toBeNull();
+  expect(storyOutcome(storyLevel(6), { ...complete, orbs: 35 })).toBeNull();
   expect(storyOutcome(storyLevel(6), { ...complete, rotations: 5 })).toBeNull();
 });
 

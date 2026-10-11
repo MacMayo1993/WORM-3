@@ -266,7 +266,7 @@ The codebase already contains most of the parts. This plan joins them into one b
 | Tunnels trigger automatically on crawl-in; jumping over avoids them; jumping while on dives in | `worm/healerWorm/wormSim.js` crawl step | Invert: jump on to ride. |
 | Active-tunnel cap halved to 10 because open tunnels "became terrain" | `worm/healerWorm/constants.js` | Pads remove the cause, so the cap can be re-tuned. |
 | Turn hazard: inverse-scramble queue every 10 s, rotation-preview rim | `worm/HealerWormMode.jsx`, `SliceWarningLights.jsx` | The Rumbler becomes the warning inside the game world. |
-| Mobi dialogue; MOBI character ("Multi Orientable Block Intelligence") whose ability opens a tunnel | `MobiIntroScreen.jsx`, `worm/wormCharacterData.js`, `healerWorm/signatures.js` | Mobi is the Flip Cube's native. |
+| Mobi dialogue; MOBI character ("Multi-Oriented Block Intelligence") whose ability opens a tunnel | `MobiIntroScreen.jsx`, `worm/wormCharacterData.js`, `healerWorm/signatures.js` | Mobi is the Flip Cube's native. |
 | Menu cube flips its face centres and sends worms through them | `MainMenu.jsx`, `menuCenterPortals.js`, `MenuFlipWave.jsx` | Those centre flips become real pads. |
 
 ## 2. Pillars
@@ -471,7 +471,17 @@ The gates copy the Lightning storm's (`lightningStorm.js` and the `runStorm` gat
 
 ## 6. Mobi, WORM³ and the Flip Cube
 
-### Story opening extension — 2026-10-08
+### Story canon — 2026-10-11 (supersedes the 2026-10-08 opening below)
+
+MOBI is a **Multi-Oriented Block Intelligence** from **the Projective Plane**.
+The Flip Cube is his ship, not a fragment of his world. It survived **W³, the
+Great World Worm War**, and crash-landed here broken. The World Worm grew so long
+that it met its own tail mirrored and attacked it; its head came along in the
+crash, trapped in the Core. The full 120-level arc, chapter by chapter, is in
+[worm-story-campaign.md](worm-story-campaign.md). Where §6.1–6.3 below disagree,
+that document and `docs/COPY_STYLE.md` win.
+
+### Story opening extension — 2026-10-08 (historical)
 
 The demo and WORM levels 1–20 now frame the lost cube through the aftermath of
 **Great Worm War 3**. Twins and tunnels predate the war; armies used the existing
@@ -511,7 +521,7 @@ Recommended: in the finale, the way home stays *open*, and Mobi doesn't leave. T
 - **The Core.** The middle of the Flip Cube, the only spot that is its own twin. Every tunnel passes through it.
 - **Worms.** WORM³ natives who ride tunnels.
 - **The Rumbler.** Came along with the Flip Cube. Lives under the tiles and can't get through the Core (cover choice).
-- **Mobi.** Multi Orientable Block Intelligence: a little block from WORM³ who can open doors (Create Wormhole).
+- **Mobi.** Multi-Oriented Block Intelligence: a ferry pilot from the Projective Plane who can open doors (Create Wormhole).
 
 ### 6.3 Where Mobi says it (draft lines, house style)
 

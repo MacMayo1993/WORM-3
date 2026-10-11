@@ -3,7 +3,7 @@ export function requiredPowerCycles(level) {
   const m=level.mechanics??{};
   // Budget repeated quantities too: one elemental pickup per offer, and at
   // most four quest catches supported by each magnet offer in offerStoryPower.
-  return Math.max(2,2*((m.steamFusions??0)+(m.quenchFusions??0)),m.explodes??0,m.rockets??0,m.elementPickups??0,Math.ceil((m.magnetOrbs??0)/4));
+  return Math.max(2,2*((m.steamFusions??0)+(m.quenchFusions??0)),m.explodes??0,m.rockets??0,m.elementPickups??0,Math.ceil((m.magnetOrbs??0)/4),m.fusions??0,m.uniqueFusions??0);
 }
 export function assess(record, character='glow', scenario={}) {
   const level=record.config, stage=record.stages[character], powerPool=stage.powerCycle.filter(x=>!(scenario.disabledPowers??[]).includes(x));
@@ -30,6 +30,15 @@ export function assess(record, character='glow', scenario={}) {
       detail='Collect '+(key==='steamFusions'?'Water → Fire':'Fire → Water')+' during one elemental window. Missed partners expire; the base can be offered again. Route execution needs a playtest.';
       state='playtest';
       if(!powerPool.includes('water')||!powerPool.includes('fire'))fail('Both water and fire are required for this fusion.');
+    } else if(['fusions','uniqueFusions'].includes(key)) {
+      available=distinct.length+' types · paired offers';
+      detail='Two distinct elements are offered together; collecting both within one elemental window fuses them, and pickup order picks the recipe. Route execution needs a playtest.';
+      state='playtest';
+      if(distinct.length<2||(key==='uniqueFusions'&&target>distinct.length*(distinct.length-1)))fail('Not enough distinct elements are offered for these fusions.');
+    } else if(key==='bodyLength') {
+      available=recurring?'Recurring food':String(initial)+' orbs';
+      detail='Peak body length counts. Each orb adds 3 segments; deposits shrink the worm afterwards without removing credit.';
+      if(!recurring&&10+3*initial<target)fail('Opening food cannot grow the worm this long without refills.');
     } else if(['elements','uniqueElements','elementPickups'].includes(key)) {
       available=distinct.length+' types · repeats';
       detail=key==='elements'?'Mastery requires actions: water momentum, fire trail, grass spring launch, ice jump/landing, lightning survival. Pickup alone earns no mastery credit.':key==='uniqueElements'?'Distinct types count once on pickup. Duplicate pickups do not advance variety.':'Any elemental pickup earns quantity credit; distinct types are not required by this objective.';
@@ -50,8 +59,8 @@ export function assess(record, character='glow', scenario={}) {
       if(!level.rotateEvery)fail('Required turns have no rotation schedule.');
       else if(target*level.rotateEvery>=limit){state='undersupplied';detail='Nominal rotation time consumes the time limit before routing and settling.';}
     } else {
-      available={boosts:'Player control',doubleJumps:'Player control',bodyJumps:'Staged body route',signatures:'Character ability',ringHeals:'Staged tunnels',bombs:'Recurring bombs',kills:'Recurring enemy rifts'}[key]??'Unverified';
-      detail={boosts:'Finish the boost; pressing the control is not completion.',doubleJumps:'Two jumps in one flight, then land.',bodyJumps:'Cross your own body while airborne, then land; empty jumps do not count.',signatures:'Successful ability activation earns credit; character-specific behavior needs a playtest.',ringHeals:'Cover the surrounding tiles to heal. Healing resources recur on all colors.',bombs:'Dedicated supply retries while disarms are outstanding; surround the bomb before its fuse ends.',kills:'Dedicated enemy rifts recur while kills are outstanding; aim, combat and survival need a playtest.'}[key]??'No supply rule has been mapped for this objective.';
+      available={boosts:'Player control',doubleJumps:'Player control',bodyJumps:'Staged body route',signatures:'Character ability',ringHeals:'Staged tunnels',bombs:'Recurring bombs',kills:'Recurring enemy rifts',selfPasses:'Staged tunnels',multiHeals:'Staged tunnels'}[key]??'Unverified';
+      detail={boosts:'Finish the boost; pressing the control is not completion.',doubleJumps:'Two jumps in one flight, then land.',bodyJumps:'Cross your own body while airborne, then land; empty jumps do not count.',signatures:'Successful ability activation earns credit; character-specific behavior needs a playtest.',ringHeals:'Cover the surrounding tiles to heal. Healing resources recur on all colors.',bombs:'Dedicated supply retries while disarms are outstanding; surround the bomb before its fuse ends.',kills:'Dedicated enemy rifts recur while kills are outstanding; aim, combat and survival need a playtest.',selfPasses:'Dive into a tunnel while the tail is still inside one; credit lands when the head resumes crawling. Needs a long body near two mouths.',multiHeals:'A pair seals while another heal on a different pair still rides in the body, or one surround seals two pairs.'}[key]??'No supply rule has been mapped for this objective.';
       state='playtest';
       if(!record.completionContract.acceptsComplete)fail('The source completion predicate rejects the complete metric fixture.');
     }

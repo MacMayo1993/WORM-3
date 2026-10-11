@@ -1,6 +1,6 @@
 # WORM³ campaign workshop
 
-The game contains the original 40 authored levels plus 80 generated levels (41–120), grouped into 12 chapters. The shipped recipe is `worm-100-plus`, balanced quests, standard pacing, board sizes 3–10, combat and mastery enabled. Generation uses only the original 40 world templates so later generation does not change earlier output.
+The game ships 120 authored levels in 12 chapters, all in `src/worm/story/campaign.js` (Mobi's lines are in `narrative.js`). Earlier builds generated levels 41–120 from a seeded recipe; that campaign was replaced by authored chapters with a story arc and harder, progressive objectives (body length, passes through the Core, double heals, fusions). The seeded generator remains here as a drafting workshop only. It no longer writes game files.
 
 ## Local auditor and generator
 
@@ -8,16 +8,9 @@ After `npm ci`, run `npm run worm:tools`, then open <http://127.0.0.1:4174/>. Th
 
 This command binds only to loopback. Tool files are outside the game public directory and its normal Vite build; they are not published to GitHub Pages. The existing hosted workshop remains owner-private. If hosting this tool elsewhere, configure authentication before making it accessible. Local builds show a local-only indicator, not an authentication claim.
 
-## Reproduce or extend the campaign
+## Drafting new levels
 
-```sh
-npm run worm:generate -- --check
-npm run worm:generate -- --total 150
-npm run worm:generate -- --settings ./recipe.json
-npm run worm:generate -- --pack ./exported-pack.json
-```
-
-The CLI validates consecutive IDs, chapter coverage, supported schema, actual Standard/Classic staging, tunnel allowances, repeated power placement, elemental variety, magnet catch support, food replenishment, and completion predicates before writing `src/worm/story/generated.js`. `--check` compares the output without writing. JSON recipes use the fields in `WORM_GENERATION_RECIPE`; exported packs retain manual level edits. Generation replaces the generated portion of the campaign. Review the diff and rerun tests before committing. Original levels 1–40 and their rewards are preserved.
+The generator page drafts seeded packs and checks them against the current runtime. Copy any level you keep into `src/worm/story/campaign.js` by hand, give it a world in `worlds.js` and Mobi's lines in `narrative.js`, then run the story tests: they stage every level for both orb densities, cycle its power offers, and check its completion rule, goal text and time budget.
 
 Quest supply is checked using real game functions, not a simulated inventory model. A passing check does not prove navigation, combat difficulty, or a complete player run. Playtest chapter finales and action-based objectives before release. Timers reserve repeated pickup opportunities and routing slack; no lifetime pickup cap is introduced. The conservative power budget uses the largest of two cycles, explosion/rocket counts, elemental pickup quantity, and magnet catches divided by four (rounded up). Elemental effects block subsequent offers, and each magnet offer supports at most four quest catches. Both edited and imported packs must pass this timing check before the CLI writes campaign files or the workshop exports an integration module.
 

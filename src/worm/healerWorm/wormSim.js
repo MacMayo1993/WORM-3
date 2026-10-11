@@ -356,6 +356,9 @@ export function makeWormSim(size) {
 
         // ── One-shot flags consumed by renderers ──────────────────────────────
         willHeal: false,
+        // The head dived while part of the body was still riding another tunnel:
+        // the worm passes itself in the Core. Credited once it is safely crawling.
+        selfPassPending: false,
         healFired: false,
         pendingHealBurst: null,
         healPauseT: 0,            // seconds the crawl is frozen to show a ring-heal pop
@@ -498,6 +501,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.tunnelPassages = [];
     sim.ringHealedTunnelKeys.clear();
     sim.willHeal = false;
+    sim.selfPassPending = false;
     sim.healFired = false;
     sim.pendingHealBurst = null;
     sim.healPauseT = 0;
@@ -876,6 +880,28 @@ export function killWormSim(sim, ctx, details = null) {
     ctx.onDeath(details, Math.floor(sim.timeAlive));
 }
 
+// Part of the body is still inside an earlier tunnel's band, so a new dive
+// sends the head through the Core past its own tail.
+function bodyStillRiding(sim) {
+    for (const passage of sim.tunnelPassages) {
+        if (!tunnelTailCleared(passage, sim.stepHistory, sim.tailLength)) return true;
+    }
+    return false;
+}
+
+// Another heal on a different pair is already riding in the body: the head is
+// diving through a paying tunnel, or an earlier passage still waits for the
+// tail. Sealing now heals two pairs with one body.
+function otherHealRiding(sim, ctx, tunnelKey, passage = null) {
+    const diving = sim.phase === 'windup' || sim.phase === 'tunnel' || sim.phase === 'exiting';
+    if (diving && sim.currentTunnelKey !== tunnelKey &&
+        (sim.willHeal || (ctx.isStoryTunnelTrial?.() && ctx.allowTunnelHeal?.() !== false))) return true;
+    for (const other of sim.tunnelPassages) {
+        if (other !== passage && other.heal && other.tunnelKey !== tunnelKey) return true;
+    }
+    return false;
+}
+
 function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = false, intentional = false, landingHeading = null) {
     if (usesRaisedPlatforms(ctx) && !skipDeposit && padEntryDecision({
         rule: 'pad', event: intentional ? 'land' : 'crawl', flipped: true, resolved: true,
@@ -975,6 +1001,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey, skipDeposit = fa
     const exitTileKey = tileKey(tunnel.exit);
     ttFilterInPlace(sim.tileTrail, k => k !== exitTileKey);
     sim.tunnelProgress = 0;
+    sim.selfPassPending = bodyStillRiding(sim);
     // Raised landings loop around the rim before diving; keep the existing history.
     sim.phase = 'windup';
     ctx.feel('dive');
@@ -1218,8 +1245,11 @@ function tryWormholeRingHeal(sim, size, ctx) {
     const hits = findCoveredWormholeRings(tunnels, _ringOccupied, size, cubies)
         .filter(hit => !hit.tunnelKey || !sim.ringHealedTunnelKeys.has(hit.tunnelKey));
     if (hits.length === 0) return false;
-    for (const hit of hits) {
+    for (const [index, hit] of hits.entries()) {
         const { tunnel, tunnelKey } = hit;
+        // One surround that seals several pairs, or one sealed while a paid
+        // traversal still rides in the body, heals pairs together.
+        if (index > 0 || otherHealRiding(sim, ctx, tunnelKey)) ctx.onStoryMechanic?.('multiHeals');
         if (tunnelKey) sim.ringHealedTunnelKeys.add(tunnelKey);
         const entryStableKey = getStableKey(
             tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, cubies
@@ -1648,6 +1678,10 @@ const PHASE_HANDLERS = {
             breakGlowTrail(sim.signature);
             ttReset(sim.pathHistory, tileKey(sim.pos));
             ctx.onCrawlResume();
+            if (sim.selfPassPending) {
+                sim.selfPassPending = false;
+                ctx.onStoryMechanic?.('selfPasses');
+            }
             sim.onFlippedTile = false;
             sim.lastFlipped = false;
         },
@@ -2611,9 +2645,11 @@ export function stepWormSim(sim, delta, size, ctx) {
         const pending = passage.heal;
         if (pending) {
             const { tunnel, stableKey, tunnelKey } = pending;
+            const doubled = otherHealRiding(sim, ctx, tunnelKey, passage);
             sim.healFired = true;
             sim.healed += 1;
             ctx.applyHeal(tunnel.entry, tunnel.exit, stableKey, sim.healed);
+            if (doubled) ctx.onStoryMechanic?.('multiHeals');
             releaseMobiTunnel(sim, tunnel);
             sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
             if (!ctx.isStoryMode?.()) spawnSpecial(sim, size, ctx, tunnel.exit);

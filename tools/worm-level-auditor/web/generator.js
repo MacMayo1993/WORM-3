@@ -16,7 +16,9 @@ export function requiredPowerCycle(level){
  const m=level.mechanics??{},types=new Set();
  if(m.steamFusions||m.quenchFusions){types.add('water');types.add('fire');}
  if(m.magnetOrbs)types.add('magnet');if(m.explodes)types.add('explode');if(m.rockets)types.add('rocket');
- for(const e of ELEMENTS.slice(0,Math.max(m.elementPickups??0,m.uniqueElements??0,m.elements??0)))types.add(e);
+ const pool=Math.max(m.elementPickups??0,m.uniqueElements??0,m.elements??0);
+ for(const e of ELEMENTS.slice(0,pool))types.add(e);
+ if(m.fusions||m.uniqueFusions)for(const e of ELEMENTS.slice(0,pool||ELEMENTS.length))types.add(e);
  return CYCLE.filter(x=>types.has(x));
 }
 export function modeledPowerBudget(level,misses=2){
@@ -109,5 +111,5 @@ export function generateCampaign(raw,worldTemplates){
 }
 export function integrationModule(pack,sourceCommit){
  const levels=pack.levels.map(x=>x.config),worlds=Object.fromEntries(pack.levels.map(x=>[x.config.id,x.world]));
- return '// WORM³ generated campaign. Rebuild with npm run worm:generate.\n// Supply checked; full playthroughs are still required.\nexport const WORM_GENERATION_SOURCE = '+JSON.stringify(sourceCommit)+';\nexport const WORM_GENERATION_RECIPE = '+JSON.stringify(pack.settings,null,2)+';\n\nexport const WORM_GENERATED_LEVELS = '+JSON.stringify(levels,null,2)+';\n\nexport const WORM_GENERATED_WORLDS = '+JSON.stringify(worlds,null,2)+';\n\nexport const WORM_GENERATED_CHAPTERS = '+JSON.stringify(pack.chapters,null,2)+';\n';
+ return '// WORM³ draft pack from the campaign workshop. Copy kept levels into src/worm/story/campaign.js by hand.\n// Supply checked; full playthroughs are still required.\nexport const WORM_GENERATION_SOURCE = '+JSON.stringify(sourceCommit)+';\nexport const WORM_GENERATION_RECIPE = '+JSON.stringify(pack.settings,null,2)+';\n\nexport const WORM_GENERATED_LEVELS = '+JSON.stringify(levels,null,2)+';\n\nexport const WORM_GENERATED_WORLDS = '+JSON.stringify(worlds,null,2)+';\n\nexport const WORM_GENERATED_CHAPTERS = '+JSON.stringify(pack.chapters,null,2)+';\n';
 }

@@ -3,7 +3,7 @@ import { WORM_STORY_LEVELS, storyLevel, storyChecklist, storyOutcome } from '../
 
 it('shows every level-seven task separately and checks only completed work', () => {
   const level = storyLevel(7);
-  const goals = storyChecklist(level, { boosts: 2, doubleJumps: 1, rockets: 0, magnetOrbs: 4, orbs: 12, healed: 1 });
+  const goals = storyChecklist(level, { boosts: 3, doubleJumps: 1, rockets: 0, magnetOrbs: 4, orbs: 12, healed: 1 });
   expect(goals.map(g => g.key)).toEqual(['boosts', 'doubleJumps', 'rockets', 'magnetOrbs', 'healed', 'orbs']);
   expect(goals.filter(g => g.done).map(g => g.key)).toEqual(['boosts', 'magnetOrbs']);
   expect(storyChecklist(level).every(g => g.value === 0 && !g.done)).toBe(true);

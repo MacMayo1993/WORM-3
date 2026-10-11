@@ -35,7 +35,7 @@ it('offers reachable ordered partners, counts each recipe, and exposes the same 
   claim();
   expect(offer()).toBe(false); // focus shot is held
   sim.elementalFocusT = 0;
-  const won = { alive: true, elapsed: 90, cuts: 0, peakLength: 100, orbs: 18, healed: 3,
+  const won = { alive: true, elapsed: 90, cuts: 0, peakLength: 100, orbs: level.orbs, healed: level.target,
     remaining: 0, tailClear: true, landed: true, rotationSettled: true };
   for (const [type, effect] of [['fire', 'steam'], ['water', 'quench']]) {
     expect(offer()).toBe(true); // bypass only the ordinary power cooldown
@@ -179,8 +179,9 @@ it.each(prefixLevels)('level $id rejects unrelated elements as substitutes for i
   p.collectedElements = new Set([...required.slice(0, -1), STORY_ELEMENTS[count]]);
   p.elements = new Set(p.collectedElements);
   const read = () => storyMetrics(sim, p, level, { size, rotationEpoch: 0, wormSessionOrbs: 0 }, [], 0);
+  // Every other task is complete; only the element identity goal is in question.
   const won = { alive: true, elapsed: 1, landed: true, tailClear: true, rotationSettled: true, remaining: 0,
-    healed: level.target, orbs: level.orbs, rotations: level.rotations ?? 0 };
+    ...Object.fromEntries(storyChecklist(level).filter(goal => goal.key !== key).map(goal => [goal.key, goal.target])) };
   expect(read()[key]).toBe(count - 1);
   expect(storyOutcome(level, { ...read(), ...won })).toBeNull();
   expect(nextStoryPower(p, level)).toBe(required.at(-1));

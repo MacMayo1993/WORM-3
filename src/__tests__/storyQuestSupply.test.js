@@ -12,20 +12,24 @@ import { ttPush } from '../worm/circularBuffers.js';
 
 // Independent checklist of every authored power quest, including required variety.
 const POOLS = {
-  7: ['magnet', 'rocket'], 8: ['water', 'fire'], 17: ['rocket'], 18: ['explode'],
+  7: ['magnet', 'rocket'], 8: ['water', 'fire', 'grass'], 17: ['rocket'], 18: ['explode'],
   20: ['magnet', 'explode', 'water', 'rocket', 'fire'],
   24: ['water', 'fire'], 27: ['water', 'fire', 'grass'], 28: ['explode', 'rocket'],
   30: ['magnet', 'explode', 'water', 'fire', 'grass'], 36: ['water', 'fire', 'grass', 'ice'],
   37: ['explode', 'rocket'], 40: ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'],
 };
-// Generated quests specify the same canonical inventory; keep the authored table above fixed.
+// Later chapters derive the same canonical inventory; keep the table above fixed.
+// Fusion quests return every element in the level's pool (all five when unset),
+// and ordered Steam/Quench lessons need water and fire.
 for (const level of WORM_STORY_LEVELS.filter(level => level.id > 40)) {
   const m = level.mechanics ?? {}, required = new Set();
   if (m.magnetOrbs) required.add('magnet');
   if (m.explodes) required.add('explode');
   if (m.rockets) required.add('rocket');
+  if (m.steamFusions || m.quenchFusions) { required.add('water'); required.add('fire'); }
   const count = Math.max(m.elements ?? 0, m.uniqueElements ?? 0, m.elementPickups ?? 0);
   for (const element of ['water', 'fire', 'grass', 'ice', 'lightning'].slice(0, count)) required.add(element);
+  if (m.fusions || m.uniqueFusions) for (const element of STORY_ELEMENTS.slice(0, count || STORY_ELEMENTS.length)) required.add(element);
   if (required.size) POOLS[level.id] = ['magnet', 'explode', 'water', 'rocket', 'fire', 'grass', 'ice', 'lightning'].filter(type => required.has(type));
 }
 beforeEach(() => resetLiveRotation());

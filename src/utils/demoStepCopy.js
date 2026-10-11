@@ -19,7 +19,7 @@ export const STEP_COPY = {
   'baby-cube': 'We can mend the Flip Cube by turning it, too. Watch two turns, then twist the cube back until every face is one color.',
   'learn-to-solve': 'Stuck? I can help. Follow the gold layer guide, one turn at a time.',
   'control-tour': 'Let’s find your controls. Tap each highlighted button to see what it does.',
-  'twin-paradox': 'My world had twins long before the war. Every tile has a twin on the opposite side. Turn on Flip, then tap a tile to move the pair together.',
+  'twin-paradox': 'Back home, every spot has a twin. So does every tile on my ship: its twin is on the opposite side. Turn on Flip, then tap a tile to move the pair together.',
   'flip-gateway': 'These were our doorways. Send nine tile pairs through the middle, then bring them back. Start with the face in front of you.',
   'view-showcase': 'There is more to this cube than its surface. Use Next to explore different views of the same cube.',
   'make-it-yours': 'Make this cube yours. Pick colors, tiles, and a background, then close Settings to preview your look. Press Next: Chaos when you’re ready. Your choices stay saved.',

@@ -1,5 +1,3 @@
-import { WORM_GENERATED_WORLDS } from './generated.js';
-
 // Each level uses one authored tile style on all six faces. Face colors keep
 // their gameplay meaning, while previews, retries and play share a stable look.
 // Alternate cube views and backgrounds still give each level its own setting.
@@ -57,7 +55,102 @@ export const STORY_WORLDS = {
   38: world('Mirror Numbers', 'noire', 'nebula', 'mobiusBand', 'orbit', { visualMode: 'sudokube', farSide: true }),
   39: world('Mega Crawl', 'standard', 'fireplace', 'apollonian', 'lanes'),
   40: world('Eternal Crown', 'gemstone', 'shanghai', 'solid', 'orbit'),
-  ...WORM_GENERATED_WORLDS,
+
+  // Chapter 5 · The Long Body
+  41: world('Galley Deck', 'saffron', 'lounge', 'breathingScales', 'lanes'),
+  42: world('Drill Yard', 'terracotta', 'stadium', 'elasticHoneycomb', 'steps'),
+  43: world('Twin Hall', 'pastel', 'umbrella', 'pearlMembrane', 'gates'),
+  44: world('Gearbox Gallery', 'retro', 'desert', 'livingContour', 'diagonals'),
+  45: world('Mending Ward', 'sakura', 'paris', 'coralPolyps', 'diamonds', { visualMode: 'glass' }),
+  46: world('Courier Run', 'sunset', 'shanghai', 'chromaticCilia', 'channels', { visualMode: 'neon' }),
+  47: world('Core Antechamber', 'eclipse', 'nebula', 'myceliumVeins', 'orbit'),
+  48: world('Spring Deck', 'tropical', 'forest', 'dnaHelix', 'branches'),
+  49: world('Guard Post', 'forest', 'cobblestone', 'amoebaMosaic', 'bastions', { visualMode: 'grid' }),
+  50: world('Listening Deck', 'aurora', 'snow', 'bioLattice', 'orbit'),
+
+  // Chapter 6 · Pocket Worlds
+  51: world('Sugar Cube', 'pastel', 'lounge', 'polkaDots', 'corners'),
+  52: world('Closet Deck', 'retro', 'cobblestone', 'knit', 'corners', { visualMode: 'lego' }),
+  53: world('Rope Locker', 'terracotta', 'desert', 'caneWebbing', 'steps'),
+  54: world('Twin Locker', 'mondrian', 'paris', 'checkerboard', 'gates', { visualMode: 'grid' }),
+  55: world('Tool Drawer', 'saffron', 'stadium', 'washi', 'diamonds'),
+  56: world('Dice Deck', 'standard', 'umbrella', 'dice', 'corners', { visualMode: 'gap' }),
+  57: world('Bottle Deck', 'deepsea', 'cave', 'pond', 'diagonals', { visualMode: 'glass' }),
+  58: world('Snake Pit', 'halloween', 'fireplace', 'mosaic', 'corners'),
+  59: world('Hangar Nook', 'artdeco', 'shanghai', 'quiltedSpace', 'channels', { visualMode: 'chrome' }),
+  60: world('The Smallest Door', 'noire', 'blackhole', 'delftTile', 'corners'),
+
+  // Chapter 7 · Weather of War
+  61: world('Rain Deck', 'reef', 'umbrella', 'water', 'lanes'),
+  62: world('Boiler Room', 'lava', 'fireplace', 'emberstorm', 'channels'),
+  63: world('Burning Deck', 'halloween', 'desert', 'lavaLamp', 'diagonals'),
+  64: world('Weather Vane', 'aurora', 'snow', 'auroraWeave', 'branches'),
+  65: world('Conductor Deck', 'cyberpunk', 'shanghai', 'lichtenberg', 'gates', { visualMode: 'neon' }),
+  66: world('Corps Laboratory', 'gemstone', 'lounge', 'cymatics', 'diamonds', { visualMode: 'glass' }),
+  67: world('Storm Front', 'midnight', 'cave', 'plasmaCells', 'orbit'),
+  68: world('Ice Deck', 'arctic', 'snow', 'ice', 'steps'),
+  69: world('Lightning Rods', 'neon', 'nebula', 'magnetFlux', 'bastions'),
+  70: world('Eye of the Storm', 'cosmic', 'blackhole', 'fractalPulse', 'orbit'),
+
+  // Chapter 8 · The War Machine
+  71: world('Grinding Deck', 'noire', 'cave', 'hammeredMetal', 'lanes', { visualMode: 'chrome' }),
+  72: world('Blast Doors', 'lava', 'fireplace', 'shockwave', 'bastions'),
+  73: world('Minefield', 'terracotta', 'desert', 'sand', 'branches'),
+  74: world('Flight Deck', 'sunset', 'stadium', 'carbonFiber', 'lanes'),
+  75: world('Crossfire Deck', 'cyberpunk', 'shanghai', 'circuit', 'diamonds', { visualMode: 'neon' }),
+  76: world('The Fold', 'vaporwave', 'paris', 'foldedHorizon', 'steps'),
+  77: world('Shrapnel Deck', 'retro', 'cobblestone', 'damascus', 'bastions'),
+  78: world('Reactor Deck', 'bioluminescence', 'nebula', 'pulse', 'channels'),
+  79: world('Repair Bay', 'noire', 'lounge', 'metallic', 'bastions', { visualMode: 'chrome' }),
+  80: world('Engine Room', 'lava', 'blackhole', 'liquidChrome', 'orbit'),
+
+  // Chapter 9 · Siege of the Core
+  81: world('Rift Watch', 'midnight', 'blackhole', 'crystalGrowth', 'bastions'),
+  82: world('Front Line', 'artdeco', 'stadium', 'kintsugi', 'lanes'),
+  83: world('Ring of Fire', 'halloween', 'fireplace', 'emberstorm', 'orbit'),
+  84: world('Long Wall', 'terracotta', 'cobblestone', 'cafeWall', 'lanes'),
+  85: world('The Trenches', 'forest', 'cave', 'topographic', 'gates'),
+  86: world('Breach Point', 'eclipse', 'nebula', 'stainedGlass', 'bastions'),
+  87: world('Siege Works', 'retro', 'desert', 'cloisonne', 'channels'),
+  88: world('Counter Deck', 'neon', 'shanghai', 'vortex', 'steps', { visualMode: 'neon' }),
+  89: world('The Bastion', 'gemstone', 'stadium', 'penrose', 'bastions'),
+  90: world('The First Door', 'cosmic', 'blackhole', 'eyeball', 'orbit'),
+
+  // Chapter 10 · Mirror Decks
+  91: world('Reflection Pool', 'deepsea', 'nebula', 'rp2Geodesics', 'gates', { farSide: true }),
+  92: world('Glass Pantry', 'arctic', 'snow', 'falseReflection', 'diamonds', { visualMode: 'glass' }),
+  93: world('Backwards Deck', 'inkwell', 'lounge', 'drosteSpiral', 'orbit', { visualMode: 'sudokube', farSide: true }),
+  94: world('Ghost Deck', 'midnight', 'blackhole', 'neckerFlip', 'steps', { visualMode: 'wireframe' }),
+  95: world('Hall of Mirrors', 'vaporwave', 'paris', 'rubinVase', 'bastions', { hollowMode: true }),
+  96: world('Pocket Mirror', 'sakura', 'umbrella', 'dayOverNight', 'corners', { visualMode: 'gap' }),
+  97: world('Inside-Out Deck', 'bioluminescence', 'cave', 'circleInversion', 'branches'),
+  98: world('Echo Chamber', 'mondrian', 'stadium', 'opConcentric', 'diagonals', { visualMode: 'lego' }),
+  99: world('Twin Strike', 'cyberpunk', 'shanghai', 'holographic', 'diamonds'),
+  100: world('The Center Mirror', 'eclipse', 'nebula', 'mobiusBand', 'orbit', { farSide: true }),
+
+  // Chapter 11 · The Mega Decks
+  101: world('Cargo Hold', 'standard', 'stadium', 'galaxy', 'lanes'),
+  102: world('Ring Corridor', 'deepsea', 'cave', 'hopfFibers', 'gates'),
+  103: world('Big Wheel', 'artdeco', 'desert', 'sundial', 'diagonals'),
+  104: world('Giant’s Pocket', 'saffron', 'umbrella', 'terrazzo', 'corners'),
+  105: world('Freight Deck', 'tropical', 'shanghai', 'stellarLensing', 'channels'),
+  106: world('Mega Storm', 'aurora', 'snow', 'constellation', 'branches'),
+  107: world('Gun Deck', 'noire', 'fireplace', 'gyroidSlice', 'bastions'),
+  108: world('Long Jump', 'sunset', 'paris', 'lightCone', 'steps'),
+  109: world('Observation Deck', 'cosmic', 'nebula', 'sphericalTiling', 'bastions'),
+  110: world('All Decks', 'gemstone', 'blackhole', 'poincareDisk', 'orbit'),
+
+  // Chapter 12 · Through the Middle
+  111: world('The Last Deck', 'eclipse', 'lounge', 'endlessStairs', 'lanes'),
+  112: world('Pocket Gears', 'lava', 'cobblestone', 'impossibleTriangle', 'corners'),
+  113: world('Corps Furnace', 'halloween', 'fireplace', 'emberstorm', 'channels'),
+  114: world('Leaping Deck', 'tropical', 'forest', 'perpetualFall', 'steps'),
+  115: world('Gear Gauntlet', 'retro', 'desert', 'hyperbolicWeave', 'diagonals', { visualMode: 'chrome' }),
+  116: world('Ring Deck', 'gemstone', 'stadium', 'apollonian', 'bastions'),
+  117: world('Swarm Deck', 'cyberpunk', 'shanghai', 'interlockingWings', 'branches', { visualMode: 'neon' }),
+  118: world('Mirror Match', 'inkwell', 'nebula', 'horocycleFlow', 'diamonds', { farSide: true }),
+  119: world('Eve of the End', 'midnight', 'blackhole', 'modularTiling', 'orbit'),
+  120: world('The Core', 'standard', 'nebula', 'infinityTunnel', 'orbit'),
 };
 
 // Face-local paths on the authored 5x5 footprint. Larger stages keep these

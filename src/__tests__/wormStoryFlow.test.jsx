@@ -7,7 +7,7 @@ import { makeCubies } from '../game/cubeState.js';
 import * as storyRuntime from '../worm/story/runtime.js';
 import * as wormSimulation from '../worm/healerWorm/wormSim.js';
 import { ELEMENTAL_FOCUS_DURATION } from '../worm/healerWorm/constants.js';
-import { storyLevel } from '../worm/story/levels.js';
+import { storyLevel, storyChecklist } from '../worm/story/levels.js';
 import { newProgress } from '../progression/model.js';
 import { resetLiveRotation } from '../worm/liveRotation.js';
 import { isHealReady, orbCreditFace } from '../worm/healerWorm/economy.js';
@@ -63,7 +63,8 @@ afterEach(() => { act(() => root.unmount()); host.remove(); state().clearDispari
 it.each([false, true])('claims the displayed result before a fatal next tick when Finish is clicked: %s', finish => {
   begin(1);
   const level = storyLevel(1);
-  const metrics = { alive: true, elapsed: level.par - 0.01, cuts: 0, peakLength: 10, orbs: 18, colors: 6 };
+  const metrics = { alive: true, elapsed: level.par - 0.01, cuts: 0, peakLength: 10, landed: true,
+    ...Object.fromEntries(storyChecklist(level).map(goal => [goal.key, goal.target])) };
   vi.spyOn(storyRuntime, 'storyMetrics').mockReturnValue(metrics);
   frame();
   expect(state().wormStoryResult).toBeNull();
@@ -139,7 +140,7 @@ it('opens at most two tunnel pairs and replaces cleared routes until all four ar
   begin(2);
   expect(state().wormBodyTiles).toBe(0);
   const visited = new Set();
-  for (let i=0; i<4; i++) {
+  for (let i=0; i<storyLevel(2).target; i++) {
     const tunnels = getActiveTunnels(state().cubies,state().size);
     expect(tunnels.length).toBeLessThanOrEqual(2);
     const tunnel = tunnels.find(t => !visited.has(t.pairId));
@@ -152,7 +153,7 @@ it('opens at most two tunnel pairs and replaces cleared routes until all four ar
     frame();
   }
   travelUntil(() => !!state().wormStoryResult);
-  expect(visited.size).toBe(4);
+  expect(visited.size).toBe(storyLevel(2).target);
   expect(worm.tunnelPassages.current).toHaveLength(0);
 });
 it('completes the pocket collection route through real movement with all six colors', () => {
@@ -161,14 +162,15 @@ it('completes the pocket collection route through real movement with all six col
   } } }));
   begin(11);
   expect(state().wormPowerups).toHaveLength(12);
-  for (let pickups = 0; pickups < 12 && !state().wormStoryResult; pickups++) {
+  for (let pickups = 0; pickups < 2 * storyLevel(11).target && !state().wormStoryResult; pickups++) {
     const orb = state().wormPowerups[0];
     expect(orb).toBeTruthy();
-    seek(orb, () => !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
+    // The level can finish a frame after the last pickup, once the worm has landed.
+    seek(orb, () => !!state().wormStoryResult || !state().wormPowerups.some(p => tileKey(p) === tileKey(orb)));
   }
   expect(state().wormStoryResult).toMatchObject({ levelId: 11 });
   expect(state().wormAlive).toBe(true);
-  expect(state().wormSessionOrbs).toBeGreaterThanOrEqual(10);
+  expect(state().wormSessionOrbs).toBeGreaterThanOrEqual(storyLevel(11).target);
 });
 it('crosses all three mini-cube tunnel pairs and clears the tail with the sparser layout', () => {
   act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: {
@@ -195,9 +197,9 @@ it('counts a real body clearance only on landing and requires more than one hop'
   const clock = state().wormStoryProgress; frame(0.2); expect(state().wormStoryProgress).toBe(clock);
   act(() => worm.queueTurn('jump'));
   until(() => worm.isJumping.current);
-  expect(state().wormStoryProgress).toContain('0/4 body jumps');
+  expect(state().wormStoryProgress).toContain(`0/${storyLevel(3).target} body jumps`);
   until(() => !worm.isJumping.current);
-  expect(state().wormStoryProgress).toContain('1/4 body jumps');
+  expect(state().wormStoryProgress).toContain(`1/${storyLevel(3).target} body jumps`);
   expect(state().wormStoryResult).toBeNull();
   begin(3); worm.tailLength.current = 140; until(() => !state().wormAlive); expect(state().wormStoryResult).toBeNull();
 });
@@ -238,10 +240,11 @@ it('publishes replenished orbs after the collection quota and holds refills whil
   begin(6);
   expect(state().wormPowerups).toHaveLength(60);
 });
-it('cannot win Moving Ground by waiting out six turns without collecting the orbs', () => {
+it('cannot win Moving Ground by waiting out its turns without collecting the orbs', () => {
   begin(4); frame();
-  act(() => useGameStore.setState({ rotationEpoch: state().rotationEpoch + 6, animState: null }));
-  frame(); expect(state().wormStoryResult).toBeNull(); expect(state().wormStoryProgress).toContain('6/6 turns');
+  const turns = storyLevel(4).target;
+  act(() => useGameStore.setState({ rotationEpoch: state().rotationEpoch + turns, animState: null }));
+  frame(); expect(state().wormStoryResult).toBeNull(); expect(state().wormStoryProgress).toContain(`${turns}/${turns} turns`);
 });
 it.each(['view-glass', 'fire'])('holds Story time through the entire %s pickup reveal, including its final frame', type => {
   const metricsSpy = vi.spyOn(storyRuntime, 'storyMetrics');
@@ -277,8 +280,11 @@ it.each(['view-glass', 'fire'])('holds Story time through the entire %s pickup r
 });
 
 it('expires with a clear cause and resets the deadline on retry', () => {
-  begin(1);
-  for (let i = 0; i < 6500 && state().wormAlive; i++) frame();
+  const metricsSpy = vi.spyOn(storyRuntime, 'storyMetrics');
+  begin(1); frame();
+  // Skip most of the wait; the final second still runs through real frames.
+  metricsSpy.mock.calls.at(-1)[1].elapsed = storyLevel(1).limit - 1;
+  for (let i = 0; i < 200 && state().wormAlive; i++) frame();
   expect(state().wormDeathDetails).toMatchObject({ reason: 'story-timeout' });
   expect(state().wormStoryResult).toBeNull();
   begin(1); frame(); expect(state().wormStoryProgress).toContain(`${storyLevel(1).limit}s left`);
@@ -451,7 +457,10 @@ it('keeps deposited tunnels open until the ring and signature objectives are met
   begin(9);
   expect(state().size).toBe(6);
   expect(worm.storyBombsNeeded()).toBe(true);
-  act(() => worm.recordStoryBomb(1));
+  for (let id = 1; id <= storyLevel(9).mechanics.bombs; id++) {
+    expect(worm.storyBombsNeeded()).toBe(true);
+    act(() => worm.recordStoryBomb(id));
+  }
   expect(worm.storyBombsNeeded()).toBe(false);
   // Exercise deposits without the independent combat director.
   act(() => useGameStore.setState({ wormEnemiesEnabled: false }));

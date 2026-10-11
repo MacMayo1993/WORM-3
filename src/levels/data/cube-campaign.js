@@ -24,7 +24,7 @@ export const CUBE_CAMPAIGN_LEVELS = [
       text: 'This is a real 3×3 cube, but only the middle layer is out of place. Turn it back to solve the whole cube.',
       tip: 'Grab any tile on the middle horizontal band and rotate that layer until the colors line up again.',
       mobiLines: [
-        "Aloha! I'm a Multi Orientable Block Intelligence...",
+        "Aloha! I'm a Multi-Oriented Block Intelligence...",
         "...but you can call me Mobi for short!",
         "Welcome to your very first cube. Take a breath. This one is easy.",
         "I gave the middle layer a single twist. That's the only thing out of place.",

@@ -5,7 +5,9 @@ import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import WormEntryScreen from '../components/screens/WormEntryScreen.jsx';
 import DeathScreen from '../worm/DeathScreens.jsx';
 import { StoryObjectiveCard, StoryResult } from '../worm/story/StoryCards.jsx';
-import { storyNarrative } from '../worm/story/narrative.js';
+import { storyNarrative, storyBriefingText } from '../worm/story/narrative.js';
+import { storyLevel } from '../worm/story/levels.js';
+import { storyGrowthTarget } from '../worm/story/starGoals.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { newProgress } from '../progression/model.js';
 import { STORY_WORLDS } from '../worm/story/worlds.js';
@@ -27,7 +29,7 @@ it('launches the Chapter 1 siege and finale on 6x6', () => {
   show({ initialPage: 'story' });
   click('Under Siege'); click('Play again');
   expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 9, cubeSize: 6, megaMode: false });
-  expect(host.querySelector('[aria-label="Selected level"]').textContent).toContain('defeat one enemy');
+  expect(host.querySelector('[aria-label="Selected level"]').textContent).toContain(`defeat ${storyLevel(9).mechanics.kills} enemies`);
   click('Worm Ascendant'); click('Play level');
   expect(complete.mock.lastCall[0]).toMatchObject({ storyLevel: 10, cubeSize: 6 });
 });
@@ -40,9 +42,10 @@ it('opens with Story on the left and Free Play on the right, without launching e
   click('Levels'); expect(host.querySelectorAll('.worm-level-grid button:disabled')).toHaveLength(9);
   const rules = host.querySelector('[aria-label="Star requirements"]');
   expect(rules.querySelectorAll('li')).toHaveLength(3);
-  expect(rules.textContent).toContain('125s');
-  expect(rules.textContent).toContain('70s OR');
-  expect(rules.textContent).toContain('AND reach 46 body segments');
+  const first = storyLevel(1);
+  expect(rules.textContent).toContain(`${first.limit}s`);
+  expect(rules.textContent).toContain(`${first.par}s OR`);
+  expect(rules.textContent).toContain(`AND reach ${storyGrowthTarget(first)} body segments`);
   expect(host.querySelector('[aria-label="Sunlit Garden tile preview"]')).not.toBeNull();
   click('Play level'); expect(complete).toHaveBeenCalledWith(expect.objectContaining({ storyLevel: 1, cubeSize: 6, megaMode: false, wormSpeed: 1.5, wormEnemiesEnabled: false,
     colorScheme: STORY_WORLDS[1].palette, backgroundTheme: STORY_WORLDS[1].background, perFaceStyles: STORY_WORLDS[1].styles }));
@@ -83,7 +86,7 @@ it('presents the selected mission briefing alongside its real objectives, withou
     stars: Object.fromEntries(Array.from({ length: 19 }, (_, i) => [i + 1, 1])), claimed: {}
   } } });
   show({ initialPage: 'story' });
-  expect(host.querySelector('[aria-label="Mobi’s briefing"]').textContent).toContain(storyNarrative(20).briefing);
+  expect(host.querySelector('[aria-label="Mobi’s briefing"]').textContent).toContain(storyBriefingText(20));
   expect(host.textContent).not.toContain(storyNarrative(20).debrief);
   expect(host.querySelector('[aria-label="Level goals"]').textContent).toContain('Collect orbs');
   click('Play level');
@@ -94,7 +97,7 @@ it('keeps narrative in the briefing and pause card, out of the live compact trac
   useGameStore.setState({ wormStoryLevel: 1, wormStoryStarted: false, wormStoryResult: null,
     wormAlive: true, wormStoryChecklist: null, wormPaused: false });
   act(() => root.render(<StoryObjectiveCard />));
-  expect(host.textContent).toContain(storyNarrative(1).briefing);
+  expect(host.textContent).toContain(storyBriefingText(1));
   expect(host.querySelector('[aria-label="Level tasks"]')).not.toBeNull();
   act(() => useGameStore.setState({ wormStoryStarted: true }));
   act(() => root.render(<StoryObjectiveCard compact />));
@@ -102,18 +105,18 @@ it('keeps narrative in the briefing and pause card, out of the live compact trac
   expect(host.querySelector('[aria-label="Level tasks"]')).not.toBeNull();
 });
 
-it('reveals the chapter discovery on success and leaves later levels without placeholder lore', () => {
-  for (const id of [10, 20, 21]) {
+it('reveals each chapter discovery on success, through to the ending', () => {
+  for (const id of [10, 20, 21, 120]) {
     act(() => useGameStore.setState({ wormStoryResult: { levelId: id, stars: 1, seconds: 200, xp: 50, points: 0 } }));
     act(() => root.render(<StoryResult onNext={vi.fn()} onLevels={vi.fn()} onRetry={vi.fn()} />));
     const note = host.querySelector('[aria-label="Mobi’s field notes"]');
-    if (id <= 20) expect(note.textContent).toContain(storyNarrative(id).debrief);
-    else expect(note).toBeNull();
+    expect(note.textContent).toContain(storyNarrative(id).debrief);
   }
 });
 
 it('explains the hard deadline before play and distinguishes timeout from a collision', () => {
-  show({ initialPage: 'story' }); expect(host.textContent).toContain('2:05 to finish');
+  const limit = storyLevel(1).limit;
+  show({ initialPage: 'story' }); expect(host.textContent).toContain(`${Math.floor(limit / 60)}:${String(limit % 60).padStart(2, '0')} to finish`);
   act(() => root.render(<DeathScreen deathDetails={{ reason: 'story-timeout' }} wormTimeAlive={90}
     wormBodyTiles={12} wormHealedCount={0} wormTunnelCount={0} formatTime={n => `${n}s`} />));
   expect(host.textContent).toContain('Time’s up'); expect(host.textContent).toContain('Try a shorter route');
