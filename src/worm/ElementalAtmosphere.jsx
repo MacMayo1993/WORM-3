@@ -156,6 +156,17 @@ export default function ElementalAtmosphere({ size = 3 }) {
     swap.prev = current;
     swap.keys = keys;
   }
+  // The fill light's fade ramp restarts whenever what is on the cube changes: a new
+  // element, a fusion forming, or a reclaim reversing the recipe. It is keyed on the
+  // same identity as the layers (the reaction coat and particles remount by recipe and
+  // fade in over ELEMENTAL_FADE_IN), so the light fades in with them instead of
+  // jumping to full under a reaction that is still arriving. Refreshing the newest
+  // element keeps the identity, and the ramp.
+  const lightLayerRef = useRef('');
+  if (keys && lightLayerRef.current !== keys) {
+    elapsedRef.current = 0;
+    lightLayerRef.current = keys;
+  }
   const retired = key => {
     swap.outgoing = swap.outgoing.filter(o => o.key !== key);
     refresh();
@@ -169,13 +180,6 @@ export default function ElementalAtmosphere({ size = 3 }) {
     [size]
   );
 
-  // Reset the fade ramp whenever the active element changes so a swap fades in
-  // cleanly rather than snapping to full strength.
-  const lastElementRef = useRef(null);
-  if (lastElementRef.current !== element) {
-    if (!partnerDef || !lastElementRef.current) elapsedRef.current = 0;
-    lastElementRef.current = element;
-  }
 
   // Particle envelope large enough to surround the whole cube.
   const extent = size * 0.75 + 1.6;
