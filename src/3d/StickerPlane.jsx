@@ -791,6 +791,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // Animation done: restore scale to 1 so the headstone (child of group) renders normally
         groupRef.current.scale.set(1, 1, 1);
         setDeathAnimDone(true);
+        // A flip that lands home on the cap kills the tile mid-flip: its closing
+        // portal imploded with the tile and must not pop back beside the grave.
+        endPortalClosing();
         // The grave rises once the tile has gone; reduced motion places it at once.
         tombRiseT.current = reduceHomeMotion || useGameStore.getState().settings?.reducedMotion ? -1 : 0;
       }
