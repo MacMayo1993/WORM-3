@@ -147,6 +147,10 @@ it('closes the portal with a flip that lands home on the cap, though that flip k
   expect(named('FlipPortal')).toBe(1);
   await advance(8);
   expect(named('FlipPortal')).toBe(1);
+  // The cap kills the tile: its portal implodes with it (0.5 s) and is gone with
+  // the tile, never popping back full size beside the grave.
+  await advance(26);
+  expect(named('FlipPortal')).toBe(0);
   await advance(60);
   expect(named('FlipPortal')).toBe(0);
 });
