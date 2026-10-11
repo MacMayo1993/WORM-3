@@ -21,21 +21,28 @@ import WormMissionCard from './WormMissionCard.jsx';
 // through the stats — the FX fought the text, and throwing the board away meant
 // the screen that ends your run was the one place you could not see it. It is
 // now the mode carousel's graph paper, translucent and blurred, with the cube
-// still there behind it and only a soft tint of the cause's colour.
+// still there behind it. The cause lives on the card itself (deathScreen.css):
+// caution tape in its colour, a glossy badge holding its animated emblem
+// (DeathEmblem.jsx), sticker lettering that arrives the way the cause hit (SLICED
+// in two halves, the blast shaking), and the run's length counting up over a row
+// of beads in the worm's own colour. Rays turn in the paper behind; none of it
+// crosses the text, and all of it stops under reduced motion.
 //
 // And there is no monospace diagnostics block. It read "Head tile / Body tile
 // hit / Impact progress: 0.55" — the two tile values name the same square so
 // they were usually identical, and a 0-to-1 interpolation factor means nothing
 // to anyone who has not read the collision code. One location chip replaces it.
-import React, { useRef } from 'react';
-import ModeArtwork from '../components/ui/ModeArtwork.jsx';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDialogBehavior } from '../components/ui/Panel.jsx';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { prefersReducedMotion } from '../utils/device.js';
+import DeathEmblem from './DeathEmblem.jsx';
 import {
     overlayScrimStyle, overlayCardStyle, OVERLAY_CARD_CLASS,
-    OverlayTitle, OverlayBlurb,
-    HeroStat, StatTiles, OverlayChip,
+    OverlayBlurb, OverlayChip,
     primaryBtnStyle, SECONDARY_BTN_STYLE, TERTIARY_BTN_STYLE, ACTION_ROW_STYLE,
 } from './wormOverlayUI.jsx';
+import './deathScreen.css';
 
 // ─── Death-cause classification ───────────────────────────────────────────────
 function classifyDeath(reason) {
@@ -51,82 +58,55 @@ function classifyDeath(reason) {
 }
 
 // ─── Per-cause identity ───────────────────────────────────────────────────────
-// accent        — eyebrow, lit card edge, hero number, scrim tint
-// deep          — dark end of the hue, for the title's outline
-// btnFrom/btnTo — the primary button's gradient, separate from `accent` because
-//   SLICED is steel-white and filling a button with it left white label text on
-//   a near-white field. That screen borrows the red from the slice hazard.
+// color — the cause's sticker colour: badge, tape, title lettering, rays
+// deep  — its dark end: the title's glow, the emblem's detail, the stat icons
+// ink   — text laid on `color` (the eyebrow tape); deep green on the yellows
+// Saturated on purpose: the old pastel accents (SLICED was steel-white) vanished
+// into the ivory card and left every cause looking like the same blank sheet.
 const DEATHS = {
     fallen: {
         eyebrow: 'Missed the ledge', title: 'Fell into the cube',
         blurb: 'At the caution tape, press left, right or jump before time runs out.',
-        accent: '#ffe58a', accentSoft: 'rgba(255,229,138,0.45)', deep: '#705019',
-        titleSize: 'clamp(26px, min(9vw, 8vh), 64px)',
+        color: '#ffc61a', deep: '#8a6100', ink: '#26372d', long: true,
     },
     unknown: {
-        title: 'Run ended', blurb: 'Try again for another run.',
-        accent: '#f87171', accentSoft: 'rgba(248,113,113,0.45)', deep: '#7f1d1d',
+        eyebrow: 'Game over', title: 'Run ended', blurb: 'Try again for another run.',
+        color: '#e8343a', deep: '#8c1218', ink: '#fff',
     },
     'time-up': {
-        eyebrow: 'Story challenge', title: "Time’s up",
+        eyebrow: 'Story challenge', title: 'Time’s up',
         blurb: 'Try a shorter route.',
-        accent: '#f4d35e', accentSoft: 'rgba(244,211,94,0.45)', deep: '#705019',
-        titleSize: 'clamp(32px, min(11vw, 10vh), 76px)',
+        color: '#ffb703', deep: '#7d5200', ink: '#26372d',
     },
     overrun: {
-        eyebrow: 'Portal encounter',
-        title: 'Shields down',
+        eyebrow: 'Portal encounter', title: 'Shields down',
         blurb: 'Jump to dodge. Heal a tunnel to restore a shield.',
-        accent: '#d5b4ff', accentSoft: 'rgba(181,145,235,0.45)', deep: '#492468',
-        titleSize: 'clamp(27px, min(9vw, 8vh), 64px)',
+        color: '#b44dfd', deep: '#4f1577', ink: '#fff',
     },
     'tail-bite': {
-        eyebrow: 'Worm collision',
-        title: 'Tail bite',
+        eyebrow: 'Worm collision', title: 'Tail bite',
         blurb: 'Jump over your tail to keep going.',
-        accent: '#f87171',
-        accentSoft: 'rgba(248,113,113,0.45)',
-        deep: '#7f1d1d',
-        titleSize: 'clamp(32px, min(11vw, 10vh), 76px)',
+        color: '#ff4d6d', deep: '#8a1530', ink: '#fff',
     },
     'event-horizon': {
-        eyebrow: 'Void breach',
-        title: 'Lost in the void',
+        eyebrow: 'Void breach', title: 'Lost in the void',
         blurb: 'The tunnel collapsed with you inside it.',
-        accent: '#a78bfa',
-        accentSoft: 'rgba(167,139,250,0.45)',
-        deep: '#312e81',
-        titleSize: 'clamp(23px, min(8vw, 7vh), 58px)',
-        titleAnim: 'eh-glitch 0.9s ease-out 1 forwards',
+        color: '#5b4cff', deep: '#1e1670', ink: '#fff', long: true,
     },
     sliced: {
-        eyebrow: 'Slice collision',
-        title: 'Sliced',
+        eyebrow: 'Slice collision', title: 'Sliced',
         blurb: 'You crossed a layer while it was turning. Riding one only costs your tail.',
-        accent: '#e2e8f0',
-        accentSoft: 'rgba(226,232,240,0.40)',
-        deep: '#7f1d1d',
-        btnFrom: '#dc2626',
-        btnTo: '#7f1d1d',
-        titleSize: 'clamp(34px, min(12vw, 11vh), 84px)',
+        color: '#e8343a', deep: '#8c1218', ink: '#fff',
     },
     struck: {
-        eyebrow: 'Marked tile',
-        title: 'Struck by lightning',
+        eyebrow: 'Marked tile', title: 'Struck by lightning',
         blurb: 'The storm marks a tile before it strikes. Get off it, or jump.',
-        accent: '#a78bfa',
-        accentSoft: 'rgba(139,92,246,0.45)',
-        deep: '#312e81',
-        titleSize: 'clamp(30px, min(10vw, 9vh), 76px)',
+        color: '#8b5cf6', deep: '#3b1a8c', ink: '#fff', long: true,
     },
     blasted: {
-        eyebrow: 'Direct hit',
-        title: 'Caught in the blast',
+        eyebrow: 'Direct hit', title: 'Caught in the blast',
         blurb: 'The fuse ran out. Surround the next one to disarm it.',
-        accent: '#fb923c',
-        accentSoft: 'rgba(249,115,22,0.45)',
-        deep: '#7c2d12',
-        titleSize: 'clamp(30px, min(10vw, 9vh), 76px)',
+        color: '#ff7a1a', deep: '#8a3300', ink: '#fff', long: true,
     },
 };
 
@@ -152,6 +132,66 @@ function locationFor(kind, deathDetails) {
     return null;
 }
 
+// ─── Pieces ─────────────────────────────────────────────────────────────────────
+/** Count a number up from zero as the card lands; the final value at once without motion. */
+function useCountUp(target, still, ms = 900) {
+    const animate = !still && target > 0 && typeof requestAnimationFrame === 'function';
+    const [shown, setShown] = useState(animate ? 0 : target);
+    useEffect(() => {
+        if (!animate) { setShown(target); return undefined; }
+        let raf = 0, start = null;
+        const step = (now) => {
+            start ??= now;
+            const t = Math.min(1, (now - start) / ms);
+            setShown(Math.round(target * (1 - (1 - t) ** 3)));
+            if (t < 1) raf = requestAnimationFrame(step);
+        };
+        // Let the card land before the number starts to climb.
+        const delay = setTimeout(() => { raf = requestAnimationFrame(step); }, 350);
+        return () => { clearTimeout(delay); cancelAnimationFrame(raf); };
+    }, [animate, target, ms]);
+    return shown;
+}
+
+const MAX_BEADS = 16;
+
+/** The worm as it ended: a row of beads in its colour, its head knocked out. */
+function WormBeads({ length, color }) {
+    const count = Math.max(1, Math.min(length, MAX_BEADS));
+    const more = length > MAX_BEADS ? length - MAX_BEADS : 0;
+    return (
+        <div className="worm-death-beads" aria-hidden="true" style={{ '--worm': color }}>
+            {Array.from({ length: count - 1 }, (_, i) => (
+                <span key={i} className="worm-death-bead" style={{ '--i': i, '--bead': `${11 + 7 * (i / Math.max(1, count - 2))}px` }} />
+            ))}
+            <span className="worm-death-bead is-head" style={{ '--i': count - 1, '--bead': '24px' }}>
+                <svg viewBox="0 0 20 20"><path d="M4 6l4 4M8 6l-4 4M12 6l4 4M16 6l-4 4" stroke="#17201b" strokeWidth="2.2" strokeLinecap="round" /></svg>
+            </span>
+            {more > 0 && <span className="worm-death-more">+{more}</span>}
+        </div>
+    );
+}
+
+const STAT_ICONS = {
+    Time: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l3 2M10 3h4" /></svg>,
+    Healed: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4" /><path d="M12 8v8M8 12h8" strokeLinecap="round" /></svg>,
+    Tunnels: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><ellipse cx="12" cy="12" rx="9" ry="6" /><ellipse cx="12" cy="12" rx="4" ry="2.4" fill="currentColor" /></svg>,
+};
+
+const RETRY_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9" /><path d="M20 4v5h-5" /></svg>;
+
+/** The title as sticker lettering; SLICED is drawn as two halves that meet along the cut. */
+function DeathTitle({ kind, long, children }) {
+    const cls = `worm-death-title is-${kind}${long ? ' is-long' : ''}`;
+    if (kind !== 'sliced') return <h2 className={cls}><span>{children}</span></h2>;
+    return (
+        <h2 className={cls}>
+            <span className="is-top">{children}</span>
+            <span className="is-bottom" aria-hidden="true">{children}</span>
+        </h2>
+    );
+}
+
 // ─── Entry point ────────────────────────────────────────────────────────────────
 export default function DeathScreen({
     deathDetails, wormTimeAlive, wormHealedCount, wormTunnelCount, wormBodyTiles,
@@ -159,6 +199,8 @@ export default function DeathScreen({
 }) {
     const dialogRef = useRef(null);
     const onDialogKeyDown = useDialogBehavior(dialogRef);
+    const wormColor = useGameStore(s => s.wormColor) || '#3fbf5f';
+    const [still] = useState(() => !!useGameStore.getState().settings?.reducedMotion || prefersReducedMotion());
     const kind = classifyDeath(deathDetails?.reason);
     const config = DEATHS[kind];
     const blurb = deathDetails?.reason === 'voided' || deathDetails?.reason === 'void-zone'
@@ -167,34 +209,50 @@ export default function DeathScreen({
     // Examine hides the overlay to show the board behind it, which is only worth
     // offering when there is a spot on the board to go and look at.
     const canExamine = !!onExamine && kind === 'tail-bite' && !!location;
+    const length = wormBodyTiles ?? 0;
+    const shownLength = useCountUp(length, still);
+    const stats = [
+        ['Time', formatTime(wormTimeAlive)],
+        ['Healed', wormHealedCount],
+        ['Tunnels', wormTunnelCount],
+    ];
 
     return (
         <>
-            <div style={overlayScrimStyle({ tint: config.accent })}>
-                <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={config.title} className={`run-result ${OVERLAY_CARD_CLASS}`} style={{ ...overlayCardStyle(config.accent), '--mode-accent': config.accent }}>
-                    <ModeArtwork mode={kind} className="screen-results-art" />
-                    <OverlayTitle
-                        size="clamp(28px, 7vw, 42px)"
-                        outline={config.deep}
-                        glow={config.accentSoft}
-                        animation={config.titleAnim}
-                    >{config.title}</OverlayTitle>
+            <div className={`worm-death${still ? ' is-still' : ''}`}
+                style={{ ...overlayScrimStyle({ tint: config.color }), '--death': config.color, '--death-deep': config.deep, '--death-ink': config.ink }}>
+                <div className="worm-death-rays" aria-hidden="true" />
+                <div ref={dialogRef} onKeyDown={onDialogKeyDown} tabIndex={-1} role="dialog" aria-modal="true" aria-label={config.title}
+                    className={`run-result worm-death-card ${OVERLAY_CARD_CLASS}`}
+                    style={{ ...overlayCardStyle(config.color), boxShadow: '0 6px 0 #17201b, 0 22px 50px rgba(23,32,27,0.28)', border: '2px solid #17201b', '--mode-accent': config.color }}>
+                    <div className="worm-death-tape" aria-hidden="true" />
+                    <div className="worm-death-head">
+                    <div className="worm-death-badge" aria-hidden="true">
+                        <div className="worm-death-badge-face"><DeathEmblem kind={kind} /></div>
+                    </div>
+                    <div className="worm-death-eyebrow">{config.eyebrow}</div>
+                    <DeathTitle kind={kind} long={config.long}>{config.title}</DeathTitle>
                     <OverlayBlurb>{blurb}</OverlayBlurb>
+                    </div>
 
-                    <HeroStat accent={config.accent} value={wormBodyTiles} label="Final length" />
-                    <StatTiles stats={[
-                        ['Time', formatTime(wormTimeAlive)],
-                        ['Healed', wormHealedCount],
-                        ['Tunnels', wormTunnelCount],
-                    ]} />
-
-
+                    <div className="worm-death-body">
+                    <div className="worm-death-hero">
+                        <div className="worm-death-hero-value" aria-hidden="true">{shownLength}</div>
+                        <WormBeads length={length} color={wormColor} />
+                        <div className="worm-death-hero-label">Final length<span className="worm-death-sr">: {length}</span></div>
+                    </div>
+                    <div className="worm-death-stats">
+                        {stats.map(([label, value], i) => (
+                            <div key={label} className="worm-death-stat" style={{ '--i': i }}>
+                                {STAT_ICONS[label]}
+                                <strong>{value}</strong>
+                                <span>{label}</span>
+                            </div>
+                        ))}
+                    </div>
 
                     <div style={ACTION_ROW_STYLE}>
-                        <button
-                            onClick={onRetry}
-                            style={primaryBtnStyle(config.btnFrom ?? config.accent, config.btnTo ?? config.deep)}
-                        >Try again</button>
+                        <button onClick={onRetry} className="worm-death-retry" style={primaryBtnStyle()}>{RETRY_ICON}Try again</button>
                         <button onClick={onNewGame} style={SECONDARY_BTN_STYLE}>New game</button>
                     </div>
                     {canExamine && (
@@ -202,20 +260,17 @@ export default function DeathScreen({
                     )}
                     <details className="screen-disclosure"><summary>Run details</summary>
                       <WormMissionCard summary /><XpRunSummary mode="worm" />
-                      {location && <OverlayChip accent={config.accent} label={location.label} value={location.value} />}
+                      {location && <OverlayChip accent={config.color} label={location.label} value={location.value} />}
                     </details>
+                    </div>
                 </div>
             </div>
 
             <style>{`
                 @keyframes eh-glitch {
-                    0% { text-shadow: 0 0 24px rgba(167,139,250,0.7); }
-                    20% { text-shadow: -3px 0 #f87171, 3px 0 #22d3ee, 0 0 24px rgba(167,139,250,0.7); }
-                    40% { text-shadow: 3px 0 #f87171, -3px 0 #22d3ee, 0 0 24px rgba(167,139,250,0.7); }
-                    60%, 100% { text-shadow: 0 0 24px rgba(167,139,250,0.7); }
-                }
-                @media (prefers-reduced-motion: reduce) {
-                    @keyframes eh-glitch { from {} to {} }
+                    0%, 60%, 100% { text-shadow: 0 4px 0 #17201b; }
+                    20% { text-shadow: -4px 0 #f87171, 4px 0 #22d3ee, 0 4px 0 #17201b; }
+                    40% { text-shadow: 4px 0 #f87171, -4px 0 #22d3ee, 0 4px 0 #17201b; }
                 }
             `}</style>
         </>
