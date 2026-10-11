@@ -360,6 +360,7 @@ it('announces a new fusion with a FUSION banner naming the ordered recipe and it
   expect(banner.textContent).toContain('Ice → Fire');
   expect(banner.textContent).toContain('Meltdown');
   expect(banner.textContent).toContain('30% dash');
+  expect(banner.querySelector('.worm-fusion-ignite').textContent).toContain('melt the ground');
   act(() => useGameStore.setState({ wormElementalTheme: null, wormElementalPartner: null, wormFusionNotice: null }));
   expect(host.querySelector('.worm-fusion-banner')).toBeNull();
   wormBuffs.elementalT = 0;

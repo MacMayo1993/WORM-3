@@ -4,9 +4,14 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { wormSegments } from '../wormSegments.js';
 import { wormBuffs } from '../wormBuffs.js';
 import { getElementalDef } from './elementalDefs.js';
+import { NOVA, novaAt } from './fusionNova.js';
 
-// Two small energy bands follow the head, so fusion stays visible even when the
-// camera cannot see the whole cube. Fixed two-draw budget; no particle spawning.
+// How the fuse itself reads: two shockwaves, the base's then the catalyst's, burst out
+// from the head as the ignition lands (fusionIgnition.js), then settle into the two
+// small bands that follow the head for the rest of the wash, so the fusion stays
+// visible even when the camera cannot see the whole cube.
+// Fixed four-draw budget; no particle spawning. Keyed by recipe in ElementalAtmosphere,
+// so a new fusion remounts it and the shockwaves play again.
 export default function FusionAura({ base, catalyst, animate }) {
   const group = useRef();
   const elapsed = useRef(0);
@@ -20,16 +25,35 @@ export default function FusionAura({ base, catalyst, animate }) {
     root.position.fromArray(wormSegments.positions);
     root.quaternion.copy(camera.quaternion);
     const bloom = animate ? Math.max(0, 1 - elapsed.current / 0.8) : 0;
-    root.scale.setScalar(1 + bloom * 0.7);
-    root.children.forEach((band, index) => {
+    const fade = Math.min(1, wormBuffs.elementalT / 1.25);
+    const [bands, novas] = root.children;
+    bands.scale.setScalar(1 + bloom * 0.7);
+    bands.children.forEach((band, index) => {
       band.rotation.z = index * Math.PI / 2 + (animate ? elapsed.current * (index ? -0.8 : 0.8) : 0);
-      band.material.opacity = (0.5 + bloom * 0.25) * Math.min(1, wormBuffs.elementalT / 1.25);
+      band.material.opacity = (0.5 + bloom * 0.25) * fade;
+    });
+    // Reduced motion keeps the bands and drops the shockwaves.
+    novas.children.forEach((nova, index) => {
+      const wave = animate ? novaAt(elapsed.current - index * NOVA.stagger) : null;
+      nova.visible = !!wave;
+      if (!wave) return;
+      nova.scale.setScalar(wave.radius);
+      nova.material.opacity = wave.opacity;
     });
   });
+  const types = [base, catalyst];
   return <group ref={group} visible={false}>
-    {[base, catalyst].map(type => <mesh key={type} scale={[1, 0.55, 1]} raycast={() => null}>
-      <torusGeometry args={[0.38, 0.022, 4, 32]} />
-      <meshBasicMaterial color={getElementalDef(type).color} transparent opacity={0} depthWrite={false} toneMapped={false} />
-    </mesh>)}
+    <group>
+      {types.map(type => <mesh key={type} scale={[1, 0.55, 1]} raycast={() => null}>
+        <torusGeometry args={[0.38, 0.022, 4, 32]} />
+        <meshBasicMaterial color={getElementalDef(type).color} transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </mesh>)}
+    </group>
+    <group>
+      {types.map(type => <mesh key={type} visible={false} raycast={() => null}>
+        <ringGeometry args={[0.86, 1, 48]} />
+        <meshBasicMaterial color={getElementalDef(type).color} transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </mesh>)}
+    </group>
   </group>;
 }

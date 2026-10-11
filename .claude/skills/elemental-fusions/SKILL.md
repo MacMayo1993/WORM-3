@@ -123,6 +123,22 @@ by the Story lesson, not an unlimited Free Play supply. A base reclaim posts a n
 ordered recipe event; a catalyst refresh posts none. Pause contains the recipe guide,
 and the live power chip previews the available next recipe.
 
+## Ignition: the moment of fusing
+
+The claim that forms a pair also sets off that recipe's **ignition** around the head
+(`IGNITIONS` in `fusionIgnition.js`, called from `startElemental` with the board
+size). Each ignition has a `boost` (instant: full momentum, Meltdown's dash, Static's
+burst, Slipstream's `surgeT` surge) and a `ground` (the recipe's own patches: a
+two-deep ring of steam/obsidian/blue fire/frost, a 3x3 garden of pads, ember pads on
+the corners, ramps two out, a charged pad underfoot, a three-long fire cross). It
+posts `sim.fusionBurst` kind `'ignite'` with `tiles` and `hit` (`freeze`, `kill`,
+`burn` or `stun`), which `runFusionBurst` resolves against enemies once, with blast
+flames for the fire recipes. It lands during the claim camera's pull-out, alongside
+`FusionAura`'s two shockwaves (`fusionNova.js`; dropped under reduced motion) and the
+FUSION banner, which shows the ignition's `text` between the name and the rule. A
+refresh of the newest element is not a fusion and never re-ignites. A new recipe
+needs an `IGNITIONS` entry too (a test checks all twenty).
+
 ## Implementing a planned fusion
 
 1. **Keep identity separate from the live effect.** `getFusion(base, catalyst)` and

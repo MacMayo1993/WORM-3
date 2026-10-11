@@ -420,6 +420,17 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         const burst = worm.fusionBurst?.current;
         if (!burst || burst.seq === fusionSeenRef.current) return;
         fusionSeenRef.current = burst.seq;
+        // A fusion's ignition (fusionIgnition.js): its ground is already laid in the sim;
+        // here the enemies in reach take its hit and fire recipes put flames up.
+        if (burst.kind === 'ignite') {
+            const reach = new Set(burst.tiles);
+            if (combatBridge.current && reach.size) {
+                if (burst.hit === 'kill') strikeEnemies(combatBridge.current, reach);
+                else afflictEnemies(combatBridge.current, reach, burst.hit, burst.hit === 'freeze' ? 4 : burst.hit === 'burn' ? 3 : 1.4);
+            }
+            if (burst.flames) blastApiRef.current?.spawn(burst.tiles.map((key, i) => flameAt(tileOf(key), i * 0.03)));
+            return;
+        }
         const keys = springSlamTiles(burst.tile, size);
         // Frostbloom: the landing's 3x3 is already frost in the sim; its enemies freeze.
         if (burst.kind === 'frostbloom') {

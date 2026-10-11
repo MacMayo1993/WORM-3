@@ -19,6 +19,7 @@ import { addElementalPatch, quenchTrail, tickElementalGameplay, consumeSpring, i
     fusionSpeedBonus, FUSION, CHARGED_SPRING_SPAN, CHARGED_SPRING_HEIGHT } from './elementalGameplay.js';
 import { hasElement, activeFusion, claimElement, getFusion } from './elementalFusion.js';
 import { springSlamTiles } from './jumpLanding.js';
+import { igniteFusion } from './fusionIgnition.js';
 import { ELEMENTAL_EXPERIENCE } from './elementalExperience.js';
 import { makeInchGaitState, advanceInchGaitState, inchGaitInto, inchBodyRadius } from './inchGait.js';
 import { arcLift } from './jumpArc.js';
@@ -299,6 +300,7 @@ export function makeWormSim(size) {
         iceHeldTurn: false,       // Meltdown: a turn is waiting on an ice slide
         meltdownT: 0,             // Meltdown: seconds of dash left
         staticT: 0,               // Static: seconds of discharge speed burst left
+        surgeT: 0,                // a fusion ignition's speed surge (fusionIgnition.js)
         landingGraceT: 0,         // post-rocket window where a landing can't kill
         // Injected RNG — every random draw in the special system goes through this so
         // tests can make spawn type and placement deterministic. Set once at
@@ -480,6 +482,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.iceHeldTurn = false;
     sim.meltdownT = 0;
     sim.staticT = 0;
+    sim.surgeT = 0;
     sim.landingGraceT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
@@ -725,7 +728,7 @@ export function startMagnet(sim, ctx) {
  * clock refreshes for both. A third replaces the older of the two (claimElement in
  * elementalFusion.js).
  */
-export function startElemental(sim, ctx, type) {
+export function startElemental(sim, ctx, type, size = 0) {
     const next = claimElement(sim.elementalT > 0 ? sim.elementalType : null, sim.elementalPair, type);
     sim.elementalType = next.type;
     sim.elementalPair = next.pair;
@@ -745,13 +748,15 @@ export function startElemental(sim, ctx, type) {
     if (next.fused) {
         const recipe = getFusion(sim.elementalPair, sim.elementalType);
         ctx.onStoryMechanic?.('elementFusion', recipe.id);
+        // The fusion goes off around the head as it forms (fusionIgnition.js).
+        igniteFusion(sim, recipe.id, size);
         ctx.onFusion?.(`${recipe.base}>${recipe.catalyst}`);
     }
     ctx.onElementalTheme(type, ELEMENTAL_DURATION, sim.elementalPair);
 }
 
 /** Apply a claimed special orb's effect. */
-export function activateSpecial(sim, ctx, type) {
+export function activateSpecial(sim, ctx, type, size = 0) {
     if (type === 'rocket') startRocket(sim, ctx);
     else if (type === 'magnet') startMagnet(sim, ctx);
     else if (type === 'orb-shower') startOrbShower(sim, ctx);
@@ -767,7 +772,7 @@ export function activateSpecial(sim, ctx, type) {
         ctx.onViewPower?.(type, VIEW_POWER_DURATION);
         ctx.feel('orb');
     }
-    else if (isElementalType(type)) startElemental(sim, ctx, type);
+    else if (isElementalType(type)) startElemental(sim, ctx, type, size);
 }
 
 /** Whether `next` is a 180° reversal of the current heading. */
@@ -1364,7 +1369,7 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = fals
         sim.elementalSpawnTimer = Math.max(sim.elementalSpawnTimer, ELEMENTAL_CLAIM_COOLDOWN);
     }
     ctx.onSpecialsChanged(sim.specials.slice());
-    activateSpecial(sim, ctx, claimed.type);
+    activateSpecial(sim, ctx, claimed.type, size);
     return true;
 }
 

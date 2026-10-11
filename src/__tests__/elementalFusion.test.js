@@ -16,6 +16,8 @@ import { pickStrikeTile, makeStorm, beginStorm, tickStorm, STORM } from '../worm
 import { elementalFeedback } from '../worm/healerWorm/elementalFeedback.js';
 import { springSlamTiles } from '../worm/healerWorm/jumpLanding.js';
 import { ELEMENTAL_DURATION } from '../worm/healerWorm/constants.js';
+import { IGNITIONS, igniteFusion } from '../worm/healerWorm/fusionIgnition.js';
+import { novaAt, NOVA } from '../worm/healerWorm/fusionNova.js';
 
 const SIZE = 5;
 const key = (t) => `${t.x},${t.y},${t.z},${t.dirKey}`;
@@ -228,7 +230,7 @@ describe('Wildfire (fire + nature)', () => {
     stepWormSim(sim, 0.05, SIZE, ctx);
     expect(sim.isJumping).toBe(false);
     expect(sim.springLaunch).toBe(false);
-    expect(sim.fusionBurst).toMatchObject({ seq: 1, kind: 'wildfire' });
+    expect(sim.fusionBurst).toMatchObject({ kind: 'wildfire' });
     const burning = springSlamTiles(sim.fusionBurst.tile, SIZE);
     for (const k of burning) expect(sim.elementalPatches.get(k)?.type === 'fire' || sim.elementalPatches.get(k)?.type === 'grass').toBe(true);
   });
@@ -239,7 +241,7 @@ describe('Wildfire (fire + nature)', () => {
     sim.isJumping = true;
     sim.jumpT = 0.9999;
     stepWormSim(sim, 0.05, SIZE, ctx);
-    expect(sim.fusionBurst).toBeNull();
+    expect(sim.fusionBurst?.kind).not.toBe('wildfire');
   });
 });
 
@@ -359,7 +361,7 @@ describe('Emberseed (Nature → Fire)', () => {
     addElementalPatch(sim, sim.pos, 'grass');
     startJump(sim, ctx);
     tickElementalGameplay(sim, 10, SIZE);
-    expect(sim.fusionBurst).toBeNull();
+    expect(sim.fusionBurst.kind).toBe('ignite');
   });
 });
 
@@ -404,6 +406,7 @@ describe('Coldfire (Fire → Ice) and Meltdown (Ice → Fire)', () => {
   it('Meltdown: a turn held by the ice slide ends in a dash and melts the tile', () => {
     const { sim, ctx } = fused('ice', 'fire');
     sim.elementalFocusT = 0;
+    sim.meltdownT = 0; // the ignition's own dash
     sim.interpT = 0.5;
     sim.pendingTurns.push('left');
     for (let i = 0; i < 40 && sim.meltdownT === 0; i++) stepWormSim(sim, 0.02, SIZE, ctx);
@@ -452,5 +455,73 @@ describe('fused storms', () => {
     const tiles = [{ x: 4, y: 4, z: 4, dirKey: 'PZ' }];
     expect(pickStrikeTile({ tiles, body, avoid: new Set() }, () => 0)).toEqual({ x: 0, y: 2, z: 4, dirKey: 'PZ' });
     expect(pickStrikeTile({ tiles, body, avoid: new Set(), bodyShare: 0 }, () => 0)).toBe(tiles[0]);
+  });
+});
+
+describe('fusion ignition', () => {
+  const sizedFuse = (a, b) => {
+    const sim = makeSim(), ctx = makeCtx();
+    startElemental(sim, ctx, a, SIZE);
+    startElemental(sim, ctx, b, SIZE);
+    return { sim, ctx };
+  };
+
+  it('every recipe has its own ignition, posted once as the pair forms', () => {
+    const recipes = Object.values(ORDERED_FUSIONS);
+    expect(Object.keys(IGNITIONS).sort()).toEqual(recipes.map(f => f.id).sort());
+    expect(new Set(Object.values(IGNITIONS).map(i => i.text)).size).toBe(20);
+    for (const f of recipes) {
+      const { sim, ctx } = sizedFuse(f.base, f.catalyst);
+      expect(sim.fusionBurst).toMatchObject({ kind: 'ignite', recipe: f.id, hit: IGNITIONS[f.id].hit });
+      const seq = sim.fusionBurst.seq;
+      startElemental(sim, ctx, f.catalyst, SIZE); // a refresh is not a new fusion
+      expect(sim.fusionBurst.seq).toBe(seq);
+    }
+  });
+
+  it('a lone element never ignites', () => {
+    const sim = makeSim();
+    startElemental(sim, makeCtx(), 'fire', SIZE);
+    expect(sim.fusionBurst).toBeNull();
+  });
+
+  it('lays each recipe\'s own ground around the head', () => {
+    const at = sim => sim.elementalPatches.get(key(sim.pos));
+    expect(at(sizedFuse('fire', 'water').sim)).toMatchObject({ type: 'fire', obsidian: true });
+    expect(at(sizedFuse('fire', 'ice').sim)).toMatchObject({ type: 'fire', cold: true });
+    expect(at(sizedFuse('ice', 'water').sim)).toMatchObject({ type: 'frost' });
+    expect(at(sizedFuse('grass', 'lightning').sim)).toMatchObject({ type: 'grass', charged: true });
+    expect(at(sizedFuse('ice', 'fire').sim)).toMatchObject({ type: 'fire', melt: true });
+    const steam = sizedFuse('water', 'fire').sim;
+    expect(steamTiles(steam).size).toBe(steam.fusionBurst.tiles.length);
+    expect(steam.fusionBurst.tiles.length).toBeGreaterThan(9);
+    const bloom = sizedFuse('water', 'grass').sim;
+    expect([...bloom.elementalPatches.values()].filter(p => p.type === 'grass')).toHaveLength(8);
+    expect(at(bloom)).toBeUndefined();
+    const ember = sizedFuse('grass', 'fire').sim;
+    expect([...ember.elementalPatches.values()].filter(p => p.ember)).toHaveLength(4);
+  });
+
+  it('gives the movement recipes their instant boost', () => {
+    const slip = sizedFuse('water', 'ice').sim;
+    expect(slip.waterMomentum).toBe(1);
+    expect(fusionSpeedBonus(slip)).toBe(FUSION.surge);
+    expect(sizedFuse('ice', 'lightning').sim.staticT).toBe(FUSION.staticBurstT);
+    expect(sizedFuse('ice', 'fire').sim.meltdownT).toBeGreaterThan(0);
+    // Without a board only the boost happens: no tiles are reached.
+    const sim = makeSim();
+    sim.waterMomentum = 0;
+    expect(igniteFusion(sim, 'current').tiles).toEqual([]);
+    expect(sim.waterMomentum).toBe(1);
+    expect(igniteFusion(sim, 'nonsense')).toBeNull();
+  });
+
+  it('plays two staggered shockwaves that grow and fade out', () => {
+    expect(novaAt(-0.01)).toBeNull();
+    expect(novaAt(NOVA.duration)).toBeNull();
+    const early = novaAt(0.1), late = novaAt(0.7);
+    expect(late.radius).toBeGreaterThan(early.radius);
+    expect(late.opacity).toBeLessThan(early.opacity);
+    expect(novaAt(0.1 - NOVA.stagger)).toBeNull();
   });
 });

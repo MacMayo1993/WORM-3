@@ -22,6 +22,7 @@ export const FUSION = Object.freeze({
     geyserSpan: 1,        // Geyser: extra tiles and lift on a full-momentum launch
     geyserHeight: 0.8,
     geyserMomentum: 0.8,  // momentum that counts as "full" for Geyser and Current
+    surge: 0.3,           // an ignition's speed surge (Slipstream)
 });
 
 /**
@@ -83,17 +84,19 @@ export function tickElementalGameplay(sim, delta, size = 0) {
     }
     sim.meltdownT = Math.max(0, (sim.meltdownT ?? 0) - delta);
     sim.staticT = Math.max(0, (sim.staticT ?? 0) - delta);
+    sim.surgeT = Math.max(0, (sim.surgeT ?? 0) - delta);
     // Geyser: the launch carries the water with it, so a spring leap keeps momentum.
     const carried = !sim.isJumping || (sim.springLaunch && activeFusion(sim) === 'geyser');
     const target = hasElement(sim, 'water') && carried ? 1 : 0;
     sim.waterMomentum += (target - sim.waterMomentum) * (1 - Math.exp(-delta * 2));
 }
 
-/** Short speed bursts a fusion grants: Meltdown's dash and Static's discharge. */
+/** Short speed bursts a fusion grants: Meltdown's dash, Static's discharge, an ignition surge. */
 export function fusionSpeedBonus(sim) {
     let bonus = 0;
     if (sim.meltdownT > 0) bonus += FUSION.meltdownDash;
     if (sim.staticT > 0) bonus += FUSION.staticBurst;
+    if (sim.surgeT > 0) bonus += FUSION.surge;
     return bonus;
 }
 
