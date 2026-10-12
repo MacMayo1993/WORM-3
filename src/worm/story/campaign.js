@@ -204,7 +204,8 @@ export const STORY_LEVEL_DATA = [
     mechanics: { doubleJumps: 3, bodyLength: 100 } },
   { id: 54, cubeSize: 3, title: 'Two at Once', subtitle: 'One body, two doors.',
     kind: 'tunnel', target: 3, orbsPerFace: 3, speed: 2, par: 215, limit: 365, points: 70,
-    mechanics: { selfPasses: 2, multiHeals: 1, bodyLength: 70 },
+    // Three pairs chain at most twice; the lesson asks for one of each and leaves a miss.
+    mechanics: { selfPasses: 1, multiHeals: 1, bodyLength: 70 },
     tip: 'Doors on this deck heal for free when you ride through.' },
   { id: 55, cubeSize: 4, title: 'Pocket Repairs', subtitle: 'Paid in full, healed in pairs.',
     kind: 'collector', target: 4, orbs: 34, colors: 6, speed: 2.4, rotateEvery: 12, par: 210, limit: 355, points: 70,
@@ -222,8 +223,10 @@ export const STORY_LEVEL_DATA = [
     kind: 'mastery', target: 3, orbs: 32, speed: 2.4, rotateEvery: 12, par: 230, limit: 385, points: 70,
     mechanics: { multiHeals: 1, boosts: 3, doubleJumps: 3, rockets: 2 } },
   { id: 60, cubeSize: 3, title: 'The Smallest Door', subtitle: 'It asked a question.',
-    kind: 'restore', target: 4, orbs: 48, rotations: 6, orbsPerFace: 3, speed: 2.1, rotateEvery: 9, par: 420, limit: 705, points: 120,
-    mechanics: { selfPasses: 3, multiHeals: 2, bodyLength: 130 } },
+    kind: 'restore', target: 4, orbs: 42, rotations: 4, orbsPerFace: 3, speed: 2.1, rotateEvery: 11, par: 420, limit: 705, points: 120,
+    // A 3×3 finale: four pairs chain three times, every heal needs its toll and a
+    // turn sweeps a third of the deck, so ask for two passes and one double heal.
+    mechanics: { selfPasses: 2, multiHeals: 1, bodyLength: 110 } },
 
   // ── Chapter 7 · Weather of War ────────────────────────────────────────────────────
   { id: 61, cubeSize: 6, title: 'Rainmaker', subtitle: 'Every storm is just ingredients.',
@@ -340,7 +343,8 @@ export const STORY_LEVEL_DATA = [
     mechanics: { multiHeals: 3, ringHeals: 2, signatures: 3 } },
   { id: 96, cubeSize: 3, title: 'Pocket Mirror', subtitle: 'The most polite worm in the Plane.',
     kind: 'tunnel', target: 4, orbsPerFace: 3, speed: 2.2, par: 330, limit: 520, points: 90,
-    mechanics: { selfPasses: 3, multiHeals: 2, bodyLength: 110 } },
+    // Free heals: each chained ride is a pass and a double heal; two of the three links.
+    mechanics: { selfPasses: 2, multiHeals: 2, bodyLength: 110 } },
   { id: 97, cubeSize: 9, title: 'Inside Out', subtitle: 'The inside shows on the outside.',
     kind: 'mastery', target: 4, orbs: 64, speed: 2.7, rotateEvery: 11, par: 690, limit: 1080, points: 90,
     mechanics: { explodes: 3, uniqueFusions: 3, bodyLength: 180 } },
@@ -352,7 +356,7 @@ export const STORY_LEVEL_DATA = [
     mechanics: { multiHeals: 3, bombs: 3, kills: 4 } },
   { id: 100, cubeSize: 8, title: 'Recognition', subtitle: 'Mine… is me?',
     kind: 'mastery', target: 6, orbs: 66, rotations: 8, speed: 2.75, rotateEvery: 10, par: 715, limit: 1120, points: 140,
-    mechanics: { selfPasses: 5, multiHeals: 3, elements: 5, fusions: 2, kills: 4, bodyLength: 180 } },
+    mechanics: { selfPasses: 4, multiHeals: 3, elements: 5, fusions: 2, kills: 4, bodyLength: 180 } },
 
   // ── Chapter 11 · The Mega Decks ────────────────────────────────────────────────────
   { id: 101, cubeSize: 15, title: 'Cargo Hold', subtitle: 'Hold its attention.',
@@ -391,9 +395,10 @@ export const STORY_LEVEL_DATA = [
     kind: 'restore', target: 6, orbs: 72, rotations: 10, speed: 2.8, rotateEvery: 8, par: 550, limit: 835, points: 100,
     mechanics: { selfPasses: 4, multiHeals: 2, bodyLength: 200 } },
   { id: 112, cubeSize: 3, title: 'Teeth of the Pocket', subtitle: 'Not even the air.',
-    kind: 'tunnel', target: 4, rotations: 6, orbsPerFace: 3, speed: 2.4, rotateEvery: 8, par: 455, limit: 695, points: 100,
-    // Four pairs on a 3×3: chained double heals allow three, so ask for two and leave one spare.
-    mechanics: { selfPasses: 4, multiHeals: 2, bodyLength: 150 } },
+    kind: 'tunnel', target: 4, rotations: 6, orbsPerFace: 3, speed: 2.4, rotateEvery: 10, par: 455, limit: 695, points: 100,
+    // Four pairs on a 3×3 chain three times (each link a pass and a double heal), so ask
+    // for two of each and leave one spare.
+    mechanics: { selfPasses: 2, multiHeals: 2, bodyLength: 150 } },
   { id: 113, cubeSize: 9, title: 'Fusion Furnace', subtitle: 'Warm for the first time since the crash.',
     kind: 'mastery', target: 4, orbs: 54, speed: 2.8, rotateEvery: 11, par: 645, limit: 980, points: 100,
     mechanics: { elements: 5, steamFusions: 1, quenchFusions: 1, uniqueFusions: 4 } },
@@ -411,11 +416,11 @@ export const STORY_LEVEL_DATA = [
     mechanics: { rockets: 2, magnetOrbs: 8, bombs: 4, kills: 8, bodyLength: 190 } },
   { id: 118, cubeSize: 7, title: 'Mirror Match', subtitle: 'Move for move.',
     kind: 'collector', target: 6, orbs: 72, colors: 6, speed: 2.8, rotateEvery: 10, par: 540, limit: 820, points: 100,
-    mechanics: { selfPasses: 6, multiHeals: 4, bodyLength: 200 } },
+    mechanics: { selfPasses: 4, multiHeals: 4, bodyLength: 200 } },
   { id: 119, cubeSize: 10, title: 'Eve of the End', subtitle: 'Checked twice, once from each side.',
     kind: 'restore', target: 6, orbs: 76, rotations: 10, speed: 2.8, rotateEvery: 8, par: 790, limit: 1200, points: 100,
     mechanics: { selfPasses: 4, multiHeals: 3, bodyJumps: 4, rockets: 2, explodes: 3, bombs: 3, kills: 3, bodyLength: 210 } },
   { id: 120, cubeSize: 10, title: 'Through the Middle', subtitle: 'Head meets tail.',
     kind: 'mastery', target: 6, orbs: 78, rotations: 10, speed: 2.85, rotateEvery: 9, par: 990, limit: 1500, points: 150,
-    mechanics: { selfPasses: 6, multiHeals: 4, bodyJumps: 6, ringHeals: 3, rockets: 2, magnetOrbs: 8, explodes: 3, elements: 5, uniqueFusions: 3, signatures: 4, bombs: 3, kills: 5, bodyLength: 220 } },
+    mechanics: { selfPasses: 4, multiHeals: 4, bodyJumps: 6, ringHeals: 3, rockets: 2, magnetOrbs: 8, explodes: 3, elements: 5, uniqueFusions: 3, signatures: 4, bombs: 3, kills: 5, bodyLength: 220 } },
 ];
