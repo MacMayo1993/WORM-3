@@ -1516,7 +1516,7 @@ const MenuTopBar = ({ visible, onSettings }) => (
   <div className="worm-menu-topbar" style={{ opacity: visible ? 1 : 0 }} inert={visible ? undefined : ''}>
     <div className="worm-menu-topbar-level"><PlayerLevelBadge /></div>
     <div className="worm-menu-topbar-right">
-      <ParityWallet neutral />
+      <span className="worm-menu-wallet"><ParityWallet /></span>
       {onSettings && <button type="button" className="worm-menu-gear" aria-label="Settings" onClick={onSettings}>
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 2 3-1 1-3 3-1 2-3-2-2 1-3-3-2-3 1-2-2Z" strokeLinejoin="round" />

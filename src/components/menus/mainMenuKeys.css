@@ -269,3 +269,4 @@
 .worm-menu-links button { min-height:44px; padding:8px 6px; border:0; background:none; cursor:pointer; color:#3f5646;
   font:800 13px/1 var(--heading-font, system-ui); letter-spacing:.08em; text-transform:uppercase; text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:2px; }
 .worm-menu-links button:focus-visible { outline:3px solid #2774ad; outline-offset:3px; }
+.worm-menu-wallet { display:inline-flex; padding:5px 4px; border:2px solid #26372d; border-radius:999px; background:#fffcf1; box-shadow:0 4px 0 #26372d; }
