@@ -70,7 +70,7 @@ export const BET_TYPES = {
   PAIR: {
     id: 'PAIR',
     label: 'Color Pair',
-    tagline: 'Name the winning antipodal pair',
+    tagline: 'Name the winning twin pair',
     desc: 'Pick the opposite color pair that survives.',
     odds: 2.7,
     icon: 'P',

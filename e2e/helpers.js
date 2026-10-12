@@ -43,6 +43,10 @@ export async function skipIntro(page) {
  * The relative URL keeps the app's /WORM-3/ base instead of resolving to the host root.
  */
 export async function openGame(page, { unlock = false } = {}) {
+  // A brand-new save goes from the intro straight into WORM Story level 1
+  // (progression/modeUnlocks.js); these tests start from the menu, as a player
+  // past their first launch does. firstLaunch.e2e.js covers the first launch.
+  await page.addInitScript(() => { if (!localStorage.getItem('worm3_mode_gate')) localStorage.setItem('worm3_mode_gate', 'gated'); });
   await page.goto(unlock ? './?unlockall=1' : './');
   await skipIntro(page);
 }

@@ -8,7 +8,7 @@ import { createLevel, GAME_MODES, WIN_CONDITIONS, BACKGROUNDS, DIFFICULTY, LEVEL
 export default createLevel({
   id: 7,
   name: 'Sudokube Veil',
-  description: 'Numbers meet topology',
+  description: 'Numbers meet twins',
 
   cubeSize: 4,
   // Gentle 4×4: two outer-face turns plus one seam flip — no hard inner slices.

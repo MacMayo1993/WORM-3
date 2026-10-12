@@ -8,7 +8,7 @@ import { createLevel, GAME_MODES, WIN_CONDITIONS, BACKGROUNDS, DIFFICULTY, LEVEL
 export default createLevel({
   id: 10,
   name: 'Black Hole',
-  description: 'Full antipodal topology',
+  description: 'Every twin, every turn',
 
   cubeSize: 5,
   scrambleSequence: [

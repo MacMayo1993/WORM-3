@@ -8,7 +8,7 @@ import { createLevel, GAME_MODES, WIN_CONDITIONS, BACKGROUNDS, DIFFICULTY, LEVEL
 export default createLevel({
   id: 2,
   name: 'Twin Paradox',
-  description: 'Discover antipodal pairs',
+  description: 'Discover twin tiles',
 
   cubeSize: 2,
   scrambleSequence: [

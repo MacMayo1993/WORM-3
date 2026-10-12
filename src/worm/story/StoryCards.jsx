@@ -8,6 +8,7 @@ import { storyLevel, storyChecklist, storyStars, WORM_STORY_LEVELS, storyChapter
 import { feel, resumeFeel } from '../../utils/feel.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import { getWormCharacter } from '../wormCharacterData.js';
+import { MODE_UNLOCK_LABELS } from '../../progression/modeUnlocks.js';
 import { storyNarrative, storyBriefingText } from './narrative.js';
 import '../../components/screens/wormStory.css';
 import './storyCompletion.css';
@@ -259,7 +260,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
     else exitTimer.current = setTimeout(action, 180);
   };
 
-  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-leaving={leaving} data-rewards={!!level.reward || !!result.unlockedCharacter}
+  return <div ref={ref} className="worm-story-result story-completion" data-ready={ready} data-leaving={leaving} data-rewards={!!level.reward || !!result.unlockedCharacter || !!result.unlockedModes}
     role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" tabIndex={-1}
     style={{ zIndex: Z.CELEBRATION, fontFamily: UI_FONT, '--result-ready': `${readyAt}ms` }}>
     <div className="story-completion-wave" aria-hidden="true" />
@@ -282,6 +283,9 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
           <RewardArt item={getStoreItem(`character_${result.unlockedCharacter}`) ?? { type: 'character', characterId: result.unlockedCharacter, label: getWormCharacter(result.unlockedCharacter).label }} ready={ready} />
           <p><span>New worm unlocked</span><strong>{getWormCharacter(result.unlockedCharacter).label}</strong></p>
         </div>}
+        {result.unlockedModes?.map(id => <p key={id} className="story-completion-unlock story-mode-unlock">
+          <span>New mode unlocked</span><strong>{MODE_UNLOCK_LABELS[id]}</strong>
+        </p>)}
         <StoryRewardChoices level={level} previewsReady={ready} />
         {narrative && <details className="story-completion-notes"><summary tabIndex={0}>Mobi’s field notes</summary><StoryMobiNote levelId={level.id} complete /></details>}
       </div>

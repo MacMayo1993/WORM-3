@@ -11,12 +11,12 @@ const FONT = UI_FONT;
 
 const steps = [
   {
-    title: "You Just Made an Antipodal Flip!",
-    subtitle: "Your first journey through the manifold",
+    title: "You Just Made a Flip!",
+    subtitle: "Your first trip through the cube",
     content: (
       <>
         <p style={{ margin: '0 0 14px 0' }}>
-          That color change you just saw? You sent a sticker through an <strong>antipodal tunnel</strong>—a wormhole connecting two opposite points on the cube's surface.
+          That color change you just saw? You sent a sticker through a <strong>tunnel</strong> straight through the middle of the cube, to its <strong>twin</strong> on the opposite side.
         </p>
         <p style={{ margin: '0 0 14px 0' }}>
           In <WormWordmark inline />, opposite faces of the cube are secretly linked. Flip a sticker on one face and its partner on the opposite face changes color simultaneously.
@@ -28,8 +28,8 @@ const steps = [
     ),
   },
   {
-    title: "Antipodal Pairs",
-    subtitle: "Every point has an opposite",
+    title: "Twin Pairs",
+    subtitle: "Every tile has a twin",
     content: (
       <>
         <p style={{ margin: '0 0 14px 0' }}>Each face is permanently paired with the face directly across from it:</p>
@@ -46,7 +46,7 @@ const steps = [
           <span><span style={{ color: FACE_COLORS[3] }}>■</span> White ↔ Yellow <span style={{ color: FACE_COLORS[6] }}>■</span></span>
         </div>
         <p style={{ margin: '0 0 10px 0' }}>
-          When a sticker flips, it takes on its <strong>antipodal color</strong>. The small dot on a flipped sticker shows its original color—a breadcrumb of where it came from.
+          When a sticker flips, it takes on its <strong>twin's color</strong>. The small dot on a flipped sticker shows its original color—a breadcrumb of where it came from.
         </p>
         <p style={{ margin: 0, color: PAPER_TEXT_FAINT }}>
           Every flip affects two stickers at once: one on each side of the cube.
@@ -55,29 +55,29 @@ const steps = [
     ),
   },
   {
-    title: "Parity & Orientation",
-    subtitle: "The mathematics of flipping",
+    title: "Even & Odd",
+    subtitle: "Keeping track of flips",
     content: (
       <>
         <p style={{ margin: '0 0 14px 0' }}>
-          The <strong>EVEN / ODD</strong> parity indicator tracks the mathematical signature of all your flips combined.
+          The <strong>EVEN / ODD</strong> indicator tells you whether your flips so far can cancel out.
         </p>
         <p style={{ margin: '0 0 14px 0' }}>
-          <strong>Even parity</strong> — the cube can return to its original state through flips alone.<br />
-          <strong>Odd parity</strong> — something is fundamentally "twisted" and needs an odd number of additional flips to unwind.
+          <strong>Even</strong> — the cube can return to its original state through flips alone.<br />
+          <strong>Odd</strong> — one more flip is needed somewhere before it can all unwind.
         </p>
         <p style={{ margin: '0 0 14px 0' }}>
-          <strong>Tally marks</strong> on each sticker count how many times it has traveled through the manifold. Two stickers showing the same color can have entirely different histories.
+          <strong>Tally marks</strong> on each sticker count how many trips it has made through the cube. Two stickers showing the same color can have entirely different histories.
         </p>
         <p style={{ margin: 0, color: PAPER_TEXT_FAINT, fontStyle: 'italic' }}>
-          This hidden memory of transformation is called <em>orientation</em>.
+          Every tile remembers where it has been.
         </p>
       </>
     ),
   },
   {
     title: "Chaos Mode",
-    subtitle: "When the manifold fights back",
+    subtitle: "When the cube fights back",
     content: (
       <>
         <p style={{ margin: '0 0 14px 0' }}>
@@ -89,7 +89,7 @@ const steps = [
           <li><strong>L2:</strong> Moderate — regular spreading</li>
           <li><strong>L3:</strong> Aggressive — rapid propagation</li>
           <li><strong>L4:</strong> Heavy sustained chaos</li>
-          <li><strong>L5:</strong> Deep-manifold surges — strong hops with pacing control</li>
+          <li><strong>L5:</strong> Deep surges — strong hops with pacing control</li>
         </ul>
         <p style={{ margin: 0, color: PAPER_TEXT_FAINT }}>
           Toggle Chaos Mode with the <strong>C</strong> key or the Chaos button in the menu.
@@ -104,14 +104,14 @@ const steps = [
       <>
         <p style={{ margin: '0 0 10px 0' }}>Tips for mastering <WormWordmark inline />:</p>
         <ul style={{ margin: '0 0 14px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: 1.8 }}>
-          <li>Use <strong>Explode view (X)</strong> to see all antipodal connections clearly</li>
-          <li>Track parity — plan flips to stay on even parity when possible</li>
+          <li>Use <strong>Explode view (X)</strong> to see every tunnel clearly</li>
+          <li>Watch Even/Odd — plan flips so they can cancel out</li>
           <li>In Chaos Mode, work from the center outward to minimize cascade spread</li>
           <li>For <WormWordmark inline /> victory, ensure every sticker has flipped before your final solve</li>
           <li>Use <strong>Teach Mode</strong> (available for 3×3) to learn step-by-step algorithms</li>
         </ul>
         <p style={{ margin: 0, color: PAPER_TEXT_FAINT, fontStyle: 'italic' }}>
-          The topology is your friend once you learn to see it. Good luck, explorer!
+          Once you see the twins, you can't unsee them. Good luck, explorer!
         </p>
       </>
     ),

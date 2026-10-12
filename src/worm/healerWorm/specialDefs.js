@@ -54,7 +54,7 @@ const BASE_SPECIAL_DEFS = {
     iconPath: 'M4.5 3h4.6v9.2a2.9 2.9 0 0 0 5.8 0V3h4.6v9.2a7.5 7.5 0 0 1-15 0V3z',
     // The two pole tips.
     iconAccent: 'M4.5 3h4.6v3.1H4.5V3zm10.4 0h4.6v3.1h-4.6V3z',
-    description: 'Widens orb pickup to two manifold steps for eight seconds, reaching around face edges.',
+    description: 'Widens orb pickup to two tiles for eight seconds, reaching around face edges.',
   },
 };
 
