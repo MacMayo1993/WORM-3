@@ -292,3 +292,10 @@
   .worm-fusion-banner { animation:wormFusionFade 3.2s linear both; }
   @keyframes wormFusionFade { 0%,85% { opacity:1; } 100% { opacity:0; } }
 }
+
+/* An ability recharging is not a dead key: the icon stays at full strength and
+   the ring shows the charge; a ready ability breathes so the eye finds it. */
+.worm-signature-control button:disabled { opacity: 1 !important; filter: saturate(.35); }
+.worm-signature-control button[data-ready] { animation: worm-signature-ready 1.6s ease-in-out infinite; }
+@keyframes worm-signature-ready { 50% { transform: scale(1.04); box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .worm-signature-control button[data-ready] { animation: none; } }

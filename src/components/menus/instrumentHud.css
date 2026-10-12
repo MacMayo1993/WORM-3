@@ -87,3 +87,17 @@
 .orb-sample { border-color: #26372d55; }
 .orb-slot-pickup { background: var(--hud-active); border-color: var(--hud-ink); }
 .instrument-hud :focus-visible, .instrument-dock :focus-visible, .worm-instrument :focus-visible { outline: 3px solid #2774ad; outline-offset: 3px; }
+
+/* Chart-style reserve: only the faces you are carrying. Empty slots stay in the
+   DOM (stable identity for the pickup pop) but take no room, so a fresh run
+   shows a clean bar instead of six zeros. Each new face pops in. */
+.orb-reserve { display: flex; flex-wrap: nowrap; justify-content: flex-start; min-height: 40px; align-items: center; }
+.orb-reserve .orb-slot { flex: 0 1 64px; min-width: 0; animation: orb-slot-in .32s cubic-bezier(.34,1.56,.64,1); }
+.orb-reserve .orb-slot-empty { display: none; }
+.orb-reserve .orb-slot-face { display: none; }
+.orb-reserve .orb-sample { width: 18px; height: 18px; }
+.orb-reserve .orb-slot-count { font: 400 16px/1 var(--display-font, inherit); }
+.orb-slot-pickup { animation: orb-slot-bump .36s cubic-bezier(.34,1.56,.64,1); }
+@keyframes orb-slot-in { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes orb-slot-bump { 40% { transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) { .orb-reserve .orb-slot, .orb-slot-pickup { animation: none; } }
