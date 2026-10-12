@@ -20,6 +20,7 @@ import { prefersReducedMotion } from '../../utils/device.js';
 import ParityOrbs from '../ParityOrb.jsx';
 import OrbPickupBurst from './OrbPickupBurst.jsx';
 import ElementalOrb, { ElementalClaimBurst } from './ElementalOrb.jsx';
+import ViewPickupCube from './ViewPickupCube.jsx';
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
 // The band wears the manifold the orb sits on (its colour and tile style), and
@@ -88,8 +89,8 @@ export const PowerupOrbs = memo(PowerupOrbsImpl);
 // parity orb's gem, so a special is identifiable at a glance from across the cube.
 // A shrinking ring counts down the last seconds of the orb's life.
 
-// Shared geometry — one set for every special ever spawned (at most one is on the
-// board at a time, but the cost is paid once for the whole session either way).
+// Shared geometry — one set for every special ever spawned. The cost is paid
+// once for the whole session, including simultaneous story offers.
 const _specialGeos = {
     cubie: new THREE.BoxGeometry(0.13, 0.13, 0.13),
     core: new THREE.IcosahedronGeometry(0.075, 0),
@@ -104,6 +105,10 @@ const _specialGeos = {
     timer: new THREE.TorusGeometry(0.34, 0.022, 8, 32),
     rocketBeacon: new THREE.ConeGeometry(0.42, 0.72, 3, 1, true),
     magnetField: new THREE.TorusGeometry(0.48, 0.018, 8, 40),
+    viewTimer: new THREE.RingGeometry(0.49, 0.515, 4).rotateZ(Math.PI / 4),
+    viewHalo: new THREE.RingGeometry(0.45, 0.465, 4).rotateZ(Math.PI / 4),
+    cloud: new THREE.SphereGeometry(0.13, 12, 8),
+    rain: new THREE.OctahedronGeometry(0.047),
 };
 
 // The elemental orb is not a rocket/magnet silhouette — it is a glassy elemental
@@ -123,6 +128,8 @@ function SpecialOrb({ special, size }) {
     const timerRef = useRef();
     const reducedRef = useRef(prefersReducedMotion());
     const look = getSpecialDef(special.type);
+    const viewPickup = isViewPower(special.type);
+    const showerPickup = special.type === 'orb-shower';
     const arrival = useRef({ age: 0, effect: null, done: false });
     useEffect(() => () => arrival.current.effect?.dispose(), []);
 
@@ -139,12 +146,12 @@ function SpecialOrb({ special, size }) {
         }
 
         const t = state.clock.elapsedTime;
-        const bob = Math.sin(t * 2.2) * 0.06;
+        const bob = reducedRef.current ? 0 : Math.sin(t * 2.2) * 0.06;
         group.position.copy(_spPos).addScaledVector(_spNorm, SPECIAL_HOVER_HEIGHT + bob);
         // Stand the orb up off its face — +Y local becomes the surface normal.
         _spQuat.setFromUnitVectors(_spUp, _spNorm);
         group.quaternion.copy(_spQuat);
-        if (spinRef.current) spinRef.current.rotation.y = t * 1.6;
+        if (spinRef.current) spinRef.current.rotation.y = reducedRef.current ? 0.55 : t * (viewPickup ? 0.65 : 1.6);
 
         // Expiry urgency over the tail of the lifetime. `ttl` is mutated in place by
         // the sim (see spawnSpecial), so this reads a live countdown with no store
@@ -175,7 +182,7 @@ function SpecialOrb({ special, size }) {
         if (timerRef.current) {
             const remaining = Math.max(0, Math.min(1, ttl / life));
             timerRef.current.scale.setScalar(0.25 + 0.75 * remaining);
-            timerRef.current.rotation.z = -t * 0.8;
+            timerRef.current.rotation.z = viewPickup || reducedRef.current ? 0 : -t * 0.8;
             timerRef.current.material.opacity = 0.7 * alpha;
         }
         group.visible = true;
@@ -194,7 +201,18 @@ function SpecialOrb({ special, size }) {
     return (
         <group ref={groupRef} visible={false}>
             <group ref={spinRef}>
-                {special.type === 'explode' ? (
+                {viewPickup ? <ViewPickupCube view={look.view} /> : showerPickup ? (
+                    <group name="orb-shower-pickup">
+                        {[-1, 0, 1].map((x) => <mesh key={`cloud-${x}`} geometry={_specialGeos.cloud}
+                            position={[x * 0.14, 0.12 + (x === 0 ? 0.07 : 0), 0]} scale={[1, 0.8, 0.75]} ref={tag(1)}>
+                            <meshStandardMaterial color="#ecfff8" emissive={look.color} emissiveIntensity={0.35} roughness={0.6} transparent />
+                        </mesh>)}
+                        {[-1, 0, 1].map((x) => <mesh key={`rain-${x}`} geometry={_specialGeos.rain}
+                            position={[x * 0.14, -0.1 - (x === 0 ? 0.1 : 0), 0]} ref={tag(1)}>
+                            <meshBasicMaterial color={x === 0 ? look.accent : look.color} toneMapped={false} transparent />
+                        </mesh>)}
+                    </group>
+                ) : special.type === 'explode' ? (
                     <>
                         {Array.from({ length: 8 }, (_, i) => <mesh key={i} geometry={_specialGeos.cubie}
                             position={[(i & 1 ? 1 : -1) * 0.13, (i & 2 ? 1 : -1) * 0.13, (i & 4 ? 1 : -1) * 0.13]} ref={tag(1)}>
@@ -252,7 +270,7 @@ function SpecialOrb({ special, size }) {
                 )}
             </group>
 
-            {special.type === 'explode' ? <mesh geometry={_specialGeos.cubie} scale={3.6} ref={tag(0.3)}>
+            {viewPickup || showerPickup ? null : special.type === 'explode' ? <mesh geometry={_specialGeos.cubie} scale={3.6} ref={tag(0.3)}>
                 <meshBasicMaterial color={look.accent} wireframe transparent opacity={0.3} depthWrite={false} />
             </mesh> : special.type === 'rocket' ? (
                 /* Tall triangular exhaust beacon: points along the rocket and cannot
@@ -274,21 +292,21 @@ function SpecialOrb({ special, size }) {
             )}
 
             {/* Lifetime ring — shrinks toward the orb as its time runs out. */}
-            <mesh ref={timerRef} geometry={_specialGeos.timer} rotation={[Math.PI / 2, 0, 0]}>
-                <meshBasicMaterial color={look.accent} transparent opacity={0.7} depthWrite={false} toneMapped={false} />
+            <mesh ref={timerRef} geometry={viewPickup ? _specialGeos.viewTimer : _specialGeos.timer} rotation={[Math.PI / 2, 0, 0]}>
+                <meshBasicMaterial color={look.accent} side={THREE.DoubleSide} transparent opacity={0.7} depthWrite={false} toneMapped={false} />
             </mesh>
 
             {/* Halo ring flat against the face + a soft aura, so the orb is findable
                 from an oblique camera angle where the silhouette is edge-on. */}
-            <mesh geometry={_specialGeos.halo} rotation={[Math.PI / 2, 0, 0]} ref={tag(0.55)}>
-                <meshBasicMaterial color={look.color} transparent opacity={0.55} depthWrite={false} toneMapped={false} />
+            <mesh geometry={viewPickup ? _specialGeos.viewHalo : _specialGeos.halo} rotation={[Math.PI / 2, 0, 0]} ref={tag(0.55)}>
+                <meshBasicMaterial color={look.color} side={THREE.DoubleSide} transparent opacity={0.55} depthWrite={false} toneMapped={false} />
             </mesh>
-            <mesh geometry={_specialGeos.glow} ref={tag(0.14)}>
+            {!viewPickup && !showerPickup && <mesh geometry={_specialGeos.glow} ref={tag(0.14)}>
                 <meshBasicMaterial
                     color={look.color} transparent opacity={0.14} side={THREE.BackSide}
                     blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
                 />
-            </mesh>
+            </mesh>}
             <WormPointLight ref={lightRef} color={look.color} intensity={1.2} distance={3.2} decay={2} />
         </group>
     );
@@ -303,7 +321,7 @@ export function SpecialOrbs({ size, hidden = false }) {
     return (
         <group visible={!hidden}>
             {specials.map(sp => (
-                (isElementalType(sp.type) || isViewPower(sp.type) || sp.type === 'orb-shower')
+                isElementalType(sp.type)
                     ? <ElementalOrb key={sp.id} special={sp} size={size} />
                     : <SpecialOrb key={sp.id} special={sp} size={size} />
             ))}
