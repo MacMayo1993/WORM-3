@@ -79,16 +79,16 @@ describe('the campaign gets harder', () => {
     expect(speed(12)).toBeGreaterThan(speed(4));
   });
 
-  it('grows huge worms on big and small decks, with longer bodies later', () => {
+  it('grows longer on large decks while leaving pocket decks room to recover', () => {
     const longest = (from, to) => Math.max(...levelsIn(from, to).map(level => level.mechanics?.bodyLength ?? 0));
     expect(longest(9, 12)).toBeGreaterThan(longest(5, 8));
     expect(longest(5, 8)).toBeGreaterThan(longest(1, 4) - 1);
     for (let chapter = 5; chapter <= 12; chapter++) {
       expect(levelsIn(chapter, chapter).filter(level => level.mechanics?.bodyLength).length).toBeGreaterThanOrEqual(5);
     }
-    // A pocket deck and a mega deck both ask for a worm that fills a real share of the board.
+    // Small decks keep a recovery lane; mega decks retain the long-body challenge.
     const share = level => level.mechanics.bodyLength * 0.09 / (6 * level.cubeSize ** 2);
-    expect(WORM_STORY_LEVELS.some(level => level.cubeSize <= 3 && level.mechanics?.bodyLength && share(level) >= 0.25)).toBe(true);
+    for (const level of WORM_STORY_LEVELS.filter(l => l.cubeSize <= 3 && l.mechanics?.bodyLength)) expect(share(level)).toBeLessThanOrEqual(0.21);
     expect(WORM_STORY_LEVELS.some(level => level.cubeSize >= 10 && (level.mechanics?.bodyLength ?? 0) >= 200)).toBe(true);
   });
 

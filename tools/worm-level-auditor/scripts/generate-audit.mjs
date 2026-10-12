@@ -65,7 +65,7 @@ const records=WORM_STORY_LEVELS.map(level=>{
  assert.equal(acceptsComplete,true);assert.equal(rejectsMissingGoals,true);
  const sourcePath='src/worm/story/campaign.js';
  const levelLines=sources[sourcePath].content.split('\n');
- const start=levelLines.findIndex(line=>new RegExp('^  \\{ id: '+level.id+'[, ]').test(line));
+ const start=levelLines.findIndex(line=>new RegExp('^  \\{ id: '+level.id+', cubeSize:').test(line));
  let end=start+1;
  while(end<levelLines.length&&!/^  \{ id: |^\];/.test(levelLines[end]))end++;
  while(end>start+1&&(levelLines[end-1].trim()===''||levelLines[end-1].trim().startsWith('//')))end--;

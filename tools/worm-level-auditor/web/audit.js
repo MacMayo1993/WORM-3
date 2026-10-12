@@ -1,4 +1,34 @@
 export const ELEMENTS = ['water','fire','grass','ice','lightning'];
+// Playability guardrails, not geometric impossibility proofs. Keep recovery
+// lanes and reaction time instead of scaling every task with chapter number.
+export const SMALL_BOARD_BUDGETS = {
+  2: { speed: 1.5, bodyLength: 55, starLength: 61, orbs: 24, rotateEvery: 14 },
+  3: { speed: 1.75, bodyLength: 75, starLength: 84, orbs: 32, rotateEvery: 16 },
+  4: { speed: 2.05, bodyLength: 100, starLength: 112, orbs: 36, rotateEvery: 14 },
+};
+export function difficultyFindings(level, powerBudget = 0) {
+  const findings = [], m = level.mechanics ?? {}, budget = SMALL_BOARD_BUDGETS[level.cubeSize];
+  const flag = (key, message) => findings.push({ key, severity: 'review', message });
+  const food = Math.max(level.orbs ?? (level.kind === 'orbs' ? level.target : 0), Math.ceil(((m.bodyLength ?? 10) - 10) / 3));
+  const pairs = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
+  if (budget) {
+    for (const key of ['speed', 'starLength']) if ((level[key] ?? 0) > budget[key]) flag(key, `${key} exceeds the ${level.cubeSize}×${level.cubeSize} comfort budget (${budget[key]}).`);
+    if ((m.bodyLength ?? 0) > budget.bodyLength) flag('bodyLength', `Growth target exceeds the small-board budget of ${budget.bodyLength} segments.`);
+    if (food > budget.orbs) flag('orbs', `Required food exceeds the small-board budget of ${budget.orbs} pickups.`);
+    if (level.rotateEvery && level.rotateEvery < budget.rotateEvery) flag('rotations', `Allow at least ${budget.rotateEvery}s between small-board turns.`);
+    if (level.cubeSize <= 3 && ((m.selfPasses ?? 0) > 1 || (m.multiHeals ?? 0) > 1)) flag('chains', 'Pocket decks should require at most one self-pass and one double heal.');
+    if (level.cubeSize <= 3 && level.kind !== 'tunnel' && (m.selfPasses || m.multiHeals)) flag('chains', 'Use free-ride trials for pocket chaining; avoid stacking paid heals and chain tasks.');
+  }
+  if ((m.selfPasses || m.multiHeals) && pairs < 2) findings.push({ key: 'chains', severity: 'impossible', message: 'Chain tasks need at least two staged pairs for repeatable attempts.' });
+  // Power and turn waits can overlap; leave additional time for food, routing,
+  // ten-second tunnel rides and recovery. This is a conservative planning model.
+  const actions = ['selfPasses', 'multiHeals', 'ringHeals', 'kills', 'bombs'].reduce((n, key) => n + (m[key] ?? 0), 0);
+  const reserve = food * 2 + pairs * 20 + actions * 10 + 30;
+  const rotations = (level.rotations ?? (level.kind === 'rotation' ? level.target : 0)) * (level.rotateEvery ?? 0);
+  const workload = Math.max(powerBudget, rotations) + reserve;
+  if (workload > level.limit) flag('workload', `Combined task budget needs ${workload}s including routing and recovery; limit is ${level.limit}s.`);
+  return findings;
+}
 export function requiredPowerCycles(level) {
   const m=level.mechanics??{};
   // Budget repeated quantities too: one elemental pickup per offer, and at
@@ -17,7 +47,7 @@ export function assess(record, character='glow', scenario={}) {
     const key=o.key, target=o.target;
     if(key==='orbs') {
       available=recurring?'Recurring':String(initial);
-      detail=initial+' initially staged; refill restores up to one orb per missing color every 1.5 active seconds.'+(target>initial?' This quest needs at least '+(target-initial)+' pickups beyond the opening inventory.':'');
+      detail=initial+' initially staged; refill restores up to one orb per missing color every '+record.timing.refill+' active seconds.'+(target>initial?' This quest needs at least '+(target-initial)+' pickups beyond the opening inventory.':'');
       if(!recurring&&target>initial)fail('No refill: '+target+' required exceeds '+initial+' supplied.');
       if(totalCap!==null&&target>totalCap)fail('Lifetime allowance '+totalCap+' is below the '+target+' pickup target.');
     } else if(key==='colors') {
@@ -70,6 +100,7 @@ export function assess(record, character='glow', scenario={}) {
   const missedCycles=scenario.missedCycles??2, cycleLength=powerPool.length;
   const cycles=requiredPowerCycles(level);
   const powerBudget=cycleLength?record.timing.opening+missedCycles*cycleLength*(record.timing.lifetime+record.timing.cooldown)+cycles*cycleLength*(record.timing.elementDuration+4+record.timing.cooldown):0;
+  findings.push(...difficultyFindings({...level, limit}, powerBudget));
   if(cycleLength&&powerBudget>=limit)findings.push({key:'timing',severity:'undersupplied',message:'Conservative power-offer model uses '+powerBudget+'s of the '+limit+'s limit; routing, combat and tunnels are excluded.'});
   if(!stage.refillSixColors&&recurring)findings.push({key:'refill',severity:'impossible',message:'Runtime refill did not restore six colors after depletion.'});
   if(!record.completionContract.rejectsMissingGoals)findings.push({key:'completion',severity:'review',message:'A missing objective was accepted by the source completion predicate.'});

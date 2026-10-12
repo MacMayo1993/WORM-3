@@ -81,7 +81,7 @@ describe('double-heal supply', () => {
   };
 
   it('on a double-heal level, opens the next pair while a heal still rides, so heals chain', () => {
-    const { size, sim, practice } = stage(storyLevel(60));
+    const { size, sim, practice } = stage(storyLevel(55));
     expect(practice.chainHeals).toBe(true);
     const cubies = sealFirst(practice.cubies, size);
     // The second pair's heal is still in the body: the next pair opens anyway.
@@ -92,7 +92,7 @@ describe('double-heal supply', () => {
   });
 
   it('still waits for a ride that heals nothing, and keeps the old pacing on other levels', () => {
-    const chain = stage(storyLevel(60));
+    const chain = stage(storyLevel(55));
     const cubies = sealFirst(chain.practice.cubies, chain.size);
     chain.sim.tunnelPassages.push({ heal: null });
     expect(replenishStoryTunnel(chain.sim, chain.practice, { cubies, animState: null }, chain.size)).toBeNull();

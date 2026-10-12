@@ -63,6 +63,7 @@ export function storyGoalText(level) {
   if (m.multiHeals) notes.push(level.kind === 'tunnel'
     ? 'For a double heal, ride a second pair before your tail leaves the first.'
     : 'For a double heal, carry both tolls and ride a second pair before your tail leaves the first.');
+  if (m.selfPasses || m.multiHeals) notes.push('Missed a chain? Retry doors open after the last pair and your tail clear.');
   if ((m.ringHeals || m.signatures) && TUNNEL_KINDS.includes(level.kind)) notes.push('Tunnel deposits seal only after the surround and ability tasks.');
   if (level.rotateEvery && (level.kind === 'rotation' || level.rotations)) notes.push(`Turns come every ${level.rotateEvery} seconds.`);
   if (level.tip) notes.push(level.tip);

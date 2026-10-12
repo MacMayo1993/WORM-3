@@ -2,13 +2,13 @@ import { BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH } from '../healerWorm/constants.js
 
 // Peak physical length survives healing deposits; lifetime pickups alone cannot
 // satisfy this goal. Pocket cubes get a smaller, board-appropriate target.
-// When growing is already a task, the star asks for eight more orbs beyond it.
+// Extra growth scales with the board: 2/3/4 pickups on pocket decks, 8 elsewhere.
 export const STAR_GROWTH_BEYOND_TASK = 8 * ORB_SEGMENT_GROWTH;
 export function storyGrowthTarget(level) {
   const size = level.cubeSize ?? 5;
   const pickups = Math.min(Math.max(4, Math.floor(size * size / 2)), 12 + 2 * Math.floor((level.id - 1) / 10));
   const required = level.mechanics?.bodyLength;
-  return level.starLength ?? Math.max(BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH * pickups, required ? required + STAR_GROWTH_BEYOND_TASK : 0);
+  return level.starLength ?? Math.max(BASE_TAIL_LENGTH + ORB_SEGMENT_GROWTH * pickups, required ? required + (size <= 4 ? size * ORB_SEGMENT_GROWTH : STAR_GROWTH_BEYOND_TASK) : 0);
 }
 
 export function storyStarGoals(level, metrics = {}) {

@@ -251,7 +251,7 @@ export const WORM_STORY_NARRATIVE = {
       'The pocket deck again, but now the World Worm has its teeth in the gears. They bite every few seconds.',
       'Tiny deck. Fast turns. Big appetite. Yours, not its. Hopefully.',
     ],
-    debrief: 'Ten turns on a deck the size of a dice. You don’t scare easily, do you?',
+    debrief: 'Every turn survived on a deck the size of a dice. You don’t scare easily, do you?',
   },
   34: {
     briefing: [
@@ -382,7 +382,7 @@ export const WORM_STORY_NARRATIVE = {
       'It’s retreating into the pocket decks, where a big worm can barely turn around.',
       'So turn around anyway. Grow big in a small place.',
     ],
-    debrief: 'Eighty segments on a two-by-two. You’re basically a cube now. A worm-flavored cube.',
+    debrief: 'A well-fed worm on a two-by-two, with room left to turn. Small deck, good manners.',
   },
   52: {
     briefing: [
@@ -396,7 +396,7 @@ export const WORM_STORY_NARRATIVE = {
       'When there’s no room to go around, go over. The Corps called it knotting.',
       'Your body will be everywhere. Jump it, double-jump it, and don’t tie yourself in an actual knot.',
     ],
-    debrief: 'Six jumps, zero knots. Well, one knot. It came undone. We’ll call it a bow.',
+    debrief: 'Over your tail and safely down. That knot came undone. We’ll call it a bow.',
   },
   54: {
     briefing: [
@@ -417,35 +417,35 @@ export const WORM_STORY_NARRATIVE = {
       'The World Worm jammed its teeth into the pocket gears. A layer turns every few seconds.',
       'On a two-by-two, every layer is half the world. Keep moving.',
     ],
-    debrief: 'Ten turns on the tiniest deck there is. If the World Worm has a face, it’s making one.',
+    debrief: 'You outlasted the gears on the tiniest deck there is. If the World Worm has a face, it’s making one.',
   },
   57: {
     briefing: [
       'It’s blowing weather into the small decks to flush us out.',
       'Catch the elements before they spread. In here, a storm has nowhere to go but onto you.',
     ],
-    debrief: 'Four elements caught in a four-by-four. The storm ran out of room before you did.',
+    debrief: 'The elements are yours. The storm ran out of room before you did.',
   },
   58: {
     briefing: [
       'This is it. The tightest squeeze on the ship, all the food you can eat, and nowhere to put your tail.',
       'I believe in you. I also believe in jumping.',
     ],
-    debrief: 'A hundred and sixty segments on a three-by-three. That isn’t a worm on a cube anymore. It’s a cube in a worm.',
+    debrief: 'A good meal, a longer tail, and a route back out. That’s how a healer handles a tight squeeze.',
   },
   59: {
     briefing: [
       'When there’s no room on the ground, use the air. Rockets, boosts, double jumps.',
-      'And sneak a double heal in while you’re up there.',
+      'Land safely, gather your colors, and repair the doors between flights.',
     ],
     debrief: 'Air superiority, pocket edition. The crawlers are looking up now. Good. Up is where you aren’t.',
   },
   60: {
     briefing: [
       'Found it. The World Worm’s hiding place is the smallest door on the ship. It leads straight into the Core.',
-      'Heal every door around it, two at a time, and pass yourself right under its nose.',
+      'Gather your colors, watch the gears, and repair each door at your own pace.',
     ],
-    debrief: 'It came to the door to watch. It saw a long worm meet itself and heal two doors at once. Then it said a second word: “HOW?”',
+    debrief: 'It came to the door to watch. You made room to grow and repaired every door it had torn open. Then it said a second word: “HOW?”',
   },
 
   // ── Chapter 7 · Weather of War ───────────────────────────────────────────
@@ -701,7 +701,7 @@ export const WORM_STORY_NARRATIVE = {
       'A pocket mirror. A tiny deck, a few doors, a long worm.',
       'You’ll meet yourself constantly. Be polite every time.',
     ],
-    debrief: 'Two doubles in a three-by-three. You’re the most polite worm in the Plane.',
+    debrief: 'A double heal in a three-by-three. You’re the most polite worm in the Plane.',
   },
   97: {
     briefing: [
@@ -714,7 +714,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Every turn echoes in here. A small deck, a long worm, and your tail in the way.',
     ],
-    debrief: 'Twelve turns, four jumps, and no echoes of you left behind. Clean.',
+    debrief: 'Turns survived, tail cleared, and no echoes of you left behind. Clean.',
   },
   99: {
     briefing: [
@@ -755,7 +755,7 @@ export const WORM_STORY_NARRATIVE = {
     briefing: [
       'Remember the pocket deck? Let’s see if a giant fits.',
     ],
-    debrief: 'Almost half the deck was worm, and you never bit it. If that isn’t a healer, nothing is.',
+    debrief: 'A grown worm on a tiny deck, and you found your way through. That’s a healer.',
   },
   105: {
     briefing: [
