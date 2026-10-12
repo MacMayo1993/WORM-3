@@ -379,8 +379,8 @@ it('offers a magnet after the opening, then a rocket after the magnet recovery w
   act(() => useGameStore.setState({ playerProgress: { ...newProgress(), wormStory: { stars: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [i+1, 1])), claimed: {} } } }));
   begin(7);
   expect(state().wormEnemiesEnabled).toBe(false);
-  expect(state().wormSpecials).toHaveLength(0);
-  travelUntil(() => state().wormSpecials.length > 0);
+  expect(state().wormSpecials.filter(p => !p.storyBonus)).toHaveLength(0);
+  travelUntil(() => state().wormSpecials.some(p => !p.storyBonus));
   const magnet = state().wormSpecials[0]; expect(magnet.type).toBe('magnet');
   seek(magnet, () => worm.magnetT.current > 0);
   travelUntil(() => state().wormSpecials.some(p => p.type === 'rocket'));
@@ -389,7 +389,7 @@ it('offers a magnet after the opening, then a rocket after the magnet recovery w
   expect(state().wormStoryResult).toBeNull();
   travelUntil(() => !state().wormRocketActive);
   frame();
-  expect(state().wormSpecials).toHaveLength(0);
+  expect(state().wormSpecials.filter(p => !p.storyBonus)).toHaveLength(0);
   expect(state().wormStoryResult).toBeNull();
 });
 it('offers level 30 Explode after a missed magnet and publishes the new quest marker', () => {
@@ -398,16 +398,16 @@ it('offers level 30 Explode after a missed magnet and publishes the new quest ma
     stars: Object.fromEntries(Array.from({ length: 29 }, (_, i) => [i + 1, 1])), claimed: {},
   } } }));
   begin(30);
-  travelUntil(() => state().wormSpecials.length > 0);
+  travelUntil(() => state().wormSpecials.some(p => !p.storyBonus));
   const [sim, practice] = metricsSpy.mock.calls.at(-1);
   expect(state().wormSpecials[0].type).toBe('magnet');
   // Let the real lifetime path expire the uncollected pickup, keeping it off
   // the head's next step. The Story scheduler must move on without any credit.
   sim.specials[0].ttl = 0.001;
   frame();
-  expect(state().wormSpecials).toHaveLength(0);
+  expect(state().wormSpecials.filter(p => !p.storyBonus)).toHaveLength(0);
   expect(practice.mechanics.magnetOrbs ?? 0).toBe(0);
-  travelUntil(() => state().wormSpecials.length > 0);
+  travelUntil(() => state().wormSpecials.some(p => !p.storyBonus));
   expect(state().wormSpecials[0].type).toBe('explode');
   expect(state().wormStoryTarget).toBe(state().wormSpecials[0]);
   expect(practice.mechanics.magnetOrbs ?? 0).toBe(0);

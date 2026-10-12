@@ -240,6 +240,7 @@ export function makeWormSim(size) {
         jumpT: 0,                 // 0 = grounded, >0 = in air
         isJumping: false,
         jumpCount: 0,
+        springBouncePending: false,
         // Span (in tiles) and apex height of the CURRENT flight. A normal jump uses the
         // SURFACE_* defaults; a rocket swaps in a longer, taller arc and restores these
         // on landing. Everything downstream (jumpT advance rate, the chain-fountain lift
@@ -443,6 +444,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.padFlight = null;
     sim.raisedPadHeight = 0;
     sim.jumpCount = 0;
+    sim.springBouncePending = false;
     sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
     sim.jumpHeight = SURFACE_JUMP_HEIGHT;
     sim.jumpBase = 0;
@@ -549,6 +551,7 @@ export const jumpLiftOf = (sim) => sim.isJumping && !sim.padFlight
 export function startJump(sim, ctx, size, { allowDive = true } = {}) {
     if (sim.signature.sweep || sim.padFlight) return;
     if (sim.phase !== 'crawling') return;
+    sim.springBouncePending = false; // manual input owns the follow-up, including platform flights
     // A jump press while the Spring is coiling lets it go now. If the landing is no longer
     // clear the coil is spent and this becomes the ordinary hop it would have been (a jump
     // rescue must never be swallowed by a leap that cannot land). Once the leap is airborne
@@ -695,6 +698,7 @@ export function hasJumpClearance(sim, progress = sim.interpT) {
 
 /** Start or refresh the protected rocket arc. */
 export function startRocket(sim, ctx) {
+    sim.springBouncePending = false;
     if (sim.rocketActive) {
         sim.rocketT = ROCKET_DURATION;
         ctx.feel('rocket');
@@ -759,6 +763,19 @@ export function startElemental(sim, ctx, type, size = 0) {
 /** Apply a claimed special orb's effect. */
 export function activateSpecial(sim, ctx, type, size = 0) {
     if (type === 'rocket') startRocket(sim, ctx);
+    else if (type === 'spring') {
+        if (sim.phase !== 'crawling' || sim.rocketActive || sim.padFlight || sim.isJumping || sim.signature.charge > 0 || sim.signature.sweep) return;
+        sim.isJumping = true;
+        sim.jumpT = 0.001;
+        sim.jumpCount = 1;
+        sim.jumpBase = 0;
+        sim.jumpSpan = 1.6;
+        sim.jumpHeight = 1.2;
+        sim.springBouncePending = true;
+        sim.pendingTunnelTrigger = null;
+        updateRotationDeparture(sim);
+        ctx.feel('springCharge');
+    }
     else if (type === 'magnet') startMagnet(sim, ctx);
     else if (type === 'orb-shower') startOrbShower(sim, ctx);
     else if (type === 'explode') {
@@ -1336,6 +1353,7 @@ function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey, elementsOnly = fals
     const headKey = `${x},${y},${z},${dirKey}`;
     const idx = sim.specials.findIndex(s => {
         const key = `${s.x},${s.y},${s.z},${s.dirKey}`;
+        if (s.type === 'spring') return key === headKey && sim.interpT >= 1 && !sim.isJumping && !sim.rocketActive && !sim.padFlight && !(sim.signature.charge > 0) && !sim.signature.sweep && !liveRotation.active && !sim.restRead;
         if (s.type === 'explode') return key === headKey && sim.interpT >= 1 && !sim.isJumping;
         if (isElementalType(s.type) || isViewPower(s.type)) return key === headKey && sim.interpT >= 1;
         return !elementsOnly && (reach ? reach.has(key) : key === headKey);
@@ -2625,6 +2643,18 @@ export function stepWormSim(sim, delta, size, ctx) {
         // Tie jump progress to tile-traverse progress so the speed slider never changes
         // jump distance. Rocket overdrive no longer changes the ordinary jump arc.
         sim.jumpT += (delta / STEP_SEC) / sim.jumpSpan;
+        if (sim.springBouncePending && sim.jumpT >= 0.45) {
+            sim.springBouncePending = false;
+            // A manual second jump takes precedence; never grant a third jump.
+            if (sim.jumpCount === 1 && !sim.rocketActive && !sim.padFlight) {
+                sim.jumpBase = jumpLiftOf(sim);
+                sim.jumpT = 0.001;
+                sim.jumpCount = 2;
+                sim.jumpSpan = 1.8;
+                sim.jumpHeight = 1.5;
+                ctx.feel('jump');
+            }
+        }
         if (sim.jumpT >= 1) {
             // Spring's slam belongs where the worm came down, not where it has crawled to by
             // the time the signature clock notices it is on the ground.
@@ -2657,6 +2687,7 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.jumpT = 0;
             sim.isJumping = false;
             sim.jumpCount = 0;
+            sim.springBouncePending = false;
             sim.jumpBase = 0;
             sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
             sim.jumpHeight = SURFACE_JUMP_HEIGHT;

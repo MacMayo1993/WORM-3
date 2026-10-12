@@ -9,6 +9,7 @@ import { EXPLODE_AMOUNT, EXPLODE_TRANSITION } from '../worm/wormExpansion.js';
 import { jumpLandingTile } from '../worm/healerWorm/jumpLanding.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  activateSpecial,
   makeWormSim,
   resetWormSim,
   stepWormSim,
@@ -1783,4 +1784,48 @@ it('holds a raised tunnel open throughout the reverse orbit, including a short t
   expect(sim.phase).toBe('crawling');
   stepWormSim(sim, 1 / 60, SIZE, ctx);
   expect(ctx.events.filter(e => e.type === 'heal')).toHaveLength(1);
+});
+
+
+describe('standalone spring pickup', () => {
+  beforeEach(resetLiveRotation);
+  it('collects by contact and launches two automatic stages, then resets on landing', () => {
+    const sim = makeSim(), ctx = makeCtx({ getCubies: () => makeCubies(SIZE), isStoryMode: () => true });
+    sim.specials = [{ ...sim.pos, type: 'spring', id: 'spring', ttl: 20 }];
+    // First arrival at the tile center is the only collection point.
+    sim.interpT = 1;
+    sim.stepAcc = 1.25;
+    stepWormSim(sim, 0.01, SIZE, ctx);
+    expect(sim.specials).toHaveLength(0);
+    expect(sim.isJumping).toBe(true);
+    expect(sim.jumpCount).toBe(1);
+    expect(sim.springBouncePending).toBe(true);
+    expect(runUntil(sim, ctx, () => sim.jumpCount === 2, 4)).toBe(true);
+    expect(sim.jumpBase).toBeGreaterThan(0.8);
+    expect(sim.springBouncePending).toBe(false);
+    expect(runUntil(sim, ctx, () => !sim.isJumping, 5)).toBe(true);
+    expect(sim.jumpCount).toBe(0);
+    expect(sim.elementalType).toBeNull();
+  });
+  it('respects pause and manual second jumps without granting a third', () => {
+    const sim = makeSim(), ctx = makeCtx({ isStoryMode: () => true });
+    activateSpecial(sim, ctx, 'spring', SIZE);
+    const before = sim.jumpT;
+    run(sim, { ...ctx, isPaused: () => true }, 1);
+    expect(sim.jumpT).toBe(before);
+    startJump(sim, ctx, SIZE, { allowDive: false });
+    expect(sim.jumpCount).toBe(2);
+    run(sim, ctx, 0.7);
+    expect(sim.jumpCount).toBe(2);
+    expect(sim.springBouncePending).toBe(false);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.springBouncePending).toBe(false);
+  });
+  it('does not steal a rocket flight or a platform jump', () => {
+    for (const state of [{ rocketActive: true }, { padFlight: {} }, { isJumping: true }]) {
+      const sim = makeSim(); Object.assign(sim, state);
+      activateSpecial(sim, makeCtx(), 'spring', SIZE);
+      expect(sim.springBouncePending).toBe(false);
+    }
+  });
 });
