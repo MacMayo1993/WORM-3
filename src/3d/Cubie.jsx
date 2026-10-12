@@ -460,7 +460,15 @@ const Cubie = React.forwardRef(function Cubie({
     const kick = cubieKicks.size ? cubieKicks.get(popKey) : undefined;
     const burrows = wormPads ? burrowBridge.current : null;
     const burrowingHere = burrows?.wakeCubies.has(burrowHomeKey);
-    if (!kick && !_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0 && !burrowingHere) return;
+    if (!kick && !_anyCubiePops && !poppedRef.current && !raised && spring.lift === 0 && !burrowingHere) {
+      // A piece that is not raised has no offset. Whatever left one behind (a
+      // loss mid-turn, a retry that remapped slots before poppedRef caught up),
+      // drop it here so a fresh run never shows pieces floating where they
+      // were popped out last run.
+      const pop = popGroupRef.current;
+      if (pop && (pop.position.x || pop.position.y || pop.position.z)) pop.position.set(0, 0, 0);
+      return;
+    }
     if (!popGroupRef.current || !pieceRef.current) return;
     const state = useGameStore.getState();
     const reduced = settings?.reducedMotion || prefersReducedMotion();
