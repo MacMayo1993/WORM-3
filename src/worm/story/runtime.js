@@ -122,7 +122,10 @@ export function stageStory(sim, size, level, character) {
   const edge = size - 1;
   const pairCount = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
   const mouths = storyMouths(size, pairCount);
-  const pendingMouths = mouths.slice(2).map(([x,y,z,dir]) => getStableKey(x,y,z,dir,base.cubies));
+  const mouthKeys = mouths.map(([x,y,z,dir]) => getStableKey(x,y,z,dir,base.cubies));
+  const pendingMouths = mouthKeys.slice(2);
+  const tunnelGoals = Object.fromEntries(['selfPasses', 'multiHeals', 'ringHeals']
+    .filter(key => level.mechanics?.[key]).map(key => [key, level.mechanics[key]]));
   // Reserve future mouths from food placement without opening the whole network.
   let reserved = base.cubies;
   for (const [i, [x,y,z,dir]] of mouths.entries()) {
@@ -184,7 +187,7 @@ export function stageStory(sim, size, level, character) {
   // Double-heal levels let the next pair open while a heal still rides in the body,
   // so heals can chain (see replenishStoryTunnel).
   const chainHeals = !!level.mechanics?.multiHeals;
-  const practice = { ...base, pendingMouths, chainHeals, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
+  const practice = { ...base, pendingMouths, retryMouths: mouthKeys.slice(0, 2), tunnelGoals, chainHeals, orbTargets, orbRefillDelay: STORY_ORB_REFILL_INTERVAL,
     elapsed: 0, peakLength: Math.floor(sim.tailLength), powerDelay: STORY_POWER_OPENING_DELAY, powerHint: null, lastPower: null,
     cuts: 0, wasCut: false, airborne: false, crossedThisJump: false, exploding: false,
     bodyJumps: 0, colors: new Set(), tunnels: new Set(), pendingTunnel: null, mechanics: {}, elements: new Set(), collectedElements: new Set(), fusionIds: new Set(), elementTimes: {}, powerSeq: 0, bombIds: new Set() };
@@ -259,7 +262,8 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
     orbs: state.wormSessionOrbs, colors: practice.colors.size, healed: sim.healed, uniqueTunnels: practice.tunnels.size,
     onSurface: sim.phase === 'crawling', healSettled: sim.healPauseT <= 0,
     tailClear: sim.phase === 'crawling' && sim.tunnelPassages.length === 0 && sim.healPauseT <= 0,
-    nextTarget: level.kind === 'tunnel' ? activeTunnels.find(record => !practice.tunnels.has(record.tunnel.pairId))?.tunnel.entry ?? null : null,
+    nextTarget: level.kind === 'tunnel' ? (activeTunnels.find(record => !practice.tunnels.has(record.tunnel.pairId)) ??
+      (Object.entries(practice.tunnelGoals ?? {}).some(([key, target]) => (practice.mechanics[key] ?? 0) < target) ? activeTunnels[0] : null))?.tunnel.entry ?? null : null,
     bodyJumps: practice.bodyJumps, landed: !sim.isJumping && sim.phase === 'crawling',
     rotations: state.rotationEpoch - practice.rotationEpoch,
     rotationSettled: !state.animState && !liveRotation.active, remaining: activeTunnels.length + (practice.pendingMouths?.length ?? 0),
@@ -282,8 +286,18 @@ export function storyTunnelPassagesBlock(sim, practice) {
 }
 
 export function replenishStoryTunnel(sim, practice, state, size, activeCount = getActiveTunnels(state.cubies,size).length) {
-  if (!practice.pendingMouths?.length || sim.phase !== 'crawling' || storyTunnelPassagesBlock(sim, practice) ||
-      sim.healPauseT > 0 || state.animState || liveRotation.active || activeCount >= 2) return null;
+  if (!sim.alive || state.wormPaused || sim.phase !== 'crawling' || storyTunnelPassagesBlock(sim, practice) ||
+      sim.healPauseT > 0 || sim.cutFocusT > 0 || sim.jumpRescueHeld || sim.elementalFocusT > 0 ||
+      state.animState || liveRotation.active || activeCount >= 2) return null;
+  // A missed chain must not consume the last chance to finish. Reuse the first
+  // two stable pairs only after the authored network AND every tail route clear.
+  // Pending mouths reserve both endpoints from future food refills; placement
+  // below still waits for existing pickups and the body to leave safely.
+  if (!practice.pendingMouths?.length && activeCount === 0 && !sim.tunnelPassages.length &&
+      Object.entries(practice.tunnelGoals ?? {}).some(([key, target]) => (practice.mechanics[key] ?? 0) < target)) {
+    practice.pendingMouths = [...(practice.retryMouths ?? [])];
+  }
+  if (!practice.pendingMouths?.length) return null;
   const map = buildManifoldGridMap(state.cubies, size);
   const occupied = new Set([...sim.powerups, ...sim.specials].map(tileKey));
   occupied.add(tileKey(sim.pos));

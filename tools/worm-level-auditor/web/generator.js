@@ -1,4 +1,4 @@
-import {ELEMENTS,requiredPowerCycles} from './audit.js';
+import {ELEMENTS,requiredPowerCycles,SMALL_BOARD_BUDGETS} from './audit.js';
 export const GENERATOR_VERSION=1;
 export const DEFAULT_SETTINGS={total:120,seed:'worm-100-plus',profile:'balanced',pace:'standard',sizes:[3,4,5,6,7,8,9,10],combat:true,mastery:true};
 export const SUPPORTED_SIZES=[2,3,4,5,6,7,8,9,10,15];
@@ -64,16 +64,16 @@ export function generateLevel(id,raw,worldTemplates,revision=0){
  if(['elemental','variety','blast','siege','finale'].includes(pattern))sizes=sizes.filter(n=>n>=5);
  if(['tunnels','healing'].includes(pattern))sizes=sizes.filter(n=>n>=3);
  if(!sizes.length){pattern='harvest';sizes=s.sizes;}
- const size=pick(sizes),small=size<=3,food=Math.min(50,(small?10:18)+steps*3+Math.floor(rand()*5)),pairs=Math.min(6,2+Math.floor(steps/2)+(rand()>.5?1:0));
+ const size=pick(sizes),small=size<=3,food=Math.min(SMALL_BOARD_BUDGETS[size]?.orbs??50,(small?10:18)+steps*3+Math.floor(rand()*5)),pairs=Math.min(size<=3?4:6,2+Math.floor(steps/2)+(rand()>.5?1:0));
  const level={id,title:pick(adjectives)+' '+labels[pattern]+' '+id,subtitle:'Chapter '+chapter+' · '+labels[pattern],cubeSize:size,kind:'orbs',target:food,colors:6,speed:Number((small?1.35:size>=9?2.4:2.05+steps*.06).toFixed(2)),par:120,limit:210,points:Math.min(100,40+chapter*5)};
  if(small)level.orbsPerFace=2;
  if(pattern!=='harvest')delete level.colors;
  if(pattern==='tunnels'){level.kind='tunnel';level.target=pairs;}
  if(pattern==='jumps'){level.kind='jump';level.target=Math.min(6,3+Math.floor(steps/2));level.orbs=food;}
- if(pattern==='turns'){level.kind='rotation';level.target=5+steps;level.orbs=food;level.rotateEvery=small?12:Math.max(9,14-steps);}
- if(pattern==='healing'){level.kind='collector';level.target=pairs;level.colors=6;level.orbs=food;level.rotateEvery=Math.max(10,15-steps);}
+ if(pattern==='turns'){level.kind='rotation';level.target=5+steps;level.orbs=food;level.rotateEvery=small?16:Math.max(size===4?14:9,14-steps);}
+ if(pattern==='healing'){level.kind='collector';level.target=pairs;level.colors=6;level.orbs=food;level.rotateEvery=Math.max(SMALL_BOARD_BUDGETS[size]?.rotateEvery??10,15-steps);}
  if(['elemental','variety','blast','siege','finale'].includes(pattern)){
-  level.kind='mastery';level.target=pairs;level.orbs=food;level.rotateEvery=Math.max(10,15-steps);level.mechanics={};
+  level.kind='mastery';level.target=pairs;level.orbs=food;level.rotateEvery=Math.max(SMALL_BOARD_BUDGETS[size]?.rotateEvery??10,15-steps);level.mechanics={};
   if(pattern==='elemental')level.mechanics.elementPickups=Math.min(5,2+Math.floor(steps/2)+(rand()>.5?1:0));
   if(pattern==='variety')level.mechanics.uniqueElements=Math.min(5,3+Math.floor(steps/2));
   if(pattern==='blast')level.mechanics={explodes:Math.min(3,1+Math.floor(steps/2)),rockets:1};
@@ -99,6 +99,7 @@ export function generateLevel(id,raw,worldTemplates,revision=0){
  level.par=Math.floor(level.limit*({relaxed:.72,standard:.7,intense:.66}[s.pace])/5)*5;
  if(s.pace==='relaxed')level.speed=Number((level.speed*.92).toFixed(2));
  if(s.pace==='intense')level.speed=Number(Math.min(2.65,level.speed*1.05).toFixed(2));
+ if(SMALL_BOARD_BUDGETS[size])level.speed=Math.min(level.speed,SMALL_BOARD_BUDGETS[size].speed);
  level.goal=levelGoal(level);
  return {config:level,world,generation:{pattern,chapter,seed:s.seed,revision,tier:steps}};
 }

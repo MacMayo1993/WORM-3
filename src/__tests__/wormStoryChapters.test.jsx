@@ -68,8 +68,12 @@ describe('the new chapters use the whole cube', () => {
     expect(later.some(level => level.rotateEvery)).toBe(true);
   });
 
-  it('reserves the longest final checklists for later chapters', () => {
-    for (const chapter of WORM_STORY_CHAPTERS.slice(1)) {
+  it('reserves the longest final checklists for full-size chapter finales', () => {
+    // Small-board finales use the playability budgets covered by
+    // storySmallBoardBalance.test.js. Requiring the longest checklist here
+    // would force removed chain tasks back into level 60's repair finale.
+    const fullSizeFinales = WORM_STORY_CHAPTERS.slice(1).filter(chapter => chapter.levels.at(-1).cubeSize > 4);
+    for (const chapter of fullSizeFinales) {
       const goals = chapter.levels.map(level => storyChecklist(level).length);
       expect(goals.at(-1)).toBe(Math.max(...goals));
     }

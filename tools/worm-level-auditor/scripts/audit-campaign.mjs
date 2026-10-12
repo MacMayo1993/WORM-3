@@ -71,6 +71,9 @@ for (const level of WORM_STORY_LEVELS) {
     const { sim, p, state } = setup(level, 'glow', 'replacement');
     sim.powerups = []; sim.specials = [];
     const pairs = ['tunnel', 'collector', 'restore', 'mastery'].includes(level.kind) ? level.target : 0;
+    // This pass measures the finite authored network; retry supply is exercised
+    // separately by storySmallBoardBalance.test.js with these goals unfinished.
+    Object.assign(p.mechanics, p.tunnelGoals);
     let closed = 0;
     while (getActiveTunnels(state.cubies, level.cubeSize).length) {
       const mouth = getActiveTunnels(state.cubies, level.cubeSize)[0].entry;
