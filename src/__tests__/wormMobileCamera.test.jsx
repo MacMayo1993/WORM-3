@@ -5,6 +5,8 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
 import WormChaseCamera from '../worm/WormChaseCamera.jsx';
+import { victoryViewport } from '../worm/story/victoryFrame.js';
+import { prefersReducedMotion } from '../utils/device.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { FACE_NORMALS, DIR_FORWARD, WORM_LIFT, ROCKET_DURATION, BASE_TAIL_LENGTH, ORB_SEGMENT_GROWTH,
@@ -24,6 +26,7 @@ vi.mock('@react-three/fiber', () => ({
   useFrame: callback => { scene.frame = callback; }
 }));
 vi.mock('../hooks/useIsMobile.js', () => ({ useIsMobile: () => scene.mobile }));
+vi.mock('../utils/device.js', async original => ({ ...(await original()), prefersReducedMotion: vi.fn(() => false) }));
 
 let host, root;
 const ref = current => ({ current });
@@ -64,6 +67,8 @@ function expectCentered(worm, size) {
   expect(ndc.z).toBeLessThan(1);
 }
 beforeEach(() => {
+  victoryViewport.current = null;
+  vi.mocked(prefersReducedMotion).mockReturnValue(false);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); root = createRoot(host);
   scene.mobile = true;
@@ -76,6 +81,53 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount()); host.remove();
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  victoryViewport.current = null;
+});
+
+it.each([2, 3, 4, 15])('keeps the entire size-%i victory orbit inside the clear stage, then restores the camera on retry', size => {
+  const worm = makeWorm(size);
+  render(worm, size); tick();
+  for (const [width, height, bounds] of [
+    [320, 568, { left: .04, top: .02, width: .92, height: .33 }],
+    [430, 850, { left: .04, top: .02, width: .92, height: .45 }],
+    [850, 430, { left: .02, top: .04, width: .48, height: .92 }],
+  ]) {
+    scene.size = { width, height };
+    scene.camera.aspect = width / height;
+    scene.camera.fov = 102; // victory can follow a tunnel
+    scene.camera.updateProjectionMatrix();
+    victoryViewport.current = bounds;
+    useGameStore.setState({ wormGamePhase: 'solved', wormStoryResult: { levelId: 60, stars: 2 } });
+    for (let i = 0; i < 360; i++) tick();
+    const before = scene.camera.position.clone();
+    for (let i = 0; i < 660; i++) {
+      tick();
+      for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+        const ndc = new Vector3(x, y, z).multiplyScalar(size / 2 + .45).project(scene.camera);
+        const screenX = (ndc.x + 1) / 2, screenY = (1 - ndc.y) / 2;
+        expect(screenX).toBeGreaterThan(bounds.left);
+        expect(screenX).toBeLessThan(bounds.left + bounds.width);
+        expect(screenY).toBeGreaterThan(bounds.top);
+        expect(screenY).toBeLessThan(bounds.top + bounds.height);
+      }
+    }
+    expect(scene.camera.position.distanceTo(before)).toBeGreaterThan(1);
+    useGameStore.setState({ wormGamePhase: 'scrambling', wormStoryResult: null });
+    tick();
+    expect(scene.camera.view.enabled).toBe(false);
+  }
+});
+
+it('holds the victory cube still with reduced motion and clears framing on unmount', () => {
+  vi.mocked(prefersReducedMotion).mockReturnValue(true);
+  victoryViewport.current = { left: .04, top: .02, width: .92, height: .4 };
+  useGameStore.setState({ wormGamePhase: 'solved', wormStoryResult: { levelId: 1, stars: 3 } });
+  render(makeWorm(3), 3); tick();
+  const position = scene.camera.position.clone();
+  for (let i = 0; i < 120; i++) tick();
+  expect(scene.camera.position.distanceTo(position)).toBeLessThan(1e-8);
+  act(() => root.render(null));
+  expect(scene.camera.view.enabled).toBe(false);
 });
 
 it.each([[412, 915], [915, 412], [1280, 800]])('keeps the caution-tape pull in view through death and retry at %sx%s', (width, height) => {

@@ -24,26 +24,9 @@
 .story-reward-character { margin:8px 0 16px; }
 /* Keep the rating and navigation visible; the reward area scrolls on short screens. */
 @media(max-width:360px) { .story-reward-grid { gap:8px; }.worm-story-rewards .story-reward-card { padding:6px; }.story-reward-card > strong { font-size:12px; } }
-.story-completion[data-rewards="true"] .story-completion-card { width:min(100%,520px); padding:22px 20px 18px; }
-.story-completion[data-rewards="true"] .story-completion-award { padding-top:16px; }
-.story-completion[data-rewards="true"] .story-completion-star { max-width:70px; }
-.story-completion[data-rewards="true"] p.story-completion-verdict { font-size:22px; min-height:28px; margin:10px 0 6px; }
-@media(min-width:600px) and (max-height:540px) {
-  .story-completion[data-rewards="true"] .story-completion-card { width:min(100%,780px); grid-template-columns:.85fr 1.15fr; grid-template-rows:auto auto 1fr auto; }
-  .story-completion[data-rewards="true"] .story-completion-extras { grid-column:2; grid-row:1 / 5; max-height:none; }
-  .story-completion[data-rewards="true"] .story-completion-actions { grid-column:1; grid-row:4; }
-  .story-completion[data-rewards="true"] .story-completion-star { max-width:54px; }
-  .story-completion[data-rewards="true"] .story-completion-award { padding-top:10px; }
-}
-@media(max-width:599px) and (max-height:700px) {
-  .story-completion[data-rewards="true"] .story-completion-card { padding:16px 14px 12px; }
-  .story-completion[data-rewards="true"] .story-completion-level { font-size:11px; }
-  .story-completion[data-rewards="true"] h2 { font-size:20px; margin:8px 0 4px; }
-  .story-completion[data-rewards="true"] .story-completion-award { padding-top:10px; }
-  .story-completion[data-rewards="true"] .story-completion-star { max-width:48px; }
-  .story-completion[data-rewards="true"] p.story-completion-verdict { font-size:18px; min-height:24px; margin:6px 0 4px; }
-  .story-completion[data-rewards="true"] .story-reward-art { min-height:108px; }
-  .story-completion[data-rewards="true"] .story-reward-art canvas { max-width:96px; }
-  .story-completion[data-rewards="true"] .story-completion-actions { margin-top:8px; }
-  .story-completion[data-rewards="true"] .story-completion-secondary { margin-top:4px; }
+/* The shared compact result layout also applies to reward levels. Only the
+   extras scroll; earning a reward must not cover the victory cube. */
+@media(max-height:700px) {
+  .story-completion .story-reward-art { min-height:108px; }
+  .story-completion .story-reward-art canvas { max-width:96px; }
 }

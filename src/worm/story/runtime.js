@@ -258,7 +258,7 @@ export function storyMetrics(sim, practice, level, state, activeTunnels, delta) 
     alive: sim.alive, elapsed: practice.elapsed, cuts: practice.cuts, peakLength: practice.peakLength,
     // The size goal is the longest body reached this run; deposits shrink the
     // worm afterwards without taking the credit back.
-    bodyLength: practice.peakLength,
+    bodyLength: practice.peakLength, currentLength: Math.floor(sim.tailLength),
     orbs: state.wormSessionOrbs, colors: practice.colors.size, healed: sim.healed, uniqueTunnels: practice.tunnels.size,
     onSurface: sim.phase === 'crawling', healSettled: sim.healPauseT <= 0,
     tailClear: sim.phase === 'crawling' && sim.tunnelPassages.length === 0 && sim.healPauseT <= 0,

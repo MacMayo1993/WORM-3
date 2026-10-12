@@ -85,3 +85,13 @@ it('keeps focus within the result and out of collapsed field notes', () => {
   act(() => primary.focus());
   expect(host.querySelector('details').open).toBe(false);
 });
+it('shows the finished worm size and best length alongside the earned rating', () => {
+  useGameStore.setState({ wormStoryResult: { levelId: 61, stars: 2, finalLength: 10, peakLength: 46 } });
+  act(() => root.render(<StoryResult />));
+  advance(2050);
+  expect(host.querySelector('.story-completion-cube').getAttribute('aria-label')).toBe('Completed cube and your worm');
+  expect(host.querySelector('.story-completion-size').textContent).toContain('Worm length 10 segments');
+  expect(host.querySelector('.story-completion-size').textContent).toContain('Best length 46 segments');
+  expect(host.querySelector('.story-completion-stars').getAttribute('aria-label')).toBe('2 out of 3 stars');
+  expect(host.querySelector('[role="status"]').textContent).toBe('2 stars earned');
+});

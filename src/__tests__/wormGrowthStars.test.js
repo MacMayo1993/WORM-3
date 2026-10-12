@@ -54,12 +54,24 @@ it('keeps peak length through a healing deposit and resets it on retry', () => {
   sim.tailLength = 46;
   expect(storyMetrics(sim, practice, level, state, [], 0.05).peakLength).toBe(46);
   sim.tailLength = 10;
-  expect(storyMetrics(sim, practice, level, state, [], 0.05).peakLength).toBe(46);
+  const afterDeposit = storyMetrics(sim, practice, level, state, [], 0.05);
+  expect(afterDeposit).toMatchObject({ peakLength: 46, currentLength: 10 });
+  expect(storyOutcome(level, { ...completed(level), currentLength: afterDeposit.currentLength, peakLength: afterDeposit.peakLength }))
+    .toMatchObject({ finalLength: 10, peakLength: 46 });
   // A pickup and deposit can occur within the same tick: retain the pickup peak.
   sim.peakTailLength = 49;
   expect(storyMetrics(sim, practice, level, state, [], 0.05).peakLength).toBe(49);
   const retry = stageStory(sim, level.cubeSize, level);
   expect(storyMetrics(sim, retry, level, state, [], 0.05).peakLength).toBe(BASE_TAIL_LENGTH);
+});
+
+it('refreshes the finish offer when the visible worm shrinks below its best length', () => {
+  const level = storyLevel(2), metrics = { ...completed(level), peakLength: 46, currentLength: 30 };
+  const hud = storyHudSnapshot(null, level, metrics, 42, storyOutcome(level, metrics));
+  const smaller = { ...metrics, currentLength: 10 };
+  const next = storyHudSnapshot(hud, level, smaller, 42, storyOutcome(level, smaller));
+  expect(next).not.toBe(hud);
+  expect(storyOutcome(level, next.checklist.finishMetrics)).toMatchObject({ finalLength: 10, peakLength: 46 });
 });
 
 it.each(['glow', 'classic'])('bounds food density and refills all 120 levels with unique pickups (%s)', character => {

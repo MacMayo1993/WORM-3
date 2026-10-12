@@ -1,5 +1,6 @@
 import StoryStarRequirements from './StoryStarRequirements.jsx';
-import React, { Suspense, useEffect, useId, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
+import { victoryViewport } from './victoryFrame.js';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStoreItem } from '../../utils/storeCatalog.js';
@@ -262,12 +263,32 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
   const [ready, setReady] = useState(reducedMotion);
   const [leaving, setLeaving] = useState(false);
   const ref = useRef(null), exitTimer = useRef(null), navigating = useRef(false);
+  const stage = useRef(null);
   const last = level.id === WORM_STORY_LEVELS.at(-1).id, finale = isChapterFinale(level.id);
   const heading = last ? 'Story complete' : finale ? 'Chapter complete' : 'Level complete';
   const primary = last ? 'Levels' : finale ? `Start chapter ${storyChapterId(level.id) + 1}` : 'Next level';
   const stars = Math.max(1, Math.min(3, result.stars));
   const readyAt = STAR_FIRST_MS + (stars - 1) * STAR_STEP_MS + 450;
   const narrative = storyNarrative(level.id);
+  const hasRewards = !!level.reward || !!result.unlockedCharacter || !!result.unlockedModes?.length;
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const rect = stage.current?.getBoundingClientRect();
+      if (!rect?.width || !rect.height) return;
+      victoryViewport.current = { left: rect.left / window.innerWidth, top: rect.top / window.innerHeight,
+        width: rect.width / window.innerWidth, height: rect.height / window.innerHeight };
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(stage.current);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      victoryViewport.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (reducedMotion) { feel('storyComplete'); return; }
@@ -313,9 +334,14 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
     role="dialog" aria-modal="true" aria-labelledby="worm-story-result-title" tabIndex={-1}
     style={{ zIndex: Z.CELEBRATION, fontFamily: UI_FONT, '--result-ready': `${readyAt}ms` }}>
     <div className="story-completion-wave" aria-hidden="true" />
+    <div ref={stage} className="story-completion-cube" role="img" aria-label="Completed cube and your worm" />
     <div className="worm-story-result-sheet story-completion-card">
       <small className="story-completion-level">{chapterLine(level.id)}</small>
       <h2 id="worm-story-result-title">{heading}</h2>
+      <div className="story-completion-size">
+        {Number.isFinite(result.finalLength) && <span>Worm length <strong>{result.finalLength}</strong> segments</span>}
+        {Number.isFinite(result.peakLength) && <span>Best length <strong>{result.peakLength}</strong> segments</span>}
+      </div>
       <div className="story-completion-award">
         <div className="story-completion-sparks" aria-hidden="true">{Array.from({ length: 16 }, (_, i) =>
           <i key={i} style={{ '--spark-angle': `${i * 22.5}deg`, '--spark-delay': `${STAR_FIRST_MS + Math.min(i % 3, stars - 1) * STAR_STEP_MS}ms` }} />)}</div>
@@ -329,6 +355,8 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
         <StoryRewardBurst points={result.points ?? 0} xp={result.xp ?? 0} start={STAR_FIRST_MS + stars * STAR_STEP_MS} still={reducedMotion} />
       </div>
       <div className="story-completion-extras" inert={!ready || leaving ? '' : undefined}>
+        {hasRewards && <details className="story-completion-bonus">
+          <summary>Level rewards</summary>
         {result.unlockedCharacter && <div className="story-completion-unlock story-reward-character">
           <RewardArt item={getStoreItem(`character_${result.unlockedCharacter}`) ?? { type: 'character', characterId: result.unlockedCharacter, label: getWormCharacter(result.unlockedCharacter).label }} ready={ready} />
           <p><span>New worm unlocked</span><strong>{getWormCharacter(result.unlockedCharacter).label}</strong></p>
@@ -337,6 +365,7 @@ function StoryCompletion({ result, level, onNext, onRetry, onLevels }) {
           <span>New mode unlocked</span><strong>{MODE_UNLOCK_LABELS[id]}</strong>
         </p>)}
         <StoryRewardChoices level={level} previewsReady={ready} />
+        </details>}
         {narrative && <details className="story-completion-notes"><summary tabIndex={0}>Mobi’s field notes</summary><StoryMobiNote levelId={level.id} complete /></details>}
       </div>
       <div className="story-completion-actions">
