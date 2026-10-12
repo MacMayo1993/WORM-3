@@ -45,7 +45,9 @@ export function orbPerkInto(out, near, reducedMotion = false) {
 export function beaconPoseInto(out, time, near, arrival = 1, reducedMotion = false) {
   const breathe = reducedMotion ? 0 : Math.sin(time * 2.2) * 0.05;
   out.ringScale = 1 + breathe + 0.12 * near;
-  out.ringIntensity = arrival * (0.55 + 0.45 * near + (reducedMotion ? 0 : Math.sin(time * 2.2) * 0.06));
+  // Far rings stay quiet so the board is not a field of targets; the ones the
+  // worm is closing on light up.
+  out.ringIntensity = arrival * (0.3 + 0.7 * near + (reducedMotion ? 0 : Math.sin(time * 2.2) * 0.06));
   const phase = ((time / PING_PERIOD) % 1 + 1) % 1;
   out.pingVisible = !reducedMotion && near > 0.05 && arrival >= 1;
   out.pingScale = 0.9 + 1.1 * smooth(phase);

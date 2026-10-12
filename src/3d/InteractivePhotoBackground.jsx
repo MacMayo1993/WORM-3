@@ -37,7 +37,25 @@ class SkyBoundary extends React.Component {
   }
 }
 
-function PanoramaSky({ preset, files, rotationSpeed, intensity, visible }) {
+// Calm: during play the panorama is a backdrop, not a picture. It is pulled
+// toward a soft grey-cream so the board's colours carry the contrast instead of
+// competing with a busy photo. 0 leaves the photo untouched (menus).
+const CALM_TINT = [0.93, 0.91, 0.84];
+function calmSky(material, calm) {
+  material.onBeforeCompile = shader => {
+    shader.uniforms.uCalm = { value: calm };
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'uniform float uCalm;\nvoid main() {')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+  float calmLuma = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(calmLuma), uCalm * 0.55);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${CALM_TINT.join(', ')}), uCalm * 0.4);`);
+  };
+  material.customProgramCacheKey = () => `panorama-calm-${calm > 0}`;
+  material.needsUpdate = true;
+}
+
+function PanoramaSky({ preset, files, rotationSpeed, intensity, visible, calm = 0 }) {
   const texture = useEnvironment(files ? { files } : { preset });
   const meshRef = useRef();
 
@@ -74,14 +92,15 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity, visible }) {
       {/* meshBasicMaterial = map.rgb * color, so a scalar colour reproduces the
           drei background's `backgroundIntensity` multiply. depthWrite off keeps
           the skybox from ever occluding the scene. */}
-      <meshBasicMaterial map={skyTexture} side={BackSide} depthWrite={false} color={[intensity, intensity, intensity]} />
+      <meshBasicMaterial key={calm} ref={m => { if (m && calm > 0 && !m.userData.calm) { m.userData.calm = true; calmSky(m, calm); } }}
+        map={skyTexture} side={BackSide} depthWrite={false} color={[intensity, intensity, intensity]} />
     </mesh>
   );
 }
 
 // rotationSpeed defaults to 0 (static): only the main menu / mode-select scene
 // opts into the drift by passing a speed. In-game photo panoramas stay still.
-export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0, intensity = 1.2, blurriness = 0, visible = true }) {
+export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0, intensity = 1.2, blurriness = 0, visible = true, calm = 0 }) {
   return (
     <>
       {/* Reflections / ambient IBL only (no `background`) so the rotating sphere
@@ -90,7 +109,7 @@ export default function InteractivePhotoBackground({ preset, files, rotationSpee
       <SafeEnvironment preset={files ? undefined : preset} files={files} backgroundBlurriness={blurriness} />
       <SkyBoundary>
         <React.Suspense fallback={null}>
-          <PanoramaSky visible={visible} preset={preset} files={files} rotationSpeed={rotationSpeed} intensity={intensity} />
+          <PanoramaSky visible={visible} preset={preset} files={files} rotationSpeed={rotationSpeed} intensity={intensity} calm={calm} />
         </React.Suspense>
       </SkyBoundary>
     </>
