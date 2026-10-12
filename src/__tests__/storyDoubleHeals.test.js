@@ -4,7 +4,7 @@
 // than one per two pairs: four levels asked for more than that, and eight allowed no
 // mistakes at all. And on 3×3/4×4 the two pairs open together sat on one corner cubie,
 // twins on the opposite corner, so finishing one pair meant a planned corner jump onto
-// the other. Passes come from the same chained rides, so the same spare holds for them.
+// the other. Passes come from the same overlapping rides and keep the same spare.
 import { afterEach, describe, it, expect } from 'vitest';
 import { makeWormSim, resetWormSim } from '../worm/healerWorm/wormSim.js';
 import { stageStory, replenishStoryTunnel, storyMouths, storyBodyPath } from '../worm/story/runtime.js';
@@ -31,13 +31,27 @@ describe('double-heal supply', () => {
   });
 
   // A pass is the same move as a double heal: diving into the next pair while the
-  // tail is still in the last. P pairs chain P - 1 times, so the same spare applies.
-  // (Re-entering a pair from its far end also counts, but no level should need it.)
+  // tail is still in the last. On a double-heal level the next pair opens while a heal
+  // rides, so P pairs chain P - 1 times. Anywhere else it waits for every ride to
+  // clear, so pairs overlap only two at a time: floor(P / 2) passes. Either way the
+  // level leaves one spare. (Re-entering a pair from its far end also counts, but no
+  // level should need it.)
+  const passSupply = level => level.mechanics?.multiHeals ? level.target - 1 : Math.floor(level.target / 2);
   it('every pass level allows at least one missed pass', () => {
     for (const level of LEVELS) {
       const need = level.mechanics?.selfPasses ?? 0;
-      if (need) expect(need, `level ${level.id}`).toBeLessThanOrEqual(level.target - 2);
+      if (need) expect(need, `level ${level.id}`).toBeLessThanOrEqual(passSupply(level) - 1);
     }
+  });
+
+  it('a pass level without double heals opens pairs two at a time, as its bound assumes', () => {
+    const level = storyLevel(91);
+    expect(level.mechanics.multiHeals).toBeUndefined();
+    const { size, sim, practice } = stage(level);
+    expect(practice.chainHeals).toBe(false);
+    const cubies = sealFirst(practice.cubies, size);
+    sim.tunnelPassages.push({ heal: { tunnelKey: 'second' } });
+    expect(replenishStoryTunnel(sim, practice, { cubies, animState: null }, size)).toBeNull();
   });
 
   // On a 2×2 or 3×3 every turn sweeps a third of the deck or more, the tunnels sit a
