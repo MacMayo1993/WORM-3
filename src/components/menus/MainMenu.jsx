@@ -1509,6 +1509,32 @@ export const MenuTitleCard = ({ visible }) => (
   </div>
 );
 
+// ─── Backdrop ─────────────────────────────────────────────────────────────────
+// The menu draws over whatever environment the 3D scene happened to load, and
+// those backdrops are bright, busy and mid-tone — the same range the wordmark,
+// the cube and the CTAs live in, which is why nothing separated from anything.
+// This stages the shot: a warm key light behind the cube, a vignette that drops
+// the corners, and a scrim at each end to seat the title and the button stack.
+// Purely presentational, and pointer-transparent, so the cube underneath keeps
+// its tap-to-restyle and shake-to-play behaviour.
+const MenuBackdrop = ({ visible }) => (
+  <div
+    className="worm-menu-backdrop"
+    aria-hidden="true"
+    style={{
+      position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
+      opacity: visible ? 1 : 0,
+      transition: 'opacity 0.9s ease'
+    }}
+  >
+    <div className="worm-menu-stagelight" />
+    <div className="worm-menu-vignette" />
+    <div className="worm-menu-scrim-top" />
+    <div className="worm-menu-scrim-bottom" />
+  </div>
+);
+
+
 // ─── Top bar ──────────────────────────────────────────────────────────────────
 // Who you are and what you have, the way every store game opens: level on the
 // left, wallet and settings on the right.
@@ -1552,6 +1578,7 @@ const MainMenu = ({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
+      <MenuBackdrop visible={titleVisible} />
       <MenuTopBar visible={titleVisible} onSettings={_onSettings} />
       <MenuTitleCard visible={titleVisible} />
       <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
