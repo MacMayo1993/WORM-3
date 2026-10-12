@@ -338,7 +338,7 @@ export const WORM_STORY_NARRATIVE = {
       'Let’s mix it up. Heal the doors, and pass yourself in the Core while you’re at it.',
       'Every time you meet yourself in there, the World Worm sees it happen.',
     ],
-    debrief: 'Twice through, twice polite. The coil in the Core went very still. I think it’s thinking.',
+    debrief: 'Through and back, and polite about it. The coil in the Core went very still. I think it’s thinking.',
   },
   46: {
     briefing: [
@@ -482,7 +482,7 @@ export const WORM_STORY_NARRATIVE = {
       'Lightning charges the doors on this deck.',
       'Ride through and meet yourself in the crackle.',
     ],
-    debrief: 'Five doors, two hellos, three storms bottled. It tried to shock you mid-pass. It missed.',
+    debrief: 'Five doors, one hello, three storms bottled. It tried to shock you mid-pass. It missed.',
   },
   66: {
     briefing: [
@@ -665,9 +665,9 @@ export const WORM_STORY_NARRATIVE = {
   91: {
     briefing: [
       'Inside the Core every deck is a mirror. Watch the far-side window: that’s you, from the other side.',
-      'Pass yourself over and over. Let it see you do it.',
+      'Pass yourself, and again. Let it see you do it.',
     ],
-    debrief: 'Four times you met yourself and smiled. Okay, worms don’t smile. You did the worm version.',
+    debrief: 'Twice you met yourself and smiled. Okay, worms don’t smile. You did the worm version.',
   },
   92: {
     briefing: [
